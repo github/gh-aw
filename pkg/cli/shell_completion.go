@@ -146,12 +146,22 @@ func installBashCompletion(verbose bool, cmd *cobra.Command) error {
 	completionScript := buf.String()
 
 	// Determine installation path
-	var completionPath string
 	homeDir, err := gitutil.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
+	completionPath := bashCompletionInstallPath(homeDir)
+	completionPath, err = writeBashCompletionFile(completionPath, homeDir, completionScript)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Installed bash completion to: "+completionPath))
+	return reportBashCompletionSetup(homeDir, completionPath)
+}
+
+func bashCompletionInstallPath(homeDir string) string {
+	var completionPath string
 	// Try to determine the best location for bash completions
 	if runtime.GOOS == "darwin" {
 		// macOS with Homebrew
@@ -179,36 +189,41 @@ func installBashCompletion(verbose bool, cmd *cobra.Command) error {
 		}
 	}
 
+	return completionPath
+}
+
+func writeBashCompletionFile(completionPath, homeDir, completionScript string) (string, error) {
 	// Create directory if needed (for user-level installations)
 	completionDir := filepath.Dir(completionPath)
 	if strings.HasPrefix(completionDir, homeDir) {
 		// Use restrictive permissions (0750) following principle of least privilege
 		if err := os.MkdirAll(completionDir, constants.DirPermSensitive); err != nil {
-			return fmt.Errorf("create completion directory %q error: %w; check that the parent directory exists and is writable, then retry", completionDir, err)
+			return "", fmt.Errorf("create completion directory %q error: %w; check that the parent directory exists and is writable, then retry", completionDir, err)
 		}
 	}
 
 	// Try to write completion file
 	// Use restrictive permissions (0600) following principle of least privilege
-	err = os.WriteFile(completionPath, []byte(completionScript), constants.FilePermSensitive)
+	err := os.WriteFile(completionPath, []byte(completionScript), constants.FilePermSensitive)
 	if err != nil && strings.HasPrefix(completionPath, "/etc") {
 		// If system-wide installation fails, fall back to user directory
 		shellCompletionLog.Printf("Failed to install system-wide, falling back to user directory: %v", err)
 		completionPath = filepath.Join(homeDir, ".bash_completion.d", "gh-aw")
 		// Use restrictive permissions (0750) following principle of least privilege
 		if err := os.MkdirAll(filepath.Dir(completionPath), constants.DirPermSensitive); err != nil {
-			return fmt.Errorf("create user completion directory %q error: %w; check that the home directory is writable, then retry", filepath.Dir(completionPath), err)
+			return "", fmt.Errorf("create user completion directory %q error: %w; check that the home directory is writable, then retry", filepath.Dir(completionPath), err)
 		}
 		// Use restrictive permissions (0600) following principle of least privilege
 		if err := os.WriteFile(completionPath, []byte(completionScript), constants.FilePermSensitive); err != nil {
-			return fmt.Errorf("write completion file %q error: %w; check that the directory is writable, then retry", completionPath, err)
+			return "", fmt.Errorf("write completion file %q error: %w; check that the directory is writable, then retry", completionPath, err)
 		}
 	} else if err != nil {
-		return fmt.Errorf("write completion file %q error: %w; check that the directory is writable, then retry", completionPath, err)
+		return "", fmt.Errorf("write completion file %q error: %w; check that the directory is writable, then retry", completionPath, err)
 	}
+	return completionPath, nil
+}
 
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Installed bash completion to: "+completionPath))
-
+func reportBashCompletionSetup(homeDir, completionPath string) error {
 	// Check if .bashrc sources completions
 	bashrcPath := filepath.Join(homeDir, ".bashrc")
 	if strings.HasPrefix(completionPath, homeDir) {
@@ -282,6 +297,10 @@ func installZshCompletion(verbose bool, cmd *cobra.Command) error {
 
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Installed zsh completion to: "+completionPath))
 
+	return reportZshCompletionSetup(homeDir, userCompletionDir)
+}
+
+func reportZshCompletionSetup(homeDir, userCompletionDir string) error {
 	// Check if .zshrc configures fpath
 	zshrcPath := filepath.Join(homeDir, ".zshrc")
 	// Clean and validate the path to prevent path traversal
@@ -427,6 +446,11 @@ func uninstallBashCompletion(verbose bool) error {
 		return err
 	}
 
+	possiblePaths := bashCompletionUninstallPaths(homeDir)
+	return removeBashCompletionFiles(possiblePaths)
+}
+
+func bashCompletionUninstallPaths(homeDir string) []string {
 	// Check all possible locations where completion might be installed
 	var possiblePaths []string
 
@@ -451,7 +475,10 @@ func uninstallBashCompletion(verbose bool) error {
 	if runtime.GOOS == "linux" {
 		possiblePaths = append(possiblePaths, constants.BashCompletionGhAwPath)
 	}
+	return possiblePaths
+}
 
+func removeBashCompletionFiles(possiblePaths []string) error {
 	removed := false
 	var lastErr error
 

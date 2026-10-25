@@ -51,6 +51,14 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 
 	frontmatterLog.Printf("Extracting YAML section: %s", key)
 
+	yamlBytes, err := marshalTopLevelYAMLSection(key, value)
+	if err != nil {
+		return ""
+	}
+	return c.finalizeTopLevelYAMLSection(string(yamlBytes), key, frontmatter)
+}
+
+func marshalTopLevelYAMLSection(key string, value any) ([]byte, error) {
 	// Convert the value back to YAML format with field ordering
 	var yamlBytes []byte
 	var err error
@@ -79,7 +87,7 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 		}
 		yamlBytes, err = yaml.MarshalWithOptions(wrappedData, marshalOptions...)
 		if err != nil {
-			return ""
+			return nil, err
 		}
 	} else {
 		// Use standard marshaling for non-map types
@@ -89,11 +97,14 @@ func (c *Compiler) extractTopLevelYAMLSection(frontmatter map[string]any, key st
 		}
 		yamlBytes, err = yaml.MarshalWithOptions(map[string]any{key: value}, marshalOptions...)
 		if err != nil {
-			return ""
+			return nil, err
 		}
 	}
 
-	yamlStr := string(yamlBytes)
+	return yamlBytes, nil
+}
+
+func (c *Compiler) finalizeTopLevelYAMLSection(yamlStr, key string, frontmatter map[string]any) string {
 	// Remove the trailing newline
 	yamlStr = strings.TrimSuffix(yamlStr, "\n")
 

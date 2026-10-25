@@ -134,63 +134,14 @@ func removeJavaScriptCommentsFromLine(line string, inBlockComment *bool) string 
 			beforeSlash := string(runes[:i])
 			if !isInsideStringLiteral(beforeSlash) && !isInsideRegexLiteral(beforeSlash) && canStartRegexLiteral(beforeSlash) {
 				// This is likely a regex literal
-				result.WriteRune(runes[i]) // Write the opening /
-				i++
-
-				// Process inside regex literal
-				for i < len(runes) {
-					if runes[i] == '/' {
-						// Check if it's escaped
-						escapeCount := 0
-						j := i - 1
-						for j >= 0 && runes[j] == '\\' {
-							escapeCount++
-							j--
-						}
-						if escapeCount%2 == 0 {
-							// Not escaped, end of regex
-							result.WriteRune(runes[i]) // Write the closing /
-							i++
-							// Skip regex flags (g, i, m, etc.)
-							for i < len(runes) && (runes[i] >= 'a' && runes[i] <= 'z' || runes[i] >= 'A' && runes[i] <= 'Z') {
-								result.WriteRune(runes[i])
-								i++
-							}
-							break
-						}
-					}
-					result.WriteRune(runes[i])
-					i++
-				}
+				i = appendJavaScriptRegexLiteral(&result, runes, i)
 				continue
 			}
 		}
 
 		// Check for string literals
 		if runes[i] == '"' || runes[i] == '\'' || runes[i] == '`' {
-			quote := runes[i]
-			result.WriteRune(runes[i])
-			i++
-
-			// Process inside string literal
-			for i < len(runes) {
-				result.WriteRune(runes[i])
-				if runes[i] == quote {
-					// Check if it's escaped
-					escapeCount := 0
-					j := i - 1
-					for j >= 0 && runes[j] == '\\' {
-						escapeCount++
-						j--
-					}
-					if escapeCount%2 == 0 {
-						// Not escaped, end of string
-						i++
-						break
-					}
-				}
-				i++
-			}
+			i = appendJavaScriptStringLiteral(&result, runes, i)
 			continue
 		}
 
@@ -199,6 +150,48 @@ func removeJavaScriptCommentsFromLine(line string, inBlockComment *bool) string 
 	}
 
 	return result.String()
+}
+
+func javaScriptRuneEscaped(runes []rune, i int) bool {
+	escapeCount := 0
+	for j := i - 1; j >= 0 && runes[j] == '\\'; j-- {
+		escapeCount++
+	}
+	return escapeCount%2 != 0
+}
+
+func appendJavaScriptRegexLiteral(result *strings.Builder, runes []rune, i int) int {
+	result.WriteRune(runes[i])
+	i++
+	for i < len(runes) {
+		if runes[i] == '/' && !javaScriptRuneEscaped(runes, i) {
+			result.WriteRune(runes[i])
+			i++
+			for i < len(runes) && (runes[i] >= 'a' && runes[i] <= 'z' || runes[i] >= 'A' && runes[i] <= 'Z') {
+				result.WriteRune(runes[i])
+				i++
+			}
+			break
+		}
+		result.WriteRune(runes[i])
+		i++
+	}
+	return i
+}
+
+func appendJavaScriptStringLiteral(result *strings.Builder, runes []rune, i int) int {
+	quote := runes[i]
+	result.WriteRune(runes[i])
+	i++
+	for i < len(runes) {
+		result.WriteRune(runes[i])
+		if runes[i] == quote && !javaScriptRuneEscaped(runes, i) {
+			i++
+			break
+		}
+		i++
+	}
+	return i
 }
 
 // isInsideStringLiteral checks if we're currently inside a string literal
@@ -213,27 +206,13 @@ func isInsideStringLiteral(text string) bool {
 		switch runes[i] {
 		case '\'':
 			if !inDoubleQuote && !inBacktick {
-				// Check if escaped
-				escapeCount := 0
-				j := i - 1
-				for j >= 0 && runes[j] == '\\' {
-					escapeCount++
-					j--
-				}
-				if escapeCount%2 == 0 {
+				if !javaScriptRuneEscaped(runes, i) {
 					inSingleQuote = !inSingleQuote
 				}
 			}
 		case '"':
 			if !inSingleQuote && !inBacktick {
-				// Check if escaped
-				escapeCount := 0
-				j := i - 1
-				for j >= 0 && runes[j] == '\\' {
-					escapeCount++
-					j--
-				}
-				if escapeCount%2 == 0 {
+				if !javaScriptRuneEscaped(runes, i) {
 					inDoubleQuote = !inDoubleQuote
 				}
 			}
@@ -260,27 +239,13 @@ func isInsideRegexLiteral(text string) bool {
 		switch runes[i] {
 		case '\'':
 			if !inDoubleQuote && !inBacktick && !inRegex {
-				// Check if escaped
-				escapeCount := 0
-				j := i - 1
-				for j >= 0 && runes[j] == '\\' {
-					escapeCount++
-					j--
-				}
-				if escapeCount%2 == 0 {
+				if !javaScriptRuneEscaped(runes, i) {
 					inSingleQuote = !inSingleQuote
 				}
 			}
 		case '"':
 			if !inSingleQuote && !inBacktick && !inRegex {
-				// Check if escaped
-				escapeCount := 0
-				j := i - 1
-				for j >= 0 && runes[j] == '\\' {
-					escapeCount++
-					j--
-				}
-				if escapeCount%2 == 0 {
+				if !javaScriptRuneEscaped(runes, i) {
 					inDoubleQuote = !inDoubleQuote
 				}
 			}
@@ -290,14 +255,7 @@ func isInsideRegexLiteral(text string) bool {
 			}
 		case '/':
 			if !inSingleQuote && !inDoubleQuote && !inBacktick {
-				// Check if escaped
-				escapeCount := 0
-				j := i - 1
-				for j >= 0 && runes[j] == '\\' {
-					escapeCount++
-					j--
-				}
-				if escapeCount%2 == 0 {
+				if !javaScriptRuneEscaped(runes, i) {
 					if inRegex {
 						// End of regex
 						inRegex = false

@@ -32,6 +32,15 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 		fmt.Sprintf("Workflow Forecast — weekly & monthly projections (based on last %d days of history)", config.Days)))
 	fmt.Fprintln(os.Stderr, "")
 
+	rows, anyUnreliable := buildForecastTableRows(output)
+	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
+	fmt.Fprintln(os.Stderr, "")
+	renderForecastDetailSections(output, config)
+	renderForecastTableNotes(anyUnreliable)
+	return nil
+}
+
+func buildForecastTableRows(output ForecastResult) ([]forecastTableRow, bool) {
 	anyUnreliable := false
 	var totalWeeklyP50, totalMonthlyP50 float64
 	var totalRuns int
@@ -84,9 +93,10 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 		})
 	}
 
-	fmt.Fprint(os.Stderr, console.RenderStruct(rows))
-	fmt.Fprintln(os.Stderr, "")
+	return rows, anyUnreliable
+}
 
+func renderForecastDetailSections(output ForecastResult, config ForecastConfig) {
 	// Show detailed per-run samples section only when specific workflows were requested.
 	if len(config.WorkflowIDs) > 0 {
 		printRunSamplesSection(output.Workflows)
@@ -103,7 +113,9 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 	if output.EvalMode {
 		printEvalBreakdown(output.Workflows)
 	}
+}
 
+func renderForecastTableNotes(anyUnreliable bool) {
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 		"Cost/projection figures are AI Credits (AIC) — the gh-aw cost metric."))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
@@ -116,7 +128,6 @@ func renderForecastTable(output ForecastResult, config ForecastConfig) error {
 		"All forecasts are estimates derived from historical samples and may be inaccurate."))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(
 		fmt.Sprintf("Run '%s forecast --json' for full output including P10/P90 confidence intervals.", string(constants.CLIExtensionPrefix))))
-	return nil
 }
 
 // printRunSamplesSection prints a detailed table of the sampled runs used in the forecast,

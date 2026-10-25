@@ -51,43 +51,51 @@ func renderLogsTSVToWriter(w io.Writer, data LogsData) {
 
 	// Rows
 	for _, r := range data.Runs {
-		conclusion := r.Conclusion
-		if conclusion == "" {
-			conclusion = r.Status
-		}
-		duration := r.Duration
-		if duration == "" {
-			duration = "-"
-		}
-		classification := r.Classification
-		if classification == "" {
-			classification = "-"
-		}
-		// Shorten URL to just the run path for density
-		url := r.URL
-		if idx := strings.Index(url, "/actions/runs/"); idx > 0 {
-			url = url[idx:]
-		}
-
-		fields := []string{
-			strconv.FormatInt(r.RunID, 10),
-			r.WorkflowName,
-			r.EngineID,
-			conclusion,
-			duration,
-			strconv.Itoa(r.TokenUsage),
-			fmt.Sprintf("%.3f", r.AIC),
-			strconv.Itoa(r.Turns),
-			strconv.Itoa(r.ErrorCount),
-			r.Event,
-			r.Branch,
-			r.CreatedAt.Format("2006-01-02T15:04"),
-			classification,
-			url,
-		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
+		renderLogsTSVRow(w, r)
 	}
 
+	renderLogsTSVAnnotations(w, data)
+}
+
+func renderLogsTSVRow(w io.Writer, r RunData) {
+	conclusion := r.Conclusion
+	if conclusion == "" {
+		conclusion = r.Status
+	}
+	duration := r.Duration
+	if duration == "" {
+		duration = "-"
+	}
+	classification := r.Classification
+	if classification == "" {
+		classification = "-"
+	}
+	// Shorten URL to just the run path for density
+	url := r.URL
+	if idx := strings.Index(url, "/actions/runs/"); idx > 0 {
+		url = url[idx:]
+	}
+
+	fields := []string{
+		strconv.FormatInt(r.RunID, 10),
+		r.WorkflowName,
+		r.EngineID,
+		conclusion,
+		duration,
+		strconv.Itoa(r.TokenUsage),
+		fmt.Sprintf("%.3f", r.AIC),
+		strconv.Itoa(r.Turns),
+		strconv.Itoa(r.ErrorCount),
+		r.Event,
+		r.Branch,
+		r.CreatedAt.Format("2006-01-02T15:04"),
+		classification,
+		url,
+	}
+	fmt.Fprintln(w, strings.Join(fields, "\t"))
+}
+
+func renderLogsTSVAnnotations(w io.Writer, data LogsData) {
 	// Append observability insights as comments (high signal density)
 	if len(data.Observability) > 0 {
 		fmt.Fprintln(w, "# insights:")
@@ -139,49 +147,7 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 	fmt.Fprintln(w, strings.Join(headers, "\t"))
 
 	for _, r := range data.Runs {
-		conclusion := r.Conclusion
-		if conclusion == "" {
-			conclusion = r.Status
-		}
-		duration := r.Duration
-		if duration == "" {
-			duration = "-"
-		}
-		tbt := r.AvgTimeBetweenTurns
-		if tbt == "" {
-			tbt = "-"
-		}
-		classification := r.Classification
-		if classification == "" {
-			classification = "-"
-		}
-		displayTitle := stringutil.Truncate(r.DisplayTitle, 50)
-
-		fields := []string{
-			strconv.FormatInt(r.RunID, 10),
-			r.WorkflowName,
-			r.EngineID,
-			conclusion,
-			duration,
-			strconv.Itoa(r.TokenUsage),
-			fmt.Sprintf("%.3f", r.AIC),
-			strconv.Itoa(r.Turns),
-			strconv.Itoa(r.ErrorCount),
-			strconv.Itoa(r.WarningCount),
-			strconv.Itoa(r.MissingToolCount),
-			strconv.Itoa(r.MissingDataCount),
-			strconv.Itoa(r.GitHubAPICalls),
-			r.Event,
-			r.Branch,
-			r.Actor,
-			r.CreatedAt.Format("2006-01-02T15:04"),
-			tbt,
-			classification,
-			fmt.Sprintf("%.0f", r.ActionMinutes),
-			displayTitle,
-			r.URL,
-		}
-		fmt.Fprintln(w, strings.Join(fields, "\t"))
+		renderLogsTSVVerboseRow(w, r)
 	}
 
 	if len(data.Observability) > 0 {
@@ -190,6 +156,52 @@ func renderLogsTSVVerboseToWriter(w io.Writer, data LogsData) {
 			fmt.Fprintf(w, "# [%s] %s: %s\n", obs.Severity, obs.Title, obs.Summary)
 		}
 	}
+}
+
+func renderLogsTSVVerboseRow(w io.Writer, r RunData) {
+	conclusion := r.Conclusion
+	if conclusion == "" {
+		conclusion = r.Status
+	}
+	duration := r.Duration
+	if duration == "" {
+		duration = "-"
+	}
+	tbt := r.AvgTimeBetweenTurns
+	if tbt == "" {
+		tbt = "-"
+	}
+	classification := r.Classification
+	if classification == "" {
+		classification = "-"
+	}
+	displayTitle := stringutil.Truncate(r.DisplayTitle, 50)
+
+	fields := []string{
+		strconv.FormatInt(r.RunID, 10),
+		r.WorkflowName,
+		r.EngineID,
+		conclusion,
+		duration,
+		strconv.Itoa(r.TokenUsage),
+		fmt.Sprintf("%.3f", r.AIC),
+		strconv.Itoa(r.Turns),
+		strconv.Itoa(r.ErrorCount),
+		strconv.Itoa(r.WarningCount),
+		strconv.Itoa(r.MissingToolCount),
+		strconv.Itoa(r.MissingDataCount),
+		strconv.Itoa(r.GitHubAPICalls),
+		r.Event,
+		r.Branch,
+		r.Actor,
+		r.CreatedAt.Format("2006-01-02T15:04"),
+		tbt,
+		classification,
+		fmt.Sprintf("%.0f", r.ActionMinutes),
+		displayTitle,
+		r.URL,
+	}
+	fmt.Fprintln(w, strings.Join(fields, "\t"))
 }
 
 // renderLogsTSVVerbose outputs a more detailed TSV with additional columns to os.Stdout.

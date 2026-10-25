@@ -82,6 +82,10 @@ func validateIntegrityReactions(tools *Tools, workflowName string, data *Workflo
 		return errors.New("guard policy feature 'integrity-reactions' requires 'github.min-integrity' to be set. Expected one of: 'unapproved', 'approved', 'merged'. Example:\ntools:\n  github:\n    min-integrity: approved")
 	}
 
+	return validateIntegrityReactionValues(github, workflowName)
+}
+
+func validateIntegrityReactionValues(github *GitHubToolConfig, workflowName string) error {
 	// Validate endorsement-reactions values (if explicitly provided)
 	for i, reaction := range github.EndorsementReactions {
 		if !validReactionContents[reaction] {
@@ -99,13 +103,13 @@ func validateIntegrityReactions(tools *Tools, workflowName string, data *Workflo
 	}
 
 	// Validate disapproval-integrity value
-	if hasDisapprovalIntegrity && !validDisapprovalIntegrityLevels[github.DisapprovalIntegrity] {
+	if github.DisapprovalIntegrity != "" && !validDisapprovalIntegrityLevels[github.DisapprovalIntegrity] {
 		toolsValidationLog.Printf("Invalid disapproval-integrity value '%s' in workflow: %s", github.DisapprovalIntegrity, workflowName)
 		return fmt.Errorf("guard policy 'disapproval-integrity' value '%s' is not supported. Expected one of: 'none', 'unapproved', 'approved', 'merged'. Example: disapproval-integrity: approved", github.DisapprovalIntegrity)
 	}
 
 	// Validate endorser-min-integrity value
-	if hasEndorserMinIntegrity && !validEndorserMinIntegrityLevels[github.EndorserMinIntegrity] {
+	if github.EndorserMinIntegrity != "" && !validEndorserMinIntegrityLevels[github.EndorserMinIntegrity] {
 		toolsValidationLog.Printf("Invalid endorser-min-integrity value '%s' in workflow: %s", github.EndorserMinIntegrity, workflowName)
 		return fmt.Errorf("guard policy 'endorser-min-integrity' value '%s' is not supported. Expected one of: 'unapproved', 'approved', 'merged'. Example: endorser-min-integrity: approved", github.EndorserMinIntegrity)
 	}

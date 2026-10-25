@@ -157,6 +157,10 @@ func simplifyDataSchemaNode(raw any, path string, allowShorthand bool) (map[stri
 		return nil, fmt.Errorf("%s: unsupported keyword %q", path, key)
 	}
 
+	return simplifyExplicitDataSchemaNode(node, path)
+}
+
+func simplifyExplicitDataSchemaNode(node map[string]any, path string) (map[string]any, error) {
 	result := make(map[string]any)
 	typeName, _ := node["type"].(string)
 	if typeName == "" {
@@ -197,75 +201,94 @@ func simplifyDataSchemaNode(raw any, path string, allowShorthand bool) (map[stri
 		result["enum"] = enumList
 	}
 
+	if err := simplifyDataSchemaTypeFields(node, result, path, typeName); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func simplifyObjectDataSchema(node, result map[string]any, path string) error {
+	propertiesVal, hasProperties := node["properties"]
+	if !hasProperties {
+		return fmt.Errorf("%s.properties: is required for object schemas", path)
+	}
+	propertiesMap, ok := propertiesVal.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s.properties: must be an object mapping property names to schemas. Example:\nproperties:\n  verdict:\n    type: string", path)
+	}
+	normalizedProperties := make(map[string]any, len(propertiesMap))
+	for key, propertySchema := range propertiesMap {
+		normalizedProperty, err := simplifyDataSchemaNode(propertySchema, fmt.Sprintf("%s.properties.%s", path, key), true)
+		if err != nil {
+			return err
+		}
+		normalizedProperties[key] = normalizedProperty
+	}
+	result["properties"] = normalizedProperties
+	if err := simplifyObjectDataSchemaRequired(node, result, normalizedProperties, path); err != nil {
+		return err
+	}
+	if additionalProps, exists := node["additionalProperties"]; exists {
+		additionalPropsBool, ok := additionalProps.(bool)
+		if !ok {
+			return fmt.Errorf("%s.additionalProperties: must be boolean. Example:\nadditionalProperties: false", path)
+		}
+		if additionalPropsBool {
+			return fmt.Errorf("%s.additionalProperties: must be false for OpenAI Codex structured outputs compatibility. Example:\nadditionalProperties: false", path)
+		}
+		result["additionalProperties"] = false
+	} else {
+		result["additionalProperties"] = false
+	}
+	return nil
+}
+
+func simplifyObjectDataSchemaRequired(node, result, normalizedProperties map[string]any, path string) error {
+	requiredSet := make(map[string]struct{}, len(normalizedProperties))
+	if requiredVal, exists := node["required"]; exists {
+		requiredItems, ok := requiredVal.([]any)
+		if !ok {
+			return fmt.Errorf("%s.required: must be an array of strings naming declared properties. Example:\nrequired: [\"verdict\"]", path)
+		}
+		for i, requiredItem := range requiredItems {
+			requiredName, ok := requiredItem.(string)
+			if !ok || strings.TrimSpace(requiredName) == "" {
+				return fmt.Errorf("%s.required[%d]: must be a non-empty string naming a declared property. Example:\nrequired: [\"verdict\"]", path, i)
+			}
+			if _, exists := normalizedProperties[requiredName]; !exists {
+				return fmt.Errorf("%s.required[%d]: unknown property %q", path, i, requiredName)
+			}
+			requiredSet[requiredName] = struct{}{}
+		}
+	}
+	// OpenAI Codex structured outputs compatibility:
+	// - require all object properties at every object level
+	// - represent optionality explicitly in schema types instead of omitting from required
+	// To keep output deterministic, store names in lexical order.
+	requiredNames := make([]string, 0, len(normalizedProperties))
+	for propertyName := range normalizedProperties {
+		requiredSet[propertyName] = struct{}{}
+	}
+	for requiredName := range requiredSet {
+		requiredNames = append(requiredNames, requiredName)
+	}
+	sort.Strings(requiredNames)
+	result["required"] = requiredNames
+	return nil
+}
+
+func simplifyDataSchemaTypeFields(node, result map[string]any, path, typeName string) error {
 	switch typeName {
 	case "object":
-		propertiesVal, hasProperties := node["properties"]
-		if !hasProperties {
-			return nil, fmt.Errorf("%s.properties: is required for object schemas", path)
-		}
-		propertiesMap, ok := propertiesVal.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("%s.properties: must be an object mapping property names to schemas. Example:\nproperties:\n  verdict:\n    type: string", path)
-		}
-		normalizedProperties := make(map[string]any, len(propertiesMap))
-		for key, propertySchema := range propertiesMap {
-			normalizedProperty, err := simplifyDataSchemaNode(propertySchema, fmt.Sprintf("%s.properties.%s", path, key), true)
-			if err != nil {
-				return nil, err
-			}
-			normalizedProperties[key] = normalizedProperty
-		}
-		result["properties"] = normalizedProperties
-		requiredSet := make(map[string]struct{}, len(normalizedProperties))
-		if requiredVal, exists := node["required"]; exists {
-			requiredItems, ok := requiredVal.([]any)
-			if !ok {
-				return nil, fmt.Errorf("%s.required: must be an array of strings naming declared properties. Example:\nrequired: [\"verdict\"]", path)
-			}
-			for i, requiredItem := range requiredItems {
-				requiredName, ok := requiredItem.(string)
-				if !ok || strings.TrimSpace(requiredName) == "" {
-					return nil, fmt.Errorf("%s.required[%d]: must be a non-empty string naming a declared property. Example:\nrequired: [\"verdict\"]", path, i)
-				}
-				if _, exists := normalizedProperties[requiredName]; !exists {
-					return nil, fmt.Errorf("%s.required[%d]: unknown property %q", path, i, requiredName)
-				}
-				requiredSet[requiredName] = struct{}{}
-			}
-		}
-		// OpenAI Codex structured outputs compatibility:
-		// - require all object properties at every object level
-		// - represent optionality explicitly in schema types instead of omitting from required
-		// To keep output deterministic, store names in lexical order.
-		requiredNames := make([]string, 0, len(normalizedProperties))
-		for propertyName := range normalizedProperties {
-			requiredSet[propertyName] = struct{}{}
-		}
-		for requiredName := range requiredSet {
-			requiredNames = append(requiredNames, requiredName)
-		}
-		sort.Strings(requiredNames)
-		result["required"] = requiredNames
-		if additionalProps, exists := node["additionalProperties"]; exists {
-			additionalPropsBool, ok := additionalProps.(bool)
-			if !ok {
-				return nil, fmt.Errorf("%s.additionalProperties: must be boolean. Example:\nadditionalProperties: false", path)
-			}
-			if additionalPropsBool {
-				return nil, fmt.Errorf("%s.additionalProperties: must be false for OpenAI Codex structured outputs compatibility. Example:\nadditionalProperties: false", path)
-			}
-			result["additionalProperties"] = false
-		} else {
-			result["additionalProperties"] = false
-		}
+		return simplifyObjectDataSchema(node, result, path)
 	case "array":
 		items, exists := node["items"]
 		if !exists {
-			return nil, fmt.Errorf("%s.items: is required for array schemas", path)
+			return fmt.Errorf("%s.items: is required for array schemas", path)
 		}
 		normalizedItems, err := simplifyDataSchemaNode(items, path+".items", true)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		result["items"] = normalizedItems
 	case "string":
@@ -287,7 +310,7 @@ func simplifyDataSchemaNode(raw any, path string, allowShorthand bool) (map[stri
 		}
 	}
 
-	return result, nil
+	return nil
 }
 
 func hasDataSchemaKeywords(node map[string]any) bool {

@@ -93,6 +93,11 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write
 		return fmt.Errorf("failed to write dispatcher skill: %w", err)
 	}
 
+	reportDispatcherSkillWrite(targetPath, fileExists, verbose)
+	return nil
+}
+
+func reportDispatcherSkillWrite(targetPath string, fileExists, verbose bool) {
 	if !fileExists {
 		copilotAgentsLog.Printf("Created dispatcher skill: %s", targetPath)
 		if verbose {
@@ -105,7 +110,6 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, write
 		}
 	}
 
-	return nil
 }
 
 // ensureAgenticWorkflowsAgent ensures that .github/agents/agentic-workflows.md contains the custom agent.

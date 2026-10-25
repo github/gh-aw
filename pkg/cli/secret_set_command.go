@@ -66,51 +66,7 @@ The secret value can be provided in three ways:
   gh aw secrets set MY_SECRET --value-from-env MY_TOKEN --repo myorg/myrepo`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			secretName := args[0]
-			secretSetLog.Printf("Setting repository secret: name=%s", secretName)
-
-			// Determine target repository: explicit --repo or current repo by default
-			flagRepo, _ := cmd.Flags().GetString("repo")
-			var repoSlug string
-			if flagRepo != "" {
-				repoSlug = flagRepo
-				secretSetLog.Printf("Using explicit repository: %s", repoSlug)
-			} else {
-				var err error
-				repoSlug, err = GetCurrentRepoSlug()
-				if err != nil {
-					secretSetLog.Printf("Failed to detect current repository: %v", err)
-					return fmt.Errorf("failed to detect current repository: %w", err)
-				}
-				secretSetLog.Printf("Using current repository: %s", repoSlug)
-			}
-
-			owner, repo, splitErr := repoutil.SplitRepoSlug(repoSlug)
-			if splitErr != nil {
-				return fmt.Errorf("invalid repository slug %q: %w", repoSlug, splitErr)
-			}
-
-			// Create GitHub REST client using go-gh
-			client, err := api.NewRESTClient(secretSetClientOptions(flagAPIBase))
-			if err != nil {
-				return fmt.Errorf("cannot create GitHub client: %w", err)
-			}
-
-			secretValue, err := resolveSecretValueForSet(flagValueEnv, flagValue)
-			if err != nil {
-				secretSetLog.Printf("Failed to resolve secret value: %v", err)
-				return fmt.Errorf("cannot resolve secret value: %w", err)
-			}
-
-			secretSetLog.Print("Encrypting and uploading secret to GitHub")
-			if err := setRepoSecret(client, owner, repo, secretName, secretValue); err != nil {
-				secretSetLog.Printf("Failed to set secret: %v", err)
-				return fmt.Errorf("failed to set secret: %w", err)
-			}
-
-			secretSetLog.Printf("Successfully set secret %s for %s/%s", secretName, owner, repo)
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Secret %s updated for %s/%s", secretName, owner, repo)))
-			return nil
+			return runSecretsSetCommand(cmd, args, flagValue, flagValueEnv, flagAPIBase)
 		},
 	}
 
@@ -120,6 +76,54 @@ The secret value can be provided in three ways:
 	cmd.Flags().StringVar(&flagAPIBase, "api-url", "", "GitHub API base URL (default: https://api.github.com or $GITHUB_API_URL)")
 
 	return cmd
+}
+
+func runSecretsSetCommand(cmd *cobra.Command, args []string, flagValue, flagValueEnv, flagAPIBase string) error {
+	secretName := args[0]
+	secretSetLog.Printf("Setting repository secret: name=%s", secretName)
+
+	// Determine target repository: explicit --repo or current repo by default
+	flagRepo, _ := cmd.Flags().GetString("repo")
+	var repoSlug string
+	if flagRepo != "" {
+		repoSlug = flagRepo
+		secretSetLog.Printf("Using explicit repository: %s", repoSlug)
+	} else {
+		var err error
+		repoSlug, err = GetCurrentRepoSlug()
+		if err != nil {
+			secretSetLog.Printf("Failed to detect current repository: %v", err)
+			return fmt.Errorf("failed to detect current repository: %w", err)
+		}
+		secretSetLog.Printf("Using current repository: %s", repoSlug)
+	}
+
+	owner, repo, splitErr := repoutil.SplitRepoSlug(repoSlug)
+	if splitErr != nil {
+		return fmt.Errorf("invalid repository slug %q: %w", repoSlug, splitErr)
+	}
+
+	// Create GitHub REST client using go-gh
+	client, err := api.NewRESTClient(secretSetClientOptions(flagAPIBase))
+	if err != nil {
+		return fmt.Errorf("cannot create GitHub client: %w", err)
+	}
+
+	secretValue, err := resolveSecretValueForSet(flagValueEnv, flagValue)
+	if err != nil {
+		secretSetLog.Printf("Failed to resolve secret value: %v", err)
+		return fmt.Errorf("cannot resolve secret value: %w", err)
+	}
+
+	secretSetLog.Print("Encrypting and uploading secret to GitHub")
+	if err := setRepoSecret(client, owner, repo, secretName, secretValue); err != nil {
+		secretSetLog.Printf("Failed to set secret: %v", err)
+		return fmt.Errorf("failed to set secret: %w", err)
+	}
+
+	secretSetLog.Printf("Successfully set secret %s for %s/%s", secretName, owner, repo)
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Secret %s updated for %s/%s", secretName, owner, repo)))
+	return nil
 }
 
 func secretSetClientOptions(apiBase string) api.ClientOptions {

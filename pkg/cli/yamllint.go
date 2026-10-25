@@ -75,7 +75,10 @@ func runYamllintOnFiles(lockFiles []string, verbose bool, strict bool) error {
 	cmd.Stderr = &stderr
 
 	err = cmd.Run()
+	return handleYamllintResult(err, &stdout, &stderr, lockFiles, strict)
+}
 
+func handleYamllintResult(err error, stdout, stderr *bytes.Buffer, lockFiles []string, strict bool) error {
 	totalIssues, parseErr := parseAndDisplayYamllintOutput(stdout.String())
 	if parseErr != nil {
 		yamllintLog.Printf("Failed to parse yamllint output: %v", parseErr)

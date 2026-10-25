@@ -116,42 +116,41 @@ func generateSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubAction
 	runtimeSetupLog.Printf("Generating setup step for runtime: %s, version=%s, if=%s", runtime.ID, version, req.IfCondition)
 
 	if runtime.ID == "gh-aw" {
-		if version == "" {
-			version = getDefaultGhAWRuntimeVersion()
-		}
+		return generateGhAwRuntimeSetupStep(req, data, version)
+	}
+	return generateRuntimeActionSetupStep(req, version)
+}
 
-		step, err := generateGhAwSetupStep(ghAwSetupStepConfig{
-			actionMode:           actionModeForRuntimeSetup(IsRelease()),
-			ifCondition:          req.IfCondition,
-			cliVersion:           version,
-			actionRepo:           runtime.ActionRepo,
-			fallbackActionRefTag: version,
-			workflowData:         data,
-			withFields:           mergeRuntimeWithFields(req),
-		})
-		if err != nil {
-			runtimeStepGeneratorLog.Printf("Failed to resolve pinned setup-cli action reference for %s@%s: %v", runtime.ActionRepo, version, err)
-		}
-		return step
+func generateGhAwRuntimeSetupStep(req *RuntimeRequirement, data *WorkflowData, version string) GitHubActionStep {
+	runtime := req.Runtime
+	if version == "" {
+		version = getDefaultGhAWRuntimeVersion()
 	}
 
+	step, err := generateGhAwSetupStep(ghAwSetupStepConfig{
+		actionMode:           actionModeForRuntimeSetup(IsRelease()),
+		ifCondition:          req.IfCondition,
+		cliVersion:           version,
+		actionRepo:           runtime.ActionRepo,
+		fallbackActionRefTag: version,
+		workflowData:         data,
+		withFields:           mergeRuntimeWithFields(req),
+	})
+	if err != nil {
+		runtimeStepGeneratorLog.Printf("Failed to resolve pinned setup-cli action reference for %s@%s: %v", runtime.ActionRepo, version, err)
+	}
+	return step
+}
+
+func generateRuntimeActionSetupStep(req *RuntimeRequirement, version string) GitHubActionStep {
+	runtime := req.Runtime
 	// Use default version if none specified.
 	if version == "" {
 		version = runtime.DefaultVersion
 	}
 
 	// Use SHA-pinned action reference for security if available
-	actionRef := getActionPin(runtime.ActionRepo)
-
-	// If no pin exists (custom action repo), use the action repo with its version
-	if actionRef == "" {
-		if runtime.ActionVersion != "" {
-			actionRef = fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
-		} else {
-			// Fallback to just the repo name (shouldn't happen in practice)
-			actionRef = runtime.ActionRepo
-		}
-	}
+	actionRef := runtimeSetupActionReference(req)
 
 	step := GitHubActionStep{
 		"      - name: Setup " + runtime.Name,
@@ -195,6 +194,19 @@ func generateSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubAction
 	}
 
 	return appendSortedWithFieldEntries(step, withFields)
+}
+
+func runtimeSetupActionReference(req *RuntimeRequirement) string {
+	runtime := req.Runtime
+	actionRef := getActionPin(runtime.ActionRepo)
+	if actionRef == "" {
+		if runtime.ActionVersion != "" {
+			actionRef = fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
+		} else {
+			actionRef = runtime.ActionRepo
+		}
+	}
+	return actionRef
 }
 
 func actionModeForRuntimeSetup(isRelease bool) ActionMode {

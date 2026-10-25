@@ -43,10 +43,7 @@ func normalizeBlankLines(yamlContent string) string {
 	// structural line, so runs longer than maxConsecutiveBlankLines can be
 	// collapsed outside block scalars.
 	blankRun := 0
-	inBlockScalar := false
-	pendingBlockScalar := false
-	blockScalarHeaderIndent := 0
-	blockScalarIndent := 0
+	var scalar yamlBlankLineScalarState
 	pos := 0
 	for pos < len(yamlContent) {
 		// Find the end of the current line.
@@ -60,57 +57,16 @@ func normalizeBlankLines(yamlContent string) string {
 
 		processStructuralLine := true
 		trimmed := strings.TrimRight(line, " \t")
-		if pendingBlockScalar || inBlockScalar {
-			if trimmed == "" {
-				// Whitespace-only lines inside block scalars are still semantically
-				// blank, so emit them as empty lines but never cap the run.
-				b.WriteByte('\n')
-				processStructuralLine = false
-			} else {
-				lineIndent := countLeadingSpaces(line)
-				if pendingBlockScalar {
-					if lineIndent <= blockScalarHeaderIndent {
-						pendingBlockScalar = false
-					} else {
-						blockScalarIndent = lineIndent
-						inBlockScalar = true
-						pendingBlockScalar = false
-					}
-				}
-				if inBlockScalar {
-					if lineIndent < blockScalarIndent {
-						inBlockScalar = false
-					} else {
-						b.WriteString(line)
-						b.WriteByte('\n')
-						lastNonBlankEnd = b.Len()
-						processStructuralLine = false
-					}
-				}
+		if scalar.writeLine(&b, line, trimmed) {
+			processStructuralLine = false
+			if trimmed != "" {
+				lastNonBlankEnd = b.Len()
 			}
 		}
 
 		if processStructuralLine {
-			if trimmed == "" {
-				// Blank structural line: emit at most maxConsecutiveBlankLines in a
-				// row so yamllint's empty-lines rule is never exceeded. lastNonBlankEnd
-				// is NOT updated here so that trailing blank lines (including a blank
-				// final "line" produced by a file that ends with "\n\n" or by
-				// whitespace-only text after the last real line) are excluded from the
-				// returned slice.
-				if blankRun < maxConsecutiveBlankLines {
-					b.WriteByte('\n')
-					blankRun++
-				}
-			} else {
-				b.WriteString(trimmed)
-				b.WriteByte('\n')
+			if writeStructuralYAMLLine(&b, trimmed, &blankRun, &scalar) {
 				lastNonBlankEnd = b.Len()
-				blankRun = 0
-				if headerIndent, ok := blockScalarHeaderIndentForLine(trimmed); ok {
-					pendingBlockScalar = true
-					blockScalarHeaderIndent = headerIndent
-				}
 			}
 		}
 
@@ -119,20 +75,70 @@ func normalizeBlankLines(yamlContent string) string {
 		}
 		pos += end + 1
 	}
+	return finishNormalizedYAML(&b, lastNonBlankEnd)
+}
 
-	// When lastNonBlankEnd is still 0 there were no non-blank lines at all
-	// (empty input or all-whitespace). Return a single newline, which matches
-	// the original strings.TrimRight(…, "\n") + "\n" behaviour for that case.
-	// NOTE: b.String()[:0] must NOT be used here; the early return is intentional.
+func finishNormalizedYAML(b *strings.Builder, lastNonBlankEnd int) string {
 	if lastNonBlankEnd == 0 {
 		compilerYAMLNormalizeLog.Print("Input contained no non-blank lines, returning single newline")
 		return "\n"
 	}
-	// Slice the builder string to drop trailing blank lines. b.String() copies
-	// the builder's internal buffer into a new string once; the slice avoids a
-	// second copy that a separate strings.Builder trim would incur.
 	compilerYAMLNormalizeLog.Printf("Normalized YAML to %d bytes", lastNonBlankEnd)
 	return b.String()[:lastNonBlankEnd]
+}
+
+func writeStructuralYAMLLine(b *strings.Builder, trimmed string, blankRun *int, scalar *yamlBlankLineScalarState) bool {
+	if trimmed == "" {
+		if *blankRun < maxConsecutiveBlankLines {
+			b.WriteByte('\n')
+			*blankRun++
+		}
+		return false
+	}
+	b.WriteString(trimmed)
+	b.WriteByte('\n')
+	*blankRun = 0
+	if headerIndent, ok := blockScalarHeaderIndentForLine(trimmed); ok {
+		scalar.pending = true
+		scalar.headerIndent = headerIndent
+	}
+	return true
+}
+
+type yamlBlankLineScalarState struct {
+	pending, active      bool
+	headerIndent, indent int
+}
+
+func (s *yamlBlankLineScalarState) writeLine(b *strings.Builder, line, trimmed string) bool {
+	if !s.pending && !s.active {
+		return false
+	}
+	if trimmed == "" {
+		// Clear whitespace-only scalar lines without capping their run.
+		b.WriteByte('\n')
+		return true
+	}
+	lineIndent := countLeadingSpaces(line)
+	if s.pending {
+		if lineIndent <= s.headerIndent {
+			s.pending = false
+		} else {
+			s.indent = lineIndent
+			s.active = true
+			s.pending = false
+		}
+	}
+	if s.active {
+		if lineIndent < s.indent {
+			s.active = false
+		} else {
+			b.WriteString(line)
+			b.WriteByte('\n')
+			return true
+		}
+	}
+	return false
 }
 
 func countLeadingSpaces(line string) int {

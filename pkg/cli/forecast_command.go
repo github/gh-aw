@@ -80,37 +80,43 @@ Backtesting (--eval):
   ` + string(constants.CLIExtensionPrefix) + ` forecast --repo owner/repo      # Forecast in another repository
   ` + string(constants.CLIExtensionPrefix) + ` forecast --eval                 # Backtest: evaluate forecast quality against past data`,
 		Args: cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			days, _ := cmd.Flags().GetInt("days")
-			period, _ := cmd.Flags().GetString("period")
-			jsonOutput, _ := cmd.Flags().GetBool("json")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			repoOverride, _ := cmd.Flags().GetString("repo")
-			sampleSize, _ := cmd.Flags().GetInt("sample")
-			evalMode, _ := cmd.Flags().GetBool("eval")
-			timeoutMinutes, _ := cmd.Flags().GetInt("timeout")
-			downloadConcurrency, _ := cmd.Flags().GetInt("concurrency")
+		RunE: runForecastCommand,
+	}
+	configureForecastCommand(cmd)
+	return cmd
+}
 
-			forecastRunLog.Printf("Forecast command invoked: workflow_count=%d, days=%d, period=%s, sample_size=%d, eval=%v, timeout_minutes=%d, json=%v, repo=%q",
-				len(args), days, period, sampleSize, evalMode, timeoutMinutes, jsonOutput, repoOverride)
+func runForecastCommand(cmd *cobra.Command, args []string) error {
+	days, _ := cmd.Flags().GetInt("days")
+	period, _ := cmd.Flags().GetString("period")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	repoOverride, _ := cmd.Flags().GetString("repo")
+	sampleSize, _ := cmd.Flags().GetInt("sample")
+	evalMode, _ := cmd.Flags().GetBool("eval")
+	timeoutMinutes, _ := cmd.Flags().GetInt("timeout")
+	downloadConcurrency, _ := cmd.Flags().GetInt("concurrency")
 
-			config := ForecastConfig{
-				WorkflowIDs:         args,
-				Days:                days,
-				Period:              period,
-				JSONOutput:          jsonOutput,
-				Verbose:             verbose,
-				RepoOverride:        repoOverride,
-				SampleSize:          sampleSize,
-				EvalMode:            evalMode,
-				TimeoutMinutes:      timeoutMinutes,
-				DownloadConcurrency: downloadConcurrency,
-			}
+	forecastRunLog.Printf("Forecast command invoked: workflow_count=%d, days=%d, period=%s, sample_size=%d, eval=%v, timeout_minutes=%d, json=%v, repo=%q",
+		len(args), days, period, sampleSize, evalMode, timeoutMinutes, jsonOutput, repoOverride)
 
-			return RunForecast(config)
-		},
+	config := ForecastConfig{
+		WorkflowIDs:         args,
+		Days:                days,
+		Period:              period,
+		JSONOutput:          jsonOutput,
+		Verbose:             verbose,
+		RepoOverride:        repoOverride,
+		SampleSize:          sampleSize,
+		EvalMode:            evalMode,
+		TimeoutMinutes:      timeoutMinutes,
+		DownloadConcurrency: downloadConcurrency,
 	}
 
+	return RunForecast(config)
+}
+
+func configureForecastCommand(cmd *cobra.Command) {
 	cmd.Flags().Int("days", 30, "Historical window in days to sample run history (allowed values: 7, 30)")
 	cmd.Flags().String("period", "month", "Aggregation period for projections: week or month")
 	cmd.Flags().Int("sample", 100, "Maximum number of completed runs to sample per workflow")
@@ -125,5 +131,4 @@ Backtesting (--eval):
 		return []string{"7", "30"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
-	return cmd
 }

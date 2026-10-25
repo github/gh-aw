@@ -69,7 +69,15 @@ func parseFirewallLogs(runDir string, verbose bool) error {
 	// Create a Node.js script that mimics the GitHub Actions environment
 	// The firewall parser expects logs in /tmp/gh-aw/squid-logs-{workflow}/
 	// We'll set GITHUB_WORKFLOW to a value that makes the parser look in our temp directory
-	nodeScript := fmt.Sprintf(`
+	nodeScript := buildFirewallParserScript(logsDir, jsScript)
+	return executeFirewallParser(runDir, tempDir, nodeScript)
+}
+
+func buildFirewallParserScript(logsDir, jsScript string) string {
+	return fmt.Sprintf(firewallParserScriptTemplate, logsDir, jsScript)
+}
+
+const firewallParserScriptTemplate = `
 const fs = require('fs');
 const path = require('path');
 
@@ -205,8 +213,9 @@ const originalMain = function() {
 
 // Replace main() call with our custom version
 originalMain();
-`, logsDir, jsScript)
+`
 
+func executeFirewallParser(runDir, tempDir, nodeScript string) error {
 	// Write the Node.js script
 	nodeFile := filepath.Join(tempDir, "parser.js")
 	if err := os.WriteFile(nodeFile, []byte(nodeScript), constants.FilePermPublic); err != nil {

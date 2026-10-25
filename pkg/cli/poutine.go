@@ -134,16 +134,20 @@ func runPoutineOnDirectory(workflowDir string, verbose bool, strict bool) error 
 	// Run the command
 	err = cmd.Run()
 
+	return handlePoutineDirectoryResult(err, stdout.String(), stderr.String(), verbose, strict, gitRoot)
+}
+
+func handlePoutineDirectoryResult(err error, stdout, stderr string, verbose, strict bool, gitRoot string) error {
 	// Parse and display output for all files (no filtering)
-	totalWarnings, parseErr := parseAndDisplayPoutineOutputForDirectory(stdout.String(), verbose, gitRoot)
+	totalWarnings, parseErr := parseAndDisplayPoutineOutputForDirectory(stdout, verbose, gitRoot)
 	if parseErr != nil {
 		poutineLog.Printf("Failed to parse poutine output: %v", parseErr)
 		// Fall back to showing raw output
-		if stdout.Len() > 0 {
-			fmt.Fprint(os.Stderr, stdout.String())
+		if len(stdout) > 0 {
+			fmt.Fprint(os.Stderr, stdout)
 		}
-		if stderr.Len() > 0 {
-			fmt.Fprint(os.Stderr, stderr.String())
+		if len(stderr) > 0 {
+			fmt.Fprint(os.Stderr, stderr)
 		}
 		return fmt.Errorf("poutine output could not be parsed: %w", parseErr)
 	}
@@ -159,7 +163,7 @@ func runPoutineOnDirectory(workflowDir string, verbose bool, strict bool) error 
 			if exitCode == 1 {
 				// In strict mode, any findings in the scan are treated as errors
 				if strict && totalWarnings > 0 {
-					return withPoutineFindings(fmt.Errorf("strict mode: poutine found %d security warnings/errors - workflows must have no poutine findings in strict mode. Example: rerun after resolving all reported findings", totalWarnings), stdout.String())
+					return withPoutineFindings(fmt.Errorf("strict mode: poutine found %d security warnings/errors - workflows must have no poutine findings in strict mode. Example: rerun after resolving all reported findings", totalWarnings), stdout)
 				}
 				// In non-strict mode, findings are logged but not treated as errors
 				return nil
@@ -172,7 +176,7 @@ func runPoutineOnDirectory(workflowDir string, verbose bool, strict bool) error 
 	}
 
 	if strict && totalWarnings > 0 {
-		return withPoutineFindings(fmt.Errorf("strict mode: poutine found %d security warnings/errors", totalWarnings), stdout.String())
+		return withPoutineFindings(fmt.Errorf("strict mode: poutine found %d security warnings/errors", totalWarnings), stdout)
 	}
 	return nil
 }
@@ -271,16 +275,20 @@ func runPoutineOnFile(lockFile string, verbose bool, strict bool) error {
 	// Run the command
 	err = cmd.Run()
 
+	return handlePoutineFileResult(err, stdout.String(), stderr.String(), relPath, lockFile, verbose, strict)
+}
+
+func handlePoutineFileResult(err error, stdout, stderr, relPath, lockFile string, verbose, strict bool) error {
 	// Parse and reformat the output, get total warning count
-	totalWarnings, parseErr := parseAndDisplayPoutineOutput(stdout.String(), relPath, verbose)
+	totalWarnings, parseErr := parseAndDisplayPoutineOutput(stdout, relPath, verbose)
 	if parseErr != nil {
 		poutineLog.Printf("Failed to parse poutine output: %v", parseErr)
 		// Fall back to showing raw output
-		if stdout.Len() > 0 {
-			fmt.Fprint(os.Stderr, stdout.String())
+		if len(stdout) > 0 {
+			fmt.Fprint(os.Stderr, stdout)
 		}
-		if stderr.Len() > 0 {
-			fmt.Fprint(os.Stderr, stderr.String())
+		if len(stderr) > 0 {
+			fmt.Fprint(os.Stderr, stderr)
 		}
 	}
 
@@ -400,50 +408,53 @@ func parseAndDisplayPoutineOutputForDirectory(stdout string, verbose bool, gitRo
 
 	// Display findings for each file
 	for filePath, findings := range findingsByFile {
-		// Validate and sanitize file path to prevent path traversal
-		cleanPath := filepath.Clean(filePath)
+		displayPoutineFileFindings(filePath, gitRoot, findings, output.Rules)
+	}
+	return totalWarnings, nil
+}
 
-		// Convert to absolute path if relative
-		absPath := cleanPath
-		if !filepath.IsAbs(cleanPath) {
-			absPath = filepath.Join(gitRoot, cleanPath)
-		}
+func displayPoutineFileFindings(filePath, gitRoot string, findings []poutineFinding, rules poutineRules) {
+	// Validate and sanitize file path to prevent path traversal
+	cleanPath := filepath.Clean(filePath)
 
-		// Ensure the file is within gitRoot to prevent path traversal
-		absGitRoot, err := filepath.Abs(gitRoot)
-		if err != nil {
-			poutineLog.Printf("Failed to get absolute path for git root: %v", err)
-			continue
-		}
-
-		absPath, err = filepath.Abs(absPath)
-		if err != nil {
-			poutineLog.Printf("Failed to get absolute path for %s: %v", filePath, err)
-			continue
-		}
-
-		// Check if the resolved path is within gitRoot
-		relPath, err := filepath.Rel(absGitRoot, absPath)
-		if err != nil || strings.HasPrefix(relPath, "..") {
-			poutineLog.Printf("Skipping file outside git root: %s", filePath)
-			continue
-		}
-
-		// Read file content for context display
-		// #nosec G304 -- absPath is validated through: 1) filepath.Clean() normalization,
-		// 2) absolute path resolution, and 3) filepath.Rel() check ensuring it's within gitRoot
-		// (lines 414-441). Path traversal attacks are prevented by the boundary validation.
-		fileContent, err := os.ReadFile(absPath)
-		var fileLines []string
-		if err == nil {
-			fileLines = strings.Split(string(fileContent), "\n")
-		}
-
-		// Display detailed findings using the shared finding representation
-		scanfindings.Render(os.Stderr, poutineFindingsToShared(findings, output.Rules, filePath, fileLines))
+	// Convert to absolute path if relative
+	absPath := cleanPath
+	if !filepath.IsAbs(cleanPath) {
+		absPath = filepath.Join(gitRoot, cleanPath)
 	}
 
-	return totalWarnings, nil
+	// Ensure the file is within gitRoot to prevent path traversal
+	absGitRoot, err := filepath.Abs(gitRoot)
+	if err != nil {
+		poutineLog.Printf("Failed to get absolute path for git root: %v", err)
+		return
+	}
+
+	absPath, err = filepath.Abs(absPath)
+	if err != nil {
+		poutineLog.Printf("Failed to get absolute path for %s: %v", filePath, err)
+		return
+	}
+
+	// Check if the resolved path is within gitRoot
+	relPath, err := filepath.Rel(absGitRoot, absPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		poutineLog.Printf("Skipping file outside git root: %s", filePath)
+		return
+	}
+
+	// Read file content for context display
+	// #nosec G304 -- absPath is validated through: 1) filepath.Clean() normalization,
+	// 2) absolute path resolution, and 3) filepath.Rel() check ensuring it's within gitRoot
+	// (lines 414-441). Path traversal attacks are prevented by the boundary validation.
+	fileContent, err := os.ReadFile(absPath)
+	var fileLines []string
+	if err == nil {
+		fileLines = strings.Split(string(fileContent), "\n")
+	}
+
+	// Display detailed findings using the shared finding representation
+	scanfindings.Render(os.Stderr, poutineFindingsToShared(findings, rules, filePath, fileLines))
 }
 
 // poutineFindingsToShared maps poutine's native findings onto the shared finding

@@ -58,8 +58,23 @@ func GetWorkflowStatuses(ctx context.Context, pattern string, ref string, labelF
 	}
 
 	// Fetch latest workflow runs for ref if specified
+	latestRunsByWorkflow, err := fetchStatusRunsByRef(ctx, ref, repoOverride)
+	if err != nil {
+		return nil, err
+	}
+	if repoOverride != "" {
+		if labelFilter != "" {
+			return nil, errors.New("--label filter is not supported with --repo: label information is not available from the GitHub Actions API")
+		}
+		return buildRemoteWorkflowStatuses(pattern, githubWorkflows, latestRunsByWorkflow), nil
+	}
+	return getLocalWorkflowStatuses(pattern, labelFilter, githubWorkflows, latestRunsByWorkflow)
+}
+
+func fetchStatusRunsByRef(ctx context.Context, ref, repoOverride string) (map[string]*WorkflowRun, error) {
 	var latestRunsByWorkflow map[string]*WorkflowRun
 	if ref != "" {
+		var err error
 		latestRunsByWorkflow, err = fetchLatestRunsByRef(ctx, ref, repoOverride, false)
 		if err != nil {
 			statusLog.Printf("Failed to fetch workflow runs for ref %s: %v", ref, err)
@@ -71,20 +86,10 @@ func GetWorkflowStatuses(ctx context.Context, pattern string, ref string, labelF
 			statusLog.Printf("Successfully fetched %d workflow runs for ref %s", len(latestRunsByWorkflow), ref)
 		}
 	}
+	return latestRunsByWorkflow, nil
+}
 
-	// When --repo is specified, build statuses from GitHub API data only.
-	// Local markdown files are not available for a remote repository, so
-	// local-only fields (EngineID, Compiled, TimeRemaining, Labels, On) are
-	// omitted from the results.
-	if repoOverride != "" {
-		// Label metadata is not exposed by the GitHub Actions workflow API, so
-		// filtering by label is not supported when --repo is specified.
-		if labelFilter != "" {
-			return nil, errors.New("--label filter is not supported with --repo: label information is not available from the GitHub Actions API")
-		}
-		return buildRemoteWorkflowStatuses(pattern, githubWorkflows, latestRunsByWorkflow), nil
-	}
-
+func getLocalWorkflowStatuses(pattern, labelFilter string, githubWorkflows map[string]*GitHubWorkflow, latestRunsByWorkflow map[string]*WorkflowRun) ([]WorkflowStatus, error) {
 	// Local path: discover markdown workflow files from the local filesystem.
 	mdFiles, err := getMarkdownWorkflowFiles("")
 	if err != nil {
@@ -107,103 +112,111 @@ func GetWorkflowStatuses(ctx context.Context, pattern string, ref string, labelF
 		if pattern != "" && !strings.Contains(strings.ToLower(name), strings.ToLower(pattern)) {
 			continue
 		}
-
-		// Extract engine ID from workflow file
-		agent := extractEngineIDFromFile(file)
-
-		// Check if compiled (.lock.yml file is in .github/workflows)
-		lockFile := stringutil.MarkdownToLockFile(file)
-		compiled := "N/A"
-		timeRemaining := "N/A"
-
-		if fileutil.FileExists(lockFile) {
-			// Check if up to date using hash comparison
-			compiled = isCompiledUpToDate(file, lockFile)
-
-			// Extract stop-time from lock file
-			if stopTime := workflow.ExtractStopTimeFromLockFile(lockFile); stopTime != "" {
-				timeRemaining = calculateTimeRemaining(stopTime)
-			}
+		status, include := buildLocalWorkflowStatus(file, name, labelFilter, githubWorkflows, latestRunsByWorkflow)
+		if include {
+			statuses = append(statuses, status)
 		}
+	}
+	return statuses, nil
+}
 
-		// Get GitHub workflow status
-		status := "Unknown"
-		if workflow, exists := githubWorkflows[name]; exists {
-			if workflow.State == "disabled_manually" {
-				status = "disabled"
-			} else {
-				status = workflow.State
-			}
+func buildLocalWorkflowStatus(file, name, labelFilter string, githubWorkflows map[string]*GitHubWorkflow, latestRunsByWorkflow map[string]*WorkflowRun) (WorkflowStatus, bool) {
+	// Extract engine ID from workflow file
+	agent := extractEngineIDFromFile(file)
+
+	// Check if compiled (.lock.yml file is in .github/workflows)
+	lockFile := stringutil.MarkdownToLockFile(file)
+	compiled := "N/A"
+	timeRemaining := "N/A"
+
+	if fileutil.FileExists(lockFile) {
+		// Check if up to date using hash comparison
+		compiled = isCompiledUpToDate(file, lockFile)
+
+		// Extract stop-time from lock file
+		if stopTime := workflow.ExtractStopTimeFromLockFile(lockFile); stopTime != "" {
+			timeRemaining = calculateTimeRemaining(stopTime)
 		}
+	}
 
-		// Extract "on" field and labels from frontmatter
-		var onField any
-		var labels []string
-		var dependencies []string
-		if content, err := os.ReadFile(file); err == nil {
-			contentStr := string(content)
-			if result, err := parser.ExtractFrontmatterFromContent(contentStr); err == nil {
-				if result.Frontmatter != nil {
-					onField = result.Frontmatter["on"]
-					dependencies = extractWorkflowDependencies(contentStr, result.Frontmatter)
-					// Extract labels field if present
-					if labelsField, ok := result.Frontmatter["labels"]; ok {
-						if labelsArray, ok := labelsField.([]any); ok {
-							for _, label := range labelsArray {
-								if labelStr, ok := label.(string); ok {
-									labels = append(labels, labelStr)
-								}
+	// Get GitHub workflow status
+	status := "Unknown"
+	if workflow, exists := githubWorkflows[name]; exists {
+		if workflow.State == "disabled_manually" {
+			status = "disabled"
+		} else {
+			status = workflow.State
+		}
+	}
+
+	onField, labels, dependencies := readWorkflowStatusMetadata(file)
+	if !workflowStatusMatchesLabel(labels, labelFilter) {
+		return WorkflowStatus{}, false
+	}
+	var runID int64
+	var runStatus, runConclusion string
+	if latestRunsByWorkflow != nil {
+		if run, exists := latestRunsByWorkflow[name]; exists {
+			runID = run.DatabaseID
+			runStatus = run.Status
+			runConclusion = run.Conclusion
+		}
+	}
+	return WorkflowStatus{
+		WorkflowListItem: WorkflowListItem{
+			Workflow: name,
+			EngineID: agent,
+			Compiled: compiled,
+			Labels:   labels,
+			On:       onField,
+		},
+		Status:        status,
+		TimeRemaining: timeRemaining,
+		Dependencies:  dependencies,
+		RunID:         runID,
+		RunStatus:     runStatus,
+		RunConclusion: runConclusion,
+	}, true
+}
+
+func readWorkflowStatusMetadata(file string) (onField any, labels, dependencies []string) {
+	if content, err := os.ReadFile(file); err == nil {
+		contentStr := string(content)
+		if result, err := parser.ExtractFrontmatterFromContent(contentStr); err == nil {
+			if result.Frontmatter != nil {
+				onField = result.Frontmatter["on"]
+				dependencies = extractWorkflowDependencies(contentStr, result.Frontmatter)
+				// Extract labels field if present
+				if labelsField, ok := result.Frontmatter["labels"]; ok {
+					if labelsArray, ok := labelsField.([]any); ok {
+						for _, label := range labelsArray {
+							if labelStr, ok := label.(string); ok {
+								labels = append(labels, labelStr)
 							}
 						}
 					}
 				}
 			}
 		}
-
-		// Skip if label filter specified and workflow doesn't have the label
-		if labelFilter != "" {
-			hasLabel := false
-			for _, label := range labels {
-				if strings.EqualFold(label, labelFilter) {
-					hasLabel = true
-					break
-				}
-			}
-			if !hasLabel {
-				continue
-			}
-		}
-
-		// Get run status for ref if available
-		var runID int64
-		var runStatus, runConclusion string
-		if latestRunsByWorkflow != nil {
-			if run, exists := latestRunsByWorkflow[name]; exists {
-				runID = run.DatabaseID
-				runStatus = run.Status
-				runConclusion = run.Conclusion
-			}
-		}
-
-		// Build status object
-		statuses = append(statuses, WorkflowStatus{
-			WorkflowListItem: WorkflowListItem{
-				Workflow: name,
-				EngineID: agent,
-				Compiled: compiled,
-				Labels:   labels,
-				On:       onField,
-			},
-			Status:        status,
-			TimeRemaining: timeRemaining,
-			Dependencies:  dependencies,
-			RunID:         runID,
-			RunStatus:     runStatus,
-			RunConclusion: runConclusion,
-		})
 	}
+	return onField, labels, dependencies
+}
 
-	return statuses, nil
+func workflowStatusMatchesLabel(labels []string, labelFilter string) bool {
+	// Skip if label filter specified and workflow doesn't have the label
+	if labelFilter != "" {
+		hasLabel := false
+		for _, label := range labels {
+			if strings.EqualFold(label, labelFilter) {
+				hasLabel = true
+				break
+			}
+		}
+		if !hasLabel {
+			return false
+		}
+	}
+	return true
 }
 
 // buildRemoteWorkflowStatuses constructs workflow statuses from GitHub API data when
@@ -274,7 +287,10 @@ func StatusWorkflows(ctx context.Context, pattern string, verbose bool, jsonOutp
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully fetched status for %d workflows", len(statuses))))
 	}
 
-	// Handle output
+	return displayWorkflowStatuses(statuses, verbose, jsonOutput)
+}
+
+func displayWorkflowStatuses(statuses []WorkflowStatus, verbose, jsonOutput bool) error {
 	if jsonOutput {
 		// Output JSON
 		jsonBytes, err := marshalIndentJSONOrWrap(statuses, "workflow statuses")
@@ -528,34 +544,53 @@ func fetchLatestRunsByRef(ctx context.Context, ref string, repoOverride string, 
 			spinner.Stop()
 		}
 
-		// Extract detailed error information including exit code and stderr
-		var exitCode int
-		var stderr string
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			exitCode = exitErr.ExitCode()
-			stderr = string(exitErr.Stderr)
-			statusLog.Printf("gh run list command failed with exit code %d. Command: gh %v", exitCode, args)
-			statusLog.Printf("stderr output: %s", stderr)
+		return nil, workflowRunsCommandError(err, args)
+	}
+	runs, err := parseLatestWorkflowRuns(output, spinner, verbose)
+	if err != nil {
+		return nil, err
+	}
+	latestRuns := make(map[string]*WorkflowRun)
+	for i := range runs {
+		run := &runs[i]
+		workflowName := extractWorkflowNameFromPath(run.WorkflowName)
+		if _, exists := latestRuns[workflowName]; !exists {
+			latestRuns[workflowName] = run
+		}
+	}
+	statusLog.Printf("Fetched latest runs for %d workflows on ref %s", len(latestRuns), ref)
+	return latestRuns, nil
+}
 
-			// Check for invalid field errors first (before generic error)
-			// GitHub CLI returns these when JSON fields don't exist or are misspelled
-			combinedMsg := err.Error() + " " + stderr
-			if strings.Contains(combinedMsg, "invalid field") ||
-				strings.Contains(combinedMsg, "unknown field") ||
-				strings.Contains(combinedMsg, "field not found") ||
-				strings.Contains(combinedMsg, "no such field") {
-				return nil, fmt.Errorf("invalid field in JSON query (exit code %d): %s", exitCode, stderr)
-			}
+func workflowRunsCommandError(err error, args []string) error {
+	var exitCode int
+	var stderr string
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		exitCode = exitErr.ExitCode()
+		stderr = string(exitErr.Stderr)
+		statusLog.Printf("gh run list command failed with exit code %d. Command: gh %v", exitCode, args)
+		statusLog.Printf("stderr output: %s", stderr)
 
-			return nil, fmt.Errorf("failed to execute gh run list command (exit code %d): %w. stderr: %s", exitCode, err, stderr)
+		// Check for invalid field errors first (before generic error)
+		// GitHub CLI returns these when JSON fields don't exist or are misspelled
+		combinedMsg := err.Error() + " " + stderr
+		if strings.Contains(combinedMsg, "invalid field") ||
+			strings.Contains(combinedMsg, "unknown field") ||
+			strings.Contains(combinedMsg, "field not found") ||
+			strings.Contains(combinedMsg, "no such field") {
+			return fmt.Errorf("invalid field in JSON query (exit code %d): %s", exitCode, stderr)
 		}
 
-		// If not an ExitError, log what we can
-		statusLog.Printf("gh run list command failed with error (not ExitError): %v. Command: gh %v", err, args)
-		return nil, fmt.Errorf("failed to execute gh run list command: %w", err)
+		return fmt.Errorf("failed to execute gh run list command (exit code %d): %w. stderr: %s", exitCode, err, stderr)
 	}
 
+	// If not an ExitError, log what we can
+	statusLog.Printf("gh run list command failed with error (not ExitError): %v. Command: gh %v", err, args)
+	return fmt.Errorf("failed to execute gh run list command: %w", err)
+}
+
+func parseLatestWorkflowRuns(output []byte, spinner *console.SpinnerWrapper, verbose bool) ([]WorkflowRun, error) {
 	// Check if output is empty
 	if len(output) == 0 {
 		if !verbose {
@@ -585,18 +620,5 @@ func fetchLatestRunsByRef(ctx context.Context, ref string, repoOverride string, 
 		spinner.StopWithMessage(fmt.Sprintf("✓ Fetched %d workflow runs", len(runs)))
 	}
 
-	// Build map of latest run for each workflow (first occurrence is the latest)
-	latestRuns := make(map[string]*WorkflowRun)
-	for i := range runs {
-		run := &runs[i]
-		// Extract workflow name from workflowName field
-		workflowName := extractWorkflowNameFromPath(run.WorkflowName)
-		// Only keep the first (latest) run for each workflow
-		if _, exists := latestRuns[workflowName]; !exists {
-			latestRuns[workflowName] = run
-		}
-	}
-
-	statusLog.Printf("Fetched latest runs for %d workflows on ref %s", len(latestRuns), ref)
-	return latestRuns, nil
+	return runs, nil
 }

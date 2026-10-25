@@ -44,59 +44,76 @@ func (c *Compiler) normalizeScheduleString(scheduleStr string, itemIndex int) (p
 
 	// Scatter fuzzy schedules if workflow identifier is set
 	if parser.IsFuzzyCron(parsedCron) && c.workflowIdentifier != "" {
-		// Combine repo slug/dev prefix and workflow identifier for scattering seed
-		// This ensures workflows with the same name in different repositories
-		// get different execution times, distributing load across an organization.
-		// Format:
-		// - Dev mode: "dev/workflow-path"
-		// - Release mode: "owner/repo/workflow-path" or just "workflow-path" if no repo slug
-		seed := c.workflowIdentifier
-		if IsRelease() {
-			// Release mode: use repository slug if available
-			if c.repositorySlug != "" {
-				seed = c.repositorySlug + "/" + c.workflowIdentifier
-			} else {
-				// Warn if repository slug is not available - scattering will not be org-aware
-				schedulePreprocessingLog.Printf("Warning: repository slug not available for fuzzy schedule scattering")
-				c.IncrementWarningCount()
-				c.addScheduleWarning("Fuzzy schedule scattering without repository context. Workflows with the same name in different repositories may collide. Ensure you are in a git repository with a configured remote.")
-			}
-		} else {
-			// Dev mode: use "dev" prefix for consistent scattering across all workflows
-			seed = "dev/" + c.workflowIdentifier
-			schedulePreprocessingLog.Printf("Using dev mode seed for fuzzy schedule scattering: %s", seed)
-		}
-		scatteredCron, err := parser.ScatterSchedule(parsedCron, seed)
-		if err != nil {
-			schedulePreprocessingLog.Printf("Warning: failed to scatter fuzzy schedule: %v", err)
-			// Keep the original fuzzy schedule as fallback
-		} else {
-			schedulePreprocessingLog.Printf("Scattered fuzzy schedule %s to %s for workflow %s", parsedCron, scatteredCron, c.workflowIdentifier)
-			parsedCron = scatteredCron
-			// Update the friendly format to show the scattering
-			if original != "" {
-				original = original + " (scattered)"
-			}
-		}
+		parsedCron, original = c.scatterWorkflowSchedule(parsedCron, original)
 	}
 
+	// Validate final cron expression has correct syntax (5 fields).
+	if err := validateNormalizedSchedule(parsedCron, itemIndex); err != nil {
+		return "", "", err
+	}
+	return parsedCron, original, nil
+}
+
+func (c *Compiler) scheduleScatterSeed() string {
+	// Combine repo slug/dev prefix and workflow identifier for scattering seed
+	// This ensures workflows with the same name in different repositories
+	// get different execution times, distributing load across an organization.
+	// Format:
+	// - Dev mode: "dev/workflow-path"
+	// - Release mode: "owner/repo/workflow-path" or just "workflow-path" if no repo slug
+	seed := c.workflowIdentifier
+	if IsRelease() {
+		// Release mode: use repository slug if available
+		if c.repositorySlug != "" {
+			seed = c.repositorySlug + "/" + c.workflowIdentifier
+		} else {
+			// Warn if repository slug is not available - scattering will not be org-aware
+			schedulePreprocessingLog.Printf("Warning: repository slug not available for fuzzy schedule scattering")
+			c.IncrementWarningCount()
+			c.addScheduleWarning("Fuzzy schedule scattering without repository context. Workflows with the same name in different repositories may collide. Ensure you are in a git repository with a configured remote.")
+		}
+	} else {
+		// Dev mode: use "dev" prefix for consistent scattering across all workflows
+		seed = "dev/" + c.workflowIdentifier
+		schedulePreprocessingLog.Printf("Using dev mode seed for fuzzy schedule scattering: %s", seed)
+	}
+	return seed
+}
+
+func (c *Compiler) scatterWorkflowSchedule(parsedCron, original string) (string, string) {
+	scatteredCron, err := parser.ScatterSchedule(parsedCron, c.scheduleScatterSeed())
+	if err != nil {
+		schedulePreprocessingLog.Printf("Warning: failed to scatter fuzzy schedule: %v", err)
+		// Keep the original fuzzy schedule as fallback
+	} else {
+		schedulePreprocessingLog.Printf("Scattered fuzzy schedule %s to %s for workflow %s", parsedCron, scatteredCron, c.workflowIdentifier)
+		parsedCron = scatteredCron
+		// Update the friendly format to show the scattering
+		if original != "" {
+			original = original + " (scattered)"
+		}
+	}
+	return parsedCron, original
+}
+
+func validateNormalizedSchedule(parsedCron string, itemIndex int) error {
 	// Validate final cron expression has correct syntax (5 fields)
 	// FUZZY cron expressions are not supported by GitHub Actions
 	// R-SAFE-003: missing workflow identifier causes fuzzy schedule to remain unscattered; fail with a descriptive error.
 	if parser.IsFuzzyCron(parsedCron) {
 		if itemIndex >= 0 {
-			return "", "", fmt.Errorf("fuzzy cron expression '%s' in item %d requires a workflow identifier to be scattered into a proper cron format. Set the workflow identifier before compilation", parsedCron, itemIndex)
+			return fmt.Errorf("fuzzy cron expression '%s' in item %d requires a workflow identifier to be scattered into a proper cron format. Set the workflow identifier before compilation", parsedCron, itemIndex)
 		}
-		return "", "", fmt.Errorf("fuzzy cron expression '%s' requires a workflow identifier to be scattered into a proper cron format. Set the workflow identifier before compilation", parsedCron)
+		return fmt.Errorf("fuzzy cron expression '%s' requires a workflow identifier to be scattered into a proper cron format. Set the workflow identifier before compilation", parsedCron)
 	}
 	if !parser.IsCronExpression(parsedCron) {
 		if itemIndex >= 0 {
-			return "", "", fmt.Errorf("cron expression '%s' in item %d is malformed. Expected exactly 5 fields (minute hour day-of-month month day-of-week), for example: '0 9 * * 1'", parsedCron, itemIndex)
+			return fmt.Errorf("cron expression '%s' in item %d is malformed. Expected exactly 5 fields (minute hour day-of-month month day-of-week), for example: '0 9 * * 1'", parsedCron, itemIndex)
 		}
-		return "", "", fmt.Errorf("cron expression '%s' is malformed. Expected exactly 5 fields (minute hour day-of-month month day-of-week), for example: '0 9 * * 1'", parsedCron)
+		return fmt.Errorf("cron expression '%s' is malformed. Expected exactly 5 fields (minute hour day-of-month month day-of-week), for example: '0 9 * * 1'", parsedCron)
 	}
 
-	return parsedCron, original, nil
+	return nil
 }
 
 // preprocessScheduleFields converts human-friendly schedule expressions to cron expressions
@@ -112,131 +129,151 @@ func (c *Compiler) preprocessScheduleFields(frontmatter map[string]any, markdown
 
 	// Check if "on" is a string - might be a schedule expression, slash command shorthand, label trigger shorthand, or other trigger shorthand
 	if onStr, ok := onValue.(string); ok {
-		schedulePreprocessingLog.Printf("Processing on field as string: %s", onStr)
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(onStr)), "schedule ") {
-			return c.createMissingScheduleColonError(markdownPath, content)
-		}
-
-		// Check if it's a slash command shorthand (starts with /)
-		commandName, isSlashCommand, err := parseSlashCommandShorthand(onStr)
-		if err != nil {
-			return err
-		}
-		if isSlashCommand {
-			schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to slash_command + workflow_dispatch", onStr)
-
-			// Create the expanded format
-			onMap := expandSlashCommandShorthand(commandName)
-			frontmatter["on"] = onMap
-
-			return nil
-		}
-
-		// Check if it's a label-command shorthand (starts with "label-command ")
-		if labelName, ok := strings.CutPrefix(onStr, "label-command "); ok {
-			labelName = strings.TrimSpace(labelName)
-			if labelName == "" {
-				return errors.New("label-command shorthand requires a label name after 'label-command'")
-			}
-			schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to label_command + workflow_dispatch", onStr)
-			onMap := expandLabelCommandShorthand(labelName)
-			frontmatter["on"] = onMap
-			return nil
-		}
-
-		// Check if it's a label trigger shorthand (labeled label1 label2...)
-		entityType, labelNames, isLabelTrigger, err := parseLabelTriggerShorthand(onStr)
-		if err != nil {
-			return err
-		}
-		if isLabelTrigger {
-			schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to %s labeled + workflow_dispatch", onStr, entityType)
-
-			// Create the expanded format
-			onMap := expandLabelTriggerShorthand(entityType, labelNames)
-			frontmatter["on"] = onMap
-
-			return nil
-		}
-
-		// Try the new unified trigger parser for other trigger shorthands
-		triggerIR, err := ParseTriggerShorthand(onStr)
-		if err != nil {
-			// Wrap the error with source location information
-			return c.createTriggerParseError(markdownPath, content, onStr, err)
-		}
-		if triggerIR != nil {
-			schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to structured trigger", onStr)
-
-			// Convert IR to YAML map
-			onMap := triggerIR.ToYAMLMap()
-			frontmatter["on"] = onMap
-
-			// Propagate any job-level conditions into the frontmatter if: field
-			if len(triggerIR.Conditions) > 0 {
-				condition := strings.Join(triggerIR.Conditions, " && ")
-				schedulePreprocessingLog.Printf("Setting if condition from trigger shorthand: %s", condition)
-				// Merge with any existing if condition, stripping any ${{ }} wrapper first
-				if existing, ok := frontmatter["if"].(string); ok && existing != "" {
-					existing = stripExpressionWrapper(existing)
-					frontmatter["if"] = "(" + existing + ") && (" + condition + ")"
-				} else {
-					frontmatter["if"] = condition
-				}
-			}
-
-			return nil
-		}
-
-		// Try to parse as a schedule expression (only if not already recognized as another trigger type)
-		parsedCron, original, err := c.normalizeScheduleString(onStr, -1)
-		if err != nil {
-			// Check if this is an explicit rejection of unsupported syntax
-			// vs. just not being a valid schedule at all
-			if errors.Is(err, parser.ErrUnsupportedSyntax) {
-				// This is an explicit rejection - return the error
-				return err
-			}
-			// Not a schedule expression either - leave as simple string trigger
-			// (simple event names like "push", "fork", etc. are valid)
-			schedulePreprocessingLog.Printf("Not a recognized shorthand or schedule: %s - leaving as-is", onStr)
-			return nil
-		}
-
-		schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to schedule + workflow_dispatch", onStr)
-
-		// Create schedule array format with workflow_dispatch
-		scheduleArray := []any{
-			map[string]any{
-				"cron": parsedCron,
-			},
-		}
-
-		// Replace the simple "on: schedule" with expanded format
-		onMap := map[string]any{
-			"schedule":          scheduleArray,
-			"workflow_dispatch": nil,
-		}
-		frontmatter["on"] = onMap
-
-		// Store friendly format if it was converted
-		if original != "" {
-			if c.scheduleFriendlyFormats == nil {
-				c.scheduleFriendlyFormats = make(map[int]string)
-			}
-			c.scheduleFriendlyFormats[0] = original
-		}
-
-		return nil
+		return c.preprocessStringTrigger(frontmatter, onStr, markdownPath, content)
 	}
 
 	// Only process if "on" is a map (object format)
 	onMap, ok := onValue.(map[string]any)
 	if !ok {
-		// If "on" is neither string nor map, something is wrong
+		return nil
+	}
+	return c.preprocessScheduleMap(onMap)
+}
+
+func (c *Compiler) preprocessStringTrigger(frontmatter map[string]any, onStr, markdownPath, content string) error {
+	schedulePreprocessingLog.Printf("Processing on field as string: %s", onStr)
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(onStr)), "schedule ") {
+		return c.createMissingScheduleColonError(markdownPath, content)
+	}
+
+	if handled, err := expandCommandTriggerShorthand(frontmatter, onStr); handled || err != nil {
+		return err
+	}
+	return c.preprocessUnifiedTrigger(frontmatter, onStr, markdownPath, content)
+}
+
+func expandCommandTriggerShorthand(frontmatter map[string]any, onStr string) (bool, error) {
+	// Check if it's a slash command shorthand (starts with /)
+	commandName, isSlashCommand, err := parseSlashCommandShorthand(onStr)
+	if err != nil {
+		return false, err
+	}
+	if isSlashCommand {
+		schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to slash_command + workflow_dispatch", onStr)
+
+		// Create the expanded format
+		onMap := expandSlashCommandShorthand(commandName)
+		frontmatter["on"] = onMap
+
+		return true, nil
+	}
+
+	// Check if it's a label-command shorthand (starts with "label-command ")
+	if labelName, ok := strings.CutPrefix(onStr, "label-command "); ok {
+		labelName = strings.TrimSpace(labelName)
+		if labelName == "" {
+			return false, errors.New("label-command shorthand requires a label name after 'label-command'")
+		}
+		schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to label_command + workflow_dispatch", onStr)
+		onMap := expandLabelCommandShorthand(labelName)
+		frontmatter["on"] = onMap
+		return true, nil
+	}
+
+	// Check if it's a label trigger shorthand (labeled label1 label2...)
+	entityType, labelNames, isLabelTrigger, err := parseLabelTriggerShorthand(onStr)
+	if err != nil {
+		return false, err
+	}
+	if isLabelTrigger {
+		schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to %s labeled + workflow_dispatch", onStr, entityType)
+
+		// Create the expanded format
+		onMap := expandLabelTriggerShorthand(entityType, labelNames)
+		frontmatter["on"] = onMap
+
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Compiler) preprocessUnifiedTrigger(frontmatter map[string]any, onStr, markdownPath, content string) error {
+	// Try the new unified trigger parser for other trigger shorthands
+	triggerIR, err := ParseTriggerShorthand(onStr)
+	if err != nil {
+		// Wrap the error with source location information
+		return c.createTriggerParseError(markdownPath, content, onStr, err)
+	}
+	if triggerIR != nil {
+		schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to structured trigger", onStr)
+
+		// Convert IR to YAML map
+		onMap := triggerIR.ToYAMLMap()
+		frontmatter["on"] = onMap
+
+		// Propagate any job-level conditions into the frontmatter if: field
+		if len(triggerIR.Conditions) > 0 {
+			condition := strings.Join(triggerIR.Conditions, " && ")
+			schedulePreprocessingLog.Printf("Setting if condition from trigger shorthand: %s", condition)
+			// Merge with any existing if condition, stripping any ${{ }} wrapper first
+			if existing, ok := frontmatter["if"].(string); ok && existing != "" {
+				existing = stripExpressionWrapper(existing)
+				frontmatter["if"] = "(" + existing + ") && (" + condition + ")"
+			} else {
+				frontmatter["if"] = condition
+			}
+		}
+
 		return nil
 	}
 
+	return c.preprocessScheduleTriggerString(frontmatter, onStr)
+}
+
+func (c *Compiler) preprocessScheduleTriggerString(frontmatter map[string]any, onStr string) error {
+	// Try to parse as a schedule expression (only if not already recognized as another trigger type)
+	parsedCron, original, err := c.normalizeScheduleString(onStr, -1)
+	if err != nil {
+		// Check if this is an explicit rejection of unsupported syntax
+		// vs. just not being a valid schedule at all
+		if errors.Is(err, parser.ErrUnsupportedSyntax) {
+			// This is an explicit rejection - return the error
+			return err
+		}
+		// Not a schedule expression either - leave as simple string trigger
+		// (simple event names like "push", "fork", etc. are valid)
+		schedulePreprocessingLog.Printf("Not a recognized shorthand or schedule: %s - leaving as-is", onStr)
+		return nil
+	}
+
+	schedulePreprocessingLog.Printf("Converting shorthand 'on: %s' to schedule + workflow_dispatch", onStr)
+
+	// Create schedule array format with workflow_dispatch
+	scheduleArray := []any{
+		map[string]any{
+			"cron": parsedCron,
+		},
+	}
+
+	// Replace the simple "on: schedule" with expanded format
+	onMap := map[string]any{
+		"schedule":          scheduleArray,
+		"workflow_dispatch": nil,
+	}
+	frontmatter["on"] = onMap
+
+	// Store friendly format if it was converted
+	if original != "" {
+		if c.scheduleFriendlyFormats == nil {
+			c.scheduleFriendlyFormats = make(map[int]string)
+		}
+		c.scheduleFriendlyFormats[0] = original
+	}
+
+	return nil
+}
+
+func (c *Compiler) preprocessScheduleMap(onMap map[string]any) error {
 	// Check if schedule field exists in the "on" map
 	scheduleValue, hasSchedule := onMap["schedule"]
 	if !hasSchedule {
@@ -245,38 +282,45 @@ func (c *Compiler) preprocessScheduleFields(frontmatter map[string]any, markdown
 
 	// Handle shorthand string format: schedule: "daily at 02:00"
 	if scheduleStr, ok := scheduleValue.(string); ok {
-		schedulePreprocessingLog.Printf("Converting shorthand schedule string to array format: %s", scheduleStr)
-		// Convert string to array format with single item
-		parsedCron, original, err := c.normalizeScheduleString(scheduleStr, -1)
-		if err != nil {
-			return fmt.Errorf("schedule expression is not recognized (expected a cron string or friendly format like 'daily at 09:00'): %w", err)
-		}
-
-		// Create array format
-		scheduleArray := []any{
-			map[string]any{
-				"cron": parsedCron,
-			},
-		}
-		onMap["schedule"] = scheduleArray
-
-		// Store friendly format if it was converted
-		if original != "" {
-			if c.scheduleFriendlyFormats == nil {
-				c.scheduleFriendlyFormats = make(map[int]string)
-			}
-			c.scheduleFriendlyFormats[0] = original
-		}
-
-		// Add workflow_dispatch if not already present
-		if _, hasWorkflowDispatch := onMap["workflow_dispatch"]; !hasWorkflowDispatch {
-			schedulePreprocessingLog.Printf("Adding workflow_dispatch to scheduled workflow")
-			onMap["workflow_dispatch"] = nil
-		}
-
-		return nil
+		return c.preprocessScheduleMapString(onMap, scheduleStr)
 	}
 
+	return c.preprocessScheduleArray(onMap, scheduleValue)
+}
+
+func (c *Compiler) preprocessScheduleMapString(onMap map[string]any, scheduleStr string) error {
+	schedulePreprocessingLog.Printf("Converting shorthand schedule string to array format: %s", scheduleStr)
+	// Convert string to array format with single item
+	parsedCron, original, err := c.normalizeScheduleString(scheduleStr, -1)
+	if err != nil {
+		return fmt.Errorf("schedule expression is not recognized (expected a cron string or friendly format like 'daily at 09:00'): %w", err)
+	}
+	// Create array format
+	scheduleArray := []any{
+		map[string]any{
+			"cron": parsedCron,
+		},
+	}
+	onMap["schedule"] = scheduleArray
+
+	// Store friendly format if it was converted
+	if original != "" {
+		if c.scheduleFriendlyFormats == nil {
+			c.scheduleFriendlyFormats = make(map[int]string)
+		}
+		c.scheduleFriendlyFormats[0] = original
+	}
+
+	// Add workflow_dispatch if not already present
+	if _, hasWorkflowDispatch := onMap["workflow_dispatch"]; !hasWorkflowDispatch {
+		schedulePreprocessingLog.Printf("Adding workflow_dispatch to scheduled workflow")
+		onMap["workflow_dispatch"] = nil
+	}
+
+	return nil
+}
+
+func (c *Compiler) preprocessScheduleArray(onMap map[string]any, scheduleValue any) error {
 	// Schedule should be an array of schedule items
 	scheduleArray, ok := scheduleValue.([]any)
 	if !ok {
@@ -291,41 +335,8 @@ func (c *Compiler) preprocessScheduleFields(frontmatter map[string]any, markdown
 	// Process each schedule item
 	schedulePreprocessingLog.Printf("Processing %d schedule items", len(scheduleArray))
 	for i, item := range scheduleArray {
-		itemMap, ok := item.(map[string]any)
-		if !ok {
-			return fmt.Errorf("schedule item %d should be an object with a 'cron' field. Example: { cron: \"0 9 * * 1\" }", i)
-		}
-
-		cronValue, hasCron := itemMap["cron"]
-		if !hasCron {
-			return fmt.Errorf("schedule item %d is missing the required 'cron' field. Example: { cron: \"0 9 * * 1\" }", i)
-		}
-
-		cronStr, ok := cronValue.(string)
-		if !ok {
-			return fmt.Errorf("schedule item %d 'cron' field should be a string, got %T. Example: cron: \"0 9 * * 1\"", i, cronValue)
-		}
-
-		// Validate optional timezone field (IANA timezone string)
-		if tzValue, hasTimezone := itemMap["timezone"]; hasTimezone {
-			if _, ok := tzValue.(string); !ok {
-				return fmt.Errorf("schedule item %d 'timezone' field should be a string with an IANA timezone name, got %T. Example: timezone: \"America/New_York\"", i, tzValue)
-			}
-		}
-
-		// Try to parse as human-friendly schedule
-		parsedCron, original, err := c.normalizeScheduleString(cronStr, i)
-		if err != nil {
-			// Error already includes item index from normalizeScheduleString
+		if err := c.preprocessScheduleItem(i, item); err != nil {
 			return err
-		}
-
-		// Update the cron field with the parsed cron expression
-		itemMap["cron"] = parsedCron
-
-		// If there was an original friendly format, store it for later use
-		if original != "" {
-			c.scheduleFriendlyFormats[i] = original
 		}
 	}
 
@@ -334,7 +345,46 @@ func (c *Compiler) preprocessScheduleFields(frontmatter map[string]any, markdown
 		schedulePreprocessingLog.Printf("Adding workflow_dispatch to scheduled workflow")
 		onMap["workflow_dispatch"] = nil
 	}
+	return nil
+}
 
+func (c *Compiler) preprocessScheduleItem(i int, item any) error {
+	itemMap, ok := item.(map[string]any)
+	if !ok {
+		return fmt.Errorf("schedule item %d should be an object with a 'cron' field. Example: { cron: \"0 9 * * 1\" }", i)
+	}
+
+	cronValue, hasCron := itemMap["cron"]
+	if !hasCron {
+		return fmt.Errorf("schedule item %d is missing the required 'cron' field. Example: { cron: \"0 9 * * 1\" }", i)
+	}
+
+	cronStr, ok := cronValue.(string)
+	if !ok {
+		return fmt.Errorf("schedule item %d 'cron' field should be a string, got %T. Example: cron: \"0 9 * * 1\"", i, cronValue)
+	}
+
+	// Validate optional timezone field (IANA timezone string)
+	if tzValue, hasTimezone := itemMap["timezone"]; hasTimezone {
+		if _, ok := tzValue.(string); !ok {
+			return fmt.Errorf("schedule item %d 'timezone' field should be a string with an IANA timezone name, got %T. Example: timezone: \"America/New_York\"", i, tzValue)
+		}
+	}
+
+	// Try to parse as human-friendly schedule
+	parsedCron, original, err := c.normalizeScheduleString(cronStr, i)
+	if err != nil {
+		// Error already includes item index from normalizeScheduleString
+		return err
+	}
+
+	// Update the cron field with the parsed cron expression
+	itemMap["cron"] = parsedCron
+
+	// If there was an original friendly format, store it for later use
+	if original != "" {
+		c.scheduleFriendlyFormats[i] = original
+	}
 	return nil
 }
 
@@ -387,35 +437,7 @@ func (c *Compiler) createTriggerParseError(filePath, content, triggerStr string,
 	lines := strings.Split(content, "\n")
 
 	// Find the line where "on:" appears in the frontmatter
-	var onLine int
-	var onColumn int
-	inFrontmatter := false
-
-	for i, line := range lines {
-		lineNum := i + 1
-
-		// Check for frontmatter delimiter
-		if strings.TrimSpace(line) == "---" {
-			if !inFrontmatter {
-				inFrontmatter = true
-			} else {
-				// End of frontmatter
-				break
-			}
-			continue
-		}
-
-		if inFrontmatter {
-			// Look for "on:" field
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "on:") {
-				onLine = lineNum
-				// Find the column where "on:" starts
-				onColumn = strings.Index(line, "on:") + 1
-				break
-			}
-		}
-	}
+	onLine, onColumn := findTriggerFrontmatterPosition(lines)
 
 	// If we found the line, create a formatted error
 	if onLine > 0 {
@@ -449,6 +471,40 @@ func (c *Compiler) createTriggerParseError(filePath, content, triggerStr string,
 	// Fallback to original error if we can't find the line
 	schedulePreprocessingLog.Printf("Could not find 'on:' line in frontmatter, using fallback error")
 	return fmt.Errorf("trigger syntax error: %w", err)
+}
+
+func findTriggerFrontmatterPosition(lines []string) (int, int) {
+	var onLine int
+	var onColumn int
+	inFrontmatter := false
+
+	for i, line := range lines {
+		lineNum := i + 1
+
+		// Check for frontmatter delimiter
+		if strings.TrimSpace(line) == "---" {
+			if !inFrontmatter {
+				inFrontmatter = true
+			} else {
+				// End of frontmatter
+				break
+			}
+			continue
+		}
+
+		if inFrontmatter {
+			// Look for "on:" field
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "on:") {
+				onLine = lineNum
+				// Find the column where "on:" starts
+				onColumn = strings.Index(line, "on:") + 1
+				break
+			}
+		}
+	}
+
+	return onLine, onColumn
 }
 
 // addFriendlyScheduleComments adds comments showing the original friendly format for schedule cron expressions

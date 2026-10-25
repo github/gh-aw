@@ -28,8 +28,42 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 	}
 	evalsJobLog.Print("Building evals job")
 
-	var steps []string
+	steps := c.buildEvalsPreparationSteps(data)
 
+	// Determine job dependencies.
+	// Evals can run in parallel with safe_outputs.
+	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
+	if IsDetectionJobEnabled(data.SafeOutputs) {
+		needs = append(needs, string(constants.DetectionJobName))
+	}
+	evalsJobLog.Printf("Evals job dependencies resolved: needs=%v", needs)
+	alwaysFunc := BuildFunctionCall("always")
+	agentSucceeded := BuildEquals(
+		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
+		BuildStringLiteral("success"),
+	)
+	jobCondition := RenderCondition(BuildAnd(alwaysFunc, agentSucceeded))
+	runsOn := "runs-on: ubuntu-latest"
+	if data.Evals != nil && data.Evals.RunsOn != "" {
+		runsOn = normalizeRunsOnSnippet(data.Evals.RunsOn)
+	}
+	job := &Job{
+		Name:        string(constants.EvalsJobName),
+		Needs:       needs,
+		If:          jobCondition,
+		RunsOn:      c.indentYAMLLines(runsOn, "    "),
+		Environment: c.indentYAMLLines(data.Environment, "    "),
+		Permissions: evalsJobPermissions(data),
+		Outputs: map[string]string{
+			"aic": fmt.Sprintf("${{ steps.%s.outputs.aic }}", constants.ParseMCPGatewayStepID),
+		},
+		Steps: steps,
+	}
+	return job, nil
+}
+
+func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
+	var steps []string
 	// Add setup action steps (installs the agentic engine helper scripts).
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
 	if setupActionRef != "" || c.actionMode.IsScript() {
@@ -56,30 +90,10 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 	}
 
-	// Determine job dependencies.
-	// Evals always depends on agent and activation, and additionally on detection when the detection job is enabled.
-	// This allows evals to run in parallel with safe_outputs.
-	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
-	if IsDetectionJobEnabled(data.SafeOutputs) {
-		needs = append(needs, string(constants.DetectionJobName))
-	}
-	evalsJobLog.Printf("Evals job dependencies resolved: needs=%v", needs)
+	return steps
+}
 
-	// Evals job condition: run only after the agent job succeeds.
-	alwaysFunc := BuildFunctionCall("always")
-	agentSucceeded := BuildEquals(
-		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
-		BuildStringLiteral("success"),
-	)
-	jobConditionNode := BuildAnd(alwaysFunc, agentSucceeded)
-	jobCondition := RenderCondition(jobConditionNode)
-
-	// Determine runs-on: use evals override if set, otherwise ubuntu-latest.
-	runsOn := "runs-on: ubuntu-latest"
-	if data.Evals != nil && data.Evals.RunsOn != "" {
-		runsOn = normalizeRunsOnSnippet(data.Evals.RunsOn)
-	}
-
+func evalsJobPermissions(data *WorkflowData) string {
 	// Determine permissions for the evals job (same rationale as the detection job).
 	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data)
 	perms := NewPermissionsContentsRead()
@@ -92,22 +106,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
-	permissions := perms.RenderToYAML()
-
-	job := &Job{
-		Name:        string(constants.EvalsJobName),
-		Needs:       needs,
-		If:          jobCondition,
-		RunsOn:      c.indentYAMLLines(runsOn, "    "),
-		Environment: c.indentYAMLLines(data.Environment, "    "),
-		Permissions: permissions,
-		Outputs: map[string]string{
-			"aic": fmt.Sprintf("${{ steps.%s.outputs.aic }}", constants.ParseMCPGatewayStepID),
-		},
-		Steps: steps,
-	}
-
-	return job, nil
+	return perms.RenderToYAML()
 }
 
 // buildPushEvalsStateJob creates a job that downloads the evals artifact and commits it to a
@@ -150,27 +149,7 @@ func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
 	steps = append(steps, downloadArtifactInputLines(evalsArtifactName, downloadAction)...)
 	steps = append(steps, fmt.Sprintf("          path: %s\n", evalsStateDir))
 
-	branchName := evalsBranchName(data.WorkflowID)
-	steps = append(steps,
-		"      - name: Push evals results to git\n",
-		"        id: push_evals_state\n",
-		"        if: always()\n",
-		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
-		"        env:\n",
-		"          GH_TOKEN: ${{ github.token }}\n",
-		"          GITHUB_RUN_ID: ${{ github.run_id }}\n",
-		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
-		fmt.Sprintf("          GH_AW_STATE_DIR: %s\n", evalsStateDir),
-		fmt.Sprintf("          GH_AW_STATE_BRANCH: %s\n", branchName),
-		fmt.Sprintf("          GH_AW_STATE_FILES: %s\n", constants.EvalsResultFilename),
-		"          GH_AW_STATE_LABEL: evals results\n",
-		"        with:\n",
-		"          script: |\n",
-		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
-		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
-		"            const { main } = require('"+SetupActionDestination+"/push_experiment_state.cjs');\n",
-		"            await main();\n",
-	)
+	steps = append(steps, pushEvalsResultsStep(data)...)
 
 	if c.actionMode.IsDev() {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
@@ -193,4 +172,28 @@ func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
 	}
 
 	return job, nil
+}
+
+func pushEvalsResultsStep(data *WorkflowData) []string {
+	branchName := evalsBranchName(data.WorkflowID)
+	return []string{
+		"      - name: Push evals results to git\n",
+		"        id: push_evals_state\n",
+		"        if: always()\n",
+		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
+		"        env:\n",
+		"          GH_TOKEN: ${{ github.token }}\n",
+		"          GITHUB_RUN_ID: ${{ github.run_id }}\n",
+		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n",
+		fmt.Sprintf("          GH_AW_STATE_DIR: %s\n", evalsStateDir),
+		fmt.Sprintf("          GH_AW_STATE_BRANCH: %s\n", branchName),
+		fmt.Sprintf("          GH_AW_STATE_FILES: %s\n", constants.EvalsResultFilename),
+		"          GH_AW_STATE_LABEL: evals results\n",
+		"        with:\n",
+		"          script: |\n",
+		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
+		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
+		"            const { main } = require('" + SetupActionDestination + "/push_experiment_state.cjs');\n",
+		"            await main();\n",
+	}
 }

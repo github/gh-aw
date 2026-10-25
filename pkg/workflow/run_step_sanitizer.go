@@ -102,6 +102,37 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
+	ordered := collectSanitizedExpressions(matches)
+	if len(ordered) == 0 {
+		return step, nil, false
+	}
+	existingEnv, _ := step["env"].(map[string]any)
+	newEnv := mergeSanitizedExpressionEnv(existingEnv, ordered)
+
+	// Replace every occurrence of each expression in the run: script.
+	// Replacements are limited to non-quoted-heredoc regions: quoted heredocs
+	// (e.g. << 'EOF') suppress shell variable expansion, so replacing
+	// ${{ expr }} with $GH_AW_VAR inside them would write the literal variable
+	// name to the output file instead of the expression value. Expressions
+	// that appear exclusively inside heredocs are never added to `ordered` (see
+	// the scanContent check above), so they are left intact regardless.
+	newRun := runVal
+	for _, s := range ordered {
+		newRun = replaceOutsideQuotedHeredocs(newRun, s.Original, "$"+s.EnvVar)
+	}
+
+	// Build the sanitized step as a shallow copy.
+	sanitized := make(map[string]any, len(step))
+	maps.Copy(sanitized, step)
+	sanitized["run"] = newRun
+	sanitized["env"] = newEnv
+
+	// Build human-readable descriptions for caller warnings.
+	stepName, _ := step["name"].(string)
+	return sanitized, describeSanitizedExpressions(stepName, ordered), true
+}
+
+func collectSanitizedExpressions(matches [][]string) []sanitizedExpression {
 	// Build a deduplicated, ordered list of expressions to extract.
 	extractor := NewExpressionExtractor()
 	seen := make(map[string]struct {
@@ -124,10 +155,6 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		})
 	}
 
-	if len(ordered) == 0 {
-		return step, nil, false
-	}
-
 	// Sort longest expressions first to avoid partial replacements when one
 	// expression is a substring of another.
 	slices.SortFunc(ordered, func(a, b sanitizedExpression) int {
@@ -140,13 +167,15 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 			return 0
 		}
 	})
+	return ordered
+}
 
+func mergeSanitizedExpressionEnv(existingEnv map[string]any, ordered []sanitizedExpression) map[string]any {
 	// Merge extracted env vars into a copy of the existing env: map.
 	// Collision handling:
 	//   - If the generated key already exists with the same value → reuse as-is.
 	//   - If it exists with a different value → pick an alternate name by appending
 	//     a numeric suffix (_2, _3, …) so the original user-defined value is preserved.
-	existingEnv, _ := step["env"].(map[string]any)
 	newEnv := make(map[string]any, typeutil.SafeAllocationCapacity(len(existingEnv), len(ordered)))
 	maps.Copy(newEnv, existingEnv)
 
@@ -184,27 +213,10 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		}
 		newEnv[s.EnvVar] = s.Original
 	}
+	return newEnv
+}
 
-	// Replace every occurrence of each expression in the run: script.
-	// Replacements are limited to non-quoted-heredoc regions: quoted heredocs
-	// (e.g. << 'EOF') suppress shell variable expansion, so replacing
-	// ${{ expr }} with $GH_AW_VAR inside them would write the literal variable
-	// name to the output file instead of the expression value.  Expressions
-	// that appear exclusively inside heredocs are never added to `ordered` (see
-	// the scanContent check above), so they are left intact regardless.
-	newRun := runVal
-	for _, s := range ordered {
-		newRun = replaceOutsideQuotedHeredocs(newRun, s.Original, "$"+s.EnvVar)
-	}
-
-	// Build the sanitized step as a shallow copy.
-	sanitized := make(map[string]any, len(step))
-	maps.Copy(sanitized, step)
-	sanitized["run"] = newRun
-	sanitized["env"] = newEnv
-
-	// Build human-readable descriptions for caller warnings.
-	stepName, _ := step["name"].(string)
+func describeSanitizedExpressions(stepName string, ordered []sanitizedExpression) []string {
 	var descriptions []string
 	for _, s := range ordered {
 		var msg string
@@ -222,7 +234,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		descriptions = append(descriptions, msg)
 	}
 
-	return sanitized, descriptions, true
+	return descriptions
 }
 
 // sanitizeCustomStepsYAML parses a raw "steps: ..." YAML string (as produced by

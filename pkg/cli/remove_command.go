@@ -49,18 +49,7 @@ func RemoveWorkflows(pattern string, keepOrphans bool, workflowDir string) error
 
 	// If no pattern specified, list all files for user to see
 	if pattern == "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Available workflows to remove:"))
-		for _, file := range mdFiles {
-			workflowName, _ := extractWorkflowNameFromFile(file)
-			base := filepath.Base(file)
-			name := normalizeWorkflowID(base)
-			if workflowName != "" {
-				fmt.Fprintf(os.Stderr, "  %-20s - %s\n", name, workflowName)
-			} else {
-				fmt.Fprintf(os.Stderr, "  %s\n", name)
-			}
-		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("\nUsage: %s remove <filter>", string(constants.CLIExtensionPrefix))))
+		listAvailableRemovalWorkflows(mdFiles)
 		return nil
 	}
 
@@ -84,7 +73,25 @@ func RemoveWorkflows(pattern string, keepOrphans bool, workflowDir string) error
 	}
 
 	removeLog.Printf("Found %d workflows to remove", len(filesToRemove))
+	return removeSelectedWorkflows(filesToRemove, keepOrphans)
+}
 
+func listAvailableRemovalWorkflows(mdFiles []string) {
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Available workflows to remove:"))
+	for _, file := range mdFiles {
+		workflowName, _ := extractWorkflowNameFromFile(file)
+		base := filepath.Base(file)
+		name := normalizeWorkflowID(base)
+		if workflowName != "" {
+			fmt.Fprintf(os.Stderr, "  %-20s - %s\n", name, workflowName)
+		} else {
+			fmt.Fprintf(os.Stderr, "  %s\n", name)
+		}
+	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("\nUsage: %s remove <filter>", string(constants.CLIExtensionPrefix))))
+}
+
+func removeSelectedWorkflows(filesToRemove []string, keepOrphans bool) error {
 	// Preview orphaned includes that would be removed (if orphan removal is enabled)
 	var orphanedIncludes []string
 	if !keepOrphans {
@@ -96,6 +103,24 @@ func RemoveWorkflows(pattern string, keepOrphans bool, workflowDir string) error
 		}
 	}
 
+	displayWorkflowRemovalPreview(filesToRemove, orphanedIncludes)
+	confirmed, err := console.ConfirmAction(
+		"Are you sure you want to remove these workflows?",
+		"Yes, remove",
+		"No, cancel",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get confirmation: %w", err)
+	}
+	if !confirmed {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Operation cancelled."))
+		return nil
+	}
+	deleteSelectedWorkflowFiles(filesToRemove, keepOrphans)
+	return nil
+}
+
+func displayWorkflowRemovalPreview(filesToRemove, orphanedIncludes []string) {
 	// Show what will be removed
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("The following workflows will be removed:"))
 	for _, file := range filesToRemove {
@@ -121,20 +146,9 @@ func RemoveWorkflows(pattern string, keepOrphans bool, workflowDir string) error
 		}
 	}
 
-	// Ask for confirmation
-	confirmed, err := console.ConfirmAction(
-		"Are you sure you want to remove these workflows?",
-		"Yes, remove",
-		"No, cancel",
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get confirmation: %w", err)
-	}
-	if !confirmed {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Operation cancelled."))
-		return nil
-	}
+}
 
+func deleteSelectedWorkflowFiles(filesToRemove []string, keepOrphans bool) {
 	// Remove the files
 	var removedFiles []string
 	removedPackageSources := make(map[string]struct{})
@@ -179,7 +193,6 @@ func RemoveWorkflows(pattern string, keepOrphans bool, workflowDir string) error
 		stageWorkflowChanges()
 	}
 
-	return nil
 }
 
 // cleanupOrphanedIncludes removes include files that are no longer used by any workflow
@@ -197,32 +210,7 @@ func cleanupOrphanedIncludes(verbose bool) error {
 	}
 
 	// Collect all include dependencies from remaining workflows
-	usedIncludes := make(map[string]struct {
-	})
-
-	for _, mdFile := range mdFiles {
-		content, err := os.ReadFile(mdFile)
-		if err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read %s for include analysis: %v", mdFile, err)))
-			}
-			continue
-		}
-
-		// Find includes used by this workflow
-		includes, err := findIncludesInContent(string(content))
-		if err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not analyze includes in %s: %v", mdFile, err)))
-			}
-			continue
-		}
-
-		for _, include := range includes {
-			usedIncludes[include] = struct {
-			}{}
-		}
-	}
+	usedIncludes := collectUsedWorkflowIncludes(mdFiles, verbose)
 
 	// Find all include files in the workflows directory
 	// Only consider files in subdirectories (like shared/) as potential include files
@@ -255,6 +243,11 @@ func cleanupOrphanedIncludes(verbose bool) error {
 		return fmt.Errorf("failed to scan include files: %w", walkErr)
 	}
 
+	removeUnusedIncludeFiles(workflowsDir, allIncludes, usedIncludes, verbose)
+	return nil
+}
+
+func removeUnusedIncludeFiles(workflowsDir string, allIncludes []string, usedIncludes map[string]struct{}, verbose bool) {
 	// Remove unused includes
 	for _, include := range allIncludes {
 		if !setutil.Contains(usedIncludes, include) {
@@ -269,7 +262,35 @@ func cleanupOrphanedIncludes(verbose bool) error {
 		}
 	}
 
-	return nil
+}
+
+func collectUsedWorkflowIncludes(mdFiles []string, verbose bool) map[string]struct{} {
+	usedIncludes := make(map[string]struct{})
+	for _, mdFile := range mdFiles {
+		content, err := os.ReadFile(mdFile)
+		if err != nil {
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read %s for include analysis: %v", mdFile, err)))
+			}
+			continue
+		}
+
+		// Find includes used by this workflow
+		includes, err := findIncludesInContent(string(content))
+		if err != nil {
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not analyze includes in %s: %v", mdFile, err)))
+			}
+			continue
+		}
+
+		for _, include := range includes {
+			usedIncludes[include] = struct {
+			}{}
+		}
+	}
+
+	return usedIncludes
 }
 
 // previewOrphanedIncludes returns a list of include files that would become orphaned if the specified files were removed
@@ -302,32 +323,7 @@ func previewOrphanedIncludes(filesToRemove []string, verbose bool) ([]string, er
 	}
 
 	// Collect all include dependencies from remaining workflows
-	usedIncludes := make(map[string]struct {
-	})
-
-	for _, mdFile := range remainingFiles {
-		content, err := os.ReadFile(mdFile)
-		if err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read %s for include analysis: %v", mdFile, err)))
-			}
-			continue
-		}
-
-		// Find includes used by this workflow
-		includes, err := findIncludesInContent(string(content))
-		if err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not analyze includes in %s: %v", mdFile, err)))
-			}
-			continue
-		}
-
-		for _, include := range includes {
-			usedIncludes[include] = struct {
-			}{}
-		}
-	}
+	usedIncludes := collectUsedWorkflowIncludes(remainingFiles, verbose)
 
 	// Find all include files and check which ones would be orphaned
 	allIncludes, err := getAllIncludeFiles()
@@ -456,31 +452,7 @@ func parseIncludePath(line string) string {
 	case strings.HasPrefix(trimmed, "@import"):
 		rest = trimmed[len("@import"):]
 	case strings.HasPrefix(trimmed, "{{#import"):
-		rest = trimmed[len("{{#import"):]
-		// Skip optional marker '?'
-		if rest != "" && rest[0] == '?' {
-			rest = rest[1:]
-		}
-		// Skip optional whitespace, then an optional single colon, then optional whitespace
-		// (mirrors the regex \s*:?\s* in IncludeDirectivePattern)
-		rest = strings.TrimSpace(rest)
-		if rest != "" && rest[0] == ':' {
-			rest = strings.TrimSpace(rest[1:])
-		}
-		// Extract path up to closing "}}" and require only whitespace after it.
-		before, after, ok := strings.Cut(rest, "}}")
-		if !ok || strings.TrimSpace(after) != "" {
-			return ""
-		}
-		path := strings.TrimSpace(before)
-		if path == "" {
-			return ""
-		}
-		// Strip section reference (file.md#Section → file.md)
-		if filePath, _, ok := strings.Cut(path, "#"); ok {
-			return filePath
-		}
-		return path
+		return parseMustacheIncludePath(trimmed[len("{{#import"):])
 	default:
 		return ""
 	}
@@ -494,6 +466,33 @@ func parseIncludePath(line string) string {
 		return ""
 	}
 	path := strings.TrimSpace(rest)
+	if path == "" {
+		return ""
+	}
+	// Strip section reference (file.md#Section → file.md)
+	if filePath, _, ok := strings.Cut(path, "#"); ok {
+		return filePath
+	}
+	return path
+}
+
+func parseMustacheIncludePath(rest string) string {
+	// Skip optional marker '?'
+	if rest != "" && rest[0] == '?' {
+		rest = rest[1:]
+	}
+	// Skip optional whitespace, then an optional single colon, then optional whitespace
+	// (mirrors the regex \s*:?\s* in IncludeDirectivePattern)
+	rest = strings.TrimSpace(rest)
+	if rest != "" && rest[0] == ':' {
+		rest = strings.TrimSpace(rest[1:])
+	}
+	// Extract path up to closing "}}" and require only whitespace after it.
+	before, after, ok := strings.Cut(rest, "}}")
+	if !ok || strings.TrimSpace(after) != "" {
+		return ""
+	}
+	path := strings.TrimSpace(before)
 	if path == "" {
 		return ""
 	}

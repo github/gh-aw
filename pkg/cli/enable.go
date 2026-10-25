@@ -21,6 +21,14 @@ import (
 
 var enableLog = logger.New("cli:enable")
 
+type workflowToggleTarget struct {
+	Name           string
+	ID             int64  // 0 if unknown
+	LockFileBase   string // e.g., dev.lock.yml
+	CurrentState   string // known state or "unknown"
+	HasGitHubEntry bool
+}
+
 // EnableWorkflowsByNames enables workflows by specific names, or all if no names provided
 func EnableWorkflowsByNames(ctx context.Context, workflowNames []string, repoOverride string) error {
 	enableLog.Printf("EnableWorkflowsByNames called: workflow_count=%d, repo=%s", len(workflowNames), repoOverride)
@@ -44,28 +52,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 
 	// If no specific workflow names provided, enable/disable all workflows
 	if len(workflowNames) == 0 {
-		enableLog.Print("No specific workflows provided, processing all workflows")
-		fmt.Fprintf(os.Stderr, "No specific workflows provided. %sing all workflows...\n", strings.ToUpper(action[:1])+action[1:])
-		// Get all workflow names and process them
-		mdFiles, err := getMarkdownWorkflowFiles("")
-		if err != nil {
-			return fmt.Errorf("no workflow files found to %s: %w", action, err)
-		}
-
-		if len(mdFiles) == 0 {
-			return fmt.Errorf("no markdown workflow files found to %s", action)
-		}
-
-		// Extract all workflow names
-		var allWorkflowNames []string
-		for _, file := range mdFiles {
-			base := filepath.Base(file)
-			name := normalizeWorkflowID(base)
-			allWorkflowNames = append(allWorkflowNames, name)
-		}
-
-		// Recursively call with all workflow names
-		return toggleWorkflowsByNames(ctx, allWorkflowNames, enable, repoOverride)
+		return toggleAllMarkdownWorkflows(ctx, enable, action, repoOverride)
 	}
 
 	// Check if gh CLI is available
@@ -89,16 +76,32 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	}
 	enableLog.Printf("Retrieved %d GitHub workflows from remote", len(githubWorkflows))
 
-	// Internal target model to support enabling by ID or lock filename
-	type workflowTarget struct {
-		Name           string
-		ID             int64  // 0 if unknown
-		LockFileBase   string // e.g., dev.lock.yml
-		CurrentState   string // known state or "unknown"
-		HasGitHubEntry bool
+	targets, notFoundNames := collectWorkflowToggleTargets(ctx, workflowNames, mdFiles, githubWorkflows, enable)
+	if len(notFoundNames) > 0 {
+		return workflowToggleNotFoundError(notFoundNames)
 	}
+	return applyWorkflowToggleTargets(targets, enable, action, repoOverride)
+}
 
-	var targets []workflowTarget
+func toggleAllMarkdownWorkflows(ctx context.Context, enable bool, action, repoOverride string) error {
+	enableLog.Print("No specific workflows provided, processing all workflows")
+	fmt.Fprintf(os.Stderr, "No specific workflows provided. %sing all workflows...\n", strings.ToUpper(action[:1])+action[1:])
+	mdFiles, err := getMarkdownWorkflowFiles("")
+	if err != nil {
+		return fmt.Errorf("no workflow files found to %s: %w", action, err)
+	}
+	if len(mdFiles) == 0 {
+		return fmt.Errorf("no markdown workflow files found to %s", action)
+	}
+	var names []string
+	for _, file := range mdFiles {
+		names = append(names, normalizeWorkflowID(filepath.Base(file)))
+	}
+	return toggleWorkflowsByNames(ctx, names, enable, repoOverride)
+}
+
+func collectWorkflowToggleTargets(ctx context.Context, workflowNames, mdFiles []string, githubWorkflows map[string]*GitHubWorkflow, enable bool) ([]workflowToggleTarget, []string) {
+	var targets []workflowToggleTarget
 	var notFoundNames []string
 
 	// Find matching workflows by name
@@ -112,49 +115,10 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 			if name == workflowName {
 				found = true
 
-				// Determine lock file and GitHub status (if available)
-				lockFile := stringutil.MarkdownToLockFile(file)
-				lockFileBase := filepath.Base(lockFile)
-
 				githubWorkflow, exists := githubWorkflows[name]
-
-				// If enabling and lock file doesn't exist locally, try to compile it
-				if enable {
-					if _, err := os.Stat(lockFile); os.IsNotExist(err) {
-						if err := compileWorkflow(ctx, file, false, false, ""); err != nil {
-							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflow %s to create lock file: %v", name, err)))
-							// If we can't compile and there's no GitHub entry, skip because we can't address it
-							if !exists {
-								continue
-							}
-						}
-					}
-				}
-
-				// Skip if no work is needed based on known GitHub state
-				if exists {
-					if enable && githubWorkflow.State == "active" {
-						// Already enabled
-						fmt.Fprintf(os.Stderr, "Workflow %s is already enabled\n", name)
-						continue
-					}
-					if !enable && githubWorkflow.State == "disabled_manually" {
-						// Already disabled
-						fmt.Fprintf(os.Stderr, "Workflow %s is already disabled\n", name)
-						continue
-					}
-				}
-
-				t := workflowTarget{
-					Name:           name,
-					ID:             0,
-					LockFileBase:   lockFileBase,
-					CurrentState:   "unknown",
-					HasGitHubEntry: exists,
-				}
-				if exists {
-					t.ID = githubWorkflow.ID
-					t.CurrentState = githubWorkflow.State
+				t, ok := buildWorkflowToggleTarget(ctx, file, name, githubWorkflow, exists, enable)
+				if !ok {
+					continue
 				}
 				targets = append(targets, t)
 				break
@@ -164,30 +128,69 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 			notFoundNames = append(notFoundNames, workflowName)
 		}
 	}
+	return targets, notFoundNames
+}
 
-	// Report any workflows that weren't found
-	if len(notFoundNames) > 0 {
-		enableLog.Printf("Workflows not found: %v", notFoundNames)
-		suggestions := []string{
-			fmt.Sprintf("Run '%s status' to see all available workflows", string(constants.CLIExtensionPrefix)),
-			"Check for typos in the workflow names",
-			"Ensure the workflows have been compiled and pushed to GitHub",
-		}
-
-		// Add fuzzy match suggestions for each not found workflow
-		if len(notFoundNames) == 1 {
-			similarNames := suggestWorkflowNames(notFoundNames[0])
-			if len(similarNames) > 0 {
-				suggestions = append([]string{fmt.Sprintf("Did you mean: %s?", strings.Join(similarNames, ", "))}, suggestions...)
+func buildWorkflowToggleTarget(ctx context.Context, file, name string, githubWorkflow *GitHubWorkflow, exists, enable bool) (workflowToggleTarget, bool) {
+	lockFile := stringutil.MarkdownToLockFile(file)
+	lockFileBase := filepath.Base(lockFile)
+	if enable {
+		if _, err := os.Stat(lockFile); os.IsNotExist(err) {
+			if err := compileWorkflow(ctx, file, false, false, ""); err != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflow %s to create lock file: %v", name, err)))
+				if !exists {
+					return workflowToggleTarget{}, false
+				}
 			}
 		}
+	}
+	if exists {
+		if enable && githubWorkflow.State == "active" {
+			fmt.Fprintf(os.Stderr, "Workflow %s is already enabled\n", name)
+			return workflowToggleTarget{}, false
+		}
+		if !enable && githubWorkflow.State == "disabled_manually" {
+			fmt.Fprintf(os.Stderr, "Workflow %s is already disabled\n", name)
+			return workflowToggleTarget{}, false
+		}
+	}
+	t := workflowToggleTarget{
+		Name:           name,
+		ID:             0,
+		LockFileBase:   lockFileBase,
+		CurrentState:   "unknown",
+		HasGitHubEntry: exists,
+	}
+	if exists {
+		t.ID = githubWorkflow.ID
+		t.CurrentState = githubWorkflow.State
+	}
+	return t, true
+}
 
-		return errors.New(console.FormatErrorWithSuggestions(
-			"workflows not found: "+strings.Join(notFoundNames, ", "),
-			suggestions,
-		))
+func workflowToggleNotFoundError(notFoundNames []string) error {
+	// Report any workflows that weren't found
+	enableLog.Printf("Workflows not found: %v", notFoundNames)
+	suggestions := []string{
+		fmt.Sprintf("Run '%s status' to see all available workflows", string(constants.CLIExtensionPrefix)),
+		"Check for typos in the workflow names",
+		"Ensure the workflows have been compiled and pushed to GitHub",
+	}
+	// Add fuzzy match suggestions for each not found workflow
+	if len(notFoundNames) == 1 {
+		similarNames := suggestWorkflowNames(notFoundNames[0])
+		if len(similarNames) > 0 {
+			suggestions = append([]string{fmt.Sprintf("Did you mean: %s?", strings.Join(similarNames, ", "))}, suggestions...)
+		}
 	}
 
+	return errors.New(console.FormatErrorWithSuggestions(
+		"workflows not found: "+strings.Join(notFoundNames, ", "),
+		suggestions,
+	))
+}
+
+func applyWorkflowToggleTargets(targets []workflowToggleTarget, enable bool, action, repoOverride string) error {
 	// If no targets after filtering, everything was already in the desired state
 	if len(targets) == 0 {
 		enableLog.Printf("No workflows need to be %sd - all already in desired state", action)
@@ -206,45 +209,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	var failures []string
 
 	for _, t := range targets {
-		var cmd *exec.Cmd
-		if enable {
-			// Prefer enabling by ID, otherwise fall back to lock file name
-			if t.ID != 0 {
-				args := []string{"workflow", "enable", strconv.FormatInt(t.ID, 10)}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
-			} else {
-				args := []string{"workflow", "enable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
-			}
-		} else {
-			// First cancel any running workflows (by ID when available, else by lock file name)
-			if t.ID != 0 {
-				if err := cancelWorkflowRuns(t.ID); err != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
-				}
-				// Prefer disabling by lock file name for reliability
-				args := []string{"workflow", "disable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
-			} else {
-				if err := cancelWorkflowRunsByLockFile(t.LockFileBase); err != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
-				}
-				args := []string{"workflow", "disable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
-			}
-		}
+		cmd := workflowToggleCommand(t, enable, repoOverride)
 
 		if output, err := cmd.CombinedOutput(); err != nil {
 			if len(output) > 0 {
@@ -273,6 +238,50 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	}
 
 	return nil
+}
+
+func workflowToggleCommand(t workflowToggleTarget, enable bool, repoOverride string) *exec.Cmd {
+	var cmd *exec.Cmd
+	if enable {
+		// Prefer enabling by ID, otherwise fall back to lock file name
+		if t.ID != 0 {
+			args := []string{"workflow", "enable", strconv.FormatInt(t.ID, 10)}
+			if repoOverride != "" {
+				args = append(args, "--repo", repoOverride)
+			}
+			cmd = workflow.ExecGH(args...)
+		} else {
+			args := []string{"workflow", "enable", t.LockFileBase}
+			if repoOverride != "" {
+				args = append(args, "--repo", repoOverride)
+			}
+			cmd = workflow.ExecGH(args...)
+		}
+	} else {
+		// First cancel any running workflows (by ID when available, else by lock file name)
+		if t.ID != 0 {
+			if err := cancelWorkflowRuns(t.ID); err != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
+			}
+			// Prefer disabling by lock file name for reliability
+			args := []string{"workflow", "disable", t.LockFileBase}
+			if repoOverride != "" {
+				args = append(args, "--repo", repoOverride)
+			}
+			cmd = workflow.ExecGH(args...)
+		} else {
+			if err := cancelWorkflowRunsByLockFile(t.LockFileBase); err != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
+			}
+			args := []string{"workflow", "disable", t.LockFileBase}
+			if repoOverride != "" {
+				args = append(args, "--repo", repoOverride)
+			}
+			cmd = workflow.ExecGH(args...)
+		}
+	}
+
+	return cmd
 }
 
 // DisableAllWorkflowsExcept disables all workflows except the specified ones
@@ -308,6 +317,11 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 		return nil
 	}
 
+	workflowsToDisable := filterWorkflowsToDisable(allYAMLFiles, exceptWorkflows, verbose)
+	return disableTrialWorkflowFiles(workflowsToDisable, repoSlug, verbose)
+}
+
+func filterWorkflowsToDisable(allYAMLFiles, exceptWorkflows []string, verbose bool) []string {
 	// Create a set of workflows to keep enabled
 	keepEnabled := make(map[string]struct {
 	})
@@ -346,7 +360,10 @@ func DisableAllWorkflowsExcept(repoSlug string, exceptWorkflows []string, verbos
 
 		workflowsToDisable = append(workflowsToDisable, base)
 	}
+	return workflowsToDisable
+}
 
+func disableTrialWorkflowFiles(workflowsToDisable []string, repoSlug string, verbose bool) error {
 	if len(workflowsToDisable) == 0 {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflows to disable"))

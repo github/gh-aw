@@ -5,6 +5,7 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -303,6 +304,37 @@ jobs:
 
 	err = compiler.validateDispatchWorkflow(workflowData, dispatcherFile)
 	assert.NoError(t, err, "Workflow should resolve from GH_AW_WORKFLOWS_DIR override")
+}
+
+func TestDispatchWorkflowValidation_CollectsQueueAndTriggerErrors(t *testing.T) {
+	for _, failFast := range []bool{false, true} {
+		name := "aggregate"
+		if failFast {
+			name = "fail-fast"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			workflowsDir := filepath.Join(root, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
+			source := "---\non: issues\ntools:\n  work-queue:\n---\nRun work.\n"
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "worker.md"), []byte(source), 0o600))
+			data := &WorkflowData{
+				Tools: map[string]any{"work-queue": true},
+				SafeOutputs: &SafeOutputsConfig{
+					DispatchWorkflow: &DispatchWorkflowConfig{Workflows: []string{"worker"}},
+				},
+			}
+			compiler := NewCompiler(WithVersion("1.0.0"), WithFailFast(failFast))
+			err := compiler.validateDispatchWorkflow(data, filepath.Join(root, ".github", "aw", "dispatcher.md"))
+			require.ErrorContains(t, err, "tools.work-queue.worker: true")
+			if failFast {
+				assert.NotContains(t, err.Error(), "does not support workflow_dispatch")
+			} else {
+				assert.Contains(t, err.Error(), "does not support workflow_dispatch")
+				assert.Less(t, strings.Index(err.Error(), "tools.work-queue.worker: true"), strings.Index(err.Error(), "does not support workflow_dispatch"))
+			}
+		})
+	}
 }
 
 func TestShouldSkipLocalDispatchWorkflowValidation(t *testing.T) {

@@ -80,6 +80,17 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 	}
 
 	// Build the step based on action mode
+	scriptSteps := c.buildSafeOutputScriptSteps(data, config)
+	steps = append(steps, scriptSteps...)
+
+	// Add post-steps if provided (e.g., assignees, reviewers)
+	if len(config.PostSteps) > 0 {
+		steps = append(steps, config.PostSteps...)
+	}
+	return c.finishSafeOutputJob(data, config, steps), nil
+}
+
+func (c *Compiler) buildSafeOutputScriptSteps(data *WorkflowData, config SafeOutputJobConfig) []string {
 	var scriptSteps []string
 	if c.actionMode.UsesExternalActions() && config.ScriptName != "" {
 		// Use custom action mode (dev or release) if enabled and script name is provided
@@ -116,13 +127,10 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 			UseCopilotCodingAgentToken: config.UseCopilotCodingAgentToken,
 		})
 	}
-	steps = append(steps, scriptSteps...)
+	return scriptSteps
+}
 
-	// Add post-steps if provided (e.g., assignees, reviewers)
-	if len(config.PostSteps) > 0 {
-		steps = append(steps, config.PostSteps...)
-	}
-
+func (c *Compiler) finishSafeOutputJob(data *WorkflowData, config SafeOutputJobConfig, steps []string) *Job {
 	// Determine job condition
 	jobCondition := config.Condition
 	if jobCondition == nil {
@@ -150,5 +158,5 @@ func (c *Compiler) buildSafeOutputJob(data *WorkflowData, config SafeOutputJobCo
 		Needs:          needs,
 	}
 
-	return job, nil
+	return job
 }

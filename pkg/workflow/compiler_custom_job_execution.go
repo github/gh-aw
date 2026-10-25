@@ -74,33 +74,13 @@ func (c *Compiler) configureCustomJobSteps(job *Job, jobName string, configMap m
 	// `setup-steps` and `pre-steps` stay distinct so setup-steps can remain the
 	// first injected steps in the job, followed by compiler scaffolding,
 	// `pre-steps`, and the regular `steps` list.
-	var setupSteps []string
-	var preSteps []string
-	var regularSteps []string
 	_, hasSetupStepsField := configMap["setup-steps"]
 	_, hasPreStepsField := configMap["pre-steps"]
 	_, hasStepsField := configMap["steps"]
 
-	if hasSetupStepsField {
-		var err error
-		setupSteps, err = c.extractPinnedJobSteps("setup-steps", jobName, configMap, data)
-		if err != nil {
-			return fmt.Errorf("setup-steps for job '%s' could not be processed: %w. Check that setup-steps is an array of valid step objects", jobName, err)
-		}
-	}
-	if hasPreStepsField {
-		var err error
-		preSteps, err = c.extractPinnedJobSteps("pre-steps", jobName, configMap, data)
-		if err != nil {
-			return fmt.Errorf("pre-steps for job '%s' could not be processed: %w. Check that pre-steps is an array of valid step objects", jobName, err)
-		}
-	}
-	if hasStepsField {
-		var err error
-		regularSteps, err = c.extractPinnedJobSteps("steps", jobName, configMap, data)
-		if err != nil {
-			return fmt.Errorf("steps for job '%s' could not be processed: %w. Check that steps is an array of valid step objects", jobName, err)
-		}
+	setupSteps, preSteps, regularSteps, err := c.extractCustomJobStepGroups(jobName, configMap, data)
+	if err != nil {
+		return err
 	}
 
 	// Parse restore-memory configuration.
@@ -116,7 +96,44 @@ func (c *Compiler) configureCustomJobSteps(job *Job, jobName string, configMap m
 	// When cache-memory restore is requested, inject GH_AW_WORKFLOW_ID_SANITIZED so that
 	// restore keys match those used by the agent job.  Only set it when the user has not
 	// already provided the variable in their job's env: block.
-	if hasRestoreMemory && restoreMemCfg.CacheMemory && data.WorkflowID != "" {
+	configureCustomJobMemoryEnv(job, restoreMemCfg, data)
+
+	if hasSetupStepsField || hasPreStepsField || hasStepsField || hasRestoreMemory {
+		return c.appendCustomJobSteps(job, jobName, data, restoreMemCfg, setupSteps, preSteps, regularSteps)
+	}
+
+	return nil
+}
+
+func (c *Compiler) extractCustomJobStepGroups(jobName string, configMap map[string]any, data *WorkflowData) ([]string, []string, []string, error) {
+	setupSteps, err := c.extractCustomJobStepField("setup-steps", jobName, configMap, data)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	preSteps, err := c.extractCustomJobStepField("pre-steps", jobName, configMap, data)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	regularSteps, err := c.extractCustomJobStepField("steps", jobName, configMap, data)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return setupSteps, preSteps, regularSteps, nil
+}
+
+func (c *Compiler) extractCustomJobStepField(field, jobName string, configMap map[string]any, data *WorkflowData) ([]string, error) {
+	if _, exists := configMap[field]; !exists {
+		return nil, nil
+	}
+	steps, err := c.extractPinnedJobSteps(field, jobName, configMap, data)
+	if err != nil {
+		return nil, fmt.Errorf("%s for job '%s' could not be processed: %w. Check that %s is an array of valid step objects", field, jobName, err, field)
+	}
+	return steps, nil
+}
+
+func configureCustomJobMemoryEnv(job *Job, restoreMemCfg *restoreMemoryConfig, data *WorkflowData) {
+	if restoreMemCfg != nil && restoreMemCfg.CacheMemory && data.WorkflowID != "" {
 		sanitized := SanitizeWorkflowIDForCacheKey(data.WorkflowID)
 		if job.Env == nil {
 			job.Env = make(map[string]string)
@@ -126,30 +143,30 @@ func (c *Compiler) configureCustomJobSteps(job *Job, jobName string, configMap m
 		}
 	}
 
-	if hasSetupStepsField || hasPreStepsField || hasStepsField || hasRestoreMemory {
-		job.Steps = append(job.Steps, setupSteps...)
-		// Prepend GH_HOST configuration step for GHES/GHEC compatibility.
-		// Custom frontmatter jobs run as independent GitHub Actions jobs that
-		// don't inherit GITHUB_ENV from the agent job, so the gh CLI won't
-		// know which host to target without this step.
-		job.Steps = append(job.Steps, generateGHESHostConfigurationStep())
+}
 
-		// Inject gh-aw setup + memory restore steps when restore-memory is requested.
-		// Setup lines come first (they install scripts needed by repo/comment memory).
-		// Memory lines follow immediately after (restore/clone/prepare steps).
-		if hasRestoreMemory {
-			memorySetupLines, memoryRestoreLines, memErr := c.buildRestoreMemorySteps(restoreMemCfg, jobName, data)
-			if memErr != nil {
-				return memErr
-			}
-			job.Steps = append(job.Steps, memorySetupLines...)
-			job.Steps = append(job.Steps, memoryRestoreLines...)
+func (c *Compiler) appendCustomJobSteps(job *Job, jobName string, data *WorkflowData, restoreMemCfg *restoreMemoryConfig, setupSteps, preSteps, regularSteps []string) error {
+	job.Steps = append(job.Steps, setupSteps...)
+	// Prepend GH_HOST configuration step for GHES/GHEC compatibility.
+	// Custom frontmatter jobs run as independent GitHub Actions jobs that
+	// don't inherit GITHUB_ENV from the agent job, so the gh CLI won't
+	// know which host to target without this step.
+	job.Steps = append(job.Steps, generateGHESHostConfigurationStep())
+
+	// Inject gh-aw setup + memory restore steps when restore-memory is requested.
+	// Setup lines come first (they install scripts needed by repo/comment memory).
+	// Memory lines follow immediately after (restore/clone/prepare steps).
+	if restoreMemCfg != nil {
+		memorySetupLines, memoryRestoreLines, memErr := c.buildRestoreMemorySteps(restoreMemCfg, jobName, data)
+		if memErr != nil {
+			return memErr
 		}
-
-		job.Steps = append(job.Steps, preSteps...)
-		job.Steps = append(job.Steps, regularSteps...)
+		job.Steps = append(job.Steps, memorySetupLines...)
+		job.Steps = append(job.Steps, memoryRestoreLines...)
 	}
 
+	job.Steps = append(job.Steps, preSteps...)
+	job.Steps = append(job.Steps, regularSteps...)
 	return nil
 }
 

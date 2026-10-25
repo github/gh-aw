@@ -64,6 +64,10 @@ func (c *Compiler) extractCustomJobCoreProperties(job *Job, jobName string, conf
 		return err
 	}
 
+	return extractCustomJobExecutionProperties(job, jobName, configMap)
+}
+
+func extractCustomJobExecutionProperties(job *Job, jobName string, configMap map[string]any) error {
 	extractCustomJobEnv(job, configMap)
 
 	if err := extractCustomJobContainer(job, jobName, configMap); err != nil {
@@ -109,7 +113,13 @@ func extractCustomJobTimeoutMinutes(job *Job, jobName string, configMap map[stri
 		return nil
 	}
 
-	isGeneratedJob := jobName == string(constants.AgentJobName) || jobName == string(constants.DetectionJobName)
+	if v, ok := timeout.(string); ok {
+		return extractCustomJobTimeoutExpression(job, jobName, v)
+	}
+	return extractCustomJobNumericTimeout(job, jobName, timeout)
+}
+
+func extractCustomJobNumericTimeout(job *Job, jobName string, timeout any) error {
 	const maxLosslessIntFloat64 = float64(1 << 53)
 	timeoutMustBePositiveIntegerErr := func(got any) error {
 		return fmt.Errorf("job '%s' timeout-minutes must be a positive integer, got %v", jobName, got)
@@ -144,30 +154,30 @@ func extractCustomJobTimeoutMinutes(job *Job, jobName string, configMap map[stri
 		}
 		job.TimeoutMinutes = int(minutes64)
 		job.TimeoutMinutesExpression = ""
-	case string:
-		if strings.TrimSpace(v) == "" {
-			return timeoutMustBePositiveIntegerErr(v)
-		}
-		if isGeneratedJob {
-			return fmt.Errorf("job '%s' timeout-minutes must be a positive integer; expressions are not supported", jobName)
-		}
-		// isExpression validates full GitHub Actions expression syntax (${{
-		// ... }}) and is defined in expression_patterns.go.
-		if isExpression(v) {
-			job.TimeoutMinutes = 0
-			job.TimeoutMinutesExpression = v
-		} else {
-			return fmt.Errorf(
-				"job '%s' timeout-minutes must be an integer or a GitHub Actions expression, got %q. Example: timeout-minutes: 30 or ${{ inputs.timeout }}",
-				jobName,
-				v,
-			)
-		}
 	default:
 		return timeoutMustBePositiveIntegerErr(v)
 	}
 
 	return nil
+}
+
+func extractCustomJobTimeoutExpression(job *Job, jobName string, value string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("job '%s' timeout-minutes must be a positive integer, got %v", jobName, value)
+	}
+	if jobName == string(constants.AgentJobName) || jobName == string(constants.DetectionJobName) {
+		return fmt.Errorf("job '%s' timeout-minutes must be a positive integer; expressions are not supported", jobName)
+	}
+	if isExpression(value) {
+		job.TimeoutMinutes = 0
+		job.TimeoutMinutesExpression = value
+		return nil
+	}
+	return fmt.Errorf(
+		"job '%s' timeout-minutes must be an integer or a GitHub Actions expression, got %q. Example: timeout-minutes: 30 or ${{ inputs.timeout }}",
+		jobName,
+		value,
+	)
 }
 
 func extractCustomJobConcurrency(job *Job, jobName string, configMap map[string]any) error {

@@ -166,35 +166,43 @@ func FetchIncludeFromSource(ctx context.Context, includePath string, baseSpec *W
 
 	// Check if this is a workflowspec format (owner/repo/path[@ref])
 	if isWorkflowSpecFormat(cleanPath) {
-		// Split on @ to get path and ref
-		parts := strings.SplitN(cleanPath, "@", 2)
-		pathPart := parts[0]
-		var ref string
-		if len(parts) == 2 {
-			ref = parts[1]
-		} else {
-			ref = "main"
-		}
-
-		// Parse path: owner/repo/path/to/file.md
-		slashParts := strings.Split(pathPart, "/")
-		if len(slashParts) < 3 {
-			return nil, section, errors.New("invalid workflowspec: must be owner/repo/path[@ref]")
-		}
-
-		owner := slashParts[0]
-		repo := slashParts[1]
-		filePath := strings.Join(slashParts[2:], "/")
-
-		// Download the file
-		content, err := parser.DownloadFileFromGitHub(ctx, owner, repo, filePath, ref)
-		if err != nil {
-			return nil, section, fmt.Errorf("failed to fetch include from %s: %w", includePath, err)
-		}
-
-		return content, section, nil
+		return fetchWorkflowSpecInclude(ctx, cleanPath, includePath, section)
 	}
 
+	return fetchRelativeSourceInclude(ctx, cleanPath, includePath, section, baseSpec)
+}
+
+func fetchWorkflowSpecInclude(ctx context.Context, cleanPath, includePath, section string) ([]byte, string, error) {
+	// Split on @ to get path and ref
+	parts := strings.SplitN(cleanPath, "@", 2)
+	pathPart := parts[0]
+	var ref string
+	if len(parts) == 2 {
+		ref = parts[1]
+	} else {
+		ref = "main"
+	}
+
+	// Parse path: owner/repo/path/to/file.md
+	slashParts := strings.Split(pathPart, "/")
+	if len(slashParts) < 3 {
+		return nil, section, errors.New("invalid workflowspec: must be owner/repo/path[@ref]")
+	}
+
+	owner := slashParts[0]
+	repo := slashParts[1]
+	filePath := strings.Join(slashParts[2:], "/")
+
+	// Download the file
+	content, err := parser.DownloadFileFromGitHub(ctx, owner, repo, filePath, ref)
+	if err != nil {
+		return nil, section, fmt.Errorf("failed to fetch include from %s: %w", includePath, err)
+	}
+
+	return content, section, nil
+}
+
+func fetchRelativeSourceInclude(ctx context.Context, cleanPath, includePath, section string, baseSpec *WorkflowSpec) ([]byte, string, error) {
 	// For relative paths, resolve against the base spec
 	if baseSpec != nil && baseSpec.RepoSlug != "" {
 		parts := strings.SplitN(baseSpec.RepoSlug, "/", 2)
@@ -339,6 +347,27 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 		return nil
 	}
 
+	importPaths := frontmatterImportPaths(importsField)
+	if len(importPaths) == 0 {
+		return nil
+	}
+	remoteWorkflowLog.Printf("Processing %d frontmatter imports recursively: owner=%s, repo=%s, ref=%s", len(importPaths), opts.owner, opts.repo, opts.ref)
+	absTargetDir, err := filepath.Abs(opts.targetDir)
+	if err != nil {
+		if opts.strict {
+			return fmt.Errorf("failed to resolve import target directory: %w", err)
+		}
+		return nil
+	}
+	for _, importPath := range importPaths {
+		if err := fetchFrontmatterImport(ctx, importPath, currentBaseDir, absTargetDir, opts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func frontmatterImportPaths(importsField any) []string {
 	var importPaths []string
 	switch v := importsField.(type) {
 	case []any:
@@ -362,235 +391,235 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 	case []string:
 		importPaths = v
 	}
+	return importPaths
+}
 
-	if len(importPaths) == 0 {
+func fetchFrontmatterImport(ctx context.Context, importPath, currentBaseDir, absTargetDir string, opts frontmatterImportsOpts) error {
+	// Skip workflowspec-format imports (already pinned to a remote ref)
+	if isWorkflowSpecFormat(importPath) {
 		return nil
 	}
 
-	remoteWorkflowLog.Printf("Processing %d frontmatter imports recursively: owner=%s, repo=%s, ref=%s", len(importPaths), opts.owner, opts.repo, opts.ref)
+	// Strip any section reference (file.md#Section → file.md)
+	filePath := importPath
+	if before, _, hasSec := strings.Cut(importPath, "#"); hasSec {
+		filePath = before
+	}
+	if filePath == "" {
+		return nil
+	}
 
-	// Pre-compute the absolute target directory once for path-traversal boundary checks.
-	absTargetDir, err := filepath.Abs(opts.targetDir)
-	if err != nil {
+	remoteFilePath := resolveFrontmatterRemotePath(filePath, currentBaseDir, opts.originalBaseDir)
+	if remoteFilePath == ".." || strings.HasPrefix(remoteFilePath, "../") {
 		if opts.strict {
-			return fmt.Errorf("failed to resolve import target directory: %w", err)
+			return fmt.Errorf("import path %q escapes repository root", importPath)
+		}
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping import with unsafe path: %q", importPath)))
 		}
 		return nil
 	}
+	if setutil.Contains(opts.seen, remoteFilePath) {
+		remoteWorkflowLog.Printf("Skipping already-seen import: %s", remoteFilePath)
+		return nil
+	}
+	opts.seen[remoteFilePath] = struct{}{}
+	targetPath, err := resolveFrontmatterImportTarget(importPath, remoteFilePath, absTargetDir, opts)
+	if err != nil || targetPath == "" {
+		return err
+	}
+	return fetchAndSaveFrontmatterImport(ctx, remoteFilePath, targetPath, opts)
+}
 
-	for _, importPath := range importPaths {
-		// Skip workflowspec-format imports (already pinned to a remote ref)
-		if isWorkflowSpecFormat(importPath) {
-			continue
-		}
-
-		// Strip any section reference (file.md#Section → file.md)
-		filePath := importPath
-		if before, _, hasSec := strings.Cut(importPath, "#"); hasSec {
-			filePath = before
-		}
-		if filePath == "" {
-			continue
-		}
-
-		// Resolve the remote file path to an absolute repo path.
-		// Use path (not filepath) because this is always a forward-slash URL/API path.
-		var remoteFilePath string
-		if rest, ok := strings.CutPrefix(filePath, "/"); ok {
-			// Absolute path from repo root (e.g. "/scripts/helper.md")
-			remoteFilePath = rest
-		} else if strings.HasPrefix(filePath, "./") || strings.HasPrefix(filePath, "../") {
-			// Explicitly-relative path (e.g. "./serena.md"): resolve relative to the
-			// current importing file's directory so that sibling-file references work
-			// correctly regardless of nesting depth.
-			if currentBaseDir != "" {
-				remoteFilePath = path.Join(currentBaseDir, filePath)
-			} else {
-				remoteFilePath = filePath
-			}
+func resolveFrontmatterRemotePath(filePath, currentBaseDir, originalBaseDir string) string {
+	// Resolve the remote file path to an absolute repo path.
+	// Use path (not filepath) because this is always a forward-slash URL/API path.
+	var remoteFilePath string
+	if rest, ok := strings.CutPrefix(filePath, "/"); ok {
+		// Absolute path from repo root (e.g. "/scripts/helper.md")
+		remoteFilePath = rest
+	} else if strings.HasPrefix(filePath, "./") || strings.HasPrefix(filePath, "../") {
+		// Explicitly-relative path (e.g. "./serena.md"): resolve relative to the
+		// current importing file's directory so that sibling-file references work
+		// correctly regardless of nesting depth.
+		if currentBaseDir != "" {
+			remoteFilePath = path.Join(currentBaseDir, filePath)
 		} else {
-			// Non-explicit relative path: resolution strategy mirrors the compiler's
-			// determineNestedBaseDir logic — it depends on whether the path contains a
-			// "/" separator.
-			//
-			// Paths WITHOUT "/" (e.g. "helper.md"): the importing file treats them as
-			// siblings in its own directory, so resolve relative to currentBaseDir.
-			// Example: "control-precompute.md" from ".github/workflows/shared/control.md"
-			//          → ".github/workflows/shared/control-precompute.md"
-			//
-			// Paths WITH "/" (e.g. "shared/foo.md"): workflows in this repository write
-			// these paths relative to the workflow root (.github/workflows), not relative to
-			// the importing file's directory, so resolve against originalBaseDir.
-			// Example: "shared/reporting.md" from ".github/workflows/shared/daily-audit-base.md"
-			//          → ".github/workflows/shared/reporting.md"
-			var baseDir string
-			if !strings.Contains(filePath, "/") {
-				baseDir = currentBaseDir
-			} else {
-				baseDir = opts.originalBaseDir
-			}
-			if baseDir != "" {
-				remoteFilePath = path.Join(baseDir, filePath)
-			} else {
-				remoteFilePath = filePath
-			}
+			remoteFilePath = filePath
 		}
-		remoteFilePath = path.Clean(remoteFilePath)
-
-		// Reject paths that try to escape the repository root (e.g. "../../etc/passwd")
-		if remoteFilePath == ".." || strings.HasPrefix(remoteFilePath, "../") {
-			if opts.strict {
-				return fmt.Errorf("import path %q escapes repository root", importPath)
-			}
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping import with unsafe path: %q", importPath)))
-			}
-			continue
-		}
-
-		// Cycle/duplicate prevention: use the fully-resolved remote path as the key.
-		if setutil.Contains(opts.seen, remoteFilePath) {
-			remoteWorkflowLog.Printf("Skipping already-seen import: %s", remoteFilePath)
-			continue
-		}
-		opts.seen[remoteFilePath] = struct{}{}
-
-		// Derive the local path relative to targetDir by stripping the original base-dir
-		// prefix from the remote path. This ensures that imports in nested files resolve
-		// to the correct location regardless of how many levels deep the recursion goes.
+	} else {
+		// Non-explicit relative path: resolution strategy mirrors the compiler's
+		// determineNestedBaseDir logic — it depends on whether the path contains a
+		// "/" separator.
 		//
-		// Example: originalBaseDir=".github/workflows"
-		//   remoteFilePath=".github/workflows/shared/analysis.md" → localRelPath="shared/analysis.md"
-		//   (nested) remoteFilePath=".github/workflows/other.md"  → localRelPath="other.md"
-		var localRelPath string
-		if opts.originalBaseDir != "" && strings.HasPrefix(remoteFilePath, opts.originalBaseDir+"/") {
-			localRelPath = remoteFilePath[len(opts.originalBaseDir)+1:]
+		// Paths WITHOUT "/" (e.g. "helper.md"): the importing file treats them as
+		// siblings in its own directory, so resolve relative to currentBaseDir.
+		// Example: "control-precompute.md" from ".github/workflows/shared/control.md"
+		//          → ".github/workflows/shared/control-precompute.md"
+		//
+		// Paths WITH "/" (e.g. "shared/foo.md"): workflows in this repository write
+		// these paths relative to the workflow root (.github/workflows), not relative to
+		// the importing file's directory, so resolve against originalBaseDir.
+		// Example: "shared/reporting.md" from ".github/workflows/shared/daily-audit-base.md"
+		//          → ".github/workflows/shared/reporting.md"
+		var baseDir string
+		if !strings.Contains(filePath, "/") {
+			baseDir = currentBaseDir
 		} else {
-			// Workflow at repo root, or import outside the original base dir:
-			// use the full remote path relative to targetDir.
-			localRelPath = remoteFilePath
+			baseDir = originalBaseDir
 		}
-		localRelPath = filepath.Clean(filepath.FromSlash(localRelPath))
-		// Strip any leading separator produced by Clean on root-relative paths.
-		localRelPath = strings.TrimLeft(localRelPath, string(filepath.Separator))
-		// Reject empty or "." paths (would point to targetDir itself) as a safety guard.
-		// ".." cannot appear here because remoteFilePath was already rejected above if it
-		// started with "..", and path.Clean cannot introduce new ".." components.
-		if localRelPath == "" || localRelPath == "." {
-			if opts.strict {
-				return fmt.Errorf("invalid import path %q", importPath)
-			}
-			continue
+		if baseDir != "" {
+			remoteFilePath = path.Join(baseDir, filePath)
+		} else {
+			remoteFilePath = filePath
 		}
-		targetPath := filepath.Join(opts.targetDir, localRelPath)
+	}
+	remoteFilePath = path.Clean(remoteFilePath)
+	return remoteFilePath
+}
 
-		// Belt-and-suspenders: verify the resolved path is inside targetDir
-		absTargetPath, absErr := filepath.Abs(targetPath)
-		if absErr != nil {
-			if opts.strict {
-				return fmt.Errorf("failed to resolve import target path %q: %w", importPath, absErr)
-			}
-			continue
+func resolveFrontmatterImportTarget(importPath, remoteFilePath, absTargetDir string, opts frontmatterImportsOpts) (string, error) {
+	// Derive the local path relative to targetDir by stripping the original base-dir
+	// prefix from the remote path. This ensures that imports in nested files resolve
+	// to the correct location regardless of how many levels deep the recursion goes.
+	//
+	// Example: originalBaseDir=".github/workflows"
+	//   remoteFilePath=".github/workflows/shared/analysis.md" → localRelPath="shared/analysis.md"
+	//   (nested) remoteFilePath=".github/workflows/other.md"  → localRelPath="other.md"
+	var localRelPath string
+	if opts.originalBaseDir != "" && strings.HasPrefix(remoteFilePath, opts.originalBaseDir+"/") {
+		localRelPath = remoteFilePath[len(opts.originalBaseDir)+1:]
+	} else {
+		// Workflow at repo root, or import outside the original base dir:
+		// use the full remote path relative to targetDir.
+		localRelPath = remoteFilePath
+	}
+	localRelPath = filepath.Clean(filepath.FromSlash(localRelPath))
+	// Strip any leading separator produced by Clean on root-relative paths.
+	localRelPath = strings.TrimLeft(localRelPath, string(filepath.Separator))
+	// Reject empty or "." paths (would point to targetDir itself) as a safety guard.
+	// ".." cannot appear here because remoteFilePath was already rejected above if it
+	// started with "..", and path.Clean cannot introduce new ".." components.
+	if localRelPath == "" || localRelPath == "." {
+		if opts.strict {
+			return "", fmt.Errorf("invalid import path %q", importPath)
 		}
-		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
-			if opts.strict {
-				return fmt.Errorf("refusing to write import outside target directory: %q", importPath)
-			}
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside target directory: %q", importPath)))
-			}
-			continue
-		}
+		return "", nil
+	}
+	targetPath := filepath.Join(opts.targetDir, localRelPath)
 
-		// Check existence before downloading: if the file already exists and force=false,
-		// skip the download entirely (no unnecessary network round-trip). However, still
-		// recurse into the existing file's imports so that any transitive dependencies
-		// it references are fetched even when the parent file was already present.
-		fileExists := false
-		if fileutil.FileExists(targetPath) {
-			fileExists = true
-			if !opts.force {
-				if opts.verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Import file already exists, skipping: "+targetPath))
-				}
-				// Read the existing file so we can recurse into its own imports.
-				// If the read fails, log it and skip — the compiler will report
-				// any missing transitive dependencies.
-				if existingContent, readErr := os.ReadFile(targetPath); readErr == nil {
-					importedBaseDir := path.Dir(remoteFilePath)
-					if err := fetchFrontmatterImportsRecursive(ctx, string(existingContent), importedBaseDir, opts); err != nil && opts.strict {
-						return err
-					}
-				} else {
-					if opts.strict {
-						return fmt.Errorf("failed to read existing import %s: %w", targetPath, readErr)
-					}
-					remoteWorkflowLog.Printf("Failed to read existing import %s for recursion: %v", targetPath, readErr)
-				}
-				continue
-			}
+	// Belt-and-suspenders: verify the resolved path is inside targetDir
+	absTargetPath, absErr := filepath.Abs(targetPath)
+	if absErr != nil {
+		if opts.strict {
+			return "", fmt.Errorf("failed to resolve import target path %q: %w", importPath, absErr)
 		}
-
-		// Download from the source repository
-		downloadFn := opts.downloadFn
-		if downloadFn == nil {
-			downloadFn = downloadRemoteImportFile
+		return "", nil
+	}
+	if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
+		if opts.strict {
+			return "", fmt.Errorf("refusing to write import outside target directory: %q", importPath)
 		}
-		importContent, err := downloadFn(ctx, opts.owner, opts.repo, remoteFilePath, opts.ref)
-		if err != nil {
-			if opts.strict {
-				return fmt.Errorf("failed to fetch import %s: %w", remoteFilePath, err)
-			}
-			remoteWorkflowLog.Printf("Failed to download import %s from %s/%s@%s: %v", remoteFilePath, opts.owner, opts.repo, opts.ref, err)
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch import %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		// Create the parent directory if needed
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
-			if opts.strict {
-				return fmt.Errorf("failed to create directory for import %s: %w", remoteFilePath, err)
-			}
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for import %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		// Write the file
-		if err := os.WriteFile(targetPath, importContent, constants.FilePermSensitive); err != nil {
-			if opts.strict {
-				return fmt.Errorf("failed to write import %s: %w", remoteFilePath, err)
-			}
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write import %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
 		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched import: "+targetPath))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write import outside target directory: %q", importPath)))
 		}
+		return "", nil
+	}
+	return targetPath, nil
+}
 
-		// Track the file for git staging and potential rollback
-		if opts.tracker != nil {
-			if fileExists {
-				opts.tracker.TrackModified(targetPath)
-			} else {
-				opts.tracker.TrackCreated(targetPath)
+func fetchAndSaveFrontmatterImport(ctx context.Context, remoteFilePath, targetPath string, opts frontmatterImportsOpts) error {
+	// Check existence before downloading: if the file already exists and force=false,
+	// skip the download entirely (no unnecessary network round-trip). However, still
+	// recurse into the existing file's imports so that any transitive dependencies
+	// it references are fetched even when the parent file was already present.
+	fileExists := false
+	if fileutil.FileExists(targetPath) {
+		fileExists = true
+		if !opts.force {
+			if opts.verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Import file already exists, skipping: "+targetPath))
 			}
+			return fetchExistingFrontmatterImportDependencies(ctx, remoteFilePath, targetPath, opts)
 		}
+	}
 
-		// Recurse into the imported file's imports. Use the imported file's directory as
-		// currentBaseDir so that relative paths inside it resolve correctly.
-		importedBaseDir := path.Dir(remoteFilePath)
-		if err := fetchFrontmatterImportsRecursive(ctx, string(importContent), importedBaseDir, opts); err != nil && opts.strict {
-			return err
+	importContent, saved, err := downloadAndWriteFrontmatterImport(ctx, remoteFilePath, targetPath, opts)
+	if err != nil || !saved {
+		return err
+	}
+	if opts.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched import: "+targetPath))
+	}
+	if opts.tracker != nil {
+		if fileExists {
+			opts.tracker.TrackModified(targetPath)
+		} else {
+			opts.tracker.TrackCreated(targetPath)
 		}
+	}
+	importedBaseDir := path.Dir(remoteFilePath)
+	if err := fetchFrontmatterImportsRecursive(ctx, string(importContent), importedBaseDir, opts); err != nil && opts.strict {
+		return err
 	}
 	return nil
+}
+
+func fetchExistingFrontmatterImportDependencies(ctx context.Context, remoteFilePath, targetPath string, opts frontmatterImportsOpts) error {
+	if existingContent, readErr := os.ReadFile(targetPath); readErr == nil {
+		importedBaseDir := path.Dir(remoteFilePath)
+		if err := fetchFrontmatterImportsRecursive(ctx, string(existingContent), importedBaseDir, opts); err != nil && opts.strict {
+			return err
+		}
+	} else {
+		if opts.strict {
+			return fmt.Errorf("failed to read existing import %s: %w", targetPath, readErr)
+		}
+		remoteWorkflowLog.Printf("Failed to read existing import %s for recursion: %v", targetPath, readErr)
+	}
+	return nil
+}
+
+func downloadAndWriteFrontmatterImport(ctx context.Context, remoteFilePath, targetPath string, opts frontmatterImportsOpts) ([]byte, bool, error) {
+	// Download from the source repository
+	downloadFn := opts.downloadFn
+	if downloadFn == nil {
+		downloadFn = downloadRemoteImportFile
+	}
+	importContent, err := downloadFn(ctx, opts.owner, opts.repo, remoteFilePath, opts.ref)
+	if err != nil {
+		if opts.strict {
+			return nil, false, fmt.Errorf("failed to fetch import %s: %w", remoteFilePath, err)
+		}
+		remoteWorkflowLog.Printf("Failed to download import %s from %s/%s@%s: %v", remoteFilePath, opts.owner, opts.repo, opts.ref, err)
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch import %s: %v", remoteFilePath, err)))
+		}
+		return nil, false, nil
+	}
+
+	// Create the parent directory if needed
+	if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
+		if opts.strict {
+			return nil, false, fmt.Errorf("failed to create directory for import %s: %w", remoteFilePath, err)
+		}
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for import %s: %v", remoteFilePath, err)))
+		}
+		return nil, false, nil
+	}
+
+	// Write the file
+	if err := os.WriteFile(targetPath, importContent, constants.FilePermSensitive); err != nil {
+		if opts.strict {
+			return nil, false, fmt.Errorf("failed to write import %s: %w", remoteFilePath, err)
+		}
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write import %s: %v", remoteFilePath, err)))
+		}
+		return nil, false, nil
+	}
+	return importContent, true, nil
 }
 
 // includesFetchOptions holds the constant parameters for fetchAndSaveRemoteIncludesWithOptions.
@@ -645,86 +674,99 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 		seen[filePath] = struct {
 		}{}
 
-		// Fetch the include file
-		includeContent, _, err := opts.fetchFn(ctx, includePath, opts.spec, opts.verbose)
-		if err != nil {
-			if isOptional {
-				if opts.verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Optional include not found: "+includePath))
-				}
-				continue
-			}
-			return fmt.Errorf("failed to fetch include %s: %w", includePath, err)
+		if err := fetchAndSaveRemoteInclude(ctx, includePath, filePath, isOptional, opts); err != nil {
+			return err
 		}
+	}
+	return nil
+}
 
-		// Determine target path for the include file
-		var targetPath string
-		if strings.HasPrefix(filePath, "shared/") {
-			// shared/ files go to .github/shared/
-			targetPath = filepath.Join(filepath.Dir(opts.targetDir), filePath)
-		} else if isWorkflowSpecFormat(filePath) {
-			// Workflowspec includes: extract just the filename and put in shared/
-			parts := strings.Split(filePath, "/")
-			filename := parts[len(parts)-1]
-			targetPath = filepath.Join(filepath.Dir(opts.targetDir), "shared", filename)
-		} else {
-			// Relative includes go alongside the workflow
-			targetPath = filepath.Join(opts.targetDir, filePath)
-		}
-		writeBase := opts.targetDir
-		if strings.HasPrefix(filePath, "shared/") || isWorkflowSpecFormat(filePath) {
-			writeBase = filepath.Join(filepath.Dir(opts.targetDir), "shared")
-		}
-		if err := fileutil.ValidatePathWithinBase(writeBase, targetPath); err != nil {
-			return fmt.Errorf("refusing to write include outside allowed directory %s: %w", writeBase, err)
-		}
-
-		// Create target directory if needed
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
-			return fmt.Errorf("failed to create directory for %s: %w", targetPath, err)
-		}
-
-		// Check if file already exists
-		fileExists := false
-		if fileutil.FileExists(targetPath) {
-			fileExists = true
-			if !opts.force {
-				if opts.verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Include file already exists, skipping: "+targetPath))
-				}
-				continue
-			}
-		}
-
-		// Write the include file
-		if err := os.WriteFile(targetPath, includeContent, constants.FilePermSensitive); err != nil {
-			return fmt.Errorf("failed to write include file %s: %w", targetPath, err)
-		}
-
-		if opts.verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched include: "+targetPath))
-		}
-
-		// Track the file
-		if opts.tracker != nil {
-			if fileExists {
-				opts.tracker.TrackModified(targetPath)
-			} else {
-				opts.tracker.TrackCreated(targetPath)
-			}
-		}
-
-		// Recursively fetch includes from the fetched file
-		if err := fetchAndSaveRemoteIncludesWithOptions(ctx, string(includeContent), opts); err != nil {
-			if opts.strict {
-				return fmt.Errorf("failed to fetch nested includes from %s: %w", filePath, err)
-			}
+func fetchAndSaveRemoteInclude(ctx context.Context, includePath, filePath string, isOptional bool, opts includesFetchOptions) error {
+	// Fetch the include file
+	includeContent, _, err := opts.fetchFn(ctx, includePath, opts.spec, opts.verbose)
+	if err != nil {
+		if isOptional {
 			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch nested includes from %s: %v", filePath, err)))
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Optional include not found: "+includePath))
 			}
+			return nil
+		}
+		return fmt.Errorf("failed to fetch include %s: %w", includePath, err)
+	}
+
+	// Determine target path for the include file
+	targetPath, err := remoteIncludeTargetPath(filePath, opts)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", targetPath, err)
+	}
+	fileExists := false
+	if fileutil.FileExists(targetPath) {
+		fileExists = true
+		if !opts.force {
+			if opts.verbose {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Include file already exists, skipping: "+targetPath))
+			}
+			return nil
+		}
+	}
+	return writeRemoteIncludeAndFetchDependencies(ctx, includeContent, filePath, targetPath, fileExists, opts)
+}
+
+func remoteIncludeTargetPath(filePath string, opts includesFetchOptions) (string, error) {
+	var targetPath string
+	if strings.HasPrefix(filePath, "shared/") {
+		// shared/ files go to .github/shared/
+		targetPath = filepath.Join(filepath.Dir(opts.targetDir), filePath)
+	} else if isWorkflowSpecFormat(filePath) {
+		// Workflowspec includes: extract just the filename and put in shared/
+		parts := strings.Split(filePath, "/")
+		filename := parts[len(parts)-1]
+		targetPath = filepath.Join(filepath.Dir(opts.targetDir), "shared", filename)
+	} else {
+		// Relative includes go alongside the workflow
+		targetPath = filepath.Join(opts.targetDir, filePath)
+	}
+	writeBase := opts.targetDir
+	if strings.HasPrefix(filePath, "shared/") || isWorkflowSpecFormat(filePath) {
+		writeBase = filepath.Join(filepath.Dir(opts.targetDir), "shared")
+	}
+	if err := fileutil.ValidatePathWithinBase(writeBase, targetPath); err != nil {
+		return "", fmt.Errorf("refusing to write include outside allowed directory %s: %w", writeBase, err)
+	}
+	return targetPath, nil
+}
+
+func writeRemoteIncludeAndFetchDependencies(ctx context.Context, includeContent []byte, filePath, targetPath string, fileExists bool, opts includesFetchOptions) error {
+	// Write the include file
+	if err := os.WriteFile(targetPath, includeContent, constants.FilePermSensitive); err != nil {
+		return fmt.Errorf("failed to write include file %s: %w", targetPath, err)
+	}
+
+	if opts.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched include: "+targetPath))
+	}
+
+	// Track the file
+	if opts.tracker != nil {
+		if fileExists {
+			opts.tracker.TrackModified(targetPath)
+		} else {
+			opts.tracker.TrackCreated(targetPath)
 		}
 	}
 
+	// Recursively fetch includes from the fetched file
+	if err := fetchAndSaveRemoteIncludesWithOptions(ctx, string(includeContent), opts); err != nil {
+		if opts.strict {
+			return fmt.Errorf("failed to fetch nested includes from %s: %w", filePath, err)
+		}
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch nested includes from %s: %v", filePath, err)))
+		}
+	}
 	return nil
 }
 
@@ -785,6 +827,10 @@ func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, 
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
 		}
 	}
+	return fetchRemoteWorkflowAndResourceDependencies(ctx, content, spec, targetDir, verbose, force, tracker)
+}
+
+func fetchRemoteWorkflowAndResourceDependencies(ctx context.Context, content string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker) error {
 	// Fetch and save workflows referenced in safe-outputs.dispatch-workflow so they are
 	// available locally. Workflow names using GitHub Actions expression syntax are skipped.
 	if err := fetchAndSaveRemoteDispatchWorkflows(ctx, content, spec, targetDir, verbose, force, tracker); err != nil {

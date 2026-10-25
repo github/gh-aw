@@ -83,6 +83,20 @@ func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string) []strin
 		return steps
 	}
 
+	firstCheckoutIdx, firstTokenMintIdx, lastSetupIdx := findPreStepBoundaries(steps)
+	insertIdx := preStepInsertionIndex(steps, firstCheckoutIdx, firstTokenMintIdx, lastSetupIdx)
+	if insertIdx > len(steps) {
+		insertIdx = len(steps)
+	}
+
+	result := make([]string, 0, typeutil.SafeAllocationCapacity(len(steps), len(preSteps)))
+	result = append(result, steps[:insertIdx]...)
+	result = append(result, preSteps...)
+	result = append(result, steps[insertIdx:]...)
+	return result
+}
+
+func findPreStepBoundaries(steps []string) (int, int, int) {
 	firstCheckoutIdx := -1
 	firstTokenMintIdx := -1
 	lastSetupIdx := -1
@@ -117,7 +131,10 @@ func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string) []strin
 			lastSetupIdx = i
 		}
 	}
+	return firstCheckoutIdx, firstTokenMintIdx, lastSetupIdx
+}
 
+func preStepInsertionIndex(steps []string, firstCheckoutIdx, firstTokenMintIdx, lastSetupIdx int) int {
 	insertIdx := len(steps)
 	if lastSetupIdx >= 0 {
 		for i := lastSetupIdx + 1; i < len(steps); i++ {
@@ -140,15 +157,7 @@ func insertPreStepsAtEarliestBoundary(steps []string, preSteps []string) []strin
 	} else if firstCheckoutIdx >= 0 {
 		insertIdx = firstCheckoutIdx
 	}
-	if insertIdx > len(steps) {
-		insertIdx = len(steps)
-	}
-
-	result := make([]string, 0, typeutil.SafeAllocationCapacity(len(steps), len(preSteps)))
-	result = append(result, steps[:insertIdx]...)
-	result = append(result, preSteps...)
-	result = append(result, steps[insertIdx:]...)
-	return result
+	return insertIdx
 }
 
 func (c *Compiler) extractPinnedJobSteps(fieldName string, jobName string, configMap map[string]any, data *WorkflowData) ([]string, error) {

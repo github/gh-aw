@@ -432,6 +432,15 @@ func generateActionToolDefinition(actionName string, config *SafeOutputActionCon
 	// When action.yml could not be fetched at compile time (Inputs == nil), generate a
 	// permissive fallback schema so the agent can still call the tool. The runtime step
 	// passes the raw payload through a single `payload` input rather than individual fields.
+	inputSchema := generateActionInputSchema(config)
+	return map[string]any{
+		"name":        normalizedName,
+		"description": description,
+		"inputSchema": inputSchema,
+	}
+}
+
+func generateActionInputSchema(config *SafeOutputActionConfig) map[string]any {
 	if config.Inputs == nil {
 		inputSchema := map[string]any{
 			"type": "object",
@@ -443,13 +452,12 @@ func generateActionToolDefinition(actionName string, config *SafeOutputActionCon
 			},
 			"additionalProperties": true,
 		}
-		return map[string]any{
-			"name":        normalizedName,
-			"description": description,
-			"inputSchema": inputSchema,
-		}
+		return inputSchema
 	}
+	return generateResolvedActionInputSchema(config)
+}
 
+func generateResolvedActionInputSchema(config *SafeOutputActionConfig) map[string]any {
 	inputSchema := map[string]any{
 		"type":                 "object",
 		"properties":           make(map[string]any),
@@ -494,11 +502,7 @@ func generateActionToolDefinition(actionName string, config *SafeOutputActionCon
 		inputSchema["required"] = requiredFields
 	}
 
-	return map[string]any{
-		"name":        normalizedName,
-		"description": description,
-		"inputSchema": inputSchema,
-	}
+	return inputSchema
 }
 
 // buildCustomSafeOutputActionsJSON builds a JSON mapping of normalized action names

@@ -263,64 +263,65 @@ func queryServerCapabilities(ctx context.Context, config parser.RegistryMCPServe
 	}
 
 	recordPartialResultError := func(listName string, err error) {
-		if err == nil {
-			return
-		}
-		wrappedErr := fmt.Errorf("listing %s: %w", listName, err)
-		if info.Error == nil {
-			info.Error = wrappedErr
-		} else {
-			info.Error = errors.Join(info.Error, wrappedErr)
-		}
-		if verbose {
-			console.PrintWarningMessage(fmt.Sprintf("Failed to list %s: %v", listName, err))
-		}
+		recordMCPCapabilityListError(info, listName, err, verbose)
 	}
-
-	// List tools (paginated automatically by the SDK iterator)
-	func() {
-		listToolsCtx, cancel := context.WithTimeout(ctx, MCPOperationTimeout)
-		defer cancel()
-		for tool, err := range session.Tools(listToolsCtx, &mcp.ListToolsParams{}) {
-			if err != nil {
-				recordPartialResultError("tools", err)
-				break
-			}
-			info.Tools = append(info.Tools, tool)
-		}
-	}()
-
-	// List resources (paginated automatically by the SDK iterator)
-	func() {
-		listResourcesCtx, cancel := context.WithTimeout(ctx, MCPOperationTimeout)
-		defer cancel()
-		for resource, err := range session.Resources(listResourcesCtx, &mcp.ListResourcesParams{}) {
-			if err != nil {
-				recordPartialResultError("resources", err)
-				break
-			}
-			info.Resources = append(info.Resources, resource)
-		}
-	}()
-
-	// List prompts (paginated automatically by the SDK iterator)
-	func() {
-		listPromptsCtx, cancel := context.WithTimeout(ctx, MCPOperationTimeout)
-		defer cancel()
-		for prompt, err := range session.Prompts(listPromptsCtx, &mcp.ListPromptsParams{}) {
-			if err != nil {
-				recordPartialResultError("prompts", err)
-				break
-			}
-			info.Prompts = append(info.Prompts, prompt)
-		}
-	}()
-
-	// Note: Roots are not directly available via MCP protocol in the current spec,
-	// so we infer them from resources.
+	queryMCPTools(ctx, session, info, recordPartialResultError)
+	queryMCPResources(ctx, session, info, recordPartialResultError)
+	queryMCPPrompts(ctx, session, info, recordPartialResultError)
+	// Roots are inferred from resources because the protocol does not expose them.
 	info.Roots = extractRootsFromResources(info.Resources)
-
 	return info
+}
+
+func recordMCPCapabilityListError(info *parser.MCPServerInfo, listName string, err error, verbose bool) {
+	if err == nil {
+		return
+	}
+	wrappedErr := fmt.Errorf("listing %s: %w", listName, err)
+	if info.Error == nil {
+		info.Error = wrappedErr
+	} else {
+		info.Error = errors.Join(info.Error, wrappedErr)
+	}
+	if verbose {
+		console.PrintWarningMessage(fmt.Sprintf("Failed to list %s: %v", listName, err))
+	}
+}
+
+func queryMCPTools(ctx context.Context, session *mcp.ClientSession, info *parser.MCPServerInfo, recordPartialResultError func(string, error)) {
+	listToolsCtx, cancel := context.WithTimeout(ctx, MCPOperationTimeout)
+	defer cancel()
+	for tool, err := range session.Tools(listToolsCtx, &mcp.ListToolsParams{}) {
+		if err != nil {
+			recordPartialResultError("tools", err)
+			break
+		}
+		info.Tools = append(info.Tools, tool)
+	}
+}
+
+func queryMCPResources(ctx context.Context, session *mcp.ClientSession, info *parser.MCPServerInfo, recordPartialResultError func(string, error)) {
+	listResourcesCtx, cancel := context.WithTimeout(ctx, MCPOperationTimeout)
+	defer cancel()
+	for resource, err := range session.Resources(listResourcesCtx, &mcp.ListResourcesParams{}) {
+		if err != nil {
+			recordPartialResultError("resources", err)
+			break
+		}
+		info.Resources = append(info.Resources, resource)
+	}
+}
+
+func queryMCPPrompts(ctx context.Context, session *mcp.ClientSession, info *parser.MCPServerInfo, recordPartialResultError func(string, error)) {
+	listPromptsCtx, cancel := context.WithTimeout(ctx, MCPOperationTimeout)
+	defer cancel()
+	for prompt, err := range session.Prompts(listPromptsCtx, &mcp.ListPromptsParams{}) {
+		if err != nil {
+			recordPartialResultError("prompts", err)
+			break
+		}
+		info.Prompts = append(info.Prompts, prompt)
+	}
 }
 
 // extractRootsFromResources infers root URIs from a list of resources by extracting
@@ -366,6 +367,14 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("MCP inspection returned partial results: %v", info.Error)))
 	}
+	displayServerTools(info, toolFilter)
+	displayServerResources(info, toolFilter)
+	displayServerPrompts(info, toolFilter)
+	displayServerRoots(info, toolFilter)
+	fmt.Fprintln(os.Stderr)
+}
+
+func displayServerTools(info *parser.MCPServerInfo, toolFilter string) {
 	// Display tools with allowed/not allowed status
 	if len(info.Tools) > 0 {
 		// If a specific tool is requested, show detailed information
@@ -400,7 +409,9 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 		}
 	}
 
-	// Display resources (skip if showing specific tool details)
+}
+
+func displayServerResources(info *parser.MCPServerInfo, toolFilter string) {
 	if toolFilter == "" && len(info.Resources) > 0 {
 		fmt.Fprintln(os.Stderr)
 		console.PrintSectionHeader("📚 Available Resources")
@@ -428,7 +439,9 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 		console.PrintWarningMessage("No resources available")
 	}
 
-	// Display prompts (skip if showing specific tool details)
+}
+
+func displayServerPrompts(info *parser.MCPServerInfo, toolFilter string) {
 	if toolFilter == "" && len(info.Prompts) > 0 {
 		fmt.Fprintln(os.Stderr)
 		console.PrintSectionHeader("💬 Available Prompts")
@@ -459,7 +472,9 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 		console.PrintWarningMessage("No prompts available")
 	}
 
-	// Display roots (skip if showing specific tool details)
+}
+
+func displayServerRoots(info *parser.MCPServerInfo, toolFilter string) {
 	if toolFilter == "" && len(info.Roots) > 0 {
 		fmt.Fprintln(os.Stderr)
 		console.PrintSectionHeader("🌳 Available Roots")
@@ -480,7 +495,6 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 		console.PrintWarningMessage("No roots available")
 	}
 
-	fmt.Fprintln(os.Stderr)
 }
 
 // displayDetailedToolInfo shows detailed information about a specific tool
@@ -536,6 +550,12 @@ func displayDetailedToolInfo(info *parser.MCPServerInfo, toolName string) {
 	}
 
 	// Display annotations if available
+	displayMCPToolAnnotations(foundTool)
+	displayMCPToolSchemas(foundTool)
+	fmt.Fprintln(os.Stderr)
+}
+
+func displayMCPToolAnnotations(foundTool *mcp.Tool) {
 	if foundTool.Annotations != nil {
 		fmt.Fprintln(os.Stderr)
 		console.PrintSectionHeader("⚙️  Tool Attributes")
@@ -557,7 +577,6 @@ func displayDetailedToolInfo(info *parser.MCPServerInfo, toolName string) {
 				fmt.Fprintf(os.Stderr, "➕ **Additive:** Performs only additive updates\n")
 			}
 		}
-
 		if foundTool.Annotations.OpenWorldHint != nil {
 			if *foundTool.Annotations.OpenWorldHint {
 				fmt.Fprintf(os.Stderr, "🌐 **Open world:** Interacts with external entities\n")
@@ -566,7 +585,9 @@ func displayDetailedToolInfo(info *parser.MCPServerInfo, toolName string) {
 			}
 		}
 	}
+}
 
+func displayMCPToolSchemas(foundTool *mcp.Tool) {
 	// Display input schema
 	if foundTool.InputSchema != nil {
 		fmt.Fprintln(os.Stderr)
@@ -595,7 +616,6 @@ func displayDetailedToolInfo(info *parser.MCPServerInfo, toolName string) {
 		console.PrintInfoMessage("📤 No output schema defined")
 	}
 
-	fmt.Fprintln(os.Stderr)
 }
 
 // displayToolAllowanceHint shows helpful information about how to allow tools in workflow frontmatter
@@ -617,38 +637,7 @@ func displayToolAllowanceHint(info *parser.MCPServerInfo) {
 	}
 
 	if len(blockedTools) > 0 {
-		fmt.Fprintln(os.Stderr)
-		console.PrintInfoMessage("💡 To allow blocked tools, add them to your workflow frontmatter:")
-
-		// Show the frontmatter syntax example
-		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "```yaml\n")
-		fmt.Fprintf(os.Stderr, "tools:\n")
-		fmt.Fprintf(os.Stderr, "  %s:\n", info.Config.Name)
-		fmt.Fprintf(os.Stderr, "    allowed:\n")
-
-		// Add currently allowed tools first (if any)
-		for _, allowed := range info.Config.Allowed {
-			fmt.Fprintf(os.Stderr, "      - %s\n", allowed)
-		}
-
-		// Show first few blocked tools as examples (limit to 3 for readability)
-		exampleCount := min(len(blockedTools), 3)
-
-		for i := range exampleCount {
-			fmt.Fprintf(os.Stderr, "      - %s\n", blockedTools[i])
-		}
-
-		if len(blockedTools) > 3 {
-			fmt.Fprintf(os.Stderr, "      # ... and %d more tools\n", len(blockedTools)-3)
-		}
-
-		fmt.Fprintf(os.Stderr, "```\n")
-
-		if len(blockedTools) > 3 {
-			fmt.Fprintln(os.Stderr)
-			console.PrintInfoMessage("📋 All blocked tools: " + strings.Join(blockedTools, ", "))
-		}
+		displayBlockedMCPToolHint(info, blockedTools)
 	} else if len(info.Config.Allowed) == 0 {
 		// No explicit allowed list - all tools are allowed by default
 		fmt.Fprintln(os.Stderr)
@@ -675,4 +664,35 @@ func displayToolAllowanceHint(info *parser.MCPServerInfo) {
 
 	fmt.Fprintln(os.Stderr)
 	console.PrintInfoMessage("📖 For more information, see: https://github.com/github/gh-aw/blob/main/docs/tools.md")
+}
+
+func displayBlockedMCPToolHint(info *parser.MCPServerInfo, blockedTools []string) {
+	fmt.Fprintln(os.Stderr)
+	console.PrintInfoMessage("💡 To allow blocked tools, add them to your workflow frontmatter:")
+
+	// Show the frontmatter syntax example
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "```yaml\n")
+	fmt.Fprintf(os.Stderr, "tools:\n")
+	fmt.Fprintf(os.Stderr, "  %s:\n", info.Config.Name)
+	fmt.Fprintf(os.Stderr, "    allowed:\n")
+
+	// Add currently allowed tools first (if any)
+	for _, allowed := range info.Config.Allowed {
+		fmt.Fprintf(os.Stderr, "      - %s\n", allowed)
+	}
+
+	// Show first few blocked tools as examples (limit to 3 for readability)
+	exampleCount := min(len(blockedTools), 3)
+	for i := range exampleCount {
+		fmt.Fprintf(os.Stderr, "      - %s\n", blockedTools[i])
+	}
+	if len(blockedTools) > 3 {
+		fmt.Fprintf(os.Stderr, "      # ... and %d more tools\n", len(blockedTools)-3)
+	}
+	fmt.Fprintf(os.Stderr, "```\n")
+	if len(blockedTools) > 3 {
+		fmt.Fprintln(os.Stderr)
+		console.PrintInfoMessage("📋 All blocked tools: " + strings.Join(blockedTools, ", "))
+	}
 }

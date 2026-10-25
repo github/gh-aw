@@ -42,43 +42,9 @@ func (c *Compiler) parseCommentsConfig(outputMap map[string]any) *AddCommentsCon
 		configData = nil
 	}
 
-	if err := preprocessHideOlderCommentsConfig(configData, addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid hide-older-comments configuration: %v", err)
+	if !preprocessCommentsFields(configData) {
 		return nil
 	}
-
-	// Pre-process templatable bool fields
-	if err := preprocessBoolFieldAsString(configData, "hide-older-comments", addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid hide-older-comments value: %v", err)
-		return nil
-	}
-	if err := preprocessBoolFieldAsString(configData, "replace-older-comments", addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid replace-older-comments value: %v", err)
-		return nil
-	}
-	if err := preprocessBoolFieldAsString(configData, "footer", addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid footer value: %v", err)
-		return nil
-	}
-
-	// Pre-process templatable int fields
-	if err := preprocessIntFieldAsString(configData, "max", addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid max value: %v", err)
-		return nil
-	}
-
-	// Pre-process list fields that also accept a GitHub Actions expression string.
-	if err := preprocessStringArrayFieldAsTemplatable(configData, "allowed-repos", addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid allowed-repos value: %v", err)
-		return nil
-	}
-	if err := preprocessStringArrayFieldAsTemplatable(configData, "allows-comment-ids", addCommentLog); err != nil {
-		addCommentLog.Printf("Invalid allows-comment-ids value: %v", err)
-		return nil
-	}
-
-	// Pre-process target field if numeric
-	preprocessTargetFieldAsString(configData, addCommentLog)
 
 	config := parseConfigScaffoldWithPostProcess(outputMap, "add-comment", addCommentLog,
 		func(err error) *AddCommentsConfig {
@@ -94,6 +60,47 @@ func (c *Compiler) parseCommentsConfig(outputMap map[string]any) *AddCommentsCon
 		})
 
 	return config
+}
+
+func preprocessCommentsFields(configData map[string]any) bool {
+	if err := preprocessHideOlderCommentsConfig(configData, addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid hide-older-comments configuration: %v", err)
+		return false
+	}
+
+	// Pre-process templatable bool fields
+	if err := preprocessBoolFieldAsString(configData, "hide-older-comments", addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid hide-older-comments value: %v", err)
+		return false
+	}
+	if err := preprocessBoolFieldAsString(configData, "replace-older-comments", addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid replace-older-comments value: %v", err)
+		return false
+	}
+	if err := preprocessBoolFieldAsString(configData, "footer", addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid footer value: %v", err)
+		return false
+	}
+
+	// Pre-process templatable int fields
+	if err := preprocessIntFieldAsString(configData, "max", addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid max value: %v", err)
+		return false
+	}
+
+	// Pre-process list fields that also accept a GitHub Actions expression string.
+	if err := preprocessStringArrayFieldAsTemplatable(configData, "allowed-repos", addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid allowed-repos value: %v", err)
+		return false
+	}
+	if err := preprocessStringArrayFieldAsTemplatable(configData, "allows-comment-ids", addCommentLog); err != nil {
+		addCommentLog.Printf("Invalid allows-comment-ids value: %v", err)
+		return false
+	}
+
+	// Pre-process target field if numeric
+	preprocessTargetFieldAsString(configData, addCommentLog)
+	return true
 }
 
 func preprocessHideOlderCommentsConfig(configData map[string]any, debugLog *logger.Logger) error {

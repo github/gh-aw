@@ -77,16 +77,7 @@ func compileWorkflowFile(
 ) compileWorkflowFileResult {
 	compileWorkflowProcessorLog.Printf("Processing workflow file: %s", resolvedFile)
 
-	result := compileWorkflowFileResult{
-		validationResult: ValidationResult{
-			Workflow: filepath.Base(resolvedFile),
-			Valid:    true,
-			Errors:   []ValidationIssue{},
-			Warnings: []ValidationIssue{},
-		},
-		success: false,
-	}
-
+	result := newCompileWorkflowFileResult(resolvedFile)
 	// Generate lock file name
 	lockFile := stringutil.MarkdownToLockFile(resolvedFile)
 	result.lockFile = lockFile
@@ -99,45 +90,7 @@ func compileWorkflowFile(
 	// Parse the workflow
 	workflowData, err := compiler.ParseWorkflowFile(resolvedFile)
 	if err != nil {
-		// Check if this is a shared workflow (not an error, just info)
-		var sharedErr *workflow.SharedWorkflowError
-		if errors.As(err, &sharedErr) {
-			if !opts.jsonOutput {
-				// Print info message instead of error
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(sharedErr.Error()))
-			}
-			// Mark as valid but skipped
-			result.validationResult.Valid = true
-			result.validationResult.Warnings = append(result.validationResult.Warnings, ValidationIssue{
-				Type:    "shared_workflow",
-				Message: "Skipped: Shared workflow component (missing 'on' field)",
-			})
-			result.success = true // Consider it successful, just skipped
-			return result
-		}
-
-		// Check if this is a redirect-only workflow (not an error, just info)
-		var redirectErr *workflow.RedirectOnlyWorkflowError
-		if errors.As(err, &redirectErr) {
-			if !opts.jsonOutput {
-				// Print info message instead of error
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(redirectErr.Error()))
-			}
-			// Mark as valid but skipped
-			result.validationResult.Valid = true
-			result.validationResult.Warnings = append(result.validationResult.Warnings, ValidationIssue{
-				Type:    "redirect_only_workflow",
-				Message: "Skipped: Redirect-only workflow (missing 'on' field, has redirect)",
-			})
-			result.success = true // Consider it successful, just skipped
-			return result
-		}
-
-		// Don't print error here - it will be displayed in the compilation summary
-		// The error is stored in ValidationResult for JSON output and summary display
-		result.validationResult.Valid = false
-		result.validationResult.Errors = appendValidationErrors(result.validationResult.Errors, "parse_error", err)
-		return result
+		return compileWorkflowParseError(result, err, opts)
 	}
 	result.workflowData = workflowData
 
@@ -176,6 +129,60 @@ func compileWorkflowFile(
 	}
 
 	compileWorkflowProcessorLog.Printf("Successfully processed workflow file: %s", resolvedFile)
+	return result
+}
+
+func newCompileWorkflowFileResult(resolvedFile string) compileWorkflowFileResult {
+	return compileWorkflowFileResult{
+		validationResult: ValidationResult{
+			Workflow: filepath.Base(resolvedFile),
+			Valid:    true,
+			Errors:   []ValidationIssue{},
+			Warnings: []ValidationIssue{},
+		},
+		success: false,
+	}
+}
+
+func compileWorkflowParseError(result compileWorkflowFileResult, err error, opts compileWorkflowFileOptions) compileWorkflowFileResult {
+	// Check if this is a shared workflow (not an error, just info)
+	var sharedErr *workflow.SharedWorkflowError
+	if errors.As(err, &sharedErr) {
+		if !opts.jsonOutput {
+			// Print info message instead of error
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(sharedErr.Error()))
+		}
+		// Mark as valid but skipped
+		result.validationResult.Valid = true
+		result.validationResult.Warnings = append(result.validationResult.Warnings, ValidationIssue{
+			Type:    "shared_workflow",
+			Message: "Skipped: Shared workflow component (missing 'on' field)",
+		})
+		result.success = true // Consider it successful, just skipped
+		return result
+	}
+
+	// Check if this is a redirect-only workflow (not an error, just info)
+	var redirectErr *workflow.RedirectOnlyWorkflowError
+	if errors.As(err, &redirectErr) {
+		if !opts.jsonOutput {
+			// Print info message instead of error
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(redirectErr.Error()))
+		}
+		// Mark as valid but skipped
+		result.validationResult.Valid = true
+		result.validationResult.Warnings = append(result.validationResult.Warnings, ValidationIssue{
+			Type:    "redirect_only_workflow",
+			Message: "Skipped: Redirect-only workflow (missing 'on' field, has redirect)",
+		})
+		result.success = true // Consider it successful, just skipped
+		return result
+	}
+
+	// Don't print error here - it will be displayed in the compilation summary
+	// The error is stored in ValidationResult for JSON output and summary display
+	result.validationResult.Valid = false
+	result.validationResult.Errors = appendValidationErrors(result.validationResult.Errors, "parse_error", err)
 	return result
 }
 

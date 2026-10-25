@@ -75,6 +75,10 @@ func ResolveWorkflowName(workflowInput string) (string, error) {
 	}
 
 	// Read and parse the lock file to extract the workflow name
+	return resolveLockFileDisplayName(lockFile, normalizedName)
+}
+
+func resolveLockFileDisplayName(lockFile, normalizedName string) (string, error) {
 	content, err := os.ReadFile(lockFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to read lock file '%s': %w", lockFile, err)
@@ -158,6 +162,10 @@ func FindWorkflowName(input string) (string, error) {
 	}
 
 	// Normalize input for matching
+	return matchWorkflowDisplayName(input, workflows)
+}
+
+func matchWorkflowDisplayName(input string, workflows []WorkflowNameMatch) (string, error) {
 	normalizedInput := stringutil.NormalizeWorkflowName(input)
 	// Strategy 2: Try exact match with workflow ID (case-sensitive)
 	for _, wf := range workflows {

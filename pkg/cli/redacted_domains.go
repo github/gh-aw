@@ -118,6 +118,10 @@ func analyzeRedactedDomains(runDir string, verbose bool) (*RedactedDomainsAnalys
 	}
 
 	// Fallback: search recursively for redacted-urls.log
+	return analyzeRedactedDomainsRecursively(runDir, verbose)
+}
+
+func analyzeRedactedDomainsRecursively(runDir string, verbose bool) (*RedactedDomainsAnalysis, error) {
 	var foundPath string
 	if walkErr := filepath.Walk(runDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

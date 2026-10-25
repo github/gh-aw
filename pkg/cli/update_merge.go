@@ -70,6 +70,10 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec, localWorkflo
 		sourceResolved = sourceWithSource
 	}
 
+	return compareResolvedWorkflowContent(sourceResolved, localNormalized, verbose)
+}
+
+func compareResolvedWorkflowContent(sourceResolved, localNormalized string, verbose bool) bool {
 	// Normalize again after processing.
 	// Remove the source field from both before comparing: it is managed by the update
 	// tool (not user-editable content), and its position in the local file may differ
@@ -124,8 +128,6 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	if err != nil {
 		return "", false, fmt.Errorf("failed to parse new source spec: %w", err)
 	}
-	newRef := parsedNewSourceSpec.Ref
-
 	// The source field is managed by the updater, not user content. Exclude it from the
 	// textual merge so changing only its ref cannot overlap local frontmatter additions.
 	baseWithoutSource, err := RemoveTopLevelFieldFromFrontmatter(base, "source")
@@ -146,6 +148,10 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	currentNormalized := stringutil.NormalizeWhitespace(currentWithoutSource)
 	newNormalized := stringutil.NormalizeWhitespace(newWithoutSource)
 
+	return mergeNormalizedWorkflowContent(baseNormalized, currentNormalized, newNormalized, current, newSourceSpec, parsedNewSourceSpec, localWorkflowPath, verbose)
+}
+
+func mergeNormalizedWorkflowContent(baseNormalized, currentNormalized, newNormalized, current, newSourceSpec string, parsedNewSourceSpec *SourceSpec, localWorkflowPath string, verbose bool) (string, bool, error) {
 	// If upstream content did not change, only advance the managed source ref.
 	// Avoid invoking git merge-file or include processing, which would rewrite
 	// locally customized frontmatter even though there is nothing to merge.
@@ -164,6 +170,30 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 	}
 	defer os.RemoveAll(tmpDir)
 
+	currentFile, hasConflicts, err := mergeWorkflowFiles(tmpDir, baseNormalized, currentNormalized, newNormalized, verbose)
+	if err != nil {
+		return "", false, err
+	}
+	mergedContent, err := os.ReadFile(currentFile)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to read merged content: %w", err)
+	}
+	mergedStr := string(mergedContent)
+	if !hasConflicts {
+		mergedStr = processMergedWorkflowIncludes(mergedStr, parsedNewSourceSpec, localWorkflowPath, verbose)
+	}
+	if hasConflicts {
+		mergedStr, err = updateTopLevelFieldInFrontmatterRaw(mergedStr, "source", newSourceSpec)
+	} else {
+		mergedStr, err = UpdateFieldInFrontmatter(mergedStr, "source", newSourceSpec)
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("failed to restore source in merged content: %w", err)
+	}
+	return mergedStr, hasConflicts, nil
+}
+
+func mergeWorkflowFiles(tmpDir, baseNormalized, currentNormalized, newNormalized string, verbose bool) (string, bool, error) {
 	// Write base, current, and new versions to temporary files
 	baseFile := filepath.Join(tmpDir, "base.md")
 	currentFile := filepath.Join(tmpDir, "current.md")
@@ -190,6 +220,14 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 
 	output, err := cmd.CombinedOutput()
 
+	hasConflicts, err := classifyWorkflowMergeResult(err, output, verbose)
+	if err != nil {
+		return "", false, err
+	}
+	return currentFile, hasConflicts, nil
+}
+
+func classifyWorkflowMergeResult(err error, output []byte, verbose bool) (bool, error) {
 	// git merge-file returns:
 	// - 0 if merge was successful without conflicts
 	// - >0 if conflicts were found (appears to return number of conflicts, but file is still updated)
@@ -210,58 +248,39 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRefOrSourceSpec,
 			} else {
 				// Real error (exit code >= 128)
 				updateMergeLog.Printf("Git merge-file failed: exit_code=%d", exitCode)
-				return "", false, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
+				return false, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
 			}
 		} else {
-			return "", false, fmt.Errorf("failed to execute git merge-file: %w", err)
+			return false, fmt.Errorf("failed to execute git merge-file: %w", err)
 		}
 	}
 
 	updateMergeLog.Printf("Merge completed: has_conflicts=%v", hasConflicts)
+	return hasConflicts, nil
+}
 
-	// Read the merged content from the current file (git merge-file updates it in-place)
-	mergedContent, err := os.ReadFile(currentFile)
+func processMergedWorkflowIncludes(mergedStr string, parsedNewSourceSpec *SourceSpec, localWorkflowPath string, verbose bool) string {
+	workflow := &WorkflowSpec{
+		RepoSpec: RepoSpec{
+			RepoSlug: parsedNewSourceSpec.Repo,
+			Version:  parsedNewSourceSpec.Ref,
+		},
+		WorkflowPath: parsedNewSourceSpec.Path,
+	}
+
+	localWorkflowDir := ""
+	if localWorkflowPath != "" {
+		localWorkflowDir = filepath.Dir(localWorkflowPath)
+	}
+	processedContent, err := processIncludesInContent(mergedStr, workflow, parsedNewSourceSpec.Ref, localWorkflowDir, verbose)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to read merged content: %w", err)
-	}
-
-	mergedStr := string(mergedContent)
-
-	// Process @include directives if present and no conflicts
-	// Skip include processing if there are conflicts to avoid errors
-	if !hasConflicts {
-		workflow := &WorkflowSpec{
-			RepoSpec: RepoSpec{
-				RepoSlug: parsedNewSourceSpec.Repo,
-				Version:  newRef,
-			},
-			WorkflowPath: parsedNewSourceSpec.Path,
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to process includes: %v", err)))
 		}
-
-		localWorkflowDir := ""
-		if localWorkflowPath != "" {
-			localWorkflowDir = filepath.Dir(localWorkflowPath)
-		}
-		processedContent, err := processIncludesInContent(mergedStr, workflow, newRef, localWorkflowDir, verbose)
-		if err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to process includes: %v", err)))
-			}
-			// Return unprocessed content on error
-		} else {
-			mergedStr = processedContent
-		}
-
-	}
-
-	if hasConflicts {
-		mergedStr, err = updateTopLevelFieldInFrontmatterRaw(mergedStr, "source", newSourceSpec)
+		// Return unprocessed content on error
 	} else {
-		mergedStr, err = UpdateFieldInFrontmatter(mergedStr, "source", newSourceSpec)
-	}
-	if err != nil {
-		return "", false, fmt.Errorf("failed to restore source in merged content: %w", err)
+		mergedStr = processedContent
 	}
 
-	return mergedStr, hasConflicts, nil
+	return mergedStr
 }

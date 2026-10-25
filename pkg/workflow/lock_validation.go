@@ -91,6 +91,26 @@ func ValidateActionSHAsInLockFile(ctx context.Context, lockFilePath string, cach
 	// Check for updates
 	checks := CheckActionSHAUpdates(ctx, actions, resolver)
 
+	updateCount := reportActionSHAUpdates(checks, verbose)
+	if updateCount > 0 {
+		actionSHACheckerLog.Printf("Found %d actions that need updating", updateCount)
+		// Save the cache with updated SHAs so the next compilation will use them.
+		if err := cache.Save(); err != nil {
+			actionSHACheckerLog.Printf("Warning: failed to save action cache: %v", err)
+		} else {
+			actionSHACheckerLog.Print("Saved updated action cache")
+		}
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("To apply updated action SHAs, recompile with: gh aw compile"))
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d action(s) with available updates", updateCount)))
+		}
+	} else {
+		actionSHACheckerLog.Print("All actions are up to date")
+	}
+	return nil
+}
+
+func reportActionSHAUpdates(checks []ActionUpdateCheck, verbose bool) int {
 	// Count and report updates
 	updateCount := 0
 	for _, check := range checks {
@@ -112,22 +132,5 @@ func ValidateActionSHAsInLockFile(ctx context.Context, lockFilePath string, cach
 		}
 	}
 
-	if updateCount > 0 {
-		actionSHACheckerLog.Printf("Found %d actions that need updating", updateCount)
-		// Save the cache with updated SHAs so the next compilation will use them
-		if err := cache.Save(); err != nil {
-			actionSHACheckerLog.Printf("Warning: failed to save action cache: %v", err)
-		} else {
-			actionSHACheckerLog.Print("Saved updated action cache")
-		}
-		// Provide suggestion to fix the issue
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("To apply updated action SHAs, recompile with: gh aw compile"))
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d action(s) with available updates", updateCount)))
-		}
-	} else {
-		actionSHACheckerLog.Print("All actions are up to date")
-	}
-
-	return nil
+	return updateCount
 }

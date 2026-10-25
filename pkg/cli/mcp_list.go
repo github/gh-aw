@@ -59,66 +59,9 @@ func ListWorkflowMCP(workflowFile string, verbose bool) error {
 
 	// Display the MCP servers
 	if verbose {
-		// Create detailed table for verbose mode
-		headers := []string{"Server Name", "Type", "Status", "Tools Count", "Network Access", "Command/URL"}
-		rows := make([][]string, 0, len(mcpConfigs))
-
-		for _, config := range mcpConfigs {
-			status := determineConfigStatus(config)
-			toolsCount := formatToolsCount(config.Allowed)
-			networkAccess := formatNetworkAccess(hasNetworkAccess)
-
-			commandOrURL := ""
-			if config.Command != "" {
-				commandOrURL = config.Command
-			} else if config.URL != "" {
-				commandOrURL = config.URL
-			} else if config.Container != "" {
-				commandOrURL = config.Container
-			}
-			// Truncate if too long
-			commandOrURL = stringutil.Truncate(commandOrURL, 40)
-
-			rows = append(rows, []string{
-				config.Name,
-				config.Type,
-				status,
-				toolsCount,
-				networkAccess,
-				commandOrURL,
-			})
-		}
-
-		tableConfig := console.TableConfig{
-			Title:   "MCP servers in " + filepath.Base(workflowPath),
-			Headers: headers,
-			Rows:    rows,
-		}
-		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
+		renderVerboseWorkflowMCPServers(workflowPath, mcpConfigs, hasNetworkAccess)
 	} else {
-		// Simple table for basic mode
-		headers := []string{"Server Name", "Status", "Tools Count", "Network Access"}
-		rows := make([][]string, 0, len(mcpConfigs))
-
-		for _, config := range mcpConfigs {
-			status := determineConfigStatus(config)
-			toolsCount := formatToolsCount(config.Allowed)
-			networkAccess := formatNetworkAccess(hasNetworkAccess)
-
-			rows = append(rows, []string{
-				config.Name,
-				status,
-				toolsCount,
-				networkAccess,
-			})
-		}
-
-		tableConfig := console.TableConfig{
-			Title:   "MCP servers in " + filepath.Base(workflowPath),
-			Headers: headers,
-			Rows:    rows,
-		}
-		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
+		renderWorkflowMCPServers(workflowPath, mcpConfigs, hasNetworkAccess)
 	}
 
 	if !verbose {
@@ -126,6 +69,71 @@ func ListWorkflowMCP(workflowFile string, verbose bool) error {
 	}
 
 	return nil
+}
+
+func renderVerboseWorkflowMCPServers(workflowPath string, mcpConfigs []parser.RegistryMCPServerConfig, hasNetworkAccess bool) {
+	// Create detailed table for verbose mode
+	headers := []string{"Server Name", "Type", "Status", "Tools Count", "Network Access", "Command/URL"}
+	rows := make([][]string, 0, len(mcpConfigs))
+
+	for _, config := range mcpConfigs {
+		status := determineConfigStatus(config)
+		toolsCount := formatToolsCount(config.Allowed)
+		networkAccess := formatNetworkAccess(hasNetworkAccess)
+
+		commandOrURL := ""
+		if config.Command != "" {
+			commandOrURL = config.Command
+		} else if config.URL != "" {
+			commandOrURL = config.URL
+		} else if config.Container != "" {
+			commandOrURL = config.Container
+		}
+		// Truncate if too long
+		commandOrURL = stringutil.Truncate(commandOrURL, 40)
+
+		rows = append(rows, []string{
+			config.Name,
+			config.Type,
+			status,
+			toolsCount,
+			networkAccess,
+			commandOrURL,
+		})
+	}
+
+	tableConfig := console.TableConfig{
+		Title:   "MCP servers in " + filepath.Base(workflowPath),
+		Headers: headers,
+		Rows:    rows,
+	}
+	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
+}
+
+func renderWorkflowMCPServers(workflowPath string, mcpConfigs []parser.RegistryMCPServerConfig, hasNetworkAccess bool) {
+	// Simple table for basic mode
+	headers := []string{"Server Name", "Status", "Tools Count", "Network Access"}
+	rows := make([][]string, 0, len(mcpConfigs))
+
+	for _, config := range mcpConfigs {
+		status := determineConfigStatus(config)
+		toolsCount := formatToolsCount(config.Allowed)
+		networkAccess := formatNetworkAccess(hasNetworkAccess)
+
+		rows = append(rows, []string{
+			config.Name,
+			status,
+			toolsCount,
+			networkAccess,
+		})
+	}
+
+	tableConfig := console.TableConfig{
+		Title:   "MCP servers in " + filepath.Base(workflowPath),
+		Headers: headers,
+		Rows:    rows,
+	}
+	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 }
 
 // listWorkflowsWithMCPServers shows available workflow files that contain MCP configurations
@@ -175,6 +183,19 @@ func listWorkflowsWithMCPServers(workflowsDir string, verbose bool) error {
 	// If interactive selection failed or was cancelled, fall back to table display
 	mcpListLog.Printf("Interactive selection failed or cancelled, showing table: %v", err)
 
+	renderWorkflowsMCPServerTable(workflowData, verbose)
+	if !verbose {
+		fmt.Fprintf(os.Stderr, "\nRun 'gh aw mcp list --verbose' for detailed information\n")
+	}
+	fmt.Fprintf(os.Stderr, "Run 'gh aw mcp list <workflow-name>' to list MCP servers in a specific workflow\n")
+	return nil
+}
+
+func renderWorkflowsMCPServerTable(workflowData []struct {
+	name        string
+	serverCount int
+	serverNames []string
+}, verbose bool) {
 	// Display results in table format
 	if verbose {
 		// Detailed table with server names
@@ -217,12 +238,6 @@ func listWorkflowsWithMCPServers(workflowsDir string, verbose bool) error {
 		fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 	}
 
-	if !verbose {
-		fmt.Fprintf(os.Stderr, "\nRun 'gh aw mcp list --verbose' for detailed information\n")
-	}
-	fmt.Fprintf(os.Stderr, "Run 'gh aw mcp list <workflow-name>' to list MCP servers in a specific workflow\n")
-
-	return nil
 }
 
 // showInteractiveMCPWorkflowSelection displays an interactive list of workflows with MCP servers

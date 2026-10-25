@@ -95,6 +95,18 @@ func parseTimeDeltaWithMinutes(deltaStr string, allowMinutes bool) (*TimeDelta, 
 		return nil, fmt.Errorf("invalid time delta format: +%s. Extra characters detected. Example: +2w3d", deltaStr)
 	}
 
+	delta, err := parseTimeDeltaComponents(deltaStr, matches, allowMinutes)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateTimeDeltaLimits(delta); err != nil {
+		return nil, err
+	}
+	timeDeltaLog.Printf("Parsed time delta successfully: %s", delta.String())
+	return delta, nil
+}
+
+func parseTimeDeltaComponents(deltaStr string, matches [][]string, allowMinutes bool) (*TimeDelta, error) {
 	delta := &TimeDelta{}
 	seenUnits := make(map[string]struct {
 	})
@@ -103,7 +115,6 @@ func parseTimeDeltaWithMinutes(deltaStr string, allowMinutes bool) (*TimeDelta, 
 		if len(match) != 3 {
 			continue
 		}
-
 		valueStr := match[1]
 		unit := match[2]
 
@@ -141,26 +152,28 @@ func parseTimeDeltaWithMinutes(deltaStr string, allowMinutes bool) (*TimeDelta, 
 			return nil, fmt.Errorf("unsupported time unit '%s' in time delta: +%s. Example: +2w (supported units: mo, w, d, h, m)", unit, deltaStr)
 		}
 	}
+	return delta, nil
+}
 
+func validateTimeDeltaLimits(delta *TimeDelta) error {
 	// Validate reasonable limits
 	if delta.Months > MaxTimeDeltaMonths {
-		return nil, fmt.Errorf("time delta too large: %d months exceeds maximum of %d months", delta.Months, MaxTimeDeltaMonths)
+		return fmt.Errorf("time delta too large: %d months exceeds maximum of %d months", delta.Months, MaxTimeDeltaMonths)
 	}
 	if delta.Weeks > MaxTimeDeltaWeeks {
-		return nil, fmt.Errorf("time delta too large: %d weeks exceeds maximum of %d weeks", delta.Weeks, MaxTimeDeltaWeeks)
+		return fmt.Errorf("time delta too large: %d weeks exceeds maximum of %d weeks", delta.Weeks, MaxTimeDeltaWeeks)
 	}
 	if delta.Days > MaxTimeDeltaDays {
-		return nil, fmt.Errorf("time delta too large: %d days exceeds maximum of %d days", delta.Days, MaxTimeDeltaDays)
+		return fmt.Errorf("time delta too large: %d days exceeds maximum of %d days", delta.Days, MaxTimeDeltaDays)
 	}
 	if delta.Hours > MaxTimeDeltaHours {
-		return nil, fmt.Errorf("time delta too large: %d hours exceeds maximum of %d hours", delta.Hours, MaxTimeDeltaHours)
+		return fmt.Errorf("time delta too large: %d hours exceeds maximum of %d hours", delta.Hours, MaxTimeDeltaHours)
 	}
 	if delta.Minutes > MaxTimeDeltaMinutes {
-		return nil, fmt.Errorf("time delta too large: %d minutes exceeds maximum of %d minutes", delta.Minutes, MaxTimeDeltaMinutes)
+		return fmt.Errorf("time delta too large: %d minutes exceeds maximum of %d minutes", delta.Minutes, MaxTimeDeltaMinutes)
 	}
 
-	timeDeltaLog.Printf("Parsed time delta successfully: %s", delta.String())
-	return delta, nil
+	return nil
 }
 
 // String returns a human-readable representation of the TimeDelta
@@ -196,8 +209,12 @@ func isRelativeStopTime(stopTime string) bool {
 func parseAbsoluteDateTime(dateTimeStr string) (string, error) {
 	timeDeltaLog.Printf("Parsing absolute date-time: %s", dateTimeStr)
 
+	return parseAbsoluteDateTimeFormats(dateTimeStr, absoluteDateTimeFormats())
+}
+
+func absoluteDateTimeFormats() []string {
 	// Try multiple date-time formats in order of preference
-	formats := []string{
+	return []string{
 		// Standard formats
 		"2006-01-02 15:04:05",  // YYYY-MM-DD HH:MM:SS
 		"2006-01-02T15:04:05",  // ISO 8601 without timezone
@@ -239,7 +256,9 @@ func parseAbsoluteDateTime(dateTimeStr string) (string, error) {
 		time.RFC850,  // Monday, 02-Jan-06 15:04:05 MST
 		time.RFC1123, // Mon, 02 Jan 2006 15:04:05 MST
 	}
+}
 
+func parseAbsoluteDateTimeFormats(dateTimeStr string, formats []string) (string, error) {
 	// Clean up the input string
 	dateTimeStr = strings.TrimSpace(dateTimeStr)
 

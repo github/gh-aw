@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestJavaScriptLiteralExtractionBoundaries(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"escaped slash and flags", `const r = /a\/b/gi; // remove`, `const r = /a\/b/gi; `},
+		{"even escape parity", `const s = "a\\"; // remove`, `const s = "a\\"; `},
+		{"escaped quote", `const s = "a\"//b"; // remove`, `const s = "a\"//b"; `},
+		{"unterminated string", `const s = "a // keep`, `const s = "a // keep`},
+		{"unterminated regex", `const r = /a\/`, `const r = /a\/`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			inBlockComment := false
+			if got := removeJavaScriptCommentsFromLine(tt.input, &inBlockComment); got != tt.want {
+				t.Fatalf("removeJavaScriptCommentsFromLine() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFormatJavaScriptForYAML(t *testing.T) {
 	tests := []struct {
 		name     string

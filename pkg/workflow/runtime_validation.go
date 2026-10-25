@@ -119,15 +119,7 @@ func validateBlockScalarExpressionSizes(lines []string, maxSize int) error {
 	blockHasExpression := false
 
 	checkBlock := func() error {
-		if inBlock && blockHasExpression && blockSize > maxSize {
-			actualSize := console.FormatFileSize(int64(blockSize))
-			maxSizeFormatted := console.FormatFileSize(int64(maxSize))
-			return fmt.Errorf("expression value for %q (%s) exceeds maximum allowed size (%s) starting at line %d. "+
-				"GitHub Actions has a 21KB limit for YAML values that contain template expressions (${{ }}). "+
-				"Split the step into separate run: blocks so that no single block containing ${{ }} expressions exceeds the limit",
-				blockKey, actualSize, maxSizeFormatted, blockStartLine+1)
-		}
-		return nil
+		return validateExpressionBlockSize(inBlock && blockHasExpression, blockSize, maxSize, blockKey, blockStartLine)
 	}
 
 	for i, line := range lines {
@@ -180,6 +172,18 @@ func validateBlockScalarExpressionSizes(lines []string, maxSize int) error {
 	return checkBlock()
 }
 
+func validateExpressionBlockSize(hasExpression bool, blockSize, maxSize int, blockKey string, blockStartLine int) error {
+	if hasExpression && blockSize > maxSize {
+		actualSize := console.FormatFileSize(int64(blockSize))
+		maxSizeFormatted := console.FormatFileSize(int64(maxSize))
+		return fmt.Errorf("expression value for %q (%s) exceeds maximum allowed size (%s) starting at line %d. "+
+			"GitHub Actions has a 21KB limit for YAML values that contain template expressions (${{ }}). "+
+			"Split the step into separate run: blocks so that no single block containing ${{ }} expressions exceeds the limit",
+			blockKey, actualSize, maxSizeFormatted, blockStartLine+1)
+	}
+	return nil
+}
+
 // validateContainerImages validates that container images specified in MCP configs exist and are accessible
 func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 	if workflowData.Tools == nil {
@@ -207,16 +211,9 @@ func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 			// Check if this tool originally had a container field (before transformation)
 			if containerName, hasContainer := config["container"]; hasContainer && mcpConfig.Type == "stdio" {
 				// Build the full container image name with version
-				containerStr, ok := containerName.(string)
+				containerImage, ok := containerImageWithVersion(containerName, config)
 				if !ok {
 					continue
-				}
-
-				containerImage := containerStr
-				if version, hasVersion := config["version"]; hasVersion {
-					if versionStr, ok := version.(string); ok && versionStr != "" {
-						containerImage = containerImage + ":" + versionStr
-					}
 				}
 
 				// Validate the container image exists using docker
@@ -248,6 +245,19 @@ func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 
 	runtimeValidationLog.Print("Container image validation passed")
 	return nil
+}
+
+func containerImageWithVersion(containerName any, config map[string]any) (string, bool) {
+	containerImage, ok := containerName.(string)
+	if !ok {
+		return "", false
+	}
+	if version, hasVersion := config["version"]; hasVersion {
+		if versionStr, ok := version.(string); ok && versionStr != "" {
+			containerImage = containerImage + ":" + versionStr
+		}
+	}
+	return containerImage, true
 }
 
 // validateRuntimePackages validates that packages required by npx, pip, and uv are available

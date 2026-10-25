@@ -14,9 +14,26 @@ var addWizardLog = logger.New("cli:add_wizard_command")
 // NewAddWizardCommand creates the add-wizard command, which is always interactive.
 func NewAddWizardCommand(validateEngine func(string) error) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "add-wizard <workflow>...",
-		Short: "Interactively add one or more agentic workflows with guided setup",
-		Long: `Interactively add one or more agentic workflows with guided setup.
+		Use:     "add-wizard <workflow>...",
+		Short:   "Interactively add one or more agentic workflows with guided setup",
+		Long:    addWizardLongDescription(),
+		Example: addWizardExamples(),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return errors.New("missing workflow specification\n\nRun 'gh aw add-wizard --help' for usage information")
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAddWizardCommand(cmd, args, validateEngine)
+		},
+	}
+	addWizardFlags(cmd)
+	return cmd
+}
+
+func addWizardLongDescription() string {
+	return `Interactively add one or more agentic workflows with guided setup.
 
 This command walks you through:
   - Selecting an AI engine (Copilot, Claude, Codex, Gemini, or Pi)
@@ -42,8 +59,11 @@ Note: Requires an interactive terminal. Use 'add' for CI/automation environments
 Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterprise host by default.
       For github/*, githubnext/*, and microsoft/* sources, shorthand resolves on github.com.
       Use full https://github.com/... source URLs for other public github.com workflows.
-Note: To create a new workflow from scratch, use the 'new' command instead.`,
-		Example: `  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics                    # Guided setup for repository-root aw.yml package
+Note: To create a new workflow from scratch, use the 'new' command instead.`
+}
+
+func addWizardExamples() string {
+	return `  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics                    # Guided setup for repository-root aw.yml package
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/packages/repo-assist # Guided setup for nested aw.yml package
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/daily-repo-status    # Guided setup
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor@v1.0.0     # Guided setup with version
@@ -55,74 +75,74 @@ Note: To create a new workflow from scratch, use the 'new' command instead.`,
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --pr --auto-merge  # Use pull request delivery with auto-merge
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --append "custom footer"            # Append custom content
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --no-security-scanner             # Skip security scan
-  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --no-config # Skip GitHub App permission/event inference from package workflows`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return errors.New("missing workflow specification\n\nRun 'gh aw add-wizard --help' for usage information")
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			workflows := args
-			engineOverride, _ := cmd.Flags().GetString("engine")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			noGitattributes, _ := cmd.Flags().GetBool("no-gitattributes")
-			workflowDir, _ := cmd.Flags().GetString("dir")
-			noStopAfter, _ := cmd.Flags().GetBool("no-stop-after")
-			stopAfter, _ := cmd.Flags().GetString("stop-after")
-			noSecret, _ := cmd.Flags().GetBool("no-secret")
-			skipSecretLegacy, _ := cmd.Flags().GetBool("skip-secret")
-			skipSecret := noSecret || skipSecretLegacy
-			appendText, _ := cmd.Flags().GetString("append")
-			disableSecurityScanner := resolveDeprecatedBoolFlag(cmd, "no-security-scanner", "disable-security-scanner")
-			noGitHubAppInference, _ := cmd.Flags().GetBool("no-config")
-			autoMerge, _ := cmd.Flags().GetBool("auto-merge")
-			createPRFlag, _ := cmd.Flags().GetBool("create-pull-request")
-			prFlagAlias, _ := cmd.Flags().GetBool("pr")
-			createPR := createPRFlag || prFlagAlias
-			if err := requireAutoMergePR(autoMerge, createPR); err != nil {
-				return err
-			}
-			ghAwRef, _ := cmd.Flags().GetString("gh-aw-ref")
-			resolvedGhAwRef, err := resolveAddGhAwRef(cmd.Context(), ghAwRef)
-			if err != nil {
-				return err
-			}
+  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor --no-config # Skip GitHub App permission/event inference from package workflows`
+}
 
-			addWizardLog.Printf("Starting add-wizard: workflows=%v, engine=%s, verbose=%v", workflows, engineOverride, verbose)
-
-			if err := validateEngine(engineOverride); err != nil {
-				return err
-			}
-
-			// add-wizard requires an interactive terminal
-			isTerminal := tty.IsStdoutTerminal()
-			isCIEnv := IsRunningInCI()
-			addWizardLog.Printf("Terminal check: is_terminal=%v, is_ci=%v", isTerminal, isCIEnv)
-			if !isTerminal || isCIEnv {
-				return errors.New("add-wizard requires an interactive terminal; use 'add' for non-interactive environments")
-			}
-
-			return RunAddInteractive(cmd.Context(), &AddInteractiveConfig{
-				WorkflowSpecs:                       workflows,
-				Verbose:                             verbose,
-				EngineOverride:                      engineOverride,
-				NoGitattributes:                     noGitattributes,
-				WorkflowDir:                         workflowDir,
-				NoStopAfter:                         noStopAfter,
-				StopAfter:                           stopAfter,
-				SkipSecret:                          skipSecret,
-				AppendText:                          appendText,
-				DisableSecurityScanner:              disableSecurityScanner,
-				DisableGitHubAppPermissionInference: noGitHubAppInference,
-				GhAwRef:                             resolvedGhAwRef,
-				AutoMerge:                           autoMerge,
-				CreatePR:                            createPR,
-				PRMessage:                           cmd.Flag("pr-message").Value.String(),
-			})
-		},
+func runAddWizardCommand(cmd *cobra.Command, args []string, validateEngine func(string) error) error {
+	config, err := addWizardConfigFromFlags(cmd, args)
+	if err != nil {
+		return err
 	}
+	addWizardLog.Printf("Starting add-wizard: workflows=%v, engine=%s, verbose=%v", config.WorkflowSpecs, config.EngineOverride, config.Verbose)
+	if err := validateEngine(config.EngineOverride); err != nil {
+		return err
+	}
+	// add-wizard requires an interactive terminal
+	isTerminal := tty.IsStdoutTerminal()
+	isCIEnv := IsRunningInCI()
+	addWizardLog.Printf("Terminal check: is_terminal=%v, is_ci=%v", isTerminal, isCIEnv)
+	if !isTerminal || isCIEnv {
+		return errors.New("add-wizard requires an interactive terminal; use 'add' for non-interactive environments")
+	}
+	config.PRMessage = cmd.Flag("pr-message").Value.String()
+	return RunAddInteractive(cmd.Context(), config)
+}
 
+func addWizardConfigFromFlags(cmd *cobra.Command, args []string) (*AddInteractiveConfig, error) {
+	workflows := args
+	engineOverride, _ := cmd.Flags().GetString("engine")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	noGitattributes, _ := cmd.Flags().GetBool("no-gitattributes")
+	workflowDir, _ := cmd.Flags().GetString("dir")
+	noStopAfter, _ := cmd.Flags().GetBool("no-stop-after")
+	stopAfter, _ := cmd.Flags().GetString("stop-after")
+	noSecret, _ := cmd.Flags().GetBool("no-secret")
+	skipSecretLegacy, _ := cmd.Flags().GetBool("skip-secret")
+	skipSecret := noSecret || skipSecretLegacy
+	appendText, _ := cmd.Flags().GetString("append")
+	disableSecurityScanner := resolveDeprecatedBoolFlag(cmd, "no-security-scanner", "disable-security-scanner")
+	noGitHubAppInference, _ := cmd.Flags().GetBool("no-config")
+	autoMerge, _ := cmd.Flags().GetBool("auto-merge")
+	createPRFlag, _ := cmd.Flags().GetBool("create-pull-request")
+	prFlagAlias, _ := cmd.Flags().GetBool("pr")
+	createPR := createPRFlag || prFlagAlias
+	if err := requireAutoMergePR(autoMerge, createPR); err != nil {
+		return nil, err
+	}
+	ghAwRef, _ := cmd.Flags().GetString("gh-aw-ref")
+	resolvedGhAwRef, err := resolveAddGhAwRef(cmd.Context(), ghAwRef)
+	if err != nil {
+		return nil, err
+	}
+	return &AddInteractiveConfig{
+		WorkflowSpecs:                       workflows,
+		Verbose:                             verbose,
+		EngineOverride:                      engineOverride,
+		NoGitattributes:                     noGitattributes,
+		WorkflowDir:                         workflowDir,
+		NoStopAfter:                         noStopAfter,
+		StopAfter:                           stopAfter,
+		SkipSecret:                          skipSecret,
+		AppendText:                          appendText,
+		DisableSecurityScanner:              disableSecurityScanner,
+		DisableGitHubAppPermissionInference: noGitHubAppInference,
+		GhAwRef:                             resolvedGhAwRef,
+		AutoMerge:                           autoMerge,
+		CreatePR:                            createPR,
+	}, nil
+}
+
+func addWizardFlags(cmd *cobra.Command) {
 	// Add AI engine flag
 	addEngineFlag(cmd)
 
@@ -164,5 +184,4 @@ Note: To create a new workflow from scratch, use the 'new' command instead.`,
 	RegisterEngineFlagCompletion(cmd)
 	RegisterDirFlagCompletion(cmd, "dir")
 
-	return cmd
 }

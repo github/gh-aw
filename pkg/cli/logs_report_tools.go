@@ -171,57 +171,7 @@ func buildToolUsageSummary(processedRuns []ProcessedRun) []ToolUsageSummary {
 	toolStats := make(map[string]*ToolUsageSummary)
 
 	for _, pr := range processedRuns {
-		// Extract metrics from run's logs
-		metrics := ExtractLogMetricsFromRun(pr)
-
-		// Track which runs use each tool
-		toolRunTracker := make(map[string]struct {
-		})
-
-		for _, toolCall := range metrics.ToolCalls {
-			displayKey := workflow.PrettifyToolName(toolCall.Name)
-
-			// Filter out invalid tool names
-			if !isValidToolName(displayKey) {
-				continue
-			}
-
-			toolRunTracker[displayKey] = struct {
-			}{}
-
-			if existing, exists := toolStats[displayKey]; exists {
-				existing.TotalCalls += toolCall.CallCount
-				if toolCall.MaxOutputSize > existing.MaxOutputSize {
-					existing.MaxOutputSize = toolCall.MaxOutputSize
-				}
-				if toolCall.MaxDuration > 0 {
-					maxDur := timeutil.FormatDuration(toolCall.MaxDuration)
-					if existing.MaxDuration == "" || toolCall.MaxDuration > parseDurationString(existing.MaxDuration) {
-						existing.MaxDuration = maxDur
-					}
-				}
-				existing.syncBaseFromFields()
-			} else {
-				info := &ToolUsageSummary{
-					Name:          displayKey,
-					TotalCalls:    toolCall.CallCount,
-					MaxOutputSize: toolCall.MaxOutputSize,
-					Runs:          0, // Will be incremented below
-				}
-				if toolCall.MaxDuration > 0 {
-					info.MaxDuration = timeutil.FormatDuration(toolCall.MaxDuration)
-				}
-				info.syncBaseFromFields()
-				toolStats[displayKey] = info
-			}
-		}
-
-		// Increment run count for tools used in this run
-		for toolName := range toolRunTracker {
-			if stat, exists := toolStats[toolName]; exists {
-				stat.Runs++
-			}
-		}
+		accumulateRunToolUsage(pr, toolStats)
 	}
 
 	var result []ToolUsageSummary
@@ -235,4 +185,58 @@ func buildToolUsageSummary(processedRuns []ProcessedRun) []ToolUsageSummary {
 	})
 
 	return result
+}
+
+func accumulateRunToolUsage(pr ProcessedRun, toolStats map[string]*ToolUsageSummary) {
+	// Extract metrics from run's logs
+	metrics := ExtractLogMetricsFromRun(pr)
+
+	// Track which runs use each tool
+	toolRunTracker := make(map[string]struct {
+	})
+
+	for _, toolCall := range metrics.ToolCalls {
+		displayKey := workflow.PrettifyToolName(toolCall.Name)
+
+		// Filter out invalid tool names
+		if !isValidToolName(displayKey) {
+			continue
+		}
+
+		toolRunTracker[displayKey] = struct {
+		}{}
+
+		if existing, exists := toolStats[displayKey]; exists {
+			existing.TotalCalls += toolCall.CallCount
+			if toolCall.MaxOutputSize > existing.MaxOutputSize {
+				existing.MaxOutputSize = toolCall.MaxOutputSize
+			}
+			if toolCall.MaxDuration > 0 {
+				maxDur := timeutil.FormatDuration(toolCall.MaxDuration)
+				if existing.MaxDuration == "" || toolCall.MaxDuration > parseDurationString(existing.MaxDuration) {
+					existing.MaxDuration = maxDur
+				}
+			}
+			existing.syncBaseFromFields()
+		} else {
+			info := &ToolUsageSummary{
+				Name:          displayKey,
+				TotalCalls:    toolCall.CallCount,
+				MaxOutputSize: toolCall.MaxOutputSize,
+				Runs:          0, // Will be incremented below
+			}
+			if toolCall.MaxDuration > 0 {
+				info.MaxDuration = timeutil.FormatDuration(toolCall.MaxDuration)
+			}
+			info.syncBaseFromFields()
+			toolStats[displayKey] = info
+		}
+	}
+
+	// Increment run count for tools used in this run
+	for toolName := range toolRunTracker {
+		if stat, exists := toolStats[toolName]; exists {
+			stat.Runs++
+		}
+	}
 }

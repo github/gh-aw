@@ -73,6 +73,11 @@ func parseAppConfig(appMap map[string]any) *GitHubAppConfig {
 		}
 	}
 
+	parseAppRepositoryAndPermissions(appMap, appConfig)
+	return appConfig
+}
+
+func parseAppRepositoryAndPermissions(appMap map[string]any, appConfig *GitHubAppConfig) {
 	// Parse repositories (optional)
 	if repos, exists := appMap["repositories"]; exists {
 		switch reposArray := repos.(type) {
@@ -108,7 +113,6 @@ func parseAppConfig(appMap map[string]any) *GitHubAppConfig {
 		}
 	}
 
-	return appConfig
 }
 
 func (app *GitHubAppConfig) shouldIgnoreMissingKey() bool {
@@ -478,6 +482,15 @@ func (c *Compiler) buildGitHubAppTokenMintStepWithMeta(app *GitHubAppConfig, per
 func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]string {
 	fields := make(map[string]string)
 
+	addGitHubActionsAppTokenFields(permissions, fields)
+	addRepositoryAppTokenFields(permissions, fields)
+	addOrganizationAppTokenFields(permissions, fields)
+	addOrganizationAccountAppTokenFields(permissions, fields)
+	addUserAppTokenFields(permissions, fields)
+	return fields
+}
+
+func addGitHubActionsAppTokenFields(permissions *Permissions, fields map[string]string) {
 	// Map GitHub Actions permissions to GitHub App permissions
 	// See: https://github.com/actions/create-github-app-token#permissions
 
@@ -523,7 +536,9 @@ func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]str
 	if level, ok := permissions.Get(PermissionDiscussions); ok {
 		fields["permission-discussions"] = string(level)
 	}
+}
 
+func addRepositoryAppTokenFields(permissions *Permissions, fields map[string]string) {
 	// GitHub App-only permissions (not available in GitHub Actions GITHUB_TOKEN).
 	// Use GetExplicit() so that shorthand permissions like "read-all" do not accidentally
 	// expand into broad GitHub App-only grants that the user never declared.
@@ -555,6 +570,9 @@ func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]str
 	if level, ok := permissions.GetExplicit(PermissionSecretScanningAlerts); ok && level != PermissionNone {
 		fields["permission-secret-scanning-alerts"] = string(level)
 	}
+}
+
+func addOrganizationAppTokenFields(permissions *Permissions, fields map[string]string) {
 	// Organization-level
 	if level, ok := permissions.GetExplicit(PermissionOrganizationProj); ok {
 		fields["permission-organization-projects"] = string(level)
@@ -589,6 +607,9 @@ func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]str
 	if level, ok := permissions.GetExplicit(PermissionOrganizationCustomRepositoryRoles); ok {
 		fields["permission-organization-custom-repository-roles"] = string(level)
 	}
+}
+
+func addOrganizationAccountAppTokenFields(permissions *Permissions, fields map[string]string) {
 	if level, ok := permissions.GetExplicit(PermissionOrganizationAnnouncementBanners); ok {
 		fields["permission-organization-announcement-banners"] = string(level)
 	}
@@ -613,6 +634,9 @@ func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]str
 	if level, ok := permissions.GetExplicit(PermissionOrganizationCodespaces); ok {
 		fields["permission-organization-codespaces"] = string(level)
 	}
+}
+
+func addUserAppTokenFields(permissions *Permissions, fields map[string]string) {
 	// User-level
 	if level, ok := permissions.GetExplicit(PermissionEmailAddresses); ok {
 		fields["permission-email-addresses"] = string(level)
@@ -632,7 +656,6 @@ func convertPermissionsToAppTokenFields(permissions *Permissions) map[string]str
 	// - copilot-requests: GitHub Actions-specific Copilot authentication token
 	// - metadata: GitHub App metadata permission is automatically included (read-only)
 
-	return fields
 }
 
 // ========================================

@@ -417,6 +417,22 @@ func TestRunnerGuardDockerArgsShellEscapesBangInPaths(t *testing.T) {
 	require.Contains(t, rendered, "'./path!subdir'")
 }
 
+func TestRunnerGuardDirectoryScanPath(t *testing.T) {
+	t.Parallel()
+	gitRoot := t.TempDir()
+
+	scanPath, err := runnerGuardDirectoryScanPath(filepath.Join(gitRoot, ".github", "workflows"), gitRoot)
+	require.NoError(t, err)
+	require.Equal(t, "./.github/workflows", scanPath)
+
+	scanPath, err = runnerGuardDirectoryScanPath(filepath.Join(gitRoot, "--help"), gitRoot)
+	require.NoError(t, err)
+	require.Equal(t, "./--help", scanPath)
+
+	_, err = runnerGuardDirectoryScanPath(filepath.Join(gitRoot, "..", "outside"), gitRoot)
+	require.ErrorContains(t, err, "must stay within git root")
+}
+
 func TestRunRunnerGuardOnDirectoryRejectsPathsOutsideRepo(t *testing.T) {
 	t.Parallel()
 	outsideDir := filepath.Join(t.TempDir(), "outside")

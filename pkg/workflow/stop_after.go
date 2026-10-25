@@ -426,57 +426,7 @@ func (c *Compiler) extractSkipIfCheckFailingFromOn(frontmatter map[string]any, w
 				return &SkipIfCheckFailingConfig{}, nil
 			case map[string]any:
 				// Object format: skip-if-check-failing: { include: [...], exclude: [...], branch: "...", allow-pending: true }
-				config := &SkipIfCheckFailingConfig{}
-
-				// Extract include list (optional)
-				if includeRaw, hasInclude := skip["include"]; hasInclude {
-					includeSlice, ok := includeRaw.([]any)
-					if !ok {
-						return nil, errors.New("skip-if-check-failing 'include' field must be a list of strings. Example:\n  skip-if-check-failing:\n    include:\n      - build\n      - test")
-					}
-					for _, item := range includeSlice {
-						s, ok := item.(string)
-						if !ok {
-							return nil, fmt.Errorf("skip-if-check-failing 'include' list items must be strings, got %T. Example:\n  skip-if-check-failing:\n    include:\n      - build", item)
-						}
-						config.Include = append(config.Include, s)
-					}
-				}
-
-				// Extract exclude list (optional)
-				if excludeRaw, hasExclude := skip["exclude"]; hasExclude {
-					excludeSlice, ok := excludeRaw.([]any)
-					if !ok {
-						return nil, errors.New("skip-if-check-failing 'exclude' field must be a list of strings. Example:\n  skip-if-check-failing:\n    exclude:\n      - lint")
-					}
-					for _, item := range excludeSlice {
-						s, ok := item.(string)
-						if !ok {
-							return nil, fmt.Errorf("skip-if-check-failing 'exclude' list items must be strings, got %T. Example:\n  skip-if-check-failing:\n    exclude:\n      - lint", item)
-						}
-						config.Exclude = append(config.Exclude, s)
-					}
-				}
-
-				// Extract branch (optional)
-				if branchRaw, hasBranch := skip["branch"]; hasBranch {
-					branchStr, ok := branchRaw.(string)
-					if !ok {
-						return nil, fmt.Errorf("skip-if-check-failing 'branch' field must be a string, got %T. Example: branch: main", branchRaw)
-					}
-					config.Branch = branchStr
-				}
-
-				// Extract allow-pending (optional, defaults to false — pending counts as failing)
-				if allowPendingRaw, hasAllowPending := skip["allow-pending"]; hasAllowPending {
-					allowPending, ok := allowPendingRaw.(bool)
-					if !ok {
-						return nil, fmt.Errorf("skip-if-check-failing 'allow-pending' field must be a boolean, got %T. Example: allow-pending: true", allowPendingRaw)
-					}
-					config.AllowPending = allowPending
-				}
-
-				return config, nil
+				return parseSkipIfCheckFailingObject(skip)
 			default:
 				return nil, fmt.Errorf("skip-if-check-failing value must be true or an object, got %T. Example:\n  skip-if-check-failing:\n  skip-if-check-failing: true\n  skip-if-check-failing:\n    include:\n      - build\n    branch: main\n    allow-pending: true", skipIfCheckFailing)
 			}
@@ -485,6 +435,65 @@ func (c *Compiler) extractSkipIfCheckFailingFromOn(frontmatter map[string]any, w
 	default:
 		return nil, errors.New("invalid on: section format. Expected a string or an object of triggers. Example:\non:\n  issues:\n    types: [opened]")
 	}
+}
+
+func parseSkipIfCheckFailingObject(skip map[string]any) (*SkipIfCheckFailingConfig, error) {
+	config := &SkipIfCheckFailingConfig{}
+	if err := parseSkipIfCheckFailingLists(skip, config); err != nil {
+		return nil, err
+	}
+	// Extract branch (optional)
+	if branchRaw, hasBranch := skip["branch"]; hasBranch {
+		branchStr, ok := branchRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("skip-if-check-failing 'branch' field must be a string, got %T. Example: branch: main", branchRaw)
+		}
+		config.Branch = branchStr
+	}
+
+	// Extract allow-pending (optional, defaults to false — pending counts as failing)
+	if allowPendingRaw, hasAllowPending := skip["allow-pending"]; hasAllowPending {
+		allowPending, ok := allowPendingRaw.(bool)
+		if !ok {
+			return nil, fmt.Errorf("skip-if-check-failing 'allow-pending' field must be a boolean, got %T. Example: allow-pending: true", allowPendingRaw)
+		}
+		config.AllowPending = allowPending
+	}
+	return config, nil
+}
+
+func parseSkipIfCheckFailingLists(skip map[string]any, config *SkipIfCheckFailingConfig) error {
+	// Extract include list (optional)
+	if includeRaw, hasInclude := skip["include"]; hasInclude {
+		includeSlice, ok := includeRaw.([]any)
+		if !ok {
+			return errors.New("skip-if-check-failing 'include' field must be a list of strings. Example:\n  skip-if-check-failing:\n    include:\n      - build\n      - test")
+		}
+		for _, item := range includeSlice {
+			s, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("skip-if-check-failing 'include' list items must be strings, got %T. Example:\n  skip-if-check-failing:\n    include:\n      - build", item)
+			}
+			config.Include = append(config.Include, s)
+		}
+	}
+
+	// Extract exclude list (optional)
+	if excludeRaw, hasExclude := skip["exclude"]; hasExclude {
+		excludeSlice, ok := excludeRaw.([]any)
+		if !ok {
+			return errors.New("skip-if-check-failing 'exclude' field must be a list of strings. Example:\n  skip-if-check-failing:\n    exclude:\n      - lint")
+		}
+		for _, item := range excludeSlice {
+			s, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("skip-if-check-failing 'exclude' list items must be strings, got %T. Example:\n  skip-if-check-failing:\n    exclude:\n      - lint", item)
+			}
+			config.Exclude = append(config.Exclude, s)
+		}
+	}
+
+	return nil
 }
 
 // processSkipIfCheckFailingConfiguration extracts and processes skip-if-check-failing configuration from frontmatter

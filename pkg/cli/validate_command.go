@@ -29,51 +29,59 @@ If no workflows are specified, all Markdown files in .github/workflows will be v
   ` + string(constants.CLIExtensionPrefix) + ` validate --strict                # Enforce strict mode validation
   ` + string(constants.CLIExtensionPrefix) + ` validate --fail-fast             # Stop at the first validation error`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engineOverride, _ := cmd.Flags().GetString("engine")
-			dir, _ := cmd.Flags().GetString("dir")
-			strict, _ := cmd.Flags().GetBool("strict")
-			jsonOutput, _ := cmd.Flags().GetBool("json")
-			failFast, _ := cmd.Flags().GetBool("fail-fast")
-			stats, _ := cmd.Flags().GetBool("stats")
-			allowActionRefs, _ := cmd.Flags().GetBool("allow-action-refs")
-			noCheckUpdate, _ := cmd.Flags().GetBool("no-check-update")
-			validateImages, _ := cmd.Flags().GetBool("validate-images")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-
-			if err := validateEngine(engineOverride); err != nil {
-				return err
-			}
-
-			// Check for updates (non-blocking, runs once per day); join before exit
-			joinUpdateCheck := CheckForUpdatesAsync(cmd.Context(), noCheckUpdate, verbose)
-			defer joinUpdateCheck()
-
-			validateLog.Printf("Running validate command: workflows=%v, dir=%s", args, dir)
-
-			config := CompileConfig{
-				MarkdownFiles:   args,
-				Verbose:         verbose,
-				EngineOverride:  engineOverride,
-				Validate:        true,
-				NoEmit:          true,
-				Zizmor:          true,
-				Actionlint:      true,
-				Poutine:         true,
-				WorkflowDir:     dir,
-				Strict:          strict,
-				JSONOutput:      jsonOutput,
-				FailFast:        failFast,
-				Stats:           stats,
-				AllowActionRefs: allowActionRefs,
-				ValidateImages:  validateImages,
-			}
-			if _, err := CompileWorkflows(cmd.Context(), config); err != nil {
-				return err
-			}
-			return nil
+			return runValidateCommand(cmd, args, validateEngine)
 		},
 	}
+	configureValidateCommand(cmd)
+	return cmd
+}
 
+func runValidateCommand(cmd *cobra.Command, args []string, validateEngine func(string) error) error {
+	engineOverride, _ := cmd.Flags().GetString("engine")
+	dir, _ := cmd.Flags().GetString("dir")
+	strict, _ := cmd.Flags().GetBool("strict")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	failFast, _ := cmd.Flags().GetBool("fail-fast")
+	stats, _ := cmd.Flags().GetBool("stats")
+	allowActionRefs, _ := cmd.Flags().GetBool("allow-action-refs")
+	noCheckUpdate, _ := cmd.Flags().GetBool("no-check-update")
+	validateImages, _ := cmd.Flags().GetBool("validate-images")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	if err := validateEngine(engineOverride); err != nil {
+		return err
+	}
+
+	// Check for updates (non-blocking, runs once per day); join before exit
+	joinUpdateCheck := CheckForUpdatesAsync(cmd.Context(), noCheckUpdate, verbose)
+	defer joinUpdateCheck()
+
+	validateLog.Printf("Running validate command: workflows=%v, dir=%s", args, dir)
+
+	config := CompileConfig{
+		MarkdownFiles:   args,
+		Verbose:         verbose,
+		EngineOverride:  engineOverride,
+		Validate:        true,
+		NoEmit:          true,
+		Zizmor:          true,
+		Actionlint:      true,
+		Poutine:         true,
+		WorkflowDir:     dir,
+		Strict:          strict,
+		JSONOutput:      jsonOutput,
+		FailFast:        failFast,
+		Stats:           stats,
+		AllowActionRefs: allowActionRefs,
+		ValidateImages:  validateImages,
+	}
+	if _, err := CompileWorkflows(cmd.Context(), config); err != nil {
+		return err
+	}
+	return nil
+}
+
+func configureValidateCommand(cmd *cobra.Command) {
 	addEngineFlag(cmd)
 	cmd.Flags().StringP("dir", "d", "", "Workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows)")
 	cmd.Flags().Bool("strict", false, "Override frontmatter to enforce strict mode validation for all workflows (enforces action pinning, network config, safe-outputs, disallows write permissions and deprecated fields). Note: Workflows default to strict mode unless frontmatter sets strict: false")
@@ -89,5 +97,4 @@ If no workflows are specified, all Markdown files in .github/workflows will be v
 	RegisterEngineFlagCompletion(cmd)
 	RegisterDirFlagCompletion(cmd, "dir")
 
-	return cmd
 }

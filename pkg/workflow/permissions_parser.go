@@ -42,7 +42,16 @@ func (p *PermissionsParser) parse() {
 	permissionsParserLog.Printf("Parsing permissions YAML: length=%d", len(p.rawPermissions))
 
 	// Remove the "permissions:" prefix if present and get just the YAML content
-	yamlContent := strings.TrimSpace(p.rawPermissions)
+	yamlContent := normalizePermissionsYAMLContent(p.rawPermissions)
+	if yamlContent == "" {
+		return
+	}
+
+	p.parsePermissionsYAMLContent(yamlContent)
+}
+
+func normalizePermissionsYAMLContent(rawPermissions string) string {
+	yamlContent := strings.TrimSpace(rawPermissions)
 	if strings.HasPrefix(yamlContent, "permissions:") {
 		// Extract everything after "permissions:"
 		lines := strings.Split(yamlContent, "\n")
@@ -51,24 +60,7 @@ func (p *PermissionsParser) parse() {
 			contentLines := lines[1:]
 			var normalizedLines []string
 
-			// Find the common indentation to remove
-			minIndent := -1
-			for _, line := range contentLines {
-				if strings.TrimSpace(line) == "" {
-					continue // Skip empty lines
-				}
-				indent := 0
-				for _, r := range line {
-					if r == ' ' || r == '\t' {
-						indent++
-					} else {
-						break
-					}
-				}
-				if minIndent == -1 || indent < minIndent {
-					minIndent = indent
-				}
-			}
+			minIndent := permissionsCommonIndent(contentLines)
 
 			// Remove common indentation from all lines
 			if minIndent > 0 {
@@ -95,11 +87,31 @@ func (p *PermissionsParser) parse() {
 		}
 	}
 
-	yamlContent = strings.TrimSpace(yamlContent)
-	if yamlContent == "" {
-		return
-	}
+	return strings.TrimSpace(yamlContent)
+}
 
+func permissionsCommonIndent(contentLines []string) int {
+	minIndent := -1
+	for _, line := range contentLines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		indent := 0
+		for _, r := range line {
+			if r == ' ' || r == '\t' {
+				indent++
+			} else {
+				break
+			}
+		}
+		if minIndent == -1 || indent < minIndent {
+			minIndent = indent
+		}
+	}
+	return minIndent
+}
+
+func (p *PermissionsParser) parsePermissionsYAMLContent(yamlContent string) {
 	// Check if it's a shorthand permission (read-all, write-all, none)
 	// Note: "read" and "write" are no longer valid shorthands as they create invalid GitHub Actions YAML
 	shorthandPerms := []string{"read-all", "write-all", "none"}

@@ -22,50 +22,9 @@ var inlineSubAgentPattern = regexp.MustCompile("(?m)^##[ \t]+agent:[ \t]+`[a-z][
 func wrapExpressionsInTemplateConditionals(markdown string) string {
 	templateLog.Print("Wrapping expressions in template conditionals")
 
-	// wrapTagExpr applies the wrapping logic to a single extracted expression and
-	// returns the full reconstructed tag. re must be the same regex that produced
-	// match (so FindStringSubmatch reliably extracts capture group 1 = the expression).
-	// prefix is the canonical opening tag text without the expression
-	// (e.g. "{{#if " or "{{#elseif "), used to rebuild the output tag.
-	wrapTagExpr := func(re *regexp.Regexp, match, prefix string) string {
-		submatches := re.FindStringSubmatch(match)
-		if len(submatches) < 2 {
-			return match
-		}
-
-		expr := strings.TrimSpace(submatches[1])
-
-		// Empty expressions are treated as false and wrapped as such
-		if expr == "" {
-			templateLog.Print("Empty expression detected, wrapping as false")
-			return prefix + "${{ false }} }}"
-		}
-
-		// Already wrapped in ${{ ... }} — return as-is
-		if strings.HasPrefix(expr, "${{") {
-			templateLog.Print("Expression already wrapped, skipping")
-			return match
-		}
-
-		// Environment variable reference (starts with ${) — already evaluated
-		if strings.HasPrefix(expr, "${") {
-			templateLog.Print("Environment variable reference detected, skipping wrap")
-			return match
-		}
-
-		// Placeholder reference (starts with __) — substituted at runtime
-		if strings.HasPrefix(expr, "__") {
-			templateLog.Print("Placeholder reference detected, skipping wrap")
-			return match
-		}
-
-		templateLog.Printf("Wrapping expression: %s", expr)
-		return prefix + "${{ " + expr + " }} }}"
-	}
-
 	// Process {{#if ...}} tags
 	result := TemplateIfPattern.ReplaceAllStringFunc(markdown, func(match string) string {
-		return wrapTagExpr(TemplateIfPattern, match, "{{#if ")
+		return wrapTemplateTagExpression(TemplateIfPattern, match, "{{#if ")
 	})
 
 	// Process all elseif variant tags — normalise to canonical {{#elseif ...}} form after wrapping
@@ -74,13 +33,50 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 		if len(submatches) < 2 {
 			return match
 		}
-		wrapped := wrapTagExpr(TemplateElseIfPattern, match, "{{#elseif ")
+		wrapped := wrapTemplateTagExpression(TemplateElseIfPattern, match, "{{#elseif ")
 		// If the original tag used a non-canonical form (else-if / else_if / without #),
 		// the prefix replacement above already normalises it to {{#elseif ...}}.
 		return wrapped
 	})
 
 	return result
+}
+
+// wrapTemplateTagExpression rebuilds a tag using the regex that extracted its expression.
+func wrapTemplateTagExpression(re *regexp.Regexp, match, prefix string) string {
+	submatches := re.FindStringSubmatch(match)
+	if len(submatches) < 2 {
+		return match
+	}
+
+	expr := strings.TrimSpace(submatches[1])
+
+	// Empty expressions are treated as false and wrapped as such
+	if expr == "" {
+		templateLog.Print("Empty expression detected, wrapping as false")
+		return prefix + "${{ false }} }}"
+	}
+
+	// Already wrapped in ${{ ... }} — return as-is
+	if strings.HasPrefix(expr, "${{") {
+		templateLog.Print("Expression already wrapped, skipping")
+		return match
+	}
+
+	// Environment variable reference (starts with ${) — already evaluated
+	if strings.HasPrefix(expr, "${") {
+		templateLog.Print("Environment variable reference detected, skipping wrap")
+		return match
+	}
+
+	// Placeholder reference (starts with __) — substituted at runtime
+	if strings.HasPrefix(expr, "__") {
+		templateLog.Print("Placeholder reference detected, skipping wrap")
+		return match
+	}
+
+	templateLog.Printf("Wrapping expression: %s", expr)
+	return prefix + "${{ " + expr + " }} }}"
 }
 
 // generateInterpolationAndTemplateStep generates a step that interpolates GitHub expression variables

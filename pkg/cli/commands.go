@@ -49,12 +49,16 @@ func CreateWorkflowMarkdownFile(workflowName string, verbose bool, force bool, e
 		return fmt.Errorf("failed to create .github/workflows directory: %w", err)
 	}
 
+	return writeNewWorkflowMarkdown(githubWorkflowsDir, workflowName, force, engine)
+}
+
+func writeNewWorkflowMarkdown(githubWorkflowsDir, workflowName string, force bool, engine string) error {
 	// Construct the destination file path
 	destFile := filepath.Join(githubWorkflowsDir, workflowName+".md")
 	commandsLog.Printf("Destination file: %s", destFile)
 
 	// Validate the destination file path
-	destFile, err = fileutil.ValidateAbsolutePath(destFile)
+	destFile, err := fileutil.ValidateAbsolutePath(destFile)
 	if err != nil {
 		commandsLog.Printf("Invalid destination file path: %v", err)
 		return fmt.Errorf("invalid destination file path: %w", err)
@@ -121,7 +125,11 @@ network: defaults
 
 # ` + workflowName + `
 
-Describe what you want the AI to do when this workflow runs.
+` + workflowTemplateInstructions()
+}
+
+func workflowTemplateInstructions() string {
+	return `Describe what you want the AI to do when this workflow runs.
 
 ## Instructions
 

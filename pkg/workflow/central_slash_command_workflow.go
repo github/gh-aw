@@ -182,38 +182,7 @@ func collectCentralSlashCommandRoutes(workflowDataList []*WorkflowData) (map[str
 
 	// Stable ordering for deterministic output.
 	for commandName := range routesByCommand {
-		slices.SortFunc(routesByCommand[commandName], func(left, right slashCommandRoute) int {
-			if left.Workflow != right.Workflow {
-				if left.Workflow < right.Workflow {
-					return -1
-				}
-				return 1
-			}
-			leftEvents := strings.Join(left.Events, ",")
-			rightEvents := strings.Join(right.Events, ",")
-			if leftEvents != rightEvents {
-				if leftEvents < rightEvents {
-					return -1
-				}
-				return 1
-			}
-			switch {
-			case left.AIReaction < right.AIReaction:
-				return -1
-			case left.AIReaction > right.AIReaction:
-				return 1
-			case left.Emoji < right.Emoji:
-				return -1
-			case left.Emoji > right.Emoji:
-				return 1
-			case !left.StatusComment && right.StatusComment:
-				return -1
-			case left.StatusComment && !right.StatusComment:
-				return 1
-			default:
-				return 0
-			}
-		})
+		slices.SortFunc(routesByCommand[commandName], compareCentralCommandRoutes)
 	}
 
 	return routesByCommand, mergedEvents
@@ -253,41 +222,43 @@ func collectCentralLabelCommandRoutes(workflowDataList []*WorkflowData, mergedEv
 	}
 
 	for labelName := range routesByLabel {
-		slices.SortFunc(routesByLabel[labelName], func(left, right slashCommandRoute) int {
-			if left.Workflow != right.Workflow {
-				if left.Workflow < right.Workflow {
-					return -1
-				}
-				return 1
-			}
-			leftEvents := strings.Join(left.Events, ",")
-			rightEvents := strings.Join(right.Events, ",")
-			if leftEvents != rightEvents {
-				if leftEvents < rightEvents {
-					return -1
-				}
-				return 1
-			}
-			switch {
-			case left.AIReaction < right.AIReaction:
-				return -1
-			case left.AIReaction > right.AIReaction:
-				return 1
-			case left.Emoji < right.Emoji:
-				return -1
-			case left.Emoji > right.Emoji:
-				return 1
-			case !left.StatusComment && right.StatusComment:
-				return -1
-			case left.StatusComment && !right.StatusComment:
-				return 1
-			default:
-				return 0
-			}
-		})
+		slices.SortFunc(routesByLabel[labelName], compareCentralCommandRoutes)
 	}
 
 	return routesByLabel
+}
+
+func compareCentralCommandRoutes(left, right slashCommandRoute) int {
+	if left.Workflow != right.Workflow {
+		if left.Workflow < right.Workflow {
+			return -1
+		}
+		return 1
+	}
+	leftEvents := strings.Join(left.Events, ",")
+	rightEvents := strings.Join(right.Events, ",")
+	if leftEvents != rightEvents {
+		if leftEvents < rightEvents {
+			return -1
+		}
+		return 1
+	}
+	switch {
+	case left.AIReaction < right.AIReaction:
+		return -1
+	case left.AIReaction > right.AIReaction:
+		return 1
+	case left.Emoji < right.Emoji:
+		return -1
+	case left.Emoji > right.Emoji:
+		return 1
+	case !left.StatusComment && right.StatusComment:
+		return -1
+	case left.StatusComment && !right.StatusComment:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func buildCentralizedRoutes(wd *WorkflowData, routeEvents []string, includeStatusComment bool) []slashCommandRoute {
@@ -417,22 +388,8 @@ jobs:
     timeout-minutes: 15
 `)
 	writeCentralSlashRoutePermissions(&b, mergedEvents)
-	b.WriteString(`
-    steps:
-      - name: Checkout repository
-        uses: ` + getActionPin("actions/checkout") + `
-        with:
-          persist-credentials: false
-
-      - name: Setup Scripts
-        uses: ` + setupActionRef + `
-        with:
-          destination: ` + SetupActionDestination + `
-
-      - name: Route slash command
-        uses: ` + getActionPin("actions/github-script") + `
-        # runner-guard:ignore RGS-016 -- routing tables below contain emoji variation selectors (U+FE0F) and zero-width joiners (U+200D) used to render standard emoji sequences, not steganographic payloads.
-        env:
+	writeCentralSlashSetupSteps(&b, setupActionRef)
+	b.WriteString(`        env:
           GH_AW_SLASH_ROUTING: '` + escapeYAMLSingleQuoted(string(slashRoutesJSON)) + `'
           GH_AW_LABEL_ROUTING: '` + escapeYAMLSingleQuoted(string(labelRoutesJSON)) + `'
           GH_AW_HELP_COMMANDS: '` + escapeYAMLSingleQuoted(string(helpCommandsJSON)) + `'
@@ -452,17 +409,37 @@ jobs:
 	return finalYAML, nil
 }
 
+func writeCentralSlashSetupSteps(b *strings.Builder, setupActionRef string) {
+	b.WriteString(`
+    steps:
+      - name: Checkout repository
+        uses: ` + getActionPin("actions/checkout") + `
+        with:
+          persist-credentials: false
+
+      - name: Setup Scripts
+        uses: ` + setupActionRef + `
+        with:
+          destination: ` + SetupActionDestination + `
+
+      - name: Route slash command
+        uses: ` + getActionPin("actions/github-script") + `
+        # runner-guard:ignore RGS-016 -- routing tables below contain emoji variation selectors (U+FE0F) and zero-width joiners (U+200D) used to render standard emoji sequences, not steganographic payloads.
+`)
+}
+
+type helpCommandAggregate struct {
+	Description   string
+	DescriptionBy string
+	SourceFile    string
+	Centralized   bool
+	Decentralized bool
+	Label         bool
+}
+
 func buildHelpCommandEntries(workflowDataList []*WorkflowData) []helpCommandEntry {
-	type aggregate struct {
-		Description   string
-		DescriptionBy string
-		SourceFile    string
-		Centralized   bool
-		Decentralized bool
-		Label         bool
-	}
-	byCommand := make(map[string]aggregate)
-	byLabel := make(map[string]aggregate)
+	byCommand := make(map[string]helpCommandAggregate)
+	byLabel := make(map[string]helpCommandAggregate)
 
 	for _, wd := range workflowDataList {
 		if wd == nil || (len(wd.Command) == 0 && len(wd.LabelCommand) == 0) {
@@ -470,74 +447,8 @@ func buildHelpCommandEntries(workflowDataList []*WorkflowData) []helpCommandEntr
 		}
 		description := strings.TrimSpace(wd.Description)
 
-		for _, commandName := range wd.Command {
-			trimmed := strings.TrimSpace(commandName)
-			if trimmed == "" {
-				continue
-			}
-			if trimmed == "help" {
-				centralSlashCommandWorkflowLog.Printf(
-					"Warning: 'help' is reserved for the builtin /help handler in workflow %s; "+
-						"this command will not be dispatched unless help_command is disabled via aw.json",
-					wd.WorkflowID,
-				)
-			}
-			existing := byCommand[trimmed]
-			if existing.Description != "" && description != "" && existing.Description != description {
-				centralSlashCommandWorkflowLog.Printf(
-					"Conflicting descriptions for /%s: keeping %q from workflow %s, ignoring %q from workflow %s",
-					trimmed,
-					existing.Description,
-					existing.DescriptionBy,
-					description,
-					wd.WorkflowID,
-				)
-			}
-			// Conflict resolution keeps the first non-empty description encountered
-			// while iterating workflowDataList, which is deterministic for compilation.
-			if existing.Description == "" && description != "" {
-				existing.Description = description
-				existing.DescriptionBy = wd.WorkflowID
-			}
-			if existing.SourceFile == "" {
-				existing.SourceFile = wd.WorkflowID
-			}
-			if wd.CommandCentralized {
-				existing.Centralized = true
-			} else {
-				// Slash commands are either centralized or decentralized in current workflow metadata:
-				// CommandCentralized=false indicates the command is handled in its own workflow.
-				existing.Decentralized = true
-			}
-			byCommand[trimmed] = existing
-		}
-
-		for _, labelName := range wd.LabelCommand {
-			trimmed := strings.TrimSpace(labelName)
-			if trimmed == "" {
-				continue
-			}
-			existing := byLabel[trimmed]
-			if existing.Description != "" && description != "" && existing.Description != description {
-				centralSlashCommandWorkflowLog.Printf(
-					"Conflicting descriptions for label %q: keeping %q from workflow %s, ignoring %q from workflow %s",
-					trimmed,
-					existing.Description,
-					existing.DescriptionBy,
-					description,
-					wd.WorkflowID,
-				)
-			}
-			if existing.Description == "" && description != "" {
-				existing.Description = description
-				existing.DescriptionBy = wd.WorkflowID
-			}
-			if existing.SourceFile == "" {
-				existing.SourceFile = wd.WorkflowID
-			}
-			existing.Label = true
-			byLabel[trimmed] = existing
-		}
+		collectHelpSlashCommandEntries(wd, description, byCommand)
+		collectHelpLabelCommandEntries(wd, description, byLabel)
 	}
 
 	commands := sliceutil.SortedKeys(byCommand)
@@ -566,6 +477,79 @@ func buildHelpCommandEntries(workflowDataList []*WorkflowData) []helpCommandEntr
 	}
 
 	return entries
+}
+
+func collectHelpSlashCommandEntries(wd *WorkflowData, description string, byCommand map[string]helpCommandAggregate) {
+	for _, commandName := range wd.Command {
+		trimmed := strings.TrimSpace(commandName)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == "help" {
+			centralSlashCommandWorkflowLog.Printf(
+				"Warning: 'help' is reserved for the builtin /help handler in workflow %s; "+
+					"this command will not be dispatched unless help_command is disabled via aw.json",
+				wd.WorkflowID,
+			)
+		}
+		existing := byCommand[trimmed]
+		if existing.Description != "" && description != "" && existing.Description != description {
+			centralSlashCommandWorkflowLog.Printf(
+				"Conflicting descriptions for /%s: keeping %q from workflow %s, ignoring %q from workflow %s",
+				trimmed,
+				existing.Description,
+				existing.DescriptionBy,
+				description,
+				wd.WorkflowID,
+			)
+		}
+		// Conflict resolution keeps the first non-empty description encountered
+		// while iterating workflowDataList, which is deterministic for compilation.
+		if existing.Description == "" && description != "" {
+			existing.Description = description
+			existing.DescriptionBy = wd.WorkflowID
+		}
+		if existing.SourceFile == "" {
+			existing.SourceFile = wd.WorkflowID
+		}
+		if wd.CommandCentralized {
+			existing.Centralized = true
+		} else {
+			// Slash commands are either centralized or decentralized in current workflow metadata:
+			// CommandCentralized=false indicates the command is handled in its own workflow.
+			existing.Decentralized = true
+		}
+		byCommand[trimmed] = existing
+	}
+}
+
+func collectHelpLabelCommandEntries(wd *WorkflowData, description string, byLabel map[string]helpCommandAggregate) {
+	for _, labelName := range wd.LabelCommand {
+		trimmed := strings.TrimSpace(labelName)
+		if trimmed == "" {
+			continue
+		}
+		existing := byLabel[trimmed]
+		if existing.Description != "" && description != "" && existing.Description != description {
+			centralSlashCommandWorkflowLog.Printf(
+				"Conflicting descriptions for label %q: keeping %q from workflow %s, ignoring %q from workflow %s",
+				trimmed,
+				existing.Description,
+				existing.DescriptionBy,
+				description,
+				wd.WorkflowID,
+			)
+		}
+		if existing.Description == "" && description != "" {
+			existing.Description = description
+			existing.DescriptionBy = wd.WorkflowID
+		}
+		if existing.SourceFile == "" {
+			existing.SourceFile = wd.WorkflowID
+		}
+		existing.Label = true
+		byLabel[trimmed] = existing
+	}
 }
 
 func writeCentralRouteSummaryComments(b *strings.Builder, slashRoutesByCommand map[string][]slashCommandRoute, labelRoutesByCommand map[string][]slashCommandRoute) {

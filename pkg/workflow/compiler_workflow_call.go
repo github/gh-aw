@@ -145,6 +145,22 @@ func (c *Compiler) injectWorkflowCallOutputs(onSection string, safeOutputs *Safe
 		workflowCallMap = make(map[string]any)
 	}
 
+	mergeWorkflowCallOutputs(workflowCallMap, generatedOutputs)
+	onMap["workflow_call"] = workflowCallMap
+
+	// Re-marshal to YAML. IndentSequence(true) matches extractTopLevelYAMLSection so
+	// sequence items (e.g. schedule cron lists) stay indented under their parent key.
+	newOnData := map[string]any{"on": onMap}
+	newYAML, err := yaml.MarshalWithOptions(newOnData, yaml.IndentSequence(true))
+	if err != nil {
+		workflowCallLog.Printf("Warning: failed to marshal on section with workflow_call outputs: %v", err)
+		return onSection
+	}
+
+	return finalizeWorkflowCallOnSection(newYAML)
+}
+
+func mergeWorkflowCallOutputs(workflowCallMap map[string]any, generatedOutputs map[string]workflowCallOutputEntry) {
 	// Merge auto-generated outputs with any existing user-defined outputs.
 	// User-defined outputs take precedence (their keys overwrite generated ones).
 	mergedOutputs := make(map[string]workflowCallOutputEntry)
@@ -167,18 +183,6 @@ func (c *Compiler) injectWorkflowCallOutputs(onSection string, safeOutputs *Safe
 
 	workflowCallLog.Printf("Merged workflow_call outputs: total=%d", len(mergedOutputs))
 	workflowCallMap["outputs"] = mergedOutputs
-	onMap["workflow_call"] = workflowCallMap
-
-	// Re-marshal to YAML. IndentSequence(true) matches extractTopLevelYAMLSection so
-	// sequence items (e.g. schedule cron lists) stay indented under their parent key.
-	newOnData := map[string]any{"on": onMap}
-	newYAML, err := yaml.MarshalWithOptions(newOnData, yaml.IndentSequence(true))
-	if err != nil {
-		workflowCallLog.Printf("Warning: failed to marshal on section with workflow_call outputs: %v", err)
-		return onSection
-	}
-
-	return finalizeWorkflowCallOnSection(newYAML)
 }
 
 // buildWorkflowCallOutputsMap constructs the outputs map for on.workflow_call.outputs
@@ -258,6 +262,42 @@ func injectWorkflowCallSecretsSection(onSection string, secrets []string) string
 		return onSection
 	}
 
+	secretsToInject := workflowCallSecretsToInject(secrets)
+	if len(secretsToInject) == 0 {
+		return onSection
+	}
+	workflowCallLog.Printf("Injecting %d workflow_call secrets declarations", len(secretsToInject))
+	var onData map[string]any
+	if err := yaml.Unmarshal([]byte(onSection), &onData); err != nil {
+		workflowCallLog.Printf("Warning: failed to parse on section for workflow_call secrets injection: %v", err)
+		return onSection
+	}
+	onMap := normalizeWorkflowCallOnMap(onData)
+	if onMap == nil {
+		return onSection
+	}
+	workflowCallVal, hasWorkflowCall := onMap["workflow_call"]
+	if !hasWorkflowCall {
+		return onSection
+	}
+	var workflowCallMap map[string]any
+	if m, ok := workflowCallVal.(map[string]any); ok {
+		workflowCallMap = m
+	} else {
+		workflowCallMap = make(map[string]any)
+	}
+	mergeWorkflowCallSecrets(workflowCallMap, secretsToInject)
+	onMap["workflow_call"] = workflowCallMap
+	newOnData := map[string]any{"on": onMap}
+	newYAML, err := yaml.MarshalWithOptions(newOnData, yaml.IndentSequence(true))
+	if err != nil {
+		workflowCallLog.Printf("Warning: failed to marshal on section with workflow_call secrets: %v", err)
+		return onSection
+	}
+	return finalizeWorkflowCallOnSection(newYAML)
+}
+
+func workflowCallSecretsToInject(secrets []string) []string {
 	// Build the set of secrets to declare, excluding GITHUB_TOKEN (auto-provided).
 	secretsToInject := make([]string, 0, len(secrets))
 	for _, s := range secrets {
@@ -265,24 +305,15 @@ func injectWorkflowCallSecretsSection(onSection string, secrets []string) string
 			secretsToInject = append(secretsToInject, s)
 		}
 	}
-	if len(secretsToInject) == 0 {
-		return onSection
-	}
 	sort.Strings(secretsToInject)
+	return secretsToInject
+}
 
-	workflowCallLog.Printf("Injecting %d workflow_call secrets declarations", len(secretsToInject))
-
-	// Parse the on section YAML.
-	var onData map[string]any
-	if err := yaml.Unmarshal([]byte(onSection), &onData); err != nil {
-		workflowCallLog.Printf("Warning: failed to parse on section for workflow_call secrets injection: %v", err)
-		return onSection
-	}
-
+func normalizeWorkflowCallOnMap(onData map[string]any) map[string]any {
 	// Normalize onData["on"] to map[string]any, handling string and slice shorthand forms.
 	rawOn, hasOn := onData["on"]
 	if !hasOn {
-		return onSection
+		return nil
 	}
 	var onMap map[string]any
 	switch v := rawOn.(type) {
@@ -303,25 +334,13 @@ func injectWorkflowCallSecretsSection(onSection string, secrets []string) string
 			onMap[eventName] = nil
 		}
 	default:
-		return onSection
+		return nil
 	}
 	onData["on"] = onMap
+	return onMap
+}
 
-	workflowCallVal, hasWorkflowCall := onMap["workflow_call"]
-	if !hasWorkflowCall {
-		return onSection
-	}
-
-	// Convert workflow_call to a map (it may be nil if declared without options).
-	var workflowCallMap map[string]any
-	if workflowCallVal == nil {
-		workflowCallMap = make(map[string]any)
-	} else if m, ok := workflowCallVal.(map[string]any); ok {
-		workflowCallMap = m
-	} else {
-		workflowCallMap = make(map[string]any)
-	}
-
+func mergeWorkflowCallSecrets(workflowCallMap map[string]any, secretsToInject []string) {
 	// Build the auto-generated secrets map (required: false for all entries).
 	generatedSecrets := make(map[string]workflowCallSecretEntry, len(secretsToInject))
 	for _, name := range secretsToInject {
@@ -347,17 +366,6 @@ func injectWorkflowCallSecretsSection(onSection string, secrets []string) string
 		secretsOut[k] = map[string]any{"required": v.Required}
 	}
 	workflowCallMap["secrets"] = secretsOut
-	onMap["workflow_call"] = workflowCallMap
-
-	// Re-marshal to YAML.
-	newOnData := map[string]any{"on": onMap}
-	newYAML, err := yaml.MarshalWithOptions(newOnData, yaml.IndentSequence(true))
-	if err != nil {
-		workflowCallLog.Printf("Warning: failed to marshal on section with workflow_call secrets: %v", err)
-		return onSection
-	}
-
-	return finalizeWorkflowCallOnSection(newYAML)
 }
 
 // finalizeWorkflowCallOnSection post-processes a re-marshaled on: section so it matches

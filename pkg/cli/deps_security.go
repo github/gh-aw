@@ -114,28 +114,32 @@ func DisplaySecurityAdvisories(advisories []SecurityAdvisory) {
 
 	// Display each advisory
 	for _, adv := range advisories {
-		icon := getSeverityIcon(adv.Severity)
-		header := fmt.Sprintf("%s %s: %s", icon, strings.ToUpper(adv.Severity), adv.Package)
-
-		if adv.Severity == "critical" || adv.Severity == "high" {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(header))
-		} else {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(header))
-		}
-
-		fmt.Fprintf(os.Stderr, "    %s", adv.Summary)
-		if adv.CVE != "" {
-			fmt.Fprintf(os.Stderr, " (%s)", adv.CVE)
-		}
-		fmt.Fprintln(os.Stderr, "")
-
-		if len(adv.PatchedVers) > 0 {
-			fmt.Fprintf(os.Stderr, "    Fixed in: %s\n", strings.Join(adv.PatchedVers, ", "))
-		}
-
-		fmt.Fprintf(os.Stderr, "    %s\n", adv.URL)
-		fmt.Fprintln(os.Stderr, "")
+		displaySecurityAdvisory(adv)
 	}
+}
+
+func displaySecurityAdvisory(adv SecurityAdvisory) {
+	icon := getSeverityIcon(adv.Severity)
+	header := fmt.Sprintf("%s %s: %s", icon, strings.ToUpper(adv.Severity), adv.Package)
+
+	if adv.Severity == "critical" || adv.Severity == "high" {
+		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(header))
+	} else {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(header))
+	}
+
+	fmt.Fprintf(os.Stderr, "    %s", adv.Summary)
+	if adv.CVE != "" {
+		fmt.Fprintf(os.Stderr, " (%s)", adv.CVE)
+	}
+	fmt.Fprintln(os.Stderr, "")
+
+	if len(adv.PatchedVers) > 0 {
+		fmt.Fprintf(os.Stderr, "    Fixed in: %s\n", strings.Join(adv.PatchedVers, ", "))
+	}
+
+	fmt.Fprintf(os.Stderr, "    %s\n", adv.URL)
+	fmt.Fprintln(os.Stderr, "")
 }
 
 // querySecurityAdvisories queries the GitHub Security Advisory API
@@ -177,6 +181,10 @@ func querySecurityAdvisories(ctx context.Context, depVersions map[string]string,
 
 	depsSecurityLog.Printf("Received %d advisories from GitHub API", len(apiAdvisories))
 
+	return matchingSecurityAdvisories(apiAdvisories, depVersions, verbose), nil
+}
+
+func matchingSecurityAdvisories(apiAdvisories []GitHubAdvisoryResponse, depVersions map[string]string, verbose bool) []SecurityAdvisory {
 	// Filter advisories that match our dependencies
 	var matchingAdvisories []SecurityAdvisory
 	for _, apiAdv := range apiAdvisories {
@@ -212,7 +220,7 @@ func querySecurityAdvisories(ctx context.Context, depVersions map[string]string,
 		}
 	}
 
-	return matchingAdvisories, nil
+	return matchingAdvisories
 }
 
 // getSeverityIcon returns an emoji icon for the severity level

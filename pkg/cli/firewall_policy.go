@@ -344,42 +344,44 @@ func enrichWithPolicyRules(entries []AuditLogEntry, manifest *PolicyManifest) *P
 		uniqueDomains[strings.ToLower(domain)] = struct {
 		}{}
 
-		rule := findMatchingRule(entry, manifest.Rules)
-
-		var enriched EnrichedRequest
-		enriched.Timestamp = entry.Timestamp
-		enriched.Host = host
-		enriched.Status = entry.Status
-
-		if rule != nil {
-			enriched.RuleID = rule.ID
-			enriched.Action = rule.Action
-			ruleHitMap[rule.ID]++
-
-			if rule.Action == "deny" {
-				enriched.Reason = rule.Description
-				deniedRequests = append(deniedRequests, enriched)
-				deniedCount++
-			} else {
-				allowedCount++
-			}
+		enriched := enrichFirewallPolicyEntry(entry, manifest.Rules, ruleHitMap)
+		if enriched.Action == "deny" {
+			deniedRequests = append(deniedRequests, enriched)
+			deniedCount++
 		} else {
-			// No matching rule — derive outcome from observed entry decision
-			if isEntryAllowed(entry) {
-				enriched.RuleID = "(unattributed-allow)"
-				enriched.Action = "allow"
-				enriched.Reason = "Allowed (rule not identified)"
-				allowedCount++
-			} else {
-				enriched.RuleID = "(implicit-deny)"
-				enriched.Action = "deny"
-				enriched.Reason = "No matching policy rule"
-				deniedRequests = append(deniedRequests, enriched)
-				deniedCount++
-			}
+			allowedCount++
 		}
 	}
 
+	return buildFirewallPolicyAnalysis(manifest, ruleHitMap, deniedRequests, allowedCount, deniedCount, len(uniqueDomains))
+}
+
+func enrichFirewallPolicyEntry(entry AuditLogEntry, rules []FirewallPolicyRule, ruleHitMap map[string]int) EnrichedRequest {
+	rule := findMatchingRule(entry, rules)
+	var enriched EnrichedRequest
+	enriched.Timestamp = entry.Timestamp
+	enriched.Host = entry.Host
+	enriched.Status = entry.Status
+	if rule != nil {
+		enriched.RuleID = rule.ID
+		enriched.Action = rule.Action
+		ruleHitMap[rule.ID]++
+		if rule.Action == "deny" {
+			enriched.Reason = rule.Description
+		}
+	} else if isEntryAllowed(entry) {
+		enriched.RuleID = "(unattributed-allow)"
+		enriched.Action = "allow"
+		enriched.Reason = "Allowed (rule not identified)"
+	} else {
+		enriched.RuleID = "(implicit-deny)"
+		enriched.Action = "deny"
+		enriched.Reason = "No matching policy rule"
+	}
+	return enriched
+}
+
+func buildFirewallPolicyAnalysis(manifest *PolicyManifest, ruleHitMap map[string]int, deniedRequests []EnrichedRequest, allowedCount, deniedCount, uniqueDomainCount int) *PolicyAnalysis {
 	// Build rule hits table, preserving rule order
 	var ruleHits []RuleHitStats
 	for _, rule := range manifest.Rules {
@@ -404,7 +406,7 @@ func enrichWithPolicyRules(entries []AuditLogEntry, manifest *PolicyManifest) *P
 	totalProcessed := allowedCount + deniedCount
 
 	firewallPolicyLog.Printf("Enrichment complete: total=%d, allowed=%d, denied=%d, unique_domains=%d",
-		totalProcessed, allowedCount, deniedCount, len(uniqueDomains))
+		totalProcessed, allowedCount, deniedCount, uniqueDomainCount)
 
 	return &PolicyAnalysis{
 		PolicySummary:  policySummary,
@@ -413,7 +415,7 @@ func enrichWithPolicyRules(entries []AuditLogEntry, manifest *PolicyManifest) *P
 		TotalRequests:  totalProcessed,
 		AllowedCount:   allowedCount,
 		DeniedCount:    deniedCount,
-		UniqueDomains:  len(uniqueDomains),
+		UniqueDomains:  uniqueDomainCount,
 	}
 }
 
@@ -428,24 +430,8 @@ func enrichWithPolicyRules(entries []AuditLogEntry, manifest *PolicyManifest) *P
 func detectFirewallAuditArtifacts(runDir string) (manifestPath, auditJSONLPath string, err error) {
 	firewallPolicyLog.Printf("Detecting firewall audit artifacts in: %s", runDir)
 
-	// checkDir probes dir for policy-manifest.json and audit.jsonl, populating the
-	// return variables for any files not yet found. Returns true when both are found.
 	checkDir := func(dir, label string) bool {
-		if manifestPath == "" {
-			candidate := filepath.Join(dir, "policy-manifest.json")
-			if fileutil.FileExists(candidate) {
-				manifestPath = candidate
-				firewallPolicyLog.Printf("Found policy manifest in %s: %s", label, manifestPath)
-			}
-		}
-		if auditJSONLPath == "" {
-			candidate := filepath.Join(dir, "audit.jsonl")
-			if fileutil.FileExists(candidate) {
-				auditJSONLPath = candidate
-				firewallPolicyLog.Printf("Found audit JSONL in %s: %s", label, auditJSONLPath)
-			}
-		}
-		return manifestPath != "" && auditJSONLPath != ""
+		return checkFirewallAuditDir(dir, label, &manifestPath, &auditJSONLPath)
 	}
 
 	// 1. Primary path: sandbox/firewall/audit/ after flattenUnifiedArtifact
@@ -493,6 +479,24 @@ func detectFirewallAuditArtifacts(runDir string) (manifestPath, auditJSONLPath s
 	}
 
 	return manifestPath, auditJSONLPath, nil
+}
+
+func checkFirewallAuditDir(dir, label string, manifestPath, auditJSONLPath *string) bool {
+	if *manifestPath == "" {
+		candidate := filepath.Join(dir, "policy-manifest.json")
+		if fileutil.FileExists(candidate) {
+			*manifestPath = candidate
+			firewallPolicyLog.Printf("Found policy manifest in %s: %s", label, *manifestPath)
+		}
+	}
+	if *auditJSONLPath == "" {
+		candidate := filepath.Join(dir, "audit.jsonl")
+		if fileutil.FileExists(candidate) {
+			*auditJSONLPath = candidate
+			firewallPolicyLog.Printf("Found audit JSONL in %s: %s", label, *auditJSONLPath)
+		}
+	}
+	return *manifestPath != "" && *auditJSONLPath != ""
 }
 
 // analyzeFirewallPolicy loads policy manifest and audit JSONL, then enriches with rule attribution.

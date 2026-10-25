@@ -29,7 +29,33 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 	// Extract version comments from uses lines before unmarshaling
 	// This is necessary because YAML treats "# comment" as a comment, not part of the value
 	// Format: "uses: action@sha # v1.0.0" -> after unmarshal, only "action@sha" remains
-	versionComments := make(map[string]string) // key: action@sha, value: # v1.0.0
+	versionComments := runtimeSetupVersionComments(customSteps)
+
+	// Parse custom steps YAML
+	var stepsWrapper map[string]any
+	if err := yaml.Unmarshal([]byte(customSteps), &stepsWrapper); err != nil {
+		return customSteps, runtimeRequirements, fmt.Errorf("failed to parse custom workflow steps from frontmatter. Custom steps must be valid GitHub Actions step syntax. Example:\nsteps:\n  - name: Setup\n    run: echo 'hello'\n  - name: Build\n    run: make build\nError: %w", err)
+	}
+	stepsVal, hasSteps := stepsWrapper["steps"]
+	if !hasSteps {
+		return customSteps, runtimeRequirements, nil
+	}
+	steps, ok := stepsVal.([]any)
+	if !ok {
+		return customSteps, runtimeRequirements, nil
+	}
+	actionRepoToReq := runtimeSetupActionRequirements(runtimeRequirements)
+	filteredSteps, filteredRuntimeIDs, removedCount, preservedCount := filterRuntimeSetupSteps(steps, actionRepoToReq)
+	if removedCount == 0 && preservedCount == 0 {
+		runtimeDeduplicationLog.Print("  No duplicate runtime setup steps found")
+		return customSteps, runtimeRequirements, nil
+	}
+	runtimeDeduplicationLog.Printf("  Removed %d duplicate runtime setup steps, preserved %d user-customized steps", removedCount, preservedCount)
+	return marshalDeduplicatedRuntimeSteps(customSteps, runtimeRequirements, stepsWrapper, filteredSteps, filteredRuntimeIDs, versionComments)
+}
+
+func runtimeSetupVersionComments(customSteps string) map[string]string {
+	versionComments := make(map[string]string)
 	lines := strings.SplitSeq(customSteps, "\n")
 	for line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -44,22 +70,10 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 		}
 	}
 
-	// Parse custom steps YAML
-	var stepsWrapper map[string]any
-	if err := yaml.Unmarshal([]byte(customSteps), &stepsWrapper); err != nil {
-		return customSteps, runtimeRequirements, fmt.Errorf("failed to parse custom workflow steps from frontmatter. Custom steps must be valid GitHub Actions step syntax. Example:\nsteps:\n  - name: Setup\n    run: echo 'hello'\n  - name: Build\n    run: make build\nError: %w", err)
-	}
+	return versionComments
+}
 
-	stepsVal, hasSteps := stepsWrapper["steps"]
-	if !hasSteps {
-		return customSteps, runtimeRequirements, nil
-	}
-
-	steps, ok := stepsVal.([]any)
-	if !ok {
-		return customSteps, runtimeRequirements, nil
-	}
-
+func runtimeSetupActionRequirements(runtimeRequirements []RuntimeRequirement) map[string]*RuntimeRequirement {
 	// Build map of action repos to runtime requirements
 	actionRepoToReq := make(map[string]*RuntimeRequirement)
 	for i := range runtimeRequirements {
@@ -68,7 +82,10 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 			runtimeDeduplicationLog.Printf("  Will check steps using action: %s", runtimeRequirements[i].Runtime.ActionRepo)
 		}
 	}
+	return actionRepoToReq
+}
 
+func filterRuntimeSetupSteps(steps []any, actionRepoToReq map[string]*RuntimeRequirement) ([]any, map[string]struct{}, int, int) {
 	// Track which runtimes to filter from requirements (user has custom setup)
 	filteredRuntimeIDs := make(map[string]struct {
 	})
@@ -98,118 +115,44 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 			continue
 		}
 
-		// Check if this uses string matches any runtime setup action
-		shouldRemove := false
-		shouldPreserve := false
-		for actionRepo, req := range actionRepoToReq {
-			if strings.Contains(usesStr, actionRepo) {
-				// Check if the step has custom "with" fields that differ from defaults
-				withVal, hasWith := step["with"]
-				if hasWith {
-					withMap, isMap := withVal.(map[string]any)
-					if isMap && len(withMap) > 0 {
-						// Check if this has actual user customizations beyond defaults
-						hasCustomization := false
-
-						// For Go, the standard with fields are: go-version-file and cache
-						// These should NOT be considered customizations
-						if req.Runtime.ID == "go" {
-							// Check if there are fields other than go-version-file and cache
-							for key := range withMap {
-								if key != "go-version-file" && key != "cache" {
-									hasCustomization = true
-									break
-								}
-							}
-							// Also check if go-version-file is NOT go.mod (custom path)
-							if !hasCustomization {
-								if goVersionFile, ok := withMap["go-version-file"]; ok {
-									if goVersionFileStr, isStr := goVersionFile.(string); isStr {
-										if goVersionFileStr != "go.mod" {
-											hasCustomization = true
-										}
-									}
-								}
-							}
-						} else if req.Runtime.VersionField != "" {
-							// For other runtimes, check if user specified a custom version
-							if userVersion, hasVersion := withMap[req.Runtime.VersionField]; hasVersion {
-								userVersionStr := fmt.Sprintf("%v", userVersion)
-								// Check if it differs from default or detected version
-								if req.Runtime.DefaultVersion != "" && userVersionStr != req.Runtime.DefaultVersion {
-									hasCustomization = true
-								} else if req.Version != "" && userVersionStr != req.Version {
-									hasCustomization = true
-								} else if req.Runtime.DefaultVersion == "" && req.Version == "" {
-									// No default and no detected version means user specified it
-									hasCustomization = true
-								}
-							}
-							// For Node.js, node-version-file is a version selector and should
-							// be treated as a customization so we preserve the user's setup step.
-							// If we remove it and regenerate a setup step, the generated
-							// node-version value can override this file-based selector.
-							if req.Runtime.ID == "node" {
-								if nodeVersionFile, ok := withMap["node-version-file"].(string); ok && strings.TrimSpace(nodeVersionFile) != "" {
-									hasCustomization = true
-								}
-							}
-						}
-
-						if hasCustomization {
-							// User has truly customized the setup action - preserve it
-							shouldPreserve = true
-							filteredRuntimeIDs[req.Runtime.ID] = struct {
-							}{}
-							runtimeDeduplicationLog.Printf("  Preserving user-customized runtime setup step: %s", usesStr)
-							preservedCount++
-							break
-						}
-
-						// No customization detected, but capture extra fields to carry over
-						// These are fields beyond the version field that should be preserved
-						if req.ExtraFields == nil {
-							req.ExtraFields = make(map[string]any)
-						}
-						for key, value := range withMap {
-							// Skip the version field as it's handled separately
-							if req.Runtime.VersionField != "" && key == req.Runtime.VersionField {
-								continue
-							}
-							// Skip standard Go fields that will be auto-generated
-							if req.Runtime.ID == "go" && (key == "go-version-file" || key == "cache") {
-								continue
-							}
-							if req.Runtime.ID == "uv" && key == "enable-cache" {
-								continue
-							}
-							// Carry over any other fields
-							req.ExtraFields[key] = value
-							runtimeDeduplicationLog.Printf("  Capturing extra field from setup step: %s = %v", key, value)
-						}
-					}
-				}
-
-				// No real customization - remove this duplicate but keep extra fields
-				shouldRemove = true
-				runtimeDeduplicationLog.Printf("  Removing duplicate runtime setup step: %s", usesStr)
-				removedCount++
-				break
-			}
+		shouldRemove, shouldPreserve := classifyRuntimeSetupStep(step, usesStr, actionRepoToReq, filteredRuntimeIDs)
+		if shouldRemove {
+			removedCount++
+		}
+		if shouldPreserve {
+			preservedCount++
 		}
 
 		if shouldPreserve || !shouldRemove {
 			filteredSteps = append(filteredSteps, stepAny)
 		}
 	}
+	return filteredSteps, filteredRuntimeIDs, removedCount, preservedCount
+}
 
-	if removedCount == 0 && preservedCount == 0 {
-		runtimeDeduplicationLog.Print("  No duplicate runtime setup steps found")
-		return customSteps, runtimeRequirements, nil
+func classifyRuntimeSetupStep(step map[string]any, usesStr string, actionRepoToReq map[string]*RuntimeRequirement, filteredRuntimeIDs map[string]struct{}) (bool, bool) {
+	for actionRepo, req := range actionRepoToReq {
+		if strings.Contains(usesStr, actionRepo) {
+			withVal, hasWith := step["with"]
+			if hasWith {
+				withMap, isMap := withVal.(map[string]any)
+				if isMap && len(withMap) > 0 {
+					if runtimeSetupHasCustomization(withMap, req) {
+						filteredRuntimeIDs[req.Runtime.ID] = struct{}{}
+						runtimeDeduplicationLog.Printf("  Preserving user-customized runtime setup step: %s", usesStr)
+						return false, true
+					}
+					captureRuntimeSetupExtraFields(withMap, req)
+				}
+			}
+			runtimeDeduplicationLog.Printf("  Removing duplicate runtime setup step: %s", usesStr)
+			return true, false
+		}
 	}
+	return false, false
+}
 
-	runtimeDeduplicationLog.Printf("  Removed %d duplicate runtime setup steps, preserved %d user-customized steps", removedCount, preservedCount)
-
+func marshalDeduplicatedRuntimeSteps(customSteps string, runtimeRequirements []RuntimeRequirement, stepsWrapper map[string]any, filteredSteps []any, filteredRuntimeIDs map[string]struct{}, versionComments map[string]string) (string, []RuntimeRequirement, error) {
 	// Filter runtime requirements to exclude those with user-customized setup actions
 	var filteredRequirements []RuntimeRequirement
 	for _, req := range runtimeRequirements {
@@ -250,4 +193,61 @@ func DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps string, runtimeRequ
 	deduplicatedStr := unquoteUsesWithComments(string(deduplicatedYAML))
 
 	return deduplicatedStr, filteredRequirements, nil
+}
+
+func runtimeSetupHasCustomization(withMap map[string]any, req *RuntimeRequirement) bool {
+	hasCustomization := false
+	if req.Runtime.ID == "go" {
+		for key := range withMap {
+			if key != "go-version-file" && key != "cache" {
+				hasCustomization = true
+				break
+			}
+		}
+		if !hasCustomization {
+			if goVersionFile, ok := withMap["go-version-file"]; ok {
+				if goVersionFileStr, isStr := goVersionFile.(string); isStr {
+					if goVersionFileStr != "go.mod" {
+						hasCustomization = true
+					}
+				}
+			}
+		}
+	} else if req.Runtime.VersionField != "" {
+		if userVersion, hasVersion := withMap[req.Runtime.VersionField]; hasVersion {
+			userVersionStr := fmt.Sprintf("%v", userVersion)
+			if req.Runtime.DefaultVersion != "" && userVersionStr != req.Runtime.DefaultVersion {
+				hasCustomization = true
+			} else if req.Version != "" && userVersionStr != req.Version {
+				hasCustomization = true
+			} else if req.Runtime.DefaultVersion == "" && req.Version == "" {
+				hasCustomization = true
+			}
+		}
+		if req.Runtime.ID == "node" {
+			if nodeVersionFile, ok := withMap["node-version-file"].(string); ok && strings.TrimSpace(nodeVersionFile) != "" {
+				hasCustomization = true
+			}
+		}
+	}
+	return hasCustomization
+}
+
+func captureRuntimeSetupExtraFields(withMap map[string]any, req *RuntimeRequirement) {
+	if req.ExtraFields == nil {
+		req.ExtraFields = make(map[string]any)
+	}
+	for key, value := range withMap {
+		if req.Runtime.VersionField != "" && key == req.Runtime.VersionField {
+			continue
+		}
+		if req.Runtime.ID == "go" && (key == "go-version-file" || key == "cache") {
+			continue
+		}
+		if req.Runtime.ID == "uv" && key == "enable-cache" {
+			continue
+		}
+		req.ExtraFields[key] = value
+		runtimeDeduplicationLog.Printf("  Capturing extra field from setup step: %s = %v", key, value)
+	}
 }

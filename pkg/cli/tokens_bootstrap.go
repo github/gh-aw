@@ -94,7 +94,10 @@ func runTokensBootstrap(engine, repo string, nonInteractive bool) error {
 	}
 
 	tokensBootstrapLog.Printf("Found %d missing required secrets", len(missing))
+	return configureMissingBootstrapSecrets(missing, repoSlug, existingSecrets, nonInteractive)
+}
 
+func configureMissingBootstrapSecrets(missing []SecretRequirement, repoSlug string, existingSecrets map[string]struct{}, nonInteractive bool) error {
 	// In non-interactive mode, just display what's missing
 	if nonInteractive {
 		displayMissingSecrets(missing, repoSlug, existingSecrets)

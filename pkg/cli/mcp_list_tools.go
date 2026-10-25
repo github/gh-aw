@@ -80,6 +80,10 @@ func ListToolsForMCP(workflowFile string, mcpServerName string, verbose bool) er
 		return nil
 	}
 
+	return connectAndDisplayMCPTools(targetConfig, mcpServerName, verbose)
+}
+
+func connectAndDisplayMCPTools(targetConfig *parser.RegistryMCPServerConfig, mcpServerName string, verbose bool) error {
 	mcpListToolsLog.Printf("Found MCP server: name=%s, type=%s", targetConfig.Name, targetConfig.Type)
 
 	// Connect to the MCP server and get its tools

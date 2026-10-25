@@ -34,51 +34,57 @@ func ComputeDomainBreakdowns(reports []OutcomeReport) []DomainBreakdown {
 	domains := make(map[string]*DomainBreakdown)
 
 	for _, report := range reports {
-		// If outcome has objective labels, aggregate by each label
-		for _, label := range report.ObjectiveLabels {
-			normalizedLabel := strings.ToLower(strings.TrimSpace(label))
-			if _, exists := domains[normalizedLabel]; !exists {
-				domains[normalizedLabel] = &DomainBreakdown{
-					Label: label,
-				}
-			}
+		accumulateOutcomeDomainBreakdown(domains, report)
+	}
+	return finalizeDomainBreakdowns(domains)
+}
 
-			domain := domains[normalizedLabel]
-			domain.Attempted++
-			domain.TotalObjectiveValue += report.ObjectiveValue
-
-			switch report.OutcomeStatus {
-			case OutcomeStatusAccepted:
-				domain.Accepted++
-				domain.AcceptedObjectiveValue += report.ObjectiveValue
-			case OutcomeStatusRejected:
-				domain.Rejected++
-			case OutcomeStatusPending:
-				domain.Pending++
+func accumulateOutcomeDomainBreakdown(domains map[string]*DomainBreakdown, report OutcomeReport) {
+	// If outcome has objective labels, aggregate by each label
+	for _, label := range report.ObjectiveLabels {
+		normalizedLabel := strings.ToLower(strings.TrimSpace(label))
+		if _, exists := domains[normalizedLabel]; !exists {
+			domains[normalizedLabel] = &DomainBreakdown{
+				Label: label,
 			}
 		}
+		domain := domains[normalizedLabel]
+		domain.Attempted++
+		domain.TotalObjectiveValue += report.ObjectiveValue
 
-		// If outcome has NO objective labels, create "unmapped" entry
-		if len(report.ObjectiveLabels) == 0 && report.ObjectiveValue == 0 {
-			if _, exists := domains["unmapped"]; !exists {
-				domains["unmapped"] = &DomainBreakdown{
-					Label: "unmapped",
-				}
-			}
-			domain := domains["unmapped"]
-			domain.Attempted++
-
-			switch report.OutcomeStatus {
-			case OutcomeStatusAccepted:
-				domain.Accepted++
-			case OutcomeStatusRejected:
-				domain.Rejected++
-			case OutcomeStatusPending:
-				domain.Pending++
-			}
+		switch report.OutcomeStatus {
+		case OutcomeStatusAccepted:
+			domain.Accepted++
+			domain.AcceptedObjectiveValue += report.ObjectiveValue
+		case OutcomeStatusRejected:
+			domain.Rejected++
+		case OutcomeStatusPending:
+			domain.Pending++
 		}
 	}
 
+	// If outcome has NO objective labels, create "unmapped" entry
+	if len(report.ObjectiveLabels) == 0 && report.ObjectiveValue == 0 {
+		if _, exists := domains["unmapped"]; !exists {
+			domains["unmapped"] = &DomainBreakdown{
+				Label: "unmapped",
+			}
+		}
+		domain := domains["unmapped"]
+		domain.Attempted++
+
+		switch report.OutcomeStatus {
+		case OutcomeStatusAccepted:
+			domain.Accepted++
+		case OutcomeStatusRejected:
+			domain.Rejected++
+		case OutcomeStatusPending:
+			domain.Pending++
+		}
+	}
+}
+
+func finalizeDomainBreakdowns(domains map[string]*DomainBreakdown) []DomainBreakdown {
 	// Compute efficiency metrics for each domain
 	result := make([]DomainBreakdown, 0, len(domains))
 	for _, domain := range domains {

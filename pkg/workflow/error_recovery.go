@@ -189,30 +189,32 @@ func prioritizeErrorMessages(messages []string) ([]PrioritizedError, int) {
 		suppressedCount = 0
 	}
 
-	slices.SortStableFunc(prioritized, func(a, b PrioritizedError) int {
-		if a.Severity != b.Severity {
-			if a.Severity < b.Severity {
-				return -1
-			}
-			return 1
-		}
-		if a.Category != b.Category {
-			if a.Category < b.Category {
-				return -1
-			}
-			return 1
-		}
-		switch {
-		case a.Message < b.Message:
-			return -1
-		case a.Message > b.Message:
-			return 1
-		default:
-			return 0
-		}
-	})
+	slices.SortStableFunc(prioritized, comparePrioritizedErrors)
 
 	return prioritized, suppressedCount
+}
+
+func comparePrioritizedErrors(a, b PrioritizedError) int {
+	if a.Severity != b.Severity {
+		if a.Severity < b.Severity {
+			return -1
+		}
+		return 1
+	}
+	if a.Category != b.Category {
+		if a.Category < b.Category {
+			return -1
+		}
+		return 1
+	}
+	switch {
+	case a.Message < b.Message:
+		return -1
+	case a.Message > b.Message:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func shouldSuppressCascadingError(candidate PrioritizedError, hasCriticalSyntax bool) bool {
@@ -299,6 +301,13 @@ func classifyErrorMessage(message string) PrioritizedError {
 			Category:   "configuration",
 			Suggestion: "Add an `engine:` value to the workflow frontmatter before fixing lower-priority issues.",
 		}
+	default:
+		return classifyToolAndNetworkError(message, lower)
+	}
+}
+
+func classifyToolAndNetworkError(message, lower string) PrioritizedError {
+	switch {
 	case strings.Contains(lower, "network.allowed"),
 		(strings.Contains(lower, "network") && strings.Contains(lower, "strict mode")):
 		return PrioritizedError{
@@ -324,6 +333,13 @@ func classifyErrorMessage(message string) PrioritizedError {
 			Category:   "permissions",
 			Suggestion: buildPermissionSuggestion(message),
 		}
+	default:
+		return classifyNonCriticalError(message, lower)
+	}
+}
+
+func classifyNonCriticalError(message, lower string) PrioritizedError {
+	switch {
 	case strings.Contains(lower, "event"),
 		strings.Contains(lower, "workflow_dispatch"),
 		strings.Contains(lower, "pull-request"),

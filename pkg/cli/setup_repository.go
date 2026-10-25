@@ -405,6 +405,10 @@ func runSetupRepositoryCheckWithRuntime(opts SetupRepositoryCheckOptions, runtim
 		}
 	}
 
+	return renderSetupRepositoryCheck(opts, ownerType, dir, inspection)
+}
+
+func renderSetupRepositoryCheck(opts SetupRepositoryCheckOptions, ownerType, dir string, inspection *setupCheckoutInspection) error {
 	result := SetupRepositoryCheckResult{
 		Repository:        opts.Repo,
 		Directory:         dir,

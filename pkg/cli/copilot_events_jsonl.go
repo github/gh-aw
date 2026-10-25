@@ -197,21 +197,40 @@ func parseEventsJSONLMetrics(path string, verbose bool) (workflow.LogMetrics, er
 	}
 	defer file.Close()
 
-	toolCallMap := make(map[string]*workflow.ToolCallInfo)
-	var currentSequence []string
-	turns := 0
-	totalTokens := 0
-	fallbackTokens := 0
-	sawShutdownModelMetrics := false
-	foundAnyEvent := false
-
-	// Per-turn timestamps used to compute Time Between Turns (TBT)
-	var turnTimestamps []time.Time
-
+	state := &copilotEventMetricsState{toolCallMap: make(map[string]*workflow.ToolCallInfo)}
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, maxScannerBufferSize)
 	scanner.Buffer(buf, maxScannerBufferSize)
+	state.scan(scanner, &metrics)
+	if scanErr := scanner.Err(); scanErr != nil {
+		return metrics, fmt.Errorf("error reading events.jsonl: %w", scanErr)
+	}
+	if !state.foundAnyEvent {
+		return metrics, errors.New("no events found in events.jsonl")
+	}
+	state.finalize(&metrics)
+	copilotEventsJSONLLog.Printf("Parsed events.jsonl: turns=%d totalTokens=%d toolCalls=%d sequences=%d",
+		state.turns, state.totalTokens, len(state.toolCallMap), len(metrics.ToolSequences))
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(
+			fmt.Sprintf("Parsed events.jsonl: %d turns, %d tokens, %d tool calls",
+				state.turns, state.totalTokens, len(state.toolCallMap))))
+	}
+	return metrics, nil
+}
 
+type copilotEventMetricsState struct {
+	toolCallMap             map[string]*workflow.ToolCallInfo
+	currentSequence         []string
+	turns                   int
+	totalTokens             int
+	fallbackTokens          int
+	sawShutdownModelMetrics bool
+	foundAnyEvent           bool
+	turnTimestamps          []time.Time
+}
+
+func (s *copilotEventMetricsState) scan(scanner *bufio.Scanner, metrics *workflow.LogMetrics) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || !strings.HasPrefix(line, "{") {
@@ -223,94 +242,100 @@ func parseEventsJSONLMetrics(path string, verbose bool) (workflow.LogMetrics, er
 			copilotEventsJSONLLog.Printf("Skipping malformed events.jsonl line: %v", err)
 			continue
 		}
-		fallbackTokens += extractFallbackEventTokens(entry)
+		s.fallbackTokens += extractFallbackEventTokens(entry)
+		s.foundAnyEvent = true
+		s.process(entry, metrics)
+	}
+}
 
-		foundAnyEvent = true
+func (s *copilotEventMetricsState) process(entry copilotEventsJSONLEntry, metrics *workflow.LogMetrics) {
+	switch entry.Type {
+	case "session.start":
+		copilotEventsJSONLLog.Printf("session.start: sessionId=%s copilotVersion=%s",
+			entry.Data.SessionID, entry.Data.CopilotVersion)
 
-		switch entry.Type {
-		case "session.start":
-			copilotEventsJSONLLog.Printf("session.start: sessionId=%s copilotVersion=%s",
-				entry.Data.SessionID, entry.Data.CopilotVersion)
-
-		case "user.message":
-			// Each user message represents one conversation turn.
-			// Save the current tool sequence before starting a new turn.
-			turns++
-			if len(currentSequence) > 0 {
-				metrics.ToolSequences = append(metrics.ToolSequences, currentSequence)
-				currentSequence = []string{}
+	case "user.message":
+		// Each user message represents one conversation turn.
+		// Save the current tool sequence before starting a new turn.
+		s.turns++
+		if len(s.currentSequence) > 0 {
+			metrics.ToolSequences = append(metrics.ToolSequences, s.currentSequence)
+			s.currentSequence = []string{}
+		}
+		// Record the timestamp for TBT computation.
+		if entry.Timestamp != "" {
+			if ts, parseErr := time.Parse(time.RFC3339Nano, entry.Timestamp); parseErr == nil {
+				s.turnTimestamps = append(s.turnTimestamps, ts)
+			} else if ts, parseErr = time.Parse(time.RFC3339, entry.Timestamp); parseErr == nil {
+				s.turnTimestamps = append(s.turnTimestamps, ts)
 			}
-			// Record the timestamp for TBT computation.
-			if entry.Timestamp != "" {
-				if ts, parseErr := time.Parse(time.RFC3339Nano, entry.Timestamp); parseErr == nil {
-					turnTimestamps = append(turnTimestamps, ts)
-				} else if ts, parseErr = time.Parse(time.RFC3339, entry.Timestamp); parseErr == nil {
-					turnTimestamps = append(turnTimestamps, ts)
-				}
-			}
-			copilotEventsJSONLLog.Printf("user.message: turn=%d", turns)
+		}
+		copilotEventsJSONLLog.Printf("user.message: turn=%d", s.turns)
 
-		case "tool.execution_start":
-			// Record the tool invocation and add to the current turn's sequence.
-			toolName := entry.Data.ToolName
-			if toolName != "" {
-				currentSequence = append(currentSequence, toolName)
-				if toolInfo, exists := toolCallMap[toolName]; exists {
-					toolInfo.CallCount++
-				} else {
-					toolCallMap[toolName] = &workflow.ToolCallInfo{
-						Name:      toolName,
-						CallCount: 1,
-					}
-				}
-				copilotEventsJSONLLog.Printf("tool.execution_start: %s", toolName)
-			}
+	case "tool.execution_start":
+		s.recordToolCall(entry)
+	case "session.shutdown":
+		s.recordShutdown(entry)
+	}
+}
 
-		case "session.shutdown":
-			// Aggregate token usage across all models from modelMetrics.
-			// Track whether the field was present (even if empty) so the fallback
-			// is only applied when modelMetrics is truly absent (nil), not when the
-			// totals happen to sum to zero.
-			if entry.Data.ModelMetrics != nil {
-				sawShutdownModelMetrics = true
-				for model, m := range entry.Data.ModelMetrics {
-					if m.Usage != nil {
-						modelTokens := m.Usage.InputTokens + m.Usage.OutputTokens
-						totalTokens += modelTokens
-						copilotEventsJSONLLog.Printf("session.shutdown: model=%s inputTokens=%d outputTokens=%d",
-							model, m.Usage.InputTokens, m.Usage.OutputTokens)
-					}
-				}
+func (s *copilotEventMetricsState) recordToolCall(entry copilotEventsJSONLEntry) {
+	toolName := entry.Data.ToolName
+	if toolName != "" {
+		s.currentSequence = append(s.currentSequence, toolName)
+		if toolInfo, exists := s.toolCallMap[toolName]; exists {
+			toolInfo.CallCount++
+		} else {
+			s.toolCallMap[toolName] = &workflow.ToolCallInfo{
+				Name:      toolName,
+				CallCount: 1,
 			}
-			copilotEventsJSONLLog.Printf("session.shutdown: type=%s totalTokens=%d",
-				entry.Data.ShutdownType, totalTokens)
+		}
+		copilotEventsJSONLLog.Printf("tool.execution_start: %s", toolName)
+	}
+
+}
+
+func (s *copilotEventMetricsState) recordShutdown(entry copilotEventsJSONLEntry) {
+	// Aggregate token usage across all models from modelMetrics.
+	// Track whether the field was present (even if empty) so the fallback
+	// is only applied when modelMetrics is truly absent (nil), not when the
+	// totals happen to sum to zero.
+	if entry.Data.ModelMetrics != nil {
+		s.sawShutdownModelMetrics = true
+		for model, m := range entry.Data.ModelMetrics {
+			if m.Usage != nil {
+				modelTokens := m.Usage.InputTokens + m.Usage.OutputTokens
+				s.totalTokens += modelTokens
+				copilotEventsJSONLLog.Printf("session.shutdown: model=%s inputTokens=%d outputTokens=%d",
+					model, m.Usage.InputTokens, m.Usage.OutputTokens)
+			}
 		}
 	}
+	copilotEventsJSONLLog.Printf("session.shutdown: type=%s totalTokens=%d",
+		entry.Data.ShutdownType, s.totalTokens)
+}
 
-	if scanErr := scanner.Err(); scanErr != nil {
-		return metrics, fmt.Errorf("error reading events.jsonl: %w", scanErr)
-	}
-
-	if !foundAnyEvent {
-		return metrics, errors.New("no events found in events.jsonl")
-	}
-
+func (s *copilotEventMetricsState) finalize(metrics *workflow.LogMetrics) {
 	// Flush any remaining tool sequence
-	if len(currentSequence) > 0 {
-		metrics.ToolSequences = append(metrics.ToolSequences, currentSequence)
+	if len(s.currentSequence) > 0 {
+		metrics.ToolSequences = append(metrics.ToolSequences, s.currentSequence)
 	}
 
 	// Convert tool call map to slice
-	for _, toolInfo := range toolCallMap {
+	for _, toolInfo := range s.toolCallMap {
 		metrics.ToolCalls = append(metrics.ToolCalls, *toolInfo)
 	}
 
-	metrics.TokenUsage = totalTokens
-	if !sawShutdownModelMetrics && fallbackTokens > 0 {
-		metrics.TokenUsage = fallbackTokens
+	metrics.TokenUsage = s.totalTokens
+	if !s.sawShutdownModelMetrics && s.fallbackTokens > 0 {
+		metrics.TokenUsage = s.fallbackTokens
 	}
-	metrics.Turns = turns
+	metrics.Turns = s.turns
+	computeCopilotTimeBetweenTurns(metrics, s.turnTimestamps)
+}
 
+func computeCopilotTimeBetweenTurns(metrics *workflow.LogMetrics, turnTimestamps []time.Time) {
 	// Compute Time Between Turns (TBT) from per-turn timestamps.
 	// TBT[i] = timestamp[i] - timestamp[i-1] for i > 0. Two or more timestamps
 	// are required to measure at least one interval. Only positive intervals are
@@ -334,16 +359,6 @@ func parseEventsJSONLMetrics(path string, verbose bool) (workflow.LogMetrics, er
 		}
 	}
 
-	copilotEventsJSONLLog.Printf("Parsed events.jsonl: turns=%d totalTokens=%d toolCalls=%d sequences=%d",
-		turns, totalTokens, len(toolCallMap), len(metrics.ToolSequences))
-
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(
-			fmt.Sprintf("Parsed events.jsonl: %d turns, %d tokens, %d tool calls",
-				turns, totalTokens, len(toolCallMap))))
-	}
-
-	return metrics, nil
 }
 
 func extractFallbackEventTokens(entry copilotEventsJSONLEntry) int {

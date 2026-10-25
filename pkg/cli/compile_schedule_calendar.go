@@ -282,6 +282,10 @@ func displayScheduleCalendar(statsList []*WorkflowStats) {
 		fmt.Fprintln(os.Stderr, row.String())
 	}
 
+	displayScheduleCalendarLegend(isTerminal, environ)
+}
+
+func displayScheduleCalendarLegend(isTerminal bool, environ []string) {
 	// Legend
 	fmt.Fprintln(os.Stderr)
 	type legendEntry struct {

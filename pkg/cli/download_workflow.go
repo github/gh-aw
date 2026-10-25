@@ -101,36 +101,49 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 	githubHost := getGitHubHostForRepo(repo)
 	repoURL := fmt.Sprintf("%s/%s.git", githubHost, repo)
 
+	if err := initializeSparseWorkflowClone(ctx, tmpDir, repoURL, path); err != nil {
+		return nil, err
+	}
+	if err := fetchSparseWorkflowRef(ctx, tmpDir, ref); err != nil {
+		return nil, err
+	}
+	return readSparseWorkflowContent(tmpDir, path, verbose)
+}
+
+func initializeSparseWorkflowClone(ctx context.Context, tmpDir, repoURL, path string) error {
 	// Initialize git repository
 	initCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "init")
 	if output, err := initCmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("failed to initialize git repository: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to initialize git repository: %w\nOutput: %s", err, string(output))
 	}
 
 	// Add remote
 	remoteCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "remote", "add", "origin", repoURL)
 	if output, err := remoteCmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("failed to add remote: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to add remote: %w\nOutput: %s", err, string(output))
 	}
 
 	// Enable sparse-checkout
 	sparseCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "config", "core.sparseCheckout", "true")
 	if output, err := sparseCmd.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("failed to enable sparse checkout: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to enable sparse checkout: %w\nOutput: %s", err, string(output))
 	}
 
 	// Set sparse-checkout pattern to only include the file we need
 	sparseInfoDir := filepath.Join(tmpDir, ".git", "info")
 	if err := os.MkdirAll(sparseInfoDir, constants.DirPermPublic); err != nil {
-		return nil, fmt.Errorf("failed to create sparse-checkout directory: %w", err)
+		return fmt.Errorf("failed to create sparse-checkout directory: %w", err)
 	}
 
 	sparseCheckoutFile := filepath.Join(sparseInfoDir, "sparse-checkout")
 	// Use owner-only read/write permissions (0600) for security best practices
 	if err := os.WriteFile(sparseCheckoutFile, []byte(path+"\n"), constants.FilePermSensitive); err != nil {
-		return nil, fmt.Errorf("failed to write sparse-checkout file: %w", err)
+		return fmt.Errorf("failed to write sparse-checkout file: %w", err)
 	}
+	return nil
+}
 
+func fetchSparseWorkflowRef(ctx context.Context, tmpDir, ref string) error {
 	// Check if ref is a SHA (40 hex characters)
 	isSHA := gitutil.IsValidFullSHACaseInsensitive(ref)
 	downloadLog.Printf("Fetching ref via sparse checkout: is_sha=%t", isSHA)
@@ -145,29 +158,32 @@ func downloadWorkflowContentViaGitClone(ctx context.Context, repo, path, ref str
 			// If fetching specific SHA fails, try fetching all branches with depth 1
 			fetchCmd = exec.CommandContext(ctx, "git", "-C", tmpDir, "fetch", "--depth", "1", "origin")
 			if output, err := fetchCmd.CombinedOutput(); err != nil {
-				return nil, fmt.Errorf("failed to fetch repository: %w\nOutput: %s", err, string(output))
+				return fmt.Errorf("failed to fetch repository: %w\nOutput: %s", err, string(output))
 			}
 		}
 
 		// Checkout the specific commit
 		checkoutCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "checkout", ref)
 		if output, err := checkoutCmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("failed to checkout commit %s: %w\nOutput: %s", ref, err, string(output))
+			return fmt.Errorf("failed to checkout commit %s: %w\nOutput: %s", ref, err, string(output))
 		}
 	} else {
 		// For branch/tag refs, fetch the specific ref
 		fetchCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "fetch", "--depth", "1", "origin", ref)
 		if output, err := fetchCmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("failed to fetch ref %s: %w\nOutput: %s", ref, err, string(output))
+			return fmt.Errorf("failed to fetch ref %s: %w\nOutput: %s", ref, err, string(output))
 		}
 
 		// Checkout FETCH_HEAD
 		checkoutCmd := exec.CommandContext(ctx, "git", "-C", tmpDir, "checkout", "FETCH_HEAD")
 		if output, err := checkoutCmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("failed to checkout FETCH_HEAD: %w\nOutput: %s", err, string(output))
+			return fmt.Errorf("failed to checkout FETCH_HEAD: %w\nOutput: %s", err, string(output))
 		}
 	}
+	return nil
+}
 
+func readSparseWorkflowContent(tmpDir, path string, verbose bool) ([]byte, error) {
 	// Read the file
 	filePath := filepath.Join(tmpDir, path)
 	if err := fileutil.ValidatePathWithinBase(tmpDir, filePath); err != nil {

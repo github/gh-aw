@@ -155,7 +155,18 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 	}
 
 	pipValidationLog.Printf("Starting uv package validation for %d packages", len(packages))
+	if err := validateUvPackageNames(packages); err != nil {
+		return err
+	}
+	uvPath, err := fileutil.ResolveExecutablePath("uv")
+	if err != nil {
+		return c.validateUvPackagesWithFallback(packages)
+	}
+	pipValidationLog.Print("Using uv command for validation")
+	return c.validatePackagesWithUv(packages, uvPath)
+}
 
+func validateUvPackageNames(packages []string) error {
 	// Reject any package names starting with '-' before invoking uv or pip.
 	// These would be interpreted as flags by the CLI tools (argument injection).
 	if err := rejectHyphenPrefixPackages(packages, "uv"); err != nil {
@@ -184,38 +195,38 @@ func (c *Compiler) validateUvPackages(workflowData *WorkflowData) error {
 		)
 	}
 
-	// Check if uv is available
-	uvPath, err := fileutil.ResolveExecutablePath("uv")
-	if err != nil {
-		pipValidationLog.Print("uv command not found, falling back to pip validation")
-		// uv not available, but we can still validate using pip index
-		pipPath, pipErr := fileutil.ResolveExecutablePath("pip")
-		if pipErr != nil {
-			// Try pip3 as fallback
-			var pip3Err error
-			pipPath, pip3Err = fileutil.ResolveExecutablePath("pip3")
-			if pip3Err != nil {
-				pipValidationLog.Print("Neither uv nor pip commands found, cannot validate")
-				combinedErr := errors.Join(
-					fmt.Errorf("pip: %w", pipErr),
-					fmt.Errorf("pip3: %w", pip3Err),
-				)
-				return NewOperationError(
-					"validate",
-					"uv packages",
-					"",
-					combinedErr,
-					"Install uv or pip to enable package validation:\n\nInstall uv (recommended):\n$ curl -LsSf https://astral.sh/uv/install.sh | sh\n\nOr install pip:\n$ python -m ensurepip --upgrade\n\nAlternatively, disable validation by setting GH_AW_SKIP_UV_VALIDATION=true",
-				)
-			}
-			pipValidationLog.Print("Using pip3 for validation")
-		}
+	return nil
+}
 
-		return c.validateUvPackagesWithPip(packages, pipPath)
+func (c *Compiler) validateUvPackagesWithFallback(packages []string) error {
+	pipValidationLog.Print("uv command not found, falling back to pip validation")
+	// uv not available, but we can still validate using pip index
+	pipPath, pipErr := fileutil.ResolveExecutablePath("pip")
+	if pipErr != nil {
+		// Try pip3 as fallback
+		var pip3Err error
+		pipPath, pip3Err = fileutil.ResolveExecutablePath("pip3")
+		if pip3Err != nil {
+			pipValidationLog.Print("Neither uv nor pip commands found, cannot validate")
+			combinedErr := errors.Join(
+				fmt.Errorf("pip: %w", pipErr),
+				fmt.Errorf("pip3: %w", pip3Err),
+			)
+			return NewOperationError(
+				"validate",
+				"uv packages",
+				"",
+				combinedErr,
+				"Install uv or pip to enable package validation:\n\nInstall uv (recommended):\n$ curl -LsSf https://astral.sh/uv/install.sh | sh\n\nOr install pip:\n$ python -m ensurepip --upgrade\n\nAlternatively, disable validation by setting GH_AW_SKIP_UV_VALIDATION=true",
+			)
+		}
+		pipValidationLog.Print("Using pip3 for validation")
 	}
 
-	pipValidationLog.Print("Using uv command for validation")
+	return c.validateUvPackagesWithPip(packages, pipPath)
+}
 
+func (c *Compiler) validatePackagesWithUv(packages []string, uvPath string) error {
 	// Validate with uv
 	// Package names were already validated against PyPI naming rules (PEP 508) above,
 	// before this point. validatePipCommandPackageArg below is a final point-of-use

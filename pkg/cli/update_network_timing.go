@@ -25,65 +25,86 @@ func reportUpdateNetworkOperation(operation string) func(error) {
 }
 
 func traceUpdateGitHubRequest(ctx context.Context, endpoint string) (context.Context, func()) {
-	var mu sync.Mutex
-	start := time.Now()
-	var dnsStart, tlsStart time.Time
-	var dnsTime, connectTime, tlsTime, firstByte time.Duration
-	var reused bool
-	connectStarts := make(map[string]time.Time)
+	timing := &updateRequestTiming{start: time.Now(), connectStarts: make(map[string]time.Time)}
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(httptrace.DNSStartInfo) {
-			mu.Lock()
-			dnsStart = time.Now()
-			mu.Unlock()
-		},
-		DNSDone: func(httptrace.DNSDoneInfo) {
-			mu.Lock()
-			dnsTime += time.Since(dnsStart)
-			mu.Unlock()
-		},
-		ConnectStart: func(network, addr string) {
-			mu.Lock()
-			connectStarts[network+"|"+addr] = time.Now()
-			mu.Unlock()
-		},
-		ConnectDone: func(network, addr string, _ error) {
-			mu.Lock()
-			key := network + "|" + addr
-			if started, ok := connectStarts[key]; ok {
-				connectTime += time.Since(started)
-				delete(connectStarts, key)
-			}
-			mu.Unlock()
-		},
-		TLSHandshakeStart: func() {
-			mu.Lock()
-			tlsStart = time.Now()
-			mu.Unlock()
-		},
-		TLSHandshakeDone: func(tls.ConnectionState, error) {
-			mu.Lock()
-			tlsTime += time.Since(tlsStart)
-			mu.Unlock()
-		},
-		GotConn: func(info httptrace.GotConnInfo) {
-			mu.Lock()
-			reused = info.Reused
-			mu.Unlock()
-		},
-		GotFirstResponseByte: func() {
-			mu.Lock()
-			firstByte = time.Since(start)
-			mu.Unlock()
-		},
+		DNSStart:             timing.onDNSStart,
+		DNSDone:              timing.onDNSDone,
+		ConnectStart:         timing.onConnectStart,
+		ConnectDone:          timing.onConnectDone,
+		TLSHandshakeStart:    timing.onTLSHandshakeStart,
+		TLSHandshakeDone:     timing.onTLSHandshakeDone,
+		GotConn:              timing.onGotConn,
+		GotFirstResponseByte: timing.onGotFirstResponseByte,
 	}
-	report := func() {
-		mu.Lock()
-		defer mu.Unlock()
-		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf(
-			"Network: HTTP %s (connection reused: %t, DNS: %s, connect: %s, TLS: %s, first byte: %s)",
-			endpoint, reused, dnsTime.Round(time.Millisecond), connectTime.Round(time.Millisecond),
-			tlsTime.Round(time.Millisecond), firstByte.Round(time.Millisecond))))
+	return httptrace.WithClientTrace(ctx, trace), func() { timing.report(endpoint) }
+}
+
+type updateRequestTiming struct {
+	mu                                       sync.Mutex
+	start                                    time.Time
+	dnsStart, tlsStart                       time.Time
+	dnsTime, connectTime, tlsTime, firstByte time.Duration
+	reused                                   bool
+	connectStarts                            map[string]time.Time
+}
+
+func (t *updateRequestTiming) onDNSStart(httptrace.DNSStartInfo) {
+	t.mu.Lock()
+	t.dnsStart = time.Now()
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onDNSDone(httptrace.DNSDoneInfo) {
+	t.mu.Lock()
+	t.dnsTime += time.Since(t.dnsStart)
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onConnectStart(network, addr string) {
+	t.mu.Lock()
+	t.connectStarts[network+"|"+addr] = time.Now()
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onConnectDone(network, addr string, _ error) {
+	t.mu.Lock()
+	key := network + "|" + addr
+	if started, ok := t.connectStarts[key]; ok {
+		t.connectTime += time.Since(started)
+		delete(t.connectStarts, key)
 	}
-	return httptrace.WithClientTrace(ctx, trace), report
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onTLSHandshakeStart() {
+	t.mu.Lock()
+	t.tlsStart = time.Now()
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onTLSHandshakeDone(tls.ConnectionState, error) {
+	t.mu.Lock()
+	t.tlsTime += time.Since(t.tlsStart)
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onGotConn(info httptrace.GotConnInfo) {
+	t.mu.Lock()
+	t.reused = info.Reused
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) onGotFirstResponseByte() {
+	t.mu.Lock()
+	t.firstByte = time.Since(t.start)
+	t.mu.Unlock()
+}
+
+func (t *updateRequestTiming) report(endpoint string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf(
+		"Network: HTTP %s (connection reused: %t, DNS: %s, connect: %s, TLS: %s, first byte: %s)",
+		endpoint, t.reused, t.dnsTime.Round(time.Millisecond), t.connectTime.Round(time.Millisecond),
+		t.tlsTime.Round(time.Millisecond), t.firstByte.Round(time.Millisecond))))
 }

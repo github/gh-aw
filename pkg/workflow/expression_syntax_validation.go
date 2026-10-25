@@ -199,33 +199,38 @@ func validateBalancedQuotes(expr string) error {
 
 		// Check if we reached end of string with unclosed quote
 		if i == len(expr)-1 {
-			if inSingleQuote {
-				return NewValidationError(
-					"expression",
-					"unclosed single quote",
-					"found unclosed single quote in expression: "+expr,
-					"Add the missing closing single quote (') to your expression.",
-				)
-			}
-			if inDoubleQuote {
-				return NewValidationError(
-					"expression",
-					"unclosed double quote",
-					"found unclosed double quote in expression: "+expr,
-					"Add the missing closing double quote (\") to your expression.",
-				)
-			}
-			if inBacktick {
-				return NewValidationError(
-					"expression",
-					"unclosed backtick",
-					"found unclosed backtick in expression: "+expr,
-					"Add the missing closing backtick (`) to your expression.",
-				)
-			}
+			return unclosedExpressionQuoteError(expr, inSingleQuote, inDoubleQuote, inBacktick)
 		}
 	}
 
+	return nil
+}
+
+func unclosedExpressionQuoteError(expr string, inSingleQuote, inDoubleQuote, inBacktick bool) error {
+	if inSingleQuote {
+		return NewValidationError(
+			"expression",
+			"unclosed single quote",
+			"found unclosed single quote in expression: "+expr,
+			"Add the missing closing single quote (') to your expression.",
+		)
+	}
+	if inDoubleQuote {
+		return NewValidationError(
+			"expression",
+			"unclosed double quote",
+			"found unclosed double quote in expression: "+expr,
+			"Add the missing closing double quote (\") to your expression.",
+		)
+	}
+	if inBacktick {
+		return NewValidationError(
+			"expression",
+			"unclosed backtick",
+			"found unclosed backtick in expression: "+expr,
+			"Add the missing closing backtick (`) to your expression.",
+		)
+	}
 	return nil
 }
 

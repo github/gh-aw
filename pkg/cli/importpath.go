@@ -123,23 +123,7 @@ func resolveImportPath(importPath, baseDir string, opts importPathResolverOpts) 
 
 	// 4. Relative paths (and "/" prefix paths in parser-fallback mode).
 	if opts.UseParserFallback {
-		// Only attempt stat for non-absolute paths (absolute paths go directly to parser,
-		// matching the original dependency_graph.go behaviour).
-		if !strings.HasPrefix(importPath, "/") {
-			absPath := filepath.Join(baseDir, importPath)
-			if fileutil.FileExists(absPath) {
-				importPathLog.Printf("resolveImportPath: resolved %q via stat to %q", importPath, absPath)
-				return absPath
-			}
-		}
-		importCache := parser.NewImportCache(opts.ParserGitRoot)
-		fullPath, err := parser.ResolveIncludePath(importPath, baseDir, importCache)
-		if err != nil {
-			importPathLog.Printf("resolveImportPath: parser fallback failed for %q: %v", importPath, err)
-			return ""
-		}
-		importPathLog.Printf("resolveImportPath: parser fallback resolved %q to %q", importPath, fullPath)
-		return fullPath
+		return resolveImportWithParserFallback(importPath, baseDir, opts)
 	}
 
 	// Direct resolution with optional path normalisation.
@@ -148,4 +132,24 @@ func resolveImportPath(importPath, baseDir string, opts importPathResolverOpts) 
 		result = filepath.ToSlash(filepath.Clean(result))
 	}
 	return result
+}
+
+func resolveImportWithParserFallback(importPath, baseDir string, opts importPathResolverOpts) string {
+	// Only attempt stat for non-absolute paths (absolute paths go directly to parser,
+	// matching the original dependency_graph.go behaviour).
+	if !strings.HasPrefix(importPath, "/") {
+		absPath := filepath.Join(baseDir, importPath)
+		if fileutil.FileExists(absPath) {
+			importPathLog.Printf("resolveImportPath: resolved %q via stat to %q", importPath, absPath)
+			return absPath
+		}
+	}
+	importCache := parser.NewImportCache(opts.ParserGitRoot)
+	fullPath, err := parser.ResolveIncludePath(importPath, baseDir, importCache)
+	if err != nil {
+		importPathLog.Printf("resolveImportPath: parser fallback failed for %q: %v", importPath, err)
+		return ""
+	}
+	importPathLog.Printf("resolveImportPath: parser fallback resolved %q to %q", importPath, fullPath)
+	return fullPath
 }

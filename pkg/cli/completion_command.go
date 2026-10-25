@@ -65,6 +65,12 @@ Supported shells: bash, zsh, fish, PowerShell`,
 		},
 	}
 
+	cmd.AddCommand(newCompletionInstallCommand())
+	cmd.AddCommand(newCompletionUninstallCommand())
+	return cmd
+}
+
+func newCompletionInstallCommand() *cobra.Command {
 	// Add install subcommand
 	installCmd := &cobra.Command{
 		Use:   "install",
@@ -88,7 +94,10 @@ Supported shells:
 			return InstallShellCompletion(verbose, cmd.Root())
 		},
 	}
+	return installCmd
+}
 
+func newCompletionUninstallCommand() *cobra.Command {
 	// Add uninstall subcommand
 	uninstallCmd := &cobra.Command{
 		Use:   "uninstall",
@@ -113,8 +122,5 @@ Supported shells:
 		},
 	}
 
-	cmd.AddCommand(installCmd)
-	cmd.AddCommand(uninstallCmd)
-
-	return cmd
+	return uninstallCmd
 }

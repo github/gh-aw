@@ -60,6 +60,10 @@ func buildSafeOutputChainMetrics(logsPath string) SafeOutputChainMetrics {
 		return metrics
 	}
 
+	return countSafeOutputChains(items, resolvedTargets, metrics)
+}
+
+func countSafeOutputChains(items []CreatedItemReport, resolvedTargets map[string]resolvedTemporaryIDTarget, metrics SafeOutputChainMetrics) SafeOutputChainMetrics {
 	itemCounts := make(map[string]int)
 	delegatedTargets := make(map[string]struct {
 	})

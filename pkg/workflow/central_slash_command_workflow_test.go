@@ -231,6 +231,26 @@ func TestGenerateCentralSlashCommandWorkflow_IncludesPullRequestsPermissionForIs
 	require.Contains(t, text, "pull-requests: write")
 }
 
+func TestCompareCentralCommandRoutes(t *testing.T) {
+	tests := []struct {
+		name        string
+		left, right slashCommandRoute
+	}{
+		{"workflow", slashCommandRoute{Workflow: "a", Events: []string{"z"}}, slashCommandRoute{Workflow: "b", Events: []string{"a"}}},
+		{"events", slashCommandRoute{Events: []string{"a", "b"}, AIReaction: "z"}, slashCommandRoute{Events: []string{"b"}, AIReaction: "a"}},
+		{"reaction", slashCommandRoute{AIReaction: "a", Emoji: "z"}, slashCommandRoute{AIReaction: "b", Emoji: "a"}},
+		{"emoji", slashCommandRoute{Emoji: "a", StatusComment: true}, slashCommandRoute{Emoji: "b"}},
+		{"status comment", slashCommandRoute{}, slashCommandRoute{StatusComment: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, -1, compareCentralCommandRoutes(tt.left, tt.right))
+			require.Equal(t, 1, compareCentralCommandRoutes(tt.right, tt.left))
+			require.Zero(t, compareCentralCommandRoutes(tt.left, tt.left))
+		})
+	}
+}
+
 func TestCollectCentralLabelCommandRoutes_IncludesSlashCentralizedLabelCommands(t *testing.T) {
 	data := []*WorkflowData{
 		{

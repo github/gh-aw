@@ -41,7 +41,25 @@ func buildAuditObservabilityInsights(processedRun ProcessedRun, metrics MetricsD
 	observabilityInsightsLog.Printf("Building audit observability insights: run_id=%d turns=%d tool_types=%d", processedRun.Run.DatabaseID, metrics.Turns, len(toolUsage))
 	insights := make([]ObservabilityInsight, 0, 5)
 	toolTypes := len(toolUsage)
+	insights = appendAuditExecutionInsight(insights, metrics, toolTypes)
+	insights = appendAuditActuationInsight(insights, processedRun, createdItems)
+	insights = appendAuditCapabilityInsight(insights, processedRun)
+	insights = appendAuditNetworkInsight(insights, processedRun)
 
+	if processedRun.RedactedDomainsAnalysis != nil && processedRun.RedactedDomainsAnalysis.TotalDomains > 0 {
+		insights = append(insights, ObservabilityInsight{
+			Category: "privacy",
+			Severity: "info",
+			Title:    "Sensitive destinations were redacted",
+			Summary:  fmt.Sprintf("Observability data preserved privacy boundaries by redacting %d domain(s) from emitted logs.", processedRun.RedactedDomainsAnalysis.TotalDomains),
+			Evidence: fmt.Sprintf("redacted_domains=%d", processedRun.RedactedDomainsAnalysis.TotalDomains),
+		})
+	}
+	observabilityInsightsLog.Printf("Audit observability insights built: count=%d", len(insights))
+	return insights
+}
+
+func appendAuditExecutionInsight(insights []ObservabilityInsight, metrics MetricsData, toolTypes int) []ObservabilityInsight {
 	switch {
 	case metrics.Turns >= 12 || toolTypes >= 6:
 		insights = append(insights, ObservabilityInsight{
@@ -68,7 +86,10 @@ func buildAuditObservabilityInsights(processedRun ProcessedRun, metrics MetricsD
 			Evidence: fmt.Sprintf("turns=%d tool_types=%d", metrics.Turns, toolTypes),
 		})
 	}
+	return insights
+}
 
+func appendAuditActuationInsight(insights []ObservabilityInsight, processedRun ProcessedRun, createdItems []CreatedItemReport) []ObservabilityInsight {
 	createdCount := len(createdItems)
 	safeItemsCount := processedRun.Run.SafeItemsCount
 	if createdCount > 0 || safeItemsCount > 0 {
@@ -88,7 +109,10 @@ func buildAuditObservabilityInsights(processedRun ProcessedRun, metrics MetricsD
 			Evidence: "created_items=0 safe_items=0",
 		})
 	}
+	return insights
+}
 
+func appendAuditCapabilityInsight(insights []ObservabilityInsight, processedRun ProcessedRun) []ObservabilityInsight {
 	frictionEvents := len(processedRun.MissingTools) + len(processedRun.MCPFailures) + len(processedRun.MissingData)
 	if frictionEvents > 0 {
 		severity := "medium"
@@ -103,7 +127,10 @@ func buildAuditObservabilityInsights(processedRun ProcessedRun, metrics MetricsD
 			Evidence: fmt.Sprintf("missing_tools=%d mcp_failures=%d missing_data=%d", len(processedRun.MissingTools), len(processedRun.MCPFailures), len(processedRun.MissingData)),
 		})
 	}
+	return insights
+}
 
+func appendAuditNetworkInsight(insights []ObservabilityInsight, processedRun ProcessedRun) []ObservabilityInsight {
 	if processedRun.FirewallAnalysis != nil && processedRun.FirewallAnalysis.TotalRequests > 0 {
 		blockedRate := float64(processedRun.FirewallAnalysis.BlockedRequests) / float64(processedRun.FirewallAnalysis.TotalRequests)
 		severity := "info"
@@ -126,17 +153,6 @@ func buildAuditObservabilityInsights(processedRun ProcessedRun, metrics MetricsD
 		})
 	}
 
-	if processedRun.RedactedDomainsAnalysis != nil && processedRun.RedactedDomainsAnalysis.TotalDomains > 0 {
-		insights = append(insights, ObservabilityInsight{
-			Category: "privacy",
-			Severity: "info",
-			Title:    "Sensitive destinations were redacted",
-			Summary:  fmt.Sprintf("Observability data preserved privacy boundaries by redacting %d domain(s) from emitted logs.", processedRun.RedactedDomainsAnalysis.TotalDomains),
-			Evidence: fmt.Sprintf("redacted_domains=%d", processedRun.RedactedDomainsAnalysis.TotalDomains),
-		})
-	}
-
-	observabilityInsightsLog.Printf("Audit observability insights built: count=%d", len(insights))
 	return insights
 }
 
@@ -147,6 +163,26 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 
 	observabilityInsightsLog.Printf("Building logs observability insights: processed_runs=%d tool_usage_entries=%d", len(processedRuns), len(toolUsage))
 	insights := make([]ObservabilityInsight, 0, 6)
+	workflowStats, writeRuns, readOnlyRuns := collectWorkflowObservabilityStats(processedRuns)
+	insights = appendWorkflowFailureInsight(insights, workflowStats)
+	insights = appendWorkflowDriftInsight(insights, workflowStats)
+	insights = appendWorkflowCapabilityInsight(insights, workflowStats)
+	insights = appendWorkflowNetworkInsight(insights, workflowStats)
+	if writeRuns > 0 || readOnlyRuns > 0 {
+		insights = append(insights, ObservabilityInsight{
+			Category: "actuation",
+			Severity: "info",
+			Title:    "Actuation mix summarized",
+			Summary:  fmt.Sprintf("Across %d run(s), %d executed write-capable safe outputs and %d stayed read-only.", len(processedRuns), writeRuns, readOnlyRuns),
+			Evidence: fmt.Sprintf("write_runs=%d read_only_runs=%d", writeRuns, readOnlyRuns),
+		})
+	}
+	insights = appendToolConcentrationInsight(insights, toolUsage)
+	observabilityInsightsLog.Printf("Logs observability insights built: count=%d write_runs=%d read_only_runs=%d", len(insights), writeRuns, readOnlyRuns)
+	return insights
+}
+
+func collectWorkflowObservabilityStats(processedRuns []ProcessedRun) (map[string]*workflowObservabilityStats, int, int) {
 	workflowStats := make(map[string]*workflowObservabilityStats)
 	writeRuns := 0
 	readOnlyRuns := 0
@@ -194,7 +230,10 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			}
 		}
 	}
+	return workflowStats, writeRuns, readOnlyRuns
+}
 
+func appendWorkflowFailureInsight(insights []ObservabilityInsight, workflowStats map[string]*workflowObservabilityStats) []ObservabilityInsight {
 	var failureHotspot *workflowObservabilityStats
 	for _, stats := range workflowStats {
 		if stats.failures == 0 {
@@ -219,7 +258,10 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Evidence: fmt.Sprintf("workflow=%s failures=%d runs=%d", failureHotspot.workflowName, failureHotspot.failures, failureHotspot.runs),
 		})
 	}
+	return insights
+}
 
+func appendWorkflowDriftInsight(insights []ObservabilityInsight, workflowStats map[string]*workflowObservabilityStats) []ObservabilityInsight {
 	var driftHotspot *workflowObservabilityStats
 	for _, stats := range workflowStats {
 		if stats.runs < 2 {
@@ -243,7 +285,10 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Evidence: fmt.Sprintf("workflow=%s min_turns=%d max_turns=%d", driftHotspot.workflowName, driftHotspot.minTurns, driftHotspot.maxTurns),
 		})
 	}
+	return insights
+}
 
+func appendWorkflowCapabilityInsight(insights []ObservabilityInsight, workflowStats map[string]*workflowObservabilityStats) []ObservabilityInsight {
 	var toolingHotspot *workflowObservabilityStats
 	for _, stats := range workflowStats {
 		friction := stats.missingTools + stats.mcpFailures + stats.missingData
@@ -268,7 +313,10 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Evidence: fmt.Sprintf("workflow=%s missing_tools=%d mcp_failures=%d missing_data=%d", toolingHotspot.workflowName, toolingHotspot.missingTools, toolingHotspot.mcpFailures, toolingHotspot.missingData),
 		})
 	}
+	return insights
+}
 
+func appendWorkflowNetworkInsight(insights []ObservabilityInsight, workflowStats map[string]*workflowObservabilityStats) []ObservabilityInsight {
 	var networkHotspot *workflowObservabilityStats
 	var networkRate float64
 	for _, stats := range workflowStats {
@@ -295,16 +343,10 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 		})
 	}
 
-	if writeRuns > 0 || readOnlyRuns > 0 {
-		insights = append(insights, ObservabilityInsight{
-			Category: "actuation",
-			Severity: "info",
-			Title:    "Actuation mix summarized",
-			Summary:  fmt.Sprintf("Across %d run(s), %d executed write-capable safe outputs and %d stayed read-only.", len(processedRuns), writeRuns, readOnlyRuns),
-			Evidence: fmt.Sprintf("write_runs=%d read_only_runs=%d", writeRuns, readOnlyRuns),
-		})
-	}
+	return insights
+}
 
+func appendToolConcentrationInsight(insights []ObservabilityInsight, toolUsage []ToolUsageSummary) []ObservabilityInsight {
 	totalToolCalls := 0
 	for _, tool := range toolUsage {
 		totalToolCalls += tool.CallCount
@@ -327,7 +369,6 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 		}
 	}
 
-	observabilityInsightsLog.Printf("Logs observability insights built: count=%d write_runs=%d read_only_runs=%d", len(insights), writeRuns, readOnlyRuns)
 	return insights
 }
 

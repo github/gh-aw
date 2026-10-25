@@ -62,6 +62,12 @@ func DetectRuntimeRequirements(workflowData *WorkflowData) []RuntimeRequirement 
 	}
 	detectFromInlineEngineDriver(workflowData, requirements)
 
+	detectNodeRuntimeRequirements(workflowData, requirements)
+	finishRuntimeRequirements(workflowData, requirements)
+	return sortedRuntimeRequirements(requirements)
+}
+
+func detectNodeRuntimeRequirements(workflowData *WorkflowData, requirements map[string]*RuntimeRequirement) {
 	// When using a custom image runner, ensure Node.js is set up.
 	// Standard GitHub-hosted runners (ubuntu-*, windows-*) have Node.js pre-installed,
 	// but custom image runners (self-hosted, enterprise runners, non-standard labels) may not.
@@ -95,7 +101,9 @@ func DetectRuntimeRequirements(workflowData *WorkflowData) []RuntimeRequirement 
 			updateRequiredRuntime(nodeRuntime, string(constants.DefaultNodeVersion), requirements)
 		}
 	}
+}
 
+func finishRuntimeRequirements(workflowData *WorkflowData, requirements map[string]*RuntimeRequirement) {
 	// Detect runtimes required by LSP server configurations.
 	// Each known LSP server declares the runtime it needs (e.g. "go" for gopls,
 	// "ruby" for solargraph). Feeding these through the runtime manager ensures
@@ -125,7 +133,9 @@ func DetectRuntimeRequirements(workflowData *WorkflowData) []RuntimeRequirement 
 	// Instead, we will deduplicate the setup actions from CustomSteps in the compiler.
 	// This ensures runtime setup steps are always added BEFORE custom steps.
 	// The deduplication happens in compiler_yaml.go to remove duplicate setup actions from custom steps.
+}
 
+func sortedRuntimeRequirements(requirements map[string]*RuntimeRequirement) []RuntimeRequirement {
 	// Convert map to sorted slice (alphabetically by runtime ID)
 	var result []RuntimeRequirement
 	runtimeIDs := sliceutil.SortedKeys(requirements)

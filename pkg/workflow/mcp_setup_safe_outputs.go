@@ -52,31 +52,39 @@ func generateSafeOutputsSetup(c *Compiler, yaml *strings.Builder, safeOutputConf
 	}
 
 	if safeOutputConfig != "" {
-		safeOutputsSetupLog.Printf("Safe outputs config: envVars=%d", len(envKeys))
-		fileConfigJSON, err := json.Marshal(fileRenderConfig{
-			Files: []fileRenderItem{{
-				Path:       "safeoutputs/config.json",
-				ContentEnv: "GH_AW_SAFE_OUTPUTS_CONFIG",
-			}},
-		})
-		if err != nil {
-			// Build-time invariant: fileRenderConfig above is a fixed struct literal of
-			// strings, which json.Marshal always serialises successfully; this branch is
-			// unreachable in practice.
-			panic(fmt.Sprintf("BUG: failed to marshal generated file render config: %v", err))
-		}
-		yaml.WriteString("      - name: Generate Safe Outputs Config\n")
-		fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", workflowData))
-		yaml.WriteString("        env:\n")
-		writeYAMLEnv(yaml, "          ", "GH_AW_FILE_ROOT", constants.GhAwRootDir)
-		writeYAMLEnv(yaml, "          ", "GH_AW_FILE_CONFIG", string(fileConfigJSON))
-		writeYAMLEnv(yaml, "          ", "GH_AW_SAFE_OUTPUTS_CONFIG", sanitizedConfig)
-		writeStepEnvVars(yaml, envKeys, envValues)
-		yaml.WriteString("        with:\n")
-		yaml.WriteString("          script: |\n")
-		yaml.WriteString(generateGitHubScriptWithRequire("create_files.cjs"))
+		writeSafeOutputsRuntimeConfig(yaml, workflowData, sanitizedConfig, envKeys, envValues)
 	}
 
+	writeSafeOutputsToolsSetup(c, yaml, safeOutputConfig, workflowData)
+}
+
+func writeSafeOutputsRuntimeConfig(yaml *strings.Builder, workflowData *WorkflowData, sanitizedConfig string, envKeys []string, envValues map[string]string) {
+	safeOutputsSetupLog.Printf("Safe outputs config: envVars=%d", len(envKeys))
+	fileConfigJSON, err := json.Marshal(fileRenderConfig{
+		Files: []fileRenderItem{{
+			Path:       "safeoutputs/config.json",
+			ContentEnv: "GH_AW_SAFE_OUTPUTS_CONFIG",
+		}},
+	})
+	if err != nil {
+		// Build-time invariant: fileRenderConfig above is a fixed struct literal of
+		// strings, which json.Marshal always serialises successfully; this branch is
+		// unreachable in practice.
+		panic(fmt.Sprintf("BUG: failed to marshal generated file render config: %v", err))
+	}
+	yaml.WriteString("      - name: Generate Safe Outputs Config\n")
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", workflowData))
+	yaml.WriteString("        env:\n")
+	writeYAMLEnv(yaml, "          ", "GH_AW_FILE_ROOT", constants.GhAwRootDir)
+	writeYAMLEnv(yaml, "          ", "GH_AW_FILE_CONFIG", string(fileConfigJSON))
+	writeYAMLEnv(yaml, "          ", "GH_AW_SAFE_OUTPUTS_CONFIG", sanitizedConfig)
+	writeStepEnvVars(yaml, envKeys, envValues)
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          script: |\n")
+	yaml.WriteString(generateGitHubScriptWithRequire("create_files.cjs"))
+}
+
+func writeSafeOutputsToolsSetup(c *Compiler, yaml *strings.Builder, safeOutputConfig string, workflowData *WorkflowData) {
 	toolsMetaJSON, err := generateToolsMetaJSON(workflowData, c.markdownPath)
 	if err != nil {
 		mcpSetupGeneratorLog.Printf("Error generating tools meta JSON: %v", err)
@@ -84,6 +92,26 @@ func generateSafeOutputsSetup(c *Compiler, yaml *strings.Builder, safeOutputConf
 	}
 	sanitizedToolsMetaJSON, toolsMetaEnvKeys, toolsMetaEnvValues := buildToolsMetaRuntimeData(toolsMetaJSON)
 
+	validationConfigJSON := safeOutputsValidationConfigJSON(safeOutputConfig, workflowData)
+
+	yaml.WriteString("      - name: Generate Safe Outputs Tools\n")
+	yaml.WriteString("        env:\n")
+	yaml.WriteString("          GH_AW_TOOLS_META_JSON: |\n")
+	for line := range strings.SplitSeq(sanitizedToolsMetaJSON, "\n") {
+		yaml.WriteString("            " + line + "\n")
+	}
+	yaml.WriteString("          GH_AW_VALIDATION_JSON: |\n")
+	for line := range strings.SplitSeq(validationConfigJSON, "\n") {
+		yaml.WriteString("            " + line + "\n")
+	}
+	writeStepEnvVars(yaml, toolsMetaEnvKeys, toolsMetaEnvValues)
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", workflowData))
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          script: |\n")
+	yaml.WriteString(generateGitHubScriptWithRequire("generate_safe_outputs_tools.cjs"))
+}
+
+func safeOutputsValidationConfigJSON(safeOutputConfig string, workflowData *WorkflowData) string {
 	var enabledTypes []string
 	if safeOutputConfig != "" {
 		var configMap map[string]any
@@ -111,21 +139,7 @@ func generateSafeOutputsSetup(c *Compiler, yaml *strings.Builder, safeOutputConf
 		validationConfigJSON = "{}"
 	}
 
-	yaml.WriteString("      - name: Generate Safe Outputs Tools\n")
-	yaml.WriteString("        env:\n")
-	yaml.WriteString("          GH_AW_TOOLS_META_JSON: |\n")
-	for line := range strings.SplitSeq(sanitizedToolsMetaJSON, "\n") {
-		yaml.WriteString("            " + line + "\n")
-	}
-	yaml.WriteString("          GH_AW_VALIDATION_JSON: |\n")
-	for line := range strings.SplitSeq(validationConfigJSON, "\n") {
-		yaml.WriteString("            " + line + "\n")
-	}
-	writeStepEnvVars(yaml, toolsMetaEnvKeys, toolsMetaEnvValues)
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", workflowData))
-	yaml.WriteString("        with:\n")
-	yaml.WriteString("          script: |\n")
-	yaml.WriteString(generateGitHubScriptWithRequire("generate_safe_outputs_tools.cjs"))
+	return validationConfigJSON
 }
 
 func buildSafeOutputsConfigRuntimeEnvVars(safeOutputConfig string) ([]string, map[string]string) {

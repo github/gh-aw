@@ -44,58 +44,68 @@ func ParseGitHubToolsets(toolsetsStr string) []string {
 			continue
 		}
 
-		switch toolset {
-		case "default":
-			// Add default toolsets
-			toolsetsLog.Printf("Expanding 'default' to %d toolsets", len(DefaultGitHubToolsets))
-			for _, dt := range DefaultGitHubToolsets {
-				if !setutil.Contains(seenToolsets, dt) {
-					expanded = append(expanded, dt)
-					seenToolsets[dt] = struct {
-					}{}
-				}
-			}
-		case "action-friendly":
-			// Add action-friendly toolsets (excludes "users" which GitHub Actions tokens don't support)
-			toolsetsLog.Printf("Expanding 'action-friendly' to %d toolsets", len(ActionFriendlyGitHubToolsets))
-			for _, dt := range ActionFriendlyGitHubToolsets {
-				if !setutil.Contains(seenToolsets, dt) {
-					expanded = append(expanded, dt)
-					seenToolsets[dt] = struct {
-					}{}
-				}
-			}
-		case "all":
-			// Add all toolsets from the toolset permissions map, excluding those that
-			// require GitHub App-only permissions (see GitHubToolsetsExcludedFromAll).
-			toolsetsLog.Printf("Expanding 'all' to toolsets from permissions map (excluding %v)", GitHubToolsetsExcludedFromAll)
-			excludedMap := make(map[string]struct {
-			}, len(GitHubToolsetsExcludedFromAll))
-			for _, ex := range GitHubToolsetsExcludedFromAll {
-				excludedMap[ex] = struct {
-				}{}
-			}
-			toolsetPermissionsMap := getToolsetPermissionsMap()
-			for t := range toolsetPermissionsMap {
-				if setutil.Contains(excludedMap, t) {
-					continue
-				}
-				if !setutil.Contains(seenToolsets, t) {
-					expanded = append(expanded, t)
-					seenToolsets[t] = struct {
-					}{}
-				}
-			}
-		default:
-			// Add individual toolset
-			if !setutil.Contains(seenToolsets, toolset) {
-				expanded = append(expanded, toolset)
-				seenToolsets[toolset] = struct {
-				}{}
-			}
-		}
+		expanded = expandGitHubToolset(expanded, seenToolsets, toolset)
 	}
 
 	toolsetsLog.Printf("Parsed toolsets result: %d unique toolsets expanded from input", len(expanded))
+	return expanded
+}
+
+func expandGitHubToolset(expanded []string, seenToolsets map[string]struct{}, toolset string) []string {
+	switch toolset {
+	case "default":
+		// Add default toolsets
+		toolsetsLog.Printf("Expanding 'default' to %d toolsets", len(DefaultGitHubToolsets))
+		for _, dt := range DefaultGitHubToolsets {
+			if !setutil.Contains(seenToolsets, dt) {
+				expanded = append(expanded, dt)
+				seenToolsets[dt] = struct {
+				}{}
+			}
+		}
+	case "action-friendly":
+		// Add action-friendly toolsets (excludes "users" which GitHub Actions tokens don't support)
+		toolsetsLog.Printf("Expanding 'action-friendly' to %d toolsets", len(ActionFriendlyGitHubToolsets))
+		for _, dt := range ActionFriendlyGitHubToolsets {
+			if !setutil.Contains(seenToolsets, dt) {
+				expanded = append(expanded, dt)
+				seenToolsets[dt] = struct {
+				}{}
+			}
+		}
+	case "all":
+		expanded = expandAllGitHubToolsets(expanded, seenToolsets)
+	default:
+		// Add individual toolset
+		if !setutil.Contains(seenToolsets, toolset) {
+			expanded = append(expanded, toolset)
+			seenToolsets[toolset] = struct {
+			}{}
+		}
+	}
+	return expanded
+}
+
+func expandAllGitHubToolsets(expanded []string, seenToolsets map[string]struct{}) []string {
+	// Add all toolsets from the toolset permissions map, excluding those that
+	// require GitHub App-only permissions (see GitHubToolsetsExcludedFromAll).
+	toolsetsLog.Printf("Expanding 'all' to toolsets from permissions map (excluding %v)", GitHubToolsetsExcludedFromAll)
+	excludedMap := make(map[string]struct {
+	}, len(GitHubToolsetsExcludedFromAll))
+	for _, ex := range GitHubToolsetsExcludedFromAll {
+		excludedMap[ex] = struct {
+		}{}
+	}
+	toolsetPermissionsMap := getToolsetPermissionsMap()
+	for t := range toolsetPermissionsMap {
+		if setutil.Contains(excludedMap, t) {
+			continue
+		}
+		if !setutil.Contains(seenToolsets, t) {
+			expanded = append(expanded, t)
+			seenToolsets[t] = struct {
+			}{}
+		}
+	}
 	return expanded
 }

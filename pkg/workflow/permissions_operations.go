@@ -323,36 +323,11 @@ func (p *Permissions) Merge(other *Permissions) {
 	if p.hasAll || other.hasAll {
 		// Convert both to explicit maps
 		if p.hasAll {
-			if p.permissions == nil {
-				p.permissions = make(map[PermissionScope]PermissionLevel)
-			}
-			for _, scope := range GetAllPermissionScopes() {
-				if _, exists := p.permissions[scope]; !exists {
-					// Skip id-token when level is read since it doesn't support read
-					if scope == PermissionIdToken && p.allLevel == PermissionRead {
-						continue
-					}
-					p.permissions[scope] = p.allLevel
-				}
-			}
-			p.hasAll = false
-			p.allLevel = ""
+			p.expandAllForMerge()
 		}
 		if other.hasAll {
 			if other.permissions == nil {
-				// Create a temporary map for merging
-				tempPerms := make(map[PermissionScope]PermissionLevel)
-				for _, scope := range GetAllPermissionScopes() {
-					// Skip id-token when level is read since it doesn't support read
-					if scope == PermissionIdToken && other.allLevel == PermissionRead {
-						continue
-					}
-					tempPerms[scope] = other.allLevel
-				}
-				// Merge the temporary map
-				p.mergePermissionMaps(tempPerms)
-				// Also merge explicit permissions from other if any
-				p.mergePermissionMaps(other.permissions)
+				p.mergeAllPermissions(other)
 				return
 			}
 		}
@@ -360,38 +335,7 @@ func (p *Permissions) Merge(other *Permissions) {
 
 	// If other has shorthand, we need to handle it specially
 	if other.shorthand != "" {
-		// If we also have shorthand, resolve the conflict
-		if p.shorthand != "" {
-			// Promote to the higher permission level
-			if other.shorthand == "write-all" || p.shorthand == "write-all" {
-				p.shorthand = "write-all"
-			} else if other.shorthand == "read-all" || p.shorthand == "read-all" {
-				p.shorthand = "read-all"
-			}
-			// none is lowest, so only keep if both are none
-			return
-		}
-		// We have map, other has shorthand - expand our map
-		// Apply other's shorthand as baseline, then our specific permissions override
-		otherLevel := PermissionNone
-		switch other.shorthand {
-		case "read-all":
-			otherLevel = PermissionRead
-		case "write-all":
-			otherLevel = PermissionWrite
-		}
-
-		// For all scopes we don't have, set to other's shorthand level
-		allScopes := GetAllPermissionScopes()
-		for _, scope := range allScopes {
-			if _, exists := p.permissions[scope]; !exists && otherLevel != PermissionNone {
-				// Skip id-token when level is read since it doesn't support read
-				if scope == PermissionIdToken && otherLevel == PermissionRead {
-					continue
-				}
-				p.permissions[scope] = otherLevel
-			}
-		}
+		p.mergeShorthandPermissions(other)
 		return
 	}
 
@@ -408,6 +352,71 @@ func (p *Permissions) Merge(other *Permissions) {
 	p.mergePermissionMaps(other.permissions)
 }
 
+func (p *Permissions) expandAllForMerge() {
+	if p.permissions == nil {
+		p.permissions = make(map[PermissionScope]PermissionLevel)
+	}
+	for _, scope := range GetAllPermissionScopes() {
+		if _, exists := p.permissions[scope]; !exists {
+			// id-token does not support read.
+			if scope == PermissionIdToken && p.allLevel == PermissionRead {
+				continue
+			}
+			p.permissions[scope] = p.allLevel
+		}
+	}
+	p.hasAll = false
+	p.allLevel = ""
+}
+
+func (p *Permissions) mergeAllPermissions(other *Permissions) {
+	tempPerms := make(map[PermissionScope]PermissionLevel)
+	for _, scope := range GetAllPermissionScopes() {
+		if scope == PermissionIdToken && other.allLevel == PermissionRead {
+			continue
+		}
+		tempPerms[scope] = other.allLevel
+	}
+	p.mergePermissionMaps(tempPerms)
+	p.mergePermissionMaps(other.permissions)
+}
+
+func (p *Permissions) mergeShorthandPermissions(other *Permissions) {
+	// If we also have shorthand, resolve the conflict
+	if p.shorthand != "" {
+		// Promote to the higher permission level
+		if other.shorthand == "write-all" || p.shorthand == "write-all" {
+			p.shorthand = "write-all"
+		} else if other.shorthand == "read-all" || p.shorthand == "read-all" {
+			p.shorthand = "read-all"
+		}
+		// none is lowest, so only keep if both are none
+		return
+	}
+	// We have map, other has shorthand - expand our map
+	// Apply other's shorthand as baseline, then our specific permissions override
+	otherLevel := PermissionNone
+	switch other.shorthand {
+	case "read-all":
+		otherLevel = PermissionRead
+	case "write-all":
+		otherLevel = PermissionWrite
+	}
+
+	// For all scopes we don't have, set to other's shorthand level
+	allScopes := GetAllPermissionScopes()
+	for _, scope := range allScopes {
+		if _, exists := p.permissions[scope]; !exists && otherLevel != PermissionNone {
+			// Skip id-token when level is read since it doesn't support read
+			if scope == PermissionIdToken && otherLevel == PermissionRead {
+				continue
+			}
+			p.permissions[scope] = otherLevel
+		}
+	}
+	return
+}
+
 // RenderToYAML renders the Permissions to GitHub Actions YAML format
 func (p *Permissions) RenderToYAML() string {
 	if p == nil {
@@ -422,6 +431,20 @@ func (p *Permissions) RenderToYAML() string {
 	}
 
 	// Collect all permissions to render
+	allPerms := p.permissionsForRendering()
+
+	if len(allPerms) == 0 {
+		// If explicitEmpty is true, render "permissions: {}"
+		if p.explicitEmpty {
+			return "permissions: {}"
+		}
+		return ""
+	}
+
+	return p.renderPermissionMap(allPerms)
+}
+
+func (p *Permissions) permissionsForRendering() map[PermissionScope]PermissionLevel {
 	allPerms := make(map[PermissionScope]PermissionLevel)
 
 	if p.hasAll {
@@ -447,14 +470,10 @@ func (p *Permissions) RenderToYAML() string {
 	// Override with explicit permissions
 	maps.Copy(allPerms, p.permissions)
 
-	if len(allPerms) == 0 {
-		// If explicitEmpty is true, render "permissions: {}"
-		if p.explicitEmpty {
-			return "permissions: {}"
-		}
-		return ""
-	}
+	return allPerms
+}
 
+func (p *Permissions) renderPermissionMap(allPerms map[PermissionScope]PermissionLevel) string {
 	// Sort scopes for consistent output
 	var scopes []string
 	for scope := range allPerms {

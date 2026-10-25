@@ -48,6 +48,15 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 	yaml.WriteString("          chmod +x \"${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs\"\n")
 	yaml.WriteString("          \n")
 
+	if err := appendMCPScriptToolFiles(yaml, workflowData); err != nil {
+		return err
+	}
+	appendMCPScriptsServerConfig(yaml)
+	appendMCPScriptsServerStart(yaml, workflowData)
+	return nil
+}
+
+func appendMCPScriptToolFiles(yaml *strings.Builder, workflowData *WorkflowData) error {
 	yaml.WriteString("      - name: Write MCP Scripts Tool Files\n")
 	yaml.WriteString("        run: |\n")
 	mcpScriptToolNames := sliceutil.MapKeys(workflowData.MCPScripts.Tools)
@@ -60,6 +69,10 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 		}
 	}
 	yaml.WriteString("          \n")
+	return nil
+}
+
+func appendMCPScriptsServerConfig(yaml *strings.Builder) {
 	yaml.WriteString("      - name: Generate MCP Scripts Server Config\n")
 	yaml.WriteString("        id: mcp-scripts-config\n")
 	yaml.WriteString("        run: |\n")
@@ -78,6 +91,9 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 	yaml.WriteString("          \n")
 	yaml.WriteString("          echo \"MCP Scripts server will run on port ${PORT}\"\n")
 	yaml.WriteString("          \n")
+}
+
+func appendMCPScriptsServerStart(yaml *strings.Builder, workflowData *WorkflowData) {
 	yaml.WriteString("      - name: Start MCP Scripts HTTP Server\n")
 	yaml.WriteString("        id: mcp-scripts-start\n")
 	yaml.WriteString("        env:\n")
@@ -101,7 +117,6 @@ func generateMCPScriptsSetup(yaml *strings.Builder, workflowData *WorkflowData) 
 	yaml.WriteString("          \n")
 	yaml.WriteString("          bash \"${RUNNER_TEMP}/gh-aw/actions/start_mcp_scripts_server.sh\"\n")
 	yaml.WriteString("          \n")
-	return nil
 }
 
 func appendMCPScriptToolFile(yaml *strings.Builder, workflowData *WorkflowData, toolName string, toolConfig *MCPScriptToolConfig) error {

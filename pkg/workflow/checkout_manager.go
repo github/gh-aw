@@ -336,70 +336,77 @@ func (cm *CheckoutManager) add(cfg *CheckoutConfig) {
 	allowPrivateRepos := cfg.AllowPrivateRepos != nil && *cfg.AllowPrivateRepos
 
 	if idx, exists := cm.index[key]; exists {
-		// Merge into existing entry; first-seen wins for ref and token/app (auth is mutually exclusive:
-		// once either github-token or github-app is set for an entry, the other method is not added
-		// even if a later config provides it — this preserves the main workflow's auth choice).
-		entry := cm.ordered[idx]
-		entry.maxRepos = min(entry.maxRepos, maxRepos)
-		entry.allowPrivateRepos = entry.allowPrivateRepos && allowPrivateRepos
-		entry.fetchDepth = deeperFetchDepth(entry.fetchDepth, cfg.FetchDepth)
-		if cfg.Ref != "" && entry.ref == "" {
-			entry.ref = cfg.Ref // first-seen ref wins
-		}
-		if cfg.GitHubToken != "" && entry.token == "" && entry.githubApp == nil {
-			entry.token = cfg.GitHubToken // first-seen auth wins (mutually exclusive with github-app)
-		}
-		if cfg.GitHubApp != nil && entry.githubApp == nil && entry.token == "" {
-			entry.githubApp = cfg.GitHubApp // first-seen auth wins (mutually exclusive with github-token)
-		}
-		if cfg.SafeOutputGitHubApp != nil && entry.safeOutputApp == nil {
-			entry.safeOutputApp = cfg.SafeOutputGitHubApp // first-seen safe_outputs auth wins
-		}
-		if cfg.SparseCheckout != "" {
-			entry.sparsePatterns = mergeSparsePatterns(entry.sparsePatterns, cfg.SparseCheckout)
-		}
-		if cfg.LFS {
-			entry.lfs = true
-		}
-		if cfg.Current {
-			entry.current = true
-		}
-		if cfg.Submodules != "" && entry.submodules == "" {
-			entry.submodules = cfg.Submodules
-		}
-		if len(cfg.Fetch) > 0 {
-			entry.fetchRefs = mergeFetchRefs(entry.fetchRefs, cfg.Fetch)
-		}
-		if cfg.CleanGitCredentials {
-			entry.cleanCreds = true
-		}
+		mergeCheckoutConfig(cm.ordered[idx], cfg, maxRepos, allowPrivateRepos)
 		checkoutManagerLog.Printf("Merged checkout for path=%q repository=%q", key.path, key.repository)
 	} else {
-		entry := &resolvedCheckout{
-			key:               key,
-			ref:               cfg.Ref,
-			token:             cfg.GitHubToken,
-			githubApp:         cfg.GitHubApp,
-			safeOutputApp:     cfg.SafeOutputGitHubApp,
-			fetchDepth:        cfg.FetchDepth,
-			submodules:        cfg.Submodules,
-			lfs:               cfg.LFS,
-			current:           cfg.Current,
-			cleanCreds:        cfg.CleanGitCredentials,
-			allowedRepos:      cfg.AllowedRepos,
-			maxRepos:          maxRepos,
-			allowPrivateRepos: allowPrivateRepos,
-		}
-		if cfg.SparseCheckout != "" {
-			entry.sparsePatterns = mergeSparsePatterns(nil, cfg.SparseCheckout)
-		}
-		if len(cfg.Fetch) > 0 {
-			entry.fetchRefs = mergeFetchRefs(nil, cfg.Fetch)
-		}
-		cm.index[key] = len(cm.ordered)
-		cm.ordered = append(cm.ordered, entry)
-		checkoutManagerLog.Printf("Added checkout for path=%q repository=%q", key.path, key.repository)
+		cm.addResolvedCheckout(key, cfg, maxRepos, allowPrivateRepos)
 	}
+}
+
+func mergeCheckoutConfig(entry *resolvedCheckout, cfg *CheckoutConfig, maxRepos int, allowPrivateRepos bool) {
+	// Merge into existing entry; first-seen wins for ref and token/app (auth is mutually exclusive:
+	// once either github-token or github-app is set for an entry, the other method is not added
+	// even if a later config provides it — this preserves the main workflow's auth choice).
+	entry.maxRepos = min(entry.maxRepos, maxRepos)
+	entry.allowPrivateRepos = entry.allowPrivateRepos && allowPrivateRepos
+	entry.fetchDepth = deeperFetchDepth(entry.fetchDepth, cfg.FetchDepth)
+	if cfg.Ref != "" && entry.ref == "" {
+		entry.ref = cfg.Ref // first-seen ref wins
+	}
+	if cfg.GitHubToken != "" && entry.token == "" && entry.githubApp == nil {
+		entry.token = cfg.GitHubToken // first-seen auth wins (mutually exclusive with github-app)
+	}
+	if cfg.GitHubApp != nil && entry.githubApp == nil && entry.token == "" {
+		entry.githubApp = cfg.GitHubApp // first-seen auth wins (mutually exclusive with github-token)
+	}
+	if cfg.SafeOutputGitHubApp != nil && entry.safeOutputApp == nil {
+		entry.safeOutputApp = cfg.SafeOutputGitHubApp // first-seen safe_outputs auth wins
+	}
+	if cfg.SparseCheckout != "" {
+		entry.sparsePatterns = mergeSparsePatterns(entry.sparsePatterns, cfg.SparseCheckout)
+	}
+	if cfg.LFS {
+		entry.lfs = true
+	}
+	if cfg.Current {
+		entry.current = true
+	}
+	if cfg.Submodules != "" && entry.submodules == "" {
+		entry.submodules = cfg.Submodules
+	}
+	if len(cfg.Fetch) > 0 {
+		entry.fetchRefs = mergeFetchRefs(entry.fetchRefs, cfg.Fetch)
+	}
+	if cfg.CleanGitCredentials {
+		entry.cleanCreds = true
+	}
+}
+
+func (cm *CheckoutManager) addResolvedCheckout(key checkoutKey, cfg *CheckoutConfig, maxRepos int, allowPrivateRepos bool) {
+	entry := &resolvedCheckout{
+		key:               key,
+		ref:               cfg.Ref,
+		token:             cfg.GitHubToken,
+		githubApp:         cfg.GitHubApp,
+		safeOutputApp:     cfg.SafeOutputGitHubApp,
+		fetchDepth:        cfg.FetchDepth,
+		submodules:        cfg.Submodules,
+		lfs:               cfg.LFS,
+		current:           cfg.Current,
+		cleanCreds:        cfg.CleanGitCredentials,
+		allowedRepos:      cfg.AllowedRepos,
+		maxRepos:          maxRepos,
+		allowPrivateRepos: allowPrivateRepos,
+	}
+	if cfg.SparseCheckout != "" {
+		entry.sparsePatterns = mergeSparsePatterns(nil, cfg.SparseCheckout)
+	}
+	if len(cfg.Fetch) > 0 {
+		entry.fetchRefs = mergeFetchRefs(nil, cfg.Fetch)
+	}
+	cm.index[key] = len(cm.ordered)
+	cm.ordered = append(cm.ordered, entry)
+	checkoutManagerLog.Printf("Added checkout for path=%q repository=%q", key.path, key.repository)
 }
 
 // GetDefaultCheckoutOverride returns the resolved checkout for the default workspace

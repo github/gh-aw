@@ -117,47 +117,10 @@ func (v *globValidator) validateNext() bool {
 	case '*':
 		prec = false
 	case '[':
-		if v.scan.Peek() == ']' {
-			c = v.scan.Next()
-			v.unexpected(']', "content of character match []", "character match must not be empty")
-			break
-		}
-		chars := 0
-	Loop:
-		for {
-			c = v.scan.Next()
-			switch c {
-			case ']':
-				break Loop
-			case scanner.EOF:
-				v.unexpected(c, "end of character match []", "missing ]")
-				return false
-			default:
-				if v.scan.Peek() != '-' {
-					chars++
-					continue Loop
-				}
-				chars += 2
-				s := c
-				_ = v.scan.Next() // eat '-'; return value not needed
-				switch v.scan.Peek() {
-				case ']':
-					c = v.scan.Next()
-					v.unexpected(c, "character range in []", "end of range is missing")
-					break Loop
-				case scanner.EOF:
-					// do nothing
-				default:
-					c = v.scan.Next()
-					if s > c {
-						why := fmt.Sprintf("start of range %q (%d) is larger than end of range %q (%d)", s, s, c, c)
-						v.unexpected(c, "character range in []", why)
-					}
-				}
-			}
-		}
-		if chars == 1 {
-			v.unexpected(c, "character match []", "character match with single character is useless. simply use x instead of [x]")
+		var complete bool
+		c, complete = v.validateCharacterMatch()
+		if !complete {
+			return false
 		}
 	case '\r':
 		if v.scan.Peek() == '\n' {
@@ -181,6 +144,53 @@ func (v *globValidator) validateNext() bool {
 		return false
 	}
 	return true
+}
+
+func (v *globValidator) validateCharacterMatch() (rune, bool) {
+	c := rune('[')
+	if v.scan.Peek() == ']' {
+		c = v.scan.Next()
+		v.unexpected(']', "content of character match []", "character match must not be empty")
+		return c, true
+	}
+	chars := 0
+Loop:
+	for {
+		c = v.scan.Next()
+		switch c {
+		case ']':
+			break Loop
+		case scanner.EOF:
+			v.unexpected(c, "end of character match []", "missing ]")
+			return c, false
+		default:
+			if v.scan.Peek() != '-' {
+				chars++
+				continue Loop
+			}
+			chars += 2
+			s := c
+			_ = v.scan.Next() // eat '-'; return value not needed
+			switch v.scan.Peek() {
+			case ']':
+				c = v.scan.Next()
+				v.unexpected(c, "character range in []", "end of range is missing")
+				break Loop
+			case scanner.EOF:
+				// do nothing
+			default:
+				c = v.scan.Next()
+				if s > c {
+					why := fmt.Sprintf("start of range %q (%d) is larger than end of range %q (%d)", s, s, c, c)
+					v.unexpected(c, "character range in []", why)
+				}
+			}
+		}
+	}
+	if chars == 1 {
+		v.unexpected(c, "character match []", "character match with single character is useless. simply use x instead of [x]")
+	}
+	return c, true
 }
 
 func (v *globValidator) validate(pat string) {

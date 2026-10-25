@@ -472,150 +472,169 @@ func renderUnifiedTimelineStream(events []UnifiedTimelineEvent) string {
 		return ""
 	}
 
-	isTerminal := tty.IsStdoutTerminal()
-
-	// streamColor wraps text with a lipgloss style only when output is a TTY so
-	// that piped output stays clean of ANSI escape codes.
-	streamColor := func(s streamStyleRenderer, text string) string {
-		if isTerminal {
-			return s.Render(text)
-		}
-		return text
-	}
-
-	// coloredMessageSnippet renders the first few lines of message content.
-	// lineStyle and truncStyle are applied only when output is a TTY.
-	coloredMessageSnippet := func(content, indent string, lineStyle, truncStyle streamStyleRenderer) string {
-		ls, ts := streamStyleRenderer(noopStyleRenderer{}), streamStyleRenderer(noopStyleRenderer{})
-		if isTerminal {
-			ls, ts = lineStyle, truncStyle
-		}
-		return renderMessageSnippet(content, indent, ls, ts)
-	}
-
+	renderer := timelineStreamRenderer{isTerminal: tty.IsStdoutTerminal()}
 	var sb strings.Builder
 	inTurn := false
 
 	for _, evt := range events {
-		ts := formatTimelineTime(evt)
-
-		switch evt.Kind {
-		case TimelineKindAgentTurn:
+		if evt.Kind == TimelineKindAgentTurn {
 			if inTurn {
 				sb.WriteString("\n")
 			}
 			inTurn = true
-			// Turn headers are bold purple (Command), timestamp muted.
-			turnLabel := streamColor(styles.Command, fmt.Sprintf("> Turn %d", evt.TurnIndex))
-			tsLabel := streamColor(styles.LineNumber, "["+ts+"]")
-			fmt.Fprintf(&sb, "%s %s\n", turnLabel, tsLabel)
-			// Show the first few lines of the user's message in muted style.
-			sb.WriteString(coloredMessageSnippet(evt.MessageContent, "  ", styles.ContextLine, styles.LineNumber))
-
-		case TimelineKindAssistantMessage:
-			icon := streamColor(styles.Info, timelineEventIcon(TimelineKindAssistantMessage))
-			fmt.Fprintf(&sb, "  %s\n", icon)
-			// Show assistant response snippet in standard foreground, muted truncation.
-			sb.WriteString(coloredMessageSnippet(evt.MessageContent, "  ", styles.ContextLine, styles.LineNumber))
-
-		case TimelineKindReasoning:
-			icon := streamColor(styles.Verbose, timelineEventIcon(TimelineKindReasoning))
-			fmt.Fprintf(&sb, "  %s\n", icon)
-			// Show reasoning snippet in muted/verbose style.
-			sb.WriteString(coloredMessageSnippet(evt.MessageContent, "  ", styles.Verbose, styles.LineNumber))
-
-		case TimelineKindAgentToolStart:
-			detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
-			// Tool start is yellow progress indicator.
-			icon := streamColor(styles.Progress, timelineEventIcon(TimelineKindAgentToolStart))
-			fmt.Fprintf(&sb, "  %s %s\n", icon, detail)
-
-		case TimelineKindAgentToolDone:
-			detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
-			status := evt.Status
-			if status == "" {
-				if evt.Success {
-					status = "success"
-				} else {
-					status = "error"
-				}
-			}
-			// Completion icon and status are green on success, red on error.
-			if evt.Success || status == "success" {
-				icon := streamColor(styles.Success, timelineEventIcon(TimelineKindAgentToolDone))
-				statusColored := streamColor(styles.Success, status)
-				fmt.Fprintf(&sb, "  %s %s  %s\n", icon, detail, statusColored)
-			} else {
-				icon := streamColor(styles.Error, timelineEventIcon(TimelineKindAgentToolDone))
-				statusColored := streamColor(styles.Error, status)
-				fmt.Fprintf(&sb, "  %s %s  %s\n", icon, detail, statusColored)
-			}
-
-		case TimelineKindToolCall:
-			detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
-			icon := streamColor(styles.ServerName, timelineEventIcon(TimelineKindToolCall))
-			suffix := ""
-			if evt.Duration > 0 {
-				suffix = "  " + streamColor(styles.LineNumber, fmt.Sprintf("%.0fms", evt.Duration))
-			} else if evt.Error != "" {
-				suffix = "  " + streamColor(styles.Error, "error: "+stringutil.Truncate(evt.Error, streamMaxAnnotationLen))
-			}
-			fmt.Fprintf(&sb, "    %s %s%s\n", icon, detail, suffix)
-
-		case TimelineKindNetworkAllowed:
-			method := ""
-			if evt.HTTPMethod != "" {
-				method = "  " + streamColor(styles.LineNumber, evt.HTTPMethod)
-			}
-			icon := streamColor(styles.Info, timelineEventIcon(TimelineKindNetworkAllowed))
-			fmt.Fprintf(&sb, "    %s %s%s\n", icon, evt.Host, method)
-
-		case TimelineKindNetworkBlocked:
-			method := ""
-			if evt.HTTPMethod != "" {
-				method = "  " + streamColor(styles.LineNumber, evt.HTTPMethod)
-			}
-			icon := streamColor(styles.Error, timelineEventIcon(TimelineKindNetworkBlocked))
-			blocked := streamColor(styles.Error, "[blocked]")
-			fmt.Fprintf(&sb, "    %s %s%s  %s\n", icon, evt.Host, method, blocked)
-
-		case TimelineKindDIFCFiltered:
-			detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
-			icon := streamColor(styles.Warning, timelineEventIcon(TimelineKindDIFCFiltered))
-			reason := ""
-			if evt.Reason != "" {
-				reason = "  " + streamColor(styles.Warning, stringutil.Truncate(evt.Reason, streamMaxAnnotationLen))
-			}
-			fmt.Fprintf(&sb, "    %s %s%s\n", icon, detail, reason)
-
-		case TimelineKindGuardPolicyBlocked:
-			detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
-			icon := streamColor(styles.Error, timelineEventIcon(TimelineKindGuardPolicyBlocked))
-			annotation := evt.Reason
-			if annotation == "" {
-				annotation = evt.Error
-			}
-			annotationStr := ""
-			if annotation != "" {
-				annotationStr = "  " + streamColor(styles.Error, stringutil.Truncate(annotation, streamMaxAnnotationLen))
-			}
-			fmt.Fprintf(&sb, "    %s %s%s\n", icon, detail, annotationStr)
-
-		case TimelineKindSteering:
-			icon := streamColor(styles.Warning, timelineEventIcon(TimelineKindSteering))
-			msg := stringutil.Truncate(evt.Reason, streamMaxAnnotationLen)
-			fmt.Fprintf(&sb, "    %s %s\n", icon, msg)
-
-		default:
-			fmt.Fprintf(&sb, "  · [%s] %s  %s\n", ts, string(evt.Kind), timelineSourceLabel(evt.Source))
 		}
+		renderer.writeEvent(&sb, evt)
 	}
-
 	if inTurn {
 		sb.WriteString("\n")
 	}
-
 	return sb.String()
+}
+
+type timelineStreamRenderer struct {
+	isTerminal bool
+}
+
+func (r timelineStreamRenderer) color(s streamStyleRenderer, text string) string {
+	if r.isTerminal {
+		return s.Render(text)
+	}
+	return text
+}
+
+func (r timelineStreamRenderer) messageSnippet(content, indent string, lineStyle, truncStyle streamStyleRenderer) string {
+	ls, ts := streamStyleRenderer(noopStyleRenderer{}), streamStyleRenderer(noopStyleRenderer{})
+	if r.isTerminal {
+		ls, ts = lineStyle, truncStyle
+	}
+	return renderMessageSnippet(content, indent, ls, ts)
+}
+
+func (r timelineStreamRenderer) writeEvent(sb *strings.Builder, evt UnifiedTimelineEvent) {
+	switch evt.Kind {
+	case TimelineKindAgentTurn, TimelineKindAssistantMessage, TimelineKindReasoning:
+		r.writeMessageEvent(sb, evt)
+	case TimelineKindAgentToolStart, TimelineKindAgentToolDone, TimelineKindToolCall:
+		r.writeToolEvent(sb, evt)
+	case TimelineKindNetworkAllowed, TimelineKindNetworkBlocked:
+		r.writeNetworkEvent(sb, evt)
+	case TimelineKindDIFCFiltered, TimelineKindGuardPolicyBlocked, TimelineKindSteering:
+		r.writePolicyEvent(sb, evt)
+	default:
+		fmt.Fprintf(sb, "  · [%s] %s  %s\n", formatTimelineTime(evt), string(evt.Kind), timelineSourceLabel(evt.Source))
+	}
+}
+
+func (r timelineStreamRenderer) writeMessageEvent(sb *strings.Builder, evt UnifiedTimelineEvent) {
+	switch evt.Kind {
+	case TimelineKindAgentTurn:
+		turnLabel := r.color(styles.Command, fmt.Sprintf("> Turn %d", evt.TurnIndex))
+		tsLabel := r.color(styles.LineNumber, "["+formatTimelineTime(evt)+"]")
+		fmt.Fprintf(sb, "%s %s\n", turnLabel, tsLabel)
+		sb.WriteString(r.messageSnippet(evt.MessageContent, "  ", styles.ContextLine, styles.LineNumber))
+	case TimelineKindAssistantMessage:
+		icon := r.color(styles.Info, timelineEventIcon(TimelineKindAssistantMessage))
+		fmt.Fprintf(sb, "  %s\n", icon)
+		sb.WriteString(r.messageSnippet(evt.MessageContent, "  ", styles.ContextLine, styles.LineNumber))
+	case TimelineKindReasoning:
+		icon := r.color(styles.Verbose, timelineEventIcon(TimelineKindReasoning))
+		fmt.Fprintf(sb, "  %s\n", icon)
+		sb.WriteString(r.messageSnippet(evt.MessageContent, "  ", styles.Verbose, styles.LineNumber))
+	}
+}
+
+func (r timelineStreamRenderer) writeToolEvent(sb *strings.Builder, evt UnifiedTimelineEvent) {
+	switch evt.Kind {
+	case TimelineKindAgentToolStart:
+		detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
+		// Tool start is yellow progress indicator.
+		icon := r.color(styles.Progress, timelineEventIcon(TimelineKindAgentToolStart))
+		fmt.Fprintf(sb, "  %s %s\n", icon, detail)
+
+	case TimelineKindAgentToolDone:
+		detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
+		status := evt.Status
+		if status == "" {
+			if evt.Success {
+				status = "success"
+			} else {
+				status = "error"
+			}
+		}
+		// Completion icon and status are green on success, red on error.
+		if evt.Success || status == "success" {
+			icon := r.color(styles.Success, timelineEventIcon(TimelineKindAgentToolDone))
+			statusColored := r.color(styles.Success, status)
+			fmt.Fprintf(sb, "  %s %s  %s\n", icon, detail, statusColored)
+		} else {
+			icon := r.color(styles.Error, timelineEventIcon(TimelineKindAgentToolDone))
+			statusColored := r.color(styles.Error, status)
+			fmt.Fprintf(sb, "  %s %s  %s\n", icon, detail, statusColored)
+		}
+
+	case TimelineKindToolCall:
+		detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
+		icon := r.color(styles.ServerName, timelineEventIcon(TimelineKindToolCall))
+		suffix := ""
+		if evt.Duration > 0 {
+			suffix = "  " + r.color(styles.LineNumber, fmt.Sprintf("%.0fms", evt.Duration))
+		} else if evt.Error != "" {
+			suffix = "  " + r.color(styles.Error, "error: "+stringutil.Truncate(evt.Error, streamMaxAnnotationLen))
+		}
+		fmt.Fprintf(sb, "    %s %s%s\n", icon, detail, suffix)
+	}
+}
+
+func (r timelineStreamRenderer) writeNetworkEvent(sb *strings.Builder, evt UnifiedTimelineEvent) {
+	switch evt.Kind {
+	case TimelineKindNetworkAllowed:
+		method := ""
+		if evt.HTTPMethod != "" {
+			method = "  " + r.color(styles.LineNumber, evt.HTTPMethod)
+		}
+		icon := r.color(styles.Info, timelineEventIcon(TimelineKindNetworkAllowed))
+		fmt.Fprintf(sb, "    %s %s%s\n", icon, evt.Host, method)
+
+	case TimelineKindNetworkBlocked:
+		method := ""
+		if evt.HTTPMethod != "" {
+			method = "  " + r.color(styles.LineNumber, evt.HTTPMethod)
+		}
+		icon := r.color(styles.Error, timelineEventIcon(TimelineKindNetworkBlocked))
+		blocked := r.color(styles.Error, "[blocked]")
+		fmt.Fprintf(sb, "    %s %s%s  %s\n", icon, evt.Host, method, blocked)
+	}
+}
+
+func (r timelineStreamRenderer) writePolicyEvent(sb *strings.Builder, evt UnifiedTimelineEvent) {
+	switch evt.Kind {
+	case TimelineKindDIFCFiltered:
+		detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
+		icon := r.color(styles.Warning, timelineEventIcon(TimelineKindDIFCFiltered))
+		reason := ""
+		if evt.Reason != "" {
+			reason = "  " + r.color(styles.Warning, stringutil.Truncate(evt.Reason, streamMaxAnnotationLen))
+		}
+		fmt.Fprintf(sb, "    %s %s%s\n", icon, detail, reason)
+
+	case TimelineKindGuardPolicyBlocked:
+		detail := formatStreamToolDetail(evt.ServerName, evt.ToolName)
+		icon := r.color(styles.Error, timelineEventIcon(TimelineKindGuardPolicyBlocked))
+		annotation := evt.Reason
+		if annotation == "" {
+			annotation = evt.Error
+		}
+		annotationStr := ""
+		if annotation != "" {
+			annotationStr = "  " + r.color(styles.Error, stringutil.Truncate(annotation, streamMaxAnnotationLen))
+		}
+		fmt.Fprintf(sb, "    %s %s%s\n", icon, detail, annotationStr)
+
+	case TimelineKindSteering:
+		icon := r.color(styles.Warning, timelineEventIcon(TimelineKindSteering))
+		msg := stringutil.Truncate(evt.Reason, streamMaxAnnotationLen)
+		fmt.Fprintf(sb, "    %s %s\n", icon, msg)
+	}
 }
 
 // ─── Top-level renderer ───────────────────────────────────────────────────────
@@ -628,86 +647,96 @@ func renderUnifiedTimeline(events []UnifiedTimelineEvent) string {
 		return ""
 	}
 
-	// Tally event counts for the summary header.
-	var gwCount, fwCount, agCount int
-	var toolCalls, difcFiltered, guardBlocked, netAllowed, netBlocked, steeringCount int
-	var agentTurns, agentToolStarts, agentToolDones, assistantMessages, reasoningCount int
-	for _, evt := range events {
-		switch evt.Source {
-		case TimelineSourceGateway:
-			gwCount++
-			switch evt.Kind {
-			case TimelineKindToolCall:
-				toolCalls++
-			case TimelineKindDIFCFiltered:
-				difcFiltered++
-			case TimelineKindGuardPolicyBlocked:
-				guardBlocked++
-			}
-		case TimelineSourceFirewall:
-			fwCount++
-			switch evt.Kind {
-			case TimelineKindNetworkAllowed:
-				netAllowed++
-			case TimelineKindNetworkBlocked:
-				netBlocked++
-			case TimelineKindSteering:
-				steeringCount++
-			}
-		case TimelineSourceAgent:
-			agCount++
-			switch evt.Kind {
-			case TimelineKindAgentTurn:
-				agentTurns++
-			case TimelineKindAgentToolStart:
-				agentToolStarts++
-			case TimelineKindAgentToolDone:
-				agentToolDones++
-			case TimelineKindAssistantMessage:
-				assistantMessages++
-			case TimelineKindReasoning:
-				reasoningCount++
-			}
-		}
-	}
-
+	counts := countUnifiedTimelineEvents(events)
 	var sb strings.Builder
-
-	sb.WriteString("\n")
-	sb.WriteString(console.FormatInfoMessage("Unified MCP + Firewall + Agent Event Timeline"))
-	sb.WriteString("\n\n")
-
-	fmt.Fprintf(&sb, "Total Events  : %d\n", len(events))
-	if gwCount > 0 {
-		fmt.Fprintf(&sb, "  Gateway     : %d  (tool_calls=%d, difc_filtered=%d, guard_blocked=%d)\n",
-			gwCount, toolCalls, difcFiltered, guardBlocked)
-	}
-	if fwCount > 0 {
-		fwDetail := fmt.Sprintf("allowed=%d, blocked=%d", netAllowed, netBlocked)
-		if steeringCount > 0 {
-			fwDetail += fmt.Sprintf(", steering=%d", steeringCount)
-		}
-		fmt.Fprintf(&sb, "  Firewall    : %d  (%s)\n", fwCount, fwDetail)
-	}
-	if agCount > 0 {
-		fmt.Fprintf(&sb, "  Agent       : %d  (turns=%d, tool_start=%d, tool_done=%d, messages=%d, reasoning=%d)\n",
-			agCount, agentTurns, agentToolStarts, agentToolDones, assistantMessages, reasoningCount)
-	}
-	sb.WriteString("\n")
+	writeUnifiedTimelineSummary(&sb, len(events), counts)
 
 	// Build the table rows using per-kind primitives.
 	rows := make([][]string, 0, len(events))
 	for _, evt := range events {
 		rows = append(rows, renderTimelineEventRow(evt))
 	}
-
 	sb.WriteString(console.RenderTable(console.TableConfig{
 		Title:   "Event Timeline",
 		Headers: []string{"Time", "Src", "Kind", "Detail", "Status"},
 		Rows:    rows,
 	}))
-
 	return sb.String()
+}
+
+type unifiedTimelineEventCounts struct {
+	gateway, firewall, agent                    int
+	toolCalls, difcFiltered, guardBlocked       int
+	netAllowed, netBlocked, steering            int
+	agentTurns, agentToolStarts, agentToolDones int
+	assistantMessages, reasoning                int
+}
+
+func countUnifiedTimelineEvents(events []UnifiedTimelineEvent) unifiedTimelineEventCounts {
+	var counts unifiedTimelineEventCounts
+	for _, evt := range events {
+		switch evt.Source {
+		case TimelineSourceGateway:
+			counts.gateway++
+			switch evt.Kind {
+			case TimelineKindToolCall:
+				counts.toolCalls++
+			case TimelineKindDIFCFiltered:
+				counts.difcFiltered++
+			case TimelineKindGuardPolicyBlocked:
+				counts.guardBlocked++
+			}
+		case TimelineSourceFirewall:
+			counts.firewall++
+			switch evt.Kind {
+			case TimelineKindNetworkAllowed:
+				counts.netAllowed++
+			case TimelineKindNetworkBlocked:
+				counts.netBlocked++
+			case TimelineKindSteering:
+				counts.steering++
+			}
+		case TimelineSourceAgent:
+			counts.agent++
+			switch evt.Kind {
+			case TimelineKindAgentTurn:
+				counts.agentTurns++
+			case TimelineKindAgentToolStart:
+				counts.agentToolStarts++
+			case TimelineKindAgentToolDone:
+				counts.agentToolDones++
+			case TimelineKindAssistantMessage:
+				counts.assistantMessages++
+			case TimelineKindReasoning:
+				counts.reasoning++
+			}
+		}
+	}
+	return counts
+}
+
+func writeUnifiedTimelineSummary(sb *strings.Builder, total int, counts unifiedTimelineEventCounts) {
+	sb.WriteString("\n")
+	sb.WriteString(console.FormatInfoMessage("Unified MCP + Firewall + Agent Event Timeline"))
+	sb.WriteString("\n\n")
+
+	fmt.Fprintf(sb, "Total Events  : %d\n", total)
+	if counts.gateway > 0 {
+		fmt.Fprintf(sb, "  Gateway     : %d  (tool_calls=%d, difc_filtered=%d, guard_blocked=%d)\n",
+			counts.gateway, counts.toolCalls, counts.difcFiltered, counts.guardBlocked)
+	}
+	if counts.firewall > 0 {
+		fwDetail := fmt.Sprintf("allowed=%d, blocked=%d", counts.netAllowed, counts.netBlocked)
+		if counts.steering > 0 {
+			fwDetail += fmt.Sprintf(", steering=%d", counts.steering)
+		}
+		fmt.Fprintf(sb, "  Firewall    : %d  (%s)\n", counts.firewall, fwDetail)
+	}
+	if counts.agent > 0 {
+		fmt.Fprintf(sb, "  Agent       : %d  (turns=%d, tool_start=%d, tool_done=%d, messages=%d, reasoning=%d)\n",
+			counts.agent, counts.agentTurns, counts.agentToolStarts, counts.agentToolDones, counts.assistantMessages, counts.reasoning)
+	}
+	sb.WriteString("\n")
 }
 
 // displayUnifiedTimeline collects all JSONL events from every processed run, merges them

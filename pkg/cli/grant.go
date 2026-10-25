@@ -87,6 +87,36 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 		return err
 	}
 
+	images = grantScannableImages(images, ignoredImages, verbose)
+
+	if len(images) == 0 {
+		grantLog.Print("All container images are excluded by ignore-images")
+		return nil
+	}
+
+	if len(images) == 1 {
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running grant license scanner on 1 container image"))
+	} else {
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(
+			fmt.Sprintf("Running grant license scanner on %d container images", len(images))))
+	}
+
+	totalFindings, findings, scanErrors := grantScanImages(images, policyFile, verbose)
+	if len(scanErrors) > 0 {
+		errMsg := fmt.Sprintf("grant scan failed for %d image(s): %s",
+			len(scanErrors), strings.Join(scanErrors, "; "))
+		if strict {
+			return errors.New(errMsg)
+		}
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(errMsg))
+	}
+	if strict && totalFindings > 0 {
+		return withScannerFindings(fmt.Errorf("strict mode: grant found %d license policy finding(s) in container images", totalFindings), findings)
+	}
+	return nil
+}
+
+func grantScannableImages(images []workflow.GHAWManifestContainer, ignoredImages []string, verbose bool) []workflow.GHAWManifestContainer {
 	scannable := make([]workflow.GHAWManifestContainer, 0, len(images))
 	for _, img := range images {
 		if grantIsImageIgnored(ignoredImages, img.Image, img.PinnedImage) {
@@ -103,24 +133,13 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 		}
 		scannable = append(scannable, img)
 	}
-	images = scannable
+	return scannable
+}
 
-	if len(images) == 0 {
-		grantLog.Print("All container images are excluded by ignore-images")
-		return nil
-	}
-
-	if len(images) == 1 {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running grant license scanner on 1 container image"))
-	} else {
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(
-			fmt.Sprintf("Running grant license scanner on %d container images", len(images))))
-	}
-
+func grantScanImages(images []workflow.GHAWManifestContainer, policyFile string, verbose bool) (int, []scanfindings.Finding, []string) {
 	totalFindings := 0
 	var findings []scanfindings.Finding
 	var scanErrors []string
-
 	for _, img := range images {
 		imageRef := img.PinnedImage
 		if imageRef == "" {
@@ -148,20 +167,7 @@ func runGrantOnLockFiles(lockFiles []string, verbose bool, strict bool) error {
 		findings = append(findings, grantFindingsToShared(displayName, output)...)
 	}
 
-	if len(scanErrors) > 0 {
-		errMsg := fmt.Sprintf("grant scan failed for %d image(s): %s",
-			len(scanErrors), strings.Join(scanErrors, "; "))
-		if strict {
-			return errors.New(errMsg)
-		}
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(errMsg))
-	}
-
-	if strict && totalFindings > 0 {
-		return withScannerFindings(fmt.Errorf("strict mode: grant found %d license policy finding(s) in container images", totalFindings), findings)
-	}
-
-	return nil
+	return totalFindings, findings, scanErrors
 }
 
 func grantPolicyFile() (string, error) {
@@ -291,6 +297,10 @@ func grantRunOnImage(imageRef, policyFile string, verbose bool) (*grantOutput, e
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run grant directly: "+dockerCmd))
 	}
 
+	return grantExecuteImageScan(cmd, imageRef)
+}
+
+func grantExecuteImageScan(cmd *exec.Cmd, imageRef string) (*grantOutput, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

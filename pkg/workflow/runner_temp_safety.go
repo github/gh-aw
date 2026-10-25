@@ -110,21 +110,7 @@ func rewriteRunnerTempInExecutableBodies(yamlContent string) string {
 			rewrittenLine = shellActionCommandRE.ReplaceAllString(lineWithoutNewline, `${1} "$${RUNNER_TEMP}/gh-aw/actions/${2}"`)
 		}
 		if inScriptBlock {
-			if strings.Contains(rewrittenLine, safeActionsDirLine) {
-				scriptBlockHasActionsDir = true
-			}
-			if requireLine, ok := rewriteGitHubScriptActionRequire(rewrittenLine); ok {
-				indent := strings.Repeat(" ", leadingSpaces(rewrittenLine))
-				if !scriptBlockHasActionsDir {
-					out.WriteString(indent)
-					out.WriteString("const path = require('path');\n")
-					out.WriteString(indent)
-					out.WriteString(safeActionsDirLine)
-					out.WriteString("\n")
-					scriptBlockHasActionsDir = true
-				}
-				rewrittenLine = requireLine
-			}
+			rewrittenLine = rewriteScriptActionsRequire(&out, rewrittenLine, &scriptBlockHasActionsDir)
 		}
 
 		out.WriteString(rewrittenLine)
@@ -132,6 +118,25 @@ func rewriteRunnerTempInExecutableBodies(yamlContent string) string {
 	}
 
 	return out.String()
+}
+
+func rewriteScriptActionsRequire(out *strings.Builder, line string, hasActionsDir *bool) string {
+	if strings.Contains(line, safeActionsDirLine) {
+		*hasActionsDir = true
+	}
+	if requireLine, ok := rewriteGitHubScriptActionRequire(line); ok {
+		indent := strings.Repeat(" ", leadingSpaces(line))
+		if !*hasActionsDir {
+			out.WriteString(indent)
+			out.WriteString("const path = require('path');\n")
+			out.WriteString(indent)
+			out.WriteString(safeActionsDirLine)
+			out.WriteString("\n")
+			*hasActionsDir = true
+		}
+		return requireLine
+	}
+	return line
 }
 
 func finalizeRunnerTempSafety(yamlContent string) (string, error) {

@@ -4,6 +4,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,20 @@ import (
 
 	"github.com/github/gh-aw/pkg/testutil"
 )
+
+func TestHandlePoutineResultsMalformedOutput(t *testing.T) {
+	commandErr := errors.New("scanner failed")
+	for _, err := range []error{nil, commandErr} {
+		directoryErr := handlePoutineDirectoryResult(err, "invalid output", "scanner stderr", false, false, ".")
+		if directoryErr == nil || !strings.Contains(directoryErr.Error(), "poutine output could not be parsed") {
+			t.Errorf("directory result error = %v, want parse failure", directoryErr)
+		}
+		fileErr := handlePoutineFileResult(err, "invalid output", "scanner stderr", "test.lock.yml", "test.lock.yml", false, false)
+		if !errors.Is(fileErr, err) {
+			t.Errorf("file result error = %v, want wrapped command error %v", fileErr, err)
+		}
+	}
+}
 
 func TestParseAndDisplayPoutineOutput(t *testing.T) {
 	tests := []struct {

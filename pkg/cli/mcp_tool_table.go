@@ -53,6 +53,30 @@ func renderMCPToolTable(info *parser.MCPServerInfo, opts MCPToolTableOptions) st
 
 	// Build table headers and rows
 	headers := []string{"Tool Name", "Allow", "Description"}
+	rows := buildMCPToolTableRows(info, opts, hasWildcard, allowedMap)
+
+	// Render the table
+	table := console.RenderTableStdout(console.TableConfig{
+		Headers: headers,
+		Rows:    rows,
+	})
+
+	result := table
+
+	// Add summary if requested
+	if opts.ShowSummary {
+		result += renderMCPToolSummary(info, opts, hasWildcard, allowedMap)
+	}
+
+	// Add verbose hint if requested
+	if opts.ShowVerboseHint {
+		result += "\nRun with --verbose for detailed information\n"
+	}
+
+	return result
+}
+
+func buildMCPToolTableRows(info *parser.MCPServerInfo, opts MCPToolTableOptions, hasWildcard bool, allowedMap map[string]struct{}) [][]string {
 	rows := make([][]string, 0, len(info.Tools))
 
 	for _, tool := range info.Tools {
@@ -79,36 +103,22 @@ func renderMCPToolTable(info *parser.MCPServerInfo, opts MCPToolTableOptions) st
 		rows = append(rows, []string{tool.Name, status, description})
 	}
 
-	// Render the table
-	table := console.RenderTableStdout(console.TableConfig{
-		Headers: headers,
-		Rows:    rows,
-	})
+	return rows
+}
 
-	result := table
-
-	// Add summary if requested
-	if opts.ShowSummary {
-		allowedCount := 0
-		for _, tool := range info.Tools {
-			if len(info.Config.Allowed) == 0 || hasWildcard || setutil.Contains(allowedMap, tool.Name) {
-				allowedCount++
-			}
+func renderMCPToolSummary(info *parser.MCPServerInfo, opts MCPToolTableOptions, hasWildcard bool, allowedMap map[string]struct{}) string {
+	allowedCount := 0
+	for _, tool := range info.Tools {
+		if len(info.Config.Allowed) == 0 || hasWildcard || setutil.Contains(allowedMap, tool.Name) {
+			allowedCount++
 		}
-
-		summaryFormat := opts.SummaryFormat
-		if summaryFormat == "" {
-			summaryFormat = "\n📊 Summary: %d allowed, %d not allowed out of %d total tools\n"
-		}
-
-		result += fmt.Sprintf(summaryFormat,
-			allowedCount, len(info.Tools)-allowedCount, len(info.Tools))
 	}
 
-	// Add verbose hint if requested
-	if opts.ShowVerboseHint {
-		result += "\nRun with --verbose for detailed information\n"
+	summaryFormat := opts.SummaryFormat
+	if summaryFormat == "" {
+		summaryFormat = "\n📊 Summary: %d allowed, %d not allowed out of %d total tools\n"
 	}
 
-	return result
+	return fmt.Sprintf(summaryFormat,
+		allowedCount, len(info.Tools)-allowedCount, len(info.Tools))
 }

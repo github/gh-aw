@@ -23,15 +23,35 @@ var compileWatchLog = logger.New("cli:compile_watch")
 
 // watchAndCompileWorkflows watches for changes to workflow files and recompiles them automatically
 func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler *workflow.Compiler, verbose bool) error {
+	workflowsDir, markdownFile, err := resolveCompileWatchPaths(markdownFile)
+	if err != nil {
+		return err
+	}
+	depGraph := buildCompileWatchDependencyGraph(workflowsDir, compiler, verbose)
+	watcher, err := fsnotify.NewBufferedWatcher(100)
+	if err != nil {
+		return fmt.Errorf("failed to create file watcher: %w", err)
+	}
+	defer watcher.Close()
+	if err := addCompileWatchDirectories(watcher, workflowsDir); err != nil {
+		return err
+	}
+	printCompileWatchStart(workflowsDir, markdownFile, verbose)
+	debounce := &compileWatchDebouncer{modifiedFiles: make(map[string]struct{})}
+	compileWatchInitialFiles(ctx, compiler, workflowsDir, markdownFile, verbose)
+	return runCompileWatchLoop(ctx, watcher, compiler, depGraph, debounce, markdownFile, verbose)
+}
+
+func resolveCompileWatchPaths(markdownFile string) (string, string, error) {
 	// Find git root for consistent behavior
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
-		return fmt.Errorf("watch mode requires being in a git repository: %w", err)
+		return "", "", fmt.Errorf("watch mode requires being in a git repository: %w", err)
 	}
 
 	workflowsDir := filepath.Join(gitRoot, constants.GetWorkflowDir())
 	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
-		return fmt.Errorf("the %s directory does not exist in git root (%s)", constants.GetWorkflowDir(), gitRoot)
+		return "", "", fmt.Errorf("the %s directory does not exist in git root (%s)", constants.GetWorkflowDir(), gitRoot)
 	}
 
 	// If a specific file is provided, watch only that file and its directory
@@ -40,10 +60,13 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 			markdownFile = filepath.Join(workflowsDir, markdownFile)
 		}
 		if _, err := os.Stat(markdownFile); os.IsNotExist(err) {
-			return fmt.Errorf("specified markdown file does not exist: %s", markdownFile)
+			return "", "", fmt.Errorf("specified markdown file does not exist: %s", markdownFile)
 		}
 	}
+	return workflowsDir, markdownFile, nil
+}
 
+func buildCompileWatchDependencyGraph(workflowsDir string, compiler *workflow.Compiler, verbose bool) *DependencyGraph {
 	// Build dependency graph for intelligent recompilation
 	depGraph := NewDependencyGraph(workflowsDir)
 	compileWatchLog.Print("Building dependency graph for watch mode...")
@@ -56,14 +79,10 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Dependency graph built: %d workflows", len(depGraph.nodes))))
 		}
 	}
+	return depGraph
+}
 
-	// Set up file system watcher with buffered events for better handling of burst activity
-	watcher, err := fsnotify.NewBufferedWatcher(100)
-	if err != nil {
-		return fmt.Errorf("failed to create file watcher: %w", err)
-	}
-	defer watcher.Close()
-
+func addCompileWatchDirectories(watcher *fsnotify.Watcher, workflowsDir string) error {
 	// addWatchPath adds a path to the watcher with platform-specific configuration.
 	// On Windows, uses a larger buffer (64KB) to prevent event overflow in busy directories.
 	addWatchPath := func(path string) error {
@@ -96,7 +115,10 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 	if walkErr != nil {
 		compileWatchLog.Printf("Failed to walk subdirectories: %v", walkErr)
 	}
+	return nil
+}
 
+func printCompileWatchStart(workflowsDir, markdownFile string, verbose bool) {
 	// Always emit the begin pattern for task integration
 	if markdownFile != "" {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Watching for file changes to %s...", markdownFile)))
@@ -107,13 +129,9 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 	if verbose {
 		fmt.Fprintln(os.Stderr, "Press Ctrl+C to stop watching.")
 	}
+}
 
-	// Debouncing setup
-	const debounceDelay = 300 * time.Millisecond
-	var debounceTimer *time.Timer
-	var debounceMu sync.Mutex
-	modifiedFiles := make(map[string]struct{})
-
+func compileWatchInitialFiles(ctx context.Context, compiler *workflow.Compiler, workflowsDir, markdownFile string, verbose bool) {
 	// Compile initially if no specific file provided
 	if markdownFile == "" {
 		fmt.Fprintln(os.Stderr, "Watching for file changes")
@@ -138,7 +156,6 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Initial compilation of %s...", markdownFile)))
 		}
-
 		// Use compileSingleFile to handle both regular workflows and campaign files
 		compileSingleFile(ctx, compiler, markdownFile, stats, verbose, false)
 
@@ -148,7 +165,9 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 		// Print summary instead of just "Recompiled"
 		printCompilationSummary(stats, false)
 	}
+}
 
+func runCompileWatchLoop(ctx context.Context, watcher *fsnotify.Watcher, compiler *workflow.Compiler, depGraph *DependencyGraph, debounce *compileWatchDebouncer, markdownFile string, verbose bool) error {
 	// Main watch loop
 	for {
 		select {
@@ -157,62 +176,7 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 				return errors.New("watcher channel closed")
 			}
 
-			// Filter out Chmod events (noisy and usually not useful for workflow changes)
-			if event.Has(fsnotify.Chmod) {
-				continue
-			}
-
-			// Only process markdown files and ignore lock files
-			if !strings.HasSuffix(event.Name, ".md") {
-				continue
-			}
-
-			// If watching a specific file, only process that file
-			if markdownFile != "" && event.Name != markdownFile {
-				continue
-			}
-
-			compileWatchLog.Printf("Detected change: %s (%s)", event.Name, event.Op.String())
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Detected change: %s (%s)", event.Name, event.Op.String())))
-			}
-
-			// Handle file operations
-			switch {
-			case event.Has(fsnotify.Remove):
-				// Handle file deletion
-				handleFileDeleted(event.Name, verbose)
-				// Remove from dependency graph
-				depGraph.RemoveWorkflow(event.Name)
-			case event.Has(fsnotify.Write) || event.Has(fsnotify.Create):
-				// Handle file modification or creation - add to debounced compilation
-				func() {
-					debounceMu.Lock()
-					defer debounceMu.Unlock()
-					modifiedFiles[event.Name] = struct{}{}
-
-					// Reset debounce timer
-					if debounceTimer != nil {
-						debounceTimer.Stop()
-					}
-					debounceTimer = time.AfterFunc(debounceDelay, func() {
-						filesToCompile := func() []string {
-							debounceMu.Lock()
-							defer debounceMu.Unlock()
-							files := make([]string, 0, len(modifiedFiles))
-							for file := range modifiedFiles {
-								files = append(files, file)
-							}
-							// Clear the modifiedFiles map
-							modifiedFiles = make(map[string]struct{})
-							return files
-						}()
-
-						// Compile the modified files using dependency graph
-						compileModifiedFilesWithDependencies(ctx, compiler, depGraph, filesToCompile, verbose)
-					})
-				}()
-			}
+			handleCompileWatchEvent(ctx, event, compiler, depGraph, debounce, markdownFile, verbose)
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -227,10 +191,60 @@ func watchAndCompileWorkflows(ctx context.Context, markdownFile string, compiler
 			if verbose {
 				fmt.Fprintln(os.Stderr, "\n🛑 Stopping watch mode...")
 			}
-			if debounceTimer != nil {
-				debounceTimer.Stop()
+			if debounce.timer != nil {
+				debounce.timer.Stop()
 			}
 			return nil
 		}
 	}
+}
+
+func handleCompileWatchEvent(ctx context.Context, event fsnotify.Event, compiler *workflow.Compiler, depGraph *DependencyGraph, debounce *compileWatchDebouncer, markdownFile string, verbose bool) {
+	if event.Has(fsnotify.Chmod) || !strings.HasSuffix(event.Name, ".md") {
+		return
+	}
+	if markdownFile != "" && event.Name != markdownFile {
+		return
+	}
+	compileWatchLog.Printf("Detected change: %s (%s)", event.Name, event.Op.String())
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Detected change: %s (%s)", event.Name, event.Op.String())))
+	}
+	switch {
+	case event.Has(fsnotify.Remove):
+		handleFileDeleted(event.Name, verbose)
+		depGraph.RemoveWorkflow(event.Name)
+	case event.Has(fsnotify.Write) || event.Has(fsnotify.Create):
+		debounce.queue(event.Name, ctx, compiler, depGraph, verbose)
+	}
+}
+
+type compileWatchDebouncer struct {
+	mu            sync.Mutex
+	timer         *time.Timer
+	modifiedFiles map[string]struct{}
+}
+
+func (d *compileWatchDebouncer) queue(name string, ctx context.Context, compiler *workflow.Compiler, depGraph *DependencyGraph, verbose bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.modifiedFiles[name] = struct{}{}
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+	d.timer = time.AfterFunc(300*time.Millisecond, func() {
+		filesToCompile := d.takeModifiedFiles()
+		compileModifiedFilesWithDependencies(ctx, compiler, depGraph, filesToCompile, verbose)
+	})
+}
+
+func (d *compileWatchDebouncer) takeModifiedFiles() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	files := make([]string, 0, len(d.modifiedFiles))
+	for file := range d.modifiedFiles {
+		files = append(files, file)
+	}
+	d.modifiedFiles = make(map[string]struct{})
+	return files
 }

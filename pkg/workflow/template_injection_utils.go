@@ -259,15 +259,7 @@ func replaceOutsideShellLineComments(content, old, new string) string {
 		if ch == '#' && !inSingleQuote && !inDoubleQuote && isShellCommentStart(content, i) {
 			result.WriteString(strings.ReplaceAll(content[segmentStart:i], old, new))
 
-			commentEnd := i
-			for commentEnd < len(content) && content[commentEnd] != '\n' {
-				commentEnd++
-			}
-			result.WriteString(content[i:commentEnd])
-			if commentEnd < len(content) {
-				result.WriteByte('\n')
-				commentEnd++
-			}
+			commentEnd := writeShellLineComment(&result, content, i)
 
 			escaped = false
 			segmentStart = commentEnd
@@ -280,6 +272,19 @@ func replaceOutsideShellLineComments(content, old, new string) string {
 
 	result.WriteString(strings.ReplaceAll(content[segmentStart:], old, new))
 	return result.String()
+}
+
+func writeShellLineComment(result *strings.Builder, content string, start int) int {
+	commentEnd := start
+	for commentEnd < len(content) && content[commentEnd] != '\n' {
+		commentEnd++
+	}
+	result.WriteString(content[start:commentEnd])
+	if commentEnd < len(content) {
+		result.WriteByte('\n')
+		commentEnd++
+	}
+	return commentEnd
 }
 
 // TemplateInjectionViolation represents a detected template injection risk

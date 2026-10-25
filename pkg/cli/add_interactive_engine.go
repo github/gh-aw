@@ -195,17 +195,25 @@ func (c *AddInteractiveConfig) configureEngineAPISecret(engine string) error {
 	// If user doesn't have write access, skip secrets configuration.
 	// Users without write access cannot configure repository secrets.
 	if !c.hasWriteAccess {
-		opt := constants.GetEngineOption(engine)
-		if opt != nil {
-			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping %s secret setup — write access is required to configure repository secrets.", opt.SecretName)))
-			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, "Once you have write access or an admin configures the repository, set the secret with:")
-			fmt.Fprintln(os.Stderr, console.FormatCommandMessage(fmt.Sprintf("  gh aw secrets set %s --repo %s", opt.SecretName, c.RepoOverride)))
-		}
+		c.printEngineSecretWriteAccessNotice(engine)
 		return nil
 	}
 
+	return c.ensureEngineAPISecret(engine)
+}
+
+func (c *AddInteractiveConfig) printEngineSecretWriteAccessNotice(engine string) {
+	opt := constants.GetEngineOption(engine)
+	if opt != nil {
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping %s secret setup — write access is required to configure repository secrets.", opt.SecretName)))
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Once you have write access or an admin configures the repository, set the secret with:")
+		fmt.Fprintln(os.Stderr, console.FormatCommandMessage(fmt.Sprintf("  gh aw secrets set %s --repo %s", opt.SecretName, c.RepoOverride)))
+	}
+}
+
+func (c *AddInteractiveConfig) ensureEngineAPISecret(engine string) error {
 	// Use the unified checkAndEnsureEngineSecrets function
 	config := EngineSecretConfig{
 		Ctx:                  c.Ctx,
@@ -261,24 +269,7 @@ func (c *AddInteractiveConfig) selectCopilotAuthMethod() error {
 	addInteractiveLog.Printf("Copilot org billing probe result: status=%s", probe.BillingStatus)
 	copilotRequestsLabel += probe.LabelSuffix
 
-	// Build select options.
-	// When billing is confirmed enabled, copilot-requests is listed first (pre-selected).
-	// When billing is disabled or inconclusive, PAT is listed first (default selection).
-	// The copilot-requests option is always shown; when disabled a validation guard
-	// prevents it from being submitted.
-	patOpt := huh.NewOption("Use a Personal Access Token (PAT) as COPILOT_GITHUB_TOKEN", authMethodPAT)
-	copilotRequestsOpt := huh.NewOption(copilotRequestsLabel, authMethodCopilotRequests)
-
-	var options []huh.Option[string]
-	switch probe.BillingStatus {
-	case "enabled":
-		// copilot-requests pre-selected
-		options = []huh.Option[string]{copilotRequestsOpt.Selected(true), patOpt}
-	default:
-		// PAT is default (first) for disabled or inconclusive
-		options = []huh.Option[string]{patOpt.Selected(true), copilotRequestsOpt}
-	}
-
+	options := copilotAuthMethodOptions(probe, copilotRequestsLabel)
 	var authMethod string
 	selectField := huh.NewSelect[string]().
 		Title("How would you like Copilot workflows to authenticate?").
@@ -303,6 +294,28 @@ func (c *AddInteractiveConfig) selectCopilotAuthMethod() error {
 
 	c.applyCopilotAuthMethodChoice(authMethod)
 	return nil
+}
+
+func copilotAuthMethodOptions(probe orgCopilotBillingProbeResult, copilotRequestsLabel string) []huh.Option[string] {
+	// Build select options.
+	// When billing is confirmed enabled, copilot-requests is listed first (pre-selected).
+	// When billing is disabled or inconclusive, PAT is listed first (default selection).
+	// The copilot-requests option is always shown; when disabled a validation guard
+	// prevents it from being submitted.
+	patOpt := huh.NewOption("Use a Personal Access Token (PAT) as COPILOT_GITHUB_TOKEN", authMethodPAT)
+	copilotRequestsOpt := huh.NewOption(copilotRequestsLabel, authMethodCopilotRequests)
+
+	var options []huh.Option[string]
+	switch probe.BillingStatus {
+	case "enabled":
+		// copilot-requests pre-selected
+		options = []huh.Option[string]{copilotRequestsOpt.Selected(true), patOpt}
+	default:
+		// PAT is default (first) for disabled or inconclusive
+		options = []huh.Option[string]{patOpt.Selected(true), copilotRequestsOpt}
+	}
+
+	return options
 }
 
 func copilotAuthMethodDescription(probe orgCopilotBillingProbeResult, source secretSource) string {

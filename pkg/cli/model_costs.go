@@ -100,6 +100,10 @@ func findModelPricing(provider, model string) (map[string]float64, bool) {
 		}
 	}
 
+	return findModelPrefixPricing(provider, model, normalizedProvider, normalizedModel, comparableModel)
+}
+
+func findModelPrefixPricing(provider, model, normalizedProvider, normalizedModel, comparableModel string) (map[string]float64, bool) {
 	var bestProviderScoped map[string]float64
 	bestProviderScopedLen := -1
 	var bestGeneric map[string]float64

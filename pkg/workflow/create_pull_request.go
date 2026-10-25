@@ -148,91 +148,90 @@ func (c *Compiler) parseCreatePullRequestsConfig(outputMap map[string]any) *Crea
 			return &CreatePullRequestsConfig{}
 		},
 		func(configData map[string]any) bool {
-			coerceStringOrArrayFields(configData, createPRStringOrArrayFields, createPRLog)
-
-			// Pre-process protected-files: supports string enum OR object form {policy, exclude}.
-			// Object form is preprocessed to extract the policy (stored back as string) and
-			// the exclude list (stored in a local variable and assigned to the config after unmarshaling).
-			protectedFilesExclude = preprocessProtectedFilesField(configData, createPRLog)
-
-			// Validate protected-files string enum after object-form preprocessing.
-			validateStringEnumField(configData, "protected-files", []string{"blocked", "allowed", "fallback-to-issue", "request_review", "request-review"}, createPRLog)
-			if value, ok := configData["protected-files"].(string); ok {
-				configData["protected-files"] = normaliseProtectedFilesPolicy(value)
-			}
-
-			// Pre-process patch-format: valid values are "bundle" (default) and "am".
-			validateStringEnumField(configData, "patch-format", []string{"am", "bundle"}, createPRLog)
-
-			if val, exists := configData["auto-merge"]; exists {
-				switch v := val.(type) {
-				case bool:
-					if v {
-						configData["auto-merge"] = "true"
-					} else {
-						configData["auto-merge"] = "false"
-					}
-				case string:
-					if !isExpression(v) && v != "true" && v != "false" && v != "squash" && v != "merge" && v != "rebase" {
-						createPRLog.Printf("Invalid auto-merge value %q, ignoring", v)
-						delete(configData, "auto-merge")
-					}
-				default:
-					createPRLog.Printf("Invalid auto-merge value type %T, ignoring", val)
-					delete(configData, "auto-merge")
-				}
-			}
-
-			// Pre-process list fields that also accept a GitHub Actions expression string.
-			// An expression is wrapped in a single-element []string so the []string struct field
-			// can receive it after YAML unmarshaling; the handler config builder later re-emits it
-			// as a JSON string for runtime evaluation.
-			for _, field := range createPRExpressionArrayFields {
-				if err := preprocessStringArrayFieldAsTemplatable(configData, field, createPRLog); err != nil {
-					createPRLog.Printf("Invalid %s value: %v", field, err)
-					return false
-				}
-			}
-
-			return true
+			var valid bool
+			protectedFilesExclude, valid = preprocessCreatePullRequestConfig(configData)
+			return valid
 		},
 		func(configData map[string]any, config *CreatePullRequestsConfig, expiresDisabled bool) {
-			config.Enabled = closeOlderEnabledFromConfigData(configData, "close-older-pull-requests")
-
-			if expiresDisabled {
-				createPRLog.Print("Pull request expiration disabled")
-			}
-
-			// Log expires if configured
-			if config.Expires > 0 {
-				createPRLog.Printf("Pull request expiration configured: %d hours", config.Expires)
-			}
-
-			// Apply the exclude list extracted from the object-form protected-files field.
-			config.ProtectedFilesExclude = protectedFilesExclude
-
-			// Set default max if not explicitly configured (default is 1)
-			if config.Max == nil {
-				config.Max = defaultIntStr(1)
-				createPRLog.Print("Using default max count: 1")
-			} else {
-				createPRLog.Printf("Pull request max count configured: %s", *config.Max)
-			}
-
-			// Parse head-github-app manually so that the app-id alias is honoured
-			// (YAML unmarshal would silently ignore app-id since GitHubAppConfig only
-			// declares the canonical client-id tag).
-			if headAppData, exists := configData["head-github-app"]; exists {
-				if headAppMap, ok := headAppData.(map[string]any); ok {
-					createPRLog.Print("Parsed head-github-app from config")
-					config.HeadGitHubApp = parseAppConfig(headAppMap)
-				}
-			}
+			finalizeCreatePullRequestConfig(configData, config, expiresDisabled, protectedFilesExclude)
 		},
 	)
-	if config == nil {
-		return nil
+	return config
+}
+
+func preprocessCreatePullRequestConfig(configData map[string]any) ([]string, bool) {
+	coerceStringOrArrayFields(configData, createPRStringOrArrayFields, createPRLog)
+
+	// Object form extracts the policy and preserves exclusions for postprocessing.
+	protectedFilesExclude := preprocessProtectedFilesField(configData, createPRLog)
+	validateStringEnumField(configData, "protected-files", []string{"blocked", "allowed", "fallback-to-issue", "request_review", "request-review"}, createPRLog)
+	if value, ok := configData["protected-files"].(string); ok {
+		configData["protected-files"] = normaliseProtectedFilesPolicy(value)
+	}
+	validateStringEnumField(configData, "patch-format", []string{"am", "bundle"}, createPRLog)
+	preprocessCreatePullRequestAutoMerge(configData)
+
+	// Expressions are wrapped so unmarshaling can populate the list fields.
+	for _, field := range createPRExpressionArrayFields {
+		if err := preprocessStringArrayFieldAsTemplatable(configData, field, createPRLog); err != nil {
+			createPRLog.Printf("Invalid %s value: %v", field, err)
+			return protectedFilesExclude, false
+		}
+	}
+	return protectedFilesExclude, true
+}
+
+func preprocessCreatePullRequestAutoMerge(configData map[string]any) {
+	if val, exists := configData["auto-merge"]; exists {
+		switch v := val.(type) {
+		case bool:
+			if v {
+				configData["auto-merge"] = "true"
+			} else {
+				configData["auto-merge"] = "false"
+			}
+		case string:
+			if !isExpression(v) && v != "true" && v != "false" && v != "squash" && v != "merge" && v != "rebase" {
+				createPRLog.Printf("Invalid auto-merge value %q, ignoring", v)
+				delete(configData, "auto-merge")
+			}
+		default:
+			createPRLog.Printf("Invalid auto-merge value type %T, ignoring", val)
+			delete(configData, "auto-merge")
+		}
+	}
+}
+
+func finalizeCreatePullRequestConfig(configData map[string]any, config *CreatePullRequestsConfig, expiresDisabled bool, protectedFilesExclude []string) {
+	config.Enabled = closeOlderEnabledFromConfigData(configData, "close-older-pull-requests")
+
+	if expiresDisabled {
+		createPRLog.Print("Pull request expiration disabled")
 	}
 
-	return config
+	// Log expires if configured
+	if config.Expires > 0 {
+		createPRLog.Printf("Pull request expiration configured: %d hours", config.Expires)
+	}
+
+	// Apply the exclude list extracted from the object-form protected-files field.
+	config.ProtectedFilesExclude = protectedFilesExclude
+
+	// Set default max if not explicitly configured (default is 1)
+	if config.Max == nil {
+		config.Max = defaultIntStr(1)
+		createPRLog.Print("Using default max count: 1")
+	} else {
+		createPRLog.Printf("Pull request max count configured: %s", *config.Max)
+	}
+
+	// Parse head-github-app manually so that the app-id alias is honoured
+	// (YAML unmarshal would silently ignore app-id since GitHubAppConfig only
+	// declares the canonical client-id tag).
+	if headAppData, exists := configData["head-github-app"]; exists {
+		if headAppMap, ok := headAppData.(map[string]any); ok {
+			createPRLog.Print("Parsed head-github-app from config")
+			config.HeadGitHubApp = parseAppConfig(headAppMap)
+		}
+	}
 }

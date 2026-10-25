@@ -148,6 +148,11 @@ func buildAgentEventsFromProcessedRun(processedRun ProcessedRun, metrics Metrics
 		})
 	}
 
+	events = appendDrain3ErrorEvents(events, processedRun)
+	return appendDrain3CompletionEvents(events, processedRun, metrics)
+}
+
+func appendDrain3ErrorEvents(events []agentdrain.AgentEvent, processedRun ProcessedRun) []agentdrain.AgentEvent {
 	// MCP failures become error-stage events.
 	for _, f := range processedRun.MCPFailures {
 		events = append(events, agentdrain.AgentEvent{
@@ -184,6 +189,10 @@ func buildAgentEventsFromProcessedRun(processedRun ProcessedRun, metrics Metrics
 		})
 	}
 
+	return events
+}
+
+func appendDrain3CompletionEvents(events []agentdrain.AgentEvent, processedRun ProcessedRun, metrics MetricsData) []agentdrain.AgentEvent {
 	// No-ops map to tool_result stage.
 	for _, n := range processedRun.Noops {
 		events = append(events, agentdrain.AgentEvent{

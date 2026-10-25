@@ -105,6 +105,26 @@ func ValidatePermissions(permissions *Permissions, githubTool ValidatableTool, p
 	readOnly := githubTool.IsReadOnly()
 	result.ReadOnlyMode = readOnly
 
+	toolsets := permissionValidationToolsets(githubTool, readOnly, parsedToolsets)
+	if len(toolsets) == 0 {
+		if permissionsValidationLog.Enabled() {
+			permissionsValidationLog.Print("No toolsets to validate")
+		}
+		return result
+	}
+	requiredPermissions := collectRequiredPermissions(toolsets, readOnly)
+	if permissionsValidationLog.Enabled() {
+		permissionsValidationLog.Printf("Required permissions: %v", requiredPermissions)
+	}
+	checkMissingPermissions(permissions, requiredPermissions, toolsets, result)
+	result.HasValidationIssues = len(result.MissingPermissions) > 0
+	if permissionsValidationLog.Enabled() {
+		permissionsValidationLog.Printf("Validation complete: hasIssues=%v, missingCount=%d", result.HasValidationIssues, len(result.MissingPermissions))
+	}
+	return result
+}
+
+func permissionValidationToolsets(githubTool ValidatableTool, readOnly bool, parsedToolsets [][]string) []string {
 	// Use pre-parsed toolsets when provided (avoids redundant ParseGitHubToolsets calls in hot paths).
 	var toolsets []string
 	if len(parsedToolsets) > 0 && parsedToolsets[0] != nil {
@@ -120,28 +140,7 @@ func ValidatePermissions(permissions *Permissions, githubTool ValidatableTool, p
 		toolsets = ParseGitHubToolsets(toolsetsStr)
 	}
 
-	if len(toolsets) == 0 {
-		if permissionsValidationLog.Enabled() {
-			permissionsValidationLog.Print("No toolsets to validate")
-		}
-		return result
-	}
-
-	// Collect required permissions for all toolsets
-	requiredPermissions := collectRequiredPermissions(toolsets, readOnly)
-	if permissionsValidationLog.Enabled() {
-		permissionsValidationLog.Printf("Required permissions: %v", requiredPermissions)
-	}
-
-	// Check for missing permissions
-	checkMissingPermissions(permissions, requiredPermissions, toolsets, result)
-
-	result.HasValidationIssues = len(result.MissingPermissions) > 0
-	if permissionsValidationLog.Enabled() {
-		permissionsValidationLog.Printf("Validation complete: hasIssues=%v, missingCount=%d", result.HasValidationIssues, len(result.MissingPermissions))
-	}
-
-	return result
+	return toolsets
 }
 
 // checkMissingPermissions checks if all required permissions are granted
@@ -223,6 +222,27 @@ func formatMissingPermissionsMessage(result *PermissionsValidationResult) string
 	var lines []string
 
 	// Build permission list with toolset details inline
+	permLines := missingPermissionDetailLines(result, scopes)
+
+	lines = append(lines, "Missing required permissions for GitHub toolsets:")
+	lines = append(lines, permLines...)
+	lines = append(lines, "")
+	lines = append(lines, "To fix this, you can either:")
+	lines = append(lines, "")
+	lines = append(lines, "Option 1: Add missing permissions to your workflow frontmatter:")
+	lines = append(lines, "permissions:")
+	for _, scopeStr := range scopes {
+		scope := PermissionScope(scopeStr)
+		level := result.MissingPermissions[scope]
+		lines = append(lines, fmt.Sprintf("  %s: %s", scope, level))
+	}
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("See: %s", constants.DocsPermissionsURL))
+	lines = appendMissingPermissionToolsetSuggestion(lines, result)
+	return strings.Join(lines, "\n")
+}
+
+func missingPermissionDetailLines(result *PermissionsValidationResult, scopes []string) []string {
 	var permLines []string
 	for _, scopeStr := range scopes {
 		scope := PermissionScope(scopeStr)
@@ -247,21 +267,10 @@ func formatMissingPermissionsMessage(result *PermissionsValidationResult) string
 		}
 	}
 
-	lines = append(lines, "Missing required permissions for GitHub toolsets:")
-	lines = append(lines, permLines...)
-	lines = append(lines, "")
-	lines = append(lines, "To fix this, you can either:")
-	lines = append(lines, "")
-	lines = append(lines, "Option 1: Add missing permissions to your workflow frontmatter:")
-	lines = append(lines, "permissions:")
-	for _, scopeStr := range scopes {
-		scope := PermissionScope(scopeStr)
-		level := result.MissingPermissions[scope]
-		lines = append(lines, fmt.Sprintf("  %s: %s", scope, level))
-	}
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("See: %s", constants.DocsPermissionsURL))
+	return permLines
+}
 
+func appendMissingPermissionToolsetSuggestion(lines []string, result *PermissionsValidationResult) []string {
 	// Add suggestion to reduce toolsets if we have toolset details
 	if len(result.MissingToolsetDetails) > 0 {
 		lines = append(lines, "")
@@ -282,7 +291,7 @@ func formatMissingPermissionsMessage(result *PermissionsValidationResult) string
 		}
 	}
 
-	return strings.Join(lines, "\n")
+	return lines
 }
 
 // ValidateIncludedPermissions validates that the main workflow permissions satisfy the imported
@@ -311,10 +320,7 @@ func (c *Compiler) ValidateIncludedPermissions(topPermissionsYAML string, import
 
 	// Track missing permissions
 	missingPermissions := make(map[PermissionScope]PermissionLevel)
-	insufficientPermissions := make(map[PermissionScope]struct {
-		required PermissionLevel
-		current  PermissionLevel
-	})
+	insufficientPermissions := make(map[PermissionScope]includedPermissionDeficit)
 
 	// Split by newlines to handle multiple JSON objects from different imports
 	lines := strings.Split(importedPermissionsJSON, "\n")
@@ -333,38 +339,50 @@ func (c *Compiler) ValidateIncludedPermissions(topPermissionsYAML string, import
 			continue
 		}
 
-		// Check each permission from the imported map
-		for scopeStr, levelValue := range importedPermsMap {
-			scope := PermissionScope(scopeStr)
+		checkIncludedPermissionLevels(topPerms, importedPermsMap, missingPermissions, insufficientPermissions)
+	}
+	if len(missingPermissions) > 0 || len(insufficientPermissions) > 0 {
+		return formatIncludedPermissionDeficits(missingPermissions, insufficientPermissions)
+	}
+	permissionsValidationLog.Print("All included workflow permissions are satisfied by main workflow")
+	return nil
+}
 
-			// Parse the level - it might be a string or already unmarshaled
-			var requiredLevel PermissionLevel
-			if levelStr, ok := levelValue.(string); ok {
-				requiredLevel = PermissionLevel(levelStr)
-			} else {
-				// Skip invalid level values
-				continue
-			}
+type includedPermissionDeficit struct {
+	required PermissionLevel
+	current  PermissionLevel
+}
 
-			// Get current level for this scope
-			currentLevel, exists := topPerms.Get(scope)
+func checkIncludedPermissionLevels(topPerms *Permissions, importedPermsMap map[string]any, missingPermissions map[PermissionScope]PermissionLevel, insufficientPermissions map[PermissionScope]includedPermissionDeficit) {
+	for scopeStr, levelValue := range importedPermsMap {
+		scope := PermissionScope(scopeStr)
 
-			// Validate that the main workflow has sufficient permissions
-			if !exists || currentLevel == PermissionNone {
-				// Permission is missing entirely
-				missingPermissions[scope] = requiredLevel
-				permissionsValidationLog.Printf("Missing permission: %s: %s", scope, requiredLevel)
-			} else if !isPermissionSufficient(currentLevel, requiredLevel) {
-				// Permission exists but is insufficient
-				insufficientPermissions[scope] = struct {
-					required PermissionLevel
-					current  PermissionLevel
-				}{requiredLevel, currentLevel}
-				permissionsValidationLog.Printf("Insufficient permission: %s: has %s, needs %s", scope, currentLevel, requiredLevel)
-			}
+		// Parse the level - it might be a string or already unmarshaled
+		var requiredLevel PermissionLevel
+		if levelStr, ok := levelValue.(string); ok {
+			requiredLevel = PermissionLevel(levelStr)
+		} else {
+			// Skip invalid level values
+			continue
+		}
+
+		// Get current level for this scope
+		currentLevel, exists := topPerms.Get(scope)
+
+		// Validate that the main workflow has sufficient permissions
+		if !exists || currentLevel == PermissionNone {
+			// Permission is missing entirely
+			missingPermissions[scope] = requiredLevel
+			permissionsValidationLog.Printf("Missing permission: %s: %s", scope, requiredLevel)
+		} else if !isPermissionSufficient(currentLevel, requiredLevel) {
+			// Permission exists but is insufficient
+			insufficientPermissions[scope] = includedPermissionDeficit{requiredLevel, currentLevel}
+			permissionsValidationLog.Printf("Insufficient permission: %s: has %s, needs %s", scope, currentLevel, requiredLevel)
 		}
 	}
+}
 
+func formatIncludedPermissionDeficits(missingPermissions map[PermissionScope]PermissionLevel, insufficientPermissions map[PermissionScope]includedPermissionDeficit) error {
 	// If there are missing or insufficient permissions, return an error
 	if len(missingPermissions) > 0 || len(insufficientPermissions) > 0 {
 		var errorMsg strings.Builder
@@ -401,31 +419,32 @@ func (c *Compiler) ValidateIncludedPermissions(topPermissionsYAML string, import
 			errorMsg.WriteString("\n")
 		}
 
-		errorMsg.WriteString("Suggested fix: Add the required permissions to your main workflow frontmatter:\n")
-		errorMsg.WriteString("permissions:\n")
-
-		// Combine all required permissions for the suggestion
-		allRequired := make(map[PermissionScope]PermissionLevel)
-		maps.Copy(allRequired, missingPermissions)
-		for scope, info := range insufficientPermissions {
-			allRequired[scope] = info.required
-		}
-
-		var scopes []PermissionScope
-		for scope := range allRequired {
-			scopes = append(scopes, scope)
-		}
-		SortPermissionScopes(scopes)
-		for _, scope := range scopes {
-			level := allRequired[scope]
-			fmt.Fprintf(&errorMsg, "  %s: %s\n", scope, level)
-		}
-
+		writeIncludedPermissionSuggestion(&errorMsg, missingPermissions, insufficientPermissions)
 		return errors.New(errorMsg.String())
 	}
-
-	permissionsValidationLog.Print("All included workflow permissions are satisfied by main workflow")
 	return nil
+}
+
+func writeIncludedPermissionSuggestion(errorMsg *strings.Builder, missingPermissions map[PermissionScope]PermissionLevel, insufficientPermissions map[PermissionScope]includedPermissionDeficit) {
+	errorMsg.WriteString("Suggested fix: Add the required permissions to your main workflow frontmatter:\n")
+	errorMsg.WriteString("permissions:\n")
+
+	// Combine all required permissions for the suggestion
+	allRequired := make(map[PermissionScope]PermissionLevel)
+	maps.Copy(allRequired, missingPermissions)
+	for scope, info := range insufficientPermissions {
+		allRequired[scope] = info.required
+	}
+
+	var scopes []PermissionScope
+	for scope := range allRequired {
+		scopes = append(scopes, scope)
+	}
+	SortPermissionScopes(scopes)
+	for _, scope := range scopes {
+		level := allRequired[scope]
+		fmt.Fprintf(errorMsg, "  %s: %s\n", scope, level)
+	}
 }
 
 // ValidatePermissionScopeNames validates that all permission scope names in the
@@ -459,7 +478,10 @@ func ValidatePermissionScopeNames(permissionsYAML string) error {
 		// Not a map (e.g., a shorthand like "read-all"); nothing to validate
 		return nil
 	}
+	return validatePermissionScopeMap(permsMap)
+}
 
+func validatePermissionScopeMap(permsMap map[string]any) error {
 	for scopeKey := range permsMap {
 		if setutil.Contains(validPermissionMetaKeys, scopeKey) {
 			continue

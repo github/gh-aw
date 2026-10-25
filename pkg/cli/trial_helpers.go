@@ -69,128 +69,160 @@ func executeTrialRun(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoS
 	var workflowResults []WorkflowTrialResult
 
 	for _, parsedSpec := range parsedSpecs {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Running trial for workflow: %s ===", parsedSpec.WorkflowName)))
-
-		// Install workflow with trial mode compilation
-		if err := installWorkflowInTrialMode(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, directTrialMode, &opts); err != nil {
-			return fmt.Errorf("failed to install workflow '%s' in trial mode: %w", parsedSpec.WorkflowName, err)
-		}
-
-		// Display workflow description if present
-		workflowPath := filepath.Join(tempDir, constants.GetWorkflowDir(), parsedSpec.WorkflowName+".md")
-		if description := ExtractWorkflowDescriptionFromFile(workflowPath); description != "" {
-			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(description))
-			fmt.Fprintln(os.Stderr, "")
-		}
-
-		// Run the workflow and wait for completion (with trigger context if provided)
-		lockFilePath := filepath.Join(tempDir, constants.GetWorkflowDir(), parsedSpec.WorkflowName+".lock.yml")
-		runID, err := triggerWorkflowRun(hostRepoSlug, parsedSpec.WorkflowName, lockFilePath, opts.TriggerContext, opts.Verbose)
+		result, err := executeOneWorkflowTrial(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, directTrialMode, &opts)
 		if err != nil {
-			return fmt.Errorf("failed to trigger workflow run for '%s': %w", parsedSpec.WorkflowName, err)
-		}
-
-		// Generate workflow run URL
-		githubHost := getGitHubHost()
-		workflowRunURL := fmt.Sprintf("%s/%s/actions/runs/%s", githubHost, hostRepoSlug, runID)
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow run started with ID: %s (%s)", runID, workflowRunURL)))
-
-		// Wait for workflow completion
-		if err := WaitForWorkflowCompletion(ctx, hostRepoSlug, runID, opts.TimeoutMinutes, opts.Verbose); err != nil {
-			// If the context was canceled or its deadline was exceeded, return that directly
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return err
-			}
-			return fmt.Errorf("workflow '%s' execution failed or timed out: %w", parsedSpec.WorkflowName, err)
-		}
-
-		// Auto-merge PRs if requested
-		if opts.AutoMergePRs {
-			if err := AutoMergePullRequestsLegacy(hostRepoSlug, opts.Verbose); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to auto-merge pull requests: %v", err)))
-			}
-		}
-
-		// Download and process all artifacts
-		artifacts, err := downloadAllArtifacts(hostRepoSlug, runID, opts.Verbose)
-		if err != nil {
-			return fmt.Errorf("failed to download artifacts for '%s': %w", parsedSpec.WorkflowName, err)
-		}
-
-		// Save individual workflow results
-		safeOutputErrors := extractSafeOutputErrors(artifacts.SafeOutputs)
-		result := WorkflowTrialResult{
-			WorkflowName: parsedSpec.WorkflowName,
-			RunID:        runID,
-			SafeOutputs:  artifacts.SafeOutputs,
-			//AgentStdioLogs:      artifacts.AgentStdioLogs,
-			AgenticRunInfo:      artifacts.AgenticRunInfo,
-			AdditionalArtifacts: artifacts.AdditionalArtifacts,
-			Timestamp:           time.Now(),
-			Success:             len(safeOutputErrors) == 0,
-			SafeOutputErrors:    safeOutputErrors,
+			return err
 		}
 		workflowResults = append(workflowResults, result)
-
-		// Save individual trial file
-		sanitizedTargetRepo := stringutil.SanitizeForFilename(targetRepoForFilename)
-		individualFilename := fmt.Sprintf("trials/%s-%s.%s.json", parsedSpec.WorkflowName, sanitizedTargetRepo, dateTimeID)
-		if err := saveTrialResult(individualFilename, result, opts.Verbose); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to save individual trial result: %v", err)))
-		}
-
-		// Display results to stdout. In JSON mode, emit the full WorkflowTrialResult
-		// (including Success/SafeOutputErrors) instead of the raw safe-outputs artifact,
-		// so consumers of `--json` see the pass/fail signal without inspecting nested
-		// "errors" arrays.
-		if opts.JSONOutput {
-			resultBytes, err := json.MarshalIndent(result, "", "  ")
-			if err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal trial result for '%s': %v", parsedSpec.WorkflowName, err)))
-			} else {
-				fmt.Fprintln(os.Stdout, string(resultBytes))
-			}
-		} else if len(artifacts.SafeOutputs) > 0 {
-			outputBytes, err := json.MarshalIndent(artifacts.SafeOutputs, "", "  ")
-			if err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal safe outputs for '%s': %v", parsedSpec.WorkflowName, err)))
-			} else {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("=== Safe Outputs from %s ===", parsedSpec.WorkflowName)))
-				fmt.Fprintln(os.Stdout, string(outputBytes))
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("=== End of Safe Outputs ==="))
-			}
-		} else {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== No Safe Outputs Generated by %s ===", parsedSpec.WorkflowName)))
-		}
-
-		// Report rejected safe-output messages, if any. Messages may contain
-		// agent-controlled content, so control characters are sanitized before being
-		// written to the terminal/CI logs to avoid escape-sequence injection.
-		if len(safeOutputErrors) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("=== %d Safe Output Message(s) Rejected from %s ===", len(safeOutputErrors), parsedSpec.WorkflowName)))
-			for _, msg := range safeOutputErrors {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(sanitizeControlChars(msg)))
-			}
-		}
-
-		// Display additional artifact information if available
-		// if len(artifacts.AgentStdioLogs) > 0 {
-		// 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Agent Stdio Logs Available from %s (%d files) ===", parsedSpec.WorkflowName, len(artifacts.AgentStdioLogs))))
-		// }
-		if len(artifacts.AgenticRunInfo) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Agentic Run Information Available from %s ===", parsedSpec.WorkflowName)))
-		}
-		if len(artifacts.AdditionalArtifacts) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Additional Artifacts Available from %s (%d files) ===", parsedSpec.WorkflowName, len(artifacts.AdditionalArtifacts))))
-		}
-
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Trial completed for workflow: "+parsedSpec.WorkflowName))
+		saveAndDisplayWorkflowTrialResult(result, targetRepoForFilename, dateTimeID, &opts)
 	}
 
+	return finishWorkflowTrialResults(parsedSpecs, workflowResults, tempDir, dateTimeID, targetRepoForFilename, opts)
+}
+
+func executeOneWorkflowTrial(ctx context.Context, tempDir string, parsedSpec *WorkflowSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug string, directTrialMode bool, opts *TrialOptions) (WorkflowTrialResult, error) {
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Running trial for workflow: %s ===", parsedSpec.WorkflowName)))
+
+	// Install workflow with trial mode compilation
+	if err := installWorkflowInTrialMode(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, directTrialMode, opts); err != nil {
+		return WorkflowTrialResult{}, fmt.Errorf("failed to install workflow '%s' in trial mode: %w", parsedSpec.WorkflowName, err)
+	}
+
+	runID, err := runInstalledTrialWorkflow(ctx, tempDir, parsedSpec.WorkflowName, hostRepoSlug, opts)
+	if err != nil {
+		return WorkflowTrialResult{}, err
+	}
+	return collectWorkflowTrialResult(hostRepoSlug, parsedSpec.WorkflowName, runID, opts)
+}
+
+func runInstalledTrialWorkflow(ctx context.Context, tempDir, workflowName, hostRepoSlug string, opts *TrialOptions) (string, error) {
+	// Display workflow description if present
+	workflowPath := filepath.Join(tempDir, constants.GetWorkflowDir(), workflowName+".md")
+	if description := ExtractWorkflowDescriptionFromFile(workflowPath); description != "" {
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(description))
+		fmt.Fprintln(os.Stderr, "")
+	}
+
+	// Run the workflow and wait for completion (with trigger context if provided)
+	lockFilePath := filepath.Join(tempDir, constants.GetWorkflowDir(), workflowName+".lock.yml")
+	runID, err := triggerWorkflowRun(hostRepoSlug, workflowName, lockFilePath, opts.TriggerContext, opts.Verbose)
+	if err != nil {
+		return "", fmt.Errorf("failed to trigger workflow run for '%s': %w", workflowName, err)
+	}
+
+	// Generate workflow run URL
+	githubHost := getGitHubHost()
+	workflowRunURL := fmt.Sprintf("%s/%s/actions/runs/%s", githubHost, hostRepoSlug, runID)
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow run started with ID: %s (%s)", runID, workflowRunURL)))
+
+	// Wait for workflow completion
+	if err := WaitForWorkflowCompletion(ctx, hostRepoSlug, runID, opts.TimeoutMinutes, opts.Verbose); err != nil {
+		// If the context was canceled or its deadline was exceeded, return that directly
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", ctxErr
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", err
+		}
+		return "", fmt.Errorf("workflow '%s' execution failed or timed out: %w", workflowName, err)
+	}
+
+	// Auto-merge PRs if requested
+	if opts.AutoMergePRs {
+		if err := AutoMergePullRequestsLegacy(hostRepoSlug, opts.Verbose); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to auto-merge pull requests: %v", err)))
+		}
+	}
+	return runID, nil
+}
+
+func collectWorkflowTrialResult(hostRepoSlug, workflowName, runID string, opts *TrialOptions) (WorkflowTrialResult, error) {
+	// Download and process all artifacts
+	artifacts, err := downloadAllArtifacts(hostRepoSlug, runID, opts.Verbose)
+	if err != nil {
+		return WorkflowTrialResult{}, fmt.Errorf("failed to download artifacts for '%s': %w", workflowName, err)
+	}
+
+	// Save individual workflow results
+	safeOutputErrors := extractSafeOutputErrors(artifacts.SafeOutputs)
+	result := WorkflowTrialResult{
+		WorkflowName: workflowName,
+		RunID:        runID,
+		SafeOutputs:  artifacts.SafeOutputs,
+		//AgentStdioLogs:      artifacts.AgentStdioLogs,
+		AgenticRunInfo:      artifacts.AgenticRunInfo,
+		AdditionalArtifacts: artifacts.AdditionalArtifacts,
+		Timestamp:           time.Now(),
+		Success:             len(safeOutputErrors) == 0,
+		SafeOutputErrors:    safeOutputErrors,
+	}
+	return result, nil
+}
+
+func saveAndDisplayWorkflowTrialResult(result WorkflowTrialResult, targetRepoForFilename, dateTimeID string, opts *TrialOptions) {
+	// Save individual trial file
+	sanitizedTargetRepo := stringutil.SanitizeForFilename(targetRepoForFilename)
+	individualFilename := fmt.Sprintf("trials/%s-%s.%s.json", result.WorkflowName, sanitizedTargetRepo, dateTimeID)
+	if err := saveTrialResult(individualFilename, result, opts.Verbose); err != nil {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to save individual trial result: %v", err)))
+	}
+
+	displayWorkflowTrialOutput(result, opts.JSONOutput)
+	displayWorkflowTrialArtifactInfo(result)
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Trial completed for workflow: "+result.WorkflowName))
+}
+
+func displayWorkflowTrialOutput(result WorkflowTrialResult, jsonOutput bool) {
+	// Display results to stdout. In JSON mode, emit the full WorkflowTrialResult
+	// (including Success/SafeOutputErrors) instead of the raw safe-outputs artifact,
+	// so consumers of `--json` see the pass/fail signal without inspecting nested
+	// "errors" arrays.
+	if jsonOutput {
+		resultBytes, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal trial result for '%s': %v", result.WorkflowName, err)))
+		} else {
+			fmt.Fprintln(os.Stdout, string(resultBytes))
+		}
+	} else if len(result.SafeOutputs) > 0 {
+		outputBytes, err := json.MarshalIndent(result.SafeOutputs, "", "  ")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to marshal safe outputs for '%s': %v", result.WorkflowName, err)))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("=== Safe Outputs from %s ===", result.WorkflowName)))
+			fmt.Fprintln(os.Stdout, string(outputBytes))
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("=== End of Safe Outputs ==="))
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== No Safe Outputs Generated by %s ===", result.WorkflowName)))
+	}
+}
+
+func displayWorkflowTrialArtifactInfo(result WorkflowTrialResult) {
+	// Report rejected safe-output messages, if any. Messages may contain
+	// agent-controlled content, so control characters are sanitized before being
+	// written to the terminal/CI logs to avoid escape-sequence injection.
+	if len(result.SafeOutputErrors) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("=== %d Safe Output Message(s) Rejected from %s ===", len(result.SafeOutputErrors), result.WorkflowName)))
+		for _, msg := range result.SafeOutputErrors {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(sanitizeControlChars(msg)))
+		}
+	}
+
+	// Display additional artifact information if available
+	// if len(artifacts.AgentStdioLogs) > 0 {
+	// 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Agent Stdio Logs Available from %s (%d files) ===", parsedSpec.WorkflowName, len(artifacts.AgentStdioLogs))))
+	// }
+	if len(result.AgenticRunInfo) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Agentic Run Information Available from %s ===", result.WorkflowName)))
+	}
+	if len(result.AdditionalArtifacts) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Additional Artifacts Available from %s (%d files) ===", result.WorkflowName, len(result.AdditionalArtifacts))))
+	}
+}
+
+func finishWorkflowTrialResults(parsedSpecs []*WorkflowSpec, workflowResults []WorkflowTrialResult, tempDir, dateTimeID, targetRepoForFilename string, opts TrialOptions) error {
 	// Step 6: Save combined results for multi-workflow trials
 	overallSuccess, totalRejected, firstErrorMessage := aggregateTrialResults(workflowResults)
 
@@ -389,6 +421,22 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 	}
 
 	// Copy individual workflow result files
+	copyWorkflowTrialResultFiles(trialsDir, dateTimeID, workflowNames, targetRepoSlug, verbose)
+
+	// Change to temp directory to commit the changes
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tempDir); err != nil {
+		return fmt.Errorf("failed to change to temp directory: %w", err)
+	}
+	return commitAndPushTrialResults(tempDir, dateTimeID, workflowNames, verbose)
+}
+
+func copyWorkflowTrialResultFiles(trialsDir, dateTimeID string, workflowNames []string, targetRepoSlug string, verbose bool) {
 	sanitizedTargetRepo := stringutil.SanitizeForFilename(targetRepoSlug)
 	for _, workflowName := range workflowNames {
 		sourceFile := fmt.Sprintf("trials/%s-%s.%s.json", workflowName, sanitizedTargetRepo, dateTimeID)
@@ -421,17 +469,9 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 		}
 	}
 
-	// Change to temp directory to commit the changes
-	originalDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
-	}
-	defer os.Chdir(originalDir)
+}
 
-	if err := os.Chdir(tempDir); err != nil {
-		return fmt.Errorf("failed to change to temp directory: %w", err)
-	}
-
+func commitAndPushTrialResults(tempDir, dateTimeID string, workflowNames []string, verbose bool) error {
 	// Add trial results to git
 	cmd := exec.Command("git", "add", "trials/")
 	if output, err := cmd.CombinedOutput(); err != nil {

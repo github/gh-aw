@@ -89,35 +89,39 @@ func computeGraderMetricComparisons(
 			AnalysisType:   analysisType,
 			Delta:          meanValues(variantValues) - meanValues(controlValues),
 		}
-		switch analysisType {
-		case "t_test":
-			pValue, err := welchTTest(controlValues, variantValues)
-			setComparisonPValue(&comparison, pValue, err)
-		case "mann_whitney":
-			pValue, err := mannWhitneyTest(controlValues, variantValues)
-			setComparisonPValue(&comparison, pValue, err)
-		case "proportion_test":
-			pValue, err := twoProportionTest(controlValues, variantValues)
-			setComparisonPValue(&comparison, pValue, err)
-		case "bayesian_ab":
-			probability, err := betaBinomialProbability(controlValues, variantValues)
-			if err != nil {
-				comparison.Error = err.Error()
-			} else {
-				if set.Direction == "lower_is_better" {
-					// betaBinomialProbability always computes P(variant > control); for a
-					// lower-is-better metric "superiority" means the variant is smaller, so
-					// invert to report P(variant < control).
-					probability = 1 - probability
-				}
-				comparison.ProbabilitySuperiority = &probability
-			}
-		default:
-			comparison.Error = fmt.Sprintf("unsupported analysis type %q", analysisType)
-		}
+		evaluateGraderComparison(&comparison, controlValues, variantValues, set.Direction)
 		comparisons = append(comparisons, comparison)
 	}
 	return comparisons
+}
+
+func evaluateGraderComparison(comparison *MetricComparison, controlValues, variantValues []float64, direction string) {
+	switch comparison.AnalysisType {
+	case "t_test":
+		pValue, err := welchTTest(controlValues, variantValues)
+		setComparisonPValue(comparison, pValue, err)
+	case "mann_whitney":
+		pValue, err := mannWhitneyTest(controlValues, variantValues)
+		setComparisonPValue(comparison, pValue, err)
+	case "proportion_test":
+		pValue, err := twoProportionTest(controlValues, variantValues)
+		setComparisonPValue(comparison, pValue, err)
+	case "bayesian_ab":
+		probability, err := betaBinomialProbability(controlValues, variantValues)
+		if err != nil {
+			comparison.Error = err.Error()
+		} else {
+			if direction == "lower_is_better" {
+				// betaBinomialProbability always computes P(variant > control); for a
+				// lower-is-better metric "superiority" means the variant is smaller, so
+				// invert to report P(variant < control).
+				probability = 1 - probability
+			}
+			comparison.ProbabilitySuperiority = &probability
+		}
+	default:
+		comparison.Error = fmt.Sprintf("unsupported analysis type %q", comparison.AnalysisType)
+	}
 }
 
 func setComparisonPValue(comparison *MetricComparison, pValue float64, err error) {

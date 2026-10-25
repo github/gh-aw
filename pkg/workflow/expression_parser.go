@@ -115,64 +115,7 @@ func (p *ExpressionParser) tokenize(expression string) ([]token, error) {
 		default:
 			// Parse literal expression - everything until we hit a logical operator or paren
 			start := i
-			parenCount := 0
-
-			for i < len(expression) {
-				ch := expression[i]
-
-				// Handle quoted strings - skip everything inside quotes
-				// Support single quotes ('), double quotes ("), and backticks (`)
-				if ch == '\'' || ch == '"' || ch == '`' {
-					quote := ch
-					i++ // skip opening quote
-					for i < len(expression) {
-						if expression[i] == quote {
-							i++ // skip closing quote
-							break
-						}
-						if expression[i] == '\\' && i+1 < len(expression) {
-							i += 2 // skip escaped character
-						} else {
-							i++
-						}
-					}
-					continue
-				}
-
-				// Track parentheses that are part of the expression (e.g., function calls)
-				if ch == '(' {
-					parenCount++
-					i++
-					continue
-				} else if ch == ')' {
-					if parenCount > 0 {
-						parenCount--
-						i++
-						continue
-					} else {
-						// This closes our group expression, stop here
-						break
-					}
-				}
-
-				// Check for logical operators when not inside parentheses
-				if parenCount == 0 {
-					// Check for && or ||
-					if i+1 < len(expression) {
-						next := expression[i : i+2]
-						if next == "&&" || next == "||" {
-							break
-						}
-					}
-
-					// Check for logical NOT that's not part of !=
-					if ch == '!' && (i+1 >= len(expression) || expression[i+1] != '=') {
-						break
-					}
-				}
-
-				i++
-			}
+			i = expressionLiteralEnd(expression, i)
 
 			literal := strings.TrimSpace(expression[start:i])
 			if literal == "" {
@@ -184,6 +127,59 @@ func (p *ExpressionParser) tokenize(expression string) ([]token, error) {
 
 	tokens = append(tokens, token{tokenEOF, "", i})
 	return tokens, nil
+}
+
+func expressionLiteralEnd(expression string, i int) int {
+	parenCount := 0
+	for i < len(expression) {
+		ch := expression[i]
+		if ch == '\'' || ch == '"' || ch == '`' {
+			i = expressionQuotedEnd(expression, i)
+			continue
+		}
+		if ch == '(' {
+			parenCount++
+			i++
+			continue
+		} else if ch == ')' {
+			if parenCount > 0 {
+				parenCount--
+				i++
+				continue
+			}
+			break
+		}
+		if parenCount == 0 {
+			if i+1 < len(expression) {
+				next := expression[i : i+2]
+				if next == "&&" || next == "||" {
+					break
+				}
+			}
+			if ch == '!' && (i+1 >= len(expression) || expression[i+1] != '=') {
+				break
+			}
+		}
+		i++
+	}
+	return i
+}
+
+func expressionQuotedEnd(expression string, i int) int {
+	quote := expression[i]
+	i++
+	for i < len(expression) {
+		if expression[i] == quote {
+			i++
+			break
+		}
+		if expression[i] == '\\' && i+1 < len(expression) {
+			i += 2
+		} else {
+			i++
+		}
+	}
+	return i
 }
 
 // parseOrExpression parses OR expressions (lowest precedence)
@@ -329,6 +325,20 @@ func BreakLongExpression(expression string) []string {
 
 	expressionsLog.Printf("Breaking long expression: length=%d", len(expression))
 
+	lines := breakExpressionAtLogicalOperators(expression)
+	var finalLines []string
+	for _, line := range lines {
+		if len(line) > int(constants.MaxExpressionLineLength) {
+			subLines := BreakAtParentheses(line)
+			finalLines = append(finalLines, subLines...)
+		} else {
+			finalLines = append(finalLines, line)
+		}
+	}
+	return finalLines
+}
+
+func breakExpressionAtLogicalOperators(expression string) []string {
 	var lines []string
 	var current strings.Builder
 	i := 0
@@ -339,25 +349,9 @@ func BreakLongExpression(expression string) []string {
 		// Handle quoted strings - don't break inside quotes
 		// Support single quotes ('), double quotes ("), and backticks (`)
 		if char == '\'' || char == '"' || char == '`' {
-			quote := char
-			current.WriteByte(char)
-			i++
-
-			// Continue until closing quote
-			for i < len(expression) {
-				current.WriteByte(expression[i])
-				if expression[i] == quote {
-					i++
-					break
-				}
-				if expression[i] == '\\' && i+1 < len(expression) {
-					i++ // Skip escaped character
-					if i < len(expression) {
-						current.WriteByte(expression[i])
-					}
-				}
-				i++
-			}
+			end := expressionQuotedEnd(expression, i)
+			current.WriteString(expression[i:end])
+			i = end
 			continue
 		}
 
@@ -391,18 +385,7 @@ func BreakLongExpression(expression string) []string {
 		lines = append(lines, trimmed)
 	}
 
-	// If we still have very long lines, try to break at parentheses
-	var finalLines []string
-	for _, line := range lines {
-		if len(line) > int(constants.MaxExpressionLineLength) {
-			subLines := BreakAtParentheses(line)
-			finalLines = append(finalLines, subLines...)
-		} else {
-			finalLines = append(finalLines, line)
-		}
-	}
-
-	return finalLines
+	return lines
 }
 
 // BreakAtParentheses attempts to break long lines at parentheses for function calls

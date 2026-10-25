@@ -20,48 +20,8 @@ func parseProjectViews(configMap map[string]any, debugLog *logger.Logger) []Proj
 		if !ok {
 			continue
 		}
-		view := ProjectView{}
-
-		// Parse name (required)
-		if name, exists := viewMap["name"]; exists {
-			if nameStr, ok := name.(string); ok {
-				view.Name = nameStr
-			}
-		}
-
-		// Parse layout (required)
-		if layout, exists := viewMap["layout"]; exists {
-			if layoutStr, ok := layout.(string); ok {
-				view.Layout = layoutStr
-			}
-		}
-
-		// Parse filter (optional)
-		if filter, exists := viewMap["filter"]; exists {
-			if filterStr, ok := filter.(string); ok {
-				view.Filter = filterStr
-			}
-		}
-
-		// Parse visible-fields (optional)
-		if visibleFields, exists := viewMap["visible-fields"]; exists {
-			if fieldsList, ok := visibleFields.([]any); ok {
-				for _, field := range fieldsList {
-					if fieldInt, ok := field.(int); ok {
-						view.VisibleFields = append(view.VisibleFields, fieldInt)
-					}
-				}
-			}
-		}
-
-		// Parse description (optional)
-		if description, exists := viewMap["description"]; exists {
-			if descStr, ok := description.(string); ok {
-				view.Description = descStr
-			}
-		}
-
-		// Only add view if it has required fields
+		view := parseProjectView(viewMap)
+		// Only add view if it has required fields.
 		if view.Name != "" && view.Layout != "" {
 			views = append(views, view)
 			debugLog.Printf("Parsed view %d: %s (%s)", i+1, view.Name, view.Layout)
@@ -70,6 +30,51 @@ func parseProjectViews(configMap map[string]any, debugLog *logger.Logger) []Proj
 		}
 	}
 	return views
+}
+
+func parseProjectView(viewMap map[string]any) ProjectView {
+	view := ProjectView{}
+
+	// Parse name (required)
+	if name, exists := viewMap["name"]; exists {
+		if nameStr, ok := name.(string); ok {
+			view.Name = nameStr
+		}
+	}
+
+	// Parse layout (required)
+	if layout, exists := viewMap["layout"]; exists {
+		if layoutStr, ok := layout.(string); ok {
+			view.Layout = layoutStr
+		}
+	}
+
+	// Parse filter (optional)
+	if filter, exists := viewMap["filter"]; exists {
+		if filterStr, ok := filter.(string); ok {
+			view.Filter = filterStr
+		}
+	}
+
+	// Parse visible-fields (optional)
+	if visibleFields, exists := viewMap["visible-fields"]; exists {
+		if fieldsList, ok := visibleFields.([]any); ok {
+			for _, field := range fieldsList {
+				if fieldInt, ok := field.(int); ok {
+					view.VisibleFields = append(view.VisibleFields, fieldInt)
+				}
+			}
+		}
+	}
+
+	// Parse description (optional)
+	if description, exists := viewMap["description"]; exists {
+		if descStr, ok := description.(string); ok {
+			view.Description = descStr
+		}
+	}
+
+	return view
 }
 
 // parseProjectFieldDefinitions parses the "field-definitions" (or "field_definitions") list

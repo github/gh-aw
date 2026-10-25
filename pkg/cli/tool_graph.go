@@ -87,6 +87,13 @@ func (g *ToolGraph) GenerateMermaidGraph() string {
 	// Add start state
 	sb.WriteString("    [*] --> start_tool : begin\n")
 
+	g.writeMermaidStartTransitions(&sb, toolToStateMap)
+	g.writeMermaidToolTransitions(&sb, toolToStateMap)
+	sb.WriteString("```\n")
+	return sb.String()
+}
+
+func (g *ToolGraph) writeMermaidStartTransitions(sb *strings.Builder, toolToStateMap map[string]string) {
 	// Find the most common starting tool(s)
 	startCounts := make(map[string]int)
 	for _, sequence := range g.sequences {
@@ -110,11 +117,14 @@ func (g *ToolGraph) GenerateMermaidGraph() string {
 
 		for _, tool := range startTools {
 			if stateId, exists := toolToStateMap[tool]; exists {
-				fmt.Fprintf(&sb, "    start_tool --> %s\n", stateId)
+				fmt.Fprintf(sb, "    start_tool --> %s\n", stateId)
 			}
 		}
 	}
 
+}
+
+func (g *ToolGraph) writeMermaidToolTransitions(sb *strings.Builder, toolToStateMap map[string]string) {
 	// Add transitions with counts as labels
 	var transitions []ToolTransition
 	for key, count := range g.Transitions {
@@ -161,12 +171,10 @@ func (g *ToolGraph) GenerateMermaidGraph() string {
 			if transition.Count > 1 {
 				label = fmt.Sprintf(" : %dx", transition.Count)
 			}
-			fmt.Fprintf(&sb, "    %s --> %s%s\n", fromState, toState, label)
+			fmt.Fprintf(sb, "    %s --> %s%s\n", fromState, toState, label)
 		}
 	}
 
-	sb.WriteString("```\n")
-	return sb.String()
 }
 
 // generateToolGraph analyzes processed runs and generates a tool sequence graph

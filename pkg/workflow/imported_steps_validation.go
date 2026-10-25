@@ -93,25 +93,7 @@ func (c *Compiler) validateCheckoutPersistCredentials(frontmatter map[string]any
 		return nil
 	}
 
-	checkoutVersion := "v4"
-	if pin, ok := actionpins.GetLatestActionPinByRepo("actions/checkout"); ok && pin.Version != "" {
-		checkoutVersion = pin.Version
-	}
-
-	persistCredentialsExample := fmt.Sprintf(`      # example (keep your existing "uses:" ref):
-      - uses: actions/checkout@%s
-        with:
-          persist-credentials: false`, checkoutVersion)
-
-	msg := fmt.Sprintf(
-		"actions/checkout step(s) without 'persist-credentials: false' detected in the agent job: %s. "+
-			"Without this setting the git token is stored in .git/config and leaked to the agent. "+
-			"Add 'persist-credentials: false' to the 'with:' block of each checkout step, for example:\n"+
-			persistCredentialsExample+"\n"+
-			"See: https://github.github.com/gh-aw/reference/steps/",
-		strings.Join(offendingStepNames, ", "),
-	)
-
+	msg := checkoutPersistCredentialsMessage(offendingStepNames)
 	importedStepsValidationLog.Printf("Checkout validation failed: %s", msg)
 
 	if c.strictMode {
@@ -122,6 +104,28 @@ func (c *Compiler) validateCheckoutPersistCredentials(frontmatter map[string]any
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(msg))
 	c.IncrementWarningCount()
 	return nil
+}
+
+func checkoutPersistCredentialsMessage(offendingStepNames []string) string {
+	checkoutVersion := "v4"
+	if pin, ok := actionpins.GetLatestActionPinByRepo("actions/checkout"); ok && pin.Version != "" {
+		checkoutVersion = pin.Version
+	}
+
+	persistCredentialsExample := fmt.Sprintf(`      # example (keep your existing "uses:" ref):
+      - uses: actions/checkout@%s
+        with:
+          persist-credentials: false`, checkoutVersion)
+
+	return fmt.Sprintf(
+		"actions/checkout step(s) without 'persist-credentials: false' detected in the agent job: %s. "+
+			"Without this setting the git token is stored in .git/config and leaked to the agent. "+
+			"Add 'persist-credentials: false' to the 'with:' block of each checkout step, for example:\n"+
+			persistCredentialsExample+"\n"+
+			"See: https://github.github.com/gh-aw/reference/steps/",
+		strings.Join(offendingStepNames, ", "),
+	)
+
 }
 
 // checkoutMissingPersistCredentialsFalse returns true when the step uses actions/checkout

@@ -132,8 +132,24 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 	// Split by newlines to handle multiple JSON objects from different imports
 	lines := strings.Split(importedNetworkJSON, "\n")
 	importsLog.Printf("Processing %d network permission lines", len(lines))
-	importedDenyAll := false
+	importedDenyAll := mergeNetworkPermissionLines(result, lines, domainSet)
+	if importedDenyAll {
+		result.Allowed = nil
+	}
 
+	// Sort the final domain list for consistent output
+	sort.Strings(result.Allowed)
+	if result.HostedWeb != nil {
+		sort.Strings(result.HostedWeb.Allowed)
+		sort.Strings(result.HostedWeb.Blocked)
+	}
+
+	importsLog.Printf("Successfully merged network permissions with %d allowed domains", len(result.Allowed))
+	return result, nil
+}
+
+func mergeNetworkPermissionLines(result *NetworkPermissions, lines []string, domainSet map[string]struct{}) bool {
+	importedDenyAll := false
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -155,19 +171,7 @@ func (c *Compiler) MergeNetworkPermissions(topNetwork *NetworkPermissions, impor
 
 		mergeImportedNetworkPermissions(result, importedNetwork, domainSet)
 	}
-	if importedDenyAll {
-		result.Allowed = nil
-	}
-
-	// Sort the final domain list for consistent output
-	sort.Strings(result.Allowed)
-	if result.HostedWeb != nil {
-		sort.Strings(result.HostedWeb.Allowed)
-		sort.Strings(result.HostedWeb.Blocked)
-	}
-
-	importsLog.Printf("Successfully merged network permissions with %d allowed domains", len(result.Allowed))
-	return result, nil
+	return importedDenyAll
 }
 
 func mergeImportedNetworkPermissions(result *NetworkPermissions, imported NetworkPermissions, domainSet map[string]struct{}) {

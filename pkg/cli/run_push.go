@@ -55,8 +55,15 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 	}{}
 	runPushLog.Printf("Added workflow file: %s", absWorkflowPath)
 
-	// Check lock file and log hash status for observability
 	lockFilePath := stringutil.MarkdownToLockFile(absWorkflowPath)
+	logWorkflowLockStatus(absWorkflowPath, lockFilePath, err, verbose)
+	if err := recompileCollectedWorkflow(ctx, absWorkflowPath, verbose, approve); err != nil {
+		return nil, err
+	}
+	return collectCompiledWorkflowImports(absWorkflowPath, lockFilePath, files, visited, verbose)
+}
+
+func logWorkflowLockStatus(absWorkflowPath, lockFilePath string, err error, verbose bool) {
 	runPushLog.Printf("Checking lock file: %s", lockFilePath)
 
 	// Always recompile, but check and log hash status for observability
@@ -90,18 +97,23 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling workflow..."))
 		}
 	}
+}
 
+func recompileCollectedWorkflow(ctx context.Context, absWorkflowPath string, verbose, approve bool) error {
 	// Always recompile (hash check is for observability only)
 	runPushLog.Printf("Always recompiling workflow: %s", absWorkflowPath)
 	if err := recompileWorkflow(ctx, absWorkflowPath, verbose, approve); err != nil {
 		runPushLog.Printf("Failed to recompile workflow: %v", err)
-		return nil, fmt.Errorf("failed to recompile workflow: %w", err)
+		return fmt.Errorf("failed to recompile workflow: %w", err)
 	}
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
 	}
 	runPushLog.Printf("Recompilation completed successfully")
+	return nil
+}
 
+func collectCompiledWorkflowImports(absWorkflowPath, lockFilePath string, files, visited map[string]struct{}, verbose bool) ([]string, error) {
 	// Add the corresponding .lock.yml file
 	if fileutil.FileExists(lockFilePath) {
 		files[lockFilePath] = struct {
@@ -271,38 +283,46 @@ func collectImports(workflowPath string, files map[string]struct {
 	// or an object with 'aw' subfield for agentic workflow paths.
 	workflowDir := filepath.Dir(workflowPath)
 	runPushLog.Printf("Workflow directory: %s", workflowDir)
-	var imports []string
-
-	// extractPathsFromArray extracts file paths from a []any import list.
-	extractPathsFromArray := func(items []any) []string {
-		var paths []string
-		for i, item := range items {
-			switch importItem := item.(type) {
-			case string:
-				runPushLog.Printf("Import %d: string format: %s", i, importItem)
-				paths = append(paths, importItem)
-			case map[string]any:
-				if pathValue, hasPath := importItem["path"]; hasPath {
-					if pathStr, ok := pathValue.(string); ok {
-						runPushLog.Printf("Import %d: object format with path: %s", i, pathStr)
-						paths = append(paths, pathStr)
-					} else {
-						runPushLog.Printf("Import %d: object has path but not string type", i)
-					}
-				} else {
-					runPushLog.Printf("Import %d: object missing path field", i)
-				}
-			default:
-				runPushLog.Printf("Import %d: unknown type: %T", i, importItem)
-			}
-		}
-		return paths
+	imports := parsePushWorkflowImports(importsField)
+	runPushLog.Printf("Found %d imports in %s", len(imports), workflowPath)
+	if err := collectPushImportFiles(imports, workflowDir, files, visited, verbose); err != nil {
+		return err
 	}
+	runPushLog.Printf("Finished processing imports for: %s", workflowPath)
+	return nil
+}
 
+func extractPushImportPaths(items []any) []string {
+	var paths []string
+	for i, item := range items {
+		switch importItem := item.(type) {
+		case string:
+			runPushLog.Printf("Import %d: string format: %s", i, importItem)
+			paths = append(paths, importItem)
+		case map[string]any:
+			if pathValue, hasPath := importItem["path"]; hasPath {
+				if pathStr, ok := pathValue.(string); ok {
+					runPushLog.Printf("Import %d: object format with path: %s", i, pathStr)
+					paths = append(paths, pathStr)
+				} else {
+					runPushLog.Printf("Import %d: object has path but not string type", i)
+				}
+			} else {
+				runPushLog.Printf("Import %d: object missing path field", i)
+			}
+		default:
+			runPushLog.Printf("Import %d: unknown type: %T", i, importItem)
+		}
+	}
+	return paths
+}
+
+func parsePushWorkflowImports(importsField any) []string {
+	var imports []string
 	switch v := importsField.(type) {
 	case []any:
 		runPushLog.Printf("Parsing imports as []any with %d items", len(v))
-		imports = extractPathsFromArray(v)
+		imports = extractPushImportPaths(v)
 	case []string:
 		runPushLog.Printf("Parsing imports as []string with %d items", len(v))
 		imports = v
@@ -313,7 +333,7 @@ func collectImports(workflowPath string, files map[string]struct {
 			switch aw := awAny.(type) {
 			case []any:
 				runPushLog.Printf("Parsing imports.aw as []any with %d items", len(aw))
-				imports = extractPathsFromArray(aw)
+				imports = extractPushImportPaths(aw)
 			case []string:
 				runPushLog.Printf("Parsing imports.aw as []string with %d items", len(aw))
 				imports = aw
@@ -323,8 +343,10 @@ func collectImports(workflowPath string, files map[string]struct {
 		runPushLog.Printf("Imports field has unexpected type: %T", v)
 	}
 
-	runPushLog.Printf("Found %d imports in %s", len(imports), workflowPath)
+	return imports
+}
 
+func collectPushImportFiles(imports []string, workflowDir string, files, visited map[string]struct{}, verbose bool) error {
 	// Process each import
 	for i, importPath := range imports {
 		runPushLog.Printf("Processing import %d/%d: %s", i+1, len(imports), importPath)
@@ -373,7 +395,6 @@ func collectImports(workflowPath string, files map[string]struct {
 		}
 	}
 
-	runPushLog.Printf("Finished processing imports for: %s", workflowPath)
 	return nil
 }
 
@@ -384,7 +405,26 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	}
 	runPushLog.Printf("Pushing %d files for workflow: %s", len(files), workflowName)
 	runPushLog.Printf("Files to push: %v", files)
+	statusOutput, err := stagePushWorkflowFiles(ctx, files, verbose)
+	if err != nil || statusOutput == nil {
+		return err
+	}
+	if err := verifyPushWorkflowRef(refOverride, verbose); err != nil {
+		return err
+	}
+	stagedFiles := pushWorkflowStagedFiles(statusOutput)
+	if err := verifyPushWorkflowStagedFiles(files, stagedFiles); err != nil {
+		return err
+	}
+	commitMessage := "Updated agentic workflow " + workflowName
+	runPushLog.Printf("Creating commit with message: %s", commitMessage)
+	if err := confirmPushWorkflowFiles(files, commitMessage); err != nil {
+		return err
+	}
+	return commitAndPushWorkflowFiles(ctx, commitMessage, verbose)
+}
 
+func stagePushWorkflowFiles(ctx context.Context, files []string, verbose bool) ([]byte, error) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Staging %d files for commit", len(files))))
 		for _, file := range files {
@@ -398,7 +438,7 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 	cmd := exec.CommandContext(ctx, "git", gitArgs...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		runPushLog.Printf("Failed to stage files: %v, output: %s", err, string(output))
-		return fmt.Errorf("failed to stage files: %w\nOutput: %s", err, string(output))
+		return nil, fmt.Errorf("failed to stage files: %w\nOutput: %s", err, string(output))
 	}
 	runPushLog.Printf("Successfully staged %d files", len(files))
 
@@ -406,26 +446,35 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Files staged successfully"))
 	}
 
-	// Check if there are any staged files in git (after we've staged our files)
-	runPushLog.Printf("Checking staged files with git diff --cached --name-only")
-	statusCmd := exec.CommandContext(ctx, "git", "diff", "--cached", "--name-only")
-	statusOutput, err := statusCmd.CombinedOutput()
+	statusOutput, err := readPushWorkflowStagedOutput(ctx)
 	if err != nil {
-		runPushLog.Printf("Failed to check git status: %v, output: %s", err, string(statusOutput))
-		return fmt.Errorf("failed to check git status: %w\nOutput: %s", err, string(statusOutput))
+		return nil, err
 	}
-	runPushLog.Printf("Git status output: %s", string(statusOutput))
-
-	// Check if there are no staged changes (nothing to commit)
 	if strings.TrimSpace(string(statusOutput)) == "" {
 		runPushLog.Printf("No staged changes detected")
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No changes to commit"))
 		}
 		runPushLog.Print("No changes to commit")
-		return nil
+		return nil, nil
 	}
+	return statusOutput, nil
+}
 
+func readPushWorkflowStagedOutput(ctx context.Context) ([]byte, error) {
+	runPushLog.Printf("Checking staged files with git diff --cached --name-only")
+	statusCmd := exec.CommandContext(ctx, "git", "diff", "--cached", "--name-only")
+	statusOutput, err := statusCmd.CombinedOutput()
+	if err != nil {
+		runPushLog.Printf("Failed to check git status: %v, output: %s", err, string(statusOutput))
+		return nil, fmt.Errorf("failed to check git status: %w\nOutput: %s", err, string(statusOutput))
+	}
+	runPushLog.Printf("Git status output: %s", string(statusOutput))
+
+	return statusOutput, nil
+}
+
+func verifyPushWorkflowRef(refOverride string, verbose bool) error {
 	// Now that we know there are changes to commit, check that current branch matches --ref value if specified
 	// This happens after we've determined there are actual changes, so we don't fail unnecessarily
 	if refOverride != "" {
@@ -447,11 +496,17 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Verified current branch matches --ref: "+currentBranch))
 		}
 	}
+	return nil
+}
 
+func pushWorkflowStagedFiles(statusOutput []byte) []string {
 	// Get the list of staged files
 	stagedFiles := strings.Split(strings.TrimSpace(string(statusOutput)), "\n")
 	runPushLog.Printf("Found %d staged files: %v", len(stagedFiles), stagedFiles)
+	return stagedFiles
+}
 
+func pushWorkflowFileSet(files []string) map[string]struct{} {
 	// Check if there are staged files beyond what we just staged
 	// Convert our files list to a map for quick lookup
 	runPushLog.Printf("Building map of our files for comparison")
@@ -477,7 +532,11 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 		}{}
 		runPushLog.Printf("Added to our files map: %s", file)
 	}
+	return ourFiles
+}
 
+func verifyPushWorkflowStagedFiles(files, stagedFiles []string) error {
+	ourFiles := pushWorkflowFileSet(files)
 	// Check if there are any staged files that aren't in our list
 	runPushLog.Printf("Checking for extra staged files not in our list")
 	var extraStagedFiles []string
@@ -519,11 +578,10 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 		return errors.New("git has staged files not part of workflow - commit or unstage them before using --push")
 	}
 	runPushLog.Printf("No extra staged files detected - all staged files are part of our workflow")
+	return nil
+}
 
-	// Create commit message
-	commitMessage := "Updated agentic workflow " + workflowName
-	runPushLog.Printf("Creating commit with message: %s", commitMessage)
-
+func confirmPushWorkflowFiles(files []string, commitMessage string) error {
 	// Show what will be committed and ask for confirmation using console helper
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Ready to commit and push the following files:"))
@@ -551,10 +609,13 @@ func pushWorkflowFiles(ctx context.Context, workflowName string, files []string,
 		return errors.New("push cancelled by user")
 	}
 	runPushLog.Printf("User confirmed - proceeding with commit and push")
+	return nil
+}
 
+func commitAndPushWorkflowFiles(ctx context.Context, commitMessage string, verbose bool) error {
 	// Commit the changes
 	runPushLog.Printf("Executing git commit with message: %s", commitMessage)
-	cmd = exec.CommandContext(ctx, "git", "commit", "-m", commitMessage)
+	cmd := exec.CommandContext(ctx, "git", "commit", "-m", commitMessage)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		runPushLog.Printf("Failed to commit: %v, output: %s", err, string(output))
 		return fmt.Errorf("failed to commit changes: %w\nOutput: %s", err, string(output))

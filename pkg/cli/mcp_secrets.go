@@ -16,7 +16,19 @@ var mcpSecretsLog = logger.New("cli:mcp_secrets")
 func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
 	mcpSecretsLog.Print("Checking and suggesting secrets for MCP tool configuration")
 
-	// Extract environment variables from the tool config
+	requiredSecrets := mcpRequiredSecrets(toolConfig)
+	if len(requiredSecrets) == 0 {
+		mcpSecretsLog.Print("No required secrets found in tool configuration")
+		return nil
+	}
+	mcpSecretsLog.Printf("Found %d required secrets in configuration", len(requiredSecrets))
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking repository secrets..."))
+	}
+	return checkAndSuggestRequiredSecrets(requiredSecrets, verbose)
+}
+
+func mcpRequiredSecrets(toolConfig map[string]any) []string {
 	var requiredSecrets []string
 
 	if mcpSection, ok := toolConfig["mcp"].(map[string]any); ok {
@@ -31,16 +43,10 @@ func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
 		}
 	}
 
-	if len(requiredSecrets) == 0 {
-		mcpSecretsLog.Print("No required secrets found in tool configuration")
-		return nil
-	}
-	mcpSecretsLog.Printf("Found %d required secrets in configuration", len(requiredSecrets))
+	return requiredSecrets
+}
 
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking repository secrets..."))
-	}
-
+func checkAndSuggestRequiredSecrets(requiredSecrets []string, verbose bool) error {
 	// Check each secret using GitHub CLI
 	var missingSecrets []string
 	for _, secretName := range requiredSecrets {

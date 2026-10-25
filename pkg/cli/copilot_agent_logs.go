@@ -63,26 +63,7 @@ func ParseCopilotCodingAgentLogMetrics(logContent string, verbose bool) workflow
 		}
 
 		// Extract tool calls from agent logs
-		if agentToolCallPattern.MatchString(line) {
-			toolName := extractToolName(line)
-			if toolName != "" {
-				// Track tool call
-				if _, exists := toolCallMap[toolName]; !exists {
-					toolCallMap[toolName] = &workflow.ToolCallInfo{
-						Name:      toolName,
-						CallCount: 0,
-					}
-				}
-				toolCallMap[toolName].CallCount++
-
-				// Add to current sequence
-				currentSequence = append(currentSequence, toolName)
-
-				if verbose {
-					copilotCodingAgentLog.Printf("Found tool call: %s", toolName)
-				}
-			}
-		}
+		currentSequence = trackCopilotAgentToolCall(line, verbose, toolCallMap, currentSequence)
 
 		// Try to extract token usage from JSON format if available
 		jsonMetrics := workflow.ExtractJSONMetrics(line, verbose)
@@ -113,6 +94,26 @@ func ParseCopilotCodingAgentLogMetrics(logContent string, verbose bool) workflow
 		metrics.TokenUsage, metrics.EstimatedCost, metrics.Turns)
 
 	return metrics
+}
+
+func trackCopilotAgentToolCall(line string, verbose bool, toolCallMap map[string]*workflow.ToolCallInfo, sequence []string) []string {
+	if agentToolCallPattern.MatchString(line) {
+		toolName := extractToolName(line)
+		if toolName != "" {
+			if _, exists := toolCallMap[toolName]; !exists {
+				toolCallMap[toolName] = &workflow.ToolCallInfo{
+					Name:      toolName,
+					CallCount: 0,
+				}
+			}
+			toolCallMap[toolName].CallCount++
+			sequence = append(sequence, toolName)
+			if verbose {
+				copilotCodingAgentLog.Printf("Found tool call: %s", toolName)
+			}
+		}
+	}
+	return sequence
 }
 
 // extractToolName extracts a tool name from a log line

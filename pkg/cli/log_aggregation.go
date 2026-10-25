@@ -71,7 +71,10 @@ func aggregateLogFiles[T MutableLogAnalysis](
 
 	// Initialize aggregated analysis
 	aggregated := newAnalysis()
+	return aggregateParsedLogFiles(files, verbose, parser, aggregated), nil
+}
 
+func aggregateParsedLogFiles[T MutableLogAnalysis](files []string, verbose bool, parser LogParser[T], aggregated T) T {
 	// Track unique domains across all files
 	allAllowedDomains := make(map[string]struct {
 	})
@@ -118,5 +121,5 @@ func aggregateLogFiles[T MutableLogAnalysis](
 	logAggregationLog.Printf("Aggregation complete: processed %d files, found %d allowed and %d blocked domains",
 		len(files), len(allowedDomains), len(blockedDomains))
 
-	return aggregated, nil
+	return aggregated
 }

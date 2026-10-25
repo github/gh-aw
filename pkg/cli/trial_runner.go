@@ -22,12 +22,40 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 	// Show welcome banner for interactive mode
 	console.ShowWelcomeBanner("This tool will run a trial of your workflow in a test repository.")
 
+	parsedSpecs, err := prepareTrialWorkflowSpecs(workflowSpecs, opts)
+	if err != nil {
+		return err
+	}
+	logicalRepoSlug, cloneRepoSlug, cloneRepoVersion, directTrialMode, err := resolveTrialRepositoryMode(opts)
+	if err != nil {
+		return err
+	}
+	hostRepoSlug, err := resolveTrialHostRepository(ctx, opts)
+	if err != nil {
+		return err
+	}
+	ready, err := prepareTrialHostRepository(ctx, parsedSpecs, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, directTrialMode, opts)
+	if err != nil || !ready {
+		return err
+	}
+	// Set up cleanup only after repository and secret preparation succeeds.
+	if opts.DeleteHostRepo {
+		defer func() {
+			if err := cleanupTrialRepository(hostRepoSlug, opts.Verbose); err != nil {
+				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cleanup host repository: %v", err)))
+			}
+		}()
+	}
+	return runConfiguredWorkflowTrials(ctx, parsedSpecs, hostRepoSlug, logicalRepoSlug, cloneRepoSlug, cloneRepoVersion, directTrialMode, opts)
+}
+
+func prepareTrialWorkflowSpecs(workflowSpecs []string, opts TrialOptions) ([]*WorkflowSpec, error) {
 	// Parse all workflow specifications
 	var parsedSpecs []*WorkflowSpec
 	for _, spec := range workflowSpecs {
 		parsedSpec, err := parseWorkflowSpec(spec)
 		if err != nil {
-			return fmt.Errorf("invalid workflow specification '%s': %w", spec, err)
+			return nil, fmt.Errorf("invalid workflow specification '%s': %w", spec, err)
 		}
 		parsedSpecs = append(parsedSpecs, parsedSpec)
 	}
@@ -43,18 +71,17 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		joinedNames := strings.Join(workflowNames, ", ")
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Starting trial of %d workflows (%s)", len(parsedSpecs), joinedNames)))
 	}
+	return parsedSpecs, nil
+}
 
+func resolveTrialRepositoryMode(opts TrialOptions) (logicalRepoSlug, cloneRepoSlug, cloneRepoVersion string, directTrialMode bool, err error) {
 	// Step 0: Determine workflow mode (mutual exclusion is enforced by Cobra)
-	var logicalRepoSlug string
-	var cloneRepoSlug string
-	var cloneRepoVersion string
-	var directTrialMode bool
 
 	if opts.Repos.CloneRepo != "" {
 		// Use clone-repo mode: clone the specified repo contents into host repo
 		cloneRepo, err := parseRepoSpec(opts.Repos.CloneRepo)
 		if err != nil {
-			return fmt.Errorf("invalid --clone-repo specification '%s': %w", opts.Repos.CloneRepo, err)
+			return "", "", "", false, fmt.Errorf("invalid --clone-repo specification '%s': %w", opts.Repos.CloneRepo, err)
 		}
 
 		cloneRepoSlug = cloneRepo.RepoSlug
@@ -67,7 +94,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		// Use logical-repo mode: simulate the workflow running against the specified repo
 		logicalRepo, err := parseRepoSpec(opts.Repos.LogicalRepo)
 		if err != nil {
-			return fmt.Errorf("invalid --logical-repo specification '%s': %w", opts.Repos.LogicalRepo, err)
+			return "", "", "", false, fmt.Errorf("invalid --logical-repo specification '%s': %w", opts.Repos.LogicalRepo, err)
 		}
 
 		logicalRepoSlug = logicalRepo.RepoSlug
@@ -90,19 +117,22 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 			var err error
 			logicalRepoSlug, err = GetCurrentRepoSlug()
 			if err != nil {
-				return fmt.Errorf("failed to determine simulated host repository: %w", err)
+				return "", "", "", false, fmt.Errorf("failed to determine simulated host repository: %w", err)
 			}
 			directTrialMode = false
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Target repository (current): "+logicalRepoSlug))
 		}
 	}
+	return logicalRepoSlug, cloneRepoSlug, cloneRepoVersion, directTrialMode, nil
+}
 
+func resolveTrialHostRepository(ctx context.Context, opts TrialOptions) (string, error) {
 	// Step 1: Determine host repository slug
 	var hostRepoSlug string
 	if opts.Repos.HostRepo != "" {
 		hostRepo, err := parseRepoSpec(opts.Repos.HostRepo)
 		if err != nil {
-			return fmt.Errorf("invalid --host-repo specification '%s': %w", opts.Repos.HostRepo, err)
+			return "", fmt.Errorf("invalid --host-repo specification '%s': %w", opts.Repos.HostRepo, err)
 		}
 		hostRepoSlug = hostRepo.RepoSlug
 		trialLog.Printf("Using specified host repository: %s", hostRepoSlug)
@@ -110,13 +140,16 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		// Use default trial repo with current username
 		username, err := getCurrentGitHubUsername(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get GitHub username for default trial repo: %w", err)
+			return "", fmt.Errorf("failed to get GitHub username for default trial repo: %w", err)
 		}
 		hostRepoSlug = username + "/gh-aw-trial"
 		trialLog.Printf("Using default host repository: %s", hostRepoSlug)
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Host repository (default): "+hostRepoSlug))
 	}
+	return hostRepoSlug, nil
+}
 
+func prepareTrialHostRepository(ctx context.Context, parsedSpecs []*WorkflowSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug string, directTrialMode bool, opts TrialOptions) (bool, error) {
 	// Step 1.5: Show confirmation unless quiet mode
 	if !opts.Quiet {
 		if err := showTrialConfirmation(trialConfirmationOptions{
@@ -131,22 +164,28 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 			directTrialMode:     directTrialMode,
 			engineOverride:      opts.EngineOverride,
 		}); err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// Step 2: Create or reuse host repository
 	trialLog.Printf("Ensuring trial repository exists: %s", hostRepoSlug)
 	if err := ensureTrialRepository(hostRepoSlug, cloneRepoSlug, opts.ForceDelete, opts.DryRun, opts.Verbose); err != nil {
-		return fmt.Errorf("failed to ensure host repository: %w", err)
+		return false, fmt.Errorf("failed to ensure host repository: %w", err)
 	}
 
 	// In dry-run mode, stop here after showing what would be done
 	if opts.DryRun {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Stopping here. No actual changes were made."))
-		return nil
+		return false, nil
 	}
+	if err := ensureTrialEngineSecrets(ctx, hostRepoSlug, opts); err != nil {
+		return false, err
+	}
+	return true, nil
+}
 
+func ensureTrialEngineSecrets(ctx context.Context, hostRepoSlug string, opts TrialOptions) error {
 	// Step 2.5: Ensure engine secrets are configured when an explicit engine override is provided
 	// When no override is specified, the workflow will use its frontmatter engine and handle secrets during compilation
 	if opts.EngineOverride != "" {
@@ -173,15 +212,10 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		}
 	}
 
-	// Set up cleanup if requested
-	if opts.DeleteHostRepo {
-		defer func() {
-			if err := cleanupTrialRepository(hostRepoSlug, opts.Verbose); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cleanup host repository: %v", err)))
-			}
-		}()
-	}
+	return nil
+}
 
+func runConfiguredWorkflowTrials(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoSlug, logicalRepoSlug, cloneRepoSlug, cloneRepoVersion string, directTrialMode bool, opts TrialOptions) error {
 	// Step 2.7: Clone source repository contents if in clone-repo mode
 	if cloneRepoSlug != "" {
 		if err := cloneRepoContentsIntoHost(cloneRepoSlug, cloneRepoVersion, hostRepoSlug, opts.Verbose); err != nil {
@@ -191,52 +225,60 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 
 	// Step 2.8: Disable all workflows except the ones being trialled (only in clone-repo mode, done once before all trials)
 	if cloneRepoSlug != "" {
-		// Build list of workflow names to keep enabled
-		var workflowsToKeep []string
-		for _, spec := range parsedSpecs {
-			workflowsToKeep = append(workflowsToKeep, spec.WorkflowName)
-		}
+		return runTrialsWithDisabledWorkflows(ctx, parsedSpecs, hostRepoSlug, logicalRepoSlug, cloneRepoSlug, directTrialMode, opts)
+	}
+	return executeConfiguredWorkflowTrials(ctx, parsedSpecs, hostRepoSlug, logicalRepoSlug, cloneRepoSlug, directTrialMode, opts)
+}
 
-		if opts.Verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Disabling workflows in cloned repository (keeping: %s)", strings.Join(workflowsToKeep, ", "))))
-		}
-
-		// Clone host repository temporarily to access workflows
-		tempDirForDisable, err := cloneTrialHostRepository(hostRepoSlug, opts.Verbose)
-		if err != nil {
-			return fmt.Errorf("failed to clone host repository for workflow disabling: %w", err)
-		}
-		defer func() {
-			if err := os.RemoveAll(tempDirForDisable); err != nil {
-				trialLog.Printf("Failed to cleanup temp directory for workflow disabling: %v", err)
-			}
-		}()
-
-		// Change to temp directory to access local .github/workflows
-		originalDir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
-		}
-
-		if err := os.Chdir(tempDirForDisable); err != nil {
-			return fmt.Errorf("failed to change to temp directory: %w", err)
-		}
-		// Always attempt to change back to the original directory
-		defer func() {
-			if err := os.Chdir(originalDir); err != nil {
-				trialLog.Printf("Failed to change back to original directory: %v", err)
-			}
-		}()
-
-		// Disable workflows (pass empty string for repoSlug since we're working locally)
-		disableErr := DisableAllWorkflowsExcept("", workflowsToKeep, opts.Verbose)
-		// Check for disable errors after changing back
-		if disableErr != nil {
-			// Log warning but don't fail the trial - workflow disabling is not critical
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to disable workflows: %v", disableErr)))
-		}
+func runTrialsWithDisabledWorkflows(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoSlug, logicalRepoSlug, cloneRepoSlug string, directTrialMode bool, opts TrialOptions) error {
+	// Build list of workflow names to keep enabled
+	var workflowsToKeep []string
+	for _, spec := range parsedSpecs {
+		workflowsToKeep = append(workflowsToKeep, spec.WorkflowName)
 	}
 
+	if opts.Verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Disabling workflows in cloned repository (keeping: %s)", strings.Join(workflowsToKeep, ", "))))
+	}
+
+	// Clone host repository temporarily to access workflows
+	tempDirForDisable, err := cloneTrialHostRepository(hostRepoSlug, opts.Verbose)
+	if err != nil {
+		return fmt.Errorf("failed to clone host repository for workflow disabling: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tempDirForDisable); err != nil {
+			trialLog.Printf("Failed to cleanup temp directory for workflow disabling: %v", err)
+		}
+	}()
+
+	// Change to temp directory to access local .github/workflows
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	if err := os.Chdir(tempDirForDisable); err != nil {
+		return fmt.Errorf("failed to change to temp directory: %w", err)
+	}
+	// Always attempt to change back to the original directory
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			trialLog.Printf("Failed to change back to original directory: %v", err)
+		}
+	}()
+
+	// Disable workflows (pass empty string for repoSlug since we're working locally)
+	disableErr := DisableAllWorkflowsExcept("", workflowsToKeep, opts.Verbose)
+	// Check for disable errors after changing back
+	if disableErr != nil {
+		// Log warning but don't fail the trial - workflow disabling is not critical
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to disable workflows: %v", disableErr)))
+	}
+	return executeConfiguredWorkflowTrials(ctx, parsedSpecs, hostRepoSlug, logicalRepoSlug, cloneRepoSlug, directTrialMode, opts)
+}
+
+func executeConfiguredWorkflowTrials(ctx context.Context, parsedSpecs []*WorkflowSpec, hostRepoSlug, logicalRepoSlug, cloneRepoSlug string, directTrialMode bool, opts TrialOptions) error {
 	// Execute trials with optional repeat functionality
 	return ExecuteWithRepeat(RepeatOptions{
 		RepeatCount:   opts.RepeatCount,

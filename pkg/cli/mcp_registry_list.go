@@ -44,6 +44,11 @@ func listAvailableServers(ctx context.Context, registryURL string, verbose bool)
 		return nil
 	}
 
+	displayAvailableMCPServers(servers, registryClient.registryURL)
+	return nil
+}
+
+func displayAvailableMCPServers(servers []MCPRegistryServerForProcessing, registryURL string) {
 	// Prepare table data
 	headers := []string{"Name", "Description"}
 	rows := make([][]string, 0, len(servers))
@@ -69,7 +74,7 @@ func listAvailableServers(ctx context.Context, registryURL string, verbose bool)
 
 	// Create and render table
 	tableConfig := console.TableConfig{
-		Title:     "MCP registry: " + registryClient.registryURL,
+		Title:     "MCP registry: " + registryURL,
 		Headers:   headers,
 		Rows:      rows,
 		ShowTotal: true,
@@ -79,5 +84,4 @@ func listAvailableServers(ctx context.Context, registryURL string, verbose bool)
 	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Usage: gh aw mcp add <workflow-file> <server-name>"))
 
-	return nil
 }

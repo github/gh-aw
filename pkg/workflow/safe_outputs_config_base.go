@@ -15,6 +15,13 @@ func (c *Compiler) parseBaseSafeOutputConfig(configMap map[string]any, config *B
 		config.Max = defaultIntStr(defaultMax)
 	}
 
+	parseSafeOutputMax(configMap, config)
+
+	parseSafeOutputCredentials(configMap, config)
+	parseSafeOutputStagedAndSamples(configMap, config)
+}
+
+func parseSafeOutputMax(configMap map[string]any, config *BaseSafeOutputConfig) {
 	// Parse max (this will override the default if present in configMap)
 	if max, exists := configMap["max"]; exists {
 		switch v := max.(type) {
@@ -33,7 +40,9 @@ func (c *Compiler) parseBaseSafeOutputConfig(configMap map[string]any, config *B
 			}
 		}
 	}
+}
 
+func parseSafeOutputCredentials(configMap map[string]any, config *BaseSafeOutputConfig) {
 	// Parse github-token
 	if githubToken, exists := configMap["github-token"]; exists {
 		if githubTokenStr, ok := githubToken.(string); ok {
@@ -49,7 +58,9 @@ func (c *Compiler) parseBaseSafeOutputConfig(configMap map[string]any, config *B
 			config.GitHubApp = parseAppConfig(appMap)
 		}
 	}
+}
 
+func parseSafeOutputStagedAndSamples(configMap map[string]any, config *BaseSafeOutputConfig) {
 	// Parse staged flag (per-handler staged mode)
 	if err := preprocessBoolFieldAsString(configMap, "staged", safeOutputsConfigLog); err != nil {
 		safeOutputsConfigLog.Printf("Invalid staged value: %v", err)

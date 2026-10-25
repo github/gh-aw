@@ -61,26 +61,7 @@ func isBootstrapInitMarkerSatisfied(baseDir string, marker string) (bool, error)
 		}
 		return strings.Contains(string(content), constants.WorkflowsLockYmlGitAttributesEntry), nil
 	case bootstrapMCPConfigPath:
-		content, err := os.ReadFile(markerPath)
-		if err != nil {
-			return false, fmt.Errorf("failed to inspect %s: %w", marker, err)
-		}
-		var config MCPConfig
-		if err := json.Unmarshal(content, &config); err != nil {
-			return false, nil
-		}
-		servers := config.MCPServers
-		if len(servers) == 0 {
-			servers = config.Servers
-		}
-		server, ok := servers["github-agentic-workflows"]
-		if !ok {
-			return false, nil
-		}
-		if strings.TrimSpace(server.Command) != "gh" {
-			return false, nil
-		}
-		return len(server.Args) >= 2 && server.Args[0] == "aw" && server.Args[1] == "mcp-server", nil
+		return isBootstrapMCPMarkerSatisfied(markerPath, marker)
 	case bootstrapCopilotSetupPath:
 		content, err := os.ReadFile(markerPath)
 		if err != nil {
@@ -114,6 +95,29 @@ func isBootstrapInitMarkerSatisfied(baseDir string, marker string) (bool, error)
 	default:
 		return info.Size() > 0, nil
 	}
+}
+
+func isBootstrapMCPMarkerSatisfied(markerPath, marker string) (bool, error) {
+	content, err := os.ReadFile(markerPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to inspect %s: %w", marker, err)
+	}
+	var config MCPConfig
+	if err := json.Unmarshal(content, &config); err != nil {
+		return false, nil
+	}
+	servers := config.MCPServers
+	if len(servers) == 0 {
+		servers = config.Servers
+	}
+	server, ok := servers["github-agentic-workflows"]
+	if !ok {
+		return false, nil
+	}
+	if strings.TrimSpace(server.Command) != "gh" {
+		return false, nil
+	}
+	return len(server.Args) >= 2 && server.Args[0] == "aw" && server.Args[1] == "mcp-server", nil
 }
 
 func expectedBootstrapInitMarkers(engineOverride string) []string {

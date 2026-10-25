@@ -152,6 +152,27 @@ func (b *InteractiveWorkflowBuilder) promptForConfiguration() error {
 		return b.promptForConfigurationFrom(os.Stdin)
 	}
 
+	basicGroup := b.configurationBasicsGroup()
+	var selectedTools []string
+	var selectedOutputs []string
+	capabilitiesGroup := configurationCapabilitiesGroup(&selectedTools, &selectedOutputs)
+	networkGroup := b.configurationNetworkGroup()
+	form := console.NewForm(
+		basicGroup,
+		capabilitiesGroup,
+		networkGroup,
+		b.configurationInstructionsGroup(),
+	)
+	if err := form.RunWithContext(b.ctx); err != nil {
+		return err
+	}
+	b.Tools = selectedTools
+	b.SafeOutputs = selectedOutputs
+	interactiveLog.Printf("User configuration selected: trigger=%s, engine=%s, tools=%v, safe_outputs=%v", b.Trigger, b.Engine, selectedTools, selectedOutputs)
+	return nil
+}
+
+func (b *InteractiveWorkflowBuilder) configurationBasicsGroup() *huh.Group {
 	// Prepare trigger options
 	triggerOptions := []huh.Option[string]{
 		huh.NewOption("Manual trigger (workflow_dispatch)", "workflow_dispatch"),
@@ -172,6 +193,24 @@ func (b *InteractiveWorkflowBuilder) promptForConfiguration() error {
 		huh.NewOption("gemini - Google Gemini CLI", "gemini"),
 	}
 
+	return huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("When should this workflow run?").
+			Description("Choose the GitHub event that triggers this workflow").
+			Options(triggerOptions...).
+			Height(8).
+			Value(&b.Trigger),
+		huh.NewSelect[string]().
+			Title("Which AI engine should process this workflow?").
+			Description("The AI engine interprets instructions and executes tasks using available tools").
+			Options(engineOptions...).
+			Value(&b.Engine),
+	).
+		Title("Basic Configuration").
+		Description("Let's start with the fundamentals of your workflow")
+}
+
+func configurationCapabilitiesGroup(selectedTools, selectedOutputs *[]string) *huh.Group {
 	// Prepare tool options
 	toolOptions := []huh.Option[string]{
 		huh.NewOption("github - GitHub API tools (issues, PRs, comments, repos)", "github"),
@@ -185,6 +224,25 @@ func (b *InteractiveWorkflowBuilder) promptForConfiguration() error {
 	// Prepare safe output options programmatically from safe_outputs_tools.json
 	outputOptions := buildSafeOutputOptions()
 
+	return huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title("Which tools should the AI have access to?").
+			Description("Tools enable the AI to interact with code, APIs, and external systems").
+			Options(toolOptions...).
+			Height(8).
+			Value(selectedTools),
+		huh.NewMultiSelect[string]().
+			Title("What outputs should the AI be able to create?").
+			Description("Safe outputs allow the AI to create GitHub resources after human approval").
+			Options(outputOptions...).
+			Height(10).
+			Value(selectedOutputs),
+	).
+		Title("Capabilities").
+		Description("Select the tools and outputs your workflow needs")
+}
+
+func (b *InteractiveWorkflowBuilder) configurationNetworkGroup() *huh.Group {
 	// Pre-detect network access based on repo contents
 	detectedNetworks := detectNetworkFromRepo()
 	interactiveLog.Printf("Pre-detected networks from repo: %v", detectedNetworks)
@@ -206,81 +264,27 @@ func (b *InteractiveWorkflowBuilder) promptForConfiguration() error {
 		b.NetworkAccess = strings.Join(append([]string{"defaults"}, detectedNetworks...), ",")
 	}
 
-	// Variables to hold multi-select results
-	var selectedTools []string
-	var selectedOutputs []string
+	return huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("What network access does the workflow need?").
+			Description("Network access controls which external domains the workflow can reach").
+			Options(networkOptions...).
+			Value(&b.NetworkAccess),
+	).
+		Title("Network & Security").
+		Description("Configure network access and security settings")
+}
 
-	// Create form with organized groups
-	form := console.NewForm(
-		// Group 1: Basic Configuration
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("When should this workflow run?").
-				Description("Choose the GitHub event that triggers this workflow").
-				Options(triggerOptions...).
-				Height(8).
-				Value(&b.Trigger),
-			huh.NewSelect[string]().
-				Title("Which AI engine should process this workflow?").
-				Description("The AI engine interprets instructions and executes tasks using available tools").
-				Options(engineOptions...).
-				Value(&b.Engine),
-		).
-			Title("Basic Configuration").
-			Description("Let's start with the fundamentals of your workflow"),
-
-		// Group 2: Capabilities
-		huh.NewGroup(
-			huh.NewMultiSelect[string]().
-				Title("Which tools should the AI have access to?").
-				Description("Tools enable the AI to interact with code, APIs, and external systems").
-				Options(toolOptions...).
-				Height(8).
-				Value(&selectedTools),
-			huh.NewMultiSelect[string]().
-				Title("What outputs should the AI be able to create?").
-				Description("Safe outputs allow the AI to create GitHub resources after human approval").
-				Options(outputOptions...).
-				Height(10).
-				Value(&selectedOutputs),
-		).
-			Title("Capabilities").
-			Description("Select the tools and outputs your workflow needs"),
-
-		// Group 3: Network & Security
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("What network access does the workflow need?").
-				Description("Network access controls which external domains the workflow can reach").
-				Options(networkOptions...).
-				Value(&b.NetworkAccess),
-		).
-			Title("Network & Security").
-			Description("Configure network access and security settings"),
-
-		// Group 4: Instructions
-		huh.NewGroup(
-			huh.NewText().
-				Title("Describe what this workflow should do:").
-				Description("Provide clear, detailed instructions for the AI to follow when executing this workflow").
-				Value(&b.Intent).
-				Validate(ValidateWorkflowIntent),
-		).
-			Title("Instructions").
-			Description("Describe what you want this workflow to accomplish"),
-	)
-
-	if err := form.RunWithContext(b.ctx); err != nil {
-		return err
-	}
-
-	// Store the multi-select results
-	b.Tools = selectedTools
-	b.SafeOutputs = selectedOutputs
-
-	interactiveLog.Printf("User configuration selected: trigger=%s, engine=%s, tools=%v, safe_outputs=%v", b.Trigger, b.Engine, selectedTools, selectedOutputs)
-
-	return nil
+func (b *InteractiveWorkflowBuilder) configurationInstructionsGroup() *huh.Group {
+	return huh.NewGroup(
+		huh.NewText().
+			Title("Describe what this workflow should do:").
+			Description("Provide clear, detailed instructions for the AI to follow when executing this workflow").
+			Value(&b.Intent).
+			Validate(ValidateWorkflowIntent),
+	).
+		Title("Instructions").
+		Description("Describe what you want this workflow to accomplish")
 }
 
 // promptForConfigurationFrom is the non-TTY fallback for promptForConfiguration.
@@ -291,6 +295,20 @@ func (b *InteractiveWorkflowBuilder) promptForConfigurationFrom(r io.Reader) err
 	interactiveLog.Print("Non-TTY detected, using text prompts for configuration")
 	scanner := b.ensureNonTTYScanner(r)
 
+	if err := b.promptNonTTYTriggerAndEngine(scanner); err != nil {
+		return err
+	}
+	if err := b.promptNonTTYCapabilities(scanner); err != nil {
+		return err
+	}
+	if err := b.promptNonTTYNetworkAndIntent(scanner); err != nil {
+		return err
+	}
+	interactiveLog.Printf("Non-TTY configuration selected: trigger=%s, engine=%s, tools=%v, safe_outputs=%v", b.Trigger, b.Engine, b.Tools, b.SafeOutputs)
+	return nil
+}
+
+func (b *InteractiveWorkflowBuilder) promptNonTTYTriggerAndEngine(scanner *bufio.Scanner) error {
 	// --- Trigger (single-select) ---
 	triggerOptions := []struct{ label, value string }{
 		{"Manual trigger (workflow_dispatch)", "workflow_dispatch"},
@@ -320,7 +338,10 @@ func (b *InteractiveWorkflowBuilder) promptForConfigurationFrom(r io.Reader) err
 		return fmt.Errorf("failed to select engine: %w", err)
 	}
 	b.Engine = engine
+	return nil
+}
 
+func (b *InteractiveWorkflowBuilder) promptNonTTYCapabilities(scanner *bufio.Scanner) error {
 	// --- Tools (multi-select) ---
 	toolOptions := []struct{ label, value string }{
 		{"github - GitHub API tools (issues, PRs, comments, repos)", "github"},
@@ -347,7 +368,10 @@ func (b *InteractiveWorkflowBuilder) promptForConfigurationFrom(r io.Reader) err
 		return fmt.Errorf("failed to select safe outputs: %w", err)
 	}
 	b.SafeOutputs = safeOutputs
+	return nil
+}
 
+func (b *InteractiveWorkflowBuilder) promptNonTTYNetworkAndIntent(scanner *bufio.Scanner) error {
 	// --- Network access (single-select) ---
 	detectedNetworks := detectNetworkFromRepo()
 	networkItems := []struct{ label, value string }{
@@ -376,7 +400,6 @@ func (b *InteractiveWorkflowBuilder) promptForConfigurationFrom(r io.Reader) err
 		return fmt.Errorf("invalid workflow intent: %w", err)
 	}
 
-	interactiveLog.Printf("Non-TTY configuration selected: trigger=%s, engine=%s, tools=%v, safe_outputs=%v", b.Trigger, b.Engine, b.Tools, b.SafeOutputs)
 	return nil
 }
 
@@ -568,6 +591,11 @@ func (b *InteractiveWorkflowBuilder) generateWorkflowContent() string {
 		fmt.Fprintf(&content, "%s\n\n", b.Intent)
 	}
 
+	b.writeWorkflowCustomizationNotes(&content)
+	return content.String()
+}
+
+func (b *InteractiveWorkflowBuilder) writeWorkflowCustomizationNotes(content *strings.Builder) {
 	// Add TODO sections for customization
 	content.WriteString("<!--\n")
 	content.WriteString("## TODO: Customize this workflow\n\n")
@@ -579,27 +607,26 @@ func (b *InteractiveWorkflowBuilder) generateWorkflowContent() string {
 	content.WriteString("- [ ] Testing and validation steps\n\n")
 
 	content.WriteString("## Configuration Summary\n\n")
-	fmt.Fprintf(&content, "- **Trigger**: %s\n", b.describeTrigger())
-	fmt.Fprintf(&content, "- **AI Engine**: %s\n", b.Engine)
+	fmt.Fprintf(content, "- **Trigger**: %s\n", b.describeTrigger())
+	fmt.Fprintf(content, "- **AI Engine**: %s\n", b.Engine)
 
 	if len(b.Tools) > 0 {
-		fmt.Fprintf(&content, "- **Tools**: %s\n", strings.Join(b.Tools, ", "))
+		fmt.Fprintf(content, "- **Tools**: %s\n", strings.Join(b.Tools, ", "))
 	}
 
 	if len(b.SafeOutputs) > 0 {
-		fmt.Fprintf(&content, "- **Safe Outputs**: %s\n", strings.Join(b.SafeOutputs, ", "))
+		fmt.Fprintf(content, "- **Safe Outputs**: %s\n", strings.Join(b.SafeOutputs, ", "))
 	}
 
-	fmt.Fprintf(&content, "- **Network Access**: %s\n", b.NetworkAccess)
+	fmt.Fprintf(content, "- **Network Access**: %s\n", b.NetworkAccess)
 
 	content.WriteString("\n## Next Steps\n\n")
 	content.WriteString("1. Review and customize the workflow content above\n")
 	content.WriteString("2. Remove TODO sections when ready\n")
-	fmt.Fprintf(&content, "3. Run `%s compile` to generate the GitHub Actions workflow\n", string(constants.CLIExtensionPrefix))
+	fmt.Fprintf(content, "3. Run `%s compile` to generate the GitHub Actions workflow\n", string(constants.CLIExtensionPrefix))
 	content.WriteString("4. Test the workflow with a manual trigger or appropriate event\n")
 	content.WriteString("-->\n")
 
-	return content.String()
 }
 
 // Helper methods for generating configuration sections

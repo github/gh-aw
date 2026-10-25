@@ -120,17 +120,21 @@ func checkActorPermission(ctx context.Context, actor string, validateActor bool,
 	// Check if the actor has write+ access
 	if !hasWriteAccess(permission) {
 		mcpLog.Printf("Tool %s: access denied for actor %s (permission: %s, requires: write+)", toolName, actor, permission)
-		return newMCPError(jsonrpc.CodeInvalidRequest, "permission denied: insufficient role", map[string]any{
-			"error":      "insufficient repository permissions",
-			"tool":       toolName,
-			"actor":      actor,
-			"repository": repo,
-			"role":       permission,
-			"required":   "write, maintain, or admin",
-			"reason":     fmt.Sprintf("Actor %s has %s access to %s. This tool requires at least write access.", actor, permission, repo),
-		})
+		return insufficientActorRoleError(toolName, actor, repo, permission)
 	}
 
 	mcpLog.Printf("Tool %s: access allowed for actor %s (permission: %s)", toolName, actor, permission)
 	return nil
+}
+
+func insufficientActorRoleError(toolName, actor, repo, permission string) error {
+	return newMCPError(jsonrpc.CodeInvalidRequest, "permission denied: insufficient role", map[string]any{
+		"error":      "insufficient repository permissions",
+		"tool":       toolName,
+		"actor":      actor,
+		"repository": repo,
+		"role":       permission,
+		"required":   "write, maintain, or admin",
+		"reason":     fmt.Sprintf("Actor %s has %s access to %s. This tool requires at least write access.", actor, permission, repo),
+	})
 }

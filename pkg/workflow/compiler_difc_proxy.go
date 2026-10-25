@@ -369,17 +369,7 @@ func injectProxyEnvIntoCustomSteps(customSteps string) string {
 	// must capture them here and re-apply after processing to preserve annotations
 	// like "uses: actions/upload-artifact@sha # v7" in the compiled lock file.
 	// Without this, gh-aw-manifest falls back to recording the SHA as the version.
-	versionComments := make(map[string]string) // key: action@sha, value: " # vX"
-	for line := range strings.SplitSeq(customSteps, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "uses:") && strings.Contains(trimmed, " # ") {
-			parts := strings.SplitN(trimmed, " # ", 2)
-			if len(parts) == 2 {
-				usesValue := strings.TrimSpace(strings.TrimPrefix(parts[0], "uses:"))
-				versionComments[usesValue] = " # " + parts[1]
-			}
-		}
-	}
+	versionComments := proxyStepVersionComments(customSteps)
 
 	var parsed struct {
 		Steps []map[string]any `yaml:"steps"`
@@ -429,6 +419,21 @@ func injectProxyEnvIntoCustomSteps(customSteps string) string {
 	// The YAML marshaller quotes strings containing "#" (version comments), but
 	// GitHub Actions expects unquoted uses values.
 	return unquoteUsesWithComments(strings.TrimRight(string(resultBytes), "\n"))
+}
+
+func proxyStepVersionComments(customSteps string) map[string]string {
+	versionComments := make(map[string]string)
+	for line := range strings.SplitSeq(customSteps, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "uses:") && strings.Contains(trimmed, " # ") {
+			parts := strings.SplitN(trimmed, " # ", 2)
+			if len(parts) == 2 {
+				usesValue := strings.TrimSpace(strings.TrimPrefix(parts[0], "uses:"))
+				versionComments[usesValue] = " # " + parts[1]
+			}
+		}
+	}
+	return versionComments
 }
 
 // generateStopDIFCProxyStep generates a step that stops the DIFC proxy container

@@ -61,49 +61,7 @@ func (c *Compiler) parseDispatchRepositoryConfig(outputMap map[string]any) *Disp
 			continue
 		}
 
-		tool := &DispatchRepositoryToolConfig{}
-
-		if desc, ok := toolMap["description"].(string); ok {
-			tool.Description = desc
-		}
-
-		if workflow, ok := toolMap["workflow"].(string); ok {
-			tool.Workflow = workflow
-		}
-
-		if eventType, ok := toolMap["event_type"].(string); ok {
-			tool.EventType = eventType
-		}
-
-		if repo, ok := toolMap["repository"].(string); ok {
-			tool.Repository = repo
-		}
-
-		// Parse allowed_repositories (list of repos)
-		if allowedReposRaw, exists := toolMap["allowed_repositories"]; exists {
-			if allowedReposList, ok := allowedReposRaw.([]any); ok {
-				for _, r := range allowedReposList {
-					if rStr, ok := r.(string); ok {
-						tool.AllowedRepositories = append(tool.AllowedRepositories, rStr)
-					}
-				}
-			}
-		}
-
-		// Parse inputs (map of input definitions)
-		if inputsRaw, exists := toolMap["inputs"]; exists {
-			if inputsMap, ok := inputsRaw.(map[string]any); ok {
-				tool.Inputs = inputsMap
-			}
-		}
-
-		// Parse max (templatable int, default 1)
-		var baseCfg BaseSafeOutputConfig
-		c.parseBaseSafeOutputConfig(toolMap, &baseCfg, 1)
-		tool.Max = baseCfg.Max
-		tool.GitHubToken = baseCfg.GitHubToken
-		tool.GitHubApp = baseCfg.GitHubApp
-		tool.Staged = baseCfg.Staged
+		tool := c.parseDispatchRepositoryTool(toolMap)
 
 		// Cap max at 50
 		if maxVal := templatableIntValue(tool.Max); maxVal > 50 {
@@ -123,6 +81,54 @@ func (c *Compiler) parseDispatchRepositoryConfig(outputMap map[string]any) *Disp
 	}
 
 	return dispatchRepoConfig
+}
+
+func (c *Compiler) parseDispatchRepositoryTool(toolMap map[string]any) *DispatchRepositoryToolConfig {
+	tool := &DispatchRepositoryToolConfig{}
+
+	if desc, ok := toolMap["description"].(string); ok {
+		tool.Description = desc
+	}
+
+	if workflow, ok := toolMap["workflow"].(string); ok {
+		tool.Workflow = workflow
+	}
+
+	if eventType, ok := toolMap["event_type"].(string); ok {
+		tool.EventType = eventType
+	}
+
+	if repo, ok := toolMap["repository"].(string); ok {
+		tool.Repository = repo
+	}
+
+	// Parse allowed_repositories (list of repos)
+	if allowedReposRaw, exists := toolMap["allowed_repositories"]; exists {
+		if allowedReposList, ok := allowedReposRaw.([]any); ok {
+			for _, r := range allowedReposList {
+				if rStr, ok := r.(string); ok {
+					tool.AllowedRepositories = append(tool.AllowedRepositories, rStr)
+				}
+			}
+		}
+	}
+
+	// Parse inputs (map of input definitions)
+	if inputsRaw, exists := toolMap["inputs"]; exists {
+		if inputsMap, ok := inputsRaw.(map[string]any); ok {
+			tool.Inputs = inputsMap
+		}
+	}
+
+	// Parse max (templatable int, default 1)
+	var baseCfg BaseSafeOutputConfig
+	c.parseBaseSafeOutputConfig(toolMap, &baseCfg, 1)
+	tool.Max = baseCfg.Max
+	tool.GitHubToken = baseCfg.GitHubToken
+	tool.GitHubApp = baseCfg.GitHubApp
+	tool.Staged = baseCfg.Staged
+
+	return tool
 }
 
 func dispatchRepositoryToolAppTokenStepID(toolKey string) string {

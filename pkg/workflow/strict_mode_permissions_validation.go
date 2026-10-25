@@ -129,59 +129,66 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 	// This applies regardless of LLM gateway support
 	// Both ecosystem domains and truly custom domains are allowed, but we warn about ecosystem domains
 	if networkPermissions != nil && len(networkPermissions.Allowed) > 0 {
-		strictModeValidationLog.Printf("Validating network domains in strict mode for all engines")
+		suggestStrictNetworkEcosystems(engineID, networkPermissions)
+	}
 
-		// Check if allowed domains contain only known ecosystem identifiers or truly custom domains
-		// Track domains that belong to known ecosystems but are not specified as ecosystem identifiers
-		type domainSuggestion struct {
-			domain    string
-			ecosystem string // empty if no ecosystem found, non-empty if domain belongs to known ecosystem
+	return validateStrictEngineFirewall(engineID, networkPermissions, sandboxConfig)
+}
+
+func suggestStrictNetworkEcosystems(engineID string, networkPermissions *NetworkPermissions) {
+	strictModeValidationLog.Printf("Validating network domains in strict mode for all engines")
+
+	// Check if allowed domains contain only known ecosystem identifiers or truly custom domains
+	// Track domains that belong to known ecosystems but are not specified as ecosystem identifiers
+	type domainSuggestion struct {
+		domain    string
+		ecosystem string // empty if no ecosystem found, non-empty if domain belongs to known ecosystem
+	}
+	var ecosystemDomainsNotAsIdentifiers []domainSuggestion
+
+	for _, domain := range networkPermissions.Allowed {
+		// Skip wildcards (handled below)
+		if domain == "*" {
+			continue
 		}
-		var ecosystemDomainsNotAsIdentifiers []domainSuggestion
-
-		for _, domain := range networkPermissions.Allowed {
-			// Skip wildcards (handled below)
-			if domain == "*" {
-				continue
-			}
-
-			// Check if this is a known ecosystem identifier using a direct map lookup
-			// to avoid the allocation, copy, and sort that getEcosystemDomains incurs.
-			if isKnownEcosystemIdentifier(domain) {
-				// This is a known ecosystem identifier - allowed in strict mode
-				strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
-				continue
-			}
-
-			// Not an ecosystem identifier - check if it belongs to any ecosystem
-			ecosystem := GetDomainEcosystem(domain)
-			strictModeValidationLog.Printf("Domain '%s' ecosystem: '%s'", domain, ecosystem)
-
-			if ecosystem != "" {
-				// This domain belongs to a known ecosystem but was not specified as an ecosystem identifier
-				// In strict mode, we suggest using ecosystem identifiers instead
-				ecosystemDomainsNotAsIdentifiers = append(ecosystemDomainsNotAsIdentifiers, domainSuggestion{domain: domain, ecosystem: ecosystem})
-			} else {
-				// This is a truly custom domain (not part of any known ecosystem) - allowed in strict mode
-				strictModeValidationLog.Printf("Domain '%s' is a truly custom domain, allowed in strict mode", domain)
-			}
+		// Check if this is a known ecosystem identifier using a direct map lookup
+		// to avoid the allocation, copy, and sort that getEcosystemDomains incurs.
+		if isKnownEcosystemIdentifier(domain) {
+			// This is a known ecosystem identifier - allowed in strict mode
+			strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
+			continue
 		}
 
-		if len(ecosystemDomainsNotAsIdentifiers) > 0 {
-			strictModeValidationLog.Printf("Engine '%s' has ecosystem domains not specified as identifiers in strict mode, emitting informational guidance", engineID)
+		// Not an ecosystem identifier - check if it belongs to any ecosystem
+		ecosystem := GetDomainEcosystem(domain)
+		strictModeValidationLog.Printf("Domain '%s' ecosystem: '%s'", domain, ecosystem)
 
-			// Build informational message with ecosystem suggestions
-			var suggestions []string
-			for _, ds := range ecosystemDomainsNotAsIdentifiers {
-				suggestions = append(suggestions, fmt.Sprintf("'%s' → '%s'", ds.domain, ds.ecosystem))
-			}
-
-			infoMsg := "recommend using ecosystem identifiers instead of individual domain names for better maintainability: " + strings.Join(suggestions, ", ")
-
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(infoMsg))
+		if ecosystem != "" {
+			// This domain belongs to a known ecosystem but was not specified as an ecosystem identifier
+			// In strict mode, we suggest using ecosystem identifiers instead
+			ecosystemDomainsNotAsIdentifiers = append(ecosystemDomainsNotAsIdentifiers, domainSuggestion{domain: domain, ecosystem: ecosystem})
+		} else {
+			// This is a truly custom domain (not part of any known ecosystem) - allowed in strict mode
+			strictModeValidationLog.Printf("Domain '%s' is a truly custom domain, allowed in strict mode", domain)
 		}
 	}
 
+	if len(ecosystemDomainsNotAsIdentifiers) > 0 {
+		strictModeValidationLog.Printf("Engine '%s' has ecosystem domains not specified as identifiers in strict mode, emitting informational guidance", engineID)
+
+		// Build informational message with ecosystem suggestions
+		var suggestions []string
+		for _, ds := range ecosystemDomainsNotAsIdentifiers {
+			suggestions = append(suggestions, fmt.Sprintf("'%s' → '%s'", ds.domain, ds.ecosystem))
+		}
+
+		infoMsg := "recommend using ecosystem identifiers instead of individual domain names for better maintainability: " + strings.Join(suggestions, ", ")
+
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(infoMsg))
+	}
+}
+
+func validateStrictEngineFirewall(engineID string, networkPermissions *NetworkPermissions, sandboxConfig *SandboxConfig) error {
 	// Only apply firewall validation to copilot and codex engines
 	if engineID != string(constants.CopilotEngine) && engineID != string(constants.CodexEngine) {
 		strictModeValidationLog.Printf("Engine '%s' does not support firewall, skipping firewall validation", engineID)

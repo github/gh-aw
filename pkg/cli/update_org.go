@@ -166,21 +166,33 @@ func renderOrgPreviewReport(previewByRepo []orgRepoPreview, applying bool) {
 }
 
 func previewOrgRepoUpdates(ctx context.Context, repo string, opts UpdateWorkflowsOptions, verbose bool) (orgRepoPreview, error) {
+	checkoutDir, err := prepareOrgUpdateCheckout(ctx, repo)
+	if err != nil {
+		return orgRepoPreview{}, err
+	}
+
+	return previewOrgCheckoutUpdates(ctx, checkoutDir, repo, opts, verbose)
+}
+
+func prepareOrgUpdateCheckout(ctx context.Context, repo string) (string, error) {
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
-		return orgRepoPreview{}, fmt.Errorf("--org requires running inside a git repository: %w", err)
+		return "", fmt.Errorf("--org requires running inside a git repository: %w", err)
 	}
 
 	updatesDir, err := ensureUpdateTargetRepoGitignore(gitRoot)
 	if err != nil {
-		return orgRepoPreview{}, err
+		return "", err
 	}
 
 	checkoutDir := filepath.Join(updatesDir, sanitizeRepoPath(repo))
 	if err := shallowCloneTargetRepo(ctx, repo, checkoutDir); err != nil {
-		return orgRepoPreview{}, err
+		return "", err
 	}
+	return checkoutDir, nil
+}
 
+func previewOrgCheckoutUpdates(ctx context.Context, checkoutDir, repo string, opts UpdateWorkflowsOptions, verbose bool) (orgRepoPreview, error) {
 	workflowsDir := filepath.Join(checkoutDir, constants.GetWorkflowDir())
 	workflows, err := findWorkflowsWithSource(workflowsDir, opts.WorkflowNames, verbose)
 	if err != nil {

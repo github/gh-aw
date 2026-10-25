@@ -78,6 +78,10 @@ func ParseTriggerShorthand(input string) (*TriggerIR, error) {
 		return ir, err
 	}
 
+	return parseRepositoryIntegrationTrigger(input)
+}
+
+func parseRepositoryIntegrationTrigger(input string) (*TriggerIR, error) {
 	// 7. Release and repository patterns
 	if ir, err := parseReleaseRepositoryTrigger(input); ir != nil || err != nil {
 		return ir, err
@@ -239,21 +243,6 @@ func parsePullRequestTrigger(tokens []string) (*TriggerIR, error) {
 	// Check for activity type: "pull_request opened", "pull_request merged", etc.
 	activityType := tokens[1]
 
-	// Map common activity types
-	validTypes := map[string]struct {
-	}{
-		"opened":           {},
-		"edited":           {},
-		"closed":           {},
-		"reopened":         {},
-		"synchronize":      {},
-		"assigned":         {},
-		"unassigned":       {},
-		"labeled":          {},
-		"unlabeled":        {},
-		"review_requested": {},
-	}
-
 	// Special case: "merged" is not a real type, it's a condition on "closed"
 	if activityType == "merged" {
 		triggerParserLog.Print("Parsed pull_request merged trigger (maps to closed with merge condition)")
@@ -267,7 +256,7 @@ func parsePullRequestTrigger(tokens []string) (*TriggerIR, error) {
 		}, nil
 	}
 
-	if setutil.Contains(validTypes, activityType) {
+	if isPullRequestActivityType(activityType) {
 		ir := &TriggerIR{
 			Event: "pull_request",
 			Types: []string{activityType},
@@ -303,6 +292,22 @@ func parsePullRequestTrigger(tokens []string) (*TriggerIR, error) {
 	}
 
 	return nil, fmt.Errorf("invalid pull_request trigger format: '%s'. Expected format: 'pull_request <type>' or 'pull_request affecting <path>'. Valid types: opened, edited, closed, reopened, synchronize, merged, labeled, unlabeled. Example: 'pull_request opened' or 'pull_request affecting src/**'", strings.Join(tokens, " "))
+}
+
+func isPullRequestActivityType(activityType string) bool {
+	validTypes := map[string]struct{}{
+		"opened":           {},
+		"edited":           {},
+		"closed":           {},
+		"reopened":         {},
+		"synchronize":      {},
+		"assigned":         {},
+		"unassigned":       {},
+		"labeled":          {},
+		"unlabeled":        {},
+		"review_requested": {},
+	}
+	return setutil.Contains(validTypes, activityType)
 }
 
 // parseIssueDiscussionTrigger parses issue and discussion triggers
@@ -651,6 +656,26 @@ func parseDeploymentTrigger(input string) (*TriggerIR, error) {
 		return nil, nil
 	}
 
+	states := deploymentTriggerStates(tokens[1:])
+	if len(states) == 0 {
+		return nil, nil
+	}
+
+	// Build the if condition expression
+	parts := make([]string, 0, len(states))
+	for _, s := range states {
+		parts = append(parts, "github.event.deployment_status.state == '"+s+"'")
+	}
+	stateExpr := strings.Join(parts, " || ")
+	condition := "github.event_name != 'deployment_status' || (" + stateExpr + ")"
+	triggerParserLog.Printf("Parsed deployment trigger with states %v, condition: %s", states, condition)
+	return &TriggerIR{
+		Event:      "deployment_status",
+		Conditions: []string{condition},
+	}, nil
+}
+
+func deploymentTriggerStates(tokens []string) []string {
 	// Map common words to GitHub deployment_status state values
 	stateAliases := map[string]string{
 		"failed":    "failure",
@@ -669,7 +694,7 @@ func parseDeploymentTrigger(input string) (*TriggerIR, error) {
 	})
 	conjunctions := map[string]struct {
 	}{"or": {}, "and": {}}
-	for _, tok := range tokens[1:] {
+	for _, tok := range tokens {
 		tok = strings.ToLower(strings.TrimRight(tok, ","))
 		if setutil.Contains(conjunctions, tok) {
 			continue
@@ -682,31 +707,11 @@ func parseDeploymentTrigger(input string) (*TriggerIR, error) {
 			}
 		} else {
 			// Unknown token - not a deployment shorthand we can handle
-			return nil, nil
+			return nil
 		}
 	}
 
-	if len(states) == 0 {
-		return nil, nil
-	}
-
-	// Build the if condition expression
-	parts := make([]string, 0, len(states))
-	for _, s := range states {
-		parts = append(parts, "github.event.deployment_status.state == '"+s+"'")
-	}
-	stateExpr := strings.Join(parts, " || ")
-
-	// Guard with event_name so the condition is transparent when the workflow is
-	// triggered by other events (e.g. workflow_dispatch combined with deployment_status).
-	condition := "github.event_name != 'deployment_status' || (" + stateExpr + ")"
-
-	triggerParserLog.Printf("Parsed deployment trigger with states %v, condition: %s", states, condition)
-
-	return &TriggerIR{
-		Event:      "deployment_status",
-		Conditions: []string{condition},
-	}, nil
+	return states
 }
 
 func mergeCommandOtherEvents(existing map[string]any, incoming map[string]any) map[string]any {

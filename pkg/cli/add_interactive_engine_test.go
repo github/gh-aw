@@ -81,6 +81,19 @@ func TestCopilotAuthMethodDescription(t *testing.T) {
 	})
 }
 
+func TestCopilotAuthMethodOptionsOrdering(t *testing.T) {
+	for _, status := range []string{"enabled", "disabled", ""} {
+		options := copilotAuthMethodOptions(orgCopilotBillingProbeResult{BillingStatus: status}, "org billing")
+		want := []string{authMethodPAT, authMethodCopilotRequests}
+		if status == "enabled" {
+			want = []string{authMethodCopilotRequests, authMethodPAT}
+		}
+		if len(options) != 2 || options[0].Value != want[0] || options[1].Value != want[1] {
+			t.Fatalf("billing status %q: unexpected options %v", status, options)
+		}
+	}
+}
+
 func TestPrioritizeEngineOption(t *testing.T) {
 	t.Parallel()
 	options := []huh.Option[string]{

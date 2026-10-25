@@ -66,42 +66,15 @@ func getLatestActionReleaseWithDeps(ctx context.Context, deps actionUpdateDeps, 
 		return latestRelease, latestSHA, nil
 	}
 
-	// Parse current version
+	return resolveActionReleaseCandidates(ctx, deps, baseRepo, currentVersion, releases, allowMajor)
+}
+
+func resolveActionReleaseCandidates(ctx context.Context, deps actionUpdateDeps, baseRepo, currentVersion string, releases []string, allowMajor bool) (string, string, error) {
 	currentVer := parseVersion(currentVersion)
-
-	// Find all valid stable semantic version releases (skip prereleases such as v1.0.0-beta.1).
-	// Per semver rules, v1.1.0-beta.1 > v1.0.0, so without this filter a prerelease of a
-	// higher base version could be incorrectly selected as the upgrade target.
-	type releaseWithVersion struct {
-		tag     string
-		version *semverutil.SemanticVersion
-	}
-	var validReleases []releaseWithVersion
-	for _, release := range releases {
-		releaseVer := parseVersion(release)
-		if releaseVer != nil && releaseVer.Pre == "" {
-			validReleases = append(validReleases, releaseWithVersion{
-				tag:     release,
-				version: releaseVer,
-			})
-		}
-	}
-
+	validReleases := sortedStableActionReleases(releases)
 	if len(validReleases) == 0 {
 		return "", "", errors.New("no valid semantic version releases found")
 	}
-
-	// Sort releases by semver in descending order (highest first)
-	slices.SortFunc(validReleases, func(a, b releaseWithVersion) int {
-		switch {
-		case a.version.IsNewer(b.version):
-			return -1
-		case b.version.IsNewer(a.version):
-			return 1
-		default:
-			return 0
-		}
-	})
 
 	// If current version is not valid, return the highest semver release
 	if currentVer == nil {
@@ -114,31 +87,7 @@ func getLatestActionReleaseWithDeps(ctx context.Context, deps actionUpdateDeps, 
 	}
 
 	// Find the highest compatible release (respecting major version if !allowMajor)
-	var latestCompatible string
-	var latestCompatibleVersion *semverutil.SemanticVersion
-
-	for _, rel := range validReleases {
-		// Check if compatible based on major version
-		if !allowMajor && rel.version.Major != currentVer.Major {
-			continue
-		}
-
-		// Since releases are sorted by semver descending, first match is highest
-		if latestCompatibleVersion == nil || rel.version.IsNewer(latestCompatibleVersion) {
-			latestCompatible = rel.tag
-			latestCompatibleVersion = rel.version
-		} else if !rel.version.IsNewer(latestCompatibleVersion) &&
-			rel.version.Major == latestCompatibleVersion.Major &&
-			rel.version.Minor == latestCompatibleVersion.Minor &&
-			rel.version.Patch == latestCompatibleVersion.Patch {
-			// If versions are equal, prefer the less precise one (e.g., "v8" over "v8.0.0")
-			// This follows GitHub Actions convention of using major version tags
-			if !rel.version.IsPreciseVersion() && latestCompatibleVersion.IsPreciseVersion() {
-				latestCompatible = rel.tag
-				latestCompatibleVersion = rel.version
-			}
-		}
-	}
+	latestCompatible := highestCompatibleActionRelease(validReleases, currentVer, allowMajor)
 
 	if latestCompatible == "" {
 		return "", "", errors.New("no compatible release found")
@@ -151,6 +100,60 @@ func getLatestActionReleaseWithDeps(ctx context.Context, deps actionUpdateDeps, 
 	}
 
 	return latestCompatible, sha, nil
+}
+
+type stableActionRelease struct {
+	tag     string
+	version *semverutil.SemanticVersion
+}
+
+func sortedStableActionReleases(releases []string) []stableActionRelease {
+	// Skip prereleases: a prerelease of a higher base version must not be an upgrade target.
+	var validReleases []stableActionRelease
+	for _, release := range releases {
+		releaseVer := parseVersion(release)
+		if releaseVer != nil && releaseVer.Pre == "" {
+			validReleases = append(validReleases, stableActionRelease{
+				tag:     release,
+				version: releaseVer,
+			})
+		}
+	}
+	slices.SortFunc(validReleases, func(a, b stableActionRelease) int {
+		switch {
+		case a.version.IsNewer(b.version):
+			return -1
+		case b.version.IsNewer(a.version):
+			return 1
+		default:
+			return 0
+		}
+	})
+	return validReleases
+}
+
+func highestCompatibleActionRelease(validReleases []stableActionRelease, currentVer *semverutil.SemanticVersion, allowMajor bool) string {
+	var latestCompatible string
+	var latestCompatibleVersion *semverutil.SemanticVersion
+	for _, rel := range validReleases {
+		if !allowMajor && rel.version.Major != currentVer.Major {
+			continue
+		}
+		if latestCompatibleVersion == nil || rel.version.IsNewer(latestCompatibleVersion) {
+			latestCompatible = rel.tag
+			latestCompatibleVersion = rel.version
+		} else if !rel.version.IsNewer(latestCompatibleVersion) &&
+			rel.version.Major == latestCompatibleVersion.Major &&
+			rel.version.Minor == latestCompatibleVersion.Minor &&
+			rel.version.Patch == latestCompatibleVersion.Patch {
+			// Prefer the less precise tag (e.g. "v8" over "v8.0.0") for equal versions.
+			if !rel.version.IsPreciseVersion() && latestCompatibleVersion.IsPreciseVersion() {
+				latestCompatible = rel.tag
+				latestCompatibleVersion = rel.version
+			}
+		}
+	}
+	return latestCompatible
 }
 
 // getLatestActionReleaseViaGit gets the latest release using git ls-remote (fallback)
@@ -180,44 +183,18 @@ func getLatestActionReleaseViaGit(ctx context.Context, repo, currentVersion stri
 		return "", "", errors.New("no releases found")
 	}
 
+	return selectActionGitRelease(releases, tagToSHA, currentVersion, allowMajor, verbose)
+}
+
+func selectActionGitRelease(releases []string, tagToSHA map[string]string, currentVersion string, allowMajor, verbose bool) (string, string, error) {
 	// Parse current version
 	currentVer := parseVersion(currentVersion)
 
-	// Find all valid stable semantic version releases (skip prereleases such as v1.0.0-beta.1).
-	// Per semver rules, v1.1.0-beta.1 > v1.0.0, so without this filter a prerelease of a
-	// higher base version could be incorrectly selected as the upgrade target.
-	// git ls-remote --tags returns every tag, so the prerelease check is especially important
-	// for this fallback path.
-	type releaseWithVersion struct {
-		tag     string
-		version *semverutil.SemanticVersion
-	}
-	var validReleases []releaseWithVersion
-	for _, release := range releases {
-		releaseVer := parseVersion(release)
-		if releaseVer != nil && releaseVer.Pre == "" {
-			validReleases = append(validReleases, releaseWithVersion{
-				tag:     release,
-				version: releaseVer,
-			})
-		}
-	}
+	validReleases := sortedStableActionReleases(releases)
 
 	if len(validReleases) == 0 {
 		return "", "", errors.New("no valid semantic version releases found")
 	}
-
-	// Sort releases by semver in descending order (highest first)
-	slices.SortFunc(validReleases, func(a, b releaseWithVersion) int {
-		switch {
-		case a.version.IsNewer(b.version):
-			return -1
-		case b.version.IsNewer(a.version):
-			return 1
-		default:
-			return 0
-		}
-	})
 
 	// If current version is not valid, return the highest semver release
 	if currentVer == nil {
@@ -230,31 +207,7 @@ func getLatestActionReleaseViaGit(ctx context.Context, repo, currentVersion stri
 	}
 
 	// Find the highest compatible release (respecting major version if !allowMajor)
-	var latestCompatible string
-	var latestCompatibleVersion *semverutil.SemanticVersion
-
-	for _, rel := range validReleases {
-		// Check if compatible based on major version
-		if !allowMajor && rel.version.Major != currentVer.Major {
-			continue
-		}
-
-		// Since releases are sorted by semver descending, first match is highest
-		if latestCompatibleVersion == nil || rel.version.IsNewer(latestCompatibleVersion) {
-			latestCompatible = rel.tag
-			latestCompatibleVersion = rel.version
-		} else if !rel.version.IsNewer(latestCompatibleVersion) &&
-			rel.version.Major == latestCompatibleVersion.Major &&
-			rel.version.Minor == latestCompatibleVersion.Minor &&
-			rel.version.Patch == latestCompatibleVersion.Patch {
-			// If versions are equal, prefer the less precise one (e.g., "v8" over "v8.0.0")
-			// This follows GitHub Actions convention of using major version tags
-			if !rel.version.IsPreciseVersion() && latestCompatibleVersion.IsPreciseVersion() {
-				latestCompatible = rel.tag
-				latestCompatibleVersion = rel.version
-			}
-		}
-	}
+	latestCompatible := highestCompatibleActionRelease(validReleases, currentVer, allowMajor)
 
 	if latestCompatible == "" {
 		return "", "", errors.New("no compatible release found")

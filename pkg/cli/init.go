@@ -78,6 +78,16 @@ func InitRepository(opts InitOptions) error {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to configure GHES repo config: %v", err)))
 	}
 
+	if err := initializeRepositoryFiles(opts, copilotArtifactsEnabled); err != nil {
+		return err
+	}
+	if err := initializeRepositoryIntegrations(ctx, opts, copilotArtifactsEnabled); err != nil {
+		return err
+	}
+	return finishRepositoryInitialization(ctx, opts)
+}
+
+func initializeRepositoryFiles(opts InitOptions, copilotArtifactsEnabled bool) error {
 	if opts.NoGitattributes {
 		initLog.Print("Skipping .gitattributes configuration")
 	} else {
@@ -106,25 +116,8 @@ func InitRepository(opts InitOptions) error {
 	}
 
 	if copilotArtifactsEnabled {
-		if opts.Agent {
-			initLog.Print("Writing agentic workflows custom agent")
-			if err := ensureAgenticWorkflowsAgent(opts.Verbose, true); err != nil {
-				initLog.Printf("Failed to write agentic workflows custom agent: %v", err)
-				return fmt.Errorf("failed to write agentic workflows custom agent: %w", err)
-			}
-			if opts.Verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created agentic workflows custom agent"))
-			}
-		} else {
-			initLog.Print("Skipping agentic workflows custom agent")
-		}
-		if err := deleteLegacyAgentFiles(opts.Verbose); err != nil {
-			initLog.Printf("Failed to delete legacy agent files: %v", err)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agent files: %v", err)))
-		}
-		if err := deleteAgenticWorkflowDesignerSkillDir(opts.Verbose); err != nil {
-			initLog.Printf("Failed to delete legacy agentic-workflow-designer skill directory: %v", err)
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agentic-workflow-designer skill directory: %v", err)))
+		if err := initializeCopilotAgentFiles(opts); err != nil {
+			return err
 		}
 	}
 
@@ -134,7 +127,34 @@ func InitRepository(opts InitOptions) error {
 		initLog.Printf("Failed to delete setup agentic workflows agent: %v", err)
 		return fmt.Errorf("failed to delete setup agentic workflows agent: %w", err)
 	}
+	return nil
+}
 
+func initializeCopilotAgentFiles(opts InitOptions) error {
+	if opts.Agent {
+		initLog.Print("Writing agentic workflows custom agent")
+		if err := ensureAgenticWorkflowsAgent(opts.Verbose, true); err != nil {
+			initLog.Printf("Failed to write agentic workflows custom agent: %v", err)
+			return fmt.Errorf("failed to write agentic workflows custom agent: %w", err)
+		}
+		if opts.Verbose {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created agentic workflows custom agent"))
+		}
+	} else {
+		initLog.Print("Skipping agentic workflows custom agent")
+	}
+	if err := deleteLegacyAgentFiles(opts.Verbose); err != nil {
+		initLog.Printf("Failed to delete legacy agent files: %v", err)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agent files: %v", err)))
+	}
+	if err := deleteAgenticWorkflowDesignerSkillDir(opts.Verbose); err != nil {
+		initLog.Printf("Failed to delete legacy agentic-workflow-designer skill directory: %v", err)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agentic-workflow-designer skill directory: %v", err)))
+	}
+	return nil
+}
+
+func initializeRepositoryIntegrations(ctx context.Context, opts InitOptions, copilotArtifactsEnabled bool) error {
 	// Configure MCP if requested
 	if opts.MCP && copilotArtifactsEnabled {
 		initLog.Print("Configuring GitHub Copilot Agent MCP integration")
@@ -187,7 +207,10 @@ func InitRepository(opts InitOptions) error {
 	if opts.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated .vscode/settings.json"))
 	}
+	return nil
+}
 
+func finishRepositoryInitialization(ctx context.Context, opts InitOptions) error {
 	// Install shell completions if requested
 	if opts.Completions {
 		initLog.Print("Installing shell completions")
@@ -272,18 +295,7 @@ func ensureMaintenanceWorkflow(ctx context.Context, verbose bool) error {
 	initLog.Printf("Action mode detected for maintenance workflow: %s", compiler.GetActionMode())
 
 	// Parse all workflows to collect WorkflowData
-	var workflowDataList []*workflow.WorkflowData
-	for _, file := range files {
-		initLog.Printf("Parsing workflow: %s", file)
-		workflowData, err := compiler.ParseWorkflowFile(file)
-		if err != nil {
-			// Ignore parse errors - workflows might be incomplete during init
-			initLog.Printf("Skipping workflow %s due to parse error: %v", file, err)
-			continue
-		}
-
-		workflowDataList = append(workflowDataList, workflowData)
-	}
+	workflowDataList := parseInitMaintenanceWorkflows(compiler, files)
 
 	// Always call GenerateMaintenanceWorkflow even with empty list
 	// This allows it to delete existing maintenance workflow if no workflows have expires
@@ -313,6 +325,23 @@ func ensureMaintenanceWorkflow(ctx context.Context, verbose bool) error {
 	}
 
 	return nil
+}
+
+func parseInitMaintenanceWorkflows(compiler *workflow.Compiler, files []string) []*workflow.WorkflowData {
+	var workflowDataList []*workflow.WorkflowData
+	for _, file := range files {
+		initLog.Printf("Parsing workflow: %s", file)
+		workflowData, err := compiler.ParseWorkflowFile(file)
+		if err != nil {
+			// Ignore parse errors - workflows might be incomplete during init
+			initLog.Printf("Skipping workflow %s due to parse error: %v", file, err)
+			continue
+		}
+
+		workflowDataList = append(workflowDataList, workflowData)
+	}
+
+	return workflowDataList
 }
 
 // isGHESHost returns true when the given host is a GitHub Enterprise Server instance,
@@ -392,7 +421,10 @@ func ensureGHESRepoConfig(verbose bool) (bool, error) {
 	}
 
 	configPath := filepath.Join(gitRoot, workflow.RepoConfigFileName)
+	return writeGHESRepoConfig(configPath, ghesHost, verbose)
+}
 
+func writeGHESRepoConfig(configPath, ghesHost string, verbose bool) (bool, error) {
 	// Read existing content or start with an empty document.
 	var doc map[string]any
 	if data, readErr := os.ReadFile(configPath); readErr == nil {

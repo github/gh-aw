@@ -70,21 +70,33 @@ func runRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) er
 
 	// Determine the scan path: use workflowDir relative to gitRoot when possible,
 	// so the scan is scoped to the compiled workflows directory.
+	containerScanPath, err := runnerGuardDirectoryScanPath(workflowDir, gitRoot)
+	if err != nil {
+		return err
+	}
+	cmd, dockerArgs, err := buildRunnerGuardCommand(gitRoot, containerScanPath)
+	if err != nil {
+		return err
+	}
+	return executeRunnerGuardScan(cmd, dockerArgs, gitRoot, verbose, strict)
+}
+
+func runnerGuardDirectoryScanPath(workflowDir, gitRoot string) (string, error) {
 	scanPath := "."
 	if workflowDir != "" {
 		absWorkflowDir, err := filepath.Abs(workflowDir)
 		if err != nil {
-			return fmt.Errorf("workflow directory %q could not be resolved to an absolute path; expected an existing directory. Example: .github/workflows: %w", workflowDir, err)
+			return "", fmt.Errorf("workflow directory %q could not be resolved to an absolute path; expected an existing directory. Example: .github/workflows: %w", workflowDir, err)
 		}
 		if err := fileutil.ValidatePathWithinBase(gitRoot, absWorkflowDir); err != nil {
-			return fmt.Errorf("workflow directory %q must stay within git root %q; expected a directory inside the repository. Example: .github/workflows: %w", workflowDir, gitRoot, err)
+			return "", fmt.Errorf("workflow directory %q must stay within git root %q; expected a directory inside the repository. Example: .github/workflows: %w", workflowDir, gitRoot, err)
 		}
 		relDir, relErr := filepath.Rel(gitRoot, absWorkflowDir)
 		if relErr != nil {
-			return fmt.Errorf("workflow directory %q could not be expressed relative to git root %q; expected a directory inside the repository. Example: .github/workflows: %w", workflowDir, gitRoot, relErr)
+			return "", fmt.Errorf("workflow directory %q could not be expressed relative to git root %q; expected a directory inside the repository. Example: .github/workflows: %w", workflowDir, gitRoot, relErr)
 		}
 		if !filepath.IsLocal(relDir) {
-			return fmt.Errorf("workflow directory %q resolved to non-local relative path %q", workflowDir, relDir)
+			return "", fmt.Errorf("workflow directory %q resolved to non-local relative path %q", workflowDir, relDir)
 		}
 		scanPath = filepath.Clean(relDir)
 	}
@@ -94,22 +106,25 @@ func runRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) er
 	// produce a scanPath beginning with "-", which runner-guard could interpret as a flag.
 	containerScanPath, err := buildRunnerGuardContainerScanPath(scanPath)
 	if err != nil {
-		return fmt.Errorf("runner-guard scan path is invalid; expected a relative path inside the repository. Example: .github/workflows: %w", err)
+		return "", fmt.Errorf("runner-guard scan path is invalid; expected a relative path inside the repository. Example: .github/workflows: %w", err)
 	}
+	return containerScanPath, nil
+}
 
+func buildRunnerGuardCommand(gitRoot, containerScanPath string) (*exec.Cmd, []string, error) {
 	// Build the Docker command
 	// docker run --rm -v "$gitRoot:/workdir" -w /workdir ghcr.io/vigilant-llc/runner-guard:latest scan <path> --format json
 	dockerPath, err := fileutil.ResolveExecutablePath("docker")
 	if err != nil {
-		return fmt.Errorf("docker command not found: %w", err)
+		return nil, nil, fmt.Errorf("docker command not found: %w", err)
 	}
 	volumeMount, err := buildDockerVolumeMount(gitRoot, "/workdir")
 	if err != nil {
-		return fmt.Errorf("docker mount path for git root %q is invalid; expected an absolute host path. Example: /home/user/repo: %w", gitRoot, err)
+		return nil, nil, fmt.Errorf("docker mount path for git root %q is invalid; expected an absolute host path. Example: /home/user/repo: %w", gitRoot, err)
 	}
 	runnerGuardImageRef, err := validateDockerImageRef(RunnerGuardImage)
 	if err != nil {
-		return fmt.Errorf("runner-guard scanner image reference %q is invalid; expected a registry reference. Example: ghcr.io/owner/image:tag: %w", RunnerGuardImage, err)
+		return nil, nil, fmt.Errorf("runner-guard scanner image reference %q is invalid; expected a registry reference. Example: ghcr.io/owner/image:tag: %w", RunnerGuardImage, err)
 	}
 	// #nosec G204 -- gitRoot is validated as an absolute path above (from git rev-parse, a trusted
 	// source). containerScanPath is derived from filepath.Rel(gitRoot, workflowDir), cleaned with
@@ -120,7 +135,10 @@ func runRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) er
 	dockerArgs := runnerGuardDockerArgs(runnerGuardImageRef, volumeMount, containerScanPath)
 	// #nosec G204 -- see the trust-boundary rationale above.
 	cmd := exec.Command(dockerPath, dockerArgs...)
+	return cmd, dockerArgs, nil
+}
 
+func executeRunnerGuardScan(cmd *exec.Cmd, dockerArgs []string, gitRoot string, verbose, strict bool) error {
 	// Always show that runner-guard is running (regular verbosity)
 	fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running runner-guard taint analysis scanner"))
 
@@ -136,7 +154,7 @@ func runRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) er
 	cmd.Stderr = &stderr
 
 	// Run the command
-	err = cmd.Run()
+	err := cmd.Run()
 
 	// Parse and display output
 	var findings []scanfindings.Finding
@@ -154,6 +172,10 @@ func runRunnerGuardOnDirectory(workflowDir string, verbose bool, strict bool) er
 		return fmt.Errorf("runner-guard output could not be parsed: %w", parseErr)
 	}
 
+	return runnerGuardScanResult(err, parseErr, totalFindings, findings, strict)
+}
+
+func runnerGuardScanResult(err, parseErr error, totalFindings int, findings []scanfindings.Finding, strict bool) error {
 	// Check if the error is due to findings or actual failure
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -251,6 +273,11 @@ func parseAndDisplayRunnerGuardOutputWithFindings(stdout string, verbose bool, g
 	}
 
 	// Display score/grade if present
+	displayRunnerGuardFindings(output, gitRoot)
+	return totalFindings, nil
+}
+
+func displayRunnerGuardFindings(output runnerGuardOutput, gitRoot string) {
 	if output.Score > 0 || output.Grade != "" {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(
 			fmt.Sprintf("Runner-Guard Score: %d/100 (Grade: %s)", output.Score, output.Grade),
@@ -265,47 +292,49 @@ func parseAndDisplayRunnerGuardOutputWithFindings(stdout string, verbose bool, g
 
 	// Display findings for each file
 	for filePath, findings := range findingsByFile {
-		// Validate and sanitize file path to prevent path traversal
-		cleanPath := filepath.Clean(filePath)
+		displayRunnerGuardFileFindings(filePath, findings, gitRoot)
+	}
+}
 
-		absPath := cleanPath
-		if !filepath.IsAbs(cleanPath) {
-			absPath = filepath.Join(gitRoot, cleanPath)
-		}
+func displayRunnerGuardFileFindings(filePath string, findings []runnerGuardFinding, gitRoot string) {
+	// Validate and sanitize file path to prevent path traversal
+	cleanPath := filepath.Clean(filePath)
 
-		absGitRoot, err := filepath.Abs(gitRoot)
-		if err != nil {
-			runnerGuardLog.Printf("Failed to get absolute path for git root: %v", err)
-			continue
-		}
-
-		absPath, err = filepath.Abs(absPath)
-		if err != nil {
-			runnerGuardLog.Printf("Failed to get absolute path for %s: %v", filePath, err)
-			continue
-		}
-
-		// Check if the resolved path is within gitRoot to prevent path traversal
-		relPath, err := filepath.Rel(absGitRoot, absPath)
-		if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-			runnerGuardLog.Printf("Skipping file outside git root: %s", filePath)
-			continue
-		}
-
-		// Read file content for context display
-		// #nosec G304 -- absPath is validated through: 1) filepath.Clean() normalization,
-		// 2) absolute path resolution, and 3) filepath.Rel() check ensuring it's within gitRoot.
-		// Path traversal attacks are prevented by the boundary validation above.
-		fileContent, err := os.ReadFile(absPath)
-		var fileLines []string
-		if err == nil {
-			fileLines = strings.Split(string(fileContent), "\n")
-		}
-
-		scanfindings.Render(os.Stderr, runnerGuardFindingsToShared(findings, fileLines))
+	absPath := cleanPath
+	if !filepath.IsAbs(cleanPath) {
+		absPath = filepath.Join(gitRoot, cleanPath)
 	}
 
-	return totalFindings, nil
+	absGitRoot, err := filepath.Abs(gitRoot)
+	if err != nil {
+		runnerGuardLog.Printf("Failed to get absolute path for git root: %v", err)
+		return
+	}
+
+	absPath, err = filepath.Abs(absPath)
+	if err != nil {
+		runnerGuardLog.Printf("Failed to get absolute path for %s: %v", filePath, err)
+		return
+	}
+
+	// Check if the resolved path is within gitRoot to prevent path traversal
+	relPath, err := filepath.Rel(absGitRoot, absPath)
+	if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+		runnerGuardLog.Printf("Skipping file outside git root: %s", filePath)
+		return
+	}
+
+	// Read file content for context display
+	// #nosec G304 -- absPath is validated through: 1) filepath.Clean() normalization,
+	// 2) absolute path resolution, and 3) filepath.Rel() check ensuring it's within gitRoot.
+	// Path traversal attacks are prevented by the boundary validation above.
+	fileContent, err := os.ReadFile(absPath)
+	var fileLines []string
+	if err == nil {
+		fileLines = strings.Split(string(fileContent), "\n")
+	}
+
+	scanfindings.Render(os.Stderr, runnerGuardFindingsToShared(findings, fileLines))
 }
 
 // runnerGuardFindingsToShared maps runner-guard's native findings onto the shared

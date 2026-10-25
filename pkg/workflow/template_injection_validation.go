@@ -186,11 +186,7 @@ func isShellIdentifier(s string) bool {
 // caller's expression checks. This matches the behaviour of removeHeredocContent, which
 // validateNoGitHubExpressionsInRunScriptsFromParsed uses on the parsed path.
 func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
-	inRunBlock := false
-	runBlockIndent := 0
-	inHeredoc := false
-	heredocDelimiter := ""
-
+	state := runBlockLineState{}
 	for line := range strings.SplitSeq(yamlContent, "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
 		if trimmed == "" {
@@ -198,37 +194,11 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 		}
 		indent := len(line) - len(trimmed)
 
-		if inRunBlock {
-			if indent <= runBlockIndent {
-				inRunBlock = false
-				inHeredoc = false
-				heredocDelimiter = ""
-				// Fall through: check whether this line starts a new run: block.
-			} else {
-				// If we are inside a heredoc, look for the closing delimiter.
-				if inHeredoc {
-					if strings.TrimSpace(line) == heredocDelimiter {
-						inHeredoc = false
-						heredocDelimiter = ""
-					}
-					continue // always skip heredoc content
-				}
-				// Check whether this line opens a heredoc.
-				if delim, ok := detectHeredocDelimiter(trimmed); ok {
-					inHeredoc = true
-					heredocDelimiter = delim
-					// The opening line itself is not heredoc body; visit it so callers
-					// can see the surrounding shell context, but do not recurse.
-					if visit(line) {
-						return true
-					}
-					continue
-				}
-				if visit(line) {
-					return true
-				}
-				continue
+		if handled, stop := state.visitRunBlockLine(line, trimmed, indent, visit); handled {
+			if stop {
+				return true
 			}
+			continue
 		}
 
 		keyPart := trimmed
@@ -242,8 +212,8 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 		}
 
 		if rest == "" || rest[0] == '|' || rest[0] == '>' {
-			inRunBlock = true
-			runBlockIndent = indent
+			state.inRunBlock = true
+			state.runBlockIndent = indent
 			continue
 		}
 
@@ -253,6 +223,37 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 	}
 
 	return false
+}
+
+type runBlockLineState struct {
+	inRunBlock       bool
+	runBlockIndent   int
+	inHeredoc        bool
+	heredocDelimiter string
+}
+
+func (s *runBlockLineState) visitRunBlockLine(line, trimmed string, indent int, visit func(string) bool) (bool, bool) {
+	if !s.inRunBlock {
+		return false, false
+	}
+	if indent <= s.runBlockIndent {
+		s.inRunBlock = false
+		s.inHeredoc = false
+		s.heredocDelimiter = ""
+		return false, false
+	}
+	if s.inHeredoc {
+		if strings.TrimSpace(line) == s.heredocDelimiter {
+			s.inHeredoc = false
+			s.heredocDelimiter = ""
+		}
+		return true, false
+	}
+	if delim, ok := detectHeredocDelimiter(trimmed); ok {
+		s.inHeredoc = true
+		s.heredocDelimiter = delim
+	}
+	return true, visit(line)
 }
 
 // scanRunContentExpressions performs a single pass over run: blocks to detect both

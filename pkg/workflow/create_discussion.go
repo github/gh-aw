@@ -43,30 +43,7 @@ func (c *Compiler) parseCreateDiscussionsConfig(outputMap map[string]any) *Creat
 			return &CreateDiscussionsConfig{}
 		},
 		nil,
-		func(configData map[string]any, config *CreateDiscussionsConfig, expiresDisabled bool) {
-			config.Enabled = closeOlderEnabledFromConfigData(configData, "close-older-discussions")
-
-			// Set default max if not specified
-			if config.Max == nil {
-				config.Max = defaultIntStr(1)
-			}
-
-			// Set default expires to 7 days (168 hours) if not specified and not explicitly disabled
-			if config.Expires == 0 && !expiresDisabled {
-				config.Expires = 168 // 7 days = 168 hours
-				discussionLog.Print("Using default expiration: 7 days (168 hours)")
-			} else if expiresDisabled {
-				config.Expires = 0
-				discussionLog.Print("Expiration explicitly disabled")
-			}
-
-			// Set default fallback-to-issue to true if not specified
-			if config.FallbackToIssue == nil {
-				trueVal := true
-				config.FallbackToIssue = &trueVal
-				discussionLog.Print("Using default fallback-to-issue: true")
-			}
-		},
+		applyCreateDiscussionDefaults,
 	)
 	if config == nil {
 		return nil
@@ -74,7 +51,35 @@ func (c *Compiler) parseCreateDiscussionsConfig(outputMap map[string]any) *Creat
 
 	// Normalize and validate category naming convention
 	config.Category = normalizeDiscussionCategory(config.Category, discussionLog, c.markdownPath)
+	logCreateDiscussionConfig(config)
+	return config
+}
 
+func applyCreateDiscussionDefaults(configData map[string]any, config *CreateDiscussionsConfig, expiresDisabled bool) {
+	config.Enabled = closeOlderEnabledFromConfigData(configData, "close-older-discussions")
+	// Set default max if not specified
+	if config.Max == nil {
+		config.Max = defaultIntStr(1)
+	}
+
+	// Set default expires to 7 days (168 hours) if not specified and not explicitly disabled
+	if config.Expires == 0 && !expiresDisabled {
+		config.Expires = 168 // 7 days = 168 hours
+		discussionLog.Print("Using default expiration: 7 days (168 hours)")
+	} else if expiresDisabled {
+		config.Expires = 0
+		discussionLog.Print("Expiration explicitly disabled")
+	}
+
+	// Set default fallback-to-issue to true if not specified
+	if config.FallbackToIssue == nil {
+		trueVal := true
+		config.FallbackToIssue = &trueVal
+		discussionLog.Print("Using default fallback-to-issue: true")
+	}
+}
+
+func logCreateDiscussionConfig(config *CreateDiscussionsConfig) {
 	// Log configured values
 	if config.TitlePrefix != "" {
 		discussionLog.Printf("Title prefix configured: %q", config.TitlePrefix)
@@ -107,7 +112,6 @@ func (c *Compiler) parseCreateDiscussionsConfig(outputMap map[string]any) *Creat
 		discussionLog.Printf("Fallback to issue configured: %t", *config.FallbackToIssue)
 	}
 
-	return config
 }
 
 // Returns normalized category (or original if it's a category ID)

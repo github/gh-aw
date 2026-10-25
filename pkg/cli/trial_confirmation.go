@@ -37,6 +37,12 @@ type trialConfirmationOptions struct {
 // showTrialConfirmation displays a confirmation prompt to the user using parsed workflow specs
 func showTrialConfirmation(opts trialConfirmationOptions) error {
 	trialConfirmationLog.Printf("Showing trial confirmation: workflows=%d, hostRepo=%s, cloneRepo=%s, repeat=%d, directMode=%v", len(opts.parsedSpecs), opts.hostRepoSlug, opts.cloneRepoSlug, opts.repeatCount, opts.directTrialMode)
+	renderTrialPlanSections(opts)
+	renderTrialExecutionSteps(opts)
+	return confirmTrialExecution()
+}
+
+func renderTrialPlanSections(opts trialConfirmationOptions) {
 	githubHost := getGitHubHost()
 	hostRepoSlugURL := fmt.Sprintf("%s/%s", githubHost, opts.hostRepoSlug)
 
@@ -64,6 +70,20 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 	sections = append(sections, "")
 
 	// Display target repository info based on mode
+	sections = append(sections, console.RenderInfoSection(trialModeDescription(opts))...)
+	sections = append(sections, "")
+
+	var hostInfo strings.Builder
+	fmt.Fprintf(&hostInfo, "Host Repo:  %s\n", opts.hostRepoSlug)
+	fmt.Fprintf(&hostInfo, "            %s", hostRepoSlugURL)
+	sections = append(sections, console.RenderInfoSection(hostInfo.String())...)
+	sections = append(sections, "")
+	sections = append(sections, console.RenderInfoSection(trialConfigurationDescription(opts))...)
+	sections = append(sections, "")
+	console.RenderComposedSections(sections)
+}
+
+func trialModeDescription(opts trialConfirmationOptions) string {
 	var modeInfo strings.Builder
 	if opts.cloneRepoSlug != "" {
 		// Clone-repo mode
@@ -79,19 +99,10 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 		modeInfo.WriteString("Mode:      Simulate execution against target repository")
 	}
 
-	sections = append(sections, console.RenderInfoSection(modeInfo.String())...)
+	return modeInfo.String()
+}
 
-	sections = append(sections, "")
-
-	// Host repository info
-	var hostInfo strings.Builder
-	fmt.Fprintf(&hostInfo, "Host Repo:  %s\n", opts.hostRepoSlug)
-	fmt.Fprintf(&hostInfo, "            %s", hostRepoSlugURL)
-
-	sections = append(sections, console.RenderInfoSection(hostInfo.String())...)
-
-	sections = append(sections, "")
-
+func trialConfigurationDescription(opts trialConfirmationOptions) string {
 	// Configuration settings
 	var configInfo strings.Builder
 	if opts.deleteHostRepo {
@@ -116,13 +127,10 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 		configInfo.WriteString("\nAuto-merge: Pull requests will be automatically merged")
 	}
 
-	sections = append(sections, console.RenderInfoSection(configInfo.String())...)
+	return configInfo.String()
+}
 
-	sections = append(sections, "")
-
-	// Compose and output all sections
-	console.RenderComposedSections(sections)
-
+func renderTrialExecutionSteps(opts trialConfirmationOptions) {
 	// Add "Execution Steps" section separator
 	executionStepsSections := console.RenderTitleBox("Execution Steps", 80)
 	console.RenderComposedSections(executionStepsSections)
@@ -147,6 +155,20 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 	stepNum++
 
 	// Step 2: Clone contents (only in clone-repo mode)
+	stepNum = renderTrialCloneSteps(opts, hostRepoExists, stepNum)
+	stepNum = renderTrialInstallSteps(opts, stepNum)
+	stepNum = renderTrialWorkflowExecution(opts, stepNum)
+	if opts.deleteHostRepo {
+		fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Delete the host repository\n"), stepNum)
+	} else {
+		fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Preserve the host repository for inspection\n"), stepNum)
+	}
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
+	fmt.Fprintln(os.Stderr, "")
+}
+
+func renderTrialCloneSteps(opts trialConfirmationOptions, hostRepoExists bool, stepNum int) int {
 	if opts.cloneRepoSlug != "" {
 		if hostRepoExists && !opts.forceDeleteHostRepo {
 			fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Force push contents from %s (overwriting existing content)\n"), stepNum, opts.cloneRepoSlug)
@@ -164,7 +186,10 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 		}
 		stepNum++
 	}
+	return stepNum
+}
 
+func renderTrialInstallSteps(opts trialConfirmationOptions, stepNum int) int {
 	// Step 3/2: Install and compile workflows
 	if len(opts.parsedSpecs) == 1 {
 		fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Install and compile %s\n"), stepNum, opts.parsedSpecs[0].WorkflowName)
@@ -179,7 +204,10 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 		fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Ensure %s API key secret is configured\n"), stepNum, opts.engineOverride)
 		stepNum++
 	}
+	return stepNum
+}
 
+func renderTrialWorkflowExecution(opts trialConfirmationOptions, stepNum int) int {
 	// Step 5/4: Execute workflows and auto-merge (repeated if --repeat is used)
 	if len(opts.parsedSpecs) == 1 {
 		workflowName := opts.parsedSpecs[0].WorkflowName
@@ -215,18 +243,10 @@ func showTrialConfirmation(opts trialConfirmationOptions) error {
 		}
 	}
 	stepNum++
+	return stepNum
+}
 
-	// Final step: Delete/preserve repository
-	if opts.deleteHostRepo {
-		fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Delete the host repository\n"), stepNum)
-	} else {
-		fmt.Fprintf(os.Stderr, console.FormatInfoMessageStderr("  %d. Preserve the host repository for inspection\n"), stepNum)
-	}
-
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
-	fmt.Fprintln(os.Stderr, "")
-
+func confirmTrialExecution() error {
 	// Ask for confirmation using console helper
 	confirmed, err := console.ConfirmAction(
 		"Do you want to continue?",

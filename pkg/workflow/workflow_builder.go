@@ -55,7 +55,22 @@ func (c *Compiler) buildInitialWorkflowData(
 	}
 	dailyCredits, dailyCreditsExplicit := resolveMaxDailyAICWithSource(result.Frontmatter, importsResult.MergedMaxDailyAICredits)
 
-	workflowData := &WorkflowData{
+	workflowData := c.initialWorkflowMetadata(result, toolsResult, importsResult, docs, dailyCredits, dailyCreditsExplicit)
+	populateInitialWorkflowTools(workflowData, result, toolsResult, importsResult, subAgents)
+	c.populateInitialWorkflowEngine(workflowData, result, toolsResult, engineSetup, importsResult, agentFile, agentImportSpec, inlinedImports)
+	c.applyImportedWorkflowConcurrency(workflowData, result, importsResult)
+	if err := populateInitialWorkflowCheckout(workflowData, result, toolsResult, importsResult); err != nil {
+		return nil, err
+	}
+	c.finalizeInitialWorkflowCheckout(workflowData, result)
+	populateInitialWorkflowUpdateFlags(workflowData, result, toolsResult)
+	c.populateInitialWorkflowModels(workflowData, result, toolsResult, importsResult)
+	populateInitialWorkflowExcludedEnv(workflowData, toolsResult, importsResult)
+	return workflowData, nil
+}
+
+func (c *Compiler) initialWorkflowMetadata(result *parser.FrontmatterResult, toolsResult *toolsProcessingResult, importsResult *parser.ImportsResult, docs string, dailyCredits *string, dailyCreditsExplicit bool) *WorkflowData {
+	return &WorkflowData{
 		Name:                       toolsResult.workflowName,
 		AdmissionEnabled:           c.isAdmissionEnabled(result.Frontmatter),
 		FrontmatterName:            toolsResult.frontmatterName,
@@ -75,54 +90,63 @@ func (c *Compiler) buildInitialWorkflowData(
 		MaxDailyAICreditsGitHubApp: extractMaxDailyAICGitHubApp(result.Frontmatter),
 		MaxDailyAICContinueOnError: resolveMaxDailyAICContinueOnError(result.Frontmatter, importsResult.MergedMaxDailyAICredits),
 		ImportedFiles:              importsResult.ImportedFiles,
-		Skills:                     extractFrontmatterSkills(toolsResult.parsedFrontmatter, result.Frontmatter),
-		SkillReferences:            extractFrontmatterSkillReferences(toolsResult.parsedFrontmatter, result.Frontmatter),
-		Plugins:                    mergeFrontmatterPlugins(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects),
-		PluginReferences:           mergeFrontmatterPluginReferences(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects),
-		ImportedMarkdown:           toolsResult.importedMarkdown, // Only imports WITH inputs
-		ImportPaths:                toolsResult.importPaths,      // Import paths for runtime-import macros (imports without inputs)
-		PromptImports:              toolsResult.promptImports,    // Ordered prompt contributions from imports
-		MainWorkflowMarkdown:       toolsResult.mainWorkflowMarkdown,
-		IncludedFiles:              toolsResult.allIncludedFiles,
-		ImportInputs:               importsResult.ImportInputs,
-		Tools:                      toolsResult.tools,
-		ExplicitlyDisabledTools:    toolsResult.explicitlyDisabledTools,
-		LSP:                        extractLSPConfig(toolsResult.parsedFrontmatter, result.Frontmatter),
-		ParsedTools:                NewTools(toolsResult.tools),
-		Runtimes:                   toolsResult.runtimes,
-		RunInstallScripts:          toolsResult.runInstallScripts,
-		MarkdownContent:            toolsResult.markdownContent,
-		SubAgentModels:             append(toolsResult.subAgentModels, importsResult.SubAgentModels...),
-		SubAgents:                  append(subAgents, importsResult.SubAgents...),
-		AI:                         engineSetup.engineSetting,
-		Model:                      engineSetup.model,
-		EngineConfig:               engineSetup.engineConfig,
-		GHES:                       c.ghesArtifactCompat,
-		AgentFile:                  agentFile,
-		AgentImportSpec:            agentImportSpec,
-		RepositoryImports:          importsResult.RepositoryImports,
-		NetworkPermissions:         engineSetup.networkPermissions,
-		SandboxConfig:              applySandboxDefaults(engineSetup.sandboxConfig, engineSetup.engineConfig),
-		RunnerConfig:               extractRunnerConfig(result.Frontmatter),
-		Enclaves:                   extractEnclavesConfig(result.Frontmatter),
-		NeedsTextOutput:            toolsResult.needsTextOutput,
-		ToolsTimeout:               toolsResult.toolsTimeout,
-		ToolsStartupTimeout:        toolsResult.toolsStartupTimeout,
-		TrialMode:                  c.trialMode,
-		TrialLogicalRepo:           c.trialLogicalRepoSlug,
-		UseSamples:                 c.samplesEnabledFromImports(result.Frontmatter, importsResult.MergedFeatures),
-		StrictMode:                 c.strictMode,
-		AllowActionRefs:            c.allowActionRefs,
-		ValidateAWFConfig:          !c.skipValidation,
-		SecretMasking:              toolsResult.secretMasking,
-		ParsedFrontmatter:          toolsResult.parsedFrontmatter,
-		RawFrontmatter:             result.Frontmatter,
-		ResolvedMCPServers:         toolsResult.resolvedMCPServers,
-		HasExplicitGitHubTool:      toolsResult.hasExplicitGitHubTool,
-		ActionMode:                 c.actionMode,
-		InlinedImports:             inlinedImports,
-		EngineConfigSteps:          engineSetup.configSteps,
 	}
+}
+
+func populateInitialWorkflowTools(workflowData *WorkflowData, result *parser.FrontmatterResult, toolsResult *toolsProcessingResult, importsResult *parser.ImportsResult, subAgents []parser.InlineSubAgent) {
+	workflowData.Skills = extractFrontmatterSkills(toolsResult.parsedFrontmatter, result.Frontmatter)
+	workflowData.SkillReferences = extractFrontmatterSkillReferences(toolsResult.parsedFrontmatter, result.Frontmatter)
+	workflowData.Plugins = mergeFrontmatterPlugins(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects)
+	workflowData.PluginReferences = mergeFrontmatterPluginReferences(toolsResult.parsedFrontmatter, result.Frontmatter, importsResult.MergedPlugins, importsResult.MergedPluginObjects)
+	workflowData.ImportedMarkdown = toolsResult.importedMarkdown
+	workflowData.ImportPaths = toolsResult.importPaths
+	workflowData.PromptImports = toolsResult.promptImports
+	workflowData.MainWorkflowMarkdown = toolsResult.mainWorkflowMarkdown
+	workflowData.IncludedFiles = toolsResult.allIncludedFiles
+	workflowData.ImportInputs = importsResult.ImportInputs
+	workflowData.Tools = toolsResult.tools
+	workflowData.ExplicitlyDisabledTools = toolsResult.explicitlyDisabledTools
+	workflowData.LSP = extractLSPConfig(toolsResult.parsedFrontmatter, result.Frontmatter)
+	workflowData.ParsedTools = NewTools(toolsResult.tools)
+	workflowData.Runtimes = toolsResult.runtimes
+	workflowData.RunInstallScripts = toolsResult.runInstallScripts
+	workflowData.MarkdownContent = toolsResult.markdownContent
+	workflowData.SubAgentModels = append(toolsResult.subAgentModels, importsResult.SubAgentModels...)
+	workflowData.SubAgents = append(subAgents, importsResult.SubAgents...)
+}
+
+func (c *Compiler) populateInitialWorkflowEngine(workflowData *WorkflowData, result *parser.FrontmatterResult, toolsResult *toolsProcessingResult, engineSetup *engineSetupResult, importsResult *parser.ImportsResult, agentFile, agentImportSpec string, inlinedImports bool) {
+	workflowData.AI = engineSetup.engineSetting
+	workflowData.Model = engineSetup.model
+	workflowData.EngineConfig = engineSetup.engineConfig
+	workflowData.GHES = c.ghesArtifactCompat
+	workflowData.AgentFile = agentFile
+	workflowData.AgentImportSpec = agentImportSpec
+	workflowData.RepositoryImports = importsResult.RepositoryImports
+	workflowData.NetworkPermissions = engineSetup.networkPermissions
+	workflowData.SandboxConfig = applySandboxDefaults(engineSetup.sandboxConfig, engineSetup.engineConfig)
+	workflowData.RunnerConfig = extractRunnerConfig(result.Frontmatter)
+	workflowData.Enclaves = extractEnclavesConfig(result.Frontmatter)
+	workflowData.NeedsTextOutput = toolsResult.needsTextOutput
+	workflowData.ToolsTimeout = toolsResult.toolsTimeout
+	workflowData.ToolsStartupTimeout = toolsResult.toolsStartupTimeout
+	workflowData.TrialMode = c.trialMode
+	workflowData.TrialLogicalRepo = c.trialLogicalRepoSlug
+	workflowData.UseSamples = c.samplesEnabledFromImports(result.Frontmatter, importsResult.MergedFeatures)
+	workflowData.StrictMode = c.strictMode
+	workflowData.AllowActionRefs = c.allowActionRefs
+	workflowData.ValidateAWFConfig = !c.skipValidation
+	workflowData.SecretMasking = toolsResult.secretMasking
+	workflowData.ParsedFrontmatter = toolsResult.parsedFrontmatter
+	workflowData.RawFrontmatter = result.Frontmatter
+	workflowData.ResolvedMCPServers = toolsResult.resolvedMCPServers
+	workflowData.HasExplicitGitHubTool = toolsResult.hasExplicitGitHubTool
+	workflowData.ActionMode = c.actionMode
+	workflowData.InlinedImports = inlinedImports
+	workflowData.EngineConfigSteps = engineSetup.configSteps
+}
+
+func (c *Compiler) applyImportedWorkflowConcurrency(workflowData *WorkflowData, result *parser.FrontmatterResult, importsResult *parser.ImportsResult) {
 	if importsResult.MergedConcurrency != "" && !hasExplicitConcurrencyGroup(result.Frontmatter) {
 		var importedConcurrency any
 		if err := json.Unmarshal([]byte(importsResult.MergedConcurrency), &importedConcurrency); err == nil {
@@ -131,7 +155,9 @@ func (c *Compiler) buildInitialWorkflowData(
 			workflowBuilderLog.Printf("Skipping imported concurrency merge: invalid JSON: %v", err)
 		}
 	}
+}
 
+func populateInitialWorkflowCheckout(workflowData *WorkflowData, result *parser.FrontmatterResult, toolsResult *toolsProcessingResult, importsResult *parser.ImportsResult) error {
 	// Populate checkout configs from parsed frontmatter.
 	// Fall back to raw frontmatter parsing when full ParseFrontmatterConfig fails
 	// (e.g. due to unrecognised tool config shapes like bash: ["*"]).
@@ -148,7 +174,7 @@ func (c *Compiler) buildInitialWorkflowData(
 			} else {
 				configs, err := ParseCheckoutConfigs(rawCheckout)
 				if err != nil {
-					return nil, fmt.Errorf("invalid checkout configuration: %w", err)
+					return fmt.Errorf("invalid checkout configuration: %w", err)
 				}
 				workflowData.CheckoutConfigs = configs
 			}
@@ -172,16 +198,19 @@ func (c *Compiler) buildInitialWorkflowData(
 			}
 			var raw any
 			if err := json.Unmarshal([]byte(line), &raw); err != nil {
-				return nil, fmt.Errorf("invalid imported checkout JSON: %w", err)
+				return fmt.Errorf("invalid imported checkout JSON: %w", err)
 			}
 			importedConfigs, err := ParseCheckoutConfigs(raw)
 			if err != nil {
-				return nil, fmt.Errorf("invalid imported checkout configuration: %w", err)
+				return fmt.Errorf("invalid imported checkout configuration: %w", err)
 			}
 			workflowData.CheckoutConfigs = append(workflowData.CheckoutConfigs, importedConfigs...)
 		}
 	}
+	return nil
+}
 
+func (c *Compiler) finalizeInitialWorkflowCheckout(workflowData *WorkflowData, result *parser.FrontmatterResult) {
 	// Warn when permissions.contents: none skips the default checkout but no other
 	// checkout: entries (own repo, imports) are configured, since that leaves the
 	// agent with no working-directory checkout at all (effectively equivalent to
@@ -216,7 +245,9 @@ func (c *Compiler) buildInitialWorkflowData(
 			}
 		}
 	}
+}
 
+func populateInitialWorkflowUpdateFlags(workflowData *WorkflowData, result *parser.FrontmatterResult, toolsResult *toolsProcessingResult) {
 	// Populate check-for-updates flag: disabled when check-for-updates: false is set in frontmatter.
 	if toolsResult.parsedFrontmatter != nil && toolsResult.parsedFrontmatter.UpdateCheck != nil {
 		workflowData.UpdateCheckDisabled = !*toolsResult.parsedFrontmatter.UpdateCheck
@@ -239,7 +270,9 @@ func (c *Compiler) buildInitialWorkflowData(
 			}
 		}
 	}
+}
 
+func (c *Compiler) populateInitialWorkflowModels(workflowData *WorkflowData, result *parser.FrontmatterResult, toolsResult *toolsProcessingResult, importsResult *parser.ImportsResult) {
 	// Populate model mappings: builtin, then imported, then main-workflow aliases (main wins).
 	workflowData.ModelMappings = MergeImportedModelAliases(importsResult.MergedModels, extractMainModelAliases(result.Frontmatter))
 
@@ -265,7 +298,9 @@ func (c *Compiler) buildInitialWorkflowData(
 	if pricing := resolveDefaultAiCreditsPricing(result.Frontmatter, importsResult.MergedDefaultAiCreditsPricing); pricing != nil {
 		workflowData.DefaultAiCreditsPricing = pricing
 	}
+}
 
+func populateInitialWorkflowExcludedEnv(workflowData *WorkflowData, toolsResult *toolsProcessingResult, importsResult *parser.ImportsResult) {
 	// Populate explicitly excluded env var names: union of imported workflows' excluded-env
 	// and the main workflow's excluded-env. Deduplicate and sort for stability.
 	var mainExcludedEnv []string
@@ -276,7 +311,6 @@ func (c *Compiler) buildInitialWorkflowData(
 		workflowData.ExcludedEnv = names
 	}
 
-	return workflowData, nil
 }
 
 // sourceActionPinVersions collects inline labels from frontmatter and imported action steps.

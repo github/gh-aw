@@ -178,31 +178,9 @@ func (g *DependencyGraph) extractImportsFromFrontmatter(workflowPath string, fro
 	// or an object with 'aw' subfield for agentic workflow paths.
 	workflowDir := filepath.Dir(workflowPath)
 
-	// extractPathsFromArray resolves file paths from a []any import list.
-	extractPathsFromArray := func(items []any) []string {
-		var paths []string
-		for _, item := range items {
-			switch importItem := item.(type) {
-			case string:
-				if resolvedPath := g.resolveImportPath(importItem, workflowDir); resolvedPath != "" {
-					paths = append(paths, resolvedPath)
-				}
-			case map[string]any:
-				if pathValue, hasPath := importItem["path"]; hasPath {
-					if pathStr, ok := pathValue.(string); ok {
-						if resolvedPath := g.resolveImportPath(pathStr, workflowDir); resolvedPath != "" {
-							paths = append(paths, resolvedPath)
-						}
-					}
-				}
-			}
-		}
-		return paths
-	}
-
 	switch v := importsField.(type) {
 	case []any:
-		imports = extractPathsFromArray(v)
+		imports = g.extractImportPathsFromArray(v, workflowDir)
 	case []string:
 		for _, importPath := range v {
 			if resolvedPath := g.resolveImportPath(importPath, workflowDir); resolvedPath != "" {
@@ -215,7 +193,7 @@ func (g *DependencyGraph) extractImportsFromFrontmatter(workflowPath string, fro
 		if awAny, hasAW := v["aw"]; hasAW {
 			switch aw := awAny.(type) {
 			case []any:
-				imports = extractPathsFromArray(aw)
+				imports = g.extractImportPathsFromArray(aw, workflowDir)
 			case []string:
 				for _, importPath := range aw {
 					if resolvedPath := g.resolveImportPath(importPath, workflowDir); resolvedPath != "" {
@@ -227,6 +205,27 @@ func (g *DependencyGraph) extractImportsFromFrontmatter(workflowPath string, fro
 	}
 
 	return imports
+}
+
+func (g *DependencyGraph) extractImportPathsFromArray(items []any, workflowDir string) []string {
+	var paths []string
+	for _, item := range items {
+		switch importItem := item.(type) {
+		case string:
+			if resolvedPath := g.resolveImportPath(importItem, workflowDir); resolvedPath != "" {
+				paths = append(paths, resolvedPath)
+			}
+		case map[string]any:
+			if pathValue, hasPath := importItem["path"]; hasPath {
+				if pathStr, ok := pathValue.(string); ok {
+					if resolvedPath := g.resolveImportPath(pathStr, workflowDir); resolvedPath != "" {
+						paths = append(paths, resolvedPath)
+					}
+				}
+			}
+		}
+	}
+	return paths
 }
 
 // resolveImportPath resolves an import path to an absolute file path

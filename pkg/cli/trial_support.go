@@ -55,6 +55,11 @@ func downloadAllArtifacts(hostRepoSlug, runID string, verbose bool) (*TrialArtif
 	}
 
 	// Walk through all downloaded artifacts
+	collectTrialArtifacts(tempDir, artifacts, verbose)
+	return artifacts, nil
+}
+
+func collectTrialArtifacts(tempDir string, artifacts *TrialArtifacts, verbose bool) {
 	walkErr := filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -73,51 +78,51 @@ func downloadAllArtifacts(hostRepoSlug, runID string, verbose bool) (*TrialArtif
 			return nil
 		}
 
-		// Handle specific artifact types
-		switch {
-		case strings.HasSuffix(path, constants.AgentOutputFilename.String()):
-			// Parse safe outputs
-			trialSupportLog.Printf("Processing safe outputs artifact: %s", relPath)
-			if safeOutputs := parseJSONArtifact(path, verbose); safeOutputs != nil {
-				artifacts.SafeOutputs = safeOutputs
-			}
-
-		case strings.HasSuffix(path, "aw_info.json"):
-			// Parse agentic run information
-			trialSupportLog.Printf("Processing agentic run info artifact: %s", relPath)
-			if runInfo := parseJSONArtifact(path, verbose); runInfo != nil {
-				artifacts.AgenticRunInfo = runInfo
-			}
-
-		// case strings.Contains(relPath, "agent") && strings.HasSuffix(path, ".log"):
-		// 	// Collect agent stdio logs
-		// 	if logContent := readTextArtifact(path, verbose); logContent != "" {
-		// 		artifacts.AgentStdioLogs = append(artifacts.AgentStdioLogs, logContent)
-		// 	}
-
-		case strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".jsonl") || strings.HasSuffix(path, ".log") || strings.HasSuffix(path, ".txt"):
-			// Handle other artifacts
-			if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".jsonl") {
-				if content := parseJSONArtifact(path, verbose); content != nil {
-					artifacts.AdditionalArtifacts[relPath] = content
-				}
-			} else {
-				if content := readTextArtifact(path, verbose); content != "" {
-					artifacts.AdditionalArtifacts[relPath] = content
-				}
-			}
-		}
-
+		processTrialArtifact(path, relPath, artifacts, verbose)
 		return nil
 	})
-
 	if walkErr != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error walking artifact directory: %v", walkErr)))
 		}
 	}
+}
 
-	return artifacts, nil
+func processTrialArtifact(path, relPath string, artifacts *TrialArtifacts, verbose bool) {
+	switch {
+	case strings.HasSuffix(path, constants.AgentOutputFilename.String()):
+		// Parse safe outputs
+		trialSupportLog.Printf("Processing safe outputs artifact: %s", relPath)
+		if safeOutputs := parseJSONArtifact(path, verbose); safeOutputs != nil {
+			artifacts.SafeOutputs = safeOutputs
+		}
+
+	case strings.HasSuffix(path, "aw_info.json"):
+		// Parse agentic run information
+		trialSupportLog.Printf("Processing agentic run info artifact: %s", relPath)
+		if runInfo := parseJSONArtifact(path, verbose); runInfo != nil {
+			artifacts.AgenticRunInfo = runInfo
+		}
+
+	// case strings.Contains(relPath, "agent") && strings.HasSuffix(path, ".log"):
+	// 	// Collect agent stdio logs
+	// 	if logContent := readTextArtifact(path, verbose); logContent != "" {
+	// 		artifacts.AgentStdioLogs = append(artifacts.AgentStdioLogs, logContent)
+	// 	}
+
+	case strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".jsonl") || strings.HasSuffix(path, ".log") || strings.HasSuffix(path, ".txt"):
+		// Handle other artifacts
+		if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".jsonl") {
+			if content := parseJSONArtifact(path, verbose); content != nil {
+				artifacts.AdditionalArtifacts[relPath] = content
+			}
+		} else {
+			if content := readTextArtifact(path, verbose); content != "" {
+				artifacts.AdditionalArtifacts[relPath] = content
+			}
+		}
+	}
+
 }
 
 // parseJSONArtifact parses a JSON artifact file and returns the parsed content

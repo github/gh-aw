@@ -50,6 +50,15 @@ func renderGatewayMetricsTable(metrics *GatewayMetrics, verbose bool) string {
 
 	output.WriteString("\n")
 
+	renderGatewayServerMetrics(&output, metrics)
+	renderGatewayPolicyEvents(&output, metrics)
+	if verbose {
+		renderGatewayToolMetrics(&output, metrics)
+	}
+	return output.String()
+}
+
+func renderGatewayServerMetrics(output *strings.Builder, metrics *GatewayMetrics) {
 	// Server metrics table
 	if len(metrics.Servers) > 0 {
 		// Sort servers by request count
@@ -94,6 +103,9 @@ func renderGatewayMetricsTable(metrics *GatewayMetrics, verbose bool) string {
 		}))
 	}
 
+}
+
+func renderGatewayPolicyEvents(output *strings.Builder, metrics *GatewayMetrics) {
 	// DIFC filtered events table
 	if len(metrics.FilteredEvents) > 0 {
 		output.WriteString("\n")
@@ -139,50 +151,48 @@ func renderGatewayMetricsTable(metrics *GatewayMetrics, verbose bool) string {
 		}))
 	}
 
-	// Tool metrics table (if verbose)
-	if verbose {
-		output.WriteString("\n")
-		output.WriteString("Tool Usage Details:\n")
+}
 
-		for _, serverName := range getSortedServerNames(metrics) {
-			server := metrics.Servers[serverName]
-			if len(server.Tools) == 0 {
-				continue
-			}
+func renderGatewayToolMetrics(output *strings.Builder, metrics *GatewayMetrics) {
+	output.WriteString("\n")
+	output.WriteString("Tool Usage Details:\n")
 
-			// Sort tools by call count
-			toolNames := sliceutil.MapKeys(server.Tools)
-			slices.SortFunc(toolNames, func(a, b string) int {
-				if server.Tools[a].CallCount > server.Tools[b].CallCount {
-					return -1
-				}
-				if server.Tools[a].CallCount < server.Tools[b].CallCount {
-					return 1
-				}
-				return 0
-			})
-
-			toolRows := make([][]string, 0, len(toolNames))
-			for _, toolName := range toolNames {
-				tool := server.Tools[toolName]
-				toolRows = append(toolRows, []string{
-					toolName,
-					strconv.Itoa(tool.CallCount),
-					fmt.Sprintf("%.0fms", tool.AvgDuration),
-					fmt.Sprintf("%.0fms", tool.MaxDuration),
-					strconv.Itoa(tool.ErrorCount),
-				})
-			}
-
-			output.WriteString(console.RenderTable(console.TableConfig{
-				Title:   serverName,
-				Headers: []string{"Tool", "Calls", "Avg Time", "Max Time", "Errors"},
-				Rows:    toolRows,
-			}))
+	for _, serverName := range getSortedServerNames(metrics) {
+		server := metrics.Servers[serverName]
+		if len(server.Tools) == 0 {
+			continue
 		}
-	}
 
-	return output.String()
+		// Sort tools by call count
+		toolNames := sliceutil.MapKeys(server.Tools)
+		slices.SortFunc(toolNames, func(a, b string) int {
+			if server.Tools[a].CallCount > server.Tools[b].CallCount {
+				return -1
+			}
+			if server.Tools[a].CallCount < server.Tools[b].CallCount {
+				return 1
+			}
+			return 0
+		})
+
+		toolRows := make([][]string, 0, len(toolNames))
+		for _, toolName := range toolNames {
+			tool := server.Tools[toolName]
+			toolRows = append(toolRows, []string{
+				toolName,
+				strconv.Itoa(tool.CallCount),
+				fmt.Sprintf("%.0fms", tool.AvgDuration),
+				fmt.Sprintf("%.0fms", tool.MaxDuration),
+				strconv.Itoa(tool.ErrorCount),
+			})
+		}
+
+		output.WriteString(console.RenderTable(console.TableConfig{
+			Title:   serverName,
+			Headers: []string{"Tool", "Calls", "Avg Time", "Max Time", "Errors"},
+			Rows:    toolRows,
+		}))
+	}
 }
 
 // getSortedServerNames returns server names sorted by request count
@@ -225,52 +235,7 @@ func displayAggregatedGatewayMetrics(processedRuns []ProcessedRun, outputDir str
 
 		runCount++
 
-		// Merge metrics from this run into aggregated metrics
-		aggregated.TotalRequests += runMetrics.TotalRequests
-		aggregated.TotalToolCalls += runMetrics.TotalToolCalls
-		aggregated.TotalErrors += runMetrics.TotalErrors
-		aggregated.TotalFiltered += runMetrics.TotalFiltered
-		aggregated.TotalGuardBlocked += runMetrics.TotalGuardBlocked
-		aggregated.TotalDuration += runMetrics.TotalDuration
-		aggregated.FilteredEvents = append(aggregated.FilteredEvents, runMetrics.FilteredEvents...)
-		aggregated.GuardPolicyEvents = append(aggregated.GuardPolicyEvents, runMetrics.GuardPolicyEvents...)
-
-		// Merge server metrics
-		for serverName, serverMetrics := range runMetrics.Servers {
-			aggServer := getOrCreateServer(aggregated, serverName)
-			aggServer.RequestCount += serverMetrics.RequestCount
-			aggServer.ToolCallCount += serverMetrics.ToolCallCount
-			aggServer.TotalDuration += serverMetrics.TotalDuration
-			aggServer.ErrorCount += serverMetrics.ErrorCount
-			aggServer.FilteredCount += serverMetrics.FilteredCount
-			aggServer.GuardPolicyBlocked += serverMetrics.GuardPolicyBlocked
-
-			// Merge tool metrics
-			for toolName, toolMetrics := range serverMetrics.Tools {
-				aggTool := getOrCreateTool(aggServer, toolName)
-				aggTool.CallCount += toolMetrics.CallCount
-				aggTool.TotalDuration += toolMetrics.TotalDuration
-				aggTool.ErrorCount += toolMetrics.ErrorCount
-				aggTool.TotalInputSize += toolMetrics.TotalInputSize
-				aggTool.TotalOutputSize += toolMetrics.TotalOutputSize
-
-				// Update max/min durations
-				if toolMetrics.MaxDuration > aggTool.MaxDuration {
-					aggTool.MaxDuration = toolMetrics.MaxDuration
-				}
-				if aggTool.MinDuration == 0 || (toolMetrics.MinDuration > 0 && toolMetrics.MinDuration < aggTool.MinDuration) {
-					aggTool.MinDuration = toolMetrics.MinDuration
-				}
-			}
-		}
-
-		// Update time range
-		if aggregated.StartTime.IsZero() || (!runMetrics.StartTime.IsZero() && runMetrics.StartTime.Before(aggregated.StartTime)) {
-			aggregated.StartTime = runMetrics.StartTime
-		}
-		if aggregated.EndTime.IsZero() || (!runMetrics.EndTime.IsZero() && runMetrics.EndTime.After(aggregated.EndTime)) {
-			aggregated.EndTime = runMetrics.EndTime
-		}
+		mergeGatewayRunMetrics(aggregated, runMetrics)
 	}
 
 	// Only display if we found gateway metrics
@@ -291,5 +256,54 @@ func displayAggregatedGatewayMetrics(processedRuns []ProcessedRun, outputDir str
 			fmt.Fprintf(os.Stderr, "\n%s\n",
 				console.FormatInfoMessage(fmt.Sprintf("Gateway metrics aggregated from %d runs", runCount)))
 		}
+	}
+}
+
+func mergeGatewayRunMetrics(aggregated, runMetrics *GatewayMetrics) {
+	// Merge metrics from this run into aggregated metrics
+	aggregated.TotalRequests += runMetrics.TotalRequests
+	aggregated.TotalToolCalls += runMetrics.TotalToolCalls
+	aggregated.TotalErrors += runMetrics.TotalErrors
+	aggregated.TotalFiltered += runMetrics.TotalFiltered
+	aggregated.TotalGuardBlocked += runMetrics.TotalGuardBlocked
+	aggregated.TotalDuration += runMetrics.TotalDuration
+	aggregated.FilteredEvents = append(aggregated.FilteredEvents, runMetrics.FilteredEvents...)
+	aggregated.GuardPolicyEvents = append(aggregated.GuardPolicyEvents, runMetrics.GuardPolicyEvents...)
+
+	// Merge server metrics
+	for serverName, serverMetrics := range runMetrics.Servers {
+		aggServer := getOrCreateServer(aggregated, serverName)
+		aggServer.RequestCount += serverMetrics.RequestCount
+		aggServer.ToolCallCount += serverMetrics.ToolCallCount
+		aggServer.TotalDuration += serverMetrics.TotalDuration
+		aggServer.ErrorCount += serverMetrics.ErrorCount
+		aggServer.FilteredCount += serverMetrics.FilteredCount
+		aggServer.GuardPolicyBlocked += serverMetrics.GuardPolicyBlocked
+
+		// Merge tool metrics
+		for toolName, toolMetrics := range serverMetrics.Tools {
+			aggTool := getOrCreateTool(aggServer, toolName)
+			aggTool.CallCount += toolMetrics.CallCount
+			aggTool.TotalDuration += toolMetrics.TotalDuration
+			aggTool.ErrorCount += toolMetrics.ErrorCount
+			aggTool.TotalInputSize += toolMetrics.TotalInputSize
+			aggTool.TotalOutputSize += toolMetrics.TotalOutputSize
+
+			// Update max/min durations
+			if toolMetrics.MaxDuration > aggTool.MaxDuration {
+				aggTool.MaxDuration = toolMetrics.MaxDuration
+			}
+			if aggTool.MinDuration == 0 || (toolMetrics.MinDuration > 0 && toolMetrics.MinDuration < aggTool.MinDuration) {
+				aggTool.MinDuration = toolMetrics.MinDuration
+			}
+		}
+	}
+
+	// Update time range
+	if aggregated.StartTime.IsZero() || (!runMetrics.StartTime.IsZero() && runMetrics.StartTime.Before(aggregated.StartTime)) {
+		aggregated.StartTime = runMetrics.StartTime
+	}
+	if aggregated.EndTime.IsZero() || (!runMetrics.EndTime.IsZero() && runMetrics.EndTime.After(aggregated.EndTime)) {
+		aggregated.EndTime = runMetrics.EndTime
 	}
 }

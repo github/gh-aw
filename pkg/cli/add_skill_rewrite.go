@@ -199,63 +199,68 @@ func rewriteSkillsInFrontmatterLines(lines []string, repoSlug, headSHA string) [
 			continue
 		}
 
-		// Handle list items: "  - <value>" or "  - skill: <value>"
-		if strings.HasPrefix(trimmed, "- ") {
-			itemContent := trimmed[2:] // content after "- "
-			leadingSpace := strings.Repeat(" ", indent)
-
-			if rest, ok := strings.CutPrefix(itemContent, "skill:"); ok {
-				// Object form: "- skill: <value>"
-				rawVal := strings.TrimSpace(rest)
-				valPart, comment := splitYAMLValueAndComment(rawVal)
-				unquoted := trimYAMLQuotesSkill(valPart)
-				if isLocalSkillRef(unquoted) {
-					qualified := buildQualifiedSkillRef(unquoted, repoSlug, headSHA)
-					suffix := ""
-					if comment != "" {
-						suffix = " " + comment
-					}
-					line = leadingSpace + "- skill: " + qualified + suffix
-					skillRewriteLog.Printf("Rewrote local skill ref (object form): %q -> %q", unquoted, qualified)
-				}
-			} else {
-				// String form: "- <value>"
-				valPart, comment := splitYAMLValueAndComment(itemContent)
-				unquoted := trimYAMLQuotesSkill(valPart)
-				if isLocalSkillRef(unquoted) {
-					qualified := buildQualifiedSkillRef(unquoted, repoSlug, headSHA)
-					suffix := ""
-					if comment != "" {
-						suffix = " " + comment
-					}
-					line = leadingSpace + "- " + qualified + suffix
-					skillRewriteLog.Printf("Rewrote local skill ref (string form): %q -> %q", unquoted, qualified)
-				}
-			}
-		} else if indent > skillsBaseIndent && strings.HasPrefix(trimmed, "skill:") {
-			// Object block key on its own line (rare YAML form where the list
-			// item marker was on the previous line and skill: is indented):
-			//   -
-			//     skill: .github/skills/my-skill
-			rawVal := strings.TrimSpace(strings.TrimPrefix(trimmed, "skill:"))
-			valPart, comment := splitYAMLValueAndComment(rawVal)
-			unquoted := trimYAMLQuotesSkill(valPart)
-			if isLocalSkillRef(unquoted) {
-				qualified := buildQualifiedSkillRef(unquoted, repoSlug, headSHA)
-				leadingSpace := strings.Repeat(" ", indent)
-				suffix := ""
-				if comment != "" {
-					suffix = " " + comment
-				}
-				line = leadingSpace + "skill: " + qualified + suffix
-				skillRewriteLog.Printf("Rewrote local skill ref (block object form): %q -> %q", unquoted, qualified)
-			}
-		}
-
+		line = rewriteSkillBlockLine(line, trimmed, indent, skillsBaseIndent, repoSlug, headSHA)
 		newLines = append(newLines, line)
 	}
 
 	return newLines
+}
+
+func rewriteSkillBlockLine(line, trimmed string, indent, skillsBaseIndent int, repoSlug, headSHA string) string {
+	// Handle list items: "  - <value>" or "  - skill: <value>"
+	if strings.HasPrefix(trimmed, "- ") {
+		itemContent := trimmed[2:] // content after "- "
+		leadingSpace := strings.Repeat(" ", indent)
+
+		if rest, ok := strings.CutPrefix(itemContent, "skill:"); ok {
+			// Object form: "- skill: <value>"
+			rawVal := strings.TrimSpace(rest)
+			valPart, comment := splitYAMLValueAndComment(rawVal)
+			unquoted := trimYAMLQuotesSkill(valPart)
+			if isLocalSkillRef(unquoted) {
+				qualified := buildQualifiedSkillRef(unquoted, repoSlug, headSHA)
+				suffix := ""
+				if comment != "" {
+					suffix = " " + comment
+				}
+				line = leadingSpace + "- skill: " + qualified + suffix
+				skillRewriteLog.Printf("Rewrote local skill ref (object form): %q -> %q", unquoted, qualified)
+			}
+		} else {
+			// String form: "- <value>"
+			valPart, comment := splitYAMLValueAndComment(itemContent)
+			unquoted := trimYAMLQuotesSkill(valPart)
+			if isLocalSkillRef(unquoted) {
+				qualified := buildQualifiedSkillRef(unquoted, repoSlug, headSHA)
+				suffix := ""
+				if comment != "" {
+					suffix = " " + comment
+				}
+				line = leadingSpace + "- " + qualified + suffix
+				skillRewriteLog.Printf("Rewrote local skill ref (string form): %q -> %q", unquoted, qualified)
+			}
+		}
+	} else if indent > skillsBaseIndent && strings.HasPrefix(trimmed, "skill:") {
+		// Object block key on its own line (rare YAML form where the list
+		// item marker was on the previous line and skill: is indented):
+		//   -
+		//     skill: .github/skills/my-skill
+		rawVal := strings.TrimSpace(strings.TrimPrefix(trimmed, "skill:"))
+		valPart, comment := splitYAMLValueAndComment(rawVal)
+		unquoted := trimYAMLQuotesSkill(valPart)
+		if isLocalSkillRef(unquoted) {
+			qualified := buildQualifiedSkillRef(unquoted, repoSlug, headSHA)
+			leadingSpace := strings.Repeat(" ", indent)
+			suffix := ""
+			if comment != "" {
+				suffix = " " + comment
+			}
+			line = leadingSpace + "skill: " + qualified + suffix
+			skillRewriteLog.Printf("Rewrote local skill ref (block object form): %q -> %q", unquoted, qualified)
+		}
+	}
+
+	return line
 }
 
 // trimYAMLQuotesSkill strips a single layer of matching single or double

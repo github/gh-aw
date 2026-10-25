@@ -119,31 +119,41 @@ func findGitHubRateLimitsFile(runDir string) string {
 	return ""
 }
 
+type githubRateLimitResourceState struct {
+	requestsMade      int
+	firstRemaining    int
+	lastRemaining     int
+	firstUsed         int
+	lastUsed          int
+	firstSnapshotUsed int
+	lastSnapshotUsed  int
+	snapshotCount     int
+	limit             int
+	firstEntrySet     bool
+}
+
 // parseGitHubRateLimitsFile reads and parses the github_rate_limits.jsonl file,
 // returning an aggregated GitHubRateLimitUsage summary.
 func parseGitHubRateLimitsFile(filePath string) (*GitHubRateLimitUsage, error) {
 	gitHubRateLimitUsageLog.Printf("Parsing GitHub rate limits file: %s", filePath)
-
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open rate limits file: %w", err)
 	}
 	defer file.Close()
-
-	type resourceState struct {
-		requestsMade      int
-		firstRemaining    int
-		lastRemaining     int
-		firstUsed         int
-		lastUsed          int
-		firstSnapshotUsed int
-		lastSnapshotUsed  int
-		snapshotCount     int
-		limit             int
-		firstEntrySet     bool
+	byResource, totalRequests, err := scanGitHubRateLimitEntries(file)
+	if err != nil {
+		return nil, err
 	}
-	byResource := make(map[string]*resourceState)
+	if len(byResource) == 0 && totalRequests == 0 {
+		// File was empty or had no parseable entries
+		return nil, nil
+	}
+	return buildGitHubRateLimitUsage(byResource, totalRequests), nil
+}
 
+func scanGitHubRateLimitEntries(file *os.File) (map[string]*githubRateLimitResourceState, int, error) {
+	byResource := make(map[string]*githubRateLimitResourceState)
 	totalRequests := 0
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -162,103 +172,78 @@ func parseGitHubRateLimitsFile(filePath string) (*GitHubRateLimitUsage, error) {
 			continue
 		}
 
-		resource := entry.Resource
-		if resource == "" {
-			resource = "core"
+		totalRequests += recordGitHubRateLimitEntry(byResource, entry)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error reading rate limits file: %w", err)
+	}
+	return byResource, totalRequests, nil
+}
+
+func recordGitHubRateLimitEntry(byResource map[string]*githubRateLimitResourceState, entry GitHubRateLimitEntry) int {
+	resource := entry.Resource
+	if resource == "" {
+		resource = "core"
+	}
+
+	// Only count actual API calls (not rate-limit-API snapshots) toward request totals
+	switch entry.Source {
+	case "response_headers":
+		state, ok := byResource[resource]
+		if !ok {
+			state = &githubRateLimitResourceState{}
+			byResource[resource] = state
 		}
+		state.requestsMade++
 
-		// Only count actual API calls (not rate-limit-API snapshots) toward request totals
-		switch entry.Source {
-		case "response_headers":
-			totalRequests++
-
-			state, ok := byResource[resource]
-			if !ok {
-				state = &resourceState{}
-				byResource[resource] = state
-			}
-			state.requestsMade++
-
-			if !state.firstEntrySet {
-				state.firstRemaining = entry.Remaining
-				state.firstUsed = entry.Used
-				state.firstEntrySet = true
-			}
-			// Always update last values
+		if !state.firstEntrySet {
+			state.firstRemaining = entry.Remaining
+			state.firstUsed = entry.Used
+			state.firstEntrySet = true
+		}
+		// Always update last values
+		state.lastRemaining = entry.Remaining
+		state.lastUsed = entry.Used
+		if entry.Limit > 0 {
+			state.limit = entry.Limit
+		}
+		return 1
+	case "rate_limit_api":
+		// Use rate-limit API snapshots to fill in limit and remaining, and to
+		// derive core_consumed via firstSnapshotUsed/lastSnapshotUsed when no
+		// response-header entries are present for this resource.
+		state, ok := byResource[resource]
+		if !ok {
+			state = &githubRateLimitResourceState{}
+			byResource[resource] = state
+		}
+		state.snapshotCount++
+		if state.snapshotCount == 1 {
+			state.firstSnapshotUsed = entry.Used
+		}
+		state.lastSnapshotUsed = entry.Used
+		if entry.Limit > 0 && state.limit == 0 {
+			state.limit = entry.Limit
+		}
+		// If we have no response-header entries, record the snapshot as an approximation
+		if !state.firstEntrySet {
 			state.lastRemaining = entry.Remaining
 			state.lastUsed = entry.Used
 			if entry.Limit > 0 {
 				state.limit = entry.Limit
 			}
-		case "rate_limit_api":
-			// Use rate-limit API snapshots to fill in limit and remaining, and to
-			// derive core_consumed via firstSnapshotUsed/lastSnapshotUsed when no
-			// response-header entries are present for this resource.
-			state, ok := byResource[resource]
-			if !ok {
-				state = &resourceState{}
-				byResource[resource] = state
-			}
-			state.snapshotCount++
-			if state.snapshotCount == 1 {
-				state.firstSnapshotUsed = entry.Used
-			}
-			state.lastSnapshotUsed = entry.Used
-			if entry.Limit > 0 && state.limit == 0 {
-				state.limit = entry.Limit
-			}
-			// If we have no response-header entries, record the snapshot as an approximation
-			if !state.firstEntrySet {
-				state.lastRemaining = entry.Remaining
-				state.lastUsed = entry.Used
-				if entry.Limit > 0 {
-					state.limit = entry.Limit
-				}
-			}
 		}
 	}
+	return 0
+}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading rate limits file: %w", err)
-	}
-
-	if len(byResource) == 0 && totalRequests == 0 {
-		// File was empty or had no parseable entries
-		return nil, nil
-	}
-
+func buildGitHubRateLimitUsage(byResource map[string]*githubRateLimitResourceState, totalRequests int) *GitHubRateLimitUsage {
 	usage := &GitHubRateLimitUsage{
 		TotalRequestsMade: totalRequests,
 	}
 
 	for resource, state := range byResource {
-		// Compute quota consumed within the same rate-limit window.
-		// If used values suggest a window reset occurred (lastUsed < firstUsed),
-		// fall back to using the absolute lastUsed value as the consumption metric.
-		var consumed int
-		consumedSource := ""
-		if state.requestsMade > 0 {
-			diff := state.lastUsed - state.firstUsed
-			if diff >= 0 {
-				consumed = diff
-			} else {
-				// Window reset mid-run; use lastUsed as a lower-bound estimate
-				consumed = state.lastUsed
-			}
-			consumedSource = "response_headers_delta"
-		} else if state.snapshotCount >= 2 {
-			diff := state.lastSnapshotUsed - state.firstSnapshotUsed
-			if diff >= 0 {
-				consumed = diff
-			} else {
-				// Window reset across snapshots; use last snapshot used as a lower-bound estimate
-				consumed = state.lastSnapshotUsed
-			}
-			consumedSource = "rate_limit_api_delta"
-		} else if state.snapshotCount == 1 {
-			consumedSource = "rate_limit_api_single_snapshot"
-		}
-
+		consumed, consumedSource := githubRateLimitConsumption(state)
 		row := &GitHubRateLimitResourceUsage{
 			Resource:       resource,
 			RequestsMade:   state.requestsMade,
@@ -267,7 +252,6 @@ func parseGitHubRateLimitsFile(filePath string) (*GitHubRateLimitUsage, error) {
 			Limit:          state.limit,
 		}
 		usage.Resources = append(usage.Resources, row)
-
 		if resource == "core" {
 			usage.CoreConsumed = consumed
 			usage.CoreConsumedSource = consumedSource
@@ -275,7 +259,6 @@ func parseGitHubRateLimitsFile(filePath string) (*GitHubRateLimitUsage, error) {
 			usage.CoreLimit = state.limit
 		}
 	}
-
 	// Sort resources for deterministic output
 	slices.SortFunc(usage.Resources, func(a, b *GitHubRateLimitResourceUsage) int {
 		if a.RequestsMade > b.RequestsMade {
@@ -286,8 +269,38 @@ func parseGitHubRateLimitsFile(filePath string) (*GitHubRateLimitUsage, error) {
 		}
 		return 0
 	})
+	return usage
+}
 
-	return usage, nil
+func githubRateLimitConsumption(state *githubRateLimitResourceState) (int, string) {
+	// Compute quota consumed within the same rate-limit window.
+	// If used values suggest a window reset occurred (lastUsed < firstUsed),
+	// fall back to using the absolute lastUsed value as the consumption metric.
+	var consumed int
+	consumedSource := ""
+	if state.requestsMade > 0 {
+		diff := state.lastUsed - state.firstUsed
+		if diff >= 0 {
+			consumed = diff
+		} else {
+			// Window reset mid-run; use lastUsed as a lower-bound estimate
+			consumed = state.lastUsed
+		}
+		consumedSource = "response_headers_delta"
+	} else if state.snapshotCount >= 2 {
+		diff := state.lastSnapshotUsed - state.firstSnapshotUsed
+		if diff >= 0 {
+			consumed = diff
+		} else {
+			// Window reset across snapshots; use last snapshot used as a lower-bound estimate
+			consumed = state.lastSnapshotUsed
+		}
+		consumedSource = "rate_limit_api_delta"
+	} else if state.snapshotCount == 1 {
+		consumedSource = "rate_limit_api_single_snapshot"
+	}
+
+	return consumed, consumedSource
 }
 
 // analyzeGitHubRateLimits locates and parses the github_rate_limits.jsonl file within

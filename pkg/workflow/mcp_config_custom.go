@@ -619,20 +619,8 @@ func getMCPConfig(toolConfig map[string]any, toolName string) (*parser.RegistryM
 		result.Registry = registry
 	}
 
-	mcpCustomLog.Printf("Extracting fields for MCP type: %s", result.Type)
-	switch result.Type {
-	case "stdio":
-		extractMCPStdioFields(config, result)
-	case "http":
-		if err := extractMCPHTTPFields(config, toolName, result); err != nil {
-			return nil, err
-		}
-	default:
-		mcpCustomLog.Printf("Unsupported MCP type '%s' for tool '%s'", result.Type, toolName)
-		return nil, fmt.Errorf(
-			"unsupported MCP type '%s' for tool '%s'. Valid types are: stdio, http. "+
-				"Example:\nmcp-servers:\n  %s:\n    type: stdio\n    command: \"npx @my/tool\"\n    args: [\"--port\", \"3000\"]",
-			result.Type, toolName, toolName)
+	if err := extractMCPTransportFields(config, toolName, result); err != nil {
+		return nil, err
 	}
 
 	if allowed, ok := config.GetStringArray("allowed"); ok {
@@ -646,6 +634,26 @@ func getMCPConfig(toolConfig map[string]any, toolName string) (*parser.RegistryM
 
 	postProcessMCPConfig(result)
 	return result, nil
+}
+
+func extractMCPTransportFields(config MapToolConfig, toolName string, result *parser.RegistryMCPServerConfig) error {
+	mcpCustomLog.Printf("Extracting fields for MCP type: %s", result.Type)
+	switch result.Type {
+	case "stdio":
+		extractMCPStdioFields(config, result)
+	case "http":
+		if err := extractMCPHTTPFields(config, toolName, result); err != nil {
+			return err
+		}
+	default:
+		mcpCustomLog.Printf("Unsupported MCP type '%s' for tool '%s'", result.Type, toolName)
+		return fmt.Errorf(
+			"unsupported MCP type '%s' for tool '%s'. Valid types are: stdio, http. "+
+				"Example:\nmcp-servers:\n  %s:\n    type: stdio\n    command: \"npx @my/tool\"\n    args: [\"--port\", \"3000\"]",
+			result.Type, toolName, toolName)
+	}
+
+	return nil
 }
 
 // hasMCPConfig checks if a tool configuration has MCP configuration

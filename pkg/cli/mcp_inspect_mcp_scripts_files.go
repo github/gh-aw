@@ -51,6 +51,17 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 		}
 	}
 
+	if err := writeMCPScriptsConfiguration(dir, mcpScriptsConfig, verbose); err != nil {
+		return err
+	}
+	if err := writeMCPScriptsToolHandlers(dir, mcpScriptsConfig, verbose); err != nil {
+		return err
+	}
+	mcpInspectLog.Printf("Successfully wrote all mcp-scripts files")
+	return nil
+}
+
+func writeMCPScriptsConfiguration(dir string, mcpScriptsConfig *workflow.MCPScriptsConfig, verbose bool) error {
 	// Generate and write tools.json
 	toolsJSON := workflow.GenerateMCPScriptsToolsConfig(mcpScriptsConfig)
 	toolsPath := filepath.Join(dir, "tools.json")
@@ -75,6 +86,10 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Wrote mcp-server.cjs"))
 	}
 
+	return nil
+}
+
+func writeMCPScriptsToolHandlers(dir string, mcpScriptsConfig *workflow.MCPScriptsConfig, verbose bool) error {
 	// Generate and write tool handler files
 	for toolName, toolConfig := range mcpScriptsConfig.Tools {
 		var content string
@@ -108,6 +123,5 @@ func writeMCPScriptsFiles(dir string, mcpScriptsConfig *workflow.MCPScriptsConfi
 		}
 	}
 
-	mcpInspectLog.Printf("Successfully wrote all mcp-scripts files")
 	return nil
 }

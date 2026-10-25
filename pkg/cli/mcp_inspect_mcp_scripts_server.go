@@ -166,7 +166,10 @@ func startMCPScriptsServer(ctx context.Context, mcpScriptsConfig *workflow.MCPSc
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
 		return nil, nil, "", fmt.Errorf("failed to write mcp-scripts files: %w", err)
 	}
+	return startPreparedMCPScriptsServer(ctx, tmpDir, verbose)
+}
 
+func startPreparedMCPScriptsServer(ctx context.Context, tmpDir string, verbose bool) (*parser.RegistryMCPServerConfig, *exec.Cmd, string, error) {
 	// Find an available port for the HTTP server
 	port := findAvailablePort(mcpScriptsStartPort, verbose)
 	if port == 0 {

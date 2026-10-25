@@ -73,41 +73,28 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
 
-	// runCleanup executes the optional cleanup function
-	runCleanup := func() {
-		if options.CleanupFunc != nil {
-			retryLog.Print("Executing cleanup function")
-			options.CleanupFunc()
-		}
-	}
+	return executeRepeatIterations(ctx, sigChan, output, options)
+}
 
+func executeRepeatIterations(ctx context.Context, sigChan <-chan os.Signal, output *os.File, options RepeatOptions) error {
 	// Run the specified number of additional times
 	for i := 1; i <= options.RepeatCount; i++ {
 		select {
 		case <-ctx.Done():
 			retryLog.Printf("Context cancelled at iteration %d/%d", i, options.RepeatCount)
 			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
-			runCleanup()
+			runRepeatCleanup(options)
 			return ctx.Err()
 
 		case <-sigChan:
 			retryLog.Printf("Interrupt signal received at iteration %d/%d", i, options.RepeatCount)
 			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
-			runCleanup()
+			runRepeatCleanup(options)
 			return context.Canceled
 
 		default:
 			retryLog.Printf("Starting iteration %d/%d", i, options.RepeatCount)
-			// Use provided repeat message or default
-			repeatMsg := options.RepeatMessage
-			if repeatMsg == "" {
-				repeatMsg = fmt.Sprintf("Running repetition %d/%d", i, options.RepeatCount)
-			} else {
-				// If message contains timestamp placeholder, replace it with current time
-				if strings.Contains(repeatMsg, "%s") {
-					repeatMsg = fmt.Sprintf(repeatMsg, time.Now().Format("2006-01-02 15:04:05"))
-				}
-			}
+			repeatMsg := formatRepeatIterationMessage(options, i)
 			fmt.Fprintln(output, console.FormatInfoMessageStdout(repeatMsg))
 
 			if err := options.ExecuteFunc(); err != nil {
@@ -120,4 +107,21 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 
 	retryLog.Printf("Completed all %d iterations successfully", options.RepeatCount)
 	return nil
+}
+
+func runRepeatCleanup(options RepeatOptions) {
+	if options.CleanupFunc != nil {
+		retryLog.Print("Executing cleanup function")
+		options.CleanupFunc()
+	}
+}
+
+func formatRepeatIterationMessage(options RepeatOptions, iteration int) string {
+	repeatMsg := options.RepeatMessage
+	if repeatMsg == "" {
+		repeatMsg = fmt.Sprintf("Running repetition %d/%d", iteration, options.RepeatCount)
+	} else if strings.Contains(repeatMsg, "%s") {
+		repeatMsg = fmt.Sprintf(repeatMsg, time.Now().Format("2006-01-02 15:04:05"))
+	}
+	return repeatMsg
 }

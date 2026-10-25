@@ -250,94 +250,110 @@ func deriveFrictionFromLogs(mcpUsage *MCPToolUsageData, session *usageActivitySe
 
 	if mcpUsage != nil {
 		sources["mcp_gateway"] = true
-		for _, call := range mcpUsage.ToolCalls {
-			if !isFrictionToolCallStatus(call.Status) && call.Error == "" {
-				continue
-			}
-			gatewayFailures++
-			id := call.ToolCallID
-			if id == "" {
-				id = fmt.Sprintf("%s/%s@%s", call.ServerName, call.ToolName, call.Timestamp)
-			}
-			events = append(events, FrictionEvent{
-				ID:                 "mcp_tool_error:" + id,
-				Driver:             "mcp_tool_error",
-				Source:             "mcp_gateway",
-				GroupID:            "tool_failure",
-				Label:              fmt.Sprintf("%s/%s", call.ServerName, call.ToolName),
-				Detail:             call.Error,
-				Timestamp:          call.Timestamp,
-				Occurrences:        1,
-				CountedOccurrences: 1,
-				State:              FrictionStateUnavailable,
-				DimensionStates: map[string]string{
-					"aic":        FrictionStateUnavailable,
-					"tokens":     FrictionStateUnavailable,
-					"turns":      FrictionStateUnsupported,
-					"tool_calls": FrictionStateMeasured,
-					"latency_ms": FrictionStateUnavailable,
-				},
-				Cost: FrictionCost{ToolCalls: 1},
-			})
-		}
-		if mcpUsage.Integrity != nil && mcpUsage.Integrity.TotalFiltered > 0 {
-			events = append(events, FrictionEvent{
-				ID:                 "integrity_filter:aggregate",
-				Driver:             "integrity_filter",
-				Source:             "mcp_gateway",
-				GroupID:            "integrity_filter",
-				Label:              "integrity-filtered responses",
-				Occurrences:        mcpUsage.Integrity.TotalFiltered,
-				CountedOccurrences: mcpUsage.Integrity.TotalFiltered,
-				State:              FrictionStateUnavailable,
-				DimensionStates: map[string]string{
-					"aic":        FrictionStateUnavailable,
-					"tokens":     FrictionStateUnavailable,
-					"turns":      FrictionStateUnsupported,
-					"tool_calls": FrictionStateMeasured,
-					"latency_ms": FrictionStateUnsupported,
-				},
-				Cost: FrictionCost{ToolCalls: mcpUsage.Integrity.TotalFiltered},
-			})
-		}
+		events, gatewayFailures = appendGatewayFrictionEvents(events, mcpUsage)
 	}
-
 	if session != nil {
 		sources["agent_session"] = true
-		// Apply the same fidelity rule as the precomputed model: the gateway
-		// owns overlapping tool failures, the session contributes only excess.
-		if excess := session.FailedToolExecutions - gatewayFailures; session.FailedToolExecutions > 0 {
-			counted := max(excess, 0)
-			event := FrictionEvent{
-				ID:                    "session_tool_failure:aggregate",
-				Driver:                "session_tool_failure",
-				Source:                "agent_session",
-				GroupID:               "tool_failure",
-				Label:                 "agent session tool executions",
-				Occurrences:           session.FailedToolExecutions,
-				CountedOccurrences:    counted,
-				SuppressedOccurrences: session.FailedToolExecutions - counted,
-				State:                 FrictionStateUnavailable,
-				DimensionStates: map[string]string{
-					"aic":        FrictionStateUnavailable,
-					"tokens":     FrictionStateUnavailable,
-					"turns":      FrictionStateUnsupported,
-					"tool_calls": FrictionStateMeasured,
-					"latency_ms": FrictionStateUnsupported,
-				},
-				Cost: FrictionCost{ToolCalls: counted},
-			}
-			if event.SuppressedOccurrences > 0 {
-				event.SuppressedBy = "causal-group:tool_failure"
-			}
-			events = append(events, event)
-		}
+		events = appendSessionFrictionEvents(events, session, gatewayFailures)
 	}
-
 	if len(events) == 0 {
 		return nil
 	}
+	return buildDerivedFrictionSummary(events, sources)
+}
 
+func appendGatewayFrictionEvents(events []FrictionEvent, mcpUsage *MCPToolUsageData) ([]FrictionEvent, int) {
+	gatewayFailures := 0
+	for _, call := range mcpUsage.ToolCalls {
+		if !isFrictionToolCallStatus(call.Status) && call.Error == "" {
+			continue
+		}
+		gatewayFailures++
+		id := call.ToolCallID
+		if id == "" {
+			id = fmt.Sprintf("%s/%s@%s", call.ServerName, call.ToolName, call.Timestamp)
+		}
+		events = append(events, FrictionEvent{
+			ID:                 "mcp_tool_error:" + id,
+			Driver:             "mcp_tool_error",
+			Source:             "mcp_gateway",
+			GroupID:            "tool_failure",
+			Label:              fmt.Sprintf("%s/%s", call.ServerName, call.ToolName),
+			Detail:             call.Error,
+			Timestamp:          call.Timestamp,
+			Occurrences:        1,
+			CountedOccurrences: 1,
+			State:              FrictionStateUnavailable,
+			DimensionStates: map[string]string{
+				"aic":        FrictionStateUnavailable,
+				"tokens":     FrictionStateUnavailable,
+				"turns":      FrictionStateUnsupported,
+				"tool_calls": FrictionStateMeasured,
+				"latency_ms": FrictionStateUnavailable,
+			},
+			Cost: FrictionCost{ToolCalls: 1},
+		})
+	}
+	return appendIntegrityFrictionEvent(events, mcpUsage), gatewayFailures
+}
+
+func appendIntegrityFrictionEvent(events []FrictionEvent, mcpUsage *MCPToolUsageData) []FrictionEvent {
+	if mcpUsage.Integrity != nil && mcpUsage.Integrity.TotalFiltered > 0 {
+		events = append(events, FrictionEvent{
+			ID:                 "integrity_filter:aggregate",
+			Driver:             "integrity_filter",
+			Source:             "mcp_gateway",
+			GroupID:            "integrity_filter",
+			Label:              "integrity-filtered responses",
+			Occurrences:        mcpUsage.Integrity.TotalFiltered,
+			CountedOccurrences: mcpUsage.Integrity.TotalFiltered,
+			State:              FrictionStateUnavailable,
+			DimensionStates: map[string]string{
+				"aic":        FrictionStateUnavailable,
+				"tokens":     FrictionStateUnavailable,
+				"turns":      FrictionStateUnsupported,
+				"tool_calls": FrictionStateMeasured,
+				"latency_ms": FrictionStateUnsupported,
+			},
+			Cost: FrictionCost{ToolCalls: mcpUsage.Integrity.TotalFiltered},
+		})
+	}
+	return events
+}
+
+func appendSessionFrictionEvents(events []FrictionEvent, session *usageActivitySession, gatewayFailures int) []FrictionEvent {
+	// Apply the same fidelity rule as the precomputed model: the gateway
+	// owns overlapping tool failures, the session contributes only excess.
+	if excess := session.FailedToolExecutions - gatewayFailures; session.FailedToolExecutions > 0 {
+		counted := max(excess, 0)
+		event := FrictionEvent{
+			ID:                    "session_tool_failure:aggregate",
+			Driver:                "session_tool_failure",
+			Source:                "agent_session",
+			GroupID:               "tool_failure",
+			Label:                 "agent session tool executions",
+			Occurrences:           session.FailedToolExecutions,
+			CountedOccurrences:    counted,
+			SuppressedOccurrences: session.FailedToolExecutions - counted,
+			State:                 FrictionStateUnavailable,
+			DimensionStates: map[string]string{
+				"aic":        FrictionStateUnavailable,
+				"tokens":     FrictionStateUnavailable,
+				"turns":      FrictionStateUnsupported,
+				"tool_calls": FrictionStateMeasured,
+				"latency_ms": FrictionStateUnsupported,
+			},
+			Cost: FrictionCost{ToolCalls: counted},
+		}
+		if event.SuppressedOccurrences > 0 {
+			event.SuppressedBy = "causal-group:tool_failure"
+		}
+		events = append(events, event)
+	}
+	return events
+}
+
+func buildDerivedFrictionSummary(events []FrictionEvent, sources map[string]bool) *FrictionCostSummary {
 	summary := &FrictionCostSummary{
 		MeasurementState: FrictionStateUnavailable,
 		CanonicalUnit:    "aic",

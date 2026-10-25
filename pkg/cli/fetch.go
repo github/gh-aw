@@ -120,27 +120,7 @@ func fetchRemoteWorkflow(ctx context.Context, spec *WorkflowSpec, verbose bool) 
 	// Download the workflow file from GitHub
 	content, err := downloadFileFromGitHubForHost(ctx, owner, repo, spec.WorkflowPath, ref, spec.Host)
 	if err != nil {
-		// Try with common workflow directory prefixes if the direct path fails.
-		// This handles short workflow names without path separators (e.g. "my-workflow.md").
-		if !strings.HasPrefix(spec.WorkflowPath, "workflows/") && !strings.Contains(spec.WorkflowPath, "/") {
-			for _, prefix := range []string{"workflows/", constants.WorkflowsDirSlash} {
-				altPath := prefix + spec.WorkflowPath
-				if !strings.HasSuffix(altPath, ".md") {
-					altPath += ".md"
-				}
-				remoteWorkflowLog.Printf("Direct path failed, trying: %s", altPath)
-				if altContent, altErr := downloadFileFromGitHubForHost(ctx, owner, repo, altPath, ref, spec.Host); altErr == nil {
-					remoteWorkflowLog.Printf("Downloaded workflow via alt path: %s (%d bytes)", altPath, len(altContent))
-					return &FetchedWorkflow{
-						Content:    altContent,
-						CommitSHA:  commitSHA,
-						IsLocal:    false,
-						SourcePath: altPath,
-					}, nil
-				}
-			}
-		}
-		return nil, fmt.Errorf("failed to download workflow from %s/%s/%s@%s: %w", owner, repo, spec.WorkflowPath, ref, err)
+		return fetchRemoteWorkflowAlternative(ctx, spec, owner, repo, ref, commitSHA, err)
 	}
 
 	remoteWorkflowLog.Printf("Downloaded workflow: path=%s bytes=%d", spec.WorkflowPath, len(content))
@@ -155,6 +135,30 @@ func fetchRemoteWorkflow(ctx context.Context, spec *WorkflowSpec, verbose bool) 
 		IsLocal:    false,
 		SourcePath: spec.WorkflowPath,
 	}, nil
+}
+
+func fetchRemoteWorkflowAlternative(ctx context.Context, spec *WorkflowSpec, owner, repo, ref, commitSHA string, downloadErr error) (*FetchedWorkflow, error) {
+	// Try with common workflow directory prefixes if the direct path fails.
+	// This handles short workflow names without path separators (e.g. "my-workflow.md").
+	if !strings.HasPrefix(spec.WorkflowPath, "workflows/") && !strings.Contains(spec.WorkflowPath, "/") {
+		for _, prefix := range []string{"workflows/", constants.WorkflowsDirSlash} {
+			altPath := prefix + spec.WorkflowPath
+			if !strings.HasSuffix(altPath, ".md") {
+				altPath += ".md"
+			}
+			remoteWorkflowLog.Printf("Direct path failed, trying: %s", altPath)
+			if altContent, altErr := downloadFileFromGitHubForHost(ctx, owner, repo, altPath, ref, spec.Host); altErr == nil {
+				remoteWorkflowLog.Printf("Downloaded workflow via alt path: %s (%d bytes)", altPath, len(altContent))
+				return &FetchedWorkflow{
+					Content:    altContent,
+					CommitSHA:  commitSHA,
+					IsLocal:    false,
+					SourcePath: altPath,
+				}, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("failed to download workflow from %s/%s/%s@%s: %w", owner, repo, spec.WorkflowPath, ref, downloadErr)
 }
 
 func resolveCommitSHAWithRetries(ctx context.Context, owner, repo, ref, workflowPath, host string, verbose bool) (string, error) {
@@ -326,49 +330,7 @@ func fetchGenericURLWorkflow(ctx context.Context, spec *WorkflowSpec, verbose bo
 		}, nil
 
 	case ct == "application/json" || strings.HasSuffix(ct, "+json"):
-		remoteWorkflowLog.Printf("URL returned JSON content (%d bytes); converting", len(resource.Body))
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloaded JSON workflow (%d bytes); converting to markdown...", len(resource.Body))))
-		}
-
-		remoteWorkflowLog.Printf("JSON payload:\n%s", string(resource.Body))
-
-		var wf JSONWorkflow
-		if err := json.Unmarshal(resource.Body, &wf); err != nil {
-			return nil, fmt.Errorf("failed to parse JSON workflow from URL: %w", err)
-		}
-
-		nameOverride := selectJSONImportNameOverride(spec.WorkflowName, &wf)
-		generated, err := ConvertJSONWorkflowToMarkdown(&wf, ConvertOptions{NameOverride: nameOverride})
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert JSON workflow: %w", err)
-		}
-
-		remoteWorkflowLog.Printf("Converted JSON to markdown: filename=%s bytes=%d warnings=%d",
-			generated.Filename, len(generated.Markdown), len(generated.Warnings))
-
-		if verbose {
-			for _, w := range generated.Warnings {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage("JSON workflow import: "+w))
-			}
-		}
-
-		// Use the generated filename as the WorkflowName on the spec so that
-		// downstream code (e.g. add_command.go) uses the correct file name.
-		spec.WorkflowName = generated.Filename
-
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Converted JSON workflow to markdown (%d bytes)", len(generated.Markdown))))
-		}
-
-		return &FetchedWorkflow{
-			Content:                []byte(generated.Markdown),
-			CommitSHA:              "",
-			IsLocal:                false,
-			SourcePath:             spec.RawURL,
-			ConvertedFromJSON:      true,
-			JSONConversionWarnings: generated.Warnings,
-		}, nil
+		return fetchedJSONWorkflow(resource.Body, spec, verbose)
 
 	default:
 		if ct == "" {
@@ -378,6 +340,53 @@ func fetchGenericURLWorkflow(ctx context.Context, spec *WorkflowSpec, verbose bo
 		return nil, errors.New(console.FormatErrorMessage(
 			fmt.Sprintf("unsupported Content-Type %q from URL. Expected text/markdown or application/json.", ct)))
 	}
+}
+
+func fetchedJSONWorkflow(body []byte, spec *WorkflowSpec, verbose bool) (*FetchedWorkflow, error) {
+	remoteWorkflowLog.Printf("URL returned JSON content (%d bytes); converting", len(body))
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Downloaded JSON workflow (%d bytes); converting to markdown...", len(body))))
+	}
+
+	remoteWorkflowLog.Printf("JSON payload:\n%s", string(body))
+
+	var wf JSONWorkflow
+	if err := json.Unmarshal(body, &wf); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON workflow from URL: %w", err)
+	}
+
+	nameOverride := selectJSONImportNameOverride(spec.WorkflowName, &wf)
+	generated, err := ConvertJSONWorkflowToMarkdown(&wf, ConvertOptions{NameOverride: nameOverride})
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert JSON workflow: %w", err)
+	}
+
+	remoteWorkflowLog.Printf("Converted JSON to markdown: filename=%s bytes=%d warnings=%d",
+		generated.Filename, len(generated.Markdown), len(generated.Warnings))
+
+	if verbose {
+		for _, w := range generated.Warnings {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("JSON workflow import: "+w))
+		}
+	}
+
+	// Use the generated filename as the WorkflowName on the spec so that
+	// downstream code (e.g. add_command.go) uses the correct file name.
+	spec.WorkflowName = generated.Filename
+
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Converted JSON workflow to markdown (%d bytes)", len(generated.Markdown))))
+	}
+
+	return &FetchedWorkflow{
+		Content:                []byte(generated.Markdown),
+		CommitSHA:              "",
+		IsLocal:                false,
+		SourcePath:             spec.RawURL,
+		ConvertedFromJSON:      true,
+		JSONConversionWarnings: generated.Warnings,
+	}, nil
+
 }
 
 func selectJSONImportNameOverride(currentName string, wf *JSONWorkflow) string {

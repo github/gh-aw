@@ -42,6 +42,25 @@ func (c *Compiler) buildUnlockJob(data *WorkflowData, threatDetectionEnabled boo
 	unlockParentSpanID := setupParentSpanNeedsExpr(constants.ActivationJobName)
 	steps = append(steps, c.generateSetupStepForJob("unlock", data, setupActionRef, SetupActionDestination, false, unlockTraceID, unlockParentSpanID, "")...)
 
+	steps = append(steps, generateUnlockIssueStep(data)...)
+
+	// Build the condition for this job:
+	// 1. always() - run even if agent or other jobs fail
+	// 2. activation was not skipped - skip unlock when activation was never triggered
+	//    (e.g. the event did not match any trigger condition, so no locking occurred)
+	// 3. issue was locked (checked at step level for clarity in workflow YAML)
+	alwaysFunc := BuildFunctionCall("always")
+	activationNotSkipped := BuildNotEquals(
+		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.ActivationJobName)),
+		BuildStringLiteral("skipped"),
+	)
+	jobCondition := BuildAnd(alwaysFunc, activationNotSkipped)
+
+	return c.finishUnlockJob(data, steps, jobCondition, threatDetectionEnabled), nil
+}
+
+func generateUnlockIssueStep(data *WorkflowData) []string {
+	var steps []string
 	// Add unlock step
 	// Build condition: only unlock if issue was locked by activation job
 	// Must match lock condition: event type is 'issues' or 'issue_comment'
@@ -66,18 +85,10 @@ func (c *Compiler) buildUnlockJob(data *WorkflowData, threatDetectionEnabled boo
 
 	compilerUnlockJobLog.Print("Added unlock issue step to dedicated unlock job")
 
-	// Build the condition for this job:
-	// 1. always() - run even if agent or other jobs fail
-	// 2. activation was not skipped - skip unlock when activation was never triggered
-	//    (e.g. the event did not match any trigger condition, so no locking occurred)
-	// 3. issue was locked (checked at step level for clarity in workflow YAML)
-	alwaysFunc := BuildFunctionCall("always")
-	activationNotSkipped := BuildNotEquals(
-		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.ActivationJobName)),
-		BuildStringLiteral("skipped"),
-	)
-	jobCondition := BuildAnd(alwaysFunc, activationNotSkipped)
+	return steps
+}
 
+func (c *Compiler) finishUnlockJob(data *WorkflowData, steps []string, jobCondition ConditionNode, threatDetectionEnabled bool) *Job {
 	// Create the unlock job
 	// This job depends on activation (for issue_locked output) and agent (to run after workflow)
 	// When threat detection is enabled, it also depends on the detection job
@@ -119,5 +130,5 @@ func (c *Compiler) buildUnlockJob(data *WorkflowData, threatDetectionEnabled boo
 		TimeoutMinutes: 5, // Short timeout - unlock is a quick operation
 	}
 
-	return job, nil
+	return job
 }

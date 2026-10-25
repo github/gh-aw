@@ -284,58 +284,68 @@ func parseWorkflowSpec(spec string) (*WorkflowSpec, error) {
 
 	// Check if this is a GitHub URL
 	if strings.HasPrefix(spec, "http://") || strings.HasPrefix(spec, "https://") {
-		specLog.Print("Detected URL format")
-		// Try to parse as a recognized GitHub URL first.
-		parsedURL, urlErr := url.Parse(spec)
-		if urlErr == nil && isGitHubHost(parsedURL.Host) {
-			specLog.Print("Detected GitHub URL format")
-			// Rewrite dotcom automations UI URLs to the CAPI endpoint before further parsing.
-			if capiURL, ok := rewriteAutomationsURL(parsedURL); ok {
-				specLog.Printf("Rewrote automations UI URL to CAPI URL")
-				return &WorkflowSpec{
-					RawURL:       capiURL,
-					WorkflowName: genericURLWorkflowName(capiURL),
-				}, nil
-			}
-			return parseGitHubURL(spec)
-		}
-		// Non-GitHub HTTP(S) URL: return a generic URL spec whose content will be
-		// fetched at resolution time and dispatched on Content-Type.
-		if urlErr != nil {
-			return nil, fmt.Errorf("could not parse URL %q (use a fully qualified http(s) URL): %w", spec, urlErr)
-		}
-		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-			return nil, fmt.Errorf("URL scheme %q is not supported. Only http and https are supported. Example: https://example.com/workflow.md", parsedURL.Scheme)
-		}
-		specLog.Printf("Detected generic import URL: %s", spec)
-		return &WorkflowSpec{
-			RawURL:       spec,
-			WorkflowName: genericURLWorkflowName(spec),
-		}, nil
+		return parseURLWorkflowSpec(spec)
 	}
-
 	// Check if this is a local path
 	if isLocalWorkflowPath(spec) {
-		specLog.Print("Detected local path format")
+		return parseLocalWildcardWorkflowSpec(spec)
+	}
+	return parseRepositoryWorkflowSpec(spec)
+}
 
-		ws, err := parseLocalWorkflowSpec(spec)
-		if err != nil {
-			return nil, err
+func parseURLWorkflowSpec(spec string) (*WorkflowSpec, error) {
+	specLog.Print("Detected URL format")
+	// Try to parse as a recognized GitHub URL first.
+	parsedURL, urlErr := url.Parse(spec)
+	if urlErr == nil && isGitHubHost(parsedURL.Host) {
+		specLog.Print("Detected GitHub URL format")
+		// Rewrite dotcom automations UI URLs to the CAPI endpoint before further parsing.
+		if capiURL, ok := rewriteAutomationsURL(parsedURL); ok {
+			specLog.Printf("Rewrote automations UI URL to CAPI URL")
+			return &WorkflowSpec{
+				RawURL:       capiURL,
+				WorkflowName: genericURLWorkflowName(capiURL),
+			}, nil
 		}
+		return parseGitHubURL(spec)
+	}
+	// Non-GitHub HTTP(S) URL: return a generic URL spec whose content will be
+	// fetched at resolution time and dispatched on Content-Type.
+	if urlErr != nil {
+		return nil, fmt.Errorf("could not parse URL %q (use a fully qualified http(s) URL): %w", spec, urlErr)
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("URL scheme %q is not supported. Only http and https are supported. Example: https://example.com/workflow.md", parsedURL.Scheme)
+	}
+	specLog.Printf("Detected generic import URL: %s", spec)
+	return &WorkflowSpec{
+		RawURL:       spec,
+		WorkflowName: genericURLWorkflowName(spec),
+	}, nil
+}
 
-		// Detect local wildcard specs like "./*.md" and mark them so that
-		// downstream expansion (e.g., expandLocalWildcardWorkflows) can run.
-		if strings.ContainsAny(spec, "*?[") {
-			ws.IsWildcard = true
-			// Ensure a stable WorkflowName for wildcard specs.
-			if ws.WorkflowName == "" {
-				ws.WorkflowName = spec
-			}
-		}
+func parseLocalWildcardWorkflowSpec(spec string) (*WorkflowSpec, error) {
+	specLog.Print("Detected local path format")
 
-		return ws, nil
+	ws, err := parseLocalWorkflowSpec(spec)
+	if err != nil {
+		return nil, err
 	}
 
+	// Detect local wildcard specs like "./*.md" and mark them so that
+	// downstream expansion (e.g., expandLocalWildcardWorkflows) can run.
+	if strings.ContainsAny(spec, "*?[") {
+		ws.IsWildcard = true
+		// Ensure a stable WorkflowName for wildcard specs.
+		if ws.WorkflowName == "" {
+			ws.WorkflowName = spec
+		}
+	}
+
+	return ws, nil
+}
+
+func parseRepositoryWorkflowSpec(spec string) (*WorkflowSpec, error) {
 	// Handle version first (anything after @)
 	parts := strings.SplitN(spec, "@", 2)
 	specWithoutVersion := parts[0]
@@ -385,6 +395,10 @@ func parseWorkflowSpec(spec string) (*WorkflowSpec, error) {
 
 	repoSlug := fmt.Sprintf("%s/%s", owner, repo)
 
+	return buildRepositoryWorkflowSpec(repoSlug, workflowPath, version, len(slashParts))
+}
+
+func buildRepositoryWorkflowSpec(repoSlug, workflowPath, version string, pathParts int) (*WorkflowSpec, error) {
 	// Determine the API host for this repo. getGitHubHostForRepo returns the canonical
 	// host, which for well-known public-only repos (githubnext/agentics, github/gh-aw)
 	// is always public GitHub regardless of GHE configuration. If the repo's canonical
@@ -407,7 +421,7 @@ func parseWorkflowSpec(spec string) (*WorkflowSpec, error) {
 	}
 
 	// Handle different cases based on the number of path parts
-	if len(slashParts) == 3 && !strings.HasSuffix(workflowPath, ".md") {
+	if pathParts == 3 && !strings.HasSuffix(workflowPath, ".md") {
 		// Three-part spec: owner/repo/workflow-name
 		// Add "workflows/" prefix
 		workflowPath = "workflows/" + workflowPath + ".md"

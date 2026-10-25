@@ -114,59 +114,65 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 	needsDiscussions := workflowData.SafeOutputs.CreateDiscussions != nil
 
 	if needsDiscussions {
-		hasDiscussions, err := checkRepositoryHasDiscussions(repo, c.verbose)
-
-		if err != nil {
-			// If we can't check, log but don't fail
-			// This could happen due to network issues or auth problems
-			repositoryFeaturesLog.Printf("Warning: Could not check if discussions are enabled: %v", err)
-			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
-					fmt.Sprintf("Could not verify if discussions are enabled: %v", err)))
-			}
-			// Continue checking other features even if this check fails
-		} else if !hasDiscussions {
-			// Changed to warning instead of error per issue feedback
-			// Strategy: Always try to create the discussion at runtime and investigate if it fails
-			// The runtime create_discussion handler will provide better error messages if creation fails
-			warningMsg := fmt.Sprintf("Repository %s may not have discussions enabled. The workflow will attempt to create discussions at runtime. If creation fails, enable discussions in repository settings.", repo)
-			repositoryFeaturesLog.Printf("Warning: %s", warningMsg)
-			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
-			}
-			// Don't add to error collector - this is a warning, not an error
-		}
+		c.validateRepositoryDiscussions(repo)
 	}
-
-	// Check if issues are enabled when create-issue is configured
 	if workflowData.SafeOutputs.CreateIssues != nil {
-		hasIssues, err := checkRepositoryHasIssues(repo, c.verbose)
-
-		if err != nil {
-			// If we can't check, log but don't fail
-			repositoryFeaturesLog.Printf("Warning: Could not check if issues are enabled: %v", err)
-			if c.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
-					fmt.Sprintf("Could not verify if issues are enabled: %v", err)))
-			}
-			// Continue to return aggregated errors even if this check fails
-		} else if !hasIssues {
-			issueErr := NewValidationError(
-				"safe-outputs.create-issue",
-				repo,
-				"repository requires issues to be enabled when create-issue is configured",
-				"Enable issues in repository settings or remove create-issue from safe-outputs. Example:\nsafe-outputs:\n  add-comment: {}",
-			)
-			if returnErr := collector.Add(issueErr); returnErr != nil {
-				return returnErr // Fail-fast mode
-			}
+		if err := c.validateRepositoryIssues(repo, collector); err != nil {
+			return err
 		}
 	}
-
 	repositoryFeaturesLog.Printf("Repository features validation completed: error_count=%d", collector.Count())
-
-	// Return aggregated errors with formatted output
 	return collector.FormattedError("repository features")
+}
+
+func (c *Compiler) validateRepositoryDiscussions(repo string) {
+	hasDiscussions, err := checkRepositoryHasDiscussions(repo, c.verbose)
+
+	if err != nil {
+		// If we can't check, log but don't fail
+		// This could happen due to network issues or auth problems
+		repositoryFeaturesLog.Printf("Warning: Could not check if discussions are enabled: %v", err)
+		if c.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Sprintf("Could not verify if discussions are enabled: %v", err)))
+		}
+		// Continue checking other features even if this check fails
+	} else if !hasDiscussions {
+		// Changed to warning instead of error per issue feedback
+		// Strategy: Always try to create the discussion at runtime and investigate if it fails
+		// The runtime create_discussion handler will provide better error messages if creation fails
+		warningMsg := fmt.Sprintf("Repository %s may not have discussions enabled. The workflow will attempt to create discussions at runtime. If creation fails, enable discussions in repository settings.", repo)
+		repositoryFeaturesLog.Printf("Warning: %s", warningMsg)
+		if c.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
+		}
+		// Don't add to error collector - this is a warning, not an error
+	}
+}
+
+func (c *Compiler) validateRepositoryIssues(repo string, collector *ErrorCollector) error {
+	hasIssues, err := checkRepositoryHasIssues(repo, c.verbose)
+
+	if err != nil {
+		// If we can't check, log but don't fail
+		repositoryFeaturesLog.Printf("Warning: Could not check if issues are enabled: %v", err)
+		if c.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
+				fmt.Sprintf("Could not verify if issues are enabled: %v", err)))
+		}
+		// Continue to return aggregated errors even if this check fails
+	} else if !hasIssues {
+		issueErr := NewValidationError(
+			"safe-outputs.create-issue",
+			repo,
+			"repository requires issues to be enabled when create-issue is configured",
+			"Enable issues in repository settings or remove create-issue from safe-outputs. Example:\nsafe-outputs:\n  add-comment: {}",
+		)
+		if returnErr := collector.Add(issueErr); returnErr != nil {
+			return returnErr // Fail-fast mode
+		}
+	}
+	return nil
 }
 
 // getCurrentRepository gets the current repository from git context (with caching)
@@ -259,6 +265,10 @@ func getRepositoryFeatures(repo string, verbose bool) (*RepositoryFeatures, erro
 	}
 	features.HasIssues = hasIssues
 
+	return cacheRepositoryFeatures(repo, features, verbose)
+}
+
+func cacheRepositoryFeatures(repo string, features *RepositoryFeatures, verbose bool) (*RepositoryFeatures, error) {
 	// Cache the result using sync.Map's LoadOrStore for atomic caching
 	// This handles the race condition where multiple goroutines might fetch the same repo
 	actual, loaded := repositoryFeaturesCache.LoadOrStore(repo, features)

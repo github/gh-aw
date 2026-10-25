@@ -78,27 +78,34 @@ func buildArtifactDownloadSteps(config ArtifactDownloadConfig, pinAction func(st
 
 	// Add environment variable setup if requested
 	if config.SetupEnvStep {
-		artifactsLog.Printf("Adding environment variable setup step: %s=%s%s",
-			config.EnvVarName, config.DownloadPath, config.ArtifactFilename)
-		steps = append(steps, "      - name: Setup agent output environment variable\n")
-		steps = append(steps, "        id: setup-agent-output-env\n")
-		// Only set the env var when the artifact was actually downloaded and contains the expected file
-		if config.StepID != "" {
-			steps = append(steps, fmt.Sprintf("        if: steps.%s.outcome == 'success'\n", config.StepID))
-			artifactsLog.Printf("Added env-setup conditional on step outcome: %s", config.StepID)
-		}
-		steps = append(steps, "        run: |\n")
-		steps = append(steps, fmt.Sprintf("          mkdir -p %s\n", config.DownloadPath))
-		steps = append(steps, fmt.Sprintf("          find \"%s\" -type f -print\n", config.DownloadPath))
-		// When downloading a single artifact by name with download-artifact@v4,
-		// artifacts are extracted directly to {download-path}, not {download-path}/{artifact-name}/
-		// The actual filename is specified in ArtifactFilename
-		artifactPath := fmt.Sprintf("%s%s", config.DownloadPath, config.ArtifactFilename)
-		steps = append(steps, fmt.Sprintf("          if [ -f \"%s\" ]; then\n", artifactPath))
-		steps = append(steps, fmt.Sprintf("            echo \"%s=%s\" >> \"$GITHUB_OUTPUT\"\n", config.EnvVarName, artifactPath))
-		steps = append(steps, "          fi\n")
+		steps = append(steps, buildArtifactEnvironmentSteps(config)...)
 	}
 
+	return steps
+}
+
+func buildArtifactEnvironmentSteps(config ArtifactDownloadConfig) []string {
+	artifactsLog.Printf("Adding environment variable setup step: %s=%s%s",
+		config.EnvVarName, config.DownloadPath, config.ArtifactFilename)
+	steps := []string{
+		"      - name: Setup agent output environment variable\n",
+		"        id: setup-agent-output-env\n",
+	}
+	// Only set the env var when the artifact was actually downloaded and contains the expected file
+	if config.StepID != "" {
+		steps = append(steps, fmt.Sprintf("        if: steps.%s.outcome == 'success'\n", config.StepID))
+		artifactsLog.Printf("Added env-setup conditional on step outcome: %s", config.StepID)
+	}
+	steps = append(steps, "        run: |\n")
+	steps = append(steps, fmt.Sprintf("          mkdir -p %s\n", config.DownloadPath))
+	steps = append(steps, fmt.Sprintf("          find \"%s\" -type f -print\n", config.DownloadPath))
+	// When downloading a single artifact by name with download-artifact@v4,
+	// artifacts are extracted directly to {download-path}, not {download-path}/{artifact-name}/
+	// The actual filename is specified in ArtifactFilename
+	artifactPath := fmt.Sprintf("%s%s", config.DownloadPath, config.ArtifactFilename)
+	steps = append(steps, fmt.Sprintf("          if [ -f \"%s\" ]; then\n", artifactPath))
+	steps = append(steps, fmt.Sprintf("            echo \"%s=%s\" >> \"$GITHUB_OUTPUT\"\n", config.EnvVarName, artifactPath))
+	steps = append(steps, "          fi\n")
 	return steps
 }
 

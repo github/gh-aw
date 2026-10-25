@@ -48,61 +48,69 @@ Trial results are saved both locally (in the trials/ directory) and in the host 
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			workflowSpecs := args
-			trialLog.Printf("Trial command invoked: workflow_count=%d", len(workflowSpecs))
-			logicalRepoSpec, _ := cmd.Flags().GetString("logical-repo")
-			cloneRepoSpec, _ := cmd.Flags().GetString("clone-repo")
-			hostRepoSpec, _ := cmd.Flags().GetString("host-repo")
-			deleteHostRepo, _ := cmd.Flags().GetBool("delete-host-repo-after")
-			forceDeleteHostRepo := resolveDeprecatedBoolFlag(cmd, "delete-host-repo-before", "force-delete-host-repo-before")
-			yes, _ := cmd.Flags().GetBool("yes")
-			dryRun, _ := cmd.Flags().GetBool("dry-run")
-			jsonOutput, _ := cmd.Flags().GetBool("json")
-			timeout, _ := cmd.Flags().GetInt("timeout")
-			triggerContext, _ := cmd.Flags().GetString("trigger-context")
-			repeatCount, _ := cmd.Flags().GetInt("repeat")
-			autoMergePRs, _ := cmd.Flags().GetBool("auto-merge-prs")
-			engineOverride, _ := cmd.Flags().GetString("engine")
-			appendText, _ := cmd.Flags().GetString("append")
-			verbose, _ := cmd.Root().PersistentFlags().GetBool("verbose")
-			disableSecurityScanner := resolveDeprecatedBoolFlag(cmd, "no-security-scanner", "disable-security-scanner")
-
-			if err := validateEngine(engineOverride); err != nil {
-				trialLog.Printf("Engine validation failed: engine=%s, err=%v", engineOverride, err)
-				return err
-			}
-			if trialLog.Enabled() {
-				trialLog.Printf("Trial options: dry_run=%v, repeat=%d, timeout_min=%d, auto_merge_prs=%v, logical_repo=%q, clone_repo=%q, host_repo=%q",
-					dryRun, repeatCount, timeout, autoMergePRs, logicalRepoSpec, cloneRepoSpec, hostRepoSpec)
-			}
-			opts := TrialOptions{
-				Repos: TrialRepoContext{
-					LogicalRepo: logicalRepoSpec,
-					CloneRepo:   cloneRepoSpec,
-					HostRepo:    hostRepoSpec,
-				},
-				DeleteHostRepo:         deleteHostRepo,
-				ForceDelete:            forceDeleteHostRepo,
-				Quiet:                  yes,
-				DryRun:                 dryRun,
-				JSONOutput:             jsonOutput,
-				TimeoutMinutes:         timeout,
-				TriggerContext:         triggerContext,
-				RepeatCount:            repeatCount,
-				AutoMergePRs:           autoMergePRs,
-				EngineOverride:         engineOverride,
-				AppendText:             appendText,
-				Verbose:                verbose,
-				DisableSecurityScanner: disableSecurityScanner,
-			}
-
-			if err := RunWorkflowTrials(cmd.Context(), workflowSpecs, opts); err != nil {
-				return err
-			}
-			return nil
+			return runTrialCommand(cmd, args, validateEngine)
 		},
 	}
+	configureTrialCommandFlags(cmd)
+	return cmd
+}
 
+func runTrialCommand(cmd *cobra.Command, args []string, validateEngine func(string) error) error {
+	workflowSpecs := args
+	trialLog.Printf("Trial command invoked: workflow_count=%d", len(workflowSpecs))
+	logicalRepoSpec, _ := cmd.Flags().GetString("logical-repo")
+	cloneRepoSpec, _ := cmd.Flags().GetString("clone-repo")
+	hostRepoSpec, _ := cmd.Flags().GetString("host-repo")
+	deleteHostRepo, _ := cmd.Flags().GetBool("delete-host-repo-after")
+	forceDeleteHostRepo := resolveDeprecatedBoolFlag(cmd, "delete-host-repo-before", "force-delete-host-repo-before")
+	yes, _ := cmd.Flags().GetBool("yes")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	timeout, _ := cmd.Flags().GetInt("timeout")
+	triggerContext, _ := cmd.Flags().GetString("trigger-context")
+	repeatCount, _ := cmd.Flags().GetInt("repeat")
+	autoMergePRs, _ := cmd.Flags().GetBool("auto-merge-prs")
+	engineOverride, _ := cmd.Flags().GetString("engine")
+	appendText, _ := cmd.Flags().GetString("append")
+	verbose, _ := cmd.Root().PersistentFlags().GetBool("verbose")
+	disableSecurityScanner := resolveDeprecatedBoolFlag(cmd, "no-security-scanner", "disable-security-scanner")
+
+	if err := validateEngine(engineOverride); err != nil {
+		trialLog.Printf("Engine validation failed: engine=%s, err=%v", engineOverride, err)
+		return err
+	}
+	if trialLog.Enabled() {
+		trialLog.Printf("Trial options: dry_run=%v, repeat=%d, timeout_min=%d, auto_merge_prs=%v, logical_repo=%q, clone_repo=%q, host_repo=%q",
+			dryRun, repeatCount, timeout, autoMergePRs, logicalRepoSpec, cloneRepoSpec, hostRepoSpec)
+	}
+	opts := TrialOptions{
+		Repos: TrialRepoContext{
+			LogicalRepo: logicalRepoSpec,
+			CloneRepo:   cloneRepoSpec,
+			HostRepo:    hostRepoSpec,
+		},
+		DeleteHostRepo:         deleteHostRepo,
+		ForceDelete:            forceDeleteHostRepo,
+		Quiet:                  yes,
+		DryRun:                 dryRun,
+		JSONOutput:             jsonOutput,
+		TimeoutMinutes:         timeout,
+		TriggerContext:         triggerContext,
+		RepeatCount:            repeatCount,
+		AutoMergePRs:           autoMergePRs,
+		EngineOverride:         engineOverride,
+		AppendText:             appendText,
+		Verbose:                verbose,
+		DisableSecurityScanner: disableSecurityScanner,
+	}
+
+	if err := RunWorkflowTrials(cmd.Context(), workflowSpecs, opts); err != nil {
+		return err
+	}
+	return nil
+}
+
+func configureTrialCommandFlags(cmd *cobra.Command) {
 	// Add flags
 	cmd.Flags().StringP("logical-repo", "l", "", "Repository to simulate workflow execution against, as if the workflow was installed there (defaults to current repository)")
 	cmd.Flags().String("clone-repo", "", "Clone the contents of the specified repository into the host repository before execution (useful for testing against actual repository state)")
@@ -124,5 +132,4 @@ Trial results are saved both locally (in the trials/ directory) and in the host 
 	addSecurityScannerFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive("logical-repo", "clone-repo")
 
-	return cmd
 }

@@ -18,6 +18,29 @@ import (
 
 // ── extractWorkflowIDFromName ─────────────────────────────────────────────────
 
+func TestForecastHistoryDates(t *testing.T) {
+	now := time.Date(2026, time.March, 5, 23, 0, 0, 0, time.FixedZone("local", -7*60*60))
+	tests := []struct {
+		name                                  string
+		days, periodDays                      int
+		eval                                  bool
+		start, validationStart, validationEnd string
+	}{
+		{"normal week", 7, 7, false, "2026-02-26", "", ""},
+		{"normal month", 30, 30, false, "2026-02-03", "", ""},
+		{"eval week", 7, 7, true, "2026-02-19", "2026-02-26", "2026-03-05"},
+		{"eval month", 7, 30, true, "2026-01-27", "2026-02-03", "2026-03-05"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, validationStart, validationEnd := forecastHistoryDates(now, ForecastConfig{Days: tt.days, EvalMode: tt.eval}, tt.periodDays)
+			if start != tt.start || validationStart != tt.validationStart || validationEnd != tt.validationEnd {
+				t.Fatalf("got (%s, %s, %s), want (%s, %s, %s)", start, validationStart, validationEnd, tt.start, tt.validationStart, tt.validationEnd)
+			}
+		})
+	}
+}
+
 func TestExtractWorkflowIDFromName(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

@@ -71,7 +71,14 @@ func configurePRAutoMerge(ctx context.Context, prURL string) error {
 	if number <= 0 {
 		return errors.New("expected a positive pull request number in the URL")
 	}
+	repo, err := readPRAutoMergeRepository(ctx, parsed.Host, owner, repoName, number)
+	if err != nil {
+		return err
+	}
+	return enableRepositoryPRAutoMerge(ctx, parsed.Host, repo)
+}
 
+func readPRAutoMergeRepository(ctx context.Context, hostname, owner, repoName string, number int) (*prAutoMergeRepository, error) {
 	const query = `query($owner: String!, $name: String!, $number: Int!) {
 		repository(owner: $owner, name: $name) {
 			autoMergeAllowed viewerDefaultMergeMethod
@@ -80,10 +87,10 @@ func configurePRAutoMerge(ctx context.Context, prURL string) error {
 		}
 	}`
 	output, err := autoMergeRunGH(ctx, "Checking auto-merge configuration...",
-		"api", "graphql", "--hostname", parsed.Host,
+		"api", "graphql", "--hostname", hostname,
 		"-f", "query="+query, "-f", "owner="+owner, "-f", "name="+repoName, "-F", fmt.Sprintf("number=%d", number))
 	if err != nil {
-		return fmt.Errorf("could not read repository auto-merge configuration: %w", err)
+		return nil, fmt.Errorf("could not read repository auto-merge configuration: %w", err)
 	}
 	var response struct {
 		Data struct {
@@ -94,15 +101,18 @@ func configurePRAutoMerge(ctx context.Context, prURL string) error {
 		} `json:"errors"`
 	}
 	if err := json.Unmarshal(output, &response); err != nil {
-		return fmt.Errorf("could not parse repository auto-merge configuration: %w", err)
+		return nil, fmt.Errorf("could not parse repository auto-merge configuration: %w", err)
 	}
 	if len(response.Errors) > 0 {
-		return fmt.Errorf("could not read repository auto-merge configuration: %s", response.Errors[0].Message)
+		return nil, fmt.Errorf("could not read repository auto-merge configuration: %s", response.Errors[0].Message)
 	}
 	if response.Data.Repository == nil {
-		return errors.New("GitHub did not return repository auto-merge configuration")
+		return nil, errors.New("GitHub did not return repository auto-merge configuration")
 	}
-	repo := *response.Data.Repository
+	return response.Data.Repository, nil
+}
+
+func enableRepositoryPRAutoMerge(ctx context.Context, hostname string, repo *prAutoMergeRepository) error {
 	if !repo.AutoMergeAllowed {
 		return errors.New("auto-merge is disabled or unavailable in this repository; enable it in repository settings")
 	}
@@ -119,8 +129,8 @@ func configurePRAutoMerge(ctx context.Context, prURL string) error {
 			pullRequest { id }
 		}
 	}`
-	output, err = autoMergeRunGH(ctx, "Enabling pull request auto-merge...",
-		"api", "graphql", "--hostname", parsed.Host,
+	output, err := autoMergeRunGH(ctx, "Enabling pull request auto-merge...",
+		"api", "graphql", "--hostname", hostname,
 		"-f", "query="+mutation, "-f", "prId="+repo.PullRequest.ID, "-f", "mergeMethod="+method)
 	if err != nil {
 		return fmt.Errorf("GitHub refused auto-merge; check repository settings, branch rules, and token permissions: %w", err)
@@ -182,6 +192,10 @@ func AutoMergePullRequestsCreatedAfter(repoSlug string, createdAfter time.Time, 
 		return nil
 	}
 
+	return autoMergeEligiblePullRequests(repoSlug, prs, createdAfter, verbose)
+}
+
+func autoMergeEligiblePullRequests(repoSlug string, prs []PullRequest, createdAfter time.Time, verbose bool) error {
 	// Filter PRs to only those created after the specified time
 	var eligiblePRs []PullRequest
 	for _, pr := range prs {
@@ -204,37 +218,40 @@ func AutoMergePullRequestsCreatedAfter(repoSlug string, createdAfter time.Time, 
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d pull request(s) created after workflow start time", len(eligiblePRs))))
 
 	for _, pr := range eligiblePRs {
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Processing PR #%d: %s (draft: %t, mergeable: %s, created: %s)",
-				pr.Number, pr.Title, pr.IsDraft, pr.Mergeable, pr.CreatedAt.Format(time.RFC3339))))
-		}
+		autoMergeEligiblePullRequest(repoSlug, pr, verbose)
+	}
+	return nil
+}
 
-		// Convert from draft to non-draft if necessary
-		if pr.IsDraft {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Converting PR #%d from draft to ready for review", pr.Number)))
-			if output, err := workflow.RunGHCombined("Converting draft to ready...", "pr", "ready", strconv.Itoa(pr.Number), "--repo", repoSlug); err != nil {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to convert PR #%d from draft: %v (output: %s)", pr.Number, err, string(output))))
-				continue
-			}
-		}
-
-		// Check if PR is mergeable
-		if pr.Mergeable != "MERGEABLE" {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("PR #%d is not mergeable (status: %s), skipping auto-merge", pr.Number, pr.Mergeable)))
-			continue
-		}
-
-		// Auto-merge the PR
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Auto-merging PR #%d", pr.Number)))
-		if output, err := workflow.RunGHCombined("Auto-merging pull request...", "pr", "merge", strconv.Itoa(pr.Number), "--repo", repoSlug, "--auto", "--squash"); err != nil {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to auto-merge PR #%d: %v (output: %s)", pr.Number, err, string(output))))
-			continue
-		}
-
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully enabled auto-merge for PR #%d", pr.Number)))
+func autoMergeEligiblePullRequest(repoSlug string, pr PullRequest, verbose bool) {
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Processing PR #%d: %s (draft: %t, mergeable: %s, created: %s)",
+			pr.Number, pr.Title, pr.IsDraft, pr.Mergeable, pr.CreatedAt.Format(time.RFC3339))))
 	}
 
-	return nil
+	// Convert from draft to non-draft if necessary
+	if pr.IsDraft {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Converting PR #%d from draft to ready for review", pr.Number)))
+		if output, err := workflow.RunGHCombined("Converting draft to ready...", "pr", "ready", strconv.Itoa(pr.Number), "--repo", repoSlug); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to convert PR #%d from draft: %v (output: %s)", pr.Number, err, string(output))))
+			return
+		}
+	}
+
+	// Check if PR is mergeable
+	if pr.Mergeable != "MERGEABLE" {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("PR #%d is not mergeable (status: %s), skipping auto-merge", pr.Number, pr.Mergeable)))
+		return
+	}
+
+	// Auto-merge the PR
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Auto-merging PR #%d", pr.Number)))
+	if output, err := workflow.RunGHCombined("Auto-merging pull request...", "pr", "merge", strconv.Itoa(pr.Number), "--repo", repoSlug, "--auto", "--squash"); err != nil {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to auto-merge PR #%d: %v (output: %s)", pr.Number, err, string(output))))
+		return
+	}
+
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully enabled auto-merge for PR #%d", pr.Number)))
 }
 
 // AutoMergePullRequestsLegacy is the legacy function that auto-merges all open PRs (used by trial command for backward compatibility)

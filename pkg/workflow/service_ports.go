@@ -129,36 +129,9 @@ func ExtractServicePortExpressions(servicesYAML string) (string, []string) {
 	serviceIDs := sliceutil.SortedKeys(wrapper.Services)
 
 	for _, serviceID := range serviceIDs {
-		svc := wrapper.Services[serviceID]
-		if svc == nil {
-			servicePortsLog.Printf("Service %s is nil, skipping", serviceID)
-			continue
-		}
-
-		if svc.Ports == nil {
-			warnings = append(warnings, fmt.Sprintf("service %q has no ports mapping; it will not be reachable from the AWF sandbox", serviceID))
-			servicePortsLog.Printf("Service %s has no ports, skipping", serviceID)
-			continue
-		}
-
-		portsList, ok := svc.Ports.([]any)
-		if !ok {
-			servicePortsLog.Printf("Service %s ports is not a list, skipping", serviceID)
-			warnings = append(warnings, fmt.Sprintf("service %q has an invalid ports mapping (expected a list); it will not be reachable from the AWF sandbox", serviceID))
-			continue
-		}
-
-		for _, portSpec := range portsList {
-			containerPorts, portWarnings := parsePortSpec(portSpec)
-			for _, w := range portWarnings {
-				warnings = append(warnings, fmt.Sprintf("service %q: %s", serviceID, w))
-			}
-			for _, cp := range containerPorts {
-				escapedServiceID := strings.ReplaceAll(serviceID, "'", "''")
-				expr := fmt.Sprintf("${{ job.services['%s'].ports['%d'] }}", escapedServiceID, cp)
-				expressions = append(expressions, expr)
-			}
-		}
+		serviceExpressions, serviceWarnings := extractServiceContainerPorts(serviceID, wrapper.Services[serviceID])
+		expressions = append(expressions, serviceExpressions...)
+		warnings = append(warnings, serviceWarnings...)
 	}
 
 	if len(expressions) == 0 {
@@ -169,6 +142,40 @@ func ExtractServicePortExpressions(servicesYAML string) (string, []string) {
 	result := strings.Join(expressions, ",")
 	servicePortsLog.Printf("Generated %d service port expressions", len(expressions))
 	return result, warnings
+}
+
+func extractServiceContainerPorts(serviceID string, svc *serviceContainerConfig) ([]string, []string) {
+	var expressions, warnings []string
+	if svc == nil {
+		servicePortsLog.Printf("Service %s is nil, skipping", serviceID)
+		return nil, nil
+	}
+
+	if svc.Ports == nil {
+		warnings = append(warnings, fmt.Sprintf("service %q has no ports mapping; it will not be reachable from the AWF sandbox", serviceID))
+		servicePortsLog.Printf("Service %s has no ports, skipping", serviceID)
+		return nil, warnings
+	}
+
+	portsList, ok := svc.Ports.([]any)
+	if !ok {
+		servicePortsLog.Printf("Service %s ports is not a list, skipping", serviceID)
+		warnings = append(warnings, fmt.Sprintf("service %q has an invalid ports mapping (expected a list); it will not be reachable from the AWF sandbox", serviceID))
+		return nil, warnings
+	}
+
+	for _, portSpec := range portsList {
+		containerPorts, portWarnings := parsePortSpec(portSpec)
+		for _, w := range portWarnings {
+			warnings = append(warnings, fmt.Sprintf("service %q: %s", serviceID, w))
+		}
+		for _, cp := range containerPorts {
+			escapedServiceID := strings.ReplaceAll(serviceID, "'", "''")
+			expr := fmt.Sprintf("${{ job.services['%s'].ports['%d'] }}", escapedServiceID, cp)
+			expressions = append(expressions, expr)
+		}
+	}
+	return expressions, warnings
 }
 
 // parsePortSpec parses a single port specification and returns the container port(s).
@@ -220,7 +227,10 @@ func parsePortSpec(spec any) ([]int, []string) {
 	default:
 		return nil, []string{fmt.Sprintf("unsupported port spec type %T: %v", spec, spec)}
 	}
+	return parseStringPortSpec(portStr)
+}
 
+func parseStringPortSpec(portStr string) ([]int, []string) {
 	portStr = strings.TrimSpace(portStr)
 	if portStr == "" {
 		return nil, nil
@@ -241,7 +251,10 @@ func parsePortSpec(spec any) ([]int, []string) {
 		servicePortsLog.Printf("Skipping unsupported protocol %q for port %q", protocol, portStr)
 		return nil, []string{fmt.Sprintf("unsupported protocol %q for port %q; AWF only supports TCP", protocol, portStr)}
 	}
+	return parseContainerPortSpec(portStr)
+}
 
+func parseContainerPortSpec(portStr string) ([]int, []string) {
 	// Split host:container
 	var containerPart string
 	if _, after, found := strings.Cut(portStr, ":"); found {

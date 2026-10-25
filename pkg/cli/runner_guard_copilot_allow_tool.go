@@ -82,11 +82,14 @@ func findingInCopilotLocalCurlAllowTool(lines []string, lineNum int) bool {
 		}
 	}
 
+	return hasOnlyLocalCurlToolComments(lines[stepStart:runIndex])
+}
+
+func hasOnlyLocalCurlToolComments(lines []string) bool {
 	hasToolCommentHeader := false
 	hasLocalCurlAllowTool := false
 	hasNonLocalCurlAllowTool := false
-	for i := stepStart; i < runIndex; i++ {
-		line := lines[i]
+	for _, line := range lines {
 		if strings.Contains(line, "# Copilot CLI tool arguments") {
 			hasToolCommentHeader = true
 		}

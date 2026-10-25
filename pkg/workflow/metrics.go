@@ -113,37 +113,48 @@ func ExtractJSONTokenUsage(data map[string]any) int {
 	// Check nested usage objects (Claude and OpenAI API formats)
 	if usage, exists := data["usage"]; exists {
 		if usageMap, ok := usage.(map[string]any); ok {
-			// Claude format: {"usage": {"input_tokens": 10, "output_tokens": 5, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 200}}
-			inputTokens := typeutil.ConvertToInt(usageMap["input_tokens"])
-			outputTokens := typeutil.ConvertToInt(usageMap["output_tokens"])
-			cacheCreationTokens := typeutil.ConvertToInt(usageMap["cache_creation_input_tokens"])
-			cacheReadTokens := typeutil.ConvertToInt(usageMap["cache_read_input_tokens"])
-
-			// OpenAI format: {"usage": {"prompt_tokens": 100, "completion_tokens": 50}}
-			// If Claude fields are not present, try OpenAI fields
-			if inputTokens == 0 {
-				inputTokens = typeutil.ConvertToInt(usageMap["prompt_tokens"])
-			}
-			if outputTokens == 0 {
-				outputTokens = typeutil.ConvertToInt(usageMap["completion_tokens"])
-			}
-
-			totalTokens := inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens
-			if totalTokens > 0 {
-				return totalTokens
-			}
-
-			// Generic token count fields inside usage
-			for _, field := range tokenFields {
-				if val, exists := usageMap[field]; exists {
-					if tokens := typeutil.ConvertToInt(val); tokens > 0 {
-						return tokens
-					}
-				}
+			if tokens := extractNestedJSONTokenUsage(usageMap, tokenFields); tokens > 0 {
+				return tokens
 			}
 		}
 	}
 
+	return extractDeltaJSONTokenUsage(data)
+}
+
+func extractNestedJSONTokenUsage(usageMap map[string]any, tokenFields []string) int {
+	// Claude format: {"usage": {"input_tokens": 10, "output_tokens": 5, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 200}}
+	inputTokens := typeutil.ConvertToInt(usageMap["input_tokens"])
+	outputTokens := typeutil.ConvertToInt(usageMap["output_tokens"])
+	cacheCreationTokens := typeutil.ConvertToInt(usageMap["cache_creation_input_tokens"])
+	cacheReadTokens := typeutil.ConvertToInt(usageMap["cache_read_input_tokens"])
+
+	// OpenAI format: {"usage": {"prompt_tokens": 100, "completion_tokens": 50}}
+	// If Claude fields are not present, try OpenAI fields
+	if inputTokens == 0 {
+		inputTokens = typeutil.ConvertToInt(usageMap["prompt_tokens"])
+	}
+	if outputTokens == 0 {
+		outputTokens = typeutil.ConvertToInt(usageMap["completion_tokens"])
+	}
+
+	totalTokens := inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens
+	if totalTokens > 0 {
+		return totalTokens
+	}
+
+	// Generic token count fields inside usage
+	for _, field := range tokenFields {
+		if val, exists := usageMap[field]; exists {
+			if tokens := typeutil.ConvertToInt(val); tokens > 0 {
+				return tokens
+			}
+		}
+	}
+	return 0
+}
+
+func extractDeltaJSONTokenUsage(data map[string]any) int {
 	// Check for delta structures (streaming format)
 	if delta, exists := data["delta"]; exists {
 		if deltaMap, ok := delta.(map[string]any); ok {

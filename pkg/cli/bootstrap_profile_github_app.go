@@ -62,6 +62,10 @@ func runBootstrapGitHubAppAction(ctx context.Context, repo string, action reposi
 		return nil, nil
 	}
 
+	return createAndConfigureBootstrapGitHubApp(ctx, repo, owner, repoName, ownerType, action, overrides)
+}
+
+func createAndConfigureBootstrapGitHubApp(ctx context.Context, repo, owner, repoName, ownerType string, action repositoryPackageBootstrapAction, overrides bootstrapGitHubAppOverrides) (*bootstrapCreatedGitHubApp, error) {
 	if !bootstrapIsInteractive() && overrides.Mode != "create" {
 		return nil, fmt.Errorf("creating a new GitHub App requires an interactive browser flow; provide existing credentials via %s and %s, or set %s=create to force browser-based creation. Example: export %s=Iv23example and %s='-----BEGIN PRIVATE KEY-----...'", bootstrapGitHubAppClientIDEnv, bootstrapGitHubAppPrivateKeyEnv, bootstrapGitHubAppModeEnv, bootstrapGitHubAppClientIDEnv, bootstrapGitHubAppPrivateKeyEnv)
 	}
@@ -235,6 +239,10 @@ func createBootstrapGitHubApp(ctx context.Context, repo, owner, repoName, ownerT
 		fmt.Fprintln(os.Stderr, console.FormatCommandMessage(openURL))
 	}
 
+	return waitForBootstrapGitHubAppCreation(ctx, resultCh, errCh)
+}
+
+func waitForBootstrapGitHubAppCreation(ctx context.Context, resultCh <-chan *bootstrapCreatedGitHubApp, errCh <-chan error) (*bootstrapCreatedGitHubApp, error) {
 	timeout := time.NewTimer(bootstrapProfileManifestTimeout)
 	defer timeout.Stop()
 

@@ -45,20 +45,7 @@ func GenerateWorkflowHeader(sourceFile string, generatedBy string, customInstruc
 	header.WriteString("#\n")
 
 	if !slices.Contains(logo, false) {
-		// TrimRight removes only trailing newlines, preserving per-line leading spaces
-		logoLines := strings.Split(strings.TrimRight(headerAsciiLogo, "\n"), "\n")
-		headerLog.Printf("Adding ASCII logo with %d lines", len(logoLines))
-		for _, line := range logoLines {
-			// Strip trailing whitespace from each logo line so the generated comment
-			// lines do not carry trailing spaces (yamllint trailing-spaces).
-			if trimmed := strings.TrimRight(line, " \t"); trimmed == "" {
-				header.WriteString("#\n")
-			} else {
-				fmt.Fprintf(&header, "# %s\n", trimmed)
-			}
-		}
-		header.WriteString("#\n")
-		header.WriteString("#\n")
+		writeWorkflowHeaderLogo(&header)
 	}
 
 	// Add regeneration instructions
@@ -91,4 +78,19 @@ func GenerateWorkflowHeader(sourceFile string, generatedBy string, customInstruc
 
 	headerLog.Printf("Generated header with %d bytes", header.Len())
 	return header.String()
+}
+
+func writeWorkflowHeaderLogo(header *strings.Builder) {
+	// TrimRight removes only trailing newlines, preserving per-line leading spaces.
+	logoLines := strings.Split(strings.TrimRight(headerAsciiLogo, "\n"), "\n")
+	headerLog.Printf("Adding ASCII logo with %d lines", len(logoLines))
+	for _, line := range logoLines {
+		if trimmed := strings.TrimRight(line, " \t"); trimmed == "" {
+			header.WriteString("#\n")
+		} else {
+			fmt.Fprintf(header, "# %s\n", trimmed)
+		}
+	}
+	header.WriteString("#\n")
+	header.WriteString("#\n")
 }

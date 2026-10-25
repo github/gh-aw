@@ -52,6 +52,16 @@ type containerPinUpdateOptions struct {
 	failOnResolveErrors bool
 }
 
+type updatedContainerPin struct {
+	image       string
+	pinnedImage string
+}
+
+type containerDigestResult struct {
+	digest string
+	err    error
+}
+
 func defaultContainerPinUpdateDeps() containerPinUpdateDeps {
 	return containerPinUpdateDeps{fetchDigest: fetchContainerDigest}
 }
@@ -100,6 +110,10 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 
 	containerPinsLog.Printf("Found %d unique container image(s) across lock files", len(images))
 
+	return updateCollectedContainerPins(ctx, deps, images, verbose, opts)
+}
+
+func updateCollectedContainerPins(ctx context.Context, deps containerPinUpdateDeps, images []string, verbose bool, opts containerPinUpdateOptions) (bool, error) {
 	// Load the action cache.
 	actionsLockPath := filepath.Join(".github", "aw", "actions-lock.json")
 	actionCache := workflow.NewActionCache(".")
@@ -124,19 +138,26 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 	}
 
 	// Resolve digests for images that are not yet pinned.
-	type pinnedEntry struct {
-		image       string
-		pinnedImage string // image@sha256:...
+	results, err := resolveContainerPinDigests(ctx, deps, images, actionCache, verbose, opts)
+	if err != nil {
+		return false, err
 	}
-	var updatedImages []pinnedEntry
-	var failedImages []imageFailure
-	var skippedImages []string
+	updatedImages, failedImages, skippedImages := applyContainerPinDigests(images, results, actionCache, verbose, opts)
+	printContainerPinUpdateSummary(updatedImages, failedImages, skippedImages, prunedCount, verbose)
+	if len(updatedImages) > 0 || prunedCount > 0 {
+		if err := actionCache.Save(); err != nil {
+			return false, fmt.Errorf("failed to save actions-lock.json: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated container pins in actions-lock.json"))
+	}
+	if len(failedImages) > 0 && opts.failOnResolveErrors {
+		return len(updatedImages) > 0, fmt.Errorf("failed to resolve digest for %d image(s)", len(failedImages))
+	}
+	return len(updatedImages) > 0, nil
+}
 
-	type digestResult struct {
-		digest string
-		err    error
-	}
-	results := make([]digestResult, len(images))
+func resolveContainerPinDigests(ctx context.Context, deps containerPinUpdateDeps, images []string, actionCache *workflow.ActionCache, verbose bool, opts containerPinUpdateOptions) ([]containerDigestResult, error) {
+	results := make([]containerDigestResult, len(images))
 	jobs := make([]func(), 0, len(images))
 	for i, image := range images {
 		pin, found := actionCache.GetContainerPin(image)
@@ -148,8 +169,15 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		})
 	}
 	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
-		return false, err
+		return nil, err
 	}
+	return results, nil
+}
+
+func applyContainerPinDigests(images []string, results []containerDigestResult, actionCache *workflow.ActionCache, verbose bool, opts containerPinUpdateOptions) ([]updatedContainerPin, []imageFailure, []string) {
+	var updatedImages []updatedContainerPin
+	var failedImages []imageFailure
+	var skippedImages []string
 
 	for i, image := range images {
 		existingPin, hasExistingPin := actionCache.GetContainerPin(image)
@@ -177,13 +205,16 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 			continue
 		}
 		actionCache.SetContainerPin(image, digest, pinnedImage)
-		updatedImages = append(updatedImages, pinnedEntry{image: image, pinnedImage: pinnedImage})
+		updatedImages = append(updatedImages, updatedContainerPin{image: image, pinnedImage: pinnedImage})
 
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Pinned %s → %s", image, digest)))
 		}
 	}
+	return updatedImages, failedImages, skippedImages
+}
 
+func printContainerPinUpdateSummary(updatedImages []updatedContainerPin, failedImages []imageFailure, skippedImages []string, prunedCount int, verbose bool) {
 	// Print summary.
 	fmt.Fprintln(os.Stderr, "")
 
@@ -213,18 +244,6 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		fmt.Fprintln(os.Stderr, "")
 	}
 
-	if len(updatedImages) > 0 || prunedCount > 0 {
-		if err := actionCache.Save(); err != nil {
-			return false, fmt.Errorf("failed to save actions-lock.json: %w", err)
-		}
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated container pins in actions-lock.json"))
-	}
-
-	if len(failedImages) > 0 && opts.failOnResolveErrors {
-		return len(updatedImages) > 0, fmt.Errorf("failed to resolve digest for %d image(s)", len(failedImages))
-	}
-
-	return len(updatedImages) > 0, nil
 }
 
 // collectImagesFromLockFiles scans all .lock.yml files under workflowDir and returns

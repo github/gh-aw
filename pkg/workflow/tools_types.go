@@ -197,6 +197,20 @@ func mcpServerConfigToMap(config MCPServerConfig) map[string]any {
 	}
 
 	// Add container-specific fields
+	addMCPContainerFields(result, config)
+
+	// Add guard policies if set
+	if len(config.GuardPolicies) > 0 {
+		result["guard-policies"] = config.GuardPolicies
+	}
+
+	// Add custom fields (these override standard fields if there are conflicts)
+	maps.Copy(result, config.CustomFields)
+
+	return result
+}
+
+func addMCPContainerFields(result map[string]any, config MCPServerConfig) {
 	if config.Container != "" {
 		result["container"] = config.Container
 	}
@@ -210,15 +224,6 @@ func mcpServerConfigToMap(config MCPServerConfig) map[string]any {
 		result["mounts"] = config.Mounts
 	}
 
-	// Add guard policies if set
-	if len(config.GuardPolicies) > 0 {
-		result["guard-policies"] = config.GuardPolicies
-	}
-
-	// Add custom fields (these override standard fields if there are conflicts)
-	maps.Copy(result, config.CustomFields)
-
-	return result
 }
 
 // ToMap converts the ToolsConfig back to a map[string]any for backward compatibility.

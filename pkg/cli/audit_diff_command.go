@@ -47,57 +47,7 @@ analyzes their data, and produces a diff showing:
   ` + string(constants.CLIExtensionPrefix) + ` audit diff 12345 12346 --json                        # JSON for CI integration
   ` + string(constants.CLIExtensionPrefix) + ` audit diff 12345 12346 --repo owner/repo             # Specify repository`,
 		Args: cobra.MinimumNArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			baseRunID, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid base run ID %q: must be a numeric run ID", args[0])
-			}
-
-			compareRunIDs := make([]int64, 0, len(args)-1)
-			seen := make(map[int64]bool)
-			for _, arg := range args[1:] {
-				id, err := strconv.ParseInt(arg, 10, 64)
-				if err != nil {
-					return fmt.Errorf("invalid run ID %q: must be a numeric run ID", arg)
-				}
-				if id == baseRunID {
-					return fmt.Errorf("comparison run ID %d is the same as the base run ID: cannot diff a run against itself", id)
-				}
-				if seen[id] {
-					return fmt.Errorf("duplicate comparison run ID %d: each run ID must appear only once", id)
-				}
-				seen[id] = true
-				compareRunIDs = append(compareRunIDs, id)
-			}
-
-			outputDir, _ := cmd.Flags().GetString("output")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			jsonOutput, _ := cmd.Flags().GetBool("json")
-			format, _ := cmd.Flags().GetString("format")
-			repoFlag, _ := cmd.Flags().GetString("repo")
-			artifacts, _ := cmd.Flags().GetStringSlice("artifacts")
-
-			var owner, repo, hostname string
-			if repoFlag != "" {
-				parts := strings.SplitN(repoFlag, "/", 2)
-				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-					return fmt.Errorf("invalid repository format '%s': expected 'owner/repo'", repoFlag)
-				}
-				owner = parts[0]
-				repo = parts[1]
-			}
-
-			return RunAuditDiff(cmd.Context(), baseRunID, compareRunIDs, AuditOptions{
-				Owner:        owner,
-				Repo:         repo,
-				Hostname:     hostname,
-				OutputDir:    outputDir,
-				Verbose:      verbose,
-				JSONOutput:   jsonOutput,
-				Format:       format,
-				ArtifactSets: artifacts,
-			})
-		},
+		RunE: runAuditDiffCommand,
 	}
 
 	addOutputFlag(cmd, defaultLogsOutputDir)
@@ -107,6 +57,58 @@ analyzes their data, and produces a diff showing:
 	cmd.Flags().StringSlice("artifacts", nil, "Artifact sets to download (default: all, because auditing requires comprehensive artifacts for analysis). Valid sets: "+strings.Join(ValidArtifactSetNames(), ", "))
 
 	return cmd
+}
+
+func runAuditDiffCommand(cmd *cobra.Command, args []string) error {
+	baseRunID, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid base run ID %q: must be a numeric run ID", args[0])
+	}
+
+	compareRunIDs := make([]int64, 0, len(args)-1)
+	seen := make(map[int64]bool)
+	for _, arg := range args[1:] {
+		id, err := strconv.ParseInt(arg, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid run ID %q: must be a numeric run ID", arg)
+		}
+		if id == baseRunID {
+			return fmt.Errorf("comparison run ID %d is the same as the base run ID: cannot diff a run against itself", id)
+		}
+		if seen[id] {
+			return fmt.Errorf("duplicate comparison run ID %d: each run ID must appear only once", id)
+		}
+		seen[id] = true
+		compareRunIDs = append(compareRunIDs, id)
+	}
+
+	outputDir, _ := cmd.Flags().GetString("output")
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	format, _ := cmd.Flags().GetString("format")
+	repoFlag, _ := cmd.Flags().GetString("repo")
+	artifacts, _ := cmd.Flags().GetStringSlice("artifacts")
+
+	var owner, repo, hostname string
+	if repoFlag != "" {
+		parts := strings.SplitN(repoFlag, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("invalid repository format '%s': expected 'owner/repo'", repoFlag)
+		}
+		owner = parts[0]
+		repo = parts[1]
+	}
+
+	return RunAuditDiff(cmd.Context(), baseRunID, compareRunIDs, AuditOptions{
+		Owner:        owner,
+		Repo:         repo,
+		Hostname:     hostname,
+		OutputDir:    outputDir,
+		Verbose:      verbose,
+		JSONOutput:   jsonOutput,
+		Format:       format,
+		ArtifactSets: artifacts,
+	})
 }
 
 // RunAuditDiff compares behavior between a base workflow run and one or more comparison runs.
@@ -163,21 +165,29 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 		return fmt.Errorf("failed to load data for base run %d: %w", baseRunID, err)
 	}
 
-	diffs := make([]*AuditDiff, 0, len(compareRunIDs))
+	diffs, err := loadAuditComparisons(ctx, baseRunID, compareRunIDs, baseSummary, opts, hostname, artifactFilter)
+	if err != nil {
+		return err
+	}
 
+	return renderAuditComparisons(diffs, opts.JSONOutput, format)
+}
+
+func loadAuditComparisons(ctx context.Context, baseRunID int64, compareRunIDs []int64, baseSummary *RunSummary, opts AuditOptions, hostname string, artifactFilter []string) ([]*AuditDiff, error) {
+	diffs := make([]*AuditDiff, 0, len(compareRunIDs))
 	for _, compareRunID := range compareRunIDs {
 		// Check context cancellation between downloads
 		select {
 		case <-ctx.Done():
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Operation cancelled"))
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
 		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Loading data for run %d...", compareRunID)))
-		compareSummary, err := loadRunSummaryForDiff(ctx, compareRunID, outputDir, owner, repo, hostname, verbose, artifactFilter)
+		compareSummary, err := loadRunSummaryForDiff(ctx, compareRunID, opts.OutputDir, opts.Owner, opts.Repo, hostname, opts.Verbose, artifactFilter)
 		if err != nil {
-			return fmt.Errorf("failed to load data for run %d: %w", compareRunID, err)
+			return nil, fmt.Errorf("failed to load data for run %d: %w", compareRunID, err)
 		}
 
 		// Warn if no firewall data found for this pair
@@ -197,9 +207,12 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 		diff := computeAuditDiff(baseRunID, compareRunID, baseSummary, compareSummary)
 		diffs = append(diffs, diff)
 	}
+	return diffs, nil
+}
 
+func renderAuditComparisons(diffs []*AuditDiff, jsonOutput bool, format string) error {
 	// Render output
-	if opts.JSONOutput || format == "json" {
+	if jsonOutput || format == "json" {
 		return renderAuditDiffJSON(diffs)
 	}
 

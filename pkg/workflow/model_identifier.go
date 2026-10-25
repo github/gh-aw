@@ -174,43 +174,9 @@ func ParseModelIdentifier(s string) (*ParsedModelIdentifier, error) {
 		Params: map[string]string{},
 	}
 
-	// ── Validate base identifier ─────────────────────────────────────────────
-	if strings.Contains(base, "/") {
-		// Provider-scoped or glob pattern.
-		provider, modelPart, _ := strings.Cut(base, "/")
-
-		if err := validateProviderToken(provider); err != nil {
-			modelIdentifierLog.Printf("Invalid provider token %q: %v", provider, err)
-			return nil, err
-		}
-
-		p.Provider = provider
-
-		if strings.Contains(modelPart, "*") {
-			// Glob pattern.
-			modelIdentifierLog.Printf("Parsing as glob pattern: provider=%q model-glob=%q", provider, modelPart)
-			if err := validateModelGlobToken(modelPart); err != nil {
-				return nil, err
-			}
-			p.ModelToken = modelPart
-			p.IsGlob = true
-		} else {
-			// Exact provider-scoped name.
-			modelIdentifierLog.Printf("Parsing as provider-scoped: provider=%q model=%q", provider, modelPart)
-			if err := validateModelToken(modelPart); err != nil {
-				return nil, err
-			}
-			p.ModelToken = modelPart
-		}
-	} else {
-		// Bare name.
-		modelIdentifierLog.Printf("Parsing as bare name: %q", base)
-		if err := validateBareName(base); err != nil {
-			return nil, err
-		}
+	if err := parseModelIdentifierBase(p); err != nil {
+		return nil, err
 	}
-
-	// ── Parse and validate query string ─────────────────────────────────────
 	if rawQuery != "" {
 		modelIdentifierLog.Printf("Parsing query string: %q", rawQuery)
 		params, err := parseQueryString(rawQuery)
@@ -220,9 +186,49 @@ func ParseModelIdentifier(s string) (*ParsedModelIdentifier, error) {
 		p.Params = params
 		modelIdentifierLog.Printf("Parsed %d query param(s)", len(params))
 	}
-
 	modelIdentifierLog.Printf("Successfully parsed model identifier: provider=%q model=%q isGlob=%v params=%d", p.Provider, p.ModelToken, p.IsGlob, len(p.Params))
 	return p, nil
+}
+
+func parseModelIdentifierBase(p *ParsedModelIdentifier) error {
+	base := p.Base
+	// ── Validate base identifier ─────────────────────────────────────────────
+	if strings.Contains(base, "/") {
+		// Provider-scoped or glob pattern.
+		provider, modelPart, _ := strings.Cut(base, "/")
+
+		if err := validateProviderToken(provider); err != nil {
+			modelIdentifierLog.Printf("Invalid provider token %q: %v", provider, err)
+			return err
+		}
+
+		p.Provider = provider
+
+		if strings.Contains(modelPart, "*") {
+			// Glob pattern.
+			modelIdentifierLog.Printf("Parsing as glob pattern: provider=%q model-glob=%q", provider, modelPart)
+			if err := validateModelGlobToken(modelPart); err != nil {
+				return err
+			}
+			p.ModelToken = modelPart
+			p.IsGlob = true
+		} else {
+			// Exact provider-scoped name.
+			modelIdentifierLog.Printf("Parsing as provider-scoped: provider=%q model=%q", provider, modelPart)
+			if err := validateModelToken(modelPart); err != nil {
+				return err
+			}
+			p.ModelToken = modelPart
+		}
+	} else {
+		// Bare name.
+		modelIdentifierLog.Printf("Parsing as bare name: %q", base)
+		if err := validateBareName(base); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ─── Segment validators ───────────────────────────────────────────────────────

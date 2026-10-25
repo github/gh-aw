@@ -156,7 +156,10 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	if !ok || projectID == "" {
 		return errors.New("failed to get project ID from response")
 	}
+	return configureCreatedProject(ctx, config, project, projectID)
+}
 
+func configureCreatedProject(ctx context.Context, config ProjectConfig, project map[string]any, projectID string) error {
 	// Link to repository if specified
 	if config.Repo != "" {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Linking project to repository %s...", config.Repo)))
@@ -716,7 +719,10 @@ func getStatusField(ctx context.Context, info projectURLInfo, verbose bool) (sta
 	if err != nil {
 		return statusFieldInfo{}, fmt.Errorf("failed to get project fields: %w", err)
 	}
+	return parseProjectStatusField(fieldsOutput, projectID)
+}
 
+func parseProjectStatusField(fieldsOutput []byte, projectID string) (statusFieldInfo, error) {
 	// Parse fields to find Status field
 	var fields []map[string]any
 	if err := json.Unmarshal(fieldsOutput, &fields); err != nil {

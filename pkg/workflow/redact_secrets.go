@@ -111,17 +111,7 @@ func CollectActionReferences(yamlContent string) []string {
 
 		// The action ref is the first whitespace-delimited token; anything after
 		// optional whitespace + "#" is treated as the inline tag comment.
-		spaceIdx := strings.IndexByte(rest, ' ')
-		var ref, comment string
-		if spaceIdx == -1 {
-			ref = rest
-		} else {
-			ref = rest[:spaceIdx]
-			afterRef := strings.TrimSpace(rest[spaceIdx:])
-			if strings.HasPrefix(afterRef, "#") {
-				comment = strings.TrimSpace(afterRef[1:])
-			}
-		}
+		ref, comment := splitActionReferenceComment(rest)
 
 		// Skip local actions (e.g. "./actions/setup", "./.github/workflows/...")
 		if strings.HasPrefix(ref, "./") {
@@ -140,6 +130,20 @@ func CollectActionReferences(yamlContent string) []string {
 
 	secretMaskingLog.Printf("Found %d unique external action reference(s) in workflow", len(actions))
 	return actions
+}
+
+func splitActionReferenceComment(rest string) (ref, comment string) {
+	spaceIdx := strings.IndexByte(rest, ' ')
+	if spaceIdx == -1 {
+		ref = rest
+	} else {
+		ref = rest[:spaceIdx]
+		afterRef := strings.TrimSpace(rest[spaceIdx:])
+		if strings.HasPrefix(afterRef, "#") {
+			comment = strings.TrimSpace(afterRef[1:])
+		}
+	}
+	return ref, comment
 }
 
 func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {

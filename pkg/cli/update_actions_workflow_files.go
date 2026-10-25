@@ -73,47 +73,13 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
 			return nil
 		}
-
-		content, err := os.ReadFile(path)
+		updated, err := updateWorkflowActionReferences(ctx, deps, opts, path, d.Name(), cache, coolDownCache)
 		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read %s: %v", path, err)))
-			}
-			return nil
+			return err
 		}
-
-		updatedActions, newContent, err := updateActionRefsInContentWithDeps(ctx, deps, string(content), cache, coolDownCache, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update action refs in %s: %v", path, err)))
-			}
-			return nil
+		if updated {
+			updatedFiles = append(updatedFiles, path)
 		}
-		updatedSkills, newContent, err := updateSkillRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update skill refs in %s: %v", path, err)))
-			}
-			return nil
-		}
-		updatedPlugins, newContent, err := updatePluginRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
-		if err != nil {
-			if opts.verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update plugin refs in %s: %v", path, err)))
-			}
-			return nil
-		}
-
-		if !updatedActions && !updatedSkills && !updatedPlugins {
-			return nil
-		}
-
-		if err := os.WriteFile(path, []byte(newContent), constants.FilePermPublic); err != nil {
-			return fmt.Errorf("unable to write updated workflow %s: %w", path, err)
-		}
-
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated action/skill/plugin references in "+d.Name()))
-		updatedFiles = append(updatedFiles, path)
 		return nil
 	})
 	if err != nil {
@@ -131,4 +97,47 @@ func updateActionsInWorkflowFiles(ctx context.Context, deps actionUpdateDeps, op
 	}
 
 	return nil
+}
+
+func updateWorkflowActionReferences(ctx context.Context, deps actionUpdateDeps, opts updateActionsOptions, path, name string, cache map[string]latestReleaseResult, coolDownCache map[string]coolDownCheckResult) (bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read %s: %v", path, err)))
+		}
+		return false, nil
+	}
+
+	updatedActions, newContent, err := updateActionRefsInContentWithDeps(ctx, deps, string(content), cache, coolDownCache, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
+	if err != nil {
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update action refs in %s: %v", path, err)))
+		}
+		return false, nil
+	}
+	updatedSkills, newContent, err := updateSkillRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
+	if err != nil {
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update skill refs in %s: %v", path, err)))
+		}
+		return false, nil
+	}
+	updatedPlugins, newContent, err := updatePluginRefsInContent(ctx, newContent, !opts.disableReleaseBump, opts.verbose, opts.coolDown)
+	if err != nil {
+		if opts.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update plugin refs in %s: %v", path, err)))
+		}
+		return false, nil
+	}
+
+	if !updatedActions && !updatedSkills && !updatedPlugins {
+		return false, nil
+	}
+
+	if err := os.WriteFile(path, []byte(newContent), constants.FilePermPublic); err != nil {
+		return false, fmt.Errorf("unable to write updated workflow %s: %w", path, err)
+	}
+
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated action/skill/plugin references in "+name))
+	return true, nil
 }

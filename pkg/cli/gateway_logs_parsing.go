@@ -56,6 +56,17 @@ func parseGatewayLogs(logDir string, verbose bool) (*GatewayMetrics, error) {
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, maxScannerBufferSize)
 	scanner.Buffer(buf, maxScannerBufferSize)
+	scanGatewayLogEntries(scanner, metrics, verbose)
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading gateway.jsonl: %w", err)
+	}
+	calculateGatewayAggregates(metrics)
+	gatewayLogsLog.Printf("Successfully parsed gateway.jsonl: %d servers, %d total requests",
+		len(metrics.Servers), metrics.TotalRequests)
+	return metrics, nil
+}
+
+func scanGatewayLogEntries(scanner *bufio.Scanner, metrics *GatewayMetrics, verbose bool) {
 	lineNum := 0
 
 	for scanner.Scan() {
@@ -80,21 +91,24 @@ func parseGatewayLogs(logDir string, verbose bool) (*GatewayMetrics, error) {
 		processGatewayLogEntry(&entry, metrics, verbose)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading gateway.jsonl: %w", err)
-	}
-
-	// Calculate aggregate statistics
-	calculateGatewayAggregates(metrics)
-
-	gatewayLogsLog.Printf("Successfully parsed gateway.jsonl: %d servers, %d total requests",
-		len(metrics.Servers), metrics.TotalRequests)
-
-	return metrics, nil
 }
 
 // processGatewayLogEntry processes a single log entry and updates metrics
 func processGatewayLogEntry(entry *GatewayLogEntry, metrics *GatewayMetrics, verbose bool) {
+	updateGatewayTimeRange(entry, metrics)
+	if entry.Type == "DIFC_FILTERED" {
+		recordGatewayFilteredEvent(entry, metrics)
+		return
+	}
+	if entry.Type == "GUARD_POLICY_BLOCKED" {
+		recordGatewayGuardBlockedEvent(entry, metrics)
+		return
+	}
+	recordGatewayEntryErrors(entry, metrics)
+	recordGatewayRequest(entry, metrics)
+}
+
+func updateGatewayTimeRange(entry *GatewayLogEntry, metrics *GatewayMetrics) {
 	// Parse timestamp for time range (supports both RFC3339 and RFC3339Nano)
 	if entry.Timestamp != "" {
 		t, err := time.Parse(time.RFC3339Nano, entry.Timestamp)
@@ -110,57 +124,55 @@ func processGatewayLogEntry(entry *GatewayLogEntry, metrics *GatewayMetrics, ver
 			}
 		}
 	}
+}
 
-	// Handle DIFC_FILTERED events
-	if entry.Type == "DIFC_FILTERED" {
-		metrics.TotalFiltered++
-		// DIFC_FILTERED events use server_id; fall back to server_name for compatibility
-		serverKey := entry.ServerID
-		if serverKey == "" {
-			serverKey = entry.ServerName
-		}
-		if serverKey != "" {
-			server := getOrCreateServer(metrics, serverKey)
-			server.FilteredCount++
-		}
-		metrics.FilteredEvents = append(metrics.FilteredEvents, DifcFilteredEvent{
-			Timestamp:         entry.Timestamp,
-			ServerID:          serverKey,
-			ToolName:          entry.ToolName,
-			Description:       entry.Description,
-			Reason:            entry.Reason,
-			SecrecyTags:       entry.SecrecyTags,
-			IntegrityTags:     entry.IntegrityTags,
-			AuthorAssociation: entry.AuthorAssociation,
-			AuthorLogin:       entry.AuthorLogin,
-			HTMLURL:           entry.HTMLURL,
-			Number:            entry.Number,
-		})
-		return
+func recordGatewayFilteredEvent(entry *GatewayLogEntry, metrics *GatewayMetrics) {
+	metrics.TotalFiltered++
+	// DIFC_FILTERED events use server_id; fall back to server_name for compatibility
+	serverKey := entry.ServerID
+	if serverKey == "" {
+		serverKey = entry.ServerName
 	}
-
-	// Handle GUARD_POLICY_BLOCKED events from gateway.jsonl
-	if entry.Type == "GUARD_POLICY_BLOCKED" {
-		metrics.TotalGuardBlocked++
-		serverKey := entry.ServerID
-		if serverKey == "" {
-			serverKey = entry.ServerName
-		}
-		if serverKey != "" {
-			server := getOrCreateServer(metrics, serverKey)
-			server.GuardPolicyBlocked++
-		}
-		metrics.GuardPolicyEvents = append(metrics.GuardPolicyEvents, GuardPolicyEvent{
-			Timestamp: entry.Timestamp,
-			ServerID:  serverKey,
-			ToolName:  entry.ToolName,
-			Reason:    entry.Reason,
-			Message:   entry.Message,
-			Details:   entry.Description,
-		})
-		return
+	if serverKey != "" {
+		server := getOrCreateServer(metrics, serverKey)
+		server.FilteredCount++
 	}
+	metrics.FilteredEvents = append(metrics.FilteredEvents, DifcFilteredEvent{
+		Timestamp:         entry.Timestamp,
+		ServerID:          serverKey,
+		ToolName:          entry.ToolName,
+		Description:       entry.Description,
+		Reason:            entry.Reason,
+		SecrecyTags:       entry.SecrecyTags,
+		IntegrityTags:     entry.IntegrityTags,
+		AuthorAssociation: entry.AuthorAssociation,
+		AuthorLogin:       entry.AuthorLogin,
+		HTMLURL:           entry.HTMLURL,
+		Number:            entry.Number,
+	})
+}
 
+func recordGatewayGuardBlockedEvent(entry *GatewayLogEntry, metrics *GatewayMetrics) {
+	metrics.TotalGuardBlocked++
+	serverKey := entry.ServerID
+	if serverKey == "" {
+		serverKey = entry.ServerName
+	}
+	if serverKey != "" {
+		server := getOrCreateServer(metrics, serverKey)
+		server.GuardPolicyBlocked++
+	}
+	metrics.GuardPolicyEvents = append(metrics.GuardPolicyEvents, GuardPolicyEvent{
+		Timestamp: entry.Timestamp,
+		ServerID:  serverKey,
+		ToolName:  entry.ToolName,
+		Reason:    entry.Reason,
+		Message:   entry.Message,
+		Details:   entry.Description,
+	})
+}
+
+func recordGatewayEntryErrors(entry *GatewayLogEntry, metrics *GatewayMetrics) {
 	// Track errors. Include entries where level is "error" to handle gateway log formats
 	// that omit the "status" field post-OTel-collector migration.
 	if entry.Status == "error" || entry.Error != "" || entry.Level == "error" {
@@ -175,7 +187,9 @@ func processGatewayLogEntry(entry *GatewayLogEntry, metrics *GatewayMetrics, ver
 			}
 		}
 	}
+}
 
+func recordGatewayRequest(entry *GatewayLogEntry, metrics *GatewayMetrics) {
 	// Process based on event type
 	switch entry.Event {
 	case "request", "tool_call", "rpc_call":

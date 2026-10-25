@@ -39,24 +39,7 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 
 	// Script mode: checkout .github folder from github/gh-aw to /tmp/gh-aw/actions-source/
 	if c.actionMode.IsScript() {
-		lines := []string{
-			"      - name: Checkout actions folder\n",
-			fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
-			"        with:\n",
-			"          repository: github/gh-aw\n",
-		}
-		if ref != "" {
-			lines = append(lines, fmt.Sprintf("          ref: %s\n", ref))
-		}
-		lines = append(lines,
-			"          sparse-checkout: |\n",
-			"            actions\n",
-			"          path: /tmp/gh-aw/actions-source\n",
-			"          fetch-depth: 1\n",
-			"          clean: false\n",
-			"          persist-credentials: false\n",
-		)
-		return lines
+		return generateScriptActionsCheckout(ref)
 	}
 
 	// Dev mode: checkout actions folder from github/gh-aw so that cross-repo
@@ -80,6 +63,27 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 
 	// Release mode or other modes: no checkout needed
 	return nil
+}
+
+func generateScriptActionsCheckout(ref string) []string {
+	lines := []string{
+		"      - name: Checkout actions folder\n",
+		fmt.Sprintf("        uses: %s\n", getActionPin("actions/checkout")),
+		"        with:\n",
+		"          repository: github/gh-aw\n",
+	}
+	if ref != "" {
+		lines = append(lines, fmt.Sprintf("          ref: %s\n", ref))
+	}
+	lines = append(lines,
+		"          sparse-checkout: |\n",
+		"            actions\n",
+		"          path: /tmp/gh-aw/actions-source\n",
+		"          fetch-depth: 1\n",
+		"          clean: false\n",
+		"          persist-credentials: false\n",
+	)
+	return lines
 }
 
 // generateRestoreActionsSetupStep generates a single "Restore actions folder" step that

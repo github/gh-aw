@@ -53,73 +53,90 @@ func resolveRedirectedUpdateLocation(ctx context.Context, workflowName string, i
 		}
 		visited[locationKey] = struct{}{}
 
-		latestRefResult, err := resolveLatestRefFn(ctx, current.Repo, currentRef, allowMajor, verbose, coolDown)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve latest ref for %s: %w", sourceSpecWithRef(current, currentRef), err)
-		}
-		if latestRefResult.CoolDownBlocked {
-			return &resolvedUpdateLocation{
-				sourceSpec:      current,
-				currentRef:      currentRef,
-				latestRef:       currentRef,
-				sourceFieldRef:  currentRef,
-				redirectHistory: history,
-				coolDownBlocked: true,
-			}, nil
-		}
-		latestRef := latestRefResult.Ref
-
-		content, err := downloadWorkflowContentFn(ctx, current.Repo, current.Path, latestRef, verbose)
-		if err != nil {
-			return nil, fmt.Errorf("failed to download workflow %s: %w", sourceSpecWithRef(current, latestRef), err)
-		}
-
-		redirect, err := extractRedirectFromContent(string(content))
+		location, redirect, err := resolveUpdateLocationAtRef(ctx, current, currentRef, allowMajor, verbose, coolDown, history)
 		if err != nil {
 			return nil, err
 		}
-
-		sourceFieldRef := latestRef
-		if isBranchRef(currentRef) {
-			sourceFieldRef = currentRef
+		if location.coolDownBlocked {
+			return location, nil
 		}
-
 		if redirect == "" {
-			updateRedirectsLog.Printf("Resolved update location: workflow=%s, repo=%s, latestRef=%s, redirects=%d", workflowName, current.Repo, latestRef, len(history))
-			return &resolvedUpdateLocation{
-				sourceSpec:      current,
-				currentRef:      currentRef,
-				latestRef:       latestRef,
-				sourceFieldRef:  sourceFieldRef,
-				content:         content,
-				redirectHistory: history,
-			}, nil
+			updateRedirectsLog.Printf("Resolved update location: workflow=%s, repo=%s, latestRef=%s, redirects=%d", workflowName, current.Repo, location.latestRef, len(history))
+			return location, nil
 		}
-
 		if noRedirect {
 			updateRedirectsLog.Printf("Redirect blocked by --no-redirect: workflow=%s, redirect=%s", workflowName, redirect)
-			return nil, fmt.Errorf("redirect is disabled by --no-redirect for %s: %s declares redirect to %s (remove redirect frontmatter or run update without --no-redirect)", workflowName, sourceSpecWithRef(current, latestRef), redirect)
+			return nil, fmt.Errorf("redirect is disabled by --no-redirect for %s: %s declares redirect to %s (remove redirect frontmatter or run update without --no-redirect)", workflowName, sourceSpecWithRef(current, location.latestRef), redirect)
 		}
-
-		redirectedSource, err := normalizeRedirectToSourceSpec(redirect)
+		redirectedSource, redirectMessage, err := followWorkflowUpdateRedirect(ctx, workflowName, current, location.latestRef, redirect)
 		if err != nil {
-			return nil, fmt.Errorf("invalid redirect %q in %s: %w", redirect, sourceSpecWithRef(current, latestRef), err)
+			return nil, err
 		}
-
-		nextRef := redirectedSource.Ref
-		if nextRef == "" {
-			nextRef = resolveDefaultBranchRef(ctx, redirectedSource.Repo)
-		}
-
-		updateRedirectsLog.Printf("Following redirect: workflow=%s, from=%s, to=%s", workflowName, sourceSpecWithRef(current, latestRef), sourceSpecWithRef(redirectedSource, nextRef))
-		redirectMessage := fmt.Sprintf("Workflow %s redirect: %s → %s", workflowName, sourceSpecWithRef(current, latestRef), sourceSpecWithRef(redirectedSource, nextRef))
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(redirectMessage))
 		history = append(history, redirectMessage)
 		current = redirectedSource
 	}
 
 	updateRedirectsLog.Printf("Redirect chain exceeded max depth: workflow=%s, depth=%d", workflowName, maxRedirectDepth)
 	return nil, fmt.Errorf("redirect chain exceeded maximum depth (%d) while updating %s", maxRedirectDepth, workflowName)
+}
+
+func resolveUpdateLocationAtRef(ctx context.Context, current *SourceSpec, currentRef string, allowMajor, verbose bool, coolDown time.Duration, history []string) (*resolvedUpdateLocation, string, error) {
+	latestRefResult, err := resolveLatestRefFn(ctx, current.Repo, currentRef, allowMajor, verbose, coolDown)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to resolve latest ref for %s: %w", sourceSpecWithRef(current, currentRef), err)
+	}
+	if latestRefResult.CoolDownBlocked {
+		return &resolvedUpdateLocation{
+			sourceSpec:      current,
+			currentRef:      currentRef,
+			latestRef:       currentRef,
+			sourceFieldRef:  currentRef,
+			redirectHistory: history,
+			coolDownBlocked: true,
+		}, "", nil
+	}
+	latestRef := latestRefResult.Ref
+
+	content, err := downloadWorkflowContentFn(ctx, current.Repo, current.Path, latestRef, verbose)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to download workflow %s: %w", sourceSpecWithRef(current, latestRef), err)
+	}
+
+	redirect, err := extractRedirectFromContent(string(content))
+	if err != nil {
+		return nil, "", err
+	}
+
+	sourceFieldRef := latestRef
+	if isBranchRef(currentRef) {
+		sourceFieldRef = currentRef
+	}
+
+	return &resolvedUpdateLocation{
+		sourceSpec:      current,
+		currentRef:      currentRef,
+		latestRef:       latestRef,
+		sourceFieldRef:  sourceFieldRef,
+		content:         content,
+		redirectHistory: history,
+	}, redirect, nil
+}
+
+func followWorkflowUpdateRedirect(ctx context.Context, workflowName string, current *SourceSpec, latestRef, redirect string) (*SourceSpec, string, error) {
+	redirectedSource, err := normalizeRedirectToSourceSpec(redirect)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid redirect %q in %s: %w", redirect, sourceSpecWithRef(current, latestRef), err)
+	}
+
+	nextRef := redirectedSource.Ref
+	if nextRef == "" {
+		nextRef = resolveDefaultBranchRef(ctx, redirectedSource.Repo)
+	}
+
+	updateRedirectsLog.Printf("Following redirect: workflow=%s, from=%s, to=%s", workflowName, sourceSpecWithRef(current, latestRef), sourceSpecWithRef(redirectedSource, nextRef))
+	redirectMessage := fmt.Sprintf("Workflow %s redirect: %s → %s", workflowName, sourceSpecWithRef(current, latestRef), sourceSpecWithRef(redirectedSource, nextRef))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(redirectMessage))
+	return redirectedSource, redirectMessage, nil
 }
 
 // resolveDefaultBranchRef returns the repository's default branch name via the

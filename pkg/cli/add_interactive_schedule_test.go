@@ -9,6 +9,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUpdateSelectedSchedulePreservesOtherTriggers(t *testing.T) {
+	t.Parallel()
+	content := "---\non:\n  schedule: daily\n  workflow_dispatch:\n  push:\n    branches: [main]\n---\n# Report\n"
+	detection := detectWorkflowScheduleInfo(content)
+	updated, changed := updateSelectedSchedule(content, "weekly", detection)
+	require.True(t, changed)
+	assert.Contains(t, updated, "workflow_dispatch:")
+	assert.Contains(t, updated, "push:")
+	assert.Contains(t, updated, "branches:")
+	assert.Contains(t, updated, "# Report")
+	assert.Equal(t, "weekly", detectWorkflowScheduleInfo(updated).Frequency)
+}
+
+func TestUpdateSelectedScheduleRejectsUnknownSelection(t *testing.T) {
+	t.Parallel()
+	updated, changed := updateSelectedSchedule("---\non: daily\n---\n", "unknown", scheduleDetection{})
+	assert.False(t, changed)
+	assert.Empty(t, updated)
+}
+
+func TestUpdateSelectedScheduleUpdatesScalarTrigger(t *testing.T) {
+	t.Parallel()
+	content := "---\non: daily\n---\n# Report\n"
+	updated, changed := updateSelectedSchedule(content, "weekly", detectWorkflowScheduleInfo(content))
+	require.True(t, changed)
+	assert.Equal(t, "weekly", detectWorkflowScheduleInfo(updated).Frequency)
+	assert.Contains(t, updated, "# Report")
+}
+
 func TestClassifyScheduleFrequency(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

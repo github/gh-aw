@@ -62,47 +62,47 @@ re-downloading.`,
   ` + string(constants.CLIExtensionPrefix) + ` view 1234567890 -v`,
 		Args:   cobra.ExactArgs(1),
 		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			outputDir, _ := cmd.Flags().GetString("output")
-			repoFlag, _ := cmd.Flags().GetString("repo")
-
-			runIDOrURL := args[0]
-
-			components, err := parser.ParseRunURLExtended(runIDOrURL)
-			if err != nil {
-				return err
-			}
-
-			// Apply --repo flag when owner/repo were not inferred from a URL.
-			if repoFlag != "" && components.Owner == "" {
-				parts := strings.SplitN(repoFlag, "/", 2)
-				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-					return fmt.Errorf("invalid repository format %q: expected 'owner/repo'", repoFlag)
-				}
-				components.Owner = parts[0]
-				components.Repo = parts[1]
-			}
-
-			if outputDir == "" {
-				outputDir = defaultLogsOutputDir
-			}
-
-			return ViewWorkflowRun(cmd.Context(), components.Number, ViewOptions{
-				Owner:     components.Owner,
-				Repo:      components.Repo,
-				Hostname:  components.Host,
-				OutputDir: outputDir,
-				Verbose:   verbose,
-			})
-		},
+		RunE:   runViewCommand,
 	}
-
 	addOutputFlag(cmd, defaultLogsOutputDir)
 	addRepoFlag(cmd)
 	RegisterDirFlagCompletion(cmd, "output")
-
 	return cmd
+}
+
+func runViewCommand(cmd *cobra.Command, args []string) error {
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	outputDir, _ := cmd.Flags().GetString("output")
+	repoFlag, _ := cmd.Flags().GetString("repo")
+
+	runIDOrURL := args[0]
+
+	components, err := parser.ParseRunURLExtended(runIDOrURL)
+	if err != nil {
+		return err
+	}
+
+	// Apply --repo flag when owner/repo were not inferred from a URL.
+	if repoFlag != "" && components.Owner == "" {
+		parts := strings.SplitN(repoFlag, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("invalid repository format %q: expected 'owner/repo'", repoFlag)
+		}
+		components.Owner = parts[0]
+		components.Repo = parts[1]
+	}
+
+	if outputDir == "" {
+		outputDir = defaultLogsOutputDir
+	}
+
+	return ViewWorkflowRun(cmd.Context(), components.Number, ViewOptions{
+		Owner:     components.Owner,
+		Repo:      components.Repo,
+		Hostname:  components.Host,
+		OutputDir: outputDir,
+		Verbose:   verbose,
+	})
 }
 
 // ViewOptions holds configuration for the view command.
@@ -153,6 +153,10 @@ func ViewWorkflowRun(ctx context.Context, runID int64, opts ViewOptions) error {
 		}
 	}
 
+	return renderViewWorkflowRun(runDir, runID, hostname, opts)
+}
+
+func renderViewWorkflowRun(runDir string, runID int64, hostname string, opts ViewOptions) error {
 	// Collect and merge events from all available JSONL sources.
 	events, err := BuildUnifiedTimeline(runDir, opts.Verbose)
 	if err != nil {

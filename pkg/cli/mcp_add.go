@@ -53,7 +53,14 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 	if len(servers) == 0 {
 		return fmt.Errorf("no MCP servers found matching '%s'", mcpServerID)
 	}
+	selectedServer := selectMCPRegistryServer(servers, mcpServerID, verbose)
+	if selectedServer == nil {
+		return fmt.Errorf("no MCP servers found matching '%s'", mcpServerID)
+	}
+	return installMCPRegistryServer(workflowPath, selectedServer, transportType, registryClient.registryURL, customToolID, verbose)
+}
 
+func selectMCPRegistryServer(servers []MCPRegistryServerForProcessing, mcpServerID string, verbose bool) *MCPRegistryServerForProcessing {
 	// Find exact match by name first, then by partial match
 	var selectedServer *MCPRegistryServerForProcessing
 	for i, server := range servers {
@@ -82,10 +89,10 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 		}
 	}
 
-	if selectedServer == nil {
-		return fmt.Errorf("no MCP servers found matching '%s'", mcpServerID)
-	}
+	return selectedServer
+}
 
+func installMCPRegistryServer(workflowPath string, selectedServer *MCPRegistryServerForProcessing, transportType, registryURL, customToolID string, verbose bool) error {
 	// Determine tool ID (use custom if provided, otherwise use cleaned server name)
 	toolID := stringutil.SanitizeToolID(selectedServer.Name)
 	if customToolID != "" {
@@ -119,7 +126,7 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 	}
 
 	// Create MCP tool configuration based on server info and preferences
-	mcpConfig, err := createMCPToolConfig(selectedServer, transportType, registryClient.registryURL, verbose)
+	mcpConfig, err := createMCPToolConfig(selectedServer, transportType, registryURL, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP tool configuration: %w", err)
 	}
@@ -140,6 +147,11 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 	}
 
 	// Compile the workflow
+	compileWorkflowAfterMCPAddition(workflowPath, verbose)
+	return nil
+}
+
+func compileWorkflowAfterMCPAddition(workflowPath string, verbose bool) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling workflow..."))
 	}
@@ -160,7 +172,6 @@ func AddMCPTool(ctx context.Context, workflowFile string, mcpServerID string, re
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
 	}
 
-	return nil
 }
 
 // createMCPToolConfig creates the MCP tool configuration based on registry server info
@@ -189,37 +200,30 @@ func createMCPToolConfig(server *MCPRegistryServerForProcessing, preferredTransp
 
 	switch transport {
 	case "stdio":
-		// Handle container field (simplified Docker run)
-		if server.Config != nil {
-			if container, hasContainer := server.Config["container"]; hasContainer {
-				if containerStr, ok := container.(string); ok {
-					mcpSection["container"] = containerStr
+		configureMCPStdioTransport(server, mcpSection)
+	case "http":
+		if err := configureMCPHTTPTransport(server, mcpSection); err != nil {
+			return nil, err
+		}
+	case "docker":
+		if err := configureMCPDockerTransport(server, mcpSection); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported transport type: %s", transport)
+	}
+	config["mcp"] = mcpSection
+	return config, nil
+}
 
-					// Add environment variables for Docker container
-					if envRaw, hasEnv := server.Config["env"]; hasEnv {
-						if envMap, ok := envRaw.(map[string]any); ok {
-							mcpSection["env"] = convertToGitHubActionsEnv(envMap, server.EnvironmentVariables)
-						}
-					}
-				}
-			} else {
-				// Handle regular command and args
-				// Use runtime_hint for command if available, otherwise fall back to Command
-				if server.RuntimeHint != "" {
-					mcpSection["command"] = server.RuntimeHint
-				} else if server.Command != "" {
-					mcpSection["command"] = server.Command
-				}
+func configureMCPStdioTransport(server *MCPRegistryServerForProcessing, mcpSection map[string]any) {
+	// Handle container field (simplified Docker run)
+	if server.Config != nil {
+		if container, hasContainer := server.Config["container"]; hasContainer {
+			if containerStr, ok := container.(string); ok {
+				mcpSection["container"] = containerStr
 
-				// Combine runtime_arguments and package arguments for args
-				var allArgs []string
-				allArgs = append(allArgs, server.RuntimeArguments...)
-				allArgs = append(allArgs, server.Args...)
-				if len(allArgs) > 0 {
-					mcpSection["args"] = allArgs
-				}
-
-				// Add environment variables if present
+				// Add environment variables for Docker container
 				if envRaw, hasEnv := server.Config["env"]; hasEnv {
 					if envMap, ok := envRaw.(map[string]any); ok {
 						mcpSection["env"] = convertToGitHubActionsEnv(envMap, server.EnvironmentVariables)
@@ -227,7 +231,7 @@ func createMCPToolConfig(server *MCPRegistryServerForProcessing, preferredTransp
 				}
 			}
 		} else {
-			// Handle command and args when no config
+			// Handle regular command and args
 			// Use runtime_hint for command if available, otherwise fall back to Command
 			if server.RuntimeHint != "" {
 				mcpSection["command"] = server.RuntimeHint
@@ -242,33 +246,6 @@ func createMCPToolConfig(server *MCPRegistryServerForProcessing, preferredTransp
 			if len(allArgs) > 0 {
 				mcpSection["args"] = allArgs
 			}
-		}
-
-	case "http":
-		// For HTTP transport, we need a URL
-		if server.Config != nil {
-			if url, hasURL := server.Config["url"]; hasURL {
-				mcpSection["url"] = url
-			} else {
-				return nil, errors.New("HTTP transport requires URL configuration")
-			}
-
-			// Add headers if present
-			if headers, hasHeaders := server.Config["headers"]; hasHeaders {
-				mcpSection["headers"] = headers
-			}
-		} else {
-			return nil, errors.New("HTTP transport requires configuration")
-		}
-
-	case "docker":
-		// For Docker transport, use container configuration
-		if server.Config != nil {
-			if container, hasContainer := server.Config["container"]; hasContainer {
-				mcpSection["container"] = container
-			} else {
-				return nil, errors.New("docker transport requires container configuration")
-			}
 
 			// Add environment variables if present
 			if envRaw, hasEnv := server.Config["env"]; hasEnv {
@@ -276,17 +253,65 @@ func createMCPToolConfig(server *MCPRegistryServerForProcessing, preferredTransp
 					mcpSection["env"] = convertToGitHubActionsEnv(envMap, server.EnvironmentVariables)
 				}
 			}
-		} else {
-			return nil, errors.New("docker transport requires configuration")
+		}
+	} else {
+		// Handle command and args when no config
+		// Use runtime_hint for command if available, otherwise fall back to Command
+		if server.RuntimeHint != "" {
+			mcpSection["command"] = server.RuntimeHint
+		} else if server.Command != "" {
+			mcpSection["command"] = server.Command
 		}
 
-	default:
-		return nil, fmt.Errorf("unsupported transport type: %s", transport)
+		// Combine runtime_arguments and package arguments for args
+		var allArgs []string
+		allArgs = append(allArgs, server.RuntimeArguments...)
+		allArgs = append(allArgs, server.Args...)
+		if len(allArgs) > 0 {
+			mcpSection["args"] = allArgs
+		}
 	}
 
-	config["mcp"] = mcpSection
+}
 
-	return config, nil
+func configureMCPHTTPTransport(server *MCPRegistryServerForProcessing, mcpSection map[string]any) error {
+	// For HTTP transport, we need a URL
+	if server.Config != nil {
+		if url, hasURL := server.Config["url"]; hasURL {
+			mcpSection["url"] = url
+		} else {
+			return errors.New("HTTP transport requires URL configuration")
+		}
+
+		// Add headers if present
+		if headers, hasHeaders := server.Config["headers"]; hasHeaders {
+			mcpSection["headers"] = headers
+		}
+	} else {
+		return errors.New("HTTP transport requires configuration")
+	}
+	return nil
+}
+
+func configureMCPDockerTransport(server *MCPRegistryServerForProcessing, mcpSection map[string]any) error {
+	// For Docker transport, use container configuration
+	if server.Config != nil {
+		if container, hasContainer := server.Config["container"]; hasContainer {
+			mcpSection["container"] = container
+		} else {
+			return errors.New("docker transport requires container configuration")
+		}
+
+		// Add environment variables if present
+		if envRaw, hasEnv := server.Config["env"]; hasEnv {
+			if envMap, ok := envRaw.(map[string]any); ok {
+				mcpSection["env"] = convertToGitHubActionsEnv(envMap, server.EnvironmentVariables)
+			}
+		}
+	} else {
+		return errors.New("docker transport requires configuration")
+	}
+	return nil
 }
 
 // addToolToWorkflow adds a tool configuration to the workflow file
@@ -316,7 +341,35 @@ func NewMCPAddSubcommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [workflow] [server]",
 		Short: "Add an MCP server to an agentic workflow",
-		Long: `Add an MCP server to an agentic workflow by searching the MCP registry.
+		Long:  mcpAddDescription(),
+		Example: `  gh aw mcp add                                          # List available MCP servers
+  gh aw mcp add weekly-research makenotion/notion-mcp-server  # Add Notion MCP server to weekly-research.md
+  gh aw mcp add weekly-research makenotion/notion-mcp-server --transport stdio  # Prefer stdio transport
+  gh aw mcp add weekly-research makenotion/notion-mcp-server --registry https://custom.registry.com/v1  # Use custom registry
+  gh aw mcp add weekly-research makenotion/notion-mcp-server --tool-id my-notion  # Use custom tool ID`,
+		Args: cobra.RangeArgs(0, 2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			if len(args) == 0 {
+				if registryURL == "" {
+					registryURL = string(constants.DefaultMCPRegistryURL)
+				}
+				return listAvailableServers(cmd.Context(), registryURL, verbose)
+			}
+			if len(args) == 1 {
+				return errors.New("both workflow ID/file and server name are required to add an MCP server\nUse 'gh aw mcp add' to list available servers")
+			}
+			return AddMCPTool(cmd.Context(), args[0], args[1], registryURL, transportType, customToolID, verbose)
+		},
+	}
+	cmd.Flags().StringVar(&registryURL, "registry", "", "MCP registry URL (default: https://api.mcp.github.com/v0.1)")
+	cmd.Flags().StringVar(&transportType, "transport", "", "Preferred transport type (stdio, http, docker)")
+	cmd.Flags().StringVar(&customToolID, "tool-id", "", "Custom tool ID to use in the workflow (default: uses server ID)")
+	return cmd
+}
+
+func mcpAddDescription() string {
+	return `Add an MCP server to an agentic workflow by searching the MCP registry.
 
 This command searches the MCP registry for the specified server, adds it to the workflow's tools section,
 and automatically compiles the workflow. If the server already exists, the command will fail.
@@ -331,41 +384,5 @@ The command will:
 - Search the MCP registry for the specified server
 - Check that the server doesn't already exist in the workflow
 - Add the MCP server configuration to the workflow's frontmatter
-- Automatically compile the workflow to generate the .lock.yml file`,
-		Example: `  gh aw mcp add                                          # List available MCP servers
-  gh aw mcp add weekly-research makenotion/notion-mcp-server  # Add Notion MCP server to weekly-research.md
-  gh aw mcp add weekly-research makenotion/notion-mcp-server --transport stdio  # Prefer stdio transport
-  gh aw mcp add weekly-research makenotion/notion-mcp-server --registry https://custom.registry.com/v1  # Use custom registry
-  gh aw mcp add weekly-research makenotion/notion-mcp-server --tool-id my-notion  # Use custom tool ID`,
-		Args: cobra.RangeArgs(0, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			verbose, _ := cmd.Flags().GetBool("verbose")
-
-			// If no arguments provided, show list of available servers
-			if len(args) == 0 {
-				// Use default registry URL if not provided
-				if registryURL == "" {
-					registryURL = string(constants.DefaultMCPRegistryURL)
-				}
-				return listAvailableServers(cmd.Context(), registryURL, verbose)
-			}
-
-			// If only workflow ID/file is provided, show error (need both workflow and server)
-			if len(args) == 1 {
-				return errors.New("both workflow ID/file and server name are required to add an MCP server\nUse 'gh aw mcp add' to list available servers")
-			}
-
-			// If both arguments are provided, add the MCP tool
-			workflowFile := args[0]
-			mcpServerID := args[1]
-
-			return AddMCPTool(cmd.Context(), workflowFile, mcpServerID, registryURL, transportType, customToolID, verbose)
-		},
-	}
-
-	cmd.Flags().StringVar(&registryURL, "registry", "", "MCP registry URL (default: https://api.mcp.github.com/v0.1)")
-	cmd.Flags().StringVar(&transportType, "transport", "", "Preferred transport type (stdio, http, docker)")
-	cmd.Flags().StringVar(&customToolID, "tool-id", "", "Custom tool ID to use in the workflow (default: uses server ID)")
-
-	return cmd
+- Automatically compile the workflow to generate the .lock.yml file`
 }

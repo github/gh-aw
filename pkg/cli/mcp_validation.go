@@ -28,7 +28,16 @@ func validateServerSecrets(config parser.RegistryMCPServerConfig, verbose bool, 
 
 	// Extract secrets from the config
 	requiredSecrets := extractSecretsFromConfig(config)
+	requiredSecrets = addRemoteGitHubRequiredSecret(config, requiredSecrets)
+	if len(requiredSecrets) == 0 {
+		mcpValidationLog.Printf("No required secrets found, validating %d environment variables", len(config.Env))
+		return validateMCPEnvironment(config.Env)
+	}
+	reportMCPServerSecretAvailability(config, requiredSecrets, verbose, useActionsSecrets)
+	return nil
+}
 
+func addRemoteGitHubRequiredSecret(config parser.RegistryMCPServerConfig, requiredSecrets []SecretInfo) []SecretInfo {
 	// Special case: Check for GH_AW_GITHUB_TOKEN when GitHub tool is in remote mode
 	if config.Name == "github" && config.Type == "http" {
 		mcpValidationLog.Print("GitHub remote mode detected, checking for GH_AW_GITHUB_TOKEN")
@@ -60,70 +69,78 @@ func validateServerSecrets(config parser.RegistryMCPServerConfig, verbose bool, 
 			}
 		}
 	}
+	return requiredSecrets
+}
 
-	if len(requiredSecrets) == 0 {
-		mcpValidationLog.Printf("No required secrets found, validating %d environment variables", len(config.Env))
-		// No secrets required, proceed with normal env var validation
-		for key, value := range config.Env {
-			// Check if value contains variable references
-			if strings.Contains(value, "${") {
-				// Extract variable name (simplified parsing)
-				if strings.Contains(value, "secrets.") {
-					// This should have been caught by extractSecretsFromConfig
-					continue
-				}
-				if strings.Contains(value, "GH_TOKEN") || strings.Contains(value, "GITHUB_TOKEN") || strings.Contains(value, "GITHUB_PERSONAL_ACCESS_TOKEN") {
-					if token, err := parser.GetGitHubToken(); err != nil {
-						return errors.New("GitHub token not found in environment (set GH_TOKEN or GITHUB_TOKEN)")
-					} else {
-						config.Env[key] = token
-					}
-				}
-				// Handle our placeholder for GitHub token requirement
-				if strings.Contains(value, "GITHUB_TOKEN_REQUIRED") {
-					if token, err := parser.GetGitHubToken(); err != nil {
-						return fmt.Errorf("GitHub token required but not available: %w", err)
-					} else {
-						config.Env[key] = token
-					}
-				}
-			} else {
-				// For direct environment variable values (not containing ${}),
-				// check if they represent actual token values
-				if value == "" {
-					return fmt.Errorf("environment variable '%s' has empty value", key)
-				}
-				// If value contains "GITHUB_TOKEN_REQUIRED", treat it as needing validation
-				if strings.Contains(value, "GITHUB_TOKEN_REQUIRED") {
-					if token, err := parser.GetGitHubToken(); err != nil {
-						return fmt.Errorf("GitHub token required but not available: %w", err)
-					} else {
-						config.Env[key] = token
-					}
+func validateMCPEnvironment(env map[string]string) error {
+	for key, value := range env {
+		// Check if value contains variable references
+		if strings.Contains(value, "${") {
+			// Extract variable name (simplified parsing)
+			if strings.Contains(value, "secrets.") {
+				// This should have been caught by extractSecretsFromConfig
+				continue
+			}
+			if strings.Contains(value, "GH_TOKEN") || strings.Contains(value, "GITHUB_TOKEN") || strings.Contains(value, "GITHUB_PERSONAL_ACCESS_TOKEN") {
+				if token, err := parser.GetGitHubToken(); err != nil {
+					return errors.New("GitHub token not found in environment (set GH_TOKEN or GITHUB_TOKEN)")
 				} else {
-					// Automatically try to get GitHub token for GitHub-related environment variables
-					if key == "GITHUB_PERSONAL_ACCESS_TOKEN" || key == "GITHUB_TOKEN" || key == "GH_TOKEN" {
-						if actualValue := os.Getenv(key); actualValue == "" { //nolint:osgetenvlibrary
-							// Try to automatically get the GitHub token
-							if token, err := parser.GetGitHubToken(); err == nil {
-								config.Env[key] = token
-							} else {
-								return fmt.Errorf("GitHub token required for '%s' but not available: %w", key, err)
-							}
-						}
-					} else {
-						// For backward compatibility: check if environment variable with this name exists
-						// This preserves the original behavior for existing tests
-						if actualValue := os.Getenv(key); actualValue == "" { //nolint:osgetenvlibrary
-							return fmt.Errorf("environment variable '%s' not set", key)
-						}
-					}
+					env[key] = token
 				}
 			}
+			// Handle our placeholder for GitHub token requirement
+			if strings.Contains(value, "GITHUB_TOKEN_REQUIRED") {
+				if token, err := parser.GetGitHubToken(); err != nil {
+					return fmt.Errorf("GitHub token required but not available: %w", err)
+				} else {
+					env[key] = token
+				}
+			}
+		} else {
+			if err := validateMCPDirectEnvironmentValue(env, key, value); err != nil {
+				return err
+			}
 		}
-		return nil
 	}
+	return nil
+}
 
+func validateMCPDirectEnvironmentValue(env map[string]string, key, value string) error {
+	// For direct environment variable values (not containing ${}),
+	// check if they represent actual token values
+	if value == "" {
+		return fmt.Errorf("environment variable '%s' has empty value", key)
+	}
+	// If value contains "GITHUB_TOKEN_REQUIRED", treat it as needing validation
+	if strings.Contains(value, "GITHUB_TOKEN_REQUIRED") {
+		if token, err := parser.GetGitHubToken(); err != nil {
+			return fmt.Errorf("GitHub token required but not available: %w", err)
+		} else {
+			env[key] = token
+		}
+	} else {
+		// Automatically try to get GitHub token for GitHub-related environment variables
+		if key == "GITHUB_PERSONAL_ACCESS_TOKEN" || key == "GITHUB_TOKEN" || key == "GH_TOKEN" {
+			if actualValue := os.Getenv(key); actualValue == "" { //nolint:osgetenvlibrary
+				// Try to automatically get the GitHub token
+				if token, err := parser.GetGitHubToken(); err == nil {
+					env[key] = token
+				} else {
+					return fmt.Errorf("GitHub token required for '%s' but not available: %w", key, err)
+				}
+			}
+		} else {
+			// For backward compatibility: check if environment variable with this name exists
+			// This preserves the original behavior for existing tests
+			if actualValue := os.Getenv(key); actualValue == "" { //nolint:osgetenvlibrary
+				return fmt.Errorf("environment variable '%s' not set", key)
+			}
+		}
+	}
+	return nil
+}
+
+func reportMCPServerSecretAvailability(config parser.RegistryMCPServerConfig, requiredSecrets []SecretInfo, verbose, useActionsSecrets bool) {
 	// Check availability of required secrets
 	mcpValidationLog.Printf("Checking availability of %d required secrets", len(requiredSecrets))
 	secretsStatus := checkSecretsAvailability(requiredSecrets, useActionsSecrets)
@@ -173,7 +190,6 @@ func validateServerSecrets(config parser.RegistryMCPServerConfig, verbose bool, 
 	}
 
 	mcpValidationLog.Printf("Secret validation completed: available=%d, missing=%d", len(availableSecrets), len(missingSecrets))
-	return nil
 }
 
 // validateMCPServerConfiguration validates that the CLI is properly configured

@@ -174,24 +174,26 @@ func (c *Compiler) createFrontmatterError(filePath, content string, err error, f
 		// Fallback if we can't parse the line/col: emit an IDE-compatible error
 		// pointing to the frontmatter start so the developer is at least brought to
 		// the right section rather than the useless line 1, col 1.
-		frontmatterErrorLog.Print("Could not extract line/col from formatted error, falling back to frontmatter start")
-		fallbackMsg := "failed to parse YAML frontmatter"
-		// Try to surface a single-line description from the raw error text.
-		if _, rest, found := strings.Cut(errorStr, frontmatterParseErrPrefix); found {
-			firstLine, _, _ := strings.Cut(rest, "\n")
-			if translated := parser.TranslateYAMLMessage(strings.TrimSpace(firstLine)); translated != "" {
-				fallbackMsg = "failed to parse YAML frontmatter: " + translated
-			}
-		}
-		fallbackFmt := fmt.Sprintf("%s:%d:1: error: %s", filePath, frontmatterLineOffset, fallbackMsg)
-		return parser.NewFormattedParserError(fallbackFmt)
+		return frontmatterStartFallback(filePath, errorStr, frontmatterLineOffset)
 	}
 
-	// Fallback: if not already formatted, create a FormattedParserError pointing to the
-	// frontmatter start so the IDE navigates to the right file and section rather than
-	// defaulting to line 1, col 1.
+	// Fallback: if not already formatted, point to the frontmatter start.
 	frontmatterErrorLog.Printf("Using fallback error message: %v", err)
 	fallbackFmt := fmt.Sprintf("%s:%d:1: error: %s", filePath, frontmatterLineOffset, err)
+	return parser.NewFormattedParserError(fallbackFmt)
+}
+
+func frontmatterStartFallback(filePath, errorStr string, frontmatterLineOffset int) error {
+	frontmatterErrorLog.Print("Could not extract line/col from formatted error, falling back to frontmatter start")
+	fallbackMsg := "failed to parse YAML frontmatter"
+	// Try to surface a single-line description from the raw error text.
+	if _, rest, found := strings.Cut(errorStr, frontmatterParseErrPrefix); found {
+		firstLine, _, _ := strings.Cut(rest, "\n")
+		if translated := parser.TranslateYAMLMessage(strings.TrimSpace(firstLine)); translated != "" {
+			fallbackMsg = "failed to parse YAML frontmatter: " + translated
+		}
+	}
+	fallbackFmt := fmt.Sprintf("%s:%d:1: error: %s", filePath, frontmatterLineOffset, fallbackMsg)
 	return parser.NewFormattedParserError(fallbackFmt)
 }
 

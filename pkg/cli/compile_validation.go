@@ -47,6 +47,10 @@ func CompileWorkflowWithValidation(ctx context.Context, compiler *workflow.Compi
 		return nil
 	}
 
+	return validateCompiledWorkflow(ctx, compiler, filePath, opts)
+}
+
+func validateCompiledWorkflow(ctx context.Context, compiler *workflow.Compiler, filePath string, opts CompileValidationOptions) error {
 	// Validate emitted output only; no-emit compilation validates generated YAML in memory.
 	lockFile := stringutil.MarkdownToLockFile(filePath)
 	if _, err := os.Stat(lockFile); err != nil {
@@ -68,6 +72,10 @@ func CompileWorkflowWithValidation(ctx context.Context, compiler *workflow.Compi
 		return fmt.Errorf("generated lock file is not valid YAML: %w", err)
 	}
 
+	return validateCompiledWorkflowScanners(ctx, compiler, lockFile, opts)
+}
+
+func validateCompiledWorkflowScanners(ctx context.Context, compiler *workflow.Compiler, lockFile string, opts CompileValidationOptions) error {
 	// Validate action SHAs if requested
 	if opts.ValidateActionSHAs {
 		compileValidationLog.Print("Validating action SHAs in lock file")
@@ -124,64 +132,7 @@ func CompileWorkflowDataWithValidation(ctx context.Context, compiler *workflow.C
 		return nil
 	}
 
-	// Validate emitted output only; no-emit compilation validates generated YAML in memory.
-	lockFile := stringutil.MarkdownToLockFile(filePath)
-	if _, err := os.Stat(lockFile); err != nil {
-		compileValidationLog.Print("Lock file not found, skipping validation (likely no-emit mode)")
-		// Lock file doesn't exist (likely due to no-emit), skip YAML validation
-		return nil
-	}
-
-	compileValidationLog.Print("Validating generated lock file YAML syntax")
-
-	lockContent, err := os.ReadFile(lockFile)
-	if err != nil {
-		return fmt.Errorf("failed to read generated lock file for validation: %w", err)
-	}
-
-	// Validate the lock file is valid YAML
-	var yamlValidationTest any
-	if err := yaml.Unmarshal(lockContent, &yamlValidationTest); err != nil {
-		return fmt.Errorf("generated lock file is not valid YAML: %w", err)
-	}
-
-	// Validate action SHAs if requested
-	if opts.ValidateActionSHAs {
-		compileValidationLog.Print("Validating action SHAs in lock file")
-		// Use the compiler's shared action cache to benefit from cached resolutions
-		actionCache := compiler.GetSharedActionCache()
-		if err := workflow.ValidateActionSHAsInLockFile(ctx, lockFile, actionCache, opts.Verbose); err != nil {
-			if opts.FailOnWarnings {
-				return fmt.Errorf("action SHA validation failed: %w", err)
-			}
-			// Action SHA validation warnings are non-fatal
-			compileValidationLog.Printf("Action SHA validation completed with warnings: %v", err)
-		}
-	}
-
-	// Run zizmor on the generated lock file if requested
-	if opts.RunZizmorPerFile {
-		if err := runZizmorOnFile(lockFile, opts.Verbose, opts.Strict); err != nil {
-			return fmt.Errorf("zizmor security scan failed: %w", err)
-		}
-	}
-
-	// Run poutine on the generated lock file if requested
-	if opts.RunPoutinePerFile {
-		if err := runPoutineOnFile(lockFile, opts.Verbose, opts.Strict); err != nil {
-			return fmt.Errorf("poutine security scan failed: %w", err)
-		}
-	}
-
-	// Run actionlint on the generated lock file if requested
-	// Note: For batch processing, use RunActionlintOnFiles instead
-	if opts.RunActionlintPerFile {
-		if err := runActionlintOnFiles(ctx, []string{lockFile}, opts.Verbose, opts.Strict); err != nil {
-			return fmt.Errorf("actionlint linter failed: %w", err)
-		}
-	}
-
-	return nil
+	return validateCompiledWorkflow(ctx, compiler, filePath, opts)
 }
 
 // validateCompileConfig validates the configuration flags before compilation

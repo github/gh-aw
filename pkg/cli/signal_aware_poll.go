@@ -89,6 +89,10 @@ func PollWithSignalHandling(options PollOptions) error {
 		return err
 	}
 
+	return continueSignalAwarePolling(ctx, sigChan, ticker, start, options)
+}
+
+func continueSignalAwarePolling(ctx context.Context, sigChan <-chan os.Signal, ticker *time.Ticker, start time.Time, options PollOptions) error {
 	// Continue polling
 	for {
 		select {

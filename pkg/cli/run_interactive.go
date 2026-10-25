@@ -58,6 +58,10 @@ func RunWorkflowInteractively(ctx context.Context, opts RunWorkflowOptions) erro
 
 	runInteractiveLog.Printf("Selected workflow: %s", selectedWorkflow.Name)
 
+	return runSelectedWorkflowInteractively(ctx, selectedWorkflow, opts)
+}
+
+func runSelectedWorkflowInteractively(ctx context.Context, selectedWorkflow *WorkflowOption, opts RunWorkflowOptions) error {
 	// Step 3: Show workflow information
 	showWorkflowInfo(selectedWorkflow)
 
@@ -310,6 +314,10 @@ func collectInputsWithMap(ctx context.Context, inputs map[string]*workflow.Input
 		return nil, fmt.Errorf("input collection cancelled: %w", err)
 	}
 
+	return collectWorkflowInputPointerValues(inputPtrs), nil
+}
+
+func collectWorkflowInputPointerValues(inputPtrs map[string]*string) []string {
 	// Collect the final values from the pointers
 	var result []string
 	for name, valuePtr := range inputPtrs {
@@ -320,7 +328,7 @@ func collectInputsWithMap(ctx context.Context, inputs map[string]*workflow.Input
 	}
 
 	runInteractiveLog.Printf("Collected %d input values", len(result))
-	return result, nil
+	return result
 }
 
 // confirmExecution asks the user to confirm workflow execution

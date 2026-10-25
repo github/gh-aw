@@ -93,19 +93,7 @@ func (c *MCPRegistryClient) SearchServers(ctx context.Context, query string) ([]
 	if resp.StatusCode != http.StatusOK {
 		spinner.Stop()
 		body, _ := io.ReadAll(resp.Body)
-		// Provide more helpful error messages for common HTTP status codes
-		switch resp.StatusCode {
-		case http.StatusForbidden:
-			return nil, fmt.Errorf("MCP registry access forbidden (403): %s\nThis may be due to network or firewall restrictions", string(body))
-		case http.StatusUnauthorized:
-			return nil, fmt.Errorf("MCP registry access unauthorized (401): %s\nAuthentication may be required", string(body))
-		case http.StatusNotFound:
-			return nil, fmt.Errorf("MCP registry endpoint not found (404): %s\nPlease verify the registry URL is correct", string(body))
-		case http.StatusTooManyRequests:
-			return nil, fmt.Errorf("MCP registry rate limit exceeded (429): %s\nPlease try again later", string(body))
-		default:
-			return nil, fmt.Errorf("MCP registry returned status %d: %s", resp.StatusCode, string(body))
-		}
+		return nil, mcpRegistryStatusError(resp.StatusCode, body)
 	}
 
 	// Parse response
@@ -124,6 +112,26 @@ func (c *MCPRegistryClient) SearchServers(ctx context.Context, query string) ([]
 	// Stop spinner with success message
 	spinner.StopWithMessage(fmt.Sprintf("✓ Fetched %d servers from registry", len(response.Servers)))
 
+	servers := flattenMCPRegistryServers(response)
+	return c.filterRegistryServers(servers, query)
+}
+
+func mcpRegistryStatusError(status int, body []byte) error {
+	switch status {
+	case http.StatusForbidden:
+		return fmt.Errorf("MCP registry access forbidden (403): %s\nThis may be due to network or firewall restrictions", string(body))
+	case http.StatusUnauthorized:
+		return fmt.Errorf("MCP registry access unauthorized (401): %s\nAuthentication may be required", string(body))
+	case http.StatusNotFound:
+		return fmt.Errorf("MCP registry endpoint not found (404): %s\nPlease verify the registry URL is correct", string(body))
+	case http.StatusTooManyRequests:
+		return fmt.Errorf("MCP registry rate limit exceeded (429): %s\nPlease try again later", string(body))
+	default:
+		return fmt.Errorf("MCP registry returned status %d: %s", status, string(body))
+	}
+}
+
+func flattenMCPRegistryServers(response ServerListResponse) []MCPRegistryServerForProcessing {
 	// Convert servers to flattened format and filter by status
 	mcpRegistryLog.Printf("Processing %d servers from registry", len(response.Servers))
 	servers := make([]MCPRegistryServerForProcessing, 0, len(response.Servers))
@@ -137,101 +145,116 @@ func (c *MCPRegistryClient) SearchServers(ctx context.Context, query string) ([]
 			}
 		}
 
-		processedServer := MCPRegistryServerForProcessing{
-			Name:        server.Name,
-			Description: server.Description,
-		}
-
-		// Set repository URL if available
-		if server.Repository != nil && server.Repository.URL != "" {
-			processedServer.Repository = server.Repository.URL
-		}
-
-		// Extract transport and config from first package if available
-		if len(server.Packages) > 0 {
-			pkg := server.Packages[0]
-
-			// Use transport type from package
-			if pkg.Transport != nil {
-				processedServer.Transport = pkg.Transport.Type
-			}
-			if processedServer.Transport == "" {
-				processedServer.Transport = "stdio" // default fallback
-			}
-
-			// Set command from package identifier
-			processedServer.Command = pkg.Identifier
-
-			// Set runtime hint (used for the actual command execution)
-			processedServer.RuntimeHint = pkg.RuntimeHint
-
-			// Extract runtime arguments
-			var runtimeArgs []string
-			for _, arg := range pkg.RuntimeArguments {
-				if arg.Type == ArgumentTypePositional && arg.Value != "" {
-					runtimeArgs = append(runtimeArgs, arg.Value)
-				}
-			}
-			processedServer.RuntimeArguments = runtimeArgs
-
-			// Extract string values from package arguments as command args
-			var args []string
-			for _, arg := range pkg.PackageArguments {
-				if arg.Type == ArgumentTypePositional && arg.Value != "" {
-					args = append(args, arg.Value)
-				}
-			}
-			processedServer.Args = args
-
-			// Convert environment variables to config
-			if len(pkg.EnvironmentVariables) > 0 {
-				processedServer.Config = make(map[string]any)
-				envVars := make(map[string]any)
-
-				for _, envVar := range pkg.EnvironmentVariables {
-					// Use name as key, and create a placeholder value for secrets
-					if envVar.IsSecret {
-						envVars[envVar.Name] = fmt.Sprintf("${%s}", envVar.Name)
-					} else if envVar.Default != "" {
-						envVars[envVar.Name] = envVar.Default
-					} else {
-						envVars[envVar.Name] = fmt.Sprintf("${%s}", envVar.Name)
-					}
-				}
-				processedServer.Config["env"] = envVars
-
-				// Preserve environment variable metadata for proper GitHub Actions conversion
-				processedServer.EnvironmentVariables = pkg.EnvironmentVariables
-			}
-		} else if len(server.Remotes) > 0 {
-			// Handle remote servers
-			remote := server.Remotes[0]
-			processedServer.Transport = remote.Type
-			processedServer.Config = map[string]any{
-				"url": remote.URL,
-			}
-
-			// Add headers if present
-			if len(remote.Headers) > 0 {
-				headers := make(map[string]any)
-				for _, header := range remote.Headers {
-					if header.IsSecret {
-						headers[header.Name] = fmt.Sprintf("${%s}", header.Name)
-					} else if header.Default != "" {
-						headers[header.Name] = header.Default
-					} else {
-						headers[header.Name] = fmt.Sprintf("${%s}", header.Name)
-					}
-				}
-				processedServer.Config["headers"] = headers
-			}
-		} else {
-			processedServer.Transport = "stdio" // default fallback
-		}
-
+		processedServer := flattenMCPRegistryServer(server)
 		servers = append(servers, processedServer)
 	}
+	return servers
+}
 
+func flattenMCPRegistryServer(server ServerDetail) MCPRegistryServerForProcessing {
+	processedServer := MCPRegistryServerForProcessing{
+		Name:        server.Name,
+		Description: server.Description,
+	}
+
+	// Set repository URL if available
+	if server.Repository != nil && server.Repository.URL != "" {
+		processedServer.Repository = server.Repository.URL
+	}
+
+	// Extract transport and config from first package if available
+	if len(server.Packages) > 0 {
+		configureRegistryServerPackage(&processedServer, server.Packages[0])
+	} else if len(server.Remotes) > 0 {
+		configureRegistryServerRemote(&processedServer, server.Remotes[0])
+	} else {
+		processedServer.Transport = "stdio" // default fallback
+	}
+	return processedServer
+}
+
+func configureRegistryServerPackage(processedServer *MCPRegistryServerForProcessing, pkg MCPPackage) {
+	// Use transport type from package
+	if pkg.Transport != nil {
+		processedServer.Transport = pkg.Transport.Type
+	}
+	if processedServer.Transport == "" {
+		processedServer.Transport = "stdio" // default fallback
+	}
+
+	// Set command from package identifier
+	processedServer.Command = pkg.Identifier
+
+	// Set runtime hint (used for the actual command execution)
+	processedServer.RuntimeHint = pkg.RuntimeHint
+
+	// Extract runtime arguments
+	var runtimeArgs []string
+	for _, arg := range pkg.RuntimeArguments {
+		if arg.Type == ArgumentTypePositional && arg.Value != "" {
+			runtimeArgs = append(runtimeArgs, arg.Value)
+		}
+	}
+	processedServer.RuntimeArguments = runtimeArgs
+
+	// Extract string values from package arguments as command args
+	var args []string
+	for _, arg := range pkg.PackageArguments {
+		if arg.Type == ArgumentTypePositional && arg.Value != "" {
+			args = append(args, arg.Value)
+		}
+	}
+	processedServer.Args = args
+
+	// Convert environment variables to config
+	configureRegistryServerEnvironment(processedServer, pkg.EnvironmentVariables)
+}
+
+func configureRegistryServerEnvironment(processedServer *MCPRegistryServerForProcessing, variables []EnvironmentVariable) {
+	if len(variables) > 0 {
+		processedServer.Config = make(map[string]any)
+		envVars := make(map[string]any)
+
+		for _, envVar := range variables {
+			// Use name as key, and create a placeholder value for secrets
+			if envVar.IsSecret {
+				envVars[envVar.Name] = fmt.Sprintf("${%s}", envVar.Name)
+			} else if envVar.Default != "" {
+				envVars[envVar.Name] = envVar.Default
+			} else {
+				envVars[envVar.Name] = fmt.Sprintf("${%s}", envVar.Name)
+			}
+		}
+		processedServer.Config["env"] = envVars
+
+		// Preserve environment variable metadata for proper GitHub Actions conversion
+		processedServer.EnvironmentVariables = variables
+	}
+}
+
+func configureRegistryServerRemote(processedServer *MCPRegistryServerForProcessing, remote Remote) {
+	processedServer.Transport = remote.Type
+	processedServer.Config = map[string]any{
+		"url": remote.URL,
+	}
+
+	// Add headers if present
+	if len(remote.Headers) > 0 {
+		headers := make(map[string]any)
+		for _, header := range remote.Headers {
+			if header.IsSecret {
+				headers[header.Name] = fmt.Sprintf("${%s}", header.Name)
+			} else if header.Default != "" {
+				headers[header.Name] = header.Default
+			} else {
+				headers[header.Name] = fmt.Sprintf("${%s}", header.Name)
+			}
+		}
+		processedServer.Config["headers"] = headers
+	}
+}
+
+func (c *MCPRegistryClient) filterRegistryServers(servers []MCPRegistryServerForProcessing, query string) ([]MCPRegistryServerForProcessing, error) {
 	// Apply local filtering if query is provided
 	if query != "" {
 		var filteredServers []MCPRegistryServerForProcessing

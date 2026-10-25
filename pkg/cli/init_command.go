@@ -13,12 +13,7 @@ import (
 
 var initCommandLog = logger.New("cli:init_command")
 
-// NewInitCommand creates the init command
-func NewInitCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize the repository for agentic workflows",
-		Long: `Initialize the repository for agentic workflows by configuring repository settings.
+const initCommandLong = `Initialize the repository for agentic workflows by configuring repository settings.
 
 This command performs non-interactive repository setup and does not prompt for
 engine selection or secret configuration.
@@ -60,8 +55,9 @@ With --completions flag:
 
 After running this command, you can:
 - Add workflows from the catalog with: ` + string(constants.CLIExtensionPrefix) + ` add <workflow-name>
-- Create new workflows from scratch with: ` + string(constants.CLIExtensionPrefix) + ` new <workflow-name>`,
-		Example: `  ` + string(constants.CLIExtensionPrefix) + ` init                                # Initialize repository with defaults
+- Create new workflows from scratch with: ` + string(constants.CLIExtensionPrefix) + ` new <workflow-name>`
+
+const initCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` init                                # Initialize repository with defaults
   ` + string(constants.CLIExtensionPrefix) + ` init -v                             # Initialize with verbose output
   ` + string(constants.CLIExtensionPrefix) + ` init --engine copilot               # Add Copilot MCP and agent files
   ` + string(constants.CLIExtensionPrefix) + ` init --engine claude                # Initialize for the Claude engine
@@ -72,80 +68,99 @@ After running this command, you can:
   ` + string(constants.CLIExtensionPrefix) + ` init --codespaces=repo1,repo2       # Codespaces with additional repos
   ` + string(constants.CLIExtensionPrefix) + ` init --completions                  # Install shell completions
   ` + string(constants.CLIExtensionPrefix) + ` init --create-pull-request          # Initialize and create a pull request
-  ` + string(constants.CLIExtensionPrefix) + ` init --pr --auto-merge              # Initialize and enable pull request auto-merge`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			mcpFlag, _ := cmd.Flags().GetBool("mcp")
-			noMcp, _ := cmd.Flags().GetBool("no-mcp")
-			noSkill, _ := cmd.Flags().GetBool("no-skill")
-			noAgent, _ := cmd.Flags().GetBool("no-agent")
-			engineOverride, _ := cmd.Flags().GetString("engine")
-			codespaceReposStr, _ := cmd.Flags().GetString("codespaces")
-			codespaceEnabled := cmd.Flags().Changed("codespaces")
-			completions, _ := cmd.Flags().GetBool("completions")
-			createPRFlag, _ := cmd.Flags().GetBool("create-pull-request")
-			prFlagAlias, _ := cmd.Flags().GetBool("pr")
-			createPR := createPRFlag || prFlagAlias // Support both --create-pull-request and --pr
-			autoMerge, _ := cmd.Flags().GetBool("auto-merge")
-			if err := requireAutoMergePR(autoMerge, createPR); err != nil {
-				return err
-			}
+  ` + string(constants.CLIExtensionPrefix) + ` init --pr --auto-merge              # Initialize and enable pull request auto-merge`
 
-			if engineOverride != "" {
-				registry := workflow.GetGlobalEngineRegistry()
-				if !registry.IsValidEngine(engineOverride) {
-					supportedEngines := registry.GetSupportedEngines()
-					sort.Strings(supportedEngines)
-					return fmt.Errorf("invalid engine value '%s'. Must be one of: %s", engineOverride, strings.Join(supportedEngines, ", "))
-				}
-			}
+func runInitCommand(cmd *cobra.Command, args []string) error {
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	mcpFlag, _ := cmd.Flags().GetBool("mcp")
+	noMcp, _ := cmd.Flags().GetBool("no-mcp")
+	noSkill, _ := cmd.Flags().GetBool("no-skill")
+	noAgent, _ := cmd.Flags().GetBool("no-agent")
+	engineOverride, _ := cmd.Flags().GetString("engine")
+	codespaceReposStr, _ := cmd.Flags().GetString("codespaces")
+	codespaceEnabled := cmd.Flags().Changed("codespaces")
+	completions, _ := cmd.Flags().GetBool("completions")
+	createPRFlag, _ := cmd.Flags().GetBool("create-pull-request")
+	prFlagAlias, _ := cmd.Flags().GetBool("pr")
+	createPR := createPRFlag || prFlagAlias // Support both --create-pull-request and --pr
+	autoMerge, _ := cmd.Flags().GetBool("auto-merge")
+	if err := requireAutoMergePR(autoMerge, createPR); err != nil {
+		return err
+	}
 
-			// Determine MCP state: default true, unless --no-mcp is specified
-			// --mcp flag is kept for backward compatibility (hidden from help)
-			mcp := !noMcp
-			if cmd.Flags().Changed("mcp") {
-				// If --mcp is explicitly set, use it (backward compatibility)
-				mcp = mcpFlag
-			}
+	if err := validateInitEngine(engineOverride); err != nil {
+		return err
+	}
 
-			// Trim the codespace repos string after parsing. With NoOptDefVal set, bare
-			// --codespaces becomes the current-repo sentinel while explicit values use
-			// --codespaces=<repo1,repo2>.
-			codespaceReposStr = strings.TrimSpace(codespaceReposStr)
+	// Determine MCP state: default true, unless --no-mcp is specified
+	// --mcp flag is kept for backward compatibility (hidden from help)
+	mcp := !noMcp
+	if cmd.Flags().Changed("mcp") {
+		// If --mcp is explicitly set, use it (backward compatibility)
+		mcp = mcpFlag
+	}
 
-			// Parse codespace repos from comma-separated string
-			var codespaceRepos []string
-			if codespaceReposStr != "" {
-				codespaceRepos = strings.Split(codespaceReposStr, ",")
-				// Trim spaces from each repo name
-				for i, repo := range codespaceRepos {
-					codespaceRepos[i] = strings.TrimSpace(repo)
-				}
-			}
+	// Trim the codespace repos string after parsing. With NoOptDefVal set, bare
+	// --codespaces becomes the current-repo sentinel while explicit values use
+	// --codespaces=<repo1,repo2>.
+	codespaceRepos := parseInitCodespaceRepos(codespaceReposStr)
 
-			initCommandLog.Printf("Executing init command: verbose=%v, skill=%v, agent=%v, mcp=%v, codespaces=%v, codespaceEnabled=%v, completions=%v, createPR=%v", verbose, !noSkill, !noAgent, mcp, codespaceRepos, codespaceEnabled, completions, createPR)
-			opts := InitOptions{
-				Ctx:              cmd.Context(),
-				Verbose:          verbose,
-				Engine:           engineOverride,
-				Skill:            !noSkill,
-				Agent:            !noAgent,
-				MCP:              mcp,
-				CodespaceRepos:   codespaceRepos,
-				CodespaceEnabled: codespaceEnabled,
-				Completions:      completions,
-				CreatePR:         createPR,
-				AutoMerge:        autoMerge,
-				PRMessage:        cmd.Flag("pr-message").Value.String(),
-				RootCmd:          cmd.Root(),
-			}
-			if err := InitRepository(opts); err != nil {
-				initCommandLog.Printf("Init command failed: %v", err)
-				return err
-			}
-			initCommandLog.Print("Init command completed successfully")
-			return nil
-		},
+	initCommandLog.Printf("Executing init command: verbose=%v, skill=%v, agent=%v, mcp=%v, codespaces=%v, codespaceEnabled=%v, completions=%v, createPR=%v", verbose, !noSkill, !noAgent, mcp, codespaceRepos, codespaceEnabled, completions, createPR)
+	opts := InitOptions{
+		Ctx:              cmd.Context(),
+		Verbose:          verbose,
+		Engine:           engineOverride,
+		Skill:            !noSkill,
+		Agent:            !noAgent,
+		MCP:              mcp,
+		CodespaceRepos:   codespaceRepos,
+		CodespaceEnabled: codespaceEnabled,
+		Completions:      completions,
+		CreatePR:         createPR,
+		AutoMerge:        autoMerge,
+		PRMessage:        cmd.Flag("pr-message").Value.String(),
+		RootCmd:          cmd.Root(),
+	}
+	if err := InitRepository(opts); err != nil {
+		initCommandLog.Printf("Init command failed: %v", err)
+		return err
+	}
+	initCommandLog.Print("Init command completed successfully")
+	return nil
+}
+
+func validateInitEngine(engineOverride string) error {
+	if engineOverride != "" {
+		registry := workflow.GetGlobalEngineRegistry()
+		if !registry.IsValidEngine(engineOverride) {
+			supportedEngines := registry.GetSupportedEngines()
+			sort.Strings(supportedEngines)
+			return fmt.Errorf("invalid engine value '%s'. Must be one of: %s", engineOverride, strings.Join(supportedEngines, ", "))
+		}
+	}
+	return nil
+}
+
+func parseInitCodespaceRepos(value string) []string {
+	value = strings.TrimSpace(value)
+	var repos []string
+	if value != "" {
+		repos = strings.Split(value, ",")
+		for i, repo := range repos {
+			repos[i] = strings.TrimSpace(repo)
+		}
+	}
+	return repos
+}
+
+// NewInitCommand creates the init command
+func NewInitCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "init",
+		Short:   "Initialize the repository for agentic workflows",
+		Long:    initCommandLong,
+		Example: initCommandExample,
+		RunE:    runInitCommand,
 	}
 
 	addEngineFlag(cmd)

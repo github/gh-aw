@@ -79,6 +79,41 @@ func extractCallWorkflowNames(content string) []string {
 // to provide a fast-failing mock instead of making real network calls.
 type fileDownloadFn func(ctx context.Context, owner, repo, path, ref string) ([]byte, error)
 
+type workflowDependencyFetchOptions struct {
+	spec            *WorkflowSpec
+	targetDir       string
+	workflowBaseDir string
+	absTargetDir    string
+	owner           string
+	repo            string
+	ref             string
+	verbose         bool
+	force           bool
+	tracker         *FileTracker
+	downloader      fileDownloadFn
+}
+
+func newWorkflowDependencyFetchOptions(spec *WorkflowSpec, targetDir, workflowBaseDir, absTargetDir string, verbose, force bool, tracker *FileTracker, downloader fileDownloadFn) workflowDependencyFetchOptions {
+	parts := strings.SplitN(spec.RepoSlug, "/", 2)
+	ref := spec.Version
+	if ref == "" {
+		ref = "main"
+	}
+	return workflowDependencyFetchOptions{
+		spec:            spec,
+		targetDir:       targetDir,
+		workflowBaseDir: workflowBaseDir,
+		absTargetDir:    absTargetDir,
+		owner:           parts[0],
+		repo:            parts[1],
+		ref:             ref,
+		verbose:         verbose,
+		force:           force,
+		tracker:         tracker,
+		downloader:      downloader,
+	}
+}
+
 // fetchAndSaveRemoteDispatchWorkflows fetches and saves the workflow files referenced in the
 // safe-outputs.dispatch-workflow configuration of a remote workflow. Each listed workflow name
 // (without extension) is resolved as a sibling file ("<name>.md") in the same directory as
@@ -305,7 +340,6 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 	if len(parts) != 2 {
 		return
 	}
-	owner, repo := parts[0], parts[1]
 	ref := spec.Version
 	if ref == "" {
 		ref = "main"
@@ -348,135 +382,152 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 		return
 	}
 
+	options := newWorkflowDependencyFetchOptions(spec, targetDir, workflowBaseDir, absTargetDir, verbose, force, tracker, parser.DownloadFileFromGitHub)
 	for _, workflowName := range filtered {
-		// Early rejection of path traversal patterns (authoritative check is filepath.Rel below).
-		if strings.Contains(workflowName, "..") {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping dispatch workflow with unsafe name: %q", workflowName)))
-			}
-			continue
-		}
-
-		var remoteFilePath string
-		if workflowBaseDir != "" {
-			remoteFilePath = path.Join(workflowBaseDir, workflowName+".md")
-		} else {
-			remoteFilePath = workflowName + ".md"
-		}
-		remoteFilePath = path.Clean(remoteFilePath)
-
-		localRelPath := filepath.Clean(workflowName + ".md")
-		targetPath := filepath.Join(targetDir, localRelPath)
-
-		absTargetPath, absErr2 := filepath.Abs(targetPath)
-		if absErr2 != nil {
-			remoteWorkflowLog.Printf("Failed to resolve absolute path for dispatch workflow %s: %v", workflowName, absErr2)
-			continue
-		}
-		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write dispatch workflow outside target directory: %q", workflowName)))
-			}
-			continue
-		}
-
-		// Check whether the target file already exists.
-		fileExists := false
-		if _, statErr := os.Stat(targetPath); statErr == nil {
-			fileExists = true
-			if !force {
-				existingSourceRepo := readSourceRepoFromFile(targetPath)
-				if existingSourceRepo == spec.RepoSlug {
-					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dispatch workflow (from import) from same source already exists, skipping: "+targetPath))
-					}
-					continue
-				}
-				// Different or missing source — warn and skip (post-write best-effort).
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
-					"Dispatch workflow %q already exists at %s from a different source (existing: %q, needed: %q); use --force to overwrite",
-					workflowName, targetPath, sourceRepoLabel(existingSourceRepo), spec.RepoSlug,
-				)))
-				continue
-			}
-		}
-
-		// Download from source repository — try .md first, then .yml as fallback
-		workflowContent, err := parser.DownloadFileFromGitHub(ctx, owner, repo, remoteFilePath, ref)
-		if err != nil {
-			// .md not found — try .yml fallback
-			ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
-			ymlLocalPath := filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))
-
-			ymlContent, ymlErr := parser.DownloadFileFromGitHub(ctx, owner, repo, ymlRemotePath, ref)
-			if ymlErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, err)))
-				}
-				continue
-			}
-			if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", ymlRemotePath, mkErr)))
-				}
-				continue
-			}
-			// Capture whether file exists before writing (for correct tracker classification).
-			_, ymlFileExistsErr := os.Stat(ymlLocalPath)
-			ymlFileExists := ymlFileExistsErr == nil
-			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", ymlRemotePath, writeErr)))
-				}
-				continue
-			}
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (.yml, from import): "+ymlLocalPath))
-			}
-			if tracker != nil {
-				if ymlFileExists {
-					tracker.TrackModified(ymlLocalPath)
-				} else {
-					tracker.TrackCreated(ymlLocalPath)
-				}
-			}
-			continue
-		}
-
-		// Embed the source field for future conflict detection.
-		depSourceString := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
-		if updated, srcErr := addSourceToWorkflow(string(workflowContent), depSourceString); srcErr == nil {
-			workflowContent = []byte(updated)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (from import): "+targetPath))
-		}
-
-		if tracker != nil {
-			if fileExists {
-				tracker.TrackModified(targetPath)
-			} else {
-				tracker.TrackCreated(targetPath)
-			}
-		}
-
-		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)
+		fetchImportedDispatchWorkflow(ctx, workflowName, options)
 	}
+}
+
+func fetchImportedDispatchWorkflow(ctx context.Context, workflowName string, options workflowDependencyFetchOptions) {
+	// Early rejection of path traversal patterns (authoritative check is filepath.Rel below).
+	if strings.Contains(workflowName, "..") {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping dispatch workflow with unsafe name: %q", workflowName)))
+		}
+		return
+	}
+
+	remoteFilePath, targetPath, ok := workflowDependencyPaths(workflowName, options.workflowBaseDir, options.targetDir, options.absTargetDir, "dispatch workflow", options.verbose)
+	if !ok {
+		return
+	}
+
+	// Check whether the target file already exists.
+	fileExists := false
+	if _, statErr := os.Stat(targetPath); statErr == nil {
+		fileExists = true
+		if !options.force {
+			existingSourceRepo := readSourceRepoFromFile(targetPath)
+			if existingSourceRepo == options.spec.RepoSlug {
+				if options.verbose {
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dispatch workflow (from import) from same source already exists, skipping: "+targetPath))
+				}
+				return
+			}
+			// Different or missing source — warn and skip (post-write best-effort).
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
+				"Dispatch workflow %q already exists at %s from a different source (existing: %q, needed: %q); use --force to overwrite",
+				workflowName, targetPath, sourceRepoLabel(existingSourceRepo), options.spec.RepoSlug,
+			)))
+			return
+		}
+	}
+
+	// Download from source repository — try .md first, then .yml as fallback
+	workflowContent, err := options.downloader(ctx, options.owner, options.repo, remoteFilePath, options.ref)
+	if err != nil {
+		fetchImportedDispatchYMLFallback(ctx, options, workflowName, remoteFilePath, err)
+		return
+	}
+	saveImportedDispatchMarkdown(ctx, options, workflowContent, remoteFilePath, targetPath, fileExists)
+}
+
+func workflowDependencyPaths(workflowName, workflowBaseDir, targetDir, absTargetDir, label string, verbose bool) (string, string, bool) {
+	var remoteFilePath string
+	if workflowBaseDir != "" {
+		remoteFilePath = path.Join(workflowBaseDir, workflowName+".md")
+	} else {
+		remoteFilePath = workflowName + ".md"
+	}
+	remoteFilePath = path.Clean(remoteFilePath)
+	targetPath := filepath.Join(targetDir, filepath.Clean(workflowName+".md"))
+	absTargetPath, err := filepath.Abs(targetPath)
+	if err != nil {
+		remoteWorkflowLog.Printf("Failed to resolve absolute path for %s %s: %v", label, workflowName, err)
+		return "", "", false
+	}
+	if rel, err := filepath.Rel(absTargetDir, absTargetPath); err != nil || strings.HasPrefix(rel, "..") {
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write %s outside target directory: %q", label, workflowName)))
+		}
+		return "", "", false
+	}
+	return remoteFilePath, targetPath, true
+}
+
+func fetchImportedDispatchYMLFallback(ctx context.Context, options workflowDependencyFetchOptions, workflowName, remoteFilePath string, mdErr error) {
+	// .md not found — try .yml fallback
+	ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
+	ymlLocalPath := filepath.Join(options.targetDir, filepath.Clean(workflowName+".yml"))
+
+	ymlContent, ymlErr := options.downloader(ctx, options.owner, options.repo, ymlRemotePath, options.ref)
+	if ymlErr != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, mdErr)))
+		}
+		return
+	}
+	if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", ymlRemotePath, mkErr)))
+		}
+		return
+	}
+	// Capture whether file exists before writing (for correct tracker classification).
+	_, ymlFileExistsErr := os.Stat(ymlLocalPath)
+	ymlFileExists := ymlFileExistsErr == nil
+	if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", ymlRemotePath, writeErr)))
+		}
+		return
+	}
+	if options.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (.yml, from import): "+ymlLocalPath))
+	}
+	if options.tracker != nil {
+		if ymlFileExists {
+			options.tracker.TrackModified(ymlLocalPath)
+		} else {
+			options.tracker.TrackCreated(ymlLocalPath)
+		}
+	}
+}
+
+func saveImportedDispatchMarkdown(ctx context.Context, options workflowDependencyFetchOptions, workflowContent []byte, remoteFilePath, targetPath string, fileExists bool) {
+	// Embed the source field for future conflict detection.
+	depSourceString := options.spec.RepoSlug + "/" + remoteFilePath + "@" + options.ref
+	if updated, srcErr := addSourceToWorkflow(string(workflowContent), depSourceString); srcErr == nil {
+		workflowContent = []byte(updated)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for dispatch workflow %s: %v", remoteFilePath, err)))
+		}
+		return
+	}
+
+	if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", remoteFilePath, err)))
+		}
+		return
+	}
+
+	if options.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (from import): "+targetPath))
+	}
+
+	if options.tracker != nil {
+		if fileExists {
+			options.tracker.TrackModified(targetPath)
+		} else {
+			options.tracker.TrackCreated(targetPath)
+		}
+	}
+
+	fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, options.spec, remoteFilePath, options.targetDir, options.verbose, options.force, options.tracker)
 }
 
 // fetchAndSaveRemoteCallWorkflows fetches and saves the worker workflow files referenced in the
@@ -507,7 +558,6 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 	if len(parts) != 2 {
 		return nil
 	}
-	owner, repo := parts[0], parts[1]
 	ref := spec.Version
 	if ref == "" {
 		defaultBranch, err := getRepoDefaultBranch(ctx, spec.RepoSlug)
@@ -535,133 +585,128 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 		return nil
 	}
 
+	options := newWorkflowDependencyFetchOptions(spec, targetDir, workflowBaseDir, absTargetDir, verbose, force, tracker, downloader)
 	for _, workflowName := range workflowNames {
-		var remoteFilePath string
-		if workflowBaseDir != "" {
-			remoteFilePath = path.Join(workflowBaseDir, workflowName+".md")
-		} else {
-			remoteFilePath = workflowName + ".md"
+		if err := fetchRemoteCallWorkflow(ctx, workflowName, options); err != nil {
+			return err
 		}
-		remoteFilePath = path.Clean(remoteFilePath)
+	}
+	return nil
+}
 
-		localRelPath := filepath.Clean(workflowName + ".md")
-		targetPath := filepath.Join(targetDir, localRelPath)
+func fetchRemoteCallWorkflow(ctx context.Context, workflowName string, options workflowDependencyFetchOptions) error {
+	remoteFilePath, targetPath, ok := workflowDependencyPaths(workflowName, options.workflowBaseDir, options.targetDir, options.absTargetDir, "call-workflow worker", options.verbose)
+	if !ok {
+		return nil
+	}
+	// Build expected full source string now so it can be used in the conflict check below.
+	expectedSource := options.spec.RepoSlug + "/" + remoteFilePath + "@" + options.ref
 
-		absTargetPath, absErr := filepath.Abs(targetPath)
-		if absErr != nil {
-			remoteWorkflowLog.Printf("Failed to resolve absolute path for call-workflow worker %s: %v", workflowName, absErr)
-			continue
-		}
-		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
-			}
-			continue
-		}
-
-		// Build expected full source string now so it can be used in the conflict check below.
-		expectedSource := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
-
-		fileExists := false
-		if _, statErr := os.Stat(targetPath); statErr == nil {
-			fileExists = true
-			if !force {
-				// Allow if the existing file was installed from the exact same source path.
-				existingSource := readFullSourceFromFile(targetPath)
-				if existingSource == expectedSource {
-					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Call-workflow worker from same source already exists, skipping: "+targetPath))
-					}
-					continue
+	fileExists := false
+	if _, statErr := os.Stat(targetPath); statErr == nil {
+		fileExists = true
+		if !options.force {
+			// Allow if the existing file was installed from the exact same source path.
+			existingSource := readFullSourceFromFile(targetPath)
+			if existingSource == expectedSource {
+				if options.verbose {
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Call-workflow worker from same source already exists, skipping: "+targetPath))
 				}
-				return fmt.Errorf(
-					"call-workflow worker %q already exists at %s (existing source: %q, installing from: %q); remove the file or use --force to overwrite",
-					workflowName, targetPath, sourceRepoLabel(existingSource), spec.RepoSlug,
-				)
+				return nil
 			}
+			return fmt.Errorf(
+				"call-workflow worker %q already exists at %s (existing source: %q, installing from: %q); remove the file or use --force to overwrite",
+				workflowName, targetPath, sourceRepoLabel(existingSource), options.spec.RepoSlug,
+			)
 		}
-
-		// Download from the source repository — try .md first, then .yml as fallback
-		// (the call-workflow validator accepts either .md or .yml files locally).
-		workflowContent, err := downloader(ctx, owner, repo, remoteFilePath, ref)
-		if err != nil {
-			remoteWorkflowLog.Printf(".md fetch failed for call-workflow worker %s, trying .yml fallback", workflowName)
-			// .md not found — try .yml fallback (e.g. plain GitHub Actions reusable workflow)
-			ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
-			ymlLocalPath := filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))
-
-			ymlContent, ymlErr := downloader(ctx, owner, repo, ymlRemotePath, ref)
-			if ymlErr != nil {
-				// Neither .md nor .yml found — best-effort, continue
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
-				}
-				continue
-			}
-			// .yml fallback succeeded — write it (no source field for yml)
-			if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
-				}
-				continue
-			}
-			_, ymlFileExistsErr := os.Stat(ymlLocalPath)
-			ymlFileExists := ymlFileExistsErr == nil
-			// Track before writing so rollback captures the original content.
-			if tracker != nil {
-				if ymlFileExists {
-					tracker.TrackModified(ymlLocalPath)
-				} else {
-					tracker.TrackCreated(ymlLocalPath)
-				}
-			}
-			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
-				}
-				continue
-			}
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker (.yml): "+ymlLocalPath))
-			}
-			continue
-		}
-
-		if updated, srcErr := addSourceToWorkflow(string(workflowContent), expectedSource); srcErr == nil {
-			workflowContent = []byte(updated)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		// Track before writing so rollback captures the original content.
-		if tracker != nil {
-			if fileExists {
-				tracker.TrackModified(targetPath)
-			} else {
-				tracker.TrackCreated(targetPath)
-			}
-		}
-
-		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker: "+targetPath))
-		}
-
-		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)
 	}
 
+	// Download from the source repository — try .md first, then .yml as fallback
+	// (the call-workflow validator accepts either .md or .yml files locally).
+	workflowContent, err := options.downloader(ctx, options.owner, options.repo, remoteFilePath, options.ref)
+	if err != nil {
+		remoteWorkflowLog.Printf(".md fetch failed for call-workflow worker %s, trying .yml fallback", workflowName)
+		fetchCallWorkflowYMLFallback(ctx, options, workflowName, remoteFilePath, err, "Fetched call-workflow worker (.yml): ")
+		return nil
+	}
+	saveCallWorkflowMarkdown(ctx, options, workflowContent, remoteFilePath, targetPath, expectedSource, fileExists, "Fetched call-workflow worker: ")
 	return nil
+}
+
+func fetchCallWorkflowYMLFallback(ctx context.Context, options workflowDependencyFetchOptions, workflowName, remoteFilePath string, mdErr error, successPrefix string) {
+	// .md not found — try .yml fallback (e.g. plain GitHub Actions reusable workflow)
+	ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
+	ymlLocalPath := filepath.Join(options.targetDir, filepath.Clean(workflowName+".yml"))
+
+	ymlContent, ymlErr := options.downloader(ctx, options.owner, options.repo, ymlRemotePath, options.ref)
+	if ymlErr != nil {
+		// Neither .md nor .yml found — best-effort, continue
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, mdErr)))
+		}
+		return
+	}
+	// .yml fallback succeeded — write it (no source field for yml)
+	if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
+		}
+		return
+	}
+	_, ymlFileExistsErr := os.Stat(ymlLocalPath)
+	ymlFileExists := ymlFileExistsErr == nil
+	// Track before writing so rollback captures the original content.
+	if options.tracker != nil {
+		if ymlFileExists {
+			options.tracker.TrackModified(ymlLocalPath)
+		} else {
+			options.tracker.TrackCreated(ymlLocalPath)
+		}
+	}
+	if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
+		}
+		return
+	}
+	if options.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(successPrefix+ymlLocalPath))
+	}
+}
+
+func saveCallWorkflowMarkdown(ctx context.Context, options workflowDependencyFetchOptions, workflowContent []byte, remoteFilePath, targetPath, expectedSource string, fileExists bool, successPrefix string) {
+	if updated, srcErr := addSourceToWorkflow(string(workflowContent), expectedSource); srcErr == nil {
+		workflowContent = []byte(updated)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
+		}
+		return
+	}
+
+	// Track before writing so rollback captures the original content.
+	if options.tracker != nil {
+		if fileExists {
+			options.tracker.TrackModified(targetPath)
+		} else {
+			options.tracker.TrackCreated(targetPath)
+		}
+	}
+
+	if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
+		}
+		return
+	}
+
+	if options.verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(successPrefix+targetPath))
+	}
+
+	fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, options.spec, remoteFilePath, options.targetDir, options.verbose, options.force, options.tracker)
 }
 
 // fetchAndSaveCallWorkflowsFromParsedFile parses a locally-saved workflow file to obtain
@@ -685,7 +730,6 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 	if len(parts) != 2 {
 		return
 	}
-	owner, repo := parts[0], parts[1]
 	ref := spec.Version
 	if ref == "" {
 		ref = "main"
@@ -726,134 +770,55 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 		return
 	}
 
+	options := newWorkflowDependencyFetchOptions(spec, targetDir, workflowBaseDir, absTargetDir, verbose, force, tracker, parser.DownloadFileFromGitHub)
 	for _, workflowName := range filtered {
-		if strings.Contains(workflowName, "..") {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping call-workflow worker with unsafe name: %q", workflowName)))
-			}
-			continue
-		}
-
-		var remoteFilePath string
-		if workflowBaseDir != "" {
-			remoteFilePath = path.Join(workflowBaseDir, workflowName+".md")
-		} else {
-			remoteFilePath = workflowName + ".md"
-		}
-		remoteFilePath = path.Clean(remoteFilePath)
-
-		localRelPath := filepath.Clean(workflowName + ".md")
-		targetPath := filepath.Join(targetDir, localRelPath)
-
-		absTargetPath, absErr2 := filepath.Abs(targetPath)
-		if absErr2 != nil {
-			remoteWorkflowLog.Printf("Failed to resolve absolute path for call-workflow worker %s: %v", workflowName, absErr2)
-			continue
-		}
-		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
-			}
-			continue
-		}
-
-		// Build expected full source string now so it can be used in the conflict check below.
-		expectedSource := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
-
-		fileExists := false
-		if _, statErr := os.Stat(targetPath); statErr == nil {
-			fileExists = true
-			if !force {
-				// Allow if the existing file was installed from the exact same source path.
-				existingSource := readFullSourceFromFile(targetPath)
-				if existingSource == expectedSource {
-					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Call-workflow worker (from import) from same source already exists, skipping: "+targetPath))
-					}
-					continue
-				}
-				// Different or missing source — warn and skip (post-write best-effort).
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
-					"Call-workflow worker %q already exists at %s from a different source (existing: %q, needed: %q); use --force to overwrite",
-					workflowName, targetPath, sourceRepoLabel(existingSource), spec.RepoSlug,
-				)))
-				continue
-			}
-		}
-
-		// Download from source repository — try .md first, then .yml as fallback
-		workflowContent, err := parser.DownloadFileFromGitHub(ctx, owner, repo, remoteFilePath, ref)
-		if err != nil {
-			// .md not found — try .yml fallback (e.g. plain GitHub Actions reusable workflow)
-			ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
-			ymlLocalPath := filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))
-
-			ymlContent, ymlErr := parser.DownloadFileFromGitHub(ctx, owner, repo, ymlRemotePath, ref)
-			if ymlErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
-				}
-				continue
-			}
-			if mkErr := os.MkdirAll(filepath.Dir(ymlLocalPath), constants.DirPermPublic); mkErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", ymlRemotePath, mkErr)))
-				}
-				continue
-			}
-			_, ymlFileExistsErr := os.Stat(ymlLocalPath)
-			ymlFileExists := ymlFileExistsErr == nil
-			// Track before writing so rollback captures the original content.
-			if tracker != nil {
-				if ymlFileExists {
-					tracker.TrackModified(ymlLocalPath)
-				} else {
-					tracker.TrackCreated(ymlLocalPath)
-				}
-			}
-			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", ymlRemotePath, writeErr)))
-				}
-				continue
-			}
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker (.yml, from import): "+ymlLocalPath))
-			}
-			continue
-		}
-
-		if updated, srcErr := addSourceToWorkflow(string(workflowContent), expectedSource); srcErr == nil {
-			workflowContent = []byte(updated)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to create directory for call-workflow worker %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		// Track before writing so rollback captures the original content.
-		if tracker != nil {
-			if fileExists {
-				tracker.TrackModified(targetPath)
-			} else {
-				tracker.TrackCreated(targetPath)
-			}
-		}
-
-		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write call-workflow worker %s: %v", remoteFilePath, err)))
-			}
-			continue
-		}
-
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched call-workflow worker (from import): "+targetPath))
-		}
-
-		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)
+		fetchImportedCallWorkflow(ctx, workflowName, options)
 	}
+}
+
+func fetchImportedCallWorkflow(ctx context.Context, workflowName string, options workflowDependencyFetchOptions) {
+	if strings.Contains(workflowName, "..") {
+		if options.verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping call-workflow worker with unsafe name: %q", workflowName)))
+		}
+		return
+	}
+
+	remoteFilePath, targetPath, ok := workflowDependencyPaths(workflowName, options.workflowBaseDir, options.targetDir, options.absTargetDir, "call-workflow worker", options.verbose)
+	if !ok {
+		return
+	}
+
+	// Build expected full source string now so it can be used in the conflict check below.
+	expectedSource := options.spec.RepoSlug + "/" + remoteFilePath + "@" + options.ref
+
+	fileExists := false
+	if _, statErr := os.Stat(targetPath); statErr == nil {
+		fileExists = true
+		if !options.force {
+			// Allow if the existing file was installed from the exact same source path.
+			existingSource := readFullSourceFromFile(targetPath)
+			if existingSource == expectedSource {
+				if options.verbose {
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Call-workflow worker (from import) from same source already exists, skipping: "+targetPath))
+				}
+				return
+			}
+			// Different or missing source — warn and skip (post-write best-effort).
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf(
+				"Call-workflow worker %q already exists at %s from a different source (existing: %q, needed: %q); use --force to overwrite",
+				workflowName, targetPath, sourceRepoLabel(existingSource), options.spec.RepoSlug,
+			)))
+			return
+		}
+	}
+
+	// Download from source repository — try .md first, then .yml as fallback
+	workflowContent, err := options.downloader(ctx, options.owner, options.repo, remoteFilePath, options.ref)
+	if err != nil {
+		fetchCallWorkflowYMLFallback(ctx, options, workflowName, remoteFilePath, err, "Fetched call-workflow worker (.yml, from import): ")
+		return
+	}
+
+	saveCallWorkflowMarkdown(ctx, options, workflowContent, remoteFilePath, targetPath, expectedSource, fileExists, "Fetched call-workflow worker (from import): ")
 }

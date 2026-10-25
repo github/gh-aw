@@ -155,8 +155,6 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 		return nil, errors.New("JSONWorkflow must not be nil")
 	}
 
-	var warnings []string
-
 	// ── Derive filename ─────────────────────────────────────────────────────────
 	filename := opts.NameOverride
 	if filename == "" {
@@ -166,15 +164,65 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 	jsonWorkflowLog.Printf("Converting JSON workflow: id=%q name=%q filename=%q", a.ID, a.Name, filename)
 
 	// ── Build frontmatter ────────────────────────────────────────────────────────
+	frontmatter, warnings := buildJSONWorkflowFrontmatter(a)
+
+	// ── Build body ───────────────────────────────────────────────────────────────
+	var body strings.Builder
+
+	// Heading from name (or ID as fallback).
+	heading := a.Name
+	if heading != "" {
+		body.WriteString("# ")
+		body.WriteString(heading)
+		body.WriteString("\n\n")
+	}
+
+	if a.Instructions != "" {
+		body.WriteString(strings.TrimRight(a.Instructions, "\n"))
+		body.WriteString("\n")
+	} else if a.Prompt != "" {
+		// Prompt is the fallback body text when no Instructions field is present.
+		body.WriteString(strings.TrimRight(a.Prompt, "\n"))
+		body.WriteString("\n")
+	}
+
+	markdown := frontmatter + "\n" + body.String()
+
+	jsonWorkflowLog.Printf("Generated workflow %q: %d byte(s), %d warning(s)", filename, len(markdown), len(warnings))
+
+	return &GeneratedWorkflow{
+		Filename: filename,
+		Markdown: markdown,
+		Warnings: warnings,
+	}, nil
+}
+
+func buildJSONWorkflowFrontmatter(a *JSONWorkflow) (string, []string) {
 	var fm strings.Builder
 	fm.WriteString("---\n")
-
 	if a.Description != "" {
 		fm.WriteString("description: ")
 		fm.WriteString(yamlQuoteString(a.Description))
 		fm.WriteString("\n")
 	}
 
+	warnings := writeJSONWorkflowOn(&fm, a)
+	warnings = append(warnings, writeJSONWorkflowTools(&fm, a)...)
+	warnings = append(warnings, writeJSONWorkflowPermissions(&fm, a)...)
+	if len(a.Tags) > 0 {
+		fm.WriteString("tags:\n")
+		for _, tag := range a.Tags {
+			fm.WriteString("  - ")
+			fm.WriteString(yamlQuoteString(tag))
+			fm.WriteString("\n")
+		}
+	}
+	warnings = append(warnings, writeJSONWorkflowExtra(&fm, a)...)
+	fm.WriteString("---\n")
+	return fm.String(), warnings
+}
+
+func writeJSONWorkflowOn(fm *strings.Builder, a *JSONWorkflow) []string {
 	if a.Engine != "" {
 		fm.WriteString("engine: ")
 		fm.WriteString(a.Engine)
@@ -183,7 +231,7 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 
 	// "on:" is resolved from On (explicit, takes precedence) or converted from Triggers.
 	onVal, triggerWarnings := resolveOnValue(a)
-	warnings = append(warnings, triggerWarnings...)
+	warnings := append([]string(nil), triggerWarnings...)
 	if onVal != nil {
 		if s, ok := onVal.(string); ok {
 			// Scalar shorthand e.g. "on: hourly"
@@ -207,7 +255,11 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 			}
 		}
 	}
+	return warnings
+}
 
+func writeJSONWorkflowTools(fm *strings.Builder, a *JSONWorkflow) []string {
+	var warnings []string
 	if len(a.Tools) > 0 {
 		toolsConfig, toolWarnings := convertToolsToConfig(a.Tools, a.Engine)
 		warnings = append(warnings, toolWarnings...)
@@ -228,7 +280,11 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 			}
 		}
 	}
+	return warnings
+}
 
+func writeJSONWorkflowPermissions(fm *strings.Builder, a *JSONWorkflow) []string {
+	var warnings []string
 	if len(a.Permissions) > 0 {
 		permYAML, err := marshalFrontmatterValue(a.Permissions)
 		if err == nil {
@@ -245,16 +301,11 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 			warnings = append(warnings, fmt.Sprintf("could not serialize 'permissions' field: %v", err))
 		}
 	}
+	return warnings
+}
 
-	if len(a.Tags) > 0 {
-		fm.WriteString("tags:\n")
-		for _, tag := range a.Tags {
-			fm.WriteString("  - ")
-			fm.WriteString(yamlQuoteString(tag))
-			fm.WriteString("\n")
-		}
-	}
-
+func writeJSONWorkflowExtra(fm *strings.Builder, a *JSONWorkflow) []string {
+	var warnings []string
 	// Emit unknown fields as YAML comments so the file remains valid YAML while
 	// preserving the original data for the operator to inspect.
 	if len(a.Extra) > 0 {
@@ -279,37 +330,7 @@ func ConvertJSONWorkflowToMarkdown(a *JSONWorkflow, opts ConvertOptions) (*Gener
 		}
 	}
 
-	fm.WriteString("---\n")
-
-	// ── Build body ───────────────────────────────────────────────────────────────
-	var body strings.Builder
-
-	// Heading from name (or ID as fallback).
-	heading := a.Name
-	if heading != "" {
-		body.WriteString("# ")
-		body.WriteString(heading)
-		body.WriteString("\n\n")
-	}
-
-	if a.Instructions != "" {
-		body.WriteString(strings.TrimRight(a.Instructions, "\n"))
-		body.WriteString("\n")
-	} else if a.Prompt != "" {
-		// Prompt is the fallback body text when no Instructions field is present.
-		body.WriteString(strings.TrimRight(a.Prompt, "\n"))
-		body.WriteString("\n")
-	}
-
-	markdown := fm.String() + "\n" + body.String()
-
-	jsonWorkflowLog.Printf("Generated workflow %q: %d byte(s), %d warning(s)", filename, len(markdown), len(warnings))
-
-	return &GeneratedWorkflow{
-		Filename: filename,
-		Markdown: markdown,
-		Warnings: warnings,
-	}, nil
+	return warnings
 }
 
 // filenameFromJSONWorkflow derives a kebab-cased filename slug from the workflow's name
@@ -441,6 +462,10 @@ func convertTriggersToOn(t *JSONWorkflowTriggers) (any, []string) {
 		}
 	}
 
+	return resolveJSONTriggerParts(parts, warnings)
+}
+
+func resolveJSONTriggerParts(parts map[string]any, warnings []string) (any, []string) {
 	if len(parts) == 0 {
 		return nil, warnings
 	}

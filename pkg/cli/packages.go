@@ -81,107 +81,121 @@ func collectLocalIncludeDependenciesRecursive(content, baseDir string, dependenc
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found include dependency: %s -> %s", fullSourcePath, filePath)))
 			}
 
-			// Read the included file and process its includes recursively
-			includedContent, err := os.ReadFile(fullSourcePath)
-			if err != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read include file %s: %v", fullSourcePath, err)))
-				}
-				continue
-			}
-
-			// Extract markdown content from the included file
-			markdownContent, err := parser.ExtractMarkdownContent(string(includedContent))
-			if err != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not extract markdown from %s: %v", fullSourcePath, err)))
-				}
-				continue
-			}
-
-			// Recursively process includes in the included file
-			includedDir := filepath.Dir(fullSourcePath)
-			if err := collectLocalIncludeDependenciesRecursive(markdownContent, includedDir, dependencies, seen, verbose); err != nil {
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error processing includes in %s: %v", fullSourcePath, err)))
-				}
-			}
+			collectNestedLocalIncludeDependencies(fullSourcePath, dependencies, seen, verbose)
 		}
 	}
-
 	return scanner.Err()
+}
+
+func collectNestedLocalIncludeDependencies(fullSourcePath string, dependencies *[]IncludeDependency, seen map[string]struct{}, verbose bool) {
+	// Read the included file and process its includes recursively
+	includedContent, err := os.ReadFile(fullSourcePath)
+	if err != nil {
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not read include file %s: %v", fullSourcePath, err)))
+		}
+		return
+	}
+
+	// Extract markdown content from the included file
+	markdownContent, err := parser.ExtractMarkdownContent(string(includedContent))
+	if err != nil {
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not extract markdown from %s: %v", fullSourcePath, err)))
+		}
+		return
+	}
+
+	// Recursively process includes in the included file
+	includedDir := filepath.Dir(fullSourcePath)
+	if err := collectLocalIncludeDependenciesRecursive(markdownContent, includedDir, dependencies, seen, verbose); err != nil {
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error processing includes in %s: %v", fullSourcePath, err)))
+		}
+	}
 }
 
 // copyIncludeDependenciesFromPackageWithForce copies include dependencies from package filesystem with force option
 func copyIncludeDependenciesFromPackageWithForce(dependencies []IncludeDependency, githubWorkflowsDir string, verbose bool, force bool, tracker *FileTracker) error {
 	packagesLog.Printf("Copying %d include dependencies to %s (force=%t)", len(dependencies), githubWorkflowsDir, force)
 	for _, dep := range dependencies {
-		// Create the target path in .github/workflows
-		targetPath := filepath.Join(githubWorkflowsDir, dep.TargetPath)
-
-		// Create target directory if it doesn't exist
-		targetDir := filepath.Dir(targetPath)
-		if err := os.MkdirAll(targetDir, constants.DirPermPublic); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", targetDir, err)
-		}
-
-		// Read source content from package
-		sourceContent, err := os.ReadFile(dep.SourcePath)
-		if err != nil {
-			if dep.IsOptional {
-				// For optional includes, just show an informational message and skip
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Optional include file not found: %s (you can create this file to configure the workflow)", dep.TargetPath)))
-				}
-				continue
-			}
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read include file %s: %v", dep.SourcePath, err)))
-			continue
-		}
-
-		// Check if target file already exists
-		fileExists := false
-		if existingContent, err := os.ReadFile(targetPath); err == nil {
-			fileExists = true
-			// File exists, compare contents
-			if bytes.Equal(existingContent, sourceContent) {
-				// Contents are the same, skip
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Include file %s already exists with same content, skipping", dep.TargetPath)))
-				}
-				continue
-			}
-
-			// Contents are different
-			if !force {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Include file %s already exists with different content, skipping (use --force to overwrite)", dep.TargetPath)))
-				continue
-			}
-
-			// Force is enabled, overwrite
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing include file: "+dep.TargetPath))
-		}
-
-		// Track the file based on whether it existed before (if tracker is available)
-		if tracker != nil {
-			if fileExists {
-				tracker.TrackModified(targetPath)
-			} else {
-				tracker.TrackCreated(targetPath)
-			}
-		}
-
-		// Write to target
-		if err := os.WriteFile(targetPath, sourceContent, constants.FilePermPublic); err != nil {
-			return fmt.Errorf("failed to write include file %s: %w", targetPath, err)
-		}
-
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Copied include file: %s -> %s", dep.SourcePath, targetPath)))
+		if err := copyPackageIncludeDependency(dep, githubWorkflowsDir, verbose, force, tracker); err != nil {
+			return err
 		}
 	}
-
 	return nil
+}
+
+func copyPackageIncludeDependency(dep IncludeDependency, githubWorkflowsDir string, verbose, force bool, tracker *FileTracker) error {
+	// Create the target path in .github/workflows
+	targetPath := filepath.Join(githubWorkflowsDir, dep.TargetPath)
+
+	// Create target directory if it doesn't exist
+	targetDir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(targetDir, constants.DirPermPublic); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", targetDir, err)
+	}
+
+	// Read source content from package
+	sourceContent, err := os.ReadFile(dep.SourcePath)
+	if err != nil {
+		if dep.IsOptional {
+			// For optional includes, just show an informational message and skip
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Optional include file not found: %s (you can create this file to configure the workflow)", dep.TargetPath)))
+			}
+			return nil
+		}
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to read include file %s: %v", dep.SourcePath, err)))
+		return nil
+	}
+
+	// Check if target file already exists
+	fileExists, skip := shouldSkipPackageIncludeCopy(targetPath, sourceContent, dep, verbose, force)
+	if skip {
+		return nil
+	}
+
+	if tracker != nil {
+		if fileExists {
+			tracker.TrackModified(targetPath)
+		} else {
+			tracker.TrackCreated(targetPath)
+		}
+	}
+	if err := os.WriteFile(targetPath, sourceContent, constants.FilePermPublic); err != nil {
+		return fmt.Errorf("failed to write include file %s: %w", targetPath, err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Copied include file: %s -> %s", dep.SourcePath, targetPath)))
+	}
+	return nil
+}
+
+func shouldSkipPackageIncludeCopy(targetPath string, sourceContent []byte, dep IncludeDependency, verbose, force bool) (bool, bool) {
+	fileExists := false
+	if existingContent, err := os.ReadFile(targetPath); err == nil {
+		fileExists = true
+		// File exists, compare contents
+		if bytes.Equal(existingContent, sourceContent) {
+			// Contents are the same, skip
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Include file %s already exists with same content, skipping", dep.TargetPath)))
+			}
+			return fileExists, true
+		}
+
+		// Contents are different
+		if !force {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Include file %s already exists with different content, skipping (use --force to overwrite)", dep.TargetPath)))
+			return fileExists, true
+		}
+
+		// Force is enabled, overwrite
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Overwriting existing include file: "+dep.TargetPath))
+	}
+
+	return fileExists, false
 }
 
 // IncludeDependency represents a file dependency from @include directives

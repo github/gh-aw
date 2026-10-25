@@ -3,9 +3,71 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestAcceptLatestWorkflowRun(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, time.October, 25, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name      string
+		createdAt time.Time
+		attempt   int
+		want      bool
+	}{
+		{"recent", start.Add(-29 * time.Second), 0, true},
+		{"tolerance boundary", start.Add(-30 * time.Second), 0, false},
+		{"old before fallback", start.Add(-time.Hour), 2, false},
+		{"old at fallback", start.Add(-time.Hour), 3, true},
+		{"unknown before fallback", time.Time{}, 2, false},
+		{"unknown at fallback", time.Time{}, 3, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			run := &WorkflowRunInfo{DatabaseID: 42, CreatedAt: tt.createdAt}
+			if got := acceptLatestWorkflowRun(run, start, tt.attempt, 6, false); got != tt.want {
+				t.Errorf("acceptLatestWorkflowRun() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseLatestWorkflowRun(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		output  string
+		wantErr string
+		zero    bool
+	}{
+		{"valid", `[{"url":"https://github.com/o/r/actions/runs/42","databaseId":42,"createdAt":"2026-10-25T12:00:00Z"}]`, "", false},
+		{"invalid timestamp", `[{"databaseId":42,"createdAt":"invalid"}]`, "", true},
+		{"missing timestamp", `[{"databaseId":42}]`, "", true},
+		{"empty list", `[]`, "no runs found", false},
+		{"malformed JSON", `{`, "failed to parse workflow run data", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			run, err := parseLatestWorkflowRun([]byte(tt.output), 0, 6, false)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("parseLatestWorkflowRun() error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil || run == nil {
+				t.Fatalf("parseLatestWorkflowRun() = %v, %v", run, err)
+			}
+			if run.DatabaseID != 42 || run.CreatedAt.IsZero() != tt.zero {
+				t.Errorf("unexpected parsed run: %+v", run)
+			}
+		})
+	}
+}
 
 // TestWorkflowRunInfo tests the WorkflowRunInfo struct
 func TestWorkflowRunInfo(t *testing.T) {

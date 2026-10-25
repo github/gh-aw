@@ -148,6 +148,24 @@ func compileModifiedFilesWithDependencies(ctx context.Context, compiler *workflo
 	console.ClearScreen()
 
 	// Use dependency graph to determine what needs to be recompiled
+	workflowsToCompile := collectModifiedWorkflowDependencies(compiler, depGraph, files)
+
+	fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr("Watching for file changes"))
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Recompiling %d workflow(s) affected by %d change(s)...", len(workflowsToCompile), len(files))))
+	}
+
+	compiler.ResetWarningCount()
+	stats := &CompilationStats{}
+	for _, file := range workflowsToCompile {
+		compileSingleFile(ctx, compiler, file, stats, verbose, true)
+	}
+	stats.Warnings = compiler.GetWarningCount()
+	saveModifiedWorkflowCompilationCache(compiler, stats, verbose)
+	printCompilationSummary(stats, false)
+}
+
+func collectModifiedWorkflowDependencies(compiler *workflow.Compiler, depGraph *DependencyGraph, files []string) []string {
 	var workflowsToCompile []string
 	uniqueWorkflows := make(map[string]struct {
 	})
@@ -174,24 +192,10 @@ func compileModifiedFilesWithDependencies(ctx context.Context, compiler *workflo
 		}
 	}
 
-	fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr("Watching for file changes"))
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatProgressMessageStderr(fmt.Sprintf("Recompiling %d workflow(s) affected by %d change(s)...", len(workflowsToCompile), len(files))))
-	}
+	return workflowsToCompile
+}
 
-	// Reset warning count before compilation
-	compiler.ResetWarningCount()
-
-	// Track compilation statistics
-	stats := &CompilationStats{}
-
-	for _, file := range workflowsToCompile {
-		compileSingleFile(ctx, compiler, file, stats, verbose, true)
-	}
-
-	// Get warning count from compiler
-	stats.Warnings = compiler.GetWarningCount()
-
+func saveModifiedWorkflowCompilationCache(compiler *workflow.Compiler, stats *CompilationStats, verbose bool) {
 	// Save the action cache after compilations
 	actionCache := compiler.GetSharedActionCache()
 	hasActionCacheEntries := actionCache != nil && len(actionCache.Entries) > 0
@@ -221,8 +225,6 @@ func compileModifiedFilesWithDependencies(ctx context.Context, compiler *workflo
 		compileHelpersLog.Print("Skipping .gitattributes update (no compiled workflows and no action cache entries)")
 	}
 
-	// Print summary instead of just "Recompiled"
-	printCompilationSummary(stats, false)
 }
 
 // handleFileDeleted handles the deletion of a markdown file by removing its corresponding lock file

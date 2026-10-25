@@ -151,6 +151,33 @@ func TestBuildCacheMemoryPromptSection_MultipleCachesWithAllowedExtensions(t *te
 		"Should include union of allowed extensions guidance")
 }
 
+func TestBuildCacheMemoryPromptSection_ExtensionOrdering(t *testing.T) {
+	tests := []struct {
+		name       string
+		extensions [][]string
+		want       string
+	}{
+		{"identical lists preserve order and duplicates", [][]string{{".txt", ".json", ".txt"}, {".txt", ".json", ".txt"}}, "\nAllowed file extensions: .txt, .json, .txt."},
+		{"different orders produce sorted union", [][]string{{".txt", ".json"}, {".json", ".txt"}}, "\nAllowed file extensions: .json, .txt."},
+		{"mixed unrestricted and restricted", [][]string{nil, {".txt"}}, "\nAllowed file extensions: .txt."},
+		{"all unrestricted", [][]string{nil, {}}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &CacheMemoryConfig{}
+			for _, extensions := range tt.extensions {
+				config.Caches = append(config.Caches, CacheMemoryEntry{AllowedExtensions: extensions})
+			}
+			section := buildCacheMemoryPromptSection(config)
+			require.NotNil(t, section)
+			assert.Equal(t, tt.want, section.EnvVars["GH_AW_ALLOWED_EXTENSIONS"])
+			for i, extensions := range tt.extensions {
+				assert.Equal(t, extensions, config.Caches[i].AllowedExtensions, "must not mutate configured extensions")
+			}
+		})
+	}
+}
+
 func TestBuildCacheMemoryPromptSection_SingleNonDefaultCache(t *testing.T) {
 	config := &CacheMemoryConfig{
 		Caches: []CacheMemoryEntry{

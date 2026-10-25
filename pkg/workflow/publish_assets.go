@@ -80,21 +80,7 @@ func (c *Compiler) parseUploadAssetConfig(outputMap map[string]any) *UploadAsset
 			// Parse allowed-exts
 			if allowedExts, exists := configMap["allowed-exts"]; exists {
 				if allowedExtsArray, ok := allowedExts.([]any); ok {
-					var extStrings []string
-					seen := make(map[string]struct{})
-					for _, ext := range allowedExtsArray {
-						if extStr, ok := ext.(string); ok {
-							normalized := normalizeAllowedExtension(extStr)
-							if normalized == "" {
-								continue
-							}
-							if _, exists := seen[normalized]; exists {
-								continue
-							}
-							seen[normalized] = struct{}{}
-							extStrings = append(extStrings, normalized)
-						}
-					}
+					extStrings := parseAllowedAssetExtensions(allowedExtsArray)
 					if len(extStrings) > 0 {
 						config.AllowedExts = extStrings
 					}
@@ -116,6 +102,25 @@ func (c *Compiler) parseUploadAssetConfig(outputMap map[string]any) *UploadAsset
 	return nil
 }
 
+func parseAllowedAssetExtensions(extensions []any) []string {
+	var extStrings []string
+	seen := make(map[string]struct{})
+	for _, ext := range extensions {
+		if extStr, ok := ext.(string); ok {
+			normalized := normalizeAllowedExtension(extStr)
+			if normalized == "" {
+				continue
+			}
+			if _, exists := seen[normalized]; exists {
+				continue
+			}
+			seen[normalized] = struct{}{}
+			extStrings = append(extStrings, normalized)
+		}
+	}
+	return extStrings
+}
+
 // buildUploadAssetsJob creates the publish_assets job
 func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, threatDetectionEnabled bool) (*Job, error) {
 	publishAssetsLog.Printf("Building upload_assets job: workflow=%s, main_job=%s, threat_detection=%v", data.Name, mainJobName, threatDetectionEnabled)
@@ -124,8 +129,45 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 		return nil, errors.New("safe-outputs.upload-asset configuration is required")
 	}
 
-	var preSteps []string
+	preSteps := c.buildUploadAssetsPreSteps(data)
+	customEnvVars := c.buildUploadAssetsEnv(data)
+	outputs := map[string]string{
+		"published_count": "${{ steps.upload_assets.outputs.published_count }}",
+		"branch_name":     "${{ steps.upload_assets.outputs.branch_name }}",
+	}
+	jobCondition := BuildSafeOutputType("upload_asset")
+	if IsConditionalDetection(data.SafeOutputs) {
+		jobCondition = BuildAnd(
+			BuildAnd(BuildFunctionCall("always"), BuildSafeOutputType("upload_asset")),
+			buildDetectionPassedCondition(),
+		)
+	}
+	needs := []string{mainJobName, string(constants.ActivationJobName)}
+	var postSteps []string
+	if c.actionMode.IsDev() {
+		postSteps = append(postSteps, c.generateRestoreActionsSetupStep())
+		publishAssetsLog.Print("Added restore actions folder step to upload_assets job (dev mode)")
+	}
+	return c.buildSafeOutputJob(data, SafeOutputJobConfig{
+		JobName:       "upload_assets",
+		StepName:      "Push assets",
+		StepID:        "upload_assets",
+		ScriptName:    "upload_assets",
+		MainJobName:   mainJobName,
+		CustomEnvVars: customEnvVars,
+		Script:        getUploadAssetsScript(),
+		Permissions:   NewPermissionsContentsWrite(),
+		Outputs:       outputs,
+		Condition:     jobCondition,
+		PreSteps:      preSteps,
+		PostSteps:     postSteps,
+		Token:         data.SafeOutputs.UploadAssets.GitHubToken,
+		Needs:         needs,
+	})
+}
 
+func (c *Compiler) buildUploadAssetsPreSteps(data *WorkflowData) []string {
+	var preSteps []string
 	// Permission checks are now handled by the separate check_membership job
 	// which is always created when needed (when activation job is created)
 
@@ -164,7 +206,10 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 	preSteps = append(preSteps, "        run: |\n")
 	preSteps = append(preSteps, "          echo \"Downloaded asset files:\"\n")
 	preSteps = append(preSteps, fmt.Sprintf("          find %s -maxdepth 1 -ls\n", constants.TmpGhAwAssetsDirSlash))
+	return preSteps
+}
 
+func (c *Compiler) buildUploadAssetsEnv(data *WorkflowData) []string {
 	// Build custom environment variables specific to upload-assets
 	var customEnvVars []string
 	// Single source of truth for the staged-assets directory: the consumer script
@@ -177,57 +222,7 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 	// Add standard environment variables (metadata + staged/target repo)
 	customEnvVars = append(customEnvVars, c.buildStandardSafeOutputEnvVars(data, "")...) // No target repo for upload assets
 
-	// Create outputs for the job
-	outputs := map[string]string{
-		"published_count": "${{ steps.upload_assets.outputs.published_count }}",
-		"branch_name":     "${{ steps.upload_assets.outputs.branch_name }}",
-	}
-
-	// Build the job condition using expression tree.
-	// When detection is expression-controlled the detection job may be skipped at runtime.
-	// Wrap the condition with always() + detection-passed so this job still runs when the
-	// caller disabled threat detection for this invocation via the expression.
-	jobCondition := BuildSafeOutputType("upload_asset")
-	if IsConditionalDetection(data.SafeOutputs) {
-		jobCondition = BuildAnd(
-			BuildAnd(BuildFunctionCall("always"), BuildSafeOutputType("upload_asset")),
-			buildDetectionPassedCondition(),
-		)
-	}
-
-	// Build job dependencies — always include activation job for OTLP trace ID correlation
-	needs := []string{mainJobName, string(constants.ActivationJobName)}
-
-	// In dev mode the setup action is referenced via a local path (./actions/setup), so its
-	// files live in the workspace. The upload_assets step does a git checkout to the assets
-	// branch, which replaces the workspace content and removes the actions/setup directory.
-	// Without restoring it, the runner's post-step for Setup Scripts would fail with
-	// "Can't find 'action.yml', 'action.yaml' or 'Dockerfile' under .../actions/setup".
-	// We add a restore checkout step (if: always()) after the main step so the post-step
-	// can always find action.yml and complete its /tmp/gh-aw cleanup.
-	var postSteps []string
-	if c.actionMode.IsDev() {
-		postSteps = append(postSteps, c.generateRestoreActionsSetupStep())
-		publishAssetsLog.Print("Added restore actions folder step to upload_assets job (dev mode)")
-	}
-
-	// Use the shared builder function to create the job
-	return c.buildSafeOutputJob(data, SafeOutputJobConfig{
-		JobName:       "upload_assets",
-		StepName:      "Push assets",
-		StepID:        "upload_assets",
-		ScriptName:    "upload_assets",
-		MainJobName:   mainJobName,
-		CustomEnvVars: customEnvVars,
-		Script:        getUploadAssetsScript(),
-		Permissions:   NewPermissionsContentsWrite(),
-		Outputs:       outputs,
-		Condition:     jobCondition,
-		PreSteps:      preSteps,
-		PostSteps:     postSteps,
-		Token:         data.SafeOutputs.UploadAssets.GitHubToken,
-		Needs:         needs,
-	})
+	return customEnvVars
 }
 
 // generateSafeOutputsAssetsArtifactUpload generates a step to upload safe-outputs assets as a separate artifact.

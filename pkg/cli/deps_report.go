@@ -42,29 +42,7 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 	}
 	depsReportLog.Printf("Parsed go.mod: %d total dependencies", len(allDeps))
 
-	// Count direct vs indirect dependencies
-	directCount := 0
-	indirectCount := 0
-	v0Count := 0
-	v1Count := 0
-	v2Count := 0
-
-	for _, dep := range allDeps {
-		if dep.Indirect {
-			indirectCount++
-		} else {
-			directCount++
-		}
-
-		// Count version maturity
-		if strings.HasPrefix(dep.Version, "v0.") {
-			v0Count++
-		} else if strings.HasPrefix(dep.Version, "v1.") {
-			v1Count++
-		} else if strings.HasPrefix(dep.Version, "v2.") || strings.HasPrefix(dep.Version, "v3.") {
-			v2Count++
-		}
-	}
+	report := summarizeDependencyVersions(allDeps)
 
 	// Check for outdated dependencies (only direct)
 	outdated, err := CheckOutdatedDependencies(ctx, verbose)
@@ -84,19 +62,30 @@ func GenerateDependencyReport(ctx context.Context, verbose bool) (*DependencyRep
 		advisories = []SecurityAdvisory{}
 	}
 
-	report := &DependencyReport{
-		TotalDeps:    len(allDeps),
-		DirectDeps:   directCount,
-		IndirectDeps: indirectCount,
-		Outdated:     outdated,
-		Advisories:   advisories,
-		V0Count:      v0Count,
-		V1PlusCount:  v1Count,
-		V2PlusCount:  v2Count,
-	}
+	report.Outdated = outdated
+	report.Advisories = advisories
 
 	depsReportLog.Printf("Report generated: %d total deps, %d outdated, %d advisories", report.TotalDeps, len(report.Outdated), len(report.Advisories))
 	return report, nil
+}
+
+func summarizeDependencyVersions(allDeps []DependencyInfoWithIndirect) *DependencyReport {
+	report := &DependencyReport{TotalDeps: len(allDeps)}
+	for _, dep := range allDeps {
+		if dep.Indirect {
+			report.IndirectDeps++
+		} else {
+			report.DirectDeps++
+		}
+		if strings.HasPrefix(dep.Version, "v0.") {
+			report.V0Count++
+		} else if strings.HasPrefix(dep.Version, "v1.") {
+			report.V1PlusCount++
+		} else if strings.HasPrefix(dep.Version, "v2.") || strings.HasPrefix(dep.Version, "v3.") {
+			report.V2PlusCount++
+		}
+	}
+	return report
 }
 
 // DisplayDependencyReport shows the comprehensive dependency report
@@ -145,6 +134,11 @@ func DisplayDependencyReport(report *DependencyReport) {
 	fmt.Fprintln(os.Stderr, "")
 
 	// Dependency maturity section
+	displayDependencyMaturity(report, v0Percentage)
+	displayDependencyRecommendations(report, v0Percentage)
+}
+
+func displayDependencyMaturity(report *DependencyReport, v0Percentage float64) {
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dependency Maturity"))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("-------------------"))
 	fmt.Fprintf(os.Stderr, "v0.x (unstable): %d (%.0f%%)", report.V0Count, v0Percentage)
@@ -152,14 +146,15 @@ func DisplayDependencyReport(report *DependencyReport) {
 		fmt.Fprintf(os.Stderr, " ⚠️")
 	}
 	fmt.Fprintln(os.Stderr, "")
-
 	v1Percentage := safePercent(report.V1PlusCount, report.TotalDeps)
 	fmt.Fprintf(os.Stderr, "v1.x (stable): %d (%.0f%%)\n", report.V1PlusCount, v1Percentage)
 
 	v2Percentage := safePercent(report.V2PlusCount, report.TotalDeps)
 	fmt.Fprintf(os.Stderr, "v2+ (mature): %d (%.0f%%)\n", report.V2PlusCount, v2Percentage)
 	fmt.Fprintln(os.Stderr, "")
+}
 
+func displayDependencyRecommendations(report *DependencyReport, v0Percentage float64) {
 	// Recommendations section
 	if len(report.Outdated) > 0 || len(report.Advisories) > 0 || v0Percentage > 30 {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recommendations"))
@@ -197,20 +192,7 @@ func DisplayDependencyReportJSON(report *DependencyReport) error {
 
 	// Build JSON-friendly output structure
 	output := map[string]any{
-		"summary": map[string]any{
-			"total_dependencies":    report.TotalDeps,
-			"direct_dependencies":   report.DirectDeps,
-			"indirect_dependencies": report.IndirectDeps,
-			"outdated_count":        len(report.Outdated),
-			"outdated_percentage":   outdatedPercentage,
-			"security_advisories":   len(report.Advisories),
-			"v0_count":              report.V0Count,
-			"v0_percentage":         v0Percentage,
-			"v1_count":              report.V1PlusCount,
-			"v1_percentage":         v1Percentage,
-			"v2_count":              report.V2PlusCount,
-			"v2_percentage":         v2Percentage,
-		},
+		"summary":  dependencyReportJSONSummary(report, outdatedPercentage, v0Percentage, v1Percentage, v2Percentage),
 		"outdated": report.Outdated,
 		"security": report.Advisories,
 		"maturity": map[string]any{
@@ -230,6 +212,36 @@ func DisplayDependencyReportJSON(report *DependencyReport) error {
 	}
 
 	// Add recommendations
+	output["recommendations"] = dependencyReportRecommendations(report, v0Percentage)
+
+	// Marshal and output to stdout
+	jsonData, err := marshalIndentJSONOrWrap(output, "dependency report")
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(os.Stdout, string(jsonData))
+	return nil
+}
+
+func dependencyReportJSONSummary(report *DependencyReport, outdatedPercentage, v0Percentage, v1Percentage, v2Percentage float64) map[string]any {
+	return map[string]any{
+		"total_dependencies":    report.TotalDeps,
+		"direct_dependencies":   report.DirectDeps,
+		"indirect_dependencies": report.IndirectDeps,
+		"outdated_count":        len(report.Outdated),
+		"outdated_percentage":   outdatedPercentage,
+		"security_advisories":   len(report.Advisories),
+		"v0_count":              report.V0Count,
+		"v0_percentage":         v0Percentage,
+		"v1_count":              report.V1PlusCount,
+		"v1_percentage":         v1Percentage,
+		"v2_count":              report.V2PlusCount,
+		"v2_percentage":         v2Percentage,
+	}
+}
+
+func dependencyReportRecommendations(report *DependencyReport, v0Percentage float64) []string {
 	recommendations := []string{}
 	if len(report.Advisories) > 0 {
 		recommendations = append(recommendations, fmt.Sprintf("Address %d security %s immediately", len(report.Advisories), pluralize("advisory", len(report.Advisories))))
@@ -240,16 +252,7 @@ func DisplayDependencyReportJSON(report *DependencyReport) error {
 	if v0Percentage > 30 {
 		recommendations = append(recommendations, fmt.Sprintf("Reduce v0.x exposure from %.0f%% to <30%%", v0Percentage))
 	}
-	output["recommendations"] = recommendations
-
-	// Marshal and output to stdout
-	jsonData, err := marshalIndentJSONOrWrap(output, "dependency report")
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(os.Stdout, string(jsonData))
-	return nil
+	return recommendations
 }
 
 // DependencyInfoWithIndirect extends DependencyInfo to track indirect dependencies

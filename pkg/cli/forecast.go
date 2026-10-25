@@ -36,6 +36,10 @@ func RunForecast(config ForecastConfig) error {
 		ctx = timeoutCtx
 	}
 
+	return runForecastWithContext(ctx, config)
+}
+
+func runForecastWithContext(ctx context.Context, config ForecastConfig) error {
 	// Validate period.
 	periodDays, ok := forecastPeriodDays[config.Period]
 	if !ok {
@@ -59,7 +63,15 @@ func RunForecast(config ForecastConfig) error {
 	}
 
 	now := time.Now()
+	startDate, validationStartDate, validationEndDate := forecastHistoryDates(now, config, periodDays)
+	results, err := sampleForecastWorkflows(ctx, workflowIDs, startDate, validationStartDate, validationEndDate, config, periodDays, now)
+	if err != nil {
+		return err
+	}
+	return renderForecastResults(results, config, now)
+}
 
+func forecastHistoryDates(now time.Time, config ForecastConfig, periodDays int) (startDate, validationStartDate, validationEndDate string) {
 	// In eval mode, shift the entire date range back by one period so we can
 	// compare the forecast against the actual runs in the most recent period.
 	//
@@ -70,7 +82,6 @@ func RunForecast(config ForecastConfig) error {
 	//
 	// Normal mode: startDate = now - days (no anchor shift).
 	var anchor time.Time
-	var validationStartDate, validationEndDate string
 	if config.EvalMode {
 		anchor = now.AddDate(0, 0, -periodDays)
 		validationStartDate = anchor.Format("2006-01-02")
@@ -80,12 +91,15 @@ func RunForecast(config ForecastConfig) error {
 				anchor.Format("2006-01-02"), validationStartDate, validationEndDate)))
 	}
 
-	startDate := now.AddDate(0, 0, -config.Days).Format("2006-01-02")
+	startDate = now.AddDate(0, 0, -config.Days).Format("2006-01-02")
 	if config.EvalMode {
 		// Training window ends at the anchor, not now.
 		startDate = anchor.AddDate(0, 0, -config.Days).Format("2006-01-02")
 	}
+	return startDate, validationStartDate, validationEndDate
+}
 
+func sampleForecastWorkflows(ctx context.Context, workflowIDs []string, startDate, validationStartDate, validationEndDate string, config ForecastConfig, periodDays int, now time.Time) ([]ForecastWorkflowResult, error) {
 	if !config.Verbose && !config.JSONOutput {
 		label := fmt.Sprintf("Forecasting %d workflow(s) using %d-day history → projecting per %s",
 			len(workflowIDs), config.Days, config.Period)
@@ -104,7 +118,7 @@ func RunForecast(config ForecastConfig) error {
 				spinner.Stop()
 			}
 			emitPartialForecastResults(results, config, now)
-			return normalizeForecastRunError(err, config)
+			return nil, normalizeForecastRunError(err, config)
 		}
 		if !config.Verbose {
 			spinner.UpdateMessage(fmt.Sprintf("Sampling %s…", wfID))
@@ -121,7 +135,7 @@ func RunForecast(config ForecastConfig) error {
 					spinner.Stop()
 				}
 				emitPartialForecastResults(results, config, now)
-				return normalizeForecastRunError(err, config)
+				return nil, normalizeForecastRunError(err, config)
 			}
 			if !config.Verbose {
 				spinner.Stop()
@@ -145,7 +159,10 @@ func RunForecast(config ForecastConfig) error {
 	if !config.Verbose {
 		spinner.Stop()
 	}
+	return results, nil
+}
 
+func renderForecastResults(results []ForecastWorkflowResult, config ForecastConfig, now time.Time) error {
 	// Sort results by Monte Carlo P50 (or point estimate when MC unavailable) descending.
 	slices.SortFunc(results, func(a, b ForecastWorkflowResult) int {
 		pi := a.ProjectedAIC

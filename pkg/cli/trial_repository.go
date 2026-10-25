@@ -94,44 +94,55 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 	}
 
 	if repoExists {
-		trialRepoLog.Printf("Repository %s already exists", repoSlug)
-		// Repository exists - determine what to do
-		if forceDeleteHostRepo {
-			// Force delete mode: delete the existing repository first
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Force deleting existing host repository: "+repoSlug))
-			}
-
-			if dryRun {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Would delete repository: "+repoSlug))
-			} else {
-				if deleteOutput, deleteErr := workflow.RunGHCombined("Deleting repository...", "repo", "delete", repoSlug, "--yes"); deleteErr != nil {
-					return fmt.Errorf("failed to force delete existing host repository %s: %w (output: %s)", repoSlug, deleteErr, string(deleteOutput))
-				}
-
-				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Force deleted existing host repository: "+repoSlug))
-			}
-
-			// Continue to create the repository below
-		} else {
-			// Both clone-repo and logical-repo modes: reusing is allowed
-			// In clone-repo mode, the cloneRepoContentsIntoHost function will force push the new contents
-			if verbose {
-				if cloneRepoSlug != "" {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Reusing existing host repository: %s (contents will be force-pushed)", repoSlug)))
-				} else {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Reusing existing host repository: "+repoSlug))
-				}
-			}
-			prefix := ""
-			if dryRun {
-				prefix = "[DRY RUN] "
-			}
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("%sUsing existing host repository: %s", prefix, trialRepositoryURL(repoSlug))))
-			return nil
+		reused, err := handleExistingTrialRepository(repoSlug, cloneRepoSlug, forceDeleteHostRepo, dryRun, verbose)
+		if err != nil || reused {
+			return err
 		}
 	}
+	return createTrialRepository(repoSlug, dryRun, verbose)
+}
 
+func handleExistingTrialRepository(repoSlug, cloneRepoSlug string, forceDeleteHostRepo, dryRun, verbose bool) (bool, error) {
+	trialRepoLog.Printf("Repository %s already exists", repoSlug)
+	// Repository exists - determine what to do
+	if forceDeleteHostRepo {
+		// Force delete mode: delete the existing repository first
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Force deleting existing host repository: "+repoSlug))
+		}
+
+		if dryRun {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Would delete repository: "+repoSlug))
+		} else {
+			if deleteOutput, deleteErr := workflow.RunGHCombined("Deleting repository...", "repo", "delete", repoSlug, "--yes"); deleteErr != nil {
+				return false, fmt.Errorf("failed to force delete existing host repository %s: %w (output: %s)", repoSlug, deleteErr, string(deleteOutput))
+			}
+
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Force deleted existing host repository: "+repoSlug))
+		}
+
+		// Continue to create the repository below
+	} else {
+		// Both clone-repo and logical-repo modes: reusing is allowed
+		// In clone-repo mode, the cloneRepoContentsIntoHost function will force push the new contents
+		if verbose {
+			if cloneRepoSlug != "" {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Reusing existing host repository: %s (contents will be force-pushed)", repoSlug)))
+			} else {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Reusing existing host repository: "+repoSlug))
+			}
+		}
+		prefix := ""
+		if dryRun {
+			prefix = "[DRY RUN] "
+		}
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("%sUsing existing host repository: %s", prefix, trialRepositoryURL(repoSlug))))
+		return true, nil
+	}
+	return false, nil
+}
+
+func createTrialRepository(repoSlug string, dryRun, verbose bool) error {
 	// Repository doesn't exist, create it
 	if verbose || dryRun {
 		prefix := ""
@@ -150,7 +161,7 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 	}
 
 	// Use gh CLI to create private repo with initial README using full OWNER/REPO format
-	output, err = workflow.RunGHCombined("Creating repository...", "repo", "create", repoSlug, "--private", "--add-readme", "--description", "GitHub Agentic Workflows host repository")
+	output, err := workflow.RunGHCombined("Creating repository...", "repo", "create", repoSlug, "--private", "--add-readme", "--description", "GitHub Agentic Workflows host repository")
 
 	if err != nil {
 		// Check if the error is because the repository already exists
@@ -169,6 +180,11 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 	// Show host repository creation message with URL
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created host repository: "+trialRepositoryURL(repoSlug)))
 
+	initializeCreatedTrialRepository(repoSlug, verbose)
+	return nil
+}
+
+func initializeCreatedTrialRepository(repoSlug string, verbose bool) {
 	// Prompt user to enable GitHub Actions permissions
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(""))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("IMPORTANT: You must enable GitHub Actions permissions for the repository."))
@@ -198,7 +214,6 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 	// Give GitHub a moment to fully initialize the repository
 	time.Sleep(trialRepoInitDelay)
 
-	return nil
 }
 
 func cleanupTrialRepository(repoSlug string, verbose bool) error {
@@ -263,10 +278,19 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 		return fmt.Errorf("failed to change to temp directory: %w", err)
 	}
 
+	fetched, err := fetchTrialWorkflow(ctx, tempDir, originalDir, parsedSpec, opts)
+	if err != nil {
+		return fmt.Errorf("failed to fetch workflow: %w", err)
+	}
+	return installFetchedTrialWorkflow(ctx, tempDir, fetched, parsedSpec, logicalRepoSlug, cloneRepoSlug, directTrialMode, opts)
+}
+
+func fetchTrialWorkflow(ctx context.Context, tempDir, originalDir string, parsedSpec *WorkflowSpec, opts *TrialOptions) (*FetchedWorkflow, error) {
 	// Fetch workflow content - handle local workflows specially since they need
 	// to be resolved from the original directory, not the tempDir
 	specToFetch := parsedSpec
 	var fetched *FetchedWorkflow
+	var err error
 
 	if isLocalWorkflowPath(parsedSpec.WorkflowPath) {
 		// For local workflows, temporarily change to original dir for fetch
@@ -291,10 +315,10 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 		fetched, err = FetchWorkflowFromSourceWithContext(ctx, specToFetch, opts.Verbose)
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to fetch workflow: %w", err)
-	}
+	return fetched, err
+}
 
+func installFetchedTrialWorkflow(ctx context.Context, tempDir string, fetched *FetchedWorkflow, parsedSpec *WorkflowSpec, logicalRepoSlug, cloneRepoSlug string, directTrialMode bool, opts *TrialOptions) error {
 	content := fetched.Content
 
 	// When the fetch used a fallback path (e.g. .github/workflows/my-workflow.md
@@ -339,14 +363,8 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 
 	// Fetch and save all remote dependencies (includes, imports, runtime imports,
 	// dispatch workflows, resources) using the exact commit resolved for this install.
-	if !fetched.IsLocal {
-		depSpec := *parsedSpec
-		if fetched.CommitSHA != "" {
-			depSpec.Version = fetched.CommitSHA
-		}
-		if err := fetchAllRemoteDependencies(ctx, string(content), &depSpec, result.WorkflowsDir, opts.Verbose, true, nil); err != nil {
-			return fmt.Errorf("failed to fetch remote dependencies: %w", err)
-		}
+	if err := fetchTrialWorkflowDependencies(ctx, content, parsedSpec, fetched, result.WorkflowsDir, opts); err != nil {
+		return err
 	}
 
 	// Modify the workflow for trial mode (skip in direct trial mode)
@@ -358,9 +376,26 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Direct trial mode: Skipping trial mode modifications"))
 	}
 
+	return compileAndPushTrialWorkflow(ctx, tempDir, parsedSpec.WorkflowName, logicalRepoSlug, cloneRepoSlug, directTrialMode, opts)
+}
+
+func fetchTrialWorkflowDependencies(ctx context.Context, content []byte, parsedSpec *WorkflowSpec, fetched *FetchedWorkflow, workflowsDir string, opts *TrialOptions) error {
+	if !fetched.IsLocal {
+		depSpec := *parsedSpec
+		if fetched.CommitSHA != "" {
+			depSpec.Version = fetched.CommitSHA
+		}
+		if err := fetchAllRemoteDependencies(ctx, string(content), &depSpec, workflowsDir, opts.Verbose, true, nil); err != nil {
+			return fmt.Errorf("failed to fetch remote dependencies: %w", err)
+		}
+	}
+	return nil
+}
+
+func compileAndPushTrialWorkflow(ctx context.Context, tempDir, workflowName, logicalRepoSlug, cloneRepoSlug string, directTrialMode bool, opts *TrialOptions) error {
 	// Compile the workflow with trial modifications
 	config := CompileConfig{
-		MarkdownFiles:        []string{constants.WorkflowsDirSlash + parsedSpec.WorkflowName + ".md"},
+		MarkdownFiles:        []string{constants.WorkflowsDirSlash + workflowName + ".md"},
 		Verbose:              opts.Verbose,
 		EngineOverride:       opts.EngineOverride,
 		Validate:             true,
@@ -382,7 +417,7 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 	_ = workflowDataList[0]
 
 	// Commit and push the changes
-	if err := commitAndPushWorkflow(tempDir, parsedSpec.WorkflowName, opts.Verbose); err != nil {
+	if err := commitAndPushWorkflow(tempDir, workflowName, opts.Verbose); err != nil {
 		return fmt.Errorf("failed to commit and push workflow: %w", err)
 	}
 
@@ -486,91 +521,7 @@ func modifyWorkflowForTrialMode(tempDir, workflowName, logicalRepoSlug string, v
 		// Also replace checkout actions to use the simulated host repo
 		// Split content into lines to preserve indentation
 		lines := strings.Split(modifiedContent, "\n")
-
-		for i := 0; i < len(lines); i++ {
-			m := checkoutActionPattern.FindStringSubmatch(lines[i])
-			if m == nil {
-				continue
-			}
-
-			keyIndent := leadingIndentWidth(lines[i])
-			// For the inline list-item form ("- uses: actions/checkout@…") the
-			// effective indentation for child keys (with:, id:, …) is two columns
-			// deeper than the physical dash position.
-			if len(m) > 2 && m[2] == "- " {
-				keyIndent += 2
-			}
-
-			withIndex := -1
-			for j := i + 1; j < len(lines); j++ {
-				if isCheckoutStepBoundary(lines[j], keyIndent) {
-					break
-				}
-				if isIndentedKeyLine(lines[j], "with", keyIndent) {
-					withIndex = j
-					break
-				}
-			}
-
-			if withIndex == -1 {
-				indent := strings.Repeat(" ", keyIndent)
-				lines = append(lines[:i+1], append([]string{
-					indent + "with:",
-					fmt.Sprintf("%s  repository: %s", indent, logicalRepoSlug),
-				}, lines[i+1:]...)...)
-				i += 2
-				continue
-			}
-
-			withChildIndent := keyIndent + 2
-			withBlockEnd := withIndex + 1
-			for withBlockEnd < len(lines) {
-				if isCheckoutStepBoundary(lines[withBlockEnd], keyIndent) {
-					break
-				}
-
-				indent := leadingIndentWidth(lines[withBlockEnd])
-				if strings.TrimSpace(lines[withBlockEnd]) != "" && indent <= keyIndent {
-					break
-				}
-
-				if strings.TrimSpace(lines[withBlockEnd]) != "" && indent > keyIndent {
-					withChildIndent = indent
-					break
-				}
-
-				withBlockEnd++
-			}
-
-			for withBlockEnd = withIndex + 1; withBlockEnd < len(lines); withBlockEnd++ {
-				if isCheckoutStepBoundary(lines[withBlockEnd], keyIndent) {
-					break
-				}
-				if strings.TrimSpace(lines[withBlockEnd]) != "" && leadingIndentWidth(lines[withBlockEnd]) <= keyIndent {
-					break
-				}
-			}
-
-			repositoryIndex := -1
-			for j := withIndex + 1; j < withBlockEnd; j++ {
-				if strings.HasPrefix(strings.TrimSpace(lines[j]), "repository:") {
-					repositoryIndex = j
-					break
-				}
-			}
-
-			indent := strings.Repeat(" ", withChildIndent)
-			repositoryLine := fmt.Sprintf("%srepository: %s", indent, logicalRepoSlug)
-
-			if repositoryIndex >= 0 {
-				lines[repositoryIndex] = repositoryLine
-				continue
-			}
-
-			lines = append(lines[:withIndex+1], append([]string{repositoryLine}, lines[withIndex+1:]...)...)
-			i++
-		}
-
+		lines = rewriteTrialCheckoutRepositories(lines, logicalRepoSlug)
 		modifiedContent = strings.Join(lines, "\n")
 	} else if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping repository simulation modifications (using clone-repo mode)"))
@@ -586,6 +537,104 @@ func modifyWorkflowForTrialMode(tempDir, workflowName, logicalRepoSlug string, v
 	}
 
 	return nil
+}
+
+func rewriteTrialCheckoutRepositories(lines []string, logicalRepoSlug string) []string {
+	for i := 0; i < len(lines); i++ {
+		m := checkoutActionPattern.FindStringSubmatch(lines[i])
+		if m == nil {
+			continue
+		}
+
+		keyIndent := leadingIndentWidth(lines[i])
+		// For the inline list-item form ("- uses: actions/checkout@…") the
+		// effective indentation for child keys (with:, id:, …) is two columns
+		// deeper than the physical dash position.
+		if len(m) > 2 && m[2] == "- " {
+			keyIndent += 2
+		}
+
+		withIndex := findTrialCheckoutWithIndex(lines, i, keyIndent)
+
+		if withIndex == -1 {
+			indent := strings.Repeat(" ", keyIndent)
+			lines = append(lines[:i+1], append([]string{
+				indent + "with:",
+				fmt.Sprintf("%s  repository: %s", indent, logicalRepoSlug),
+			}, lines[i+1:]...)...)
+			i += 2
+			continue
+		}
+
+		var inserted bool
+		lines, inserted = rewriteTrialCheckoutWithRepository(lines, withIndex, keyIndent, logicalRepoSlug)
+		if inserted {
+			i++
+		}
+	}
+	return lines
+}
+
+func findTrialCheckoutWithIndex(lines []string, checkoutIndex, keyIndent int) int {
+	for j := checkoutIndex + 1; j < len(lines); j++ {
+		if isCheckoutStepBoundary(lines[j], keyIndent) {
+			break
+		}
+		if isIndentedKeyLine(lines[j], "with", keyIndent) {
+			return j
+		}
+	}
+	return -1
+}
+
+func rewriteTrialCheckoutWithRepository(lines []string, withIndex, keyIndent int, logicalRepoSlug string) ([]string, bool) {
+	withChildIndent := keyIndent + 2
+	withBlockEnd := withIndex + 1
+	for withBlockEnd < len(lines) {
+		if isCheckoutStepBoundary(lines[withBlockEnd], keyIndent) {
+			break
+		}
+
+		indent := leadingIndentWidth(lines[withBlockEnd])
+		if strings.TrimSpace(lines[withBlockEnd]) != "" && indent <= keyIndent {
+			break
+		}
+
+		if strings.TrimSpace(lines[withBlockEnd]) != "" && indent > keyIndent {
+			withChildIndent = indent
+			break
+		}
+
+		withBlockEnd++
+	}
+
+	for withBlockEnd = withIndex + 1; withBlockEnd < len(lines); withBlockEnd++ {
+		if isCheckoutStepBoundary(lines[withBlockEnd], keyIndent) {
+			break
+		}
+		if strings.TrimSpace(lines[withBlockEnd]) != "" && leadingIndentWidth(lines[withBlockEnd]) <= keyIndent {
+			break
+		}
+	}
+
+	repositoryIndex := -1
+	for j := withIndex + 1; j < withBlockEnd; j++ {
+		if strings.HasPrefix(strings.TrimSpace(lines[j]), "repository:") {
+			repositoryIndex = j
+			break
+		}
+	}
+
+	indent := strings.Repeat(" ", withChildIndent)
+	repositoryLine := fmt.Sprintf("%srepository: %s", indent, logicalRepoSlug)
+
+	if repositoryIndex >= 0 {
+		lines[repositoryIndex] = repositoryLine
+		return lines, false
+	}
+
+	lines = append(lines[:withIndex+1], append([]string{repositoryLine}, lines[withIndex+1:]...)...)
+	return lines, true
 }
 
 // commitAndPushWorkflow commits and pushes the workflow changes

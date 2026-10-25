@@ -70,6 +70,23 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 		workflowPermissions = NewPermissionsParser(workflowData.Permissions).ToPermissions()
 	}
 
+	if err := c.validatePermissionConfiguration(workflowData, workflowPermissions, markdownPath); err != nil {
+		return nil, err
+	}
+	if err := c.validatePermissionTriggers(workflowData, markdownPath); err != nil {
+		return nil, err
+	}
+	if err := c.validateGitHubToolsetPermissions(workflowData, workflowPermissions, markdownPath); err != nil {
+		return nil, err
+	}
+	if err := validatePermissionOIDCConfiguration(workflowData, workflowPermissions, markdownPath); err != nil {
+		return nil, err
+	}
+	c.emitPermissionInformation(workflowData, workflowPermissions, markdownPath)
+	return workflowPermissions, nil
+}
+
+func (c *Compiler) validatePermissionConfiguration(workflowData *WorkflowData, workflowPermissions *Permissions, markdownPath string) error {
 	// Validate permission scope names for typos (e.g. "contnts" → "contents")
 	workflowLog.Printf("Validating permission scope names")
 	var scopeValidationErr error
@@ -79,45 +96,51 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 		scopeValidationErr = ValidatePermissionScopeNames(workflowData.Permissions)
 	}
 	if scopeValidationErr != nil {
-		return nil, formatCompilerError(markdownPath, "error", scopeValidationErr.Error(), scopeValidationErr)
+		return formatCompilerError(markdownPath, "error", scopeValidationErr.Error(), scopeValidationErr)
 	}
 
 	// Validate dangerous permissions
 	workflowLog.Printf("Validating dangerous permissions")
 	if err := validateDangerousPermissions(workflowData, workflowPermissions); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Validate GitHub App-only permissions require a GitHub App to be configured
 	workflowLog.Printf("Validating GitHub App-only permissions")
 	if err := validateGitHubAppOnlyPermissions(workflowData, workflowPermissions); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Validate tools.github.github-app.permissions does not use "write"
 	workflowLog.Printf("Validating GitHub MCP app permissions (no write)")
 	if err := validateGitHubMCPAppPermissionsNoWrite(workflowData); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	if err := validateMentionGitHubAppPermissionsReadOnly(workflowData); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Warn when github-app.permissions is set in contexts that don't support it
 	warnGitHubAppPermissionsUnsupportedContexts(workflowData)
+	return nil
+}
 
+func (c *Compiler) validatePermissionTriggers(workflowData *WorkflowData, markdownPath string) error {
 	// Validate workflow_run triggers have branch restrictions
 	workflowLog.Printf("Validating workflow_run triggers for branch restrictions")
 	if err := c.validateWorkflowRunBranches(workflowData, markdownPath); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Validate pull_request_target trigger security
 	workflowLog.Printf("Validating pull_request_target trigger security")
 	if err := c.validatePullRequestTargetTrigger(workflowData, markdownPath); err != nil {
-		return nil, err
+		return err
 	}
+	return nil
+}
 
+func (c *Compiler) validateGitHubToolsetPermissions(workflowData *WorkflowData, workflowPermissions *Permissions, markdownPath string) error {
 	// Validate permissions against GitHub MCP toolsets
 	workflowLog.Printf("Validating permissions for GitHub MCP toolsets")
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil {
@@ -138,56 +161,67 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 			// ParseGitHubToolsets call inside ValidatePermissions.
 			validationResult := ValidatePermissions(workflowPermissions, workflowData.ParsedTools.GitHub, workflowData.CachedParsedToolsets)
 
-			if validationResult.HasValidationIssues {
-				// Format the validation message
-				message := FormatValidationMessage(validationResult, c.strictMode)
-
-				if len(validationResult.MissingPermissions) > 0 {
-					downgradeToWarning := c.strictMode && shouldDowngradeDefaultToolsetPermissionError(workflowData.ParsedTools.GitHub)
-					if c.strictMode && !downgradeToWarning {
-						// In strict mode, missing permissions are errors
-						return nil, formatCompilerError(markdownPath, "error", message, nil)
-					}
-
-					if downgradeToWarning {
-						message += "\n\n" + missingPermissionsDefaultToolsetWarning
-					}
-
-					// Emit to stderr once per markdown path + warning fingerprint.
-					// Prefer frontmatter hash when available; otherwise use the formatted
-					// message as a fallback fingerprint for code paths/tests where the hash
-					// is not set.
-					warningFingerprint := workflowData.FrontmatterHash
-					if warningFingerprint == "" {
-						warningFingerprint = message
-					}
-					if c.permissionWarningShown[markdownPath] != warningFingerprint {
-						// In non-strict mode, missing permissions are warnings.
-						// In strict mode with default-only toolsets, this is intentionally downgraded to warning.
-						fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
-						c.permissionWarningShown[markdownPath] = warningFingerprint
-					}
-					c.IncrementWarningCount()
-				}
-			}
+			return c.reportGitHubToolsetPermissionIssues(workflowData, validationResult, markdownPath)
 		}
 	}
+	return nil
+}
 
+func (c *Compiler) reportGitHubToolsetPermissionIssues(workflowData *WorkflowData, validationResult *PermissionsValidationResult, markdownPath string) error {
+	if validationResult.HasValidationIssues {
+		// Format the validation message
+		message := FormatValidationMessage(validationResult, c.strictMode)
+
+		if len(validationResult.MissingPermissions) > 0 {
+			downgradeToWarning := c.strictMode && shouldDowngradeDefaultToolsetPermissionError(workflowData.ParsedTools.GitHub)
+			if c.strictMode && !downgradeToWarning {
+				// In strict mode, missing permissions are errors
+				return formatCompilerError(markdownPath, "error", message, nil)
+			}
+
+			if downgradeToWarning {
+				message += "\n\n" + missingPermissionsDefaultToolsetWarning
+			}
+
+			// Emit to stderr once per markdown path + warning fingerprint.
+			// Prefer frontmatter hash when available; otherwise use the formatted
+			// message as a fallback fingerprint for code paths/tests where the hash
+			// is not set.
+			warningFingerprint := workflowData.FrontmatterHash
+			if warningFingerprint == "" {
+				warningFingerprint = message
+			}
+			if c.permissionWarningShown[markdownPath] != warningFingerprint {
+				// In non-strict mode, missing permissions are warnings.
+				// In strict mode with default-only toolsets, this is intentionally downgraded to warning.
+				fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+				c.permissionWarningShown[markdownPath] = warningFingerprint
+			}
+			c.IncrementWarningCount()
+		}
+	}
+	return nil
+}
+
+func validatePermissionOIDCConfiguration(workflowData *WorkflowData, workflowPermissions *Permissions, markdownPath string) error {
 	// Enforce required id-token: write permission for OIDC auth users.
 	if err := validateOIDCPermissions(workflowData, workflowPermissions); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Reject legacy AWF pins when HTTP MCP OIDC is configured: --exclude-env is required to
 	// keep Actions OIDC credentials out of the agent container, and that flag only exists in
 	// AWF v0.25.3+. Compilation must fail rather than silently expose the credentials.
 	if err := validateHTTPMCPOIDCAwfVersion(workflowData); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 	if err := validateCodexCopilotAwfVersion(workflowData); err != nil {
-		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	return nil
+}
 
+func (c *Compiler) emitPermissionInformation(workflowData *WorkflowData, workflowPermissions *Permissions, markdownPath string) {
 	workflowLog.Printf("Checking for id-token: write permission")
 	if level, exists := workflowPermissions.Get(PermissionIdToken); exists && level == PermissionWrite {
 		infoMsg := `This workflow grants id-token: write permission
@@ -207,7 +241,6 @@ Ensure proper audience validation and trust policies are configured.`
 		}
 	}
 
-	return workflowPermissions, nil
 }
 
 // repositoryOwnerIsIndividualUser reports whether the repository owner is confirmed

@@ -59,25 +59,30 @@ func removeXMLComments(content string) string {
 		}
 
 		// Handle XML comment boundaries
-		if !wasInComment && !isInComment {
-			// Line had no comment involvement, keep as-is
-			result = append(result, processedLine)
-		} else if !wasInComment && isInComment {
-			// Line started a multiline comment, keep the processed part and add empty line
-			if strings.TrimSpace(processedLine) != "" {
-				result = append(result, processedLine)
-			}
-			result = append(result, "")
-		} else if wasInComment && !isInComment {
-			// Line ended a multiline comment, keep the processed part
-			if strings.TrimSpace(processedLine) != "" {
-				result = append(result, processedLine)
-			}
-		}
+		result = appendXMLCommentBoundaryLine(result, processedLine, wasInComment, isInComment)
 	}
 
 	xmlCommentsLog.Printf("XML comment removal completed: removed %d comment lines, output %d lines", removedComments, len(result))
 	return strings.Join(result, "\n")
+}
+
+func appendXMLCommentBoundaryLine(result []string, processedLine string, wasInComment, isInComment bool) []string {
+	if !wasInComment && !isInComment {
+		// Line had no comment involvement, keep as-is
+		result = append(result, processedLine)
+	} else if !wasInComment && isInComment {
+		// Line started a multiline comment, keep the processed part and add empty line
+		if strings.TrimSpace(processedLine) != "" {
+			result = append(result, processedLine)
+		}
+		result = append(result, "")
+	} else if wasInComment && !isInComment {
+		// Line ended a multiline comment, keep the processed part
+		if strings.TrimSpace(processedLine) != "" {
+			result = append(result, processedLine)
+		}
+	}
+	return result
 }
 
 // removeXMLCommentsFromLine removes XML comments from a single line

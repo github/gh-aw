@@ -122,6 +122,13 @@ func (c *Compiler) validateEngineDriver(workflowData *WorkflowData) error {
 	isCopilotEngine := workflowData.EngineConfig.ID == "copilot"
 	engineDriverValidationLog.Printf("Validating engine.driver %q (copilot=%v)", name, isCopilotEngine)
 
+	if err := validateEngineDriverPath(name); err != nil {
+		return err
+	}
+	return validateEngineDriverExtension(name, isCopilotEngine)
+}
+
+func validateEngineDriverPath(name string) error {
 	if strings.TrimSpace(name) != name {
 		return NewValidationError(
 			"engine.driver",
@@ -162,7 +169,10 @@ func (c *Compiler) validateEngineDriver(workflowData *WorkflowData) error {
 			)
 		}
 	}
+	return nil
+}
 
+func validateEngineDriverExtension(name string, isCopilotEngine bool) error {
 	ext := strings.ToLower(filepath.Ext(name))
 	switch ext {
 	case ".js", ".cjs", ".mjs":

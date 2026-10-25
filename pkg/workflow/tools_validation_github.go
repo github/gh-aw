@@ -172,7 +172,13 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 		return errors.New("'github.min-integrity' is required when 'github.allowed-repos' is set. Valid values: 'none', 'unapproved', 'approved', 'merged'. Example:\ntools:\n  github:\n    allowed-repos: all\n    min-integrity: approved")
 	}
 
-	// Validate min-integrity value
+	if err := validateGuardMinIntegrity(github.MinIntegrity, workflowName); err != nil {
+		return err
+	}
+	return validateGuardPolicyUserEntries(github, workflowName)
+}
+
+func validateGuardMinIntegrity(integrity GitHubIntegrityLevel, workflowName string) error {
 	validIntegrityLevels := map[GitHubIntegrityLevel]bool{
 		GitHubIntegrityNone:       true,
 		GitHubIntegrityUnapproved: true,
@@ -180,11 +186,14 @@ func validateGitHubGuardPolicy(tools *Tools, workflowName string) error {
 		GitHubIntegrityMerged:     true,
 	}
 
-	if !validIntegrityLevels[github.MinIntegrity] {
-		toolsValidationLog.Printf("Invalid min-integrity level '%s' in workflow: %s", github.MinIntegrity, workflowName)
-		return errors.New("'github.min-integrity' must be one of: 'none', 'unapproved', 'approved', 'merged'. Got: '" + string(github.MinIntegrity) + "'. Example:\ntools:\n  github:\n    min-integrity: approved")
+	if !validIntegrityLevels[integrity] {
+		toolsValidationLog.Printf("Invalid min-integrity level '%s' in workflow: %s", integrity, workflowName)
+		return errors.New("'github.min-integrity' must be one of: 'none', 'unapproved', 'approved', 'merged'. Got: '" + string(integrity) + "'. Example:\ntools:\n  github:\n    min-integrity: approved")
 	}
+	return nil
+}
 
+func validateGuardPolicyUserEntries(github *GitHubToolConfig, workflowName string) error {
 	// Validate blocked-users (must be non-empty strings; expressions are accepted as-is)
 	for i, user := range github.BlockedUsers {
 		if user == "" {

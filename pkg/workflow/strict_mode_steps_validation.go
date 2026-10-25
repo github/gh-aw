@@ -88,22 +88,7 @@ func (c *Compiler) validateStepsSectionSecrets(frontmatter map[string]any, secti
 		len(allSecretRefs), sectionName, len(unsafeSecretRefs), len(safeSecretRefs))
 
 	if c.strictMode {
-		// In strict mode, secrets in step-level env: bindings and with: inputs
-		// for uses: action steps are allowed (controlled binding, masked by
-		// GitHub Actions). Only block secrets found in other fields (run, etc.).
-		if len(unsafeSecretRefs) == 0 {
-			strictModeValidationLog.Printf("All secrets in %s section are in safe bindings (allowed in strict mode)", sectionName)
-			return nil
-		}
-
-		unsafeSecretRefs = sliceutil.Deduplicate(unsafeSecretRefs)
-		sort.Strings(unsafeSecretRefs)
-		return fmt.Errorf(
-			"strict mode: secrets expressions detected in '%s' section may be leaked to the agent job. Found: %s. "+
-				"Operations requiring secrets must be moved to a separate job outside the agent job, "+
-				"or use step-level env: bindings (for run: steps) or with: inputs (for uses: action steps) instead",
-			sectionName, strings.Join(unsafeSecretRefs, ", "),
-		)
+		return validateStrictStepSecretRefs(sectionName, unsafeSecretRefs)
 	}
 
 	// Non-strict mode: emit a warning for all secrets.
@@ -119,6 +104,25 @@ func (c *Compiler) validateStepsSectionSecrets(frontmatter map[string]any, secti
 	c.IncrementWarningCount()
 
 	return nil
+}
+
+func validateStrictStepSecretRefs(sectionName string, unsafeSecretRefs []string) error {
+	// In strict mode, secrets in step-level env: bindings and with: inputs
+	// for uses: action steps are allowed (controlled binding, masked by
+	// GitHub Actions). Only block secrets found in other fields (run, etc.).
+	if len(unsafeSecretRefs) == 0 {
+		strictModeValidationLog.Printf("All secrets in %s section are in safe bindings (allowed in strict mode)", sectionName)
+		return nil
+	}
+
+	unsafeSecretRefs = sliceutil.Deduplicate(unsafeSecretRefs)
+	sort.Strings(unsafeSecretRefs)
+	return fmt.Errorf(
+		"strict mode: secrets expressions detected in '%s' section may be leaked to the agent job. Found: %s. "+
+			"Operations requiring secrets must be moved to a separate job outside the agent job, "+
+			"or use step-level env: bindings (for run: steps) or with: inputs (for uses: action steps) instead",
+		sectionName, strings.Join(unsafeSecretRefs, ", "),
+	)
 }
 
 // githubEnvWritePattern matches common patterns that write to $GITHUB_ENV,

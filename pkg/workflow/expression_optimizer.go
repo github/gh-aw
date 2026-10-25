@@ -244,6 +244,14 @@ func optimizeAndNode(n *AndNode) ConditionNode {
 		return &BooleanLiteralNode{Value: true}
 	}
 
+	deduped := deduplicateAndTerms(filtered)
+	if len(deduped) == 1 {
+		return deduped[0]
+	}
+	return simplifyAndTerms(deduped, hasStatusFuncInTerms)
+}
+
+func deduplicateAndTerms(filtered []ConditionNode) []ConditionNode {
 	// Deduplicate terms by rendered form (safe even for status functions).
 	seen := make(map[string]struct{}, len(filtered))
 	deduped := make([]ConditionNode, 0, len(filtered))
@@ -256,10 +264,10 @@ func optimizeAndNode(n *AndNode) ConditionNode {
 			expressionOptimizerLog.Printf("AND dedup: removing duplicate term %q", key)
 		}
 	}
-	if len(deduped) == 1 {
-		return deduped[0]
-	}
+	return deduped
+}
 
+func simplifyAndTerms(deduped []ConditionNode, hasStatusFuncInTerms bool) ConditionNode {
 	// Complement: A && !A → false (skip when status functions present).
 	if !hasStatusFuncInTerms {
 		for i := range deduped {
@@ -276,41 +284,45 @@ func optimizeAndNode(n *AndNode) ConditionNode {
 	// If any term is an OR/Disjunction that contains another conjunct as a
 	// sub-term, the OR term is absorbed: the simpler conjunct subsumes it.
 	if !hasStatusFuncInTerms {
-		absorbed := make([]bool, len(deduped))
-		for i, ti := range deduped {
-			orTerms := collectOrTerms(ti)
-			if len(orTerms) < 2 {
-				continue // ti is not an OR expression
-			}
-			for j, tj := range deduped {
-				if i == j || absorbed[i] {
-					continue
-				}
-				for _, ot := range orTerms {
-					if nodesEqual(ot, tj) {
-						expressionOptimizerLog.Printf("AND absorption: (%s) && (%s) → %s (absorbed)",
-							tj.Render(), ti.Render(), tj.Render())
-						absorbed[i] = true
-						break
-					}
-				}
-			}
+		return absorbAndTerms(deduped)
+	}
+	return rebuildAndChain(deduped)
+}
+
+func absorbAndTerms(deduped []ConditionNode) ConditionNode {
+	absorbed := make([]bool, len(deduped))
+	for i, ti := range deduped {
+		orTerms := collectOrTerms(ti)
+		if len(orTerms) < 2 {
+			continue // ti is not an OR expression
 		}
-		anyAbsorbed := slices.Contains(absorbed, true)
-		if anyAbsorbed {
-			surviving := make([]ConditionNode, 0, len(deduped))
-			for i, t := range deduped {
-				if !absorbed[i] {
-					surviving = append(surviving, t)
+		for j, tj := range deduped {
+			if i == j || absorbed[i] {
+				continue
+			}
+			for _, ot := range orTerms {
+				if nodesEqual(ot, tj) {
+					expressionOptimizerLog.Printf("AND absorption: (%s) && (%s) → %s (absorbed)",
+						tj.Render(), ti.Render(), tj.Render())
+					absorbed[i] = true
+					break
 				}
 			}
-			if len(surviving) == 0 {
-				return &BooleanLiteralNode{Value: true}
-			}
-			return optimizeNode(rebuildAndChain(surviving))
 		}
 	}
-
+	anyAbsorbed := slices.Contains(absorbed, true)
+	if anyAbsorbed {
+		surviving := make([]ConditionNode, 0, len(deduped))
+		for i, t := range deduped {
+			if !absorbed[i] {
+				surviving = append(surviving, t)
+			}
+		}
+		if len(surviving) == 0 {
+			return &BooleanLiteralNode{Value: true}
+		}
+		return optimizeNode(rebuildAndChain(surviving))
+	}
 	return rebuildAndChain(deduped)
 }
 
@@ -354,6 +366,10 @@ func optimizeOrNode(n *OrNode) ConditionNode {
 	}
 
 	// Idempotent: A || A → A
+	return simplifyOrOperands(left, right)
+}
+
+func simplifyOrOperands(left, right ConditionNode) ConditionNode {
 	if nodesEqual(left, right) {
 		expressionOptimizerLog.Printf("OR idempotent: %s || %s → %s", left.Render(), right.Render(), left.Render())
 		return left
@@ -473,6 +489,14 @@ func optimizeDisjunctionNode(n *DisjunctionNode) ConditionNode {
 		return &BooleanLiteralNode{Value: false}
 	}
 
+	deduped := deduplicateDisjunctionTerms(filtered)
+	if len(deduped) == 1 {
+		return deduped[0]
+	}
+	return simplifyDisjunctionTerms(n, deduped)
+}
+
+func deduplicateDisjunctionTerms(filtered []ConditionNode) []ConditionNode {
 	// Deduplicate terms by rendered form.
 	seen := make(map[string]struct{}, len(filtered))
 	deduped := make([]ConditionNode, 0, len(filtered))
@@ -486,10 +510,10 @@ func optimizeDisjunctionNode(n *DisjunctionNode) ConditionNode {
 		}
 	}
 
-	if len(deduped) == 1 {
-		return deduped[0]
-	}
+	return deduped
+}
 
+func simplifyDisjunctionTerms(n *DisjunctionNode, deduped []ConditionNode) ConditionNode {
 	// Complement: A || !A → true (mirrors the OrNode complement rule).
 	// Guard: skip when any term contains a status function so that
 	// status-function expressions are never silently eliminated.
@@ -503,39 +527,43 @@ func optimizeDisjunctionNode(n *DisjunctionNode) ConditionNode {
 			}
 		}
 
-		// Subsumption: disj(A, A&&B, …) → disj(A, …)
-		// A term cand is subsumed (and thus redundant in a disjunction) when
-		// a simpler term sub is also present such that sub |= cand, i.e. every
-		// assignment that satisfies sub also satisfies cand.
-		subsumed := make([]bool, len(deduped))
-		for i, cand := range deduped {
-			for j, sub := range deduped {
-				if i == j {
-					continue
-				}
-				if termSubsumedBy(cand, sub) {
-					expressionOptimizerLog.Printf("Disjunction subsumption: %s subsumed by %s", cand.Render(), sub.Render())
-					subsumed[i] = true
-					break
-				}
+		return subsumeDisjunctionTerms(n, deduped)
+	}
+	return &DisjunctionNode{Terms: deduped, Multiline: n.Multiline}
+}
+
+func subsumeDisjunctionTerms(n *DisjunctionNode, deduped []ConditionNode) ConditionNode {
+	// Subsumption: disj(A, A&&B, …) → disj(A, …)
+	// A term cand is subsumed (and thus redundant in a disjunction) when
+	// a simpler term sub is also present such that sub |= cand, i.e. every
+	// assignment that satisfies sub also satisfies cand.
+	subsumed := make([]bool, len(deduped))
+	for i, cand := range deduped {
+		for j, sub := range deduped {
+			if i == j {
+				continue
 			}
-		}
-		if slices.Contains(subsumed, true) {
-			surviving := make([]ConditionNode, 0, len(deduped))
-			for i, t := range deduped {
-				if !subsumed[i] {
-					surviving = append(surviving, t)
-				}
+			if termSubsumedBy(cand, sub) {
+				expressionOptimizerLog.Printf("Disjunction subsumption: %s subsumed by %s", cand.Render(), sub.Render())
+				subsumed[i] = true
+				break
 			}
-			if len(surviving) == 0 {
-				return &BooleanLiteralNode{Value: false}
-			}
-			if len(surviving) == 1 {
-				return surviving[0]
-			}
-			return optimizeNode(&DisjunctionNode{Terms: surviving, Multiline: n.Multiline})
 		}
 	}
-
+	if slices.Contains(subsumed, true) {
+		surviving := make([]ConditionNode, 0, len(deduped))
+		for i, t := range deduped {
+			if !subsumed[i] {
+				surviving = append(surviving, t)
+			}
+		}
+		if len(surviving) == 0 {
+			return &BooleanLiteralNode{Value: false}
+		}
+		if len(surviving) == 1 {
+			return surviving[0]
+		}
+		return optimizeNode(&DisjunctionNode{Terms: surviving, Multiline: n.Multiline})
+	}
 	return &DisjunctionNode{Terms: deduped, Multiline: n.Multiline}
 }
