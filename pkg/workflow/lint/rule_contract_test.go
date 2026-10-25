@@ -34,6 +34,12 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"bash-case-pattern": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    steps:\n      - run: 'matched=$(case \"$ref\" in $pattern) echo yes ;; esac)'\n",
+			safe:   contractJob + "    steps:\n      - run: 'matched=$(case \"$ref\" in ($pattern) echo yes ;; esac)'\n",
+			path:   "jobs.check.steps[0].run",
+		},
 		"step-reference": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: contractJob + "    outputs: {value: '${{ steps.PRIVATE_VALUE.outputs.value }}'}\n" + contractSafeSteps,

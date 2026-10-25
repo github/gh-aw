@@ -365,6 +365,44 @@ func TestMCPCompileDiagnosticsPreserveShellcheck(t *testing.T) {
 	assert.NotContains(t, diagnostics.shellcheck.String(), "cli:test")
 }
 
+func TestInjectDevelopmentShellcheckDiagnosticsSkipsStructuredFindings(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		valid    bool
+		errors   []ValidationIssue
+		warnings []ValidationIssue
+	}{
+		{
+			name: "low-only", valid: true,
+			warnings: []ValidationIssue{{Type: "shellcheck_finding", Message: "structured advisory", Severity: "info"}},
+		},
+		{
+			name: "blocking", valid: false,
+			errors: []ValidationIssue{{Type: "shellcheck_finding", Message: "structured blocking finding", Severity: "medium"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			input, err := json.Marshal([]ValidationResult{{
+				Scope: "batch", Workflow: "shellcheck", Valid: tc.valid,
+				Errors: tc.errors, Warnings: tc.warnings,
+			}})
+			require.NoError(t, err)
+			output := injectDevelopmentShellcheckDiagnostics(
+				string(input),
+				"⚠ shellcheck findings in test.lock.yml:\nscript: line 1: SC2086 quote variable\n\n",
+			)
+			var results []ValidationResult
+			require.NoError(t, json.Unmarshal([]byte(output), &results))
+			require.Len(t, results, 1)
+			assert.Equal(t, tc.valid, results[0].Valid)
+			assert.Equal(t, tc.errors, results[0].Errors)
+			assert.Equal(t, tc.warnings, results[0].Warnings)
+		})
+	}
+}
+
 func TestMCPCompileDiagnosticTextByteBoundaries(t *testing.T) {
 	t.Parallel()
 	for _, text := range []string{

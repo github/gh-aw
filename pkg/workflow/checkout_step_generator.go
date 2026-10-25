@@ -571,7 +571,7 @@ func generateFetchStepLines(entry *resolvedCheckout, index int) string {
 	sb.WriteString("              while read -r _ remote_ref; do\n")
 	sb.WriteString("                # Match the configured ref glob, not a literal string.\n")
 	sb.WriteString("                # shellcheck disable=SC2254\n")
-	sb.WriteString("                case \"$remote_ref\" in $source_ref) found=1 ;; esac\n")
+	sb.WriteString("                case \"$remote_ref\" in ($source_ref) found=1 ;; esac\n")
 	sb.WriteString("              done\n")
 	sb.WriteString("              printf '%s' \"$found\"\n")
 	sb.WriteString("            }); then\n")

@@ -88,6 +88,7 @@ const shellcheckMaxConcurrency = 8
 type runStepInfo struct {
 	JobID string
 	ID    string
+	Index int // one-based index among all steps in the job, including uses: steps
 	// Name is the step's "name" field, used only for diagnostic messages.
 	Name string
 	// Script is the raw content of the run: field.
@@ -157,7 +158,7 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 	if !ok {
 		return steps
 	}
-	for _, stepData := range rawSteps {
+	for index, stepData := range rawSteps {
 		step, ok := stepData.(map[string]any)
 		if !ok {
 			continue
@@ -180,6 +181,7 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 		id, _ := step["id"].(string)
 		steps = append(steps, runStepInfo{
 			ID:       id,
+			Index:    index + 1,
 			Name:     name,
 			Script:   runScript,
 			Shell:    effectiveShell,
@@ -433,25 +435,34 @@ func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignor
 // stderr in step order so diagnostic blocks are never interleaved.
 //
 // In both strict and non-strict modes every step is checked before returning.
-// When strict is true, any step failure causes a non-nil error to be returned
-// after all steps have been checked (reports-all-then-errors). In non-strict
-// mode, all failures are printed as warnings and nil is returned.
+// Findings and operational failures are reported before the error is returned;
+// the public runner applies the existing non-strict error suppression policy.
 func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []string, resources []workflow.ShellScriptResource, verbose bool, strict bool) error {
 	if len(lockFiles) == 0 && len(resources) == 0 {
 		return nil
 	}
 
-	useDocker, available := shellcheckDockerFallback(ctx)
-	if !available {
-		return nil
-	}
-
-	allSteps := collectShellcheckSteps(lockFiles, resources)
-	if len(allSteps) == 0 {
+	allSteps, extractionErrors := collectShellcheckSteps(lockFiles, resources)
+	if len(allSteps) == 0 && len(extractionErrors) == 0 {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps (0 run steps found in lock files)"))
 		return nil
 	}
-	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker)
+
+	if len(allSteps) == 0 {
+		return reportShellcheckResultsWithErrors(ctx, nil, nil, strict, extractionErrors)
+	}
+
+	useDocker, available := shellcheckDockerFallback(ctx)
+	if !available {
+		err := errors.Join(append(extractionErrors, errors.New("shellcheck binary not found and Docker is unavailable; install ShellCheck or Docker to lint run steps"))...)
+		reportCompileScannerResult(ctx, "shellcheck", err)
+		if strict {
+			return err
+		}
+		return nil
+	}
+
+	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker, extractionErrors)
 }
 
 func shellcheckDockerFallback(ctx context.Context) (useDocker bool, available bool) {
@@ -466,13 +477,15 @@ func shellcheckDockerFallback(ctx context.Context) (useDocker bool, available bo
 	return true, true
 }
 
-func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScriptResource) []runStepInfo {
+func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScriptResource) ([]runStepInfo, []error) {
 	var steps []runStepInfo
+	var extractionErrors []error
 	for _, lockFile := range lockFiles {
 		lockSteps, err := extractRunStepsFromLockFile(lockFile)
 		if err != nil {
 			shellcheckLog.Printf("Failed to extract run steps from %s: %v", lockFile, err)
 			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage("shellcheck: could not parse "+filepath.Base(lockFile)+": "+err.Error()))
+			extractionErrors = append(extractionErrors, fmt.Errorf("shellcheck could not parse %s: %w", filepath.Base(lockFile), err))
 			continue
 		}
 		steps = append(steps, lockSteps...)
@@ -488,10 +501,10 @@ func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScript
 			Source: resource.Source,
 		})
 	}
-	return steps
+	return steps, extractionErrors
 }
 
-func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool) error {
+func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool, extractionErrors []error) error {
 	shellcheckLog.Printf("Running shellcheck on %d run step resource(s) from %d lock file(s) (strict=%t, docker=%t)", len(allSteps), len(lockFiles), strict, useDocker)
 	if len(lockFiles) == 1 {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps in "+filepath.Base(lockFiles[0])))
@@ -499,7 +512,7 @@ func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running shellcheck on %d run step resources", len(allSteps))))
 	}
 	results := runShellcheckWorkers(ctx, allSteps, verbose, useDocker)
-	return reportShellcheckResults(allSteps, results, strict)
+	return reportShellcheckResultsWithErrors(ctx, allSteps, results, strict, extractionErrors)
 }
 
 type shellcheckResult struct {
@@ -543,11 +556,20 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 	return results
 }
 
-func reportShellcheckResults(steps []runStepInfo, results []shellcheckResult, strict bool) error {
+func reportShellcheckResults(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool) error {
+	return reportShellcheckResultsWithErrors(ctx, steps, results, strict, nil)
+}
+
+func reportShellcheckResultsWithErrors(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool, earlyErrors []error) error {
 	var totalIssues int
 	var firstErr error
 	var diagnostics []scannerDiagnostic
-	var operationalErrors []error
+	operationalErrors := append([]error(nil), earlyErrors...)
+	if len(operationalErrors) > 0 {
+		firstErr = operationalErrors[0]
+		totalIssues = len(operationalErrors)
+
+	}
 	for i, r := range results {
 		if len(r.output) > 0 {
 			os.Stderr.Write(r.output) //nolint:errcheck
@@ -569,23 +591,36 @@ func reportShellcheckResults(steps []runStepInfo, results []shellcheckResult, st
 
 	shellcheckLog.Printf("shellcheck complete: steps=%d, issues=%d", len(steps), totalIssues)
 
+	var findingsErr error
+	if len(diagnostics) > 0 {
+		findingsErr = &scannerFindingsError{
+			err:         errors.New("shellcheck found issues in run steps"),
+			diagnostics: diagnostics,
+		}
+	}
+	combinedErr := errors.Join(findingsErr, errors.Join(operationalErrors...))
+	reportCompileScannerResult(ctx, "shellcheck", combinedErr)
 	if strict && firstErr != nil {
 		if len(operationalErrors) > 0 {
-			return fmt.Errorf("strict mode: shellcheck failed in run steps: %w", errors.Join(operationalErrors...))
+			return errors.Join(
+				fmt.Errorf("strict mode: shellcheck failed in run steps: %w", errors.Join(operationalErrors...)),
+				findingsErr,
+			)
 		}
 		return &scannerFindingsError{
 			err:         fmt.Errorf("strict mode: shellcheck found issues in run steps: %w", firstErr),
 			diagnostics: diagnostics,
 		}
 	}
-	return nil
+	return combinedErr
 }
 
 var shellcheckFindingPattern = regexp.MustCompile(`(?m)^script:(\d+):(\d+): (error|warning|note): (.+) \[(SC\d+)\]$`)
 
 func withShellcheckFindings(err error, info runStepInfo, output string) error {
 	var diagnostics []scannerDiagnostic
-	lines := strings.Split(sanitizeGHAExpressions(info.Script), "\n")
+	script := sanitizeGHAExpressions(info.Script)
+	lines := strings.Split(script, "\n")
 	for outputLine := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		if strings.TrimSpace(outputLine) == "" {
 			continue
@@ -603,7 +638,15 @@ func withShellcheckFindings(err error, info runStepInfo, output string) error {
 		}
 		finding := scanfindings.Finding{
 			RuleID: match[5], Severity: scanfindings.ParseSeverity(match[3]), Message: match[4],
-			File: firstNonEmpty(info.LockFile, info.Source), Line: line, Column: column,
+			File: info.LockFile,
+		}
+		location := &ValidationScriptLocation{
+			JobID: info.JobID, StepID: info.ID, StepName: info.Name, StepIndex: info.Index,
+			Line: line, Column: column, Sanitized: script != info.Script,
+		}
+		if info.LockFile == "" {
+			location.Source, location.Resource = info.Source, info.Name
+			location.StepName = ""
 		}
 		step := info.ID
 		if step == "" {
@@ -613,8 +656,8 @@ func withShellcheckFindings(err error, info runStepInfo, output string) error {
 			step = info.Script
 		}
 		diagnostics = append(diagnostics, scannerDiagnostic{
-			Finding: finding,
-			Identity: strings.Join([]string{finding.File, info.JobID, step, finding.RuleID,
+			Finding: finding, Script: location,
+			Identity: strings.Join([]string{firstNonEmpty(info.LockFile, info.Source), info.JobID, step, finding.RuleID,
 				finding.Severity.String(), finding.Message, strings.TrimSpace(lines[lineIndex])}, "\x00"),
 		})
 	}
