@@ -256,9 +256,7 @@ func TestMCPAuditPipeDrainTimeoutPreservesReport(t *testing.T) {
 		t.Skip("pipe inheritance test requires a POSIX process")
 	}
 	execCmd := func(ctx context.Context, _ ...string) *exec.Cmd {
-		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMCPPipeDrainChild$")
-		cmd.Env = append(os.Environ(), "GH_AW_MCP_PIPE_DRAIN_CHILD=1")
-		return cmd
+		return exec.CommandContext(ctx, "sh", "-c", `printf '%s' '{"overview":{"run_id":123}}'; sleep 2 &`)
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
@@ -275,22 +273,6 @@ func TestMCPAuditPipeDrainTimeoutPreservesReport(t *testing.T) {
 	report, ok := envelope["partial_results"].(map[string]any)
 	require.True(t, ok)
 	assert.InDelta(t, 123.0, report["overview"].(map[string]any)["run_id"], 0)
-}
-
-func TestMCPPipeDrainChild(t *testing.T) {
-	if os.Getenv("GH_AW_MCP_PIPE_DRAIN_CHILD") != "1" {
-		return
-	}
-	fmt.Fprint(os.Stdout, `{"overview":{"run_id":123}}`)
-	descendant := exec.Command("sleep", "2")
-	descendant.Stdout = os.Stdout
-	descendant.Stderr = os.Stderr
-	if err := descendant.Start(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	_ = descendant.Process.Release()
-	os.Exit(0)
 }
 
 func TestMCPTimeoutWaitingForSubprocessSlot(t *testing.T) {

@@ -165,7 +165,10 @@ func IsDockerAvailable(ctx context.Context) bool {
 // any error that occurred (nil on success or context cancellation).
 func StartDockerImageDownload(ctx context.Context, image string) (bool, func() error) {
 	ctx = ctxutil.OrBackground(ctx)
+	return startDockerImageDownload(ctx, ctx, image)
+}
 
+func startDockerImageDownload(probeCtx, downloadCtx context.Context, image string) (bool, func() error) {
 	// Check availability and downloading status atomically under lock
 	pullState.mu.Lock()
 	defer pullState.mu.Unlock()
@@ -190,16 +193,19 @@ func StartDockerImageDownload(ctx context.Context, image string) (bool, func() e
 	}
 
 	// Check if already available (inside lock for atomicity)
-	if isDockerImageAvailableUnlocked(ctx, image) {
+	if isDockerImageAvailableUnlocked(probeCtx, image) {
 		dockerImagesLog.Printf("Image %s is already available", image)
 		return false, func() error { return nil }
+	}
+	if err := probeCtx.Err(); err != nil {
+		return false, func() error { return err }
 	}
 
 	dl := &inflightDownload{done: make(chan struct{})}
 	pullState.downloading[image] = true
 	pullState.inflight[image] = dl
 
-	go runDockerImageDownload(ctx, image, dl)
+	go runDockerImageDownload(downloadCtx, image, dl)
 
 	return true, func() error {
 		<-dl.done
@@ -283,7 +289,7 @@ func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) 
 func CheckAndPrepareDockerImagesWithDetachedDownloads(ctx context.Context, opts DockerImagesOptions) error {
 	return checkAndPrepareDockerImages(ctx, opts, func(probeCtx context.Context, image string) (bool, func() error) {
 		downloadCtx, cancel := context.WithTimeout(context.WithoutCancel(probeCtx), dockerImageDownloadLifetime)
-		started, join := StartDockerImageDownload(downloadCtx, image)
+		started, join := startDockerImageDownload(probeCtx, downloadCtx, image)
 		if !started {
 			cancel()
 			return started, join

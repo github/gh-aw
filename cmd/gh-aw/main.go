@@ -504,8 +504,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	staged, _ := cmd.Flags().GetBool("staged")
 	approve, _ := cmd.Flags().GetBool("approve")
 	validateImages, _ := cmd.Flags().GetBool("validate-images")
-	priorManifestFile, _ := cmd.Flags().GetString("prior-manifest-file")
-	mcpProgressFile, _ := cmd.Flags().GetString("mcp-progress-file")
+	priorManifestFile, mcpProgressFile := getCompileInternalFileOptions(cmd)
 	ghes, _ := cmd.Flags().GetBool("ghes")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	useSamples, _ := cmd.Flags().GetBool("use-samples")
@@ -520,6 +519,12 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
 		staged: staged, approve: approve, validateImages: validateImages, ghes: ghes, verbose: verbose, useSamples: useSamples,
 	}
+}
+
+func getCompileInternalFileOptions(cmd *cobra.Command) (priorManifestFile, mcpProgressFile string) {
+	priorManifestFile, _ = cmd.Flags().GetString("prior-manifest-file")
+	mcpProgressFile, _ = cmd.Flags().GetString("mcp-progress-file")
+	return priorManifestFile, mcpProgressFile
 }
 
 func getCompileReadOnlyOptions(cmd *cobra.Command) (noEmit, readOnly, noCheckUpdate bool) {

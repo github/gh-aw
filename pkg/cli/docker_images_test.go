@@ -100,6 +100,42 @@ exit 1
 	assert.False(t, IsDockerImageDownloading(ZizmorImage))
 }
 
+func TestCheckAndPrepareDockerImagesSecondProbeHonorsDeadline(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Docker probe test requires a POSIX shell")
+	}
+	ResetDockerPullState()
+	t.Cleanup(ResetDockerPullState)
+
+	dockerDir := t.TempDir()
+	markerPath := filepath.Join(t.TempDir(), "first-inspection")
+	dockerScript := `#!/bin/sh
+case "$1" in
+  info) exit 0 ;;
+  image)
+    if [ -f "$DOCKER_TEST_MARKER" ]; then
+      exec /bin/sleep 2
+    fi
+    printf 'inspected\n' > "$DOCKER_TEST_MARKER"
+    exit 1 ;;
+esac
+exit 1
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dockerDir, "docker"), []byte(dockerScript), 0o755))
+	t.Setenv("PATH", dockerDir)
+	t.Setenv("DOCKER_TEST_MARKER", markerPath)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err := CheckAndPrepareDockerImagesWithDetachedDownloads(ctx, DockerImagesOptions{Zizmor: true})
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(start), time.Second)
+	assert.FileExists(t, markerPath)
+	assert.False(t, IsDockerImageDownloading(ZizmorImage))
+}
+
 func TestDockerImageDownloadState(t *testing.T) {
 	// Reset state before test
 	ResetDockerPullState()
