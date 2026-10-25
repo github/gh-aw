@@ -24,6 +24,7 @@ var (
 )
 
 var notYetEnforced = map[string]string{
+	"sprintfstring":               "new analyzer; CI enforcement to be enabled in a follow-up (repository currently has zero violations)",
 	"blankassigncomma":            "existing production violations need remediation before enforcement; nolint suppression already works",
 	"bufferresetbeforereuse":      "new correctness analyzer needs an enforcement-readiness audit before native CI enables it",
 	"bufioscannererunchecked":     "existing scanner loops need Err handling before native CI enables it",

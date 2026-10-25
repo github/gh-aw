@@ -67,6 +67,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `sprintferrorsnew` — reports `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead.
 - `sprintfbool` — reports `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead.
 - `sprintfint` — reports `fmt.Sprintf("%d", ...)` and related conversions that should use `strconv` helpers.
+- `sprintfstring` — reports `fmt.Sprintf("%s", x)` calls where `x` is already a plain `string`; use `x` directly.
 - `ssljson` — validates `ssl.json` skill artifacts found in `.github/skills/` against the SSL spec (enum membership, graph integrity, transition targets, entry pointer validity).
 - `strconvparseignorederror` — reports `strconv` parsing calls (`Atoi`, `ParseInt`, etc.) where the error return is discarded with `_`.
 - `stringbytesroundtrip` — reports redundant `string([]byte(s))` or `[]byte(string(b))` round-trip conversions that produce a wasteful intermediate copy.
@@ -233,6 +234,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `sprintferrorsnew` | Custom `go/analysis` analyzer that flags `errors.New(fmt.Sprintf(...))` calls that should use `fmt.Errorf` instead |
 | `sprintfbool` | Custom `go/analysis` analyzer that flags `fmt.Sprintf("%t", b)` calls where `b` is a single bool value and suggests using `strconv.FormatBool(b)` instead |
 | `sprintfint` | Custom `go/analysis` analyzer that flags `fmt.Sprintf` integer conversions that should use `strconv` helpers |
+| `sprintfstring` | Custom `go/analysis` analyzer that flags `fmt.Sprintf("%s", x)` where `x` is already a string |
 | `ssljson` | Custom `go/analysis` analyzer that validates SSL JSON skill artifacts in `.github/skills/` |
 | `strconvparseignorederror` | Custom `go/analysis` analyzer that flags `strconv` parsing calls where the error return is discarded with `_` |
 | `stringbytesroundtrip` | Custom `go/analysis` analyzer that flags redundant `string([]byte(s))` or `[]byte(string(b))` round-trip conversions that produce a wasteful intermediate copy |
@@ -384,6 +386,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/sprintferrorsnew` — sprintf-errors-new analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/sprintfbool` — sprintf-bool analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/sprintfint` — sprintf-int analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/sprintfstring` — sprintf-string analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/ssljson` — ssl-json analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/strconvparseignorederror` — strconv-parse-ignored-error analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringbytesroundtrip` — string-bytes-round-trip analyzer subpackage

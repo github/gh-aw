@@ -64,6 +64,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
 	"github.com/github/gh-aw/pkg/linters/sprintfint"
+	"github.com/github/gh-aw/pkg/linters/sprintfstring"
 	"github.com/github/gh-aw/pkg/linters/ssljson"
 	"github.com/github/gh-aw/pkg/linters/strconvparseignorederror"
 	"github.com/github/gh-aw/pkg/linters/stringbytesroundtrip"
@@ -159,6 +160,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	sprintferrorsnew.Analyzer,
 	sprintfbool.Analyzer,
 	sprintfint.Analyzer,
+	sprintfstring.Analyzer,
 	strconvparseignorederror.Analyzer,
 	stringbytesroundtrip.Analyzer,
 	stringreplaceminusone.Analyzer,
