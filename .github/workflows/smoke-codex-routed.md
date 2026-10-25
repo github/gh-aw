@@ -64,6 +64,7 @@ post-steps:
           allowedModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
           mainEndpoint: "/responses",
           expectSelectedEffort: "max",
+          expectRequestedEffortMatchesSelection: true,
         });
 ---
 

@@ -37,6 +37,13 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  * - H2 coverage effort (only when `expectSelectedEffort` is set): the proxy
  *   selection record's selected effort equals the expected effort, so a run
  *   that routed to a different effort is not mistaken for coverage of it.
+ * - H3 applied effort (only when `expectRequestedEffortMatchesSelection` is
+ *   true): every main-agent `firewall.model_routing` `stage: "request"` event
+ *   written by the firewall has `requestedEffort` (the effort AWF read from the
+ *   forwarded request body) equal to the selection record's `selectedEffort`.
+ *   Classifier requests (`purpose: "routing_classification"`) and requests on
+ *   a declared sub-agent model are excluded; fails when no main-agent request
+ *   events exist.
  * - S1 sub-agent ran exactly once; S2 completed without failing; S3 status 200 on
  *   the declared model and endpoint; S4 events carry the declared agent name
  *   (when configured)
@@ -125,6 +132,7 @@ const RESOLVED_STATUSES = ["exact", "resolved"];
  *   executionOutcome?: string,
  *   steering?: SteeringExpectation,
  *   expectSelectedEffort?: string,
+ *   expectRequestedEffortMatchesSelection?: boolean,
  * }} RoutingExpectations
  * @typedef {{ passes: string[], failures: string[], info?: string[] }} RoutingAssertionResults
  */
@@ -510,6 +518,37 @@ function evaluateSelectedEffortCoverage({ events, expectedEffort }) {
   return results;
 }
 
+/**
+ * H3: every main-agent request the proxy forwarded carried the selected effort.
+ * @param {{ events: any[], subAgentModels?: string[] }} evidence
+ * @returns {RoutingAssertionResults}
+ */
+function evaluateRequestedEffort({ events, subAgentModels = [] }) {
+  /** @type {RoutingAssertionResults} */
+  const results = { passes: [], failures: [], info: [] };
+  const routing = events.filter(event => event?.type === "firewall.model_routing" && event.provenance?.component === "firewall");
+  const selection = routing.filter(event => event.data?.stage === "selection" && event.data?.selectedModel).at(-1)?.data;
+  const selectedEffort = selection?.selectedEffort ?? null;
+  const subAgentServed = new Set(subAgentModels.map(servedModel));
+  const requests = routing.map(event => event.data).filter(data => data?.stage === "request" && data.purpose !== CLASSIFIER_PURPOSE && !subAgentServed.has(servedModel(data.requestedModel)));
+  if (!requests.length) {
+    results.failures.push("FAIL H3 no main-agent firewall model_routing request events to check the requested effort");
+    return results;
+  }
+  const mismatched = requests.filter(data => (data.requestedEffort ?? null) !== selectedEffort);
+  if (mismatched.length) {
+    const shown = mismatched
+      .slice(0, MAX_OBSERVED)
+      .map(data => `${data.requestId ?? "<no request id>"} requested=${data.requestedEffort ?? "null"} selected=${selectedEffort ?? "null"}`)
+      .join(", ");
+    const observed = mismatched.length > MAX_OBSERVED ? `${shown}, … (${mismatched.length} total)` : shown;
+    results.failures.push(`FAIL H3 ${mismatched.length} of ${requests.length} main-agent request(s) did not request the selected effort: ${observed}`);
+  } else {
+    results.passes.push(`PASS H3 all ${requests.length} main-agent request(s) requested the selected effort ${selectedEffort ?? "null"}`);
+  }
+  return results;
+}
+
 /** @param {unknown} value @returns {number | undefined} */
 function finiteNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -864,6 +903,11 @@ function checkModelRoutingEvidence(options) {
     results.passes.push(...coverage.passes);
     results.failures.push(...coverage.failures);
   }
+  if (expectations.expectRequestedEffortMatchesSelection) {
+    const applied = evaluateRequestedEffort({ events: evidence.events, subAgentModels: (expectations.subAgents ?? []).map(agent => agent.model) });
+    results.passes.push(...applied.passes);
+    results.failures.push(...applied.failures);
+  }
   if (hasSessionContract(expectations)) appendSessionContract(results, evidence, expectations);
   if (expectations.steering) {
     // T4: the existing checks still pass alongside the steering checks.
@@ -1118,6 +1162,7 @@ module.exports = {
   evaluateModelRoutingEvidence,
   evaluateSteeringEvidence,
   evaluateSelectedEffortCoverage,
+  evaluateRequestedEffort,
   collectModelRoutingEvidence,
   checkModelRoutingEvidence,
   main,
