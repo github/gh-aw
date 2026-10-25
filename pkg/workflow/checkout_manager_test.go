@@ -1030,7 +1030,7 @@ func TestGenerateFetchStep(t *testing.T) {
 		got := generateFetchStepLines(entry, 0)
 		assert.Contains(t, got, "+refs/heads/*:refs/remotes/origin/*", "should include branches refspec")
 		assert.Contains(t, got, "+refs/pull/*/head:refs/remotes/origin/pull/*/head", "should include PR refspec")
-		assert.Contains(t, got, "for refspec in ")
+		assert.Contains(t, got, `for refspec in "${refspecs[@]}"; do`)
 		assert.Contains(t, got, `ls-remote --exit-code origin "$source_ref"`)
 		assert.Contains(t, got, `fetch origin --depth=1 "$refspec"`)
 		assert.Contains(t, got, `if [ "$status" -ne 2 ]; then exit "$status"; fi`)
@@ -1085,6 +1085,33 @@ func TestGenerateFetchStep(t *testing.T) {
 		got := generateFetchStepLines(entry, 0)
 		assert.Contains(t, got, "--depth=10", "fetch-depth: 10 should pass --depth=10 to git fetch")
 	})
+}
+
+func TestGenerateFetchStepShellcheck(t *testing.T) {
+	if _, err := exec.LookPath("shellcheck"); err != nil {
+		t.Skip("shellcheck is not installed")
+	}
+	for _, tc := range []struct {
+		name string
+		refs []string
+	}{
+		{name: "single glob", refs: []string{"*"}},
+		{name: "single branch", refs: []string{"main"}},
+		{name: "mixed refs", refs: []string{"main", "feature/*", "refs/pulls/open/*"}},
+		{name: "expression", refs: []string{"${{ github.head_ref }}"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var steps []struct {
+				Run string `yaml:"run"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(generateFetchStepLines(&resolvedCheckout{fetchRefs: tc.refs}, 0)), &steps))
+			require.Len(t, steps, 1)
+			cmd := exec.Command("shellcheck", "-s", "bash", "-")
+			cmd.Stdin = strings.NewReader(steps[0].Run)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "generated fetch step must pass ShellCheck:\n%s", output)
+		})
+	}
 }
 
 func TestGenerateFetchStepExecution(t *testing.T) {

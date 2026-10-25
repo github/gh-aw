@@ -8,13 +8,15 @@ func scaleBinaryBytes(size int64, units []string) (float64, string) {
 		return float64(size), "B"
 	}
 
-	div, exp := int64(unit), 0
-	for n := size / unit; n >= unit && exp < len(units)-1; n /= unit {
+	div := int64(unit)
+	for i, name := range units {
+		if size/div < unit || i == len(units)-1 {
+			return float64(size) / float64(div), name
+		}
 		div *= unit
-		exp++
 	}
 
-	return float64(size) / float64(div), units[exp]
+	return float64(size), "B"
 }
 
 // FormatFileSize formats file sizes in a human-readable way (e.g., "1.2 KB", "3.4 MB")

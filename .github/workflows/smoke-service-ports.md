@@ -28,7 +28,7 @@ sandbox:
     runtime: docker-sudo-iptables
 services:
   redis:
-    image: redis:7
+    image: redis:7@sha256:44960b3100c48159a66d28c18b0588c193492e25f7551d60e51dd464fc3eca5b
     ports:
       - 6379:6379
     options: >-

@@ -88,6 +88,50 @@ func TestConclusionWorkerTerminationIsInlineAndAlwaysRuns(t *testing.T) {
 	}
 }
 
+func TestConclusionWorkQueueReferencesOnlyGeneratedSteps(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		queue       any
+		dispatch    bool
+		participant bool
+	}{
+		{name: "ordinary", queue: false},
+		{name: "observer", queue: true},
+		{name: "worker", queue: map[string]any{"worker": true}, participant: true},
+		{name: "dispatcher", queue: true, dispatch: true, participant: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &WorkflowData{
+				AdmissionEnabled: true,
+				Tools:            map[string]any{"work-queue": tc.queue},
+				SafeOutputs: &SafeOutputsConfig{
+					NoOp:             &NoOpConfig{},
+					MissingTool:      &MissingToolConfig{},
+					ReportIncomplete: &ReportIncompleteConfig{},
+				},
+			}
+			if tc.dispatch {
+				data.SafeOutputs.DispatchWorkflow = &DispatchWorkflowConfig{Workflows: []string{"worker"}}
+			}
+			job, err := NewCompiler().buildConclusionJob(data, "agent", nil)
+			require.NoError(t, err)
+			require.NotNil(t, job)
+			steps := strings.Join(job.Steps, "")
+			for _, id := range []string{"noop", "missing_tool", "report_incomplete", "report_failed_jobs"} {
+				require.Equal(t, !tc.participant, strings.Contains(steps, "        id: "+id+"\n"), id)
+			}
+			for _, key := range []string{"noop_message", "noop_comment_body", "tools_reported", "total_count", "incomplete_count"} {
+				_, exists := job.Outputs[key]
+				require.Equal(t, !tc.participant, exists, key)
+			}
+			require.Equal(t, !tc.participant, strings.Contains(steps, "steps.report_failed_jobs.outputs.job_durations"))
+			require.Contains(t, job.Outputs, "admission_compact_session")
+			require.Contains(t, job.Outputs, "usage_artifact_id")
+			require.Contains(t, job.Outputs, "usage_artifact_retry_id")
+		})
+	}
+}
+
 func TestConclusionWorkQueueObserverPreservesOrdinaryPermissions(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
