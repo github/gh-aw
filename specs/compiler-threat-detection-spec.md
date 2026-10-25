@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.72
+**Version**: 1.0.71
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,9 +32,8 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
-| `1.0.72` | Unreleased | Adds a separate compiler-only `artipacked` exception for agent checkouts immediately followed by exact compiler-owned cleanup and credential verification. Requires current-compilation provenance and unique full-block matching; runtime authentication and standalone lint remain unchanged. |
-| `1.0.71` | Unreleased | Specifies the compiler-only `artipacked` warning exception for the exact generated safe-output PR checkout/authentication block, with per-compilation provenance and unchanged standalone lint and runtime authentication. No new threat identifier, permission grant, or lock-file schema change. |
-| `1.0.70` | Unreleased | Requires generated admission-output references to follow effective admission enablement, including component execution and conclusion usage metadata. Regeneration removes disabled-admission references; no new threat identifier, permission grant, lint exception, or lock-file schema change. |
+| `1.0.71` | Unreleased | Adds a separate compiler-only `artipacked` exception for agent checkouts immediately followed by exact compiler-owned cleanup and credential verification. Requires current-compilation provenance and unique full-block matching; runtime authentication and standalone lint remain unchanged. |
+| `1.0.70` | Unreleased | Requires generated admission-output references to follow effective admission enablement, including component execution and conclusion usage metadata. Regeneration removes disabled-admission references. Specifies the compiler-only `artipacked` warning exception for the exact generated safe-output PR checkout/authentication block, with per-compilation provenance and unchanged standalone lint and runtime authentication. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.69` | Unreleased | Restores CTR-005's `detection-gate: status-only` syntax and adds bounded TLA+ coverage for the validated continuation exception. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.68` | Unreleased | Maps proxy startup diagnostic privacy to runtime redaction and private capture, including runner proxy values, overlapping credential matches, late mask registration, and fail-closed CLI diagnostic publication. No new compiler rejection, threat identifier, permission grant, or lock-file schema change. |
 | `1.0.67` | Unreleased | Audit-only; maps retained PR-head checkout after source-branch deletion to runtime ref isolation (RS-05a), separate from compiler checkout provenance and safe-output lifecycle fencing. No new threat identifier, permission grant, or lock-file schema change. |

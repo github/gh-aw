@@ -25,6 +25,22 @@ const promote = script(promotion, "Validate and promote release");
 const compare = script(alignment, "Compare latest releases");
 const stable = { tag_name: "v1.2.3", draft: false, prerelease: false };
 
+test("release checkout is credential-free while tag publishing retains git authentication", () => {
+  const lock = fs.readFileSync(path.join(root, ".github/workflows/release.lock.yml"), "utf8");
+  for (const source of [release, lock]) {
+    const releaseJob = source.split("\n  release:\n")[1]?.split(/\n  \w+:\n/)[0];
+    assert.ok(releaseJob, "Missing release job");
+    assert.match(releaseJob, /fetch-depth: 0\n +persist-credentials: false/);
+    assert.match(releaseJob, /GH_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/);
+    assert.doesNotMatch(releaseJob, /\bgit (?:fetch|pull|push|clone|ls-remote)\b/);
+
+    const pushTagJob = source.split("\n  push_tag:\n")[1]?.split(/\n  \w+:\n/)[0];
+    assert.ok(pushTagJob, "Missing push_tag job");
+    assert.match(pushTagJob, /persist-credentials: true/);
+    assert.match(pushTagJob, /git push origin "\$RELEASE_TAG"/);
+  }
+});
+
 test("release safe-output example preserves apostrophes, newlines, and Unicode through Bash and JSON", () => {
   const outputFormat = release.split("## Output Format\n")[1];
   assert.ok(outputFormat, "Missing release output instructions");

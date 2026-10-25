@@ -121,6 +121,58 @@ Maintain the repository.
 	require.Empty(t, compiler.prCheckoutLintBlock, "compiler reuse must not preserve a previous workflow's exception")
 }
 
+func TestCompilerLintGeneratedPRCheckoutTransformations(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, checkout, safeOutputsRunsOn, wantLockContent string
+	}{
+		{
+			name: "cross-repository checkout",
+			checkout: `checkout:
+  - repository: octo-org/target-repository
+    path: target
+`,
+			wantLockContent: "repository: octo-org/target-repository",
+		},
+		{
+			name:              "Windows runner",
+			safeOutputsRunsOn: "  runs-on: windows-latest\n",
+			wantLockContent:   "shell: bash",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "pr-checkout.md")
+			source := `---
+on:
+  workflow_dispatch:
+  admission: true
+engine: copilot
+permissions:
+  contents: read
+` + tc.checkout + `tools:
+  github: false
+safe-outputs:
+` + tc.safeOutputsRunsOn + `  create-pull-request:
+  push-to-pull-request-branch:
+---
+Maintain the repository.
+`
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Zero(t, compiler.GetWarningCount())
+			lock, err := os.ReadFile(filepath.Join(dir, "pr-checkout.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), tc.wantLockContent)
+		})
+	}
+}
+
 func TestCompilerLintUsesEffectiveStrictness(t *testing.T) {
 	t.Parallel()
 	for _, policy := range []string{"authored", "cli", "repository"} {
