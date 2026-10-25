@@ -44,6 +44,7 @@ The compiler threat IDs reference the [Compiler Threat Detection Specification](
 | `cache-poisoning` | — | AW, Actions | Release-event and tag-push workflows avoid cache restoration through `actions/cache`, `actions/cache/restore`, `actions/setup-go`, and `actions/setup-node`. Save-only and lookup-only actions are exempt. |
 | `excessive-permissions` | `CTR-001` | Actions | Workflow-wide write grants are moved to the jobs that require them. Job-level writes and AW root grants are not workflow-wide permissions. |
 | `obfuscation` | — | AW, Actions | Runner-interpolated fields avoid literal-only string expressions such as `${{ '' }}`. Ordinary expressions, fallback strings, and boolean conditions are unaffected. |
+| `bash-case-pattern` | — | AW, Actions | Bash `case` patterns inside `$(...)` use balanced `(pattern)` syntax for Bash 3.2 compatibility. Intentional variable glob matching remains unquoted. Reports warnings without executing scripts or requiring ShellCheck. |
 
 ### Historical zizmor regressions
 
@@ -239,6 +240,46 @@ Analysis is conservative within Bash/sh control flow and can report infeasible p
 ## Diagnostics
 
 Text findings include the linter rule ID and its known compiler threat ID, for example `[safe-output-shell-expansion] (CTR-009)`. `--list-rules` includes the same threat ID after the rule description. JSON diagnostics contain the file, rule ID, optional `threat_rule_id`, severity, AST path, optional script-relative line, message, and symbolic source locations, never resolved secrets or script contents. The threat ID is omitted for unmapped rules. Errors produce a nonzero exit status; coverage warnings alone do not.
+
+`gh aw compile --json --actionlint --shellcheck` also preserves optional external-linter findings in batch-scoped results (`scope: "batch"`, `workflow: "actionlint"` or `"shellcheck"`). Issues include `rule_id`, normalized `severity`, and `file`. Actionlint supplies YAML `line` and `column`; standalone ShellCheck uses a `script` location with snippet-relative coordinates and job/step or resource identity, rather than misleading YAML coordinates. `script.sanitized` identifies snippets whose Actions expressions were replaced before analysis. Tool invocation or parsing failures have a distinct `*_error` type rather than appearing as a clean scan.
+
+Default non-strict compilation keeps these issues in `warnings` and preserves its existing exit-status policy, even for high-severity findings. Explicit `--strict` reports them in `errors`, marks the batch result invalid, and fails compilation. Individual workflow results still describe compilation, not the batch scan. The separate `--dry-run` gate retains its existing severity and scanner-coverage requirements; it is not needed merely to collect diagnostics.
+
+### Bash case-pattern compatibility
+
+`bash-case-pattern` checks parsed `run` scripts with an omitted shell or an explicit Bash invocation. It ignores comments, quoted script data, and explicit non-Bash interpreters. It checks authored execution blocks or the compiled Actions graph when available; it does not load imports, execute expressions, validate every shell construct, or replace `bash -n` and ShellCheck. Findings identify the script-relative line without reproducing the pattern:
+
+```bash
+matched=$(case "$remote_ref" in ($source_ref) printf 1 ;; esac)
+```
+
+The opening parenthesis avoids Bash 3.2 command-substitution parsing ambiguity. Quoting `$source_ref` instead would change intentional glob matching to literal matching. The fetch-generator syntax tests run `bash -n` independently of optional ShellCheck availability. The macOS CI job selects system Bash for syntax checks; run `go test ./pkg/workflow -run TestGenerateFetchStep -count=1` with Bash 3.2 and a modern Bash separately on `PATH` for execution coverage too (the generated script requires GNU `base64`).
+
+### Comparing compiler revisions
+
+Build the candidate from the intended source revision, rather than reusing an installed release binary:
+
+```bash
+make build
+git rev-parse HEAD
+./gh-aw version
+sha256sum ./gh-aw
+actionlint --version
+shellcheck --version
+```
+
+Record dirty-tree changes as well as the revision, binary checksum, external linter versions, and repository source SHAs. Use identical disposable source snapshots, existing locks, action-pin caches, and compiler flags for baseline and candidate. Select action mode explicitly: source builds can default to development mode, which adds Docker build actions absent from release locks. Pin the same checked-in setup-action SHA in both runs:
+
+```bash
+/absolute/path/to/compiler compile \
+  --action-mode release --action-tag "$SETUP_ACTION_SHA" \
+  --no-check-update --actionlint --shellcheck --json \
+  > compile.json 2> compile.stderr
+```
+
+Retain exit status, stdout, stderr, and emitted locks separately for each run. For the downstream regression set, use actionlint 1.7.12 and ShellCheck 0.11.0; retain `--use-samples` for gh-aw-test compilers that support it and `--strict --schedule-seed githubnext/gh-cao --show-all` for CAO. Record any unsupported baseline/candidate flags rather than silently comparing different modes.
+
+Compare normalized diagnostics by repository-relative workflow, tool/rule, severity, AST or script location, and message. Remove disposable-directory prefixes and presentation escapes, not real findings; generated line shifts may require matching the job/step and script-relative location. Include stderr-only findings from older compilers. Keep unchanged baseline findings separate from added diagnostics. Exit 0 alone is not evidence of a clean lint run. Do not use `--approve`, blanket security exceptions, or workflow dispatches to normalize a comparison.
 
 ## Optional native JavaScript analysis
 

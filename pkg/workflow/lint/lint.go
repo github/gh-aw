@@ -250,5 +250,6 @@ func Default() *Runner {
 		CachePoisoningRule(),
 		ExcessivePermissionsRule(),
 		ObfuscationRule(),
+		BashCasePatternRule(),
 	}}
 }

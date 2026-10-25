@@ -284,9 +284,23 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 		actionlintStats.TotalWorkflows += len(lockFiles)
 	}
 	err = handleActionlintExecutionError(runResult.err, strict, lockFiles, totalErrors, parseErr, runResult.stdout)
-	if shouldParseOutput && parseErr == nil && totalErrors > 0 {
-		return withActionlintFindings(err, runResult.stdout)
+	return reportActionlintResult(ctx, err, runResult.stdout, parseErr, shouldParseOutput && totalErrors > 0)
+}
+
+func reportActionlintResult(ctx context.Context, err error, output string, parseErr error, hasFindings bool) error {
+	if hasFindings && parseErr == nil {
+		findingsErr := withActionlintFindings(err, output)
+		reportCompileScannerResult(ctx, "actionlint", findingsErr)
+		if err != nil {
+			return findingsErr
+		}
+		return nil
 	}
+	reportErr := err
+	if reportErr == nil {
+		reportErr = parseErr
+	}
+	reportCompileScannerResult(ctx, "actionlint", reportErr)
 	return err
 }
 
@@ -314,8 +328,11 @@ func withActionlintFindings(err error, output string) error {
 		}
 		diagnostics = append(diagnostics, scannerDiagnostic{Finding: finding, Identity: identity})
 	}
-	if err == nil || len(diagnostics) == 0 {
+	if len(diagnostics) == 0 {
 		return err
+	}
+	if err == nil {
+		err = fmt.Errorf("actionlint found %d issue(s)", len(diagnostics))
 	}
 	return &scannerFindingsError{err: err, diagnostics: diagnostics}
 }

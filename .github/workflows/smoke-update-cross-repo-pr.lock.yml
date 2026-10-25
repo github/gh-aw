@@ -682,7 +682,7 @@ jobs:
               while read -r _ remote_ref; do
                 # Match the configured ref glob, not a literal string.
                 # shellcheck disable=SC2254
-                case "$remote_ref" in $source_ref) found=1 ;; esac
+                case "$remote_ref" in ($source_ref) found=1 ;; esac
               done
               printf '%s' "$found"
             }); then
@@ -2613,7 +2613,7 @@ jobs:
               while read -r _ remote_ref; do
                 # Match the configured ref glob, not a literal string.
                 # shellcheck disable=SC2254
-                case "$remote_ref" in $source_ref) found=1 ;; esac
+                case "$remote_ref" in ($source_ref) found=1 ;; esac
               done
               printf '%s' "$found"
             }); then

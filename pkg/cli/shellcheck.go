@@ -88,6 +88,7 @@ const shellcheckMaxConcurrency = 8
 type runStepInfo struct {
 	JobID string
 	ID    string
+	Index int // one-based index among all steps in the job, including uses: steps
 	// Name is the step's "name" field, used only for diagnostic messages.
 	Name string
 	// Script is the raw content of the run: field.
@@ -157,7 +158,7 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 	if !ok {
 		return steps
 	}
-	for _, stepData := range rawSteps {
+	for index, stepData := range rawSteps {
 		step, ok := stepData.(map[string]any)
 		if !ok {
 			continue
@@ -180,6 +181,7 @@ func extractRunStepsFromJob(job map[string]any, jobDefaultShell, lockFile string
 		id, _ := step["id"].(string)
 		steps = append(steps, runStepInfo{
 			ID:       id,
+			Index:    index + 1,
 			Name:     name,
 			Script:   runScript,
 			Shell:    effectiveShell,
@@ -499,7 +501,7 @@ func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running shellcheck on %d run step resources", len(allSteps))))
 	}
 	results := runShellcheckWorkers(ctx, allSteps, verbose, useDocker)
-	return reportShellcheckResults(allSteps, results, strict)
+	return reportShellcheckResults(ctx, allSteps, results, strict)
 }
 
 type shellcheckResult struct {
@@ -543,7 +545,7 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 	return results
 }
 
-func reportShellcheckResults(steps []runStepInfo, results []shellcheckResult, strict bool) error {
+func reportShellcheckResults(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool) error {
 	var totalIssues int
 	var firstErr error
 	var diagnostics []scannerDiagnostic
@@ -569,9 +571,17 @@ func reportShellcheckResults(steps []runStepInfo, results []shellcheckResult, st
 
 	shellcheckLog.Printf("shellcheck complete: steps=%d, issues=%d", len(steps), totalIssues)
 
+	var findingsErr error
+	if len(diagnostics) > 0 {
+		findingsErr = &scannerFindingsError{
+			err:         errors.New("shellcheck found issues in run steps"),
+			diagnostics: diagnostics,
+		}
+	}
+	reportCompileScannerResult(ctx, "shellcheck", errors.Join(findingsErr, errors.Join(operationalErrors...)))
 	if strict && firstErr != nil {
 		if len(operationalErrors) > 0 {
-			return fmt.Errorf("strict mode: shellcheck failed in run steps: %w", errors.Join(operationalErrors...))
+			return fmt.Errorf("strict mode: shellcheck failed in run steps: %w", errors.Join(findingsErr, errors.Join(operationalErrors...)))
 		}
 		return &scannerFindingsError{
 			err:         fmt.Errorf("strict mode: shellcheck found issues in run steps: %w", firstErr),
@@ -585,7 +595,8 @@ var shellcheckFindingPattern = regexp.MustCompile(`(?m)^script:(\d+):(\d+): (err
 
 func withShellcheckFindings(err error, info runStepInfo, output string) error {
 	var diagnostics []scannerDiagnostic
-	lines := strings.Split(sanitizeGHAExpressions(info.Script), "\n")
+	script := sanitizeGHAExpressions(info.Script)
+	lines := strings.Split(script, "\n")
 	for outputLine := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		if strings.TrimSpace(outputLine) == "" {
 			continue
@@ -603,7 +614,15 @@ func withShellcheckFindings(err error, info runStepInfo, output string) error {
 		}
 		finding := scanfindings.Finding{
 			RuleID: match[5], Severity: scanfindings.ParseSeverity(match[3]), Message: match[4],
-			File: firstNonEmpty(info.LockFile, info.Source), Line: line, Column: column,
+			File: info.LockFile,
+		}
+		location := &ValidationScriptLocation{
+			JobID: info.JobID, StepID: info.ID, StepName: info.Name, StepIndex: info.Index,
+			Line: line, Column: column, Sanitized: script != info.Script,
+		}
+		if info.LockFile == "" {
+			location.Source, location.Resource = info.Source, info.Name
+			location.StepName = ""
 		}
 		step := info.ID
 		if step == "" {
@@ -613,8 +632,8 @@ func withShellcheckFindings(err error, info runStepInfo, output string) error {
 			step = info.Script
 		}
 		diagnostics = append(diagnostics, scannerDiagnostic{
-			Finding: finding,
-			Identity: strings.Join([]string{finding.File, info.JobID, step, finding.RuleID,
+			Finding: finding, Script: location,
+			Identity: strings.Join([]string{firstNonEmpty(info.LockFile, info.Source), info.JobID, step, finding.RuleID,
 				finding.Severity.String(), finding.Message, strings.TrimSpace(lines[lineIndex])}, "\x00"),
 		})
 	}

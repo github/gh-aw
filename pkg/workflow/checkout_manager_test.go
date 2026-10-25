@@ -1032,6 +1032,7 @@ func TestGenerateFetchStep(t *testing.T) {
 		assert.Contains(t, got, "+refs/pull/*/head:refs/remotes/origin/pull/*/head", "should include PR refspec")
 		assert.Contains(t, got, `for refspec in "${refspecs[@]}"; do`)
 		assert.Contains(t, got, `ls-remote --exit-code origin "$source_ref"`)
+		assert.Contains(t, got, `case "$remote_ref" in ($source_ref)`, "balanced patterns must parse inside command substitution on Bash 3.2")
 		assert.Contains(t, got, `fetch origin --depth=1 "$refspec"`)
 		assert.Contains(t, got, `if [ "$status" -ne 2 ]; then exit "$status"; fi`)
 	})
@@ -1087,10 +1088,7 @@ func TestGenerateFetchStep(t *testing.T) {
 	})
 }
 
-func TestGenerateFetchStepShellcheck(t *testing.T) {
-	if _, err := exec.LookPath("shellcheck"); err != nil {
-		t.Skip("shellcheck is not installed")
-	}
+func TestGenerateFetchStepSyntax(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		refs []string
@@ -1106,10 +1104,23 @@ func TestGenerateFetchStepShellcheck(t *testing.T) {
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(generateFetchStepLines(&resolvedCheckout{fetchRefs: tc.refs}, 0)), &steps))
 			require.Len(t, steps, 1)
-			cmd := exec.Command("shellcheck", "-s", "bash", "-")
-			cmd.Stdin = strings.NewReader(steps[0].Run)
-			output, err := cmd.CombinedOutput()
-			require.NoError(t, err, "generated fetch step must pass ShellCheck:\n%s", output)
+			for _, check := range []struct {
+				name string
+				args []string
+			}{
+				{name: "bash", args: []string{"-n"}},
+				{name: "shellcheck", args: []string{"-s", "bash", "-"}},
+			} {
+				t.Run(check.name, func(t *testing.T) {
+					if _, err := exec.LookPath(check.name); err != nil {
+						t.Skipf("%s is not installed", check.name)
+					}
+					cmd := exec.Command(check.name, check.args...)
+					cmd.Stdin = strings.NewReader(steps[0].Run)
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, "generated fetch step must pass %s:\n%s", check.name, output)
+				})
+			}
 		})
 	}
 }

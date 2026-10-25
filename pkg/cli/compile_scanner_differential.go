@@ -20,6 +20,7 @@ import (
 type scannerDiagnostic struct {
 	Finding  scanfindings.Finding
 	Identity string
+	Script   *ValidationScriptLocation
 }
 
 // scannerFindingsError distinguishes findings from execution and parsing failures.
@@ -71,7 +72,7 @@ func (b *dryRunScannerBaseline) filter(tool string, err error) (*DryRunScannerDi
 	for _, diagnostic := range baseline {
 		counts[diagnostic.Identity]++
 	}
-	var actionable []scanfindings.Finding
+	var actionable []scannerDiagnostic
 	for _, diagnostic := range current {
 		finding := diagnostic.Finding
 		if finding.Severity == scanfindings.SeverityLow || finding.Severity == scanfindings.SeverityInfo {
@@ -79,14 +80,17 @@ func (b *dryRunScannerBaseline) filter(tool string, err error) (*DryRunScannerDi
 		} else if counts[diagnostic.Identity] > 0 {
 			counts[diagnostic.Identity]--
 			diff.Existing++
-			actionable = append(actionable, finding)
+			actionable = append(actionable, diagnostic)
 		} else {
 			diff.Added++
-			actionable = append(actionable, finding)
+			actionable = append(actionable, diagnostic)
 		}
 	}
 	if len(actionable) > 0 {
-		return diff, withScannerFindings(fmt.Errorf("%s found %d medium-or-higher or unclassified finding(s) (%d existing, %d added)", tool, len(actionable), diff.Existing, diff.Added), actionable)
+		return diff, &scannerFindingsError{
+			err:         fmt.Errorf("%s found %d medium-or-higher or unclassified finding(s) (%d existing, %d added)", tool, len(actionable), diff.Existing, diff.Added),
+			diagnostics: actionable,
+		}
 	}
 	return diff, nil
 }
