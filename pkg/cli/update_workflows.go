@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/errorutil"
+	"github.com/github/gh-aw/pkg/githubapi"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -458,28 +458,9 @@ func getLatestBranchCommitInfoCached(ctx context.Context, repo, branch string) (
 // are sufficient for the handful of calls needed during update resolution.
 func fetchPublicGitHubAPI(ctx context.Context, endpoint string) (result []byte, resultErr error) {
 	apiURL := "https://api.github.com" + endpoint
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-
 	finish := ctxutil.StartOperation(ctx, "GitHub public GET "+endpoint)
 	defer func() { finish(resultErr) }()
-	resp, err := updatePublicAPIClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	return body, nil
+	return githubapi.GetPublic(ctx, updatePublicAPIClient, apiURL)
 }
 
 func fetchPublicReleaseTagsPaginated(ctx context.Context, repo string) ([]string, error) {

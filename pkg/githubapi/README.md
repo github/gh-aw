@@ -1,10 +1,10 @@
 # githubapi Package
 
-> Provides a factory function for constructing go-gh REST client options with repository-standard defaults.
+> Provides go-gh REST client options with repository-standard defaults and an unauthenticated GitHub GET helper.
 
 ## Overview
 
-The `githubapi` package is a thin adapter over the `github.com/cli/go-gh/v2/pkg/api` library. Its sole responsibility is to produce an `api.ClientOptions` value pre-populated with the repository's default HTTP timeout (`constants.DefaultHTTPClientTimeout`), so callers do not have to remember to set this timeout themselves.
+The `githubapi` package produces an `api.ClientOptions` value pre-populated with the repository's default HTTP timeout (`constants.DefaultHTTPClientTimeout`) and centralizes public GitHub GET transport. Callers retain endpoint construction, fallback eligibility, operation timing, and response parsing.
 
 ## Public API
 
@@ -13,6 +13,11 @@ The `githubapi` package is a thin adapter over the `github.com/cli/go-gh/v2/pkg/
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `ClientOptions` | `func(host, authToken string) api.ClientOptions` | Returns go-gh REST client options with the repository default timeout applied |
+| `GetPublic` | `func(ctx context.Context, client *http.Client, endpointURL string) ([]byte, error)` | Fetches a public GitHub JSON response using the supplied client |
+
+#### `GetPublic`
+
+Sends a context-aware GET with `Accept: application/vnd.github+json` without adding authorization. The supplied client controls transport and timeouts. Returns the unmodified body for HTTP 200; other statuses return `*HTTPStatusError` with `StatusCode` and a whitespace-trimmed `Body`. Request and body-read errors pass through, and the response body is closed on both success and read or status errors.
 
 #### `ClientOptions`
 
