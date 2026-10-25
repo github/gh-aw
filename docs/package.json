@@ -23,29 +23,29 @@
     "test:debug": "playwright test --debug"
   },
   "dependencies": {
-    "@astrojs/markdown-remark": "7.3.3",
+    "@astrojs/markdown-remark": "7.3.4",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
-    "@astrojs/starlight": "^0.42.6",
-    "@primer/octicons": "^19.40.0",
-    "astro": "^7.4.0",
-    "astro-mermaid": "^2.1.0",
-    "mermaid": "11.17.2",
+    "@astrojs/starlight": "^0.42.7",
+    "@primer/octicons": "^19.42.0",
+    "astro": "^7.4.2",
+    "astro-mermaid": "^2.2.0",
+    "mermaid": "12.2.0",
     "sharp": "^0.35.5",
-    "starlight-blog": "^0.30.0",
+    "starlight-blog": "^0.30.2",
     "starlight-changelogs": "^0.7.1",
-    "starlight-links-validator": "0.26.0",
+    "starlight-links-validator": "0.27.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "@types/primer__octicons": "^19.21.0",
     "http-server": "^14.1.1",
-    "satori": "^0.33.5",
+    "satori": "^0.63.2",
     "starlight-github-alerts": "^0.5.0"
   },
   "overrides": {
-    "@astrojs/markdown-remark": "7.3.3",
+    "@astrojs/markdown-remark": "7.3.4",
     "p-queue": "9.3.3",
     "zod": "4.6.5",
     "mermaid": {
