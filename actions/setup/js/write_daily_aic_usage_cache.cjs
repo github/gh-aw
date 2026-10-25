@@ -40,7 +40,7 @@ function logCache(message, details) {
  * retention window.  Entries older than {@link CACHE_RETENTION_MS} are pruned to keep the
  * cache file bounded.
  *
- * @param {string} [cacheFilePath] Override the cache file path (defaults to {@link CACHE_FILE_PATH}; useful in tests).
+ * @param {string} [cacheFilePath] Override the cache file path (defaults to {@link AIC_USAGE_CACHE_FILE_PATH}; useful in tests).
  * @param {string} [usageDir] Override the usage directory (defaults to {@link USAGE_DIR}; useful in tests).
  * @returns {Promise<void>}
  */
