@@ -27,6 +27,96 @@ func namedFuncGoroutine() {
 	go namedFuncHelper()
 }
 
+// localClosureGoroutine launches a local literal without recover — should be flagged.
+func localClosureGoroutine() {
+	fn := func() {
+		panic("oops")
+	}
+	go fn() // want `goroutine launched via a function literal without a top-level defer/recover`
+}
+
+// safeLocalClosureGoroutine installs recovery inside the local literal.
+func safeLocalClosureGoroutine() {
+	fn := func() {
+		defer func() {
+			recover()
+		}()
+		panic("oops")
+	}
+	go fn()
+}
+
+// varLocalClosureGoroutine also resolves a parenthesized var initializer and call.
+func varLocalClosureGoroutine() {
+	var unused, fn = 1, (func() {
+		panic("oops")
+	})
+	_ = unused
+	go (fn)() // want `goroutine launched via a function literal without a top-level defer/recover`
+}
+
+// shadowedLocalClosureGoroutine distinguishes variables with the same name.
+func shadowedLocalClosureGoroutine() {
+	fn := func() {
+		defer namedRecoverHelper()
+	}
+	{
+		fn := func() {
+			panic("oops")
+		}
+		go fn() // want `goroutine launched via a function literal without a top-level defer/recover`
+	}
+	go fn()
+}
+
+// suppressedLocalClosureGoroutine respects suppression at the launch site.
+func suppressedLocalClosureGoroutine() {
+	fn := func() {
+		panic("oops")
+	}
+	//nolint:goroutinemissingrecover
+	go fn()
+}
+
+// packageClosureGoroutine and function values without local literal initializers are out of scope.
+var packageClosure = func() {}
+
+func packageClosureGoroutine(fn func()) {
+	go packageClosure()
+	go fn()
+	named := namedFuncHelper
+	go named()
+}
+
+// reassignedLocalClosureGoroutine must not inspect a stale literal initializer.
+func reassignedLocalClosureGoroutine() {
+	fn := func() {
+		panic("oops")
+	}
+	(fn) = namedFuncHelper
+	go fn()
+}
+
+// rangeAssignedLocalClosureGoroutine also has a mutable launch target.
+func rangeAssignedLocalClosureGoroutine() {
+	fn := func() {
+		panic("oops")
+	}
+	for _, fn = range []func(){namedFuncHelper} {
+		go fn()
+	}
+}
+
+// addressTakenLocalClosureGoroutine can change its target through a pointer.
+func addressTakenLocalClosureGoroutine() {
+	fn := func() {
+		panic("oops")
+	}
+	ptr := &fn
+	*ptr = namedFuncHelper
+	go fn()
+}
+
 // unrelatedDeferGoroutine has a defer but no recover — should be flagged.
 func unrelatedDeferGoroutine() {
 	go func() { // want `goroutine launched via a function literal without a top-level defer/recover`
