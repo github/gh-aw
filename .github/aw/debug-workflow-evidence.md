@@ -368,12 +368,12 @@ This heading preserves existing links; it defines no separate compilation gate.
 
 ## Reference Commands
 
-Full flag/option tables: [logs](cli-commands.md#gh-aw-logs) (scoped to the
-identified target repository), [audit](cli-commands.md#gh-aw-audit) (preserve
+Full flag/option tables: [logs](cli-commands-reference.md#gh-aw-logs) (scoped to the
+identified target repository), [audit](cli-commands-reference.md#gh-aw-audit) (preserve
 supplied URLs; qualify bare IDs with `--repo HOST/OWNER/REPO`),
-[mcp inspect](cli-commands.md#gh-aw-mcp-inspect) (after the shared startup
+[mcp inspect](cli-commands-reference.md#gh-aw-mcp-inspect) (after the shared startup
 preflight — a listing is not startup authorization), and
-[status](cli-commands.md#gh-aw-status) (compilation belongs to the
+[status](cli-commands-reference.md#gh-aw-status) (compilation belongs to the
 [compilation guide](debug-compilation.md), not a status check).
 
 ### Active Debugging Commands (Permitted Contexts Only)

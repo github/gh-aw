@@ -60,7 +60,7 @@ Avoid front-loading large raw context when data can be fetched on demand. Prefer
 
 ## How to Measure Token Usage
 
-`gh aw audit` reports per-run cost. See [cli-commands.md](cli-commands.md#gh-aw-audit) for full command syntax (single run, `--json`, multi-run diff) and the MCP `audit` equivalent.
+`gh aw audit` reports per-run cost. See [cli-commands-reference.md](cli-commands-reference.md#gh-aw-audit) for full command syntax (single run, `--json`, multi-run diff) and the MCP `audit` equivalent.
 
 Token-specific fields in `gh aw audit <run-id> --json`:
 
@@ -382,5 +382,5 @@ See [token-optimization-caching-budgets.md](token-optimization-caching-budgets.m
 | A/B experiments | [experiments.md](experiments.md) |
 | Persistent memory | [memory.md](memory.md) |
 | DataOps pattern | [DataOps guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/patterns/data-ops.md) |
-| Audit command reference | [cli-commands.md](cli-commands.md) |
+| Audit command reference | [cli-commands-reference.md](cli-commands-reference.md) |
 | Frontmatter syntax | [syntax.md](syntax.md) |
