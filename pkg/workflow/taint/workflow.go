@@ -84,7 +84,7 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	return a.result, nil
 }
 
-func credentialEndpointJobs(rule Rule, document *aw.Document) ([]string, error) {
+func safeOutputIntegrationJobs(rule Rule, document *aw.Document) ([]string, error) {
 	jobs := slices.Clone(rule.SafeOutputJobs)
 	if document == nil {
 		return jobs, nil
@@ -111,7 +111,7 @@ func AnalyzeDocument(document *aw.Document, compiled *actions.Workflow, rule Rul
 	if document == nil {
 		return Result{}, errors.New("AW document cannot be nil")
 	}
-	jobs, err := credentialEndpointJobs(rule, document)
+	jobs, err := safeOutputIntegrationJobs(rule, document)
 	if err != nil {
 		return Result{}, err
 	}

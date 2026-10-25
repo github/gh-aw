@@ -176,15 +176,15 @@ job; microVM isolation is future work.
 
 ## Secret-flow analysis
 
-The `secret-leak` rule tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs/bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, credential-bearing destinations in [safe-output integration jobs](#credential-bearing-webhook-endpoints), and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values; formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize subsequent uses.
+The `secret-leak` rule tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs/bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, network credential consumption in [safe-output integration jobs](#safe-output-integration-credentials), and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values; formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize subsequent uses.
 
 In Bash/sh, recognized `test`/`[` string and file predicates and the `:`, `true`, and `false` builtins do not disclose their arguments. Presence-only alternate expansions such as `${TOKEN:+present}` do not contain the token, but secret-bearing replacements remain tainted. Nested command disclosures, parameter-expansion error messages, and `set -x` output are still checked. Numeric comparisons, malformed tests, and potentially word-splitting predicates retain coverage warnings because their error diagnostics can expose operands.
 
 Unknown file reads produce secret-flow coverage warnings when they could select a modeled secret-bearing file or involve a secret-bearing filename. Unknown output targets warn when the output or filename is tainted; unrelated public file operations do not introduce secret-flow warnings.
 
-### Credential-bearing webhook endpoints
+### Safe-output integration credentials
 
-Safe-output jobs are declared third-party integration boundaries. In `safe-outputs.jobs` (including imported jobs and legacy `safe-jobs`), a directly secret-bound endpoint used as a complete curl destination is treated as credential consumption without a comment or separate opt-in:
+Safe-output jobs are declared third-party integration boundaries. In `safe-outputs.jobs` (including imported jobs and legacy `safe-jobs`), secrets may be consumed through network endpoints, headers, request fields, and SDK calls without a comment or separate opt-in:
 
 ```aw wrap
 safe-outputs:
@@ -197,22 +197,38 @@ safe-outputs:
       steps:
         - env:
             DESTINATION: ${{ secrets.PRIVATE_NOTIFICATION_ENDPOINT }}
+            SERVICE_TOKEN: ${{ secrets.NOTIFICATION_SERVICE_TOKEN }}
           run: |
             jq -c '{text: .summary}' "$GH_AW_AGENT_OUTPUT" |
-              curl --fail -sS -H 'Content-Type: application/json' --data @- "$DESTINATION"
+              curl --fail -sS -H 'Content-Type: application/json' \
+                -H "X-Service-Token: $SERVICE_TOKEN" --data @- "$DESTINATION"
 ```
 
-The integration declaration establishes intended credential use, not verification of the secret's value, host, protocol, or recipient. The exemption applies only to an unchanged direct `${{ secrets.NAME }}` step-env binding, and only when `"$DESTINATION"` or `"${DESTINATION}"` is the entire, single `curl` destination (positional or following `--url`). Aliases, composed expressions, URL suffixes, unquoted expansions, and script mutations do not qualify. Dynamic shell execution, sourced helpers, or other unmodeled environment mutation prevent endpoint recognition.
+The same policy permits an SDK to consume a credential, for example in an `actions/github-script` step within a declared safe-output job:
 
-Accepted value-taking options are `-H`/`--header`, `-u`/`--user`, `--oauth2-bearer`, `-d`/`--data`, `--data-binary`, `--data-urlencode`, `--json`, `-F`/`--form`, and `-T`/`--upload-file`, including long `--option=value` forms. Accepted literal flags are `--fail`, `--silent`, `--show-error`, `-f`, `-s`, `-S`, `-sS`, `-fsS`, `-q`, and `--disable`. Redirects, proxies, config/trace options, URL rewriting, multiple destinations, other clients, and unknown options retain the endpoint finding. Shell declarations and arithmetic conservatively disable endpoint recognition. This finite grammar does not inspect implicit curl configuration or establish runtime network isolation; the author remains responsible for both.
+```yaml wrap
+- uses: actions/github-script@v8
+  env:
+    SERVICE_TOKEN: ${{ secrets.NOTIFICATION_SERVICE_TOKEN }}
+  with:
+    script: |
+      const client = getOctokit(process.env.SERVICE_TOKEN);
+      await client.rest.users.getAuthenticated();
+```
 
-This does not disable secret-leak lint for the job. The binding remains secret-tainted everywhere else: payloads, stdin, tracked uploads, non-authentication headers, logs, and xtrace are still checked, including use of the endpoint credential itself as payload or inside another destination's path/query. Ordinary jobs and native Actions inputs without AW integration provenance retain opaque secret URL findings; neither job/secret names nor comments grant an exemption. Compiler analysis includes imported safe-output jobs. Standalone lint can identify declarations in the supplied AW source or companion Markdown but does not resolve imports.
+This is a job-provenance policy, not a curl option allow-list or a requirement for direct, immutable secret bindings. The integration declaration establishes intended credential use, not verification of the secret's value, host, protocol, or recipient. Authors remain responsible for client configuration, recipient trust, and runtime network isolation.
+
+This does not disable secret-leak lint for the job. Secrets remain tainted for explicit logs, xtrace, summaries, workflow outputs, artifacts, and known publication sinks, even when those disclosures accompany a network operation. Network request bodies and headers inside the declared integration are credential-consumption channels, not proof of a leak. Ordinary jobs and native Actions inputs without AW integration provenance retain conservative network checks; neither job/secret names nor comments grant an exemption. Compiler analysis includes imported safe-output jobs. Standalone lint can identify declarations in the supplied AW source or companion Markdown but does not resolve imports.
+
+SDK use does not imply SDK implementation coverage: JavaScript inspection remains opt-in, and external modules or unmodeled calls retain the limitations below. The integration boundary does not authorize explicit publication of credentials or sanitize their later uses.
+
+For upload bodies, curl `-T`/`--upload-file` treats both `-` and `.` as stdin (`.` selects non-blocking mode). Wget `--post-file` instead reads a regular file; neither spelling consumes piped stdin.
 
 ### Scope and limitations
 
 For `.lock.yml` inputs, a companion `.md` adds authored-policy and prompt checks to the existing execution graph. Native `.yml`/`.yaml` inputs never acquire an assumed AW companion. Explicit `.md` inputs inspect the AW AST independently: the prompt, top-level `steps`/`post-steps`, authored `jobs` and `safe-outputs.jobs` (including legacy `safe-jobs`), and script hooks. No compiled graph is fabricated. Secret analysis retains a coverage warning for missing imports, generated steps, cross-job flows, and compiler defaults; scripts without an observable shell remain unknown.
 
-Analysis is conservative within Bash/sh control flow and can report infeasible paths. It does not execute analyzed code or inspect external actions, sourced shell scripts, Python/PowerShell programs, dynamically constructed shell code, or arbitrary filesystem operations. JavaScript inspection requires the explicit configuration below. Imported runtime prompt files are not recursively loaded. Authentication arguments are treated as intentional credential use; endpoint trust is not inferred. A clean result is not proof that a workflow cannot leak secrets.
+Analysis is conservative within Bash/sh control flow and can report infeasible paths. It does not execute analyzed code or inspect external actions, sourced shell scripts, Python/PowerShell programs, dynamically constructed shell code, or arbitrary filesystem operations. JavaScript inspection requires the explicit configuration below. Imported runtime prompt files are not recursively loaded. Authentication arguments are treated as intentional credential use; outside declared integration jobs, endpoint trust is not inferred. A clean result is not proof that a workflow cannot leak secrets.
 
 ## Diagnostics
 
@@ -231,7 +247,7 @@ gh aw lint --rules secret-leak --json \
   --javascript-root /path/to/repository
 ```
 
-The checker follows literal `node`/`nodejs` file and `--eval` invocations, `--print` expressions, `shell: node {0}`, `actions/github-script` scripts, and available relative CommonJS/ES module imports. It tracks symbolic environment/argument/stdin sources, aliases, object members, local function calls, selected stdin callbacks, JSON/string transformations, and known file writes/reads. Object rest preserves member shapes: credential-bearing environment members do not taint an unrelated public timeout, while a secret-derived timeout remains tainted. Logging, summaries, outputs, and non-authentication request fields are disclosure sinks. Comparison/presence results and type-proven public length/index metadata remove values; arbitrary object properties and numeric coercions do not. Genuine escaped, single-record stdout `add-mask` registrations are recognized without sanitizing later uses or captured stdout. Dynamic reads remain explicit gaps rather than invented all-environment return values.
+The checker follows literal `node`/`nodejs` file and `--eval` invocations, `--print` expressions, `shell: node {0}`, `actions/github-script` scripts, and available relative CommonJS/ES module imports. It tracks symbolic environment/argument/stdin sources, aliases, object members, local function calls, selected stdin callbacks, JSON/string transformations, and known file writes/reads. Object rest preserves member shapes: credential-bearing environment members do not taint an unrelated public timeout, while a secret-derived timeout remains tainted. Logging, summaries, and outputs remain disclosure sinks. Non-authentication request fields are also disclosure sinks outside declared safe-output integration jobs; within those jobs, the network credential-consumption policy above applies. Comparison/presence results and type-proven public length/index metadata remove values; arbitrary object properties and numeric coercions do not. Genuine escaped, single-record stdout `add-mask` registrations are recognized without sanitizing later uses or captured stdout. Dynamic reads remain explicit gaps rather than invented all-environment return values.
 
 `--javascript-mode fast` is the CLI default when JavaScript is enabled. With a companion AW document, it analyzes authored JavaScript rather than generated runtime wrappers, while retaining the compiled shell, prompt, and job/output checks. Native Actions files without an AW companion retain their explicit JavaScript entry points. Entry sources across Markdown inputs are deduplicated and parsed in bounded native batches; syntax failures are isolated per script. Additional sources discovered through data flow are parsed on demand.
 

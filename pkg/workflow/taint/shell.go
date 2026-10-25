@@ -33,7 +33,6 @@ type shell struct {
 	constantValues        map[string]map[string]struct{}
 	constantUnknown       map[string]bool
 	javascriptExecutables map[string]struct{}
-	credentialEndpoints   map[string]struct{}
 }
 
 type constantState struct {
@@ -117,7 +116,6 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		return nil, nil, nil
 	}
 	s.javascriptExecutables = javascriptExecutables(tree)
-	s.credentialEndpoints = s.endpointContracts(tree, fields)
 	return s, tree, nil
 }
 
@@ -649,11 +647,7 @@ func (s *shell) callCommand(cmd *syntax.CallExpr, captured bool, stdin value) va
 			}
 		}
 	case "curl", "wget":
-		var endpoint *syntax.Word
-		if name == "curl" {
-			endpoint = s.authenticatedEndpoint(cmd.Args[1:])
-		}
-		s.network(cmd.Args[1:], line, stdin, endpoint)
+		s.network(cmd.Args[1:], line, stdin)
 	case "set":
 		if len(cmd.Args) == 1 {
 			for _, sources := range s.vars {
@@ -770,11 +764,11 @@ func (s *shell) environmentOutput() value {
 	return out
 }
 
-func (s *shell) network(args []*syntax.Word, line int, stdin value, endpoint *syntax.Word) {
+func (s *shell) network(args []*syntax.Word, line int, stdin value) {
 	var request value
 	for index := 0; index < len(args); index++ {
 		word, ok := sliceAt(args, index)
-		if !ok || word == endpoint {
+		if !ok {
 			continue
 		}
 		arg := staticWord(word)
@@ -801,12 +795,12 @@ func (s *shell) network(args []*syntax.Word, line int, stdin value, endpoint *sy
 		if arg == "--post-file" || arg == "-T" || arg == "--upload-file" {
 			if file, ok := sliceAt(args, index+1); ok {
 				index++
-				request = union(request, s.networkFileBody(file, stdin))
+				request = union(request, s.networkFileBody(file, stdin, arg != "--post-file"))
 			}
 			continue
 		}
 		if option, file, found := strings.Cut(arg, "="); found && (option == "--post-file" || option == "--upload-file") {
-			request = union(request, s.networkFileBodyValue(file, stdin))
+			request = union(request, s.networkFileBodyValue(file, stdin, option != "--post-file"))
 			continue
 		}
 		if strings.HasPrefix(arg, "--user=") || strings.HasPrefix(arg, "--oauth2-bearer=") {
@@ -872,7 +866,7 @@ func (s *shell) networkBody(word *syntax.Word, stdin value) value {
 	return s.word(word)
 }
 
-func (s *shell) networkFileBody(word *syntax.Word, stdin value) value {
+func (s *shell) networkFileBody(word *syntax.Word, stdin value, stdinUpload bool) value {
 	texts, known := wordTexts(word, s.constants, s.constantValues, s.constantUnknown)
 	var contents value
 	for _, text := range texts {
@@ -880,7 +874,7 @@ func (s *shell) networkFileBody(word *syntax.Word, stdin value) value {
 			known = false
 			continue
 		}
-		contents = union(contents, s.networkFileBodyValue(text, stdin))
+		contents = union(contents, s.networkFileBodyValue(text, stdin, stdinUpload))
 	}
 	if !known {
 		s.a.gap(s.path, "dynamic network upload files are not modeled")
@@ -888,8 +882,9 @@ func (s *shell) networkFileBody(word *syntax.Word, stdin value) value {
 	return contents
 }
 
-func (s *shell) networkFileBodyValue(path string, stdin value) value {
-	if path == "-" || path == "." {
+func (s *shell) networkFileBodyValue(path string, stdin value, stdinUpload bool) value {
+	// Curl accepts "-" and "." as stdin; wget --post-file requires a regular file.
+	if stdinUpload && (path == "-" || path == ".") {
 		return stdin
 	}
 	if path == "" {

@@ -1,20 +1,20 @@
-# ADR-71833: Safe-Output Integration Boundaries for Secret-Bearing curl Destinations
+# ADR-71833: Safe-Output Integration Boundaries for Secret Consumption
 
 **Date**: 2026-10-25
-**Status**: Draft
-**Deciders**: pelikhan, [TODO: verify other reviewers]
+**Status**: Proposed
+**Deciders**: Not formally recorded; pending maintainer acceptance of PR #71833.
 
 ---
 
 ### Context
 
-The shell taint analyzer (`pkg/workflow/taint`) raises CTR-017 (secret leak) whenever a `${{ secrets.* }}` value flows into a network command. Webhook URLs such as Slack incoming webhooks are credentials that are *consumed* as the authenticated request destination, not disclosed in the payload, so these flows produce false positives. The analyzer cannot safely infer endpoint trust from the secret's opaque value, from a name like `WEBHOOK`/`SLACK`, or from argument position alone, and curl has many options (redirects, proxies, config files, tracing, URL rewriting, multiple URLs) that can send the destination somewhere else or record it. A related gap meant stdin uploads (`curl -T -`, `--upload-file=-`) were not tracked as request bodies.
+The secret-flow analyzer (`pkg/workflow/taint`) reports CTR-017 when symbolic secrets reach modeled disclosure sinks, including network requests. Safe-output jobs exist to integrate third-party services, which consume credentials through webhook destinations, headers, request fields, and SDK calls. Treating those integrations like ordinary jobs produces false positives; secret names or curl argument positions cannot establish the intended trust boundary. A related gap meant stdin uploads were not consistently tracked as request bodies outside that boundary.
 
 ### Decision
 
-Safe-output jobs are declared integrations with third-party services and may consume credential-bearing destinations without an opt-in comment. The compiler supplies the normalized IDs of resolved `safe-outputs.jobs`, including imports and legacy `safe-jobs`; authored and companion AW analysis uses actual integration declarations. Ordinary jobs and native Actions workflows without AW integration provenance receive no exemption based on names or comments.
+Treat declared safe-output jobs as trusted credential consumers for network integrations, including endpoints, headers, request bodies, and SDK calls, without an opt-in comment. The compiler supplies the normalized IDs of resolved `safe-outputs.jobs`, including imports and legacy `safe-jobs`; authored and companion AW analysis uses actual integration declarations. Ordinary jobs and native Actions workflows without AW integration provenance receive no exemption based on names or comments.
 
-The exemption applies only to a direct, whole-value step `env` binding to a single `secrets.X` reference. The script must never mutate the variable (assignments, `read`, `eval`, `source`, `declare`, `printf -v`, arithmetic, and similar constructs revoke endpoint recognition). The variable must also be the entire, single, double-quoted curl destination accepted by a deliberately finite allow-list of curl options; any unknown option disables the exemption. Everywhere else, including payloads, stdin, uploads, non-authentication headers, logs, xtrace, and other URLs, the secret remains tainted. We also fix stdin tracking for `-T -`/`--upload-file=-`.
+The boundary follows job provenance, not a curl-only grammar, a direct-binding shape, or variable immutability. Secrets remain tainted: explicit logs, xtrace, summaries, workflow outputs, artifacts, and known publication sinks remain checked, including when they occur alongside a network operation. This is a lint policy for intended credential consumption, not blanket suppression, recipient verification, or proof that arbitrary SDK code is safe; existing analysis coverage limitations still apply.
 
 ### Alternatives Considered
 
@@ -24,11 +24,11 @@ Treat secrets named like `*WEBHOOK*`/`*SLACK*` or appearing in the URL position 
 
 #### Alternative 2: Disable or suppress CTR-017 per workflow/step
 
-Rely on the existing broad lint disable or a step-level suppression. This is simpler, but it turns off all secret-leak checking for the scope, including payload, log, and header leaks. With integration provenance, all eight pinned affected workflows pass default lint unchanged, without broad suppression.
+Rely on the existing broad lint disable or a step-level suppression. This is simpler, but it turns off all secret-leak checking for the scope, including logs, summaries, outputs, and publication. The integration network-consumption boundary instead preserves those checks without requiring workflow source edits.
 
-#### Alternative 3: Model and allow curl's full option surface
+#### Alternative 3: Restrict consumption to immutable curl destinations
 
-Parse every curl option and reason about redirects, proxies, and config files to decide trust. This was rejected because the option surface is large, changes between curl versions, and is hard to model soundly. A finite grammar that fails closed is easier to audit.
+Require a direct secret-bound, unmodified variable as the entire quoted curl destination, with a finite option allow-list. This is locally auditable, but excludes legitimate headers, composed credentials, other HTTP clients, and SDKs. Modeling curl's full option surface would add maintenance without fixing that mismatch; the declared integration job is the intended boundary instead.
 
 #### Alternative 4: Require an authenticated-endpoint comment
 
@@ -37,20 +37,21 @@ The initial implementation required `# gh-aw: authenticated-endpoint NAME`. This
 ### Consequences
 
 #### Positive
-- Removes CTR-017 false positives for legitimate webhook-URL usage without weakening detection for payloads, headers, logs, or uploads.
+- Removes CTR-017 false positives for intended network credential use through endpoints, headers, request fields, and SDKs in declared integrations.
 - The existing safe-output integration declaration supplies the boundary without extra comments or workflow source edits.
-- Fails closed: unknown curl options, mutation of the variable, or non-direct bindings revoke the exemption.
-- Closes a stdin-upload tracking gap (`curl -T -`, `--upload-file=-`).
+- Preserves explicit logging, summary, output, artifact, and publication checks; ordinary jobs retain conservative network checks.
+- Closes stdin-upload tracking gaps outside the integration boundary.
 
 #### Negative
-- The integration boundary asserts intent only. It does not verify the secret's real host, protocol, or recipient, or implicit curl configuration such as `~/.curlrc` (though `-q`/`--disable` is accepted).
+- The integration boundary asserts intent only. It does not verify the secret's real host, protocol, recipient, or SDK behavior; a secret sent to an unintended network recipient within an integration may not be reported.
 - Standalone lint does not resolve imported declarations; compiler lint uses resolved imported integration jobs.
-- Only `curl` is supported. `wget` and other HTTP clients get no equivalent exemption.
+- Authors remain responsible for client configuration, recipient trust, and runtime network isolation. Unmodeled helper or SDK code is not made analyzable by the integration declaration.
 
 #### Neutral
-- The curl option allow-list will need maintenance when authors need additional safe options.
+- The policy applies across supported network clients rather than maintaining a curl-only credential-destination allow-list.
 - The contract is documented in `docs/src/content/docs/reference/workflow-linters.md`.
+- Job provenance must remain consistent across authored, companion, and compiler analysis; generated job names alone cannot establish the integration boundary.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*Prepared for review in PR #71833. Proposed records the design under review, not maintainer acceptance or merge approval.*

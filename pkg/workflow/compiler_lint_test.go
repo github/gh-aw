@@ -61,7 +61,8 @@ func TestCompilerLintAuthenticatedWebhookPipeline(t *testing.T) {
 	}{
 		{"ordinary job", `"$GH_AW_AGENT_OUTPUT"`, false, true},
 		{"safe-output endpoint", `"$GH_AW_AGENT_OUTPUT"`, true, false},
-		{"secret payload", `<(printf '%s' "$WEBHOOK")`, true, true},
+		{"secret payload consumed by integration", `<(printf '%s' "$WEBHOOK")`, true, false},
+		{"integration still rejects logging", `"$GH_AW_AGENT_OUTPUT"; echo "$WEBHOOK"; jq -c . "$GH_AW_AGENT_OUTPUT"`, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			content := `on: workflow_dispatch
@@ -106,7 +107,7 @@ Report findings privately.
 	for _, disclose := range []bool{false, true} {
 		payload := `"$GH_AW_AGENT_OUTPUT"`
 		if disclose {
-			payload = `<(printf '%s' "$WEBHOOK")`
+			payload = `"$GH_AW_AGENT_OUTPUT"; echo "$WEBHOOK"; jq -c . "$GH_AW_AGENT_OUTPUT"`
 		}
 		require.NoError(t, os.WriteFile(shared, []byte(`---
 safe-outputs:
