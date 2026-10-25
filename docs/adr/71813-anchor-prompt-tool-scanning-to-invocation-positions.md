@@ -1,8 +1,8 @@
 # ADR-71813: Anchor Prompt Tool Scanning to Invocation Positions and Track Fences Structurally
 
-**Date**: 2026-07-16
+**Date**: 2026-10-25
 **Status**: Draft
-**Deciders**: pelikhan (PR author), [TODO: verify reviewers]
+**Deciders**: pelikhan (PR author); reviewer acceptance has not been recorded.
 
 ---
 
@@ -14,15 +14,17 @@ The workflow compiler runs a heuristic scanner (`pkg/workflow/prompt_tool_valida
 
 We will recognize qualified tool references (`mcp__server__tool` and `server(tool)`) only at the start of the instruction target. Further references are accepted only after explicit list separators (`,`, `and`, `or`, with optional backticks). Scanning stops at the first non-list token, so we no longer search all prose that follows. We will also track complete fence delimiters, including the full run of backticks or tildes. A fence closes only on a valid closing fence. Inside `markdown`/`md` fences, a same-length fence with an info string opens a nested example that is skipped until it closes. The main driver is precision: these warnings are only useful if they rarely fire on harmless prose or example content. Tool permissions and transport checks stay unchanged.
 
+Parenthesized `(s)` is treated as ambiguous pluralization and ends qualified-tool list scanning; an actual tool named `s` can still be required using `mcp__server__s`. Markdown template language identifiers are recognized case-insensitively, including `Markdown` and `MD`.
+
 ### Alternatives Considered
 
 #### Alternative 1: Keep unanchored matching and add a stop-list of plural/prose tokens
 
-We could add an exclusion list for patterns such as `(s)`, `(es)`, or known nouns like `file` and `workflow`. This would be a smaller change, but it is whack-a-mole. Any new parenthesized prose (`issue(s)`, `step(s)`, `option(a)`) would bring the false positives back. It also does not fix the fence-tracking issue. Anchoring to invocation positions fixes the whole class of problems.
+An exclusion list for patterns such as `(s)`, `(es)`, or known nouns like `file` and `workflow` would be a smaller change, but it would not distinguish invocation positions from arbitrary prose or fix fence tracking. Narrow filtering of plural suffixes can complement anchored matching when prose occurs at an invocation position; it is not a substitute for anchoring.
 
 #### Alternative 2: Use a full CommonMark parser for fences and instruction extraction
 
-A real Markdown parser such as goldmark would handle fences per the spec, including fence length and closing rules. It would also give structured access to inline code and list items. We considered this because it is the most correct option. We did not choose it for this fix because it would mean rewriting the line-oriented scanner and changing its state model. That is a much larger change than a targeted false-positive fix. The scanner also deliberately handles non-CommonMark conventions, such as same-length nested fences in `markdown` output templates, that a strict parser would not handle as intended. [TODO: verify whether a parser-based approach was evaluated]
+A CommonMark parser such as goldmark could provide standard fence handling and structured access to inline code and list items. This is a design alternative, not a documented experiment: no parser prototype or comparative evaluation is recorded for this change. The selected approach retains the existing line-oriented scanner rather than introducing AST-based instruction extraction. It also deliberately handles same-length nested fences in `markdown` output templates, a non-CommonMark convention that would still require custom handling with a strict parser.
 
 #### Alternative 3: Suppress or downgrade warnings for affected workflows
 
@@ -46,4 +48,4 @@ We could have made the three affected workflows quiet, for example with per-work
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*This ADR remains Draft pending reviewer acceptance.*

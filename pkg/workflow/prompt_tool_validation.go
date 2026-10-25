@@ -165,7 +165,7 @@ func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[str
 		state.fence = marker
 		language := strings.TrimSpace(strings.TrimPrefix(line, marker))
 		state.runFence = state.pendingRun && slices.Contains([]string{"bash", "sh", "shell"}, language)
-		state.markdownFence = slices.Contains([]string{"markdown", "md"}, language)
+		state.markdownFence = slices.Contains([]string{"markdown", "md"}, strings.ToLower(language))
 		state.pendingRun = false
 		return nil
 	}
@@ -263,7 +263,6 @@ func promptQualifiedRequirements(target string) ([]promptToolRequirement, bool) 
 		if len(groups) < 2 {
 			break
 		}
-		qualified = true
 		var invocation, server, tool string
 		for index, group := range groups {
 			if group == "" {
@@ -278,6 +277,11 @@ func promptQualifiedRequirements(target string) ([]promptToolRequirement, bool) 
 				tool = group
 			}
 		}
+		// Parenthesized "(s)" is ambiguous pluralization; explicit MCP names are not.
+		if tool == "s" && !strings.HasPrefix(invocation, "mcp__") {
+			break
+		}
+		qualified = true
 		// Native read tools are available by default; Read(path) is not an MCP reference.
 		if !slices.Contains([]string{"Read", "read", "Glob", "glob", "Grep", "grep", "LS", "NotebookRead", "read_file", "read_many_files", "list_directory", "grep_search", "view"}, server) {
 			requirements = append(requirements, promptToolRequirement{server: server, tool: tool, nativeMCP: true})
