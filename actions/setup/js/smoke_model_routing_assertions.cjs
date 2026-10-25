@@ -7,10 +7,8 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *
  * Smoke workflows call this from a `post-steps` github-script step. Every check
  * reads runner- and proxy-written evidence (the unified session and the
- * api-proxy token-usage log), never the agent's own reply. The agent-writable
- * `agent/awf-routing-outcome.json` (`model_routing.outcome`) is never evidence
- * for the R/M/P/S checks; only the opt-in H1 reads it, and only as a record of
- * what the harness applied.
+ * api-proxy token-usage log), never the agent's own reply or the agent-writable
+ * `agent/awf-routing-outcome.json` (`model_routing.outcome`).
  *
  * Request attribution follows what AWF records: a token-usage record with
  * `purpose: "routing_classification"` is the classifier; every other record is
@@ -36,12 +34,6 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *   `supported_reasoning_efforts`, or null when that list is empty (when
  *   configured). The recommended profile and selected effort are also printed
  *   as info; they vary between runs and are never pass/fail on their own.
- * - H1 harness-written outcome (only when `expectAppliedEffort` is true): the
- *   raw `agent/awf-routing-outcome.json` has `status: selected`, its
- *   `wire_model` is the proxy-selected model, and its `applied_effort` equals
- *   the proxy selection record's selected effort. This is the harness's record
- *   of the effort it passed to the client, kept separate from runner/proxy
- *   evidence; it is not evidence of the effort on the upstream wire.
  * - H2 coverage effort (only when `expectSelectedEffort` is set): the proxy
  *   selection record's selected effort equals the expected effort, so a run
  *   that routed to a different effort is not mistaken for coverage of it.
@@ -105,7 +97,6 @@ const SESSION_PATH = "usage/aw_session.jsonl";
 const TOKEN_USAGE_PATHS = ["sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl"];
 const MODEL_ROUTING_PATHS = TOKEN_USAGE_PATHS.map(file => file.replace(/token-usage\.jsonl$/, "model-routing.jsonl"));
 const REFLECT_PATHS = ["sandbox/firewall/awf-reflect.json", "agent/awf-reflect.json"];
-const HARNESS_OUTCOME_PATH = "agent/awf-routing-outcome.json";
 const CLASSIFIER_PURPOSE = "routing_classification";
 const MAX_OBSERVED = 12;
 const STEERING_THRESHOLDS = [80, 90, 95, 99];
@@ -133,7 +124,6 @@ const RESOLVED_STATUSES = ["exact", "resolved"];
  *   requireDeclaredAgentNames?: boolean,
  *   executionOutcome?: string,
  *   steering?: SteeringExpectation,
- *   expectAppliedEffort?: boolean,
  *   expectSelectedEffort?: string,
  * }} RoutingExpectations
  * @typedef {{ passes: string[], failures: string[], info?: string[] }} RoutingAssertionResults
@@ -506,37 +496,6 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
 }
 
 /**
- * H1: the harness-written routing outcome records the proxy-selected effort as
- * the applied effort. The selected model and effort come from the firewall
- * selection record; the applied effort comes only from the raw harness file.
- * @param {{ events: any[], harnessOutcome: { record: any, problem: string | null } }} evidence
- * @returns {RoutingAssertionResults}
- */
-function evaluateAppliedEffortEvidence({ events, harnessOutcome }) {
-  /** @type {RoutingAssertionResults} */
-  const results = { passes: [], failures: [], info: [] };
-  const selection = events.filter(event => event?.type === "firewall.model_routing" && event.provenance?.component === "firewall" && event.data?.stage === "selection" && event.data?.selectedModel).at(-1)?.data;
-  const selectedModel = servedModel(selection?.selectedModel);
-  const selectedEffort = selection?.selectedEffort ?? null;
-  const record = harnessOutcome.record;
-  const appliedEffort = record?.applied_effort ?? null;
-  const problems = [];
-  if (harnessOutcome.problem) problems.push(harnessOutcome.problem);
-  else if (!isPlainObject(record)) problems.push(`${HARNESS_OUTCOME_PATH} is not a JSON object`);
-  else {
-    if (record.status !== "selected") problems.push(`harness outcome status is ${record.status ?? "missing"}${record.failure_code ? ` (${record.failure_code})` : ""}, expected selected`);
-    if (!selection) problems.push("no firewall model_routing selection record with a selected model to compare against");
-    else {
-      if (servedModel(record.wire_model) !== selectedModel) problems.push(`harness outcome wire_model ${record.wire_model ?? "missing"} differs from the proxy-selected model ${selectedModel}`);
-      if (appliedEffort !== selectedEffort) problems.push(`harness outcome applied_effort ${appliedEffort ?? "null"} differs from the proxy-selected effort ${selectedEffort ?? "null"}`);
-    }
-  }
-  if (problems.length) results.failures.push(`FAIL H1 ${problems.join("; ")}`);
-  else results.passes.push(`PASS H1 harness-written outcome applied_effort=${appliedEffort ?? "null"} matches the proxy-selected effort for ${selectedModel} (harness record, not upstream wire evidence)`);
-  return results;
-}
-
-/**
  * H2: the proxy-selected effort is the effort this smoke exists to cover.
  * @param {{ events: any[], expectedEffort: string }} evidence
  * @returns {RoutingAssertionResults}
@@ -823,12 +782,10 @@ function readJsonl(file, problems) {
  * Collect evidence from the gh-aw temp directory. Post-steps run before the
  * usage-artifact step writes aw_session.jsonl, so the unified session is built first.
  * With `sessionOnly`, only the unified session is read.
- * With `withHarnessOutcome`, the raw harness-written routing outcome is read
- * separately; a missing or broken file is reported by H1, not as an E2 problem.
- * @param {{ rootDir?: string, engine?: string, buildSession?: boolean, withRoutingRecords?: boolean, sessionOnly?: boolean, withHarnessOutcome?: boolean }} [options]
- * @returns {{ events: any[], requests: any[], routingRecords: any[], reflect: any, problems: string[], sessionFound: boolean, harnessOutcome: { record: any, problem: string | null } | null }}
+ * @param {{ rootDir?: string, engine?: string, buildSession?: boolean, withRoutingRecords?: boolean, sessionOnly?: boolean }} [options]
+ * @returns {{ events: any[], requests: any[], routingRecords: any[], reflect: any, problems: string[], sessionFound: boolean }}
  */
-function collectModelRoutingEvidence({ rootDir = DEFAULT_ROOT_DIR, engine, buildSession = true, withRoutingRecords = false, sessionOnly = false, withHarnessOutcome = false } = {}) {
+function collectModelRoutingEvidence({ rootDir = DEFAULT_ROOT_DIR, engine, buildSession = true, withRoutingRecords = false, sessionOnly = false } = {}) {
   /** @type {string[]} */
   const problems = [];
   if (buildSession) {
@@ -845,7 +802,7 @@ function collectModelRoutingEvidence({ rootDir = DEFAULT_ROOT_DIR, engine, build
   const sessionFound = fs.existsSync(sessionFile);
   if (sessionFound) events = readJsonl(sessionFile, problems);
   else problems.push(`missing ${SESSION_PATH}`);
-  if (sessionOnly) return { events, requests: [], routingRecords: [], reflect: null, problems, sessionFound, harnessOutcome: null };
+  if (sessionOnly) return { events, requests: [], routingRecords: [], reflect: null, problems, sessionFound };
 
   let requests = [];
   const tokenFile = TOKEN_USAGE_PATHS.map(file => path.join(rootDir, file)).find(file => fs.existsSync(file));
@@ -870,17 +827,7 @@ function collectModelRoutingEvidence({ rootDir = DEFAULT_ROOT_DIR, engine, build
       problems.push(`${reflectFile} is not valid JSON: ${getErrorMessage(error)}`);
     }
   }
-  /** @type {{ record: any, problem: string | null } | null} */
-  let harnessOutcome = null;
-  if (withHarnessOutcome) {
-    const outcomeFile = path.join(rootDir, HARNESS_OUTCOME_PATH);
-    try {
-      harnessOutcome = { record: JSON.parse(fs.readFileSync(outcomeFile, "utf8")), problem: null };
-    } catch (error) {
-      harnessOutcome = { record: null, problem: fs.existsSync(outcomeFile) ? `${HARNESS_OUTCOME_PATH} is not valid JSON: ${getErrorMessage(error)}` : `missing harness-written ${HARNESS_OUTCOME_PATH}` };
-    }
-  }
-  return { events, requests, routingRecords, reflect, problems, sessionFound, harnessOutcome };
+  return { events, requests, routingRecords, reflect, problems, sessionFound };
 }
 
 /**
@@ -908,15 +855,10 @@ function appendSessionContract(results, evidence, expectations) {
  */
 function checkModelRoutingEvidence(options) {
   const { rootDir, engine, buildSession, ...expectations } = options;
-  const evidence = collectModelRoutingEvidence({ rootDir, engine, buildSession, withRoutingRecords: Boolean(expectations.steering), withHarnessOutcome: Boolean(expectations.expectAppliedEffort) });
+  const evidence = collectModelRoutingEvidence({ rootDir, engine, buildSession, withRoutingRecords: Boolean(expectations.steering) });
   const results = evaluateModelRoutingEvidence({ events: evidence.events, requests: evidence.requests, reflect: evidence.reflect, expectations });
   if (evidence.problems.length) results.failures.unshift(...evidence.problems.map(problem => `FAIL E2 evidence: ${problem}`));
   else results.passes.unshift("PASS E2 evidence: unified session and api-proxy token usage present");
-  if (expectations.expectAppliedEffort && evidence.harnessOutcome) {
-    const applied = evaluateAppliedEffortEvidence({ events: evidence.events, harnessOutcome: evidence.harnessOutcome });
-    results.passes.push(...applied.passes);
-    results.failures.push(...applied.failures);
-  }
   if (expectations.expectSelectedEffort) {
     const coverage = evaluateSelectedEffortCoverage({ events: evidence.events, expectedEffort: expectations.expectSelectedEffort });
     results.passes.push(...coverage.passes);
@@ -1175,7 +1117,6 @@ module.exports = {
   supportedEfforts,
   evaluateModelRoutingEvidence,
   evaluateSteeringEvidence,
-  evaluateAppliedEffortEvidence,
   evaluateSelectedEffortCoverage,
   collectModelRoutingEvidence,
   checkModelRoutingEvidence,

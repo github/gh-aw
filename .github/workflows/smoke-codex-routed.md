@@ -1,7 +1,7 @@
 ---
 private: true
 emoji: "🧭"
-description: Smoke Codex model routing with deterministic runner and proxy evidence checks and the harness-applied effort
+description: Smoke Codex model routing with deterministic runner and proxy evidence checks
 on:
   schedule: every 2 days
   workflow_dispatch:
@@ -63,7 +63,6 @@ post-steps:
           executionOutcome: process.env.SMOKE_EXECUTION,
           allowedModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
           mainEndpoint: "/responses",
-          expectAppliedEffort: true,
           expectSelectedEffort: "max",
         });
 ---
@@ -82,4 +81,4 @@ Create an issue titled **"Smoke Test: Codex Routed - ${{ github.run_id }}"** wit
 - ✅ for the task above
 - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-The routing verdict comes from the post-step, which checks runner- and proxy-written evidence and the harness-recorded applied effort, not this report. It fails (H2) when the proxy selected an effort other than `max`, so a run that did not exercise `max` is never counted as coverage.
+The routing verdict comes from the post-step, which checks runner- and proxy-written evidence, not this report. It fails (H2) when the proxy selected an effort other than `max`, so a run that did not exercise `max` is never counted as coverage.

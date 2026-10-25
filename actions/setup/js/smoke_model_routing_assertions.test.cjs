@@ -531,12 +531,12 @@ describe("smoke_model_routing_assertions", () => {
     const ROUTING = "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl";
     const golden = file => fs.readFileSync(path.join(goldenDir, file), "utf8");
     const GPT_56 = ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"];
-    const codexExpectations = { engine: "codex", allowedModels: GPT_56, mainEndpoint: "/responses", executionOutcome: "success", expectAppliedEffort: true, expectSelectedEffort: "max" };
+    const codexExpectations = { engine: "codex", allowedModels: GPT_56, mainEndpoint: "/responses", executionOutcome: "success", expectSelectedEffort: "max" };
     const lunaReflect = {
       endpoints: [{ provider: "copilot", routing_models: [{ model_id: "gpt-5.6-luna", supported_endpoints: ["/responses", "ws:/responses"], supported_reasoning_efforts: ["none", "low", "medium", "high", "xhigh", "max"] }] }],
     };
 
-    function codexFixture({ selectedEffort = "max", outcome = { status: "selected", wire_model: "gpt-5.6-luna", endpoint: "/responses", selected_endpoint: "/responses", effort: selectedEffort, applied_effort: selectedEffort } } = {}) {
+    function codexFixture({ selectedEffort = "max" } = {}) {
       const awInfo = JSON.parse(golden("aw_info.json"));
       awInfo.engine_id = "codex";
       awInfo.model_routing = { ...awInfo.model_routing, effort: selectedEffort };
@@ -549,22 +549,20 @@ describe("smoke_model_routing_assertions", () => {
       write(ROUTING, records);
       write(TOKEN_USAGE, golden(TOKEN_USAGE));
       write("sandbox/firewall/awf-reflect.json", lunaReflect);
-      if (outcome) write("agent/awf-routing-outcome.json", outcome);
     }
 
     const codexCheck = (expectations = {}) => checkModelRoutingEvidence({ rootDir: root, ...codexExpectations, ...expectations });
 
-    it.each(["max", "none"])("routed_codex_smoke_records_selected_effort_as_applied (%s)", effort => {
+    it.each(["max", "none"])("routed_codex_smoke_checks_proxy-selected effort (%s)", effort => {
       codexFixture({ selectedEffort: effort });
       const results = codexCheck({ expectSelectedEffort: effort });
       expect(results.failures).toEqual([]);
-      expect(checkIds(results.passes)).toEqual(["E2", "E1", "R1", "R2", "R3", "R4", "M1", "H1", "H2"]);
+      expect(checkIds(results.passes)).toEqual(["E2", "E1", "R1", "R2", "R3", "R4", "M1", "H2"]);
       expect(results.passes).toContain(`PASS H2 proxy-selected effort ${effort} is the covered effort`);
-      expect(results.passes).toContain(`PASS H1 harness-written outcome applied_effort=${effort} matches the proxy-selected effort for gpt-5.6-luna (harness record, not upstream wire evidence)`);
       expect(results.passes).toContain("PASS R3 main-agent request on selected model: gpt-5.6-luna /responses 200");
     });
 
-    it("routed_codex_smoke_records_selected_effort_as_applied: the workflow configures routed Codex on GitHub with gpt-5.6 candidates and H1", () => {
+    it("routed_codex_smoke_checks_proxy-selected effort: the workflow configures routed Codex on GitHub with gpt-5.6 candidates", () => {
       const workflow = fs.readFileSync(new URL("../../../.github/workflows/smoke-codex-routed.md", import.meta.url), "utf8");
       const engine = workflow
         .split("\nengine:\n")[1]
@@ -578,7 +576,7 @@ describe("smoke_model_routing_assertions", () => {
       expect(workflow).toContain('engine: "codex"');
       expect(workflow).toContain('allowedModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]');
       expect(workflow).toContain('mainEndpoint: "/responses"');
-      expect(workflow).toContain("expectAppliedEffort: true");
+      expect(workflow).not.toContain("expectAppliedEffort");
       expect(workflow).toContain('expectSelectedEffort: "max"');
     });
 
@@ -587,31 +585,13 @@ describe("smoke_model_routing_assertions", () => {
       expect(codexCheck().failures).toEqual(["FAIL H2 proxy-selected effort high, expected max: this run does not cover the max path"]);
     });
 
-    it("fails only H1 when the harness applied a different effort than the proxy selected", () => {
-      codexFixture({ outcome: { status: "selected", wire_model: "gpt-5.6-luna", endpoint: "/responses", effort: "max", applied_effort: "xhigh" } });
-      expect(codexCheck().failures).toEqual(["FAIL H1 harness outcome applied_effort xhigh differs from the proxy-selected effort max"]);
-    });
-
-    it("fails H1 for the pre-fix rejected harness outcome", () => {
-      codexFixture({ outcome: { status: "rejected", failure_code: "unsupported_effort", detail: 'AWF model routing effort "max" is not supported by the codex engine' } });
-      expect(codexCheck().failures).toEqual([
-        "FAIL H1 harness outcome status is rejected (unsupported_effort), expected selected; harness outcome wire_model missing differs from the proxy-selected model gpt-5.6-luna; harness outcome applied_effort null differs from the proxy-selected effort max",
-      ]);
-    });
-
-    it("fails H1, not E2, when the harness outcome is missing", () => {
-      codexFixture({ outcome: null });
+    it("ignores agent-writable harness outcome for pass/fail", () => {
+      codexFixture();
+      write("agent/awf-routing-outcome.json", { status: "rejected", wire_model: "attacker-model", applied_effort: "high" });
       const results = codexCheck();
-      expect(results.failures).toEqual(["FAIL H1 missing harness-written agent/awf-routing-outcome.json"]);
-      expect(checkIds(results.passes)).toContain("E2");
-    });
-
-    it("does not read the harness outcome or add H1 unless expectAppliedEffort is set", () => {
-      codexFixture({ outcome: null });
-      const results = codexCheck({ expectAppliedEffort: undefined, expectSelectedEffort: undefined });
       expect(results.failures).toEqual([]);
       expect(checkIds(results.passes)).not.toContain("H1");
-      expect(checkIds(results.passes)).not.toContain("H2");
+      expect(results.passes).toContain("PASS H2 proxy-selected effort max is the covered effort");
     });
   });
 
