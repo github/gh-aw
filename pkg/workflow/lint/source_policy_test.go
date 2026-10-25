@@ -18,6 +18,55 @@ func policyTestInput(t *testing.T, frontmatter string) Input {
 	return Input{Workflow: &actions.Workflow{}, Document: document}
 }
 
+func TestAuthoredImportEntries(t *testing.T) {
+	conditional := map[string]any{"path": "shared.md", "if": false}
+	for _, tt := range []struct {
+		name        string
+		frontmatter map[string]any
+		entries     []any
+		path        string
+		present     bool
+		invalid     bool
+	}{
+		{"absent", nil, nil, "imports", false, false},
+		{"null", map[string]any{"imports": nil}, nil, "imports", true, true},
+		{"empty mapping", map[string]any{"imports": map[string]any{}}, nil, "imports.aw", false, false},
+		{"other import kind", map[string]any{"imports": map[string]any{"mcp": []any{"server"}}}, nil, "imports.aw", false, false},
+		{"null aw", map[string]any{"imports": map[string]any{"aw": nil}}, nil, "imports.aw", true, true},
+		{"any list", map[string]any{"imports": []any{"shared.md"}}, []any{"shared.md"}, "imports", true, false},
+		{"string list", map[string]any{"imports": []string{"shared.md"}}, []any{"shared.md"}, "imports", true, false},
+		{"aw any list", map[string]any{"imports": map[string]any{"aw": []any{"shared.md"}}}, []any{"shared.md"}, "imports.aw", true, false},
+		{"aw string list", map[string]any{"imports": map[string]any{"aw": []string{"shared.md"}}}, []any{"shared.md"}, "imports.aw", true, false},
+		{"empty list", map[string]any{"imports": []any{}}, []any{}, "imports", true, false},
+		{"empty string list", map[string]any{"imports": []string{}}, nil, "imports", true, false},
+		{"nil list", map[string]any{"imports": []any(nil)}, nil, "imports", true, false},
+		{"nil string list", map[string]any{"imports": []string(nil)}, nil, "imports", true, false},
+		{"malformed imports", map[string]any{"imports": "PRIVATE_VALUE"}, nil, "imports", true, true},
+		{"malformed aw", map[string]any{"imports": map[string]any{"aw": true}}, nil, "imports.aw", true, true},
+		{"malformed entry is not inspected", map[string]any{"imports": []any{42}}, []any{42}, "imports", true, false},
+		{"conditional entry", map[string]any{"imports": []any{conditional}}, []any{conditional}, "imports", true, false},
+		{"aw conditional entry", map[string]any{"imports": map[string]any{"aw": []any{conditional}}}, []any{conditional}, "imports.aw", true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			before, err := json.Marshal(tt.frontmatter)
+			require.NoError(t, err)
+			entries, path, present, err := authoredImportEntries(tt.frontmatter)
+			if tt.invalid {
+				require.Error(t, err)
+				assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.entries, entries)
+			assert.Equal(t, tt.path, path)
+			assert.Equal(t, tt.present, present)
+			after, err := json.Marshal(tt.frontmatter)
+			require.NoError(t, err)
+			assert.Equal(t, before, after)
+		})
+	}
+}
+
 func TestAuthoredImportsPending(t *testing.T) {
 	for _, tt := range []struct {
 		name, text string
@@ -25,12 +74,14 @@ func TestAuthoredImportsPending(t *testing.T) {
 		invalid    bool
 	}{
 		{"absent", "", false, false},
+		{"null imports", "imports: null", false, false},
 		{"empty list", "imports: []", false, false},
 		{"list", "imports: [shared.md]", true, false},
 		{"empty object", "imports: {}", false, false},
 		{"empty aw", "imports: {aw: []}", false, false},
 		{"aw paths", "imports: {aw: [shared.md]}", true, false},
 		{"aw mappings", "imports: {aw: [{path: shared.md, inputs: {key: value}}]}", true, false},
+		{"conditional entry", "imports: [{path: shared.md, if: false}]", true, false},
 		{"invalid imports", "imports: PRIVATE_VALUE", false, true},
 		{"invalid aw string", "imports: {aw: PRIVATE_VALUE}", false, true},
 		{"invalid aw mapping", "imports: {aw: {path: PRIVATE_VALUE}}", false, true},
@@ -58,6 +109,60 @@ func TestAuthoredImportsPending(t *testing.T) {
 	pending, err := authoredImportsPending(Input{})
 	require.NoError(t, err)
 	assert.False(t, pending)
+}
+
+func TestAuthoredImportDeferralRules(t *testing.T) {
+	for _, policy := range []struct {
+		rule  Rule
+		text  string
+		paths []string
+	}{
+		{ToolScopeRule(), "tools: {github: {min-integrity: none}}", []string{"tools.bash"}},
+		{PushTargetRule(), "safe-outputs: {push-to-pull-request-branch: {target: '*'}}", []string{"safe-outputs.push-to-pull-request-branch.target"}},
+		{CheckoutModeRule(), "checkout: {multi: true}", []string{"checkout.path", "checkout.allowed-repos"}},
+		{PullRequestTargetCheckoutRule(), "on: pull_request_target", []string{"checkout"}},
+		{NeedsConsistencyRule(), "jobs: {check: {needs: imported}}", []string{"jobs.check.needs"}},
+	} {
+		t.Run(policy.rule.ID, func(t *testing.T) {
+			for _, imports := range []struct {
+				text    string
+				pending bool
+				invalid bool
+			}{
+				{"", false, false},
+				{"imports: null\n", false, false},
+				{"imports: {}\n", false, false},
+				{"imports: []\n", false, false},
+				{"imports: {aw: []}\n", false, false},
+				{"imports: [shared.md]\n", true, false},
+				{"imports: {aw: [shared.md]}\n", true, false},
+				{"imports: {aw: [{path: shared.md, if: false}]}\n", true, false},
+				{"imports: {aw: null}\n", false, true},
+				{"imports: PRIVATE_VALUE\n", false, true},
+				{"imports: {aw: PRIVATE_VALUE}\n", false, true},
+			} {
+				t.Run(imports.text, func(t *testing.T) {
+					input := ruleContractInput(t, imports.text+policy.text+"\n", AWAST, false)
+					diagnostics, err := policy.rule.Check(context.Background(), input)
+					if imports.invalid {
+						require.Error(t, err)
+						assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
+						return
+					}
+					require.NoError(t, err)
+					var paths []string
+					for _, diagnostic := range diagnostics {
+						paths = append(paths, diagnostic.Path)
+					}
+					if imports.pending {
+						assert.Empty(t, paths)
+					} else {
+						assert.Equal(t, policy.paths, paths)
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestSourcePolicySeverityAndBoundaries(t *testing.T) {
@@ -155,6 +260,30 @@ func TestConditionalImportRule(t *testing.T) {
 				assert.NotContains(t, diagnostic.Message, "private-value")
 			}
 		})
+	}
+}
+
+func TestConditionalImportStringLists(t *testing.T) {
+	for _, imports := range []any{
+		[]string{}, []string(nil), []string{"shared.md"},
+		map[string]any{"aw": []string{}},
+		map[string]any{"aw": []string(nil)},
+		map[string]any{"aw": []string{"shared.md"}},
+	} {
+		input := policyTestInput(t, "")
+		input.Document.Frontmatter["imports"] = imports
+		diagnostics, err := ConditionalImportRule().Check(context.Background(), input)
+		require.NoError(t, err)
+		assert.Empty(t, diagnostics)
+	}
+	for _, tt := range []struct {
+		text, path string
+	}{
+		{"imports: null", "imports"},
+		{"imports: {aw: null}", "imports.aw"},
+	} {
+		_, err := ConditionalImportRule().Check(context.Background(), policyTestInput(t, tt.text))
+		require.EqualError(t, err, "conditional-import requires "+tt.path+" to be a list; correct the AW frontmatter")
 	}
 }
 
