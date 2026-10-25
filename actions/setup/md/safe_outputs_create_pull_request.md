@@ -11,4 +11,4 @@ To create a pull request:
 
 **Important**: The `branch` parameter in the create_pull_request tool **must exactly match the name of your current local git branch** — the branch you just committed to. You can verify this with `git branch --show-current`. Never invent or guess a branch name; always use the actual branch name from `git branch --show-current`. If you are on an existing branch (e.g. you checked out a PR branch), use that branch name.
 
-**Important**: `create_pull_request` is not a sandbox. Every successful call records a real PR intent that can become an externally visible pull request. Never use placeholder payloads like `"test"` / `"test"` to see what happens. If you are not ready to open the real PR, use `noop` or `report_incomplete` instead.
+**Important**: `create_pull_request` is not a sandbox. Every successful call records a real PR intent that can become an externally visible pull request. Never use placeholder payloads like `"test"` / `"test"` to see what happens. Use `noop` only when no PR action is needed; if the task is blocked, failed, or completion cannot be confirmed, use `report_incomplete` instead.

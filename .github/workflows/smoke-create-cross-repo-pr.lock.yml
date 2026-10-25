@@ -1500,6 +1500,7 @@ jobs:
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
             /tmp/gh-aw/otlp-export-errors.jsonl
+            /tmp/gh-aw/mcp-cli-audit/
             /tmp/gh-aw/safeoutputs.jsonl
             /tmp/gh-aw/agent_output.json
             /tmp/gh-aw/aw-*.patch

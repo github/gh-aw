@@ -61,6 +61,8 @@ func TestCrossRepoSmokeTerminalSafeOutputGuidanceAndTelemetry(t *testing.T) {
 	prompt, err := os.ReadFile("../../actions/setup/md/safe_outputs_prompt.md")
 	require.NoError(t, err)
 	assert.Contains(t, string(prompt), "mandatory final step")
+	assert.Contains(t, string(prompt), "successful non-diagnostic safe-output tool")
+	assert.Contains(t, string(prompt), "`report_missing_tool` and `report_missing_data` are diagnostic tools and do not count as terminal output")
 	assert.Contains(t, string(prompt), "at least one safe-output call succeeded")
 	assert.Contains(t, string(prompt), "A failed tool call or a final text response does not satisfy this requirement")
 	assert.Contains(t, string(prompt), "`noop` only when no action was needed")
@@ -75,11 +77,17 @@ func TestCrossRepoSmokeTerminalSafeOutputGuidanceAndTelemetry(t *testing.T) {
 			require.NoError(t, err)
 			output, err := compiler.CompileToYAML(data, source)
 			require.NoError(t, err)
-			assert.Contains(t, promptRenderPlan(t, output), "safe_outputs_prompt.md")
+			promptPlan := promptRenderPlan(t, output)
+			assert.Contains(t, promptPlan, "safe_outputs_prompt.md")
+			assert.Contains(t, promptPlan, "mcp_cli_tools_with_safeoutputs_prompt.md")
+			if name == "smoke-create-cross-repo-pr" {
+				assert.Contains(t, promptPlan, "safe_outputs_create_pull_request.md")
+			}
 
 			var workflow struct {
 				Jobs map[string]struct {
 					Steps []struct {
+						Name string            `yaml:"name"`
 						ID   string            `yaml:"id"`
 						If   string            `yaml:"if"`
 						Env  map[string]string `yaml:"env"`
@@ -88,9 +96,15 @@ func TestCrossRepoSmokeTerminalSafeOutputGuidanceAndTelemetry(t *testing.T) {
 				} `yaml:"jobs"`
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
-			collectorFound, reporterFound := false, false
+			collectorFound, reporterFound, artifactUploadFound := false, false, false
 			for job, config := range workflow.Jobs {
 				for _, step := range config.Steps {
+					if job == "agent" && step.Name == "Upload agent artifacts" {
+						artifactUploadFound = true
+						assert.Contains(t, step.With["path"], "/tmp/gh-aw/mcp-logs/")
+						assert.Contains(t, step.With["path"], "/tmp/gh-aw/safeoutputs.jsonl")
+						assert.Contains(t, step.With["path"], "/tmp/gh-aw/mcp-cli-audit/")
+					}
 					if job == "agent" && step.ID == "collect_output" {
 						collectorFound = true
 						assert.Equal(t, "always()", step.If)
@@ -104,6 +118,7 @@ func TestCrossRepoSmokeTerminalSafeOutputGuidanceAndTelemetry(t *testing.T) {
 			}
 			assert.True(t, collectorFound, "Smoke run must collect safe-output evidence even after startup failure")
 			assert.True(t, reporterFound, "Smoke run must report safe-output evidence on failure")
+			assert.True(t, artifactUploadFound, "Smoke run must upload CLI audit data for conclusion reporting")
 		})
 	}
 }

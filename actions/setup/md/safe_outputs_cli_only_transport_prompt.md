@@ -9,4 +9,4 @@ safeoutputs add_comment '{"item_number":42,"body":"### Result\n\nIt\u0027s ready
 ```
 Adapt fields to the enabled tool's schema. Stdin is also supported: `safeoutputs <tool_name> .` reads a complete JSON object from stdin. Prefer inline JSON without auxiliary tools, pipelines, temporary files, or shell expansion; stdin support does not grant permission for helper commands or redirections.
 
-Report unavailable functionality with `report_missing_tool` when configured and reachable; reserve `report_incomplete` for failed write attempts. If the diagnostic tool is unavailable or denied, report the limitation in the final response. Never bypass a denial using an unapproved shell workaround.
+Report unavailable functionality with `report_missing_tool` when configured and reachable, but remember that diagnostics do not satisfy the terminal safe-output requirement. Use `report_incomplete` when the task is blocked, a write fails, or completion cannot be confirmed. If the diagnostic tool is unavailable or denied, report the limitation in the final response. Never bypass a denial using an unapproved shell workaround.
