@@ -64,41 +64,12 @@ func (c *Compiler) generateUnifiedArtifactUpload(yaml *strings.Builder, paths []
 }
 
 func (c *Compiler) generateTrackedSecretRedactionStep(yaml *strings.Builder, yamlContent string, data *WorkflowData) {
-	secretReferences := CollectSecretReferences(yamlContent)
-	body := injectProtectedCaptureSecretEnvironment(yaml.String(), secretReferences)
 	var step strings.Builder
 	c.generateSecretRedactionStep(&step, yamlContent, data)
-	redactionStep := strings.Replace(step.String(),
+	yaml.WriteString(strings.Replace(step.String(),
 		"      - name: Redact secrets in logs\n",
 		"      - name: Redact secrets in logs\n        id: redact_secrets\n",
-		1)
-	yaml.Reset()
-	yaml.WriteString(body)
-	yaml.WriteString(redactionStep)
-}
-
-func injectProtectedCaptureSecretEnvironment(yamlContent string, secretReferences []string) string {
-	if len(secretReferences) == 0 {
-		return yamlContent
-	}
-	const parserStep = "      - name: Parse agent logs for step summary\n"
-	const protectedCapture = "          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n"
-	start := strings.Index(yamlContent, parserStep)
-	if start < 0 {
-		return yamlContent
-	}
-	end := len(yamlContent)
-	if nextStep := strings.Index(yamlContent[start+len(parserStep):], "\n      - name:"); nextStep >= 0 {
-		end = start + len(parserStep) + nextStep
-	}
-	step := yamlContent[start:end]
-	if !strings.Contains(step, protectedCapture) {
-		return yamlContent
-	}
-	var secretEnvironment strings.Builder
-	secretEnvironment.WriteString("          GH_AW_SECRET_NAMES: '" + strings.Join(secretReferences, ",") + "'\n")
-	step = strings.Replace(step, protectedCapture, protectedCapture+secretEnvironment.String(), 1)
-	return yamlContent[:start] + step + yamlContent[end:]
+		1))
 }
 
 // generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing
@@ -108,7 +79,7 @@ func injectProtectedCaptureSecretEnvironment(yamlContent string, secretReference
 // artifact and every safe output is silently dropped. Uploading the few-KB payload separately
 // gives those jobs a reliable fallback source.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
-func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data *WorkflowData, prefix string) {
+func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data *WorkflowData, prefix string, protectedSessionCapture bool) {
 	if data.SafeOutputs == nil || data.SafeOutputs.AutoInjectedCreateIssue {
 		return
 	}
@@ -141,7 +112,11 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 	yaml.WriteString("      # Small dedicated copy of the agent output so safe-output processing\n")
 	yaml.WriteString("      # survives a failed or timed-out upload of the larger agent artifact\n")
 	yaml.WriteString("      - name: Upload agent output fallback artifact\n")
-	yaml.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
+	condition := "always() && " + secretRedactionSuccessCondition(data)
+	if protectedSessionCapture {
+		condition += " && steps.parse_agent_logs.outcome == 'success'"
+	}
+	yaml.WriteString("        if: " + condition + "\n")
 	yaml.WriteString("        continue-on-error: true\n")
 	yaml.WriteString("        uses: " + c.getActionPin("actions/upload-artifact") + "\n")
 	yaml.WriteString("        with:\n")

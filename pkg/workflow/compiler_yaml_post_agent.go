@@ -172,7 +172,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 // AWF reflect summary, and observability summary.
 func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine) {
 	// Parse agent logs for GITHUB_STEP_SUMMARY
-	c.generateLogParsing(yaml, data, engine)
+	if protectedSessionCaptureParserID(engine) == "" {
+		c.generateLogParsing(yaml, data, engine)
+	}
 
 	// Parse mcp-scripts logs for GITHUB_STEP_SUMMARY (if mcp-scripts is enabled)
 	if IsMCPScriptsEnabled(data.MCPScripts) {
@@ -302,9 +304,9 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	// In workflow_call context, apply the per-invocation prefix to avoid name clashes.
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
 	compilerYamlLog.Printf("Emitting unified agent artifact upload with %d path(s)", len(artifactPaths))
-	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix)
 	behaviorEngine, protectedSessionCapture := engine.(*BehaviorDefinedEngine)
 	protectedSessionCapture = protectedSessionCapture && behaviorEngine.protectedSessionCaptureEnabled()
+	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix, protectedSessionCapture)
 	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, data, protectedSessionCapture)
 
 	// In dev mode the setup action is referenced via a local path (./actions/setup), so its files

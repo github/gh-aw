@@ -82,6 +82,8 @@ describe("log_parser_bootstrap.cjs", () => {
             process.env.GH_AW_PROTECTED_SESSION_CAPTURE = "1";
             process.env.GH_AW_SECRET_NAMES = "SESSION_TEST";
             process.env.SECRET_SESSION_TEST = "opaque-configured-secret";
+            process.env.GH_AW_SAFE_OUTPUTS = path.join(tmpDir, "safeoutputs.jsonl");
+            fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS, '{"type":"noop","message":"opaque-configured-secret"}\n');
             const mockParseLog = vi.fn().mockReturnValue({
               markdown: "summary opaque-configured-secret",
               logEntries: [
@@ -97,6 +99,7 @@ describe("log_parser_bootstrap.cjs", () => {
             const published = fs.readFileSync(path.join(artifactDir, "agent-session.jsonl"), "utf8");
             expect(published).not.toContain("private secret");
             expect(published).not.toContain("stdout secret");
+            expect(published).not.toContain("opaque-configured-secret");
             expect(published).not.toContain("forged");
             expect(published).toContain('"status":"failure"');
             expect(published).toContain('"exitCode":17');
@@ -106,12 +109,14 @@ describe("log_parser_bootstrap.cjs", () => {
             expect(stdio).not.toContain("trusted stderr");
             expect(stdio).not.toContain("private secret");
             expect(JSON.stringify(mockCore.summary.addRaw.mock.calls)).not.toContain("opaque-configured-secret");
+            expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain("opaque-configured-secret");
             const unified = collectUnifiedSession({ rootDir: artifactDir, engine: "custom", dailyAIC: {}, admission: {}, jobResults: "" });
             expect(unified.events.find(event => event.type === "agent.execution")?.data.exitCode).toBe(17);
             expect(JSON.stringify(unified.events)).not.toContain("forged from agent-errors");
             expect(mockCore.setFailed).not.toHaveBeenCalled();
           } finally {
             delete process.env.GH_AW_PROTECTED_SESSION_CAPTURE;
+            delete process.env.GH_AW_SAFE_OUTPUTS;
             fs.rmSync(tmpDir, { recursive: true, force: true });
           }
         }),

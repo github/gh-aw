@@ -157,7 +157,7 @@ func TestBehaviorDefinedEngineHarnessScript(t *testing.T) {
 		parserYAML := parserStepYAML[:redactionStepStart]
 		redactionYAML := parserStepYAML[redactionStepStart:]
 		assert.Contains(t, parserYAML, "GH_AW_SECRET_NAMES: 'CAPTURE_TEST_SECRET'")
-		assert.NotContains(t, parserYAML, "SECRET_CAPTURE_TEST_SECRET:")
+		assert.Contains(t, parserYAML, "SECRET_CAPTURE_TEST_SECRET: ${{ secrets.CAPTURE_TEST_SECRET }}")
 		assert.Contains(t, redactionYAML, "SECRET_CAPTURE_TEST_SECRET: ${{ secrets.CAPTURE_TEST_SECRET }}")
 	})
 

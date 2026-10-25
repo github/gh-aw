@@ -373,10 +373,10 @@ async function main() {
     let collectorEngineErrorType;
     const hasTerminalOutput = parsedItems.some(item => !["report_missing_tool", "report_missing_data"].includes(item.type));
     let failedFinalResult = false;
-    let session;
+    let session = process.env.GH_AW_PROTECTED_SESSION_CAPTURE === "1" ? collectOutcomeSession(TMP_GH_AW_PATH) : undefined;
     if (!queueScope && hasTerminalOutput) {
       try {
-        session = collectOutcomeSession(TMP_GH_AW_PATH);
+        session ??= collectOutcomeSession(TMP_GH_AW_PATH);
         failedFinalResult = hasFailedFinalResult(session.events);
       } catch {
         core.warning("Runtime diagnostics could not be collected.");

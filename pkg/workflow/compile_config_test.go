@@ -198,7 +198,7 @@ func TestSafeOutputsConfigGeneration(t *testing.T) {
 
 			// Use the compiler's generateOutputCollectionStep to verify config is not in env vars
 			var yamlBuilder strings.Builder
-			err := compiler.generateOutputCollectionStep(&yamlBuilder, workflowData)
+			err := compiler.generateOutputCollectionStep(&yamlBuilder, workflowData, false)
 			if err != nil {
 				t.Fatalf("generateOutputCollectionStep returned unexpected error: %v", err)
 			}

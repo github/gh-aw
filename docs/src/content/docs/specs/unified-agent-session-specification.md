@@ -1639,6 +1639,14 @@ publication, gate session-artifact uploads, and discard stale publishable
 artifacts without following artifact symlinks. Cleanup failure MUST be reported
 explicitly and MUST NOT make artifacts eligible for upload.
 
+Verification and structure-preserving publication MUST precede any collector
+that derives outcomes from session evidence. In protected mode those collectors
+MUST use the verified canonical agent session without legacy-log or error-sidecar
+recovery. Both unified and fallback artifact exports of session-derived evidence
+MUST require successful protected parsing. The trusted publication step MUST
+receive configured secret values, not only their names, before emitting summary
+or artifact copies.
+
 Protected session capture MUST NOT be enabled when workflow `evals` are
 configured, because the secondary engine invocation consumes `evals.log` rather
 than the native capture.

@@ -99,6 +99,8 @@ The parser receives only the final started attempt's **stderr**, selected from `
 
 Protected session capture is not compatible with `evals`, which runs a secondary engine invocation that consumes `evals.log`; compilation rejects this combination.
 
+Protected verification and publication run before safe-output ingestion. The trusted parser step receives configured secret values for publication redaction; these bindings are not added to the guest execution environment. Outcome collection uses only the verified canonical agent session, without shared-log or error-sidecar recovery. Both unified and fallback artifact uploads require successful protected parsing.
+
 > [!CAUTION]
 > Native capture protects storage, not the origin of guest-side bytes. The engine must isolate its recorder from same-UID tools and verify its session framing before returning events. A matching key prefix or a public-key header on an otherwise accessible pipe is not authentication. The compiler explicitly `exec`s the final harness, but the harness must replace remaining launchers, protect its key and capture descriptors, route ordinary tool output to stdout, and reject invalid or incomplete signed streams without a legacy-parser fallback. Pydantic's existing keyed-stdout integration must adapt before enabling this option.
 

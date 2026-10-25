@@ -525,7 +525,7 @@ async function runLogParser(options) {
         if (safeOutputsContent) {
           const safeOutputsPlainText = formatSafeOutputsPreview(safeOutputsContent, { isPlainText: true });
           if (safeOutputsPlainText) {
-            core.info(safeOutputsPlainText);
+            core.info(redactPublication(safeOutputsPlainText));
           }
         }
 
@@ -567,7 +567,7 @@ async function runLogParser(options) {
         if (safeOutputsContent) {
           const safeOutputsPlainText = formatSafeOutputsPreview(safeOutputsContent, { isPlainText: true });
           if (safeOutputsPlainText) {
-            core.info(safeOutputsPlainText);
+            core.info(redactPublication(safeOutputsPlainText));
           }
         }
 
