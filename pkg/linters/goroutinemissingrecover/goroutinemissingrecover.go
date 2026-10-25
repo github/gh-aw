@@ -1,6 +1,6 @@
 // Package goroutinemissingrecover implements a Go analysis linter that flags
-// goroutines started via a function literal whose body does not install a
-// top-level defer/recover guard.
+// goroutines started via a function literal, directly or through a local
+// variable, whose body does not install a top-level defer/recover guard.
 //
 // An unrecovered panic inside a goroutine terminates the entire process and
 // is not caught by the caller's recover, so any goroutine that might panic
@@ -10,18 +10,21 @@
 // deferred named function or method declared in the same package whose body
 // calls recover() directly, since both forms stop a panic per the Go spec.
 //
-// Only goroutines launched with a function literal (`go func() { ... }()`)
-// are checked. Goroutines that call a named function (`go f()`) are out of
-// scope because the named function can install its own recovery.
+// Goroutines launched with a function literal (`go func() { ... }()`) or a
+// local variable initialized to a literal are checked. Reassigned or
+// address-taken variables are out of scope because their targets may change.
+// Named functions remain out of scope and can install their own recovery.
 package goroutinemissingrecover
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -41,6 +44,7 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	funcBodies := indexFuncBodies(pass)
+	localLiterals := indexLocalFuncLiterals(pass)
 
 	nodeFilter := []ast.Node{(*ast.GoStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
@@ -49,10 +53,16 @@ func run(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		// Only flag goroutines started with a function literal, not named functions.
-		// Unwrap parentheses: go (func() { ... })() is equivalent to go func() { ... }()
-		call, ok := unwrapParens(goStmt.Call.Fun).(*ast.FuncLit)
-		if !ok {
+		var call *ast.FuncLit
+		switch fun := unwrapParens(goStmt.Call.Fun).(type) {
+		case *ast.FuncLit:
+			call = fun
+		case *ast.Ident:
+			if variable, ok := pass.TypesInfo.Uses[fun].(*types.Var); ok {
+				call = localLiterals[variable]
+			}
+		}
+		if call == nil {
 			return
 		}
 
@@ -72,6 +82,60 @@ func run(pass *analysis.Pass) (any, error) {
 		pkgLog.Printf("flagging goroutine without recover at %s", position)
 		pass.ReportRangef(goStmt, "goroutine launched via a function literal without a top-level defer/recover; add defer func() { if r := recover(); r != nil { ... } }() to contain panics")
 	})
+}
+
+// indexLocalFuncLiterals resolves local literal initializers by object identity,
+// excluding mutable variables rather than inspecting a stale initializer.
+func indexLocalFuncLiterals(pass *analysis.Pass) map[*types.Var]*ast.FuncLit {
+	literals := make(map[*types.Var]*ast.FuncLit)
+	mutable := make(map[*types.Var]bool)
+	record := func(name ast.Expr, value ast.Expr) {
+		ident, ok := unwrapParens(name).(*ast.Ident)
+		if !ok {
+			return
+		}
+		variable, ok := pass.TypesInfo.Defs[ident].(*types.Var)
+		if !ok {
+			if variable, ok := pass.TypesInfo.Uses[ident].(*types.Var); ok {
+				mutable[variable] = true
+			}
+			return
+		}
+		if !astutil.IsLocalObject(variable) {
+			return
+		}
+		if literal, ok := unwrapParens(value).(*ast.FuncLit); ok {
+			literals[variable] = literal
+		}
+	}
+	for _, file := range pass.Files {
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch stmt := n.(type) {
+			case *ast.AssignStmt:
+				for i, lhs := range stmt.Lhs {
+					value, _ := astutil.RhsExprForIndex(stmt.Rhs, i)
+					record(lhs, value)
+				}
+			case *ast.ValueSpec:
+				for i, name := range stmt.Names {
+					value, _ := astutil.RhsExprForIndex(stmt.Values, i)
+					record(name, value)
+				}
+			case *ast.RangeStmt:
+				record(stmt.Key, nil)
+				record(stmt.Value, nil)
+			case *ast.UnaryExpr:
+				if stmt.Op == token.AND {
+					record(stmt.X, nil)
+				}
+			}
+			return true
+		})
+	}
+	for variable := range mutable {
+		delete(literals, variable)
+	}
+	return literals
 }
 
 // unwrapParens removes any surrounding *ast.ParenExpr nodes, returning the
