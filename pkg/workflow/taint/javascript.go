@@ -108,9 +108,10 @@ type JavaScriptOptions struct {
 	Mode JavaScriptMode
 	// fastEntries limits compiled entry traversal to authored scripts. Imported
 	// modules still use the normal verified repository source resolver.
-	fastEntries map[string]bool
-	fastMatched map[string][]string
-	fastSites   map[string][]string
+	fastEntries  map[string]bool
+	fastMatched  map[string][]string
+	fastSites    map[string][]string
+	fastConsumed map[string]int
 }
 
 type JavaScriptInput struct {

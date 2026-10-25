@@ -24,6 +24,7 @@ func analyzeFastJavaScript(ctx context.Context, document *aw.Document, compiled 
 	options.fastEntries = make(map[string]bool)
 	options.fastMatched = make(map[string][]string)
 	options.fastSites = make(map[string][]string)
+	options.fastConsumed = make(map[string]int)
 	for _, source := range recorder.sources {
 		options.fastEntries[source] = true
 	}
@@ -92,26 +93,13 @@ func fastStepLocation(location string) (string, int, string, bool) {
 
 func (j *javascript) recordFastEntry() {
 	if j.options.fastEntries != nil {
-		locations := j.options.fastMatched[j.input.Source]
-		if !slices.Contains(locations, j.input.Name) {
-			j.options.fastMatched[j.input.Source] = append(locations, j.input.Name)
-		}
+		j.options.fastMatched[j.input.Source] = append(j.options.fastMatched[j.input.Source], j.input.Name)
 		return
 	}
-	if _, exists := j.options.fastSites[j.input.Name]; exists {
-		return
-	}
-	// Match occurrences, not only source text: identical authored scripts in
-	// distinct steps must not erase each other's diagnostics.
-	j.options.fastSites[j.input.Name] = nil
-	for _, target := range j.options.fastMatched[j.input.Source] {
-		used := false
-		for _, assigned := range j.options.fastSites {
-			used = used || slices.Contains(assigned, target)
-		}
-		if !used {
-			j.options.fastSites[j.input.Name] = []string{target}
-			return
-		}
+	index := j.options.fastConsumed[j.input.Source]
+	j.options.fastConsumed[j.input.Source] = index + 1
+	if target, ok := sliceAt(j.options.fastMatched[j.input.Source], index); ok {
+		j.fastVerified = true
+		j.options.fastSites[j.input.Name] = append(j.options.fastSites[j.input.Name], target)
 	}
 }

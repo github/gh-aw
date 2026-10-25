@@ -109,6 +109,76 @@ func TestJavaScriptFastAuthoredShellDelta(t *testing.T) {
 	assert.Equal(t, "jobs.agent.steps[0].run", result.Findings[0].Site.Path)
 }
 
+func TestJavaScriptFastTransportVerificationIsPerSourceOccurrence(t *testing.T) {
+	options := nativeJavaScriptOptions(t)
+	options.Mode = JavaScriptFast
+	authored := `node -e 'require("@actions/core").setOutput("first", process.env.TOKEN)'; node -e 'require("@actions/core").setOutput("second", process.env.TOKEN)'`
+	compiledScript := `node -e 'require("@actions/core").setOutput("first", process.env.TOKEN)'; node -e 'require("@actions/core").setOutput("other", process.env.TOKEN)'`
+	document, err := aw.Parse(`---
+env:
+  TOKEN: '${{ secrets.TOKEN }}'
+steps:
+  - id: producer
+    shell: bash
+    run: ` + authored + `
+---
+Prompt
+`)
+	require.NoError(t, err)
+	compiled, err := actions.Parse([]byte(`jobs:
+  agent:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: '${{ secrets.TOKEN }}'
+    steps:
+      - id: producer
+        shell: bash
+        run: ` + compiledScript + `
+`))
+	require.NoError(t, err)
+	rule := SecretLeakRule()
+	rule.JavaScript = options
+	result, err := AnalyzeDocument(document, compiled, rule)
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 1, "%+v", result.Findings)
+	assert.Equal(t, Output, result.Findings[0].Site.Kind)
+}
+
+func TestJavaScriptFastUnverifiedStdoutKeepsShellOutputFinding(t *testing.T) {
+	options := nativeJavaScriptOptions(t)
+	options.Mode = JavaScriptFast
+	authored := `value=$(node -e 'process.stdout.write(process.env.TOKEN)'); echo "token=$value" >> "$GITHUB_OUTPUT"`
+	compiledScript := `value=$(node -e 'process.stdout.write("safe")'); echo "token=$value" >> "$GITHUB_OUTPUT"`
+	document, err := aw.Parse(`---
+env:
+  TOKEN: '${{ secrets.TOKEN }}'
+steps:
+  - id: producer
+    shell: bash
+    run: ` + authored + `
+---
+Prompt
+`)
+	require.NoError(t, err)
+	compiled, err := actions.Parse([]byte(`jobs:
+  agent:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: '${{ secrets.TOKEN }}'
+    steps:
+      - id: producer
+        shell: bash
+        run: ` + compiledScript + `
+`))
+	require.NoError(t, err)
+	rule := SecretLeakRule()
+	rule.JavaScript = options
+	result, err := AnalyzeDocument(document, compiled, rule)
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 1, "%+v", result.Findings)
+	assert.Equal(t, Output, result.Findings[0].Site.Kind)
+}
+
 func TestJavaScriptAuthoredDriverSource(t *testing.T) {
 	options := nativeJavaScriptOptions(t)
 	options.Mode = JavaScriptFast

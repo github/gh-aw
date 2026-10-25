@@ -122,6 +122,27 @@ func TestStepOutputJobBoundaryAndGenericRule(t *testing.T) {
 	}
 }
 
+func TestStepOutputToDeploymentEnvironmentURL(t *testing.T) {
+	workflow, err := actions.Parse([]byte(`jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: '${{ secrets.TOKEN }}'
+    environment:
+      name: production
+      url: '${{ steps.producer.outputs.url }}'
+    steps:
+      - id: producer
+        run: echo "url=$TOKEN" >> "$GITHUB_OUTPUT"
+`))
+	require.NoError(t, err)
+	result, err := Analyze(workflow, SecretLeakRule())
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 1)
+	assert.Equal(t, Display, result.Findings[0].Site.Kind)
+	assert.Equal(t, "jobs.deploy.environment.url", result.Findings[0].Site.Path)
+}
+
 func TestUnresolvedStepOutputTransport(t *testing.T) {
 	tests := []struct{ name, producer string }{
 		{"dynamic name", "      - id: producer\n        run: echo \"$NAME=$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
@@ -130,6 +151,8 @@ func TestUnresolvedStepOutputTransport(t *testing.T) {
 		{"ANSI quoted records", "      - id: producer\n        run: echo $'first=ok\\nsecond='\"$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
 		{"ANSI quoted suffix", "      - id: producer\n        run: echo \"first=ok\"$'\\x0asecond='\"$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
 		{"ANSI quoted printf payload", "      - id: producer\n        run: printf '%s\\n' $'first=ok\\012second='\"$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
+		{"printf named format with multiline payload", "      - id: producer\n        run: printf 'first=%s\\n' $'ok\\nsecond='\"$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
+		{"sh echo escape records", "      - id: producer\n        shell: sh\n        run: echo \"first=ok\\nsecond=$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
 		{"idless", "      - run: echo \"token=$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"},
 		{"compound", "      - id: producer\n        run: '{ echo \"first=ok\"; echo \"second=$TOKEN\"; } >> \"$GITHUB_OUTPUT\"'\n"},
 		{"unmodeled", "      - id: producer\n        run: printf '%s' \"$TOKEN\" | tee \"$GITHUB_OUTPUT\" > /dev/null\n"},
@@ -148,6 +171,29 @@ func TestUnresolvedStepOutputTransport(t *testing.T) {
 			assert.Equal(t, Log, result.Findings[1].Site.Kind)
 		})
 	}
+}
+
+func TestDynamicOutputRecordsUseWildcardTracking(t *testing.T) {
+	producer := `      - id: producer
+        run: |
+          value=$'ok\nother='"$TOKEN"
+          echo "token=$value" >> "$GITHUB_OUTPUT"
+`
+	result, err := Analyze(outputWorkflow(t, producer, "      - run: echo '${{ steps.producer.outputs.other }}'\n", ""), SecretLeakRule())
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 1, "%+v", result.Findings)
+	assert.Equal(t, Log, result.Findings[0].Site.Kind)
+	assert.Empty(t, result.Gaps)
+}
+
+func TestOutputRecordStateIsSharedAcrossWrites(t *testing.T) {
+	producer := "      - id: producer\n        run: |\n          printf 'first=%s' \"$TOKEN\" >> \"$GITHUB_OUTPUT\"\n          printf 'second=%s\\n' \"$TOKEN\" >> \"$GITHUB_OUTPUT\"\n"
+	result, err := Analyze(outputWorkflow(t, producer, "      - run: echo '${{ steps.producer.outputs.other }}'\n", ""), SecretLeakRule())
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 3, "%+v", result.Findings)
+	assert.Equal(t, Output, result.Findings[0].Site.Kind)
+	assert.Equal(t, Output, result.Findings[1].Site.Kind)
+	assert.Equal(t, Log, result.Findings[2].Site.Kind)
 }
 
 func TestUnresolvedJavaScriptOutputTransport(t *testing.T) {

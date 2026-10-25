@@ -93,7 +93,7 @@ func (j *javascript) callValue(n *JavaScriptNode, callee jsValue, args []jsValue
 		if first.literal && len(first.taint()) == 0 && len(args) == 2 {
 			name = first.text
 		}
-		j.transportOutput(n, name, all.taint())
+		j.transportOutput(n, name, all.taint(), true)
 		return jsValue{}
 	case "core.summary.addRaw", "core.summary.addCodeBlock", "core.summary.addTable", "core.summary.addHeading":
 		j.emit(n, Summary, all.taint())
@@ -189,7 +189,7 @@ func (j *javascript) writeFile(n *JavaScriptNode, args []jsValue) {
 	case "process.env.GITHUB_STEP_SUMMARY":
 		j.emit(n, Summary, contents)
 	case "process.env.GITHUB_OUTPUT":
-		j.transportOutput(n, "", contents)
+		j.transportOutput(n, "", contents, false)
 	case "process.env.GITHUB_ENV":
 		j.gap(n, "JavaScript persisted environment records are not modeled")
 	default:

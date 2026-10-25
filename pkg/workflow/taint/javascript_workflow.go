@@ -29,7 +29,7 @@ func (a *analyzer) javascriptInline(text, name string, bindings scope, files sco
 		return err
 	}
 	if strings.HasSuffix(name, ".with.script") {
-		j.transportOutput(&JavaScriptNode{Line: 1}, "result", j.returns.taint())
+		j.transportOutput(&JavaScriptNode{Line: 1}, "result", j.returns.taint(), true)
 	}
 
 	for name, sources := range j.files {
@@ -38,18 +38,13 @@ func (a *analyzer) javascriptInline(text, name string, bindings scope, files sco
 	return nil
 }
 
-func (j *javascript) transportOutput(node *JavaScriptNode, name string, sources value) {
+func (j *javascript) transportOutput(node *JavaScriptNode, name string, sources value, complete bool) {
 	j.files["$GITHUB_OUTPUT"] = union(j.files["$GITHUB_OUTPUT"], sources)
 	transport := j.a.stepOutput
-	if transport != nil && j.options != nil && j.options.fastMatched != nil && j.options.fastEntries == nil && len(j.options.fastSites[j.input.Name]) == 0 {
-		copy := *transport
-		copy.modeled = false
-		transport = &copy
-		if len(sources) > 0 {
-			j.gap(node, "authored JavaScript output has no verified compiled entry; downstream output transport is not fully modeled")
-		}
+	if transport != nil && j.options != nil && j.options.fastMatched != nil && j.options.fastEntries == nil && !j.fastVerified {
+		j.markUnverifiedOutput(sources, node)
 	}
-	j.a.transportOutput(Site{Kind: Output, Path: j.scriptPath(), Line: node.Line}, name, sources, transport)
+	j.a.transportOutputRecord(Site{Kind: Output, Path: j.scriptPath(), Line: node.Line}, name, sources, transport, false, complete)
 }
 
 func (a *analyzer) javascriptRender(text, name string, bindings scope) (string, map[string][]Source, error) {

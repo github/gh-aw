@@ -74,9 +74,7 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		constants:    make(map[string]string), constantValues: make(map[string]map[string]struct{}),
 		constantUnknown: make(map[string]bool),
 	}
-	for _, name := range []string{"GITHUB_OUTPUT", "GITHUB_ENV", "GITHUB_STEP_SUMMARY"} {
-		s.setConstants(name, []string{"$" + name}, false)
-	}
+	s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
 	for key, sources := range bindings {
 		if name, ok := strings.CutPrefix(key, "shell."); ok {
 			s.vars[name] = sources
@@ -352,7 +350,7 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 				s.a.gapAt(s.path, int(redir.Pos().Line()), "dynamic file targets are not modeled")
 			}
 			for _, target := range targets {
-				s.write(target, out, s.outputName(stmt.Cmd, target), int(stmt.Pos().Line()))
+				s.write(target, out, s.outputName(stmt.Cmd, target), int(stmt.Pos().Line()), stmt.Cmd)
 			}
 			return
 		}
@@ -370,7 +368,7 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 				}
 			}
 		}
-		s.write(target, out, payload, int(stmt.Pos().Line()))
+		s.write(target, out, payload, int(stmt.Pos().Line()), stmt.Cmd)
 	case ">&":
 		if staticWord(redir.Word) == "2" {
 			s.a.emit(Site{Kind: Log, Path: s.path, Line: int(stmt.Pos().Line())}, out)
@@ -424,7 +422,7 @@ func (s *shell) readPaths(pattern string) ([]string, bool) {
 func (s *shell) readFileWord(word *syntax.Word) value {
 	targets, known := s.paths(word)
 	pathSources := s.word(word)
-	relevant := s.files.hasSources() || len(pathSources) > 0
+	relevant := s.files.hasSources() || s.persisted.hasSources() || len(pathSources) > 0
 	if !known && relevant {
 		s.a.gapAt(s.path, int(word.Pos().Line()), "dynamic file targets are not modeled")
 	}
@@ -641,7 +639,7 @@ func (s *shell) callCommand(cmd *syntax.CallExpr, captured bool, stdin value) va
 				}
 				for _, target := range targets {
 					if target != "" && !strings.HasPrefix(target, "-") {
-						s.write(target, stdin, "", line)
+						s.write(target, stdin, "", line, nil)
 					}
 				}
 			}
@@ -1157,7 +1155,7 @@ func (s *shell) outputName(command syntax.Command, target string) string {
 		if format == "%s" && singleOutputWord(second) {
 			return literalOutputName(second, s.markers)
 		}
-		if key, ok := strings.CutSuffix(format, "=%s"); ok && outputIdentifier.MatchString(key) && !containsMarker(key, s.markers) {
+		if key, ok := strings.CutSuffix(format, "=%s"); ok && outputIdentifier.MatchString(key) && !containsMarker(key, s.markers) && singleOutputWord(second) {
 			return key + "="
 		}
 	}
@@ -1165,7 +1163,7 @@ func (s *shell) outputName(command syntax.Command, target string) string {
 }
 
 func singleOutputWord(word *syntax.Word) bool {
-	if strings.ContainsAny(staticWord(word), "\r\n") {
+	if strings.ContainsAny(staticWord(word), "\r\n\\") {
 		return false
 	}
 	known := true
@@ -1178,6 +1176,67 @@ func singleOutputWord(word *syntax.Word) bool {
 		return known
 	})
 	return known
+}
+
+func (s *shell) outputMayBeMultiline(command syntax.Command) bool {
+	call, ok := command.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return true
+	}
+	commandWord, exists := sliceAt(call.Args, 0)
+	if !exists {
+		return true
+	}
+	name := literalShellWord(commandWord)
+	wordIndex := 1
+	if name == "printf" {
+		wordIndex = 2
+	}
+	word, exists := sliceAt(call.Args, wordIndex)
+	if !exists {
+		return true
+	}
+	uncertain := false
+	syntax.Walk(word, func(node syntax.Node) bool {
+		switch n := node.(type) {
+		case *syntax.ParamExp, *syntax.CmdSubst:
+			uncertain = true
+		case *syntax.Lit:
+			uncertain = uncertain || strings.ContainsAny(n.Value, "\\\r\n")
+		case *syntax.SglQuoted:
+			uncertain = uncertain || n.Dollar || strings.ContainsAny(n.Value, "\\\r\n")
+		case *syntax.Word, *syntax.DblQuoted:
+		default:
+			uncertain = true
+		}
+		return !uncertain
+	})
+	return uncertain
+}
+
+func (s *shell) outputRecordComplete(command syntax.Command) bool {
+	call, ok := command.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return false
+	}
+	commandWord, exists := sliceAt(call.Args, 0)
+	if !exists {
+		return false
+	}
+	switch literalShellWord(commandWord) {
+	case "echo":
+		return true
+	case "printf":
+		format, exists := sliceAt(call.Args, 1)
+		if !exists {
+			return false
+		}
+		texts, known := wordTexts(format, s.constants, s.constantValues, s.constantUnknown)
+		text, hasText := sliceAt(texts, 0)
+		return known && hasText && len(texts) == 1 && strings.HasSuffix(text, `\n`)
+	default:
+		return false
+	}
 }
 
 // The name must precede every expansion. wordText alone is insufficient:
@@ -1326,7 +1385,7 @@ func wordText(word *syntax.Word, constants map[string]string) string {
 	return text.String()
 }
 
-func (s *shell) write(target string, sources value, payload string, line int) {
+func (s *shell) write(target string, sources value, payload string, line int, command syntax.Command) {
 	site := Site{Path: s.path, Line: line}
 	switch target {
 	case "$GITHUB_STEP_SUMMARY":
@@ -1341,7 +1400,7 @@ func (s *shell) write(target string, sources value, payload string, line int) {
 		if target == "$GITHUB_OUTPUT" {
 			site.Kind = Output
 			s.files[target] = union(s.files[target], sources)
-			s.a.transportOutput(site, name, sources, s.a.stepOutput)
+			s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
 		} else if name != "" {
 			key := "env." + strings.ToLower(name)
 			s.persisted[key] = union(s.persisted[key], sources)

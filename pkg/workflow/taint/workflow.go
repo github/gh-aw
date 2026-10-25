@@ -193,6 +193,15 @@ func (a *analyzer) job(job *actions.Job, workflow *actions.Workflow, outputs sco
 	}
 	outputBindings := maps.Clone(env)
 	maps.Copy(outputBindings, persisted)
+	if environment, ok := job.Environment.(map[string]any); ok {
+		if rawURL, exists := environment["url"]; exists {
+			sources, err := a.text(fmt.Sprint(rawURL), path+".environment.url", outputBindings)
+			if err != nil {
+				return err
+			}
+			a.emit(Site{Kind: Display, Path: path + ".environment.url"}, sources)
+		}
+	}
 	if err := a.jobOutputs(job, workflow, path, outputs, outputBindings); err != nil {
 		return err
 	}
@@ -348,7 +357,7 @@ func (a *analyzer) step(fields map[string]any, path string, env, persisted, file
 		return err
 	}
 	previous := a.stepOutput
-	a.stepOutput = &stepOutputTransport{id: id, bindings: bindings, modeled: a.workflowContext}
+	a.stepOutput = &stepOutputTransport{id: id, bindings: bindings, modeled: a.workflowContext, recordStateKnown: true}
 	defer func() { a.stepOutput = previous }()
 	stepEnv, err := optionalField[map[string]any](fields, "env", path)
 	if err != nil {
