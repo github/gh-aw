@@ -529,7 +529,7 @@ describe("mcp_cli_bridge.cjs", () => {
       );
 
       const files = fs.readdirSync(auditDir);
-      expect(files).toEqual(["server_.._name.audit.jsonl"]);
+      expect(files).toEqual(["mcp-cli-audit.server_.._name.audit.jsonl"]);
       const logPath = path.join(auditDir, files[0]);
       const record = JSON.parse(fs.readFileSync(logPath, "utf8"));
       expect(record).toMatchObject({
@@ -557,7 +557,7 @@ describe("mcp_cli_bridge.cjs", () => {
     try {
       ensureAuditDir(auditDir);
       auditLog("safeoutputs", { event: "call_start", tool: "private-tool", argumentBytes: 42 }, auditDir);
-      const logPath = path.join(auditDir, "safeoutputs.audit.jsonl");
+      const logPath = path.join(auditDir, "mcp-cli-audit.safeoutputs.audit.jsonl");
 
       expect(processFile(logPath, ["private-tool"])).toBe(1);
 
@@ -579,11 +579,13 @@ describe("mcp_cli_bridge.cjs", () => {
 
   it("removes audit records older than the 24-hour retention window", () => {
     const auditDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-audit-"));
-    const staleLog = path.join(auditDir, "stale.audit.jsonl");
-    const currentLog = path.join(auditDir, "current.audit.jsonl");
+    const staleLog = path.join(auditDir, "mcp-cli-audit.stale.audit.jsonl");
+    const currentLog = path.join(auditDir, "mcp-cli-audit.current.audit.jsonl");
+    const unrelatedLog = path.join(auditDir, "unrelated.audit.jsonl");
     try {
       fs.writeFileSync(staleLog, "{}\n");
       fs.writeFileSync(currentLog, "{}\n");
+      fs.writeFileSync(unrelatedLog, "{}\n");
       const staleTime = new Date(Date.now() - 25 * 60 * 60 * 1000);
       fs.utimesSync(staleLog, staleTime, staleTime);
 
@@ -591,6 +593,7 @@ describe("mcp_cli_bridge.cjs", () => {
 
       expect(fs.existsSync(staleLog)).toBe(false);
       expect(fs.existsSync(currentLog)).toBe(true);
+      expect(fs.existsSync(unrelatedLog)).toBe(true);
     } finally {
       fs.rmSync(auditDir, { recursive: true, force: true });
     }
@@ -2053,7 +2056,7 @@ describe("mcp_cli_bridge.cjs", () => {
       expect(recordedBodies.find(b => b.method === "tools/call")).toBeUndefined();
       expect(stderrChunks.join("")).toContain("use --key value flags");
       expect(stderrChunks.join("")).not.toContain("private payload");
-      const audit = fs.readFileSync("/tmp/gh-aw/mcp-cli-audit/safeoutputs.audit.jsonl", "utf8");
+      const audit = fs.readFileSync("/tmp/gh-aw/mcp-cli-audit.safeoutputs.audit.jsonl", "utf8");
       expect(audit).toContain('"event":"parse_args_error"');
       expect(audit).not.toContain("private payload");
     });

@@ -34,7 +34,7 @@ describe("collect_ndjson_output.cjs", () => {
     outcomeSpy = vi.spyOn(emptyOutputOutcome, "buildEmptyOutputOutcome").mockImplementation((errors, _rootDir, session) => buildEmptyOutputOutcome(errors, diagnosticRoot, session));
     const collectOutcomeSession = emptyOutputOutcome.collectOutcomeSession;
     sessionSpy = vi.spyOn(emptyOutputOutcome, "collectOutcomeSession").mockImplementation(() => collectOutcomeSession(diagnosticRoot));
-    fs.rmSync("/tmp/gh-aw/mcp-cli-audit", { recursive: true, force: true });
+    fs.rmSync("/tmp/gh-aw/mcp-cli-audit.safeoutputs.audit.jsonl", { force: true });
     (fs.existsSync("/tmp/gh-aw") || fs.mkdirSync("/tmp/gh-aw", { recursive: !0 }),
       (global.originalConsole = global.console),
       (global.console = { log: vi.fn(), error: vi.fn() }),
@@ -379,8 +379,7 @@ describe("collect_ndjson_output.cjs", () => {
       fs.writeFileSync(path.join(diagnosticRoot, "aw_info.json"), JSON.stringify({ engine_id: "gemini" }));
       fs.writeFileSync(path.join(diagnosticRoot, "agent_execution_exit_code.txt"), "1");
       fs.writeFileSync(path.join(diagnosticRoot, "agent-stdio.log"), `${JSON.stringify({ type: "result", status: "error" })}\n`);
-      const auditPath = path.join(diagnosticRoot, "mcp-cli-audit/safeoutputs.audit.jsonl");
-      fs.mkdirSync(path.dirname(auditPath), { recursive: true });
+      const auditPath = path.join(diagnosticRoot, "mcp-cli-audit.safeoutputs.audit.jsonl");
       fs.writeFileSync(auditPath, `${JSON.stringify({ event: "parse_args_error" })}\n`);
 
       await eval(`(async () => { ${collectScript}; await main(); })()`);

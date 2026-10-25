@@ -17,7 +17,7 @@ const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
-const MCP_CLI_AUDIT_PATH = "mcp-cli-audit/safeoutputs.audit.jsonl";
+const MCP_CLI_AUDIT_PATH = "mcp-cli-audit.safeoutputs.audit.jsonl";
 const MCP_CLI_AUDIT_MAX_BYTES = 10 * 1024 * 1024;
 
 /**

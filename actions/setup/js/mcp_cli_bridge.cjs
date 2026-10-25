@@ -14,7 +14,7 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  * Protocol flow: initialize → notifications/initialized → (periodic ping) → tools/call
  *
  * Operation metadata is logged via core.* (shim.cjs) and appended as JSONL
- * entries to /tmp/gh-aw/mcp-cli-audit/<server>.audit.jsonl for auditing. Audit logs
+ * entries to /tmp/gh-aw/mcp-cli-audit.<server>.audit.jsonl for auditing. Audit logs
  * omit payloads and are removed after 24 hours.
  *
  * Usage (called by generated CLI wrappers):
@@ -40,8 +40,9 @@ const http = require("http");
 const { renderToolRecommendedExample, renderToolSignature, summarizeHelpText } = require("./mcp_cli_schema_docs.cjs");
 const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 
-/** Directory for JSONL audit logs (writable inside AWF sandbox via /tmp mount) */
-const AUDIT_LOG_DIR = "/tmp/gh-aw/mcp-cli-audit";
+/** Root directory for owner-only JSONL audit files (writable inside AWF sandbox via /tmp mount) */
+const AUDIT_LOG_DIR = "/tmp/gh-aw";
+const AUDIT_LOG_PREFIX = "mcp-cli-audit.";
 const AUDIT_LOG_RETENTION_MS = 24 * 60 * 60 * 1000;
 const SAFE_AUDIT_FIELDS = new Set(["event", "tool", "statusCode", "hasSession", "elapsedMs", "totalElapsedMs", "pingId", "intervalMs", "pid", "toolCount", "argumentBytes", "responseBytes"]);
 
@@ -90,18 +91,18 @@ const deferredToolsRefreshExhaustedServers = new Set();
 // ---------------------------------------------------------------------------
 
 /**
- * Ensure the JSONL audit log directory exists and remove expired records.
+ * Ensure the audit log root exists and remove expired audit records.
  * @param {string} [auditDir]
  */
 function ensureAuditDir(auditDir = AUDIT_LOG_DIR) {
   try {
     fs.mkdirSync(auditDir, { recursive: true, mode: 0o700 });
-    fs.chmodSync(auditDir, 0o700);
     const cutoff = Date.now() - AUDIT_LOG_RETENTION_MS;
     for (const filename of fs.readdirSync(auditDir)) {
+      if (!filename.startsWith(AUDIT_LOG_PREFIX) || !filename.endsWith(".audit.jsonl")) continue;
       const logPath = path.join(auditDir, filename);
       const stat = fs.lstatSync(logPath);
-      if (stat.isFile() && filename.endsWith(".jsonl") && stat.mtimeMs < cutoff) {
+      if (stat.isFile() && stat.mtimeMs < cutoff) {
         fs.rmSync(logPath);
       }
     }
@@ -151,7 +152,7 @@ function auditLog(serverName, entry, auditDir = AUDIT_LOG_DIR) {
   let fd;
   try {
     const safeServerName = serverName.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const logPath = path.join(auditDir, `${safeServerName}.audit.jsonl`);
+    const logPath = path.join(auditDir, `${AUDIT_LOG_PREFIX}${safeServerName}.audit.jsonl`);
     const record = {
       timestamp: new Date().toISOString(),
       server: serverName,

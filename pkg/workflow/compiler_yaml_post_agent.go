@@ -88,7 +88,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 	// Collect safe outputs and agent output paths for the unified artifact.
 	// These were previously uploaded as separate safe-output and agent-output artifacts.
 	if data.SafeOutputs != nil {
-		paths = append(paths, constants.TmpGhAwDirSlash+"mcp-cli-audit/")
+		paths = append(paths, constants.TmpGhAwDirSlash+"mcp-cli-audit.*.audit.jsonl")
 		// Raw safe-output NDJSON (copied to /tmp/gh-aw/ by generateOutputCollectionStep)
 		paths = append(paths, constants.TmpGhAwDirSlash+constants.SafeOutputsFilename.String())
 		// Processed agent output JSON produced by collect_ndjson_output.cjs

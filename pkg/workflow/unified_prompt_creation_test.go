@@ -103,7 +103,7 @@ func TestCrossRepoSmokeTerminalSafeOutputGuidanceAndTelemetry(t *testing.T) {
 						artifactUploadFound = true
 						assert.Contains(t, step.With["path"], "/tmp/gh-aw/mcp-logs/")
 						assert.Contains(t, step.With["path"], "/tmp/gh-aw/safeoutputs.jsonl")
-						assert.Contains(t, step.With["path"], "/tmp/gh-aw/mcp-cli-audit/")
+						assert.Contains(t, step.With["path"], "/tmp/gh-aw/mcp-cli-audit.*.audit.jsonl")
 					}
 					if job == "agent" && step.ID == "collect_output" {
 						collectorFound = true

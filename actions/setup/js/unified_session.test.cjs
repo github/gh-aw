@@ -967,7 +967,7 @@ describe("Unified conclusion session", () => {
   });
 
   it("persists aggregate safe-output CLI audit evidence without payload details", () => {
-    const audit = write("mcp-cli-audit/safeoutputs.audit.jsonl", [
+    const audit = write("mcp-cli-audit.safeoutputs.audit.jsonl", [
       { event: "call_start", tool: "PRIVATE_TOOL", argumentBytes: 42 },
       { event: "call_complete", tool: "PRIVATE_TOOL", totalElapsedMs: 12 },
       { event: "tool_error", tool: "PRIVATE_TOOL", error: "PRIVATE_ERROR" },
@@ -979,7 +979,7 @@ describe("Unified conclusion session", () => {
     const telemetry = events.find(event => event.type === "mcp.cli_audit");
     expect(telemetry).toMatchObject({
       data: { callStarts: 1, callCompletions: 1, toolErrors: 1, malformedRecords: 1 },
-      provenance: { component: "mcp", phase: "agent", path: "mcp-cli-audit/safeoutputs.audit.jsonl" },
+      provenance: { component: "mcp", phase: "agent", path: "mcp-cli-audit.safeoutputs.audit.jsonl" },
     });
     const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
     expect(persisted).not.toContain("PRIVATE_TOOL");
@@ -988,11 +988,11 @@ describe("Unified conclusion session", () => {
   });
 
   it("distinguishes an empty recorded CLI audit from unavailable audit data", () => {
-    write("mcp-cli-audit/safeoutputs.audit.jsonl", "");
+    write("mcp-cli-audit.safeoutputs.audit.jsonl", "");
     const recorded = collectUnifiedSession({ rootDir: root }).events.find(event => event.type === "mcp.cli_audit");
     expect(recorded?.data).toEqual({ callStarts: 0, callCompletions: 0, toolErrors: 0, malformedRecords: 0 });
 
-    fs.rmSync(path.join(root, "mcp-cli-audit/safeoutputs.audit.jsonl"));
+    fs.rmSync(path.join(root, "mcp-cli-audit.safeoutputs.audit.jsonl"));
     const missing = collectUnifiedSession({ rootDir: root }).events;
     expect(missing.some(event => event.type === "mcp.cli_audit")).toBe(false);
   });

@@ -109,7 +109,7 @@ function buildCompletionEvidence(rootDir = "/tmp/gh-aw") {
   }
   const summary = [`Safe-output tools: ${availability}`];
   for (const [label, relativePath, eventName] of [
-    ["CLI", "mcp-cli-audit/safeoutputs.audit.jsonl", "call_start"],
+    ["CLI", "mcp-cli-audit.safeoutputs.audit.jsonl", "call_start"],
     ["MCP", "mcp-logs/rpc-messages.jsonl", "tools/call"],
   ]) {
     const evidence = readCompletionEvidence(rootDir, relativePath);
@@ -212,7 +212,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   const redactJson = value => JSON.stringify(value, (_key, nested) => (typeof nested === "string" ? redact(nested) : nested));
   let safeoutputsCliError = false;
   try {
-    const auditPath = path.join(rootDir, "mcp-cli-audit/safeoutputs.audit.jsonl");
+    const auditPath = path.join(rootDir, "mcp-cli-audit.safeoutputs.audit.jsonl");
     if (fs.lstatSync(auditPath).isFile()) {
       for (const entry of iterateJsonl(fs.readFileSync(auditPath, "utf8"))) {
         try {
