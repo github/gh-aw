@@ -47,14 +47,32 @@ func decodeFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, er
 		return nil, fmt.Errorf("failed to marshal frontmatter to JSON: %w", err)
 	}
 	var config FrontmatterConfig
-	if err := json.Unmarshal(jsonBytes, &config); err != nil {
+	type alias FrontmatterConfig
+	// Credit limits have a broader scalar syntax than ordinary templatable ints.
+	aux := struct {
+		MaxAICredits      json.RawMessage `json:"max-ai-credits"`
+		MaxDailyAICredits json.RawMessage `json:"max-daily-ai-credits"`
+		*alias
+	}{alias: (*alias)(&config)}
+	if err := json.Unmarshal(jsonBytes, &aux); err != nil {
 		frontmatterTypesLog.Printf("Failed to unmarshal frontmatter: %v", err)
 		return nil, fmt.Errorf("failed to unmarshal frontmatter into config: %w", err)
+	}
+	config.MaxAICredits, err = parseFrontmatterAICLimit(aux.MaxAICredits, false)
+	if err != nil {
+		return nil, fmt.Errorf("invalid max-ai-credits: %w", err)
+	}
+	config.MaxDailyAICredits, err = parseFrontmatterAICLimit(aux.MaxDailyAICredits, true)
+	if err != nil {
+		return nil, fmt.Errorf("invalid max-daily-ai-credits: %w", err)
 	}
 	return &config, nil
 }
 
 func validateParsedFrontmatterConfig(config *FrontmatterConfig, frontmatter map[string]any) error {
+	if err := validateFrontmatterCacheShape(config.Cache); err != nil {
+		return err
+	}
 	if err := validateThreatDetectionSuppressions(config.ThreatDetectionSuppressions); err != nil {
 		return err
 	}
@@ -65,6 +83,22 @@ func validateParsedFrontmatterConfig(config *FrontmatterConfig, frontmatter map[
 		return err
 	}
 	return validateSafeOutputRunsOn(frontmatter["safe-outputs"])
+}
+
+func validateFrontmatterCacheShape(cache any) error {
+	switch value := cache.(type) {
+	case nil, map[string]any:
+		return nil
+	case []any:
+		for i, entry := range value {
+			if _, ok := entry.(map[string]any); !ok {
+				return fmt.Errorf("invalid cache entry at index %d: expected a cache object, got %T", i, entry)
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid cache: expected a cache object or array of cache objects, got %T", cache)
+	}
 }
 
 func validateSafeOutputRunsOn(value any) error {

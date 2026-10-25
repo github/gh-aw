@@ -136,6 +136,12 @@ func normalizeSafeOutputShorthands(frontmatter map[string]any) error {
 		case "data":
 			// data is an inline JSON schema, not a handler configuration.
 			continue
+		case "jobs":
+			if jobs, ok := value.(map[string]any); ok {
+				normalized[name] = normalizeSafeJobNeeds(jobs)
+				changed = true
+			}
+			continue
 		}
 		handler, ok := value.(map[string]any)
 		if !ok {
@@ -155,4 +161,20 @@ func normalizeSafeOutputShorthands(frontmatter map[string]any) error {
 		frontmatter["safe-outputs"] = normalized
 	}
 	return nil
+}
+
+func normalizeSafeJobNeeds(jobs map[string]any) map[string]any {
+	normalized := maps.Clone(jobs)
+	for name, value := range jobs {
+		job, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		if needs, ok := job["needs"].(string); ok {
+			job = maps.Clone(job)
+			job["needs"] = []string{needs}
+			normalized[name] = job
+		}
+	}
+	return normalized
 }

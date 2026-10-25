@@ -1,6 +1,9 @@
 package workflow
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -9,6 +12,48 @@ import (
 )
 
 var aicLimitLog = logger.New("workflow:aic_limit_parser")
+
+// parseFrontmatterAICLimit preserves the existing typed threshold API while
+// accepting credit-specific suffixes and the daily guardrail's object form.
+func parseFrontmatterAICLimit(data json.RawMessage, allowObject bool) (*TemplatableInt32, error) {
+	if len(data) == 0 || string(data) == "null" {
+		return nil, nil
+	}
+	if allowObject {
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(data, &object); err == nil {
+			value, ok := object["value"]
+			if !ok || string(value) == "null" {
+				return nil, errors.New("object form requires a positive 'value' field. Example: max-daily-ai-credits: {value: 20K}")
+			}
+			limit, err := parseFrontmatterAICLimit(value, false)
+			if err != nil {
+				return nil, err
+			}
+			if limit.String() == "-1" {
+				return nil, errors.New("object 'value' must be positive; use max-daily-ai-credits: -1 to disable the guardrail")
+			}
+			return limit, nil
+		}
+	}
+	var number int64
+	if err := json.Unmarshal(data, &number); err == nil && (number > 0 || number == -1) {
+		limit := TemplatableInt32(strconv.FormatInt(number, 10))
+		return &limit, nil
+	}
+	var value string
+	if err := json.Unmarshal(data, &value); err == nil {
+		if value == "-1" || isExpression(value) {
+			limit := TemplatableInt32(value)
+			return &limit, nil
+		}
+		if normalized, ok := normalizePositiveAICLimit(value); ok {
+			limit := TemplatableInt32(normalized)
+			return &limit, nil
+		}
+	}
+	return nil, fmt.Errorf("expected a positive integer, a K/M suffix string, a GitHub Actions expression, or -1; got %s", data)
+}
 
 // normalizePositiveAICLimit converts positive integer-like values
 // into a canonical base-10 string.

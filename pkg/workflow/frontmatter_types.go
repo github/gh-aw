@@ -363,7 +363,7 @@ type FrontmatterConfig struct {
 	MaxRuns                     *TemplatableInt32            `json:"max-runs,omitempty"` // Deprecated: top-level legacy alias for max-turns; migrate with 'gh aw fix'
 	MaxAICredits                *TemplatableInt32            `json:"max-ai-credits,omitempty"`
 	MaxTurnCacheMisses          *int32                       `json:"max-turn-cache-misses,omitempty"`
-	MaxDailyAICredits           *TemplatableInt32            `json:"max-daily-ai-credits,omitempty"`
+	MaxDailyAICredits           *TemplatableInt32            `json:"max-daily-ai-credits,omitempty"` // Normalized threshold; object-form guardrail settings are read from raw frontmatter
 	MaxToolDenials              *TemplatableInt32            `json:"max-tool-denials,omitempty"`
 	MaxToolCalls                *TemplatableInt32            `json:"max-tool-calls,omitempty"`
 	Strict                      *bool                        `json:"strict,omitempty"`  // Pointer to distinguish unset from false
@@ -417,7 +417,7 @@ type FrontmatterConfig struct {
 	Environment   map[string]any `json:"environment,omitempty"`     // GitHub environment
 	Container     map[string]any `json:"container,omitempty"`
 	Services      map[string]any `json:"services,omitempty"`
-	Cache         map[string]any `json:"cache,omitempty"`
+	Cache         any            `json:"cache,omitempty"` // Single cache object or array of cache objects
 
 	// Import and inclusion
 	Imports        any            `json:"imports,omitempty"`         // Can be string or array
