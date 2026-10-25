@@ -46,12 +46,6 @@ func mcpErrorStage(err error, fallback string) string {
 
 func buildMCPCompileTimeoutResult(err error, stdout []byte, diagnostics *mcpCompileDiagnostics, workflows []string) (*mcp.CallToolResult, any, error) {
 	stage := mcpErrorStage(err, "compilation")
-	var results []ValidationResult
-	if json.Unmarshal(stdout, &results) != nil {
-		if diagnostics != nil {
-			results = diagnostics.partialResults()
-		}
-	}
 	diagnosticSummary := "Compiler and scanner diagnostics were withheld because subprocess output may contain sensitive or untrusted data."
 	if diagnostics != nil && diagnostics.timeoutNote != "" {
 		diagnosticSummary = diagnostics.timeoutNote
@@ -62,7 +56,7 @@ func buildMCPCompileTimeoutResult(err error, stdout []byte, diagnostics *mcpComp
 		"complete":        false,
 		"stage":           stage,
 		"workflows":       workflows,
-		"partial_results": results,
+		"partial_results": []ValidationResult{},
 		"diagnostics":     diagnosticSummary,
 	}
 	output, marshalErr := json.Marshal(envelope)

@@ -533,7 +533,23 @@ func writeMCPCompileProgress(progressPath string, results []ValidationResult) {
 	if progressPath == "" {
 		return
 	}
-	output, err := formatValidationOutput(results)
+	sanitizedResults := make([]ValidationResult, 0, len(results))
+	for _, result := range results {
+		sanitizedErrors := make([]ValidationIssue, 0, len(result.Errors))
+		for _, issue := range result.Errors {
+			issue.Message = boundMCPCompileDiagnostic(issue.Message)
+			sanitizedErrors = append(sanitizedErrors, issue)
+		}
+		result.Errors = sanitizedErrors
+		sanitizedWarnings := make([]ValidationIssue, 0, len(result.Warnings))
+		for _, issue := range result.Warnings {
+			issue.Message = boundMCPCompileDiagnostic(issue.Message)
+			sanitizedWarnings = append(sanitizedWarnings, issue)
+		}
+		result.Warnings = sanitizedWarnings
+		sanitizedResults = append(sanitizedResults, result)
+	}
+	output, err := formatValidationOutput(sanitizedResults)
 	if err != nil {
 		compileOrchestrationLog.Printf("Failed to format MCP compile progress: %v", err)
 		return

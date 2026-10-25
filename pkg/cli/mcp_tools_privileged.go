@@ -776,11 +776,11 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 	if partial != nil && partial["partial"] == true && partial["complete"] == false {
 		errorEnvelope["partial"] = true
 		errorEnvelope["complete"] = false
-		errorEnvelope["partial_results"] = partial
+		errorEnvelope["partial_results"] = map[string]any{"available": true}
 	}
 	pipeDrainTimeout := mcpErrorStage(err, "") == "pipe_drain"
 	if pipeDrainTimeout {
-		errorEnvelope["partial_results"] = report
+		errorEnvelope["partial_results"] = map[string]any{"available": report != nil}
 	}
 	setAuditTimeoutEnvelope(errorEnvelope, err, pipeDrainTimeout, partial)
 	jsonBytes, jsonErr := json.Marshal(errorEnvelope)

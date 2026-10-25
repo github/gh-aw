@@ -257,7 +257,7 @@ func TestMCPCompileDiagnosticsStreaming(t *testing.T) {
 			}
 			diagnostics.finishLine()
 			message := diagnostics.failureMessage(errors.New("exit status 1"))
-			assert.True(t, strings.HasPrefix(message, tt.expected), message)
+			assert.True(t, strings.HasPrefix(message, sanitizeMCPUntrustedText(tt.expected)), message)
 			assert.LessOrEqual(t, len(message), maxMCPCompileDiagnosticBytes)
 		})
 	}
@@ -343,8 +343,8 @@ func TestMCPCompileDiagnosticsExcludeMultilineDebugWarnings(t *testing.T) {
 			var results []ValidationResult
 			require.NoError(t, json.Unmarshal([]byte(output), &results))
 			message := results[0].Errors[0].Message
-			assert.Contains(t, message, "actionable warning\nretain this remediation")
-			assert.Contains(t, message, "another actionable warning\nretain this too")
+			assert.Contains(t, message, "actionable warning\n| retain this remediation")
+			assert.Contains(t, message, "another actionable warning\n| retain this too")
 			assert.NotContains(t, message, "workflow:prompts")
 			assert.NotContains(t, message, "workflow_dispatch")
 			assert.NotContains(t, message, "debug payload")
@@ -377,13 +377,16 @@ func TestMCPCompileDiagnosticTextByteBoundaries(t *testing.T) {
 			diagnostic.Write([]byte{char})
 		}
 		assert.Equal(t, text, diagnostic.String())
-		assert.Equal(t, text, boundMCPCompileDiagnostic(text))
+		bounded := boundMCPCompileDiagnostic(text)
+		assert.True(t, utf8.ValidString(bounded))
+		assert.LessOrEqual(t, len(bounded), maxMCPCompileDiagnosticBytes)
+		assert.True(t, strings.HasPrefix(bounded, "| "))
 	}
 	message := "cause\n" + strings.Repeat("界", maxMCPCompileDiagnosticBytes) + "\nremediation"
 	bounded := boundMCPCompileDiagnostic(message)
 	assert.True(t, utf8.ValidString(bounded))
-	assert.True(t, strings.HasPrefix(bounded, "cause\n"))
-	assert.True(t, strings.HasSuffix(bounded, "\nremediation"))
+	assert.True(t, strings.HasPrefix(bounded, "| cause\n"))
+	assert.True(t, strings.HasSuffix(bounded, "\n| remediation"))
 	assert.LessOrEqual(t, len(bounded), maxMCPCompileDiagnosticBytes)
 	assert.Contains(t, bounded, "truncated")
 	var streamed compileDiagnosticText
@@ -414,7 +417,7 @@ func TestMCPCompileFallbackByteBudget(t *testing.T) {
 		assert.Equal(t, "batch", results[0].Scope)
 		assert.False(t, results[0].Valid)
 		diagnostic := results[0].Errors[0].Message
-		assert.True(t, strings.HasPrefix(diagnostic, "dependency cause"))
+		assert.True(t, strings.HasPrefix(diagnostic, "| dependency cause"))
 		assert.Contains(t, diagnostic, "remediation")
 		assert.Contains(t, diagnostic, "334 workflows")
 		assert.Contains(t, diagnostic, "per-workflow entries omitted")

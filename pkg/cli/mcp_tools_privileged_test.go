@@ -1212,7 +1212,7 @@ func TestAuditToolCalculatesTimeoutAfterAcquiringSubprocessSlot(t *testing.T) {
 	assert.InDelta(t, (responseDeadline.Sub(launchTime) - mcpAuditResponseMargin).Seconds(), softTimeout.Seconds(), 0.1)
 }
 
-func TestAuditTimeoutErrorPreservesPartialResults(t *testing.T) {
+func TestAuditTimeoutErrorSummarizesPartialResults(t *testing.T) {
 	for _, output := range []string{
 		`{"partial":true,"complete":false,"overview":{"run_id":123,"workflow_name":"example"}}`,
 		`{"overview":`,
@@ -1230,7 +1230,8 @@ func TestAuditTimeoutErrorPreservesPartialResults(t *testing.T) {
 		assert.Contains(t, envelope["error"], "timed out")
 		assert.NotEmpty(t, envelope["suggestions"])
 		if json.Valid([]byte(output)) {
-			assert.NotEmpty(t, envelope["partial_results"])
+			assert.Equal(t, map[string]any{"available": true}, envelope["partial_results"])
+			assert.NotContains(t, content.Text, "overview")
 		} else {
 			assert.NotContains(t, envelope, "partial_results")
 		}
@@ -1254,8 +1255,9 @@ func TestAuditToolReturnsIncompleteSubprocessData(t *testing.T) {
 	assert.Equal(t, false, envelope["complete"])
 	partial, ok := envelope["partial_results"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "artifacts", partial["stage"])
+	assert.Equal(t, true, partial["available"])
 	assert.Equal(t, "artifacts", envelope["stage"])
+	assert.NotContains(t, content.Text, "overview")
 	assert.Contains(t, envelope["error"], "artifacts")
 }
 

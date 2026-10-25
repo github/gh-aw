@@ -61,7 +61,7 @@ func TestCheckAndPrepareDockerImages_ImageAlreadyDownloading(t *testing.T) {
 	ResetDockerPullState()
 }
 
-func TestCheckAndPrepareDockerImagesPullSurvivesProbeCancellation(t *testing.T) {
+func TestCheckAndPrepareDockerImagesPullHonorsProbeCancellation(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Docker pull test requires a POSIX shell")
 	}
@@ -77,7 +77,7 @@ case "$1" in
   image) exit 1 ;;
   pull)
     printf 'started\n' >> "$DOCKER_TEST_MARKER"
-    /bin/sleep 0.2
+    exec /bin/sleep 10
     printf 'complete\n' >> "$DOCKER_TEST_MARKER"
     exit 0 ;;
 esac
@@ -91,12 +91,19 @@ exit 1
 	err := CheckAndPrepareDockerImagesWithDetachedDownloads(probeCtx, DockerImagesOptions{Zizmor: true})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Started downloading")
+	require.Eventually(t, func() bool {
+		status, readErr := os.ReadFile(markerPath)
+		return readErr == nil && strings.Contains(string(status), "started")
+	}, time.Second, 10*time.Millisecond)
 	cancel()
 
 	require.Eventually(t, func() bool {
-		status, readErr := os.ReadFile(markerPath)
-		return readErr == nil && strings.Contains(string(status), "complete")
+		_, readErr := os.ReadFile(markerPath)
+		return readErr == nil && !IsDockerImageDownloading(ZizmorImage)
 	}, time.Second, 10*time.Millisecond)
+	status, err := os.ReadFile(markerPath)
+	require.NoError(t, err)
+	assert.NotContains(t, string(status), "complete")
 	assert.False(t, IsDockerImageDownloading(ZizmorImage))
 }
 

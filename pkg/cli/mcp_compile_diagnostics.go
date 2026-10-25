@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/stringutil"
 )
@@ -26,6 +27,7 @@ const (
 var compileDebugLinePattern = regexp.MustCompile(`^` + compileDebugNamespace + ` .* \+[0-9]+(?:\.[0-9]+)?(?:ns|[µμ]s|ms|s|m|h)$`)
 var compileDebugStartPattern = regexp.MustCompile(`^` + compileDebugNamespace + ` `)
 var compileDebugEndPattern = regexp.MustCompile(`(?:^| )\+[0-9]+(?:\.[0-9]+)?(?:ns|[µμ]s|ms|s|m|h)$`)
+var mcpInstructionRolePattern = regexp.MustCompile(`(?i)\b(system|assistant|user)([ \t]*:)`)
 
 // compileDiagnosticText retains both ends of a line without buffering debug floods.
 type compileDiagnosticText struct {
@@ -79,21 +81,6 @@ type mcpCompileDiagnostics struct {
 	progressDir  string
 	progressFile string
 	timeoutNote  string
-}
-
-func (diagnostics *mcpCompileDiagnostics) partialResults() []ValidationResult {
-	if diagnostics == nil || diagnostics.progressFile == "" {
-		return nil
-	}
-	output, err := os.ReadFile(diagnostics.progressFile)
-	if err != nil {
-		return nil
-	}
-	var results []ValidationResult
-	if json.Unmarshal(output, &results) != nil {
-		return nil
-	}
-	return results
 }
 
 func (diagnostics *mcpCompileDiagnostics) cleanup() {
@@ -325,14 +312,42 @@ func (diagnostics *mcpCompileDiagnostics) failureMessage(err error) string {
 }
 
 func boundMCPCompileDiagnostic(message string) string {
-	message = strings.ToValidUTF8(message, "")
+	message = sanitizeMCPUntrustedText(message)
 	if len(message) <= maxMCPCompileDiagnosticBytes {
 		return message
 	}
-	budget := maxMCPCompileDiagnosticBytes - len(compileDiagnosticTruncation) - 1
-	head := strings.ToValidUTF8(message[:budget/2], "")
-	tail := strings.ToValidUTF8(message[len(message)-(budget-budget/2):], "")
+	budget := maxMCPCompileDiagnosticBytes - len(compileDiagnosticTruncation) - 3
+	headSize := budget / 2
+	tailSize := budget - headSize - 2
+	head := strings.ToValidUTF8(message[:headSize], "")
+	tail := strings.ToValidUTF8(message[len(message)-tailSize:], "")
+	tail = "| " + strings.TrimPrefix(tail, "| ")
 	return head + compileDiagnosticTruncation + "\n" + tail
+}
+
+func sanitizeMCPUntrustedText(message string) string {
+	message = strings.ToValidUTF8(message, "\uFFFD")
+	var sanitized strings.Builder
+	for _, char := range message {
+		if unicode.IsControl(char) && char != '\n' && char != '\t' {
+			continue
+		}
+		if char == '\u200B' {
+			continue
+		}
+		sanitized.WriteRune(char)
+		if strings.ContainsRune("`<>@{}", char) {
+			sanitized.WriteRune('\u200B')
+		}
+	}
+	message = mcpInstructionRolePattern.ReplaceAllString(sanitized.String(), "$1\u200B$2")
+	lines := strings.Split(message, "\n")
+	for i := range lines {
+		if !strings.HasPrefix(lines[i], "| ") {
+			lines[i] = "| " + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func runMCPCompileOutput(ctx context.Context, execCmd execCmdFunc, args ...string) ([]byte, *mcpCompileDiagnostics, error) {

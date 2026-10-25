@@ -284,11 +284,11 @@ func CheckAndPrepareDockerImages(ctx context.Context, opts DockerImagesOptions) 
 	return checkAndPrepareDockerImages(ctx, opts, StartDockerImageDownload)
 }
 
-// CheckAndPrepareDockerImagesWithDetachedDownloads keeps image probes bounded by
-// ctx while allowing started pulls to outlive the request for a limited time.
+// CheckAndPrepareDockerImagesWithDetachedDownloads keeps image probes and
+// started pulls bounded by ctx and the download lifetime.
 func CheckAndPrepareDockerImagesWithDetachedDownloads(ctx context.Context, opts DockerImagesOptions) error {
 	return checkAndPrepareDockerImages(ctx, opts, func(probeCtx context.Context, image string) (bool, func() error) {
-		downloadCtx, cancel := context.WithTimeout(context.WithoutCancel(probeCtx), dockerImageDownloadLifetime)
+		downloadCtx, cancel := context.WithTimeout(probeCtx, dockerImageDownloadLifetime)
 		started, join := startDockerImageDownload(probeCtx, downloadCtx, image)
 		if !started {
 			cancel()
