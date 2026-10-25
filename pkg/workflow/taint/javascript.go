@@ -106,6 +106,12 @@ type JavaScriptOptions struct {
 	RuntimePaths map[string]string
 	// An empty mode preserves the original, deep library API behavior.
 	Mode JavaScriptMode
+	// fastEntries limits compiled entry traversal to authored scripts. Imported
+	// modules still use the normal verified repository source resolver.
+	fastEntries  map[string]bool
+	fastMatched  map[string][]string
+	fastSites    map[string][]string
+	fastConsumed map[string]int
 }
 
 type JavaScriptInput struct {

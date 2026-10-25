@@ -29,12 +29,22 @@ func (a *analyzer) javascriptInline(text, name string, bindings scope, files sco
 		return err
 	}
 	if strings.HasSuffix(name, ".with.script") {
-		j.emit(&JavaScriptNode{Line: 1}, Output, j.returns.taint())
+		j.transportOutput(&JavaScriptNode{Line: 1}, "result", j.returns.taint(), true)
 	}
+
 	for name, sources := range j.files {
 		files[name] = union(files[name], sources)
 	}
 	return nil
+}
+
+func (j *javascript) transportOutput(node *JavaScriptNode, name string, sources value, complete bool) {
+	j.files["$GITHUB_OUTPUT"] = union(j.files["$GITHUB_OUTPUT"], sources)
+	transport := j.a.stepOutput
+	if transport != nil && j.options != nil && j.options.fastMatched != nil && j.options.fastEntries == nil && !j.fastVerified {
+		j.markUnverifiedOutput(sources, node)
+	}
+	j.a.transportOutputRecord(Site{Kind: Output, Path: j.scriptPath(), Line: node.Line}, name, sources, transport, false, complete)
 }
 
 func (a *analyzer) javascriptRender(text, name string, bindings scope) (string, map[string][]Source, error) {
