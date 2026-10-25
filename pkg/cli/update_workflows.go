@@ -635,10 +635,11 @@ func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, 
 		return "", fmt.Errorf("failed to fetch releases: %w", err)
 	}
 
-	releases := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(releases) == 0 || releases[0] == "" {
+	trimmedReleases := strings.TrimSpace(string(output))
+	if trimmedReleases == "" {
 		return "", errors.New("no releases found")
 	}
+	releases := strings.Split(trimmedReleases, "\n")
 
 	// Parse current version
 	currentVer := parseVersion(currentRef)
@@ -688,11 +689,12 @@ func resolveLatestReleaseWithDeps(ctx context.Context, deps workflowUpdateDeps, 
 	}
 
 	// If the repo is exempt from cooldown, return the best (newest) upgrade candidate.
-	if isExemptFromCoolDown(repo) {
+	if isExemptFromCoolDown(repo) && len(upgradeCandidates) > 0 {
+		candidate := upgradeCandidates[0]
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found newer release: "+upgradeCandidates[0].tag))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found newer release: "+candidate.tag))
 		}
-		return upgradeCandidates[0].tag, nil
+		return candidate.tag, nil
 	}
 
 	// Iterate from newest to oldest upgrade candidate, stopping at the first release

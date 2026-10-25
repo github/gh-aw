@@ -66,18 +66,16 @@ func resolveRefToSHAViaGit(ctx context.Context, owner, repo, ref, host string) (
 	}
 
 	// Parse the output: "<sha> <ref>"
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) == 0 || lines[0] == "" {
+	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
+	if firstLine == "" {
 		return "", fmt.Errorf("no matching ref found for %s", ref)
 	}
 
 	// Extract SHA from the first line
-	parts := strings.Fields(lines[0])
-	if len(parts) < 1 {
+	var sha string
+	if _, err := fmt.Sscan(firstLine, &sha); err != nil {
 		return "", errors.New("invalid git ls-remote output format")
 	}
-
-	sha := parts[0]
 
 	// Validate it's a valid SHA
 	if !gitutil.IsValidFullSHACaseInsensitive(sha) {

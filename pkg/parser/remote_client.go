@@ -86,9 +86,9 @@ func fetchPublicGitHubContentsAPI(ctx context.Context, owner, repo, path, ref st
 	// preserved — url.PathEscape would turn them into '%2F', breaking nested
 	// paths like '.github/workflows/shared/foo.md'.
 	segments := strings.Split(path, "/")
-	encodedSegments := make([]string, len(segments))
-	for i, s := range segments {
-		encodedSegments[i] = url.PathEscape(s)
+	encodedSegments := make([]string, 0, len(segments))
+	for _, s := range segments {
+		encodedSegments = append(encodedSegments, url.PathEscape(s))
 	}
 	endpoint := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
 		owner, repo, strings.Join(encodedSegments, "/"), url.QueryEscape(ref))
