@@ -1,41 +1,24 @@
 {
-  "run_date": "2026-10-25T00:59:09Z",
-  "run_id": "40148677350",
+  "run_date": "2026-10-25T06:35:05Z",
+  "run_id": "40169473065",
   "source": "pr-triage",
-  "eligible_total": 2,
+  "eligible_total": 1,
   "cooldown_skipped": 0,
-  "open_copilot_prs": 2,
+  "open_copilot_prs": 1,
   "category_counts": {
-    "bug": 1,
     "feature": 1
   },
   "risk_counts": {
-    "high": 1,
     "medium": 1
   },
   "priority_counts": {
-    "high": 1,
     "medium": 1
   },
   "action_counts": {
-    "fast_track": 2
+    "fast_track": 1
   },
   "batches": [],
   "selected_candidates": [
-    {
-      "number": 69586,
-      "title": "Protect behavior-defined engine session capture",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 76,
-      "score_breakdown": {
-        "impact": 38,
-        "urgency": 20,
-        "quality": 18
-      }
-    },
     {
       "number": 70952,
       "title": "Model routing: accept none/max for pinned Codex and add routed Codex smoke",
