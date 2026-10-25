@@ -191,6 +191,17 @@ for file in "${JS_SOURCE_DIR}"/*.json; do
   fi
 done
 
+# Copy the locked Copilot SDK npm manifests and lockfiles
+for file in "${JS_SOURCE_DIR}"/copilot-sdk/*/package*.json; do
+  if [ -f "$file" ]; then
+    profile="$(basename "$(dirname "$file")")"
+    mkdir -p "${DESTINATION}/copilot-sdk/${profile}"
+    cp "$file" "${DESTINATION}/copilot-sdk/${profile}/"
+    debug_log "Copied Copilot SDK ${profile}/$(basename "$file")"
+    FILE_COUNT=$((FILE_COUNT + 1))
+  fi
+done
+
 # Copy shell scripts from sh/ directory with executable permissions
 SH_SOURCE_DIR="${SCRIPT_DIR}/sh"
 if [ -d "${SH_SOURCE_DIR}" ]; then

@@ -38,6 +38,29 @@ describe("setup.sh Copilot runtime files", () => {
     expect(getDirectLocalRequires("copilot_harness.cjs")).toContain("copilot_routing_effort.cjs");
     expect(getDirectLocalRequires("copilot_sdk_driver.cjs")).toContain("copilot_routing_effort.cjs");
   });
+
+  it("copies the maintained SDK manifests and lockfiles into the runtime action directory", () => {
+    const runnerRoot = resolve(__dirname, `.setup-copilot-sdk-${process.pid}`);
+    mkdirSync(runnerRoot);
+    try {
+      const start = setupShContent.indexOf("# Copy the locked Copilot SDK npm manifests and lockfiles");
+      const end = setupShContent.indexOf("# Copy shell scripts from sh/ directory", start);
+      expect(start).toBeGreaterThanOrEqual(0);
+      expect(end).toBeGreaterThan(start);
+      const copyBlock = setupShContent.slice(start, end);
+      execFileSync("bash", ["-ec", `FILE_COUNT=0\ndebug_log() { :; }\n${copyBlock}`], {
+        env: { ...process.env, JS_SOURCE_DIR: __dirname, DESTINATION: runnerRoot },
+      });
+
+      for (const profile of ["node", "typescript"]) {
+        for (const filename of ["package.json", "package-lock.json"]) {
+          expect(readFileSync(resolve(runnerRoot, "copilot-sdk", profile, filename), "utf8")).toBe(readFileSync(resolve(__dirname, "copilot-sdk", profile, filename), "utf8"));
+        }
+      }
+    } finally {
+      rmSync(runnerRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 /**

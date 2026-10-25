@@ -21,7 +21,7 @@ func TestCopilotSDKInstallDependenciesArePinned(t *testing.T) {
 	t.Parallel()
 	for _, profile := range []string{"node", "typescript"} {
 		t.Run(profile, func(t *testing.T) {
-			manifest, err := copilotSDKNpmManifests.ReadFile("data/copilot-sdk/" + profile + "/package.json")
+			manifest, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", profile, "package.json"))
 			require.NoError(t, err)
 			var pkg struct {
 				Dependencies map[string]string `json:"dependencies"`
@@ -37,7 +37,7 @@ func TestCopilotSDKInstallDependenciesArePinned(t *testing.T) {
 			for name, version := range pkg.Dependencies {
 				assert.Regexp(t, exactVersion, version, name)
 			}
-			lockData, err := copilotSDKNpmManifests.ReadFile("data/copilot-sdk/" + profile + "/package-lock.json")
+			lockData, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", profile, "package-lock.json"))
 			require.NoError(t, err)
 			var lock struct {
 				Packages map[string]struct {
@@ -74,6 +74,14 @@ func TestCopilotSDKGeneratedLockedInstall(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			workspace := t.TempDir()
+			runnerTemp := t.TempDir()
+			assetDir := filepath.Join(runnerTemp, "gh-aw", "actions", "copilot-sdk", spec.runtimeID)
+			require.NoError(t, os.MkdirAll(assetDir, 0700))
+			for _, filename := range []string{"package.json", "package-lock.json"} {
+				content, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", spec.runtimeID, filename))
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(assetDir, filename), content, 0600))
+			}
 			require.NoError(t, os.WriteFile(filepath.Join(workspace, "package.json"), []byte(`{"private":true}`), 0600))
 			require.NoError(t, os.Mkdir(filepath.Join(workspace, "node_modules"), 0700))
 			bin := t.TempDir()
@@ -83,7 +91,7 @@ func TestCopilotSDKGeneratedLockedInstall(t *testing.T) {
 			require.Contains(t, script, copilotSDKNpmCICommand)
 			require.NotContains(t, script, "npm install")
 			cmd := exec.Command("bash", "-e", "-c", script)
-			cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "PATH="+bin+":"+os.Getenv("PATH"))
+			cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "RUNNER_TEMP="+runnerTemp, "PATH="+bin+":"+os.Getenv("PATH"))
 			output, err := cmd.CombinedOutput()
 			require.NoError(t, err, "%s", output)
 			got, err := os.ReadFile(filepath.Join(workspace, "package.json"))
@@ -93,9 +101,14 @@ func TestCopilotSDKGeneratedLockedInstall(t *testing.T) {
 			require.NoError(t, err)
 			lock, err := os.ReadFile(filepath.Join(workspace, ".gh-aw", "copilot-sdk", "package-lock.json"))
 			require.NoError(t, err)
-			expected, err := copilotSDKNpmManifests.ReadFile("data/copilot-sdk/" + spec.runtimeID + "/package-lock.json")
+			expected, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", spec.runtimeID, "package-lock.json"))
 			require.NoError(t, err)
 			assert.JSONEq(t, string(expected), string(lock))
+			manifest, err := os.ReadFile(filepath.Join(workspace, ".gh-aw", "copilot-sdk", "package.json"))
+			require.NoError(t, err)
+			expectedManifest, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", spec.runtimeID, "package.json"))
+			require.NoError(t, err)
+			assert.JSONEq(t, string(expectedManifest), string(manifest))
 		})
 	}
 }
@@ -176,7 +189,7 @@ func TestCopilotSDKIsolatedModuleResolution(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(workspace, ".gh-aw/copilot-sdk/resolve.cjs"), []byte(copilotSDKNpmResolver), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(workspace, "legacy.cjs"), []byte(`require("node:module").registerHooks = undefined;`), 0600))
 	for _, profile := range []string{"node", "typescript"} {
-		manifest, err := copilotSDKNpmManifests.ReadFile("data/copilot-sdk/" + profile + "/package.json")
+		manifest, err := os.ReadFile(filepath.Join("../../actions/setup/js/copilot-sdk", profile, "package.json"))
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(workspace, ".gh-aw/copilot-sdk/package.json"), manifest, 0600))
 		for _, legacy := range []bool{false, true} {
