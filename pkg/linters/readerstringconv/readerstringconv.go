@@ -44,16 +44,13 @@ func run(pass *analysis.Pass) (any, error) {
 		if !ok || len(conv.Args) != 1 {
 			return
 		}
-		if !pass.TypesInfo.Types[astutil.UnwrapParenExpr(conv.Fun)].IsType() {
-			return
-		}
 		source := conv.Args[0] //nolint:uncheckedsliceindex // len(conv.Args) == 1 is checked above.
 
 		var message string
 		switch {
-		case pkgPath == "strings" && astutil.IsStringType(pass, conv) && astutil.IsByteSlice(pass, source):
+		case pkgPath == "strings" && astutil.IsStringConversion(pass, conv) && astutil.IsByteSlice(pass, source):
 			message = "use bytes.NewReader instead of converting []byte to string for strings.NewReader"
-		case pkgPath == "bytes" && astutil.IsByteSlice(pass, conv) && astutil.IsStringType(pass, source):
+		case pkgPath == "bytes" && astutil.IsByteSliceConversion(pass, conv) && astutil.IsStringType(pass, source):
 			message = "use strings.NewReader instead of converting string to []byte for bytes.NewReader"
 		default:
 			return
