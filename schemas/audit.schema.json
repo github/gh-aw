@@ -3161,7 +3161,13 @@
               "message": {
                 "type": "string"
               },
+              "rule_id": {
+                "type": "string"
+              },
               "line": {
+                "type": "integer"
+              },
+              "column": {
                 "type": "integer"
               },
               "file": {
@@ -3169,6 +3175,46 @@
               },
               "severity": {
                 "type": "string"
+              },
+              "script": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "step_id": {
+                    "type": "string"
+                  },
+                  "step_name": {
+                    "type": "string"
+                  },
+                  "step_index": {
+                    "type": "integer"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "column": {
+                    "type": "integer"
+                  },
+                  "sanitized": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "line",
+                  "column"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -3192,7 +3238,13 @@
               "message": {
                 "type": "string"
               },
+              "rule_id": {
+                "type": "string"
+              },
               "line": {
+                "type": "integer"
+              },
+              "column": {
                 "type": "integer"
               },
               "file": {
@@ -3200,6 +3252,46 @@
               },
               "severity": {
                 "type": "string"
+              },
+              "script": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "step_id": {
+                    "type": "string"
+                  },
+                  "step_name": {
+                    "type": "string"
+                  },
+                  "step_index": {
+                    "type": "integer"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "column": {
+                    "type": "integer"
+                  },
+                  "sanitized": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "line",
+                  "column"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
