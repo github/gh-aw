@@ -79,6 +79,25 @@ func directAssignment(path string) bool {
 	return operating.IsPermission(err)
 }
 
+func directAssignmentInReturnCall(path string) bool {
+	err := operating.Remove(path)
+	return bool(operating.IsNotExist(err))
+}
+
+func directAssignmentInSinkCall(path string) {
+	err := operating.Remove(path)
+	observe(operating.IsNotExist(err))
+}
+
+func directAssignmentAfterEarlierArgument(path string, earlier func() bool) {
+	err := operating.Remove(path)
+	observeTwo(earlier(), operating.IsNotExist(err)) // want `os.IsNotExist.*errors.Is`
+}
+
+func observe(bool) {}
+
+func observeTwo(bool, bool) {}
+
 func unknownOrigin(path string, source fs.FS, unknown func(string) (operating.FileInfo, error)) {
 	if _, err := unknown(path); operating.IsNotExist(err) { // want `os.IsNotExist.*errors.Is`
 	}

@@ -49,6 +49,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 func inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *ast.BlockStmt) {
 	var stack []ast.Node
+	deferredFuncLits := make(map[*ast.FuncLit]struct{})
 
 	ast.Inspect(body, func(node ast.Node) bool {
 		if node == nil {
@@ -57,12 +58,17 @@ func inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *a
 		}
 
 		if deferStmt, ok := node.(*ast.DeferStmt); ok {
-			// A deferred function literal is already deferred; its body should not
-			// be analyzed as non-deferred Done() calls.
 			if deferStmt.Call != nil {
-				if _, ok := astutil.UnwrapParenExpr(deferStmt.Call.Fun).(*ast.FuncLit); ok {
-					return false
+				if deferredFuncLit, ok := astutil.UnwrapParenExpr(deferStmt.Call.Fun).(*ast.FuncLit); ok {
+					deferredFuncLits[deferredFuncLit] = struct{}{}
 				}
+			}
+		}
+
+		if funcLit, ok := node.(*ast.FuncLit); ok {
+			if _, deferred := deferredFuncLits[funcLit]; deferred {
+				stack = append(stack, node)
+				return false
 			}
 		}
 

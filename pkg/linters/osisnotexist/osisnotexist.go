@@ -169,9 +169,10 @@ func hasInterveningEffect(pass *analysis.Pass, node ast.Node, start, end token.P
 				skippedBody = node.Body
 			}
 		case *ast.CallExpr, *ast.FuncLit:
-			effect = true
+			// Any completed call, closure, or address-of before the predicate may mutate obj.
+			effect = node.End() <= end
 		case *ast.UnaryExpr:
-			effect = node.Op == token.AND
+			effect = node.Op == token.AND && node.End() <= end
 		case *ast.AssignStmt:
 			for _, lhs := range node.Lhs {
 				if ident, ok := astutil.UnwrapParenExpr(lhs).(*ast.Ident); ok && pass.TypesInfo.ObjectOf(ident) == obj {

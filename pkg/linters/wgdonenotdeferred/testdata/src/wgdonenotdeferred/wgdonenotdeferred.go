@@ -76,6 +76,13 @@ func GoodParenthesizedDeferredClosure(wg *sync.WaitGroup) {
 	})()
 }
 
+func BadDeferredCallArgument(wg *sync.WaitGroup) {
+	defer (func(int) {})(func() int {
+		wg.Done() // want `sync.WaitGroup Done\(\) should be deferred to prevent deadlock if the function panics`
+		return 0
+	}())
+}
+
 // Good: loop-body Done() calls are intentionally not flagged.
 func GoodLoopDone(wg *sync.WaitGroup, n int) {
 	for range n {
