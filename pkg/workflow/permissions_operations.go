@@ -186,6 +186,20 @@ func filterJobLevelPermissions(rawPermissionsYAML string, cachedPerms ...*Permis
 	return strings.Join(lines, "\n")
 }
 
+// fillMissingScopes expands a permission level without overwriting explicit entries.
+func fillMissingScopes(target map[PermissionScope]PermissionLevel, level PermissionLevel) {
+	for _, scope := range GetAllPermissionScopes() {
+		if _, exists := target[scope]; exists {
+			continue
+		}
+		// id-token does not support the read level
+		if scope == PermissionIdToken && level == PermissionRead {
+			continue
+		}
+		target[scope] = level
+	}
+}
+
 // Set sets a permission for a specific scope
 func (p *Permissions) Set(scope PermissionScope, level PermissionLevel) {
 	permissionsOpsLog.Printf("Setting permission: scope=%s, level=%s", scope, level)
@@ -209,15 +223,7 @@ func (p *Permissions) Set(scope PermissionScope, level PermissionLevel) {
 		case "none":
 			shorthandLevel = PermissionNone
 		}
-		for _, s := range GetAllPermissionScopes() {
-			if _, exists := p.permissions[s]; !exists {
-				// id-token does not support the read level
-				if s == PermissionIdToken && shorthandLevel == PermissionRead {
-					continue
-				}
-				p.permissions[s] = shorthandLevel
-			}
-		}
+		fillMissingScopes(p.permissions, shorthandLevel)
 	}
 	if p.hasAll {
 		// Convert from all to explicit map
@@ -226,15 +232,7 @@ func (p *Permissions) Set(scope PermissionScope, level PermissionLevel) {
 			p.permissions = make(map[PermissionScope]PermissionLevel)
 		}
 		// Expand all permissions to explicit permissions first
-		for _, s := range GetAllPermissionScopes() {
-			if _, exists := p.permissions[s]; !exists {
-				// id-token does not support the read level
-				if s == PermissionIdToken && p.allLevel == PermissionRead {
-					continue
-				}
-				p.permissions[s] = p.allLevel
-			}
-		}
+		fillMissingScopes(p.permissions, p.allLevel)
 		p.hasAll = false
 		p.allLevel = ""
 	}
@@ -326,15 +324,7 @@ func (p *Permissions) Merge(other *Permissions) {
 			if p.permissions == nil {
 				p.permissions = make(map[PermissionScope]PermissionLevel)
 			}
-			for _, scope := range GetAllPermissionScopes() {
-				if _, exists := p.permissions[scope]; !exists {
-					// Skip id-token when level is read since it doesn't support read
-					if scope == PermissionIdToken && p.allLevel == PermissionRead {
-						continue
-					}
-					p.permissions[scope] = p.allLevel
-				}
-			}
+			fillMissingScopes(p.permissions, p.allLevel)
 			p.hasAll = false
 			p.allLevel = ""
 		}
@@ -342,13 +332,7 @@ func (p *Permissions) Merge(other *Permissions) {
 			if other.permissions == nil {
 				// Create a temporary map for merging
 				tempPerms := make(map[PermissionScope]PermissionLevel)
-				for _, scope := range GetAllPermissionScopes() {
-					// Skip id-token when level is read since it doesn't support read
-					if scope == PermissionIdToken && other.allLevel == PermissionRead {
-						continue
-					}
-					tempPerms[scope] = other.allLevel
-				}
+				fillMissingScopes(tempPerms, other.allLevel)
 				// Merge the temporary map
 				p.mergePermissionMaps(tempPerms)
 				// Also merge explicit permissions from other if any
@@ -382,15 +366,8 @@ func (p *Permissions) Merge(other *Permissions) {
 		}
 
 		// For all scopes we don't have, set to other's shorthand level
-		allScopes := GetAllPermissionScopes()
-		for _, scope := range allScopes {
-			if _, exists := p.permissions[scope]; !exists && otherLevel != PermissionNone {
-				// Skip id-token when level is read since it doesn't support read
-				if scope == PermissionIdToken && otherLevel == PermissionRead {
-					continue
-				}
-				p.permissions[scope] = otherLevel
-			}
+		if otherLevel != PermissionNone {
+			fillMissingScopes(p.permissions, otherLevel)
 		}
 		return
 	}

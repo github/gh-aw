@@ -662,18 +662,20 @@ func buildConclusionJobNeeds(data *WorkflowData, mainJobName string, safeOutputJ
 
 // buildConclusionJobOutputs builds outputs for the conclusion job.
 func buildConclusionJobOutputs(data *WorkflowData) map[string]string {
-	// Create outputs for the job (include noop and missing_tool outputs if configured)
+	// Add noop/missing_tool/report_incomplete outputs only for non-participants,
+	// since work-queue participants skip those reporting steps.
 	outputs := map[string]string{}
 	if data.AdmissionEnabled {
 		outputs["admission_compact_session"] = "${{ steps.admission-conclusion-metadata.outputs.compact_session }}"
 		outputs["usage_artifact_id"] = "${{ steps.upload-usage-artifact.outputs.artifact-id }}"
 		outputs["usage_artifact_retry_id"] = "${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}"
 	}
+	if isWorkQueueParticipant(data) {
+		return outputs
+	}
 	if data.SafeOutputs.NoOp != nil {
 		outputs["noop_message"] = "${{ steps.noop.outputs.noop_message }}"
-		if !isWorkQueueParticipant(data) {
-			outputs["noop_comment_body"] = "${{ steps.noop.outputs.noop_comment_body }}"
-		}
+		outputs["noop_comment_body"] = "${{ steps.noop.outputs.noop_comment_body }}"
 	}
 	if data.SafeOutputs.MissingTool != nil {
 		outputs["tools_reported"] = "${{ steps.missing_tool.outputs.tools_reported }}"

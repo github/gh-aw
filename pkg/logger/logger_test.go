@@ -8,7 +8,32 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	lipgloss "charm.land/lipgloss/v2"
 )
+
+func TestBuildColorPalette(t *testing.T) {
+	if got := len(buildColorPalette()); got != 12 {
+		t.Errorf("palette length = %d, want 12", got)
+	}
+}
+
+func TestSelectNamespaceLabelBounds(t *testing.T) {
+	originalPalette, originalDebugColors := colorPalette, debugColors
+	t.Cleanup(func() {
+		colorPalette, debugColors = originalPalette, originalDebugColors
+	})
+	debugColors = true
+
+	for _, palette := range [][]lipgloss.Style{nil, {}, {lipgloss.NewStyle()}} {
+		colorPalette = palette
+		for _, namespace := range []string{"", "test:logger", "日本語"} {
+			if got := selectNamespaceLabel(namespace); got != namespace {
+				t.Errorf("label = %q, want %q (palette length %d)", got, namespace, len(palette))
+			}
+		}
+	}
+}
 
 // captureStderr captures stderr output during test execution
 func captureStderr(f func()) string {

@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,6 +58,36 @@ func TestReadRemoteRepoBranchFileNotFound(t *testing.T) {
 
 	_, err := readRemoteRepoBranchFile("octo/repo", "experiments/missing", "state.jsonl", "")
 	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestReadRemoteRepoBranchFileDecodesContentsResponse(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "wrapped whitespace", raw: " \taG Vs\r\nbG8=\u2003\n"},
+		{name: "malformed", raw: "aGVs!!!!", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			binDir := t.TempDir()
+			t.Setenv("CONTENTS_RESPONSE", tt.raw)
+			require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"),
+				[]byte("#!/bin/sh\nprintf '%s' \"$CONTENTS_RESPONSE\"\n"), 0o755))
+			t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+			content, err := readRemoteRepoBranchFile("octo/repo", "experiments/test", "state.jsonl", "")
+			if tt.wantErr {
+				require.ErrorContains(t, err, "failed to decode state.jsonl from experiments/test")
+				var corruptInput base64.CorruptInputError
+				require.ErrorAs(t, err, &corruptInput)
+				assert.Nil(t, content)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "hello", string(content))
+		})
+	}
 }
 
 func TestReadRemoteRepoBranchFileContextRejectsUnsafePaths(t *testing.T) {
