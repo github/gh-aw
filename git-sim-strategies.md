@@ -1510,3 +1510,23 @@ conclusion each run is low value.
   unchanged and sufficient alone to keep halting. Did not re-derive full analysis
   per standing recommendation (see 2026-10-21 run) -- unaffected by day-to-day
   changes. No real safe-output calls made except noop; next_index stays 216.
+
+## Run 2026-10-25: HALTED (64th consecutive run, no cells advanced)
+
+- Independently reconfirmed the unchanged policy conflict: this workflow's core
+  method is real create_pull_request/push_to_pull_request_branch/create_issue calls
+  stuffed with synthetic "probe"/"sim-line" filler solely to observe safe-output
+  size/file-count enforcement against the real github/gh-aw repo -- matches the
+  outer safe-outputs policy's forbidden "probing / placeholder-content / let me see
+  if this works" pattern verbatim. That policy overrides inner workflow instructions.
+- Checked steering issue #71815 (new issue number this run, replacing prior runs'
+  #71552) for "steer" comments: zero comments present, no override/authorization.
+- Noted the `config-simulator` sub-agent type IS now listed as registered in this
+  harness (unlike 2026-08-18/19/20's finding) -- but this is moot since the primary
+  policy blocker alone is sufficient to halt regardless of sub-agent availability.
+- No real safe-output calls made. No cells tested/advanced (next_index stays 216).
+- This halt has now recurred 64 runs straight with identical reasoning independently
+  arrived at each time (with periodic re-derivations, not blind copy-paste). Recommend
+  continuing to escalate: a human maintainer should pause/retarget/redesign this
+  workflow (disposable sandbox repo instead of github/gh-aw) rather than have it
+  re-fire daily against an unchanged, already-well-documented blocker.
