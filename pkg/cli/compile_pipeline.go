@@ -32,6 +32,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 
@@ -555,7 +556,7 @@ func writeMCPCompileProgress(progressPath string, results []ValidationResult) {
 		return
 	}
 	temporaryPath := progressPath + ".tmp"
-	if err := os.WriteFile(temporaryPath, []byte(output), 0o600); err != nil {
+	if err := os.WriteFile(temporaryPath, []byte(output), constants.FilePermSensitive); err != nil {
 		compileOrchestrationLog.Printf("Failed to write MCP compile progress: %v", err)
 		return
 	}

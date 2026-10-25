@@ -442,23 +442,27 @@ func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 		return nil
 	}
 
-	allSteps, extractionErr := collectShellcheckSteps(lockFiles, resources)
-	if len(allSteps) == 0 {
-		if extractionErr != nil {
-			reportCompileScannerResult(ctx, "shellcheck", extractionErr)
-			return extractionErr
-		}
+	allSteps, extractionErrors := collectShellcheckSteps(lockFiles, resources)
+	if len(allSteps) == 0 && len(extractionErrors) == 0 {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps (0 run steps found in lock files)"))
 		return nil
 	}
 
+	if len(allSteps) == 0 {
+		return reportShellcheckResultsWithErrors(ctx, nil, nil, strict, extractionErrors)
+	}
+
 	useDocker, available := shellcheckDockerFallback(ctx)
 	if !available {
-		err := errors.Join(extractionErr, errors.New("shellcheck binary not found and Docker is unavailable; install ShellCheck or Docker to lint run steps"))
+		err := errors.Join(append(extractionErrors, errors.New("shellcheck binary not found and Docker is unavailable; install ShellCheck or Docker to lint run steps"))...)
 		reportCompileScannerResult(ctx, "shellcheck", err)
-		return err
+		if strict {
+			return err
+		}
+		return nil
 	}
-	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker, extractionErr)
+
+	return runShellcheckOnSteps(ctx, allSteps, lockFiles, verbose, strict, useDocker, extractionErrors)
 }
 
 func shellcheckDockerFallback(ctx context.Context) (useDocker bool, available bool) {
@@ -473,15 +477,15 @@ func shellcheckDockerFallback(ctx context.Context) (useDocker bool, available bo
 	return true, true
 }
 
-func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScriptResource) ([]runStepInfo, error) {
+func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScriptResource) ([]runStepInfo, []error) {
 	var steps []runStepInfo
-	var failures []error
+	var extractionErrors []error
 	for _, lockFile := range lockFiles {
 		lockSteps, err := extractRunStepsFromLockFile(lockFile)
 		if err != nil {
 			shellcheckLog.Printf("Failed to extract run steps from %s: %v", lockFile, err)
 			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage("shellcheck: could not parse "+filepath.Base(lockFile)+": "+err.Error()))
-			failures = append(failures, fmt.Errorf("shellcheck could not parse %s: %w", filepath.Base(lockFile), err))
+			extractionErrors = append(extractionErrors, fmt.Errorf("shellcheck could not parse %s: %w", filepath.Base(lockFile), err))
 			continue
 		}
 		steps = append(steps, lockSteps...)
@@ -497,10 +501,10 @@ func collectShellcheckSteps(lockFiles []string, resources []workflow.ShellScript
 			Source: resource.Source,
 		})
 	}
-	return steps, errors.Join(failures...)
+	return steps, extractionErrors
 }
 
-func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool, additionalErrors ...error) error {
+func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles []string, verbose bool, strict bool, useDocker bool, extractionErrors []error) error {
 	shellcheckLog.Printf("Running shellcheck on %d run step resource(s) from %d lock file(s) (strict=%t, docker=%t)", len(allSteps), len(lockFiles), strict, useDocker)
 	if len(lockFiles) == 1 {
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage("Running shellcheck on run steps in "+filepath.Base(lockFiles[0])))
@@ -508,7 +512,7 @@ func runShellcheckOnSteps(ctx context.Context, allSteps []runStepInfo, lockFiles
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatInfoMessage(fmt.Sprintf("Running shellcheck on %d run step resources", len(allSteps))))
 	}
 	results := runShellcheckWorkers(ctx, allSteps, verbose, useDocker)
-	return reportShellcheckResults(ctx, allSteps, results, strict, additionalErrors...)
+	return reportShellcheckResultsWithErrors(ctx, allSteps, results, strict, extractionErrors)
 }
 
 type shellcheckResult struct {
@@ -552,18 +556,19 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 	return results
 }
 
-func reportShellcheckResults(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool, additionalErrors ...error) error {
+func reportShellcheckResults(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool) error {
+	return reportShellcheckResultsWithErrors(ctx, steps, results, strict, nil)
+}
+
+func reportShellcheckResultsWithErrors(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool, earlyErrors []error) error {
 	var totalIssues int
 	var firstErr error
 	var diagnostics []scannerDiagnostic
-	var operationalErrors []error
-	for _, err := range additionalErrors {
-		if err != nil {
-			operationalErrors = append(operationalErrors, err)
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
+	operationalErrors := append([]error(nil), earlyErrors...)
+	if len(operationalErrors) > 0 {
+		firstErr = operationalErrors[0]
+		totalIssues = len(operationalErrors)
+
 	}
 	for i, r := range results {
 		if len(r.output) > 0 {

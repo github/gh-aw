@@ -64,40 +64,57 @@ func effectiveRunShell(input Input, block aw.ExecutionBlock, step aw.ExecutionSt
 			if block.Path != "jobs."+string(job.ID) {
 				continue
 			}
-			if shell, configured, valid := runDefaultShell(job.Defaults); configured {
-				return shell, valid
+			if shell, found, known := defaultRunShell(job.Defaults); found {
+				return shell, known
 			}
 			break
 		}
-		if shell, configured, valid := runDefaultShell(input.Workflow.Defaults); configured {
-			return shell, valid
+		if shell, found, known := defaultRunShell(input.Workflow.Defaults); found {
+			return shell, known
 		}
 	} else if input.Document != nil {
-		if shell, configured, valid := runDefaultShell(block.Fields["defaults"]); configured {
-			return shell, valid
+		if block.Path != "" {
+			if shell, found, known := defaultRunShellField(block.Fields); found {
+				return shell, known
+			}
 		}
-		if shell, configured, valid := runDefaultShell(input.Document.Frontmatter["defaults"]); configured {
-			return shell, valid
+		if shell, found, known := defaultRunShellField(input.Document.Frontmatter); found {
+			return shell, known
 		}
 	}
-	return "bash", true
+	return "", true
 }
 
-func runDefaultShell(value any) (shell string, configured bool, valid bool) {
+func defaultRunShellField(fields map[string]any) (string, bool, bool) {
+	value, ok := fields["defaults"]
+	if !ok || value == nil {
+		return "", false, true
+	}
 	defaults, ok := value.(map[string]any)
 	if !ok {
-		return "", false, false
+		return "", true, false
 	}
-	run, ok := defaults["run"].(map[string]any)
+	return defaultRunShell(defaults)
+}
+
+func defaultRunShell(defaults map[string]any) (string, bool, bool) {
+	if defaults == nil {
+		return "", false, true
+	}
+	value, ok := defaults["run"]
+	if !ok || value == nil {
+		return "", false, true
+	}
+	run, ok := value.(map[string]any)
 	if !ok {
-		return "", false, false
+		return "", true, false
 	}
-	value, configured = run["shell"]
-	if !configured || value == nil {
-		return "", false, false
+	value, ok = run["shell"]
+	if !ok || value == nil {
+		return "", false, true
 	}
-	shell, valid = value.(string)
-	return shell, true, valid
+	shell, ok := value.(string)
+	return shell, true, ok
 }
 
 func bashCasePatterns(ctx context.Context, script, path string) ([]Diagnostic, error) {

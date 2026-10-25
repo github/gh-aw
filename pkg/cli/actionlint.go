@@ -480,6 +480,9 @@ func actionlintContextError(result actionlintCommandResult, lockFiles []string) 
 }
 
 func handleActionlintExecutionError(err error, strict bool, lockFiles []string, totalErrors int, parseErr error, stdout string) error {
+	if strict && parseErr != nil {
+		return fmt.Errorf("strict mode: actionlint output could not be parsed: %w", parseErr)
+	}
 	if err == nil {
 		return nil
 	}

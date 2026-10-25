@@ -82,23 +82,42 @@ func TestBashCasePatternsResolveInheritedShell(t *testing.T) {
 	})
 
 	t.Run("authored AW step job workflow order", func(t *testing.T) {
-		step := func(shell string) map[string]any {
-			fields := map[string]any{"run": script}
-			if shell != "" {
-				fields["shell"] = shell
-			}
-			return fields
-		}
-		document := &aw.Document{Frontmatter: map[string]any{
-			"defaults": defaults("python"),
-			"steps":    []any{step("")},
-			"jobs": map[string]any{
-				"job-bash":        map[string]any{"defaults": defaults("bash"), "steps": []any{step("")}},
-				"step-python":     map[string]any{"defaults": defaults("bash"), "steps": []any{step("python")}},
-				"step-bash":       map[string]any{"defaults": defaults("python"), "steps": []any{step("bash")}},
-				"workflow-python": map[string]any{"steps": []any{step("")}},
-			},
-		}}
+		source := `---
+defaults:
+  run:
+    shell: python
+steps:
+  - run: |
+      matched=$(case "$ref" in $pattern) echo yes ;; esac)
+jobs:
+  job-bash:
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: |
+          matched=$(case "$ref" in $pattern) echo yes ;; esac)
+  step-python:
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - shell: python
+        run: |
+          matched=$(case "$ref" in $pattern) echo yes ;; esac)
+  step-bash:
+    defaults:
+      run:
+        shell: python
+    steps:
+      - shell: bash
+        run: |
+          matched=$(case "$ref" in $pattern) echo yes ;; esac)
+---
+Prompt
+`
+		document, err := aw.Parse(source)
+		require.NoError(t, err)
 		diagnostics, err := checkBashCasePatterns(context.Background(), Input{Document: document})
 		require.NoError(t, err)
 		require.Len(t, diagnostics, 2)

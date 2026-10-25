@@ -239,8 +239,11 @@ func TestDryRunScannerReportingKeepsFindingsAndGate(t *testing.T) {
 	lock := filepath.Join(dir, "test.lock.yml")
 	require.NoError(t, os.WriteFile(lock, []byte("jobs:\n  test:\n    steps:\n      - run: echo hello\n"), 0o600))
 	for _, tool := range []string{"actionlint", "shellcheck"} {
-		for _, mode := range []string{"findings", "low", "tooling"} {
+		for _, mode := range []string{"findings", "low", "tooling", "malformed-success"} {
 			t.Run(tool+"/"+mode, func(t *testing.T) {
+				if tool == "shellcheck" && mode == "malformed-success" {
+					t.Skip("ShellCheck does not emit JSON")
+				}
 				t.Setenv("SCANNER_TEST_MODE", mode)
 				message, kind, level := "quote this variable", "expression", "warning"
 				if mode == "low" {
@@ -330,6 +333,9 @@ func TestShellcheckEarlyFailuresAreReported(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" {
+				t.Skip("test scanners use POSIX shell scripts")
+			}
 			dir := scannerJSONTestRepo(t)
 			lock := filepath.Join(dir, "test.lock.yml")
 			require.NoError(t, os.WriteFile(lock, []byte(tc.lockContent), 0o600))

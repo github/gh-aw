@@ -115,6 +115,21 @@ func TestInjectShellcheckDiagnostics_IgnoresUnrelatedStderr(t *testing.T) {
 	}
 }
 
+func TestInjectDevelopmentShellcheckDiagnosticsKeepsStructuredResults(t *testing.T) {
+	for _, inputJSON := range []string{
+		`[{"scope":"batch","workflow":"shellcheck","valid":true,"errors":[],"warnings":[{"type":"shellcheck_finding","message":"advisory","severity":"info"}]}]`,
+		`[{"scope":"batch","workflow":"shellcheck","valid":false,"errors":[{"type":"shellcheck_finding","message":"blocking","severity":"high"}],"warnings":[]}]`,
+	} {
+		output := injectDevelopmentShellcheckDiagnostics(
+			inputJSON,
+			"shellcheck findings in a.lock.yml:\nscript:1:3: warning: quote this [SC2086]\n",
+		)
+		if output != inputJSON {
+			t.Fatalf("Expected structured ShellCheck results to be preserved without stderr duplicates, got: %s", output)
+		}
+	}
+}
+
 func TestBuildCompileErrorResults_NormalizesRequestedWorkflowNames(t *testing.T) {
 	results := buildCompileErrorResults([]string{"foo", "bar.md", "nested/baz"}, "compile failed")
 
