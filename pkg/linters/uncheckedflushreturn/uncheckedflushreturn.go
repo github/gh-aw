@@ -9,6 +9,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -55,7 +56,7 @@ func run(pass *analysis.Pass) (any, error) {
 // checkDiscardedFlushExpr flags Flush() used as a bare expression statement,
 // where the error return is silently discarded.
 func checkDiscardedFlushExpr(pass *analysis.Pass, stmt *ast.ExprStmt, noLintIndex nolint.DirectiveIndex) {
-	call, ok := stmt.X.(*ast.CallExpr)
+	call, ok := astutil.UnwrapParenExpr(stmt.X).(*ast.CallExpr)
 	if !ok {
 		return
 	}
@@ -75,7 +76,7 @@ func checkDiscardedFlushAssign(pass *analysis.Pass, assign *ast.AssignStmt, noLi
 	if !ok || blank.Name != "_" {
 		return
 	}
-	call, ok := assign.Rhs[0].(*ast.CallExpr)
+	call, ok := astutil.UnwrapParenExpr(assign.Rhs[0]).(*ast.CallExpr)
 	if !ok {
 		return
 	}

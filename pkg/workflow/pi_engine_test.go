@@ -233,6 +233,7 @@ func TestPiEngine_GetInstallationSteps_NoCustomCommand(t *testing.T) {
 		rendered.WriteString(strings.Join(step, "\n"))
 		rendered.WriteString("\n")
 	}
+	assert.Contains(t, rendered.String(), "npm install --ignore-scripts -g @earendil-works/pi-coding-agent@"+string(constants.DefaultPiVersion))
 	assert.NotContains(t, rendered.String(), "NPM_CONFIG_MIN_RELEASE_AGE", "Pi installation should not set the npm release-age cooldown")
 }
 
