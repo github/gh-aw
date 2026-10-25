@@ -46,7 +46,7 @@ const {
 
 const OP_FIELDS = {
   Policy: [["kind", "epoch", "policy"], []],
-  PoolInstall: [["kind", "pool", "config"], []],
+  PoolInstall: [["kind", "pool", "config"], ["config_ref"]],
   Deployment: [["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"], ["activate"]],
   Control: [["kind", "control", "value", "reason"], []],
   Work: [
@@ -95,6 +95,21 @@ function approvedPoolProfile(state, name, profile) {
     if (Object.hasOwn(revisions, profile.ref) && revisions[profile.ref].available && canonical(revisions[profile.ref].profile) === canonical(profile)) return true;
   }
   return false;
+}
+
+function newPoolProfile(state, name, profile, configRef) {
+  if (Object.values(state.policy.pools).some(pool => Object.hasOwn(pool.profiles, name))) return false;
+  return (
+    typeof configRef === "string" &&
+    /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(configRef) &&
+    !/^0+$/.test(configRef) &&
+    profile.ref === configRef &&
+    /^[a-f0-9]{64}$/.test(profile.logical_contract) &&
+    profile.workflow === `.github/workflows/${name}.lock.yml` &&
+    !name.includes("/") &&
+    profile.max_claims === 1 &&
+    profile.share_keys === false
+  );
 }
 
 const REQUEST_KINDS = {
@@ -1253,8 +1268,21 @@ function replayOrdered(ordered) {
           break;
         case "PoolInstall": {
           poolIdentity(operation.pool);
+          if (Object.hasOwn(operation, "config_ref") && (typeof operation.config_ref !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.config_ref) || /^0+$/.test(operation.config_ref)))
+            throw queueError("policy_invalid", "pool configuration provenance requires an immutable default revision");
           const installedPolicy = state.policy;
-          if (!installedPolicy || installedPolicy.authorization !== "aw" || Object.hasOwn(installedPolicy.pools, operation.pool)) throw queueError("policy_invalid", "only new pools can be installed into an AW-managed Policy");
+          if (!installedPolicy || installedPolicy.authorization !== "aw") throw queueError("policy_invalid", "pool installation requires an AW-managed Policy");
+          const installed = Object.hasOwn(installedPolicy.pools, operation.pool) ? installedPolicy.pools[operation.pool] : undefined;
+          if (installed) {
+            const { profiles: oldProfiles, ...oldBoundary } = installed;
+            const { profiles: newProfiles, ...newBoundary } = operation.config;
+            if (
+              canonical(oldBoundary) !== canonical(newBoundary) ||
+              Object.entries(oldProfiles).some(([name, profile]) => !Object.hasOwn(newProfiles, name) || canonical(newProfiles[name]) !== canonical(profile)) ||
+              Object.keys(newProfiles).length <= Object.keys(oldProfiles).length
+            )
+              throw queueError("policy_invalid", "pool installation must only add profiles, preserving installed pool authority and economics");
+          }
           const policy = structuredClone(installedPolicy);
           Object.defineProperty(policy.pools, operation.pool, { value: structuredClone(operation.config), enumerable: true, configurable: true, writable: true });
           validatePolicy(policy);
@@ -1262,8 +1290,11 @@ function replayOrdered(ordered) {
           if (operation.config.allowed_repositories.some(repository => !authorizedRepositories.has(repository))) throw queueError("policy_invalid", "PoolInstall cannot expand the installed repository allowlist");
           if (Object.values(operation.config.profiles).some(profile => profile.effect_scope !== state.repository || Object.hasOwn(profile, "principal")))
             throw queueError("policy_invalid", "automatically installed AW pools must preserve repository-scoped authority");
-          for (const [name, profile] of Object.entries(operation.config.profiles))
-            if (!approvedPoolProfile(state, name, profile)) throw queueError("policy_invalid", "pool profiles must match installed or registered worker revision authority");
+          for (const [name, profile] of Object.entries(operation.config.profiles)) {
+            if (installed && Object.hasOwn(installed.profiles, name)) continue;
+            if (!approvedPoolProfile(state, name, profile) && !newPoolProfile(state, name, profile, operation.config_ref))
+              throw queueError("policy_invalid", "pool profiles require registered worker revision authority or a new default-revision AW worker");
+          }
           state.policy = policy;
           initializeDeployments(state, [operation.pool]);
           break;

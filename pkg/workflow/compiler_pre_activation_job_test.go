@@ -6,9 +6,48 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildPreActivationActivatedExpression(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		data WorkflowData
+	}{
+		{"custom steps", WorkflowData{OnSteps: []map[string]any{{"run": "echo gate"}}}},
+		{"custom needs", WorkflowData{OnNeeds: []string{"prepare"}}},
+		{"author associations", WorkflowData{SkipAuthorAssociations: map[string][]string{"issues": {"BOT"}}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			value, err := buildPreActivationActivatedExpression(&tt.data, nil)
+			require.NoError(t, err)
+			assert.Equal(t, `"true"`, value)
+			var outputs map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte("activated: "+value), &outputs))
+			assert.Equal(t, "true", outputs["activated"], "job outputs must remain strings, not YAML booleans")
+		})
+	}
+	t.Run("conditions remain expressions", func(t *testing.T) {
+		conditions := []ConditionNode{
+			BuildComparison(BuildPropertyAccess("steps.gate.outputs.ok"), "==", BuildStringLiteral("true")),
+			BuildComparison(BuildPropertyAccess("steps.check.outputs.ok"), "==", BuildStringLiteral("true")),
+		}
+		for _, count := range []int{1, 2} {
+			value, err := buildPreActivationActivatedExpression(&WorkflowData{}, conditions[:count])
+			require.NoError(t, err)
+			assert.Equal(t, "${{ "+strings.Join([]string{
+				"steps.gate.outputs.ok == 'true'",
+				"steps.check.outputs.ok == 'true'",
+			}[:count], " && ")+" }}", value)
+		}
+	})
+	t.Run("missing checks remain an error", func(t *testing.T) {
+		_, err := buildPreActivationActivatedExpression(&WorkflowData{}, nil)
+		require.ErrorContains(t, err, "without activation checks or custom steps")
+	})
+}
 
 func TestBuildPreActivationPermissions(t *testing.T) {
 	t.Run("release mode without optional checks keeps permissions empty", func(t *testing.T) {

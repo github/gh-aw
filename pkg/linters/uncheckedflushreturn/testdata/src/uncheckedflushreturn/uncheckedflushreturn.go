@@ -9,7 +9,8 @@ import (
 func bad() {
 	var sb strings.Builder
 	bw := bufio.NewWriter(&sb)
-	bw.Flush() // want `error return from Flush\(\) is discarded`
+	bw.Flush()   // want `error return from Flush\(\) is discarded`
+	(bw.Flush()) // want `error return from Flush\(\) is discarded`
 
 	tw := tabwriter.NewWriter(&sb, 0, 0, 1, ' ', 0)
 	tw.Flush() // want `error return from Flush\(\) is discarded`
@@ -18,7 +19,8 @@ func bad() {
 func badBlankAssign() {
 	var sb strings.Builder
 	bw := bufio.NewWriter(&sb)
-	_ = bw.Flush() // want `error return from Flush\(\) is discarded`
+	_ = bw.Flush()   // want `error return from Flush\(\) is discarded`
+	_ = (bw.Flush()) // want `error return from Flush\(\) is discarded`
 }
 
 func deferBad() {

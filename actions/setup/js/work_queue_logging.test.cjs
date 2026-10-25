@@ -272,9 +272,9 @@ describe("privacy-preserving work queue logging", () => {
   });
 
   it.each([
-    ["work_queue_pool_not_installed", "Automatic installation must preserve installed Policy and worker authority"],
-    ["work_queue_profile_not_approved", "quiescent queue"],
-    ["work_queue_worker_not_compiler_approved", "do not bypass the worker allowlist"],
+    ["work_queue_pool_not_installed", "Installed pool settings and profiles must remain unchanged"],
+    ["work_queue_profile_not_approved", "registered on demand"],
+    ["work_queue_worker_not_compiler_approved", "dispatch allowlist"],
   ])("explains installed routing failures without exposing task data: %s", (code, recovery) => {
     const error = Object.assign(new Error("private-task-and-token"), { code });
     expect(queueControlErrorCode(error)).toBe(code);

@@ -25,7 +25,8 @@ import { synchronizeDeployments } from "./work_queue_deployment_control.cjs";
 import { authenticatePublisher } from "./work_queue_native.cjs";
 import { requestForIntent, stagePlanIntents } from "./work_queue_intents.cjs";
 import { canonical, digest } from "./work_queue_codec.cjs";
-import { queueFixture, DISPATCHER, REF, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
+import { queueFixture, noWriteClaimVerifier, DISPATCHER, REF, REPOSITORY } from "./work_queue_lifecycle.test_helpers.cjs";
+import { reconcileWorkerClaim, finalizeWorkerResults } from "./finish_work_queue_claim.cjs";
 import { fakeGitHub } from "./work_queue_store_checks.cjs";
 
 function setup(settings = {}) {
@@ -49,7 +50,7 @@ function setup(settings = {}) {
   return { fixture, post, options };
 }
 
-function setupPoolInstallation() {
+function setupPoolInstallation(newWorker = false) {
   const result = setup({
     granted: false,
     configurePolicy: policy => {
@@ -64,6 +65,14 @@ function setupPoolInstallation() {
   proposal.pools.smoke = structuredClone(proposal.pools.default);
   proposal.pools.smoke.logical_limit = 1;
   proposal.pools.smoke.native_limit = 1;
+  if (newWorker) {
+    const profile = { ...proposal.pools.default.profiles.default, workflow: ".github/workflows/smoke-work-queue-worker.lock.yml", max_claims: 1, share_keys: false };
+    proposal.pools.default.profiles["smoke-work-queue-worker"] = profile;
+    proposal.pools.smoke.profiles["smoke-work-queue-worker"] = structuredClone(profile);
+    proposal.pools.smoke.default_profile = "smoke-work-queue-worker";
+    options.config.work_queue_workflows.push("smoke-work-queue-worker");
+    options.config.aw_context_workflows.push("smoke-work-queue-worker");
+  }
   const contents = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
   fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
     data: {
@@ -76,7 +85,7 @@ function setupPoolInstallation() {
   fixture.githubClient.rest.repos.get = async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7, default_branch: "main", permissions: { push: true } } });
   const getRef = fixture.githubClient.rest.git.getRef;
   fixture.githubClient.rest.git.getRef = async parameters => (parameters.ref === "heads/main" ? { data: { ref: "refs/heads/main", object: { type: "commit", sha: REF } } } : getRef(parameters));
-  fixture.githubClient.rest.actions.getWorkflow = vi.fn(async () => ({ data: { path: ".github/workflows/worker.lock.yml", state: "active" } }));
+  fixture.githubClient.rest.actions.getWorkflow = vi.fn(async ({ workflow_id }) => ({ data: { path: `.github/workflows/${workflow_id}`, state: "active" } }));
   return { ...result, options: { ...options, policyProposal: proposal }, proposal };
 }
 
@@ -2278,19 +2287,20 @@ describe("native queue launch fencing and conservative recovery", () => {
     }
   });
 
-  it("installs the pool, admits prepared Work and binds one worker launch end to end", async () => {
-    const { fixture, options, post } = setupPoolInstallation();
+  it.each([false, true])("installs the pool, admits prepared Work and binds one worker launch end to end (new worker: %s)", async newWorker => {
+    const { fixture, options, post } = setupPoolInstallation(newWorker);
     const getRun = fixture.githubClient.rest.actions.getWorkflowRun;
     fixture.githubClient.rest.actions.getWorkflowRun = async parameters => {
       const response = await getRun(parameters);
-      return parameters.run_id === "42" ? { ...response, data: { ...response.data, display_title: `gh-aw work-queue ${[...fixture.state.dispatches.values()].at(-1).dispatch_id}` } } : response;
+      const dispatch = [...fixture.state.dispatches.values()].at(-1);
+      return parameters.run_id === "42" ? { ...response, data: { ...response.data, path: dispatch.profile.workflow, display_title: `gh-aw work-queue ${dispatch.dispatch_id}` } } : response;
     };
     const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-pool-plan-"));
     const filename = path.join(directory, "intents.jsonl");
     try {
       stagePlanIntents(filename, {
         version: 1,
-        nodes: [{ pool: "smoke", payload: { task: "synthetic smoke", effect_contract: { kind: "none" } } }],
+        nodes: [{ pool: "smoke", worker_profile: newWorker ? "smoke-work-queue-worker" : "default", payload: { task: "synthetic smoke", effect_contract: { kind: "none" } } }],
         dispatch: { pool: "smoke", max_claims: 1, max_dispatches: 1 },
       });
       const configured = { ...options, assignment: null, role: "dispatcher", intentPath: filename, maxDispatches: 1 };
@@ -2300,13 +2310,99 @@ describe("native queue launch fencing and conservative recovery", () => {
       expect(fixture.transactions.flatMap(commit => commit.operations).filter(operation => operation.kind === "PoolInstall")).toHaveLength(1);
       expect([...fixture.state.works.values()].find(work => work.pool === "smoke")).toMatchObject({ state: "claimed", attempts: 1 });
       expect(post).toHaveBeenCalledTimes(1);
+      if (newWorker) {
+        expect(fixture.state.policy.pools.smoke.profiles["smoke-work-queue-worker"]).toMatchObject({ ref: REF, max_claims: 1 });
+        expect(fixture.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "PoolInstall")).toHaveProperty("config_ref", REF);
+        expect([...fixture.state.dispatches.values()].at(-1).worker_profile).toBe("smoke-work-queue-worker");
+        expect(fixture.state.policy.pools.default).toEqual(fixture.policy.pools.default);
+      }
       const beforeRecovery = canonical(fixture.transactions);
       expect((await processWorkQueueIntents(configured)).receipts).toMatchObject([{ status: "durable" }, { status: "durable", success: true, dispatches: 1 }]);
       expect(canonical(fixture.transactions)).toBe(beforeRecovery);
       expect(post).toHaveBeenCalledTimes(1);
+      const assignment = JSON.parse(post.mock.calls[0][0].inputs.work_queue_assignment);
+      const dispatch = fixture.state.dispatches.get(assignment.dispatch_id);
+      const finishIntentPath = path.join(directory, "finish.jsonl");
+      fs.writeFileSync(finishIntentPath, `${JSON.stringify({ version: 3, kind: "finish", intent_id: "smoke-finished", claim_handle: "h1", parameters: { outcome: "completed" } })}\n`);
+      const workerOptions = {
+        ...options,
+        config: undefined,
+        assignment,
+        logicalContract: dispatch.profile.logical_contract,
+        context: fixture.workerContext,
+        workflowRef: `${REPOSITORY}/${dispatch.profile.workflow}@${REF}`,
+        finishIntentPath,
+      };
+      expect((await reconcileWorkerClaim(workerOptions)).claims.h1).toMatchObject({ state: "completed", authorized: true });
+      expect((await finalizeWorkerResults({ ...workerOptions, verifyEffects: noWriteClaimVerifier(workerOptions) })).claims.h1).toMatchObject({ state: "result" });
+      expect(fixture.state.works.get(assignment.claims[0].work_id)).toMatchObject({ state: "completed", barrier: "verified" });
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("registers a new worker in an existing pool on submission without resetting a deployed worker or active Claims", async () => {
+    const { fixture, options, proposal } = setupPoolInstallation(true);
+    delete proposal.pools.smoke;
+    options.config.work_queue_workflows = ["smoke-work-queue-worker"];
+    options.config.aw_context_workflows = ["smoke-work-queue-worker"];
+    fixture.append("dispatch_next", { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 }, fixture.dispatcher, "existing-claim");
+    const original = fixture.state.deployments.get("default").get("default");
+    fixture.append(
+      "deployment",
+      { operations: [{ kind: "Deployment", pool: "default", worker_profile: "default", expected_ref: REF, expected_contract: "a".repeat(64), profile: original.revisions[REF].profile, available: false, reason: "worker_unavailable" }] },
+      fixture.dispatcher
+    );
+    const before = fixture.state;
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-new-worker-"));
+    const filename = path.join(directory, "intents.jsonl");
+    try {
+      fs.writeFileSync(
+        filename,
+        `${JSON.stringify({ version: 3, intent_id: "new-worker-submit", kind: "submit", parameters: { nodes: [{ pool: "default", worker_profile: "smoke-work-queue-worker", payload: { task: "new worker" } }] } })}\n`
+      );
+      const result = await processWorkQueueIntents({ ...options, assignment: null, role: "dispatcher", intentPath: filename });
+      expect(result.receipts).toMatchObject([{ status: "durable" }]);
+      expect(fixture.state.policy_epoch).toBe(before.policy_epoch);
+      expect(fixture.state.clocks).toEqual(before.clocks);
+      expect(fixture.state.claims).toEqual(before.claims);
+      expect(fixture.state.dispatches).toEqual(before.dispatches);
+      expect(fixture.state.deployments.get("default").get("default")).toEqual(before.deployments.get("default").get("default"));
+      expect(fixture.state.deployments.get("default").get("smoke-work-queue-worker")).toMatchObject({ current_ref: REF, current_contract: "a".repeat(64) });
+      expect([...fixture.state.works.values()].filter(work => work.worker_profile === "smoke-work-queue-worker")).toHaveLength(1);
+      const checkpoint = compactTransactions(fixture.transactions, "c".repeat(40), fixture.administrator, fixture.at);
+      const restored = replayTransactions(compactTransactions(checkpoint, "d".repeat(40), fixture.administrator, fixture.at));
+      expect(restored.policy).toEqual(fixture.state.policy);
+      expect(restored.deployments).toEqual(fixture.state.deployments);
+      expect(restored.works).toEqual(fixture.state.works);
+      const beforeRecovery = canonical(fixture.transactions);
+      expect((await processWorkQueueIntents({ ...options, assignment: null, role: "dispatcher", intentPath: filename })).receipts).toMatchObject([{ status: "durable" }]);
+      expect(canonical(fixture.transactions)).toBe(beforeRecovery);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["source", "contract", "registration", "default-ref", "batch", "effect-scope", "principal"])("rejects a new worker when %s cannot be verified without publishing partial installation", async failure => {
+    const { fixture, options, proposal } = setupPoolInstallation(true);
+    const profile = proposal.pools.smoke.profiles["smoke-work-queue-worker"];
+    if (failure === "source" || failure === "contract") {
+      const getContent = fixture.githubClient.rest.repos.getContent;
+      fixture.githubClient.rest.repos.getContent = vi.fn(async args => {
+        const response = await getContent(args);
+        if (args.path.includes("smoke-work-queue-worker") && args.path.endsWith(failure === "source" ? ".md" : ".yml"))
+          response.data.content = Buffer.from(failure === "source" ? "---\ntools: {}\n---\nNot a worker." : "on: push\n").toString("base64");
+        return response;
+      });
+    }
+    if (failure === "registration") fixture.githubClient.rest.actions.getWorkflow.mockResolvedValue({ data: { path: profile.workflow, state: "disabled_manually" } });
+    if (failure === "default-ref") fixture.githubClient.rest.git.getRef = async () => ({ data: { ref: "refs/heads/main", object: { sha: "main" } } });
+    if (failure === "batch") profile.max_claims = 2;
+    if (failure === "effect-scope") profile.effect_scope = "foreign/repo";
+    if (failure === "principal") profile.principal = "22";
+    const before = canonical(fixture.transactions);
+    await expect(installWorkQueuePools(options, { ...fixture.dispatcher, authenticated: true, roles: ["dispatcher"] }, ["smoke"])).rejects.toThrow();
+    expect(canonical(fixture.transactions)).toBe(before);
   });
 
   it.each(["preview", "policy", "route", "verification", "missing"])("does not install or admit a missing pool when %s prevents first use", async mode => {

@@ -15,6 +15,7 @@
 
 "use strict";
 
+const { classifyDriverStderr, agentErrorDiagnosticText } = require("./agent_execution.cjs");
 const { spawn } = require("child_process");
 const os = require("os");
 const { StringDecoder } = require("string_decoder");
@@ -136,6 +137,7 @@ function runProcess({
     // log and resolve so callers receive a deterministic result.
     let settled = false;
     let childExited = false;
+    let spawnError = false;
     /** @param {Awaited<ReturnType<typeof runProcess>>} result */
     function settle(result) {
       if (settled) return;
@@ -269,6 +271,33 @@ function runProcess({
       observeStdout(stdoutTail, true);
       observeStderr(stderrTail, true);
       const exitCode = cancelled ? (exitCodeForSignal(cancellationSignal) ?? 1) : (code ?? exitCodeForSignal(signal) ?? 1);
+      if (exitCode !== 0) {
+        let source = "stderr";
+        let category;
+        try {
+          if (spawnError) {
+            category = "process_startup";
+          } else if (stderr.trim()) {
+            category = classifyDriverStderr(stderr);
+            if (category === "unclassified") {
+              const stdoutCategory = classifyDriverStdout(stdout, env ?? process.env);
+              if (stdoutCategory !== "unclassified" && stdoutCategory !== "no_output") {
+                category = stdoutCategory;
+                source = "stdout";
+              }
+            }
+          } else if (stdout.trim()) {
+            source = "stdout";
+            category = classifyDriverStdout(stdout, env ?? process.env);
+          } else {
+            category = "no_output";
+          }
+        } catch {
+          // Malformed diagnostics must not prevent the process result from settling.
+          category = "unclassified";
+        }
+        log(`attempt ${attempt + 1}: driver stderr summary: exitCode=${exitCode} category=${category} source=${source}`);
+      }
       settle({
         exitCode,
         output: stdout && stderr ? `${stdout}${stdout.endsWith("\n") ? "" : "\n"}${stderr}` : stdout || stderr,
@@ -537,6 +566,7 @@ function runProcess({
     });
 
     child.on("error", err => {
+      spawnError = true;
       const durationMs = Date.now() - startTime;
       // prettier-ignore
       const errno = /** @type {NodeJS.ErrnoException} */ (err);
@@ -546,6 +576,28 @@ function runProcess({
       finish(1, null);
     });
   });
+}
+
+/**
+ * Classify only bounded, attributable diagnostics when stderr was redirected to stdout.
+ * Plain stdout text is not sufficient evidence of a provider failure or agent guard.
+ * @param {string} stdout
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ */
+function classifyDriverStdout(stdout, env) {
+  const lines = stdout.slice(-8000).split(/\r?\n/).slice(-20);
+  const rawSourceEngine = env.GH_AW_ENGINE_ID === "aider" ? "aider" : undefined;
+  for (const line of lines.reverse()) {
+    const category = classifyDriverStderr(line);
+    if (category === "process_startup") return category;
+    if (rawSourceEngine && line.trimStart().startsWith("{")) {
+      const diagnostic = agentErrorDiagnosticText(line, [], rawSourceEngine);
+      const attributedCategory = classifyDriverStderr(diagnostic);
+      if (diagnostic && !["no_output", "unclassified"].includes(attributedCategory)) return attributedCategory;
+    }
+  }
+  return stdout.trim() ? "unclassified" : "no_output";
 }
 
 // Driver-level stall watchdog: how long the spawned agent CLI may stay completely

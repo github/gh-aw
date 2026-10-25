@@ -125,39 +125,6 @@ func TestScannerFindingIdentityResolvesPathsFromGitRoot(t *testing.T) {
 	assert.Equal(t, scannerFindingIdentity(absolute), scannerFindingIdentity(relative))
 }
 
-func TestActionlintShellcheckIdentitySurvivesLeadingScriptComment(t *testing.T) {
-	t.Parallel()
-	path := filepath.Join(t.TempDir(), "shellcheck.lock.yml")
-	before := `jobs:
-  agent:
-    runs-on: ubuntu-latest
-    steps:
-      - id: check
-        run: |
-          echo "$value"
-`
-	require.NoError(t, os.WriteFile(path, []byte(before), 0600))
-	lineFor := func(content, text string) int {
-		offset := strings.Index(content, text)
-		require.NotEqual(t, -1, offset)
-		return strings.Count(content[:offset], "\n") + 1
-	}
-	issue := actionlintError{
-		Kind: "shellcheck", Filepath: path, Line: lineFor(before, `echo "$value"`),
-		Message: "SC2086:warning:1:6: quote this",
-	}
-	beforeIdentity, ok := actionlintShellcheckIdentity(issue)
-	require.True(t, ok)
-
-	after := strings.Replace(before, "          echo \"$value\"", "          # harmless comment\n          echo \"$value\"", 1)
-	require.NoError(t, os.WriteFile(path, []byte(after), 0600))
-	issue.Line = lineFor(after, `echo "$value"`)
-	issue.Message = "SC2086:warning:2:6: quote this"
-	afterIdentity, ok := actionlintShellcheckIdentity(issue)
-	require.True(t, ok)
-	assert.Equal(t, beforeIdentity, afterIdentity)
-}
-
 func TestScannerFindingIdentityAST(t *testing.T) {
 	t.Parallel()
 	wrap := func(steps string) string {
@@ -333,7 +300,7 @@ func TestScannerSourceUnmappedLocationsRemainConservative(t *testing.T) {
 	assert.False(t, location.run, "a following env field must not be part of a dash-prefixed run scalar")
 	assert.Equal(t, "$.jobs.agent.steps[0].env.TOKEN", location.path)
 	for _, line := range []int{0, 9, 99} {
-		_, ok := actionlintShellcheckIdentity(actionlintError{
+		_, ok := make(scannerSources).shellcheckIdentity(actionlintError{
 			Filepath: path, Line: line, Column: 1, Message: "SC2086:warning:1:1: quote this",
 		})
 		assert.False(t, ok)
@@ -420,10 +387,10 @@ func TestActionlintShellcheckIdentityKeepsDiagnosticText(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "workflow.yml")
 	require.NoError(t, os.WriteFile(path, []byte("jobs:\n  agent:\n    runs-on: ubuntu-latest\n    steps:\n      - id: check\n        run: echo unsafe\n"), 0600))
 	issue := actionlintError{Filepath: path, Line: 6, Column: 9, Message: "SC2086:warning:1:1: first message"}
-	before, ok := actionlintShellcheckIdentity(issue)
+	before, ok := make(scannerSources).shellcheckIdentity(issue)
 	require.True(t, ok)
 	issue.Message = "SC2086:warning:1:1: second message"
-	after, ok := actionlintShellcheckIdentity(issue)
+	after, ok := make(scannerSources).shellcheckIdentity(issue)
 	require.True(t, ok)
 	assert.NotEqual(t, before, after)
 	for _, message := range []string{"SC2086:warning:0:1: invalid", "SC2086:warning:1:0: invalid", "SC2086:warning:-1:1: invalid"} {

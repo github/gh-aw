@@ -129,6 +129,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		CachedPermissions:    data.CachedPermissions,
 		ModelCosts:           data.ModelCosts,
 		IsDetectionRun:       true,
+		AdmissionEnabled:     admissionBudgetOutputsEnabled(data),
 		RunnerConfig:         data.RunnerConfig,
 		TimeoutMinutes:       "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
 		CompiledVersion:      data.CompiledVersion,
@@ -170,7 +171,6 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if len(detectionData.SandboxConfig.Agent.Images) == 0 {
 		detectionData.SandboxConfig.Agent.Images = buildThreatDetectionContainerImages(detectionData)
 	}
-
 	return detectionData
 }
 

@@ -26,31 +26,53 @@ func sourcePolicySeverity(input Input, ruleID string) (Severity, error) {
 	return Warning, nil
 }
 
-func authoredImportsPending(input Input) (bool, error) {
-	if input.Document == nil {
-		return false, nil
+var errNullImportList = errors.New("import list must not be null")
+
+func authoredImportEntries(frontmatter map[string]any) (entries []any, path string, nested, present bool, err error) {
+	path = "imports"
+	value, present := frontmatter["imports"]
+	if !present {
+		return nil, path, false, false, nil
 	}
-	value := input.Document.Frontmatter["imports"]
 	if imports, ok := value.(map[string]any); ok {
-		var exists bool
-		value, exists = imports["aw"]
-		if !exists {
-			return false, nil
-		}
-		if value == nil {
-			return false, errors.New("authored policy requires an imports.aw list to determine whether configuration may be inherited")
+		nested = true
+		path += ".aw"
+		value, present = imports["aw"]
+		if !present {
+			return nil, path, nested, false, nil
 		}
 	}
 	switch imports := value.(type) {
 	case nil:
-		return false, nil
+		return nil, path, nested, true, errNullImportList
 	case []any:
-		return len(imports) > 0, nil
+		return imports, path, nested, true, nil
 	case []string:
-		return len(imports) > 0, nil
+		for _, entry := range imports {
+			entries = append(entries, entry)
+		}
+		return entries, path, nested, true, nil
 	default:
+		return nil, path, nested, true, fmt.Errorf("%s must be a list", path)
+	}
+}
+
+func authoredImportsPending(input Input) (bool, error) {
+	if input.Document == nil {
+		return false, nil
+	}
+	entries, _, nested, _, err := authoredImportEntries(input.Document.Frontmatter)
+	if errors.Is(err, errNullImportList) {
+		// Top-level null has historically meant no inherited configuration.
+		if nested {
+			return false, errors.New("authored policy requires an imports.aw list to determine whether configuration may be inherited")
+		}
+		return false, nil
+	}
+	if err != nil {
 		return false, errors.New("authored policy requires an imports list or an imports mapping with an aw list to determine whether configuration may be inherited")
 	}
+	return len(entries) > 0, nil
 }
 
 // VersionCheckRule inspects authored policy, not the presence of a generated
@@ -182,28 +204,12 @@ func checkConditionalImports(ctx context.Context, input Input) ([]Diagnostic, er
 	if input.Document == nil {
 		return nil, nil
 	}
-	value, exists := input.Document.Frontmatter["imports"]
-	if !exists {
-		return nil, nil
-	}
-	importsPath := "imports"
-	if imports, ok := value.(map[string]any); ok {
-		value, exists = imports["aw"]
-		if !exists {
-			return nil, nil
-		}
-		importsPath += ".aw"
-	}
-	var entries []any
-	switch value := value.(type) {
-	case []any:
-		entries = value
-	case []string:
-		for _, entry := range value {
-			entries = append(entries, entry)
-		}
-	default:
+	entries, importsPath, _, present, err := authoredImportEntries(input.Document.Frontmatter)
+	if err != nil {
 		return nil, fmt.Errorf("conditional-import requires %s to be a list; correct the AW frontmatter", importsPath)
+	}
+	if !present {
+		return nil, nil
 	}
 	var diagnostics []Diagnostic
 	var failures []error

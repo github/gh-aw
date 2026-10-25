@@ -10,9 +10,9 @@ function initializeDeployments(state, selectedPools = undefined) {
   if (state.policy.authorization !== "aw") return;
   for (const [pool, policy] of Object.entries(state.policy.pools)) {
     if (selectedPools !== undefined && !selectedPools.includes(pool)) continue;
-    const workers = new Map();
+    const workers = state.deployments.get(pool) ?? new Map();
     for (const [name, profile] of Object.entries(policy.profiles)) {
-      if (!profile.logical_contract) continue;
+      if (!profile.logical_contract || workers.has(name)) continue;
       workers.set(name, { current_ref: profile.ref, current_contract: profile.logical_contract, revisions: { [profile.ref]: { profile: structuredClone(profile), available: true } } });
     }
     if (workers.size) state.deployments.set(pool, workers);

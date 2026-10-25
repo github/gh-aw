@@ -25,9 +25,17 @@ var (
 
 // ExpressionMapping represents a mapping between a GitHub expression and its environment variable
 type ExpressionMapping struct {
-	Original string // The original ${{ ... }} expression
-	EnvVar   string // The GH_AW_ prefixed environment variable name
-	Content  string // The expression content without ${{ }}
+	Original  string // The original ${{ ... }} expression
+	EnvVar    string // The GH_AW_ prefixed environment variable name
+	Content   string // The expression content without ${{ }}
+	IsLiteral bool   // Content is a compiler-generated string, not an Actions expression
+}
+
+func (m *ExpressionMapping) environmentValue() string {
+	if m.IsLiteral {
+		return fmt.Sprintf("%q", m.Content)
+	}
+	return fmt.Sprintf("${{ %s }}", m.Content)
 }
 
 // ExpressionExtractor extracts GitHub Actions expressions from markdown content

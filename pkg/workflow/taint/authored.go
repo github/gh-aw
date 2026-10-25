@@ -14,7 +14,11 @@ import (
 // AnalyzeAuthoredDocument follows explicit AW execution nodes and the prompt.
 // It does not compile, expand imports, or assume generated execution behavior.
 func AnalyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Rule) (Result, error) {
-	result, err := analyzeAuthoredDocument(ctx, document, rule)
+	return analyzeAuthoredWithContext(ctx, document, rule, false)
+}
+
+func analyzeAuthoredWithContext(ctx context.Context, document *aw.Document, rule Rule, workflowContext bool) (Result, error) {
+	result, err := analyzeAuthoredDocumentWithContext(ctx, document, rule, workflowContext)
 	if document == nil {
 		return result, err
 	}
@@ -24,7 +28,7 @@ func AnalyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Ru
 	return result, errors.Join(err, scriptErr)
 }
 
-func analyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Rule) (Result, error) {
+func analyzeAuthoredDocumentWithContext(ctx context.Context, document *aw.Document, rule Rule, workflowContext bool) (Result, error) {
 	if rule.ID == "" || rule.IsSource == nil || rule.IsSink == nil {
 		return Result{}, errors.New("taint rule requires an id, sources, and sinks")
 	}
@@ -33,7 +37,7 @@ func analyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Ru
 	if document == nil {
 		return Result{}, err
 	}
-	a := &analyzer{rule: rule}
+	a := &analyzer{rule: rule, workflowContext: workflowContext}
 	a.gap("workflow", "only authored AW execution nodes are available; imports, generated steps, cross-job flows and compiler defaults require the compiled Actions AST")
 	failures := []error{err}
 	parent, err := a.authoredEnvironment(ctx, document.Frontmatter, "env", nil)
@@ -41,6 +45,7 @@ func analyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Ru
 		return a.result, err
 	}
 	for _, block := range blocks {
+		a.safeOutputJob = strings.HasPrefix(block.Path, "safe-outputs.jobs.") || strings.HasPrefix(block.Path, "safe-jobs.")
 		if ctx.Err() != nil {
 			return a.result, errors.Join(append(failures, ctx.Err())...)
 		}
@@ -83,15 +88,13 @@ func analyzeAuthoredDocument(ctx context.Context, document *aw.Document, rule Ru
 	return a.result, errors.Join(failures...)
 }
 
-// AnalyzeAuthoredJavaScript returns new authored script flows without duplicating
-// the ordinary shell/prompt findings already checked in the compiled graph.
-func AnalyzeAuthoredJavaScript(ctx context.Context, document *aw.Document, rule Rule) (Result, error) {
-	result, err := AnalyzeAuthoredDocument(ctx, document, rule)
+func analyzeAuthoredJavaScript(ctx context.Context, document *aw.Document, rule Rule, workflowContext bool) (Result, error) {
+	result, err := analyzeAuthoredWithContext(ctx, document, rule, workflowContext)
 	// A JS-disabled baseline removes ordinary shell/prompt duplicates without
 	// dropping shell findings whose taint came from JavaScript stdout or files.
 	baselineRule := rule
 	baselineRule.JavaScript = nil
-	baseline, baselineErr := analyzeAuthoredDocument(ctx, document, baselineRule)
+	baseline, baselineErr := analyzeAuthoredDocumentWithContext(ctx, document, baselineRule, workflowContext)
 	result.Findings = slices.DeleteFunc(result.Findings, func(finding Finding) bool {
 		return slices.ContainsFunc(baseline.Findings, func(previous Finding) bool {
 			return finding.Site == previous.Site && slices.Equal(finding.Sources, previous.Sources)

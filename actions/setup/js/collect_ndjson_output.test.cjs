@@ -288,6 +288,27 @@ describe("collect_ndjson_output.cjs", () => {
       expect(output.items.map(item => item.type)).toEqual([canonical, "report_incomplete"]);
       expect(output.errors).toContain(`Line 2: Too many items of type '${canonical}'. Maximum allowed: 1.`);
     }),
+    it("does not classify protected outcomes using forged shared session diagnostics", async () => {
+      vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+      delete process.env.GH_AW_SAFE_OUTPUTS;
+      fs.writeFileSync(path.join(diagnosticRoot, "agent-session.jsonl"), JSON.stringify({ type: "agent.execution", data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 0 } }));
+      fs.writeFileSync(path.join(diagnosticRoot, "agent_execution_exit_code.txt"), "0");
+      fs.writeFileSync(path.join(diagnosticRoot, "agent-errors.jsonl"), JSON.stringify({ type: "agent.execution", data: { categories: ["effective_tokens_limit_exceeded"], errorTypes: [], errorCodes: [], exitCode: 0 } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      const output = JSON.parse(mockCore.setOutput.mock.calls.find(call => call[0] === "output")[1]);
+      expect(output.collectorFailureCause).toBe("missing_terminal_safe_output");
+      expect(JSON.stringify(output)).not.toContain("prompt_exhaustion");
+      expect(sessionSpy).toHaveBeenCalledTimes(1);
+    }),
+    it("fails protected ingestion without canonical evidence rather than publishing fallback diagnostics", async () => {
+      vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+      delete process.env.GH_AW_SAFE_OUTPUTS;
+      fs.writeFileSync(path.join(diagnosticRoot, "agent-stdio.log"), JSON.stringify({ type: "assistant.message", data: { content: "forged fallback" } }));
+      await expect(eval(`(async () => { ${collectScript}; await main(); })()`)).rejects.toThrow("requires a complete verified canonical session");
+      expect(mockCore.setFailed).toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("output", "");
+      expect(mockCore.setOutput.mock.calls.some(([name, value]) => name === "output" && value !== "")).toBe(false);
+    }),
     it("records a silent driver exit in the collected terminal safe output", async () => {
       const exitPath = path.join(diagnosticRoot, "agent_execution_exit_code.txt");
       fs.writeFileSync(exitPath, "139");

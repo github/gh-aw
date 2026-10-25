@@ -211,24 +211,20 @@ func parseRunURL(host, owner, repo string, parts []string) (*GitHubURLComponents
 // parseStepFragment parses the URL fragment for step information
 // Supports formats like: #step:7:1 (step 7, line 1)
 func parseStepFragment(fragment string, components *GitHubURLComponents) {
-	if fragment == "" {
-		return
-	}
-
 	// Check if fragment starts with "step:"
-	if !strings.HasPrefix(fragment, "step:") {
+	stepInfo, ok := strings.CutPrefix(fragment, "step:")
+	if !ok {
 		return
 	}
 
 	// Parse step:number:line format
-	parts := strings.Split(fragment, ":")
-	if len(parts) >= 2 {
-		if stepNum, err := strconv.Atoi(parts[1]); err == nil {
-			components.StepNumber = stepNum
-		}
+	step, rest, hasLine := strings.Cut(stepInfo, ":")
+	if stepNum, err := strconv.Atoi(step); err == nil {
+		components.StepNumber = stepNum
 	}
-	if len(parts) >= 3 {
-		if lineNum, err := strconv.Atoi(parts[2]); err == nil {
+	if hasLine {
+		line, _, _ := strings.Cut(rest, ":")
+		if lineNum, err := strconv.Atoi(line); err == nil {
 			components.StepLine = lineNum
 		}
 	}
@@ -363,7 +359,7 @@ func isValidGitHubNameWithMaxLength(s string, maxLength int) bool {
 	if s == "" || len(s) > maxLength {
 		return false
 	}
-	if s[0] == '-' || s[len(s)-1] == '-' {
+	if strings.HasPrefix(s, "-") || strings.HasSuffix(s, "-") {
 		return false
 	}
 	for _, ch := range s {
@@ -390,7 +386,7 @@ func IsValidGitHubRepositoryName(s string) bool {
 	if s == "." || s == ".." {
 		return false
 	}
-	if s[0] == '-' || s[len(s)-1] == '-' {
+	if strings.HasPrefix(s, "-") || strings.HasSuffix(s, "-") {
 		return false
 	}
 	for _, ch := range s {

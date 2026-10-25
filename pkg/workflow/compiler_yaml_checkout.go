@@ -63,6 +63,9 @@ func (c *Compiler) generateInitialAndCheckoutSteps(yaml *strings.Builder, data *
 
 	// Emit additional (non-default) user-configured checkouts
 	additionalLines := checkoutMgr.GenerateAdditionalCheckoutSteps(c.getActionPin)
+	if len(additionalLines) > 0 {
+		c.agentCheckoutLintBlocks = append(c.agentCheckoutLintBlocks, strings.Join(additionalLines, ""))
+	}
 	for _, line := range additionalLines {
 		yaml.WriteString(line)
 	}
@@ -113,6 +116,7 @@ func (c *Compiler) generateAppTokenAndDefaultCheckoutSteps(yaml *strings.Builder
 		c.trialLogicalRepoSlug,
 		c.getActionPin,
 	)
+	c.agentCheckoutLintBlocks = append(c.agentCheckoutLintBlocks, strings.Join(defaultLines, ""))
 	for _, line := range defaultLines {
 		yaml.WriteString(line)
 	}

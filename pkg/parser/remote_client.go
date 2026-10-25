@@ -4,8 +4,8 @@ package parser
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/ctxutil"
+	"github.com/github/gh-aw/pkg/githubapi"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
@@ -85,34 +86,19 @@ func fetchPublicGitHubContentsAPI(ctx context.Context, owner, repo, path, ref st
 	// preserved — url.PathEscape would turn them into '%2F', breaking nested
 	// paths like '.github/workflows/shared/foo.md'.
 	segments := strings.Split(path, "/")
-	encodedSegments := make([]string, len(segments))
-	for i, s := range segments {
-		encodedSegments[i] = url.PathEscape(s)
+	encodedSegments := make([]string, 0, len(segments))
+	for _, s := range segments {
+		encodedSegments = append(encodedSegments, url.PathEscape(s))
 	}
 	endpoint := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
 		owner, repo, strings.Join(encodedSegments, "/"), url.QueryEscape(ref))
 	remoteLog.Printf("Unauthenticated public API fallback fetch: %s/%s path=%s ref=%s", owner, repo, path, ref)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-
 	finish := ctxutil.StartOperation(ctx, fmt.Sprintf("GitHub public GET %s/%s/contents/%s@%s", owner, repo, path, ref))
 	defer func() { finish(resultErr) }()
-	resp, err := publicAPIClient.Do(req)
-	if err != nil {
-		return nil, err
+	body, err := githubapi.GetPublic(ctx, publicAPIClient, endpoint)
+	var statusErr *githubapi.HTTPStatusError
+	if errors.As(err, &statusErr) {
+		remoteLog.Printf("Public API fallback returned non-OK status: %d for %s/%s", statusErr.StatusCode, owner, repo)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		remoteLog.Printf("Public API fallback returned non-OK status: %d for %s/%s", resp.StatusCode, owner, repo)
-		return nil, fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	return body, nil
+	return body, err
 }

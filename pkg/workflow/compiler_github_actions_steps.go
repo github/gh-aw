@@ -94,6 +94,10 @@ func generatePlaceholderEnvironment(yaml *strings.Builder, expressionMappings []
 	// For static values (wrapped in quotes), output them directly without ${{ }}
 	// For GitHub expressions, wrap them in ${{ }}
 	for _, mapping := range expressionMappings {
+		if mapping.IsLiteral {
+			writeYAMLEnv(yaml, indent+"    ", mapping.EnvVar, mapping.Content)
+			continue
+		}
 		content := mapping.Content
 		// Check if this is a static quoted value (starts and ends with quotes)
 		if (strings.HasPrefix(content, "'") && strings.HasSuffix(content, "'")) ||

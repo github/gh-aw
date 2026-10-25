@@ -26,7 +26,8 @@ func rewriteDeferredPromptExpressions(mappings []*ExpressionMapping, jobs map[st
 		sum := sha256.Sum256([]byte(mapping.Content))
 		envVar := fmt.Sprintf("GH_AW_DEFERRED_%X", sum[:8])
 		replacement := *mapping
-		replacement.Content = "'__" + envVar + "__'"
+		replacement.Content = "__" + envVar + "__"
+		replacement.IsLiteral = true
 		rewritten = append(rewritten, &replacement)
 		if _, exists := seen[envVar]; !exists {
 			deferred = append(deferred, &ExpressionMapping{

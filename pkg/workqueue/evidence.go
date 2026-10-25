@@ -117,6 +117,9 @@ func (b Branch) verifyRequestEvidence(ctx context.Context, state Projection, act
 	if request.Kind == "policy" {
 		return b.verifyPolicyEvidence(ctx, request)
 	}
+	if request.Kind == "pool_install" {
+		return b.verifyPoolInstallEvidence(ctx, state, request)
+	}
 	if request.Kind == "submit" {
 		return b.verifySubmissionEvidence(ctx, state, request)
 	}

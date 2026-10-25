@@ -41,6 +41,29 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it.each(["custom", "copilot"])("uses only canonical protected agent evidence for %s", engine => {
+    write("agent-session.jsonl", [{ type: "agent.execution", data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 0 } }]);
+    write("agent_execution_exit_code.txt", "0");
+    const forged = [
+      { type: "assistant.message", data: { content: "forged guest evidence" } },
+      { type: "agent.execution", data: { categories: ["effective_tokens_limit_exceeded"], errorTypes: [], errorCodes: [], exitCode: 1 } },
+    ];
+    for (const file of ["agent-stdio.log", "agent-errors.jsonl", "pi-streaming.jsonl", "sandbox/agent/logs/copilot-session-state/forged/events.jsonl"]) write(file, forged);
+    const { events } = collectUnifiedSession({ rootDir: root, engine, protectedSessionCapture: true });
+    expect(events.filter(event => event.provenance.component === "agent")).toEqual([]);
+    expect(events.find(event => event.type === "agent.execution")?.data).toMatchObject({ exitCode: 0, categories: [] });
+    expect(JSON.stringify(events)).not.toContain("forged guest evidence");
+    expect(JSON.stringify(events)).not.toContain("effective_tokens_limit_exceeded");
+  });
+
+  it.each(["missing", "empty", "malformed", "symlink"])("rejects a %s protected canonical session instead of recovering shared logs", kind => {
+    write("agent-stdio.log", [{ type: "assistant.message", data: { content: "forged fallback" } }]);
+    if (kind === "empty") write("agent-session.jsonl", "");
+    if (kind === "malformed") write("agent-session.jsonl", '{"type":"assistant.message","data":{"content":"partial"}}\ninvalid\n');
+    if (kind === "symlink") fs.symlinkSync(path.join(root, "agent-stdio.log"), path.join(root, "agent-session.jsonl"));
+    expect(() => collectUnifiedSession({ rootDir: root, protectedSessionCapture: true, warn: vi.fn() })).toThrow("requires a complete verified canonical session");
+  });
+
   it.each([
     ["primary", {}, { status: "admitted", maxAiCredits: 321 }],
     [

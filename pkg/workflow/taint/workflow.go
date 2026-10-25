@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 )
@@ -28,7 +29,7 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	if err != nil {
 		return Result{}, err
 	}
-	a := &analyzer{rule: rule}
+	a := &analyzer{rule: rule, workflowContext: true}
 	bindings := make(scope)
 	jobs := make(map[actions.JobID]*actions.Job)
 	for _, job := range resolved.Jobs {
@@ -45,6 +46,7 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 				return err
 			}
 		}
+		a.safeOutputJob = slices.Contains(rule.SafeOutputJobs, string(job.ID))
 		if err := a.job(job, resolved, bindings); err != nil {
 			return err
 		}
@@ -82,14 +84,38 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	return a.result, nil
 }
 
+func safeOutputIntegrationJobs(rule Rule, document *aw.Document) ([]string, error) {
+	jobs := slices.Clone(rule.SafeOutputJobs)
+	if document == nil {
+		return jobs, nil
+	}
+	blocks, err := aw.ExecutionBlocks(context.Background(), document)
+	if err != nil {
+		return nil, err
+	}
+	for _, block := range blocks {
+		for _, prefix := range []string{"safe-outputs.jobs.", "safe-jobs."} {
+			if name, ok := strings.CutPrefix(block.Path, prefix); ok {
+				jobs = append(jobs, stringutil.NormalizeSafeOutputIdentifier(name))
+			}
+		}
+	}
+	return jobs, nil
+}
+
 // AnalyzeDocument checks the AW prompt and script entry points alongside its
 // compiled Actions graph. Fast mode avoids generated JavaScript traversal.
-// Callers compile through workflow.Compiler.CompileDocument so imports and
+// Callers compile through the workflow compiler so imports and
 // compiler-generated steps use exactly the same execution model as gh aw.
 func AnalyzeDocument(document *aw.Document, compiled *actions.Workflow, rule Rule) (Result, error) {
 	if document == nil {
 		return Result{}, errors.New("AW document cannot be nil")
 	}
+	jobs, err := safeOutputIntegrationJobs(rule, document)
+	if err != nil {
+		return Result{}, err
+	}
+	rule.SafeOutputJobs = jobs
 	ctx := context.Background()
 	if rule.JavaScript != nil && rule.JavaScript.Context != nil {
 		ctx = rule.JavaScript.Context
@@ -103,7 +129,7 @@ func AnalyzeDocument(document *aw.Document, compiled *actions.Workflow, rule Rul
 	var scripts Result
 	var scriptErr error
 	if fast {
-		scripts, scriptErr = AnalyzeAuthoredJavaScript(ctx, document, rule)
+		result, scriptErr = analyzeFastJavaScript(ctx, document, compiled, rule, result)
 		result.Gaps = append(result.Gaps, CoverageGap{
 			Path: "workflow", Reason: "fast JavaScript analysis checks authored scripts and reviewed API summaries; generated JavaScript and cross-job JavaScript flows require deep mode",
 		})
@@ -167,6 +193,15 @@ func (a *analyzer) job(job *actions.Job, workflow *actions.Workflow, outputs sco
 	}
 	outputBindings := maps.Clone(env)
 	maps.Copy(outputBindings, persisted)
+	if environment, ok := job.Environment.(map[string]any); ok {
+		if rawURL, exists := environment["url"]; exists {
+			sources, err := a.text(fmt.Sprint(rawURL), path+".environment.url", outputBindings)
+			if err != nil {
+				return err
+			}
+			a.emit(Site{Kind: Display, Path: path + ".environment.url"}, sources)
+		}
+	}
 	if err := a.jobOutputs(job, workflow, path, outputs, outputBindings); err != nil {
 		return err
 	}
@@ -312,9 +347,18 @@ func (a *analyzer) inputs(inputs map[string]actions.Expression, site Site, job a
 }
 
 func (a *analyzer) step(fields map[string]any, path string, env, persisted, files scope) error {
+	// Runner command files belong to one step, unlike ordinary workspace files.
+	delete(files, "$GITHUB_OUTPUT")
 	parent := maps.Clone(env)
 	maps.Copy(parent, persisted)
 	bindings := maps.Clone(parent)
+	id, err := optionalField[string](fields, "id", path)
+	if err != nil {
+		return err
+	}
+	previous := a.stepOutput
+	a.stepOutput = &stepOutputTransport{id: id, bindings: bindings, modeled: a.workflowContext, recordStateKnown: true}
+	defer func() { a.stepOutput = previous }()
 	stepEnv, err := optionalField[map[string]any](fields, "env", path)
 	if err != nil {
 		return err

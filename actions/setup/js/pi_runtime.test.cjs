@@ -114,13 +114,13 @@ describe("Pi runtime configuration", () => {
   it.each(["0.99.2", "1.0.0-beta.1", "unexpected"])("rejects an incompatible actual CLI version: %s", version => {
     expect(() => verifyPiVersion("pi", () => version)).toThrow("v1.0.0 or newer");
   });
-  it.each(["1.0.0", "1.1.0", "1.3.0", "2.0.0", "Pi 1.0.0"])("accepts an actual compatible version: %s", version => {
+  it.each(["1.0.0", "1.1.0", "1.3.0", "1.4.0", "2.0.0", "Pi 1.0.0"])("accepts an actual compatible version: %s", version => {
     expect(() => verifyPiVersion("pi", () => version)).not.toThrow();
   });
   it.each(["1.0.0", "1.2.9", "1.3.0-beta.1"])("rejects max effort on an older CLI: %s", version => {
     expect(() => verifyPiVersion("pi", () => version, "1.3.0")).toThrow("v1.3.0 or newer is required for effort=max");
   });
-  it.each(["1.3.0", "v1.3.0+build.1", "1.10.0", "2.0.0"])("accepts max effort on a supported CLI: %s", version => {
+  it.each(["1.3.0", "v1.3.0+build.1", "1.4.0", "1.10.0", "2.0.0"])("accepts max effort on a supported CLI: %s", version => {
     expect(() => verifyPiVersion("pi", () => version, "1.3.0")).not.toThrow();
   });
 

@@ -105,6 +105,9 @@ func parseCronFieldPart(part string, min, max int) ([]int, error) {
 	result := make([]int, 0, (end-start)/step+1)
 	for v := start; v <= end; v += step {
 		result = append(result, v)
+		if step > end-v {
+			break
+		}
 	}
 	return result, nil
 }

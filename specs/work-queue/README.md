@@ -364,17 +364,21 @@ compatibility does not authorize new standalone seeding.
 
 AW-managed queues resolve global scheduling and backing Issue/label settings
 from `.github/workflows/aw.json`. `QueueBootstrap` models only first-submit
-genesis; `QueuePoolInstall` separately models an explicit additive pool on an
-existing AW-managed queue. The latter preserves installed pools, accepted Work
-and the Policy epoch, and demonstrates an authorized producer can install
+genesis; `QueuePoolInstall` separately models additive pools and worker profiles on an
+existing AW-managed queue. The latter preserves installed authority, accepted Work,
+existing deployments and the Policy epoch, and demonstrates an authorized producer can install
 without administrator authority. `RoutesApproved` represents the independent
 replay check that each profile is already authorized in installed Policy or an
 available registered Deployment revision; it is not the caller-local dispatch
-allowlist and cannot revive a revision marked unavailable.
+allowlist and cannot revive a revision marked unavailable. `DefaultRevisionApproved`
+models trusted verification of a previously unknown worker's default-revision
+AW source, compiled contract and active registration. Recorded provenance alone
+does not establish that premise. `ExtendExistingPool` selects profile addition
+instead of adding a pool.
 `RepositoryAllowlistPreserved` models replay's requirement that the added pool's
 repository allowlist be a subset of the repositories authorized by installed
-pools. Ordinary submit and dispatch intents do not implicitly publish
-`PoolInstall`; a missing pool is rejected before deployment synchronization.
+pools. Trusted submit and dispatch processing publish `PoolInstall` on demand
+before deployment synchronization; worker and observer intents do not.
 Host authorization, proposal validity, exact profile equality and native
 worker-route verification are abstract inputs, not proved by either model.
 Queue configuration contains no enrollment, producer allowlists, worker
@@ -410,6 +414,9 @@ TLA2TOOLS_JAR=/path/to/tla2tools.jar TLC_MODEL_FILTER=QueuePoolInstall \
 | `PoolInstallUnapprovedRoute.cfg` | Reject otherwise valid routes absent from installed worker authority. |
 | `PoolInstallUnauthorized.cfg` | Reject publication without trusted host authorization. |
 | `PoolInstallProducerWitness.cfg` | Reach producer installation while preserving `Safety`; the deliberately false `NoProducerInstall` invariant must fail. |
+| `PoolInstallNewWorker.cfg` | Register a verified new default-revision worker in a new pool. |
+| `PoolInstallExistingPool.cfg` | Add a verified new worker while retaining an existing pool and deployment. |
+| `PoolInstallNewWorkerWitness.cfg` | Reach new-worker registration in an existing pool; the deliberately false `NoNewWorkerInstall` invariant must fail. |
 
 | Configuration | Scope / expected result |
 |---|---|

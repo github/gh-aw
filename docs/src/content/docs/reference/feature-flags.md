@@ -93,7 +93,8 @@ features:
 
 ## External Threat Detection (`features.gh-aw-detection`)
 
-Threat detection uses the external `threat-detect` binary by default. Set
+Threat detection uses the stable external `threat-detect` binary by default.
+Enabling `gh-aw-detection` does not emit an experimental-feature warning. Set
 `features.gh-aw-detection: false` to use the legacy inline engine path.
 
 ```yaml wrap

@@ -14,6 +14,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func extractWorkflowStepByName(t *testing.T, workflowYAML, stepName string) string {
@@ -36,6 +37,94 @@ func extractWorkflowStepByName(t *testing.T, workflowYAML, stepName string) stri
 		stepSection = stepSection[:next+1]
 	}
 	return stepSection
+}
+
+func TestUnifiedArtifactUploadRequiresProtectedParserSuccess(t *testing.T) {
+	compiler := NewCompiler()
+	var protected strings.Builder
+	compiler.generateUnifiedArtifactUpload(&protected, []string{"/tmp/gh-aw/agent-session.jsonl"}, "", &WorkflowData{}, true)
+	assert.Contains(t, protected.String(), "steps.parse_agent_logs.outcome == 'success'")
+
+	var unprotected strings.Builder
+	compiler.generateUnifiedArtifactUpload(&unprotected, []string{"/tmp/gh-aw/agent-session.jsonl"}, "", &WorkflowData{}, false)
+	assert.NotContains(t, unprotected.String(), "parse_agent_logs")
+}
+
+func TestProtectedSessionCapturePublicationPipeline(t *testing.T) {
+	for _, protected := range []bool{false, true} {
+		t.Run(map[bool]string{false: "shared", true: "protected"}[protected], func(t *testing.T) {
+			dir := testutil.TempDir(t, "protected-publication")
+			capture := "false"
+			if protected {
+				capture = "true"
+			}
+			definition := `---
+engine:
+  id: protected-test
+  display-name: Protected Test
+  auth:
+    - role: api-key
+      secret: CAPTURE_TEST_SECRET
+  behaviors:
+    execution:
+      command-name: protected-test
+      protected-session-capture: ` + capture + `
+    log-parser: |
+      function parseLog() { return { markdown: "verified", logEntries: [{ type: "assistant.message", data: { content: "verified" } }] }; }
+---
+`
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "engine.md"), []byte(definition), 0o600))
+			content := `---
+on: workflow_dispatch
+strict: false
+permissions:
+  contents: read
+engine:
+  id: protected-test
+env:
+  GLOBAL_SECRET: ${{ secrets.CAPTURE_GLOBAL_SECRET }}
+imports: [engine.md]
+safe-outputs:
+  create-issue:
+    max: 1
+---
+Test protected publication.
+`
+			source := filepath.Join(dir, "capture.md")
+			require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
+			require.NoError(t, NewCompiler().CompileWorkflow(source))
+			lock, err := os.ReadFile(filepath.Join(dir, "capture.lock.yml"))
+			require.NoError(t, err)
+			workflow := string(lock)
+			require.Equal(t, 1, strings.Count(workflow, "      - name: Parse agent logs for step summary\n"))
+			parserStep := extractWorkflowStepByName(t, workflow, "Parse agent logs for step summary")
+			ingestStep := extractWorkflowStepByName(t, workflow, "Ingest agent output")
+			fallbackStep := extractWorkflowStepByName(t, workflow, "Upload agent output fallback artifact")
+			uploadStep := extractWorkflowStepByName(t, workflow, "Upload agent artifacts")
+			parserPosition := strings.Index(workflow, "      - name: Parse agent logs for step summary\n")
+			redactionPosition := strings.Index(workflow, "      - name: Redact secrets in logs\n")
+			ingestPosition := strings.Index(workflow, "      - name: Ingest agent output\n")
+			if protected {
+				assert.Less(t, parserPosition, redactionPosition)
+				assert.Less(t, parserPosition, ingestPosition)
+				assert.Contains(t, parserStep, "GH_AW_SECRET_NAMES: 'CAPTURE_GLOBAL_SECRET,CAPTURE_TEST_SECRET,")
+				assert.Contains(t, parserStep, "SECRET_CAPTURE_TEST_SECRET: ${{ secrets.CAPTURE_TEST_SECRET }}")
+				assert.Contains(t, parserStep, "SECRET_CAPTURE_GLOBAL_SECRET: ${{ secrets.CAPTURE_GLOBAL_SECRET }}")
+				assert.Contains(t, ingestStep, "GH_AW_PROTECTED_SESSION_CAPTURE: 1")
+				for _, step := range []string{ingestStep, fallbackStep, uploadStep} {
+					assert.Contains(t, step, "steps.parse_agent_logs.outcome == 'success'")
+				}
+			} else {
+				assert.Less(t, redactionPosition, ingestPosition)
+				assert.Less(t, ingestPosition, parserPosition)
+				assert.NotContains(t, parserStep, "SECRET_CAPTURE_TEST_SECRET:")
+				for _, step := range []string{ingestStep, fallbackStep, uploadStep} {
+					assert.NotContains(t, step, "parse_agent_logs")
+					assert.NotContains(t, step, "GH_AW_PROTECTED_SESSION_CAPTURE")
+				}
+			}
+		})
+	}
 }
 
 func TestArtifactDownloadSingleArtifactUsesExactName(t *testing.T) {

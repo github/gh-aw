@@ -595,6 +595,8 @@ Specifies the environment for deployment protection rules and environment-specif
 environment: production
 ```
 
+The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment takes precedence for the activation job.
+
 See [GitHub Actions environment docs](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment).
 
 ### Container Configuration (`container:`)

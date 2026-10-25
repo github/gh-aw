@@ -389,7 +389,9 @@ func buildAgentFailureActivationStatusVars(data *WorkflowData) []string {
 	}
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.%s.outputs.lockdown_check_failed }}\n", constants.ActivationJobName))
 	envVars = append(envVars, fmt.Sprintf("          GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.%s.outputs.oauth_token_check_failed }}\n", constants.ActivationJobName))
-	envVars = append(envVars, fmt.Sprintf("          GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.%s.outputs.stale_lock_file_failed }}\n", constants.ActivationJobName))
+	if !data.StaleCheckDisabled {
+		envVars = append(envVars, fmt.Sprintf("          GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.%s.outputs.stale_lock_file_failed }}\n", constants.ActivationJobName))
+	}
 	// SkillReferences holds structured skill refs (with github-token/github-app); Skills holds raw
 	// skill specs from simple frontmatter. Both result in activation-job skill install steps.
 	if len(data.SkillReferences) > 0 || len(data.Skills) > 0 {
@@ -599,8 +601,12 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	agentNotSkipped := BuildNotEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.result", mainJobName)), BuildStringLiteral("skipped"))
 	lockdownCheckFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.lockdown_check_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
 	oauthTokenCheckFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.oauth_token_check_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
-	staleLockFileFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.stale_lock_file_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
-	activationGuardrailsFailed := BuildOr(lockdownCheckFailed, BuildOr(oauthTokenCheckFailed, staleLockFileFailed))
+	var oauthOrStaleCheckFailed ConditionNode = oauthTokenCheckFailed
+	if !data.StaleCheckDisabled {
+		staleLockFileFailed := BuildEquals(BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.stale_lock_file_failed", constants.ActivationJobName)), BuildStringLiteral("true"))
+		oauthOrStaleCheckFailed = BuildOr(oauthTokenCheckFailed, staleLockFileFailed)
+	}
+	activationGuardrailsFailed := BuildOr(lockdownCheckFailed, oauthOrStaleCheckFailed)
 	// Only reference the secret_verification_result output when the activation job
 	// actually declares it. The output is emitted only when the engine or safe outputs
 	// require a secret validation step (see addActivationSecretValidationStep); referencing it
@@ -656,18 +662,20 @@ func buildConclusionJobNeeds(data *WorkflowData, mainJobName string, safeOutputJ
 
 // buildConclusionJobOutputs builds outputs for the conclusion job.
 func buildConclusionJobOutputs(data *WorkflowData) map[string]string {
-	// Create outputs for the job (include noop and missing_tool outputs if configured)
+	// Add noop/missing_tool/report_incomplete outputs only for non-participants,
+	// since work-queue participants skip those reporting steps.
 	outputs := map[string]string{}
 	if data.AdmissionEnabled {
 		outputs["admission_compact_session"] = "${{ steps.admission-conclusion-metadata.outputs.compact_session }}"
 		outputs["usage_artifact_id"] = "${{ steps.upload-usage-artifact.outputs.artifact-id }}"
 		outputs["usage_artifact_retry_id"] = "${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}"
 	}
+	if isWorkQueueParticipant(data) {
+		return outputs
+	}
 	if data.SafeOutputs.NoOp != nil {
 		outputs["noop_message"] = "${{ steps.noop.outputs.noop_message }}"
-		if !isWorkQueueParticipant(data) {
-			outputs["noop_comment_body"] = "${{ steps.noop.outputs.noop_comment_body }}"
-		}
+		outputs["noop_comment_body"] = "${{ steps.noop.outputs.noop_comment_body }}"
 	}
 	if data.SafeOutputs.MissingTool != nil {
 		outputs["tools_reported"] = "${{ steps.missing_tool.outputs.tools_reported }}"

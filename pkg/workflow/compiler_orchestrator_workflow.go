@@ -140,6 +140,9 @@ func (c *Compiler) formatToolsProcessingError(cleanPath string, err error) error
 
 // validateWorkflowBuildContext runs model, engine, and tool validations for the workflow.
 func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error {
+	if err := validateProtectedSessionCaptureEvals(ctx.engineSetup.agenticEngine, ctx.workflowData.Evals); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
+	}
 	if err := c.validateWorkflowModelAliasMap(ctx); err != nil {
 		return err
 	}
@@ -163,6 +166,14 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 		}
 	}
 	return c.validateWorkflowToolConfigurations(ctx)
+}
+
+func validateProtectedSessionCaptureEvals(engine CodingAgentEngine, evals *EvalsConfig) error {
+	behaviorEngine, ok := engine.(*BehaviorDefinedEngine)
+	if !ok || !behaviorEngine.protectedSessionCaptureEnabled() || evals == nil || !evals.HasEvals() {
+		return nil
+	}
+	return errors.New("engine.behaviors.execution.protected-session-capture is not supported with evals because the evals job runs a secondary engine invocation that reads evals.log; remove evals or disable protected-session-capture, for example:\nengine:\n  behaviors:\n    execution:\n      protected-session-capture: false")
 }
 
 func (c *Compiler) validateWorkflowModelAliasMap(ctx *workflowBuildContext) error {

@@ -20,6 +20,7 @@ func SecretLeakRule() Rule {
 			var result taint.Result
 			var err error
 			rule := taint.SecretLeakRule()
+			rule.SafeOutputJobs = input.SafeOutputJobs
 			isSink := rule.IsSink
 			rule.IsSink = func(site taint.Site) bool {
 				return site.Kind != taint.OTLPAttribute && isSink(site)

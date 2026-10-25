@@ -63,7 +63,7 @@ const DefaultAgyVersion Version = "1.3.6"
 const AgyDefaultModel = "gemini-3.8-flash-medium"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "1.3.0"
+const DefaultPiVersion Version = "1.4.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
 const DefaultGitHubMCPServerVersion Version = "v2.0.3"
@@ -77,6 +77,9 @@ const DefaultGitHubMCPServerVersion Version = "v2.0.3"
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
 const DefaultFirewallVersion Version = "v0.28.70"
+
+// AWFProtectedCommandOutputMinVersion supports native, isolated command output capture.
+const AWFProtectedCommandOutputMinVersion Version = "v0.28.67"
 
 // AWFFallbackModelsMinVersion is the first AWF release with ordered request-level fallback.
 const AWFFallbackModelsMinVersion Version = "v0.28.31"

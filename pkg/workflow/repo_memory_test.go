@@ -3,6 +3,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -1336,7 +1338,7 @@ func TestRepoMemoryWikiPromptSection(t *testing.T) {
 	assert.Contains(t, wikiNote, "Markdown", "Wiki note should mention Markdown syntax")
 }
 
-// TestRepoMemoryNonWikiPromptSection tests that non-wiki mode uses empty string expression for wiki note
+// TestRepoMemoryNonWikiPromptSection tests that non-wiki mode substitutes an empty wiki note.
 func TestRepoMemoryNonWikiPromptSection(t *testing.T) {
 	config := &RepoMemoryConfig{
 		Memories: []RepoMemoryEntry{
@@ -1352,10 +1354,43 @@ func TestRepoMemoryNonWikiPromptSection(t *testing.T) {
 	require.NotNil(t, section, "Expected non-nil prompt section")
 	require.NotNil(t, section.EnvVars, "Expected env vars")
 
-	wikiNote := section.EnvVars["GH_AW_WIKI_NOTE"]
-	// Non-wiki mode should use a GitHub expression that evaluates to empty string.
-	// This ensures __GH_AW_WIKI_NOTE__ is always substituted via expression interpolation.
-	assert.Equal(t, ghaEmptyStringExpr, wikiNote, "Non-wiki mode should use empty string expression for GH_AW_WIKI_NOTE")
+	require.Contains(t, section.EnvVars, "GH_AW_WIKI_NOTE")
+	assert.Empty(t, section.EnvVars["GH_AW_WIKI_NOTE"])
+	var prompt strings.Builder
+	mappings := NewCompiler().generateUnifiedPromptCreationStep(&prompt, []PromptSection{*section}, nil, nil, &WorkflowData{})
+	assert.NotContains(t, prompt.String(), "GH_AW_WIKI_NOTE:")
+	assert.Contains(t, mappings, &ExpressionMapping{EnvVar: "GH_AW_WIKI_NOTE", Content: "''"})
+}
+
+func TestRepoMemoryNonWikiCompilation(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "repo-memory.md")
+	source := `---
+on:
+  workflow_dispatch:
+  admission: true
+engine: copilot
+permissions:
+  contents: read
+tools:
+  github: false
+  repo-memory:
+    branch-name: memory/repo-memory
+---
+Maintain the repository memory.
+`
+	require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+	compiler := NewCompiler(WithLint(true))
+	compiler.gitRoot = dir
+	compiler.SetReadOnly(true)
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(path))
+	require.Zero(t, compiler.GetWarningCount())
+	lock, err := os.ReadFile(filepath.Join(dir, "repo-memory.lock.yml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(lock), "GH_AW_WIKI_NOTE: ${{ '' }}")
+	assert.Contains(t, string(lock), "GH_AW_WIKI_NOTE: ''")
 }
 
 // TestRepoMemoryWikiPushAllowedRepos tests that wiki mode sets REPO_MEMORY_ALLOWED_REPOS
