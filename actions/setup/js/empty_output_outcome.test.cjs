@@ -313,10 +313,12 @@ describe("empty output outcome", () => {
     ["codex", "2026-10-25T12:00:00.000Z ", "syntax_error", "Driver initialization failed"],
     ["pi", "", "runtime_exception", "Driver execution failed"],
     ["gemini", "", "no_output", "no output captured"],
-  ])("reads shared stderr capture from the %s wrapper", (engine, timestamp, category, summary) => {
+  ])("does not trust driver stderr summary text from the %s wrapper", (engine, timestamp, category, summary) => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), `[${engine}-harness] ${timestamp}attempt 1: driver stderr summary: exitCode=1 category=${category} source=stderr\n`);
-    expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Last driver stderr summary: ${summary}`);
+    const details = buildEmptyOutputOutcome([], rootDir).details;
+    expect(details).not.toContain(`Last driver stderr summary: ${summary}`);
+    expect(details).toContain("Last driver stderr summary: not recorded (no classified stderr diagnostic)");
   });
 
   it.each([

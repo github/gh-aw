@@ -5992,11 +5992,11 @@ describe("handle_agent_failure", () => {
 
   describe("buildReportIncompleteContext", () => {
     it.each([
-      ["TypeError: private-driver-payload\n", 1, "Driver execution failed (unhandled JavaScript exception)", "General failure", false],
-      ["TypeError: private-driver-payload\n", 1, "Driver execution failed (unhandled JavaScript exception) (from stdout; stderr may have been redirected)", "General failure", true],
-      ['{"type":"assistant.message","data":{"content":"TypeError: private-driver-payload"}}\n', 1, "Output captured during driver execution, but no classified stderr diagnostic", "General failure", true],
-      ["", 127, "no output captured", "Command not found", false],
-    ])("renders classified stderr from the shared driver wrapper in failure reports", async (stderr, exitCode, summary, meaning, merged) => {
+      ["TypeError: private-driver-payload\n", 1, "General failure", false],
+      ["TypeError: private-driver-payload\n", 1, "General failure", true],
+      ['{"type":"assistant.message","data":{"content":"TypeError: private-driver-payload"}}\n', 1, "General failure", true],
+      ["", 127, "Command not found", false],
+    ])("does not trust driver stderr summary text in failure reports", async (stderr, exitCode, meaning, merged) => {
       const { runProcess } = require("./process_runner.cjs");
       const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
       const rootDir = mkdtempSync(join(require("os").tmpdir(), "failure-driver-stderr-"));
@@ -6014,7 +6014,7 @@ describe("handle_agent_failure", () => {
         const outcome = buildEmptyOutputOutcome([], rootDir);
         const report = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
         expect(report).toContain("Failure classification: driver_crash");
-        expect(report).toContain(`Last driver stderr summary: ${summary}`);
+        expect(report).toContain("Last driver stderr summary: not recorded (no classified stderr diagnostic)");
         expect(report).toContain(`Driver exit meaning: ${meaning}`);
         expect(report).not.toContain("private-driver-payload");
       } finally {

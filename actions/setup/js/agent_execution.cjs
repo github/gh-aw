@@ -69,7 +69,6 @@ function recordErrors(record) {
 
 /** @param {string} line @returns {boolean} */
 function isAgentDiagnosticLine(line) {
-  if (DRIVER_STDERR_RECORD_PATTERN.test(line)) return true;
   if (/^(?:(?:Syntax|Type|Reference|Range|URI|Eval)Error:|Error \[(?:ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|ERR_INVALID_TYPESCRIPT_SYNTAX)\]:|Error: Cannot find (?:module|package)\b|FATAL ERROR:.*(?:heap|Allocation failed))/.test(line))
     return true;
   if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:)/.test(line);
