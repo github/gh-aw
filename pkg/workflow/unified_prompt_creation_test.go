@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,6 +55,57 @@ func promptRenderPlan(t *testing.T, output string) string {
 		plan.WriteString(value)
 	}
 	return plan.String()
+}
+
+func TestCrossRepoSmokeTerminalSafeOutputGuidanceAndTelemetry(t *testing.T) {
+	prompt, err := os.ReadFile("../../actions/setup/md/safe_outputs_prompt.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(prompt), "mandatory final step")
+	assert.Contains(t, string(prompt), "at least one safe-output call succeeded")
+	assert.Contains(t, string(prompt), "A failed tool call or a final text response does not satisfy this requirement")
+	assert.Contains(t, string(prompt), "`noop` only when no action was needed")
+	assert.Contains(t, string(prompt), "`report_incomplete` when the task failed, was blocked, or completion could not be confirmed")
+
+	for _, name := range []string{"smoke-create-cross-repo-pr", "smoke-update-cross-repo-pr"} {
+		t.Run(name, func(t *testing.T) {
+			source, err := filepath.Abs(filepath.Join("../../.github/workflows", name+".md"))
+			require.NoError(t, err)
+			compiler := NewCompiler()
+			data, err := compiler.ParseWorkflowFile(source)
+			require.NoError(t, err)
+			output, err := compiler.CompileToYAML(data, source)
+			require.NoError(t, err)
+			assert.Contains(t, promptRenderPlan(t, output), "safe_outputs_prompt.md")
+
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						ID   string            `yaml:"id"`
+						If   string            `yaml:"if"`
+						Env  map[string]string `yaml:"env"`
+						With map[string]string `yaml:"with"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+			collectorFound, reporterFound := false, false
+			for job, config := range workflow.Jobs {
+				for _, step := range config.Steps {
+					if job == "agent" && step.ID == "collect_output" {
+						collectorFound = true
+						assert.Equal(t, "always()", step.If)
+						assert.Contains(t, step.With["script"], "collect_ndjson_output.cjs")
+					}
+					if job == "conclusion" && strings.Contains(step.With["script"], "handle_agent_failure.cjs") {
+						reporterFound = true
+						assert.Equal(t, "true", step.Env["GH_AW_FAILURE_REPORT_AS_ISSUE"])
+					}
+				}
+			}
+			assert.True(t, collectorFound, "Smoke run must collect safe-output evidence even after startup failure")
+			assert.True(t, reporterFound, "Smoke run must report safe-output evidence on failure")
+		})
+	}
 }
 
 func TestGenerateUnifiedPromptCreationStep_TreatsUserContentAsData(t *testing.T) {

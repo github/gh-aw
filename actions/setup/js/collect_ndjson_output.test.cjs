@@ -16,7 +16,7 @@ const incompleteOutput = JSON.stringify({
       failureCause: "missing_terminal_safe_output",
       retryCount: 0,
       details:
-        "Failure classification: missing_terminal_safe_output\nSafe-output telemetry: not recorded\nNo terminal safe output was recorded. These observations do not establish why the agent omitted it; inspect the agent artifact (agent-session.jsonl and agent-stdio.log) for the final actions, then ensure the workflow emits a terminal safe output.",
+        "Failure classification: missing_terminal_safe_output\nSafe-output tools: unknown (registration evidence not recorded)\nSafe-output CLI calls observed: unknown (not recorded)\nSafe-output MCP calls observed: unknown (not recorded)\nSafe-output persistence: not recorded\nNo terminal safe output was recorded. These observations do not establish why the agent omitted it; inspect the agent artifact (agent-session.jsonl and agent-stdio.log) for the final actions, then ensure the workflow emits a terminal safe output.",
     },
   ],
   errors: [],

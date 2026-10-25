@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { createRequire } from "module";
 import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -6029,11 +6029,41 @@ describe("handle_agent_failure", () => {
         expect(result).toContain("Last tool call status: started");
         expect(result).not.toContain("Last tool call: read");
         expect(result).toContain("Driver exit code: 0");
-        expect(result).toContain("Safe-output telemetry: not recorded");
+        expect(result).toContain("Safe-output CLI calls observed: unknown (not recorded)");
+        expect(result).toContain("Safe-output MCP calls observed: unknown (not recorded)");
         expect(result).not.toContain("Token budget state: unknown");
         expect(result).not.toContain("private-path");
         expect(result).not.toContain("exhausted its prompt");
         expect(result).not.toContain("due to an infrastructure or tool failure");
+      } finally {
+        rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
+    it.each([undefined, 0, 2])("includes safe-output call counts in a clean-exit failure report with %s observed calls", calls => {
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const { tmpdir } = require("os");
+      const rootDir = mkdtempSync(join(tmpdir(), "failure-clean-exit-telemetry-"));
+      try {
+        writeFileSync(join(rootDir, "agent_execution_exit_code.txt"), "0");
+        if (calls !== undefined) {
+          mkdirSync(join(rootDir, "mcp-logs"));
+          writeFileSync(
+            join(rootDir, "mcp-logs/rpc-messages.jsonl"),
+            Array(calls)
+              .fill({ event: "rpc_request", server_id: "safeoutputs", method: "tools/call", params: { name: "create_issue", arguments: { body: "private-payload" } } })
+              .map(JSON.stringify)
+              .join("\n")
+          );
+        }
+        const outcome = buildEmptyOutputOutcome([], rootDir);
+        const report = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
+        expect(report).toContain("Failure classification: missing_terminal_safe_output");
+        expect(report).toContain("Driver exit code: 0");
+        expect(report).toContain(`Safe-output MCP calls observed: ${calls ?? "unknown (not recorded)"}`);
+        expect(report).toContain("Safe-output CLI calls observed: unknown (not recorded)");
+        expect(report).not.toContain("private-payload");
+        expect(outcome.type).toBe("report_incomplete");
       } finally {
         rmSync(rootDir, { recursive: true, force: true });
       }

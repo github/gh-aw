@@ -368,13 +368,11 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     ),
   ];
   const completionEvidence = buildCompletionEvidence(rootDir);
-  const observedCompletionEvidence = completionEvidence.filter(
-    line => !line.endsWith(": not recorded") && !line.includes("unknown (not recorded)") && !line.includes("unknown (registration evidence not recorded)") && !line.startsWith("Safe-output persistence: empty (0 records,")
-  );
   const summary = agentNotStarted
     ? [
         `Failure classification: ${failureCause}`,
         "Agent execution state: not_started",
+        ...completionEvidence,
         "The runtime recorded that agent execution never started. Inspect the failed startup step and gateway/setup logs in the linked run; missing safe outputs are downstream, not evidence that the agent omitted a terminal output.",
       ]
     : failureCause === "missing_terminal_safe_output"
@@ -384,7 +382,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
           ...(lastToolCallStatus !== "not recorded" ? [`Last tool call status: ${lastToolCallStatus}`] : []),
           ...(lastToolExitCode !== undefined ? [`Last tool exit code: ${lastToolExitCode}`] : []),
           ...(failedToolCalls ? [`Failed tool calls observed: ${failedToolCalls}`] : []),
-          ...observedCompletionEvidence,
+          ...completionEvidence,
           "No terminal safe output was recorded. These observations do not establish why the agent omitted it; inspect the agent artifact (agent-session.jsonl and agent-stdio.log) for the final actions, then ensure the workflow emits a terminal safe output.",
         ]
       : [
@@ -401,7 +399,6 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
           `Step budget state (LLM invocations): ${executionCategories.includes("invocation_cap_exceeded") ? "exceeded" : "unknown (no exhaustion signal recorded)"}`,
           ...completionEvidence,
         ];
-  if (failureCause === "missing_terminal_safe_output" && !observedCompletionEvidence.length) summary.splice(-1, 0, "Safe-output telemetry: not recorded");
   if (failedFinalResult) diagnostics.add("The engine's final result reported an error; task completion could not be confirmed, even if safe outputs were recorded.");
   else if (!agentNotStarted && failureCause !== "missing_terminal_safe_output") diagnostics.add("Agent finished without emitting a terminal safe output; task completion could not be confirmed.");
   if (errorCodes.length) diagnostics.add(`Engine HTTP error codes: ${[...new Set(errorCodes)].join(", ")}`);

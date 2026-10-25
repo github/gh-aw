@@ -36,9 +36,9 @@ describe("empty output outcome", () => {
       retryCount: 0,
     });
     const { details } = buildEmptyOutputOutcome([], rootDir);
-    expect(details).toContain("Safe-output telemetry: not recorded");
+    expect(details).toContain("Safe-output CLI calls observed: unknown (not recorded)");
+    expect(details).toContain("Safe-output MCP calls observed: unknown (not recorded)");
     expect(details).toContain("inspect the agent artifact (agent-session.jsonl and agent-stdio.log)");
-    expect(details).not.toContain("unknown (");
     expect(details).not.toContain("Retry attempts observed: 0");
   });
 
@@ -132,11 +132,12 @@ describe("empty output outcome", () => {
     expect(buildEmptyOutputOutcome([], rootDir).failureCause).toBe("missing_terminal_safe_output");
   });
 
-  it("does not treat an empty persistence file as safe-output telemetry", () => {
+  it("does not treat an empty persistence file as evidence of zero safe-output calls", () => {
     fs.writeFileSync(path.join(rootDir, "safeoutputs.jsonl"), "");
     const { details } = buildEmptyOutputOutcome([], rootDir);
-    expect(details).toContain("Safe-output telemetry: not recorded");
-    expect(details).not.toContain("Safe-output persistence: empty");
+    expect(details).toContain("Safe-output CLI calls observed: unknown (not recorded)");
+    expect(details).toContain("Safe-output MCP calls observed: unknown (not recorded)");
+    expect(details).toContain("Safe-output persistence: empty (0 records, 0 malformed; not validation or publication evidence)");
   });
 
   it.each(["agent_execution.json", "usage/agent/execution.json"])("classifies recorded pre-agent startup failure from %s", relativePath => {
@@ -148,6 +149,8 @@ describe("empty output outcome", () => {
     expect(outcome).toMatchObject({ reason: "agent_startup_failure", failureCause: "agent_startup_failure" });
     expect(outcome).not.toHaveProperty("engineErrorType");
     expect(outcome.details).toContain("Agent execution state: not_started");
+    expect(outcome.details).toContain("Safe-output CLI calls observed: unknown (not recorded)");
+    expect(outcome.details).toContain("Safe-output MCP calls observed: unknown (not recorded)");
     expect(outcome.details).toContain("Inspect the failed startup step and gateway/setup logs");
     expect(outcome.details).not.toContain("inspect the agent artifact");
     expect(outcome.details).not.toContain("Agent finished");
@@ -224,7 +227,7 @@ describe("empty output outcome", () => {
     expect(details).toContain("Last tool call status: succeeded");
     expect(details).toContain("Safe-output tools: available at gateway snapshot (registered 5 tools)");
     expect(details).toContain("Safe-output MCP calls observed: 0");
-    expect(details).not.toContain("unknown (");
+    expect(details).toContain("Safe-output CLI calls observed: unknown (not recorded)");
     expect(details).not.toContain("Token budget state:");
     expect(details).not.toContain("private-");
   });
