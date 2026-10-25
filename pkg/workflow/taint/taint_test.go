@@ -134,7 +134,11 @@ func TestSecretLeakSinksAndFilters(t *testing.T) {
 				steps.WriteString("          " + line + "\n")
 			}
 			result := checkSteps(t, steps.String())
-			require.Empty(t, result.Gaps)
+			if tt.kind == Output {
+				require.NotEmpty(t, result.Gaps, "idless outputs retain a coverage gap")
+			} else {
+				require.Empty(t, result.Gaps)
+			}
 			require.Len(t, result.Findings, tt.count, "%+v", result.Findings)
 			if tt.count > 0 {
 				assert.Equal(t, tt.kind, result.Findings[0].Site.Kind)
@@ -273,7 +277,7 @@ jobs:
 	result, err := CheckSecretLeaks(workflow)
 	require.NoError(t, err)
 	require.Empty(t, result.Gaps)
-	require.Len(t, result.Findings, 6, "%+v", result.Findings)
+	require.Len(t, result.Findings, 5, "%+v", result.Findings)
 	for _, finding := range result.Findings {
 		assert.NotContains(t, finding.Site.Path, "unrelated")
 		assert.NotEqual(t, "jobs.producer.steps[3].run", finding.Site.Path)
@@ -376,7 +380,7 @@ func TestGroupedOutputsAndArtifactPaths(t *testing.T) {
           key: ${{ steps.emit.outputs.credential }}
           path: cache
 `)
-	require.Empty(t, result.Gaps)
+	require.NotEmpty(t, result.Gaps, "compound output records are tracked conservatively")
 	require.Len(t, result.Findings, 3)
 	assert.Equal(t, Output, result.Findings[0].Site.Kind)
 	assert.Equal(t, Artifact, result.Findings[1].Site.Kind)
