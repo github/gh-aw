@@ -662,7 +662,8 @@ func buildConclusionJobNeeds(data *WorkflowData, mainJobName string, safeOutputJ
 
 // buildConclusionJobOutputs builds outputs for the conclusion job.
 func buildConclusionJobOutputs(data *WorkflowData) map[string]string {
-	// Create outputs for the job (include noop and missing_tool outputs if configured)
+	// Add noop/missing_tool/report_incomplete outputs only for non-participants,
+	// since work-queue participants skip those reporting steps.
 	outputs := map[string]string{}
 	if data.AdmissionEnabled {
 		outputs["admission_compact_session"] = "${{ steps.admission-conclusion-metadata.outputs.compact_session }}"
