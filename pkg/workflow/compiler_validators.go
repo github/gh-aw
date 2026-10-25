@@ -541,10 +541,6 @@ func (c *Compiler) emitExperimentalFeatureWarnings(workflowData *WorkflowData) {
 }
 
 func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData, writer io.Writer) {
-	_, detectionConfigured := getFeatureValueFromFrontmatter(string(constants.GHAWDetectionFeatureFlag), workflowData, false)
-	if !detectionConfigured {
-		detectionConfigured = isFeatureInEnvironment(string(constants.GHAWDetectionFeatureFlag), false)
-	}
 	warnings := []struct {
 		enabled bool
 		message string
@@ -571,7 +567,6 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.LinkWorkItems != nil, message: "Using experimental feature: ado-link-work-items"},
 		{enabled: workflowData.SafeOutputs != nil && workflowData.SafeOutputs.UploadWorkItemAttachments != nil, message: "Using experimental feature: ado-upload-workitem-attachment"},
 		{enabled: hasLinearSafeOutputs(workflowData.SafeOutputs), message: "Using experimental feature: Linear safe outputs"},
-		{enabled: detectionConfigured && isFeatureEnabled(constants.GHAWDetectionFeatureFlag, workflowData), message: "Using experimental feature: gh-aw-detection"},
 		{enabled: len(workflowData.LSP) > 0, message: "Using experimental feature: lsp"},
 		{enabled: hasCloudHypervisorEnclaves(workflowData), message: "Using experimental feature: enclaves cloud-hypervisor runtime"},
 		{enabled: len(workflowData.Plugins) > 0, message: "Using experimental feature: plugins"},

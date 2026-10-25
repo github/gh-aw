@@ -162,81 +162,57 @@ func TestValidateFeatureConfig(t *testing.T) {
 }
 
 func TestEmitExperimentalFeatureWarningsGHAWDetection(t *testing.T) {
-	t.Setenv("GH_AW_FEATURES", "")
 	tests := []struct {
-		name          string
-		features      map[string]any
-		batchMode     bool
-		expectWarning bool
-		expectedUsage int
+		name        string
+		features    map[string]any
+		envFeatures string
 	}{
 		{
-			name: "gh-aw-detection enabled produces experimental warning",
+			name: "explicitly enabled",
 			features: map[string]any{
 				"gh-aw-detection": true,
 			},
-			expectWarning: true,
 		},
 		{
-			name: "batch mode aggregates gh-aw-detection usage",
-			features: map[string]any{
-				"gh-aw-detection": true,
-			},
-			batchMode:     true,
-			expectWarning: false,
-			expectedUsage: 1,
-		},
-		{
-			name: "gh-aw-detection disabled does not produce experimental warning",
+			name: "explicitly disabled",
 			features: map[string]any{
 				"gh-aw-detection": false,
 			},
-			expectWarning: false,
 		},
 		{
-			name:          "no gh-aw-detection does not produce experimental warning",
-			features:      nil,
-			expectWarning: false,
+			name: "enabled by default",
+		},
+		{
+			name:        "enabled through environment",
+			envFeatures: "gh-aw-detection",
+		},
+		{
+			name: "frontmatter overrides environment",
+			features: map[string]any{
+				"gh-aw-detection": false,
+			},
+			envFeatures: "gh-aw-detection",
 		},
 	}
 
-	expectedMessage := "Using experimental feature: gh-aw-detection"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			compiler := NewCompiler()
-			compiler.SetBatchMode(tt.batchMode)
+			t.Setenv("GH_AW_FEATURES", tt.envFeatures)
 			workflowData := &WorkflowData{
 				Features: tt.features,
 			}
 
-			oldStderr := os.Stderr
-			r, w, err := os.Pipe()
-			require.NoError(t, err)
-			os.Stderr = w
-			t.Cleanup(func() {
-				os.Stderr = oldStderr
-				_ = r.Close()
-			})
+			for _, batchMode := range []bool{false, true} {
+				compiler := NewCompiler()
+				compiler.SetBatchMode(batchMode)
+				var output bytes.Buffer
+				compiler.emitExperimentalFeatureWarningsTo(workflowData, &output)
 
-			compiler.emitExperimentalFeatureWarnings(workflowData)
-
-			require.NoError(t, w.Close())
-			os.Stderr = oldStderr
-			var buf bytes.Buffer
-			_, err = io.Copy(&buf, r)
-			require.NoError(t, err)
-			stderrOutput := buf.String()
-
-			if tt.expectWarning {
-				assert.Contains(t, stderrOutput, expectedMessage)
-				assert.Positive(t, compiler.GetWarningCount())
-			} else {
-				assert.NotContains(t, stderrOutput, expectedMessage)
-				if tt.expectedUsage == 0 {
-					assert.Zero(t, compiler.GetWarningCount())
-				}
+				assert.Empty(t, output.String(), "batch mode: %t", batchMode)
+				assert.Zero(t, compiler.GetWarningCount(), "batch mode: %t", batchMode)
+				assert.Zero(t, compiler.GetExperimentalWarningCount(), "batch mode: %t", batchMode)
+				assert.Empty(t, compiler.GetExperimentalFeatureUsage(), "batch mode: %t", batchMode)
 			}
-			assert.Equal(t, tt.expectedUsage, compiler.GetExperimentalFeatureUsage()[expectedMessage])
 		})
 	}
 }
