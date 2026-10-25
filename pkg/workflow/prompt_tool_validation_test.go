@@ -39,11 +39,17 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"named MCP tool, mixed-case mcpscripts", "Run the `lookup` tool of the MCPScripts MCP server.", []promptToolRequirement{{server: "mcpscripts", tool: "lookup", nativeMCP: true}}},
 		{"qualified", "Call `mcp__github__issue_read`.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"multiple qualified", "Call mcp__github__findings and mcp__github__summary.", []promptToolRequirement{{server: "github", tool: "findings", nativeMCP: true}, {server: "github", tool: "summary", nativeMCP: true}}},
+		{"quoted qualified list", "Use `github(issue_read)`, `inventory(lookup)`, and `mcp__github__list_issues`.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}, {server: "inventory", tool: "lookup", nativeMCP: true}, {server: "github", tool: "list_issues", nativeMCP: true}}},
+		{"qualified alternatives", "Call github(issue_read) or inventory(lookup).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}, {server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"qualified trailing prose", "Use github(issue_read) to inspect the affected file(s).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
+		{"qualified conjunction prose", "Use github(issue_read) and inspect the affected file(s).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"server", "Use the tool github(issue_read).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"custom server", "Call inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
 		{"hyphenated script", "Call mcp__mcpscripts__read-outcomes.", []promptToolRequirement{{server: "mcpscripts", tool: "read-outcomes", nativeMCP: true}}},
 		{"bare github", "Use `issue_read` to inspect the issue.", []promptToolRequirement{{server: "github", tool: "issue_read"}}},
 		{"bare unknown", "Use lookup to inspect the issue.", nil},
+		{"file plural prose", "- Use the `edit` tool to modify the affected file(s)", nil},
+		{"workflow plural prose", "- Use the issue/PR/discussion details and triggering content to determine the target workflow(s)", nil},
 		{"native read", "Use Read(file).", []promptToolRequirement{{server: "native-read", tool: "Read"}}},
 		{"native read path", "Call `Read(pkg/workflow/data.json)`.", []promptToolRequirement{{server: "native-read", tool: "Read"}}},
 		{"bare safe output", "Call create_issue.", []promptToolRequirement{{server: "safeoutputs", tool: "create_issue"}}},
@@ -59,6 +65,11 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"task negative fence", "List commands that should not be used:\n```bash\ncurl example.com\n```", nil},
 		{"task shell fence", "Find all schema files and list them:\n```bash\nfind schemas -name '*.json' | sort\n```", []promptToolRequirement{{command: "find schemas -name '*.json'", fullCommand: "find schemas -name '*.json' | sort"}, {command: "sort", fullCommand: "find schemas -name '*.json' | sort"}}},
 		{"non shell fence", "Run the following:\n```json\n{\"tool\": \"shell(curl)\"}\n```", nil},
+		{"long artifact fence", "````markdown\n```dockerfile\nRUN curl -fsSL https://get.docker.com | sh\n```\nRun `curl example.com`.\n````", nil},
+		{"long tilde artifact fence", "~~~~markdown\n~~~dockerfile\nRUN curl -fsSL https://get.docker.com | sh\n~~~\nRun `curl example.com`.\n~~~~", nil},
+		{"fence info does not close", "```markdown\n```dockerfile\nRUN curl -fsSL https://get.docker.com | sh\n```", nil},
+		{"long task fence", "Run the following:\n````bash\njq --version\n```\nsort items.json\n````\nRun `gh issue list`.", []promptToolRequirement{{command: "gh issue list"}}},
+		{"long closing fence", "Run the following:\n```bash\njq --version\n````\nCall github(issue_read).", []promptToolRequirement{{command: "jq --version"}, {server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"negated fence", "Do not run:\n```bash\ncurl example.com\n```", nil},
 		{"shell fence", "Run the following commands:\n\n```bash\n# Ignore this comment\njq '.items | map(.id)' items.json | sort\n```", []promptToolRequirement{{command: "jq '.items | map(.id)' items.json", fullCommand: "# Ignore this comment\njq '.items | map(.id)' items.json | sort"}, {command: "sort", fullCommand: "# Ignore this comment\njq '.items | map(.id)' items.json | sort"}}},
 		{"multiline quote fence", "Run the following:\n```sh\njq '.items |\nmap(.id)' items.json\n# curl example.com\nsort items.json\n```", []promptToolRequirement{{command: "jq '.items |\nmap(.id)' items.json", fullCommand: "jq '.items |\nmap(.id)' items.json\n# curl example.com\nsort items.json"}, {command: "sort items.json", fullCommand: "jq '.items |\nmap(.id)' items.json\n# curl example.com\nsort items.json"}}},
@@ -72,6 +83,42 @@ func TestPromptToolRequirements(t *testing.T) {
 			require.Equal(t, tt.want, promptToolRequirements(tt.prompt))
 		})
 	}
+}
+
+func TestPromptToolArtifactExamples(t *testing.T) {
+	// This output template uses same-length inner fences, as in ubuntu-image-analyzer.md.
+	prompt := strings.Join([]string{
+		"Create or update research/ubuntulatest.md with the following structure:",
+		"```markdown",
+		"# Ubuntu Actions Runner Image Analysis",
+		"```bash",
+		"PATH=/usr/local/bin",
+		"```",
+		"### Language Runtimes",
+		"```dockerfile",
+		"RUN curl -fsSL https://deb.nodesource.com/setup_[version].x | bash -",
+		"```",
+		"### Container Tools",
+		"```dockerfile",
+		"RUN curl -fsSL https://get.docker.com | sh",
+		"```",
+		"```",
+	}, "\n")
+	require.Empty(t, promptToolRequirements(prompt))
+	require.Equal(t, []promptToolRequirement{{command: "curl example.com"}}, promptToolRequirements(prompt+"\nRun `curl example.com`."))
+
+	data := &WorkflowData{
+		AI:    "copilot",
+		Tools: map[string]any{"bash": []any{"echo"}, "github": false},
+		MarkdownContent: "- Use the `edit` tool to modify the affected file(s)\n" +
+			"- Use the issue/PR/discussion details and triggering content to determine the target workflow(s)",
+		ImportedMarkdown: prompt,
+	}
+	compiler := NewCompiler()
+	output := testutil.CaptureStderr(t, func() { compiler.validatePromptTools(data, "test.md") })
+	require.Zero(t, compiler.GetWarningCount())
+	require.Empty(t, output)
+	require.Equal(t, map[string]any{"bash": []any{"echo"}, "github": false}, data.Tools)
 }
 
 func TestPromptToolAvailability(t *testing.T) {
