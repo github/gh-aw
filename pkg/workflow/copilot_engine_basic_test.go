@@ -111,8 +111,11 @@ func TestCopilotEngineInstallationSteps(t *testing.T) {
 	if !strings.Contains(sdkInstallStep, expectedSDKInstall) {
 		t.Fatalf("Expected SDK install command %q, got:\n%s", expectedSDKInstall, sdkInstallStep)
 	}
-	if !strings.Contains(sdkInstallStep, `"@github/copilot-sdk":"`+string(constants.DefaultCopilotSDKVersion)+`"`) {
-		t.Fatalf("Expected SDK install manifest to pin the compiler SDK version, got:\n%s", sdkInstallStep)
+	for _, asset := range []string{"package.json", "package-lock.json"} {
+		expectedCopy := `cp -- "${RUNNER_TEMP}/gh-aw/actions/copilot-sdk/node/` + asset + `" ` + asset
+		if !strings.Contains(sdkInstallStep, expectedCopy) {
+			t.Errorf("Expected SDK install step to copy %s, got:\n%s", asset, sdkInstallStep)
+		}
 	}
 }
 

@@ -575,6 +575,19 @@ describe("copilot_harness.cjs", () => {
       expect(buildCopilotSDKDriverEnv(env)).toBe(env);
     });
 
+    it("does not load a workspace resolver without explicit trust", () => {
+      const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-sdk-untrusted-"));
+      try {
+        fs.mkdirSync(path.join(workspace, ".gh-aw", "copilot-sdk"), { recursive: true });
+        fs.writeFileSync(path.join(workspace, ".gh-aw", "copilot-sdk", "resolve.cjs"), "");
+        const env = { GITHUB_WORKSPACE: workspace, PATH: "/usr/bin", NODE_OPTIONS: "--trace-warnings" };
+
+        expect(buildCopilotSDKDriverEnv(env)).toBe(env);
+      } finally {
+        fs.rmSync(workspace, { recursive: true, force: true });
+      }
+    });
+
     it("adds SDK hooks and executable paths only to a copy of the driver environment", () => {
       const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-sdk workspace-"));
       try {
@@ -582,7 +595,7 @@ describe("copilot_harness.cjs", () => {
         fs.mkdirSync(sdkDir, { recursive: true });
         const resolver = path.join(sdkDir, "resolve.cjs");
         fs.writeFileSync(resolver, "");
-        const baseEnv = { GITHUB_WORKSPACE: workspace, PATH: "/usr/bin", NODE_PATH: "/existing/modules", NODE_OPTIONS: "--trace-warnings" };
+        const baseEnv = { GITHUB_WORKSPACE: workspace, PATH: "/usr/bin", NODE_PATH: "/existing/modules", NODE_OPTIONS: "--trace-warnings", GH_AW_TRUSTED_SDK_RESOLVER: "1" };
         const sidecarEnv = buildCopilotEngineChildEnv(baseEnv, { COPILOT_MODEL: "gpt-6.1-sol" });
         const driverEnv = buildCopilotSDKDriverEnv(sidecarEnv);
         expect(driverEnv).toMatchObject({
@@ -592,7 +605,7 @@ describe("copilot_harness.cjs", () => {
           COPILOT_MODEL: "gpt-6.1-sol",
         });
         expect(sidecarEnv).toEqual({ ...baseEnv, COPILOT_MODEL: "gpt-6.1-sol" });
-        expect(buildCopilotSDKDriverEnv({ GITHUB_WORKSPACE: workspace })).toMatchObject({
+        expect(buildCopilotSDKDriverEnv({ GITHUB_WORKSPACE: workspace, GH_AW_TRUSTED_SDK_RESOLVER: "1" })).toMatchObject({
           NODE_OPTIONS: `--import=${JSON.stringify(resolver)}`,
           NODE_PATH: path.join(sdkDir, "node_modules"),
         });
@@ -4537,7 +4550,7 @@ require("fs").writeFileSync(${JSON.stringify(path.join(tmpDir, "driver-env.json"
   it.each([true, false])("does not create a CLI selection record in SDK mode (routed=%s)", async routed => {
     const [providerPort, sdkPort] = [await freePort(), await freePort()];
     const { tmpDir, result, args, selection } = runHarness(
-      { AWF_REFLECT_ENABLED: "1", ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }), COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}` },
+      { AWF_REFLECT_ENABLED: "1", ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }), COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}`, GH_AW_TRUSTED_SDK_RESOLVER: "1" },
       { routed, providerPort, sdk: true }
     );
 

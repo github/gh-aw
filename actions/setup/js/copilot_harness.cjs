@@ -1496,6 +1496,10 @@ function buildCopilotSDKDriverEnv(baseEnv) {
   const sdkDir = path.join(baseEnv.GITHUB_WORKSPACE || process.cwd(), ".gh-aw", "copilot-sdk");
   const resolver = path.join(sdkDir, "resolve.cjs");
   if (!fs.existsSync(resolver)) return baseEnv;
+  if (baseEnv.GH_AW_TRUSTED_SDK_RESOLVER !== "1") {
+    log("Skipping workspace Copilot SDK resolver preload because GH_AW_TRUSTED_SDK_RESOLVER is not enabled");
+    return baseEnv;
+  }
   const nodeModules = path.join(sdkDir, "node_modules");
   return {
     ...baseEnv,
