@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,25 +160,60 @@ func TestCopilotSDKIsolatedModuleResolution(t *testing.T) {
 	}
 	workspace := t.TempDir()
 	for dir, value := range map[string]string{
-		"node_modules/undici":                    "workspace",
-		".gh-aw/copilot-sdk/node_modules/undici": "locked",
+		"node_modules/undici":                      "workspace",
+		".gh-aw/copilot-sdk/node_modules/undici":   "locked",
+		"project/node_modules/undici":              "nested",
+		"project/node_modules/typescript":          "repository-typescript",
+		"project/node_modules/ts-node":             "repository-ts-node",
+		"project/node_modules/@github/copilot-sdk": "repository-sdk",
+		"project/node_modules/unrelated":           "unrelated",
 	} {
 		path := filepath.Join(workspace, dir)
 		require.NoError(t, os.MkdirAll(path, 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(path, "index.js"), []byte("module.exports = '"+value+"'"), 0600))
 	}
+	require.NoError(t, os.WriteFile(filepath.Join(workspace, "project/node_modules/undici/local-only.js"), []byte(`module.exports = "local-only"`), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(workspace, ".gh-aw/copilot-sdk/resolve.cjs"), []byte(copilotSDKNpmResolver), 0600))
-	for name, source := range map[string]string{
-		"commonjs": `console.log(require("undici"))`,
-		"esm":      `import("undici").then(m => console.log(m.default))`,
-	} {
-		t.Run(name, func(t *testing.T) {
-			cmd := exec.Command("bash", "-e", "-c", nodePathSetupCommandForCopilotSDK+`; exec "$GH_AW_NODE_BIN" -e "$DRIVER_SOURCE"`)
-			cmd.Dir = workspace
-			cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "GH_AW_NODE_BIN="+node, "DRIVER_SOURCE="+source)
-			output, err := cmd.CombinedOutput()
-			require.NoError(t, err, "%s", output)
-			assert.Equal(t, "locked\n", string(output))
-		})
+	require.NoError(t, os.WriteFile(filepath.Join(workspace, "legacy.cjs"), []byte(`require("node:module").registerHooks = undefined;`), 0600))
+	for _, profile := range []string{"node", "typescript"} {
+		manifest, err := copilotSDKNpmManifests.ReadFile("data/copilot-sdk/" + profile + "/package.json")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(workspace, ".gh-aw/copilot-sdk/package.json"), manifest, 0600))
+		for _, legacy := range []bool{false, true} {
+			for name, source := range map[string]string{
+				"commonjs": `for (const pkg of ["undici", "typescript", "ts-node", "@github/copilot-sdk", "unrelated", "undici/local-only.js"]) console.log(require(pkg))`,
+				"esm":      `for (const pkg of ["undici", "typescript", "ts-node", "@github/copilot-sdk", "unrelated", "undici/local-only.js"]) console.log((await import(pkg)).default)`,
+			} {
+				t.Run(fmt.Sprintf("%s/%s/legacy=%t", profile, name, legacy), func(t *testing.T) {
+					args := []string{}
+					if legacy {
+						args = append(args, "--require", filepath.Join(workspace, "legacy.cjs"))
+					}
+					args = append(args, "--import", filepath.Join(workspace, ".gh-aw/copilot-sdk/resolve.cjs"), "-e", source)
+					cmd := exec.Command(node, args...)
+					cmd.Dir = filepath.Join(workspace, "project")
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, "%s", output)
+					assert.Equal(t, "locked\nrepository-typescript\nrepository-ts-node\nrepository-sdk\nunrelated\nlocal-only\n", string(output))
+				})
+			}
+		}
 	}
+	t.Run("session-environment", func(t *testing.T) {
+		assert.NotContains(t, nodePathSetupCommandForCopilotSDK, "NODE_OPTIONS")
+		assert.NotContains(t, nodePathSetupCommandForCopilotSDK, ".gh-aw/copilot-sdk")
+		for name, source := range map[string]string{
+			"commonjs": `console.log(require("undici"))`,
+			"esm":      `import("undici").then(m => console.log(m.default))`,
+		} {
+			t.Run(name, func(t *testing.T) {
+				cmd := exec.Command("bash", "-e", "-c", nodePathSetupCommandForCopilotSDK+`; exec "$GH_AW_NODE_BIN" -e "$DRIVER_SOURCE"`)
+				cmd.Dir = workspace
+				cmd.Env = append(os.Environ(), "GITHUB_WORKSPACE="+workspace, "GH_AW_NODE_BIN="+node, "DRIVER_SOURCE="+source)
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+				assert.Equal(t, "workspace\n", string(output))
+			})
+		}
+	})
 }

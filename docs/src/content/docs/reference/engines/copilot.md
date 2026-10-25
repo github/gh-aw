@@ -124,7 +124,8 @@ The compiler installs the Node.js SDK with `npm ci --ignore-scripts` using embed
 package manifests and an integrity-checked lockfile in
 `${GITHUB_WORKSPACE}/.gh-aw/copilot-sdk/`. It does not replace the repository's
 package manifests or `node_modules`. SDK drivers resolve these isolated packages
-through `NODE_PATH` and an ESM import hook. Python SDK installs use an exact
+through driver-only module hooks and `NODE_PATH`. SDK executable paths and hooks
+are not passed to the sidecar or repository tooling. Python SDK installs use an exact
 `github-copilot-sdk==<version>` pin.
 
 The built-in driver registers native MCP servers from converter-owned `RUNNER_TEMP/gh-aw/mcp-config/copilot-sdk.json`, not the user-managed CLI catalog. `tools.cli-proxy` servers remain CLI-only. A SHA-256 integrity value is bound to the run, attempt, and job; missing, malformed, changed, linked, or stale catalogs fail before inference. This does not protect against a compromised runner able to replace both catalog and trusted environment.

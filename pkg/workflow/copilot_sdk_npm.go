@@ -17,19 +17,27 @@ var copilotSDKNpmManifests embed.FS
 const copilotSDKNpmCICommand = `npm ci --ignore-scripts --no-audit --no-fund`
 
 // Redirect only SDK-owned imports, retaining the driver's normal resolution for
-// relative imports and repository dependencies. Older Node versions support only
-// the asynchronous ESM hook; CommonJS then uses NODE_PATH.
+// relative imports and repository dependencies. Older Node versions need a
+// separate CommonJS resolver alongside the asynchronous ESM hook.
 const copilotSDKNpmResolver = `const { register, registerHooks, createRequire } = require("node:module");` +
 	`const { pathToFileURL } = require("node:url");` +
 	`const sdkParentURL = pathToFileURL(__filename).href;` +
+	`const packages = Object.keys(require("./package.json").dependencies);` +
 	`function resolve(specifier, context, nextResolve) {` +
-	`const packages = ["@github/copilot-sdk", "undici", "ts-node", "typescript"];` +
 	`if (context.parentURL !== sdkParentURL && packages.some(pkg => specifier === pkg || specifier.startsWith(pkg + "/"))) {` +
-	`return { url: pathToFileURL(createRequire(sdkParentURL).resolve(specifier)).href, shortCircuit: true }; }` +
+	`try { return { url: pathToFileURL(createRequire(sdkParentURL).resolve(specifier)).href, shortCircuit: true }; }` +
+	`catch (error) { if (error.code !== "MODULE_NOT_FOUND" && error.code !== "ERR_MODULE_NOT_FOUND") throw error; } }` +
 	`return nextResolve(specifier, context); }` +
 	`if (registerHooks) { registerHooks({ resolve }); } else {` +
+	`const Module = require("node:module"); const originalResolve = Module._resolveFilename;` +
+	`Module._resolveFilename = function(specifier, parent, ...args) {` +
+	`if (parent?.filename !== __filename && packages.some(pkg => specifier === pkg || specifier.startsWith(pkg + "/"))) {` +
+	`try { return createRequire(sdkParentURL).resolve(specifier); }` +
+	`catch (error) { if (error.code !== "MODULE_NOT_FOUND") throw error; } }` +
+	`return originalResolve.call(this, specifier, parent, ...args); };` +
 	`register("data:text/javascript," + encodeURIComponent(` +
 	`'import { createRequire } from "node:module"; import { pathToFileURL } from "node:url";' +` +
+	`"const packages = " + JSON.stringify(packages) + ";" +` +
 	`"const sdkParentURL = " + JSON.stringify(sdkParentURL) + "; export " + resolve.toString())); }`
 
 func copilotSDKNpmInstallLines(runtimeID string) []string {

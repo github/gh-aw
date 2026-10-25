@@ -21,6 +21,7 @@ const {
   buildCopilotProxyAuthFailureDiagnostic,
   buildCopilotSDKChildEnv,
   buildCopilotEngineChildEnv,
+  buildCopilotSDKDriverEnv,
   envFlagEnabled,
   countPermissionDeniedIssues,
   detectCopilotErrors,
@@ -565,6 +566,39 @@ describe("copilot_harness.cjs", () => {
       expect(env).toMatchObject({ PATH: "/usr/bin", COPILOT_MODEL: "gpt-6.1-sol" });
       expect(env).not.toHaveProperty("GH_AW_AWF_EXECUTION_COMPONENT");
       expect(env).not.toHaveProperty("GH_AW_AWF_EXECUTION_EVIDENCE_FILE");
+    });
+  });
+
+  describe("buildCopilotSDKDriverEnv", () => {
+    it("leaves legacy installations unchanged", () => {
+      const env = { GITHUB_WORKSPACE: "/nonexistent-workspace", PATH: "/usr/bin" };
+      expect(buildCopilotSDKDriverEnv(env)).toBe(env);
+    });
+
+    it("adds SDK hooks and executable paths only to a copy of the driver environment", () => {
+      const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-sdk workspace-"));
+      try {
+        const sdkDir = path.join(workspace, ".gh-aw", "copilot-sdk");
+        fs.mkdirSync(sdkDir, { recursive: true });
+        const resolver = path.join(sdkDir, "resolve.cjs");
+        fs.writeFileSync(resolver, "");
+        const baseEnv = { GITHUB_WORKSPACE: workspace, PATH: "/usr/bin", NODE_PATH: "/existing/modules", NODE_OPTIONS: "--trace-warnings" };
+        const sidecarEnv = buildCopilotEngineChildEnv(baseEnv, { COPILOT_MODEL: "gpt-6.1-sol" });
+        const driverEnv = buildCopilotSDKDriverEnv(sidecarEnv);
+        expect(driverEnv).toMatchObject({
+          NODE_OPTIONS: `--trace-warnings --import=${JSON.stringify(resolver)}`,
+          NODE_PATH: `${path.join(sdkDir, "node_modules")}${path.delimiter}/existing/modules`,
+          PATH: `${path.join(sdkDir, "node_modules", ".bin")}${path.delimiter}/usr/bin`,
+          COPILOT_MODEL: "gpt-6.1-sol",
+        });
+        expect(sidecarEnv).toEqual({ ...baseEnv, COPILOT_MODEL: "gpt-6.1-sol" });
+        expect(buildCopilotSDKDriverEnv({ GITHUB_WORKSPACE: workspace })).toMatchObject({
+          NODE_OPTIONS: `--import=${JSON.stringify(resolver)}`,
+          NODE_PATH: path.join(sdkDir, "node_modules"),
+        });
+      } finally {
+        fs.rmSync(workspace, { recursive: true, force: true });
+      }
     });
   });
 
@@ -4371,7 +4405,7 @@ describe("Copilot CLI model-selection evidence through harness startup", () => {
     for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  function runHarness(envOverrides, { routed, providerPort = 0, sdk = false }) {
+  function runHarness(envOverrides, { routed, providerPort = 0, sdk = false, sdkInstall = sdk }) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-selection-startup-"));
     tempDirs.push(tmpDir);
     const preloadPath = path.join(tmpDir, "reflect-preload.cjs");
@@ -4405,9 +4439,26 @@ process.stdout.write("done\\n");`
     );
     // SDK sidecar double: listens on the requested --port until the harness stops it.
     const sidecarPath = path.join(tmpDir, "copilot-sidecar.cjs");
-    fs.writeFileSync(sidecarPath, `#!/usr/bin/env node\nconst args = process.argv.slice(2);\nrequire("net").createServer(socket => socket.end()).listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1");\n`, { mode: 0o755 });
+    fs.writeFileSync(
+      sidecarPath,
+      `#!/usr/bin/env node
+require("fs").writeFileSync(${JSON.stringify(path.join(tmpDir, "sidecar-env.json"))}, JSON.stringify({ NODE_OPTIONS: process.env.NODE_OPTIONS, PATH: process.env.PATH, NODE_PATH: process.env.NODE_PATH }));
+const args = process.argv.slice(2);
+require("net").createServer(socket => socket.end()).listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1");\n`,
+      { mode: 0o755 }
+    );
+    if (sdkInstall) {
+      const sdkDir = path.join(tmpDir, ".gh-aw", "copilot-sdk");
+      fs.mkdirSync(sdkDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sdkDir, "resolve.cjs"),
+        `if (process.argv[1] !== ${JSON.stringify(stubPath)}) throw new Error("SDK hook escaped the driver");
+require("fs").writeFileSync(${JSON.stringify(path.join(tmpDir, "driver-env.json"))}, JSON.stringify({ NODE_OPTIONS: process.env.NODE_OPTIONS, PATH: process.env.PATH, NODE_PATH: process.env.NODE_PATH }));`
+      );
+    }
     const env = {
       ...harnessChildEnv,
+      GITHUB_WORKSPACE: tmpDir,
       GH_AW_TMP_DIR: tmpDir,
       GH_AW_AWF_CONFIG_PATH: configPath,
       COPILOT_HOME: path.join(tmpDir, "copilot-home"),
@@ -4477,9 +4528,15 @@ process.stdout.write("done\\n");`
     expect(selection).toEqual({ status: "observed", configured_model: "gpt-5.6-luna", resolved_model: "gpt-5.6-luna", effective_model: "gpt-5.6-luna" });
   });
 
+  it("ignores retained SDK installations in CLI mode", () => {
+    const { tmpDir, result } = runHarness({ GH_AW_SKIP_REFLECT: "true", COPILOT_MODEL: "gpt-5.6-luna" }, { routed: false, sdkInstall: true });
+    expect(result.status, result.stderr).toBe(0);
+    expect(fs.existsSync(path.join(tmpDir, "driver-env.json"))).toBe(false);
+  });
+
   it.each([true, false])("does not create a CLI selection record in SDK mode (routed=%s)", async routed => {
     const [providerPort, sdkPort] = [await freePort(), await freePort()];
-    const { result, args, selection } = runHarness(
+    const { tmpDir, result, args, selection } = runHarness(
       { AWF_REFLECT_ENABLED: "1", ...(routed ? { GH_AW_MODEL_ROUTING: "1" } : { COPILOT_MODEL: "gpt-5.6-luna" }), COPILOT_SDK_URI: `http://127.0.0.1:${sdkPort}` },
       { routed, providerPort, sdk: true }
     );
@@ -4488,6 +4545,16 @@ process.stdout.write("done\\n");`
     expect(result.stderr).toContain("copilot-sdk driver mode: starting sidecar");
     expect(args).not.toContain("--session-id");
     expect(selection).toBeNull();
+    const driverEnv = JSON.parse(fs.readFileSync(path.join(tmpDir, "driver-env.json"), "utf8"));
+    const sidecarEnv = JSON.parse(fs.readFileSync(path.join(tmpDir, "sidecar-env.json"), "utf8"));
+    const sdkDir = path.join(tmpDir, ".gh-aw", "copilot-sdk");
+    expect(driverEnv.NODE_OPTIONS).toContain(`--import=${JSON.stringify(path.join(sdkDir, "resolve.cjs"))}`);
+    expect(driverEnv.NODE_OPTIONS).toContain("--require");
+    expect(driverEnv.PATH.split(path.delimiter)[0]).toBe(path.join(sdkDir, "node_modules", ".bin"));
+    expect(driverEnv.NODE_PATH.split(path.delimiter)[0]).toBe(path.join(sdkDir, "node_modules"));
+    expect(sidecarEnv.NODE_OPTIONS).not.toContain("resolve.cjs");
+    expect(sidecarEnv.PATH).not.toContain(sdkDir);
+    expect(sidecarEnv.NODE_PATH || "").not.toContain(sdkDir);
   });
 });
 

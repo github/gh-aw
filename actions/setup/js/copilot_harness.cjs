@@ -1489,6 +1489,23 @@ function buildCopilotEngineChildEnv(baseEnv, sdkEnv) {
 }
 
 /**
+ * @param {NodeJS.ProcessEnv} baseEnv
+ * @returns {NodeJS.ProcessEnv}
+ */
+function buildCopilotSDKDriverEnv(baseEnv) {
+  const sdkDir = path.join(baseEnv.GITHUB_WORKSPACE || process.cwd(), ".gh-aw", "copilot-sdk");
+  const resolver = path.join(sdkDir, "resolve.cjs");
+  if (!fs.existsSync(resolver)) return baseEnv;
+  const nodeModules = path.join(sdkDir, "node_modules");
+  return {
+    ...baseEnv,
+    NODE_OPTIONS: `${baseEnv.NODE_OPTIONS ? `${baseEnv.NODE_OPTIONS} ` : ""}--import=${JSON.stringify(resolver)}`,
+    NODE_PATH: `${nodeModules}${baseEnv.NODE_PATH ? `${path.delimiter}${baseEnv.NODE_PATH}` : ""}`,
+    PATH: `${path.join(nodeModules, ".bin")}${path.delimiter}${baseEnv.PATH || ""}`,
+  };
+}
+
+/**
  * Write Copilot detection outputs to $GITHUB_OUTPUT.
  * @param {{ inferenceAccessError: boolean, mcpPolicyError: boolean, agenticEngineTimeout: boolean, modelNotSupportedError: boolean, http400ResponseError: boolean }} results
  */
@@ -2089,7 +2106,7 @@ async function main() {
             attempt,
             log,
             logArgs: safeArgs,
-            env: childEnv,
+            env: copilotSDKMode ? buildCopilotSDKDriverEnv(childEnv ?? process.env) : childEnv,
             stdin: promptStdin,
             runtimeGuard: { shouldTerminate: () => ({ terminate: Boolean(modelObserver.check()), reason: "copilot_model_verification" }) },
             postResultWatchdog: safeOutputsPath
@@ -2538,6 +2555,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildCopilotProxyAuthFailureDiagnostic,
     buildCopilotSDKChildEnv,
     buildCopilotEngineChildEnv,
+    buildCopilotSDKDriverEnv,
     envFlagEnabled,
     generateCopilotConnectionToken,
     buildCopilotSDKServerArgs,
