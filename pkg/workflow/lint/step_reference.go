@@ -34,7 +34,7 @@ func checkStepReference(ctx context.Context, input Input) ([]Diagnostic, error) 
 		if err := ctx.Err(); err != nil {
 			return diagnostics, err
 		}
-		found, err := checkStepReferenceBlock(ctx, block)
+		found, err := checkStepReferenceBlock(ctx, block, input.Workflow == nil)
 		diagnostics = append(diagnostics, found...)
 		failures = append(failures, err)
 	}
@@ -63,7 +63,7 @@ func stepReferenceBlocks(ctx context.Context, input Input) ([]aw.ExecutionBlock,
 				continue
 			}
 			// These scopes may acquire steps from imports or compiler generation.
-			if pending || constants.IsCompilerOwnedJobName(strings.ToLower(id)) ||
+			if _, builtin := constants.KnownBuiltInJobNames[strings.ToLower(id)]; pending || builtin ||
 				section == "jobs" && block.Fields["restore-memory"] != nil {
 				continue
 			}
@@ -104,8 +104,8 @@ func stepReferenceBlocks(ctx context.Context, input Input) ([]aw.ExecutionBlock,
 	return blocks, ctx.Err()
 }
 
-func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock) ([]Diagnostic, error) {
-	additional, err := stepReferenceSetupSteps(ctx, block)
+func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock, authored bool) ([]Diagnostic, error) {
+	additional, err := stepReferenceSetupSteps(ctx, block, authored)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +130,9 @@ func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock) ([]Di
 	var diagnostics []Diagnostic
 	reported := make(map[string]struct{})
 	err = walkExpressionScalars(ctx, block.Fields, block.Path, func(path, text string) error {
+		if stepReferenceAgentMetadataPath(block.Path, path) {
+			return nil
+		}
 		visit := func(_, _, _ int, node actionlint.ExprNode) error {
 			actionlint.VisitExprNode(node, func(child, _ actionlint.ExprNode, entering bool) {
 				if !entering || ctx.Err() != nil {
@@ -159,13 +162,32 @@ func checkStepReferenceBlock(ctx context.Context, block aw.ExecutionBlock) ([]Di
 	return diagnostics, err
 }
 
+func stepReferenceAgentMetadataPath(jobPath, path string) bool {
+	if !strings.HasPrefix(jobPath, "safe-jobs.") && !strings.HasPrefix(jobPath, "safe-outputs.jobs.") {
+		return false
+	}
+	field, found := strings.CutPrefix(path, jobPath+".")
+	return found && (field == "description" || strings.HasPrefix(field, "inputs."))
+}
+
 // Custom jobs emit setup/pre-steps in the same Actions job, but the shared
 // authored execution traversal only exposes regular steps and post-steps.
-func stepReferenceSetupSteps(ctx context.Context, block aw.ExecutionBlock) ([]aw.ExecutionStep, error) {
-	if !strings.HasPrefix(block.Path, "jobs.") {
+func stepReferenceSetupSteps(ctx context.Context, block aw.ExecutionBlock, authored bool) ([]aw.ExecutionStep, error) {
+	if !authored || !strings.HasPrefix(block.Path, "jobs.") {
 		return nil, nil
 	}
 	var additional []aw.ExecutionStep
+	_, reusable := block.Fields["uses"]
+	if !reusable {
+		for _, field := range []string{"steps", "setup-steps", "pre-steps"} {
+			if _, exists := block.Fields[field]; exists {
+				additional = append(additional, aw.ExecutionStep{
+					Fields: map[string]any{"id": "ghes-host-config"},
+				})
+				break
+			}
+		}
+	}
 	for _, field := range []string{"setup-steps", "pre-steps"} {
 		raw := block.Fields[field]
 		if raw == nil {

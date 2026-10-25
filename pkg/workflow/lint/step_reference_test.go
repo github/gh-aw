@@ -153,7 +153,11 @@ func TestStepReferenceJobIsolation(t *testing.T) {
 func TestStepReferenceAuthoredScopes(t *testing.T) {
 	for _, tt := range []struct{ name, source, path string }{
 		{"custom job", "jobs: {check: {steps: [{run: '${{ steps.missing.outputs.value }}'}]}}", "jobs.check.steps[0].run"},
+		{"authored repo memory job name", "jobs: {push_repo_memory: {steps: [{run: '${{ steps.missing.outputs.value }}'}]}}", "jobs.push_repo_memory.steps[0].run"},
+		{"authored cache memory job name", "jobs: {update_cache_memory: {steps: [{run: '${{ steps.missing.outputs.value }}'}]}}", "jobs.update_cache_memory.steps[0].run"},
+		{"generated GHES host step", "jobs: {check: {steps: [{run: \"${{ steps['ghes-host-config'].outcome }}\"}]}}", ""},
 		{"safe job", "safe-jobs: {check: {steps: [{run: '${{ steps.missing.outputs.value }}'}]}}", "safe-jobs.check.steps[0].run"},
+		{"safe job metadata uses agent steps", "safe-jobs: {check: {description: '${{ steps.prepare.outputs.value }}', inputs: {value: {default: '${{ steps.prepare.outputs.value }}'}}}}", ""},
 		{"safe output job", "safe-outputs: {jobs: {check: {steps: [{run: '${{ steps.missing.outputs.value }}'}]}}}", "safe-outputs.jobs.check.steps[0].run"},
 		{"post step", "jobs: {check: {post-steps: [{if: steps.missing.outcome, run: echo check}]}}", "jobs.check.post-steps[0].if"},
 		{"post producer", "jobs: {check: {steps: [{run: '${{ steps.producer.outputs.value }}'}], post-steps: [{id: producer, run: echo check}]}}", ""},
@@ -193,6 +197,7 @@ func TestStepReferenceAuthoredSetupAndPreSteps(t *testing.T) {
 			{"producer", "    " + field + ": [{id: producer, run: echo setup}]\n" +
 				"    outputs: {value: '${{ steps.producer.outputs.value }}'}\n" +
 				"    steps: [{run: '${{ steps.producer.outputs.value }}'}]\n", ""},
+			{"generated GHES host step", "    " + field + ": [{run: \"${{ steps['ghes-host-config'].outcome }}\"}]\n", ""},
 			{"interpolation", "    " + field + ": [{run: '${{ steps.missing.outputs.value }}'}]\n", field + "[0].run"},
 			{"bare condition", "    " + field + ": [{if: steps.missing.outcome, run: echo setup}]\n", field + "[0].if"},
 			{"existing condition", "    " + field + ": [{if: steps.producer.outcome, run: echo setup}]\n" +
@@ -256,6 +261,20 @@ func TestStepReferenceTypedAndCompiledPrecedence(t *testing.T) {
 	after, err := json.Marshal(input)
 	require.NoError(t, err)
 	assert.Equal(t, string(before), string(after))
+}
+
+func TestStepReferenceCompiledGraphDoesNotAssumeAuthoredProducer(t *testing.T) {
+	input := Input{Workflow: &actions.Workflow{Jobs: []*actions.Job{{
+		ID: "check", RunsOn: "ubuntu-latest",
+		Outputs: map[actions.OutputName]actions.Expression{
+			"value": actions.Context("steps['ghes-host-config'].outcome"),
+		},
+		Steps: []actions.Step{actions.RunStep{Run: "echo check"}},
+	}}}}
+	found, err := StepReferenceRule().Check(context.Background(), input)
+	require.NoError(t, err)
+	require.Len(t, found, 1)
+	assert.Equal(t, "jobs.check.outputs.value", found[0].Path)
 }
 
 func TestStepReferenceInvalidAndCancelled(t *testing.T) {
