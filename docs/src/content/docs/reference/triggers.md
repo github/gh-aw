@@ -709,6 +709,8 @@ on:
 
 Sets the `environment` on the activation job for human-in-the-loop approval before execution. The value must match a configured environment in repository Settings → Environments (approval rules, required reviewers, wait timers). See [GitHub's environment documentation](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) for configuration details.
 
+This setting takes precedence over the top-level [`environment:`](/gh-aw/reference/frontmatter/#environment-protection-environment) for the activation job. Without `manual-approval`, activation inherits the top-level environment and its protection rules.
+
 ### Skip-If-Match Condition (`skip-if-match:`)
 
 Conditionally skip workflow execution when a GitHub search query has matches. Useful for preventing duplicate scheduled runs or waiting for prerequisites.
