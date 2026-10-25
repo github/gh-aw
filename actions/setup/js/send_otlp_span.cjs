@@ -2211,10 +2211,11 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const detectionReason = process.env.GH_AW_DETECTION_REASON || "";
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
-  const agentUsageFilePath = "/tmp/gh-aw/agent_usage.json";
+  const agentUsageFilePath = jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_usage.json" : "/tmp/gh-aw/agent_usage.json";
   const agentUsageRaw = readJSONIfExists(agentUsageFilePath);
   const agentUsageNormalized = normalizeRuntimeTokenUsage(agentUsageRaw);
-  const agentUsage = agentUsageNormalized || runtimeMetrics.tokenUsage || {};
+  // Detection uses its own counters and must not inherit usage from downloaded agent logs.
+  const agentUsage = jobName === "detection" ? (detectionConclusion === "skipped" ? {} : agentUsageNormalized || {}) : agentUsageNormalized || runtimeMetrics.tokenUsage || {};
   // Mark the span as an error when the agent job failed, timed out, or was cancelled.
   const isAgentTimedOut = agentConclusion === "timed_out";
   const isAgentFailure = agentConclusion === "failure" || isAgentTimedOut;

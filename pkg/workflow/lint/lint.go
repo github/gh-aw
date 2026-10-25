@@ -222,6 +222,7 @@ func Default() *Runner {
 		ActionPinRule(),
 		JobTimeoutRule(),
 		NeedsConsistencyRule(),
+		StepReferenceRule(),
 		TemplateInjectionRule(),
 		WorkflowRunScopeRule(),
 		PermissionScopeRule(),

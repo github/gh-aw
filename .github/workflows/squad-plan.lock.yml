@@ -1923,6 +1923,9 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
+      - name: Clear agent token usage
+        if: always()
+        run: rm -f /tmp/gh-aw/agent_usage.json
       - name: Checkout repository for patch context
         if: needs.agent.outputs.has_patch == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

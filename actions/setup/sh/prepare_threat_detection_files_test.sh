@@ -42,7 +42,6 @@ test_stages_detection_inputs() {
   printf 'ignored\n' >"${source_dir}/comment-memory/context.txt"
   printf 'patch\n' >"${source_dir}/aw-test.patch"
   printf 'bundle\n' >"${source_dir}/aw-test.bundle"
-  printf 'stale\n' >"${source_dir}/agent_usage.json"
 
   local output
   if ! output="$(bash "${PREPARE_SCRIPT}" "${source_dir}" "${detection_dir}" 2>&1)"; then
@@ -59,12 +58,6 @@ test_stages_detection_inputs() {
   assert_file_content "copies markdown comment memory" "${detection_dir}/comment-memory/context.md" "memory"
   assert_file_content "copies patch artifact" "${detection_dir}/aw-test.patch" "patch"
   assert_file_content "copies bundle artifact" "${detection_dir}/aw-test.bundle" "bundle"
-
-  if [ -e "${source_dir}/agent_usage.json" ]; then
-    fail "removes stale agent usage" "agent_usage.json still exists"
-  else
-    pass "removes stale agent usage"
-  fi
 
   if [ -e "${detection_dir}/comment-memory/context.txt" ]; then
     fail "ignores non-markdown comment memory" "context.txt was copied"

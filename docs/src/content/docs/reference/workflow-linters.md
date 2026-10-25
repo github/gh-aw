@@ -14,6 +14,7 @@ The compiler threat IDs reference the [Compiler Threat Detection Specification](
 | `action-pin` | `CTR-002` | AW, Actions | All action and reusable-workflow references are well-formed literals without expressions, control characters, or whitespace. Remote references use full commit SHAs; Docker actions use digests. Local paths are exempt from immutable pinning, not format validation. |
 | `job-timeout` | `CTR-026` | AW, Actions | An explicit workflow/job timeout is a positive integer literal, not an expression. Omission is allowed. |
 | `needs-consistency` | — | AW, Actions | Dependencies name existing jobs without self-edges or cycles. Literal `needs` accesses name direct dependencies and declared job outputs; prompt references must be available during activation. Ordering-only dependencies are valid. |
+| `step-reference` | — | AW, Actions | Literal `steps` accesses name a step ID declared in the same job. Checks expressions, including bare `if` conditions, without requiring output declarations or step ordering. |
 | `template-injection` | `CTR-006` | AW, Actions | Known attacker-controlled expressions are not interpolated into executable `run` or `actions/github-script` code. Use environment bindings and quoted shell expansions or `process.env` instead. |
 | `workflow-run-scope` | `CTR-021` | AW, Actions | `workflow_run` selects workflows and has a positive branch scope, not just wildcard, negated-only, or empty branch filters. |
 | `secret-leak` | `CTR-017` | AW, Actions | Symbolic secrets do not reach modeled disclosure sinks. AW-only checks report missing generated execution coverage. |
@@ -94,6 +95,12 @@ sandbox:
 ```
 
 The compiler rejects `network.firewall` regardless of its SSL setting. Remove that legacy block and use `network.allowed` for domain policy; do not add `network.firewall.ssl-bump` as a remedy.
+
+### Step references
+
+`step-reference` reports warnings in either strict mode when expressions reference a missing step in the same job, including job outputs and step `if`, `with`, `env`, and `run` fields. It catches dangling reporting-step references such as those fixed in [#71898](https://github.com/github/gh-aw/pull/71898). Dot and literal bracket accesses are case-insensitive. Quoted expression text, whole-context reads, wildcard projections, and dynamic indexes do not select a known step ID; literal references nested inside computed indexes are still checked. Output names are not validated because external actions can provide arbitrary outputs. This rule does not validate context availability or execution ordering.
+
+The compiled Actions graph is authoritative when supplied. AW-only analysis checks complete explicit custom `jobs`, `safe-jobs`, and `safe-outputs.jobs` scopes, including post-steps and custom job setup/pre-steps. Root steps, `safe-outputs` steps, compiler-owned job overrides, and jobs with `restore-memory` defer to the compiled graph. Unresolved AW imports or dynamic step IDs also defer missing-step checks because they may supply producers not visible in authored source.
 
 ### Needs consistency
 

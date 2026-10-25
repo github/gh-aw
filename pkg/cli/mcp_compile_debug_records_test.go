@@ -29,7 +29,7 @@ func TestMCPCompileDebugRecordsReplayIncomplete(t *testing.T) {
 				}
 				diagnostics.finishLine()
 				assert.True(t, strings.HasPrefix(diagnostics.failureMessage(errors.New("exit status 1")),
-					"✗ real compile error\nremediation steps"))
+					"| ✗ real compile error\n| remediation steps"))
 				assert.Empty(t, diagnostics.debugLines)
 				assert.Zero(t, diagnostics.debugBytes)
 			})
@@ -141,7 +141,7 @@ func TestMCPCompileDebugRecordsBoundProvisionalBuffer(t *testing.T) {
 			_, err = diagnostics.Write([]byte("✗ real error\n  remediation\n"))
 			require.NoError(t, err)
 			diagnostics.finishLine()
-			assert.True(t, strings.HasPrefix(diagnostics.failureMessage(errors.New("exit status 1")), "✗ real error\nremediation"))
+			assert.True(t, strings.HasPrefix(diagnostics.failureMessage(errors.New("exit status 1")), "| ✗ real error\n| remediation"))
 			assert.Empty(t, diagnostics.debugLines)
 		})
 	}
