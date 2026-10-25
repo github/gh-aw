@@ -55,6 +55,8 @@ type Input struct {
 	// AllowActionRefs permits well-formed mutable references as warnings.
 	// Malformed references remain errors regardless of this compiler allowance.
 	AllowActionRefs bool
+	// SafeOutputJobs includes imported integration jobs resolved by the compiler.
+	SafeOutputJobs []string
 }
 
 type Diagnostic struct {

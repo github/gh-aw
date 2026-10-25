@@ -70,6 +70,9 @@ type Rule struct {
 	ActionSources      func(uses string) []string
 	JavaScript         *JavaScriptOptions
 	IsJavaScriptFilter func(*JavaScriptNode) bool
+	// SafeOutputJobs identifies compiled third-party integration jobs from
+	// compiler provenance, not job-name heuristics.
+	SafeOutputJobs []string
 }
 
 type value []Source
@@ -128,6 +131,7 @@ type analyzer struct {
 	promptScope   scope
 	failure       error
 	literalScript bool
+	safeOutputJob bool
 }
 
 func (a *analyzer) emit(site Site, sources value) {

@@ -111,7 +111,7 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		a.gap(path, "working directory could not be modeled")
 		s.workingDirectory = ""
 	}
-	tree, parseErr := syntax.NewParser(syntax.KeepComments(true)).Parse(strings.NewReader(rendered), "")
+	tree, parseErr := syntax.NewParser().Parse(strings.NewReader(rendered), "")
 	if parseErr != nil {
 		a.gap(path, "shell syntax could not be analyzed")
 		return nil, nil, nil

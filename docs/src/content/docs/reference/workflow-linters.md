@@ -176,7 +176,7 @@ job; microVM isolation is future work.
 
 ## Secret-flow analysis
 
-The `secret-leak` rule tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs/bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values; formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize subsequent uses.
+The `secret-leak` rule tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs/bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, credential-bearing destinations in [safe-output integration jobs](#credential-bearing-webhook-endpoints), and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values; formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize subsequent uses.
 
 In Bash/sh, recognized `test`/`[` string and file predicates and the `:`, `true`, and `false` builtins do not disclose their arguments. Presence-only alternate expansions such as `${TOKEN:+present}` do not contain the token, but secret-bearing replacements remain tainted. Nested command disclosures, parameter-expansion error messages, and `set -x` output are still checked. Numeric comparisons, malformed tests, and potentially word-splitting predicates retain coverage warnings because their error diagnostics can expose operands.
 
@@ -184,22 +184,29 @@ Unknown file reads produce secret-flow coverage warnings when they could select 
 
 ### Credential-bearing webhook endpoints
 
-An opaque secret URL remains a disclosure by default: neither a `WEBHOOK`/`SLACK` name nor the destination argument role proves that it is an authentication endpoint. A script can explicitly declare that a direct step-local secret binding contains a complete, approved credential-bearing endpoint:
+Safe-output jobs are declared third-party integration boundaries. In `safe-outputs.jobs` (including imported jobs and legacy `safe-jobs`), a directly secret-bound endpoint used as a complete curl destination is treated as credential consumption without a comment or separate opt-in:
 
-```yaml wrap
-- env:
-    DESTINATION: ${{ secrets.PRIVATE_NOTIFICATION_ENDPOINT }}
-  run: |
-    # gh-aw: authenticated-endpoint DESTINATION
-    jq -c '{text: .summary}' "$GH_AW_AGENT_OUTPUT" |
-      curl --fail -sS -H 'Content-Type: application/json' --data @- "$DESTINATION"
+```aw wrap
+safe-outputs:
+  jobs:
+    notify:
+      description: Send a private notification to an external service
+      runs-on: ubuntu-latest
+      max: 1
+      permissions: {}
+      steps:
+        - env:
+            DESTINATION: ${{ secrets.PRIVATE_NOTIFICATION_ENDPOINT }}
+          run: |
+            jq -c '{text: .summary}' "$GH_AW_AGENT_OUTPUT" |
+              curl --fail -sS -H 'Content-Type: application/json' --data @- "$DESTINATION"
 ```
 
-The comment is an author assertion about the secret's purpose, not verification of its value, host, protocol, or recipient. It applies only within that script, only to an unchanged direct `${{ secrets.NAME }}` step-env binding, and only when `"$DESTINATION"` or `"${DESTINATION}"` is the entire, single `curl` destination (positional or following `--url`). Aliases, composed expressions, URL suffixes, unquoted expansions, and script mutations do not qualify. Scripts using dynamic shell execution, sourced helpers, or other unmodeled environment mutation cannot establish this contract.
+The integration declaration establishes intended credential use, not verification of the secret's value, host, protocol, or recipient. The exemption applies only to an unchanged direct `${{ secrets.NAME }}` step-env binding, and only when `"$DESTINATION"` or `"${DESTINATION}"` is the entire, single `curl` destination (positional or following `--url`). Aliases, composed expressions, URL suffixes, unquoted expansions, and script mutations do not qualify. Dynamic shell execution, sourced helpers, or other unmodeled environment mutation prevent endpoint recognition.
 
-Accepted value-taking options are `-H`/`--header`, `-u`/`--user`, `--oauth2-bearer`, `-d`/`--data`, `--data-binary`, `--data-urlencode`, `--json`, `-F`/`--form`, and `-T`/`--upload-file`, including long `--option=value` forms. Accepted literal flags are `--fail`, `--silent`, `--show-error`, `-f`, `-s`, `-S`, `-sS`, `-fsS`, `-q`, and `--disable`. Redirects, proxies, config/trace options, URL rewriting, multiple destinations, other clients, and unknown options retain the endpoint finding. Shell declarations and arithmetic conservatively disable the contract. This finite grammar does not inspect implicit curl configuration or establish runtime network isolation; the author remains responsible for both.
+Accepted value-taking options are `-H`/`--header`, `-u`/`--user`, `--oauth2-bearer`, `-d`/`--data`, `--data-binary`, `--data-urlencode`, `--json`, `-F`/`--form`, and `-T`/`--upload-file`, including long `--option=value` forms. Accepted literal flags are `--fail`, `--silent`, `--show-error`, `-f`, `-s`, `-S`, `-sS`, `-fsS`, `-q`, and `--disable`. Redirects, proxies, config/trace options, URL rewriting, multiple destinations, other clients, and unknown options retain the endpoint finding. Shell declarations and arithmetic conservatively disable endpoint recognition. This finite grammar does not inspect implicit curl configuration or establish runtime network isolation; the author remains responsible for both.
 
-The binding remains secret-tainted everywhere else. Payloads, stdin, tracked uploads, non-authentication headers, logs, and xtrace are still checked, including use of the endpoint credential itself as payload or inside another destination's path/query. No source changes are required for ordinary authentication headers/options; opaque webhook URLs require this explicit opt-in.
+This does not disable secret-leak lint for the job. The binding remains secret-tainted everywhere else: payloads, stdin, tracked uploads, non-authentication headers, logs, and xtrace are still checked, including use of the endpoint credential itself as payload or inside another destination's path/query. Ordinary jobs and native Actions inputs without AW integration provenance retain opaque secret URL findings; neither job/secret names nor comments grant an exemption. Compiler analysis includes imported safe-output jobs. Standalone lint can identify declarations in the supplied AW source or companion Markdown but does not resolve imports.
 
 ### Scope and limitations
 

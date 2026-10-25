@@ -8,25 +8,17 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// Endpoint contracts describe credential consumption at a sink, not sanitization.
+// Safe-output jobs consume endpoint credentials at a sink, without sanitization.
 // Only direct step-env secret bindings that the script never mutates qualify.
 func (s *shell) endpointContracts(tree *syntax.File, fields map[string]any) map[string]struct{} {
 	endpoints := make(map[string]struct{})
-	syntax.Walk(tree, func(node syntax.Node) bool {
-		if comment, ok := node.(*syntax.Comment); ok {
-			if name, found := strings.CutPrefix(strings.TrimSpace(comment.Text), "gh-aw: authenticated-endpoint "); found {
-				endpoints[strings.TrimSpace(name)] = struct{}{}
-			}
-		}
-		return true
-	})
 	env, ok := fields["env"].(map[string]any)
-	if len(endpoints) == 0 || !ok {
+	if !s.a.safeOutputJob || !ok {
 		return nil
 	}
-	for name := range endpoints {
-		if !s.directEndpointBinding(name, env) {
-			delete(endpoints, name)
+	for name := range env {
+		if s.directEndpointBinding(name, env) {
+			endpoints[name] = struct{}{}
 		}
 	}
 	syntax.Walk(tree, func(node syntax.Node) bool {
