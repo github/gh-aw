@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.71
+**Version**: 1.0.72
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.72` | Unreleased | Adds a separate compiler-only `artipacked` exception for agent checkouts immediately followed by exact compiler-owned cleanup and credential verification. Requires current-compilation provenance and unique full-block matching; runtime authentication and standalone lint remain unchanged. |
 | `1.0.71` | Unreleased | Specifies the compiler-only `artipacked` warning exception for the exact generated safe-output PR checkout/authentication block, with per-compilation provenance and unchanged standalone lint and runtime authentication. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.70` | Unreleased | Requires generated admission-output references to follow effective admission enablement, including component execution and conclusion usage metadata. Regeneration removes disabled-admission references; no new threat identifier, permission grant, lint exception, or lock-file schema change. |
 | `1.0.69` | Unreleased | Restores CTR-005's `detection-gate: status-only` syntax and adds bounded TLA+ coverage for the validated continuation exception. No new threat identifier, permission grant, or lock-file schema change. |
@@ -352,6 +353,8 @@ During compilation only, the compiler MAY suppress warning-level `artipacked` di
 The exception MUST NOT suppress authored steps outside that block, steps in other jobs, other rules, error findings, or analysis failures. Standalone `gh aw lint` MUST retain its normal `artipacked` diagnostics, including for compiled lock files, because it has no compiler-local provenance. The exception does not change checkout credential persistence, token selection, per-checkout authentication, cleanup, permissions, or runtime authorization, and adds no `CTR-*` rule.
 
 Implementation: `pkg/workflow/compiler_lint_checkouts.go` and `compiler_lint.go`, with provenance captured in `compiler_safe_outputs_steps.go` and reset in `compiler_yaml.go`. Evidence: `TestCompilerLintRetainedCheckoutException` covers generated steps, authored steps before/after the block, other jobs, absent provenance, modified blocks, ambiguous copies, and unchanged standalone rule findings; `TestCompilerLintRetainedMultiRepoCheckouts` covers distinct checkout tokens and retained credentials; `TestCompilerLintGeneratedPRCheckoutSteps` covers compiler integration and provenance reset on reuse. Standalone checkout-policy regressions remain in `pkg/workflow/lint/zizmor_regression_test.go`.
+
+Separately, compilation MAY suppress warning-level `artipacked` findings for literal credential-retaining agent checkouts immediately followed by the compiler's exact cleanup-and-verification step. The compiler MUST capture the emitted checkout block separately from authored steps, require a unique full-block parsed-field match in `agent`, and reset this provenance for each compilation. The immediately following step MUST exactly match `generateCheckoutCredentialsCleanupStep`, including both cleanup and fail-closed credential verification; intervening steps, altered commands, conditions, or error-handling overrides MUST NOT qualify. Names alone and authored copies without compiler-local provenance MUST NOT qualify. This exception MUST NOT change standalone lint, other findings, runtime YAML, or per-checkout credentials. Implementation: `compiler_lint_checkout_cleanup.go`, with capture in `compiler_yaml_checkout.go`; evidence: `TestCompilerLintVerifiedCheckoutCleanup`, `TestCompilerLintVerifiedCleanupMultiRepo`, `TestCompilerLintGeneratedCheckoutCleanup`, and `TestCompilerLintCheckoutCleanupProvenanceErrors`.
 
 Source-only checks accept an AW AST independently or as a companion and skip native Actions without that evidence. They inspect authored frontmatter only; they do not recursively load imports or reconstruct compiler/CLI policy overrides. Version-check, private-to-public, install-scripts, and network-scope findings follow authored strict policy; conditional imports and bare allowed-label wildcards are always errors. Blanket write grants follow the same authored strict policy, while invalid OIDC read grants are always errors. Push-target findings remain warnings regardless of strict mode and defer when imports may supply constraints. Explicit domain allowances mixed with `defaults` do not hide a bare wildcard from network-scope, unlike the compiler's existing early-default acceptance.
 
