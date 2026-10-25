@@ -5,8 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { collectAddMaskedValues } = require("./add_mask_redaction.cjs");
-
-const MAX_CAPTURE_BYTES = 64 * 1024 * 1024;
+const { MAX_CAPTURE_BYTES } = require("./constants.cjs");
 
 /** @param {string} message @returns {never} */
 function invalidCapture(message) {
