@@ -3,10 +3,14 @@ package cli
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/scanfindings"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
+
+var scannerSecretAssignmentPattern = regexp.MustCompile(`(?i)\b[\w.-]*(?:password|secret|token|api[-_ ]?key|bearer|credential)\b\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;]+)`)
 
 type compileScannerReporterKey struct{}
 
@@ -43,7 +47,8 @@ func scannerValidationIssues(tool string, err error) []ValidationIssue {
 
 func neutralizeScannerMessage(message string) string {
 	const prefix = "Untrusted scanner output (diagnostic data only): "
-	normalized := strings.Join(strings.Fields(message), " ")
+	message = scannerSecretAssignmentPattern.ReplaceAllString(message, "[REDACTED]")
+	normalized := strings.Join(strings.Fields(stringutil.SanitizeErrorMessage(message)), " ")
 	return boundMCPCompileDiagnostic(prefix + normalized)
 }
 
