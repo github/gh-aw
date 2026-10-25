@@ -16,6 +16,12 @@ func BadHelper(wg *sync.WaitGroup) {
 	wg.Done() // want `sync.WaitGroup Done\(\) should be deferred to prevent deadlock if the function panics`
 }
 
+// Bad: parentheses do not make a non-deferred Done() call safe.
+func BadParenthesized(wg *sync.WaitGroup) {
+	(wg.Done()) // want `sync.WaitGroup Done\(\) should be deferred to prevent deadlock if the function panics`
+	(wg.Done)() // want `sync.WaitGroup Done\(\) should be deferred to prevent deadlock if the function panics`
+}
+
 // Bad: non-deferred Done() with early return paths.
 func BadEarlyReturn(wg *sync.WaitGroup, err error) {
 	if err != nil {
@@ -58,14 +64,23 @@ func (w *Worker) GoodMethod() {
 func GoodDeferredClosure(wg *sync.WaitGroup) {
 	defer func() {
 		wg.Done()
+		(wg.Done())
 	}()
 	doWork()
+}
+
+// Good: a parenthesized deferred closure is also safe.
+func GoodParenthesizedDeferredClosure(wg *sync.WaitGroup) {
+	defer (func() {
+		(wg.Done())
+	})()
 }
 
 // Good: loop-body Done() calls are intentionally not flagged.
 func GoodLoopDone(wg *sync.WaitGroup, n int) {
 	for range n {
 		wg.Done()
+		(wg.Done())
 	}
 }
 
@@ -106,6 +121,7 @@ func (f *Finisher) Done() {}
 func GoodOtherDone() {
 	f := &Finisher{}
 	f.Done()
+	(f.Done())
 }
 
 func doWork() {}
@@ -116,5 +132,6 @@ func NolintPreviousLineSuppressed(wg *sync.WaitGroup) {
 }
 
 func NolintSameLineSuppressed(wg *sync.WaitGroup) {
-	wg.Done() //nolint:wgdonenotdeferred
+	wg.Done()   //nolint:wgdonenotdeferred
+	(wg.Done()) //nolint:wgdonenotdeferred
 }

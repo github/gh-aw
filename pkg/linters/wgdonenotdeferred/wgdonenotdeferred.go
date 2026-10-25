@@ -11,6 +11,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/github/gh-aw/pkg/linters/internal/analyzerutil"
+	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
 	"github.com/github/gh-aw/pkg/logger"
@@ -59,7 +60,7 @@ func inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *a
 			// A deferred function literal is already deferred; its body should not
 			// be analyzed as non-deferred Done() calls.
 			if deferStmt.Call != nil {
-				if _, ok := deferStmt.Call.Fun.(*ast.FuncLit); ok {
+				if _, ok := astutil.UnwrapParenExpr(deferStmt.Call.Fun).(*ast.FuncLit); ok {
 					return false
 				}
 			}
@@ -67,8 +68,8 @@ func inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *a
 
 		inLoop := false
 	loopSearch:
-		for i := range slices.Backward(stack) {
-			switch stack[i].(type) {
+		for _, ancestor := range slices.Backward(stack) {
+			switch ancestor.(type) {
 			case *ast.FuncLit:
 				break loopSearch
 			case *ast.ForStmt, *ast.RangeStmt:
@@ -83,7 +84,7 @@ func inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *a
 			// A deferred call appears as a DeferStmt, not an ExprStmt, so checking for
 			// ExprStmt naturally excludes deferred calls.
 			if exprStmt, ok := node.(*ast.ExprStmt); ok {
-				if call, ok := exprStmt.X.(*ast.CallExpr); ok {
+				if call, ok := astutil.UnwrapParenExpr(exprStmt.X).(*ast.CallExpr); ok {
 					if isWaitGroupDone(pass, call) {
 						pos := pass.Fset.PositionFor(call.Pos(), false)
 						if !nolint.HasDirectiveForLinter(pos, noLintIndex, "wgdonenotdeferred") {
@@ -102,7 +103,7 @@ func inspectBody(pass *analysis.Pass, noLintIndex nolint.DirectiveIndex, body *a
 }
 
 func isWaitGroupDone(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Done" {
 		return false
 	}
