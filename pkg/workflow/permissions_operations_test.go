@@ -171,6 +171,86 @@ func TestPermissionsSetPreservesShorthandPermissions(t *testing.T) {
 	}
 }
 
+func TestPermissionsScopeExpansion(t *testing.T) {
+	shorthands := map[PermissionLevel]string{
+		PermissionRead:  "read-all",
+		PermissionWrite: "write-all",
+		PermissionNone:  "none",
+	}
+	operations := []struct {
+		name   string
+		expand func(*Permissions, PermissionLevel)
+	}{
+		{"set shorthand", func(p *Permissions, level PermissionLevel) {
+			p.shorthand = shorthands[level]
+			p.Set(PermissionCopilotRequests, PermissionWrite)
+		}},
+		{"set all", func(p *Permissions, level PermissionLevel) {
+			p.hasAll, p.allLevel = true, level
+			p.Set(PermissionCopilotRequests, PermissionWrite)
+		}},
+		{"merge receiver all", func(p *Permissions, level PermissionLevel) {
+			p.hasAll, p.allLevel = true, level
+			p.Merge(NewPermissions())
+		}},
+		{"merge other all", func(p *Permissions, level PermissionLevel) {
+			p.Merge(&Permissions{hasAll: true, allLevel: level})
+		}},
+		{"merge other shorthand", func(p *Permissions, level PermissionLevel) {
+			p.Merge(&Permissions{shorthand: shorthands[level]})
+		}},
+	}
+
+	for _, operation := range operations {
+		for _, level := range []PermissionLevel{PermissionRead, PermissionWrite, PermissionNone} {
+			t.Run(operation.name+"/"+string(level), func(t *testing.T) {
+				p := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+					PermissionContents: PermissionNone,
+					PermissionIssues:   PermissionWrite,
+				})
+				operation.expand(p, level)
+
+				if p.shorthand != "" || p.hasAll || p.allLevel != "" {
+					t.Errorf("expected explicit permissions, got shorthand=%q hasAll=%v allLevel=%q", p.shorthand, p.hasAll, p.allLevel)
+				}
+				for _, scope := range GetAllPermissionScopes() {
+					want, wantExists := level, true
+					switch scope {
+					case PermissionContents:
+						if operation.name != "merge other all" {
+							want = PermissionNone
+						}
+					case PermissionIssues:
+						want = PermissionWrite
+					default:
+						if (scope == PermissionIdToken && level == PermissionRead) ||
+							(operation.name == "merge other shorthand" && level == PermissionNone) {
+							want, wantExists = "", false
+						}
+					}
+					if got, exists := p.GetExplicit(scope); got != want || exists != wantExists {
+						t.Errorf("%s: got %q (exists=%v), want %q (exists=%v)", scope, got, exists, want, wantExists)
+					}
+				}
+			})
+		}
+	}
+
+	t.Run("preserve explicit id-token during read expansion", func(t *testing.T) {
+		for _, operation := range operations {
+			t.Run(operation.name, func(t *testing.T) {
+				p := NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+					PermissionIdToken: PermissionWrite,
+				})
+				operation.expand(p, PermissionRead)
+				if got, exists := p.GetExplicit(PermissionIdToken); !exists || got != PermissionWrite {
+					t.Errorf("expected explicit id-token: write, got %q (exists=%v)", got, exists)
+				}
+			})
+		}
+	})
+}
+
 func TestPermissionsGet(t *testing.T) {
 	tests := []struct {
 		name        string
