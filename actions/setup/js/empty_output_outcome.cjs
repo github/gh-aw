@@ -4,7 +4,7 @@ const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
 const { collectUnifiedSession } = require("./unified_session.cjs");
-const { agentErrorSummaryText, collectAgentErrorEvidence } = require("./agent_execution.cjs");
+const { agentErrorSummaryText, collectAgentErrorEvidence, DRIVER_STDERR_RECORD_PATTERN, DRIVER_STDERR_SUMMARIES } = require("./agent_execution.cjs");
 const { crashSignalNameForExitCode } = require("./harness_crash_signals.cjs");
 const { sessionContext, isNestedSessionEvent } = require("./agent_session.cjs");
 const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
@@ -319,9 +319,17 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   if (engineSummary) diagnostics.add(engineSummary);
   const driverExitSignal = crashSignalNameForExitCode(driverExitCode) ?? ({ 130: "SIGINT", 137: "SIGKILL", 143: "SIGTERM" }[driverExitCode] || undefined);
   let driverStderrSummary = "";
+  let capturedStderrSummary = "";
   let unhandledDriverError = false;
   if (!agentNotStarted && driverExitCode > 0) {
     const evidence = collectAgentErrorEvidence(safeStdio, events, rawSourceEngine);
+    const lastCapture = evidence.diagnostics
+      .map(line => line.match(DRIVER_STDERR_RECORD_PATTERN))
+      .filter(Boolean)
+      .at(-1);
+    if (lastCapture && Number(lastCapture[1]) === driverExitCode && Object.hasOwn(DRIVER_STDERR_SUMMARIES, lastCapture[2])) {
+      capturedStderrSummary = DRIVER_STDERR_SUMMARIES[lastCapture[2]];
+    }
     for (const line of evidence.diagnostics.slice().reverse()) {
       driverStderrSummary = agentErrorSummaryText(line, [], rawSourceEngine);
       if (!driverStderrSummary && /^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) {
@@ -335,6 +343,9 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   }
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
   const errorCodes = executionErrorCodes.filter(code => Number.isSafeInteger(code) && code >= 400 && code <= 599);
+  const driverExitMeaning =
+    { 1: "General failure", 2: "Invalid usage (conventional; engine-specific)", 124: "Command timed out (timeout utility convention)", 126: "Command is not executable", 127: "Command not found" }[driverExitCode] ||
+    (driverExitSignal ? `Terminated by ${driverExitSignal} (128 + signal number)` : "Unknown (engine-specific exit code)");
   const isPromptExhaustion = executionCategories.some(category => PROMPT_EXHAUSTION_ERROR_CATEGORIES.has(category));
   const isRequestRejection =
     contentFiltered || ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) || executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) || errorCodes.some(code => code >= 400 && code < 500);
@@ -393,7 +404,9 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
             ? `Driver exit code: ${driverExitCode ?? "not recorded"}. The engine driver exited before a terminal safe output was recorded.`
             : `Driver exit code: ${driverExitCode ?? "not recorded"}`,
           ...(driverExitSignal ? [`Driver exit signal (inferred from exit code): ${driverExitSignal}`] : []),
-          ...(driverExitCode > 0 ? [`Last driver stderr summary: ${driverStderrSummary || "not recorded (no classified stderr diagnostic)"}`] : []),
+          ...(driverExitCode > 0
+            ? [`Driver exit meaning: ${driverExitMeaning}`, `Last driver stderr summary: ${capturedStderrSummary || driverStderrSummary || (stdio.trim() ? "not recorded (no classified stderr diagnostic)" : "no output captured")}`]
+            : []),
           `Last tool call status: ${lastToolCallStatus}`,
           ...(lastToolExitCode !== undefined ? [`Last tool exit code: ${lastToolExitCode}`] : []),
           `Failed tool calls observed: ${failedToolCalls}`,

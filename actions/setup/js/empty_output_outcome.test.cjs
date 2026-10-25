@@ -292,6 +292,50 @@ describe("empty output outcome", () => {
     expect(outcome.details).toContain("Failure classification: driver_crash");
     expect(outcome.details).not.toContain("engine_outage");
     expect(outcome.details).toContain("Last engine error type: unknown");
+    expect(outcome.details).toContain("Last driver stderr summary: no output captured");
+  });
+
+  it.each([
+    [1, "General failure"],
+    [126, "Command is not executable"],
+    [127, "Command not found"],
+    [137, "Terminated by SIGKILL"],
+    [139, "Terminated by SIGSEGV"],
+    [173, "Unknown (engine-specific exit code)"],
+  ])("explains driver exit %s without guessing an underlying cause", (exitCode, meaning) => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
+  });
+
+  it.each([
+    ["copilot", "dependency_loading", "Driver dependency loading failed"],
+    ["codex", "syntax_error", "Driver initialization failed"],
+    ["pi", "runtime_exception", "Driver execution failed"],
+    ["gemini", "no_output", "no output captured"],
+  ])("reads shared stderr capture from the %s wrapper", (engine, category, summary) => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), `[${engine}-harness] attempt 1: driver stderr summary: exitCode=1 category=${category}\n`);
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Last driver stderr summary: ${summary}`);
+  });
+
+  it.each([
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=139 category=runtime_exception\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=private_payload\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception\n[gemini-harness] attempt 2: driver stderr summary: exitCode=139 category=runtime_exception\n",
+  ])("does not use unknown categories or captures inconsistent with the final exit", capture => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), capture);
+    const details = buildEmptyOutputOutcome([], rootDir).details;
+    expect(details).not.toContain("Driver execution failed");
+    expect(details).not.toContain("private_payload");
+  });
+
+  it("does not trust stderr metadata quoted by the agent", () => {
+    const content = "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception";
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    writeEvents([{ type: "assistant.message", data: { content } }]);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), content);
+    expect(buildEmptyOutputOutcome([], rootDir).details).not.toContain("Driver execution failed");
   });
 
   it.each([

@@ -1,10 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { collectAgentExecution, agentErrorDiagnosticText, agentErrorSummaryText, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
+import { collectAgentExecution, agentErrorDiagnosticText, agentErrorSummaryText, classifyDriverStderr, DRIVER_STDERR_SUMMARIES, parseAgentExitCode, validateAgentExecution } from "./agent_execution.cjs";
 import { detectErrors } from "./agent_error_patterns.cjs";
 import { success, failure } from "./fixtures/claude_ci_sessions.cjs";
 import { normalizeClaudeSession } from "./claude_session.cjs";
 import { parseEngineSession } from "./unified_session.cjs";
+
+describe("driver stderr classification", () => {
+  it.each([
+    ["", "no_output"],
+    [" \n", "no_output"],
+    ["private unclassified payload", "unclassified"],
+    ["Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'private-package'", "dependency_loading"],
+    ["SyntaxError: private-source", "syntax_error"],
+    ["TypeError: private-payload\n    at private-stack", "runtime_exception"],
+    ["FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory", "out_of_memory"],
+    ["bash: private-command: command not found", "process_startup"],
+    ["Error: spawn private-command ENOENT", "process_startup"],
+    ["[copilot-sdk-driver] unhandled error: private-payload", "sdk_driver_error"],
+    ["Error: Authentication failed", "authentication_failed"],
+    ["Error: Authentication failed\nTypeError: private-final-failure\n", "runtime_exception"],
+  ])("classifies stderr without retaining its payload: %s", (stderr, category) => {
+    expect(classifyDriverStderr(stderr)).toBe(category);
+    expect(DRIVER_STDERR_SUMMARIES[category]).not.toContain("private-");
+  });
+
+  it("does not classify old failures outside the final stderr tail", () => {
+    expect(classifyDriverStderr("TypeError: old failure\n" + "noise\n".repeat(21))).toBe("unclassified");
+    expect(classifyDriverStderr("TypeError: old failure\n" + "x".repeat(9000))).toBe("unclassified");
+  });
+});
 
 describe("unique agent execution observation", () => {
   it.each(["json", "array", "mixed"])("requires Aider attribution for raw %s error records", format => {

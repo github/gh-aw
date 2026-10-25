@@ -337,6 +337,7 @@ describe("process_runner.cjs", () => {
       });
       expect(result.hasOutput).toBe(true);
       expect(result.output).toContain("hello stderr");
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified");
     });
 
     it("sets hasOutput false when no output is produced", async () => {
@@ -349,6 +350,7 @@ describe("process_runner.cjs", () => {
       });
       expect(result.hasOutput).toBe(false);
       expect(result.output).toBe("");
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=no_output");
     });
 
     it("logs spawning with logArgs instead of args when provided", async () => {

@@ -5992,6 +5992,35 @@ describe("handle_agent_failure", () => {
 
   describe("buildReportIncompleteContext", () => {
     it.each([
+      ["TypeError: private-driver-payload\n", 1, "Driver execution failed (unhandled JavaScript exception)", "General failure"],
+      ["", 127, "no output captured", "Command not found"],
+    ])("renders classified stderr from the shared driver wrapper in failure reports", async (stderr, exitCode, summary, meaning) => {
+      const { runProcess } = require("./process_runner.cjs");
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const rootDir = mkdtempSync(join(require("os").tmpdir(), "failure-driver-stderr-"));
+      const logs = [];
+      try {
+        const result = await runProcess({
+          command: process.execPath,
+          args: ["-e", `process.stderr.write(${JSON.stringify(stderr)}); process.exit(${exitCode})`],
+          logArgs: ["<test-driver>"],
+          attempt: 0,
+          log: message => logs.push(`[gemini-harness] ${message}`),
+        });
+        writeFileSync(join(rootDir, "agent_execution_exit_code.txt"), String(result.exitCode));
+        writeFileSync(join(rootDir, "agent-stdio.log"), logs.join("\n"));
+        const outcome = buildEmptyOutputOutcome([], rootDir);
+        const report = buildReportIncompleteContext([outcome], { collectorEmptyOutputCause: outcome.reason, rootDir });
+        expect(report).toContain("Failure classification: driver_crash");
+        expect(report).toContain(`Last driver stderr summary: ${summary}`);
+        expect(report).toContain(`Driver exit meaning: ${meaning}`);
+        expect(report).not.toContain("private-driver-payload");
+      } finally {
+        rmSync(rootDir, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
       [1, [], [], "driver_crash"],
       [137, [], [], "driver_crash"],
       [139, [], [], "driver_crash"],

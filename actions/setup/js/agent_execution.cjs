@@ -69,6 +69,7 @@ function recordErrors(record) {
 
 /** @param {string} line @returns {boolean} */
 function isAgentDiagnosticLine(line) {
+  if (DRIVER_STDERR_RECORD_PATTERN.test(line)) return true;
   if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:)/.test(line);
   if (/^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) return true;
   if (/^\[gh-aw\/pi-provider\]\s+\S+\s+provider_error\b/.test(line)) return true;
@@ -166,7 +167,7 @@ function collectAgentErrorEvidence(content, events = [], rawSourceEngine) {
     }
     if (conversationLines.has(conversationKey(line))) continue;
     if (entry.type === "invalid") {
-      const runtimeLine = /^\[(?:(?:copilot|claude|codex)-harness|copilot-sdk-driver|sdk-driver|gh-aw\/pi-provider|ERROR)\]/.test(line) || /^\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+/.test(line);
+      const runtimeLine = DRIVER_STDERR_RECORD_PATTERN.test(line) || /^\[(?:(?:copilot|claude|codex)-harness|copilot-sdk-driver|sdk-driver|gh-aw\/pi-provider|ERROR)\]/.test(line) || /^\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+/.test(line);
       if (runtimeLine) transcriptBlock = false;
       if (!transcriptBlock && isAgentDiagnosticLine(line)) {
         diagnostics.push(line);
@@ -219,6 +220,39 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
   goal_already_active: "Session already has an active goal",
   sandbox_runtime_crash: "Sandbox runtime crashed",
 });
+
+const DRIVER_STDERR_RECORD_PATTERN = /^\[[a-z][a-z0-9-]*-harness\] attempt \d+: driver stderr summary: exitCode=(\d{1,3}) category=([a-z_]+)$/;
+const DRIVER_STDERR_SUMMARIES = Object.freeze({
+  ...Object.fromEntries(Object.entries(ENGINE_ERROR_SUMMARIES).map(([category, summary]) => [category, `Engine request/execution: ${summary} (${category})`])),
+  no_output: "no output captured",
+  dependency_loading: "Driver dependency loading failed (module not found)",
+  syntax_error: "Driver initialization failed (SyntaxError)",
+  runtime_exception: "Driver execution failed (unhandled JavaScript exception)",
+  out_of_memory: "Driver runtime exhausted memory",
+  process_startup: "Driver process startup failed (command missing or not executable)",
+  sdk_driver_error: "SDK driver execution failed (unclassified error)",
+  unclassified: "Output captured during driver execution, but no classified stderr diagnostic",
+});
+
+/**
+ * Persist only a fixed classification of the final stderr lines, never payloads.
+ * @param {string} stderr
+ * @returns {string}
+ */
+function classifyDriverStderr(stderr) {
+  if (!stderr.trim()) return "no_output";
+  for (const line of stripVTControlCharacters(stderr.slice(-8000)).split(/\r?\n/).slice(-20).reverse()) {
+    if (/\b(?:ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND)\b|Cannot find (?:module|package)\b/.test(line)) return "dependency_loading";
+    if (/^(?:SyntaxError|Error \[ERR_INVALID_TYPESCRIPT_SYNTAX\]):/.test(line.trim())) return "syntax_error";
+    if (/\b(?:heap out of memory|Allocation failed|Reached heap limit)\b/i.test(line)) return "out_of_memory";
+    if (/^(?:TypeError|ReferenceError|RangeError|URIError|EvalError):/.test(line.trim())) return "runtime_exception";
+    if (/\b(?:command not found|Permission denied|spawn \S+ (?:ENOENT|EACCES))\b/.test(line)) return "process_startup";
+    const category = collectAgentExecution({ content: line })?.data.categories.find(value => Object.hasOwn(ENGINE_ERROR_SUMMARIES, value));
+    if (category) return category;
+    if (/^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) return "sdk_driver_error";
+  }
+  return "unclassified";
+}
 
 /**
  * Preserve actionable error classes without publishing raw log lines or payloads.
@@ -353,4 +387,16 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
   return { type: "agent.execution", data };
 }
 
-module.exports = { collectAgentExecution, collectAgentErrorEvidence, agentErrorDiagnosticText, agentErrorSummaryText, validateAgentExecution, validateAgentExitCode, parseAgentExitCode, isAgentExecutionEvent };
+module.exports = {
+  collectAgentExecution,
+  collectAgentErrorEvidence,
+  agentErrorDiagnosticText,
+  agentErrorSummaryText,
+  classifyDriverStderr,
+  DRIVER_STDERR_RECORD_PATTERN,
+  DRIVER_STDERR_SUMMARIES,
+  validateAgentExecution,
+  validateAgentExitCode,
+  parseAgentExitCode,
+  isAgentExecutionEvent,
+};

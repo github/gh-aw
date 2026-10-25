@@ -15,6 +15,7 @@
 
 "use strict";
 
+const { classifyDriverStderr } = require("./agent_execution.cjs");
 const { spawn } = require("child_process");
 const os = require("os");
 const { StringDecoder } = require("string_decoder");
@@ -269,6 +270,7 @@ function runProcess({
       observeStdout(stdoutTail, true);
       observeStderr(stderrTail, true);
       const exitCode = cancelled ? (exitCodeForSignal(cancellationSignal) ?? 1) : (code ?? exitCodeForSignal(signal) ?? 1);
+      if (exitCode !== 0) log(`attempt ${attempt + 1}: driver stderr summary: exitCode=${exitCode} category=${classifyDriverStderr(stderr)}`);
       settle({
         exitCode,
         output: stdout && stderr ? `${stdout}${stdout.endsWith("\n") ? "" : "\n"}${stderr}` : stdout || stderr,
