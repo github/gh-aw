@@ -33,6 +33,8 @@ func TestHealthToolArguments(t *testing.T) {
 		{"date range", map[string]any{"start_date": "-24h", "end_date": "2026-10-19"},
 			[]string{"health", "--json", "--start-date=-24h", "--end-date=2026-10-19"}, `{"total_workflows":1}`},
 		{"zero threshold", map[string]any{"threshold": 0}, []string{"health", "--json", "--threshold=0"}, `{}`},
+		{"timeout", map[string]any{"timeout": "30s"}, []string{"health", "--json", "--timeout=30s"}, `{"collection":{"partial":true,"reason":"time_budget"}}`},
+		{"unlimited", map[string]any{"timeout": "0"}, []string{"health", "--json", "--timeout=0"}, `{}`},
 		{"flag-like value", map[string]any{"repo": "--help"}, []string{"health", "--json", "--repo=--help"}, `{}`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -63,6 +65,9 @@ func TestHealthToolRejectsInvalidArguments(t *testing.T) {
 		{"days": "30"},
 		{"threshold": "80"},
 		{"unknown": true},
+		{"timeout": "-1s"},
+		{"timeout": "invalid"},
+		{"timeout": 30},
 	} {
 		name, err := json.Marshal(options)
 		require.NoError(t, err)

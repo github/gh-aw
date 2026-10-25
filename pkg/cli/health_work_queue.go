@@ -65,7 +65,7 @@ func healthWorkQueueAPIWarning(collection *HealthCollection, err error) error {
 		safe = healthWorkQueueAccessError(errLogsAPIRateLimitReached)
 	}
 	// healthAPI can also copy command output into the enclosing collection warning.
-	if collection.Warning != "" && collection.stopped {
+	if collection.Warning != "" && collection.stopped && collection.Reason != "time_budget" {
 		collection.Warning = safe.Error()
 	}
 	return safe
@@ -145,10 +145,16 @@ func detectHealthWorkQueueWorkflows(ref string, collection *HealthCollection, re
 }
 
 func readHealthWorkQueueStats(repository string, collection *HealthCollection) (*workQueueStatsReport, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := checkHealthTimeBudget(collection); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(collection.context(), 30*time.Second)
 	defer cancel()
 	branch := workqueue.Branch{Remote: repository, Name: workqueue.DefaultBranch, Host: collection.Host}
 	commits, err := healthReadWorkQueue(ctx, branch)
+	if budgetErr := checkHealthTimeBudget(collection); budgetErr != nil {
+		return nil, budgetErr
+	}
 	if err != nil {
 		var protocol *workqueue.ProtocolError
 		if errors.As(err, &protocol) {

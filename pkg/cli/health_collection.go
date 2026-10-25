@@ -44,6 +44,10 @@ type HealthCollection struct {
 	LifecycleRequests         int                                 `json:"lifecycle_requests"`
 	ApprovalExpiryEvidence    map[int64]HealthApprovalEvidence    `json:"approval_expiry_evidence,omitempty"`
 	ApprovalRequests          int                                 `json:"approval_requests"`
+	TimeoutSeconds            float64                             `json:"timeout_seconds,omitempty"`
+	ElapsedSeconds            float64                             `json:"elapsed_seconds"`
+	ctx                       context.Context
+	startedAt                 time.Time
 	failureInventory          []WorkflowRun
 	lifecycleResponses        map[string]healthLifecycleResponse
 	workflows                 []GitHubWorkflow
@@ -71,7 +75,36 @@ const healthMaximumAPIRequests = 1000
 var errHealthAPIBudget = errors.New("health API request budget reached")
 var healthRunGH = workflow.RunGHCombinedContext
 
+func (collection *HealthCollection) context() context.Context {
+	if collection.ctx != nil {
+		return collection.ctx
+	}
+	return context.Background()
+}
+
+func checkHealthTimeBudget(collection *HealthCollection) error {
+	if err := collection.context().Err(); err != nil {
+		stopHealthCollection(collection, err)
+		return err
+	}
+	return nil
+}
+
+func finishHealthCollection(collection *HealthCollection) {
+	if collection == nil || collection.startedAt.IsZero() {
+		return
+	}
+	checkHealthTimeBudget(collection)
+	elapsed := time.Since(collection.startedAt)
+	collection.ElapsedSeconds = elapsed.Seconds()
+	healthLog.Printf("Health collection finished: elapsed=%s api_requests=%d partial=%t reason=%s",
+		elapsed.Round(time.Millisecond), collection.APIRequests, collection.Partial, collection.Reason)
+}
+
 func checkHealthAPIBudget(collection *HealthCollection) error {
+	if err := checkHealthTimeBudget(collection); err != nil {
+		return err
+	}
 	if collection.APIRequests >= healthMaximumAPIRequests {
 		return errHealthAPIBudget
 	}
@@ -79,10 +112,13 @@ func checkHealthAPIBudget(collection *HealthCollection) error {
 		collection.APIRateLimit.Remaining-(collection.APIRequests-collection.checkedRequests) > RateLimitThreshold {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(collection.context(), 10*time.Second)
 	defer cancel()
 	state, err := fetchRateLimitForHostFunc(ctx, collection.Host)
 	if err != nil {
+		if budgetErr := checkHealthTimeBudget(collection); budgetErr != nil {
+			return budgetErr
+		}
 		healthLog.Printf("Health API budget unavailable: %v", err)
 		collection.Warning = "GitHub API quota could not be checked: " + err.Error()
 		return fmt.Errorf("cannot check health API budget: %w", err)
@@ -105,8 +141,15 @@ func stopHealthCollection(collection *HealthCollection, err error) {
 		collection.Reason = "rate_limit"
 	} else if errors.Is(err, errHealthAPIBudget) {
 		collection.Reason = "request_budget"
+	} else if errors.Is(err, context.DeadlineExceeded) && errors.Is(collection.context().Err(), context.DeadlineExceeded) {
+		collection.Reason = "time_budget"
+	} else if errors.Is(err, context.Canceled) && errors.Is(collection.context().Err(), context.Canceled) {
+		collection.Reason = "canceled"
 	}
 	collection.Warning = err.Error()
+	if collection.Reason == "time_budget" {
+		collection.Warning = "Health collection time budget exhausted; results are partial. Increase --timeout or narrow the workflow/time window for more evidence."
+	}
 	healthLog.Printf("Health collection stopped: %s", collection.Warning)
 }
 
@@ -115,12 +158,20 @@ func healthAPI(collection *HealthCollection, endpoint string, extra ...string) (
 		stopHealthCollection(collection, err)
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(collection.context(), 30*time.Second)
 	defer cancel()
 	args := []string{"api", "--hostname", collection.Host, endpoint}
 	args = append(args, extra...)
 	collection.APIRequests++
+	started := time.Now()
+	// Only log the endpoint path, never response bodies or request headers.
+	endpointPath, _, _ := strings.Cut(endpoint, "?")
+	healthLog.Printf("Health API request %d started: %s", collection.APIRequests, endpointPath)
 	out, err := healthRunGH(ctx, "Fetching health evidence...", args...)
+	healthLog.Printf("Health API request %d finished: elapsed=%s failed=%t", collection.APIRequests, time.Since(started).Round(time.Millisecond), err != nil)
+	if budgetErr := checkHealthTimeBudget(collection); budgetErr != nil {
+		return nil, budgetErr
+	}
 	if err != nil {
 		err = fmt.Errorf("health API request failed: %w: %s", err, strings.TrimSpace(string(out)))
 		message := err.Error()

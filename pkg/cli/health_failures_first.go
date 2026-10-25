@@ -27,10 +27,10 @@ type HealthPotentialIssue struct {
 func collectHealthFailures(startDate, repoOverride string, collection *HealthCollection) ([]WorkflowRun, error) {
 	inventory := newHealthFailureInventory(startDate, collection)
 	candidates, err := inventory.fill(repoOverride, collection)
+	collection.failureInventory = candidates
 	if err != nil {
 		return nil, err
 	}
-	collection.failureInventory = candidates
 	scopes := make(map[string]struct{})
 	var runs []WorkflowRun
 	for index := 0; index >= 0 && index < len(collection.failureInventory); index++ {

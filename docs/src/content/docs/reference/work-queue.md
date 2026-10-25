@@ -9,7 +9,9 @@ For architecture, a [minimal deployment example](/gh-aw/patterns/workqueue-ops/#
 
 ## Initialization and authorization
 
-The first accepted producer submission atomically installs Policy and Work. Compilation, activation, reads, and dispatch-only requests do not initialize a queue. On an existing AW-managed queue, trusted submission and dispatch processing install missing configured pools on demand before deployment synchronization. Add the pool to `aw.json` and recompile the producer or dispatcher. Installation publishes a separate `PoolInstall` operation, preserves existing pools and the Policy epoch, and reuses worker authority already granted by installed pools. Workers, observers, dry-run previews, and accepted-request recovery do not install pools. New worker profiles, economic changes, and existing-pool changes still require a quiescent queue and an explicit administrator `policy` update.
+The first accepted producer submission atomically installs Policy and Work. Compilation, activation, reads, and dispatch-only requests do not initialize a queue. On an existing AW-managed queue, trusted submission and dispatch processing install missing configured pools and worker profiles on demand before deployment synchronization. Publish the worker Markdown and compiled lock to the default branch, add any pool to `aw.json`, and recompile the producer or dispatcher. No manual registration or drain is needed for these additions.
+
+Installation publishes a separate `PoolInstall` operation. New workers must be singleton, repository-scoped AW workflows with verified default-revision source, a matching compiled contract, and active native registration. `config_ref` records that immutable revision; it is provenance, not authorization. Existing profiles, deployments, pool limits, default selection, accepted Work, Claims, fairness debt and the Policy epoch are preserved. Workers, observers, dry-run previews, and accepted-request recovery do not install pools or profiles. Changes to installed authority or scheduling economics still require a quiescent queue and an explicit administrator `policy` update.
 
 Native `submit-work` and `submit-graph` resolve scheduling and approved AW worker routes from the verified repository revision, not an unrelated local checkout. Assignment-capable workers must already be published.
 
@@ -331,8 +333,8 @@ Routing diagnostics distinguish installed Policy gaps from compiler approval fai
 
 | Code | Meaning and recovery |
 | --- | --- |
-| `work_queue_pool_not_installed` | The requested pool is absent from installed Policy. Configuration edits alone do not install it; recovery requires an explicit administrator Policy update after the queue is quiescent. |
-| `work_queue_profile_not_approved` | The worker profile is absent from the installed pool. Check installed Policy and caller-approved routes; adding profiles requires an administrator Policy update on a quiescent queue. |
+| `work_queue_pool_not_installed` | The requested pool could not be installed on demand. Declare it in `aw.json`, publish the worker source and lock to the default branch, and recompile the producer or dispatcher. Installed economics must remain unchanged. |
+| `work_queue_profile_not_approved` | The worker could not be registered on demand. Check its default-revision AW source, compiled contract, active registration and the caller's dispatch allowlist. |
 | `work_queue_worker_not_compiler_approved` | The caller's compiled configuration does not approve the worker route. Check `safe-outputs.dispatch-workflow.workflows` and the published worker's assignment support. |
 
 HTTP failure diagnostics include validated quota counters, `rate_limit_reset_unix` (Unix seconds), `retry_after_seconds`, fixed rate-limit/SSO flags, and the GitHub request ID when available. Explicit rate-limit evidence distinguishes throttled HTTP 403 responses from otherwise ambiguous access denials; quota headroom alone does not prove permission denial. Raw provider messages, arbitrary headers, and authorization URLs are never printed.

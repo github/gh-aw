@@ -511,23 +511,38 @@ dispatch-only requests MUST NOT initialize an
 absent queue. Existing nonempty ledgers without a valid Policy, empty or
 malformed logs, and unsupported histories MUST fail closed rather than being
 overwritten. On an existing AW-managed queue, trusted producer/dispatcher
-processing MUST install a missing configured pool on first submission or
+processing MUST install missing configured pools and worker profiles on first submission or
 dispatch by appending a separate `PoolInstall` before deployment synchronization,
 when the proposal preserves every
-installed pool and all non-pool Policy fields, comparing profile boundaries
-independently of the caller's newer source revision. Replay MUST require each
-new profile to match the same named profile already authorized in an installed
-pool or its available registered Deployment revisions, including its immutable ref,
-logical contract, identity, scopes, and scheduling authority. Installation MUST
-NOT introduce new worker authority or depend on the caller's local dispatch
-targets; actual submission and dispatch retain those caller-local checks.
+installed pool's existing profiles, default selection, scheduling limits and all
+non-pool Policy fields, comparing profile boundaries independently of the caller's
+newer source revision. `PoolInstall` MAY add profiles to an existing pool; its
+complete `config` MUST retain all installed profiles byte-for-byte and MUST add
+at least one profile. It MUST NOT replace or remove installed profiles.
+
+Replay MUST require each added profile either to match the same named profile
+already authorized in an installed pool or its available registered Deployment
+revisions, or to introduce a previously unknown named worker with `config_ref`
+equal to its nonzero immutable revision. A new worker MUST have a compiler-derived
+logical contract, workflow `.github/workflows/<profile-name>.lock.yml`, default
+trust domain, repository credential/effect scope, no fixed principal, one Claim
+per dispatch, and no shared keys. Trusted publication MUST independently resolve
+the repository's default revision and verify `config_ref`, the source's
+`tools.work-queue.worker: true`, the exact compiled assignment input and logical
+contract, and active native registration. An adapter proposal or recorded
+`config_ref` alone is not authorization. Native Go publishers MUST apply the
+same verification; replay treats authenticated publication as a trusted premise.
+Installation MUST NOT depend on the caller's local dispatch targets; actual
+submission and dispatch retain those caller-local checks.
 The operation MUST NOT revive a revision marked unavailable. Reserved pool
 identities `__proto__`, `constructor`, and `prototype` MUST be rejected.
 The adapter MUST verify the selected immutable routes before publication.
 Workers, observers, staged previews, and accepted-request recovery MUST NOT
 trigger installation. Dispatch-only requests MUST NOT bootstrap an absent queue.
 The operation MUST preserve existing Work and the Policy epoch. It MUST NOT
-edit an installed pool or scheduling economics. Compatible newer source refs
+edit installed profiles, default selection or scheduling economics. Initializing
+new profiles MUST preserve all existing Deployment revisions and availability.
+Compatible newer source refs
 use the separate verified Deployment transition after installation.
 Later scheduling Policy epochs require an administrator-authorized,
 quiescent update.

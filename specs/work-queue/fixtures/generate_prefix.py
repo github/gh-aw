@@ -202,6 +202,17 @@ def generate():
     append("dispatcher", "pool-install", "pool_install", 5300, [{
         "kind": "PoolInstall", "pool": "smoke", "config": new_pool,
     }], reason="grants_paused")
+    new_profile = {
+        **policy2["pools"]["default"]["profiles"]["default"],
+        "workflow": ".github/workflows/smoke-worker.lock.yml",
+        "ref": "f" * 40, "logical_contract": "a" * 64, "max_claims": 1,
+    }
+    extended_pool = json.loads(json.dumps(new_pool))
+    extended_pool["profiles"]["smoke-worker"] = new_profile
+    append("dispatcher", "worker-register", "pool_install", 5400, [{
+        "kind": "PoolInstall", "pool": "smoke", "config": extended_pool,
+        "config_ref": "f" * 40,
+    }], reason="grants_paused")
     assignment = {
         "version": 3, "dispatch_id": dispatch_id, "request_id": "grant", "commit_id": grant["id"],
         "policy_epoch": "epoch1", "pool": "default", "worker_profile": "default",

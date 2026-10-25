@@ -9,17 +9,9 @@ This page lists the built-in model aliases used by GitHub Agentic Workflows.
 
 ## Model Aliases
 
-Model aliases let you write a human-friendly model name such as `sonnet` or `mini`, and gh-aw resolves it at runtime, before the engine starts, to the newest matching model in the live model list. Each alias holds an ordered list of patterns; the first pattern that matches an available model wins. A provider prefix such as `copilot/opus` limits the lookup to that provider. Exact model ids are never rewritten. Copilot, Claude, Codex, Pi, and Agy resolve aliases the same way; see [Engines](/gh-aw/reference/engines/#model-aliases).
+Model aliases let you write `engine: copilot` with a human-friendly model name such as `sonnet` or `mini`, and gh-aw resolves it to the best available concrete model at compile time. Each alias holds an ordered list of patterns; the first pattern that matches an available model wins.
 
-Define your own aliases, or override a built-in one, under `models:` in workflow frontmatter. The main workflow's aliases win over imported and built-in aliases:
-
-```yaml wrap
-model: opus
-models:
-  opus: ["copilot/claude-opus-5*"]
-```
-
-For details on the alias syntax and the fallback resolution algorithm, see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
+For details on the alias syntax, fallback resolution algorithm, and how to define your own aliases in workflow frontmatter, see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
 
 ### Vendor Aliases
 

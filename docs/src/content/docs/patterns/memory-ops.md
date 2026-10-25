@@ -5,7 +5,7 @@ sidebar:
   badge: { text: 'Patterns', variant: 'note' }
 ---
 
-MemoryOps is a set of patterns for using [Cache Memory](/gh-aw/reference/cache-memory/) and [Repo Memory](/gh-aw/reference/repo-memory/) to persist state across workflow runs. Use memory to record progress, resume after interruptions, share data between workflows, support incremental processing, analyze trends, and coordinate multi-step tasks.
+MemoryOps is a set of patterns for using [Cache Memory](/gh-aw/reference/cache-memory/) and [Repo Memory](/gh-aw/reference/repo-memory/) to persist state across runs: record progress, resume after interruptions, share data between workflows, and analyze trends.
 
 ```mermaid
 flowchart LR
@@ -15,7 +15,7 @@ flowchart LR
     s2 --> r3([Run 3])
 ```
 
-When prompting agents to use memory, high-level descriptions are often enough. You usually do not need to define a schema up front: the first run can write a practical structure, and later runs can read and evolve it as needed. That flexibility makes memory useful for stateful workflows without rigid schemas.
+High-level prompts are usually enough: no schema is needed up front, since the first run can write a practical structure that later runs read and evolve.
 
 ## Memory Types
 
@@ -44,7 +44,7 @@ tools:
 
 ## Pattern 1: Exhaustive Processing
 
-Track progress through large datasets with todo/done lists to ensure complete coverage across multiple runs.
+Track progress through large datasets with todo/done lists for complete coverage across runs.
 
 ```markdown
 Analyze all open issues in the repository. Track your progress in cache-memory
@@ -52,7 +52,7 @@ so you can resume if the workflow times out. Mark each issue as done after
 processing it. Generate a final report with statistics.
 ```
 
-The agent maintains a state file with items to process and completed items, updating it after each item so the workflow can resume if interrupted:
+The agent updates a state file after each item so the workflow can resume if interrupted:
 
 ```json
 {
@@ -67,7 +67,7 @@ Real examples: `.github/workflows/repository-quality-improver.md`, `.github/work
 
 ## Pattern 2: State Persistence
 
-Save workflow checkpoints to resume long-running tasks that may timeout.
+Save checkpoints to resume long-running tasks that may time out.
 
 ```markdown
 Migrate 10,000 records from the old format to the new format. Process 500
@@ -75,7 +75,7 @@ records per run and save a checkpoint. Each run should resume from the last
 checkpoint until all records are migrated.
 ```
 
-The agent stores a checkpoint with the last processed position and resumes from it each run:
+The agent stores the last processed position and resumes from it:
 
 ```json
 {
@@ -116,7 +116,7 @@ Real examples: `.github/workflows/metrics-collector.md` (producer), trend analys
 
 ## Pattern 4: Data Caching
 
-Cache API responses to avoid rate limits and reduce workflow time. Check for fresh cached data before making API calls. A reasonable starting point is repository metadata (24h), contributor lists (12h), issues and PRs (1h), and workflow runs (30m).
+Cache API responses to avoid rate limits and reduce run time. Suggested freshness: repository metadata 24h, contributor lists 12h, issues and PRs 1h, workflow runs 30m.
 
 ```markdown
 Fetch repository metadata and contributor lists. Cache the data for 24 hours
@@ -128,7 +128,7 @@ Real examples: `.github/workflows/daily-news.md`
 
 ## Pattern 5: Trend Computation
 
-Store time-series data and compute trends, moving averages, and statistics. The agent appends new data points to a JSON Lines history file and computes trends using Python.
+Append data points to a JSON Lines history file and compute trends and moving averages with Python.
 
 ```markdown
 Collect daily build times and test times. Store them in repo-memory as
@@ -140,7 +140,7 @@ Real examples: `.github/workflows/daily-code-metrics.md`, `.github/workflows/sha
 
 ## Pattern 6: Multiple Memory Stores
 
-Use multiple memory instances for different lifecycles — cache-memory for temporary session data, separate repo-memory branches for metrics, configuration, and archives.
+Use separate stores for different lifecycles: cache-memory for session data, repo-memory branches for metrics, configuration, and archives.
 
 ```markdown
 Use cache-memory for temporary API responses during this run. Store daily
@@ -166,7 +166,7 @@ tools:
 
 ## Pattern 7: PR Comment Memory
 
-Use comment memory to keep task state in the pull request discussion, so each run can continue with the latest context from the PR itself.
+Keep task state in the PR discussion so each run continues from the latest context.
 
 ```markdown
 Review this pull request in passes. Store the running checklist, unresolved
@@ -181,7 +181,7 @@ tools:
     memory-id: pr-review-state  # Separate state bucket in the managed comment
 ```
 
-This works well for PRs that need multiple review cycles because state stays attached to the PR. Use a stable `memory-id` so repeated runs update the same state file at `/tmp/gh-aw/comment-memory/<memory-id>.md`; changing the `memory-id` writes to a different file instead.
+Use a stable `memory-id`: runs update the state file at `/tmp/gh-aw/comment-memory/<memory-id>.md`, and changing the ID writes to a different file.
 
 ## Best Practices
 
@@ -196,17 +196,6 @@ echo '{"date": "2024-01-15", "value": 42}' >> data.jsonl
 # Keep only last 90 entries
 tail -n 90 history.jsonl > history-trimmed.jsonl
 mv history-trimmed.jsonl history.jsonl
-```
-
-```json
-{
-  "dataset": "performance-metrics",
-  "schema": {
-    "date": "YYYY-MM-DD",
-    "value": "integer"
-  },
-  "retention": "90 days"
-}
 ```
 
 ## Security Considerations
