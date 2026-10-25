@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,14 +38,32 @@ const stepScript = name =>
     .replace(/^      /gm, "");
 
 describe("daily container image scan analysis", () => {
-  it("uses the same immutable Node image pin in the compiler caches and compiled manifest", () => {
-    const image = "ghcr.io/github/gh-aw-node";
+  it.each(["ghcr.io/github/gh-aw-node", "node:lts-alpine"])("uses the same immutable %s pin in the compiler caches and every compiled manifest", image => {
     const cachePaths = ["../../../.github/aw/actions-lock.json", "../../../pkg/actionpins/data/action_pins.json", "../../../pkg/workflow/data/action_pins.json"];
     const pins = cachePaths.map(path => JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8")).containers[image].pinned_image);
-    expect(pins[0]).toMatch(/^ghcr\.io\/github\/gh-aw-node@sha256:[a-f0-9]{64}$/);
+    expect(pins[0]).toMatch(/@sha256:[a-f0-9]{64}$/);
+    expect(pins[0].split("@")[0]).toBe(image);
     expect(new Set(pins).size).toBe(1);
-    const manifest = JSON.parse(lock.match(/^# gh-aw-manifest: (.+)$/m)[1]);
-    expect(manifest.containers.find(container => container.image === image).pinned_image).toBe(pins[0]);
+    const workflowDir = new URL("../../../.github/workflows/", import.meta.url);
+    let references = 0;
+    for (const file of readdirSync(workflowDir).filter(file => file.endsWith(".lock.yml"))) {
+      const compiled = readFileSync(new URL(file, workflowDir), "utf8");
+      const manifest = JSON.parse(compiled.match(/^# gh-aw-manifest: (.+)$/m)[1]);
+      for (const container of manifest.containers ?? []) {
+        if (container.image === image) {
+          expect(container.pinned_image, file).toBe(pins[0]);
+          references++;
+        }
+      }
+    }
+    expect(references).toBeGreaterThan(0);
+  });
+
+  it("requires fixed brotli and undici versions in the vendored Node rebuild", () => {
+    const dockerfile = readFileSync(new URL("./Dockerfile.safe-outputs-mcp", import.meta.url), "utf8");
+    expect(dockerfile).toContain('apk add --no-cache git "brotli-libs>=1.2.1-r0"');
+    expect(dockerfile).toContain('"undici@^6.29.1"');
+    expect(dockerfile).toContain("RUN apk upgrade --no-cache");
   });
 
   it("classifies the locally built Node image as vendored without promising automatic release upgrades", () => {
