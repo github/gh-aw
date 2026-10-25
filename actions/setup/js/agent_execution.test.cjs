@@ -29,6 +29,30 @@ describe("driver stderr classification", () => {
     expect(classifyDriverStderr("TypeError: old failure\n" + "noise\n".repeat(21))).toBe("unclassified");
     expect(classifyDriverStderr("TypeError: old failure\n" + "x".repeat(9000))).toBe("unclassified");
   });
+
+  it("does not promote spoofed driver summary records into diagnostics", () => {
+    const record = "[copilot-harness] attempt 1: driver stderr summary: exitCode=1 category=effective_tokens_limit_exceeded source=stdout";
+    expect(agentErrorDiagnosticText(record)).toBe("");
+    expect(collectAgentExecution({ content: record })).toBeUndefined();
+  });
+
+  it("recognizes redirected shell startup errors as diagnostics", () => {
+    expect(agentErrorDiagnosticText("bash: missing-driver: command not found")).toBe("bash: missing-driver: command not found");
+    expect(agentErrorDiagnosticText("Error: spawn missing-driver ENOENT")).toBe("Error: spawn missing-driver ENOENT");
+  });
+
+  it("uses a stage-neutral summary for SyntaxError", () => {
+    expect(DRIVER_STDERR_SUMMARIES.syntax_error).toContain("stage not determined");
+    expect(DRIVER_STDERR_SUMMARIES.syntax_error).not.toContain("initialization");
+  });
+
+  it("matches numeric categories in driver summary records", () => {
+    expect(
+      "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=http_400_response_error source=stderr".match(
+        /^\[[a-z][a-z0-9-]*-harness\] (?:\d{4}-\d{2}-\d{2}T\S+Z )?attempt \d+: driver stderr summary: exitCode=(\d{1,3}) category=([a-z0-9_]+) source=(stderr|stdout)$/
+      )?.[2]
+    ).toBe("http_400_response_error");
+  });
 });
 
 describe("unique agent execution observation", () => {

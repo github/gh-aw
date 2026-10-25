@@ -71,7 +71,8 @@ function recordErrors(record) {
 function isAgentDiagnosticLine(line) {
   if (/^(?:(?:Syntax|Type|Reference|Range|URI|Eval)Error:|Error \[(?:ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|ERR_INVALID_TYPESCRIPT_SYNTAX)\]:|Error: Cannot find (?:module|package)\b|FATAL ERROR:.*(?:heap|Allocation failed))/.test(line))
     return true;
-  if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:)/.test(line);
+  if (/^(?:[^\s:]+:\s+.*(?:command not found|Permission denied)|Error: spawn \S+ (?:ENOENT|EACCES)\b)/i.test(line)) return true;
+  if (/^\[(?:copilot|claude|codex)-harness\]/.test(line)) return !/\b(?:outputTail=|spawning:|resolved --prompt-file:|driver stderr summary:)/.test(line);
   if (/^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) return true;
   if (/^\[gh-aw\/pi-provider\]\s+\S+\s+provider_error\b/.test(line)) return true;
   if (/^(?:\[ERROR\]\s*|\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+)/.test(line)) return true;
@@ -168,7 +169,7 @@ function collectAgentErrorEvidence(content, events = [], rawSourceEngine) {
     }
     if (conversationLines.has(conversationKey(line))) continue;
     if (entry.type === "invalid") {
-      const runtimeLine = DRIVER_STDERR_RECORD_PATTERN.test(line) || /^\[(?:(?:copilot|claude|codex)-harness|copilot-sdk-driver|sdk-driver|gh-aw\/pi-provider|ERROR)\]/.test(line) || /^\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+/.test(line);
+      const runtimeLine = /^\[(?:(?:copilot|claude|codex)-harness|copilot-sdk-driver|sdk-driver|gh-aw\/pi-provider|ERROR)\]/.test(line) || /^\d{4}-\d{2}-\d{2}T\S+\s+ERROR\s+/.test(line);
       if (runtimeLine) transcriptBlock = false;
       if (!transcriptBlock && isAgentDiagnosticLine(line)) {
         diagnostics.push(line);
@@ -222,12 +223,12 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
   sandbox_runtime_crash: "Sandbox runtime crashed",
 });
 
-const DRIVER_STDERR_RECORD_PATTERN = /^\[[a-z][a-z0-9-]*-harness\] (?:\d{4}-\d{2}-\d{2}T\S+Z )?attempt \d+: driver stderr summary: exitCode=(\d{1,3}) category=([a-z_]+) source=(stderr|stdout)$/;
+const DRIVER_STDERR_RECORD_PATTERN = /^\[[a-z][a-z0-9-]*-harness\] (?:\d{4}-\d{2}-\d{2}T\S+Z )?attempt \d+: driver stderr summary: exitCode=(\d{1,3}) category=([a-z0-9_]+) source=(stderr|stdout)$/;
 const DRIVER_STDERR_SUMMARIES = Object.freeze({
   ...Object.fromEntries(Object.entries(ENGINE_ERROR_SUMMARIES).map(([category, summary]) => [category, `Engine request/execution: ${summary} (${category})`])),
   no_output: "no output captured",
   dependency_loading: "Driver dependency loading failed (module not found)",
-  syntax_error: "Driver initialization failed (SyntaxError)",
+  syntax_error: "Driver reported a SyntaxError (stage not determined)",
   runtime_exception: "Driver execution failed (unhandled JavaScript exception)",
   out_of_memory: "Driver runtime exhausted memory",
   process_startup: "Driver process startup failed (command missing or not executable)",

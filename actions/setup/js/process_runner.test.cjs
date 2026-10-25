@@ -353,6 +353,80 @@ describe("process_runner.cjs", () => {
       expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=no_output source=stderr");
     });
 
+    it("classifies redirected shell startup errors without treating arbitrary stdout as a guard", async () => {
+      const startupLogs = [];
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write("bash: missing-driver: command not found\\n"); process.exit(127);`],
+        attempt: 0,
+        log: message => startupLogs.push(message),
+      });
+      expect(startupLogs).toContain("attempt 1: driver stderr summary: exitCode=127 category=process_startup source=stdout");
+
+      const guardLogs = [];
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write("Maximum effective tokens exceeded\\n"); process.exit(1);`],
+        attempt: 0,
+        log: message => guardLogs.push(message),
+      });
+      expect(guardLogs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified source=stdout");
+    });
+
+    it("applies the final tail window before filtering redirected stdout", async () => {
+      const logs = [];
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write("TypeError: old failure\\n" + "noise\\n".repeat(21)); process.exit(1);`],
+        attempt: 0,
+        log: message => logs.push(message),
+      });
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=unclassified source=stdout");
+    });
+
+    it.each([
+      ["untagged", { type: "session.error", data: { errorType: "InjectedError", code: 400, message: "The requested model is not supported" } }, "unclassified"],
+      ["foreign", { type: "session.error", data: { sourceEngine: "copilot", errorType: "InjectedError", code: 400, message: "The requested model is not supported" } }, "unclassified"],
+      ["Aider-attributed", { type: "session.error", data: { sourceEngine: "aider", errorType: "NativeError", code: 400, message: "The requested model is not supported" } }, "model_not_supported_error"],
+    ])("applies Aider source attribution to %s stdout errors", async (_description, error, category) => {
+      const logs = [];
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write(${JSON.stringify(JSON.stringify(error))} + "\\n"); process.exit(1);`],
+        attempt: 0,
+        env: { ...process.env, GH_AW_ENGINE_ID: "aider" },
+        log: message => logs.push(message),
+      });
+      expect(logs).toContain(`attempt 1: driver stderr summary: exitCode=1 category=${category} source=stdout`);
+    });
+
+    it("keeps the original order when classifying structured stdout errors", async () => {
+      const logs = [];
+      const earlier = { type: "session.error", data: { sourceEngine: "aider", code: 503, message: "Failed to get response from the AI model; retried 5 times. Last error: 503" } };
+      const final = { type: "session.error", data: { sourceEngine: "aider", code: 400, message: "The requested model is not supported" } };
+      await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write(${JSON.stringify(JSON.stringify(earlier) + "\n" + JSON.stringify(final) + "\n")}); process.exit(1);`],
+        attempt: 0,
+        env: { ...process.env, GH_AW_ENGINE_ID: "aider" },
+        log: message => logs.push(message),
+      });
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=model_not_supported_error source=stdout");
+    });
+
+    it("reports a failed spawn as a process startup failure", async () => {
+      const logs = [];
+      const result = await runProcess({
+        command: `${process.execPath}-missing-driver`,
+        args: [],
+        attempt: 0,
+        log: message => logs.push(message),
+      });
+      expect(result.exitCode).toBe(1);
+      expect(result.hasOutput).toBe(false);
+      expect(logs).toContain("attempt 1: driver stderr summary: exitCode=1 category=process_startup source=stderr");
+    });
+
     it("preserves the process result when diagnostic classification throws", async () => {
       const logs = [];
       const result = await runProcess({
