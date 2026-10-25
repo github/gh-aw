@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"path"
 	"reflect"
 	"strings"
 
@@ -24,7 +25,8 @@ func (c *Compiler) artipackedCheckoutLintPaths(graph *actions.Workflow) (map[str
 }
 
 // Cleanup is eligible only when compiler provenance proves the entire block and
-// the very next step runs both the canonical cleanup and its fail-closed verifier.
+// the very next step runs both the canonical cleanup and its fail-closed verifier,
+// and the checkout config is within their bounded discovery coverage.
 func (c *Compiler) verifiedCleanupCheckoutLintPaths(graph *actions.Workflow) (map[string]struct{}, error) {
 	if len(c.agentCheckoutLintBlocks) == 0 {
 		return nil, nil
@@ -66,6 +68,9 @@ func (c *Compiler) verifiedCleanupCheckoutLintPaths(graph *actions.Workflow) (ma
 				if !isAction || !hasInputs || !strings.HasPrefix(uses, "actions/checkout@") || with["persist-credentials"] != true {
 					continue
 				}
+				if !checkoutWithinCleanupDiscovery(with) {
+					continue
+				}
 				if len(cleanup) == 1 && reflect.DeepEqual(expected[index+1], cleanup[0]) { //nolint:reflectdeepequalusage,uncheckedsliceindex // Compare full fields; the range excludes the last step and cleanup length is checked.
 					paths[fmt.Sprintf("jobs.agent.steps[%d].with.persist-credentials", match+index)] = struct{}{}
 				}
@@ -73,4 +78,24 @@ func (c *Compiler) verifiedCleanupCheckoutLintPaths(graph *actions.Workflow) (ma
 		}
 	}
 	return paths, nil
+}
+
+func checkoutWithinCleanupDiscovery(with map[string]any) bool {
+	value, present := with["path"]
+	if !present {
+		return true
+	}
+	checkoutPath, literal := value.(string)
+	if !literal || strings.Contains(checkoutPath, "${{") || strings.ContainsAny(checkoutPath, ":\\\r\n") {
+		return false
+	}
+	checkoutPath = strings.TrimSpace(checkoutPath)
+	if validateCheckoutPath(checkoutPath) != nil {
+		return false
+	}
+	// Both scripts find regular .git/config files at maxdepth 15 from the
+	// workspace. Reserve two components for .git/config; backslashes above
+	// remain unproven because their separator semantics depend on the platform.
+	cleaned := path.Clean(checkoutPath)
+	return cleaned == "." || strings.Count(cleaned, "/")+1 <= 13
 }

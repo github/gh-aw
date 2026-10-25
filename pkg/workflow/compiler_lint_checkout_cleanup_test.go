@@ -17,11 +17,23 @@ func TestCompilerLintVerifiedCheckoutCleanup(t *testing.T) {
 	t.Parallel()
 	const authored = "      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567\n        with:\n          persist-credentials: true\n"
 	for _, tc := range []struct {
-		name, job, before, after, old, replacement string
-		noProvenance, duplicate                    bool
-		warnings, exemptions                       int
+		name, job, before, after, old, replacement, path string
+		noProvenance, duplicate                          bool
+		warnings, exemptions                             int
 	}{
 		{name: "generated", exemptions: 1, warnings: 1},
+		{name: "root path", path: ".", exemptions: 1, warnings: 1},
+		{name: "config at depth 15", path: strings.Repeat("dir/", 12) + "repo", exemptions: 1, warnings: 1},
+		{name: "config at depth 16", path: strings.Repeat("dir/", 13) + "repo", warnings: 1},
+		{name: "normalized config at depth 15", path: "./" + strings.Repeat("dir//./", 12) + "repo/", exemptions: 1, warnings: 1},
+		{name: "normalized config at depth 16", path: "./" + strings.Repeat("dir//./", 13) + "repo/", warnings: 1},
+		{name: "dynamic path", path: "${{ inputs.checkout_path }}", warnings: 1},
+		{name: "dynamic path component", path: "repos/${{ inputs.checkout_path }}/repo", warnings: 1},
+		{name: "absolute path", path: "/workspace/repo", warnings: 1},
+		{name: "parent traversal", path: "repos/../repo", warnings: 1},
+		{name: "windows absolute path", path: "C:/workspace/repo", warnings: 1},
+		{name: "backslash path", path: `repos\repo`, warnings: 1},
+		{name: "backslash dot components", path: strings.Repeat(`\./`, 14), warnings: 1},
 		{name: "authored before", before: authored, exemptions: 1, warnings: 2},
 		{name: "authored after", after: authored, exemptions: 1, warnings: 2},
 		{name: "authored cleanup name", old: "Checkout repository (gh-aw default)", replacement: "Authored checkout", warnings: 1},
@@ -44,7 +56,7 @@ func TestCompilerLintVerifiedCheckoutCleanup(t *testing.T) {
 			compiler := NewCompiler(WithLint(true))
 			var generated strings.Builder
 			_, _, err := compiler.generateInitialAndCheckoutSteps(&generated, &WorkflowData{
-				CheckoutConfigs: []*CheckoutConfig{{CleanGitCredentials: true}},
+				CheckoutConfigs: []*CheckoutConfig{{Path: tc.path, CleanGitCredentials: true}},
 			})
 			require.NoError(t, err)
 			block := generated.String()
@@ -115,6 +127,16 @@ func TestCompilerLintVerifiedCleanupMultiRepo(t *testing.T) {
 			} else {
 				require.Len(t, exempt, 3)
 			}
+		})
+	}
+}
+
+func TestCheckoutWithinCleanupDiscoveryUnknownPaths(t *testing.T) {
+	t.Parallel()
+	for _, value := range []any{nil, true, 42, []string{"repo"}, "repo\nnested", "repo\rnested", " /outside", " ../outside"} {
+		t.Run(fmt.Sprintf("%T:%q", value, value), func(t *testing.T) {
+			t.Parallel()
+			require.False(t, checkoutWithinCleanupDiscovery(map[string]any{"path": value}))
 		})
 	}
 }
