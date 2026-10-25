@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/github/gh-aw/pkg/stringutil"
 )
@@ -292,15 +293,19 @@ func boundMCPCompileDiagnostic(message string) string {
 func runMCPCompileOutput(ctx context.Context, execCmd execCmdFunc, args ...string) ([]byte, *mcpCompileDiagnostics, error) {
 	diagnostics := &mcpCompileDiagnostics{}
 	if err := defaultMCPSubprocessGuardrail.acquire(ctx); err != nil {
-		return nil, diagnostics, err
+		return nil, diagnostics, &mcpStageError{stage: "subprocess_slot", err: err}
 	}
 	defer defaultMCPSubprocessGuardrail.release()
 	cmd := execCmd(ctx, args...)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = diagnostics
+	cmd.WaitDelay = time.Second
 	err := cmd.Run()
 	diagnostics.finishLine()
+	if err != nil && ctx.Err() != nil {
+		err = &mcpStageError{stage: "compilation", err: ctx.Err()}
+	}
 	return stdout.Bytes(), diagnostics, err
 }
 

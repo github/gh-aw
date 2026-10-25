@@ -1255,6 +1255,8 @@ func TestAuditToolReturnsIncompleteSubprocessData(t *testing.T) {
 	partial, ok := envelope["partial_results"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "artifacts", partial["stage"])
+	assert.Equal(t, "artifacts", envelope["stage"])
+	assert.Contains(t, envelope["error"], "artifacts")
 }
 
 func TestAuditToolTimeoutHelperProcess(t *testing.T) {
