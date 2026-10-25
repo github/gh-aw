@@ -1,50 +1,54 @@
+---
+title: Accept schema-supported frontmatter shapes in typed parsing
+description: Rationale for adapting typed frontmatter decoding without broadening shared integer syntax.
+---
+
 # ADR-71809: Accept Schema-Supported Frontmatter Shapes in Typed Parsing
 
 **Date**: 2026-10-25
-**Status**: Draft
-**Deciders**: pelikhan, [TODO: verify reviewers]
+**Status**: Proposed
+**Related PR**: [#71809](https://github.com/github/gh-aw/pull/71809)
 
----
+## Context
 
-### Context
+The workflow compiler validates frontmatter against a JSON schema and also decodes it into `FrontmatterConfig`. Schema-valid input can fail typed decoding when a Go field represents only one of the accepted shapes. A failure causes the compiler to discard the entire typed configuration and emit a generic parse warning, potentially losing unrelated typed settings.
 
-Workflow frontmatter is validated against a JSON schema and then decoded into the typed `FrontmatterConfig` struct (`pkg/workflow/frontmatter_types.go`) through a single `json.Unmarshal` in `decodeFrontmatterConfig`. Several forms that the schema accepts did not fit that struct's Go types: a scalar `needs:` on a custom safe-output job, `cache:` as an array of cache objects, and `max-ai-credits` / `max-daily-ai-credits` values written as K/M-suffixed strings, the `-1` disable sentinel, or (for the daily limit) an object such as `{value: 20K}`. If any one field failed to unmarshal, the whole typed configuration was dropped and the user saw a generic warning. A sweep of public workflows found these mismatches. The fix needed to accept valid input while still reporting real invalid input.
+The reported sweep of 460 public workflows found 13 such warnings: five scalar custom safe-output job `needs` values, four cache arrays, three daily credit-limit objects, and one `20K` credit limit. The schema already accepts these forms; changing workflow syntax is not necessary.
 
-### Decision
+The compatibility fix must preserve invalid-input diagnostics and existing consumers of typed thresholds. In particular, credit-specific syntax must not become valid for every field using the shared `TemplatableInt32` type.
 
-We will make typed frontmatter parsing accept every shape the schema allows. Mismatched shapes are handled at the decode boundary, and the typed API stays the same for its consumers. In detail: (1) scalar `safe-outputs.jobs.*.needs` values are normalized to single-element string slices on a clone, so the raw frontmatter is not mutated; (2) `FrontmatterConfig.Cache` is widened from `map[string]any` to `any`, and a new `validateFrontmatterCacheShape` check accepts only an object or an array of objects; (3) the credit-limit fields are captured as `json.RawMessage` through an embedded-alias auxiliary struct and parsed by a dedicated `parseFrontmatterAICLimit` into the existing `*TemplatableInt32` threshold fields. Daily-guardrail settings beyond the threshold are still read from raw frontmatter. Invalid shapes return a specific, field-named error rather than being silently ignored.
+## Decision
 
-### Alternatives Considered
+Adapt the normalization and decode boundary for these fields rather than relax decoding globally or change the schema:
 
-#### Alternative 1: Custom `UnmarshalJSON` methods on the affected types
+1. Normalize scalar `safe-outputs.jobs.*.needs` strings to single-element string slices in `normalizeSafeOutputShorthands`. Clone the affected maps so the original frontmatter remains unchanged. Existing list values retain their meaning.
+2. Change `FrontmatterConfig.Cache` from `map[string]any` to `any` to preserve either a single cache object or an array of cache objects. `validateFrontmatterCacheShape` rejects other non-null shapes, including non-object array entries. This is a shape check, not a replacement for schema validation of cache properties.
+3. Capture `max-ai-credits` and `max-daily-ai-credits` as `json.RawMessage` through an auxiliary struct embedding an alias of `FrontmatterConfig`. Parse them with `parseFrontmatterAICLimit` into the existing `*TemplatableInt32` fields. Accept positive integers, positive numeric strings with optional K/M suffixes, GitHub Actions expressions, and the scalar `-1` disable sentinel. Normalize numeric thresholds to base-10 strings and preserve expressions.
 
-Each field type (`TemplatableInt32`, a new cache type, a new `needs` type) could implement its own `UnmarshalJSON` to accept the extra shapes. This keeps the parsing logic next to each type. It was not chosen because `TemplatableInt32` is shared with many other integer fields (`max-turns`, `max-tool-calls`, and others). Widening its syntax would let K/M suffixes and object forms into fields where the schema does not allow them. The PR explicitly says it will "leave ordinary templatable integer parsing unchanged."
+Only the daily limit accepts an object. Its required `value` supplies the typed threshold; `-1` is not accepted inside that object. Disabling the guardrail uses scalar `max-daily-ai-credits: -1`. Other daily settings, including `backend`, `continue-on-error`, and `github-app`, continue to be read from the unchanged raw frontmatter.
 
-#### Alternative 2: Lenient decoding (ignore or skip fields that fail to unmarshal)
+Ordinary `TemplatableInt32` decoding remains unchanged. Invalid input still fails typed parsing and retains the compiler's warning path. Cache-shape and credit-limit errors add field-specific detail; this change does not replace every generic parse diagnostic.
 
-The decoder could tolerate per-field type mismatches, either by decoding field by field or by suppressing errors, so that one bad field no longer drops the whole config. This would hide the symptom, but schema-valid values would still be lost. Genuinely invalid input would also be silently discarded. The PR's goal of keeping real invalid-input diagnostics rules this out.
+This is the approach implemented in PR #71809, recorded as proposed pending maintainer acceptance. It makes no changes to permissions, checkout behavior, or workflow-execution authorization.
 
-#### Alternative 3: Narrow the JSON schema to match the Go types
+## Alternatives Considered
 
-The schema could be tightened to reject the forms the typed struct can't decode. This was rejected because those forms are already documented and used in public workflows. Narrowing the schema would be a breaking change for users.
+### Shared custom `UnmarshalJSON`
 
-### Consequences
+Extending `TemplatableInt32.UnmarshalJSON` would colocate decoding with the type but broaden credit-specific syntax for unrelated integer fields. Dedicated wrapper types for credits, cache, and job dependencies could avoid that problem, at the cost of changing more typed interfaces and consumers. Boundary adaptation preserves the existing threshold and dependency APIs; cache is the explicit exception.
 
-#### Positive
-- Workflows that use schema-valid shapes (scalar `needs`, array `cache`, suffixed, expression, or object credit limits) no longer lose their entire typed configuration.
-- Downstream code that reads `MaxAICredits` / `MaxDailyAICredits` keeps using the existing `*TemplatableInt32` API with canonical values.
-- Invalid shapes now produce specific error messages that name the field (for example, `invalid max-daily-ai-credits: ...` or `invalid cache entry at index N`).
-- Regression tests cover parsing, invalid-input warnings, non-mutation of raw frontmatter, and compiled output.
+### Lenient decoding
 
-#### Negative
-- `FrontmatterConfig.Cache` is now `any`, so type safety is lost. Consumers must type-switch between the object and array forms.
-- Credit-limit parsing lives outside the struct's normal unmarshal path, in an aux/alias wrapper in `decodeFrontmatterConfig`. That is less obvious to future maintainers and must be kept in sync if more fields need special handling.
-- Daily-guardrail object settings are split: the threshold is typed, while the other object keys are still read from raw frontmatter. There are two sources of truth for one frontmatter key.
+Skipping fields that fail decoding would preserve some unrelated settings, but silently lose valid values and hide invalid input. It would mask the representation mismatch rather than resolve it. The selected approach continues to return errors instead of silently accepting partial configuration.
 
-#### Neutral
-- The schema stays the authoritative definition of accepted shapes. The typed layer now adapts to it.
-- The normalization of safe-output job `needs` runs inside the existing `normalizeSafeOutputShorthands` pass.
+### Narrowing the schema
 
----
+Rejecting scalar dependencies, cache arrays, or supported credit-limit forms would align validation with the old Go representation. It would also break existing schema-valid workflows. The typed representation should adapt to the supported input contract instead.
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+## Consequences
+
+The affected schema-valid forms no longer discard the typed configuration. Credit consumers retain their existing threshold API, and normalization does not mutate raw frontmatter. Existing regression tests cover supported forms, invalid-input warnings, raw-map preservation, cache round trips, and compiled output.
+
+The tradeoff is weaker static typing for `Cache`; consumers must handle its object and array forms. The alias/raw-message decoder requires maintenance alongside the schema. Daily-limit consumers must also distinguish the derived typed threshold from auxiliary settings retained in raw frontmatter; the typed threshold is not a complete representation of the object.
+
+The reported local compilation check covered 348 workflows with zero generic parse warnings. It also identified generated lock drift in 27 files; those lock files were not modified. This observation is compilation evidence, not live-execution validation or a guarantee that every possible schema/type mismatch has been eliminated.

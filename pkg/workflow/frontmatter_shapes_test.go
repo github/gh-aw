@@ -15,6 +15,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseFrontmatterConfig_RegressionPublicSweep(t *testing.T) {
+	// The sweep at github/gh-aw@aa89ad15310c2bfd983aaee1ef6e1268e4508e81
+	// found this daily-limit shape in daily-cli-performance, daily-code-metrics,
+	// and daily-community-attribution. Keep the reproducer to the observed fields.
+	source := `---
+on: workflow_dispatch
+max-daily-ai-credits:
+  value: 10000
+  backend: repo-memory
+---
+`
+	result, err := parser.ExtractFrontmatterFromContent(source)
+	require.NoError(t, err)
+	frontmatter := result.Frontmatter
+	require.NoError(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "daily-cli-performance.md"))
+	before, err := json.Marshal(frontmatter)
+	require.NoError(t, err)
+
+	compiler := NewCompiler()
+	stderr := testutil.CaptureStderr(t, func() {
+		config := compiler.tryParseFrontmatterConfig(frontmatter)
+		require.NotNil(t, config)
+		require.NotNil(t, config.MaxDailyAICredits)
+		assert.Equal(t, "10000", config.MaxDailyAICredits.String())
+	})
+	assert.Zero(t, compiler.GetWarningCount())
+	assert.NotContains(t, stderr, "Failed to parse frontmatter config")
+	assert.Equal(t, "repo-memory", resolveMaxDailyAICBackend(frontmatter, ""))
+	after, err := json.Marshal(frontmatter)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(before), string(after))
+}
+
 func TestParseFrontmatterConfigSupportedShapes(t *testing.T) {
 	for _, needs := range []any{"activation", []any{"activation", "agent"}} {
 		t.Run(fmt.Sprintf("safe job needs %v", needs), func(t *testing.T) {

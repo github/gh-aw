@@ -15,7 +15,7 @@ func ParseInt64KMSuffix(raw string) (int64, bool) {
 	}
 
 	multiplier := int64(1)
-	switch last := trimmed[len(trimmed)-1]; last {
+	switch last := trimmed[len(trimmed)-1]; last { //nolint:uncheckedsliceindex // The empty-string check above guarantees a final byte.
 	case 'k', 'K':
 		multiplier = 1_000
 		trimmed = trimmed[:len(trimmed)-1]
@@ -30,11 +30,11 @@ func ParseInt64KMSuffix(raw string) (int64, bool) {
 
 	parsed, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil || parsed <= 0 {
-		typeutilLog.Printf("Rejected K/M-suffixed value %q: not a positive base-10 integer", raw)
+		typeutilLog.Print("Rejected K/M-suffixed value: not a positive base-10 integer")
 		return 0, false
 	}
 	if parsed > math.MaxInt64/multiplier {
-		typeutilLog.Printf("Rejected K/M-suffixed value %q: would overflow int64 (multiplier=%d)", raw, multiplier)
+		typeutilLog.Printf("Rejected K/M-suffixed value: would overflow int64 (multiplier=%d)", multiplier)
 		return 0, false
 	}
 	return parsed * multiplier, true

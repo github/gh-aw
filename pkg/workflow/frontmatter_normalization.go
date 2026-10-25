@@ -163,6 +163,8 @@ func normalizeSafeOutputShorthands(frontmatter map[string]any) error {
 	return nil
 }
 
+// normalizeSafeJobNeeds adapts needs for typed JSON decoding; parseSafeJobsConfig
+// separately accepts both shapes because it parses the unchanged raw map.
 func normalizeSafeJobNeeds(jobs map[string]any) map[string]any {
 	normalized := maps.Clone(jobs)
 	for name, value := range jobs {

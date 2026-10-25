@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -22,16 +21,14 @@ func parseFrontmatterAICLimit(data json.RawMessage, allowObject bool) (*Templata
 	if allowObject {
 		var object map[string]json.RawMessage
 		if err := json.Unmarshal(data, &object); err == nil {
+			const objectValueError = "object 'value' must be a positive integer, a K/M suffix string, or a GitHub Actions expression. Example: max-daily-ai-credits: {value: 20K}; use scalar max-daily-ai-credits: -1 to disable the guardrail"
 			value, ok := object["value"]
 			if !ok || string(value) == "null" {
-				return nil, errors.New("object form requires a positive 'value' field. Example: max-daily-ai-credits: {value: 20K}")
+				return nil, errors.New(objectValueError)
 			}
 			limit, err := parseFrontmatterAICLimit(value, false)
-			if err != nil {
-				return nil, err
-			}
-			if limit.String() == "-1" {
-				return nil, errors.New("object 'value' must be positive; use max-daily-ai-credits: -1 to disable the guardrail")
+			if err != nil || limit == nil || limit.String() == "-1" {
+				return nil, errors.New(objectValueError)
 			}
 			return limit, nil
 		}
@@ -52,7 +49,7 @@ func parseFrontmatterAICLimit(data json.RawMessage, allowObject bool) (*Templata
 			return &limit, nil
 		}
 	}
-	return nil, fmt.Errorf("expected a positive integer, a K/M suffix string, a GitHub Actions expression, or -1; got %s", data)
+	return nil, errors.New("expected a positive integer, a K/M suffix string, a GitHub Actions expression, or -1")
 }
 
 // normalizePositiveAICLimit converts positive integer-like values
@@ -86,10 +83,10 @@ func normalizePositiveAICLimit(raw any) (string, bool) {
 
 	normalized, ok := typeutil.NormalizeInt64KMSuffix(trimmed)
 	if !ok {
-		aicLimitLog.Printf("Rejecting AI Credits limit: %q is not a valid positive value", trimmed)
+		aicLimitLog.Print("Rejecting AI Credits limit: not a valid positive value")
 		return "", false
 	}
-	aicLimitLog.Printf("Normalized AI Credits limit %q to %s", trimmed, normalized)
+	aicLimitLog.Print("Normalized AI Credits limit")
 	return normalized, true
 }
 
