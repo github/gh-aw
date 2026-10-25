@@ -382,6 +382,43 @@ func TestDetectionJobDownloadsActivationArtifactBeforeAgentOutput(t *testing.T) 
 	}
 }
 
+func TestDetectionJobClearsInheritedAgentUsageWithoutDetectionGuard(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		Name: "test-workflow",
+		AI:   "copilot",
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	job, err := compiler.buildDetectionJob(data)
+	if err != nil {
+		t.Fatalf("buildDetectionJob() error: %v", err)
+	}
+	if job == nil {
+		t.Fatal("buildDetectionJob() returned nil job")
+	}
+
+	steps := strings.Join(job.Steps, "")
+	cleanup := "      - name: Clear agent token usage\n" +
+		"        if: always()\n" +
+		"        run: rm -f /tmp/gh-aw/agent_usage.json\n"
+	cleanupIdx := strings.Index(steps, cleanup)
+	if cleanupIdx < 0 {
+		t.Fatal("Expected agent usage cleanup to run with always(), independently of run_detection")
+	}
+
+	downloadSteps := strings.Join(buildAgentOutputDownloadSteps(artifactPrefixExprForAgentDownstreamJob(data), compiler.getActionPin), "")
+	if !strings.Contains(steps, downloadSteps+cleanup) {
+		t.Error("Agent usage cleanup should run immediately after the agent artifact download steps")
+	}
+	guardIdx := strings.Index(steps, "Check if detection needed")
+	if guardIdx < 0 || cleanupIdx > guardIdx {
+		t.Error("Agent usage cleanup should run before the detection guard")
+	}
+}
+
 func TestDetectionActivationArtifactDownloadUsesActivationPrefixForWorkflowCall(t *testing.T) {
 	steps := strings.Join(buildDetectionActivationArtifactDownloadSteps(&WorkflowData{
 		On: "workflow_call",

@@ -6309,6 +6309,45 @@ describe("sendJobConclusionSpan", () => {
       expect(attrs["gh-aw.detection.reason"]).toBe("threat_detected");
     });
 
+    it.each([
+      ["skipped", "file"],
+      ["skipped", "log"],
+      ["success", "file"],
+      ["success", "log"],
+    ])("reports token usage for detection conclusion %s with counters from %s", async (conclusion, source) => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+      vi.stubGlobal("fetch", mockFetch);
+
+      process.env.INPUT_JOB_NAME = "detection";
+      process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
+      statSpy.mockImplementation(() => {
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+
+      const usage = { input_tokens: 5000, output_tokens: 200, cache_read_tokens: 100, cache_write_tokens: 50 };
+      readFileSpy.mockImplementation(filePath => {
+        if (source === "file" && filePath === "/tmp/gh-aw/agent_usage.json") return JSON.stringify(usage);
+        if (source === "log" && filePath === "/tmp/gh-aw/agent-stdio.log") return JSON.stringify({ type: "result", usage }) + "\n";
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+
+      await sendJobConclusionSpan("gh-aw.detection.conclusion");
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const attrs = Object.fromEntries(body.resourceSpans[0].scopeSpans[0].spans[0].attributes.map(a => [a.key, a.value.intValue ?? a.value.doubleValue ?? a.value.stringValue]));
+      expect(attrs["gh-aw.detection.conclusion"]).toBe(conclusion);
+      if (conclusion === "skipped") {
+        expect(Object.keys(attrs).filter(key => key.startsWith("gen_ai.usage."))).toEqual([]);
+      } else {
+        expect(attrs["gen_ai.usage.input_tokens"]).toBe(5000);
+        expect(attrs["gen_ai.usage.output_tokens"]).toBe(200);
+        expect(attrs["gen_ai.usage.cache_read.input_tokens"]).toBe(100);
+        expect(attrs["gen_ai.usage.cache_creation.input_tokens"]).toBe(50);
+        expect(attrs["gen_ai.usage.total_tokens"]).toBe(5200);
+      }
+    });
+
     it.each(["skipped", "success"])("does not reuse inherited agent costs when detection is %s without its own AIC", async conclusion => {
       const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
       vi.stubGlobal("fetch", mockFetch);

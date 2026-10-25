@@ -2214,7 +2214,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const agentUsageFilePath = "/tmp/gh-aw/agent_usage.json";
   const agentUsageRaw = readJSONIfExists(agentUsageFilePath);
   const agentUsageNormalized = normalizeRuntimeTokenUsage(agentUsageRaw);
-  const agentUsage = agentUsageNormalized || runtimeMetrics.tokenUsage || {};
+  // A skipped scan has no token usage, even if downloaded agent artifacts contain counters.
+  const agentUsage = jobName === "detection" && detectionConclusion === "skipped" ? {} : agentUsageNormalized || runtimeMetrics.tokenUsage || {};
   // Mark the span as an error when the agent job failed, timed out, or was cancelled.
   const isAgentTimedOut = agentConclusion === "timed_out";
   const isAgentFailure = agentConclusion === "failure" || isAgentTimedOut;
