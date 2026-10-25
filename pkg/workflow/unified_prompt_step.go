@@ -346,7 +346,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 
 	// Add environment variables from user prompt expressions (these override built-in ones)
 	for _, mapping := range expressionMappings {
-		allEnvVars[mapping.EnvVar] = fmt.Sprintf("${{ %s }}", mapping.Content)
+		allEnvVars[mapping.EnvVar] = mapping.environmentValue()
 		expressionMappingsMap[mapping.EnvVar] = mapping
 	}
 

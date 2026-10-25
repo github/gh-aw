@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow/actions"
+	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,9 +75,22 @@ Test workflow with on.steps creating pre-activation job
 		}
 
 		// Verify activated output is 'true' when on.steps is the only condition
-		if !strings.Contains(lockContentStr, "activated: ${{ 'true' }}") {
+		if !strings.Contains(lockContentStr, `activated: "true"`) {
 			t.Errorf("Expected activated output to be 'true'. Lock file:\n%s", lockContentStr)
 		}
+		var document struct {
+			Jobs map[string]struct {
+				Outputs map[string]any `yaml:"outputs"`
+			} `yaml:"jobs"`
+		}
+		require.NoError(t, yaml.Unmarshal(lockContent, &document))
+		assert.Equal(t, "true", document.Jobs["pre_activation"].Outputs["activated"])
+		assert.NotContains(t, lockContentStr, "activated: ${{ 'true' }}")
+		compiled, err := actions.Parse(lockContent)
+		require.NoError(t, err)
+		diagnostics, err := workflowlint.ObfuscationRule().Check(context.Background(), workflowlint.Input{Workflow: compiled})
+		require.NoError(t, err)
+		assert.Empty(t, diagnostics)
 	})
 
 	t.Run("on_steps_with_other_checks", func(t *testing.T) {
@@ -119,7 +136,7 @@ Test workflow with on.steps combined with role checks
 		}
 
 		// The activated output should use the membership check (not 'true')
-		if strings.Contains(lockContentStr, "activated: ${{ 'true' }}") {
+		if strings.Contains(lockContentStr, `activated: "true"`) {
 			t.Error("Expected activated output to use membership check, not 'true'")
 		}
 		if !strings.Contains(lockContentStr, "check_membership") {

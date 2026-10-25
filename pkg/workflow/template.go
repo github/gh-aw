@@ -144,8 +144,7 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 		}
 		seen[mapping.EnvVar] = struct{}{}
 
-		// Write the environment variable with the original GitHub expression
-		fmt.Fprintf(yaml, "          %s: ${{ %s }}\n", mapping.EnvVar, mapping.Content)
+		yaml.WriteString("          " + mapping.EnvVar + ": " + mapping.environmentValue() + "\n")
 	}
 
 	yaml.WriteString("        with:\n")
