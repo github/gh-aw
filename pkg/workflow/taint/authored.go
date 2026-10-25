@@ -88,12 +88,6 @@ func analyzeAuthoredDocumentWithContext(ctx context.Context, document *aw.Docume
 	return a.result, errors.Join(failures...)
 }
 
-// AnalyzeAuthoredJavaScript returns new authored script flows without duplicating
-// the ordinary shell/prompt findings already checked in the compiled graph.
-func AnalyzeAuthoredJavaScript(ctx context.Context, document *aw.Document, rule Rule) (Result, error) {
-	return analyzeAuthoredJavaScript(ctx, document, rule, false)
-}
-
 func analyzeAuthoredJavaScript(ctx context.Context, document *aw.Document, rule Rule, workflowContext bool) (Result, error) {
 	result, err := analyzeAuthoredWithContext(ctx, document, rule, workflowContext)
 	// A JS-disabled baseline removes ordinary shell/prompt duplicates without

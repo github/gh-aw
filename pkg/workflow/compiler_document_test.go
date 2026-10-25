@@ -7,9 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
-	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,40 +33,6 @@ steps:
 
 Find something worth reporting.
 `
-
-func TestCompileDocumentToActionsAST(t *testing.T) {
-	document, err := aw.Parse(documentWorkflowSource)
-	require.NoError(t, err)
-	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
-	actual, err := compiler.CompileDocument(document, "document.md")
-	require.NoError(t, err)
-	assert.Equal(t, "Document workflow", actual.Name)
-	assert.NotEmpty(t, actual.Jobs)
-	assert.Contains(t, actual.On, "workflow_dispatch")
-	jobs := make(map[actions.JobID]*actions.Job)
-	for _, job := range actual.Jobs {
-		jobs[job.ID] = job
-	}
-	assert.Contains(t, jobs, actions.JobID("agent"))
-	assert.Contains(t, jobs, actions.JobID("safe_outputs"))
-	other := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
-	data, err := other.ParseWorkflowString(documentWorkflowSource, "document.md")
-	require.NoError(t, err)
-	content, err := other.CompileToYAML(data, "document.md")
-	require.NoError(t, err)
-	expected, err := actions.Parse([]byte(content))
-	require.NoError(t, err)
-	assert.Equal(t, expected, actual, "document compilation must use the complete existing compiler")
-	emitted, err := actions.Emit(actual)
-	require.NoError(t, err)
-	assert.Contains(t, emitted, "echo authored")
-	assert.Contains(t, emitted, "Find something worth reporting.")
-	assert.NotContains(t, emitted, "\nengine:")
-	assert.NotContains(t, emitted, "\ntools:")
-	after, err := aw.Emit(document)
-	require.NoError(t, err)
-	assert.Equal(t, documentWorkflowSource, after)
-}
 
 func TestParseWorkflowDocumentEditsAndTypedConfig(t *testing.T) {
 	document, err := aw.Parse(documentWorkflowSource)
@@ -164,37 +128,4 @@ func TestDocumentRelativeImports(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, content, "{{#runtime-import")
 	assert.Contains(t, content, "shared.md")
-}
-
-func TestCompileDocumentValidationErrors(t *testing.T) {
-	tests := []struct {
-		source string
-		want   string
-	}{
-		{"# Plain Markdown\n", "no frontmatter found"},
-		{"---\ntools:\n  bash: [echo]\n---\nShared prompt.\n", "shared"},
-		{"---\nredirect: owner/repo/workflow.md@main\n---\n", "redirect"},
-		{"---\non: workflow_dispatch\nengine: copilot\nunknown-property: true\n---\nPrompt.\n", "unknown-property"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			document, err := aw.Parse(tt.source)
-			require.NoError(t, err)
-			compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
-			_, err = compiler.CompileDocument(document, "invalid.md")
-			require.ErrorContains(t, err, tt.want)
-		})
-	}
-	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
-	_, err := compiler.CompileDocument(nil, "invalid.md")
-	require.ErrorContains(t, err, "cannot be nil")
-}
-
-func TestCompileDocumentPropagatesCompilationFailures(t *testing.T) {
-	t.Setenv(compilerenv.RequireSelfHostedRunners, "true")
-	document, err := aw.Parse("---\non: workflow_dispatch\nengine: copilot\n---\n\n# Mission\n")
-	require.NoError(t, err)
-	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
-	_, err = compiler.CompileDocument(document, "invalid-runner.md")
-	require.ErrorContains(t, err, "self-hosted runner")
 }

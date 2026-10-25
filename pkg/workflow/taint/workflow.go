@@ -105,7 +105,7 @@ func safeOutputIntegrationJobs(rule Rule, document *aw.Document) ([]string, erro
 
 // AnalyzeDocument checks the AW prompt and script entry points alongside its
 // compiled Actions graph. Fast mode avoids generated JavaScript traversal.
-// Callers compile through workflow.Compiler.CompileDocument so imports and
+// Callers compile through the workflow compiler so imports and
 // compiler-generated steps use exactly the same execution model as gh aw.
 func AnalyzeDocument(document *aw.Document, compiled *actions.Workflow, rule Rule) (Result, error) {
 	if document == nil {
