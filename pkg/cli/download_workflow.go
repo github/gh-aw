@@ -243,9 +243,7 @@ func decodeBase64FileContent(raw string) ([]byte, error) {
 	cleaned := strings.Join(strings.Fields(raw), "")
 	content, err := base64.StdEncoding.DecodeString(cleaned)
 	if err != nil {
-		downloadLog.Printf("Base64 decode failed: cleaned_len=%d, err=%v", len(cleaned), err)
 		return nil, fmt.Errorf("failed to decode file content: %w", err)
 	}
-	downloadLog.Printf("Decoded base64 file content: bytes=%d", len(content))
 	return content, nil
 }
