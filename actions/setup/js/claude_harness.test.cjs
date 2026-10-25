@@ -55,7 +55,7 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
   fs.writeFileSync(stubPath, stubScript, "utf8");
   fs.writeFileSync(promptPath, prompt, "utf8");
 
-  const env = { ...harnessChildEnv, GH_AW_AWF_CONFIG_PATH: path.join(tempDir, "missing-awf-config.json"), ...extraEnv, CLAUDE_HARNESS_STUB_CALLS: callsPath };
+  const env = { ...harnessChildEnv, GH_AW_TMP_DIR: tempDir, GH_AW_AWF_CONFIG_PATH: path.join(tempDir, "missing-awf-config.json"), ...extraEnv, CLAUDE_HARNESS_STUB_CALLS: callsPath };
   try {
     if (reflectData) {
       const preloadPath = path.join(tempDir, "reflect-fixture.cjs");
@@ -76,13 +76,40 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
           .filter(Boolean)
           .map(line => JSON.parse(line))
       : [];
-    return { result, calls };
+    const telemetryPath = path.join(env.GH_AW_TMP_DIR, env.GH_AW_PHASE === "detection" ? "threat-detection/detection_harness_retry.json" : "harness_retry.json");
+    const harnessRetry = fs.existsSync(telemetryPath) ? JSON.parse(fs.readFileSync(telemetryPath, "utf8")) : null;
+    return { result, calls, harnessRetry };
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
 describe("claude_harness.cjs", () => {
+  it.each([
+    { failures: 0, exitCode: 0, attempts: 1, phase: "agent" },
+    { failures: 2, exitCode: 0, attempts: 3, phase: "agent" },
+    { failures: 3, exitCode: 1, attempts: 3, phase: "detection" },
+  ])("persists classified retries after $failures failures in $phase", ({ failures, exitCode, attempts, phase }) => {
+    const { result, harnessRetry } = runHarnessWithStub({
+      extraEnv: { GH_AW_PHASE: phase, GH_AW_HARNESS_MAX_RETRIES: "2", GH_AW_SAFE_OUTPUTS: "", ANTHROPIC_MODEL: "claude-sonnet-5" },
+      stubScript: `
+        const fs = require("fs");
+        const calls = process.env.CLAUDE_HARNESS_STUB_CALLS;
+        const attempt = fs.existsSync(calls) ? fs.readFileSync(calls, "utf8").trim().split("\\n").length : 0;
+        fs.appendFileSync(calls, JSON.stringify({ attempt }) + "\\n");
+        console.log(JSON.stringify({ type: "system", subtype: "init", session_id: "retry-telemetry-session" }));
+        console.log(JSON.stringify({ type: "assistant", session_id: "retry-telemetry-session", message: { content: [{ type: "text", text: "Working" }] } }));
+        if (attempt < ${failures}) {
+          console.log(JSON.stringify({ type: "result", subtype: "error_during_execution", is_error: true, result: "rate_limit_error" }));
+          process.exit(1);
+        }
+      `,
+    });
+    expect(result.status, result.stderr).toBe(exitCode);
+    expect(harnessRetry).toMatchObject({ attempts, exit_code: exitCode });
+    expect(harnessRetry.attempt_results.map(attempt => attempt.failure_classes)).toEqual(Array.from({ length: attempts }, (_, index) => (index < failures ? ["rate_limit_error"] : [])));
+  });
+
   describe("threat detection model aliases", () => {
     const reflectData = {
       endpoints: [{ provider: "anthropic", configured: true, port: 10001, models: ["claude-haiku-4-5-20251001", "claude-sonnet-5"] }],

@@ -39,7 +39,7 @@ const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require(".
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
-const { captureExecutionEvidenceConfiguration, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -1044,6 +1044,7 @@ async function main() {
       ` pollIntervalMs=${contextRebuildCircuitBreaker.pollIntervalMs}`
   );
   const retryRun = await runHarnessRetryLoop({
+    telemetryPath: resolveHarnessRetryTelemetryPath(),
     maxRetries: MAX_RETRIES,
     initialDelayMs: INITIAL_DELAY_MS,
     backoffMultiplier: BACKOFF_MULTIPLIER,
@@ -1174,6 +1175,19 @@ async function main() {
       const isInvalidRequest = invalidRequestErrorCode !== null;
       const permissionDeniedCount = countPermissionDeniedIssues(result.output);
       const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
+      result.failureClasses = Object.entries({
+        rate_limit_error: isRateLimit,
+        token_per_minute_rate_limit: isTokenPerMinuteRateLimit,
+        authentication_failed: isAuthenticationFailed,
+        missing_api_key: isMissingApiKey,
+        server_error: isServer,
+        invalid_model: isInvalidModel,
+        unsupported_model_tools: isUnsupportedModelTools,
+        invalid_request: isInvalidRequest,
+        permission_denied: hasNumerousPermissionDenied,
+      })
+        .filter(([, detected]) => detected)
+        .map(([reason]) => reason);
       log(
         `attempt ${attempt + 1} failed:` +
           ` exitCode=${result.exitCode}` +

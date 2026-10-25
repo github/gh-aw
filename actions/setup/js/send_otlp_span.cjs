@@ -2574,6 +2574,12 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // When no agent span is emitted the attributes fall through to the conclusion span
   // so a single query is still sufficient for observability.
   const usageAttrs = [];
+  const harnessRetry = jobEmitsOwnTokenUsage ? readJSONIfExists(getGhAwPath(jobName === "detection" ? "threat-detection/detection_harness_retry.json" : "harness_retry.json")) : null;
+  if (harnessRetry && Number.isSafeInteger(harnessRetry.attempts) && harnessRetry.attempts >= 0 && Array.isArray(harnessRetry.attempt_results) && harnessRetry.attempt_results.length === harnessRetry.attempts) {
+    const retryReasons = harnessRetry.attempt_results.flatMap(attempt => (Array.isArray(attempt?.failure_classes) ? attempt.failure_classes.filter(reason => typeof reason === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(reason)) : []));
+    usageAttrs.push(buildAttr("gh-aw.harness.attempts", harnessRetry.attempts));
+    usageAttrs.push(buildArrayAttr("gh-aw.harness.retry_reasons", retryReasons));
+  }
   if (typeof aiCredits === "number") {
     usageAttrs.push(buildDoubleAttr("gh-aw.aic", aiCredits));
   }

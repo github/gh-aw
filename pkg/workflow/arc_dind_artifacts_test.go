@@ -72,3 +72,13 @@ func TestArcDindFailureHandlerUsesDownloadedArtifactPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(steps, ""), "GH_AW_TMP_DIR:")
 }
+
+func TestArcDindDetectionHarnessRetryTelemetryCollection(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		RunnerConfig:  &RunnerConfig{Topology: RunnerTopologyArcDind},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+	}
+	detection := strings.Join(compiler.buildCopyDetectionFirewallLogsStep(data), "")
+	assert.Contains(t, detection, `"${RUNNER_TEMP}/gh-aw/sandbox/agent/detection_harness_retry.json" /tmp/gh-aw/threat-detection/detection_harness_retry.json`)
+}
