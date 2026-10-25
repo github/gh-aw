@@ -60,7 +60,7 @@ describe("PR lifecycle guard", () => {
     await expect(getStalePullRequestReason(client(undefined), runtime("open"))).rejects.toThrow("Cannot determine current state");
   });
 
-  it("keeps staged previews available without API reads", async () => {
+  it("keeps staged previews available without API reads and logs a preview notice", async () => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "true");
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const github = client("closed");

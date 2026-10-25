@@ -16,7 +16,7 @@ func TestCustomJobDetectionGuardExpressionContract(t *testing.T) {
 	} {
 		t.Run(condition, func(t *testing.T) {
 			job := &Job{Name: "report", Needs: []string{"agent"}, If: condition}
-			require.NoError(t, addCustomJobDetectionGuard(job))
+			require.NoError(t, addCustomJobDetectionGuard(job, false))
 			assert.Contains(t, job.Needs, "detection")
 			assert.Contains(t, job.If, "needs.detection.outputs.detection_success == 'true'")
 			assert.NotContains(t, job.If, "(${{")
@@ -29,7 +29,7 @@ func TestCustomJobDetectionGuardExpressionContract(t *testing.T) {
 	} {
 		t.Run(condition, func(t *testing.T) {
 			job := &Job{Name: "report", Needs: []string{"agent"}, If: condition}
-			require.ErrorContains(t, addCustomJobDetectionGuard(job), "jobs.report.if")
+			require.ErrorContains(t, addCustomJobDetectionGuard(job, false), "jobs.report.if")
 			assert.Equal(t, condition, job.If)
 			assert.Equal(t, []string{"agent"}, job.Needs)
 		})

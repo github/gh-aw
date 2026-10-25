@@ -55,7 +55,7 @@ trap 'rm -f "$OUTPUT"; rm -rf "$FIXTURE_ROOT"' EXIT
 
 bash "$SCRIPT_DIR/check-safe-outputs-transport-integrity_test.sh"
 
-(cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" >"$OUTPUT" 2>&1) || true
+(cd "$REPO_ROOT" && bash "$SCRIPT_DIR/check-safe-outputs-conformance.sh" 2>&1 | sed -E $'s/\033\\[[0-9;]*[[:alpha:]]//g' >"$OUTPUT") || true
 
 if ! grep -q 'SEC-005: All cross-repo handlers validate allowlists' "$OUTPUT" ||
     grep -q '\[HIGH\].*SEC-005:' "$OUTPUT"; then
@@ -63,6 +63,14 @@ if ! grep -q 'SEC-005: All cross-repo handlers validate allowlists' "$OUTPUT" ||
     grep 'SEC-005:' "$OUTPUT" || true
     exit 1
 fi
+
+for finding in TYPE-016 MCE-001 USE-001 USE-003; do
+    if grep -E "\\[(HIGH|MEDIUM|LOW)\\] $finding:" "$OUTPUT" >/dev/null; then
+        echo "FAIL: Expected no $finding safe-output conformance findings"
+        grep -E "\\[(HIGH|MEDIUM|LOW)\\] $finding:" "$OUTPUT"
+        exit 1
+    fi
+done
 
 mapfile -t findings < <(grep "IMP-004: Safe output config property is missing" "$OUTPUT" || true)
 mapfile -t target_findings < <(grep "IMP-005: Safe output target authorization conformance gap" "$OUTPUT" || true)

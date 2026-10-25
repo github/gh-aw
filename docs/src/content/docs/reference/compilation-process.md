@@ -13,6 +13,22 @@ The `gh aw compile` command transforms a markdown workflow file into a complete 
 
 When the workflow runs, the markdown body is loaded at runtime — you can edit instructions without recompilation. See [Editing Workflows](/gh-aw/setup/working-with-workflows/#editing-workflows) for details.
 
+## Network access
+
+Workflow schemas and built-in Actions/AW lint rules are bundled with the CLI; they do not download schemas or install linters during compilation. Remote imports and action references not covered by cached or embedded pins can require GitHub requests. `--validate` additionally checks runtime packages, container images, and repository features. External scanners are opt-in and may download container images or contact upstream services.
+
+Interactive compilation performs a best-effort compiler update check at most once every 24 hours. It runs in the background with a three-second total budget, cancels outstanding requests when compilation finishes, and probes identical current/latest release tags only once. `--no-check-update` disables this check; CI and non-interactive invocations skip it.
+
+`gh aw update` refreshes upstream state on each invocation, but shares action release lists and tag resolutions across actions from the same repository within that invocation. Release lists use 100 entries per page, and source content already fetched for comparison or merging is reused. By default, `update` also recompiles workflows, so a separate `gh aw compile` is unnecessary unless additional compilation options are required.
+
+When SDK authentication is available, update uses native GitHub API clients with pooled HTTP connections for source metadata, workflow downloads, release lists, and action tags, instead of starting a fresh `gh api` subprocess for each request. Host selection follows the GitHub CLI helpers, including `GH_HOST` and repository detection. If native client setup fails, existing GitHub CLI requests remain available.
+
+Independent action release lookups, container digest lookups, and final action integrity checks run in bounded batches of up to eight concurrent operations. Concurrent requests for the same action metadata share one fetch, including failures. Action tags resolve through the commit endpoint with a SHA-only response, avoiding separate annotated-tag peeling requests and commit diff downloads. Successful resolutions also prove commit existence; final validation reuses that evidence only within the same update invocation, checks the stored version/SHA pair against it, and fetches any unverified entries. Cache changes, workflow rewrites, and summaries are applied sequentially after each batch.
+
+Container digest resolution uses registry metadata only (`docker buildx imagetools inspect`, then `crane digest`); it never pulls full images to discover their digests. If both methods fail, the command reports the failure and preserves any existing pin rather than downloading image layers.
+
+`gh aw update --verbose` prints network-operation start messages and completion messages with elapsed time and success/failure status. These cover GitHub CLI calls, native source/commit API requests, public API fallbacks, Git workflow downloads, and each metadata-only container-digest resolution strategy. Native update requests also report connection reuse, DNS lookup, TCP connect, TLS handshake, and time to first response byte (measured from request start, including connection setup). GitHub CLI timings include subprocess startup and all pages requested by that invocation; they are not per-page HTTP timings. Request headers, credentials, and response bodies are not included.
+
 ## Repository Configuration (`aw.json`)
 
 `.github/workflows/aw.json` stores repository-wide compilation settings.

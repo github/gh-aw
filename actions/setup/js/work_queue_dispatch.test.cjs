@@ -49,6 +49,37 @@ function setup(settings = {}) {
   return { fixture, post, options };
 }
 
+function setupPoolInstallation() {
+  const result = setup({
+    granted: false,
+    configurePolicy: policy => {
+      policy.authorization = "aw";
+      policy.producers = {};
+      delete policy.pools.default.profiles.default.principal;
+      policy.pools.default.profiles.default.logical_contract = "a".repeat(64);
+    },
+  });
+  const { fixture, options } = result;
+  const proposal = structuredClone(fixture.policy);
+  proposal.pools.smoke = structuredClone(proposal.pools.default);
+  proposal.pools.smoke.logical_limit = 1;
+  proposal.pools.smoke.native_limit = 1;
+  const contents = `on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\nenv:\n  GH_AW_WORK_QUEUE_CONTRACT: "${"a".repeat(64)}"\n`;
+  fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
+    data: {
+      type: "file",
+      path: workflowPath,
+      encoding: "base64",
+      content: Buffer.from(workflowPath.endsWith(".md") ? "---\ntools:\n  work-queue:\n    worker: true\n---\nWorker.\n" : contents).toString("base64"),
+    },
+  }));
+  fixture.githubClient.rest.repos.get = async () => ({ status: 200, data: { full_name: REPOSITORY, id: 7, default_branch: "main", permissions: { push: true } } });
+  const getRef = fixture.githubClient.rest.git.getRef;
+  fixture.githubClient.rest.git.getRef = async parameters => (parameters.ref === "heads/main" ? { data: { ref: "refs/heads/main", object: { type: "commit", sha: REF } } } : getRef(parameters));
+  fixture.githubClient.rest.actions.getWorkflow = vi.fn(async () => ({ data: { path: ".github/workflows/worker.lock.yml", state: "active" } }));
+  return { ...result, options: { ...options, policyProposal: proposal }, proposal };
+}
+
 function failedFixture(disposition) {
   const result = setup({ bound: true, count: 1, workerPrincipal: "22" });
   const { fixture } = result;
@@ -1495,32 +1526,41 @@ describe("native queue launch fencing and conservative recovery", () => {
     await expect(dispatchQueueIntent({ ...options, remainingDispatches: 1, message: { type: "work_queue_dispatch_next", intent_id: "forged", pool: "default", max_claims: 1, max_dispatches: 1, work_id: "preferred" } })).rejects.toThrow();
   });
 
-  it("rejects dispatch to a missing pool before synchronizing deployments", async () => {
-    const { fixture, options } = setup({
-      granted: false,
-      configurePolicy: policy => {
-        policy.authorization = "aw";
-        policy.producers = {};
-        delete policy.pools.default.profiles.default.principal;
-      },
+  it("installs a configured missing pool before dispatch without changing existing Work or the Policy epoch", async () => {
+    const { fixture, options, post, proposal } = setupPoolInstallation();
+    const beforeWorks = canonical([...fixture.state.works]);
+    const beforeEpoch = fixture.state.policy_epoch;
+    const result = await dispatchQueueIntent({
+      ...options,
+      assignment: null,
+      remainingDispatches: 1,
+      message: { type: "work_queue_dispatch_next", intent_id: "missing-pool", pool: "smoke", max_claims: 1, max_dispatches: 1 },
     });
-    const proposal = structuredClone(fixture.policy);
-    proposal.pools.smoke = structuredClone(proposal.pools.default);
-    fixture.githubClient.rest.repos.getContent = vi.fn();
+    expect(result).toMatchObject({ success: true, status: "no_grant", dispatches: 0 });
+    expect(fixture.state.policy.pools.smoke).toEqual(proposal.pools.smoke);
+    expect(fixture.state.policy.pools.default).toEqual(fixture.policy.pools.default);
+    expect(fixture.state.policy_epoch).toBe(beforeEpoch);
+    expect(canonical([...fixture.state.works])).toBe(beforeWorks);
+    expect(fixture.transactions.flatMap(commit => commit.operations).filter(operation => operation.kind === "PoolInstall")).toHaveLength(1);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it.each(["budget", "claims", "unknown", "preview", "missing-proposal"])("does not install a pool for %s dispatch", async mode => {
+    const { fixture, options, post } = setupPoolInstallation();
     const before = canonical(fixture.transactions);
-
-    await expect(
-      dispatchQueueIntent({
-        ...options,
-        policyProposal: proposal,
-        assignment: null,
-        remainingDispatches: 1,
-        message: { type: "work_queue_dispatch_next", intent_id: "missing-pool", pool: "smoke", max_claims: 1, max_dispatches: 1 },
-      })
-    ).rejects.toMatchObject({ code: "work_queue_pool_not_installed" });
-
+    const pending = dispatchQueueIntent({
+      ...options,
+      assignment: null,
+      remainingDispatches: mode === "budget" ? 0 : 1,
+      ...(mode === "preview" ? { staged: true } : {}),
+      ...(mode === "missing-proposal" ? { policyProposal: undefined } : {}),
+      message: { type: "work_queue_dispatch_next", intent_id: "invalid-pool-dispatch", pool: mode === "unknown" ? "unknown" : "smoke", max_claims: mode === "claims" ? 0 : 1, max_dispatches: 1 },
+    });
+    if (mode === "unknown" || mode === "missing-proposal") await expect(pending).rejects.toMatchObject({ code: "work_queue_pool_not_installed" });
+    else await expect(pending).rejects.toThrow();
     expect(canonical(fixture.transactions)).toBe(before);
     expect(fixture.githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
   });
 
   it("rechecks the authenticated origin's durable budget inside fresh candidate generation", async () => {
@@ -2212,36 +2252,111 @@ describe("native queue launch fencing and conservative recovery", () => {
     await installWorkQueuePools({ ...options, policyProposal: proposal }, trusted, [name]);
     expect(fixture.transactions).toHaveLength(count);
   });
-  it("rejects a first submission to a missing AW pool before deployment synchronization", async () => {
-    const { fixture, options } = setup({
-      granted: false,
+  it("installs a configured pool on first submission and recovers the accepted request without reinstalling", async () => {
+    const { fixture, options, proposal } = setupPoolInstallation();
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-first-use-pool-"));
+    const filename = path.join(directory, "intents.jsonl");
+    try {
+      fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "first-smoke-use", kind: "submit", parameters: { nodes: [{ pool: "smoke", payload: { task: "approved" } }] } })}\n`);
+      const beforeWorks = canonical([...fixture.state.works]);
+      const beforeEpoch = fixture.state.policy_epoch;
+      const publish = vi.fn(options.publishWorkQueueRequest);
+      const result = await processWorkQueueIntents({ ...options, assignment: null, role: "dispatcher", policyProposal: proposal, intentPath: filename, publishWorkQueueRequest: publish });
+
+      expect(result.receipts).toMatchObject([{ status: "durable" }]);
+      expect(fixture.state.policy.pools.smoke).toEqual(proposal.pools.smoke);
+      expect(fixture.state.policy.pools.default).toEqual(fixture.policy.pools.default);
+      expect(fixture.state.policy_epoch).toBe(beforeEpoch);
+      expect(canonical([...fixture.state.works].filter(([, work]) => work.pool === "default"))).toBe(beforeWorks);
+      expect([...fixture.state.works.values()].filter(work => work.pool === "smoke")).toHaveLength(1);
+      expect(publish.mock.calls.map(([args]) => args.request.kind)).toEqual(["pool_install", "submit"]);
+      const beforeRecovery = canonical(fixture.transactions);
+      expect((await processWorkQueueIntents({ ...options, assignment: null, role: "dispatcher", intentPath: filename })).receipts).toMatchObject([{ status: "durable", request_id: result.receipts[0].request_id }]);
+      expect(canonical(fixture.transactions)).toBe(beforeRecovery);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("installs the pool, admits prepared Work and binds one worker launch end to end", async () => {
+    const { fixture, options, post } = setupPoolInstallation();
+    const getRun = fixture.githubClient.rest.actions.getWorkflowRun;
+    fixture.githubClient.rest.actions.getWorkflowRun = async parameters => {
+      const response = await getRun(parameters);
+      return parameters.run_id === "42" ? { ...response, data: { ...response.data, display_title: `gh-aw work-queue ${[...fixture.state.dispatches.values()].at(-1).dispatch_id}` } } : response;
+    };
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-pool-plan-"));
+    const filename = path.join(directory, "intents.jsonl");
+    try {
+      stagePlanIntents(filename, {
+        version: 1,
+        nodes: [{ pool: "smoke", payload: { task: "synthetic smoke", effect_contract: { kind: "none" } } }],
+        dispatch: { pool: "smoke", max_claims: 1, max_dispatches: 1 },
+      });
+      const configured = { ...options, assignment: null, role: "dispatcher", intentPath: filename, maxDispatches: 1 };
+      const result = await processWorkQueueIntents(configured);
+      expect(result.receipts).toMatchObject([{ status: "durable" }, { status: "durable", success: true, dispatches: 1, launches: [{ state: "bound", run_id: "42", dispatched: true }] }]);
+      expect(result.remaining_dispatches).toBe(0);
+      expect(fixture.transactions.flatMap(commit => commit.operations).filter(operation => operation.kind === "PoolInstall")).toHaveLength(1);
+      expect([...fixture.state.works.values()].find(work => work.pool === "smoke")).toMatchObject({ state: "claimed", attempts: 1 });
+      expect(post).toHaveBeenCalledTimes(1);
+      const beforeRecovery = canonical(fixture.transactions);
+      expect((await processWorkQueueIntents(configured)).receipts).toMatchObject([{ status: "durable" }, { status: "durable", success: true, dispatches: 1 }]);
+      expect(canonical(fixture.transactions)).toBe(beforeRecovery);
+      expect(post).toHaveBeenCalledTimes(1);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["preview", "policy", "route", "verification", "missing"])("does not install or admit a missing pool when %s prevents first use", async mode => {
+    const { fixture, options, proposal, post } = setupPoolInstallation();
+    if (mode === "policy") proposal.pools.default.logical_limit += 1;
+    if (mode === "route") proposal.pools.smoke.profiles.default.workflow = ".github/workflows/unapproved.lock.yml";
+    if (mode === "verification") fixture.githubClient.rest.repos.getContent.mockRejectedValue(Object.assign(new Error("unavailable"), { status: 404 }));
+    if (mode === "missing") delete proposal.pools.smoke;
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-pool-rejection-"));
+    const filename = path.join(directory, "intents.jsonl");
+    try {
+      fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "blocked-first-use", kind: "submit", parameters: { nodes: [{ pool: "smoke", payload: {} }] } })}\n`);
+      const before = canonical(fixture.transactions);
+      const result = await processWorkQueueIntents({ ...options, assignment: null, role: "dispatcher", intentPath: filename, ...(mode === "preview" ? { staged: true } : {}) });
+      expect(result.receipts).toMatchObject([{ status: mode === "preview" ? "staged_preview" : "blocked" }]);
+      expect(canonical(fixture.transactions)).toBe(before);
+      expect(post).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not allow an assigned worker to install a missing pool", async () => {
+    const { fixture, options, post } = setup({
+      bound: true,
+      count: 1,
       configurePolicy: policy => {
         policy.authorization = "aw";
         policy.producers = {};
         delete policy.pools.default.profiles.default.principal;
       },
     });
+    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: "h1", outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: "h1" });
     const proposal = structuredClone(fixture.policy);
     proposal.pools.smoke = structuredClone(proposal.pools.default);
-    const workerContents = "on:\n  workflow_dispatch:\n    inputs:\n      work_queue_assignment:\n        type: string\n";
-    fixture.githubClient.rest.repos.getContent = vi.fn(async ({ path: workflowPath }) => ({
-      data: { type: "file", path: workflowPath, encoding: "base64", content: Buffer.from(workerContents).toString("base64") },
-    }));
-    fixture.githubClient.rest.actions.getWorkflow = vi.fn(async () => ({ data: { path: ".github/workflows/worker.lock.yml", state: "active" } }));
-    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-first-use-pool-"));
+    const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "gh-aw-queue-worker-pool-"));
     const filename = path.join(directory, "intents.jsonl");
     try {
-      fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "first-smoke-use", kind: "submit", parameters: { nodes: [{ pool: "smoke", payload: { task: "approved" } }] } })}\n`);
+      fs.writeFileSync(filename, `${JSON.stringify({ version: 3, intent_id: "worker-pool", kind: "submit", parameters: { nodes: [{ pool: "smoke", payload: {} }] } })}\n`);
       const before = canonical(fixture.transactions);
-      const publish = vi.fn(options.publishWorkQueueRequest);
-      const result = await processWorkQueueIntents({ ...options, assignment: null, role: "dispatcher", policyProposal: proposal, intentPath: filename, publishWorkQueueRequest: publish });
-
+      const result = await processWorkQueueIntents({
+        ...options,
+        policyProposal: proposal,
+        context: fixture.workerContext,
+        workflowRef: `${REPOSITORY}/.github/workflows/worker.lock.yml@${REF}`,
+        intentPath: filename,
+      });
       expect(result.receipts).toMatchObject([{ status: "blocked", reason: "work_queue_pool_not_installed" }]);
       expect(canonical(fixture.transactions)).toBe(before);
-      expect(Object.hasOwn(fixture.state.policy.pools, "smoke")).toBe(false);
-      expect([...fixture.state.works.values()].filter(work => work.pool === "smoke")).toHaveLength(0);
-      expect(publish).not.toHaveBeenCalled();
-      expect(fixture.githubClient.rest.repos.getContent).not.toHaveBeenCalled();
+      expect(post).not.toHaveBeenCalled();
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

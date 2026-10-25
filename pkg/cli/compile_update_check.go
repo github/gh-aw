@@ -60,12 +60,14 @@ func StartCompileUpdateCheck(ctx context.Context, noCheckUpdate bool, verbose bo
 	if !shouldRunCompileUpdateCheck(noCheckUpdate) {
 		return func() {}
 	}
+	ctx, cancel := context.WithTimeout(ctx, compileUpdateCheckTimeout)
 	updateCompileUpdateCheckTime()
 
 	results := make(chan *compileUpdateNotification, 1) // buffered channel closed by sender goroutine via defer
 
 	go func() {
 		defer close(results)
+		defer cancel()
 		defer func() {
 			if r := recover(); r != nil {
 				compileUpdateCheckLog.Printf("Panic in compile update check (recovered): %v", r)
@@ -96,6 +98,7 @@ func StartCompileUpdateCheck(ctx context.Context, noCheckUpdate bool, verbose bo
 	}()
 
 	return func() {
+		defer cancel()
 		result := waitForCompileUpdateNotification(ctx, results, compileUpdateCheckNoWait)
 		if result != nil {
 			printCompileUpdateNotification(result)
@@ -186,9 +189,12 @@ func runCompileUpdateCheck(ctx context.Context, client *http.Client) (*compileUp
 		return nil, nil
 	}
 
-	currentTagExists, err := downloadReleaseProbeFile(ctx, client, currentVersion)
-	if err != nil {
-		return nil, err
+	currentTagExists := true
+	if currentVersion != latestVersion {
+		currentTagExists, err = downloadReleaseProbeFile(ctx, client, currentVersion)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !currentTagExists {
 		return &compileUpdateNotification{
@@ -216,17 +222,31 @@ func fetchLatestReleaseTag(ctx context.Context, client *http.Client) (string, er
 	}
 	req.Header.Set("User-Agent", "gh-aw/"+GetVersion())
 
-	resp, err := client.Do(req)
+	// The redirect already identifies the tag; fetching its release page adds a round trip.
+	lookupClient := *client
+	lookupClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := lookupClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to query latest release: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("latest release request returned status %d", resp.StatusCode)
+	finalURL := resp.Request.URL
+	switch resp.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		finalURL, err = resp.Location()
+		if err != nil {
+			return "", fmt.Errorf("invalid latest release redirect: %w", err)
+		}
+	default:
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return "", fmt.Errorf("latest release request returned status %d", resp.StatusCode)
+		}
 	}
 
-	finalPath := resp.Request.URL.Path
+	finalPath := finalURL.Path
 	if !strings.Contains(finalPath, "/releases/tag/") {
 		return "", fmt.Errorf("unexpected latest release path %q", finalPath)
 	}

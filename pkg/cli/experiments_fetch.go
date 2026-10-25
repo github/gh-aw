@@ -199,6 +199,9 @@ func loadLocalExperimentConfigs(experimentName string) experimentFrontmatterResu
 // Returns a zero-value result when the file cannot be fetched or parsed.
 func loadRemoteExperimentConfigs(repoOverride, experimentName string) experimentFrontmatterResult {
 	experimentsLog.Printf("Loading remote experiment configs for %s from %s", experimentName, repoOverride)
+	if !isSafeRemoteExperimentName(experimentName) {
+		return experimentFrontmatterResult{}
+	}
 
 	// Build the candidate list. First, use the directory listing to find the exact filename
 	// whose sanitized basename matches experimentName (e.g. "ci-coach" for "cicoach").
@@ -206,16 +209,17 @@ func loadRemoteExperimentConfigs(repoOverride, experimentName string) experiment
 	candidates := workflowFileCandidates(experimentName)
 	if resolved := findRemoteWorkflowFilenameForExperiment(repoOverride, experimentName); resolved != "" && resolved != experimentName {
 		// Prepend the resolved name so it is tried before the bare sanitized form.
-		// Skip when resolved == experimentName to avoid a redundant fetch.
 		candidates = append([]string{resolved}, candidates...)
 	}
 
 	for _, candidate := range candidates {
 		apiPath := constants.WorkflowsDirSlash + candidate + ".md"
-		args := []string{"api",
-			"repos/{owner}/{repo}/contents/" + url.PathEscape(apiPath),
+		args, err := repositoryAPIArgs(repoOverride, "", "contents/"+escapeEndpoint(apiPath),
 			"--jq", ".content",
-			"--repo", repoOverride,
+		)
+		if err != nil {
+			experimentsLog.Printf("Rejecting remote workflow path %q: %v", apiPath, err)
+			continue
 		}
 		cmd := workflow.ExecGH(args...)
 		out, err := cmd.Output()
@@ -256,6 +260,14 @@ func loadRemoteExperimentConfigs(repoOverride, experimentName string) experiment
 	return experimentFrontmatterResult{}
 }
 
+func isSafeRemoteExperimentName(experimentName string) bool {
+	if err := validateAPIEndpoint(experimentName); err != nil {
+		experimentsLog.Printf("Rejecting unsafe experiment name %q: %v", experimentName, err)
+		return false
+	}
+	return true
+}
+
 func parseExperimentMetricConfigs(
 	frontmatter map[string]any,
 	source string,
@@ -276,10 +288,12 @@ func parseExperimentMetricConfigs(
 // matches experimentName. This mirrors findWorkflowFileForExperiment for remote repos.
 // Returns "" when the directory cannot be listed or no match is found.
 func findRemoteWorkflowFilenameForExperiment(repoOverride, experimentName string) string {
-	args := []string{"api",
-		"repos/{owner}/{repo}/contents/.github/workflows",
+	args, err := repositoryAPIArgs(repoOverride, "", "contents/.github/workflows",
 		"--jq", `[.[] | select(.name | endswith(".md")) | .name]`,
-		"--repo", repoOverride,
+	)
+	if err != nil {
+		experimentsLog.Printf("Rejecting remote workflow listing endpoint: %v", err)
+		return ""
 	}
 	cmd := workflow.ExecGH(args...)
 	out, err := cmd.Output()
@@ -399,10 +413,12 @@ func fetchLocalExperiments() ([]ExperimentInfo, error) {
 func fetchRemoteExperiments(repoOverride string) ([]ExperimentInfo, error) {
 	experimentsLog.Printf("Fetching remote experiment branches: repo=%s", repoOverride)
 
-	args := []string{"api", "repos/{owner}/{repo}/branches",
+	args, err := repositoryAPIArgs(repoOverride, "", "branches",
 		"--paginate",
-		"--jq", `[.[] | select(.name | startswith("` + experimentsBranchPrefix + `")) | .name]`,
-		"--repo", repoOverride,
+		"--jq", `[.[] | select(.name | startswith("`+experimentsBranchPrefix+`")) | .name]`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote branches endpoint: %w", err)
 	}
 	cmd := workflow.ExecGH(args...)
 	output, err := cmd.Output()
@@ -452,10 +468,11 @@ func fetchRemoteExperimentDetails(repoOverride, branchName, workflowID string) (
 
 	// Verify the branch exists.
 	encodedBranch := url.PathEscape(branchName)
-	checkArgs := []string{"api",
-		"repos/{owner}/{repo}/branches/" + encodedBranch,
+	checkArgs, err := repositoryAPIArgs(repoOverride, "", "branches/"+encodedBranch,
 		"--jq", ".name",
-		"--repo", repoOverride,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("invalid experiment branch endpoint: %w", err)
 	}
 	checkCmd := workflow.ExecGH(checkArgs...)
 	if _, err := checkCmd.Output(); err != nil {

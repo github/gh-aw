@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -22,6 +23,40 @@ func graderArtifact(results ...graderArtifactResult) *graderResultsArtifact {
 
 func graderResult(id, status, value string) graderArtifactResult {
 	return graderArtifactResult{ID: id, Status: status, Value: json.RawMessage(value)}
+}
+
+func TestGitHubGraderRunArtifactSourceHostRouting(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		repo     string
+		expected string
+	}{
+		{name: "ambient enterprise", repo: "owner/repo", expected: "ghes.example.com"},
+		{name: "explicit public", repo: "github.com/owner/repo", expected: "github.com"},
+		{name: "explicit enterprise", repo: "other.example.com/owner/repo", expected: "other.example.com"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GH_HOST", "ghes.example.com")
+			calls := installHostRoutingTestGH(t, tt.expected, tt.repo)
+			source := newGitHubGraderRunArtifactSource(t.TempDir(), tt.repo)
+			result := source.Load(context.Background(), "123")
+			require.Empty(t, result.ExclusionReason)
+			require.NotNil(t, result.Artifact)
+			require.Len(t, result.Artifact.Results, 1)
+			assert.Equal(t, "score", result.Artifact.Results[0].ID)
+			commands, err := os.ReadFile(calls)
+			require.NoError(t, err)
+			assert.Contains(t, string(commands), "repos/owner/repo/actions/runs/123")
+			assert.Contains(t, string(commands), "repos/owner/repo/actions/runs/123/artifacts")
+			assert.Contains(t, string(commands), "--name graders")
+			assert.Contains(t, string(commands), "-R "+tt.repo)
+			if tt.repo == "owner/repo" {
+				assert.NotContains(t, string(commands), "--hostname")
+			} else {
+				assert.Equal(t, 3, strings.Count(string(commands), "--hostname "+tt.expected))
+			}
+		})
+	}
 }
 
 func TestExperimentsDownloadSeparateGraderArtifactsBeforeLegacy(t *testing.T) {

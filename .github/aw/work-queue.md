@@ -1,12 +1,12 @@
 ---
-description: Agent instructions for Git-backed work queue producers, dispatchers, workers and observers.
+description: Git-backed work queue agent instructions.
 ---
 
 # Work Queue
 
 `tools.work-queue` schedules immutable DAGs and Claim-scoped effects.
-`work-queue.jsonl` is authoritative; V3 has no storage selector. Issues/PRs are dependencies.
-For issue-backed WorkQueueOps, see [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
+`work-queue.jsonl` is authoritative; V3 omits storage selectors. Issues/PRs are dependencies.
+For issue-backed WorkQueueOps: [WorkQueueOps](../../docs/src/content/docs/patterns/workqueue-ops.md).
 
 ## Select the role
 
@@ -35,11 +35,13 @@ Dispatchers require `tools.work-queue: true`, worker allowlist, bounded
 `dispatch-workflow.max`. Approved AW routes/credentials bind Claims to immutable
 native runs; ignore moved `target-ref`.
 
-`aw.json` `work_queue` configures concurrency, pending limits, retries, pools,
-fairness and Issue settings. Defaults: weighted-priority, concurrency 16,
+`aw.json` `work_queue`: concurrency, pending limits, retries, pools, fairness,
+Issues. Defaults: weighted-priority, concurrency 16,
 pending 4,096, singleton assignments, three attempts, 30-second backoff.
-First submit installs Policy/Work; first-use pools reuse installed worker
-authority, preserving existing pools/epoch.
+Submission initializes Policy/Work. Only trusted submit/dispatch install missing
+configured pools before deployment synchronization, reusing installed worker
+authority and preserving pools/epoch; never workers, observers, dry-run previews or
+accepted-request recovery. New worker profiles require administrator Policy updates.
 Standalone seeding is unsupported; AW/Actions authorize submissions.
 Economic/existing-pool changes require quiescence and
 `policy --from-config --epoch EPOCH`; config edits never rewrite active state.
@@ -98,8 +100,8 @@ Unassigned dispatchers cannot emit `noop` or `report_incomplete`.
   ([reference](safe-outputs-runtime.md)); each adapter binds one effect-type to
   an independently verified result, never job success alone.
 
-`<mcp-clis>` takes one JSON argument. `uninitialized` plus null SHA is empty;
-first `work_queue_submit` installs Policy and Work. Submit before dispatch.
+`<mcp-clis>` takes one JSON argument. `uninitialized` plus null SHA is empty.
+Submit before dispatch.
 Policyless ledgers fail; workers require Policy; `status: "staged"` is no grant.
 
 ## Dependencies and recovery
@@ -120,8 +122,7 @@ Retries/checkpoints preserve submission identity; never delete queues to retry a
 - Operator commands, TUI and diagnostic artifacts:
   [queue reference](../../docs/src/content/docs/reference/work-queue.md).
   Cancellation terminates Work, not workers; reconcile separately.
-  Build `go build -o ./gh-aw ./cmd/gh-aw`; use
-  `./gh-aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
+  `gh aw work-queue --repo OWNER/REPO stats --json`. `dispatch-next` grants
   reservations, never launches; use the authorized dispatcher.
 - Destructive: `gh aw work-queue clear --reason CODE [--dry-run | --hard]`
   requires repo maintain/admin, forbids CI, and requires interactive confirmation

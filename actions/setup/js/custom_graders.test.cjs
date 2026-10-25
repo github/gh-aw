@@ -15,6 +15,10 @@ const definition = (script, extra = {}) => ({ id: "custom-count", source: "inlin
 const grade = script => runCustomGraders(session, [definition(script)]).output.results[0];
 
 describe("isolated custom graders", () => {
+  it("uses a standardized code for invalid session input", () => {
+    expect(() => createSessionLookups(null)).toThrow(/^ERR_GRADER_SESSION_INVALID:/);
+  });
+
   it("serializes the shared data-only lookup contract for the worker", () => {
     const lookups = createSessionLookups(session);
     expect(serializeLookupsForWorker(lookups)).toEqual({

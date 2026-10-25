@@ -2,6 +2,7 @@
 "use strict";
 
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("run");
+const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { API_VERSION, nativeId, authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
@@ -14,7 +15,7 @@ const { readQueueMetadata } = require("./work_queue_read_retry.cjs");
 const { ERR_WORK_QUEUE_RECONCILIATION } = require("./error_codes.cjs");
 
 const reconciliationError = message => {
-  const error = new Error(message);
+  const error = new Error(`${ERR_VALIDATION}: ${message}`);
   return Object.assign(error, { code: message.split(";", 1)[0], category: ERR_WORK_QUEUE_RECONCILIATION });
 };
 

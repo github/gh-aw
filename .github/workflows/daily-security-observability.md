@@ -139,6 +139,29 @@ steps:
       count=$(jq '.runs | length' "$FIREWALL_RUNS" 2>/dev/null || echo 0)
       echo "Downloaded $count firewall-enabled workflow runs"
 
+  - name: Select bounded security audit candidates
+    env:
+      CURRENT_RUN_ID: ${{ github.run_id }}
+    run: |
+      jq -s --argjson current "$CURRENT_RUN_ID" '
+        [.[].runs[]
+          | select(.status == "completed" and .run_id != $current)
+          | select((.run_id | type) == "number" and .run_id > 0)
+          | select((.created_at | fromdateiso8601?) >= (now - 7 * 24 * 60 * 60))]
+        | unique_by(.run_id)
+        | sort_by(.run_id) | reverse
+        | {
+            runs: .[:20],
+            eligible_runs: length,
+            selected_runs: (.[:20] | length),
+            omitted_runs: ((length - 20) | if . > 0 then . else 0 end),
+            partial: (length > 20),
+            max_audits: 20
+          }
+      ' /tmp/gh-aw/agent/firewall/firewall-enabled-runs.json \
+        /tmp/gh-aw/agent/integrity/filtered-logs.json \
+        > /tmp/gh-aw/agent/security-audit-candidates.json
+
 tools:
   bash:
     - "*"
@@ -204,6 +227,8 @@ Both datasets cover the **last 7 days** and share the cache-memory path `/tmp/gh
 
 Read the pre-downloaded list of firewall-enabled workflow runs from `/tmp/gh-aw/agent/firewall/firewall-enabled-runs.json`. This file was populated by the startup step and contains runs from the last 7 days with the firewall feature enabled. Extract the `run_id` from each entry in the `runs` array.
 
+Restrict all detailed audits in Phases 2 and 3 to `/tmp/gh-aw/agent/security-audit-candidates.json`. Startup selects at most **20 unique completed runs** across both datasets, newest first, excluding this run and entries outside the reporting window. Audit each selected run at most once and reuse that result across both phases. Do not expand this list or follow collection continuations. Use at most **2 concurrent audits**, retain stderr diagnostics, and stop starting audits if disk free space falls below **1 GiB**. Report selected, successfully audited, omitted, and failed counts; describe capped, failed, or budget-stopped coverage as partial rather than a full seven-day census.
+
 ### Step 1.2: Early Exit if No Firewall Data
 
 If Step 1.1 returns zero workflow runs, note this in the final report as "No firewall-enabled workflow runs found in the past 7 days." and proceed directly to Phase 3 (DIFC analysis). Do not skip the final report.
@@ -214,11 +239,12 @@ If Step 1.1 returns zero workflow runs, note this in the final report as "No fir
 
 ### Step 2.1: Fetch Firewall Audit Data
 
-For each run collected in Phase 1, call the `audit` tool with the run_id to get detailed firewall information:
+For each selected run that appears in the firewall dataset, call the `audit` tool with only the required artifact sets to get detailed firewall information:
 
 ```json
 {
-  "run_id": 12345678
+  "run_id": 12345678,
+  "artifacts": ["firewall", "mcp"]
 }
 ```
 
@@ -230,6 +256,7 @@ The audit tool returns:
 - `policy_analysis` (when present) — rule-level attribution with `rule_hits`, `denied_requests`, `policy_summary`
 
 **Important:** Do NOT manually download and parse firewall log files. Always use the `audit` tool.
+Never omit `artifacts` or request `all`: the default audit downloads every artifact. The `firewall` and `mcp` sets currently share the agent artifact, so selection avoids unrelated artifacts but is not a hard byte cap. Preserve partial/error outcomes and missing evidence; do not treat them as zero events.
 
 ### Step 2.2: Aggregate Firewall Results
 
@@ -273,12 +300,13 @@ The startup step restores a cached snapshot from `/tmp/gh-aw/cache-memory/securi
 
 ### Step 3.2: Fetch Detailed DIFC Gateway Data
 
-1. Read `/tmp/gh-aw/agent/integrity/filtered-logs.json` and extract all run IDs from each entry's `run_id` field (under the `runs` array).
-2. For each run ID, call the `audit` tool to get its detailed DIFC filtered events:
+1. Read `/tmp/gh-aw/agent/integrity/filtered-logs.json` and intersect its run IDs with the bounded security audit candidates.
+2. Reuse Phase 2 results for overlapping runs. For each remaining selected run, call the `audit` tool with the same artifact selection to get its detailed DIFC filtered events:
 
 ```json
 {
-  "run_id": 12345678
+  "run_id": 12345678,
+  "artifacts": ["firewall", "mcp"]
 }
 ```
 

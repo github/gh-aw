@@ -18,7 +18,7 @@ const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 
 function scopeError(message, code = "claim_scope_invalid") {
-  return Object.assign(new Error(`work_queue_claim_scope: ${message}`), { code });
+  return Object.assign(new Error(`${ERR_WORK_QUEUE_CLAIM_SCOPE}: work_queue_claim_scope: ${message}`), { code });
 }
 
 function identifier(value, name) {

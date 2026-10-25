@@ -22,12 +22,6 @@ import (
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
-// getLatestActionRelease gets the latest release for an action repository
-// It respects semantic versioning and the allowMajor flag
-func getLatestActionRelease(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
-	return getLatestActionReleaseWithDeps(ctx, defaultActionUpdateDeps(), repo, currentVersion, allowMajor, verbose)
-}
-
 func getLatestActionReleaseWithDeps(ctx context.Context, deps actionUpdateDeps, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
 	updateLog.Printf("Getting latest release for %s@%s (allowMajor=%v)", repo, currentVersion, allowMajor)
 
@@ -368,6 +362,9 @@ func findCooledDownActionVersion(
 // reaches the underlying non-tag object SHA, matching what tools like Renovate expect.
 func getActionSHAForTag(ctx context.Context, repo, tag string) (string, error) {
 	updateLog.Printf("Getting SHA for %s@%s", repo, tag)
+	if client := updateGitHubClientFromContext(ctx); client != nil {
+		return client.actionTagSHA(ctx, repo, tag)
+	}
 
 	// Fetch both SHA and object type to detect annotated tags.
 	// Annotated tags have type "tag" and their SHA points to the tag object,

@@ -270,6 +270,54 @@ func TestLogsStorageLimitAllowsFinalDownloadThenStops(t *testing.T) {
 	assert.False(t, secondCalled)
 }
 
+func TestLogsStorageLimitRejectsNewRunsWhileOverBudgetRunIsActive(t *testing.T) {
+	for _, pruneOlderRuns := range []bool{false, true} {
+		t.Run(fmt.Sprintf("pruneOlderRuns=%t", pruneOlderRuns), func(t *testing.T) {
+			outputDir := t.TempDir()
+			limit := newLogsStorageLimit(outputDir, 1, pruneOlderRuns)
+			activeRun := filepath.Join(outputDir, "run-1")
+			require.NoError(t, limit.runDownloadWithPruning(context.Background(), activeRun, func() error {
+				require.NoError(t, os.MkdirAll(activeRun, 0o700))
+				return os.WriteFile(filepath.Join(activeRun, "essential.bin"), make([]byte, bytesPerMegabyte), 0o600)
+			}, false, false))
+			require.Equal(t, 1, limit.active)
+
+			for i := 2; i <= 4; i++ {
+				called := false
+				err := limit.runDownloadWithPruning(context.Background(), filepath.Join(outputDir, fmt.Sprintf("run-%d", i)), func() error {
+					called = true
+					return nil
+				}, true, false)
+				require.ErrorIs(t, err, errLogsStorageLimitReached)
+				assert.False(t, called)
+				assert.Equal(t, 1, limit.active, "rejected runs must not leak reservations")
+			}
+			require.NoError(t, limit.finalizeDownload(activeRun))
+			assert.Zero(t, limit.active)
+		})
+	}
+}
+
+func TestLogsStorageLimitRejectsIncrementalDownloadButAllowsCacheReservation(t *testing.T) {
+	outputDir := t.TempDir()
+	runDir := filepath.Join(outputDir, "run-1")
+	require.NoError(t, os.MkdirAll(runDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, runSummaryFileName), make([]byte, bytesPerMegabyte), 0o600))
+	limit := newLogsStorageLimit(outputDir, 1, false)
+
+	require.NoError(t, limit.reserve(runDir), "existing cache must remain readable over budget")
+	called := false
+	err := limit.runDownloadDeferredReserved(context.Background(), runDir, func() error {
+		called = true
+		return nil
+	})
+	require.ErrorIs(t, err, errLogsStorageLimitReached)
+	assert.False(t, called, "a cached directory must not bypass admission for missing artifacts")
+	require.NoError(t, limit.finalizeDownload(runDir))
+	assert.Zero(t, limit.active)
+	assert.FileExists(t, filepath.Join(runDir, runSummaryFileName))
+}
+
 func TestLogsStorageLimitPrunesOldestRunAfterCachePruningIsExhausted(t *testing.T) {
 	outputDir := t.TempDir()
 	oldestRunDir := filepath.Join(outputDir, "run-1")

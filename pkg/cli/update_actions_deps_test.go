@@ -93,6 +93,7 @@ func TestCachedActionUpdateDepsCachesResultsAndErrors(t *testing.T) {
 			return coolDownCheckResult{InCoolDown: true}
 		},
 	}
+
 	deps := newCachedActionUpdateDeps(base)
 	ctx := context.Background()
 
@@ -119,6 +120,41 @@ func TestCachedActionUpdateDepsCachesResultsAndErrors(t *testing.T) {
 			latestCalls, releaseCalls, shaCalls, coolDownCalls)
 	}
 }
+func TestCachedActionUpdateDepsSharesNestedLookups(t *testing.T) {
+	t.Parallel()
+	releaseCalls, shaCalls := 0, 0
+	const sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	deps := newCachedActionUpdateDeps(actionUpdateDeps{
+		runGHReleasesAPI: func(_ context.Context, repo string) ([]byte, error) {
+			if repo != "actions/cache" {
+				t.Fatalf("unexpected release repository: %s", repo)
+			}
+			releaseCalls++
+			return []byte("v4.2.0\nv4.1.0"), nil
+		},
+		getActionSHAForTag: func(_ context.Context, repo, tag string) (string, error) {
+			if repo != "actions/cache" || tag != "v4.2.0" {
+				t.Fatalf("unexpected tag lookup: %s@%s", repo, tag)
+			}
+			shaCalls++
+			return sha, nil
+		},
+	})
+	for _, action := range []struct{ repo, version string }{
+		{"actions/cache", "v4"},
+		{"actions/cache/restore", "v4.1.0"},
+		{"actions/cache/save", "v4"},
+	} {
+		version, gotSHA, err := deps.getLatestRelease(context.Background(), action.repo, action.version, true, false)
+		if err != nil || version != "v4.2.0" || gotSHA != sha {
+			t.Fatalf("unexpected resolution: %s, %s, %v", version, gotSHA, err)
+		}
+	}
+	if releaseCalls != 1 || shaCalls != 1 {
+		t.Fatalf("network calls = releases:%d sha:%d, want one each", releaseCalls, shaCalls)
+	}
+}
+
 func TestIsCoreAction(t *testing.T) {
 	tests := []struct {
 		name string

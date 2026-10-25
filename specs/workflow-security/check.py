@@ -531,6 +531,8 @@ def check_workflow_models(java, jar, results):
                               **WITNESS_SETTINGS.get(name, {})))
     cases.append(run_case(java, jar, results, "secure-runtime-checkout",
                           model="RuntimeRepositoryCheckout"))
+    cases.append(run_case(java, jar, results, "secure-status-only-job",
+                          model="StatusOnlyJob"))
     for fault, invariant in RUNTIME_CHECKOUT_MUTATIONS.items():
         cases.append(run_case(java, jar, results, f"runtime-checkout-{fault}", fault,
                               invariant=invariant, model="RuntimeRepositoryCheckout"))

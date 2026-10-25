@@ -173,6 +173,15 @@ steps:
     with:
       persist-credentials: false
 
+  - name: Checkout agentics workflows
+    uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    with:
+      repository: githubnext/agentics
+      ref: main
+      path: .agentics
+      persist-credentials: false
+      sparse-checkout: workflows
+
   - name: Setup Node.js
     uses: actions/setup-node@v7.1.0
     with:
@@ -187,6 +196,7 @@ steps:
   - name: Build documentation
     working-directory: ./docs
     env:
+      AGENTICS_WORKFLOWS_DIR: ${{ github.workspace }}/.agentics/workflows
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     run: npm run build
 evals:

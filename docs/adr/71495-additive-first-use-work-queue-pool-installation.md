@@ -12,13 +12,13 @@ The smoke dispatcher failed because the `smoke-work-queue` pool was configured i
 
 ### Decision
 
-`PoolInstall` adds exactly one new pool to an existing AW-managed Policy without touching installed pools, accepted work, or the Policy epoch. Ordinary submit and dispatch intents do not publish `PoolInstall` implicitly; they reject a missing pool before deployment synchronization. An explicit `pool_install` request checks the compiled proposal's stable Policy and existing-pool boundaries, resolves new profiles against repository-wide installed worker authority, and verifies each selected immutable route with `verifyWorkerRoute`. A caller's newer source ref does not replace installed profiles during installation; verified Deployment synchronization handles newer refs separately. Caller-local target checks still govern actual submission and dispatch. Replay in Go (`installReplayPool`) and JS requires each new profile to match an already installed same-named profile or one of its registered Deployment revisions, including ref, logical contract, identity, scopes, and scheduling authority. The new pool's `allowed_repositories` must also be a subset of the repositories authorized by installed pools. Reserved JavaScript pool keys are rejected consistently. The `administrator`, `producer`, and `dispatcher` roles may emit an explicit `PoolInstall` operation. A TLA+ model (`specs/work-queue/QueuePoolInstall.tla`) bounds the safety argument. Missing pools, unapproved worker routes, and proposal mismatches are classified as `work_queue_pool_not_installed`, `work_queue_worker_not_compiler_approved`, and `work_queue_policy_proposal_mismatch`.
+`PoolInstall` adds exactly one new pool to an existing AW-managed Policy without touching installed pools, accepted work, or the Policy epoch. Trusted submit and dispatch processing publish a separate `pool_install` request on first use of a missing configured pool, before deployment synchronization. Workers, observers, staged previews, and accepted-request recovery never trigger installation. The request checks the compiled proposal's stable Policy and existing-pool boundaries, resolves new profiles against repository-wide installed worker authority, and verifies each selected immutable route with `verifyWorkerRoute`. A caller's newer source ref does not replace installed profiles during installation; verified Deployment synchronization handles newer refs separately. Caller-local target checks still govern actual submission and dispatch. Replay in Go (`installReplayPool`) and JS requires each new profile to match an already installed same-named profile or one of its registered Deployment revisions, including ref, logical contract, identity, scopes, and scheduling authority. The new pool's `allowed_repositories` must also be a subset of the repositories authorized by installed pools. Reserved JavaScript pool keys are rejected consistently. The `administrator`, `producer`, and `dispatcher` roles may emit an explicit `PoolInstall` operation. A TLA+ model (`specs/work-queue/QueuePoolInstall.tla`) bounds the safety argument. Missing pools, unapproved worker routes, and proposal mismatches are classified as `work_queue_pool_not_installed`, `work_queue_worker_not_compiler_approved`, and `work_queue_policy_proposal_mismatch`.
 
 ### Alternatives Considered
 
-#### Alternative 1: Implicit first-use installation
+#### Alternative 1: Explicit installation only
 
-Allow ordinary submit and dispatch intents to create missing pools before proceeding. This makes untrusted intent data a trigger for durable Policy mutation and may perform that mutation before deployment synchronization. It was rejected; missing pools fail closed, while `PoolInstall` remains an explicit queue operation.
+Require a separate administrator action before submitting or dispatching to a newly configured pool. This was the initial implementation, but left ordinary first use blocked even when the compiled proposal only reused installed authority. Trusted processing now invokes the same validated `PoolInstall` transition on demand; intent data selects a configured pool, never its Policy definition or worker authority.
 
 #### Alternative 2: Let first use republish the full compiled Policy
 
@@ -31,14 +31,14 @@ Give each pool its own queue branch so that adding a pool always bootstraps a ne
 ### Consequences
 
 #### Positive
-- A missing pool is rejected before submission, dispatch, or deployment synchronization; the error is classified as `work_queue_pool_not_installed`.
+- Missing configured pools install on first submission or dispatch without draining existing Work. Unsupported or absent proposals fail closed before admission or launch.
 - Missing pools, unapproved worker routes, and proposal mismatches now produce classified, actionable errors instead of unclassified failures.
 - Existing pools, accepted work, and the Policy epoch are preserved, enforced at publish time and again at replay, with a bounded TLA+ model.
 
 #### Negative
 - Non-administrator roles (`producer`, `dispatcher`) can now add pools, but cannot introduce worker authority through `PoolInstall`. Replay enforces that boundary even when a publisher bypasses the adapter.
 - The protocol surface grows: a new operation kind, a new intent, new JSON schemas, and updated canonical fixtures. Go and JS replay must stay in sync.
-- Explicit `PoolInstall` remains available to trusted `administrator`, `producer`, and `dispatcher` roles; it is not triggered by ordinary worker-facing intents.
+- `PoolInstall` is triggered only by authenticated, non-preview producer/dispatcher processing. Worker and observer intents cannot install pools.
 
 #### Neutral
 - Changing an existing pool or economic Policy still requires an explicit administrator `policy` update on a quiescent queue.

@@ -99,12 +99,13 @@ describe("immutable Claim scope", () => {
 
   it.each(["environment", "execution"])("logs a staged preview before rejecting resource effects via %s", async source => {
     vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", source === "environment" ? "true" : "false");
+    vi.stubGlobal("core", undefined);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const authorize = vi.fn();
     try {
       await withClaimExecution({ assignment: assignment(1), claim_handle: "h1", staged: source === "execution", authorize }, async () => {
         await expect(assertClaimAuthorized({ type: "create_issue" }, { effect: true })).rejects.toMatchObject({
-          message: "work_queue_claim_scope: read-only Claim preview cannot perform resource effects",
+          message: "ERR_WORK_QUEUE_CLAIM_SCOPE: work_queue_claim_scope: read-only Claim preview cannot perform resource effects",
           code: "claim_scope_invalid",
         });
       });
@@ -129,6 +130,7 @@ describe("immutable Claim scope", () => {
     } finally {
       log.mockRestore();
       vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
     }
   });
 

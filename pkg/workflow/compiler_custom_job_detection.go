@@ -20,6 +20,13 @@ func (c *Compiler) guardCustomJobDetection(data *WorkflowData) error {
 	for id, job := range c.jobManager.GetAllJobs() {
 		graph[id] = job.Needs
 	}
+	allJobs := c.jobManager.GetAllJobs()
+	allowedOutputJobs := make(map[string]struct{})
+	for id, job := range allJobs {
+		if constants.IsCompilerOwnedJobName(id) && graph.DependsOn(id, detection) && aw.HasSuccessfulDetectionCondition(job.If) {
+			allowedOutputJobs[id] = struct{}{}
+		}
+	}
 	for _, id := range sliceutil.SortedKeys(data.Jobs) {
 		if isBuiltinJobName(id) {
 			continue
@@ -37,14 +44,30 @@ func (c *Compiler) guardCustomJobDetection(data *WorkflowData) error {
 		if graph.DependsOn(detection, id) {
 			return fmt.Errorf("jobs.%s.needs: custom jobs must run before agent or after detection, not between them; remove this job from detection's dependencies", id)
 		}
-		if err := addCustomJobDetectionGuard(job); err != nil {
+		config, ok := data.Jobs[id].(map[string]any)
+		if !ok {
+			return fmt.Errorf("jobs.%s: custom job configuration must be an object", id)
+		}
+		statusOnly := aw.IsStatusOnlyJob(config)
+		if statusOnly {
+			for _, dependent := range sliceutil.SortedKeys(data.Jobs) {
+				if dependent != id && !isBuiltinJobName(dependent) && graph.DependsOn(dependent, id) {
+					return fmt.Errorf("jobs.%s.detection-gate: status-only jobs cannot have dependent custom job %s; apply the same contract to a leaf job instead", id, dependent)
+				}
+			}
+			violations := aw.ValidateStatusOnlyJob(id, config, allowedOutputJobs)
+			if len(violations) > 0 {
+				return fmt.Errorf("%s: %s", violations[0].Path, violations[0].Message)
+			}
+		}
+		if err := addCustomJobDetectionGuard(job, statusOnly); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addCustomJobDetectionGuard(job *Job) error {
+func addCustomJobDetectionGuard(job *Job, statusOnly bool) error {
 	condition := strings.TrimSpace(job.If)
 	if condition != "" {
 		var err error
@@ -56,6 +79,9 @@ func addCustomJobDetectionGuard(job *Job) error {
 	detection := string(constants.DetectionJobName)
 	if !slices.Contains(job.Needs, detection) {
 		job.Needs = append(job.Needs, detection)
+	}
+	if statusOnly {
+		return nil
 	}
 	// Warn-mode detections can report job success while flagging tainted output.
 	guard := "needs." + detection + ".result == 'success' && needs." + detection + ".outputs.detection_success == 'true'"
