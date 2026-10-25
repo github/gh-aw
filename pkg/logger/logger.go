@@ -52,7 +52,10 @@ func buildColorPalette() []lipgloss.Style {
 	order := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 3}
 	palette := make([]lipgloss.Style, 0, len(order))
 	for _, idx := range order {
-		palette = append(palette, lipgloss.NewStyle().Foreground(basePaletteColors[idx]))
+		if idx >= 0 && idx < len(basePaletteColors) {
+			baseColor := basePaletteColors[idx]
+			palette = append(palette, lipgloss.NewStyle().Foreground(baseColor))
+		}
 	}
 	return palette
 }
@@ -93,7 +96,7 @@ func New(namespace string) *Logger {
 
 // selectNamespaceLabel renders the namespace label with a hash-selected style.
 func selectNamespaceLabel(namespace string) string {
-	if !debugColors {
+	if !debugColors || len(colorPalette) == 0 {
 		return namespace
 	}
 
@@ -107,7 +110,11 @@ func selectNamespaceLabel(namespace string) string {
 	hash := h.Sum32()
 
 	// Select color from palette based on hash and render namespace with it.
-	return colorPalette[hash%uint32(len(colorPalette))].Render(namespace)
+	idx := int(uint64(hash) % uint64(len(colorPalette)))
+	if idx >= 0 && idx < len(colorPalette) {
+		return colorPalette[idx].Render(namespace)
+	}
+	return namespace
 }
 
 // Enabled returns whether this logger is enabled
@@ -198,9 +205,7 @@ func matchPattern(namespace, pattern string) bool {
 			return strings.HasSuffix(namespace, suffix)
 		}
 		// Middle wildcard: split and check both parts
-		parts := strings.SplitN(pattern, "*", 2)
-		if len(parts) == 2 {
-			prefix, suffix := parts[0], parts[1]
+		if prefix, suffix, ok := strings.Cut(pattern, "*"); ok {
 			return len(namespace) >= len(prefix)+len(suffix) &&
 				strings.HasPrefix(namespace, prefix) &&
 				strings.HasSuffix(namespace, suffix)

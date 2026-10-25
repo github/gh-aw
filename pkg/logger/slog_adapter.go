@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
 )
@@ -35,20 +34,11 @@ func (h *SlogHandler) Handle(_ context.Context, r slog.Record) error {
 	var msg strings.Builder
 	msg.WriteString(r.Message)
 	if r.NumAttrs() > 0 {
-		attrs := make([]any, 0, r.NumAttrs()*2)
+		// Format attributes as key=value pairs
 		r.Attrs(func(a slog.Attr) bool {
-			attrs = append(attrs, a.Key, a.Value)
+			msg.WriteString(" " + a.Key + "=" + formatSlogValue(a.Value))
 			return true
 		})
-		// Format attributes as key=value pairs
-		for i := 0; i < len(attrs); i += 2 {
-			// Safely handle non-string keys (defensive programming - slog always provides string keys)
-			key, ok := attrs[i].(string)
-			if !ok {
-				key = fmt.Sprint(attrs[i])
-			}
-			msg.WriteString(" " + key + "=" + formatSlogValue(attrs[i+1]))
-		}
 	}
 
 	// Log with appropriate level prefix

@@ -4,11 +4,53 @@ package logger
 
 import (
 	"bytes"
+	"image/color"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	lipgloss "charm.land/lipgloss/v2"
 )
+
+func TestBuildColorPaletteBounds(t *testing.T) {
+	original := basePaletteColors
+	t.Cleanup(func() { basePaletteColors = original })
+
+	for _, tc := range []struct {
+		name   string
+		colors []color.Color
+		want   int
+	}{
+		{name: "empty"},
+		{name: "single color", colors: original[:1], want: 2},
+		{name: "full palette", colors: original, want: 12},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			basePaletteColors = tc.colors
+			if got := len(buildColorPalette()); got != tc.want {
+				t.Errorf("palette length = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSelectNamespaceLabelBounds(t *testing.T) {
+	originalPalette, originalDebugColors := colorPalette, debugColors
+	t.Cleanup(func() {
+		colorPalette, debugColors = originalPalette, originalDebugColors
+	})
+	debugColors = true
+
+	for _, palette := range [][]lipgloss.Style{nil, {}, {lipgloss.NewStyle()}} {
+		colorPalette = palette
+		for _, namespace := range []string{"", "test:logger", "日本語"} {
+			if got := selectNamespaceLabel(namespace); got != namespace {
+				t.Errorf("label = %q, want %q (palette length %d)", got, namespace, len(palette))
+			}
+		}
+	}
+}
 
 // captureStderr captures stderr output during test execution
 func captureStderr(f func()) string {

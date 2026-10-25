@@ -178,7 +178,7 @@ func parseFrontmatterKey(trimmed string) (string, bool) {
 	if trimmed == "" {
 		return "", false
 	}
-	if quote := trimmed[0]; quote == '\'' || quote == '"' {
+	if strings.HasPrefix(trimmed, "'") || strings.HasPrefix(trimmed, `"`) {
 		key, rest, ok := cutQuotedYAMLScalar(trimmed)
 		if !ok || !strings.HasPrefix(strings.TrimLeft(rest, " \t"), ":") {
 			return "", false
@@ -198,6 +198,9 @@ func parseFrontmatterKey(trimmed string) (string, bool) {
 // and unicode escapes such as \n or \uXXXX are not, since frontmatter keys and repository
 // references never contain them.
 func cutQuotedYAMLScalar(value string) (string, string, bool) {
+	if value == "" {
+		return "", "", false
+	}
 	quote := value[0]
 	var body strings.Builder
 	for i := 1; i < len(value); i++ {
@@ -298,6 +301,9 @@ func replaceFrontmatterRefValues(line string, candidates []frontmatterRefCandida
 		best := -1
 		bestLen := 0
 		for j, candidate := range candidates {
+			if candidate.update < 0 || candidate.update >= len(applied) {
+				continue
+			}
 			if applied[candidate.update] || len(candidate.search) <= bestLen {
 				continue
 			}
@@ -327,7 +333,7 @@ func yamlValueEnd(line string) int {
 			case '\'', '"':
 				quote = current
 			case '#':
-				if i == 0 || line[i-1] == ' ' || line[i-1] == '\t' {
+				if i == 0 || strings.HasSuffix(line[:i], " ") || strings.HasSuffix(line[:i], "\t") {
 					return i
 				}
 			}
@@ -349,10 +355,11 @@ func yamlValueEnd(line string) int {
 }
 
 func isBackslashEscaped(value string, index int) bool {
-	backslashes := 0
-	for index--; index >= 0 && value[index] == '\\'; index-- {
-		backslashes++
+	if index <= 0 || index > len(value) {
+		return false
 	}
+	prefix := value[:index]
+	backslashes := len(prefix) - len(strings.TrimRight(prefix, `\`))
 	return backslashes%2 == 1
 }
 
