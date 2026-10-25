@@ -54,6 +54,12 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	// Use agent-downstream prefix since this job depends on the agent job.
 	agentArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 	steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
+	// Do not attribute the agent's usage to detection, even when its scan is skipped.
+	steps = append(steps,
+		"      - name: Clear agent token usage\n",
+		"        if: always()\n",
+		"        run: rm -f /tmp/gh-aw/agent_usage.json\n",
+	)
 
 	// Download experiment artifact so the detection agent can read the current variant assignments.
 	// The experiment artifact is uploaded by the activation job.
