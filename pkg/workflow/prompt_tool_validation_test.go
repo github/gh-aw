@@ -39,6 +39,11 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"named MCP tool, mixed-case mcpscripts", "Run the `lookup` tool of the MCPScripts MCP server.", []promptToolRequirement{{server: "mcpscripts", tool: "lookup", nativeMCP: true}}},
 		{"qualified", "Call `mcp__github__issue_read`.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"multiple qualified", "Call mcp__github__findings and mcp__github__summary.", []promptToolRequirement{{server: "github", tool: "findings", nativeMCP: true}, {server: "github", tool: "summary", nativeMCP: true}}},
+		{"uppercase qualified conjunction", "Call mcp__inventory__findings AND mcp__inventory__summary.", []promptToolRequirement{{server: "inventory", tool: "findings", nativeMCP: true}, {server: "inventory", tool: "summary", nativeMCP: true}}},
+		{"uppercase qualified alternatives", "Call mcp__inventory__findings OR mcp__inventory__summary.", []promptToolRequirement{{server: "inventory", tool: "findings", nativeMCP: true}, {server: "inventory", tool: "summary", nativeMCP: true}}},
+		{"uppercase qualified comma conjunction", "Call `inventory(findings)`, AND `inventory(summary)`.", []promptToolRequirement{{server: "inventory", tool: "findings", nativeMCP: true}, {server: "inventory", tool: "summary", nativeMCP: true}}},
+		{"uppercase qualified comma alternatives", "Call `inventory(findings)`, OR `inventory(summary)`.", []promptToolRequirement{{server: "inventory", tool: "findings", nativeMCP: true}, {server: "inventory", tool: "summary", nativeMCP: true}}},
+		{"mixed-case qualified separator preserves names", "Call InventoryAPI(Findings) aNd mcp__InventoryAPI__Summary.", []promptToolRequirement{{server: "InventoryAPI", tool: "Findings", nativeMCP: true}, {server: "InventoryAPI", tool: "Summary", nativeMCP: true}}},
 		{"quoted qualified list", "Use `github(issue_read)`, `inventory(lookup)`, and `mcp__github__list_issues`.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}, {server: "inventory", tool: "lookup", nativeMCP: true}, {server: "github", tool: "list_issues", nativeMCP: true}}},
 		{"qualified alternatives", "Call github(issue_read) or inventory(lookup).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}, {server: "inventory", tool: "lookup", nativeMCP: true}}},
 		{"qualified trailing prose", "Use github(issue_read) to inspect the affected file(s).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
@@ -46,6 +51,7 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"qualified plural list boundary", "Use github(issue_read), workflow(s) to update.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"qualified multiple plurals", "Use github(issue_read), file(s), and workflow(s) to update.", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"qualified stops at plural", "Use github(issue_read), file(s), and inventory(lookup).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
+		{"uppercase qualified stops at plural", "Use github(issue_read), file(s), AND inventory(lookup).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"qualified stops at prose", "Use github(issue_read), the affected files, and inventory(lookup).", []promptToolRequirement{{server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"explicit native plural-like name", "Use mcp__file__s.", []promptToolRequirement{{server: "file", tool: "s", nativeMCP: true}}},
 		{"custom single-letter tool", "Call inventory(q).", []promptToolRequirement{{server: "inventory", tool: "q", nativeMCP: true}}},
@@ -79,6 +85,12 @@ func TestPromptToolRequirements(t *testing.T) {
 		{"fence info does not close", "```markdown\n```dockerfile\nRUN curl -fsSL https://get.docker.com | sh\n```", nil},
 		{"mixed-case markdown artifact", "```Markdown\n```bash\necho example\n```\nRun `curl example.com`.\n```\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
 		{"uppercase md artifact", "```MD\n```bash\necho example\n```\nRun `curl example.com`.\n```\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"yaml artifact", "```yaml\n---\nengine: codex\n---\n```json\n{}\n```\nCall inventory(example).\n```\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"json artifact", "```json\n{}\n```bash\necho example\n```\nCall inventory(example).\n```\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"unlabeled artifact", "```\n```yaml\nengine: codex\n```\nCall inventory(example).\n```\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"tilde yaml artifact", "~~~yaml\n~~~json\n{}\n~~~\nCall inventory(example).\n~~~\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"shell example artifact", "Example:\n```bash\n```json\n{}\n```\nCall inventory(example).\n```\nCall inventory(lookup).", []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}},
+		{"task shell after artifact", "```yaml\n```json\n{}\n```\nRun `curl example.com`.\n```\nRun the following:\n```bash\njq --version\n```\nCall inventory(lookup).", []promptToolRequirement{{command: "jq --version"}, {server: "inventory", tool: "lookup", nativeMCP: true}}},
 		{"long task fence", "Run the following:\n````bash\njq --version\n```\nsort items.json\n````\nRun `gh issue list`.", []promptToolRequirement{{command: "gh issue list"}}},
 		{"long closing fence", "Run the following:\n```bash\njq --version\n````\nCall github(issue_read).", []promptToolRequirement{{command: "jq --version"}, {server: "github", tool: "issue_read", nativeMCP: true}}},
 		{"negated fence", "Do not run:\n```bash\ncurl example.com\n```", nil},
@@ -130,6 +142,74 @@ func TestPromptToolArtifactExamples(t *testing.T) {
 	require.Zero(t, compiler.GetWarningCount())
 	require.Empty(t, output)
 	require.Equal(t, map[string]any{"bash": []any{"echo"}, "github": false}, data.Tools)
+
+	for _, tt := range []struct {
+		name  string
+		lines []string
+	}{
+		{
+			name: "schema-feature-coverage yaml workflow template",
+			lines: []string{
+				"### Template for Demo Workflow Files",
+				"```yaml",
+				"---",
+				"description: Demonstrates the `<FIELD>` schema field",
+				"engine: codex",
+				"---",
+				"# Schema Demo: `<FIELD>`",
+				"## Task",
+				"Call `noop` - this is a coverage-only demo workflow.",
+				"```json",
+				"{\"noop\": {\"message\": \"Coverage demo - no action needed.\"}}",
+				"```",
+				"Call inventory(example).",
+				"```",
+			},
+		},
+		{
+			name: "repo-audit-analyzer report template",
+			lines: []string{
+				"### Report Structure",
+				"```markdown",
+				"### Repository Audit & Agentic Workflow Opportunities Report",
+				"### Repository Structure",
+				"```",
+				"[Key directories and their purposes]",
+				"```",
+				"### Agentic Workflow Opportunities",
+				"**Implementation Sketch:**",
+				"```yaml",
+				"---",
+				"description: [Brief description]",
+				"tools:",
+				"  [required tools]",
+				"---",
+				"[Agent prompt outline]",
+				"```",
+				"Call inventory(example).",
+				"**Success Metrics:**",
+				"- [Metric 1: e.g., Reduce unlabeled issues from 30% to 5%]",
+				"```",
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			template := strings.Join(tt.lines, "\n")
+			require.Empty(t, promptToolRequirements(template))
+			data := &WorkflowData{
+				AI:               "copilot",
+				Tools:            map[string]any{"github": false},
+				ImportedMarkdown: template + "\nCall inventory(lookup).",
+			}
+			require.Equal(t, []promptToolRequirement{{server: "inventory", tool: "lookup", nativeMCP: true}}, promptToolRequirements(data.ImportedMarkdown))
+			compiler := NewCompiler()
+			output := testutil.CaptureStderr(t, func() { compiler.validatePromptTools(data, "test.md") })
+			require.Equal(t, 1, compiler.GetWarningCount())
+			require.Contains(t, output, "inventory(lookup)")
+			require.NotContains(t, output, "inventory(example)")
+			require.Equal(t, map[string]any{"github": false}, data.Tools)
+		})
+	}
 }
 
 func TestPromptToolAvailability(t *testing.T) {
@@ -220,6 +300,7 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 		{"github disabled", "engine: copilot\ntools:\n  github: false\n", "Call mcp__github__issue_read.\nUse issue_read.", 1},
 		{"github restricted", "engine: copilot\ntools:\n  github:\n    allowed: [list_issues]\n", "Call github(issue_read).", 1},
 		{"github empty", "engine: copilot\ntools:\n  github:\n    allowed: []\n", "Call github(issue_read).", 1},
+		{"uppercase qualified allowed first denied second", "engine: copilot\ntools:\n  github:\n    allowed: [list_issues]\n", "Call mcp__github__list_issues OR mcp__github__issue_read.", 1},
 		{"github toolset", "engine: copilot\ntools:\n  github:\n    toolsets: [repos]\n", "Use issue_read.", 1},
 		{"default sandbox shell", "engine: copilot\n", "Run jq --version.", 0},
 		{"bash scope allowed", "engine: copilot\ntools:\n  bash: [gh]\n", "Use Bash(gh:*).", 0},
@@ -269,6 +350,10 @@ func TestPromptToolCompilerIntegration(t *testing.T) {
 			output := testutil.CaptureStderr(t, func() { err = compiler.CompileWorkflow(path) })
 			require.NoError(t, err)
 			require.Equal(t, tt.want, strings.Count(output, "Prompt explicitly requires"), output)
+			if tt.name == "uppercase qualified allowed first denied second" {
+				require.Contains(t, output, "Prompt explicitly requires github(issue_read)")
+				require.NotContains(t, output, "Prompt explicitly requires github(list_issues)")
+			}
 			if tt.name == "CLI native mismatch" || tt.name == "named GitHub CLI excluded" {
 				require.Contains(t, output, "use the github CLI instead")
 				require.Contains(t, output, "disable tools.cli-proxy")

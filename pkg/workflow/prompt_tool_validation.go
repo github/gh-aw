@@ -13,7 +13,7 @@ import (
 
 var promptToolImperative = regexp.MustCompile(`(?i)^(?:please\s+|you must\s+|must\s+)?(use|call|run)\s+(?:the\s+)?(?:tool\s+)?(.+)$`)
 var promptQualifiedTool = regexp.MustCompile(`^(mcp__([A-Za-z0-9_-]+)__([A-Za-z0-9_-]+)|([A-Za-z0-9_-]+)\(([A-Za-z0-9_-]+)\))(?:$|[^A-Za-z0-9_])`)
-var promptToolListSeparator = regexp.MustCompile("^`?\\s*(?:,\\s*(?:(?:and|or)\\s+)?|(?:and|or)\\s+)`?")
+var promptToolListSeparator = regexp.MustCompile("(?i)^`?\\s*(?:,\\s*(?:(?:and|or)\\s+)?|(?:and|or)\\s+)`?")
 var promptMCPToolPhrase = regexp.MustCompile(`(?i)^(?:the\s+)?\x60?([a-z][a-z0-9_-]*)\x60?\s+(?:tool\s+)?(?:of|from)\s+(?:the\s+)?\x60?([a-z][a-z0-9_-]*)\x60?\s+MCP\s+server\b`)
 var promptBareTool = regexp.MustCompile(`^([a-z][a-z0-9_]+)(?:$|[\s\x60.,(])`)
 var promptListPrefix = regexp.MustCompile(`^(?:[-*+]\s+|\d+[.)]\s+)`)
@@ -116,12 +116,11 @@ func promptKnownTools() map[string]promptToolRequirement {
 }
 
 type promptToolScanState struct {
-	fence         string
-	markdownFence bool
-	nestedFence   string
-	shellFence    strings.Builder
-	runFence      bool
-	pendingRun    bool
+	fence       string
+	nestedFence string
+	shellFence  strings.Builder
+	runFence    bool
+	pendingRun  bool
 }
 
 func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[string]promptToolRequirement) []promptToolRequirement {
@@ -134,14 +133,14 @@ func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[str
 		}
 	}
 	if state.fence != "" {
-		// Markdown output templates sometimes use same-length fences for embedded examples.
+		// Output templates may use same-length fences for embedded examples, regardless of language.
 		if state.nestedFence != "" {
 			if isClosingCodeFence(line, state.nestedFence) {
 				state.nestedFence = ""
 			}
 			return nil
 		}
-		if state.markdownFence && marker == state.fence && strings.TrimSpace(strings.TrimPrefix(line, marker)) != "" {
+		if !state.runFence && marker == state.fence && strings.TrimSpace(strings.TrimPrefix(line, marker)) != "" {
 			state.nestedFence = marker
 			return nil
 		}
@@ -151,7 +150,6 @@ func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[str
 				requirements = promptShellRequirements(state.shellFence.String())
 			}
 			state.fence, state.runFence = "", false
-			state.markdownFence = false
 			state.shellFence.Reset()
 			return requirements
 		}
@@ -165,7 +163,6 @@ func (state *promptToolScanState) consumeLine(rawLine string, knownTools map[str
 		state.fence = marker
 		language := strings.TrimSpace(strings.TrimPrefix(line, marker))
 		state.runFence = state.pendingRun && slices.Contains([]string{"bash", "sh", "shell"}, language)
-		state.markdownFence = slices.Contains([]string{"markdown", "md"}, strings.ToLower(language))
 		state.pendingRun = false
 		return nil
 	}

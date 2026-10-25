@@ -12,9 +12,9 @@ The workflow compiler runs a heuristic scanner (`pkg/workflow/prompt_tool_valida
 
 ### Decision
 
-We will recognize qualified tool references (`mcp__server__tool` and `server(tool)`) only at the start of the instruction target. Further references are accepted only after explicit list separators (`,`, `and`, `or`, with optional backticks). Scanning stops at the first non-list token, so we no longer search all prose that follows. We will also track complete fence delimiters, including the full run of backticks or tildes. A fence closes only on a valid closing fence. Inside `markdown`/`md` fences, a same-length fence with an info string opens a nested example that is skipped until it closes. The main driver is precision: these warnings are only useful if they rarely fire on harmless prose or example content. Tool permissions and transport checks stay unchanged.
+We will recognize qualified tool references (`mcp__server__tool` and `server(tool)`) only at the start of the instruction target. Further references are accepted only after explicit list separators (`,`, `and`, `or`, with optional backticks). Scanning stops at the first non-list token, so we no longer search all prose that follows. We will also track complete fence delimiters, including the full run of backticks or tildes. A fence closes only on a valid closing fence. Inside non-executable fences, including `markdown`/`md` and `yaml` artifact examples, a same-length fence with an info string opens a nested example that is skipped until it closes. Explicit task shell fences remain subject to command scanning. The main driver is precision: these warnings are only useful if they rarely fire on harmless prose or example content. Tool permissions and transport checks stay unchanged.
 
-Parenthesized `(s)` is treated as ambiguous pluralization and ends qualified-tool list scanning; an actual tool named `s` can still be required using `mcp__server__s`. Markdown template language identifiers are recognized case-insensitively, including `Markdown` and `MD`.
+Parenthesized `(s)` is treated as ambiguous pluralization and ends qualified-tool list scanning; an actual tool named `s` can still be required using `mcp__server__s`. List conjunctions are case-insensitive while server and tool names retain their original casing. Non-executable template nesting does not depend on the outer language identifier, including its casing.
 
 ### Alternatives Considered
 
@@ -39,8 +39,8 @@ We could have made the three affected workflows quiet, for example with per-work
 
 #### Negative
 - Qualified tool references that appear mid-sentence and not at an invocation position (for example, "Use the issue tracker via github(issue_read)") are no longer detected. This creates possible false negatives where true positives used to be found.
-- The nested-fence rule (a same-length fence with an info string inside a `markdown` fence) is a custom heuristic, not standard Markdown. Prompts that rely on other nesting conventions may still be misparsed.
-- The scanner state machine gains two fields (`markdownFence`, `nestedFence`) and more branches, which makes it harder to reason about.
+- The nested-fence rule (a same-length fence with an info string inside a non-executable fence) is a custom heuristic, not standard Markdown. It does not infer untagged nested examples from placeholder text, so prompts that rely on other nesting conventions may still be misparsed.
+- Tracking outer and nested fence state adds branches to the scanner state machine, which makes it harder to reason about.
 
 #### Neutral
 - The scanner is still heuristic and line-oriented. This decision refines it rather than replacing it with a structural parser.
