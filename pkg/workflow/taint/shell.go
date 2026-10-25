@@ -17,7 +17,6 @@ var shellLog = logger.New("workflow:taint:shell")
 type shell struct {
 	a                     *analyzer
 	path                  string
-	step                  string
 	bindings              scope
 	persisted             scope
 	files                 scope
@@ -75,11 +74,9 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		constants:    make(map[string]string), constantValues: make(map[string]map[string]struct{}),
 		constantUnknown: make(map[string]bool),
 	}
-	id, err := optionalField[string](fields, "id", path)
-	if err != nil {
-		return nil, nil, err
+	for _, name := range []string{"GITHUB_OUTPUT", "GITHUB_ENV", "GITHUB_STEP_SUMMARY"} {
+		s.setConstants(name, []string{"$" + name}, false)
 	}
-	s.step = id
 	for key, sources := range bindings {
 		if name, ok := strings.CutPrefix(key, "shell."); ok {
 			s.vars[name] = sources
@@ -355,15 +352,18 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 				s.a.gapAt(s.path, int(redir.Pos().Line()), "dynamic file targets are not modeled")
 			}
 			for _, target := range targets {
-				s.write(target, out, commandOutputName(stmt.Cmd, s.markers), int(stmt.Pos().Line()))
+				s.write(target, out, s.outputName(stmt.Cmd, target), int(stmt.Pos().Line()))
 			}
 			return
 		}
-		payload := commandOutputName(stmt.Cmd, s.markers)
+		payload := s.outputName(stmt.Cmd, target)
 		if payload == "" {
 			for _, source := range stmt.Redirs {
 				if source.Hdoc != nil {
 					payload = heredocOutputName(source.Hdoc, s.constants, s.markers)
+					if target == "$GITHUB_OUTPUT" {
+						payload = "" // A heredoc can contain several output records.
+					}
 					if payload != "" {
 						break
 					}
@@ -379,7 +379,7 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 }
 
 func (s *shell) pathFor(path string) string {
-	if filepath.IsAbs(path) || s.workingDirectory == "" {
+	if specialTarget(path) || filepath.IsAbs(path) || s.workingDirectory == "" {
 		return filepath.Clean(path)
 	}
 	return filepath.Clean(filepath.Join(s.workingDirectory, path))
@@ -1135,6 +1135,90 @@ func commandOutputName(command syntax.Command, markers scope) string {
 	return ""
 }
 
+func (s *shell) outputName(command syntax.Command, target string) string {
+	if target != "$GITHUB_OUTPUT" {
+		return commandOutputName(command, s.markers)
+	}
+	// Compound output may contain several distinct records. Track the union
+	// under a wildcard rather than treating its first name as the entire write.
+	call, ok := command.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return ""
+	}
+	commandWord, _ := sliceAt(call.Args, 0)
+	first, _ := sliceAt(call.Args, 1)
+	name := literalShellWord(commandWord)
+	if name == "echo" && len(call.Args) == 2 && singleOutputWord(first) {
+		return literalOutputName(first, s.markers)
+	}
+	if name == "printf" && len(call.Args) == 3 {
+		second, _ := sliceAt(call.Args, 2)
+		format := strings.TrimSuffix(literalShellWord(first), `\n`)
+		if format == "%s" && singleOutputWord(second) {
+			return literalOutputName(second, s.markers)
+		}
+		if key, ok := strings.CutSuffix(format, "=%s"); ok && outputIdentifier.MatchString(key) && !containsMarker(key, s.markers) {
+			return key + "="
+		}
+	}
+	return ""
+}
+
+func singleOutputWord(word *syntax.Word) bool {
+	if strings.ContainsAny(staticWord(word), "\r\n") {
+		return false
+	}
+	known := true
+	syntax.Walk(word, func(node syntax.Node) bool {
+		if quoted, ok := node.(*syntax.SglQuoted); ok && quoted.Dollar {
+			// ANSI-C escapes are raw in the AST and may introduce extra records
+			// or change names. Do not infer transport names without decoding them.
+			known = false
+		}
+		return known
+	})
+	return known
+}
+
+// The name must precede every expansion. wordText alone is insufficient:
+// command substitutions are deliberately omitted from its diagnostic text.
+func literalOutputName(word *syntax.Word, markers scope) string {
+	var prefix strings.Builder
+	known, complete := true, false
+	syntax.Walk(word, func(node syntax.Node) bool {
+		if node == nil || !known || complete {
+			return false
+		}
+		switch n := node.(type) {
+		case *syntax.Word, *syntax.DblQuoted:
+			return true
+		case *syntax.Lit:
+			prefix.WriteString(n.Value)
+		case *syntax.SglQuoted:
+			prefix.WriteString(n.Value)
+		default:
+			known = false
+			return false
+		}
+		text := prefix.String()
+		name, _, found := strings.Cut(text, "=")
+		if !found {
+			name, _, found = strings.Cut(text, "<<")
+		}
+		if found {
+			complete = true
+			prefix.Reset()
+			prefix.WriteString(name)
+		}
+		return false
+	})
+	name := prefix.String()
+	if !known || !complete || containsMarker(name, markers) || !outputIdentifier.MatchString(name) {
+		return ""
+	}
+	return name + "="
+}
+
 func containsMarker(text string, markers scope) bool {
 	for marker := range markers {
 		if strings.Contains(text, marker) {
@@ -1256,14 +1340,8 @@ func (s *shell) write(target string, sources value, payload string, line int) {
 		name = strings.TrimSpace(name)
 		if target == "$GITHUB_OUTPUT" {
 			site.Kind = Output
-			s.a.emit(site, sources)
-			if name == "" {
-				name = "*"
-			}
-			if s.step != "" {
-				key := "steps." + strings.ToLower(s.step) + ".outputs." + strings.ToLower(name)
-				s.bindings[key] = union(s.bindings[key], sources)
-			}
+			s.files[target] = union(s.files[target], sources)
+			s.a.transportOutput(site, name, sources, s.a.stepOutput)
 		} else if name != "" {
 			key := "env." + strings.ToLower(name)
 			s.persisted[key] = union(s.persisted[key], sources)

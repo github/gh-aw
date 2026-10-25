@@ -106,7 +106,7 @@ func TestJavaScriptFastAuthoredShellDelta(t *testing.T) {
 	result, err := AnalyzeDocument(document, compiled, rule)
 	require.NoError(t, err)
 	require.Len(t, result.Findings, 1)
-	assert.Equal(t, "steps[0].run", result.Findings[0].Site.Path)
+	assert.Equal(t, "jobs.agent.steps[0].run", result.Findings[0].Site.Path)
 }
 
 func TestJavaScriptAuthoredDriverSource(t *testing.T) {

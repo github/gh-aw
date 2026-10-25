@@ -29,7 +29,7 @@ func analyze(input *actions.Workflow, rule Rule, document *aw.Document) (Result,
 	if err != nil {
 		return Result{}, err
 	}
-	a := &analyzer{rule: rule}
+	a := &analyzer{rule: rule, workflowContext: true}
 	bindings := make(scope)
 	jobs := make(map[actions.JobID]*actions.Job)
 	for _, job := range resolved.Jobs {
@@ -129,7 +129,7 @@ func AnalyzeDocument(document *aw.Document, compiled *actions.Workflow, rule Rul
 	var scripts Result
 	var scriptErr error
 	if fast {
-		scripts, scriptErr = AnalyzeAuthoredJavaScript(ctx, document, rule)
+		result, scriptErr = analyzeFastJavaScript(ctx, document, compiled, rule, result)
 		result.Gaps = append(result.Gaps, CoverageGap{
 			Path: "workflow", Reason: "fast JavaScript analysis checks authored scripts and reviewed API summaries; generated JavaScript and cross-job JavaScript flows require deep mode",
 		})
@@ -338,9 +338,18 @@ func (a *analyzer) inputs(inputs map[string]actions.Expression, site Site, job a
 }
 
 func (a *analyzer) step(fields map[string]any, path string, env, persisted, files scope) error {
+	// Runner command files belong to one step, unlike ordinary workspace files.
+	delete(files, "$GITHUB_OUTPUT")
 	parent := maps.Clone(env)
 	maps.Copy(parent, persisted)
 	bindings := maps.Clone(parent)
+	id, err := optionalField[string](fields, "id", path)
+	if err != nil {
+		return err
+	}
+	previous := a.stepOutput
+	a.stepOutput = &stepOutputTransport{id: id, bindings: bindings, modeled: a.workflowContext}
+	defer func() { a.stepOutput = previous }()
 	stepEnv, err := optionalField[map[string]any](fields, "env", path)
 	if err != nil {
 		return err

@@ -84,6 +84,12 @@ func (j *javascript) initialGlobals() map[string]jsValue {
 func jsIndex(i int) string { return strconv.Itoa(i) }
 
 func (j *javascript) run() error {
+	if j.options != nil && j.options.fastEntries != nil && !j.options.fastEntries[j.input.Source] {
+		return nil
+	}
+	if j.options != nil && j.options.fastMatched != nil {
+		j.recordFastEntry()
+	}
 	if j.a.rule.ID == "" || j.a.rule.IsSource == nil || j.a.rule.IsSink == nil {
 		return errors.New("JavaScript taint rule requires an id, sources, and sinks")
 	}
