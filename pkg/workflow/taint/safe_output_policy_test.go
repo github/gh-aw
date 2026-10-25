@@ -195,7 +195,11 @@ func TestSafeOutputJavaScriptIntegrationPolicy(t *testing.T) {
 					}
 					result, err := Analyze(workflow, rule)
 					require.NoError(t, err)
-					require.Empty(t, result.Gaps)
+					if tt.kind == Output {
+						require.NotEmpty(t, result.Gaps, "idless output transport is conservative")
+					} else {
+						require.Empty(t, result.Gaps)
+					}
 					if safeOutput && tt.kind == Network {
 						assert.Empty(t, result.Findings)
 					} else {
