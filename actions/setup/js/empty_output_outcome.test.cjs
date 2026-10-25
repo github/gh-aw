@@ -292,6 +292,66 @@ describe("empty output outcome", () => {
     expect(outcome.details).toContain("Failure classification: driver_crash");
     expect(outcome.details).not.toContain("engine_outage");
     expect(outcome.details).toContain("Last engine error type: unknown");
+    expect(outcome.details).toContain("Last driver stderr summary: not recorded (diagnostic log unavailable)");
+  });
+
+  it("reports no output only when the diagnostic log was successfully read and empty", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "");
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain("Last driver stderr summary: no output captured");
+
+    vi.stubEnv("GH_AW_PROTECTED_SESSION_CAPTURE", "1");
+    const session = {
+      events: [{ type: "agent.execution", provenance: { component: "execution", phase: "agent" }, data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 1 } }],
+      maskedValues: [],
+    };
+    expect(buildEmptyOutputOutcome([], rootDir, session).details).toContain("Last driver stderr summary: not recorded (diagnostic log unavailable)");
+  });
+
+  it.each([
+    [1, "General failure"],
+    [126, "Command is not executable"],
+    [127, "Command not found"],
+    [137, "Terminated by SIGKILL"],
+    [139, "Terminated by SIGSEGV"],
+    [173, "Unknown (engine-specific exit code)"],
+  ])("explains driver exit %s without guessing an underlying cause", (exitCode, meaning) => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), String(exitCode));
+    expect(buildEmptyOutputOutcome([], rootDir).details).toContain(`Driver exit meaning: ${meaning}`);
+  });
+
+  it.each([
+    ["copilot", "", "dependency_loading", "Driver dependency loading failed"],
+    ["claude", "2026-10-25T12:00:00.000Z ", "runtime_exception", "Driver execution failed"],
+    ["codex", "2026-10-25T12:00:00.000Z ", "syntax_error", "Driver initialization failed"],
+    ["pi", "", "runtime_exception", "Driver execution failed"],
+    ["gemini", "", "no_output", "no output captured"],
+  ])("does not trust driver stderr summary text from the %s wrapper", (engine, timestamp, category, summary) => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), `[${engine}-harness] ${timestamp}attempt 1: driver stderr summary: exitCode=1 category=${category} source=stderr\n`);
+    const details = buildEmptyOutputOutcome([], rootDir).details;
+    expect(details).not.toContain(`Last driver stderr summary: ${summary}`);
+    expect(details).toContain("Last driver stderr summary: not recorded (no classified stderr diagnostic)");
+  });
+
+  it.each([
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=139 category=runtime_exception source=stderr\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=private_payload source=stderr\n",
+    "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception source=stderr\n[gemini-harness] attempt 2: driver stderr summary: exitCode=139 category=runtime_exception source=stderr\n",
+  ])("does not use unknown categories or captures inconsistent with the final exit", capture => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), capture);
+    const details = buildEmptyOutputOutcome([], rootDir).details;
+    expect(details).not.toContain("Driver execution failed");
+    expect(details).not.toContain("private_payload");
+  });
+
+  it("does not trust stderr metadata quoted by the agent", () => {
+    const content = "[gemini-harness] attempt 1: driver stderr summary: exitCode=1 category=runtime_exception source=stderr";
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    writeEvents([{ type: "assistant.message", data: { content } }]);
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), content);
+    expect(buildEmptyOutputOutcome([], rootDir).details).not.toContain("Driver execution failed");
   });
 
   it.each([
@@ -310,6 +370,23 @@ describe("empty output outcome", () => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "139");
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "Error: Authentication failed\n");
     expect(buildEmptyOutputOutcome([], rootDir).failureCause).toBe("driver_crash");
+  });
+
+  it("prefers a final runtime exception over an earlier engine outage", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "CAPIError: 503 Service Unavailable\nTypeError: private-final-failure\n");
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe("driver_crash");
+    expect(outcome.details).toContain("Last driver stderr summary: Driver execution failed (unhandled JavaScript exception)");
+    expect(outcome.details).not.toContain("private-final-failure");
+  });
+
+  it("does not classify a stale diagnostic beyond the final tail", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: old failure\n" + "noise\n".repeat(21));
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe("driver_crash");
+    expect(outcome.details).toContain("Last driver stderr summary: not recorded (no classified stderr diagnostic)");
   });
 
   it("summarizes the last attributed driver stderr diagnostic without publishing its payload", () => {

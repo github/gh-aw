@@ -284,10 +284,6 @@ func (sources scannerSources) locationIdentity(location scanfindings.SourceLocat
 	return scannerValueDigest(fmt.Sprintf("%q", []string{file, location.Role, path, anchor}))
 }
 
-func actionlintShellcheckIdentity(issue actionlintError) (string, bool) {
-	return make(scannerSources).shellcheckIdentity(issue)
-}
-
 func (sources scannerSources) shellcheckIdentity(issue actionlintError) (string, bool) {
 	message := strings.TrimPrefix(issue.Message, actionlintShellcheckMessagePrefix)
 	rule, severity, line, column, ok := parseActionlintShellcheckMessage(message)

@@ -13,7 +13,7 @@
 // values, including expression strings, at the root and in custom jobs.
 //
 // workflow.Compiler.ParseWorkflowDocument accepts this source AST, and
-// CompileDocument lowers it through the existing compiler to an actions.Workflow.
+// callers then lower the resolved data through the existing compiler.
 // The AW source AST and the native Actions execution AST are separate stages;
 // AW-specific fields are never emitted as native Actions workflow properties.
 package aw

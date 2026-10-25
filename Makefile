@@ -206,7 +206,7 @@ bench-performance:
 		-benchmem -benchtime=2s -run=^$$ ./pkg/workflow | tee bench_performance.txt
 	@echo ""
 	@echo "Also running CLI helper benchmarks..."
-	@go test -bench='Benchmark(ExtractWorkflowNameFromFile|FindIncludesInContent)$$' \
+	@go test -bench='Benchmark(ExtractWorkflowNameFromFile|FastParseTitleFromReader|FindIncludesInContent)$$' \
 		-benchmem -benchtime=2s -run=^$$ ./pkg/cli >> bench_performance.txt
 	@echo ""
 	@echo "Performance benchmark results saved to bench_performance.txt"
