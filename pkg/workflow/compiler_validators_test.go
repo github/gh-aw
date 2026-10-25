@@ -163,31 +163,37 @@ func TestValidateFeatureConfig(t *testing.T) {
 
 func TestEmitExperimentalFeatureWarningsGHAWDetection(t *testing.T) {
 	tests := []struct {
-		name        string
-		features    map[string]any
-		envFeatures string
+		name            string
+		features        map[string]any
+		envFeatures     string
+		expectedEnabled bool
 	}{
 		{
-			name: "explicitly enabled",
+			name:            "explicitly enabled",
+			expectedEnabled: true,
 			features: map[string]any{
 				"gh-aw-detection": true,
 			},
 		},
 		{
-			name: "explicitly disabled",
+			name:            "explicitly disabled",
+			expectedEnabled: false,
 			features: map[string]any{
 				"gh-aw-detection": false,
 			},
 		},
 		{
-			name: "enabled by default",
+			name:            "enabled by default",
+			expectedEnabled: true,
 		},
 		{
-			name:        "enabled through environment",
-			envFeatures: "gh-aw-detection",
+			name:            "enabled through environment",
+			envFeatures:     "gh-aw-detection",
+			expectedEnabled: true,
 		},
 		{
-			name: "frontmatter overrides environment",
+			name:            "frontmatter overrides environment",
+			expectedEnabled: false,
 			features: map[string]any{
 				"gh-aw-detection": false,
 			},
@@ -201,6 +207,7 @@ func TestEmitExperimentalFeatureWarningsGHAWDetection(t *testing.T) {
 			workflowData := &WorkflowData{
 				Features: tt.features,
 			}
+			assert.Equal(t, tt.expectedEnabled, isFeatureEnabled(constants.GHAWDetectionFeatureFlag, workflowData))
 
 			for _, batchMode := range []bool{false, true} {
 				compiler := NewCompiler()
