@@ -1937,10 +1937,6 @@ jobs:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       admission_compact_session: ${{ steps.admission-conclusion-metadata.outputs.compact_session }}
-      incomplete_count: ${{ steps.report_incomplete.outputs.incomplete_count }}
-      noop_message: ${{ steps.noop.outputs.noop_message }}
-      tools_reported: ${{ steps.missing_tool.outputs.tools_reported }}
-      total_count: ${{ steps.missing_tool.outputs.total_count }}
       usage_artifact_id: ${{ steps.upload-usage-artifact.outputs.artifact-id }}
       usage_artifact_retry_id: ${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}
     steps:

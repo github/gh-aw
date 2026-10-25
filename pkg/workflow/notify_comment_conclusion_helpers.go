@@ -669,11 +669,12 @@ func buildConclusionJobOutputs(data *WorkflowData) map[string]string {
 		outputs["usage_artifact_id"] = "${{ steps.upload-usage-artifact.outputs.artifact-id }}"
 		outputs["usage_artifact_retry_id"] = "${{ steps.upload-usage-artifact-retry.outputs.artifact-id }}"
 	}
+	if isWorkQueueParticipant(data) {
+		return outputs
+	}
 	if data.SafeOutputs.NoOp != nil {
 		outputs["noop_message"] = "${{ steps.noop.outputs.noop_message }}"
-		if !isWorkQueueParticipant(data) {
-			outputs["noop_comment_body"] = "${{ steps.noop.outputs.noop_comment_body }}"
-		}
+		outputs["noop_comment_body"] = "${{ steps.noop.outputs.noop_comment_body }}"
 	}
 	if data.SafeOutputs.MissingTool != nil {
 		outputs["tools_reported"] = "${{ steps.missing_tool.outputs.tools_reported }}"

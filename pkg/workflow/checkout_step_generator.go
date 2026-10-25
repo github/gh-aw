@@ -554,7 +554,6 @@ func generateFetchStepLines(entry *resolvedCheckout, index int) string {
 	if effectiveDepth > 0 {
 		depthFlag = fmt.Sprintf(" --depth=%d", effectiveDepth)
 	}
-
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "      - name: %s\n", name)
 	sb.WriteString("        env:\n")
@@ -563,12 +562,15 @@ func generateFetchStepLines(entry *resolvedCheckout, index int) string {
 	sb.WriteString("        run: |\n")
 	sb.WriteString("          set -o pipefail\n")
 	sb.WriteString("          header=$(printf \"x-access-token:%s\" \"${GH_AW_FETCH_TOKEN}\" | base64 -w 0)\n")
-	sb.WriteString("          for refspec in " + refspecs + "; do\n")
+	sb.WriteString("          refspecs=(" + refspecs + ")\n")
+	sb.WriteString("          for refspec in \"${refspecs[@]}\"; do\n")
 	sb.WriteString("            source_ref=${refspec%%:*}\n")
 	sb.WriteString("            source_ref=${source_ref#+}\n")
 	sb.WriteString("            if matched=$(" + gitPrefix + " -c \"http.extraheader=Authorization: Basic ${header}\" ls-remote --exit-code origin \"$source_ref\" | {\n")
 	sb.WriteString("              found=0\n")
-	sb.WriteString("              while read -r oid remote_ref; do\n")
+	sb.WriteString("              while read -r _ remote_ref; do\n")
+	sb.WriteString("                # Match the configured ref glob, not a literal string.\n")
+	sb.WriteString("                # shellcheck disable=SC2254\n")
 	sb.WriteString("                case \"$remote_ref\" in $source_ref) found=1 ;; esac\n")
 	sb.WriteString("              done\n")
 	sb.WriteString("              printf '%s' \"$found\"\n")

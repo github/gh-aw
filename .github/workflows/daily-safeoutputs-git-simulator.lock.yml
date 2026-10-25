@@ -611,12 +611,15 @@ jobs:
         run: |
           set -o pipefail
           header=$(printf "x-access-token:%s" "${GH_AW_FETCH_TOKEN}" | base64 -w 0)
-          for refspec in '+refs/heads/*:refs/remotes/origin/*'; do
+          refspecs=('+refs/heads/*:refs/remotes/origin/*')
+          for refspec in "${refspecs[@]}"; do
             source_ref=${refspec%%:*}
             source_ref=${source_ref#+}
             if matched=$(git -c "http.extraheader=Authorization: Basic ${header}" ls-remote --exit-code origin "$source_ref" | {
               found=0
-              while read -r oid remote_ref; do
+              while read -r _ remote_ref; do
+                # Match the configured ref glob, not a literal string.
+                # shellcheck disable=SC2254
                 case "$remote_ref" in $source_ref) found=1 ;; esac
               done
               printf '%s' "$found"
@@ -2935,12 +2938,15 @@ jobs:
         run: |
           set -o pipefail
           header=$(printf "x-access-token:%s" "${GH_AW_FETCH_TOKEN}" | base64 -w 0)
-          for refspec in '+refs/heads/*:refs/remotes/origin/*'; do
+          refspecs=('+refs/heads/*:refs/remotes/origin/*')
+          for refspec in "${refspecs[@]}"; do
             source_ref=${refspec%%:*}
             source_ref=${source_ref#+}
             if matched=$(git -c "http.extraheader=Authorization: Basic ${header}" ls-remote --exit-code origin "$source_ref" | {
               found=0
-              while read -r oid remote_ref; do
+              while read -r _ remote_ref; do
+                # Match the configured ref glob, not a literal string.
+                # shellcheck disable=SC2254
                 case "$remote_ref" in $source_ref) found=1 ;; esac
               done
               printf '%s' "$found"
