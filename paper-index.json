@@ -2239,6 +2239,181 @@
       "published": "2026-10-20",
       "relevant": true,
       "analyzed_at": "2026-10-21-08-43-32"
+    },
+    {
+      "id": "2610.31662v1",
+      "title": "Reliable AI-Assisted Decisions via Selective Auditing",
+      "published": "2026-10-22",
+      "relevant": false,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31656v1",
+      "title": "METTA: Memory-Enhanced Test-Time Adaptation for Meta-Reinforcement Learning",
+      "published": "2026-10-22",
+      "relevant": false,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31650v1",
+      "title": "EpiSEM-Bench: Evaluating Safety and Evidence Recovery in LLM Agents under Missing Evidence",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31624v1",
+      "title": "Questioning Instrumental Convergence in RLVR: Checkpoint Evidence from OLMo-3",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31573v1",
+      "title": "Social-HUMINT: An LLM-Augmented Unified Framework for Measuring Social Media Exposure",
+      "published": "2026-10-22",
+      "relevant": false,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31553v1",
+      "title": "Contestable Agents for Data Governance: Recording Human Stewardship of AI-Generated Metadata Across Structured and Unstructured Systems",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31544v1",
+      "title": "Same Luck, Different Choice: Twin-World Credit Assignment for Agentic Reinforcement Learning",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31511v1",
+      "title": "DuoCook: An Overcooked-Inspired Benchmark for Visual Planning and Coordination",
+      "published": "2026-10-22",
+      "relevant": false,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31483v1",
+      "title": "Training Small Language Models for Transferable Tool Selection",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31479v1",
+      "title": "Evaluating the Applicability of LLM Inference Optimizations on Apple Silicon",
+      "published": "2026-10-22",
+      "relevant": false,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31461v1",
+      "title": "Adaptive Skill Granularity for Coding Agents: Runtime Routing and Macro-to-Micro Recovery",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31436v1",
+      "title": "Conservative Meta-Agent Search: Architecture Adaptation under Non-Stationarity",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31404v1",
+      "title": "AgentPhishing: A Benchmark of LLM Email Agents Under Adaptive Attack",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31376v1",
+      "title": "Certified Execution Harness for Agentic AI: Safe and Least-Intrusive Petri-Net Supervisory Control Between Reasoning and Action",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31372v1",
+      "title": "RIDAR: Safeguarding Research Integrity in Autonomous Research Agents via Automated Detection and Runtime Intervention",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31366v1",
+      "title": "AfterDeleteBench: Auditing Post-Deletion Information Persistence in LLM Agents",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31355v1",
+      "title": "Muffin - A Shared Memory Buffer for Asynchronous AI Agents",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31351v1",
+      "title": "Automating Feature Flag Cleanup at Scale with Multi-Agent LLM Systems: An Industrial Experience at DoorDash",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31326v1",
+      "title": "AgenticEvolve: Evolutionary Program Search with Persistent Language Model Agents that Design and Run Experiments",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31307v1",
+      "title": "Subgoal-aware Memory Graph for GUI Agent",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31306v1",
+      "title": "Superintelligent Software Engineering: Governance That Scales with Capability",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31303v1",
+      "title": "The Value of Memory in Language Agents",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31293v1",
+      "title": "RecallGS: Geometry-Grounded Recall for Online Semantic Gaussian Splatting",
+      "published": "2026-10-22",
+      "relevant": false,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31280v1",
+      "title": "Beyond Accuracy: Disentangling Decomposition from Typed-State Quality Assurance in Multi-Agent LLM Pipelines",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.31277v1",
+      "title": "CoWriter: Guiding Methodological and Synergetic Human-LLM Co-Authoring",
+      "published": "2026-10-22",
+      "relevant": true,
+      "analyzed_at": "2026-10-25-08-40-27"
     }
   ]
 }

@@ -1460,3 +1460,191 @@ Papers investigated for GitHub Agentic Workflows improvement opportunities. Full
 - **Relevant**: Yes
 - **Opportunity**: Relevant mechanism identified for further gh-aw evaluation.
 - **Area**: Agentic workflows
+
+### [Reliable AI-Assisted Decisions via Selective Auditing](https://arxiv.org/abs/2610.31662v1)
+- **ID**: 2610.31662v1
+- **Published**: 2026-10-22
+- **Categories**: stat.ML, cs.LG, stat.ME
+- **Relevant**: No
+
+### [METTA: Memory-Enhanced Test-Time Adaptation for Meta-Reinforcement Learning](https://arxiv.org/abs/2610.31656v1)
+- **ID**: 2610.31656v1
+- **Published**: 2026-10-22
+- **Categories**: cs.LG, cs.AI
+- **Relevant**: No
+
+### [EpiSEM-Bench: Evaluating Safety and Evidence Recovery in LLM Agents under Missing Evidence](https://arxiv.org/abs/2610.31650v1)
+- **ID**: 2610.31650v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, cs.LG
+- **Relevant**: Yes
+- **Opportunity**: Benchmark missing-evidence safety failures in tool-using workflows.
+- **Area**: security
+
+### [Questioning Instrumental Convergence in RLVR: Checkpoint Evidence from OLMo-3](https://arxiv.org/abs/2610.31624v1)
+- **ID**: 2610.31624v1
+- **Published**: 2026-10-22
+- **Categories**: cs.LG, cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Track agent safety behavior across engine training checkpoints.
+- **Area**: security
+
+### [Social-HUMINT: An LLM-Augmented Unified Framework for Measuring Social Media Exposure](https://arxiv.org/abs/2610.31573v1)
+- **ID**: 2610.31573v1
+- **Published**: 2026-10-22
+- **Categories**: cs.CR, cs.AI, cs.SI
+- **Relevant**: No
+
+### [Contestable Agents for Data Governance: Recording Human Stewardship of AI-Generated Metadata Across Structured and Unstructured Systems](https://arxiv.org/abs/2610.31553v1)
+- **ID**: 2610.31553v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, cs.DB, cs.HC
+- **Relevant**: Yes
+- **Opportunity**: Add contestable, cited specialist-agent proposals for human review.
+- **Area**: safe-outputs
+
+### [Same Luck, Different Choice: Twin-World Credit Assignment for Agentic Reinforcement Learning](https://arxiv.org/abs/2610.31544v1)
+- **ID**: 2610.31544v1
+- **Published**: 2026-10-22
+- **Categories**: cs.LG
+- **Relevant**: Yes
+- **Opportunity**: Use controlled counterfactual replay for agent decision evaluation.
+- **Area**: evaluation
+
+### [DuoCook: An Overcooked-Inspired Benchmark for Visual Planning and Coordination](https://arxiv.org/abs/2610.31511v1)
+- **ID**: 2610.31511v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI
+- **Relevant**: No
+
+### [Training Small Language Models for Transferable Tool Selection](https://arxiv.org/abs/2610.31483v1)
+- **ID**: 2610.31483v1
+- **Published**: 2026-10-22
+- **Categories**: cs.LG, cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Add a small-model tool-routing pre-step that selects minimal relevant MCP tools.
+- **Area**: token-optimization
+
+### [Evaluating the Applicability of LLM Inference Optimizations on Apple Silicon](https://arxiv.org/abs/2610.31479v1)
+- **ID**: 2610.31479v1
+- **Published**: 2026-10-22
+- **Categories**: cs.LG, cs.DC
+- **Relevant**: No
+
+### [Adaptive Skill Granularity for Coding Agents: Runtime Routing and Macro-to-Micro Recovery](https://arxiv.org/abs/2610.31461v1)
+- **ID**: 2610.31461v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, cs.SE
+- **Relevant**: Yes
+- **Opportunity**: Route between macro skills and primitive tools with micro-level failure recovery.
+- **Area**: prompt-engineering
+
+### [Conservative Meta-Agent Search: Architecture Adaptation under Non-Stationarity](https://arxiv.org/abs/2610.31436v1)
+- **ID**: 2610.31436v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, cs.LG, cs.MA
+- **Relevant**: Yes
+- **Opportunity**: Tune sub-agent graphs through paired shadow replay and canary promotion.
+- **Area**: multi-agent
+
+### [AgentPhishing: A Benchmark of LLM Email Agents Under Adaptive Attack](https://arxiv.org/abs/2610.31404v1)
+- **ID**: 2610.31404v1
+- **Published**: 2026-10-22
+- **Categories**: cs.CR, cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Add adaptive social-engineering scenarios to agent security evaluations.
+- **Area**: security
+
+### [Certified Execution Harness for Agentic AI: Safe and Least-Intrusive Petri-Net Supervisory Control Between Reasoning and Action](https://arxiv.org/abs/2610.31376v1)
+- **ID**: 2610.31376v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, eess.SY
+- **Relevant**: Yes
+- **Opportunity**: Model capabilities, approvals, budgets, and retries as enforceable execution state.
+- **Area**: security
+
+### [RIDAR: Safeguarding Research Integrity in Autonomous Research Agents via Automated Detection and Runtime Intervention](https://arxiv.org/abs/2610.31372v1)
+- **ID**: 2610.31372v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Detect and intervene on research-integrity violations during agent runs.
+- **Area**: audit
+
+### [AfterDeleteBench: Auditing Post-Deletion Information Persistence in LLM Agents](https://arxiv.org/abs/2610.31366v1)
+- **ID**: 2610.31366v1
+- **Published**: 2026-10-22
+- **Categories**: cs.CR, cs.CL, cs.LG
+- **Relevant**: Yes
+- **Opportunity**: Audit derived memory for information persistence after deletion.
+- **Area**: memory
+
+### [Muffin - A Shared Memory Buffer for Asynchronous AI Agents](https://arxiv.org/abs/2610.31355v1)
+- **ID**: 2610.31355v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, cs.MA
+- **Relevant**: Yes
+- **Opportunity**: Provide structured shared buffers for asynchronous sub-agent coordination.
+- **Area**: multi-agent
+
+### [Automating Feature Flag Cleanup at Scale with Multi-Agent LLM Systems: An Industrial Experience at DoorDash](https://arxiv.org/abs/2610.31351v1)
+- **ID**: 2610.31351v1
+- **Published**: 2026-10-22
+- **Categories**: cs.SE, cs.AI, cs.MA
+- **Relevant**: Yes
+- **Opportunity**: Codify MCP-to-ticket-to-PR automation patterns with governed writes.
+- **Area**: workflow-patterns
+
+### [AgenticEvolve: Evolutionary Program Search with Persistent Language Model Agents that Design and Run Experiments](https://arxiv.org/abs/2610.31326v1)
+- **ID**: 2610.31326v1
+- **Published**: 2026-10-22
+- **Categories**: cs.NE, cs.AI, cs.LG
+- **Relevant**: Yes
+- **Opportunity**: Support persistent experiment-design loops with recorded evaluations.
+- **Area**: repo-memory
+
+### [Subgoal-aware Memory Graph for GUI Agent](https://arxiv.org/abs/2610.31307v1)
+- **ID**: 2610.31307v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Store reusable agent evidence at subgoal granularity.
+- **Area**: memory
+
+### [Superintelligent Software Engineering: Governance That Scales with Capability](https://arxiv.org/abs/2610.31306v1)
+- **ID**: 2610.31306v1
+- **Published**: 2026-10-22
+- **Categories**: cs.SE, cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Scale governance gates and decision records with agent capability.
+- **Area**: governance
+
+### [The Value of Memory in Language Agents](https://arxiv.org/abs/2610.31303v1)
+- **ID**: 2610.31303v1
+- **Published**: 2026-10-22
+- **Categories**: cs.AI, cs.CL
+- **Relevant**: Yes
+- **Opportunity**: Apply value-aware retention, recovery, and revision to agent memory.
+- **Area**: memory
+
+### [RecallGS: Geometry-Grounded Recall for Online Semantic Gaussian Splatting](https://arxiv.org/abs/2610.31293v1)
+- **ID**: 2610.31293v1
+- **Published**: 2026-10-22
+- **Categories**: cs.CV, cs.AI
+- **Relevant**: No
+
+### [Beyond Accuracy: Disentangling Decomposition from Typed-State Quality Assurance in Multi-Agent LLM Pipelines](https://arxiv.org/abs/2610.31280v1)
+- **ID**: 2610.31280v1
+- **Published**: 2026-10-22
+- **Categories**: cs.SE, cs.AI, cs.ET
+- **Relevant**: Yes
+- **Opportunity**: Validate typed intermediate state between multi-agent workflow stages.
+- **Area**: safe-outputs
+
+### [CoWriter: Guiding Methodological and Synergetic Human-LLM Co-Authoring](https://arxiv.org/abs/2610.31277v1)
+- **ID**: 2610.31277v1
+- **Published**: 2026-10-22
+- **Categories**: cs.CL, cs.AI, cs.HC
+- **Relevant**: Yes
+- **Opportunity**: Add proactive human-engagement checkpoints to coauthoring workflows.
+- **Area**: human-in-the-loop
