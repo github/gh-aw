@@ -277,8 +277,27 @@
         "Data pipeline failure persists: 0/50 conversation logs; population still CI-gate/review-bot.",
         "0/6 open PRs orphaned (max gate=0) -> NORMAL, 52nd healthy day. Standard run (roll=34)."
       ]
+    },
+    {
+      "date": "2026-10-26",
+      "sessions_analyzed": 50,
+      "completion_rate": 74.0,
+      "average_duration_minutes": 35.645,
+      "median_duration_minutes": 35.534,
+      "orphan_rate_pct": 0.0,
+      "escalations": 0,
+      "experimental_strategy": null,
+      "key_insights": [
+        "74.0% completion (37/50: 37 success, 10 action_required, 2 failure, 1 cancelled), +24.0pts vs 10-25 (50.0%); 3rd-highest of 54 recorded days (behind 10-21 80.0%, 09-02 78.0%); 30-day mean 41.0%.",
+        "Partial data-pipeline recovery: 3/50 events.jsonl transcripts (same 3 workflow types as 10-21, 5-day gap) -- PR Code Quality Reviewer 87.5% tool success, Test Quality Sentinel 100% (clean noop on missing data), Matt Pocock Skills Reviewer 100%.",
+        "provenance 84.8% bot-driven (28/33, excl. 4 ambiguous); true-agentic 5/5=100% resolved (Addressing comment on PR #71934 x3, #71957 x2).",
+        "workflow_identity_conclusion_determinism (10-25 standing strategy) REPLICATION MIXED: holds on copilot/bump-mcpg-to-v050-firewall-to-v0290, BREAKS on copilot/harness-retries-telemetry (CGO hit all 3 outcomes) -- downgrade to branch-dependent, not a confirmed law.",
+        "2 branches (56%/44%); duration mean 35.65min/median 35.53min (10/50 zero-dur, 9 outliers >60min) -- ~4x 10-25's 9.34min, driven by outliers not population shift.",
+        "Smoke Copilot failed 1/1 on copilot/harness-retries-telemetry -- flagged for manual review.",
+        "0/10 open PRs orphaned (max gate=3) -> NORMAL, 54th healthy day. Standard run (roll=50)."
+      ]
     }
   ],
-  "last_updated": "2026-10-24",
+  "last_updated": "2026-10-26",
   "version": "1.11"
 }
