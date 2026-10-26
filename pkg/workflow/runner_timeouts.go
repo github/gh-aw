@@ -38,13 +38,20 @@ func (c *Compiler) resolveJobRunnerTimeouts(data *WorkflowData) error {
 		}
 
 		if usesDefaultFrameworkRunner(data, name) {
-			job.RunsOn = "runs-on: ubuntu-latest"
+			if name == string(constants.SafeOutputsJobName) && !hasExplicitLongSafeOutputsTimeout(data) {
+				continue
+			}
+			job.RunsOn = "runs-on: ubuntu-latest # Automatically selected because the configured timeout exceeds ubuntu-slim's 15-minute limit."
 			jobTimeoutsLog.Printf("Using ubuntu-latest for job %s because timeout-minutes %d exceeds ubuntu-slim's %d-minute limit", name, minutes, ubuntuSlimMaxTimeoutMinutes)
 			continue
 		}
 		return fmt.Errorf("job '%s' sets timeout-minutes to %d, but ubuntu-slim supports at most %d minutes; use runs-on: ubuntu-latest or reduce timeout-minutes to %d", name, minutes, ubuntuSlimMaxTimeoutMinutes, ubuntuSlimMaxTimeoutMinutes)
 	}
 	return nil
+}
+
+func hasExplicitLongSafeOutputsTimeout(data *WorkflowData) bool {
+	return data != nil && data.SafeOutputs != nil && data.SafeOutputs.TimeoutMinutes > ubuntuSlimMaxTimeoutMinutes
 }
 
 func usesDefaultFrameworkRunner(data *WorkflowData, jobName string) bool {

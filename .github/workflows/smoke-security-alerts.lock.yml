@@ -2196,7 +2196,7 @@ jobs:
       - gateway_admission
       - gateway_provenance
     if: "${{ needs.gateway_provenance.result == 'success' && needs.gateway_provenance.outputs.verified == 'true' && needs.gateway_admission.result == 'success' && needs.gateway_admission.outputs.verified == 'true' && ((!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success') }}"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       issues: write

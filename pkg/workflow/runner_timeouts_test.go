@@ -26,12 +26,14 @@ func TestResolveJobRunnerTimeouts(t *testing.T) {
 		{
 			name:       "default framework runner switches for longer timeout",
 			job:        Job{Name: string(constants.SafeOutputsJobName), RunsOn: "runs-on: ubuntu-slim", TimeoutMinutes: 16},
-			wantRunner: "runs-on: ubuntu-latest",
+			data:       WorkflowData{SafeOutputs: &SafeOutputsConfig{TimeoutMinutes: 16}},
+			wantRunner: "runs-on: ubuntu-latest # Automatically selected because the configured timeout exceeds ubuntu-slim's 15-minute limit.",
 		},
 		{
 			name:       "numeric timeout in expression field is checked",
 			job:        Job{Name: string(constants.SafeOutputsJobName), RunsOn: "runs-on: ubuntu-slim", TimeoutMinutesExpression: "45"},
-			wantRunner: "runs-on: ubuntu-latest",
+			data:       WorkflowData{SafeOutputs: &SafeOutputsConfig{TimeoutMinutes: 45}},
+			wantRunner: "runs-on: ubuntu-latest # Automatically selected because the configured timeout exceeds ubuntu-slim's 15-minute limit.",
 		},
 		{
 			name:      "explicit slim runner is not silently replaced",
@@ -116,13 +118,14 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 		frontmatter string
 		jobName     string
 		wantRunner  string
+		wantComment bool
 		wantError   bool
 	}{
 		{
-			name:        "safe outputs default timeout selects larger runner",
+			name:        "safe outputs default timeout stays on slim runner",
 			frontmatter: "safe-outputs:\n  add-comment:\n",
 			jobName:     "safe_outputs",
-			wantRunner:  "ubuntu-latest",
+			wantRunner:  "ubuntu-slim",
 		},
 		{
 			name:        "safe outputs fifteen minutes stays slim",
@@ -135,6 +138,7 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 			frontmatter: "safe-outputs:\n  timeout-minutes: 16\n  add-comment:\n",
 			jobName:     "safe_outputs",
 			wantRunner:  "ubuntu-latest",
+			wantComment: true,
 		},
 		{
 			name:        "explicit other runner is preserved",
@@ -178,6 +182,11 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(output), &lock))
 			assert.Equal(t, tt.wantRunner, lock.Jobs[tt.jobName].RunsOn)
+			if tt.wantComment {
+				assert.Contains(t, output, "runs-on: ubuntu-latest # Automatically selected because the configured timeout exceeds ubuntu-slim's 15-minute limit.")
+			} else {
+				assert.NotContains(t, output, "Automatically selected because the configured timeout exceeds ubuntu-slim's 15-minute limit.")
+			}
 		})
 	}
 }

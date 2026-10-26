@@ -1512,7 +1512,7 @@ jobs:
       - activation
       - agent
     if: (!cancelled()) && needs.agent.result != 'skipped'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       issues: write

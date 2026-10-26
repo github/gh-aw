@@ -4375,7 +4375,7 @@ jobs:
       - detection
       - prefilter
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       actions: write
