@@ -103,6 +103,7 @@ func normalizeOutput(content string) string {
 }
 
 func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
+	pinnedRuntimeConfig := `{"pinnedAwf":"v0.5.0","pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0","pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"}`
 	input := strings.Join([]string{
 		`GH_AW_INFO_AWF_VERSION: "` + string(constants.DefaultFirewallVersion) + `"`,
 		`GH_AW_INFO_AWMG_VERSION: "` + string(constants.DefaultMCPGatewayVersion) + `"`,
@@ -125,7 +126,7 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 		`GH_AW_INFO_AGENT_VERSION: "` + string(constants.DefaultCopilotVersion) + `"`,
 		`run: npm install --ignore-scripts -g @openai/codex@` + string(constants.DefaultCodexVersion),
 		`run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@` + string(constants.DefaultPiVersion),
-		`{"pinnedAwf":"vPINNED_AWF","pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:PINNED_AWF","pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:vPINNED_MCPG"}`,
+		pinnedRuntimeConfig,
 	}, "\n")
 
 	normalized := normalizeOutput(input)
@@ -155,11 +156,12 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 	require.Contains(t, normalized, `GH_AW_INFO_AGENT_VERSION: "COPILOT_VERSION"`)
 	require.Contains(t, normalized, `@openai/codex@CODEX_VERSION`)
 	require.Contains(t, normalized, `@earendil-works/pi-coding-agent@PI_VERSION`)
-	require.Contains(t, normalized, `"pinnedAwf":"vPINNED_AWF"`)
-	require.Contains(t, normalized, `"pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:PINNED_AWF"`)
-	require.Contains(t, normalized, `"pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:vPINNED_MCPG"`)
-	require.NotContains(t, normalized, string(constants.DefaultFirewallVersion))
-	require.NotContains(t, normalized, string(constants.DefaultMCPGatewayVersion))
+	require.Contains(t, normalized, `"pinnedAwf":"v0.5.0"`)
+	require.Contains(t, normalized, `"pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0"`)
+	require.Contains(t, normalized, `"pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"`)
+	normalizedWithoutPinnedRuntimeConfig := strings.Replace(normalized, pinnedRuntimeConfig, "", 1)
+	require.NotContains(t, normalizedWithoutPinnedRuntimeConfig, string(constants.DefaultFirewallVersion))
+	require.NotContains(t, normalizedWithoutPinnedRuntimeConfig, string(constants.DefaultMCPGatewayVersion))
 	require.NotContains(t, normalized, constants.SonnetDefaultModel)
 	require.NotContains(t, normalized, string(constants.DefaultClaudeCodeVersion))
 	require.NotContains(t, normalized, string(constants.DefaultCopilotVersion))
