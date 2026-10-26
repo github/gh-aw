@@ -7,7 +7,7 @@ package constants
 //
 // Example usage:
 //
-//	const DefaultCopilotVersion Version = "1.0.101"
+//	const DefaultCopilotVersion Version = "1.0.103"
 //	func InstallTool(name string, version Version) error { ... }
 type Version string
 
@@ -39,11 +39,13 @@ const DefaultClaudeCodeVersion Version = "2.1.310"
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.101"
+const DefaultCopilotVersion Version = "1.0.103"
 
 // DefaultCopilotChecksumsSHA256 authenticates DefaultCopilotVersion's SHA256SUMS.txt.
 // Update both constants with scripts/update-copilot-version.sh after reviewing the release pin.
-const DefaultCopilotChecksumsSHA256 = "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
+// Reviewed 2026-10-26 against GitHub API metadata for mutable release asset 666400170:
+// https://api.github.com/repos/github/copilot-cli/releases/assets/666400170
+const DefaultCopilotChecksumsSHA256 = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
 
 // CopilotSessionIDMinVersion is the minimum Copilot CLI version that supports
 // the exact session selector injected by the model-verification harness.

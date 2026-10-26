@@ -16,7 +16,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		want Version
 	}{
 		{"Claude Code", DefaultClaudeCodeVersion, "2.1.310"},
-		{"Copilot CLI", DefaultCopilotVersion, "1.0.101"},
+		{"Copilot CLI", DefaultCopilotVersion, "1.0.103"},
 		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
 		{"Codex", DefaultCodexVersion, "0.164.0"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.64.0"},
@@ -38,6 +38,15 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 				t.Fatalf("%s default version = %q, want %q", tt.name, tt.got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDefaultCopilotChecksumsSHA256(t *testing.T) {
+	t.Parallel()
+
+	const expected = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
+	if DefaultCopilotChecksumsSHA256 != expected {
+		t.Fatalf("DefaultCopilotChecksumsSHA256 = %q, want the reviewed v1.0.103 manifest digest %q", DefaultCopilotChecksumsSHA256, expected)
 	}
 }
 

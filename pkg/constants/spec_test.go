@@ -119,7 +119,7 @@ func TestSpec_Constants_VersionsAndURLs(t *testing.T) {
 		{name: "network docs", got: constants.DocsNetworkURL.String(), want: "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/network.md"},
 		{name: "sandbox docs", got: constants.DocsSandboxURL.String(), want: "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md"},
 		{name: "membership step", got: constants.CheckMembershipStepID.String(), want: "check_membership"},
-		{name: "default Copilot version", got: constants.DefaultCopilotVersion.String(), want: "1.0.101"},
+		{name: "default Copilot version", got: constants.DefaultCopilotVersion.String(), want: "1.0.103"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
