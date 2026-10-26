@@ -13,6 +13,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFetchContainerDigestFailureReasons(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test executables use a POSIX shell")
+	}
+	for _, tc := range []struct {
+		name   string
+		output string
+		reason string
+	}{
+		{"access denied", "failed to fetch oauth token: 403 Forbidden", "registry access denied (HTTP 403)"},
+		{"authentication required", "unexpected status: 401 Unauthorized", "registry authentication required (HTTP 401)"},
+		{"network failure", "dial tcp: connection refused", "registry metadata lookup failed"},
+		{"tools missing", "", "Docker Buildx and crane are unavailable"},
+		{"buildx plugin missing", "docker: 'buildx' is not a docker command.", "Docker Buildx and crane are unavailable"},
+		{"unknown buildx command", `unknown command "buildx" for "docker"`, "Docker Buildx and crane are unavailable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("PATH", dir)
+			if tc.output != "" {
+				t.Setenv("REGISTRY_ERROR", tc.output)
+				const docker = "#!/bin/sh\nprintf '%s\\n' \"$REGISTRY_ERROR\" >&2\nexit 1\n"
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "docker"), []byte(docker), 0o755))
+			}
+			digest, err := fetchContainerDigest(context.Background(), "ghcr.io/example/agent:v1", false)
+			require.Empty(t, digest)
+			var resolutionErr *containerDigestResolutionError
+			require.ErrorAs(t, err, &resolutionErr)
+			require.Equal(t, tc.reason, resolutionErr.reason)
+			if tc.output != "" {
+				require.Contains(t, err.Error(), tc.output, "retain full diagnostics for debug logging")
+			}
+		})
+	}
+}
 func TestFetchContainerDigestNeverPullsImages(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test executables use a POSIX shell")

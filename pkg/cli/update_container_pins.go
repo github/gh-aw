@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,13 +22,13 @@ import (
 
 var containerPinsLog = logger.New("cli:update_container_pins")
 
-// imageFailure pairs a container image tag with the human-readable reason it
-// could not be pinned, so the summary can surface actionable details.
-type imageFailure struct {
-	// image is the container image tag, e.g. "ghcr.io/github/github-mcp-server:v0.32.0".
-	image string
-	// reason is the human-readable error message explaining why digest resolution failed.
-	reason string
+type containerDigestResolutionError struct {
+	reason  string
+	details string
+}
+
+func (e *containerDigestResolutionError) Error() string {
+	return "could not resolve container digest without downloading image layers: " + e.details
 }
 
 // dockerImagesArgPattern matches the download_docker_images.sh invocation in lock files
@@ -64,8 +65,8 @@ func defaultContainerPinUpdateDeps() containerPinUpdateDeps {
 // as they are already pinned. Images without a cached pin are queried via the
 // Docker CLI ("docker buildx imagetools inspect").
 //
-// When Docker is unavailable the function logs a warning and returns nil so that
-// the overall upgrade flow is not interrupted.
+// Resolution failures produce a short informational summary and return nil so
+// that the overall upgrade flow is not interrupted.
 //
 // Returns true when new container pins were added and lock files should be
 // recompiled to embed the digest references.
@@ -129,7 +130,8 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		pinnedImage string // image@sha256:...
 	}
 	var updatedImages []pinnedEntry
-	var failedImages []imageFailure
+	failedCount := 0
+	failureReasons := make(map[string]struct{})
 	var skippedImages []string
 
 	type digestResult struct {
@@ -164,7 +166,13 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		digest, resolveErr := results[i].digest, results[i].err
 		if resolveErr != nil {
 			containerPinsLog.Printf("Failed to resolve digest for %s: %v", image, resolveErr)
-			failedImages = append(failedImages, imageFailure{image: image, reason: resolveErr.Error()})
+			failedCount++
+			reason := "registry metadata lookup failed"
+			var digestErr *containerDigestResolutionError
+			if errors.As(resolveErr, &digestErr) {
+				reason = digestErr.reason
+			}
+			failureReasons[reason] = struct{}{}
 			continue
 		}
 
@@ -205,12 +213,8 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		fmt.Fprintln(os.Stderr, "")
 	}
 
-	if len(failedImages) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to resolve digest for %d image(s) (Docker/crane may be unavailable):", len(failedImages))))
-		for _, f := range failedImages {
-			fmt.Fprintf(os.Stderr, "  %s: %s\n", f.image, f.reason)
-		}
-		fmt.Fprintln(os.Stderr, "")
+	if failedCount > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Container pins could not be updated: "+strings.Join(sliceutil.SortedKeys(failureReasons), "; ")+"."))
 	}
 
 	if len(updatedImages) > 0 || prunedCount > 0 {
@@ -220,8 +224,8 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated container pins in actions-lock.json"))
 	}
 
-	if len(failedImages) > 0 && opts.failOnResolveErrors {
-		return len(updatedImages) > 0, fmt.Errorf("failed to resolve digest for %d image(s)", len(failedImages))
+	if failedCount > 0 && opts.failOnResolveErrors {
+		return len(updatedImages) > 0, fmt.Errorf("failed to resolve digest for %d image(s)", failedCount)
 	}
 
 	return len(updatedImages) > 0, nil
@@ -309,6 +313,8 @@ func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, er
 	}
 
 	var errs []string
+	unavailable := 0
+	reason := "registry metadata lookup failed"
 	for _, s := range strategies {
 		if err := ctx.Err(); err != nil {
 			return "", err
@@ -323,9 +329,23 @@ func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, er
 		msg := fmt.Sprintf("%s: %v", s.name, err)
 		containerPinsLog.Printf("Strategy %q failed for %s: %v", s.name, image, err)
 		errs = append(errs, msg)
+		if errors.Is(err, exec.ErrNotFound) ||
+			(s.name == "docker buildx imagetools" &&
+				(strings.Contains(msg, "is not a docker command") || strings.Contains(msg, `unknown command "buildx"`))) {
+			unavailable++
+		}
+		switch {
+		case strings.Contains(msg, "403 Forbidden"):
+			reason = "registry access denied (HTTP 403)"
+		case strings.Contains(msg, "401 Unauthorized"):
+			reason = "registry authentication required (HTTP 401)"
+		}
 	}
 
-	return "", fmt.Errorf("could not resolve container digest without downloading image layers; check registry access and install Docker Buildx or crane: %s", strings.Join(errs, "; "))
+	if unavailable == len(strategies) {
+		reason = "Docker Buildx and crane are unavailable"
+	}
+	return "", &containerDigestResolutionError{reason: reason, details: strings.Join(errs, "; ")}
 }
 
 // resolveDigestViaBuildx uses "docker buildx imagetools inspect" to get the content
