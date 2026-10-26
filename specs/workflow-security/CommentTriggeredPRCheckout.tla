@@ -36,8 +36,7 @@ CommentEvent == event \in CommentEvents
 CommentOrReviewEvent == event \in CommentOrReviewEvents
 BranchEvent == event \in BranchEvents
 SupportedBranchAction == action \in {"opened", "synchronize",
-                                      "ready_for_review", "reopened",
-                                      "labeled"}
+                                      "ready_for_review", "reopened"}
 AuthorMatchesSender ==
     IF CommentEvent THEN sender = commentAuthor
     ELSE IF event \in ReviewEvents THEN sender = reviewAuthor

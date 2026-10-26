@@ -362,10 +362,8 @@ If the pull request is still open, verify that:
         ["pull_request", "synchronize"],
         ["pull_request", "ready_for_review"],
         ["pull_request", "reopened"],
-        ["pull_request", "labeled"],
         ["pull_request_target", "ready_for_review"],
         ["pull_request_target", "reopened"],
-        ["pull_request_target", "labeled"],
       ])("should allow a same-repository GitHub App PR on %s with action %s", async (eventName, action) => {
         mockContext.eventName = eventName;
         mockContext.actor = "automation[bot]";
@@ -416,6 +414,23 @@ If the pull request is still open, verify that:
         await runScript();
 
         expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+      });
+
+      it.each(["pull_request", "pull_request_target"])("should require collaborator permission for a same-repository GitHub App PR on %s with action labeled", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+        mockContext.payload.action = "labeled";
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.pull_request.head.repo.id = 42;
+        mockContext.payload.pull_request.base.repo.id = 42;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "automation[bot]" }));
         expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
         expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
       });

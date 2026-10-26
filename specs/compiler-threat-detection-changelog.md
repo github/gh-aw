@@ -16,7 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
-| 1.0.72 | Audit-only clarification that same-repository bot checkout for `pull_request` and `pull_request_target` `labeled` events is governed by RS-05a and its bounded TLA+ model. No new threat identifier, permission grant, or lock-file schema change. |
+| 1.0.72 | Audit-only clarification that same-repository bot PR `labeled` events remain subject to the RS-05a collaborator permission floor. No new threat identifier, permission grant, or lock-file schema change. |
 | 1.0.71 | Added a separate compiler-only `artipacked` exception for agent checkouts immediately followed by compiler-owned credential cleanup and verification. Requires current-compilation provenance, unique full-block parsed-field matching, exact adjacency, and statically proven discovery coverage; altered, authored, ambiguous, interrupted, deep-path, and unknown-path blocks remain warned. Preserves runtime YAML, per-checkout authentication, other diagnostics, and standalone lint. Maps adversarial, discovery-depth boundary, multi-repository, sparse-checkout, compilation, and provenance-reset regressions. |
 | 1.0.70 | Specifies generated admission-output gating for agent, threat-detection, evals, and conclusion usage/session steps. Disabled admission emits no activation admission-output references; dry-run component execution omits admission environment bindings. Preserves component-specific budget selection and independent grader, daily-credit, and job-duration bindings. Also specifies the compiler-only `artipacked` warning exception for retained-credential checkouts in the exact generated `safe_outputs` PR checkout/authentication block, requiring current-compilation provenance, a unique full-block parsed-field match, and provenance reset between workflows; modified or ambiguous blocks remain ineligible. Preserves authored-step and other-job diagnostics, other rules, errors, analysis failures, standalone lint, and runtime authentication. Maps admission-only lint compilation, component/usage, exclusion, multi-repository, compiler integration, and reuse regressions. Regeneration removes stale references; no new threat identifier, permission grant, or lock-file schema change. |
 | 1.0.69 | Restored CTR-005's `detection-gate: status-only` syntax and added a bounded TLA+ model for the validated exception: detection completion ordering, failure/warn continuation, and prohibited agent-data access. No new threat identifier, permission grant, or lock-file schema change. |
@@ -70,15 +70,15 @@ This changelog records the version history and the dated mapping audits for `spe
 
 ### Mapping Audit (2026-10-26)
 
-Reviewed the same-repository bot checkout exception for `pull_request` and
+Reviewed the same-repository bot checkout handling for `pull_request` and
 `pull_request_target` `labeled` events in
 `actions/setup/js/checkout_pr_branch.cjs`, its regression tests, RS-05a, and the
-bounded checkout authorization model. The exception retains the exact Bot
-sender/runtime actor match and positive runtime, PR-head, and PR-base repository
-ID equality checks. Forks, missing or mismatched provenance, non-Bot senders,
-and other actions retain the collaborator-permission floor. The GitHub Actions
-security review found no confirmed vulnerabilities. This is a runtime trust
-clarification, not a compiler-generated construct or a new `CTR-*` rule.
+bounded checkout authorization model. Label events remain outside the trusted
+branch-action allowlist and require collaborator write-or-higher permission.
+The same-repository exception retains the exact Bot sender/runtime actor match
+and positive runtime, PR-head, and PR-base repository ID equality checks for
+its listed actions. This is a runtime trust clarification, not a
+compiler-generated construct or a new `CTR-*` rule.
 
 ### Mapping Audit (2026-10-24)
 

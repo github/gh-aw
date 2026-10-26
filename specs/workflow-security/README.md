@@ -44,7 +44,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Runtime repository-list checkout | [`RuntimeRepositoryCheckout.tla`](RuntimeRepositoryCheckout.tla) | Trusted policy, bounded whole-batch validation, visibility, entry authentication, agent/privileged finalization, job-local manifests, staged isolation, and failure reporting. |
 | Pull-request fork admission | [`PullRequestForkAdmission.tla`](PullRequestForkAdmission.tla) | Same-repository default, repository-pattern or explicit author-association admission, non-PR trigger preservation, and permission independence. |
 | `pull_request_target` checkout policy | [`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) | Strict warning acknowledgment, explicit checkout disablement, trusted base checkout, exact allowlisted external checkout, and fail-closed `fetch` handling. |
-| PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions including `labeled`, plus the stricter allow-listed comment/review exception. |
+| PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions; `labeled` and other unlisted actions retain the collaborator permission floor, as does the stricter allow-listed comment/review exception. |
 | Patch/bundle application | [`SafeOutputTransport.tla`](SafeOutputTransport.tla) | Captured bytes, trusted transformations, private snapshots, publication retries, sticky failures, bounded local checking cost, and finally cleanup. |
 | Bundle Git operations | [`SafeOutputGit.tla`](SafeOutputGit.tla) | Explicit prerequisite recovery, offline optional discovery, bounded comparison/history work, credential roles, and separate size/protection provenance. |
 | Host-side MCP compilation | [`MCPCompile.tla`](MCPCompile.tla) | Startup write capability, actor authorization, early option rejection, filesystem isolation, cached-only imports, repository-root cache selection, validation, and write-enabled emission. |
@@ -509,7 +509,7 @@ checks; the real-Git `.gitmodules` regression is not replaced by this abstractio
 
 [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) exhaustively
 models `pull_request` and `pull_request_target` actions `opened`, `synchronize`,
-`ready_for_review`, `reopened`, and `labeled`, as well as `issue_comment`,
+`ready_for_review`, `reopened`, `labeled`, and other unlisted actions, as well as `issue_comment`,
 `pull_request_review_comment`, and `pull_request_review`. The branch-event
 exception requires a Bot sender whose login exactly matches the runtime actor
 and matching positive runtime, PR-head, and PR-base repository identities. The
