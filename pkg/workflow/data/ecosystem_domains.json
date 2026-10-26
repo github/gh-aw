@@ -1,7 +1,7 @@
 {
   "ecosystems": {
     "bazel": ["releases.bazel.build", "mirror.bazel.build", "bcr.bazel.build", "blog.bazel.build"],
-    "chrome": ["*.google.com", "*.googleapis.com", "*.gvt1.com"],
+    "chrome": ["safebrowsing.googleapis.com", "optimizationguide-pa.googleapis.com", "update.googleapis.com", "*.gvt1.com"],
     "clojure": ["repo.clojars.org", "clojars.org"],
     "codex-vendor": ["ab.chatgpt.com", "auth.openai.com"],
     "containers": ["ghcr.io", "registry.hub.docker.com", "*.docker.io", "*.docker.com", "production.cloudflare.docker.com", "dl.k8s.io", "pkgs.k8s.io", "quay.io", "mcr.microsoft.com", "gcr.io", "auth.docker.io"],

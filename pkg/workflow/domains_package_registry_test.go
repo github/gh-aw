@@ -138,9 +138,8 @@ type engineEcosystemDomainOverlap struct {
 }
 
 func engineDefaultEcosystemOverlaps(ecosystems, defaults map[string][]string) []engineEcosystemDomainOverlap {
-	// These categories describe shared transport or vendor services rather than
-	// gated package ecosystems. Chrome's broad Google vendor rules also cover
-	// Gemini's inference API; do not treat those as package registry rules.
+	// These categories describe shared transport, browser, or vendor services
+	// rather than gated package ecosystems.
 	excludedEcosystems := []string{
 		"chrome", "codex-vendor", "copilot-vendor", "defaults", "dev-tools",
 		"fonts", "gh-aw", "github", "github-actions", "local", "threat-detection",

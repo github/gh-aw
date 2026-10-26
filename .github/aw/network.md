@@ -81,7 +81,7 @@ Keywords expanding to curated domain lists:
 | `scala` | sbt / Scala | `repo.scala-sbt.org`, `repo1.maven.org` |
 | `zig` | Zig packages | `ziglang.org` |
 | `dev-tools` | CI/CD tools | Renovate, Codecov, shields.io, and other dev tooling |
-| `chrome` | Chrome / Chromium | `*.googleapis.com`, `*.gvt1.com` |
+| `chrome` | Chrome / Chromium browser services | `safebrowsing.googleapis.com`, `optimizationguide-pa.googleapis.com`, `update.googleapis.com`, `*.gvt1.com` |
 | `latex` | LaTeX / TeX | `ctan.org`, `mirror.ctan.org`, `miktex.org`, `tug.org` |
 | `lean` | Lean theorem prover | `lean-lang.org`, `elan.lean-lang.org`, `reservoir.lean-lang.org` |
 | `python-native` | Python native build deps | Native toolchain mirrors for building Python packages from source |
@@ -95,6 +95,13 @@ Keywords expanding to curated domain lists:
 | `pi` | Pi engine transport | `api.githubcopilot.com`, GitHub web, `host.docker.internal`, `raw.githubusercontent.com` |
 | `pi-base` | Pi provider-independent baseline | `github.com`, `host.docker.internal`, `raw.githubusercontent.com` |
 | `threat-detection` | Compatibility alias for Copilot threat detection | Copilot API hosts, GitHub API/web, `host.docker.internal`, `registry.npmjs.org` |
+
+The `chrome` set excludes general Google web/API access, including accounts, fonts,
+package hosts, and the Gemini API. Add concrete hosts such as `accounts.google.com`
+and `www.google.com`, or the corresponding ecosystem, to `network.allowed` when
+needed. Playwright browser installation happens before the agent starts.
+The retained `*.gvt1.com` download-CDN rule also permits non-browser artifacts on
+that shared CDN; the firewall cannot restrict it by URL path.
 
 ## Engine Domain Sets
 

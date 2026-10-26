@@ -100,7 +100,7 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | `containers` | Docker Hub, GitHub Container Registry, Quay, GCR, MCR |
 | `linux-distros` | Debian, Ubuntu, Alpine, Fedora, and other Linux package repositories |
 | `playwright` | Playwright browser testing (see [Playwright Reference](/gh-aw/reference/playwright/)) |
-| `chrome` | Headless Chrome/Puppeteer (`*.google.com`, `*.googleapis.com`, `*.gvt1.com`) |
+| `chrome` | Headless Chrome/Puppeteer services (`safebrowsing.googleapis.com`, `optimizationguide-pa.googleapis.com`, `update.googleapis.com`, `*.gvt1.com`) |
 | `fonts` | Google Fonts (`fonts.googleapis.com`, `fonts.gstatic.com`) |
 | `terraform` | HashiCorp registry, apt/yum releases |
 | `bazel` | Bazel build system (`releases.bazel.build`, `bcr.bazel.build`) |
@@ -140,6 +140,10 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 | `scala` | Scala packages (`repo.scala-sbt.org`, `jitpack.io`) |
 | `swift` | Swift packages (`swift.org`, `cocoapods.org`) |
 | `zig` | Zig packages (`ziglang.org`) |
+
+The `chrome` set permits Safe Browsing, optimization-guide requests, component updates, and the `gvt1.com` download CDN (including `redirector.gvt1.com`). It excludes general Google web and API access. Account or web access requires explicit hosts, for example `network.allowed: [chrome, accounts.google.com, www.google.com]`. Fonts, packages, and direct Gemini API access require their corresponding opt-ins (`fonts`, `node`/`go`/`dart`, `java`, `defaults`, or `gemini`).
+
+Browser installation for the [Playwright tool](/gh-aw/reference/playwright/) happens before the agent starts; `chrome` does not include `storage.googleapis.com` or `dl.google.com`. Workflows performing their own downloads must explicitly allow those hosts or a matching package ecosystem. The retained `*.gvt1.com` rule allows the entire shared download CDN, not only Chrome artifacts: the firewall cannot restrict downloads by URL path.
 
 ## Engine Domain Sets
 

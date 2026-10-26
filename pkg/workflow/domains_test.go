@@ -48,7 +48,7 @@ func TestGetDomainEcosystem(t *testing.T) {
 			expected: "containers",
 		},
 
-		// Fonts ecosystem (takes priority over chrome for fonts.googleapis.com)
+		// Fonts ecosystem
 		{
 			name:     "fonts ecosystem - fonts.googleapis.com",
 			domain:   "fonts.googleapis.com",
@@ -60,17 +60,18 @@ func TestGetDomainEcosystem(t *testing.T) {
 			expected: "fonts",
 		},
 
-		// Chrome ecosystem (headless Chrome/Puppeteer browser testing)
+		// Optional account and web access is not part of browser support.
 		{
-			name:     "chrome ecosystem - accounts.google.com",
+			name:     "optional account host - accounts.google.com",
 			domain:   "accounts.google.com",
-			expected: "chrome",
+			expected: "",
 		},
 		{
-			name:     "chrome ecosystem - www.google.com",
+			name:     "optional web host - www.google.com",
 			domain:   "www.google.com",
-			expected: "chrome",
+			expected: "",
 		},
+		// Chrome ecosystem (headless Chrome/Puppeteer browser testing)
 		{
 			name:     "chrome ecosystem - safebrowsing.googleapis.com",
 			domain:   "safebrowsing.googleapis.com",
@@ -91,7 +92,7 @@ func TestGetDomainEcosystem(t *testing.T) {
 			domain:   "redirector.gvt1.com",
 			expected: "chrome",
 		},
-		// Java ecosystem takes priority over chrome for its Google domains
+		// Java ecosystem owns its Google package domains.
 		{
 			name:     "java ecosystem - maven.google.com (not chrome)",
 			domain:   "maven.google.com",
@@ -102,7 +103,7 @@ func TestGetDomainEcosystem(t *testing.T) {
 			domain:   "dl.google.com",
 			expected: "java",
 		},
-		// Defaults ecosystem takes priority over chrome for packages.cloud.google.com
+		// Defaults ecosystem owns packages.cloud.google.com.
 		{
 			name:     "defaults ecosystem - packages.cloud.google.com (not chrome)",
 			domain:   "packages.cloud.google.com",
@@ -576,6 +577,65 @@ func TestGeminiDomainSetRequiresPackageOptIn(t *testing.T) {
 	}
 }
 
+func TestChromeDomainSetScope(t *testing.T) {
+	domains := GetAllowedDomains(&NetworkPermissions{Allowed: []string{"chrome"}})
+	assert.ElementsMatch(t, []string{
+		"safebrowsing.googleapis.com",
+		"optimizationguide-pa.googleapis.com",
+		"update.googleapis.com",
+		"*.gvt1.com",
+	}, domains)
+
+	for _, host := range []string{
+		"safebrowsing.googleapis.com",
+		"optimizationguide-pa.googleapis.com",
+		"update.googleapis.com",
+		"redirector.gvt1.com",
+	} {
+		reachable := false
+		for _, rule := range domains {
+			reachable = reachable || awfDomainAllowsHost(rule, host)
+		}
+		assert.True(t, reachable, "preserve browser service %q", host)
+	}
+}
+
+func TestChromeDomainSetRequiresExplicitOptIn(t *testing.T) {
+	tests := []struct {
+		optIn, host string
+	}{
+		{"gemini", "generativelanguage.googleapis.com"},
+		{"node", "storage.googleapis.com"},
+		{"go", "storage.googleapis.com"},
+		{"dart", "storage.googleapis.com"},
+		{"java", "maven-central.storage-download.googleapis.com"},
+		{"java", "maven.google.com"},
+		{"java", "dl.google.com"},
+		{"defaults", "packages.cloud.google.com"},
+		{"fonts", "fonts.googleapis.com"},
+		{"accounts.google.com", "accounts.google.com"},
+		{"www.google.com", "www.google.com"},
+		{"unrelated.googleapis.com", "unrelated.googleapis.com"},
+		{"unrelated.google.com", "unrelated.google.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.optIn+"/"+tt.host, func(t *testing.T) {
+			for _, optIn := range []bool{false, true} {
+				allowed := []string{"chrome"}
+				if optIn {
+					allowed = append(allowed, tt.optIn)
+				}
+				domains := GetAllowedDomains(&NetworkPermissions{Allowed: allowed})
+				reachable := false
+				for _, rule := range domains {
+					reachable = reachable || awfDomainAllowsHost(rule, tt.host)
+				}
+				assert.Equal(t, optIn, reachable, "opt-in=%t host %q", optIn, tt.host)
+			}
+		})
+	}
+}
+
 func TestClaudeDefaultDomains(t *testing.T) {
 	expectedDomains := []string{
 		"api.github.com",
@@ -704,9 +764,10 @@ func TestGetAllowedDomains_VariousCombinations(t *testing.T) {
 			expectContains: []string{"fonts.googleapis.com", "fonts.gstatic.com"},
 		},
 		{
-			name:           "chrome ecosystem",
-			allowed:        []string{"chrome"},
-			expectContains: []string{"*.google.com", "*.googleapis.com", "*.gvt1.com"},
+			name:              "chrome ecosystem",
+			allowed:           []string{"chrome"},
+			expectContains:    []string{"safebrowsing.googleapis.com", "optimizationguide-pa.googleapis.com", "update.googleapis.com", "*.gvt1.com"},
+			expectNotContains: []string{"*.google.com", "*.googleapis.com", "google.com", "googleapis.com"},
 		},
 		{
 			name:           "deno ecosystem",

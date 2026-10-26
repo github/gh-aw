@@ -316,7 +316,7 @@ func getDomainsFromRuntimes(runtimes map[string]any) []string {
 //
 // # Supported ecosystem identifiers:
 //   - "defaults": basic infrastructure (certs, JSON schema, Ubuntu, package mirrors)
-//   - "chrome": headless Chrome/Puppeteer browser testing (*.google.com, *.googleapis.com, *.gvt1.com)
+//   - "chrome": headless Chrome/Puppeteer browser services (Safe Browsing, optimization guide, updates, *.gvt1.com downloads)
 //   - "clojure": Clojure/Clojars
 //   - "containers": container registries (Docker, GHCR, etc.)
 //   - "copilot-vendor": plan-specific Copilot API hosts and Copilot telemetry (opt-in)
@@ -399,12 +399,12 @@ var ecosystemPriority = []string{
 	"deno", // before "node" — deno-specific domains take precedence over the broader node set
 	"dotnet",
 	"elixir",
-	"fonts", // before "chrome" — fonts.googleapis.com is a fonts domain, not a chrome domain
+	"fonts",
 	"github",
 	"github-actions",
 	"go",
 	"haskell",
-	"java", // before "chrome" — maven.google.com and dl.google.com are Java domains, not chrome domains
+	"java",
 	"chrome",
 	"kotlin",
 	"latex",
