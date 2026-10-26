@@ -464,6 +464,22 @@ export interface ExecutionResultData {
   finishedAt?: JsonValue;
 }
 
+export interface HarnessRetryAttemptData {
+  /** @asType integer @minimum 1 @maximum 101 */
+  attempt: number;
+  /** @asType integer */
+  exitCode: number;
+  failureClasses: string[];
+}
+
+export interface HarnessRetryData {
+  /** @asType integer @minimum 0 @maximum 101 */
+  attempts: number;
+  /** @asType integer */
+  exitCode: number;
+  attemptResults: HarnessRetryAttemptData[];
+}
+
 /** Conclusion's dependency snapshot, not the still-running conclusion job. */
 export interface WorkflowJobResultData {
   /** @pattern ^[A-Za-z_][A-Za-z0-9_-]*$ */
@@ -750,6 +766,7 @@ export interface UnifiedSessionEventDataMap {
   "eval.result": EvalResultData;
   "usage.report": UsageReportData;
   "execution.result": ExecutionResultData;
+  "harness.retry": HarnessRetryData;
   "detection.result": DetectionResultData;
   "guardrail.admission": AdmissionDecisionData;
   "guardrail.daily_aic": DailyAICDecisionData;

@@ -5887,6 +5887,147 @@ describe("sendJobConclusionSpan", () => {
       statSpy.mockRestore();
     });
 
+    it.each([
+      { exitCodes: [0], conclusion: "success", dedicated: true },
+      { exitCodes: [1, 1, 0], conclusion: "success", dedicated: true },
+      { exitCodes: [1, 1, 1], conclusion: "failure", dedicated: true },
+      { exitCodes: [1, 1, 1], conclusion: "failure", dedicated: false },
+    ])("attaches harness telemetry to the token-owning span for $exitCodes (dedicated=$dedicated)", async ({ exitCodes, conclusion, dedicated }) => {
+      process.env.GH_AW_AGENT_CONCLUSION = conclusion;
+      const telemetry = {
+        attempts: exitCodes.length,
+        exit_code: exitCodes.at(-1),
+        attempt_results: exitCodes.map((exit_code, index) => ({ attempt: index + 1, exit_code, failure_classes: exit_code ? ["rate_limit_error"] : [] })),
+      };
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json") return JSON.stringify(telemetry);
+        if (filePath === "/tmp/gh-aw/agent_usage.json") return JSON.stringify({ input_tokens: 100, output_tokens: 20 });
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      if (!dedicated)
+        statSpy.mockImplementation(() => {
+          throw new Error("ENOENT");
+        });
+
+      await sendJobConclusionSpan("gh-aw.agent.conclusion", dedicated ? { startMs: 1_700_000_000_000 } : {});
+
+      const spans = appendSpy.mock.calls.map(([, content]) => JSON.parse(content.trim()).resourceSpans[0].scopeSpans[0].spans[0]);
+      const owners = spans.filter(span => span.attributes.some(attr => attr.key === "gh-aw.harness.attempts"));
+      expect(owners).toHaveLength(1);
+      const attrs = Object.fromEntries(owners[0].attributes.map(attr => [attr.key, attr.value]));
+      expect(attrs["gh-aw.harness.attempts"]).toEqual({ intValue: exitCodes.length });
+      expect(attrs["gh-aw.harness.retry_reasons"]).toEqual({ arrayValue: { values: exitCodes.filter(code => code !== 0).map(() => ({ stringValue: "rate_limit_error" })) } });
+      expect(attrs["gen_ai.usage.input_tokens"]).toEqual({ intValue: 100 });
+      expect(attrs["gen_ai.usage.output_tokens"]).toEqual({ intValue: 20 });
+      expect(owners[0].name).toBe(dedicated ? "gh-aw.agent.agent" : "gh-aw.agent.conclusion");
+    });
+
+    it("emits retry exhaustion even when no token accounting is available", async () => {
+      process.env.INPUT_JOB_NAME = "detection";
+      process.env.GH_AW_DETECTION_CONCLUSION = "failure";
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/threat-detection/detection_harness_retry.json")
+          return JSON.stringify({
+            attempts: 2,
+            exit_code: 1,
+            attempt_results: [
+              { attempt: 1, exit_code: 1, failure_classes: ["rate_limit_error"] },
+              { attempt: 2, exit_code: 1, failure_classes: ["rate_limit_error"] },
+            ],
+          });
+        // Inherited agent telemetry must not be mistaken for detection's own retries.
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json" || filePath === "/tmp/gh-aw/threat-detection/harness_retry.json") return JSON.stringify({ attempts: 0, attempt_results: [] });
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      await sendJobConclusionSpan("gh-aw.detection.conclusion");
+      const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
+      expect(span.attributes.find(attr => attr.key === "gh-aw.harness.attempts")?.value).toEqual({ intValue: 2 });
+      expect(span.attributes.some(attr => attr.key.startsWith("gen_ai.usage."))).toBe(false);
+    });
+
+    it.each(["conclusion", "safe_outputs", "detection"])("does not inherit agent retry telemetry in %s", async jobName => {
+      process.env.INPUT_JOB_NAME = jobName;
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json")
+          return JSON.stringify({
+            attempts: 1,
+            exit_code: 0,
+            attempt_results: [{ attempt: 1, exit_code: 0, failure_classes: [] }],
+          });
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      await sendJobConclusionSpan(`gh-aw.${jobName}.conclusion`);
+      const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
+      expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
+    });
+
+    it.each([
+      null,
+      "{invalid",
+      '{"attempts":-1,"attempt_results":[]}',
+      '{"attempts":1.5,"attempt_results":[]}',
+      '{"attempts":"1","attempt_results":[]}',
+      '{"attempts":2,"attempt_results":[]}',
+      '{"attempts":1,"attempt_results":null}',
+      '{"attempts":1,"attempt_results":[{"exit_code":null}]}',
+    ])("ignores missing or malformed harness telemetry %s", async content => {
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json" && content !== null) return content;
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      await sendJobConclusionSpan("gh-aw.agent.conclusion");
+      const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
+      expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
+    });
+
+    it.each(["agent", "detection"])("exports no arbitrary or oversized retry telemetry for %s", async jobName => {
+      process.env.INPUT_JOB_NAME = jobName;
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+      vi.stubGlobal("fetch", mockFetch);
+      const record = {
+        attempts: 1,
+        exit_code: 1,
+        attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["rate_limit_error"] }],
+      };
+      const invalidRecords = [
+        { ...record, attempt_results: [{ ...record.attempt_results[0], failure_classes: ["rate_limit_error", "secret_736563726574"] }] },
+        { ...record, attempt_results: [{ ...record.attempt_results[0], failure_classes: Array(17).fill("rate_limit_error") }] },
+        { ...record, attempts: 102, attempt_results: Array.from({ length: 102 }, (_, index) => ({ ...record.attempt_results[0], attempt: index + 1 })) },
+      ];
+      for (const telemetry of invalidRecords) {
+        appendSpy.mockClear();
+        mockFetch.mockClear();
+        readFileSpy.mockImplementation(filePath => {
+          if (filePath === (jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_harness_retry.json" : "/tmp/gh-aw/agent/harness_retry.json")) return JSON.stringify(telemetry);
+          throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+        });
+        await sendJobConclusionSpan(`gh-aw.${jobName}.conclusion`);
+        expect(appendSpy).toHaveBeenCalledOnce();
+        expect(mockFetch).toHaveBeenCalledOnce();
+        const payloads = [...appendSpy.mock.calls.map(([, content]) => JSON.parse(content)), ...mockFetch.mock.calls.map(([, options]) => JSON.parse(options.body))];
+        for (const payload of payloads) {
+          expect(payload.resourceSpans[0].scopeSpans[0].spans.every(span => span.attributes.every(attr => !attr.key.startsWith("gh-aw.harness.")))).toBe(true);
+        }
+        expect(JSON.stringify(payloads)).not.toContain("secret_736563726574");
+      }
+    });
+
+    it("rejects invalid failure-class labels, never arbitrary output", async () => {
+      readFileSpy.mockImplementation(filePath => {
+        if (filePath === "/tmp/gh-aw/agent/harness_retry.json")
+          return JSON.stringify({
+            attempts: 1,
+            exit_code: 1,
+            attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["rate_limit_error", "private output\nsecret", 123, null, "x".repeat(100)] }],
+          });
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      });
+      await sendJobConclusionSpan("gh-aw.agent.conclusion");
+      const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
+      expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
+    });
+
     it("includes all four gen_ai token breakdown attributes on the agent span when agent_usage.json is present", async () => {
       const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
       vi.stubGlobal("fetch", mockFetch);

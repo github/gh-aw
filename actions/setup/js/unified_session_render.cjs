@@ -233,7 +233,7 @@ function eventDetail(event) {
     case "safe_output.request":
       return `${fields(data, ["type", "repo", "number"])} [requested, not executed]`;
     case "safe_output.result":
-      return `${fields(data, ["type", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
+      return `${fields(data, ["type", "status", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
     case "safe_output.outcome":
       return fields(data, ["type", "messageIndex", "status", "staged", "url"]);
     case "safe_output.error":

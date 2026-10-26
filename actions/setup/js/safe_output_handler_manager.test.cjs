@@ -325,6 +325,7 @@ describe("Safe Output Handler Manager", () => {
 
         expect(onItemCreated).toHaveBeenCalledWith({
           type: "submit_pull_request_review",
+          status: "success",
           url: "https://github.com/owner/repo/pull/1#pullrequestreview-2",
           number: 1,
           repo: "owner/repo",

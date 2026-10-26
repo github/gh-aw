@@ -52,8 +52,18 @@ interface ResolvedTemporaryIds {
 interface HandlerSuccessResult {
   /** Indicates the operation was successful */
   success: true;
+  /** Canonical resource URI returned by the backing API (absolute, not necessarily HTTP). Persisted with status:"success" only for applied results; never inferred from request inputs. */
+  url?: string;
   /** True when the handler intentionally skipped/no-oped without applying a mutation */
   skipped?: boolean;
+  /** True when processing is deferred; no successful resource outcome is persisted yet */
+  deferred?: boolean;
+  /** True when processing was cancelled; no successful resource outcome is persisted */
+  cancelled?: boolean;
+  /** True for a preview that did not apply an operation */
+  staged?: boolean;
+  /** True while buffering an operation whose manifest entry must wait for finalization */
+  deferred_manifest?: boolean;
   /** Machine-readable summary-safe reason code */
   reasonCode?: string;
   /** Human-readable summary-safe reason */

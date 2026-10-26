@@ -734,6 +734,7 @@ Body.
 		"/tmp/gh-aw/agent_execution.json",
 		"/tmp/gh-aw/agent_usage.jsonl",
 		"/tmp/gh-aw/agent_usage.json",
+		"/tmp/gh-aw/agent/harness_retry.json",
 		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
 		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl",
 		"/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
@@ -749,6 +750,7 @@ Body.
 		}
 	}
 	assert.NotContains(t, uploadSection, "/graders/")
+	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent artifacts"), "/tmp/gh-aw/agent/harness_retry.json")
 
 	// The fallback artifact must be uploaded before the (large, failure-prone) agent artifact.
 	uploadIdx := strings.Index(lockYAML, "- name: Upload agent output fallback artifact")
@@ -806,6 +808,7 @@ safe-outputs:
 	for _, expected := range []string{
 		"${{ runner.temp }}/gh-aw/agent_output.json",
 		"${{ runner.temp }}/gh-aw/agent_usage.jsonl",
+		"${{ runner.temp }}/gh-aw/agent/harness_retry.json",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
@@ -815,6 +818,9 @@ safe-outputs:
 		assert.Contains(t, uploadSection, expected)
 	}
 	assert.NotContains(t, uploadSection, "/tmp/gh-aw/")
+	consolidation := extractWorkflowStepByName(t, string(lockContent), "Consolidate artifacts for ARC/DinD")
+	assert.Contains(t, consolidation, `cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "${RUNNER_TEMP}/gh-aw/agent/harness_retry.json" || true`)
+	assert.Contains(t, consolidation, `cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "/tmp/gh-aw/agent/harness_retry.json" || true`)
 }
 
 func TestSampledAgentExecutionEvidenceReachesUsageArtifact(t *testing.T) {

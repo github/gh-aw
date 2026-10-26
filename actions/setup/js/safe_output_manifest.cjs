@@ -115,7 +115,8 @@ const NOT_LOGGED_TYPES = new Set(["noop", "report_missing_tool", "report_missing
 /**
  * @typedef {Object} ManifestEntry
  * @property {string} type - The safe output type (e.g., "create_issue")
- * @property {string} [url] - URL of the affected item in GitHub (present for creation types; omitted for modification types that don't return a URL)
+ * @property {"success"} [status] - Execution outcome, present only for explicit successful handler results
+ * @property {string} [url] - Canonical resource URI returned by the handler (not inferred from the request)
  * @property {number} [number] - Issue/PR/discussion number if applicable
  * @property {string} [repo] - Repository slug (owner/repo) if applicable
  * @property {string} [provider] - Backing service (for example github, jira, or linear)
@@ -166,7 +167,7 @@ function redactManifestValue(value, secretValues) {
  * It is designed to be easily testable by accepting the file path as a parameter.
  *
  * @param {string} [manifestFile] - Path to the manifest file (defaults to MANIFEST_FILE_PATH)
- * @returns {(item: {type: string, url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}) => void} Logger function
+ * @returns {(item: {type: string, status?: "success", url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}) => void} Logger function
  */
 function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
   const identity = currentClaimHandle() ? claimIdentity(currentClaimHandle()) : null;
@@ -178,7 +179,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
   /**
    * Log an executed safe output item to the manifest file.
    *
-   * @param {{type: string, url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}} item - Executed item details
+   * @param {{type: string, status?: "success", url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}} item - Executed item details
    */
   return function logCreatedItem(item) {
     if (identity) assertClaimIdentity(identity);
@@ -188,6 +189,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
     /** @type {ManifestEntry} */
     const entry = {
       type: item.type,
+      ...(item.status === "success" ? { status: item.status } : {}),
       ...(identity || {}),
       ...(item.url ? { url: item.url } : {}),
       ...(item.number != null ? { number: item.number } : {}),
@@ -219,6 +221,7 @@ function createManifestLogger(manifestFile = MANIFEST_FILE_PATH) {
       }
       jsonLine = JSON.stringify({
         type: entry.type,
+        ...(entry.status ? { status: entry.status } : {}),
         ...(identity || {}),
         ...(entry.provider ? { provider: entry.provider } : {}),
         ...(entry.number != null ? { number: entry.number } : {}),
@@ -254,7 +257,8 @@ function ensureManifestExists(manifestFile = MANIFEST_FILE_PATH) {
 /**
  * Extract executed item details from a handler result for manifest logging.
  * Returns null if the type is explicitly excluded (NOT_LOGGED_TYPES) or if the
- * result is from a staged (preview) run where no item was actually modified.
+ * result did not apply an operation (failed, skipped, deferred, cancelled, or staged).
+ * Only explicit success:true adds status:"success"; legacy results retain their shape.
  *
  * All other types — built-in handlers, custom safe job types, and future types —
  * are logged automatically. For creation types (CREATE_ITEM_TYPES), the result
@@ -263,10 +267,13 @@ function ensureManifestExists(manifestFile = MANIFEST_FILE_PATH) {
  *
  * @param {string} type - The handler type (e.g., "create_issue")
  * @param {any} result - The handler result object
- * @returns {{type: string, url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}|null}
+ * @returns {{type: string, status?: "success", url?: string, number?: number, repo?: string, provider?: string, id?: string|number, identifier?: string, target?: Object, labels?: Array<{name: string, database_id?: number, node_id?: string}>, temporaryId?: string, metadata?: Record<string, any>, before_state?: Object, after_state?: Object, labelsAdded?: string[], labelsSuggested?: string[], labelsBefore?: string[]}|null}
  */
 function extractCreatedItemFromResult(type, result) {
-  if (!result || NOT_LOGGED_TYPES.has(normalizeSafeOutputName(type))) return null;
+  if (!result || typeof result !== "object" || NOT_LOGGED_TYPES.has(normalizeSafeOutputName(type))) return null;
+
+  // Custom action results only prepare inputs; the generated action step applies them.
+  if (typeof result.action_name === "string" && typeof result.payload === "string") return null;
 
   // PR reviews are buffered first and only gain durable identity fields after the
   // final submitReview() call, so skip logging placeholder buffer results here.
@@ -274,8 +281,8 @@ function extractCreatedItemFromResult(type, result) {
     return null;
   }
 
-  // In staged mode (🎭 Staged Mode Preview), no item was actually modified in GitHub — skip logging
-  if (result.staged === true || result.skipped === true || result.deferred_manifest === true || result.delegated === true) return null;
+  // Non-applied outcomes must not be counted as created resources, even with a URL.
+  if (result.success === false || result.staged === true || result.skipped === true || result.deferred === true || result.cancelled === true || result.deferred_manifest === true || result.delegated === true) return null;
 
   // Normalize URL from different result shapes (present for creation types)
   const url = result.url || result.projectUrl || result.html_url || result.pull_request_url || result.review_url || result.issue_url;
@@ -309,6 +316,7 @@ function extractCreatedItemFromResult(type, result) {
 
   return {
     type,
+    ...(result.success === true ? { status: /** @type {const} */ "success" } : {}),
     ...(url ? { url } : {}),
     ...(number != null ? { number } : {}),
     ...(repo ? { repo } : {}),

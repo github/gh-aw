@@ -97,6 +97,7 @@
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.admission" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AdmissionDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
+      { "if": { "properties": { "type": { "const": "harness.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessRetryData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.configuration" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpConfigurationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       {
@@ -753,6 +754,18 @@
         },
         "results": { "type": "array", "items": { "$ref": "#/definitions/GraderMeasurementData" } }
       },
+      "additionalProperties": false
+    },
+    "HarnessRetryAttemptData": {
+      "type": "object",
+      "properties": { "attempt": { "type": "integer", "minimum": 1, "maximum": 101 }, "exitCode": { "type": "integer" }, "failureClasses": { "type": "array", "items": { "type": "string" } } },
+      "required": ["attempt", "exitCode", "failureClasses"],
+      "additionalProperties": false
+    },
+    "HarnessRetryData": {
+      "type": "object",
+      "properties": { "attempts": { "type": "integer", "minimum": 0, "maximum": 101 }, "exitCode": { "type": "integer" }, "attemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } } },
+      "required": ["attempts", "exitCode", "attemptResults"],
       "additionalProperties": false
     },
     "JsonValue": {

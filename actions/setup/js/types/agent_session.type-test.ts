@@ -106,6 +106,12 @@ const invalidUnifiedUsage: UnifiedSessionEventDataMap["session.result"] = {
   },
 };
 void invalidUnifiedUsage;
+const harnessRetry: UnifiedSessionEventDataMap["harness.retry"] = {
+  attempts: 1,
+  exitCode: 0,
+  attemptResults: [{ attempt: 1, exitCode: 0, failureClasses: [] }],
+};
+void harnessRetry;
 const invalidUnifiedInit: UnifiedSessionEventDataMap["session.init"] = {
   // @ts-expect-error Tool inventories are omitted from the essential projection.
   tools: [],

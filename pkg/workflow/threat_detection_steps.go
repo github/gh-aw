@@ -103,7 +103,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 		steps = append(steps, c.buildDetectionEngineExecutionStep(data)...)
 	}
 
-	steps = append(steps, c.buildCopyDetectionFirewallLogsStep(data)...)
+	steps = append(steps, c.buildCopyDetectionFirewallLogsStep(buildThreatDetectionWorkflowData(data, ""))...)
 	if len(data.SafeOutputs.ThreatDetection.PostSteps) > 0 {
 		steps = append(steps, c.buildCustomThreatDetectionSteps(data.SafeOutputs.ThreatDetection.PostSteps)...)
 	}
@@ -255,7 +255,7 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 		auditDir = rewriteArcDindPath(auditDir)
 	}
 
-	return []string{
+	steps := []string{
 		"      - name: Copy detection firewall logs\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 		"        continue-on-error: true\n",
@@ -264,6 +264,10 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/logs && cp -r %s/. %s/logs/; fi\n", proxyLogsDir, detectionFirewallLogsDir, proxyLogsDir, detectionFirewallLogsDir),
 		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/audit && cp -r %s/. %s/audit/; fi\n", auditDir, detectionFirewallLogsDir, auditDir, detectionFirewallLogsDir),
 	}
+	if isArcDindTopology(data) {
+		steps = append(steps, "          if [ -f \"${RUNNER_TEMP}/gh-aw/sandbox/agent/detection_harness_retry.json\" ]; then cp \"${RUNNER_TEMP}/gh-aw/sandbox/agent/detection_harness_retry.json\" /tmp/gh-aw/threat-detection/detection_harness_retry.json; fi\n")
+	}
+	return steps
 }
 
 // buildPrepareDetectionFilesStep creates a step that stages agent output files
@@ -555,6 +559,7 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 		"            " + detectionExecutionEvidencePath + "\n",
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.json\n",
 		"            " + constants.TmpGhAwDir + "/threat-detection/detection_usage.jsonl\n",
+		"            " + constants.TmpGhAwDir + "/threat-detection/detection_harness_retry.json\n",
 	}
 	if isFirewallEnabled(data) {
 		threatLog.Print("Including firewall logs in detection log upload artifact")
