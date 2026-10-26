@@ -36,11 +36,12 @@ If a gateway timeout or token budget guardrail cuts the call short, the response
 
 ### `audit`
 
-Inspect a specific run in detail (missing tools, safe outputs, metrics).
+Inspect one or more runs in detail (missing tools, safe outputs, metrics). With multiple runs, compares each to the first (base).
 
 | Parameter | Description |
 |---|---|
-| `run_id_or_url` | Run ID or run/job URL (including step anchors), as string or number |
+| `run_ids_or_urls` | Preferred. One or more run IDs or run/job URLs (including step anchors). Single item: detailed audit; multiple: diff mode. |
+| `run_id` / `run_id_or_url` | Aliases for a single run; `run_id_or_url` is deprecated in favor of `run_ids_or_urls`. |
 
 ### `compile`
 
@@ -51,3 +52,7 @@ Disabled by default, even with `dry_run: true`. Trusted workflow authors must ex
 `dry_run: true` still emits local lock files with compiler-managed mutations suppressed; it does not execute workflows or make arbitrary custom code safe. Use `strict: true` for validation and report actual errors, warnings, and missing checks.
 
 **MCP equivalent of**: `gh aw compile`
+
+### Timeouts and partial results
+
+`compile` and `audit` reserve 5 seconds before the caller's deadline (55s budget when no deadline is given). A timeout response is a tool error with `partial: true`, `complete: false`, and an `error` naming the timed-out stage. `compile` timeouts include `partial_results` with workflows completed before the stall; `audit` timeouts include any decoded report under `partial_results`. Retry the same call to reuse downloaded artifacts, or narrow `artifacts`.

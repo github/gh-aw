@@ -89,7 +89,7 @@ An MCP server field that controls startup criticality. By default every configur
 
 ### Partial Results (MCP Logs)
 
-A response pattern used by the `gh aw` MCP server's `logs` tool when a gateway timeout or token budget guardrail prevents returning a complete result set. Instead of failing the call, the tool returns the JSON data it collected so far with `partial: true` and continuation parameters (such as `after_run_id`/`before_run_id`) so the caller can request the remaining results in a follow-up call. See [`gh aw` as an MCP Server](/gh-aw/reference/gh-aw-as-mcp-server/).
+A response pattern used by the `gh aw` MCP server's `logs` tool when a gateway timeout or token budget guardrail prevents returning a complete result set. Instead of failing the call, the tool returns the JSON data it collected so far with `partial: true` and continuation parameters (such as `after_run_id`/`before_run_id`) so the caller can request the remaining results in a follow-up call. The `compile` and `audit` tools instead return a timeout tool error with `partial: true`, `complete: false`, the timed-out `stage`, and any structured `partial_results` captured before the stall; subprocess diagnostics are withheld. See [`gh aw` as an MCP Server](/gh-aw/reference/gh-aw-as-mcp-server/).
 
 ### Logs Storage Budget (`--max-storage`)
 
@@ -854,6 +854,10 @@ An experimental top-level frontmatter field that installs [Agent Plugins](https:
 ### Custom Provider (`OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`)
 
 A deployment pattern where the `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` environment variable routes an engine's API calls to a non-default, OpenAI- or Anthropic-compatible endpoint. When set, gh-aw passes the configured model through verbatim and automatically emits `apiProxy.modelFallback.enabled: false` so the API proxy does not rewrite provider-specific model slugs (for example `anthropic/claude-sonnet-5` on OpenRouter) that are absent from the built-in model catalog, which would otherwise cause an HTTP 404 `model_not_found` error. See [`sandbox.agent.model-fallback`](#sandboxagentruntime) and [AI Engines Reference](/gh-aw/reference/engines/).
+
+### Driver Crash (`driver_crash`)
+
+A failure classification for an engine driver that exits with an unexplained nonzero code before recording a terminal safe output. Reports include the exit code, an inferred signal when recognized, and a fixed summary of the final stderr tail by stage (dependency loading, initialization, or execution). Raw stderr is excluded and published diagnostics are redacted. Explicit provider, request, or budget evidence takes precedence for ordinary nonzero exits. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/).
 
 ### Engine Driver (`engine.driver`)
 

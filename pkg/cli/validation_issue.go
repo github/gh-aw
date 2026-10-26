@@ -16,13 +16,14 @@ type ValidationIssue struct {
 
 // ValidationScriptLocation identifies snippet-relative coordinates, not YAML
 // file coordinates. StepIndex is one-based; Sanitized marks replaced expressions.
+// Free-text identities are internal only and are not exposed in JSON.
 type ValidationScriptLocation struct {
-	JobID     string `json:"job_id,omitempty"`
-	StepID    string `json:"step_id,omitempty"`
-	StepName  string `json:"step_name,omitempty"`
+	JobID     string `json:"-"`
+	StepID    string `json:"-"`
+	StepName  string `json:"-"`
 	StepIndex int    `json:"step_index,omitempty"`
-	Source    string `json:"source,omitempty"`
-	Resource  string `json:"resource,omitempty"`
+	Source    string `json:"-"`
+	Resource  string `json:"-"`
 	Line      int    `json:"line"`
 	Column    int    `json:"column"`
 	Sanitized bool   `json:"sanitized,omitempty"`

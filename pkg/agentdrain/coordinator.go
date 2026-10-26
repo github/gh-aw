@@ -114,6 +114,7 @@ func (c *Coordinator) minerFor(stage string) (*Miner, error) {
 	defer c.mu.RUnlock()
 	m, ok := c.miners[stage]
 	if !ok {
+		coordinatorLog.Printf("minerFor: no miner registered for stage=%s", stage)
 		return nil, fmt.Errorf("agentdrain: no miner registered for stage %q", stage)
 	}
 	return m, nil
