@@ -4131,6 +4131,7 @@ jobs:
       - evals
     if: always() && (!cancelled()) && needs.evals.result != 'skipped'
     runs-on: ubuntu-slim
+    environment: aoai-model
     # Permissions for the push_evals_state job (workflow permissions default to none).
     permissions:
       contents: write
@@ -4216,6 +4217,7 @@ jobs:
     needs: activation
     if: always() && (!cancelled()) && needs.activation.result == 'success'
     runs-on: ubuntu-slim
+    environment: aoai-model
     # Permissions for the push_experiments_state job (workflow permissions default to none).
     permissions:
       contents: write
@@ -4514,6 +4516,7 @@ jobs:
       - detection
     if: always() && needs.detection.result == 'success' && needs.agent.result == 'success'
     runs-on: ubuntu-slim
+    environment: aoai-model
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
       actions: write
