@@ -1,21 +1,35 @@
 {
-  "run_date": "2026-10-25T18:28:23.093823Z",
-  "run_id": "40221066512",
+  "run_date": "2026-10-26T00:58:10Z",
+  "run_id": "40251698081",
   "source": "pr-triage",
-  "eligible_total": 0,
-  "cooldown_skipped": 8,
-  "open_copilot_prs": 8,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
+  "eligible_total": 1,
+  "cooldown_skipped": 2,
+  "open_copilot_prs": 3,
+  "category_counts": {
+    "feature": 1
+  },
+  "risk_counts": {
+    "medium": 1
+  },
+  "priority_counts": {
+    "high": 1
+  },
+  "action_counts": {
+    "fast_track": 1
+  },
   "batches": [],
-  "selected_candidates": [],
+  "selected_candidates": [
+    70952
+  ],
   "skipped_prs": [
     {
-      "count": 8,
+      "number": 71957,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 71934,
       "reason": "opened/updated within the past hour"
     }
   ],
-  "notes": "All open app/github-copilot PRs were updated within the 1-hour cooldown window, so no eligible PRs remained for triage in this run."
+  "notes": "Only one eligible Copilot PR remained outside the 1-hour cooldown window. The remaining open Copilot PRs were skipped as active work and not triaged in this run."
 }
