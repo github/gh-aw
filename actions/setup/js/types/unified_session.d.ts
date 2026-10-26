@@ -472,6 +472,18 @@ export interface WorkflowJobResultData {
   durationMs?: SessionCount;
 }
 
+/** Trusted persistence evidence, separate from an agent's request to save memory. */
+export interface MemorySaveResultData {
+  memoryId: string;
+  jobResult: "success" | "failure" | "cancelled" | "skipped";
+  outcome?: "success" | "failure" | "cancelled" | "skipped";
+  status: "saved" | "unchanged" | "skipped" | "failure" | "cancelled" | "unknown";
+  /** Target branch of a successful push. */
+  branch?: string;
+  /** Commit that landed remotely, which may differ from the local commit. */
+  commit?: string;
+}
+
 /** Validated admission allowances, not spend or credentials. */
 export interface AdmissionDecisionData {
   status: "admitted" | "ignored" | "skipped";
@@ -614,6 +626,7 @@ export interface CollectionData {
 /** Known essential payloads. Unknown native extensions remain open. */
 export interface UnifiedSessionEventDataMap {
   "workflow.job_result": WorkflowJobResultData;
+  "memory.push": MemorySaveResultData;
   "model.inventory": ModelInventoryData;
   "model.config": ModelConfigData;
   "model.baseline_estimate": ModelBaselineEstimateData;
