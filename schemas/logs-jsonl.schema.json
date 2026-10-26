@@ -7152,7 +7152,13 @@
                       "message": {
                         "type": "string"
                       },
+                      "rule_id": {
+                        "type": "string"
+                      },
                       "line": {
+                        "type": "integer"
+                      },
+                      "column": {
                         "type": "integer"
                       },
                       "file": {
@@ -7160,6 +7166,31 @@
                       },
                       "severity": {
                         "type": "string"
+                      },
+                      "script": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "step_index": {
+                            "type": "integer"
+                          },
+                          "line": {
+                            "type": "integer"
+                          },
+                          "column": {
+                            "type": "integer"
+                          },
+                          "sanitized": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "line",
+                          "column"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -7183,7 +7214,13 @@
                       "message": {
                         "type": "string"
                       },
+                      "rule_id": {
+                        "type": "string"
+                      },
                       "line": {
+                        "type": "integer"
+                      },
+                      "column": {
                         "type": "integer"
                       },
                       "file": {
@@ -7191,6 +7228,31 @@
                       },
                       "severity": {
                         "type": "string"
+                      },
+                      "script": {
+                        "type": [
+                          "null",
+                          "object"
+                        ],
+                        "properties": {
+                          "step_index": {
+                            "type": "integer"
+                          },
+                          "line": {
+                            "type": "integer"
+                          },
+                          "column": {
+                            "type": "integer"
+                          },
+                          "sanitized": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "line",
+                          "column"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [

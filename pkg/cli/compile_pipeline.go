@@ -772,6 +772,11 @@ func runBatchExternalTools(
 	stats *CompilationStats,
 	validationResults *[]ValidationResult,
 ) (strictGrantErr error, batchToolErr error) {
+	scannerResults := make(map[string]error)
+	ctx = context.WithValue(ctx, compileScannerReporterKey{}, func(tool string, err error) {
+		scannerResults[tool] = err
+	})
+	previousReport := opts.reportResult
 	if config.DryRun {
 		if config.dryRunBaseline != nil {
 			opts.filterResult = func(tool string, err error) error {
@@ -786,8 +791,23 @@ func runBatchExternalTools(
 		}
 		opts.reportResult = func(tool string, inputs int, err error) {
 			recordDryRunScannerResult(config.dryRunReport, tool, inputs, err)
-			if err != nil {
-				appendDevelopmentBatchDiagnostics(tool, appendValidationErrors(nil, tool+"_error", err), stats, validationResults)
+			appendDryRunScannerResult(tool, scannerResults[tool], err, stats, validationResults)
+			if previousReport != nil {
+				previousReport(tool, inputs, err)
+			}
+		}
+	} else {
+		opts.reportResult = func(tool string, inputs int, err error) {
+			diagnostics, reported := scannerResults[tool]
+			if !reported {
+				diagnostics = err
+			}
+			// Grant already emits its strict batch result.
+			if tool != "grant" || !config.Strict {
+				appendCompileScannerResult(tool, diagnostics, config.Strict && err != nil, stats, validationResults)
+			}
+			if previousReport != nil {
+				previousReport(tool, inputs, err)
 			}
 		}
 	}

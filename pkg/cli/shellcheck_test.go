@@ -276,11 +276,15 @@ func TestDefaultIgnoreCodes(t *testing.T) {
 // returns nil (no error) and does not panic when shellcheck is not in PATH and
 // Docker is also unavailable. We use a PATH override to hide both binaries.
 func TestRunShellcheckOnLockFilesSkipsWhenUnavailable(t *testing.T) {
-	orig := os.Getenv("PATH")
-	t.Cleanup(func() { os.Setenv("PATH", orig) })
-	os.Setenv("PATH", "") // ensure neither shellcheck nor docker can be found
+	lockFile := writeTempLockFile(t, `
+jobs:
+  build:
+    steps:
+      - run: echo hello
+`)
+	t.Setenv("PATH", "") // ensure neither shellcheck nor docker can be found
 
-	err := runShellcheckOnLockFilesAndResources(context.Background(), []string{"/fake/file.lock.yml"}, nil, false, false)
+	err := runShellcheckOnLockFilesAndResources(context.Background(), []string{lockFile}, nil, false, false)
 	assert.NoError(t, err)
 }
 
@@ -409,7 +413,7 @@ if [ "${1:-}" = "info" ]; then
 fi
 if [ "${1:-}" = "run" ]; then
   echo run >> "$DOCKER_CALLS_FILE"
-  cat >/dev/null
+  while IFS= read -r line || [ -n "$line" ]; do :; done
   exit 0
 fi
 exit 2
@@ -479,7 +483,7 @@ exit 0
 	t.Run("non-strict: all steps checked, no error returned", func(t *testing.T) {
 		_ = os.Remove(os.Getenv("DOCKER_CALLS_FILE")) // may not exist on first run
 
-		err := runShellcheckOnLockFilesAndResources(context.Background(), []string{lockFile}, nil, false, false)
+		err := RunShellcheckOnLockFilesAndResources(context.Background(), []string{lockFile}, nil, false, false)
 		require.NoError(t, err, "non-strict mode should not return error even when steps have findings")
 
 		calls, readErr := os.ReadFile(os.Getenv("DOCKER_CALLS_FILE"))

@@ -169,14 +169,18 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 
 	calls = nil
 	failAll = true
+	stats = &CompilationStats{}
+	validationResults = nil
 	strictGrantErr, batchToolErr = runBatchExternalTools(ctx, config, opts, stats, &validationResults)
 	require.ErrorContains(t, strictGrantErr, "fake grant finding")
 	require.ErrorIs(t, batchToolErr, fakeActionlintErr)
 	assert.Equal(t, wantOrder, calls)
-	require.Len(t, validationResults, 1, "ordinary compilation retains its existing Grant result only")
-	assert.Empty(t, validationResults[0].Scope)
-	assert.Equal(t, "grant", validationResults[0].Workflow)
-	assert.Equal(t, 1, stats.Errors)
+	require.Len(t, validationResults, 9, "ordinary compilation reports every scanner without duplicating Grant")
+	for _, result := range validationResults {
+		assert.False(t, result.Valid)
+		assert.NotEmpty(t, result.Errors)
+	}
+	assert.Equal(t, 10, stats.Errors)
 
 	calls = nil
 	config.DryRun = true
@@ -219,10 +223,10 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 		if tool == "poutine" || tool == "runner-guard" {
 			message = tool + " failed: " + message
 		}
-		assert.Equal(t, message, result.Errors[0].Message)
+		assert.Equal(t, neutralizeScannerMessage(message), result.Errors[0].Message)
 	}
 	require.Len(t, decoded[2].Errors, 2)
-	assert.Equal(t, "second actionlint finding", decoded[2].Errors[1].Message)
+	assert.Equal(t, neutralizeScannerMessage("second actionlint finding"), decoded[2].Errors[1].Message)
 
 	calls = nil
 	failAll = false
