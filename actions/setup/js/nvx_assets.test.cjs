@@ -161,7 +161,9 @@ describe.skipIf(process.platform === "darwin" || (process.platform === "linux" &
     const interpreter = readELFInterpreter(copilot);
     expect(interpreter?.startsWith(`${runtime}/lib/`)).toBe(true);
     expect(fs.existsSync(interpreter || "")).toBe(true);
-    const cliResult = spawnSync(copilot, ["literal $HOME; $(exit 1)"], { argv0: "echo", encoding: "utf8" });
+    const echo = path.join(runtime, "bin", "echo");
+    fs.linkSync(copilot, echo);
+    const cliResult = spawnSync(echo, ["literal $HOME; $(exit 1)"], { encoding: "utf8" });
     expect(cliResult.status, cliResult.stderr).toBe(0);
     expect(cliResult.stdout.trim()).toBe("literal $HOME; $(exit 1)");
     const node = path.join(runtime, "bin", "node");
