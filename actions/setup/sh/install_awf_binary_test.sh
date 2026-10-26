@@ -106,14 +106,14 @@ test_curl_retry_all_errors() {
   local expected="$2"
   local help_all_fails="${3:-false}"
   local curl_help="${4:-${curl_help_all}}"
+  local node_version="${5:-v18.0.0}"
+  local platform="${6:-Linux}"
   local test_dir
   local option_index
   local -a actual_options
-  local -a expected_options=(-fsSL --proto '=https' --proto-redir '=https' --retry 8 --retry-delay 0 --retry-max-time 180 --connect-timeout 15 --max-time 60)
+  local -a common_options=(-fsSL --proto '=https' --proto-redir '=https' --retry 8 --retry-max-time 180 --connect-timeout 15)
+  local -a expected_options
   TEST_FAILURE_REASON=""
-  if [ "${expected}" = true ]; then
-    expected_options+=(--retry-all-errors)
-  fi
   test_dir=$(mktemp -d)
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
   cat > "${test_dir}/bin/curl" <<'EOF'
@@ -142,14 +142,14 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 if [[ "${output}" == *checksums.txt ]]; then
-  printf '%064d awf-linux-x64\n' 0 > "${output}"
+  printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
 else
   printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
 fi
 EOF
   cat > "${test_dir}/bin/node" <<'EOF'
 #!/usr/bin/env bash
-echo v18.0.0
+echo "$AWF_TEST_NODE_VERSION"
 EOF
   cat > "${test_dir}/bin/sha256sum" <<'EOF'
 #!/usr/bin/env bash
@@ -162,7 +162,7 @@ EOF
   cat > "${test_dir}/bin/uname" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
-  -s) echo Linux ;;
+  -s) echo "$AWF_TEST_OS" ;;
   -m) echo x86_64 ;;
 esac
 EOF
@@ -171,7 +171,7 @@ EOF
   chmod +x "${test_dir}/bin/"*
   if ! AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall v0.28.62 checksums.txt)" \
     CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
-    HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
+    AWF_TEST_NODE_VERSION="$node_version" AWF_TEST_OS="$platform" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
     PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" v0.28.62 --rootless >/dev/null; then
     TEST_FAILURE_REASON="installer exited unsuccessfully"
     rm -rf "${test_dir}"
@@ -189,6 +189,14 @@ EOF
   fi
   for curl_args in "${curl_args_files[@]}"; do
     mapfile -t actual_options < "${curl_args}"
+    expected_options=("${common_options[@]}")
+    case "${actual_options[${#actual_options[@]}-1]}" in
+      */awf-linux-*|*/awf-darwin-*) expected_options+=(--speed-limit 1 --speed-time 60) ;;
+      *) expected_options+=(--max-time 60) ;;
+    esac
+    if [ "$expected" = true ] && [[ "${actual_options[${#actual_options[@]}-1]}" != */awf-bundle.js ]]; then
+      expected_options+=(--retry-all-errors)
+    fi
     for option_index in "${!expected_options[@]}"; do
       if [ "${actual_options[option_index]:-}" != "${expected_options[option_index]}" ]; then
         TEST_FAILURE_REASON="expected curl argument ${expected_options[option_index]} at position ${option_index}"
@@ -232,6 +240,16 @@ if test_curl_retry_all_errors '' false; then
   pass "unsupported curl omits --retry-all-errors"
 else
   fail "unsupported curl retry options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0; then
+  pass "optional bundle uses standard retries without retrying HTTP 404"
+else
+  fail "optional bundle retry options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v18.0.0 Darwin; then
+  pass "macOS binary uses a stall timeout without a total transfer limit"
+else
+  fail "macOS binary timeout options were incorrect" "${TEST_FAILURE_REASON}"
 fi
 
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode

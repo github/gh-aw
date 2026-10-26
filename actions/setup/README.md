@@ -75,10 +75,16 @@ All files are copied from the committed `js/` and `sh/` directories which contai
 
 The AWF installer retries release downloads up to eight times with exponential
 backoff and a 180-second retry budget. Each transfer has a 15-second connection
-timeout and a 60-second total timeout; the retry budget does not interrupt an
-in-progress transfer. Failed downloads report the asset, release, HTTP status,
-and curl exit code without logging signed redirect URLs. Checksum verification
-remains mandatory before installation or execution.
+timeout. Manifests and bundles have a 60-second total timeout; platform binaries
+instead abort after 60 seconds below one byte per second, allowing slow downloads
+that continue making progress. The retry budget is not a hard wall-clock limit:
+scheduled backoff and in-progress transfers can exceed it (immediately failing
+requests can start a final attempt around 255 seconds). A missing optional bundle
+(HTTP 404) falls back to the platform binary without retries; transient bundle
+HTTP errors still use curl's standard retries. Failed downloads report the asset,
+release, HTTP status, and curl exit code, with a separate diagnostic for local
+write failures, without logging signed redirect URLs. Checksum verification remains
+mandatory before installation or execution.
 
 ## OTLP credential masking
 

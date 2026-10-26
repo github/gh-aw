@@ -35,7 +35,7 @@ sed -e "s/0b03f6ea5b638356a799fa541ade4fd7902a6ac8d7c3f0252ee09d8259a4ce8f/$mani
 cat >"$TEMP_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-if [ "${1:-}" = "--help" ]; then exit 0; fi
+if [ "${1:-}" = "--help" ]; then echo '--retry-all-errors'; exit 0; fi
 printf '%s\n' "$*" >>"$TEST_ROOT/curl.log"
 out=""
 write_out=""
@@ -110,7 +110,7 @@ test -x "$TEMP_DIR/home/.local/bin/awf"
 grep -q EXECUTED "$TEMP_DIR/executions"
 echo "PASS: authenticated AWF bundle installs and executes"
 
-for failure in '504 22' '404 22' '000 28'; do
+for failure in '504 22' '404 22' '000 28' '200 23'; do
   read -r http_status curl_exit <<<"$failure"
   rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"
   installer_exit=0
@@ -118,18 +118,28 @@ for failure in '504 22' '404 22' '000 28'; do
     run_awf v0.28.62 --rootless || installer_exit=$?
   test "$installer_exit" = "$curl_exit"
   grep -qF "Failed to download checksums.txt from github/gh-aw-firewall v0.28.62 (HTTP $http_status, curl exit $curl_exit)" "$TEMP_DIR/output"
+  if [ "$curl_exit" = 23 ]; then
+    grep -qF 'Local write failure; check free disk space and permissions' "$TEMP_DIR/output"
+  elif grep -qF 'Local write failure' "$TEMP_DIR/output"; then
+    echo "FAIL: network error misdiagnosed as a local write failure" >&2; exit 1
+  fi
   test ! -e "$TEMP_DIR/executions"
   test ! -e "$TEMP_DIR/home/.local/bin/awf"
   test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
 done
 echo "PASS: failed checksum downloads preserve HTTP/curl diagnostics and never install or execute partial files"
 
-rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions"
-AWF_TEST_FAIL_ASSET=awf-bundle.js run_awf v0.28.62 --rootless
-grep -qF 'HTTP 504, curl exit 22' "$TEMP_DIR/output"
-grep -q '/awf-linux-x64' "$TEMP_DIR/curl.log"
-grep -q EXECUTED "$TEMP_DIR/executions"
-test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 3
+for http_status in 404 504; do
+  rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions"
+  AWF_TEST_FAIL_ASSET=awf-bundle.js AWF_TEST_HTTP_STATUS="$http_status" run_awf v0.28.62 --rootless
+  grep -qF "HTTP $http_status, curl exit 22" "$TEMP_DIR/output"
+  grep -q '/awf-linux-x64' "$TEMP_DIR/curl.log"
+  grep -q EXECUTED "$TEMP_DIR/executions"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 3
+  if grep '/awf-bundle.js' "$TEMP_DIR/curl.log" | grep -q -- '--retry-all-errors'; then
+    echo "FAIL: optional bundle retries permanent HTTP failures" >&2; exit 1
+  fi
+done
 echo "PASS: bundle download failure retains the authenticated platform-binary fallback"
 
 rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"

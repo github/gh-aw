@@ -130,8 +130,9 @@ fi
 BASE_URL="https://github.com/${AWF_REPO}/releases/download/${AWF_VERSION}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
 # Exponential backoff spans longer gateway outages than six fixed-delay attempts.
-# Bound each transfer as well: --retry-max-time alone cannot stop a stalled request.
-CURL_RETRY_OPTS=(--proto '=https' --proto-redir '=https' --retry 8 --retry-delay 0 --retry-max-time 180 --connect-timeout 15 --max-time 60)
+# Bound stalled transfers without imposing a total timeout on large binaries.
+CURL_RETRY_OPTS=(--proto '=https' --proto-redir '=https' --retry 8 --retry-max-time 180 --connect-timeout 15)
+CURL_EXTRA_RETRY_OPTS=()
 # --retry-all-errors was added in curl 7.71, so it must not be passed to older curl
 # builds found on some self-hosted runners. Probe the help output instead of parsing
 # `curl --version`, which reports vendor-patched version strings that do not reliably
@@ -140,7 +141,7 @@ CURL_RETRY_OPTS=(--proto '=https' --proto-redir '=https' --retry 8 --retry-delay
 # older builds.
 if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors' ||
   curl --help 2>/dev/null | grep -q -- '--retry-all-errors'; then
-  CURL_RETRY_OPTS+=(--retry-all-errors)
+  CURL_EXTRA_RETRY_OPTS+=(--retry-all-errors)
 fi
 
 # Platform-portable SHA256 function
@@ -162,14 +163,26 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 
 download_release_asset() {
   local asset="$1"
-  local http_status curl_exit
-  if http_status=$(curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${asset}" \
+  local http_status="" curl_exit=0
+  local -a options=("${CURL_RETRY_OPTS[@]}")
+  case "$asset" in
+    awf-linux-*|awf-darwin-*) options+=(--speed-limit 1 --speed-time 60) ;;
+    *) options+=(--max-time 60) ;;
+  esac
+  # A missing optional bundle should fall back immediately, not retry HTTP 404.
+  if [ "$asset" != awf-bundle.js ]; then
+    options+=("${CURL_EXTRA_RETRY_OPTS[@]}")
+  fi
+  if http_status=$(curl -fsSL "${options[@]}" -o "${TEMP_DIR}/${asset}" \
     --write-out '%{http_code}' "${BASE_URL}/${asset}"); then
     return 0
   else
     curl_exit=$?
   fi
   echo "ERROR: Failed to download ${asset} from ${AWF_REPO} ${AWF_VERSION} (HTTP ${http_status:-000}, curl exit ${curl_exit})." >&2
+  if [ "$curl_exit" -eq 23 ]; then
+    echo "ERROR: Local write failure; check free disk space and permissions in ${TEMP_DIR}." >&2
+  fi
   return "$curl_exit"
 }
 
