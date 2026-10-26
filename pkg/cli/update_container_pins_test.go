@@ -564,3 +564,28 @@ func TestUpdateContainerPins_FailureSummary(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateContainerPins_Interrupted(t *testing.T) {
+	for _, interruption := range []error{context.Canceled, context.DeadlineExceeded} {
+		for _, fatal := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%v/fatal=%v", interruption, fatal), func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				require.NoError(t, os.MkdirAll(".github/workflows", 0o755))
+				require.NoError(t, os.WriteFile(".github/workflows/test.lock.yml",
+					[]byte("run: bash download_docker_images.sh ghcr.io/example/agent:v1\n"), 0o644))
+				deps := containerPinUpdateDeps{
+					fetchDigest: func(context.Context, string, bool) (string, error) {
+						return "", fmt.Errorf("interrupted lookup: %w", interruption)
+					},
+				}
+				output := captureUpdateOrgStderr(t, func() {
+					changed, err := updateContainerPins(context.Background(), deps, ".github/workflows", false,
+						containerPinUpdateOptions{failOnResolveErrors: fatal})
+					require.ErrorIs(t, err, interruption)
+					require.False(t, changed)
+				})
+				assert.Empty(t, output, "interruption must not emit a registry failure summary")
+			})
+		}
+	}
+}

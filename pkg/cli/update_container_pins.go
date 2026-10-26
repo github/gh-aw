@@ -44,6 +44,8 @@ var dockerImagesArgPattern = regexp.MustCompile(`download_docker_images\.sh"?\s+
 // in practice and are not expected here.
 var buildxDigestPattern = regexp.MustCompile(`(?m)^Digest:\s+(sha256:[a-f0-9]{64})`)
 
+var registryAuthErrorPattern = regexp.MustCompile(`(?i)(?:^|[\s:])(denied|unauthorized|forbidden):`)
+
 type containerPinUpdateDeps struct {
 	fetchDigest func(ctx context.Context, image string, verbose bool) (string, error)
 }
@@ -165,6 +167,9 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 
 		digest, resolveErr := results[i].digest, results[i].err
 		if resolveErr != nil {
+			if errors.Is(resolveErr, context.Canceled) || errors.Is(resolveErr, context.DeadlineExceeded) {
+				return false, resolveErr
+			}
 			containerPinsLog.Printf("Failed to resolve digest for %s: %v", image, resolveErr)
 			failedCount++
 			reason := "registry metadata lookup failed"
@@ -322,6 +327,9 @@ func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, er
 		finish := ctxutil.StartOperation(ctx, s.name+" "+image)
 		digest, err := s.fn()
 		finish(err)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		if err == nil && digest != "" {
 			containerPinsLog.Printf("Resolved %s via %s: %s", image, s.name, digest)
 			return digest, nil
@@ -334,11 +342,8 @@ func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, er
 				(strings.Contains(msg, "is not a docker command") || strings.Contains(msg, `unknown command "buildx"`))) {
 			unavailable++
 		}
-		switch {
-		case strings.Contains(msg, "403 Forbidden"):
-			reason = "registry access denied (HTTP 403)"
-		case strings.Contains(msg, "401 Unauthorized"):
-			reason = "registry authentication required (HTTP 401)"
+		if authReason := containerRegistryAuthReason(msg); authReason != "" {
+			reason = authReason
 		}
 	}
 
@@ -346,6 +351,24 @@ func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, er
 		reason = "Docker Buildx and crane are unavailable"
 	}
 	return "", &containerDigestResolutionError{reason: reason, details: strings.Join(errs, "; ")}
+}
+
+func containerRegistryAuthReason(message string) string {
+	message = strings.ToLower(message)
+	switch {
+	case strings.Contains(message, "403 forbidden"):
+		return "registry access denied (HTTP 403)"
+	case strings.Contains(message, "401 unauthorized"):
+		return "registry authentication required (HTTP 401)"
+	}
+	authError := registryAuthErrorPattern.FindString(message)
+	if strings.Contains(authError, "unauthorized") {
+		return "registry authentication required"
+	}
+	if authError != "" {
+		return "registry access denied"
+	}
+	return ""
 }
 
 // resolveDigestViaBuildx uses "docker buildx imagetools inspect" to get the content
