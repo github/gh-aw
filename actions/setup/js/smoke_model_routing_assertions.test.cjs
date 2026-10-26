@@ -3,7 +3,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkDetectionEvidence, checkModelRoutingEvidence, checkSessionContract, detectionMain, evaluateDetectionEvidence, main, normalizeEndpoint, servedModel, sessionContractMain } from "./smoke_model_routing_assertions.cjs";
+import {
+  checkDetectionEvidence,
+  checkModelRoutingEvidence,
+  checkSessionContract,
+  detectionMain,
+  evaluateDetectionEvidence,
+  evaluateRequestedEffort,
+  main,
+  normalizeEndpoint,
+  servedModel,
+  sessionContractMain,
+} from "./smoke_model_routing_assertions.cjs";
 import { piRoutedSession, postFixCopilotRoutedSession, postFixCopilotSession, preFixCopilotSession } from "./fixtures/session_contract_sessions.cjs";
 
 const TOKEN_USAGE = "sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl";
@@ -518,6 +529,131 @@ describe("smoke_model_routing_assertions", () => {
       awInfo.model_routing = { status: "rejected", failure_code: "unsupported_endpoint", detail: "AWF model routing endpoint /chat/completions is not supported by this engine" };
       claudeFixture({ awInfo });
       expect(claudeCheck().failures).toEqual(["FAIL R1 routing not selected: runner-written routing status is rejected, expected selected; ignored agent-written model_routing.outcome (status=selected)"]);
+    });
+  });
+
+  // Routed Codex: raw records from pkg/cli/testdata/model_routing_golden/copilot-routed-gpt-responses
+  // (run 37886511291, gpt-5.6-luna on /responses). Derived fixture: the selection and request
+  // records' raw `selected_effort` / `requested_effort` are changed from high to the effort under
+  // test, aw_info.json names the codex engine, and the harness outcome records `effort` /
+  // `applied_effort` as codex_harness.cjs writes them. No recorded routed Codex run exists yet.
+  describe("routed codex smoke (derived from copilot-routed-gpt-responses)", () => {
+    const goldenDir = fileURLToPath(new URL("../../../pkg/cli/testdata/model_routing_golden/copilot-routed-gpt-responses/", import.meta.url));
+    const ROUTING = "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl";
+    const golden = file => fs.readFileSync(path.join(goldenDir, file), "utf8");
+    const GPT_56 = ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"];
+    const codexExpectations = { engine: "codex", allowedModels: GPT_56, mainEndpoint: "/responses", executionOutcome: "success", expectSelectedEffort: "max", expectRequestedEffortMatchesSelection: true };
+    const lunaReflect = {
+      endpoints: [{ provider: "copilot", routing_models: [{ model_id: "gpt-5.6-luna", supported_endpoints: ["/responses", "ws:/responses"], supported_reasoning_efforts: ["none", "low", "medium", "high", "xhigh", "max"] }] }],
+    };
+
+    function codexFixture({ selectedEffort = "max" } = {}) {
+      const awInfo = JSON.parse(golden("aw_info.json"));
+      awInfo.engine_id = "codex";
+      awInfo.model_routing = { ...awInfo.model_routing, effort: selectedEffort };
+      write("aw_info.json", awInfo);
+      const records = golden(ROUTING)
+        .split("\n")
+        .filter(Boolean)
+        .map(line => JSON.parse(line))
+        .map(record => (record.stage === "selection" || record.stage === "request" ? { ...record, selected_effort: selectedEffort, ...(record.stage === "request" ? { requested_effort: selectedEffort } : {}) } : record));
+      write(ROUTING, records);
+      write(TOKEN_USAGE, golden(TOKEN_USAGE));
+      write("sandbox/firewall/awf-reflect.json", lunaReflect);
+    }
+
+    const codexCheck = (expectations = {}) => checkModelRoutingEvidence({ rootDir: root, ...codexExpectations, ...expectations });
+
+    it.each(["max", "none"])("routed_codex_smoke_checks_proxy-selected effort (%s)", effort => {
+      codexFixture({ selectedEffort: effort });
+      const results = codexCheck({ expectSelectedEffort: effort });
+      expect(results.failures).toEqual([]);
+      expect(checkIds(results.passes)).toEqual(["E2", "E1", "R1", "R2", "R3", "R4", "M1", "H2", "H3"]);
+      expect(results.passes).toContain(`PASS H2 proxy-selected effort ${effort} is the covered effort`);
+      expect(results.passes).toContain("PASS R3 main-agent request on selected model: gpt-5.6-luna /responses 200");
+    });
+
+    it("routed_codex_smoke_checks_proxy-selected effort: the workflow configures routed Codex on GitHub with gpt-5.6 candidates", () => {
+      const workflow = fs.readFileSync(new URL("../../../.github/workflows/smoke-codex-routed.md", import.meta.url), "utf8");
+      const engine = workflow
+        .split("\nengine:\n")[1]
+        .split("\n")
+        .filter(line => line.startsWith("  "))
+        .join("\n");
+      expect(engine).toContain("  id: codex");
+      expect(engine).toContain("  model-provider: github");
+      expect(engine).toContain("    mode: robust");
+      expect(engine).toMatch(/\n {2}model-routing:\n(?: {4}.*\n)* {4}allowed-models: \[gpt-5\.6-luna, gpt-5\.6-terra, gpt-5\.6-sol\]/);
+      expect(workflow).toContain('engine: "codex"');
+      expect(workflow).toContain('allowedModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]');
+      expect(workflow).toContain('mainEndpoint: "/responses"');
+      expect(workflow).not.toContain("expectAppliedEffort");
+      expect(workflow).toContain('expectSelectedEffort: "max"');
+      expect(workflow).toContain("expectRequestedEffortMatchesSelection: true");
+    });
+
+    it("fails only H2 when the proxy selected high instead of the covered max", () => {
+      codexFixture({ selectedEffort: "high" });
+      expect(codexCheck().failures).toEqual(["FAIL H2 proxy-selected effort high, expected max: this run does not cover the max path"]);
+    });
+
+    it("ignores agent-writable harness outcome for pass/fail", () => {
+      codexFixture();
+      write("agent/awf-routing-outcome.json", { status: "rejected", wire_model: "attacker-model", applied_effort: "high" });
+      const results = codexCheck();
+      expect(results.failures).toEqual([]);
+      expect(checkIds(results.passes)).not.toContain("H1");
+      expect(results.passes).toContain("PASS H2 proxy-selected effort max is the covered effort");
+    });
+  });
+
+  // H3: firewall.model_routing session events with the record shapes of sandbox run
+  // 40142889213 (AWF v0.28.75, gpt-5.6-luna, mode robust, selected effort max).
+  // Request IDs are replaced.
+  describe("H3 requested effort (run 40142889213 record shapes)", () => {
+    const provenance = index => ({ component: "firewall", phase: "agent", path: "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", index });
+    const maxSelection = {
+      type: "firewall.model_routing",
+      data: { schema: "model-routing/v0.28.75", stage: "selection", mode: "robust", selectedProvider: "copilot", selectedModel: "github-copilot/gpt-5.6-luna", selectedEffort: "max", wireModel: "gpt-5.6-luna", endpoint: "/responses" },
+      provenance: provenance(1),
+    };
+    const request = (requestId, requestedEffort, outcome = "client_closed", extra = {}) => ({
+      type: "firewall.model_routing",
+      data: { schema: "model-routing/v0.28.75", stage: "request", requestId, routed: "as_selected", requestedModel: "gpt-5.6-luna", requestedEffort, selectedEffort: "max", requestedEndpoint: "/responses", outcome, ...extra },
+      provenance: provenance(2),
+    });
+    const runRequests = (effortOf = () => "max") => ["req-a", "req-b", "req-c", "req-d"].map((id, index) => request(id, effortOf(id), index === 3 ? "completed" : "client_closed"));
+
+    it("passes when every main-agent request carried the selected max effort", () => {
+      const results = evaluateRequestedEffort({ events: [maxSelection, ...runRequests()] });
+      expect(results.failures).toEqual([]);
+      expect(results.passes).toEqual(["PASS H3 all 4 main-agent request(s) requested the selected effort max"]);
+    });
+
+    it("fails when one main-agent request was downgraded to high under a max selection", () => {
+      const results = evaluateRequestedEffort({ events: [maxSelection, ...runRequests(id => (id === "req-c" ? "high" : "max"))] });
+      expect(results.passes).toEqual([]);
+      expect(results.failures).toEqual(["FAIL H3 1 of 4 main-agent request(s) did not request the selected effort: req-c requested=high selected=max"]);
+    });
+
+    it("fails when there are no main-agent request events", () => {
+      const classifierRequest = request("req-classifier", "max", "completed", { purpose: "routing_classification" });
+      const results = evaluateRequestedEffort({ events: [maxSelection, classifierRequest] });
+      expect(results.passes).toEqual([]);
+      expect(results.failures).toEqual(["FAIL H3 no main-agent firewall model_routing request events to check the requested effort"]);
+    });
+
+    it("ignores a classifier request at a different effort", () => {
+      const classifierRequest = request("req-classifier", "high", "completed", { purpose: "routing_classification" });
+      const results = evaluateRequestedEffort({ events: [maxSelection, classifierRequest, ...runRequests()] });
+      expect(results.failures).toEqual([]);
+      expect(results.passes).toEqual(["PASS H3 all 4 main-agent request(s) requested the selected effort max"]);
+    });
+
+    it("ignores request events not written by the firewall", () => {
+      const forged = { ...request("req-forged", "high"), provenance: { component: "agent", phase: "agent", path: "agent/awf-routing-outcome.json", index: 0 } };
+      const results = evaluateRequestedEffort({ events: [maxSelection, forged, ...runRequests()] });
+      expect(results.failures).toEqual([]);
     });
   });
 
