@@ -223,10 +223,10 @@ func TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting(t *tes
 		if tool == "poutine" || tool == "runner-guard" {
 			message = tool + " failed: " + message
 		}
-		assert.Equal(t, message, result.Errors[0].Message)
+		assert.Equal(t, neutralizeScannerMessage(message), result.Errors[0].Message)
 	}
 	require.Len(t, decoded[2].Errors, 2)
-	assert.Equal(t, "second actionlint finding", decoded[2].Errors[1].Message)
+	assert.Equal(t, neutralizeScannerMessage("second actionlint finding"), decoded[2].Errors[1].Message)
 
 	calls = nil
 	failAll = false
