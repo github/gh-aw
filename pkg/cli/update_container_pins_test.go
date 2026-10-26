@@ -4,11 +4,15 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -498,4 +502,103 @@ jobs:
 		assert.False(t, changed)
 		assert.Contains(t, err.Error(), "failed to resolve digest for 1 image(s)")
 	})
+}
+
+func TestUpdateContainerPins_FailureSummary(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		errors []error
+		reason string
+	}{
+		{
+			name: "repeated registry denial",
+			errors: []error{
+				&containerDigestResolutionError{reason: "registry access denied (HTTP 403)", details: "long buildx diagnostics"},
+				&containerDigestResolutionError{reason: "registry access denied (HTTP 403)", details: "missing crane diagnostics"},
+			},
+			reason: "registry access denied (HTTP 403)",
+		},
+		{
+			name: "mixed causes",
+			errors: []error{
+				&containerDigestResolutionError{reason: "registry access denied (HTTP 403)"},
+				&containerDigestResolutionError{reason: "registry metadata lookup failed"},
+			},
+			reason: "registry access denied (HTTP 403); registry metadata lookup failed",
+		},
+		{
+			name:   "unknown errors",
+			errors: []error{errors.New("unexpected first failure"), errors.New("unexpected second failure")},
+			reason: "registry metadata lookup failed",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			t.Chdir(tmpDir)
+			workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "test.lock.yml"),
+				[]byte("run: bash download_docker_images.sh ghcr.io/example/agent:v1 ghcr.io/example/proxy:v1\n"), 0o644))
+			cache := workflow.NewActionCache(".")
+			digest := "sha256:" + strings.Repeat("a", 64)
+			cache.SetContainerPin("ghcr.io/example/agent:v1", digest, "ghcr.io/example/agent:v1@"+digest)
+			require.NoError(t, cache.Save())
+			deps := containerPinUpdateDeps{
+				fetchDigest: func(_ context.Context, image string, _ bool) (string, error) {
+					if image == "ghcr.io/example/agent:v1" {
+						return "", tc.errors[0]
+					}
+					return "", tc.errors[1]
+				},
+			}
+			var expected string
+			output := captureUpdateOrgStderr(t, func() {
+				expected = console.FormatInfoMessage("Container pins could not be updated: " + tc.reason + ".")
+				changed, err := updateContainerPins(context.Background(), deps, workflowsDir, false, containerPinUpdateOptions{refreshExisting: true})
+				require.NoError(t, err)
+				require.False(t, changed)
+			})
+			assert.Equal(t, strings.TrimSpace(expected), containerPinNormalOutput(output), "emit exactly one informational line without per-image diagnostics")
+			cache = workflow.NewActionCache(".")
+			require.NoError(t, cache.Load())
+			pin, ok := cache.GetContainerPin("ghcr.io/example/agent:v1")
+			require.True(t, ok, "failed refresh must preserve the existing pin")
+			assert.Equal(t, digest, pin.Digest)
+		})
+	}
+}
+
+func TestUpdateContainerPins_Interrupted(t *testing.T) {
+	for _, interruption := range []error{context.Canceled, context.DeadlineExceeded} {
+		for _, fatal := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%v/fatal=%v", interruption, fatal), func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				require.NoError(t, os.MkdirAll(".github/workflows", 0o755))
+				require.NoError(t, os.WriteFile(".github/workflows/test.lock.yml",
+					[]byte("run: bash download_docker_images.sh ghcr.io/example/agent:v1\n"), 0o644))
+				deps := containerPinUpdateDeps{
+					fetchDigest: func(context.Context, string, bool) (string, error) {
+						return "", fmt.Errorf("interrupted lookup: %w", interruption)
+					},
+				}
+				output := captureUpdateOrgStderr(t, func() {
+					changed, err := updateContainerPins(context.Background(), deps, ".github/workflows", false,
+						containerPinUpdateOptions{failOnResolveErrors: fatal})
+					require.ErrorIs(t, err, interruption)
+					require.False(t, changed)
+				})
+				assert.Empty(t, containerPinNormalOutput(output), "interruption must not emit a registry failure summary")
+			})
+		}
+	}
+}
+
+func containerPinNormalOutput(output string) string {
+	var lines []string
+	for line := range strings.SplitSeq(output, "\n") {
+		if !isCompileDebugLine(stringutil.StripANSI(line)) {
+			lines = append(lines, line)
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
