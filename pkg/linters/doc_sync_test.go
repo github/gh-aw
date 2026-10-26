@@ -35,6 +35,7 @@ var notYetEnforced = map[string]string{
 	"formatintitoa":               "existing FormatInt conversions need remediation before CI enforcement",
 	"fprintferrorunchecked":       "existing production violations need remediation before enforcement; nolint suppression already works",
 	"goroutineresourceleak":       "requires an enforcement-readiness audit before native and WebAssembly CI enable it",
+	"splitindexzero":              "existing Split(...)[0] uses in pkg/cli need remediation before CI enforcement",
 	"hardcodedfilepath":           "requires an enforcement audit after the same-package constant fix (#52428)",
 	"largefunc":                   "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":               "requires an enforcement audit after the diagnostic-message fix (#54717)",

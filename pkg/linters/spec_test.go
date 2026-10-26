@@ -68,6 +68,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
+	"github.com/github/gh-aw/pkg/linters/splitindexzero"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
@@ -111,7 +112,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 85 analyzer
+// "Public API > Subpackages" table. The README documents 86 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -196,6 +197,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"stringsindexcontains", stringsindexcontains.Analyzer},
 		{"stringsindexhasprefix", stringsindexhasprefix.Analyzer},
 		{"stringsjoinone", stringsjoinone.Analyzer},
+		{"splitindexzero", splitindexzero.Analyzer},
 		{"timeafterleak", timeafterleak.Analyzer},
 		{"timesleepnocontext", timesleepnocontext.Analyzer},
 		{"timenowsub", timenowsub.Analyzer},
