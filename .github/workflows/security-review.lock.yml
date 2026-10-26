@@ -3085,7 +3085,7 @@ jobs:
       checks: write
       issues: write
       pull-requests: write
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
       GH_AW_AIC: ${{ needs.agent.outputs.aic }}

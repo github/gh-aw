@@ -124,6 +124,7 @@
       { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "memory.push" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MemorySaveResultData" } } } },
       { "if": { "properties": { "type": { "const": "model.baseline_estimate" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelBaselineEstimateData" } } } },
       { "if": { "properties": { "type": { "const": "model.config" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelConfigData" } } } },
       { "if": { "properties": { "type": { "const": "model.inventory" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelInventoryData" } } } },
@@ -817,6 +818,20 @@
         "error": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false
+    },
+    "MemorySaveResultData": {
+      "type": "object",
+      "properties": {
+        "memoryId": { "type": "string" },
+        "jobResult": { "type": "string", "enum": ["success", "failure", "cancelled", "skipped"] },
+        "outcome": { "type": "string", "enum": ["success", "failure", "cancelled", "skipped"] },
+        "status": { "type": "string", "enum": ["saved", "unchanged", "skipped", "failure", "cancelled", "unknown"] },
+        "branch": { "type": "string", "description": "Target branch of a successful push." },
+        "commit": { "type": "string", "description": "Commit that landed remotely, which may differ from the local commit." }
+      },
+      "required": ["memoryId", "jobResult", "status"],
+      "additionalProperties": false,
+      "description": "Trusted persistence evidence, separate from an agent's request to save memory."
     },
     "ModelBaselineEstimateData": {
       "type": "object",

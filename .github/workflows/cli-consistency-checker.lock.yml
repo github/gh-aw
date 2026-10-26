@@ -2558,7 +2558,7 @@ jobs:
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       issues: write
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
       GH_AW_AIC: ${{ needs.agent.outputs.aic }}

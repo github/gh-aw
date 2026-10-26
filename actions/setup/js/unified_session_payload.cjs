@@ -201,6 +201,7 @@ const EVENT_FIELDS = {
   ...COPILOT_WORKFLOW_EVENT_FIELDS,
   "session.format": { version: ["version"] },
   "workflow.job_result": { jobId: ["jobId"], result: ["result"], durationMs: ["durationMs"] },
+  "memory.push": { memoryId: ["memoryId"], jobResult: ["jobResult"], outcome: ["outcome"], status: ["status"], branch: ["branch"], commit: ["commit"] },
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "harness.retry": { attempts: ["attempts"], exitCode: ["exitCode", "exit_code"], attemptResults: ["attemptResults", "attempt_results"] },
   "skill.invoked": { name: ["name"], path: ["path"], source: ["source"], trigger: ["trigger"], model: ["model"], invokedAtTurn: ["invokedAtTurn"] },

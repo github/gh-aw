@@ -27,6 +27,16 @@ describe("compact unified session projection", () => {
         privateOutput: "private retry output",
       }),
       event("grader.result", { value: 1, run: { passed: 1, errors: 0, unbounded: "private run" }, results: ["private results"] }),
+      event("memory.push", {
+        memoryId: "default",
+        jobResult: "failure",
+        outcome: "success",
+        status: "saved",
+        branch: "memory/default",
+        commit: "b".repeat(40),
+        content: "private memory",
+        error: "private error",
+      }),
     ];
     const original = JSON.stringify(events);
     const result = compactUnifiedSession(events);
@@ -46,6 +56,14 @@ describe("compact unified session projection", () => {
       ],
     });
     expect(projected[9].data).toEqual({ value: 1, run: { passed: 1, errors: 0 } });
+    expect(projected[10].data).toEqual({
+      memoryId: "default",
+      jobResult: "failure",
+      outcome: "success",
+      status: "saved",
+      branch: "memory/default",
+      commit: "b".repeat(40),
+    });
     expect(result.session).not.toContain("private");
     expect(JSON.stringify(events)).toBe(original);
   });

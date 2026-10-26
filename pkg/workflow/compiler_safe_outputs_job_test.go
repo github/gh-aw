@@ -568,7 +568,7 @@ func TestCompileSafeOutputsTimeoutMinutesFromFrontmatter(t *testing.T) {
 		expectedTimeout string
 	}{
 		{
-			name: "default timeout is 45 minutes",
+			name: "API-only default timeout is capped at 15 minutes",
 			frontmatter: `---
 on:
   workflow_dispatch: {}
@@ -580,7 +580,7 @@ safe-outputs:
 ---
 # Test
 `,
-			expectedTimeout: "timeout-minutes: 45",
+			expectedTimeout: "timeout-minutes: 15",
 		},
 		{
 			name: "custom timeout of 30 minutes from frontmatter",
