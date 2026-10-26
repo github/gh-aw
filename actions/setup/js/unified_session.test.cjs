@@ -1594,6 +1594,7 @@ describe("Unified conclusion session", () => {
   it.each([
     { attempts: 1, exit_code: 1, attempt_results: [{ attempt: 1, exit_code: null, failure_classes: [] }] },
     { attempts: 1, exit_code: 1, attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["PRIVATE_FAILURE_TEXT"] }] },
+    { attempts: 1, exit_code: 1, attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["secret_736563726574"] }] },
   ])("does not publish invalid retry records or their private values: %j", record => {
     write("agent/harness_retry.json", record);
     const warn = vi.fn();

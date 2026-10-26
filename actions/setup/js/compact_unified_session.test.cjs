@@ -50,6 +50,18 @@ describe("compact unified session projection", () => {
     expect(JSON.stringify(events)).toBe(original);
   });
 
+  it("drops retry records with unrecognized failure classes", () => {
+    const result = compactUnifiedSession([
+      event("harness.retry", {
+        attempts: 1,
+        exitCode: 1,
+        attemptResults: [{ attempt: 1, exitCode: 1, failureClasses: ["secret_736563726574"] }],
+      }),
+    ]);
+    expect(result.session).toBe("");
+    expect(result.omittedEvents).toBe(1);
+  });
+
   it("drops all conversation, reasoning, prompt, tool and unknown event kinds", () => {
     const types = [
       "user.message",

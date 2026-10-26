@@ -5951,6 +5951,7 @@ describe("sendJobConclusionSpan", () => {
         if (filePath === "/tmp/gh-aw/agent/harness_retry.json")
           return JSON.stringify({
             attempts: 1,
+            exit_code: 0,
             attempt_results: [{ attempt: 1, exit_code: 0, failure_classes: [] }],
           });
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
@@ -5979,20 +5980,52 @@ describe("sendJobConclusionSpan", () => {
       expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
     });
 
-    it("exports only bounded failure-class labels, never arbitrary output", async () => {
+    it.each(["agent", "detection"])("exports no arbitrary or oversized retry telemetry for %s", async jobName => {
+      process.env.INPUT_JOB_NAME = jobName;
+      process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+      vi.stubGlobal("fetch", mockFetch);
+      const record = {
+        attempts: 1,
+        exit_code: 1,
+        attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["rate_limit_error"] }],
+      };
+      const invalidRecords = [
+        { ...record, attempt_results: [{ ...record.attempt_results[0], failure_classes: ["rate_limit_error", "secret_736563726574"] }] },
+        { ...record, attempt_results: [{ ...record.attempt_results[0], failure_classes: Array(17).fill("rate_limit_error") }] },
+        { ...record, attempts: 102, attempt_results: Array.from({ length: 102 }, (_, index) => ({ ...record.attempt_results[0], attempt: index + 1 })) },
+      ];
+      for (const telemetry of invalidRecords) {
+        appendSpy.mockClear();
+        mockFetch.mockClear();
+        readFileSpy.mockImplementation(filePath => {
+          if (filePath === (jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_harness_retry.json" : "/tmp/gh-aw/agent/harness_retry.json")) return JSON.stringify(telemetry);
+          throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+        });
+        await sendJobConclusionSpan(`gh-aw.${jobName}.conclusion`);
+        expect(appendSpy).toHaveBeenCalledOnce();
+        expect(mockFetch).toHaveBeenCalledOnce();
+        const payloads = [...appendSpy.mock.calls.map(([, content]) => JSON.parse(content)), ...mockFetch.mock.calls.map(([, options]) => JSON.parse(options.body))];
+        for (const payload of payloads) {
+          expect(payload.resourceSpans[0].scopeSpans[0].spans.every(span => span.attributes.every(attr => !attr.key.startsWith("gh-aw.harness.")))).toBe(true);
+        }
+        expect(JSON.stringify(payloads)).not.toContain("secret_736563726574");
+      }
+    });
+
+    it("rejects invalid failure-class labels, never arbitrary output", async () => {
       readFileSpy.mockImplementation(filePath => {
         if (filePath === "/tmp/gh-aw/agent/harness_retry.json")
           return JSON.stringify({
             attempts: 1,
-            attempt_results: [{ exit_code: 1, failure_classes: ["rate_limit_error", "private output\nsecret", 123, null, "x".repeat(100)] }],
+            exit_code: 1,
+            attempt_results: [{ attempt: 1, exit_code: 1, failure_classes: ["rate_limit_error", "private output\nsecret", 123, null, "x".repeat(100)] }],
           });
         throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       });
       await sendJobConclusionSpan("gh-aw.agent.conclusion");
       const span = JSON.parse(appendSpy.mock.calls[0][1]).resourceSpans[0].scopeSpans[0].spans[0];
-      expect(span.attributes.find(attr => attr.key === "gh-aw.harness.retry_reasons")?.value).toEqual({
-        arrayValue: { values: [{ stringValue: "rate_limit_error" }] },
-      });
+      expect(span.attributes.some(attr => attr.key.startsWith("gh-aw.harness."))).toBe(false);
     });
 
     it("includes all four gen_ai token breakdown attributes on the agent span when agent_usage.json is present", async () => {
