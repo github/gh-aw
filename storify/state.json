@@ -1,43 +1,41 @@
 {
-  "last_run_date": "2026-10-25",
+  "last_run_date": "2026-10-26",
   "last_window": {
-    "start": "2026-10-24T07:55:23Z",
-    "end": "2026-10-25T07:55:23Z"
+    "start": "2026-10-25T08:06:09Z",
+    "end": "2026-10-26T08:06:09Z"
   },
   "observed_window": {
-    "runs": 569,
+    "metadata_runs": 449,
     "segments": [
       {
-        "runs": 244,
-        "first_run": "2026-10-24T08:23:59Z",
-        "last_run": "2026-10-24T18:00:41Z"
+        "runs": 154,
+        "first_run": "2026-10-25T08:24:21Z",
+        "last_run": "2026-10-25T13:34:36Z"
       },
       {
-        "runs": 325,
-        "first_run": "2026-10-24T18:21:55Z",
-        "last_run": "2026-10-25T07:53:08Z"
+        "runs": 295,
+        "coverage": "later segment through workflow start; original compact summary was replaced by continuation report"
       }
     ],
-    "coverage": "Continuation exhausted with zero additional runs; episode roots may still lie outside selected artifact coverage."
+    "coverage": "Continuation exhausted; 392 detailed cached summaries remained after storage pruning. Episode attribution is representative, not exhaustive."
   },
   "key_themes": [
-    "Work-queue publication boundary remains mixed",
-    "Cross-repository smoke checkout stalls both PR paths",
-    "Five-workflow review fan-out succeeds with missing root",
-    "Safety monitoring and conformance diverge"
+    "Work queue publication and handoff remain mixed",
+    "Review fan-out moved retry telemetry PR but smoke failed",
+    "Container scan updated issue ledger while gate failed"
   ],
   "carry_forward_questions": [
-    "Do claim reconciliation, Issue projection, and handoff failures recur after the successful work-queue smoke?",
-    "Does side-repository checkout recover in both cross-repo PR smoke paths?",
-    "Does the safe-output health monitor pass after PR 71833?",
-    "Will the container gate clear while the updated CVE ledger remains current?"
+    "Do trusted work queue control and formal verification handoff failures recur?",
+    "Does PR 71934 smoke pass after the follow-up fix?",
+    "Does the container scan gate clear after issue ledger updates?"
   ],
   "representative_runs": [
-    40083405475,
-    40102973967,
-    40115223401,
-    40148115535,
-    40161732282,
-    40165956449
+    40193973627,
+    40202765536,
+    40231223604,
+    40223984096,
+    40227087812,
+    40272851722,
+    40275180793
   ]
 }
