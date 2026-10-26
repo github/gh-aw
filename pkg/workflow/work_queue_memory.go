@@ -156,7 +156,7 @@ func parseWorkQueueMemory(raw any) (*WorkQueueMemoryConfig, error) {
 		return nil, fmt.Errorf("tools.work-queue.memory: %w", err)
 	}
 	config := &WorkQueueMemoryConfig{Name: "persist_work_queue_memory", MaxBytes: 262144}
-	decoder := json.NewDecoder(strings.NewReader(string(encoded)))
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(config); err != nil {
 		return nil, fmt.Errorf("tools.work-queue.memory: %w", err)

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -280,5 +281,5 @@ func putRepoSecret(client *api.RESTClient, owner, repo, name, keyID, encryptedVa
 		return err
 	}
 
-	return client.Put(path, strings.NewReader(string(body)), nil)
+	return client.Put(path, bytes.NewReader(body), nil)
 }

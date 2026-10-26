@@ -15,6 +15,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseEvalResultRecords(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		data []byte
+		want []evalResultRecord
+	}{
+		{name: "nil"},
+		{name: "empty", data: []byte{}},
+		{
+			name: "JSONL with skipped lines and no trailing newline",
+			data: []byte("\r\nnot JSON\r\n{\"answer\":\"YES\"}\r\n" +
+				" {\"id\":\"qualité\",\"answer\":\"YES\",\"runid\":\"100\"} \r\n" +
+				`{"id":"coverage","answer":"NO","runid":"101"}`),
+			want: []evalResultRecord{
+				{ID: "qualité", Answer: "YES", RunID: "100"},
+				{ID: "coverage", Answer: "NO", RunID: "101"},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, parseEvalResultRecords(tt.data))
+		})
+	}
+}
+
 func installExperimentFetchFakeGH(t *testing.T, workflowContent, state string) string {
 	t.Helper()
 	binDir := t.TempDir()

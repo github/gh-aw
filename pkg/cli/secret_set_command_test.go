@@ -5,12 +5,39 @@ package cli
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/nacl/box"
 )
+
+func TestPutRepoSecret(t *testing.T) {
+	t.Parallel()
+	called := false
+	client, err := api.NewRESTClient(api.ClientOptions{
+		Host: "github.localhost", APIHost: "api.github.localhost", AuthToken: "test-token",
+		LogIgnoreEnv: true,
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			called = true
+			assert.Equal(t, http.MethodPut, req.Method)
+			assert.Equal(t, "/repos/owner/repo/actions/secrets/MY_SECRET", req.URL.Path)
+			var payload secretPayload
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&payload))
+			assert.Equal(t, secretPayload{EncryptedValue: "encrypted+/=", KeyID: "key-id"}, payload)
+			return &http.Response{StatusCode: http.StatusNoContent, Body: http.NoBody, Header: make(http.Header), Request: req}, nil
+		}),
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, putRepoSecret(client, "owner", "repo", "MY_SECRET", "key-id", "encrypted+/="))
+	assert.True(t, called)
+}
 
 func TestResolveSecretValueForSet(t *testing.T) {
 	tests := []struct {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -85,7 +86,7 @@ func parseEvalResultRecords(data []byte) []evalResultRecord {
 	if len(data) == 0 {
 		return nil
 	}
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var records []evalResultRecord
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
