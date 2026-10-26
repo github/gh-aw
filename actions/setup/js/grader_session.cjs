@@ -153,7 +153,14 @@ function createSessionLookups(session) {
   const executionDuration = agentEvents.find(event => event.type === "execution.result" && duration(event.data.durationMs) !== null)?.data.durationMs;
   const totalDurationMs = sumMeasurements(tokenUsageEntries.map(entry => entry.duration_ms)) ?? duration(executionDuration);
   const retryEvents = agentEvents.filter(event => event.type.startsWith("mcp.") && (event.data.event === "retry" || event.data.retryHint != null || /\bretry(?:ing)?\b/i.test(String(event.data.message ?? ""))));
-  const artifacts = eventsOfType("safe_output.result").map(event => event.data);
+  const safeOutputResults = eventsOfType("safe_output.result");
+  const safeJobOutcomeTypes = new Set(
+    safeOutputResults.filter(event => event.provenance.phase === "safe_outputs" && event.provenance.path === "usage/aw_session.jsonl" && event.data.status !== undefined && typeof event.data.type === "string").map(event => event.data.type)
+  );
+  const artifacts = safeOutputResults
+    .filter(event => event.data.status === undefined || event.data.status === "success")
+    .filter(event => event.data.status !== undefined || !safeJobOutcomeTypes.has(event.data.type))
+    .map(event => event.data);
   const failedToolCalls = toolCalls.filter(isToolFailure).length;
   const workingSet = calculateWorkingSetFromEntries(tokenUsageEntries).workingSet;
   const trajectory = eventsOfType("trajectory.ir")

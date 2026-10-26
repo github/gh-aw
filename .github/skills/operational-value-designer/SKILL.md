@@ -49,6 +49,24 @@ workflow title + description + intent + effective instructions
 
 The evaluator belongs to one workflow and runs whenever that workflow is graded. It must measure that workflow's goal for the current run. It is not a generic safe-output checker: safe outputs are only one possible evidence source and may be irrelevant, insufficient, or merely an intermediate request.
 
+### Custom safe-output evidence
+
+For custom safe jobs, declare `outputs.status` and `outputs.url` mapped to
+execution-step outputs. Use `success`, `failure`, `cancelled`, or `skipped`;
+publish `skipped` for staged previews and intentional no-ops. The URL must be
+the canonical absolute resource URI returned by the external service, not an
+agent-suggested target. Safe scripts instead return `{ success: true, url }`
+after the service confirms the operation.
+
+Conclusion records these observations as `safe_output.result` with the normalized
+tool name in `data.type`, the execution status in `data.status`, and an optional
+URI in `data.url`. Failed, cancelled, and skipped jobs do not publish a created
+resource URL. A successful job without a URI proves only successful execution,
+not resource creation; missing identity is unavailable evidence when identity is
+required. Filter for successful outcomes before counting resources. Historical
+events without status remain legacy observations, not newly verified outcomes.
+Prepared work-queue adapters still require their independent effect verification.
+
 ## Deliverables
 
 Embed a compact pure JavaScript body in the workflow under a descriptive custom

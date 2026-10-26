@@ -243,4 +243,5 @@ func TestBuildAWFCommand_ArcDindPreCreatesMountDirs(t *testing.T) {
 	// Verify the mounts themselves are present
 	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/home:${RUNNER_TEMP}/gh-aw/home:rw"`)
 	assert.Contains(t, command, `--mount "${RUNNER_TEMP}/gh-aw/sandbox/agent:${RUNNER_TEMP}/gh-aw/sandbox/agent:rw"`)
+	assert.Contains(t, command, `export GH_AW_HARNESS_TELEMETRY_DIR="${RUNNER_TEMP}/gh-aw/sandbox/agent"`)
 }

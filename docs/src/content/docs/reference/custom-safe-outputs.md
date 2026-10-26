@@ -88,6 +88,39 @@ Custom safe outputs separate read and write operations: agents use read-only Mod
 
 ## Creating a Custom Safe Output
 
+### Recording execution outcomes
+
+Custom jobs can expose execution status and the canonical resource URI through
+two optional job output mappings:
+
+```yaml
+outputs:
+  status: ${{ steps.publish.outputs.status }}
+  url: ${{ steps.publish.outputs.url }}
+```
+
+The step with `id: publish` sets these outputs using `$GITHUB_OUTPUT` or
+`core.setOutput`. Set `status` to `success`, `failure`, `cancelled`, or `skipped`.
+Use `skipped` for staged previews and intentional no-ops. Set `url` only to the
+absolute URI returned by the service for the generated resource, never a URI
+suggested by the agent. These outputs describe one job-level outcome; a job
+processing multiple items must choose the resource it reports.
+
+Conclusion records a `safe_output.result` event in `usage/aw_session.jsonl` with
+`data.type` set to the normalized job name, `data.status`, and optional `data.url`.
+Without an explicit status, the Actions job result is used. Failed, cancelled,
+and skipped jobs cannot report successful resource creation, and their resource
+URLs are omitted. A successful job without a URL proves execution, not creation
+of an identifiable resource. Invalid status or URI values produce collection
+warnings without publishing their contents. Prepared work-queue adapters retain
+their separate effect-verification contract.
+
+Custom safe scripts use the handler return value instead of job outputs:
+return `{ success: true, url: canonicalResourceUri }` after the service confirms
+the operation. The manifest transports this status and URI to conclusion.
+Staged previews and deferred operations do not become successful resource events;
+script failures remain available as `safe_output.error` evidence.
+
 ### Step 1: Define the Shared Configuration
 
 In a shared file, define the read-only MCP server and the custom job together:

@@ -72,7 +72,7 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { captureExecutionEvidenceConfiguration, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -2057,6 +2057,7 @@ async function main() {
       // Unified retry loop for CLI and driver modes.
       // --continue is a CLI concept; in SDK mode retries always restart the session fresh.
       const retryRun = await runHarnessRetryLoop({
+        telemetryPath: resolveHarnessRetryTelemetryPath(),
         maxRetries,
         initialDelayMs,
         backoffMultiplier,
@@ -2117,7 +2118,10 @@ async function main() {
           return result;
         },
         handleFailure: async ({ attempt, result }) => {
-          if (result.runtimeGuardReason === "copilot_model_verification") return { action: "stop" };
+          if (result.runtimeGuardReason === "copilot_model_verification") {
+            result.failureClasses = ["copilot_model_verification"];
+            return { action: "stop" };
+          }
           // Determine whether to retry.
           // Retry whenever the session was partially executed (hasOutput).
           //   - CLI mode: retry with --continue so the Copilot CLI can continue from on-disk state.
@@ -2193,6 +2197,7 @@ async function main() {
             tokenCount,
           });
           const outputTail = extractOutputTail(result.output);
+          result.failureClasses = [failureClass];
           log(
             `attempt ${attempt + 1} failed:` +
               ` exitCode=${result.exitCode}` +

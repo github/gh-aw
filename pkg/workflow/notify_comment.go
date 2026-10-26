@@ -1,12 +1,14 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 var notifyCommentLog = logger.New("workflow:notify_comment")
@@ -124,10 +126,19 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	if err != nil {
 		return nil, fmt.Errorf("cannot serialize grader configuration: %w", err)
 	}
+	safeJobNames := configuredUsageSafeJobNames(data)
+	usageEnv := []string{gradersEnv}
+	if len(safeJobNames) > 0 {
+		namesJSON, err := json.Marshal(safeJobNames)
+		if err != nil {
+			return nil, fmt.Errorf("cannot serialize safe-job names: %w", err)
+		}
+		usageEnv = append(usageEnv, fmt.Sprintf("          GH_AW_SAFE_JOB_NAMES: %q\n", namesJSON), buildUsageSafeJobResultsEnv(safeJobNames, data.SafeOutputs.Jobs))
+	}
 	steps = append(steps, buildUsageArtifactCollectionStep(IsDetectionJobEnabled(data.SafeOutputs))...)
 	// Admission still runs in dry-run mode; record its decision without applying
 	// its budget to agent, detection, or evals execution.
-	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, gradersEnv)...)
+	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
 	if data.AdmissionEnabled {
 		steps = append(steps, c.buildConclusionAdmissionMetadataStep(data)...)
 	}
@@ -136,6 +147,18 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 	return steps, nil
+}
+
+func configuredUsageSafeJobNames(data *WorkflowData) []string {
+	var names []string
+	// Work-queue jobs only prepare adapters; they do not execute safe jobs.
+	if data.SafeOutputs != nil && !isWorkQueueParticipant(data) {
+		for name := range data.SafeOutputs.Jobs {
+			names = append(names, stringutil.NormalizeSafeOutputIdentifier(name))
+		}
+		slices.Sort(names)
+	}
+	return names
 }
 
 // computeConclusionJobPermissions resolves the GITHUB_TOKEN permissions for the conclusion
@@ -330,8 +353,10 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/agent/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/model-routing.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/execution.json\n",
+		"            /tmp/gh-aw/usage/agent/harness_retry.json\n",
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/execution.json\n",
+		"            /tmp/gh-aw/usage/detection/harness_retry.json\n",
 		"            /tmp/gh-aw/usage/detection/detection_result.json\n",
 		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/evals/execution.json\n",
@@ -389,6 +414,30 @@ func buildUsageArtifactCollectionStep(hasDetection bool) []string {
 	}
 	collectionStep = append(collectionStep, fmt.Sprintf("        run: bash \"%s/collect_usage_artifact_files.sh\"\n", SetupActionDestinationShell))
 	return collectionStep
+}
+
+func buildUsageSafeJobResultsEnv(safeJobNames []string, jobs map[string]*SafeJobConfig) string {
+	// Keep private dependency outputs outside the collector's environment.
+	// toJSON on each scalar preserves quotes and newlines in output values.
+	configured := make(map[string]*SafeJobConfig, len(jobs))
+	for name, config := range jobs {
+		configured[stringutil.NormalizeSafeOutputIdentifier(name)] = config
+	}
+	var results []string
+	for _, name := range safeJobNames {
+		fields := fmt.Sprintf("\"result\":${{ toJSON(needs.%s.result) }}", name)
+		var outputs []string
+		for _, field := range []string{"status", "url"} {
+			if config := configured[name]; config != nil {
+				if _, declared := config.Outputs[field]; declared {
+					outputs = append(outputs, fmt.Sprintf("%q:${{ toJSON(needs.%s.outputs.%s) }}", field, name, field))
+				}
+			}
+		}
+		fields += ",\"outputs\":{" + strings.Join(outputs, ",") + "}"
+		results = append(results, fmt.Sprintf("%q:{%s}", name, fields))
+	}
+	return fmt.Sprintf("          GH_AW_SAFE_JOB_RESULTS: %q\n", "{"+strings.Join(results, ",")+"}")
 }
 
 func buildUsageActivityGenerationStep(hasAdmission, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {

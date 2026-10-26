@@ -232,7 +232,7 @@ function eventDetail(event) {
     case "safe_output.request":
       return `${fields(data, ["type", "repo", "number"])} [requested, not executed]`;
     case "safe_output.result":
-      return `${fields(data, ["type", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
+      return `${fields(data, ["type", "status", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
     case "safe_output.error":
       return `${fields(data, ["type", "status", "errorCode", "message", "error"])}${Array.isArray(data.errors) ? ` errors=${data.errors.length} [${data.errors.map(error => fields(error, ["type", "errorCode"])).join("; ")}]` : ""}`;
     case "experiment.assignment":

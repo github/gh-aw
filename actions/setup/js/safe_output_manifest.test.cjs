@@ -324,6 +324,7 @@ describe("safe_output_manifest", () => {
       const item = extractCreatedItemFromResult("create_issue", result);
       expect(item).toEqual({
         type: "create_issue",
+        status: "success",
         url: "https://github.com/owner/repo/issues/42",
         number: 42,
         repo: "owner/repo",
@@ -388,6 +389,7 @@ describe("safe_output_manifest", () => {
       });
       expect(item).toEqual({
         type: "add_reviewer",
+        status: "success",
         number: 42,
         repo: "owner/repo",
         provider: "github",
@@ -431,6 +433,10 @@ describe("safe_output_manifest", () => {
       expect(item.number).toBe(42);
     });
 
+    it("should not record custom action preparation as an applied result", () => {
+      expect(extractCreatedItemFromResult("create_issue", { success: true, action_name: "create_issue", payload: "{}" })).toBeNull();
+    });
+
     it("should extract item from add_labels result (modification type without url)", () => {
       const result = {
         success: true,
@@ -468,6 +474,7 @@ describe("safe_output_manifest", () => {
       };
       expect(extractCreatedItemFromResult("submit_pull_request_review", finalizedResult)).toEqual({
         type: "submit_pull_request_review",
+        status: "success",
         url: "https://github.com/owner/repo/pull/1#pullrequestreview-2",
         number: 1,
         repo: "owner/repo",
