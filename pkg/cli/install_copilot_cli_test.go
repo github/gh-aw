@@ -145,7 +145,7 @@ func TestInstallCopilotCLIScriptMuslCacheRequiresReviewedManifest(t *testing.T) 
 			var archive bytes.Buffer
 			gzipWriter := gzip.NewWriter(&archive)
 			tarWriter := tar.NewWriter(gzipWriter)
-			binary := []byte("#!/usr/bin/env bash\necho 'copilot 1.0.101'\n")
+			binary := []byte("#!/usr/bin/env bash\necho 'copilot 1.0.103'\n")
 			require.NoError(t, tarWriter.WriteHeader(&tar.Header{Name: "copilot", Mode: 0o755, Size: int64(len(binary)), Typeflag: tar.TypeReg}))
 			_, err := tarWriter.Write(binary)
 			require.NoError(t, err)
@@ -166,8 +166,8 @@ func TestInstallCopilotCLIScriptMuslCacheRequiresReviewedManifest(t *testing.T) 
 			require.NoError(t, err)
 			lines := strings.Split(string(integrity), "\n")
 			for i, line := range lines {
-				if strings.HasPrefix(line, "github/copilot-cli v1.0.101 SHA256SUMS.txt ") {
-					lines[i] = fmt.Sprintf("github/copilot-cli v1.0.101 SHA256SUMS.txt %x", sha256.Sum256(manifest))
+				if strings.HasPrefix(line, "github/copilot-cli v1.0.103 SHA256SUMS.txt ") {
+					lines[i] = fmt.Sprintf("github/copilot-cli v1.0.103 SHA256SUMS.txt %x", sha256.Sum256(manifest))
 				}
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(tempDir, "release_integrity.sh"), []byte(strings.Join(lines, "\n")), 0o644))
@@ -184,10 +184,10 @@ done
 echo "$url" >> "$CURL_LOG"
 case "$url" in
   */compat.json)
-    printf '%s\n' '{"agent-compat-v1":{"copilot":[{"min-gh-aw":"0.0.0","max-gh-aw":"*","min-agent":"1.0.21","max-agent":"1.0.101"}]}}' > "$output"
+    printf '%s\n' '{"agent-compat-v1":{"copilot":[{"min-gh-aw":"0.0.0","max-gh-aw":"*","min-agent":"1.0.21","max-agent":"1.0.103"}]}}' > "$output"
     ;;
-  */v1.0.101/SHA256SUMS.txt) cp "$FIXTURE_CHECKSUMS" "$output" ;;
-  */v1.0.101/copilot-linux-x64.tar.gz|*/v1.0.101/copilot-linuxmusl-x64.tar.gz) cp "$FIXTURE_ARCHIVE" "$output" ;;
+  */v1.0.103/SHA256SUMS.txt) cp "$FIXTURE_CHECKSUMS" "$output" ;;
+  */v1.0.103/copilot-linux-x64.tar.gz|*/v1.0.103/copilot-linuxmusl-x64.tar.gz) cp "$FIXTURE_ARCHIVE" "$output" ;;
   *) echo "unexpected URL: $url" >&2; exit 97 ;;
 esac
 `), 0o755))
@@ -222,8 +222,8 @@ esac
 			if guestLibc == "musl" {
 				assert.Contains(t, string(output), "Skipping candidate (no reviewed manifest pin for musl guest: 1.0.97)")
 				assert.NotContains(t, string(output), "Activating cached Copilot CLI")
-				assert.Contains(t, string(curlOutput), "/v1.0.101/copilot-linux-x64.tar.gz")
-				assert.Contains(t, string(curlOutput), "/v1.0.101/copilot-linuxmusl-x64.tar.gz")
+				assert.Contains(t, string(curlOutput), "/v1.0.103/copilot-linux-x64.tar.gz")
+				assert.Contains(t, string(curlOutput), "/v1.0.103/copilot-linuxmusl-x64.tar.gz")
 				assert.Equal(t, binary, installed)
 				assert.NotContains(t, string(pathOutput), toolcacheBin)
 				staged, err := os.ReadFile(filepath.Join(runnerTemp, "gh-aw", "nvx-engine", "copilot"))
