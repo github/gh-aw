@@ -321,6 +321,24 @@ func embeddedFallbackAWMarkdownFiles() []string {
 	return awFiles
 }
 
+func removeCleanupPath(path, errorLabel, message string, verbose bool, remove func(string) error) error {
+	if err := remove(path); err != nil {
+		return fmt.Errorf("failed to remove %s: %w", errorLabel, err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, message)
+	}
+	return nil
+}
+
+func removeFileIfExists(path, errorLabel, message string, verbose bool) (bool, error) {
+	if !fileutil.FileExists(path) {
+		return false, nil
+	}
+	err := removeCleanupPath(path, errorLabel, message, verbose, os.Remove)
+	return err == nil, err
+}
+
 // cleanupOldPromptFile removes an old prompt file from .github/prompts/ if it exists
 func cleanupOldPromptFile(promptFileName string, verbose bool) error {
 	gitRoot, err := gitutil.FindGitRoot()
@@ -329,18 +347,8 @@ func cleanupOldPromptFile(promptFileName string, verbose bool) error {
 	}
 
 	oldPath := filepath.Join(gitRoot, ".github", "prompts", promptFileName)
-
-	// Check if the old file exists and remove it
-	if fileutil.FileExists(oldPath) {
-		if err := os.Remove(oldPath); err != nil {
-			return fmt.Errorf("failed to remove old prompt file: %w", err)
-		}
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed old prompt file: "+oldPath))
-		}
-	}
-
-	return nil
+	_, err = removeFileIfExists(oldPath, "old prompt file", console.FormatInfoMessage("Removed old prompt file: "+oldPath), verbose)
+	return err
 }
 
 // deleteAgenticWorkflowDesignerSkillDir removes the legacy
@@ -359,13 +367,8 @@ func deleteAgenticWorkflowDesignerSkillDir(verbose bool) error {
 		return nil // Already removed, nothing to do
 	}
 
-	if err := os.RemoveAll(designerDir); err != nil {
-		return fmt.Errorf("failed to remove legacy agentic-workflow-designer skill directory: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed legacy skill directory: "+designerDir))
-	}
-	return nil
+	return removeCleanupPath(designerDir, "legacy agentic-workflow-designer skill directory",
+		console.FormatInfoMessage("Removed legacy skill directory: "+designerDir), verbose, os.RemoveAll)
 }
 
 // deleteSetupAgenticWorkflowsAgent deletes the setup-agentic-workflows.agent.md file if it exists
@@ -377,14 +380,9 @@ func deleteSetupAgenticWorkflowsAgent(verbose bool) error {
 
 	agentPath := filepath.Join(gitRoot, ".github", "agents", "setup-agentic-workflows.agent.md")
 
-	// Check if the file exists and remove it
-	if fileutil.FileExists(agentPath) {
-		if err := os.Remove(agentPath); err != nil {
-			return fmt.Errorf("failed to remove setup-agentic-workflows agent: %w", err)
-		}
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Removed setup-agentic-workflows agent: %s\n", agentPath)
-		}
+	if _, err := removeFileIfExists(agentPath, "setup-agentic-workflows agent",
+		"Removed setup-agentic-workflows agent: "+agentPath, verbose); err != nil {
+		return err
 	}
 
 	// Also clean up the old prompt file if it exists
@@ -422,14 +420,13 @@ func deleteOldTemplateFiles(verbose bool) error {
 	removedCount := 0
 	for _, file := range templateFiles {
 		path := filepath.Join(templatesDir, file)
-		if fileutil.FileExists(path) {
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to remove old template file %s: %w", file, err)
-			}
+		removed, err := removeFileIfExists(path, "old template file "+file,
+			console.FormatInfoMessage("Removed old template file: "+path), verbose)
+		if err != nil {
+			return err
+		}
+		if removed {
 			removedCount++
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed old template file: "+path))
-			}
 		}
 	}
 
@@ -437,12 +434,8 @@ func deleteOldTemplateFiles(verbose bool) error {
 	if removedCount > 0 {
 		entries, err := os.ReadDir(templatesDir)
 		if err == nil && len(entries) == 0 {
-			if err := os.Remove(templatesDir); err != nil {
-				return fmt.Errorf("failed to remove empty templates directory: %w", err)
-			}
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Removed empty templates directory: "+templatesDir))
-			}
+			return removeCleanupPath(templatesDir, "empty templates directory",
+				console.FormatInfoMessage("Removed empty templates directory: "+templatesDir), verbose, os.Remove)
 		}
 	}
 
@@ -477,13 +470,9 @@ func deleteLegacyAgentFiles(verbose bool) error {
 	for subdir, files := range filesToDelete {
 		for _, file := range files {
 			path := filepath.Join(gitRoot, ".github", subdir, file)
-			if fileutil.FileExists(path) {
-				if err := os.Remove(path); err != nil {
-					return fmt.Errorf("failed to remove old %s file %s: %w", subdir, file, err)
-				}
-				if verbose {
-					fmt.Fprintf(os.Stderr, "Removed old %s file: %s\n", subdir, path)
-				}
+			if _, err := removeFileIfExists(path, "old "+subdir+" file "+file,
+				fmt.Sprintf("Removed old %s file: %s", subdir, path), verbose); err != nil {
+				return err
 			}
 		}
 	}
