@@ -21,14 +21,14 @@ const mockCore = { info: vi.fn(), setFailed: vi.fn() };
 global.core = mockCore;
 
 describe("push_repo_memory.cjs - nested memory persistence", () => {
-  it("pushes nested files matching recursive globs and warns with skipped paths", async () => {
+  it.each(["saved", "unchanged"])("reports %s for nested files matching recursive globs", async status => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-nested-"));
     const artifactDir = path.join(tempDir, "artifact");
     const workspaceDir = path.join(tempDir, "workspace");
-    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn(), setOutput: vi.fn() };
     const pushSignedCommits = vi.fn().mockResolvedValue(undefined);
     const execGitSync = vi.fn(args => {
-      if (args[0] === "status") return "?? archive/deep/history.jsonl\n?? state.json\n";
+      if (args[0] === "status") return status === "saved" ? "?? archive/deep/history.jsonl\n?? state.json\n" : "";
       if (args[0] === "rev-parse") return "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n";
       return "";
     });
@@ -77,8 +77,13 @@ describe("push_repo_memory.cjs - nested memory persistence", () => {
       expect(fs.readFileSync(path.join(workspaceDir, "archive", "deep", "history.jsonl"), "utf8")).toBe('{"id":1}\n');
       expect(fs.existsSync(path.join(workspaceDir, "state.json"))).toBe(true);
       expect(fs.existsSync(path.join(workspaceDir, "archive", "ignored.md"))).toBe(false);
-      expect(execGitSync).toHaveBeenCalledWith(["add", "--sparse", "--", ":(literal)archive/deep/history.jsonl", ":(literal)state.json"], { stdio: "inherit", cwd: workspaceDir });
-      expect(pushSignedCommits).toHaveBeenCalledOnce();
+      if (status === "saved") {
+        expect(execGitSync).toHaveBeenCalledWith(["add", "--sparse", "--", ":(literal)archive/deep/history.jsonl", ":(literal)state.json"], { stdio: "inherit", cwd: workspaceDir });
+        expect(pushSignedCommits).toHaveBeenCalledOnce();
+      } else {
+        expect(pushSignedCommits).not.toHaveBeenCalled();
+      }
+      expect(core.setOutput).toHaveBeenLastCalledWith("save_status", status);
       expect(core.warning).toHaveBeenCalledOnce();
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("archive/ignored.md (no pattern matched)"));
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('archive/ignored.bin (disallowed extension ".bin")'));
@@ -1655,6 +1660,7 @@ describe("push_repo_memory.cjs - shell injection security tests", () => {
 
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Memory directory not found"));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("save_status", "skipped");
     });
 
     it("should allow default repository without allowlist", async () => {
@@ -2015,7 +2021,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
     const otherDir = path.join(rootDir, "other");
     const artifactDir = path.join(rootDir, "artifact");
     const branchName = "memory/shared";
-    const core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn(), setOutput: vi.fn() };
     const git = (args, cwd = workspaceDir) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" });
     const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
     const require = createRequire(import.meta.url);
@@ -2120,6 +2126,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
 
       expect(core.setFailed).not.toHaveBeenCalled();
       expect(pushSignedCommits).toHaveBeenCalledTimes(2);
+      expect(core.setOutput).toHaveBeenLastCalledWith("save_status", "saved");
       expect(git(["status", "--porcelain"])).toBe("");
       expect(fs.existsSync(path.join(workspaceDir, "ignored.bin"))).toBe(false);
     } finally {

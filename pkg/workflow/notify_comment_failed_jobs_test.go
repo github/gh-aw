@@ -10,6 +10,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestConclusionMemorySaveEnvironment(t *testing.T) {
+	compiler := NewCompiler()
+	for _, memories := range [][]RepoMemoryEntry{nil, {{ID: "default"}, {ID: "notes"}}} {
+		data := &WorkflowData{
+			SafeOutputs:      &SafeOutputsConfig{},
+			RepoMemoryConfig: &RepoMemoryConfig{Memories: memories},
+		}
+		job, err := compiler.buildConclusionJob(data, "agent", nil)
+		require.NoError(t, err)
+		env := buildRenderedJobEnv(job)
+		if len(memories) == 0 {
+			require.NotContains(t, env, "GH_AW_MEMORY_SAVE_RESULTS")
+			continue
+		}
+		var metadata string
+		require.NoError(t, json.Unmarshal([]byte(env["GH_AW_MEMORY_SAVE_RESULTS"]), &metadata))
+		var results map[string]map[string]string
+		require.NoError(t, json.Unmarshal([]byte(metadata), &results))
+		require.Len(t, results, len(memories))
+		for _, memory := range memories {
+			require.Equal(t, map[string]string{
+				"jobResult": "${{ needs.push_repo_memory.result }}",
+				"outcome":   fmt.Sprintf("${{ needs.push_repo_memory.outputs.save_outcome_%s }}", memory.ID),
+				"status":    fmt.Sprintf("${{ needs.push_repo_memory.outputs.save_status_%s }}", memory.ID),
+			}, results[memory.ID])
+		}
+		require.NotContains(t, metadata, "validation_error")
+	}
+}
+
 func TestConclusionJobResultsEnvironmentExcludesOutputs(t *testing.T) {
 	compiler := NewCompiler()
 	job, err := compiler.buildConclusionJob(&WorkflowData{

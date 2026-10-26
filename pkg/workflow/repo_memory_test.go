@@ -18,6 +18,8 @@ func TestBuildPushRepoMemoryOutputsExcludesLedgerCompaction(t *testing.T) {
 	})
 
 	assert.NotContains(t, outputs, "ledger_compaction")
+	assert.Equal(t, "${{ steps.push_repo_memory_default.outputs.save_status }}", outputs["save_status_default"])
+	assert.Equal(t, "${{ steps.push_repo_memory_default.outcome }}", outputs["save_outcome_default"])
 }
 
 // TestRepoMemoryConfigDefault tests basic repo-memory configuration with boolean true

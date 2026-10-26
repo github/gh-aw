@@ -351,6 +351,7 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
  */
 
 async function main() {
+  core.setOutput("save_status", "skipped");
   const artifactDir = process.env.ARTIFACT_DIR;
   const memoryId = process.env.MEMORY_ID;
   const targetRepo = process.env.TARGET_REPO;
@@ -901,6 +902,7 @@ async function main() {
 
   if (changedFileCount === 0) {
     core.info("No changes detected after copying files");
+    core.setOutput("save_status", "unchanged");
     await writeLedgerSummary();
     return;
   }
@@ -1025,6 +1027,7 @@ async function main() {
           }
         : undefined,
   });
+  if (ledgerActivity.saving.pushed) core.setOutput("save_status", "saved");
   await writeLedgerSummary();
 }
 

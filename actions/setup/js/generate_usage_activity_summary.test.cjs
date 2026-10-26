@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -32,6 +32,34 @@ const {
 describe("generate_usage_activity_summary.cjs", () => {
   it("exports its main function for github-script execution", () => {
     expect(typeof main).toBe("function");
+  });
+
+  it.each([true, false])("includes only observed memory save results in the conclusion payload (configured: %s)", async configured => {
+    const originalEnv = { ...process.env };
+    const originalCore = global.core;
+    try {
+      delete process.env.GH_AW_DETECTION_JOB_RESULT;
+      delete process.env.GITHUB_STEP_SUMMARY;
+      delete process.env.GH_AW_MEMORY_SAVE_RESULTS;
+      if (configured) {
+        process.env.GH_AW_MEMORY_SAVE_RESULTS = JSON.stringify({ default: { jobResult: "success", outcome: "success", status: "saved", content: "PRIVATE_MEMORY" } });
+      }
+      global.core = { info: vi.fn(), warning: vi.fn() };
+      vi.spyOn(fs, "existsSync").mockReturnValue(false);
+      const writes = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+      await main();
+      const payload = JSON.parse(writes.mock.calls.find(([file]) => file === "/tmp/gh-aw/usage/activity/summary.json")[1]);
+      if (configured) {
+        expect(payload.memory_saves).toEqual([{ memoryId: "default", jobResult: "success", outcome: "success", status: "saved" }]);
+        expect(JSON.stringify(payload)).not.toContain("PRIVATE_MEMORY");
+      } else {
+        expect(payload).not.toHaveProperty("memory_saves");
+      }
+    } finally {
+      vi.restoreAllMocks();
+      process.env = originalEnv;
+      global.core = originalCore;
+    }
   });
 });
 
