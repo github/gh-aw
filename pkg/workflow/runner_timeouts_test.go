@@ -158,6 +158,7 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 		wantTimeout int
 		wantComment string
 		wantError   bool
+		wantField   string
 	}{
 		{
 			name:        "API-only safe outputs use slim runner with capped default timeout",
@@ -176,6 +177,13 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 		{
 			name:        "explicit slim runner caps implicit timeout",
 			frontmatter: "runs-on-slim: ubuntu-slim\nsafe-outputs:\n  add-comment:\n",
+			jobName:     "safe_outputs",
+			wantRunner:  "ubuntu-slim",
+			wantTimeout: 15,
+		},
+		{
+			name:        "explicit safe output slim runner caps implicit timeout",
+			frontmatter: "safe-outputs:\n  runs-on: ubuntu-slim\n  add-comment:\n",
 			jobName:     "safe_outputs",
 			wantRunner:  "ubuntu-slim",
 			wantTimeout: 15,
@@ -207,11 +215,25 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 			name:        "explicit slim override is rejected",
 			frontmatter: "runs-on-slim: ubuntu-slim\nsafe-outputs:\n  timeout-minutes: 30\n  add-comment:\n",
 			wantError:   true,
+			wantField:   "runs-on-slim",
+		},
+		{
+			name:        "explicit safe output slim override identifies runner field",
+			frontmatter: "safe-outputs:\n  runs-on: ubuntu-slim\n  timeout-minutes: 30\n  add-comment:\n",
+			wantError:   true,
+			wantField:   "safe-outputs.runs-on",
+		},
+		{
+			name:        "explicit detection slim override identifies runner field",
+			frontmatter: "safe-outputs:\n  add-comment:\n  threat-detection:\n    runs-on: ubuntu-slim\njobs:\n  detection:\n    timeout-minutes: 30\n",
+			wantError:   true,
+			wantField:   "safe-outputs.threat-detection.runs-on",
 		},
 		{
 			name:        "custom job over limit is rejected",
 			frontmatter: "jobs:\n  custom:\n    runs-on: ubuntu-slim\n    timeout-minutes: 16\n    steps:\n      - run: echo hello\n",
 			wantError:   true,
+			wantField:   "jobs.custom.runs-on",
 		},
 		{
 			name:        "custom job timeout expression is ignored",
@@ -229,6 +251,7 @@ func TestCompileUbuntuSlimTimeout(t *testing.T) {
 			output, err := c.CompileToYAML(data, "slim-timeout.md")
 			if tt.wantError {
 				require.ErrorContains(t, err, "ubuntu-slim supports at most 15 minutes")
+				assert.Contains(t, err.Error(), "set "+tt.wantField+" to ubuntu-latest")
 				return
 			}
 			require.NoError(t, err)
