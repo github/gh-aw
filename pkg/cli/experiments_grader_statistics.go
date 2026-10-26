@@ -155,7 +155,16 @@ func welchTTest(control, variant []float64) (float64, error) {
 	standardErrorSquared := controlTerm + variantTerm
 	difference := variantMean - controlMean
 	if standardErrorSquared == 0 {
-		if difference == 0 {
+		var controlValue, variantValue float64
+		for _, value := range control {
+			controlValue = value
+			break
+		}
+		for _, value := range variant {
+			variantValue = value
+			break
+		}
+		if controlValue == variantValue {
 			return 1, nil
 		}
 		return 0, nil

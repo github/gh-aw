@@ -520,6 +520,12 @@ func TestWelchTTest(t *testing.T) {
 			wantPValue: 1,
 		},
 		{
+			name:       "equal zero variance samples with unequal sizes",
+			control:    []float64{0.1, 0.1},
+			variant:    []float64{0.1, 0.1, 0.1},
+			wantPValue: 1,
+		},
+		{
 			name:       "different zero variance samples",
 			control:    []float64{0.5, 0.5, 0.5},
 			variant:    []float64{0.8, 0.8, 0.8},
