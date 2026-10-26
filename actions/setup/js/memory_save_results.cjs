@@ -22,7 +22,7 @@ function readMemorySaveResults(value = process.env.GH_AW_MEMORY_SAVE_RESULTS) {
       const outcome = ["success", "failure", "cancelled", "skipped"].includes(result.outcome) ? result.outcome : undefined;
       /** @type {import("./types/unified_session").MemorySaveResultData["status"]} */
       let status = "unknown";
-      if (outcome && outcome !== "skipped" && ["saved", "unchanged"].includes(result.status)) status = result.status;
+      if (outcome !== "skipped" && result.jobResult !== "skipped" && ["saved", "unchanged"].includes(result.status)) status = result.status;
       else if (outcome === "failure" || outcome === "cancelled") status = outcome;
       else if (outcome === "skipped" || (outcome === undefined && ["skipped", "cancelled"].includes(result.jobResult))) status = outcome ?? result.jobResult;
       else if (outcome === "success" && ["saved", "unchanged", "skipped"].includes(result.status)) status = result.status;

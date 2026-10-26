@@ -125,7 +125,7 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 		`GH_AW_INFO_AGENT_VERSION: "` + string(constants.DefaultCopilotVersion) + `"`,
 		`run: npm install --ignore-scripts -g @openai/codex@` + string(constants.DefaultCodexVersion),
 		`run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@` + string(constants.DefaultPiVersion),
-		`{"pinnedAwf":"v0.5.0","pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0","pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"}`,
+		`{"pinnedAwf":"v0.4.9","pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.4.9","pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"}`,
 	}, "\n")
 
 	normalized := normalizeOutput(input)
@@ -155,8 +155,8 @@ func TestNormalizeOutput_DefaultRuntimeVersions(t *testing.T) {
 	require.Contains(t, normalized, `GH_AW_INFO_AGENT_VERSION: "COPILOT_VERSION"`)
 	require.Contains(t, normalized, `@openai/codex@CODEX_VERSION`)
 	require.Contains(t, normalized, `@earendil-works/pi-coding-agent@PI_VERSION`)
-	require.Contains(t, normalized, `"pinnedAwf":"v0.5.0"`)
-	require.Contains(t, normalized, `"pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.5.0"`)
+	require.Contains(t, normalized, `"pinnedAwf":"v0.4.9"`)
+	require.Contains(t, normalized, `"pinnedAwfImage":"ghcr.io/github/gh-aw-firewall/agent:0.4.9"`)
 	require.Contains(t, normalized, `"pinnedMcpgImage":"ghcr.io/github/gh-aw-mcpg:v0.0.12"`)
 	require.NotContains(t, normalized, string(constants.DefaultFirewallVersion))
 	require.NotContains(t, normalized, string(constants.DefaultMCPGatewayVersion))

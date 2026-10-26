@@ -17,6 +17,10 @@ const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = requ
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
+function setOutput(name, value) {
+  if (typeof core.setOutput === "function") core.setOutput(name, value);
+}
+
 function redactFailureSummary(message) {
   let safeMessage = String(message);
   for (const secret of [process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN]) {
@@ -352,7 +356,7 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
  */
 
 async function main() {
-  core.setOutput("save_status", "skipped");
+  setOutput("save_status", "skipped");
   const artifactDir = process.env.ARTIFACT_DIR;
   const memoryId = process.env.MEMORY_ID;
   const targetRepo = process.env.TARGET_REPO;
@@ -856,8 +860,8 @@ async function main() {
       if (customValidation.stderr) {
         core.error(`Custom repo-memory validation stderr:\n${redactFailureSummary(customValidation.stderr)}`);
       }
-      core.setOutput("validation_failed", "true");
-      core.setOutput("validation_error", errorMessage);
+      setOutput("validation_failed", "true");
+      setOutput("validation_error", errorMessage);
       await setPushRepoMemoryFailure(errorMessage);
       return;
     }
@@ -903,7 +907,7 @@ async function main() {
 
   if (changedFileCount === 0) {
     core.info("No changes detected after copying files");
-    core.setOutput("save_status", "unchanged");
+    setOutput("save_status", "unchanged");
     await writeLedgerSummary();
     return;
   }
@@ -963,7 +967,7 @@ async function main() {
       } catch (statError) {
         core.warning(`Could not retrieve diff stat: ${getErrorMessage(statError)}`);
       }
-      core.setOutput("patch_size_exceeded", "true");
+      setOutput("patch_size_exceeded", "true");
       await setPushRepoMemoryFailure(
         `Patch diff size (${patchSizeKb} KB, ${patchSizeBytes} bytes) exceeds maximum allowed size (${effectiveMaxPatchSizeKb} KB, ${effectiveMaxPatchSize} bytes, configured limit: ${maxPatchSizeKb} KB with 20% overhead allowance). Reduce the number or size of changes, or increase max-patch-size.`
       );
@@ -1030,11 +1034,11 @@ async function main() {
   });
   ledgerActivity.saving.pushed = Boolean(pushedCommit);
   if (pushedCommit) {
-    core.setOutput("save_branch", branchName);
-    core.setOutput("save_commit", pushedCommit);
-    core.setOutput("save_status", "saved");
+    setOutput("save_branch", branchName);
+    setOutput("save_commit", pushedCommit);
+    setOutput("save_status", "saved");
   } else if (pushedCommit !== false) {
-    core.setOutput("save_status", "unchanged");
+    setOutput("save_status", "unchanged");
   }
   await writeLedgerSummary();
 }

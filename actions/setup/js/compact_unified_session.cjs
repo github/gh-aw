@@ -20,6 +20,7 @@ const EVENT_FIELDS = {
   "guardrail.admission": ["status", "maxAiCredits", "threatDetectionMaxAiCredits", "evalsMaxAiCredits"],
   "guardrail.daily_aic": ["status", "exceeded", "total", "estimated", "threshold"],
   "workflow.job_result": ["jobId", "result", "durationMs"],
+  "memory.push": ["memoryId", "jobResult", "outcome", "status", "branch", "commit"],
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
   "grader.result": ["id", "status", "value", "score", "unit", "passed", "direction", "threshold", "enabled", "min", "max", "version"],
 };

@@ -12,6 +12,7 @@ import {
   getCustomValidationFailureDetail,
   isDeterministicPushValidationError,
   isUntrustedLedgerArtifact,
+  main,
   pushRepoMemoryChangesWithRetry,
   redactFailureSummary,
   setPushRepoMemoryFailure,
@@ -98,11 +99,29 @@ describe("push_repo_memory.cjs - nested memory persistence", () => {
         expect(core.setOutput).not.toHaveBeenCalledWith("save_branch", expect.anything());
         expect(core.setOutput).not.toHaveBeenCalledWith("save_commit", expect.anything());
       }
+      if (pushedCommit === undefined) expect(core.setOutput).not.toHaveBeenCalledWith("save_status", "saved");
       expect(core.warning).toHaveBeenCalledOnce();
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("archive/ignored.md (no pattern matched)"));
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('archive/ignored.bin (disallowed extension ".bin")'));
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("handles validation errors when core.setOutput is unavailable", async () => {
+    const previousCore = global.core;
+    const previousMaxFileSize = process.env.MAX_FILE_SIZE;
+    const coreWithoutSetOutput = { info: vi.fn(), setFailed: vi.fn() };
+    global.core = coreWithoutSetOutput;
+    process.env.MAX_FILE_SIZE = "0";
+
+    try {
+      await main();
+      expect(coreWithoutSetOutput.setFailed).toHaveBeenCalledWith("Memory size, count, patch size, and validation timeout limits must be positive integers");
+    } finally {
+      if (previousMaxFileSize === undefined) delete process.env.MAX_FILE_SIZE;
+      else process.env.MAX_FILE_SIZE = previousMaxFileSize;
+      global.core = previousCore;
     }
   });
 });
