@@ -41,5 +41,6 @@ func FlattenEvent(evt AgentEvent, excludeFields []string) string {
 // StageSequence converts a slice of AgentEvents into a space-separated string
 // of their stage names, e.g. "plan tool_call tool_result finish".
 func StageSequence(events []AgentEvent) string {
+	eventLog.Printf("Building stage sequence from %d event(s)", len(events))
 	return strings.Join(sliceutil.Map(events, func(e AgentEvent) string { return e.Stage }), " ")
 }
