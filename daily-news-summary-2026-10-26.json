@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-26",
+  "window_start": "2026-09-27",
+  "window_end": "2026-10-26",
+  "snapshot_utc": "2026-10-26T08:57:00Z",
+  "open_issues_sample": 100,
+  "human_open_issues": 5,
+  "closed_issues_sample": 100,
+  "open_prs": 11,
+  "merged_prs_sample": 50,
+  "merged_since_last_digest": 48,
+  "commits_unique": 19206,
+  "commits_30d": 1244,
+  "commits_today_partial": 3,
+  "discussions": 50,
+  "discussions_created_today": 11,
+  "changesets": 883,
+  "releases_30d": 30,
+  "latest_release": "v0.93.6",
+  "top_commit_authors_30d": [["Copilot", 501], ["Peli de Halleux", 483], ["github-actions[bot]", 190], ["dependabot[bot]", 36], ["Don Syme", 15]],
+  "notes": "Partial morning snapshot. Four releases since 2026-10-23 digest: v0.93.3 to v0.93.6. Issue and PR series are sample-capped."
+}

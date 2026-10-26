@@ -1,10 +1,12 @@
 {
-  "date": "2026-10-23",
-  "latest_release": "v0.93.2",
-  "also_released": ["v0.93.1"],
-  "commits_30d": 1195,
-  "commits_today_partial": 11,
-  "open_prs": 6,
+  "date": "2026-10-26",
+  "latest_release": "v0.93.6",
+  "also_released_since_last": ["v0.93.3", "v0.93.4", "v0.93.5"],
+  "commits_30d": 1244,
+  "commits_today_partial": 3,
+  "open_prs": 11,
   "open_issues_sample": 100,
-  "changesets": 876
+  "changesets": 883,
+  "releases_30d": 30,
+  "snapshot_utc": "2026-10-26T08:57:00Z"
 }
