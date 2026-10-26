@@ -1,0 +1,80 @@
+---
+title: AI Transparency
+description: Intended uses, limitations, safeguards, and responsible deployment considerations for GitHub Agentic Workflows.
+sidebar:
+  order: 3
+---
+
+## What is a transparency note?
+
+An AI system includes the technology, the people who use or are affected by it, and the environment in which it operates. This note describes the intended uses, behavior, limitations, and responsible deployment considerations for GitHub Agentic Workflows (`gh-aw`). It is about the framework, not a certification of any particular workflow, model, or third-party integration. Workflow authors and repository owners determine the instructions, inputs, tools, credentials, AI engine, and permitted actions for their deployments.
+
+## The basics of GitHub Agentic Workflows
+
+GitHub Agentic Workflows lets developers define AI-assisted repository automation in Markdown with YAML frontmatter. The `gh aw compile` command generates a `.lock.yml` GitHub Actions workflow. GitHub Actions supplies triggers, runners, logs, and job orchestration; an AI engine interprets the Markdown instructions, uses configured tools, and may request configured outputs. The Markdown instructions can be changed for the next run, while changes to frontmatter require recompilation. Review the compiled file as well as the source before deployment. See [how it works](/gh-aw/introduction/how-they-work/) and the [FAQ](/gh-aw/reference/faq/).
+
+## Key terms
+
+**Workflow author:** The person or team specifying triggers, instructions, tools, permissions, and outputs.
+
+**AI engine:** A language-model-powered agent that interprets instructions. GitHub Copilot is the default; other supported AI engines use their own language models and identity authentication.
+
+**Tool or MCP server:** A capability the workflow makes available to the agent, potentially including access to GitHub or external services.
+
+**Safe output:** An explicitly configured, structured action, such as creating an issue or pull request,  executed by a separate job with scoped  permissions instead of the agent executing the job directly. For example, an agent wants to write a comment in a repository. With safe outputs, the agent would first create a file with the comment and then your configured, structured action will review whether agents can write within that repository. If the agent has permission, then that comment will be posted.   Some workflows can instead grant direct write access or use custom jobs. 
+
+**Untrusted content:** Material such as issue descriptions, pull requests, comments, repository files, or external tool responses that may contain errors or instructions intended to redirect the agent.
+
+## Capabilities and intended uses
+
+Agentic workflows are intended for repository tasks that benefit from interpretation or generation: issue triage, documentation drafting, dependency research, summarizing repository activity, investigating failures, and proposing code changes for review. Workflows can run on schedules or GitHub events, read permitted repository context, use configured tools, and produce reports or proposed changes. Agentic workflows complement, rather than replace, deterministic GitHub Actions steps for reproducible builds, tests, linting, and deployments. See the [FAQ](/gh-aw/reference/faq/).
+
+Results are not deterministic. What the agent can see and do depends on the workflow configuration, repository permissions, selected engine and model, available context, and tool responses. A workflow may automatically post an issue or comment through a safe output; safe output does not mean a person approved the content. A pull request is a proposal, not a verified or merged change. Human approval can be required for sensitive writes using GitHub Environment protection rules, but is not universal.
+
+## Uses requiring particular caution
+
+Do not treat generated classifications, explanations, security findings, or code as authoritative without appropriate review. In particular, do not use a workflow as the sole decision-maker for access control, security incident response, employment or other consequential decisions about people, or changes to production systems. For these uses, assess applicable policies and obligations, keep a human decision-maker in the loop, and use deterministic enforcement where possible. Avoid ingesting sensitive personal data or secrets unless necessary, permitted, and protected throughout the selected tools, engine, logs, and outputs.
+
+Workflows that process public contributions can affect contributors through mistaken labels, inaccurate comments, unfair prioritization, or unwanted public disclosure. Review who may be affected, provide a correction path, and monitor whether errors are concentrated on particular kinds of contributors or content. Restrictive trust filters can reduce exposure to malicious inputs but can also hide legitimate contributions from the agent.
+
+## Limitations and risks
+
+**Accuracy and variability:** An AI engine may hallucinate facts or citations, misread repository context, overlook relevant files, introduce bugs, or produce different results on repeated runs. Model updates, prompt changes, context limits, and tool availability may change behavior.
+
+**Prompt injection:** Untrusted repository content and external responses may attempt to override workflow instructions or induce unsafe actions. Filtering and detection reduce risk but cannot guarantee immunity.
+
+**Security and privacy:** A workflow can expose data to its selected AI provider, enabled tools, allowed network destinations, or published outputs. The data path and provider terms vary with the engine and configuration; do not assume every workflow uses GitHub Copilot services or that enabling a sandbox alone prevents disclosure. Tokens, logs, artifacts, and any custom steps or jobs need separate review.
+
+**Permissions and automation:** Read-only agent permissions do not prevent configured safe-output jobs from making writes. Authors may also explicitly grant direct write permissions, add privileged custom jobs, disable safeguards, or provide powerful external credentials. Automated posts can contain errors even when the write mechanism works as designed.
+
+**Coverage and fairness:** Incomplete context, language or domain differences, access restrictions, and integrity filtering can cause missed issues or uneven triage. There is no single accuracy or fairness level that applies to every workflow and engine.
+
+See the [GitHub Docs](https://docs.github.com/en/copilot/responsible-use/copilot-coding-agent) for more information about the limitations and risks of agents more generally.
+
+## Safeguards and their boundaries
+
+Agentic Workflows uses compilation-time validation, sandboxing and network controls, tool restrictions, permission separation, and output sanitization. In the supported default agent path, the agent does not receive repository write permissions or repository secrets automatically.
+
+The Agent Workflow Firewall is the default sandbox, and built-in safe outputs apply configured writes in separate scoped jobs. When safe outputs are configured, threat detection runs by default before they are applied; a hard threat blocks the write, while a warning can allow an output to proceed and requires human review. Sanitization and protected-file rules provide additional constraints for applicable outputs.
+
+These controls have limits and configuration exceptions. Authors can change or disable some controls, choose network destinations, enable tools or credentials, and add custom jobs that do not inherit all built-in safe-output protections. Integrity filtering can limit which GitHub content reaches the agent; for public repositories the runtime default is `min-integrity: approved`, which authors can relax when a use case requires external contributions. None of these mechanisms verifies that an output is factually correct, fair, or fit for a particular decision.
+
+For more details, see the [Agentic Workflows security architecture](/gh-aw/introduction/architecture/).
+
+## Evaluating and integrating a workflow
+
+The effectiveness of a deployment must be measured per workflow and configuration. This note does not assert product-wide accuracy, prompt-injection resistance, fairness, or security evaluation results; no such quantitative results are established here. Before enabling a workflow:
+
+1. Define its task, affected users, permissible data, expected outputs, and what must always require a person or deterministic check.
+2. Review both the Markdown source and compiled `.lock.yml`, including triggers, engine and provider, tool and MCP access, secrets, network allowlist, write permissions, safe outputs, and custom steps or jobs. Scope credentials to the minimum necessary.
+3. Trial the workflow on representative and adversarial inputs, including incomplete or multilingual content, misleading repository text, prompt injection, and sensitive data. Check factual accuracy, missed and false-positive triage decisions, unsafe code suggestions, data exposure, and how failures are surfaced. Compare outcomes across relevant contributor groups where appropriate.
+4. Record the test set, review process, results, acceptable thresholds, and owners for the specific workflow before wider rollout. For impactful writes, use branch protection, required reviews, and/or an environment approval gate rather than relying on AI or threat detection alone.
+5. Monitor Actions logs and outputs after deployment, provide a way to report or correct mistakes, and re-evaluate when instructions, models, tools, permissions, or data sources change. Follow the applicable provider's data-handling terms and your organization's retention and privacy policies.
+
+## Further reading
+
+- [GitHub Agentic Workflows FAQ](/gh-aw/reference/faq/)
+- [How GitHub Agentic Workflows work](/gh-aw/introduction/how-they-work/)
+- [Security architecture](/gh-aw/introduction/architecture/)
+- [Safe outputs and threat detection](/gh-aw/reference/safe-outputs/)
+- [Microsoft Responsible AI principles](https://www.microsoft.com/ai/principles-and-approach)
