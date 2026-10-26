@@ -392,6 +392,7 @@ export default defineConfig({
             { label: "What are Agentic Workflows?", link: "/introduction/overview/" },
             { label: "How Agentic Workflows Work", link: "/introduction/how-they-work/" },
             { label: "Security Architecture", link: "/introduction/architecture/" },
+            { label: "AI Transparency Notice", link: "/introduction/ai-transparency/" },
           ],
         },
         {
