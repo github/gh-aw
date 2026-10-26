@@ -5,7 +5,7 @@ sidebar:
   badge: { text: 'Batch processing', variant: 'caution' }
 ---
 
-BatchOps is a pattern for processing large volumes of work items efficiently. Instead of iterating sequentially through hundreds of items in a single workflow run, BatchOps splits work into chunks, parallelizes where possible, handles partial failures gracefully, and aggregates results into a consolidated report.
+BatchOps processes large volumes of work items by splitting them into chunks, parallelizing where possible, tolerating partial failures, and aggregating results into one report.
 
 ```mermaid
 flowchart LR
@@ -17,16 +17,14 @@ flowchart LR
 
 | Scenario | Recommendation |
 |----------|----------------|
-| < 50 items, order matters | Sequential ([WorkQueueOps](/gh-aw/patterns/workqueue-ops/)) |
-| 50–500 items, order doesn't matter | BatchOps with chunked processing |
+| < 50 items, order matters, or items depend on each other | Sequential ([WorkQueueOps](/gh-aw/patterns/workqueue-ops/)) |
+| 50–500 independent items | BatchOps with chunked processing |
 | > 500 items, high parallelism safe | BatchOps with matrix fan-out |
-| Items have dependencies on each other | Sequential (WorkQueueOps) |
-| Items are fully independent | BatchOps (any strategy) |
 | Strict rate limits or quotas | Rate-limit-aware batching |
 
 ## Batch Strategy 1: Chunked Processing
 
-Split work into fixed-size pages using `GITHUB_RUN_NUMBER`. Each run processes one page, picking up the next slice on the next scheduled run. Items must have a stable sort key (creation date, issue number) so pagination is deterministic.
+Split work into fixed-size pages using `GITHUB_RUN_NUMBER`; each scheduled run processes the next page. Items need a stable sort key (creation date, issue number) so pagination is deterministic.
 
 ```mermaid
 flowchart LR
@@ -34,8 +32,6 @@ flowchart LR
     fetch --> agent[AI processes batch]
     agent --> next([Run N+1, next page])
 ```
-
-Example workflow:
 
 ```aw wrap title=".github/workflows/stale-processor.md"
 ---
@@ -73,13 +69,13 @@ steps:
 This run covers offset ${{ steps.compute-page.outputs.page_offset }} with page size ${{ steps.compute-page.outputs.page_size }}.
 
 1. List issues sorted by creation date (oldest first), skipping the first ${{ steps.compute-page.outputs.page_offset }} and taking ${{ steps.compute-page.outputs.page_size }}.
-2. For each issue: add `stale` if last updated > 90 days ago with no recent comments; add `needs-triage` if it has no labels; post a stale warning comment if applicable.
-3. Summarize: issues labeled, comments posted, any errors.
+2. Add `stale` (with a warning comment) if last updated > 90 days ago; add `needs-triage` if unlabeled.
+3. Summarize labels, comments, and errors.
 ```
 
 ## Batch Strategy 2: Fan-Out with Matrix
 
-Use GitHub Actions matrix to run multiple batch workers in parallel, each responsible for a non-overlapping shard. Use `fail-fast: false` so one shard failure doesn't cancel the others. Each shard gets its own token and API rate limit quota.
+Run parallel workers with a GitHub Actions matrix, each on a non-overlapping shard. Set `fail-fast: false` so one failure doesn't cancel the others.
 
 ```mermaid
 flowchart LR
@@ -87,8 +83,6 @@ flowchart LR
     trigger --> s1[Shard 1]
     trigger --> s2[Shard 2]
 ```
-
-Example workflow:
 
 ```aw wrap title=".github/workflows/batch-worker.md"
 ---
@@ -121,14 +115,14 @@ safe-outputs:
 
 Process only issues where `(issue_number % ${{ inputs.total_shards }}) == ${{ matrix.shard }}` — this ensures no two shards process the same issue.
 
-1. List all open issues (up to 500) and keep only those assigned to this shard.
-2. For each issue: check for duplicates (similar title/content); add label `reviewed`; if a duplicate is found, add `duplicate` and reference the original.
-3. Report: issues in this shard, how many labeled, any failures.
+1. List open issues (up to 500) and keep this shard's.
+2. Label each `reviewed`; if it duplicates another, also add `duplicate` and reference the original.
+3. Report shard size, labeled count, and failures.
 ```
 
 ## Batch Strategy 3: Rate-Limit-Aware Batching
 
-Throttle API calls by processing items in small sub-batches with explicit pauses. Slower than unbounded processing but dramatically reduces rate-limit errors. Use [Rate Limiting Controls](/gh-aw/reference/rate-limiting-controls/) for built-in throttling.
+Process items in small sub-batches with explicit pauses: slower, but far fewer rate-limit errors. See [Rate Limiting Controls](/gh-aw/reference/rate-limiting-controls/) for built-in throttling.
 
 ```mermaid
 flowchart LR
@@ -136,8 +130,6 @@ flowchart LR
     batch --> pause[Pause between batches]
     pause --> report[Report totals]
 ```
-
-Example workflow:
 
 ```aw wrap title=".github/workflows/rate-limited-batch.md"
 ---
@@ -171,14 +163,14 @@ safe-outputs:
 Process all open issues in sub-batches of ${{ inputs.batch_size }}, pausing ${{ inputs.pause_seconds }} seconds between batches.
 
 1. Fetch all open issue numbers (paginate if needed).
-2. For each sub-batch: read each issue body, determine the correct label, add the label, then pause before the next sub-batch.
-3. On HTTP 429: pause 60 seconds and retry once before marking the item as failed.
-4. Report: total processed, failed, skipped.
+2. For each sub-batch: read each issue, add the correct label, then pause.
+3. On HTTP 429: pause 60 seconds, retry once, then mark failed.
+4. Report processed, failed, and skipped totals.
 ```
 
 ## Batch Strategy 4: Result Aggregation
 
-Collect results from multiple batch workers or runs and aggregate them into a single summary issue. Use [cache-memory](/gh-aw/reference/cache-memory/) to store intermediate results when runs span multiple days.
+Aggregate results from multiple workers or runs into one summary issue, using [cache-memory](/gh-aw/reference/cache-memory/) for intermediate results across days.
 
 ```mermaid
 flowchart LR
@@ -186,8 +178,6 @@ flowchart LR
     cache --> agent[AI agent]
     agent --> issue[Update tracking issue]
 ```
-
-Example workflow:
 
 ```aw wrap title=".github/workflows/batch-aggregator.md"
 ---
@@ -237,10 +227,10 @@ steps:
 
 Aggregate results from previous batch runs stored in `/tmp/gh-aw/cache-memory/batch-results/` into issue #${{ inputs.report_issue }}.
 
-1. Read `/tmp/gh-aw/cache-memory/aggregate.json` for totals and each individual result file for per-run breakdowns.
-2. Update issue #${{ inputs.report_issue }} body with a Markdown table: summary row (processed/failed/skipped) plus per-run breakdown. List any errors requiring manual intervention.
-3. Add a comment: "Batch complete ✅" if no failures, or "Batch complete with failures ⚠️" with a list of failed items.
-4. For each failed item, create a sub-issue so it can be retried.
+1. Read `aggregate.json` for totals and the result files for per-run breakdowns.
+2. Update issue #${{ inputs.report_issue }} with a Markdown table (summary row plus per-run breakdown) and any errors needing manual intervention.
+3. Comment "Batch complete ✅", or "Batch complete with failures ⚠️" listing failed items.
+4. Create a sub-issue for each failed item so it can be retried.
 ```
 
 ## Learn More
