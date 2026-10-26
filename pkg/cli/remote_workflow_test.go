@@ -550,19 +550,23 @@ imports:
 
 # Workflow
 `
-	spec := &WorkflowSpec{
-		RepoSpec: RepoSpec{
-			RepoSlug: "github/gh-aw",
-			Version:  "v1.0.0",
-		},
-		WorkflowPath: ".github/workflows/ci-coach.md",
-	}
-
 	tmpDir := t.TempDir()
-	// No network in unit tests: the download attempt for the first import will fail silently
-	// (verbose=false).  The second import must be deduplicated without a second download.
-	err := fetchAndSaveRemoteFrontmatterImports(t.Context(), content, spec, tmpDir, false, false, nil)
+	downloadCalls := 0
+	opts := frontmatterImportsOpts{
+		owner:           "github",
+		repo:            "gh-aw",
+		ref:             "v1.0.0",
+		originalBaseDir: ".github/workflows",
+		targetDir:       tmpDir,
+		seen:            make(map[string]struct{}),
+		downloadFn: func(context.Context, string, string, string, string) ([]byte, error) {
+			downloadCalls++
+			return nil, errors.New("download failed")
+		},
+	}
+	err := fetchFrontmatterImportsRecursive(t.Context(), content, ".github/workflows", opts)
 	require.NoError(t, err, "section-fragment deduplication should not error")
+	require.Equal(t, 1, downloadCalls, "duplicate sections should trigger only one download")
 
 	entries, readErr := os.ReadDir(tmpDir)
 	require.NoError(t, readErr)
