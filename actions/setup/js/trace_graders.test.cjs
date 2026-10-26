@@ -7,6 +7,10 @@ function event(type, data, phase = "agent", source = "agent-session.jsonl") {
   return { type, data, provenance: { component: "agent", phase, path: source, index: 0 } };
 }
 
+function safeOutputResult(data, source = "safe-output-items.jsonl") {
+  return { type: "safe_output.result", data, provenance: { component: "safe_output", phase: "safe_outputs", path: source, index: 0 } };
+}
+
 function fixture() {
   return [
     event("workflow.info", { runId: 123 }, "activation"),
@@ -63,6 +67,22 @@ describe("pure unified-session graders", () => {
       experiments: { model: "fast" },
       evals: { total: 1, yes: 1, no: 0, unknown: 0, byQuestion: { goal: "YES" } },
     });
+  });
+
+  it("counts successful safe-output results without superseded dispatches", () => {
+    const session = [
+      safeOutputResult({ type: "publish", number: 42 }),
+      safeOutputResult({ type: "publish", status: "success", url: "https://example.com/42" }, "usage/aw_session.jsonl"),
+      safeOutputResult({ type: "failed", number: 7 }),
+      safeOutputResult({ type: "failed", status: "failure", url: "https://example.com/failed" }, "usage/aw_session.jsonl"),
+      safeOutputResult({ type: "cancelled", status: "cancelled" }, "usage/aw_session.jsonl"),
+      safeOutputResult({ type: "skipped", status: "skipped" }, "usage/aw_session.jsonl"),
+      safeOutputResult({ type: "legacy", number: 1 }),
+    ];
+
+    const lookups = createSessionLookups(session);
+    expect(lookups.trace.artifacts.map(artifact => artifact.type)).toEqual(["publish", "legacy"]);
+    expect(lookups.stats.artifactCount).toBe(2);
   });
 
   it("does not read files, execute commands, use environment data, or mutate the session", () => {

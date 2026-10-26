@@ -2215,7 +2215,11 @@ async function main(options = {}) {
           const reviewResult = await reviewBuffer.submitReview();
           if (reviewResult.success && !reviewResult.skipped) {
             logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
-            logCreatedItemFromResult(logCreatedItem, "create_pull_request_review_comment", reviewResult.review_comments);
+            logCreatedItemFromResult(
+              logCreatedItem,
+              "create_pull_request_review_comment",
+              reviewResult.review_comments?.map(comment => (comment && typeof comment === "object" ? { ...comment, success: true } : comment))
+            );
             core.info(`✓ PR review submitted for ${reviewRepo}#${reviewPrNum}: ${reviewResult.review_url}`);
           } else if (reviewResult.success && reviewResult.skipped) {
             const skipReason = reviewResult.reason || `PR review for ${reviewRepo}#${reviewPrNum} skipped`;

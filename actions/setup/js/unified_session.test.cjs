@@ -47,7 +47,7 @@ describe("Unified conclusion session", () => {
       safeJobNames: '["publish","archive"]',
       jobResults: JSON.stringify({
         agent: { result: "success", outputs: { url: "https://example.com/untrusted" } },
-        publish: { result: "success", outputs: { status: "success", url: "https://example.com/resources/42", secret: "PRIVATE" } },
+        publish: { result: "success", outputs: { status: "success", url: "https://example.com/resources/42?access_token=URL_TOKEN#signature", secret: "PRIVATE" } },
         archive: { result: "success", outputs: { url: "s3://bucket/resource" } },
       }),
     });
@@ -58,6 +58,7 @@ describe("Unified conclusion session", () => {
     ]);
     expect(outcomes.every(event => event.provenance.component === "safe_output" && event.provenance.phase === "safe_outputs")).toBe(true);
     expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
+    expect(JSON.stringify(outcomes)).not.toContain("URL_TOKEN");
   });
 
   it.each(["failure", "cancelled", "skipped"])("never promotes a %s safe job to success", result => {

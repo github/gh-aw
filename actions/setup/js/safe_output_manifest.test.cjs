@@ -433,6 +433,10 @@ describe("safe_output_manifest", () => {
       expect(item.number).toBe(42);
     });
 
+    it("should not record custom action preparation as an applied result", () => {
+      expect(extractCreatedItemFromResult("create_issue", { success: true, action_name: "create_issue", payload: "{}" })).toBeNull();
+    });
+
     it("should extract item from add_labels result (modification type without url)", () => {
       const result = {
         success: true,

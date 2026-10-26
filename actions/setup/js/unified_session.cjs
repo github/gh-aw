@@ -781,7 +781,9 @@ function collectUnifiedSession({
                 if (typeof outputs.url !== "string" || /[\s\x00-\x1f\x7f]/.test(outputs.url)) throw new TypeError();
                 const uri = new URL(outputs.url);
                 if (uri.username || uri.password) throw new TypeError();
-                data.url = outputs.url;
+                uri.search = "";
+                uri.hash = "";
+                data.url = uri.toString();
               } catch {
                 report(file, "invalid_safe_job_url", undefined);
               }
