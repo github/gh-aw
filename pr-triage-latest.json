@@ -1,10 +1,10 @@
 {
-  "run_date": "2026-10-26T06:50:38Z",
-  "run_id": "40281947754",
+  "run_date": "2026-10-26T13:58:30Z",
+  "run_id": "40334991485",
   "source": "pr-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 2,
-  "open_copilot_prs": 3,
+  "cooldown_skipped": 10,
+  "open_copilot_prs": 11,
   "category_counts": {
     "feature": 1
   },
@@ -23,7 +23,39 @@
   ],
   "skipped_prs": [
     {
-      "number": 71957,
+      "number": 72102,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72101,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72100,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72099,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72098,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72097,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72096,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72095,
+      "reason": "opened/updated within the past hour"
+    },
+    {
+      "number": 72074,
       "reason": "opened/updated within the past hour"
     },
     {
@@ -31,7 +63,7 @@
       "reason": "opened/updated within the past hour"
     }
   ],
-  "notes": "Only one eligible Copilot PR remained outside the 1-hour cooldown window. The remaining open Copilot PRs were skipped as active work and not triaged in this run.",
+  "notes": "Only one eligible app/github-copilot PR remained outside the 1-hour cooldown window. All other open Copilot PRs were updated within the last hour and skipped per policy.",
   "pr_details": [
     {
       "number": 70952,
