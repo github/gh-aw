@@ -41,7 +41,7 @@ tools:
 
 The MCP gateway intercepts tool calls to GitHub and applies integrity checks to each piece of content returned. If an item's integrity level is below the configured minimum, the gateway removes it before the AI engine sees it. This happens transparently — the agent receives a reduced result set, and filtered items are logged as `DIFC_FILTERED` events for later inspection.
 
-Starting with [MCP gateway v0.5.0](https://github.com/github/gh-aw-mcpg/releases/tag/v0.5.0), proxy responses that cannot be filtered item by item, such as artifact downloads, raw content, and redirects, require resource-level authorization even in filter mode. These requests can be denied when the configured access policy does not authorize the resource.
+Starting with [MCP gateway v0.5.0](https://github.com/github/gh-aw-mcpg/releases/tag/v0.5.0), proxy responses that cannot be filtered item by item, such as artifact downloads, raw content, and redirects, require resource-level authorization even in filter mode. These requests can be denied when the configured allow-only policy does not authorize the resource.
 
 ## Configuration
 
