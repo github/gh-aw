@@ -133,6 +133,7 @@
       { "if": { "properties": { "type": { "const": "prompt.system" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "prompt.user" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/Pick%3CMessageData%2C%22content%22%3E" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.error" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputErrorData" } } } },
+      { "if": { "properties": { "type": { "const": "safe_output.outcome" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "safe_output.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SafeOutputData" } } } },
       { "if": { "properties": { "type": { "const": "session.collection" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/CollectionData" } } } },
@@ -1035,9 +1036,9 @@
         "identifier": { "$ref": "#/definitions/JsonValue" },
         "url": { "$ref": "#/definitions/JsonValue" },
         "status": { "$ref": "#/definitions/JsonValue" },
-        "message": { "$ref": "#/definitions/JsonValue" },
-        "error": { "$ref": "#/definitions/JsonValue" },
-        "errorCode": { "$ref": "#/definitions/JsonValue" }
+        "errorCode": { "$ref": "#/definitions/JsonValue" },
+        "messageIndex": { "type": "number" },
+        "staged": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -1051,13 +1052,10 @@
         "identifier": { "$ref": "#/definitions/JsonValue" },
         "url": { "$ref": "#/definitions/JsonValue" },
         "status": { "$ref": "#/definitions/JsonValue" },
-        "message": { "$ref": "#/definitions/JsonValue" },
-        "error": { "$ref": "#/definitions/JsonValue" },
         "errorCode": { "$ref": "#/definitions/JsonValue" },
-        "errors": {
-          "type": "array",
-          "items": { "anyOf": [{ "$ref": "#/definitions/SafeOutputData" }, { "type": "string" }, { "type": "number" }, { "type": "boolean" }, { "type": "null" }, { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } }] }
-        }
+        "messageIndex": { "type": "number" },
+        "staged": { "type": "boolean" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/SafeOutputData" } }
       },
       "additionalProperties": false
     },

@@ -1,0 +1,5 @@
+cd actions/setup/js && npm run schema:session:check
+
+> schema:session:check
+> node scripts/generate_session_schemas.cjs --check
+

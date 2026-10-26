@@ -1,0 +1,29 @@
+
+/home/runner/work/gh-aw/gh-aw/actions/setup/js/safe_output_handler_manager.cjs
+   422:48   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+   519:62   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+  1026:11   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+  1101:204  warning  Direct access to .code on caught error 'error' is unsafe — the thrown value may not be an Error instance                                                                                                                                       gh-aw-custom/no-unsafe-catch-error-property
+  1102:58   warning  Direct access to .code on caught error 'error' is unsafe — the thrown value may not be an Error instance                                                                                                                                       gh-aw-custom/no-unsafe-catch-error-property
+  1813:63   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+  1932:22   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+  1992:56   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+  2058:49   warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file  gh-aw-custom/require-error-code-in-thrown-error
+  2109:7    warning  core.setFailed() does not stop execution — add a control-transfer statement (for example: return, throw, break, continue, or process.exit(...)) immediately after to prevent the action from continuing in a failed state                      gh-aw-custom/require-return-after-core-setfailed
+  2112:7    warning  core.setFailed() does not stop execution — add a control-transfer statement (for example: return, throw, break, continue, or process.exit(...)) immediately after to prevent the action from continuing in a failed state                      gh-aw-custom/require-return-after-core-setfailed
+
+/home/runner/work/gh-aw/gh-aw/actions/setup/js/safe_output_manifest.cjs
+   35:3   warning  Wrap fs.mkdirSync(directory) in try/catch — mkdirSync throws on permission denied, invalid path, or filesystem errors; without a call-site try/catch, you lose the original error context and get a generic engine-level stack instead of a specific message with `{ cause }`  gh-aw-custom/require-mkdirsync-try-catch
+   37:3   warning  Wrap fs.chmodSync(directory) in try/catch                                                                                                                                                                                                                                      gh-aw-custom/require-fs-chmod-try-catch
+   43:5   warning  Wrap fs.chmodSync(destination) in try/catch                                                                                                                                                                                                                                    gh-aw-custom/require-fs-chmod-try-catch
+  185:42  warning  This file imports error_codes.cjs but this thrown Error message does not reference a standardized error code (e.g. ERR_API, ERR_NOT_FOUND). Prefix the message with an imported ERR_* constant for consistency with other errors in this file                                  gh-aw-custom/require-error-code-in-thrown-error
+
+/home/runner/work/gh-aw/gh-aw/actions/setup/js/types/unified_session.d.ts
+  0:0  warning  File ignored because no matching configuration was supplied
+
+/home/runner/work/gh-aw/gh-aw/actions/setup/js/upload_artifact.cjs
+  227:19  warning  Wrap fs.readdirSync(dir) in try/catch — synchronous fs methods throw on I/O errors (missing file, permission denied, disk full); without a call-site try/catch, you lose the original error context and get a generic engine-level stack instead of a specific message with `{ cause }`        gh-aw-custom/require-fs-io-try-catch
+  292:19  warning  Wrap fs.readdirSync(sourceDir) in try/catch — synchronous fs methods throw on I/O errors (missing file, permission denied, disk full); without a call-site try/catch, you lose the original error context and get a generic engine-level stack instead of a specific message with `{ cause }`  gh-aw-custom/require-fs-io-try-catch
+
+✖ 18 problems (0 errors, 18 warnings)
+

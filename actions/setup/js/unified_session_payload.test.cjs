@@ -952,7 +952,7 @@ describe("essential unified session payloads", () => {
       results: [{ id: "quality", value: 0, passed: false, direction: "higher", threshold: 0 }],
     });
     expect(normalizeUnifiedSessionEvent({ type: "safe_output.error", data: { errors: [{ type: "add_comment", error: "rejected", payload: "omit" }] } }).data).toEqual({
-      errors: [{ type: "add_comment", error: "rejected" }],
+      errors: [{ type: "add_comment" }],
     });
   });
 
@@ -994,7 +994,7 @@ describe("essential unified session payloads", () => {
 
   it("retains empty usage, scalar errors, and nested observed timestamps", () => {
     expect(normalizeUnifiedSessionEvent({ type: "session.result", data: { usage: {} } }).data).toEqual({ usage: {} });
-    expect(normalizeUnifiedSessionEvent({ type: "safe_output.error", data: { errors: ["rejected", null, false] } }).data).toEqual({ errors: ["rejected", null, false] });
+    expect(normalizeUnifiedSessionEvent({ type: "safe_output.error", data: { errors: ["rejected", null, false] } }).data).toEqual({ errors: [] });
     expect(normalizeUnifiedSessionEvent({ type: "assistant.message", message: { timestamp: 0 }, data: { content: "" } })).toEqual({ type: "assistant.message", timestamp: 0, data: { content: "" } });
   });
 
@@ -1029,7 +1029,7 @@ describe("essential unified session payloads", () => {
       type: "safe_output.error",
       data: { status: "failure", errorCode: "ERR_SAFE_OUTPUT", failures: [{ type: "add_comment", errorCode: "ERR_TARGET", error: "target unavailable" }] },
     });
-    expect(compact.data).toEqual({ status: "failure", errorCode: "ERR_SAFE_OUTPUT", errors: [{ type: "add_comment", errorCode: "ERR_TARGET", error: "target unavailable" }] });
+    expect(compact.data).toEqual({ status: "failure", errorCode: "ERR_SAFE_OUTPUT", errors: [{ type: "add_comment", errorCode: "ERR_TARGET" }] });
     expect(normalizeUnifiedSessionEvent(compact)).toEqual(compact);
     const output = generatePlainTextSummary([compact]);
     expect(output).toContain("ERR_SAFE_OUTPUT");

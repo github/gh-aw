@@ -549,6 +549,7 @@ function collectUnifiedSession({
     [["agent/awf-routing-outcome.json"], "agent", "agent", "model_routing.outcome"],
     [["safeoutputs.jsonl"], "safe_output", "agent", "safe_output.request"],
     [["safe-output-items.jsonl"], "safe_output", "safe_outputs", "safe_output.result"],
+    [["safe-output-outcomes.jsonl"], "safe_output", "safe_outputs", "safe_output.outcome"],
     [["safe-output-errors.json"], "safe_output", "safe_outputs", "safe_output.error"],
     [["experiments/state.jsonl", "usage/experiment/state.jsonl"], "experiment", "activation", "experiment.state"],
     [["experiments/state.json", "usage/experiment/state.json"], "experiment", "activation", "experiment.state"],
@@ -616,6 +617,9 @@ function collectUnifiedSession({
       continue;
     }
     if (file) add(file, component, phase, type);
+  }
+  for (const file of walk(path.join(rootDir, "claims"))) {
+    if (path.basename(file) === "safe-output-outcomes.jsonl") add(file, "safe_output", "safe_outputs", "safe_output.outcome");
   }
   const executionFile = path.join(rootDir, "agent-errors.jsonl");
   if (!protectedSessionCapture) add(executionFile, "agent", "agent", undefined);

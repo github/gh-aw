@@ -5,11 +5,26 @@ const fs = require("fs");
 const nodePath = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
+const { buildSafeOutputOutcomes } = require("./safe_output_outcomes.cjs");
 const { MANIFEST_FILE_PATH, TEMPORARY_ID_MAP_FILE_PATH, SAFE_OUTPUT_ERRORS_FILE_PATH } = require("./constants.cjs");
 const { redactBuiltInPatterns, redactSecrets, extractMCPGatewayTokens, MCP_GATEWAY_CONFIG_PATHS } = require("./redact_secrets.cjs");
 const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentity, assertClaimArtifactDirectory, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
+const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
+
+/** @param {any[]} results @param {boolean} staged @param {string} [filePath] */
+function writeSafeOutputOutcomes(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_OUTCOMES_FILE_NAME)) {
+  try {
+    const destination = scopedArtifactFile(filePath);
+    fs.mkdirSync(nodePath.dirname(destination), { recursive: true });
+    const secretValues = collectArtifactSecretValues();
+    const entries = buildSafeOutputOutcomes(results, staged).map(entry => redactManifestValue(entry, secretValues));
+    fs.appendFileSync(destination, entries.map(entry => JSON.stringify(entry)).join("\n") + (entries.length ? "\n" : ""), { mode: 0o600 });
+  } catch (error) {
+    throw new Error(`${ERR_SYSTEM}: Failed to persist safe-output application outcomes`, { cause: error });
+  }
+}
 
 /** @param {string} filename @returns {string} */
 function scopedArtifactFile(filename) {
@@ -260,7 +275,7 @@ function extractCreatedItemFromResult(type, result) {
   }
 
   // In staged mode (🎭 Staged Mode Preview), no item was actually modified in GitHub — skip logging
-  if (result.staged === true || result.skipped === true || result.deferred_manifest === true) return null;
+  if (result.staged === true || result.skipped === true || result.deferred_manifest === true || result.delegated === true) return null;
 
   // Normalize URL from different result shapes (present for creation types)
   const url = result.url || result.projectUrl || result.html_url || result.pull_request_url || result.review_url || result.issue_url;
@@ -404,4 +419,5 @@ module.exports = {
   extractCreatedItemFromResult,
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
+  writeSafeOutputOutcomes,
 };

@@ -11,6 +11,7 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { getMcpRateLimitHint, getRpcRateLimitHint } = require("./mcp_rate_limit.cjs");
 const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
+const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
 
 /** AWF failed-request origins: provider response versus AWF-originated rejection. */
 const ERROR_SOURCES = new Set(["upstream", "awf"]);
@@ -153,9 +154,9 @@ const SAFE_OUTPUT_FIELDS = {
   identifier: ["identifier"],
   url: ["url"],
   status: ["status"],
-  message: ["message"],
-  error: ["error"],
   errorCode: ["errorCode", "error_code"],
+  messageIndex: ["messageIndex"],
+  staged: ["staged"],
 };
 
 /** @type {Fields} */
@@ -387,6 +388,7 @@ const EVENT_FIELDS = {
   },
   "safe_output.request": SAFE_OUTPUT_FIELDS,
   "safe_output.result": SAFE_OUTPUT_FIELDS,
+  "safe_output.outcome": SAFE_OUTPUT_FIELDS,
   "safe_output.error": SAFE_OUTPUT_FIELDS,
   "experiment.state": { runId: ["runId", "run_id"], assignments: ["assignments"], counts: ["counts"] },
   "grader.manifest": { version: ["version"], customGraders: ["customGraders"] },
@@ -801,9 +803,13 @@ function normalizeUnifiedSessionEvent(event, phase) {
     Object.assign(data, projectResult(source));
     if (Array.isArray(source.results)) data.results = source.results.map(projectResult);
   }
+  if (event.type.startsWith("safe_output.")) {
+    for (const key of Object.keys(data)) delete data[key];
+    Object.assign(data, projectSafeOutputData(source));
+  }
   if (event.type === "safe_output.error") {
     const errors = source.errors ?? source.failures;
-    if (Array.isArray(errors)) data.errors = errors.map(error => (error && typeof error === "object" && !Array.isArray(error) ? selectFields(error, SAFE_OUTPUT_FIELDS) : structuredClone(error)));
+    if (Array.isArray(errors)) data.errors = errors.filter(error => error && typeof error === "object" && !Array.isArray(error)).map(projectSafeOutputData);
   }
   const metadata = selectFields(event, { id: ["id"], parentId: ["parentId"], timestamp: ["timestamp", "ts", "time", "created_at"], agentId: ["agentId"], ephemeral: ["ephemeral"] });
   /** @type {any} */

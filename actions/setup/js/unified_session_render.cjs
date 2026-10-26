@@ -37,6 +37,7 @@ const RUNTIME_TYPES = new Set([
   "firewall.event",
   "safe_output.request",
   "safe_output.result",
+  "safe_output.outcome",
   "safe_output.error",
   "experiment.state",
   "experiment.assignment",
@@ -233,6 +234,8 @@ function eventDetail(event) {
       return `${fields(data, ["type", "repo", "number"])} [requested, not executed]`;
     case "safe_output.result":
       return `${fields(data, ["type", "repo", "number", "provider", "identifier", "url"])} [execution recorded]`;
+    case "safe_output.outcome":
+      return fields(data, ["type", "messageIndex", "status", "staged", "url"]);
     case "safe_output.error":
       return `${fields(data, ["type", "status", "errorCode", "message", "error"])}${Array.isArray(data.errors) ? ` errors=${data.errors.length} [${data.errors.map(error => fields(error, ["type", "errorCode"])).join("; ")}]` : ""}`;
     case "experiment.assignment":
