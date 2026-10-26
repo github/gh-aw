@@ -49,40 +49,31 @@ features:
 You are an automated coding agent that improves Go test coverage by finding untested packages and adding
 minimal test stubs. Aider has no MCP client; invoke safe-output tools through
 the `safeoutputs` MCP CLI. Follow the Aider execution constraints above: one shell command per line, and
-edit files with *SEARCH/REPLACE* blocks rather than heredocs.
+no heredocs. Use the supplied command to generate stubs, not model-authored edits.
 
-## Step 1 — Find packages with no test files
+## Step 1 — Generate stubs for packages with no test files
 
 No source files need to be attached before starting. Your first reply must put
-this discovery command in a fenced `bash` block. Read the returned package list
-on the next reflection before choosing packages or deciding that no stubs are needed.
+this exact command in a fenced `bash` block. It discovers packages and creates
+stubs for at most three of them using their actual Go package names.
 
 ```bash
-go list -f '{{if and (not .TestGoFiles) (not .XTestGoFiles)}}{{.Dir}} {{.Name}}{{end}}' ./... > /tmp/gh-aw/agent/aider-untested-packages && sed '/^$/d' /tmp/gh-aw/agent/aider-untested-packages | head -5
+go list -f '{{if and (not .TestGoFiles) (not .XTestGoFiles)}}{{.Dir}} {{.Name}}{{end}}' ./... > /tmp/gh-aw/agent/aider-untested-packages && count=0 && while IFS= read -r row; do if [ -n "$row" ]; then directory="${row% *}"; package="${row##* }"; (set -C; printf 'package %s\n\nimport "testing"\n\nfunc TestPlaceholder_TODO(t *testing.T) {\n\tt.Skip("not yet implemented")\n}\n' "$package" > "$directory/${package}_test.go") || exit 1; printf '%s %s\n' "$directory" "$package"; count=$((count + 1)); if [ "$count" -eq 3 ]; then break; fi; fi; done < /tmp/gh-aw/agent/aider-untested-packages
 ```
 
-Pick at most 3 packages from the output. Each row includes the actual package name.
-Use Go's package list, not a recursive file search: testdata, hidden directories,
-and nested modules are not targets. If `go list` fails, report incomplete; an error
-is not evidence that all packages have tests.
+The command prints one directory and package name for each created stub. It
+excludes packages with internal or external tests, testdata, hidden directories,
+and nested modules. Existing files are never overwritten. If the command fails,
+report incomplete; an error is not evidence that all packages have tests.
 
-## Step 2 — Add minimal test stubs
+## Step 2 — Inspect the generation result
 
-For each selected package, create a `<package>_test.go` stub with a *SEARCH/REPLACE* block that:
-- Declares the correct package name (use `package <pkg>_test` if the source uses external test convention, otherwise `package <pkg>`)
-- Imports `"testing"`
-- Contains one `TestPlaceholder_TODO` function with `t.Skip("not yet implemented")`
-
-Read a source file to determine the actual package declaration; do not infer it from
-the directory name (command packages commonly declare `package main`). Create the
-test file **inside** the selected package directory, not alongside that directory.
-For example, a stub for `cmd/example` belongs at `cmd/example/example_test.go`,
-with the actual package name read from `cmd/example/*.go`. Follow the exact
-filename, single code fence, and seven-character SEARCH/REPLACE marker format
-in the Aider execution constraints above.
-
-Do not repeat discovery after choosing packages. If an edit cannot be applied within
-the reflection budget, report the blocker rather than claiming the files were created.
+Read the returned command output and exit status on the next reflection.
+The generated `<package>_test.go` files already declare the correct package,
+import `"testing"`, and contain `TestPlaceholder_TODO` with
+`t.Skip("not yet implemented")`. For example, a command package in a hyphenated
+directory declares `package main`, not a name derived from that directory.
+Do not rewrite the generated declarations or repeat generation.
 
 ## Step 3 — Commit and create the pull request
 
