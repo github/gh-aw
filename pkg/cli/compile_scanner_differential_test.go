@@ -94,14 +94,14 @@ jobs:
 		RuleID: "test", Severity: scanfindings.SeverityMedium, Message: "unsafe",
 		File: path, Line: 8, Column: 9,
 	}
-	before := scannerFindingIdentity(finding)
+	before := make(scannerSources).findingIdentity(finding)
 	changed := "# Added header\n" + strings.Replace(workflow, "    steps:\n", "    steps:\n      - name: New step\n        run: echo safe\n", 1)
 	require.NoError(t, os.WriteFile(path, []byte(changed), 0600))
 	finding.Line += 3
-	assert.Equal(t, before, scannerFindingIdentity(finding), "line and step index changes are not new findings")
+	assert.Equal(t, before, make(scannerSources).findingIdentity(finding), "line and step index changes are not new findings")
 	changed = strings.Replace(changed, "id: existing", "id: different", 1)
 	require.NoError(t, os.WriteFile(path, []byte(changed), 0600))
-	assert.NotEqual(t, before, scannerFindingIdentity(finding), "a finding in another logical step is new")
+	assert.NotEqual(t, before, make(scannerSources).findingIdentity(finding), "a finding in another logical step is new")
 }
 
 func TestScannerFindingIdentityResolvesPathsFromGitRoot(t *testing.T) {
@@ -122,7 +122,7 @@ func TestScannerFindingIdentityResolvesPathsFromGitRoot(t *testing.T) {
 	relative := scanfindings.Finding{RuleID: "test", Message: "unsafe", File: ".github/workflows/test.lock.yml", Line: 6}
 	absolute := relative
 	absolute.File = lock
-	assert.Equal(t, scannerFindingIdentity(absolute), scannerFindingIdentity(relative))
+	assert.Equal(t, make(scannerSources).findingIdentity(absolute), make(scannerSources).findingIdentity(relative))
 }
 
 func TestScannerFindingIdentityAST(t *testing.T) {
@@ -256,7 +256,7 @@ func TestScannerFindingIdentityAST(t *testing.T) {
 				if strings.Contains(target, "echo") || target == "run:" {
 					require.True(t, location.run, "script findings must anchor to run, not a neighboring field")
 				}
-				return scannerFindingIdentity(finding)
+				return make(scannerSources).findingIdentity(finding)
 			}
 			before := identity(test.before, test.beforeTarget)
 			after := identity(test.after, test.afterTarget)
@@ -276,7 +276,7 @@ func TestScannerSourcesAreScopedToOneResult(t *testing.T) {
 	baseline := withScannerFindings(errors.New("findings"), []scanfindings.Finding{finding})
 	require.NoError(t, os.WriteFile(path, []byte(strings.ReplaceAll(before, "echo before", "echo after")), 0600))
 	assert.Equal(t, identity, sources.findingIdentity(finding), "a scanner result uses one immutable source snapshot")
-	assert.NotEqual(t, identity, scannerFindingIdentity(finding), "a new result reparses the file")
+	assert.NotEqual(t, identity, make(scannerSources).findingIdentity(finding), "a new result reparses the file")
 	diff, err := (&dryRunScannerBaseline{results: map[string]error{"test": baseline}}).filter(
 		"test", withScannerFindings(errors.New("findings"), []scanfindings.Finding{finding}),
 	)
@@ -357,11 +357,11 @@ func TestScannerSourceFallsBackForUnsortedNeeds(t *testing.T) {
 	require.NotNil(t, source)
 	assert.Empty(t, source.locations, "lowered needs reordered from source must fall back rather than mispair anchors")
 	finding := scanfindings.Finding{File: path, Line: 15, Column: 13, RuleID: "test", Severity: scanfindings.SeverityHigh}
-	beforeIdentity := scannerFindingIdentity(finding)
+	beforeIdentity := make(scannerSources).findingIdentity(finding)
 
 	after := strings.Replace(before, "needs: [z, a]", "needs: [y, a]", 1)
 	require.NoError(t, os.WriteFile(path, []byte(after), 0600))
-	assert.NotEqual(t, beforeIdentity, scannerFindingIdentity(finding), "changing the first dependency must not retain its old identity")
+	assert.NotEqual(t, beforeIdentity, make(scannerSources).findingIdentity(finding), "changing the first dependency must not retain its old identity")
 }
 
 func TestScannerSourceAmbiguityUsesBestCandidateSet(t *testing.T) {

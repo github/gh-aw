@@ -207,9 +207,9 @@ func TestScannerStepLabelsCannotHideChangedConfiguration(t *testing.T) {
 			line := strings.Count(before[:offset], "\n") + 1
 			finding := scanfindings.Finding{File: path, Line: line, Column: 9, RuleID: "credentials", Severity: scanfindings.SeverityHigh}
 			require.NoError(t, os.WriteFile(path, []byte(before), 0600))
-			identity := scannerFindingIdentity(finding)
+			identity := make(scannerSources).findingIdentity(finding)
 			require.NoError(t, os.WriteFile(path, []byte(before+"        with:\n          token: ${{ secrets.RELEASE_PAT }}\n"), 0600))
-			assert.NotEqual(t, identity, scannerFindingIdentity(finding))
+			assert.NotEqual(t, identity, make(scannerSources).findingIdentity(finding))
 		})
 	}
 }

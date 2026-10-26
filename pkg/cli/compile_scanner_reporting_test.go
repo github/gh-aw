@@ -305,9 +305,9 @@ func TestScannerReportingPreservesMixedFailures(t *testing.T) {
 	dockerFailure := fmt.Errorf("Docker ShellCheck invocation failed: %w", errors.New("exit status 125: container stderr"))
 	var reported error
 	ctx := context.WithValue(context.Background(), compileScannerReporterKey{}, func(_ string, err error) { reported = err })
-	err := reportShellcheckResults(ctx, []runStepInfo{step, step}, []shellcheckResult{
+	err := reportShellcheckResultsWithErrors(ctx, []runStepInfo{step, step}, []shellcheckResult{
 		{err: finding}, {err: dockerFailure},
-	}, true)
+	}, true, nil)
 	require.Error(t, err)
 	issues := scannerValidationIssues("shellcheck", reported)
 	require.Len(t, issues, 2)

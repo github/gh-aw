@@ -556,10 +556,6 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 	return results
 }
 
-func reportShellcheckResults(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool) error {
-	return reportShellcheckResultsWithErrors(ctx, steps, results, strict, nil)
-}
-
 func reportShellcheckResultsWithErrors(ctx context.Context, steps []runStepInfo, results []shellcheckResult, strict bool, earlyErrors []error) error {
 	var totalIssues int
 	var firstErr error

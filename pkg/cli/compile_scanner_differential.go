@@ -267,10 +267,6 @@ func normalizeScannerFile(file string) string {
 	return file
 }
 
-func scannerFindingIdentity(finding scanfindings.Finding) string {
-	return make(scannerSources).findingIdentity(finding)
-}
-
 func (sources scannerSources) findingIdentity(finding scanfindings.Finding) string {
 	file := normalizeScannerFile(finding.File)
 	anchor := strconv.Itoa(finding.Line) + ":" + strconv.Itoa(finding.Column)
