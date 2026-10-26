@@ -108,13 +108,15 @@ func TestCopilotAgentCleanup(t *testing.T) {
 				}
 				if verbose {
 					var expected []string
-					for _, entry := range tt.logs {
-						message := entry.label + ": " + filepath.Join(dir, entry.path)
-						if !entry.plain {
-							message = console.FormatInfoMessage(message)
+					testutil.CaptureStderr(t, func() {
+						for _, entry := range tt.logs {
+							message := entry.label + ": " + filepath.Join(dir, entry.path)
+							if !entry.plain {
+								message = console.FormatInfoMessage(message)
+							}
+							expected = append(expected, message)
 						}
-						expected = append(expected, message)
-					}
+					})
 					assert.ElementsMatch(t, expected, strings.Split(strings.TrimSuffix(output, "\n"), "\n"))
 				} else {
 					assert.Empty(t, output)

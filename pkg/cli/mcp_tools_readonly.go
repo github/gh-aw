@@ -602,7 +602,7 @@ func injectDevelopmentShellcheckDiagnostics(outputStr, stderrOutput string) stri
 		index = len(results) - 1
 	} else if index >= 0 && index < len(results) {
 		for _, issue := range append(results[index].Errors, results[index].Warnings...) {
-			if issue.Type == "shellcheck_finding" || issue.Type == "shellcheck_error" {
+			if issue.Type == "shellcheck_finding" {
 				return outputStr
 			}
 		}
