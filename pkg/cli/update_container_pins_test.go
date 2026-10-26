@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -550,13 +551,15 @@ func TestUpdateContainerPins_FailureSummary(t *testing.T) {
 					return "", tc.errors[1]
 				},
 			}
+			var expected string
 			output := captureUpdateOrgStderr(t, func() {
+				expected = console.FormatInfoMessage("Container pins could not be updated: " + tc.reason + ".")
 				changed, err := updateContainerPins(context.Background(), deps, workflowsDir, false, containerPinUpdateOptions{refreshExisting: true})
 				require.NoError(t, err)
 				require.False(t, changed)
 			})
-			expected := console.FormatInfoMessage("Container pins could not be updated: " + tc.reason + ".")
-			assert.Equal(t, strings.TrimSpace(expected), strings.TrimSpace(output), "emit exactly one informational line without per-image diagnostics")
+			assert.Equal(t, strings.TrimSpace(expected), containerPinNormalOutput(output), "emit exactly one informational line without per-image diagnostics")
+			cache = workflow.NewActionCache(".")
 			require.NoError(t, cache.Load())
 			pin, ok := cache.GetContainerPin("ghcr.io/example/agent:v1")
 			require.True(t, ok, "failed refresh must preserve the existing pin")
@@ -584,8 +587,18 @@ func TestUpdateContainerPins_Interrupted(t *testing.T) {
 					require.ErrorIs(t, err, interruption)
 					require.False(t, changed)
 				})
-				assert.Empty(t, output, "interruption must not emit a registry failure summary")
+				assert.Empty(t, containerPinNormalOutput(output), "interruption must not emit a registry failure summary")
 			})
 		}
 	}
+}
+
+func containerPinNormalOutput(output string) string {
+	var lines []string
+	for line := range strings.SplitSeq(output, "\n") {
+		if !isCompileDebugLine(stringutil.StripANSI(line)) {
+			lines = append(lines, line)
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }

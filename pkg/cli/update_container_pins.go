@@ -28,7 +28,7 @@ type containerDigestResolutionError struct {
 }
 
 func (e *containerDigestResolutionError) Error() string {
-	return "could not resolve container digest without downloading image layers: " + e.details
+	return "could not resolve container digest without downloading image layers (" + e.reason + "): " + e.details
 }
 
 // dockerImagesArgPattern matches the download_docker_images.sh invocation in lock files
@@ -339,10 +339,13 @@ func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, er
 		errs = append(errs, msg)
 		if errors.Is(err, exec.ErrNotFound) ||
 			(s.name == "docker buildx imagetools" &&
-				(strings.Contains(msg, "is not a docker command") || strings.Contains(msg, `unknown command "buildx"`))) {
+				(strings.Contains(msg, "is not a docker command") ||
+					strings.Contains(msg, `unknown command "buildx"`) ||
+					strings.Contains(msg, "unknown command: docker buildx"))) {
 			unavailable++
 		}
-		if authReason := containerRegistryAuthReason(msg); authReason != "" {
+		// Preserve the first authorization cause in resolver preference order.
+		if authReason := containerRegistryAuthReason(msg); authReason != "" && reason == "registry metadata lookup failed" {
 			reason = authReason
 		}
 	}
