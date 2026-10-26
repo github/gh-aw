@@ -58,7 +58,7 @@ this exact command in a fenced `bash` block. It discovers packages and creates
 stubs for at most three of them using their actual Go package names.
 
 ```bash
-go list -f '{{if and (not .TestGoFiles) (not .XTestGoFiles)}}{{.Dir}} {{.Name}}{{end}}' ./... > /tmp/gh-aw/agent/aider-untested-packages && count=0 && while IFS= read -r row; do if [ -n "$row" ]; then directory="${row% *}"; package="${row##* }"; (set -C; printf 'package %s\n\nimport "testing"\n\nfunc TestPlaceholder_TODO(t *testing.T) {\n\tt.Skip("not yet implemented")\n}\n' "$package" > "$directory/${package}_test.go") || exit 1; printf '%s %s\n' "$directory" "$package"; count=$((count + 1)); if [ "$count" -eq 3 ]; then break; fi; fi; done < /tmp/gh-aw/agent/aider-untested-packages
+workspace="$(pwd -P)" && go list -f '{{if and (not .TestGoFiles) (not .XTestGoFiles)}}{{.Dir}} {{.Name}}{{end}}' ./... > /tmp/gh-aw/agent/aider-untested-packages && count=0 && while IFS= read -r row; do if [ -n "$row" ]; then directory="${row% *}"; package="${row##* }"; resolved="$(realpath -- "$directory")" || exit 1; case "$resolved" in "$workspace"|"$workspace"/*) ;; *) printf 'Refusing to write outside workspace: %s\n' "$resolved" >&2; exit 1 ;; esac; (set -C; printf 'package %s\n\nimport "testing"\n\nfunc TestPlaceholder_TODO(t *testing.T) {\n\tt.Skip("not yet implemented")\n}\n' "$package" > "$resolved/${package}_test.go") || exit 1; printf '%s %s\n' "$resolved" "$package"; count=$((count + 1)); if [ "$count" -eq 3 ]; then break; fi; fi; done < /tmp/gh-aw/agent/aider-untested-packages
 ```
 
 The command prints one directory and package name for each created stub. It
