@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/github/gh-aw/pkg/workflow"
+	"gonum.org/v1/gonum/stat"
 	"gonum.org/v1/gonum/stat/distuv"
 )
 
@@ -140,34 +141,19 @@ func meanValues(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	sum := 0.0
-	for _, value := range values {
-		sum += value
-	}
-	return sum / float64(len(values))
-}
-
-func sampleVariance(values []float64) float64 {
-	if len(values) < 2 {
-		return 0
-	}
-	mean := meanValues(values)
-	sum := 0.0
-	for _, value := range values {
-		diff := value - mean
-		sum += diff * diff
-	}
-	return sum / float64(len(values)-1)
+	return stat.Mean(values, nil)
 }
 
 func welchTTest(control, variant []float64) (float64, error) {
 	if len(control) < 2 || len(variant) < 2 {
 		return 0, errors.New("t_test requires at least two usable observations per variant")
 	}
-	controlTerm := sampleVariance(control) / float64(len(control))
-	variantTerm := sampleVariance(variant) / float64(len(variant))
+	controlMean, controlVariance := stat.MeanVariance(control, nil)
+	variantMean, variantVariance := stat.MeanVariance(variant, nil)
+	controlTerm := controlVariance / float64(len(control))
+	variantTerm := variantVariance / float64(len(variant))
 	standardErrorSquared := controlTerm + variantTerm
-	difference := meanValues(variant) - meanValues(control)
+	difference := variantMean - controlMean
 	if standardErrorSquared == 0 {
 		if difference == 0 {
 			return 1, nil
