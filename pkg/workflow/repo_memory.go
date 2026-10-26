@@ -883,11 +883,15 @@ func (c *Compiler) buildPushRepoMemoryJobCondition(threatDetectionEnabled bool) 
 	return jobCondition, jobNeeds
 }
 
-// buildPushRepoMemoryOutputs builds the outputs map for validation failures from all memory steps.
+// buildPushRepoMemoryOutputs builds the persistence and validation outputs from all memory steps.
 func buildPushRepoMemoryOutputs(memories []RepoMemoryEntry) map[string]string {
 	outputs := make(map[string]string)
 	for _, memory := range memories {
 		stepID := "push_repo_memory_" + memory.ID
+		outputs["save_status_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.save_status }}", stepID)
+		outputs["save_outcome_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outcome }}", stepID)
+		outputs["save_branch_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.save_branch }}", stepID)
+		outputs["save_commit_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.save_commit }}", stepID)
 		outputs["validation_failed_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.validation_failed }}", stepID)
 		outputs["validation_error_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.validation_error }}", stepID)
 		outputs["patch_size_exceeded_"+memory.ID] = fmt.Sprintf("${{ steps.%s.outputs.patch_size_exceeded }}", stepID)
