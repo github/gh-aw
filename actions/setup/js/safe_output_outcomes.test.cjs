@@ -45,6 +45,14 @@ describe("safe-output application outcomes", () => {
     expect(buildSafeOutputOutcomes([{ success: true }], true)[0]).toMatchObject({ status: "staged", staged: true });
   });
 
+  it("records queued ledger appends as delegated until persistence", () => {
+    const record = { type: "ledger_append", messageIndex: 0, success: true, result: { queued: true } };
+    const [outcome] = buildSafeOutputOutcomes([record]);
+
+    expect(outcome).toMatchObject({ type: "ledger_append", messageIndex: 0, status: "delegated" });
+    expect(computeSafeOutputsStatus([record])).toMatchObject({ itemsApplied: 0, itemsSucceeded: 0, itemsFailed: 0 });
+  });
+
   it("fans out array results without promoting failed, skipped, or empty results to applied", () => {
     const outcomes = buildSafeOutputOutcomes([
       {
