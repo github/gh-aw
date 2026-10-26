@@ -94,9 +94,9 @@ Test content`
 		t.Error("Expected add_labels in handler config")
 	}
 
-	// Check that the consolidated job has correct timeout (45 minutes for consolidated job)
-	if !strings.Contains(yamlStr, "timeout-minutes: 45") {
-		t.Error("Expected timeout-minutes: 45 for consolidated safe_outputs job")
+	// Check that the API-only consolidated job respects ubuntu-slim's timeout limit.
+	if !strings.Contains(yamlStr, "timeout-minutes: 15") {
+		t.Error("Expected timeout-minutes: 15 for consolidated safe_outputs job")
 	}
 }
 
