@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set +o histexpand
 
-# Tests for install_awf_binary.sh flag-parsing and variable-override logic.
+# Tests for install_awf_binary.sh flags, install paths, and bounded download retries.
 # Run: bash install_awf_binary_test.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -109,7 +109,7 @@ test_curl_retry_all_errors() {
   local test_dir
   local option_index
   local -a actual_options
-  local -a expected_options=(-fsSL --proto '=https' --proto-redir '=https' --retry 5 --retry-delay 10 --retry-max-time 180)
+  local -a expected_options=(-fsSL --proto '=https' --proto-redir '=https' --retry 8 --retry-delay 0 --retry-max-time 180 --connect-timeout 15 --max-time 60)
   TEST_FAILURE_REASON=""
   if [ "${expected}" = true ]; then
     expected_options+=(--retry-all-errors)
@@ -182,8 +182,8 @@ EOF
   shopt -s nullglob
   curl_args_files=("${test_dir}"/curl-args.[0-9]*)
   shopt -u nullglob
-  if [ "${#curl_args_files[@]}" -eq 0 ]; then
-    TEST_FAILURE_REASON="installer did not invoke a download"
+  if [ "${#curl_args_files[@]}" -ne 2 ]; then
+    TEST_FAILURE_REASON="expected checksum and platform binary downloads, got ${#curl_args_files[@]}"
     rm -rf "${test_dir}"
     return 1
   fi
@@ -200,6 +200,12 @@ EOF
     # extra retry flag (such as an unconditional --retry-all-errors) is caught.
     if [ "${actual_options[${#expected_options[@]}]:-}" != "-o" ]; then
       TEST_FAILURE_REASON="expected -o at position ${#expected_options[@]}, got ${actual_options[${#expected_options[@]}]:-<none>}"
+      rm -rf "${test_dir}"
+      return 1
+    fi
+    if [ "${actual_options[${#expected_options[@]}+2]:-}" != "--write-out" ] ||
+      [ "${actual_options[${#expected_options[@]}+3]:-}" != '%{http_code}' ]; then
+      TEST_FAILURE_REASON="download did not capture the final HTTP status"
       rm -rf "${test_dir}"
       return 1
     fi

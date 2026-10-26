@@ -71,6 +71,15 @@ This action copies files from `actions/setup/`, including:
 
 All files are copied from the committed `js/` and `sh/` directories which contain the source of truth for all JavaScript and shell scripts.
 
+## AWF release downloads
+
+The AWF installer retries release downloads up to eight times with exponential
+backoff and a 180-second retry budget. Each transfer has a 15-second connection
+timeout and a 60-second total timeout; the retry budget does not interrupt an
+in-progress transfer. Failed downloads report the asset, release, HTTP status,
+and curl exit code without logging signed redirect URLs. Checksum verification
+remains mandatory before installation or execution.
+
 ## OTLP credential masking
 
 Setup registers runner masks before sending its OTLP span. Full header strings
