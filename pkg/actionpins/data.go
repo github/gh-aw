@@ -170,6 +170,7 @@ func cloneActionPin(pin ActionPin) ActionPin {
 		return pin
 	}
 
+	actionPinsLog.Printf("Cloning action pin inputs: repo=%s version=%s inputs=%d", pin.Repo, pin.Version, len(pin.Inputs))
 	inputs := make(map[string]*ActionYAMLInput, len(pin.Inputs))
 	for name, input := range pin.Inputs {
 		if input == nil {

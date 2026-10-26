@@ -44,6 +44,9 @@ func NewMasker(rules []MaskRule) (*Masker, error) {
 
 // Mask applies all mask rules in order and returns the transformed line.
 func (m *Masker) Mask(line string) string {
+	if maskLog.Enabled() {
+		maskLog.Printf("Masking line: length=%d, rules=%d", len(line), len(m.rules))
+	}
 	for _, r := range m.rules {
 		line = r.re.ReplaceAllString(line, r.replacement)
 	}
