@@ -459,13 +459,103 @@ func TestComputeGraderBackedExperimentDecision(t *testing.T) {
 	assert.Equal(t, map[string]int{"control": 3, "candidate": 3}, analysis.Samples)
 }
 
-func TestWelchTTestZeroVarianceFallback(t *testing.T) {
+func TestMeanValues(t *testing.T) {
 	t.Parallel()
 
-	pValue, err := welchTTest([]float64{0.5, 0.5, 0.5}, []float64{0.8, 0.8, 0.8})
+	tests := []struct {
+		name   string
+		values []float64
+		want   float64
+	}{
+		{name: "nil", want: 0},
+		{name: "empty", values: []float64{}, want: 0},
+		{name: "single observation", values: []float64{0.75}, want: 0.75},
+		{name: "mixed signs", values: []float64{-3, 1, 5}, want: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.InDelta(t, tt.want, meanValues(tt.values), 1e-12)
+		})
+	}
+}
 
-	require.NoError(t, err)
-	assert.Zero(t, pValue)
+func TestWelchTTest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		control    []float64
+		variant    []float64
+		wantPValue float64
+	}{
+		{
+			name:       "sample variance",
+			control:    []float64{0.6, 0.7, 0.8},
+			variant:    []float64{0.8, 0.9, 1.0},
+			wantPValue: 0.07048399691021993,
+		},
+		{
+			name:       "two observations per group",
+			control:    []float64{0, 2},
+			variant:    []float64{2, 4},
+			wantPValue: 0.2928932188134524,
+		},
+		{
+			name:       "equal means with unequal sizes and variances",
+			control:    []float64{1, 3},
+			variant:    []float64{-4, -1, 2, 5, 8},
+			wantPValue: 1,
+		},
+		{
+			name:       "one zero variance sample with unequal sizes",
+			control:    []float64{2, 2},
+			variant:    []float64{2, 4, 6},
+			wantPValue: 0.2254033307585166,
+		},
+		{
+			name:       "equal zero variance samples",
+			control:    []float64{0.5, 0.5, 0.5},
+			variant:    []float64{0.5, 0.5, 0.5},
+			wantPValue: 1,
+		},
+		{
+			name:       "equal zero variance samples with unequal sizes",
+			control:    []float64{0.1, 0.1},
+			variant:    []float64{0.1, 0.1, 0.1},
+			wantPValue: 1,
+		},
+		{
+			name:       "different zero variance samples",
+			control:    []float64{0.5, 0.5, 0.5},
+			variant:    []float64{0.8, 0.8, 0.8},
+			wantPValue: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			pValue, err := welchTTest(tt.control, tt.variant)
+			require.NoError(t, err)
+			assert.InDelta(t, tt.wantPValue, pValue, 1e-12)
+
+			reversedPValue, err := welchTTest(tt.variant, tt.control)
+			require.NoError(t, err)
+			assert.InDelta(t, tt.wantPValue, reversedPValue, 1e-12)
+		})
+	}
+}
+
+func TestWelchTTestInsufficientObservations(t *testing.T) {
+	t.Parallel()
+
+	for _, values := range [][]float64{nil, {}, {1}} {
+		_, err := welchTTest(values, []float64{1, 2})
+		require.ErrorContains(t, err, "at least two usable observations per variant")
+
+		_, err = welchTTest([]float64{1, 2}, values)
+		require.ErrorContains(t, err, "at least two usable observations per variant")
+	}
 }
 
 func TestGraderReadinessUsesValidObservations(t *testing.T) {
