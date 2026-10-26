@@ -42,7 +42,7 @@ describe("generate_usage_activity_summary.cjs", () => {
       delete process.env.GITHUB_STEP_SUMMARY;
       delete process.env.GH_AW_MEMORY_SAVE_RESULTS;
       if (configured) {
-        process.env.GH_AW_MEMORY_SAVE_RESULTS = JSON.stringify({ default: { jobResult: "success", outcome: "success", status: "saved", content: "PRIVATE_MEMORY" } });
+        process.env.GH_AW_MEMORY_SAVE_RESULTS = JSON.stringify({ default: { jobResult: "success", outcome: "success", status: "saved", branch: "memory/default", commit: "b".repeat(40), content: "PRIVATE_MEMORY" } });
       }
       global.core = { info: vi.fn(), warning: vi.fn() };
       vi.spyOn(fs, "existsSync").mockReturnValue(false);
@@ -50,7 +50,7 @@ describe("generate_usage_activity_summary.cjs", () => {
       await main();
       const payload = JSON.parse(writes.mock.calls.find(([file]) => file === "/tmp/gh-aw/usage/activity/summary.json")[1]);
       if (configured) {
-        expect(payload.memory_saves).toEqual([{ memoryId: "default", jobResult: "success", outcome: "success", status: "saved" }]);
+        expect(payload.memory_saves).toEqual([{ memoryId: "default", jobResult: "success", outcome: "success", status: "saved", branch: "memory/default", commit: "b".repeat(40) }]);
         expect(JSON.stringify(payload)).not.toContain("PRIVATE_MEMORY");
       } else {
         expect(payload).not.toHaveProperty("memory_saves");

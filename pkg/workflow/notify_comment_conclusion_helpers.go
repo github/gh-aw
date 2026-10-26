@@ -660,24 +660,35 @@ func buildConclusionJobNeeds(data *WorkflowData, mainJobName string, safeOutputJ
 	return needs
 }
 
-// buildConclusionMemorySaveEnv projects only trusted persistence enums, never memory contents or errors.
+// buildConclusionMemorySaveEnv projects trusted persistence metadata, never memory contents or errors.
 func buildConclusionMemorySaveEnv(data *WorkflowData) map[string]string {
 	if data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0 {
 		return nil
 	}
 	results := make(map[string]map[string]string, len(data.RepoMemoryConfig.Memories))
+	var jsonExpressions []string
 	for _, memory := range data.RepoMemoryConfig.Memories {
 		results[memory.ID] = map[string]string{
 			"jobResult": "${{ needs.push_repo_memory.result }}",
 			"outcome":   fmt.Sprintf("${{ needs.push_repo_memory.outputs.save_outcome_%s }}", memory.ID),
 			"status":    fmt.Sprintf("${{ needs.push_repo_memory.outputs.save_status_%s }}", memory.ID),
 		}
+		for _, field := range []string{"branch", "commit"} {
+			expression := fmt.Sprintf("${{ toJSON(needs.push_repo_memory.outputs.save_%s_%s) }}", field, memory.ID)
+			results[memory.ID][field] = expression
+			jsonExpressions = append(jsonExpressions, expression)
+		}
 	}
 	value, err := json.Marshal(results)
 	if err != nil {
 		panic(fmt.Sprintf("BUG: failed to marshal memory save results: %v", err))
 	}
-	return map[string]string{"GH_AW_MEMORY_SAVE_RESULTS": fmt.Sprintf("%q", value)}
+	// Free-text metadata must be JSON-encoded by Actions, not interpolated into JSON strings.
+	metadata := string(value)
+	for _, expression := range jsonExpressions {
+		metadata = strings.ReplaceAll(metadata, strconv.Quote(expression), expression)
+	}
+	return map[string]string{"GH_AW_MEMORY_SAVE_RESULTS": fmt.Sprintf("%q", metadata)}
 }
 
 // buildConclusionJobOutputs builds outputs for the conclusion job.

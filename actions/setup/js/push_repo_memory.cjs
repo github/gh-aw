@@ -149,6 +149,7 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousB
  * @param {string} [opts.originUrlForPush]
  * @param {string} [opts.repoUrlForRetry]
  * @param {() => void} [opts.validateBeforePush]
+ * @returns {Promise<string | undefined | false>} Remote commit, unchanged replay, or failure.
  */
 async function pushRepoMemoryChangesWithRetry({
   githubClient,
@@ -196,7 +197,7 @@ async function pushRepoMemoryChangesWithRetry({
       }
     }
     try {
-      await pushSignedCommitsFn({
+      const commit = await pushSignedCommitsFn({
         githubClient,
         owner: targetOwner,
         repo: targetRepoName,
@@ -207,8 +208,8 @@ async function pushRepoMemoryChangesWithRetry({
         allowGitPushFallback: !validateBeforePush,
         requireBaseRefMatch: Boolean(validateBeforePush),
       });
-      core.info(`Successfully pushed changes to ${branchName} branch`);
-      return true;
+      core.info(commit ? `Successfully pushed changes to ${branchName} branch` : `No changes left to push to ${branchName} branch`);
+      return commit;
     } catch (error) {
       const errMsg = getErrorMessage(error);
       if (isDeterministicPushValidationError(errMsg)) {
@@ -995,7 +996,7 @@ async function main() {
   // strict signed-commits ruleset that fallback will also be rejected —
   // that is expected behaviour: remove the unsupported file types and
   // re-run.
-  ledgerActivity.saving.pushed = await pushRepoMemoryChangesWithRetry({
+  const pushedCommit = await pushRepoMemoryChangesWithRetry({
     githubClient: github,
     targetOwner,
     targetRepoName,
@@ -1027,7 +1028,14 @@ async function main() {
           }
         : undefined,
   });
-  if (ledgerActivity.saving.pushed) core.setOutput("save_status", "saved");
+  ledgerActivity.saving.pushed = Boolean(pushedCommit);
+  if (pushedCommit) {
+    core.setOutput("save_branch", branchName);
+    core.setOutput("save_commit", pushedCommit);
+    core.setOutput("save_status", "saved");
+  } else if (pushedCommit !== false) {
+    core.setOutput("save_status", "unchanged");
+  }
   await writeLedgerSummary();
 }
 

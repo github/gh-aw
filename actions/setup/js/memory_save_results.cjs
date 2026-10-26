@@ -22,10 +22,21 @@ function readMemorySaveResults(value = process.env.GH_AW_MEMORY_SAVE_RESULTS) {
       const outcome = ["success", "failure", "cancelled", "skipped"].includes(result.outcome) ? result.outcome : undefined;
       /** @type {import("./types/unified_session").MemorySaveResultData["status"]} */
       let status = "unknown";
-      if (outcome === "failure" || outcome === "cancelled") status = outcome;
+      if (outcome && outcome !== "skipped" && ["saved", "unchanged"].includes(result.status)) status = result.status;
+      else if (outcome === "failure" || outcome === "cancelled") status = outcome;
       else if (outcome === "skipped" || (outcome === undefined && ["skipped", "cancelled"].includes(result.jobResult))) status = outcome ?? result.jobResult;
       else if (outcome === "success" && ["saved", "unchanged", "skipped"].includes(result.status)) status = result.status;
-      return [{ memoryId, jobResult: result.jobResult, ...(outcome ? { outcome } : {}), status }];
+      const push =
+        status === "saved" &&
+        typeof result.branch === "string" &&
+        result.branch.length > 0 &&
+        result.branch.length <= 1024 &&
+        !/[\x00-\x20\x7f]/.test(result.branch) &&
+        typeof result.commit === "string" &&
+        /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(result.commit)
+          ? { branch: result.branch, commit: result.commit }
+          : {};
+      return [{ memoryId, jobResult: result.jobResult, ...(outcome ? { outcome } : {}), status, ...push }];
     });
 }
 

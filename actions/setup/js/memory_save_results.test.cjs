@@ -8,8 +8,11 @@ describe("memory save results", () => {
     ["success", "success", "saved", "saved"],
     ["success", "success", "unchanged", "unchanged"],
     ["success", "success", "skipped", "skipped"],
-    ["failure", "failure", "saved", "failure"],
-    ["cancelled", "cancelled", "saved", "cancelled"],
+    ["failure", "failure", "saved", "saved"],
+    ["cancelled", "cancelled", "saved", "saved"],
+    ["failure", "failure", "unchanged", "unchanged"],
+    ["failure", "failure", "skipped", "failure"],
+    ["cancelled", "cancelled", "skipped", "cancelled"],
     ["skipped", "", "", "skipped"],
     ["cancelled", "", "", "cancelled"],
     ["failure", "", "", "unknown"],
@@ -32,5 +35,30 @@ describe("memory save results", () => {
     const result = { jobResult: "success", outcome: "success", status: "saved", secret: "PRIVATE" };
     expect(readMemorySaveResults(JSON.stringify({ z: result, invalid: [], a: result })).map(result => result.memoryId)).toEqual(["a", "z"]);
     expect(JSON.stringify(readMemorySaveResults(JSON.stringify({ a: result })))).not.toContain("PRIVATE");
+  });
+
+  it.each(["success", "failure", "cancelled"])("retains successful push metadata with step outcome %s", outcome => {
+    const result = { jobResult: "failure", outcome, status: "saved", branch: "memory/default", commit: "b".repeat(40), content: "PRIVATE" };
+    expect(readMemorySaveResults(JSON.stringify({ default: result }))).toEqual([{ memoryId: "default", jobResult: "failure", outcome, status: "saved", branch: result.branch, commit: result.commit }]);
+  });
+
+  it.each(["unchanged", "skipped", "failure", "cancelled", "unknown"])("omits push metadata for %s", status => {
+    const result = { jobResult: "success", outcome: "success", status, branch: "memory/default", commit: "b".repeat(40) };
+    const [projected] = readMemorySaveResults(JSON.stringify({ default: result }));
+    expect(projected).not.toHaveProperty("branch");
+    expect(projected).not.toHaveProperty("commit");
+  });
+
+  it.each([
+    { branch: "memory/default", commit: "not-a-commit" },
+    { branch: "memory/default", commit: "b".repeat(39) },
+    { branch: "memory/default\nPRIVATE", commit: "b".repeat(40) },
+    { branch: "", commit: "b".repeat(40) },
+    { branch: {}, commit: "b".repeat(40) },
+    { branch: "memory/default", commit: null },
+  ])("omits invalid push metadata: %j", push => {
+    const [projected] = readMemorySaveResults(JSON.stringify({ default: { jobResult: "success", outcome: "success", status: "saved", ...push } }));
+    expect(projected).not.toHaveProperty("branch");
+    expect(projected).not.toHaveProperty("commit");
   });
 });

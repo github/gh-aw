@@ -812,7 +812,9 @@
         "memoryId": { "type": "string" },
         "jobResult": { "type": "string", "enum": ["success", "failure", "cancelled", "skipped"] },
         "outcome": { "type": "string", "enum": ["success", "failure", "cancelled", "skipped"] },
-        "status": { "type": "string", "enum": ["saved", "unchanged", "skipped", "failure", "cancelled", "unknown"] }
+        "status": { "type": "string", "enum": ["saved", "unchanged", "skipped", "failure", "cancelled", "unknown"] },
+        "branch": { "type": "string", "description": "Target branch of a successful push." },
+        "commit": { "type": "string", "description": "Commit that landed remotely, which may differ from the local commit." }
       },
       "required": ["memoryId", "jobResult", "status"],
       "additionalProperties": false,

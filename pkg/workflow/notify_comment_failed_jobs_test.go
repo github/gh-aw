@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,6 +27,13 @@ func TestConclusionMemorySaveEnvironment(t *testing.T) {
 		}
 		var metadata string
 		require.NoError(t, json.Unmarshal([]byte(env["GH_AW_MEMORY_SAVE_RESULTS"]), &metadata))
+		for _, memory := range memories {
+			for _, field := range []string{"branch", "commit"} {
+				expression := fmt.Sprintf("${{ toJSON(needs.push_repo_memory.outputs.save_%s_%s) }}", field, memory.ID)
+				require.Contains(t, metadata, `"`+field+`":`+expression)
+				metadata = strings.ReplaceAll(metadata, expression, strconv.Quote(expression))
+			}
+		}
 		var results map[string]map[string]string
 		require.NoError(t, json.Unmarshal([]byte(metadata), &results))
 		require.Len(t, results, len(memories))
@@ -34,6 +42,8 @@ func TestConclusionMemorySaveEnvironment(t *testing.T) {
 				"jobResult": "${{ needs.push_repo_memory.result }}",
 				"outcome":   fmt.Sprintf("${{ needs.push_repo_memory.outputs.save_outcome_%s }}", memory.ID),
 				"status":    fmt.Sprintf("${{ needs.push_repo_memory.outputs.save_status_%s }}", memory.ID),
+				"branch":    fmt.Sprintf("${{ toJSON(needs.push_repo_memory.outputs.save_branch_%s) }}", memory.ID),
+				"commit":    fmt.Sprintf("${{ toJSON(needs.push_repo_memory.outputs.save_commit_%s) }}", memory.ID),
 			}, results[memory.ID])
 		}
 		require.NotContains(t, metadata, "validation_error")

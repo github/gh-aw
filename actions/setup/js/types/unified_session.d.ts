@@ -478,6 +478,10 @@ export interface MemorySaveResultData {
   jobResult: "success" | "failure" | "cancelled" | "skipped";
   outcome?: "success" | "failure" | "cancelled" | "skipped";
   status: "saved" | "unchanged" | "skipped" | "failure" | "cancelled" | "unknown";
+  /** Target branch of a successful push. */
+  branch?: string;
+  /** Commit that landed remotely, which may differ from the local commit. */
+  commit?: string;
 }
 
 /** Validated admission allowances, not spend or credentials. */
