@@ -1648,3 +1648,180 @@ Papers investigated for GitHub Agentic Workflows improvement opportunities. Full
 - **Relevant**: Yes
 - **Opportunity**: Add proactive human-engagement checkpoints to coauthoring workflows.
 - **Area**: human-in-the-loop
+
+### [SceneBloom: Agentic Indoor Environment Generation with Realistic and Diverse Layouts for Embodied Learning](https://arxiv.org/abs/2610.32978v1)
+- **ID**: 2610.32978v1
+- **Published**: 2026-10-23
+- **Categories**: cs.CV,cs.AI,cs.RO
+- **Relevant**: No
+
+### [Measure Before You Train: Typed Decision Models vs. a Classical Baseline vs. a Generative LLM for Routing a Personal Multilingual Inbox](https://arxiv.org/abs/2610.32955v1)
+- **ID**: 2610.32955v1
+- **Published**: 2026-10-23
+- **Categories**: cs.CL,cs.HC,cs.LG
+- **Relevant**: Yes
+- **Opportunity**: Evaluate typed routing decisions against human-grounded labels.
+- **Area**: evaluation
+
+### [Do "True" and "False" Add Up to One? Complement Consistency in LLM-Agent Opinion Simulations](https://arxiv.org/abs/2610.32874v1)
+- **ID**: 2610.32874v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI,cs.CL,cs.MA
+- **Relevant**: Yes
+- **Opportunity**: Add complement-consistency checks for probabilistic agent outputs.
+- **Area**: evaluation
+
+### [Interpretable sparse fine-tuning with TopKLoRA enables faithful circuit discovery](https://arxiv.org/abs/2610.32866v1)
+- **ID**: 2610.32866v1
+- **Published**: 2026-10-23
+- **Categories**: cs.LG,cs.AI,cs.CL
+- **Relevant**: No
+
+### [Reimagining Enterprise RAG for Multi-Agent Systems: A Knowledge Layer That Organizes Before It Retrieves](https://arxiv.org/abs/2610.32851v1)
+- **ID**: 2610.32851v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Explore scope-aware retrieval across repositories and services.
+- **Area**: memory
+
+### [HarnessMM: Recursive Self-Improvement for Harness Token Efficiency](https://arxiv.org/abs/2610.32813v1)
+- **ID**: 2610.32813v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Add guarded decision reuse for validated tool receipts.
+- **Area**: token-optimization
+
+### [Every Edge Needs a Quote: Building a Quote-Grounded Knowledge Graph of Healthcare Software Adoption with Language-Model Agents](https://arxiv.org/abs/2610.32781v1)
+- **ID**: 2610.32781v1
+- **Published**: 2026-10-23
+- **Categories**: cs.CL,cs.AI,cs.IR
+- **Relevant**: No
+
+### [Semantic Representation for Agentic Self-Play in Automated Laboratories](https://arxiv.org/abs/2610.32755v1)
+- **ID**: 2610.32755v1
+- **Published**: 2026-10-23
+- **Categories**: cs.RO,cs.AI
+- **Relevant**: No
+
+### [ActionRAG: Evidence-Refining Graph Diffusion for Long-Term Memory in LLM Agents](https://arxiv.org/abs/2610.32752v1)
+- **ID**: 2610.32752v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI,cs.CL
+- **Relevant**: Yes
+- **Opportunity**: Refine persistent-memory retrieval with graph evidence.
+- **Area**: memory
+
+### [Agentic Hazard Mapper: Emulating Expert Map-Making with AI Agents for Risk Communication](https://arxiv.org/abs/2610.32738v1)
+- **ID**: 2610.32738v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: No
+
+### [Ontology-Guided Knowledge Graph Construction from Structured Metadata and Climate Science Publications](https://arxiv.org/abs/2610.32725v1)
+- **ID**: 2610.32725v1
+- **Published**: 2026-10-23
+- **Categories**: cs.CL,cs.AI
+- **Relevant**: No
+
+### [OpenDraco: A Platform for Engineering and Experimenting with Configurable Multi-Agent Architectures for Software Engineering](https://arxiv.org/abs/2610.32686v1)
+- **ID**: 2610.32686v1
+- **Published**: 2026-10-23
+- **Categories**: cs.SE
+- **Relevant**: Yes
+- **Opportunity**: Version and compare multi-agent topology configurations.
+- **Area**: sub-agents
+
+### [StateMirror: Pre-Execution Detection of Hallucinated Tool Calls in Coding Agents](https://arxiv.org/abs/2610.32648v1)
+- **ID**: 2610.32648v1
+- **Published**: 2026-10-23
+- **Categories**: cs.SE
+- **Relevant**: Yes
+- **Opportunity**: Preflight tool-call prerequisites before dispatch.
+- **Area**: workflow-compilation
+
+### [Can AI Agents Help Robotic Engineers? Lessons from Two Focus Days in Industry](https://arxiv.org/abs/2610.32636v1)
+- **ID**: 2610.32636v1
+- **Published**: 2026-10-23
+- **Categories**: cs.SE,cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Measure domain adaptation effects on agent workflows.
+- **Area**: evaluation
+
+### [What Transfers Across Protein Pockets? Experience Reuse in Molecular Optimization for Agentic Structure-Based Drug Design](https://arxiv.org/abs/2610.32620v1)
+- **ID**: 2610.32620v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI,q-bio.BM
+- **Relevant**: No
+
+### [Lessons Outlive Their Failures: A Case Study of Rules for AI Coding Agents](https://arxiv.org/abs/2610.32578v1)
+- **ID**: 2610.32578v1
+- **Published**: 2026-10-23
+- **Categories**: cs.SE
+- **Relevant**: Yes
+- **Opportunity**: Turn failure ledgers and rule fixes into replayable regression tests.
+- **Area**: workflow-compilation
+
+### [Tool-Calling LLM Agents Under Realistic MCP Faults: Scale Does Not Purchase Fault Tolerance](https://arxiv.org/abs/2610.32555v1)
+- **ID**: 2610.32555v1
+- **Published**: 2026-10-23
+- **Categories**: cs.SE,cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Test MCP recovery under realistic persistent and transient faults.
+- **Area**: error-recovery
+
+### [IGG: A Benchmark for Interactive GUI Grounding under Visibility Constraints](https://arxiv.org/abs/2610.32536v1)
+- **ID**: 2610.32536v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: No
+
+### [Accordion: Elastic-Depth Inference via Fixed-Prefix Layer Looping](https://arxiv.org/abs/2610.32492v1)
+- **ID**: 2610.32492v1
+- **Published**: 2026-10-23
+- **Categories**: cs.LG,cs.CL
+- **Relevant**: No
+
+### [When Agents Fail: Model or Harness--Who's to Blame?](https://arxiv.org/abs/2610.32483v1)
+- **ID**: 2610.32483v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI,cs.CL,cs.SE
+- **Relevant**: Yes
+- **Opportunity**: Measure model-harness fit and token load across engines.
+- **Area**: evaluation
+
+### [WaitLens: Temporal VLM-Based Adaptive Waiting for Industrial GUI Testing Agents](https://arxiv.org/abs/2610.32482v1)
+- **ID**: 2610.32482v1
+- **Published**: 2026-10-23
+- **Categories**: cs.SE
+- **Relevant**: No
+
+### [CASE: Confusion-Aware Skill Evolution for Frozen Multimodal Emotion Models](https://arxiv.org/abs/2610.32481v1)
+- **ID**: 2610.32481v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: No
+
+### [CauProphet: Teaching Agents to Develop Causal Cognition like Humans](https://arxiv.org/abs/2610.32477v1)
+- **ID**: 2610.32477v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Explore evidence-updated causal structures in persistent memory.
+- **Area**: memory
+
+### [Beyond Copying: Lifelong Smart Contract Security Task Construction via Protocol Mutation](https://arxiv.org/abs/2610.32453v1)
+- **ID**: 2610.32453v1
+- **Published**: 2026-10-23
+- **Categories**: cs.CR,cs.AI
+- **Relevant**: Yes
+- **Opportunity**: Generate mutation-based executable security evaluation tasks.
+- **Area**: security-evaluation
+
+### [POSEIDON: Scaling Training Environments for Scientific Agents from Code Repositories](https://arxiv.org/abs/2610.32448v1)
+- **ID**: 2610.32448v1
+- **Published**: 2026-10-23
+- **Categories**: cs.AI
+- **Relevant**: No
+

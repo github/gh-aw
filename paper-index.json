@@ -2414,6 +2414,181 @@
       "published": "2026-10-22",
       "relevant": true,
       "analyzed_at": "2026-10-25-08-40-27"
+    },
+    {
+      "id": "2610.32978v1",
+      "title": "SceneBloom: Agentic Indoor Environment Generation with Realistic and Diverse Layouts for Embodied Learning",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32955v1",
+      "title": "Measure Before You Train: Typed Decision Models vs. a Classical Baseline vs. a Generative LLM for Routing a Personal Multilingual Inbox",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32874v1",
+      "title": "Do \"True\" and \"False\" Add Up to One? Complement Consistency in LLM-Agent Opinion Simulations",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32866v1",
+      "title": "Interpretable sparse fine-tuning with TopKLoRA enables faithful circuit discovery",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32851v1",
+      "title": "Reimagining Enterprise RAG for Multi-Agent Systems: A Knowledge Layer That Organizes Before It Retrieves",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32813v1",
+      "title": "HarnessMM: Recursive Self-Improvement for Harness Token Efficiency",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32781v1",
+      "title": "Every Edge Needs a Quote: Building a Quote-Grounded Knowledge Graph of Healthcare Software Adoption with Language-Model Agents",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32755v1",
+      "title": "Semantic Representation for Agentic Self-Play in Automated Laboratories",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32752v1",
+      "title": "ActionRAG: Evidence-Refining Graph Diffusion for Long-Term Memory in LLM Agents",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32738v1",
+      "title": "Agentic Hazard Mapper: Emulating Expert Map-Making with AI Agents for Risk Communication",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32725v1",
+      "title": "Ontology-Guided Knowledge Graph Construction from Structured Metadata and Climate Science Publications",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32686v1",
+      "title": "OpenDraco: A Platform for Engineering and Experimenting with Configurable Multi-Agent Architectures for Software Engineering",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32648v1",
+      "title": "StateMirror: Pre-Execution Detection of Hallucinated Tool Calls in Coding Agents",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32636v1",
+      "title": "Can AI Agents Help Robotic Engineers? Lessons from Two Focus Days in Industry",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32620v1",
+      "title": "What Transfers Across Protein Pockets? Experience Reuse in Molecular Optimization for Agentic Structure-Based Drug Design",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32578v1",
+      "title": "Lessons Outlive Their Failures: A Case Study of Rules for AI Coding Agents",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32555v1",
+      "title": "Tool-Calling LLM Agents Under Realistic MCP Faults: Scale Does Not Purchase Fault Tolerance",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32536v1",
+      "title": "IGG: A Benchmark for Interactive GUI Grounding under Visibility Constraints",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32492v1",
+      "title": "Accordion: Elastic-Depth Inference via Fixed-Prefix Layer Looping",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32483v1",
+      "title": "When Agents Fail: Model or Harness--Who's to Blame?",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32482v1",
+      "title": "WaitLens: Temporal VLM-Based Adaptive Waiting for Industrial GUI Testing Agents",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32481v1",
+      "title": "CASE: Confusion-Aware Skill Evolution for Frozen Multimodal Emotion Models",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32477v1",
+      "title": "CauProphet: Teaching Agents to Develop Causal Cognition like Humans",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32453v1",
+      "title": "Beyond Copying: Lifelong Smart Contract Security Task Construction via Protocol Mutation",
+      "published": "2026-10-23",
+      "relevant": true,
+      "analyzed_at": "2026-10-26-08-52-52"
+    },
+    {
+      "id": "2610.32448v1",
+      "title": "POSEIDON: Scaling Training Environments for Scientific Agents from Code Repositories",
+      "published": "2026-10-23",
+      "relevant": false,
+      "analyzed_at": "2026-10-26-08-52-52"
     }
   ]
 }
