@@ -173,6 +173,17 @@ describe("authenticated immutable activation snapshots", () => {
     expect(loadWorkQueueSnapshot(options.snapshotPath).projection.policy_epoch).toBe("e1");
   });
 
+  it("includes visible_work_ids only when supplied", async () => {
+    const { options } = setup({ granted: false });
+    expect(await main(options)).not.toHaveProperty("visible_work_ids");
+    expect(await main({ ...options, snapshotPath: `${options.snapshotPath}.2`, visibleWorkIds: ["w1"] })).toMatchObject({ visible_work_ids: ["w1"] });
+  });
+
+  it("resolves no worker assignment when the payload carries none", () => {
+    const { fixture } = setup({ bound: true });
+    expect(resolveWorkerAssignment({}, fixture.transactions)).toBeNull();
+  });
+
   it("reports an absent queue as uninitialized without claiming worker readiness or installing Policy", async () => {
     const { options } = setup({ granted: false });
     const initialize = vi.fn();
