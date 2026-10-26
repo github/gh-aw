@@ -44,16 +44,24 @@ Model aliases ([how they resolve](/gh-aw/reference/engines/#model-aliases))
 resolve against the Gemini provider's live models from AWF `/reflect`, and Agy
 receives the native slug.
 
-The harness downloads the native Linux x64 v1.3.6 release, verifies its published
+The installation step downloads the native Linux x64 v1.3.6 release before the
+agent firewall starts, verifies its published
 SHA-256 checksum, extracts only `antigravity`, and verifies the executable version.
 Explicit `version: "1.3.3"` and `version: "1.3.1"` retain the previous verified releases.
 Other releases and architectures are not supported. A custom `engine.command`
-must report the same verified version. Installation and settings are temporary
-and removed after execution; no inherited user authentication profile is used.
+must report the same verified version and skips download and installation.
+The binary is staged under `RUNNER_TEMP`; private settings are removed after
+execution. No inherited user authentication profile is used.
 
 The archive checksum applies to the default installer only. `engine.command`
 selects a separately trusted executable; its version is checked, but its bytes
 are not attested by that archive checksum.
+
+Runtime GitHub and release-download access requires an explicit
+`network: { allowed: [agy] }` opt-in. Neither the default installer nor a custom
+executable adds these hosts to the agent allowlist. Gateway connectivity is
+retained with `network: {}`; failed endpoint discovery never enables direct
+inference fallback.
 
 ## Tools, configuration and limits
 

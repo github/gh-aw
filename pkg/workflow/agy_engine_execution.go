@@ -41,6 +41,9 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 	if cliPath := GetMCPCLIPathSetup(workflowData); cliPath != "" {
 		engineCommand = fmt.Sprintf("%s && %s", cliPath, engineCommand)
 	}
+	allowedDomains := mustGetAllowedDomainsForEngineWithModel(constants.AgyEngine, workflowData.Model, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
+	// Gateway reachability is independent of direct GitHub/download egress.
+	allowedDomains = mergeDomainsWithNetworkToolsAndRuntimes(append(splitDomainList(allowedDomains), "host.docker.internal"), nil, nil, nil)
 	return BuildAWFCommand(AWFCommandConfig{
 		EngineName:         e.GetID(),
 		EngineCommand:      engineCommand,
@@ -48,7 +51,7 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 		WorkflowData:       workflowData,
 		UsesTTY:            false,
 		PathSetup:          "touch " + AgentStepSummaryPath,
-		AllowedDomains:     mergeDomainsWithNetworkToolsAndRuntimes(AgyDefaultDomains, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes),
+		AllowedDomains:     allowedDomains,
 		ExcludeEnvVarNames: ComputeAWFExcludeEnvVarNames(workflowData, e.GetRequiredSecretNames(workflowData)),
 	})
 }

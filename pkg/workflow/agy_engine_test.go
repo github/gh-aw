@@ -102,11 +102,45 @@ func TestAgyCompilerSelectionAndRestrictions(t *testing.T) {
 			assert.NotContains(t, string(lock), "GHAW_MCP_CONFIG_ADAPTER_SCRIPT")
 			assert.Contains(t, string(lock), "generativelanguage.googleapis.com")
 			assert.Contains(t, string(lock), `GH_AW_INFO_FIREWALL_ENABLED: "true"`)
+			allowed := firewallDomainRules(t, string(lock), "allowDomains")
+			assert.Contains(t, allowed, "host.docker.internal")
+			for _, domain := range []string{"github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"} {
+				assert.NotContains(t, allowed, domain)
+			}
 			if tt.name == "custom trusted executable" {
 				assert.Contains(t, string(lock), "agy_harness.cjs /opt/trusted/agy")
 				assert.NotContains(t, string(lock), "agy_harness.cjs agy'")
+				assert.NotContains(t, string(lock), "agy_harness.cjs --install")
+			} else {
+				install := strings.Index(string(lock), "agy_harness.cjs --install")
+				execute := strings.Index(string(lock), "name: Execute experimental Agy CLI")
+				require.NotEqual(t, -1, install)
+				assert.Less(t, install, execute)
 			}
 		})
+	}
+}
+
+func TestAgyCompilerNetworkPolicy(t *testing.T) {
+	for _, command := range []string{"agy", "/opt/trusted/agy"} {
+		for _, tt := range []struct {
+			name, network string
+			allowed       []string
+		}{
+			{"empty", "{}", []string{"host.docker.internal"}},
+			{"selective", "{allowed: [example.com]}", []string{"example.com", "host.docker.internal"}},
+			{"explicit bundle", "{allowed: [agy]}", AgyDefaultDomains},
+		} {
+			t.Run(command+"/"+tt.name, func(t *testing.T) {
+				dir := t.TempDir()
+				source := filepath.Join(dir, "agy.md")
+				require.NoError(t, os.WriteFile(source, fmt.Appendf(nil, "---\non: workflow_dispatch\npermissions:\n  contents: read\nengine:\n  id: agy\n  command: %s\nnetwork: %s\ntools:\n  github: false\n  bash: [\"*\"]\n---\nSay hello.\n", command, tt.network), 0o600))
+				require.NoError(t, NewCompiler().CompileWorkflow(source))
+				lock, err := os.ReadFile(filepath.Join(dir, "agy.lock.yml"))
+				require.NoError(t, err)
+				assert.ElementsMatch(t, tt.allowed, firewallDomainRules(t, string(lock), "allowDomains"))
+			})
+		}
 	}
 }
 
@@ -230,6 +264,7 @@ func TestAgyNativeRuntimeDefaults(t *testing.T) {
 	assert.Contains(t, content, "GH_AW_ENGINE_VERSION: 1.3.6")
 	assert.Contains(t, content, "GH_AW_AGY_MODEL: gemini-3.8-flash-medium")
 	assert.Contains(t, content, "--exclude-env GEMINI_API_KEY")
+	assert.Equal(t, []string{"host.docker.internal"}, firewallDomainRules(t, content, "allowDomains"))
 	assert.Equal(t, "parse_agy_log", engine.GetLogParserScriptId())
 	assert.Nil(t, engine.GetMCPConfigAdapterWriteStep())
 	assert.Equal(t, []string{"GEMINI_API_KEY"}, engine.GetRequiredSecretNames(nil))

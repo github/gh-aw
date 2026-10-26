@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -79,5 +80,19 @@ func (e *AgyEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHubAc
 
 func (e *AgyEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
 	agyLog.Print("Generating Agy runtime installation steps")
-	return BuildNpmEngineInstallStepsWithAWF([]GitHubActionStep{GenerateNodeJsSetupStep()}, workflowData)
+	steps := []GitHubActionStep{GenerateNodeJsSetupStep()}
+	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Command == "" || workflowData.EngineConfig.Command == "agy" {
+		version := string(constants.DefaultAgyVersion)
+		if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
+			version = workflowData.EngineConfig.Version
+		}
+		steps = append(steps, GitHubActionStep{
+			"      - name: Install verified Agy CLI",
+			"        env:",
+			"          GH_AW_ENGINE_VERSION: " + version,
+			"        run: |",
+			fmt.Sprintf("          %s %s/agy_harness.cjs --install", nodeRuntimeResolutionCommand, SetupActionDestinationShell),
+		})
+	}
+	return BuildNpmEngineInstallStepsWithAWF(steps, workflowData)
 }

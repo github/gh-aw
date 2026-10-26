@@ -21,6 +21,63 @@ const fail = (result, action) => {
   if (result.error || result.signal || result.status !== 0) throw new Error(`${action} failed`);
 };
 
+const verifiedVersion = () => {
+  const version = process.env.GH_AW_ENGINE_VERSION;
+  if (!version || !Object.hasOwn(checksums, version)) throw new Error("Agy requires a verified 1.3.1, 1.3.3 or 1.3.6 release");
+  return version;
+};
+
+const stagedBinary = () => {
+  if (!process.env.RUNNER_TEMP) throw new Error("RUNNER_TEMP is required for the staged Agy executable");
+  return path.join(process.env.RUNNER_TEMP, "gh-aw", "engine-cli", "bin", "agy");
+};
+
+const verifyBinary = (binary, version) => {
+  const verification = spawnSync(binary, ["--version"], { encoding: "utf8", timeout: 10000 });
+  fail(verification, "Agy version verification");
+  if (verification.stdout.trim() !== version) throw new Error("Agy executable does not match engine.version");
+};
+
+const install = () => {
+  const version = verifiedVersion();
+  const target = stagedBinary();
+  if (process.platform !== "linux" || process.arch !== "x64") throw new Error("Experimental Agy installation supports Linux x64 only");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-agy-install-"));
+  try {
+    const archive = path.join(root, "agy.tar.gz");
+    fail(
+      spawnSync(
+        "curl",
+        [
+          "--fail",
+          "--location",
+          "--silent",
+          "--show-error",
+          "--proto",
+          "=https",
+          "--tlsv1.2",
+          "--max-time",
+          "120",
+          "--output",
+          archive,
+          `https://github.com/google-antigravity/antigravity-cli/releases/download/${version}/agy_cli_linux_x64.tar.gz`,
+        ],
+        { stdio: ["ignore", "ignore", "inherit"], timeout: 125000 }
+      ),
+      "Agy download"
+    );
+    if (createHash("sha256").update(fs.readFileSync(archive)).digest("hex") !== checksums[version]) throw new Error("Agy archive checksum did not match");
+    fail(spawnSync("tar", ["-xzf", archive, "-C", root, "--", "antigravity"], { stdio: ["ignore", "ignore", "inherit"], timeout: 60000 }), "Agy extraction");
+    const binary = path.join(root, "antigravity");
+    verifyBinary(binary, version);
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+    fs.copyFileSync(binary, target, fs.constants.COPYFILE_EXCL);
+    fs.chmodSync(target, 0o700);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+};
+
 const NATIVE_SLUG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 
 /**
@@ -48,8 +105,7 @@ const resolveAgyModel = async options => {
 };
 
 const main = async () => {
-  const version = process.env.GH_AW_ENGINE_VERSION;
-  if (!version || !Object.hasOwn(checksums, version)) throw new Error("Agy requires a verified 1.3.1, 1.3.3 or 1.3.6 release");
+  const version = verifiedVersion();
   if (!command) throw new Error("Agy command is required");
   const workspace = process.env.GITHUB_WORKSPACE;
   const promptPath = process.env.GH_AW_PROMPT;
@@ -58,38 +114,8 @@ const main = async () => {
   if (!configuredModel) throw new Error("Agy requires a native model slug, not provider/model syntax");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-agy-"));
   try {
-    let binary = command;
-    if (command === "agy") {
-      if (process.platform !== "linux" || process.arch !== "x64") throw new Error("Experimental Agy installation supports Linux x64 only");
-      const archive = path.join(root, "agy.tar.gz");
-      fail(
-        spawnSync(
-          "curl",
-          [
-            "--fail",
-            "--location",
-            "--silent",
-            "--show-error",
-            "--proto",
-            "=https",
-            "--tlsv1.2",
-            "--max-time",
-            "120",
-            "--output",
-            archive,
-            `https://github.com/google-antigravity/antigravity-cli/releases/download/${version}/agy_cli_linux_x64.tar.gz`,
-          ],
-          { stdio: ["ignore", "ignore", "inherit"], timeout: 125000 }
-        ),
-        "Agy download"
-      );
-      if (createHash("sha256").update(fs.readFileSync(archive)).digest("hex") !== checksums[version]) throw new Error("Agy archive checksum did not match");
-      fail(spawnSync("tar", ["-xzf", archive, "-C", root, "--", "antigravity"], { stdio: ["ignore", "ignore", "inherit"], timeout: 60000 }), "Agy extraction");
-      binary = path.join(root, "antigravity");
-    }
-    const verification = spawnSync(binary, ["--version"], { encoding: "utf8", timeout: 10000 });
-    fail(verification, "Agy version verification");
-    if (verification.stdout.trim() !== version) throw new Error("Agy executable does not match engine.version");
+    const binary = command === "agy" ? stagedBinary() : command;
+    verifyBinary(binary, version);
 
     const env = { ...process.env };
     /** @type {any} */
@@ -288,7 +314,7 @@ const main = async () => {
 };
 
 if (require.main === module) {
-  main().catch(error => {
+  (command === "--install" ? Promise.resolve().then(install) : main()).catch(error => {
     const message = error instanceof Error ? error.message : "Agy harness failed";
     log(message);
     process.stdout.write(JSON.stringify({ type: "session.error", data: { error: message } }) + "\n");
@@ -296,4 +322,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { resolveAgyModel };
+module.exports = { resolveAgyModel, install };
