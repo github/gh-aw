@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -483,15 +484,17 @@ Test workflow with action mode.
 	}
 }
 
+type unavailableSHAResolver struct{}
+
+func (unavailableSHAResolver) ResolveSHA(context.Context, string, string) (string, error) {
+	return "", errors.New("resolution unavailable")
+}
+
 // TestResolveSetupActionReferenceActionModeWithResolver tests that action mode uses SHA resolver when available
 func TestResolveSetupActionReferenceActionModeWithResolver(t *testing.T) {
 	t.Run("action mode with resolver attempts SHA resolution", func(t *testing.T) {
-		// Create mock action resolver and cache
-		cache := NewActionCache("")
-		resolver := NewActionResolver(cache)
-
-		// The resolver will fail to resolve github/gh-aw-actions/setup@v1.0.0
-		// since it's not a real tag, but it should fall back gracefully to tag-based reference
+		// A resolver failure should fall back to the tag-based reference.
+		resolver := unavailableSHAResolver{}
 		ref := ResolveSetupActionReference(context.Background(), ActionModeAction, "v1.0.0", "", resolver)
 
 		// Without a valid pin or successful resolution, should return tag-based reference
