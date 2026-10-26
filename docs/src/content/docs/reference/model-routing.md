@@ -318,9 +318,9 @@ The router currently chooses only among models served through GitHub Copilot, be
 
 The classifier is a language model, so the same task can get a different model or effort on another run, especially with `mode: auto`.
 
-### Reasoning effort with Claude and Codex
+### Reasoning effort with Claude
 
-The router doesn't yet account for which reasoning efforts each engine supports. If it chooses an effort the engine can't use (`none` or `minimal` with Claude, `none` or `max` with Codex), the run fails.
+The router doesn't yet account for which reasoning efforts each engine supports. If it chooses an effort Claude can't use (`none` or `minimal`), the run fails. Codex accepts every effort the router can choose, from `none` to `max`, and runs with the selected effort unchanged.
 
 ### AI Credits budget
 
