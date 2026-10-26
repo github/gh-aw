@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-07-03",
-    "workflow_name": "Claude Code User Documentation Review",
-    "workflow_file": "claude-code-user-docs-review",
-    "total_aic_analyzed": 238.071,
-    "runs_audited": 5,
-    "recommendations_count": 3,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 62
-  },
-  {
     "date": "2026-07-06",
     "workflow_name": "Typist - Go Type Analysis",
     "workflow_file": "typist",
@@ -295,5 +285,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 25
+  },
+  {
+    "date": "2026-10-26",
+    "workflow_name": "PureLock",
+    "workflow_file": "purelock",
+    "total_aic_analyzed": 99.575,
+    "runs_audited": 1,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 45
   }
 ]
