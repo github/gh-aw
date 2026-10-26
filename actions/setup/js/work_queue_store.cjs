@@ -576,10 +576,10 @@ async function publishWorkQueueRequest({
           const profile = policyOp.policy.pools[operation.pool].profiles[operation.worker_profile];
           const route = `${profile.workflow}@${profile.ref}`;
           if (verified.has(route)) continue;
-          await verifyWorkerRoute({ githubClient, owner, repo, profile });
+          await verifyWorkerRoute({ githubClient, owner, repo, profile, sleepFn });
           verified.add(route);
         }
-      } else await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
+      } else await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy, sleepFn });
     }
     let sha;
     try {

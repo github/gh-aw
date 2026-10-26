@@ -83,7 +83,7 @@ async function installWorkQueuePools(options, trustedContext, poolNames) {
   const targets = poolNames.filter(name => missing.includes(name) || Object.keys(proposal.pools[name]?.profiles ?? {}).some(profile => !Object.hasOwn(latest.projection.policy.pools[name].profiles, profile)));
   if (!targets.length) return latest;
   const candidates = targets.map(poolName => [poolName, poolFromProposal(latest.projection, proposal, poolName)]);
-  const provisioning = { githubClient: configured.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo };
+  const provisioning = { githubClient: configured.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo, sleepFn: options.sleepFn };
   const verified = new Set();
   let configRef;
   for (const [poolName, pool] of candidates) {

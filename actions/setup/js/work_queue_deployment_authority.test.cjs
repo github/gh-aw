@@ -166,6 +166,29 @@ describe("verified default worker deployment authority", () => {
     expect(f.state.claims.size).toBe(0);
   });
 
+  it.each(["source", "lock", "registration"])("recovers a transient worker %s read before updating deployments", async endpoint => {
+    const { f, options, trusted } = fixture();
+    const failure = { status: 500 };
+    let read;
+    let recovery;
+    if (endpoint === "registration") {
+      read = f.githubClient.rest.actions.getWorkflow;
+      recovery = read.mockRejectedValueOnce(failure);
+    } else {
+      read = f.githubClient.rest.repos.getContent;
+      recovery = vi.fn(async parameters => {
+        if (parameters.path.endsWith(endpoint === "source" ? ".md" : ".lock.yml") && recovery.mock.calls.filter(([call]) => call.path === parameters.path).length === 1) throw failure;
+        return read(parameters);
+      });
+      f.githubClient.rest.repos.getContent = recovery;
+    }
+    await synchronizeDeployments(options, trusted);
+    expect(recovery.mock.calls.every(([parameters]) => parameters.request.retries === 0 && parameters.request.retryCount === 0 && parameters.request.timeout === 15000)).toBe(true);
+    expect(options.sleepFn).toHaveBeenCalledExactlyOnceWith(1000);
+    expect(f.state.deployments.get("default").get("default").current_ref).toBe(DEFAULT_REF);
+    expect(f.state.claims.size).toBe(0);
+  });
+
   it.each(["repository", "reference"])("stops after three failed %s reads without publishing or exposing provider data", async endpoint => {
     const { f, options, trusted } = fixture();
     const requestId = "1B41:A4F74:930C3C:1DF33D1:6AD4920C";
@@ -222,9 +245,9 @@ describe("verified default worker deployment authority", () => {
       const before = canonical(f.transactions);
       await expect(synchronizeDeployments(options, trusted)).rejects.toBe(failure);
       expect(canonical(f.transactions)).toBe(before);
+      expect(options.sleepFn).toHaveBeenCalledTimes(status === 500 ? 2 : 0);
       if (endpoint === "repository" || endpoint === "reference") {
         expect(reject).toHaveBeenCalledTimes(status === 500 ? 3 : 1);
-        expect(options.sleepFn).toHaveBeenCalledTimes(status === 500 ? 2 : 0);
       }
     }
   });

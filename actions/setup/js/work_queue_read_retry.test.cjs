@@ -15,11 +15,12 @@ describe("bounded queue metadata reads", () => {
     const response = { status: 200, data: { id: "7" } };
     const read = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(response);
     const sleepFn = vi.fn(async () => {});
-    const log = { failure: vi.fn() };
+    const log = { failure: vi.fn(), diagnostic: vi.fn() };
     expect(await readQueueMetadata(read, log, "repository.read", sleepFn)).toBe(response);
     expect(read).toHaveBeenCalledTimes(2);
     expect(sleepFn).toHaveBeenCalledExactlyOnceWith(1000);
     expect(log.failure).toHaveBeenCalledExactlyOnceWith("repository.read.retry", failure, true);
+    expect(log.diagnostic).toHaveBeenLastCalledWith("repository.read.recovered", { attempt: 2, max_attempts: 3, elapsed_ms: expect.any(Number) });
   });
 
   it.each([
@@ -74,10 +75,26 @@ describe("bounded queue metadata reads", () => {
     const log = { failure: vi.fn(), diagnostic: vi.fn() };
     await expect(readQueueMetadata(read, log, "repository.read", async () => {})).rejects.toBe(failure);
     expect(log.diagnostic.mock.calls).toEqual([
-      ["repository.read.attempt", { attempt: 1, max_attempts: 3, retry: true, delay_ms: 1000 }],
-      ["repository.read.attempt", { attempt: 2, max_attempts: 3, retry: true, delay_ms: 1000 }],
-      ["repository.read.attempt", { attempt: 3, max_attempts: 3, retry: false, delay_ms: 0 }],
+      ["repository.read.attempt", { attempt: 1, max_attempts: 3, retry: true, delay_ms: 1000, elapsed_ms: expect.any(Number) }],
+      ["repository.read.attempt", { attempt: 2, max_attempts: 3, retry: true, delay_ms: 1000, elapsed_ms: expect.any(Number) }],
+      ["repository.read.attempt", { attempt: 3, max_attempts: 3, retry: false, delay_ms: 0, elapsed_ms: expect.any(Number) }],
     ]);
+  });
+
+  it("measures each failed and recovered request separately from retry backoff", async () => {
+    const now = vi.spyOn(performance, "now").mockReturnValueOnce(10).mockReturnValueOnce(35).mockReturnValueOnce(50).mockReturnValueOnce(57);
+    try {
+      const response = { status: 200, data: {} };
+      const read = vi.fn().mockRejectedValueOnce({ status: 500 }).mockResolvedValue(response);
+      const log = { failure: vi.fn(), diagnostic: vi.fn() };
+      expect(await readQueueMetadata(read, log, "worker.lock.read", async () => {})).toBe(response);
+      expect(log.diagnostic.mock.calls).toEqual([
+        ["worker.lock.read.attempt", { attempt: 1, max_attempts: 3, retry: true, delay_ms: 1000, elapsed_ms: 25 }],
+        ["worker.lock.read.recovered", { attempt: 2, max_attempts: 3, elapsed_ms: 7 }],
+      ]);
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("does not retry returned responses or validation and bounds cyclic cause chains", async () => {

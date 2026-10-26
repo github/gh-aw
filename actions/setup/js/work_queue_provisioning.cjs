@@ -10,7 +10,7 @@ const log = require("./work_queue_logging.cjs").createWorkQueueLogger("provision
 
 const MAX_WORKFLOW_BYTES = 1024 * 1024;
 
-/** @typedef {{rest: {repos: {getContent(options: {owner: string, repo: string, path: string, ref: string}): Promise<{data: unknown}>}, actions: {getWorkflow(options: {owner: string, repo: string, workflow_id: string}): Promise<{data: unknown}>}}}} RouteClient */
+/** @typedef {{rest: {repos: {getContent(options: {owner: string, repo: string, path: string, ref: string, request: {retries: number, retryCount: number, timeout: number}}): Promise<{data: unknown}>}, actions: {getWorkflow(options: {owner: string, repo: string, workflow_id: string, request: {retries: number, retryCount: number, timeout: number}}): Promise<{data: unknown}>}}}} RouteClient */
 /** @typedef {ReturnType<typeof import("./work_queue_policy.cjs").defaultPolicy>["pools"]["default"]["profiles"]["default"]} WorkerProfile */
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
@@ -46,12 +46,14 @@ function assignmentInputType(contents) {
 }
 
 /**
- * @param {{githubClient: RouteClient, owner: string, repo: string, path: string, ref: string}} options
+ * @param {{githubClient: RouteClient, owner: string, repo: string, path: string, ref: string, sleepFn?: (delay: number) => Promise<void>}} options
  */
-async function readWorkerFile({ githubClient, owner, repo, path, ref }) {
+async function readWorkerFile({ githubClient, owner, repo, path, ref, sleepFn }) {
   let file;
   try {
-    file = (await githubClient.rest.repos.getContent({ owner, repo, path, ref }))?.data;
+    const parameters = { owner, repo, path, ref, request: { retries: 0, retryCount: 0, timeout: 15000 } };
+    const event = path.endsWith(".md") ? "worker.source.read" : "worker.lock.read";
+    file = (await readQueueMetadata(() => githubClient.rest.repos.getContent(parameters), log, event, sleepFn))?.data;
   } catch (error) {
     if (error?.status !== 404) throw error;
     throw queueError("policy_missing", "approved worker route cannot be verified at its immutable revision");
@@ -70,7 +72,7 @@ async function readWorkerFile({ githubClient, owner, repo, path, ref }) {
   }
 }
 
-/** @param {{githubClient: RouteClient, owner: string, repo: string, profile: WorkerProfile}} options */
+/** @param {{githubClient: RouteClient, owner: string, repo: string, profile: WorkerProfile, sleepFn?: (delay: number) => Promise<void>}} options */
 async function verifyWorkerRoute(options) {
   const { profile } = options;
   validateProfile(profile);
@@ -81,11 +83,12 @@ async function verifyWorkerRoute(options) {
   await verifyRegisteredWorker(options);
 }
 
-/** @param {{githubClient: RouteClient, owner: string, repo: string, profile: WorkerProfile}} options */
-async function verifyRegisteredWorker({ githubClient, owner, repo, profile }) {
+/** @param {{githubClient: RouteClient, owner: string, repo: string, profile: WorkerProfile, sleepFn?: (delay: number) => Promise<void>}} options */
+async function verifyRegisteredWorker({ githubClient, owner, repo, profile, sleepFn }) {
   let registration;
   try {
-    registration = (await githubClient.rest.actions.getWorkflow({ owner, repo, workflow_id: posix.basename(profile.workflow) }))?.data;
+    const parameters = { owner, repo, workflow_id: posix.basename(profile.workflow), request: { retries: 0, retryCount: 0, timeout: 15000 } };
+    registration = (await readQueueMetadata(() => githubClient.rest.actions.getWorkflow(parameters), log, "worker.registration.read", sleepFn))?.data;
   } catch (error) {
     if (error?.status !== 404) throw error;
     throw queueError("policy_missing", "approved worker route registration cannot be verified");
@@ -161,8 +164,8 @@ async function configuredWorkerDeployment(options, revision) {
   }
 }
 
-/** @param {{githubClient: RouteClient, owner: string, repo: string, policy: ReturnType<typeof import("./work_queue_policy.cjs").defaultPolicy> | null}} options */
-async function verifyWorkerRoutes({ githubClient, owner, repo, policy }) {
+/** @param {{githubClient: RouteClient, owner: string, repo: string, policy: ReturnType<typeof import("./work_queue_policy.cjs").defaultPolicy> | null, sleepFn?: (delay: number) => Promise<void>}} options */
+async function verifyWorkerRoutes({ githubClient, owner, repo, policy, sleepFn }) {
   if (!policy) throw queueError("policy_missing", "Policy must precede worker routing");
   validatePolicy(policy);
   if (policy.authorization === "aw") return;
@@ -171,7 +174,7 @@ async function verifyWorkerRoutes({ githubClient, owner, repo, policy }) {
     for (const profile of Object.values(pool.profiles)) {
       const key = `${profile.workflow}\n${profile.ref}`;
       if (seen.has(key)) continue;
-      await verifyWorkerRoute({ githubClient, owner, repo, profile });
+      await verifyWorkerRoute({ githubClient, owner, repo, profile, sleepFn });
       seen.add(key);
     }
 }

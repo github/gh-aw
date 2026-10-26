@@ -20,12 +20,16 @@ function isTransientQueueReadError(error) {
 // Call only around an idempotent metadata GET, never around validation or writes.
 async function readQueueMetadata(read, log, event, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay))) {
   for (let attempt = 1; ; attempt++) {
+    const started = performance.now();
     try {
-      return await read();
+      const response = await read();
+      if (attempt > 1) log.diagnostic?.(`${event}.recovered`, { attempt, max_attempts: 3, elapsed_ms: Math.max(0, Math.round(performance.now() - started)) });
+      return response;
     } catch (error) {
+      const elapsed_ms = Math.max(0, Math.round(performance.now() - started));
       const retry = attempt < 3 && isTransientQueueReadError(error);
       log.failure(`${event}.${retry ? "retry" : "failed"}`, error, true);
-      log.diagnostic?.(`${event}.attempt`, { attempt, max_attempts: 3, retry, delay_ms: retry ? 1000 : 0 });
+      log.diagnostic?.(`${event}.attempt`, { attempt, max_attempts: 3, retry, delay_ms: retry ? 1000 : 0, elapsed_ms });
       if (!retry) throw error;
       await sleepFn(1000);
     }

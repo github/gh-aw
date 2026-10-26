@@ -44,7 +44,7 @@ function nativeRoute(content = validYAML, failures = {}) {
 }
 
 function options(native, worker = profile) {
-  return { githubClient: native.githubClient, owner: "owner", repo: "repo", profile: worker };
+  return { githubClient: native.githubClient, owner: "owner", repo: "repo", profile: worker, sleepFn: async () => {} };
 }
 
 async function rejected(native, worker = profile) {
@@ -57,8 +57,8 @@ function registerTests({ describe, it }) {
       const native = nativeRoute();
       await verifyWorkerRoute(options(native));
       assert.deepEqual(native.calls, [
-        ["contents", { owner: "owner", repo: "repo", path: profile.workflow, ref: profile.ref }],
-        ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml" }],
+        ["contents", { owner: "owner", repo: "repo", path: profile.workflow, ref: profile.ref, request: { retries: 0, retryCount: 0, timeout: 15000 } }],
+        ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml", request: { retries: 0, retryCount: 0, timeout: 15000 } }],
       ]);
     });
     it("accepts optional string inputs and genuine quoted, flow, alias and merge YAML", async () => {
@@ -145,13 +145,122 @@ function registerTests({ describe, it }) {
     });
     it("fails closed on authenticated native read errors", async () => {
       for (const endpoint of ["contentError", "registrationError"])
-        for (const status of [404, 401, 403, 429, 500]) {
+        for (const status of [404, 401, 403, 422, 429]) {
           const native = nativeRoute();
           native.state[endpoint] = Object.assign(new Error("native read failed"), { status });
           if (status === 404) await rejected(native);
           else await assert.rejects(verifyWorkerRoute(options(native)), error => error === native.state[endpoint]);
           assert.equal(native.calls.length, endpoint === "contentError" ? 1 : 2);
         }
+    });
+    it("recovers transient worker reads using the same immutable route and bounded request settings", async () => {
+      for (const endpoint of ["contentError", "registrationError"])
+        for (const failure of [{ status: 500 }, { response: { status: 503 } }, { code: "ETIMEDOUT" }, { cause: { code: "UND_ERR_SOCKET" } }]) {
+          const native = nativeRoute();
+          native.state[endpoint] = failure;
+          const delays = [];
+          await verifyWorkerRoute({
+            ...options(native),
+            sleepFn: async delay => {
+              delays.push(delay);
+              native.state[endpoint] = null;
+            },
+          });
+          assert.deepEqual(delays, [1000]);
+          const reads = native.calls.filter(([kind]) => kind === (endpoint === "contentError" ? "contents" : "registration"));
+          assert.equal(reads.length, 2);
+          assert.deepEqual(reads[0], reads[1]);
+          assert.deepEqual(reads[0][1].request, { retries: 0, retryCount: 0, timeout: 15000 });
+        }
+    });
+    it("exhausts worker reads after three attempts without accepting an unverified route", async () => {
+      for (const endpoint of ["contentError", "registrationError"]) {
+        const native = nativeRoute();
+        const failure = Object.assign(new Error("native read unavailable"), { status: 500 });
+        native.state[endpoint] = failure;
+        const delays = [];
+        await assert.rejects(
+          verifyWorkerRoute({
+            ...options(native),
+            sleepFn: async delay => {
+              delays.push(delay);
+            },
+          }),
+          error => error === failure
+        );
+        assert.deepEqual(delays, [1000, 1000]);
+        assert.equal(native.calls.length, endpoint === "contentError" ? 3 : 4);
+        if (endpoint === "contentError")
+          assert.equal(
+            native.calls.some(([kind]) => kind === "registration"),
+            false
+          );
+      }
+    });
+    it("does not retry quota, integrity or unclassified worker read failures", async () => {
+      for (const endpoint of ["contentError", "registrationError"])
+        for (const failure of [
+          { status: 503, code: "ERR_TRANSPORT_INTEGRITY" },
+          { status: 503, response: { headers: { "retry-after": "60" } } },
+          { status: 403, code: "ETIMEDOUT", response: { status: 503 } },
+          new Error("unclassified native read failure"),
+        ]) {
+          const native = nativeRoute();
+          native.state[endpoint] = failure;
+          const delays = [];
+          await assert.rejects(
+            verifyWorkerRoute({
+              ...options(native),
+              sleepFn: async delay => {
+                delays.push(delay);
+              },
+            }),
+            error => error === failure
+          );
+          assert.deepEqual(delays, []);
+          assert.equal(native.calls.length, endpoint === "contentError" ? 1 : 2);
+        }
+    });
+    it("logs worker read failures and recovery without DEBUG or provider payloads", async () => {
+      const output = [];
+      const write = process.stderr.write;
+      const debug = process.env.DEBUG;
+      delete process.env.DEBUG;
+      process.stderr.write = message => {
+        output.push(String(message));
+        return true;
+      };
+      try {
+        for (const endpoint of ["contentError", "registrationError"]) {
+          const native = nativeRoute();
+          native.state[endpoint] = Object.assign(new Error("private-provider-body"), {
+            status: 500,
+            request: { method: "GET", url: "https://private-host/private-path", headers: { authorization: "private-token" } },
+            response: { headers: { "x-github-request-id": "1B41:A4F74:930C3C:1DF33D1:6AD4920C", authorization: "private-token" }, data: { message: "private-provider-body" } },
+          });
+          await verifyWorkerRoute({
+            ...options(native),
+            sleepFn: async () => {
+              native.state[endpoint] = null;
+            },
+          });
+        }
+      } finally {
+        process.stderr.write = write;
+        if (debug === undefined) delete process.env.DEBUG;
+        else process.env.DEBUG = debug;
+      }
+      const logs = output.join("");
+      for (const stage of ["lock", "registration"]) {
+        assert.match(logs, new RegExp(`worker\\.${stage}\\.read\\.retry .*http_status=500 .*http_method_get=true`));
+        assert.match(logs, new RegExp(`worker\\.${stage}\\.read\\.attempt attempt=1 max_attempts=3 retry=true delay_ms=1000 elapsed_ms=\\d+`));
+        assert.match(logs, new RegExp(`worker\\.${stage}\\.read\\.recovered attempt=2 max_attempts=3 elapsed_ms=\\d+`));
+      }
+      assert.match(logs, /response_headers_present=true github_request_id_present=true/);
+      assert.match(logs, /GitHub request ID: 1B41:A4F74:930C3C:1DF33D1:6AD4920C\./);
+      assert.equal(logs.includes("private"), false);
+      assert.equal(logs.includes(profile.workflow), false);
+      assert.equal(logs.includes(profile.ref), false);
     });
     it("deduplicates identical routes within one fresh verification, not across calls", async () => {
       const native = nativeRoute();

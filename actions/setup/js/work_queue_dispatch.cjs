@@ -261,7 +261,7 @@ async function launchAssignment(options, supplied) {
   if (latest.projection.policy.authorization === "aw") {
     if (!profile.logical_contract) {
       approvedProfile(profile, options.config || {});
-      await verifyWorkerRoute({ githubClient: options.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo, profile });
+      await verifyWorkerRoute({ githubClient: options.githubClient, owner: options.context.repo.owner, repo: options.context.repo.repo, profile, sleepFn: options.sleepFn });
     }
   }
   if (typeof options.validateDispatchCredential !== "function") throw new Error("work_queue_dispatch_credential_validator_required");
