@@ -12,6 +12,7 @@ import {
   getCustomValidationFailureDetail,
   isDeterministicPushValidationError,
   isUntrustedLedgerArtifact,
+  main,
   pushRepoMemoryChangesWithRetry,
   redactFailureSummary,
   setPushRepoMemoryFailure,
@@ -21,14 +22,19 @@ const mockCore = { info: vi.fn(), setFailed: vi.fn() };
 global.core = mockCore;
 
 describe("push_repo_memory.cjs - nested memory persistence", () => {
-  it("pushes nested files matching recursive globs and warns with skipped paths", async () => {
+  it.each([
+    ["saved", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", true],
+    ["unchanged", undefined, false],
+    ["unchanged", undefined, true],
+    ["skipped", new Error("ERR_VALIDATION: rejected"), true],
+  ])("reports %s for nested files (push commit: %s, changed: %s)", async (status, pushedCommit, changed) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-memory-nested-"));
     const artifactDir = path.join(tempDir, "artifact");
     const workspaceDir = path.join(tempDir, "workspace");
-    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
-    const pushSignedCommits = vi.fn().mockResolvedValue(undefined);
+    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn(), setOutput: vi.fn() };
+    const pushSignedCommits = pushedCommit instanceof Error ? vi.fn().mockRejectedValue(pushedCommit) : vi.fn().mockResolvedValue(pushedCommit);
     const execGitSync = vi.fn(args => {
-      if (args[0] === "status") return "?? archive/deep/history.jsonl\n?? state.json\n";
+      if (args[0] === "status") return changed ? "?? archive/deep/history.jsonl\n?? state.json\n" : "";
       if (args[0] === "rev-parse") return "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n";
       return "";
     });
@@ -73,17 +79,49 @@ describe("push_repo_memory.cjs - nested memory persistence", () => {
 
       await module.exports.main();
 
-      expect(core.setFailed).not.toHaveBeenCalled();
+      if (pushedCommit instanceof Error) expect(core.setFailed).toHaveBeenCalledOnce();
+      else expect(core.setFailed).not.toHaveBeenCalled();
       expect(fs.readFileSync(path.join(workspaceDir, "archive", "deep", "history.jsonl"), "utf8")).toBe('{"id":1}\n');
       expect(fs.existsSync(path.join(workspaceDir, "state.json"))).toBe(true);
       expect(fs.existsSync(path.join(workspaceDir, "archive", "ignored.md"))).toBe(false);
-      expect(execGitSync).toHaveBeenCalledWith(["add", "--sparse", "--", ":(literal)archive/deep/history.jsonl", ":(literal)state.json"], { stdio: "inherit", cwd: workspaceDir });
-      expect(pushSignedCommits).toHaveBeenCalledOnce();
+      if (changed) {
+        expect(execGitSync).toHaveBeenCalledWith(["add", "--sparse", "--", ":(literal)archive/deep/history.jsonl", ":(literal)state.json"], { stdio: "inherit", cwd: workspaceDir });
+        expect(pushSignedCommits).toHaveBeenCalledOnce();
+      } else {
+        expect(pushSignedCommits).not.toHaveBeenCalled();
+      }
+      expect(core.setOutput).toHaveBeenLastCalledWith("save_status", status);
+      if (status === "saved") {
+        expect(core.setOutput).toHaveBeenCalledWith("save_branch", "memory/test");
+        expect(core.setOutput).toHaveBeenCalledWith("save_commit", pushedCommit);
+        expect(pushedCommit).not.toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      } else {
+        expect(core.setOutput).not.toHaveBeenCalledWith("save_branch", expect.anything());
+        expect(core.setOutput).not.toHaveBeenCalledWith("save_commit", expect.anything());
+      }
+      if (pushedCommit === undefined) expect(core.setOutput).not.toHaveBeenCalledWith("save_status", "saved");
       expect(core.warning).toHaveBeenCalledOnce();
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("archive/ignored.md (no pattern matched)"));
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('archive/ignored.bin (disallowed extension ".bin")'));
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("handles validation errors when core.setOutput is unavailable", async () => {
+    const previousCore = global.core;
+    const previousMaxFileSize = process.env.MAX_FILE_SIZE;
+    const coreWithoutSetOutput = { info: vi.fn(), setFailed: vi.fn() };
+    global.core = coreWithoutSetOutput;
+    process.env.MAX_FILE_SIZE = "0";
+
+    try {
+      await main();
+      expect(coreWithoutSetOutput.setFailed).toHaveBeenCalledWith("Memory size, count, patch size, and validation timeout limits must be positive integers");
+    } finally {
+      if (previousMaxFileSize === undefined) delete process.env.MAX_FILE_SIZE;
+      else process.env.MAX_FILE_SIZE = previousMaxFileSize;
+      global.core = previousCore;
     }
   });
 });
@@ -1655,6 +1693,7 @@ describe("push_repo_memory.cjs - shell injection security tests", () => {
 
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Memory directory not found"));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("save_status", "skipped");
     });
 
     it("should allow default repository without allowlist", async () => {
@@ -2015,7 +2054,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
     const otherDir = path.join(rootDir, "other");
     const artifactDir = path.join(rootDir, "artifact");
     const branchName = "memory/shared";
-    const core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn(), setOutput: vi.fn() };
     const git = (args, cwd = workspaceDir) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" });
     const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
     const require = createRequire(import.meta.url);
@@ -2066,6 +2105,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
         expect(git(["rev-list", "--count", `${remoteHead}..HEAD`], cwd).trim()).toBe("1");
         expect(fs.existsSync(path.join(cwd, "grounding-concurrent.jsonl"))).toBe(true);
         expect(gitAuthEnv).toEqual({ REPO_MEMORY_TEST_AUTH: "present" });
+        return "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
       });
       const execGitSync = (args, options = {}) => {
         const localArgs = [...args];
@@ -2120,6 +2160,7 @@ describe("push_repo_memory.cjs - allowed-extensions persistence filter (regressi
 
       expect(core.setFailed).not.toHaveBeenCalled();
       expect(pushSignedCommits).toHaveBeenCalledTimes(2);
+      expect(core.setOutput).toHaveBeenLastCalledWith("save_status", "saved");
       expect(git(["status", "--porcelain"])).toBe("");
       expect(fs.existsSync(path.join(workspaceDir, "ignored.bin"))).toBe(false);
     } finally {

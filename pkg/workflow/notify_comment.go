@@ -59,6 +59,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		Steps:       steps,
 		Needs:       needs,
 		Outputs:     buildConclusionJobOutputs(data),
+		Env:         buildConclusionMemorySaveEnv(data),
 	}, nil
 }
 
