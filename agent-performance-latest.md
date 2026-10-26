@@ -73,3 +73,6 @@ metrics/latest.json now dated 2026-10-23 but partial (4.56h of logs, null qualit
 
 ## Run 2026-10-25T12:55Z
 metrics/latest.json (2026-10-25T03:02Z) complete 24h: 440 executed / 112 failed (74.5%), 309 safe outputs accepted/0 rejected. Weakest multi-run: ai-moderator 2/31 ok, design-decision-gate 54%, test-quality-sentinel 58%, pr-code-quality-reviewer 59%, ponytail-reviewer 62%, mattpocock-skills-reviewer 59%. Discussion posted. Older shared-alerts root causes (EACCES #61952, model_not_supported) remain unverified/stale.
+
+## Run 2026-10-26T14:21Z
+metrics/latest.json (2026-10-26) partial but usable: 443 runs/123 workflows, 85.6% overall success, 236 safe outputs. Report discussion filed. Flagged: ai-moderator 25% success (18/24 failed, max 24120s vs 5min timeout), Matt Pocock reviewer 0 outputs/31 runs, Design Decision Gate 15 comments/32 runs, 23 workflows with 1/1 failed runs.
