@@ -24,6 +24,7 @@ type SafeJobConfig struct {
 	Needs          []string          `yaml:"needs,omitempty"`
 	Steps          []any             `yaml:"steps,omitempty"`
 	Env            map[string]string `yaml:"env,omitempty"`
+	Outputs        map[string]string `yaml:"outputs,omitempty"`
 	Permissions    map[string]string `yaml:"permissions,omitempty"`
 	RawPermissions any               `yaml:"-"`
 
@@ -123,6 +124,10 @@ func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJ
 				}
 			}
 		}
+
+		outputsJob := &Job{}
+		extractCustomJobOutputs(outputsJob, jobName, jobConfig)
+		safeJob.Outputs = outputsJob.Outputs
 
 		// Parse permissions
 		if permissions, exists := jobConfig["permissions"]; exists {
@@ -321,6 +326,7 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 			Name:        normalizedJobName,
 			Environment: c.indentYAMLLines(resolveSafeOutputsEnvironment(data), "    "),
 			Env:         c.buildJobLevelSafeOutputEnvVars(data, GetWorkflowIDFromPath(c.markdownPath)),
+			Outputs:     maps.Clone(jobConfig.Outputs),
 		}
 
 		// Set custom job name if specified

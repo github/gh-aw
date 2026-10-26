@@ -232,6 +232,25 @@ current authoring syntax and evidence design.
 
 Safe output functions handle GitHub API write operations (creating issues, discussions, comments, PRs) from AI-generated content with consistent messaging patterns.
 
+### Recorded execution outcomes
+
+Custom safe jobs can map `outputs.status` and `outputs.url` to step outputs.
+Conclusion identifies configured safe jobs explicitly and reads their outputs
+from `needs`, not from agent requests. It records `safe_output.result` events
+with the normalized job name, status, and optional canonical absolute resource
+URI in `data.url`. A failed, cancelled, or skipped job cannot report success.
+On a successful job, an explicit status can distinguish an intentional skip or
+application-level failure; absent status falls back to the Actions job result.
+Prepared work-queue adapters are not verified effects and must not be promoted
+to successful safe-job outcomes.
+
+Safe scripts return execution results through the handler contract:
+`success: true` with `url` identifies the canonical resource returned by the
+service. The safe-output manifest preserves execution status for conclusion's
+unified session collector. Keep artifact redaction before serialization and
+preserve staged/deferred suppression. Never infer a generated resource URI
+from an agent-supplied request or copy arbitrary handler outputs into the session.
+
 ### Safe Output Message Flow
 
 The following diagram illustrates how AI-generated content flows through the safe output system to GitHub API operations:

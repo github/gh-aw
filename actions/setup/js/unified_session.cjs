@@ -158,7 +158,7 @@ function parseEngineSession(content, engine) {
 /**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, admission?: NodeJS.ProcessEnv, jobResults?: string, jobDurations?: Record<string, number>}} [options]
+ * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
 function collectUnifiedSession({
@@ -169,6 +169,8 @@ function collectUnifiedSession({
   dailyAIC = process.env,
   admission = process.env,
   jobResults = process.env.GH_AW_JOB_RESULTS,
+  safeJobNames = process.env.GH_AW_SAFE_JOB_NAMES,
+  safeJobResults = process.env.GH_AW_SAFE_JOB_RESULTS,
   jobDurations = {},
 } = {}) {
   let currentRunId = dailyAIC.GITHUB_RUN_ID;
@@ -716,6 +718,28 @@ function collectUnifiedSession({
   }
   if (jobResults) {
     const file = path.join(rootDir, "usage/aw_session.jsonl");
+    const safeJobs = new Set();
+    let safeResults;
+    if (safeJobResults) {
+      try {
+        safeResults = JSON.parse(safeJobResults);
+        if (!safeResults || typeof safeResults !== "object" || Array.isArray(safeResults)) throw new SyntaxError();
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        safeResults = {};
+        report(file, "invalid_safe_job_results", undefined);
+      }
+    }
+    if (safeJobNames) {
+      try {
+        const names = JSON.parse(safeJobNames);
+        if (!Array.isArray(names) || names.some(name => typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name))) throw new SyntaxError();
+        for (const name of names) safeJobs.add(name);
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        report(file, "invalid_safe_job_names", undefined);
+      }
+    }
     let needs;
     try {
       needs = JSON.parse(jobResults);
@@ -729,6 +753,8 @@ function collectUnifiedSession({
       } else {
         /** @type {SessionEvent[]} */
         const events = [];
+        /** @type {SessionEvent[]} */
+        const outcomes = [];
         for (const [jobId, job] of Object.entries(needs).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))) {
           if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(jobId) || !job || typeof job !== "object" || Array.isArray(job) || !["success", "failure", "cancelled", "skipped"].includes(job.result)) {
             report(file, "invalid_job_result", undefined);
@@ -736,8 +762,35 @@ function collectUnifiedSession({
           }
           const durationMs = jobDurations[jobId];
           events.push({ type: "workflow.job_result", data: { jobId, result: job.result, ...(job.result !== "skipped" && Number.isSafeInteger(durationMs) && durationMs >= 0 ? { durationMs } : {}) } });
+          if (safeJobs.has(jobId)) {
+            const rawOutputs = safeResults === undefined ? job.outputs : safeResults[jobId]?.outputs;
+            const outputs = rawOutputs && typeof rawOutputs === "object" && !Array.isArray(rawOutputs) ? rawOutputs : {};
+            let status = job.result;
+            let validStatus = true;
+            if (job.result === "success" && outputs.status) {
+              if (["success", "failure", "cancelled", "skipped"].includes(outputs.status)) status = outputs.status;
+              else {
+                validStatus = false;
+                report(file, "invalid_safe_job_status", undefined);
+              }
+            }
+            /** @type {{type: string, status: string, url?: string}} */
+            const data = { type: jobId, status };
+            if (validStatus && status === "success" && outputs.url) {
+              try {
+                if (typeof outputs.url !== "string" || /[\s\x00-\x1f\x7f]/.test(outputs.url)) throw new TypeError();
+                const uri = new URL(outputs.url);
+                if (uri.username || uri.password) throw new TypeError();
+                data.url = outputs.url;
+              } catch {
+                report(file, "invalid_safe_job_url", undefined);
+              }
+            }
+            outcomes.push({ type: "safe_output.result", data });
+          }
         }
         if (events.length) sources.push({ component: "workflow", phase: "conclusion", path: "usage/aw_session.jsonl", events });
+        if (outcomes.length) sources.push({ component: "safe_output", phase: "safe_outputs", path: "usage/aw_session.jsonl", events: outcomes });
       }
     }
   }

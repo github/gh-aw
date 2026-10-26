@@ -42,9 +42,10 @@ The `report-incomplete` safe-output is enabled by default and is distinct from `
 
   Custom implementations should add a generated-by footer and workflow provenance annotations to published content; direct API calls omit them and lose provenance-based tracking. For GitHub issues, run the setup action, initialize `actions/setup/js/index.cjs` with `setupGlobals`, and call `createIssue`. See the [public issue-creation API](https://github.github.com/gh-aw/reference/custom-safe-outputs/#issue-creation-api).
 
-  Two extra per-job properties:
+  Additional per-job properties:
   - `needs:` (string or array) - sequence this job relative to other compiled jobs; valid targets are `agent`, `safe_outputs`, `detection`, `upload_assets`, `unlock`, or another job name (dashes normalized to underscores). Persists across recompiles, unlike hand-patching the lock file.
   - `artifacts:` (array of strings) - filesystem paths/globs under `/tmp/gh-aw/` that this job's `inputs` reference so the compiler includes them in the unified agent artifact upload (paths the agent wrote at runtime are otherwise dropped). Directory entries must end with `/`; only secret-redaction-covered extensions (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, `.patch`) are persisted, and `..` or hidden-file segments are rejected at compile time.
+  - `outputs:` (object with optional `status` and `url` string mappings) - map step outputs to execution evidence for conclusion. Status is `success`, `failure`, `cancelled`, or `skipped`; absent status uses the Actions job result. Use `skipped` for previews. `url` is the canonical absolute resource URI returned by the service, recorded only for success. Conclusion includes these fields in `safe_output.result` unified-session events; failed or skipped jobs cannot claim successful creation.
 
 - `scripts:` - Inline JavaScript handlers running inside the safe-outputs job handler loop
 
@@ -67,6 +68,8 @@ The `report-incomplete` safe-output is enabled by default and is distinct from `
   ```
 
   Unlike `jobs:` (which create separate GitHub Actions jobs), scripts execute in-process alongside built-in handlers. Write only the handler body — the compiler generates the outer wrapper with config input destructuring and `async function handleX(item, resolvedTemporaryIds) { ... }`. Script names with dashes are normalized to underscores (e.g., `post-slack-message` → `post_slack_message`). The handler receives `item` (runtime message with input values) and `resolvedTemporaryIds` (map of temporary IDs).
+
+  Return `{ success: true, url: canonicalResourceUri }` after the service confirms creation to persist execution status and resource identity in the safe-output manifest and unified session. Do not derive the URI from agent claims. Failures remain `safe_output.error` evidence; staged, skipped, and deferred operations do not become successful resource events.
 
 - `actions:` - Custom GitHub Actions mounted as MCP tools for the AI agent (resolved at compile time)
 

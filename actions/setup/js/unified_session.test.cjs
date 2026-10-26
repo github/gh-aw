@@ -41,6 +41,113 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("collects only configured safe job outcomes and canonical execution URLs", () => {
+    const { events } = collectUnifiedSession({
+      rootDir: root,
+      safeJobNames: '["publish","archive"]',
+      jobResults: JSON.stringify({
+        agent: { result: "success", outputs: { url: "https://example.com/untrusted" } },
+        publish: { result: "success", outputs: { status: "success", url: "https://example.com/resources/42", secret: "PRIVATE" } },
+        archive: { result: "success", outputs: { url: "s3://bucket/resource" } },
+      }),
+    });
+    const outcomes = events.filter(event => event.type === "safe_output.result");
+    expect(outcomes.map(event => event.data)).toEqual([
+      { type: "archive", status: "success", url: "s3://bucket/resource" },
+      { type: "publish", status: "success", url: "https://example.com/resources/42" },
+    ]);
+    expect(outcomes.every(event => event.provenance.component === "safe_output" && event.provenance.phase === "safe_outputs")).toBe(true);
+    expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
+  });
+
+  it.each(["failure", "cancelled", "skipped"])("never promotes a %s safe job to success", result => {
+    const { events } = collectUnifiedSession({
+      rootDir: root,
+      safeJobNames: '["publish"]',
+      jobResults: JSON.stringify({ publish: { result, outputs: { status: "success", url: "https://example.com/42" } } }),
+    });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: result });
+  });
+
+  it("publishes safe job and script outcomes together in the canonical session", () => {
+    process.env.GH_AW_SAFE_JOB_NAMES = '["publish"]';
+    process.env.GH_AW_JOB_RESULTS = JSON.stringify({ agent: { result: "success" }, publish: { result: "success" } });
+    process.env.GH_AW_SAFE_JOB_RESULTS = JSON.stringify({ publish: { result: "success", outputs: { url: "https://example.com/resources/job" } } });
+    write("safe-output-items.jsonl", [{ type: "notify", status: "success", url: "https://example.com/resources/script" }]);
+    const outputPath = path.join(root, "usage/aw_session.jsonl");
+    writeUnifiedSession({ rootDir: root, outputPath });
+    const events = fs
+      .readFileSync(outputPath, "utf8")
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+    expect(events.filter(event => event.type === "safe_output.result").map(event => event.data)).toEqual([
+      { type: "notify", status: "success", url: "https://example.com/resources/script" },
+      { type: "publish", status: "success", url: "https://example.com/resources/job" },
+    ]);
+    expect(validateSession(fs.readFileSync(outputPath, "utf8"))).toBe(events.length);
+    expect(events.filter(event => event.type === "workflow.job_result").map(event => event.data.jobId)).toEqual(["agent", "publish"]);
+  });
+
+  it.each(["invalid PRIVATE", "[]", "null"])("warns without leaking malformed projected safe job results %s", safeJobResults => {
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({ rootDir: root, safeJobNames: '["publish"]', safeJobResults, jobResults: '{"publish":{"result":"success"}}', warn });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "success" });
+    expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_results in usage/aw_session.jsonl");
+    expect(JSON.stringify(events)).not.toContain("PRIVATE");
+  });
+
+  it("uses the authoritative job result rather than a projected success", () => {
+    const { events } = collectUnifiedSession({
+      rootDir: root,
+      safeJobNames: '["publish"]',
+      jobResults: '{"publish":{"result":"failure"}}',
+      safeJobResults: '{"publish":{"result":"success","outputs":{"status":"success","url":"https://example.com/42"}}}',
+    });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "failure" });
+  });
+
+  it("warns without leaking an invalid safe job status", () => {
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({
+      rootDir: root,
+      safeJobNames: '["publish"]',
+      jobResults: JSON.stringify({ publish: { result: "success", outputs: { status: "PRIVATE_STATUS", url: "https://example.com/not-confirmed" } } }),
+      warn,
+    });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "success" });
+    expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_status in usage/aw_session.jsonl");
+    expect(JSON.stringify(events)).not.toContain("PRIVATE_STATUS");
+  });
+
+  it.each(["failure", "cancelled", "skipped"])("preserves a safe job's explicit %s outcome without a created resource", status => {
+    const { events } = collectUnifiedSession({
+      rootDir: root,
+      safeJobNames: '["publish"]',
+      jobResults: JSON.stringify({ publish: { result: "success", outputs: { status, url: "https://example.com/42" } } }),
+    });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status });
+  });
+
+  it.each(["relative/path", "******example.com/42", "https://example.com/\nsecret", {}])("omits malformed safe job resource URI %j", url => {
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({
+      rootDir: root,
+      safeJobNames: '["publish"]',
+      jobResults: JSON.stringify({ publish: { result: "success", outputs: { url } } }),
+      warn,
+    });
+    expect(events.find(event => event.type === "safe_output.result").data).toEqual({ type: "publish", status: "success" });
+    expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_url in usage/aw_session.jsonl");
+  });
+
+  it.each(["invalid PRIVATE", "{}", '["publish",42]'])("fails closed on malformed safe job names %s", safeJobNames => {
+    const warn = vi.fn();
+    const { events } = collectUnifiedSession({ rootDir: root, safeJobNames, jobResults: '{"publish":{"result":"success"}}', warn });
+    expect(events.some(event => event.type === "safe_output.result")).toBe(false);
+    expect(warn).toHaveBeenCalledWith("Unified session: invalid_safe_job_names in usage/aw_session.jsonl");
+  });
+
   it.each(["custom", "copilot"])("uses only canonical protected agent evidence for %s", engine => {
     write("agent-session.jsonl", [{ type: "agent.execution", data: { categories: [], errorTypes: [], errorCodes: [], exitCode: 0 } }]);
     write("agent_execution_exit_code.txt", "0");
