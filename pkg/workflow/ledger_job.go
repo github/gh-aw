@@ -49,6 +49,7 @@ func (c *Compiler) buildPushLedgerChangesJob(data *WorkflowData, threatDetection
 	return &Job{
 		Name:        pushLedgerChangesJobName,
 		RunsOn:      c.formatFrameworkJobRunsOn(data),
+		Environment: c.indentYAMLLines(data.Environment, "    "),
 		If:          "always()",
 		Permissions: "permissions:\n      contents: write",
 		Needs:       needs,

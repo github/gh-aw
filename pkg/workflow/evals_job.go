@@ -186,6 +186,7 @@ func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
 	job := &Job{
 		Name:        pushEvalsStateJobName,
 		RunsOn:      c.formatFrameworkJobRunsOn(data),
+		Environment: c.indentYAMLLines(data.Environment, "    "),
 		If:          jobCondition,
 		Permissions: "permissions:\n      contents: write",
 		Needs:       []string{string(constants.EvalsJobName), string(constants.ActivationJobName)},

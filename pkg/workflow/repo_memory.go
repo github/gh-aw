@@ -717,6 +717,7 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		Name:           pushRepoMemoryJobName,
 		DisplayName:    "",
 		RunsOn:         c.formatFrameworkJobRunsOn(data),
+		Environment:    c.indentYAMLLines(data.Environment, "    "),
 		If:             jobCondition,
 		Permissions:    "permissions:\n      contents: write",
 		TimeoutMinutes: pushRepoMemoryTimeoutMinutes,

@@ -589,6 +589,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		Name:        updateCacheMemoryJobName,
 		DisplayName: "", // No display name - job ID is sufficient
 		RunsOn:      c.formatFrameworkJobRunsOn(data),
+		Environment: c.indentYAMLLines(data.Environment, "    "),
 		If:          jobCondition,
 		Permissions: permissions,
 		Needs:       []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)},

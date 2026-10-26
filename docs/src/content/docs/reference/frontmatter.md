@@ -597,6 +597,12 @@ environment: production
 
 The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment takes precedence for the activation job.
 
+Persistence jobs (`update_cache_memory`, `update_drive_memory`, `push_repo_memory`, `push_ledger_changes`, `push_experiments_state`, and `push_evals_state`) also inherit the top-level environment. They do not inherit `on.manual-approval` or `safe-outputs.environment` overrides. Admission and isolated grader jobs remain outside this environment; reusable-workflow callers must configure environments in the called workflow.
+
+Configure the named environment's protection rules and secrets in repository settings before running the workflow. Declaring a name does not create reviewer or branch restrictions, and an environment does not prevent access to otherwise available repository or organization secrets. For jobs using OIDC, including drive-memory persistence, an environment changes the default OIDC subject; external trust policies must accept the environment-based subject.
+
+No environment is added when this field is absent. Such jobs can still produce zizmor `secrets-outside-env` findings; the compiler does not suppress them. Use an explicitly configured, protected environment for credential-bearing jobs rather than adding an unprotected default merely to silence the scanner.
+
 See [GitHub Actions environment docs](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment).
 
 ### Container Configuration (`container:`)

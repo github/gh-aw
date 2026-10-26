@@ -125,4 +125,52 @@ Test environment overrides.
 	assert.Equal(t, map[string]any{"name": "production-custom", "url": "https://custom.example.com"}, compiled.Jobs["custom"]["environment"])
 	assert.Equal(t, "production-writes", compiled.Jobs["conclusion"]["environment"])
 	assert.Equal(t, "production-writes", compiled.Jobs["pre_activation"]["environment"])
+	assert.Equal(t, map[string]any{"name": "production", "url": "https://production.example.com"}, compiled.Jobs["update_cache_memory"]["environment"])
+}
+
+func TestPersistenceJobsInheritWorkflowEnvironment(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		environment string
+		want        string
+	}{
+		{name: "absent"},
+		{name: "literal", environment: "environment: production", want: "environment: production"},
+		{name: "expression", environment: "environment: ${{ vars.RUNTIME_ENVIRONMENT }}", want: "environment: ${{ vars.RUNTIME_ENVIRONMENT }}"},
+		{name: "object", environment: "environment:\n  name: production\n  url: https://example.com", want: "environment:\n      name: production\n      url: https://example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			data := &WorkflowData{
+				Environment:        tt.environment,
+				ManualApproval:     "approval-only",
+				SafeOutputs:        &SafeOutputsConfig{Environment: "environment: writes-only"},
+				CacheMemoryConfig:  &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default"}}},
+				DriveMemoryConfig:  &DriveMemoryConfig{Drives: defaultDriveMemoryEntries()},
+				RepoMemoryConfig:   &RepoMemoryConfig{Memories: []RepoMemoryEntry{{ID: "default", BranchName: "memory"}}},
+				LedgerConfig:       &LedgerToolConfig{Ledgers: []LedgerConfig{{Name: "state", Type: "map"}}},
+				Experiments:        map[string][]string{"test": {"a", "b"}},
+				ExperimentsStorage: ExperimentsStorageRepo,
+				Evals:              &EvalsConfig{Questions: []EvalDefinition{{ID: "test", Question: "Did it work?"}}},
+			}
+			builders := map[string]func() (*Job, error){
+				"cache":       func() (*Job, error) { return compiler.buildUpdateCacheMemoryJob(data, true) },
+				"drive":       func() (*Job, error) { return compiler.buildUpdateDriveMemoryJob(data, true) },
+				"repo":        func() (*Job, error) { return compiler.buildPushRepoMemoryJob(data, true) },
+				"ledger":      func() (*Job, error) { return compiler.buildPushLedgerChangesJob(data, true) },
+				"experiments": func() (*Job, error) { return compiler.buildPushExperimentsStateJob(data) },
+				"evals":       func() (*Job, error) { return compiler.buildPushEvalsStateJob(data) },
+			}
+			for name, build := range builders {
+				t.Run(name, func(t *testing.T) {
+					job, err := build()
+					require.NoError(t, err)
+					require.NotNil(t, job)
+					assert.Equal(t, tt.want, job.Environment)
+				})
+			}
+		})
+	}
 }

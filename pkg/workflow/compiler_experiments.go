@@ -1070,6 +1070,7 @@ func (c *Compiler) buildPushExperimentsStateJob(data *WorkflowData) (*Job, error
 	return &Job{
 		Name:        pushExperimentsStateJobName,
 		RunsOn:      c.formatFrameworkJobRunsOn(data),
+		Environment: c.indentYAMLLines(data.Environment, "    "),
 		If:          pushExperimentsStateJobCondition(),
 		Permissions: "permissions:\n      contents: write",
 		Needs:       []string{string(constants.ActivationJobName)},

@@ -245,6 +245,7 @@ func (c *Compiler) buildUpdateDriveMemoryJob(data *WorkflowData, threatDetection
 	return &Job{
 		Name:        updateDriveMemoryJobName,
 		RunsOn:      "runs-on: ubuntu-latest",
+		Environment: c.indentYAMLLines(data.Environment, "    "),
 		If:          condition,
 		Permissions: perms.RenderToYAML(),
 		Needs:       []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)},
