@@ -9,7 +9,7 @@ For first-time setup, see [Using GitHub Copilot](/gh-aw/engines/copilot/). Share
 
 Copilot is the default engine. Grant [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) for organization-billed inference, or supply [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token). External providers use [BYOK configuration](#copilot-bring-your-own-key-byok-mode).
 
-The default CLI pin is `1.0.101`. The compiler embeds this version and its reviewed checksum-manifest digest in the generated workflow. Installation prefers that exact version from the trusted runner toolcache; a cache miss downloads and verifies the pinned release instead of selecting a version from the live compatibility matrix. `engine.version` overrides the default. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
+The default CLI pin is `1.0.103`. The compiler embeds this version and its reviewed checksum-manifest digest in the generated workflow. Installation prefers that exact version from the trusted runner toolcache; a cache miss downloads and verifies the pinned release instead of selecting a version from the live compatibility matrix. `engine.version` overrides the default. CLI-only execution is the default. `engine.copilot-sdk: true` or `engine.driver` selects SDK mode.
 
 ## Capabilities and limitations
 

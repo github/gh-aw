@@ -37,6 +37,13 @@ cp "$target" "$work/before"
 bash "$updater" 1.0.98
 cmp "$target" "$work/before"
 
+bash "$updater" 1.0.103
+grep -qx 'const DefaultCopilotVersion Version = "1.0.103"' "$target"
+grep -qx 'const DefaultCopilotChecksumsSHA256 = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"' "$target"
+cp "$target" "$work/before"
+bash "$updater" v1.0.103
+cmp "$target" "$work/before"
+
 for constant in DefaultCopilotVersion DefaultCopilotChecksumsSHA256; do
   sed "/^const $constant /d" "$work/baseline" > "$target"
   reject 1.0.98
