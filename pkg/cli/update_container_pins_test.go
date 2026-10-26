@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -526,7 +527,7 @@ func TestUpdateContainerPins_FailureSummary(t *testing.T) {
 		},
 		{
 			name:   "unknown errors",
-			errors: []error{fmt.Errorf("unexpected first failure"), fmt.Errorf("unexpected second failure")},
+			errors: []error{errors.New("unexpected first failure"), errors.New("unexpected second failure")},
 			reason: "registry metadata lookup failed",
 		},
 	} {
