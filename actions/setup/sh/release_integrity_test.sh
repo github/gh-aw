@@ -290,6 +290,8 @@ done
 echo "PASS: missing-pin errors explain upgrade, recompile, and independently trusted manifest overrides"
 
 test -n "$(release_artifact_sha256 github/gh-aw-firewall v0.28.62 checksums.txt)"
+test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.0 checksums.txt)" = \
+  "2d49727b3b65630b5d0ba5375168687a852afac319d05c911d4769c43fa2ed61"
 test "$(release_artifact_sha256 github/copilot-cli v1.0.101 SHA256SUMS.txt)" = \
   "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
 if release_artifact_sha256 github/gh-aw-firewall v0.28.62 wrong-asset >/dev/null 2>&1; then
