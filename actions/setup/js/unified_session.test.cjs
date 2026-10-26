@@ -167,13 +167,13 @@ describe("Unified conclusion session", () => {
     expect(validateSession(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8"))).toBe(events.length);
   });
 
-  it("persists trusted memory save outcomes separately from agent requests", () => {
+  it("persists trusted memory.push outcomes separately from agent requests", () => {
     process.env.GH_AW_MEMORY_SAVE_RESULTS = JSON.stringify({
       default: { jobResult: "failure", outcome: "success", status: "saved", content: "PRIVATE_MEMORY" },
       notes: { jobResult: "failure", outcome: "failure", status: "skipped", error: "PRIVATE_ERROR" },
     });
     const events = writeUnifiedSession({ rootDir: root });
-    expect(events.filter(event => event.type === "memory.save").map(event => event.data)).toEqual([
+    expect(events.filter(event => event.type === "memory.push").map(event => event.data)).toEqual([
       { memoryId: "default", jobResult: "failure", outcome: "success", status: "saved" },
       { memoryId: "notes", jobResult: "failure", outcome: "failure", status: "failure" },
     ]);

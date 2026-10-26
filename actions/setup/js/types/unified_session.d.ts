@@ -622,7 +622,7 @@ export interface CollectionData {
 /** Known essential payloads. Unknown native extensions remain open. */
 export interface UnifiedSessionEventDataMap {
   "workflow.job_result": WorkflowJobResultData;
-  "memory.save": MemorySaveResultData;
+  "memory.push": MemorySaveResultData;
   "model.inventory": ModelInventoryData;
   "model.config": ModelConfigData;
   "model.baseline_estimate": ModelBaselineEstimateData;

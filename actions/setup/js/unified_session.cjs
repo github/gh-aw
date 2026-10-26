@@ -744,7 +744,7 @@ function collectUnifiedSession({
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
   const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
   if (memorySaves.length) {
-    sources.push({ component: "memory", phase: "conclusion", path: "usage/aw_session.jsonl", events: memorySaves.map(data => ({ type: "memory.save", data: { ...data } })) });
+    sources.push({ component: "memory", phase: "conclusion", path: "usage/aw_session.jsonl", events: memorySaves.map(data => ({ type: "memory.push", data: { ...data } })) });
   }
   const coverageWarnings = [...warnings];
   for (const event of persistedWarnings) {

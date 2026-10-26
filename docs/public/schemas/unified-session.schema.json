@@ -123,7 +123,7 @@
       { "if": { "properties": { "type": { "const": "mcp.rpc.request" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.rpc.response" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.tool_call" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
-      { "if": { "properties": { "type": { "const": "memory.save" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MemorySaveResultData" } } } },
+      { "if": { "properties": { "type": { "const": "memory.push" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MemorySaveResultData" } } } },
       { "if": { "properties": { "type": { "const": "model.baseline_estimate" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelBaselineEstimateData" } } } },
       { "if": { "properties": { "type": { "const": "model.config" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelConfigData" } } } },
       { "if": { "properties": { "type": { "const": "model.inventory" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ModelInventoryData" } } } },
