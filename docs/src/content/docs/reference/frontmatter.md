@@ -429,6 +429,8 @@ timeout-minutes: 30                  # Agentic step timeout, defaults to 20 minu
 
 `runs-on` applies to the main agent job only. `runs-on-slim` applies to all framework/generated jobs (activation, safe-outputs, unlock, etc.), accepts the same string, array, or runner-group object forms as `runs-on`, and defaults to `ubuntu-slim`. `safe-outputs.runs-on` and `safe-outputs.threat-detection.runs-on` accept the same runner forms and take precedence where applicable.
 
+`ubuntu-slim` supports job timeouts of at most 15 minutes. When a framework job's literal `timeout-minutes` exceeds 15, the compiler automatically switches its default runner to `ubuntu-latest`. Explicit runner overrides are not replaced: selecting `ubuntu-slim` with a longer job timeout produces a compilation error. Runner and timeout expressions are not evaluated by this check.
+
 `timeout-minutes` accepts an integer or a GitHub Actions expression string such as `${{ inputs.timeout }}`. It bounds the `agentic_execution` step and defaults to `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` before a 20-minute fallback. Generated jobs are bounded separately by `jobs.agent.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES }}` or 60 minutes) and `jobs.detection.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES }}` or 10 minutes). It applies to the workflow being compiled, **not** to plain caller jobs that invoke a reusable workflow with job-level `uses:`.
 
 **Supported runners for `runs-on:`**

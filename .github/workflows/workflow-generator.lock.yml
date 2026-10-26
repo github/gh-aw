@@ -2274,7 +2274,7 @@ jobs:
       - detection
       - unlock
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       issues: write
