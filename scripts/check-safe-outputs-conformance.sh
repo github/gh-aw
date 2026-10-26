@@ -4,8 +4,8 @@ set +o histexpand
 # Safe Outputs Specification Conformance Checker
 # This script implements automated checks for the Safe Outputs specification
 # Specification: docs/src/content/docs/specs/safe-outputs-specification.md
-# Spec Version: 1.29.13 (2026-10-18; reviewed through 2026-10-19 changes)
-# Script Version: 1.29.13 (2026-10-19)
+# Spec Version: 1.29.13 (2026-10-18; reviewed through 2026-10-21 changes)
+# Script Version: 1.29.13 (2026-10-25)
 
 set -euo pipefail
 
@@ -1962,7 +1962,7 @@ check_add_comment_discussions_optin() {
 
     # Check tool description discloses the opt-in requirement to the agent
     if [ -f "$tools_json" ]; then
-        if ! grep -iE "discussions.*opt.in|opt.in.*discussions|discussions.*false|not.*require.*discussions.*write|default.*not.*discussions" "$tools_json"; then
+        if ! grep -qiE "discussions.*opt.in|opt.in.*discussions|discussions.*false|not.*require.*discussions.*write|default.*not.*discussions" "$tools_json"; then
             log_medium "TYPE-009: Tool description in $tools_json may not disclose opt-in requirement for discussions:write (Section 7.1 v1.24.0)"
             failed=1
         fi
@@ -2816,6 +2816,220 @@ PYEOF
     fi
 }
 check_bundle_git_operations
+
+# SEC-010: Invocation-Context Dispatch Target Authorization (Section 3 Cross-Repository Validation, 2026-10-21)
+# When resolving a workflow_dispatch target repository, a non-empty GH_AW_ALLOWED_REPOS list
+# MUST remain authoritative. Only when it is empty MAY the resolver fall back to per-handler
+# allowed_repos entries and exact, trimmed, validated per-handler target-repo slugs (wildcards and
+# malformed values ignored). Targets outside the workflow repo and effective list MUST be rejected.
+echo "Running SEC-010: Invocation-Context Dispatch Target Authorization..."
+check_invocation_context_authorization() {
+    local resolver="actions/setup/js/invocation_context_helpers.cjs"
+    local repo_helpers="actions/setup/js/repo_helpers.cjs"
+    local failed=0
+
+    if [ ! -f "$resolver" ]; then
+        log_critical "SEC-010: Invocation-context resolver missing: $resolver"
+        return
+    fi
+
+    if ! grep -qE 'parseAllowedRepos\(process\.env\.GH_AW_ALLOWED_REPOS\)' "$resolver" || ! grep -qE 'if \(allowedRepos\.size === 0\)' "$resolver"; then
+        log_critical "SEC-010: GH_AW_ALLOWED_REPOS is not authoritative; handler configuration may extend a non-empty global allowlist"
+        failed=1
+    fi
+    if ! grep -qE 'isExactRepoSlug\(handlerTargetRepo\)' "$resolver"; then
+        log_high "SEC-010: Handler target-repo fallback values are not validated as exact repository slugs (wildcards must be ignored)"
+        failed=1
+    fi
+    if ! grep -qF 'const trimmed = value.trim();' "$resolver"; then
+        log_medium "SEC-010: Handler target-repo fallback values are not trimmed before validation"
+        failed=1
+    fi
+    if ! grep -qE 'validateTargetRepo\(targetRepoSlug, defaultRepo, allowedRepos\)' "$resolver" || ! grep -qE 'throw .*ERR_VALIDATION' "$resolver"; then
+        log_critical "SEC-010: workflow_dispatch target repositories outside the effective allowlist are not rejected"
+        failed=1
+    fi
+    if [ ! -f "$repo_helpers" ] || ! grep -qF '/^[A-Za-z0-9_-]+$/.test(repo.owner) && /^[A-Za-z0-9_.-]+$/.test(repo.repo)' "$repo_helpers"; then
+        log_medium "SEC-010: Exact fallback slug syntax does not match spec (owner: alphanumerics/-/_; repo: additionally dots)"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "SEC-010: Invocation-context dispatch targets honor authoritative global allowlist with exact handler target-repo fallback"
+    fi
+}
+check_invocation_context_authorization
+
+# RPT-001: Issue-Body Provenance and Mandatory Rendering Redaction (Section 9 Issue-body tree provenance, 2026-10-19)
+# Missing agentTainted provenance MUST be treated as agent-tainted; renderers MUST assert a private,
+# non-serializable redaction proof and recheck all strings (including the concrete title/body) before
+# publication; coarse content policies (redactReport) replace agent subtrees with "Content redacted."
+# and are exposed only as the internal `redact` builder option.
+echo "Running RPT-001: Issue-Body Provenance and Rendering Redaction..."
+check_report_provenance_redaction() {
+    local ast="actions/setup/js/report_ast.cjs"
+    local redaction="actions/setup/js/report_redaction.cjs"
+    local issue_report="actions/setup/js/issue_report.cjs"
+    local issue_body="actions/setup/js/issue_body.cjs"
+    local failed=0
+
+    for f in "$ast" "$redaction" "$issue_report" "$issue_body"; do
+        if [ ! -f "$f" ]; then
+            log_high "RPT-001: Issue report module missing: $f"
+            failed=1
+        fi
+    done
+    if [ $failed -ne 0 ]; then
+        return
+    fi
+
+    if ! grep -qE 'typeof node\.agentTainted !== "boolean"' "$ast"; then
+        log_high "RPT-001: Report normalization does not validate agentTainted provenance as a boolean"
+        failed=1
+    fi
+    if ! grep -qE 'const redactedReports = new WeakSet\(\)' "$ast" || ! grep -qE 'if \(!redactedReports\.has\(report\)\) throw' "$ast"; then
+        log_critical "RPT-001: Rendering assertion does not require a private, non-serializable redaction proof"
+        failed=1
+    fi
+    if ! awk '/^function assertRedactedReport/,/^}/' "$ast" | grep -q 'assertNoTaintedStrings(report)'; then
+        log_critical "RPT-001: assertRedactedReport does not recheck every string against current secret masks"
+        failed=1
+    fi
+    if ! awk '/^function renderReport/,/^}/' "$ast" | grep -q 'assertRedactedReport(redacted)' || ! awk '/^function renderReport/,/^}/' "$ast" | grep -q 'assertNoTaintedStrings(result)'; then
+        log_critical "RPT-001: renderReport does not assert redaction before serialization and recheck the concrete title/body"
+        failed=1
+    fi
+    if ! grep -qE 'if \(node\.agentTainted === false\) return false' "$redaction"; then
+        log_high "RPT-001: Coarse redaction does not treat missing provenance as agent-tainted"
+        failed=1
+    fi
+    if ! grep -qF '"Content redacted."' "$redaction"; then
+        log_medium "RPT-001: Coarse redaction does not use the fixed framework notice 'Content redacted.'"
+        failed=1
+    fi
+    if ! grep -qE 'redact \} = \{\}|, redact \}' "$issue_report" || ! grep -qE 'redactReport\(report, redact\)' "$issue_body"; then
+        log_medium "RPT-001: buildIssueReport/buildIssueBodyReport do not accept the optional internal 'redact' predicate"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "RPT-001: Report provenance defaults to tainted and rendering requires a rechecked redaction proof"
+    fi
+}
+check_report_provenance_redaction
+
+# RPT-002: Automatic Publication Size Redaction (Section 9 Automatic publication size redaction, 2026-10-19)
+# Bodies MUST be measured after rendering against 65,536 UTF-16 units; overflow replaces agent-origin
+# subtrees with "Content redacted to fit size limit." while markers, expiration, closing references,
+# and footers are never sliced. Protected-frame overflow MUST fail explicitly before an API write.
+# Fitting Markdown MUST remain unchanged. Supported body inputs accept up to 524,288 units.
+echo "Running RPT-002: Automatic Publication Size Redaction..."
+check_report_size_redaction() {
+    local size="actions/setup/js/report_size.cjs"
+    local tools_json="pkg/workflow/js/safe_outputs_tools.json"
+    local failed=0
+
+    if [ ! -f "$size" ]; then
+        log_high "RPT-002: Size-fitting module missing: $size"
+        return
+    fi
+    if ! grep -qE 'MAX_BODY_LENGTH = 65536;' "$size"; then
+        log_high "RPT-002: Publication size limit is not 65,536 units"
+        failed=1
+    fi
+    if ! grep -qF 'SIZE_NOTICE = "Content redacted to fit size limit.";' "$size"; then
+        log_medium "RPT-002: Size redaction does not use the framework notice 'Content redacted to fit size limit.'"
+        failed=1
+    fi
+    if ! grep -qE 'PROTECTED_TYPES = new Set\(\[.*"xml_marker".*"json_marker".*"expiration".*"closing_reference"' "$size" || ! grep -qE 'node\.agentTainted === false \|\| node\.sizeProtected' "$size"; then
+        log_critical "RPT-002: Markers, expiration, closing references, framework, or sizeProtected nodes may be size-redacted"
+        failed=1
+    fi
+    if ! grep -qE 'fitted\.body\.length <= maxLength' "$size" || ! grep -qE 'throw new Error\(`\$\{ERR_VALIDATION\}: .*protected' "$size"; then
+        log_critical "RPT-002: Final concrete length is not checked or protected-frame overflow does not fail explicitly"
+        failed=1
+    fi
+    if ! grep -qE 'prefix\.length \+ body\.length \+ suffix\.length <= maxLength\) return prefix \+ body \+ suffix' "$size"; then
+        log_medium "RPT-002: Markdown bodies that already fit are not preserved unchanged"
+        failed=1
+    fi
+    for h in add_comment create_pr_review_comment; do
+        if ! grep -qE 'fitMarkdownBody\(' "actions/setup/js/$h.cjs" 2>/dev/null; then
+            log_high "RPT-002: $h does not fit the concrete published body with fitMarkdownBody"
+            failed=1
+        fi
+    done
+    if ! grep -qE 'renderSizedReport\(' actions/setup/js/issue_body.cjs 2>/dev/null; then
+        log_high "RPT-002: Issue body publication does not use renderSizedReport"
+        failed=1
+    fi
+    if [ ! -f "$tools_json" ] || ! python3 - "$tools_json" <<'PYEOF' > /dev/null 2>&1
+import json, sys
+tools = {t["name"]: t for t in json.load(open(sys.argv[1]))}
+for name in ("add_comment", "create_issue"):
+    if tools[name]["inputSchema"]["properties"]["body"].get("maxLength") != 524288:
+        sys.exit(1)
+PYEOF
+    then
+        log_medium "RPT-002: add_comment/create_issue body inputs do not accept bounded 524,288-unit source bodies"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "RPT-002: Published bodies are fitted by concrete length with protected frames preserved"
+    fi
+}
+check_report_size_redaction
+
+# RPT-003: HTML and Code Fidelity (Section 9 HTML and code fidelity, Excluded Content, 2026-10-19)
+# Report text MUST remain escaped (no raw-HTML node). Backtick fence info strings MUST NOT contain
+# backticks. Only single-line <img> with unique src/alt/width/height/align MAY become image nodes;
+# sources MUST be credential-free HTTPS on the allowed-domain policy (no code-region exception,
+# data URIs rejected); dimensions 1..10000; align left/right/center; attributes HTML-escaped.
+echo "Running RPT-003: HTML and Code Fidelity..."
+check_report_html_code_fidelity() {
+    local md="actions/setup/js/report_markdown.cjs"
+    local ast="actions/setup/js/report_ast.cjs"
+    local failed=0
+
+    if [ ! -f "$md" ] || [ ! -f "$ast" ]; then
+        log_high "RPT-003: Report Markdown/AST modules missing"
+        return
+    fi
+    if grep -qE 'type: "html"|"raw_html"|type: "raw"' "$ast" "$md"; then
+        log_critical "RPT-003: Report AST introduces a raw-HTML node"
+        failed=1
+    fi
+    if ! grep -qF 'match[1][0] !== "`" || !match[2].includes("`")' "$md"; then
+        log_high "RPT-003: Backtick fence info strings may contain backticks"
+        failed=1
+    fi
+    if ! grep -qE '\(src\|alt\|width\|height\|align\)' "$md" || ! grep -qE 'if \(attributes\.has\(name\)\) return undefined' "$md"; then
+        log_high "RPT-003: <img> import does not restrict attributes to unique src/alt/width/height/align"
+        failed=1
+    fi
+    if ! grep -qE 'align !== "left" && align !== "right" && align !== "center"' "$md" || ! grep -qE 'dimension < 1 \|\| dimension > 10000' "$ast"; then
+        log_high "RPT-003: Image alignment or dimension bounds (1..10000) are not enforced"
+        failed=1
+    fi
+    if ! awk '/^function normalizeReportImage/,/^}/' "$ast" | grep -q 'normalizeReportAllowedURL(node.url)'; then
+        log_critical "RPT-003: Shared image normalizer does not enforce allowed-domain policy for all image provenances"
+        failed=1
+    fi
+    if ! grep -qE 'url\.protocol !== "https:" \|\| url\.username \|\| url\.password' "$ast"; then
+        log_critical "RPT-003: Report URLs are not restricted to credential-free HTTPS (data URIs must be rejected)"
+        failed=1
+    fi
+    if ! grep -qE 'function escapeHTMLAttribute' "$ast"; then
+        log_high "RPT-003: Image layout attributes are not HTML-attribute escaped on serialization"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "RPT-003: Report HTML stays escaped, code is literal, and image imports are policy-validated"
+    fi
+}
+check_report_html_code_fidelity
 
 # Summary
 echo ""
