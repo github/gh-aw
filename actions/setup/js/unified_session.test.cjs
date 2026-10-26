@@ -275,6 +275,23 @@ describe("Unified conclusion session", () => {
     expect(validateSession(fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8"))).toBe(events.length);
   });
 
+  it("persists trusted memory.push outcomes separately from agent requests", () => {
+    process.env.GH_AW_MEMORY_SAVE_RESULTS = JSON.stringify({
+      default: { jobResult: "failure", outcome: "success", status: "saved", branch: "memory/default", commit: "b".repeat(40), content: "PRIVATE_MEMORY" },
+      notes: { jobResult: "failure", outcome: "failure", status: "skipped", error: "PRIVATE_ERROR" },
+    });
+    const events = writeUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "memory.push").map(event => event.data)).toEqual([
+      { memoryId: "default", jobResult: "failure", outcome: "success", status: "saved", branch: "memory/default", commit: "b".repeat(40) },
+      { memoryId: "notes", jobResult: "failure", outcome: "failure", status: "failure" },
+    ]);
+    const persisted = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+    expect(persisted).not.toContain("memory.save");
+    expect(persisted).not.toContain("PRIVATE_");
+    expect(validateSession(persisted)).toBe(events.length);
+    expect(writeUnifiedSession({ rootDir: root })).toEqual(events);
+  });
+
   it("persists dependency job outcomes without outputs or invented timing", () => {
     process.env.GH_AW_JOB_RESULTS = JSON.stringify({
       safe_outputs: { result: "failure", outputs: { token: "PRIVATE_OUTPUT" } },

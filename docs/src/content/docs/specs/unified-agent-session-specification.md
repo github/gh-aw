@@ -564,6 +564,7 @@ preserve encounter order and retain only these event kinds and `data` keys:
 | `guardrail.admission` | `status`, `maxAiCredits`, `threatDetectionMaxAiCredits`, `evalsMaxAiCredits` |
 | `guardrail.daily_aic` | `status`, `exceeded`, `total`, `estimated`, `threshold` |
 | `workflow.job_result` | `jobId`, `result`, `durationMs` |
+| `memory.push` | `memoryId`, `jobResult`, `outcome`, `status`, `branch`, `commit` |
 | `execution.result` | `outcome`, `conclusion`, `exitCode`, `durationMs`, `startedAt`, `finishedAt` |
 | `grader.result` | `id`, `status`, `value`, `score`, `unit`, `passed`, `direction`, `threshold`, `enabled`, `min`, `max`, `version` |
 
@@ -787,6 +788,7 @@ source for opaque fields.
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, observed `model`, `requestedModel`, compact `modelRouting`, and `triggerType` from `aw_info.json`. `requestedModel` prefers `requested_model` and falls back to `model` for earlier metadata. Unavailable values are not inferred. |
 | `workflow.job_result` | Conclusion's GitHub Actions dependency snapshot from `needs`, passed through `GH_AW_JOB_RESULTS`. Each record contains the stable `jobId` and its observed `result`: `success`, `failure`, `cancelled`, or `skipped`. Optional `durationMs` is the completed Actions job's `completed_at - started_at` in milliseconds, excluding queue time. Outputs and other dependency fields are excluded. Records have workflow component, conclusion phase, and `usage/aw_session.jsonl` provenance, with deterministic job-ID order and no invented timestamp. |
+| `memory.push` | Compiler-projected repo-memory job outputs from `GH_AW_MEMORY_SAVE_RESULTS`. Records contain only the memory ID, trusted job and step outcomes, and persistence status; branch and remote commit are present only for a confirmed saved push. Memory contents and error text are excluded. Records have memory component, conclusion phase, and `usage/aw_session.jsonl` provenance. |
 | `model_routing.outcome` | The harness's observed routing status, wire model, effective endpoint, selected endpoint, effort, applied effort, and failure code from `agent/awf-routing-outcome.json`; free-form detail is excluded. |
 | `model.inventory` | AWF's runtime model list from `sandbox/firewall/models.json` and persisted `/reflect` inventory, selecting the first valid copy from `agent/awf-reflect.json`, then `sandbox/firewall/awf-reflect.json`. Agent and threat-detection inventories retain their source path and phase separately. Payloads contain provider names, AWF's endpoint `configured` state, full model ID lists, routing model IDs, supported endpoints, supported reasoning efforts, and context windows, and the observed `modelsFetchComplete` flag when supplied. Null or absent model and routing lists are unknown and omitted, never empty (T-UAS-075). Endpoint routing metadata takes precedence over the top-level fallback. Credentials, headers, URLs, and unrecognized fields are excluded. Missing inventory does not imply unavailable models; malformed sources emit collection warnings rather than empty inventory events. JSON parse failures produce one warning per source. |
 | `model_endpoint.mismatch` | A single harness JSON record from `agent/model-endpoint-mismatch.json`, with the model/API mismatch cause and corrective action. |
@@ -2491,6 +2493,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.6.0 - Draft (2026-10-26)
+
+- Added the `memory.push` conclusion observation for compiler-projected repo-memory persistence outcomes, with only memory IDs, trusted outcome enums, and confirmed push metadata.
+- Retained serialization-format version 1.
 
 ### Version 2.5.0 - Draft (2026-10-22)
 

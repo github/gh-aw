@@ -250,8 +250,9 @@ safe-outputs:
 
 Fields that influence permission computation (`add-comment.discussions`, `hide-comment.discussions`, `create-pull-request.fallback-as-issue`) remain literal booleans.
 
-- `timeout-minutes:` - Timeout for the safe-outputs job in minutes (integer, default: `45`)
+- `timeout-minutes:` - Timeout for the safe-outputs job in minutes (integer, default: `45`; implicit timeouts are capped at `15` on `ubuntu-slim`)
   - Increase for workflows with many sequential safe-output operations (e.g. `push-to-pull-request-branch` against large repositories)
+  - API-only safe-output jobs can use `ubuntu-slim` and cap an implicit timeout at 15 minutes; jobs that create or push pull requests use `ubuntu-latest` by default because they check out and publish repository code
 - `max-patch-size:` - Maximum allowed git patch size in kilobytes (integer, default: 4096 KB = 4 MB)
   - Patches exceeding this size are rejected to prevent accidental large changes
 - `max-patch-files:` - Maximum allowed number of unique files in a create-pull-request patch (integer, default: 100)

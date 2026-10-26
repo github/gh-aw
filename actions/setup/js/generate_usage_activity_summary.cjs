@@ -9,6 +9,7 @@
 //   integrity: aggregate DIFC filtering counts from gateway/RPC logs
 //   steering: aggregate AWF steering-event counts by event type
 //   safe_outputs: total item count and per-type breakdown from safe-output-items manifest
+//   memory_saves: per-memory push job/step outcomes and confirmed save status
 //   ledger: number of recorded ledger append transactions
 //   experiments: A/B experiment variant assignments for the current run
 //   working_set: cumulative input-token traffic relative to peak invocation input
@@ -1098,6 +1099,8 @@ function writeDetectionUsageResult(detectionDir = DETECTION_DIR, outputPath = DE
 async function main() {
   writeDetectionUsageResult();
   const summary = { schema: "usage-activity-summary/v1" };
+  const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
+  if (memorySaves.length) summary.memory_saves = memorySaves;
 
   // Parse firewall logs
   const firewall = parseFirewallLogs();

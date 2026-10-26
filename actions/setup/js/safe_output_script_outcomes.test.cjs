@@ -14,6 +14,11 @@ describe("safe-output script outcome persistence", () => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-script-outcomes-"));
     manifest = path.join(directory, "items.jsonl");
     vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), error: vi.fn() });
+    vi.stubGlobal("context", {
+      repo: { owner: "test-owner", repo: "test-repo" },
+      payload: { pull_request: { number: 7, state: "open" } },
+    });
+    vi.stubGlobal("github", { rest: { pulls: { get: vi.fn().mockResolvedValue({ data: { state: "open" } }) } } });
   });
 
   afterEach(() => {
@@ -33,6 +38,16 @@ describe("safe-output script outcome persistence", () => {
     const log = createManifestLogger(manifest);
     const result = await processMessages(new Map([["post_message", async () => {}]]), [{ type: "post_message", success: true, status: "success", url: "https://untrusted.example/request" }], log);
     expect(result.results[0].success).toBe(true);
+    expect(fs.readFileSync(manifest, "utf8")).toBe("");
+  });
+
+  it("does not apply or record script outcomes when the triggering pull request has closed", async () => {
+    global.github.rest.pulls.get.mockResolvedValue({ data: { state: "closed" } });
+    const handler = vi.fn().mockResolvedValue({ success: true, url: "urn:example:resource" });
+    const result = await processMessages(new Map([["post_message", handler]]), [{ type: "post_message" }], createManifestLogger(manifest));
+    expect(global.github.rest.pulls.get).toHaveBeenCalledWith({ owner: "test-owner", repo: "test-repo", pull_number: 7 });
+    expect(handler).not.toHaveBeenCalled();
+    expect(result.results[0]).toMatchObject({ skipped: true, reason: expect.stringContaining("closed after") });
     expect(fs.readFileSync(manifest, "utf8")).toBe("");
   });
 
