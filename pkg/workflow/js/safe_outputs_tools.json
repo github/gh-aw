@@ -1,11 +1,11 @@
 [
   {
     "name": "ledger_append",
-    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Persistence follows trusted validation.",
+    "description": "Submit a custom record or a typed operation to a configured Git-backed ledger. Supported built-in types: counter, log, set, table. For map ledgers, use ledger_map_put or ledger_map_delete instead. Persistence follows trusted validation.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "ledger": { "type": "string", "description": "Configured ledger name." },
+        "ledger": { "type": "string", "description": "Configured custom, counter, log, set, or table ledger name. For map ledgers, use ledger_map_put or ledger_map_delete instead." },
         "temp_id": { "type": "string", "description": "Optional temporary ID for same-batch references." },
         "record": { "type": "object", "description": "Custom ledger record payload." },
         "operation": {
