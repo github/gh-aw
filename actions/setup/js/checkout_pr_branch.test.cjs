@@ -362,8 +362,10 @@ If the pull request is still open, verify that:
         ["pull_request", "synchronize"],
         ["pull_request", "ready_for_review"],
         ["pull_request", "reopened"],
+        ["pull_request", "labeled"],
         ["pull_request_target", "ready_for_review"],
         ["pull_request_target", "reopened"],
+        ["pull_request_target", "labeled"],
       ])("should allow a same-repository GitHub App PR on %s with action %s", async (eventName, action) => {
         mockContext.eventName = eventName;
         mockContext.actor = "automation[bot]";
@@ -387,17 +389,21 @@ If the pull request is still open, verify that:
         ["missing runtime repository ID", 42, undefined, 42, "automation[bot]", "Bot", "opened"],
         ["different sender", 42, 42, 42, "other[bot]", "Bot", "opened"],
         ["non-bot sender", 42, 42, 42, "automation[bot]", "User", "opened"],
-        ["metadata-only PR event", 42, 42, 42, "automation[bot]", "Bot", "labeled"],
+        ["untrusted PR action", 42, 42, 42, "automation[bot]", "Bot", "edited"],
         ["missing base repository ID", 42, 42, undefined, "automation[bot]", "Bot", "opened"],
         ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot", "opened"],
         ["forked PR marked ready for review", 43, 42, 42, "automation[bot]", "Bot", "ready_for_review"],
         ["reopened forked PR", 43, 42, 42, "automation[bot]", "Bot", "reopened"],
+        ["labeled forked PR", 43, 42, 42, "automation[bot]", "Bot", "labeled"],
         ["ready_for_review event with mismatched base", 42, 42, 43, "automation[bot]", "Bot", "ready_for_review"],
         ["reopened event with mismatched base", 42, 42, 43, "automation[bot]", "Bot", "reopened"],
+        ["labeled event with mismatched base", 42, 42, 43, "automation[bot]", "Bot", "labeled"],
         ["ready_for_review event with different sender", 42, 42, 42, "other[bot]", "Bot", "ready_for_review"],
         ["reopened event with different sender", 42, 42, 42, "other[bot]", "Bot", "reopened"],
+        ["labeled event with different sender", 42, 42, 42, "other[bot]", "Bot", "labeled"],
         ["ready_for_review event with non-bot sender", 42, 42, 42, "automation[bot]", "User", "ready_for_review"],
         ["reopened event with non-bot sender", 42, 42, 42, "automation[bot]", "User", "reopened"],
+        ["labeled event with non-bot sender", 42, 42, 42, "automation[bot]", "User", "labeled"],
       ])("should not bypass permission verification for a %s", async (_reason, headId, repositoryId, baseId, senderLogin, senderType, action) => {
         mockContext.actor = "automation[bot]";
         mockContext.payload.sender = { login: senderLogin, type: senderType };

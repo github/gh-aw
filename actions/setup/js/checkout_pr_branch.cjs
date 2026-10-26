@@ -37,7 +37,7 @@ const { detectForkPR } = require("./pr_helpers.cjs");
 const { parseAllowedBots, isAllowedBot, canonicalizeBotIdentifier } = require("./check_permissions_utils.cjs");
 const { ERR_API, ERR_PERMISSION } = require("./error_codes.cjs");
 const TRUSTED_CHECKOUT_PERMISSIONS = ["write", "maintain", "admin"];
-const TRUSTED_BOT_PR_ACTIONS = ["opened", "synchronize", "ready_for_review", "reopened"];
+const TRUSTED_BOT_PR_ACTIONS = ["opened", "synchronize", "ready_for_review", "reopened", "labeled"];
 // Centralized command/label routing uses the repository GITHUB_TOKEN, whose
 // GitHub-authenticated actor is fixed to this platform identity.
 const CENTRALIZED_ROUTER_ACTOR = "github-actions[bot]";
