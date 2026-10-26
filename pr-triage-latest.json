@@ -1,10 +1,10 @@
 {
-  "run_date": "2026-10-26T13:58:30Z",
-  "run_id": "40334991485",
+  "run_date": "2026-10-26T18:41:46.641432Z",
+  "run_id": "40378965524",
   "source": "pr-triage",
   "eligible_total": 1,
-  "cooldown_skipped": 10,
-  "open_copilot_prs": 11,
+  "cooldown_skipped": 4,
+  "open_copilot_prs": 5,
   "category_counts": {
     "feature": 1
   },
@@ -23,39 +23,15 @@
   ],
   "skipped_prs": [
     {
-      "number": 72102,
+      "number": 72146,
       "reason": "opened/updated within the past hour"
     },
     {
-      "number": 72101,
+      "number": 72138,
       "reason": "opened/updated within the past hour"
     },
     {
-      "number": 72100,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72099,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72098,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72097,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72096,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72095,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72074,
+      "number": 72133,
       "reason": "opened/updated within the past hour"
     },
     {
@@ -63,7 +39,7 @@
       "reason": "opened/updated within the past hour"
     }
   ],
-  "notes": "Only one eligible app/github-copilot PR remained outside the 1-hour cooldown window. All other open Copilot PRs were updated within the last hour and skipped per policy.",
+  "notes": "Only one eligible app/github-copilot PR remained outside the 1-hour cooldown window. Four open Copilot PRs were updated within the last hour and skipped per policy.",
   "pr_details": [
     {
       "number": 70952,
@@ -76,7 +52,7 @@
       "urgency": 20,
       "quality": 18,
       "action": "fast_track",
-      "ci": "passing",
+      "ci": "mixed",
       "labels": [
         "pr-type:feature",
         "pr-risk:medium",
