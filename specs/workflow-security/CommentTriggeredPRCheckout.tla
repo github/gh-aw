@@ -16,7 +16,7 @@ ReviewEvents == {"pull_request_review"}
 CommentOrReviewEvents == CommentEvents \cup ReviewEvents
 BranchEvents == {"pull_request", "pull_request_target"}
 BranchActions == {"opened", "synchronize", "ready_for_review",
-                  "reopened", "other"}
+                  "reopened", "labeled", "other"}
 Actors == {"my-app", "my-app[bot]", "other", "other[bot]"}
 SenderTypes == {"Bot", "User"}
 RepositoryRelations == {"same", "fork", "missing-head", "missing-base"}
@@ -36,7 +36,8 @@ CommentEvent == event \in CommentEvents
 CommentOrReviewEvent == event \in CommentOrReviewEvents
 BranchEvent == event \in BranchEvents
 SupportedBranchAction == action \in {"opened", "synchronize",
-                                      "ready_for_review", "reopened"}
+                                      "ready_for_review", "reopened",
+                                      "labeled"}
 AuthorMatchesSender ==
     IF CommentEvent THEN sender = commentAuthor
     ELSE IF event \in ReviewEvents THEN sender = reviewAuthor

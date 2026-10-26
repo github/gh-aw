@@ -1,8 +1,8 @@
 # Security Architecture Specification Validation
 
 **Document**: Validation of `security-architecture-spec.md` against compiled `.lock.yml` files  
-**Date**: October 12, 2026<br>
-**Last targeted validation**: v1.1.1 (RS-05a revalidation) / 2026-10-09
+**Date**: October 26, 2026<br>
+**Last targeted validation**: v1.1.5 (RS-05a labeled PR checkout) / 2026-10-26
 **Validator**: GitHub Copilot Agent  
 **Scope**: Cross-reference specification requirements with actual implementation
 
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and RS-05a targeted revalidation on 2026-10-09. The v1.1.2 review-checkout update and v1.1.3 branch-event update have not yet received targeted revalidation (see §7b); this document does not claim that they have. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
+⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and RS-05a targeted revalidation through v1.1.5 on 2026-10-26. The v1.1.2 review-checkout update and v1.1.3–v1.1.5 branch-event updates have not yet received full formal revalidation (see §7b); this document does not claim that they have. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
 
 All major security architecture claims in the specification have been verified against actual workflow implementations:
 - ✅ Job architecture (activation, agent, safe_outputs)
@@ -477,7 +477,7 @@ async function assertTrustedCheckoutRuntime() {
 | coercible/non-canonical `item_number` values rejected before actor/API/git operations | item_number validation |
 | bot/app actor with write-or-higher repository permission allowed | actor trust |
 | bot/app actor without write-or-higher repository permission rejected for `workflow_dispatch`, `issue_comment`, `pull_request_review_comment`, and `pull_request_review` | actor trust |
-| same-repository bot `opened`, `synchronize`, `ready_for_review`, and `reopened` PR events allowed only when sender and runtime, head, and base repository IDs match; `ready_for_review` and `reopened` are lifecycle actions, not branch-push evidence | actor trust exception |
+| same-repository bot `opened`, `synchronize`, `ready_for_review`, `reopened`, and `labeled` PR events allowed only when sender and runtime, head, and base repository IDs match; lifecycle/metadata actions are not branch-push evidence | actor trust exception |
 | allow-listed App comments on `issue_comment` and `pull_request_review_comment`, and reviews on `pull_request_review`, allowed only when sender and matching comment/review author match, sender and runtime actor are canonically equivalent, and runtime, head, and base repository IDs match | actor trust exception |
 | unlisted bot comments/reviews, differing sender/comment/review author identities, fork PRs, and missing or mismatched repository IDs retain the collaborator permission floor | actor trust exception (negative cases) |
 | bot exception rejected for forked heads, missing runtime ID, mismatched sender, non-bot sender, metadata-only action, and missing or mismatched base ID | actor trust exception (independent negative cases) |
@@ -509,7 +509,7 @@ async function assertTrustedCheckoutRuntime() {
 | `workflow_dispatch_uses_refs_pull_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without `refs/pull/N/head` isolation |
 | `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
 
-**Status**: **RUNTIME TESTS PASS; FORMAL REVALIDATION PENDING** — The RS-05a coverage mapping includes `pull_request_review`, plus `ready_for_review` and `reopened` same-repository bot PR events. The Z3 artifact's `pr_action_proves_branch_access` guard abstracts membership in the explicit PR action allowlist; it does not assert that a branch push occurred. Runtime regression cases and the TLA+ model cover the concrete action set and rejection guards. On 2026-10-16, all 180 `checkout_pr_branch.test.cjs` tests and the setup JavaScript TypeScript check passed. The Z3 solver and pinned TLA+ Tools were unavailable in the validation environment, so the Z3 proof and TLC model were not rerun and targeted formal revalidation remains pending. Existing `workflow_dispatch`, ref-isolation, and fork-runtime evidence remains applicable; the full revalidation policy is in `security-architecture-spec.md` §11.
+**Status**: **RUNTIME TESTS PASS; FORMAL REVALIDATION PENDING** — The RS-05a coverage mapping includes `pull_request_review`, plus `ready_for_review`, `reopened`, and `labeled` same-repository bot PR events on both `pull_request` and `pull_request_target`. The Z3 artifact's `pr_action_proves_branch_access` guard abstracts membership in the explicit PR action allowlist; it does not assert that a branch push occurred. Runtime regression cases and the TLA+ model cover the concrete action set and rejection guards. The targeted `checkout_pr_branch.test.cjs` suite passed on 2026-10-26, including positive and fail-closed `labeled` cases. The Z3 solver and pinned TLA+ Tools were unavailable in the validation environment, so the Z3 proof and TLC model were not rerun and targeted formal revalidation remains pending. Existing `workflow_dispatch`, ref-isolation, and fork-runtime evidence remains applicable; the full revalidation policy is in `security-architecture-spec.md` §11.
 
 ---
 

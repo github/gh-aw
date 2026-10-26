@@ -420,6 +420,28 @@ If the pull request is still open, verify that:
         expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
       });
 
+      it.each([
+        ["forked PR", 43, 42, 42, "automation[bot]", "Bot"],
+        ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot"],
+        ["different sender", 42, 42, 42, "other[bot]", "Bot"],
+        ["non-bot sender", 42, 42, 42, "automation[bot]", "User"],
+      ])("should retain permission checks for a pull_request_target labeled event with %s", async (_reason, headId, repositoryId, baseId, senderLogin, senderType) => {
+        mockContext.eventName = "pull_request_target";
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: senderLogin, type: senderType };
+        mockContext.payload.action = "labeled";
+        mockContext.payload.repository.id = repositoryId;
+        mockContext.payload.pull_request.head.repo.id = headId;
+        mockContext.payload.pull_request.base.repo.id = baseId;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+      });
+
       it("should fail closed when bot/app actor repository permission cannot be verified", async () => {
         mockContext.actor = "Copilot";
         mockContext.payload.sender = { login: "Copilot", type: "Bot" };
