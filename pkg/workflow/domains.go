@@ -125,9 +125,6 @@ var ClaudeDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["c
 // that would also grant access to unrelated package and browser download hosts.
 var GeminiDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["gemini"])
 
-// AgyDefaultDomains are the explicit agy opt-in bundle for direct GitHub and
-// release-download access. Verified CLI bootstrap runs before the agent firewall;
-// neither it nor a preinstalled custom executable requires these runtime hosts.
 var AgyDefaultDomains = copyEngineDefaultDomainSet(engineDefaultDomainSets["agy"])
 
 // PiBaseDefaultDomains are the base domains required for the Pi CLI to operate,

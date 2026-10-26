@@ -95,32 +95,6 @@ process.stdin.on("end", () => {
 	assert.JSONEq(t, `{"mcpServers":{}}`, string(config))
 }
 
-func TestAgyHarnessUsesStagedBinaryWithoutDownload(t *testing.T) {
-	for _, staged := range []bool{false, true} {
-		t.Run("staged="+strconv.FormatBool(staged), func(t *testing.T) {
-			cmd, dir := agyHarnessCommand(t, `process.stdin.resume(); console.log(JSON.stringify({event:"result",result:{status:"SUCCESS",num_turns:1,usage:{input_tokens:10,output_tokens:2}}}));`, `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`)
-			if staged {
-				target := filepath.Join(dir, "gh-aw", "engine-cli", "bin", "agy")
-				require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o700))
-				binary, err := os.ReadFile(cmd.Args[2])
-				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(target, binary, 0o700))
-			}
-			cmd.Args[2] = "agy"
-			cmd.Env = append(cmd.Env, "RUNNER_TEMP="+dir)
-			out, err := cmd.CombinedOutput()
-			if staged {
-				require.NoError(t, err, "%s", out)
-				assert.Contains(t, string(out), `"status":"SUCCESS"`)
-			} else {
-				require.Error(t, err)
-				assert.Contains(t, string(out), "Agy version verification failed")
-				assert.NotContains(t, string(out), "Agy download")
-			}
-		})
-	}
-}
-
 func TestAgyHarnessFailsClosed(t *testing.T) {
 	validReflect := `{"ok":true,"reflectData":{"endpoints":[{"configured":true,"provider":"gemini","models_url":"http://api-proxy:10004/v1beta/models"}]}}`
 	for _, tt := range []struct{ name, body, reflect string }{

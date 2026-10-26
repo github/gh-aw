@@ -42,7 +42,6 @@ func (e *AgyEngine) buildExecutionCommand(workflowData *WorkflowData, logFile, e
 		engineCommand = fmt.Sprintf("%s && %s", cliPath, engineCommand)
 	}
 	allowedDomains := mustGetAllowedDomainsForEngineWithModel(constants.AgyEngine, workflowData.Model, workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
-	// Gateway reachability is independent of direct GitHub/download egress.
 	allowedDomains = mergeDomainsWithNetworkToolsAndRuntimes(append(splitDomainList(allowedDomains), "host.docker.internal"), nil, nil, nil)
 	return BuildAWFCommand(AWFCommandConfig{
 		EngineName:         e.GetID(),

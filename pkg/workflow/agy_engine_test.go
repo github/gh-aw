@@ -110,12 +110,6 @@ func TestAgyCompilerSelectionAndRestrictions(t *testing.T) {
 			if tt.name == "custom trusted executable" {
 				assert.Contains(t, string(lock), "agy_harness.cjs /opt/trusted/agy")
 				assert.NotContains(t, string(lock), "agy_harness.cjs agy'")
-				assert.NotContains(t, string(lock), "agy_harness.cjs --install")
-			} else {
-				install := strings.Index(string(lock), "agy_harness.cjs --install")
-				execute := strings.Index(string(lock), "name: Execute experimental Agy CLI")
-				require.NotEqual(t, -1, install)
-				assert.Less(t, install, execute)
 			}
 		})
 	}
