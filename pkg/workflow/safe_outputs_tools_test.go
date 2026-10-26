@@ -424,6 +424,26 @@ func TestSafeOutputsToolsJSONInSync(t *testing.T) {
 		"pkg/workflow/js/safe_outputs_tools.json and actions/setup/js/safe_outputs_tools.json must define identical tool objects in the same order; update both files together")
 }
 
+func TestLedgerAppendToolGuidance(t *testing.T) {
+	var tools []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools))
+	for _, tool := range tools {
+		if tool["name"] != "ledger_append" {
+			continue
+		}
+		description := tool["description"].(string)
+		require.Contains(t, description, "Supported built-in types: counter, log, set, table.")
+		properties := tool["inputSchema"].(map[string]any)["properties"].(map[string]any)
+		ledgerDescription := properties["ledger"].(map[string]any)["description"].(string)
+		require.Contains(t, ledgerDescription, "custom, counter, log, set, or table")
+		for _, text := range []string{description, ledgerDescription} {
+			require.Contains(t, text, "For map ledgers, use ledger_map_put or ledger_map_delete instead.")
+		}
+		return
+	}
+	t.Fatal("ledger_append tool not found")
+}
+
 func TestLargeContentFieldsHaveExpectedMaxLength(t *testing.T) {
 	var tools []map[string]any
 	require.NoError(t, json.Unmarshal([]byte(safeOutputsToolsJSONContent), &tools), "failed to parse compiler copy of safe_outputs_tools.json")

@@ -347,15 +347,17 @@ func TestResolveSetupActionReference(t *testing.T) {
 
 func TestResolveSetupActionReferenceWithData(t *testing.T) {
 	t.Run("release mode with resolver resolves SHA", func(t *testing.T) {
-		// Create mock action resolver and cache
-		cache := NewActionCache("")
+		const sha = "1234567890abcdef1234567890abcdef12345678"
+		cache := NewActionCache(t.TempDir())
+		cache.Set("github/gh-aw/actions/setup", "v1.0.0", sha)
 		resolver := NewActionResolver(cache)
 
-		// The resolver will fail to resolve github/gh-aw/actions/setup@v1.0.0
-		// since it's not a real tag, but it should fall back gracefully
 		ref := ResolveSetupActionReference(context.Background(), ActionModeRelease, "v1.0.0", "", resolver)
+		assert.Equal(t, "github/gh-aw/actions/setup@"+sha+" # v1.0.0", ref, "should return SHA-pinned reference when resolution succeeds")
+	})
 
-		// Without a valid pin or successful resolution, should return tag-based reference
+	t.Run("release mode with failed resolver returns tag-based reference", func(t *testing.T) {
+		ref := ResolveSetupActionReference(context.Background(), ActionModeRelease, "v1.0.0", "", unavailableSHAResolver{})
 		assert.Equal(t, "github/gh-aw/actions/setup@v1.0.0", ref, "should return tag-based reference when SHA resolution fails")
 	})
 

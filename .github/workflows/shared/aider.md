@@ -464,7 +464,7 @@ engine:
           "safe_output.request", "safe_output.result", "safe_output.outcome", "safe_output.error",
           "experiment.state", "experiment.assignment", "grader.manifest", "grader.result",
           "eval.result", "github_api.rate_limit", "usage.report", "execution.result",
-          "guardrail.admission", "guardrail.daily_aic", "guard.tool_denials_exceeded", "workflow.info", "workflow.job_result",
+          "guardrail.admission", "guardrail.daily_aic", "guard.tool_denials_exceeded", "workflow.info", "workflow.job_result", "memory.push",
           "workflow.run_started", "workflow.run_updated", "workflow.run_settled",
           "dynamicWorkflows.task_started", "dynamicWorkflows.task_progress",
           "dynamicWorkflows.task_updated", "dynamicWorkflows.task_notification",

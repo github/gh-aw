@@ -163,6 +163,9 @@ strict: false
 	compiler := NewCompiler(WithVersion("v1.0.0"))
 	// Use release mode to test production behavior (no local action checkouts)
 	compiler.SetActionMode(ActionModeRelease)
+	const setupSHA = "1234567890abcdef1234567890abcdef12345678"
+	cache, _ := compiler.ensureSharedActionCacheAndResolver()
+	cache.Set("github/gh-aw/actions/setup", "v1.0.0", setupSHA)
 
 	// Compile the workflow
 	if err := compiler.CompileWorkflow(testFile); err != nil {
@@ -186,7 +189,7 @@ strict: false
 	}
 
 	// Should use remote action references instead
-	if !strings.Contains(lockContentStr, "github/gh-aw/actions/setup@v1.0.0") {
-		t.Error("Release mode should use remote action references like 'github/gh-aw/actions/setup@v1.0.0'")
+	if !strings.Contains(lockContentStr, "github/gh-aw/actions/setup@"+setupSHA+" # v1.0.0") {
+		t.Error("Release mode should use SHA-pinned remote action references")
 	}
 }
