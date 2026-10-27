@@ -391,6 +391,7 @@ gh aw compile --strict --zizmor            # Security scan (fails on findings)
 gh aw compile --grant                      # License scan container images
 gh aw compile --yamllint                   # Lint generated YAML output
 gh aw compile --dependabot                 # Generate dependency manifests
+gh aw compile --actions-lock               # Update the standard Actions dependency lockfile
 gh aw compile --purge                      # Remove orphaned .lock.yml files
 ```
 
@@ -400,7 +401,9 @@ If the repository root contains an [`aw.yml` manifest](/gh-aw/reference/aw-yml-p
 
 Unlike `gh aw upgrade`, `gh aw compile` does not run codemods unless you pass `--fix`.
 
-**Options:** `--action-mode`, `--action-tag`, `--actionlint`, `--actions-repo`, `--allow-action-refs`, `--allow-experimental`, `--approve`, `--dependabot`, `--dry-run`, `--dir/-d`, `--engine/-e`, `--environment`, `--fail-fast`, `--fix`, `--force/-f`, `--force-refresh-action-pins`, `--force-refresh-container-pins`, `--gh-aw-ref`, `--ghes`, `--grant`, `--grype`, `--json/-j`, `--logical-repo/-l`, `--models`, `--no-check-update`, `--no-emit`, `--no-lint`, `--no-logo`, `--poutine`, `--purge`, `--refresh-stop-time`, `--require-self-hosted-runners`, `--runner-guard`, `--schedule-seed`, `--shellcheck`, `--show-all`, `--staged`, `--stats`, `--strict`, `--syft`, `--trial`, `--validate`, `--validate-images`, `--watch/-w`, `--yamllint`, `--zizmor`
+**Options:** `--action-mode`, `--action-tag`, `--actionlint`, `--actions-lock`, `--actions-repo`, `--allow-action-refs`, `--allow-experimental`, `--approve`, `--dependabot`, `--dry-run`, `--dir/-d`, `--engine/-e`, `--environment`, `--fail-fast`, `--fix`, `--force/-f`, `--force-refresh-action-pins`, `--force-refresh-container-pins`, `--gh-aw-ref`, `--ghes`, `--grant`, `--grype`, `--json/-j`, `--logical-repo/-l`, `--models`, `--no-check-update`, `--no-emit`, `--no-lint`, `--no-logo`, `--poutine`, `--purge`, `--refresh-stop-time`, `--require-self-hosted-runners`, `--runner-guard`, `--schedule-seed`, `--shellcheck`, `--show-all`, `--staged`, `--stats`, `--strict`, `--syft`, `--trial`, `--validate`, `--validate-images`, `--watch/-w`, `--yamllint`, `--zizmor`
+
+**`--actions-lock` flag:** After successful compilation and companion workflow generation, run `gh actions-lock --no-narrow` from the repository root to update `.github/workflows/actions.lock`. The extension scans all workflows in its default directory, even when compiling specific files or using `--dir`. `--no-narrow` preserves SHA-pinned action references. Install the extension separately with `gh extension install github/gh-actions-lock`; compilation never installs it. Extension failures fail the command without rolling back compiled files. Extension output goes to stderr, preserving `--json` output on stdout. Cannot be combined with `--no-emit`, `--read-only`, or `--watch`. This integration does not replace `.github/aw/actions-lock.json` or change existing pin resolution.
 
 **`--no-lint` flag:** Disable default built-in Actions/AW AST linting. By default, compilation checks the generated execution graph and authored source before emitting a lock file, including with `--no-emit`, and fails on lint errors. This flag does not disable existing compiler validation or opt-in external scanners and cannot be combined with `--dry-run`. The compile MCP input is `skip_lint`. Native Actions YAML and downstream dispatch targets require a separate `gh aw lint` invocation.
 

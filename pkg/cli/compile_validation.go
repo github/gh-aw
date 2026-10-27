@@ -195,6 +195,14 @@ func validateCompileConfig(config CompileConfig) error {
 	if err := workflow.ValidateEnvironmentOverride(config.EnvironmentOverride); err != nil {
 		return err
 	}
+	if config.ActionsLock {
+		if config.NoEmit || config.ReadOnly {
+			return errors.New("--actions-lock cannot be used with --no-emit or --read-only")
+		}
+		if config.Watch {
+			return errors.New("--actions-lock cannot be used with --watch")
+		}
+	}
 
 	// Validate dependabot flag usage
 	if config.Dependabot {

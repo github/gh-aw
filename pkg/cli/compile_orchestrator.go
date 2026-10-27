@@ -163,13 +163,43 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 	}
 
 	// Compile specific files or all files in directory
+	var workflowDataList []*workflow.WorkflowData
+	var err error
 	if len(config.MarkdownFiles) > 0 {
 		// Compile specific workflow files
-		return compileSpecificFiles(ctx, compiler, config, stats, &validationResults)
+		workflowDataList, err = compileSpecificFiles(ctx, compiler, config, stats, &validationResults)
+	} else {
+		// Compile all workflow files in directory
+		workflowDataList, err = compileAllFilesInDirectory(ctx, compiler, config, workflowDir, stats, &validationResults)
+	}
+	if err != nil {
+		return workflowDataList, err
 	}
 
-	// Compile all workflow files in directory
-	return compileAllFilesInDirectory(ctx, compiler, config, workflowDir, stats, &validationResults)
+	if config.ActionsLock {
+		if err := runCompileActionsLock(ctx); err != nil {
+			return workflowDataList, err
+		}
+	}
+	return workflowDataList, nil
+}
+
+func runCompileActionsLock(ctx context.Context) error {
+	gitRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find repository root for gh actions-lock: %w", err)
+	}
+
+	compileOrchestratorLog.Print("Running gh actions-lock --no-narrow after compilation")
+	cmd := workflow.ExecGHContext(ctx, "actions-lock", "--no-narrow")
+	cmd.Dir = gitRoot
+	// Keep extension output separate from compile --json results on stdout.
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("gh actions-lock --no-narrow failed: %w; if the extension is missing, install it with 'gh extension install github/gh-actions-lock'", err)
+	}
+	return nil
 }
 
 func applyWorkspaceStrictMode(config CompileConfig) CompileConfig {
