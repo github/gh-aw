@@ -291,6 +291,7 @@ func runActionlintOnFilesWithOptions(ctx context.Context, lockFiles []string, ve
 }
 
 func reportActionlintResult(ctx context.Context, err error, output string, parseErr error, hasFindings bool) error {
+	actionlintLog.Printf("Reporting actionlint result: hasFindings=%t, err=%v, parseErr=%v", hasFindings, err, parseErr)
 	if hasFindings && parseErr == nil {
 		findingsErr := withActionlintFindings(err, output)
 		reportCompileScannerResult(ctx, "actionlint", findingsErr)
@@ -385,6 +386,7 @@ func runActionlintCommand(ctx context.Context, gitRoot string, lockFiles, relPat
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	actionlintLog.Printf("actionlint command finished: err=%v, ctxErr=%v", err, runCtx.Err())
 
 	return actionlintCommandResult{
 		stdout:          stdout.String(),
@@ -470,10 +472,12 @@ func actionlintContextError(result actionlintCommandResult, lockFiles []string) 
 		if actionlintStats != nil {
 			actionlintStats.IntegrationErrors++
 		}
+		actionlintLog.Printf("actionlint timed out after %s on %d file(s)", result.timeoutDuration, len(lockFiles))
 		return fmt.Errorf("actionlint timed out after %d minutes on %s - this may indicate a tooling or subprocess issue",
 			int(result.timeoutDuration.Minutes()), actionlintFileDescription(lockFiles))
 	}
 	if errors.Is(result.ctxErr, context.Canceled) {
+		actionlintLog.Print("actionlint was canceled before completion")
 		return errors.New("actionlint was canceled before completion (for example by Ctrl+C or caller cancellation)")
 	}
 	return nil

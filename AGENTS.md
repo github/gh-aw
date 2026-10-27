@@ -21,7 +21,7 @@ Everything else should be loaded **lazily** through skills only when needed.
 
 ## Critical Rules (Always Applicable)
 
-1. If you changed files, use `report_progress` to commit and push.
+1. If you changed files, use `report_progress` to commit and push if available; otherwise, use Git directly after the same validation gates.
 2. Before **intermediate** `report_progress` calls, run `make agent-report-progress-no-test` (fast, no tests). Before the **final** `report_progress`, run `make agent-report-progress` (includes `test-unit`).
    - `test-unit` is impacted-first by default (~30s target). Use `TEST_UNIT_RUN_FULL=1 make test-unit` or `make test-unit-all` when full-suite coverage is required.
    - Run `test-unit` only once per PR — at the final push, not on every intermediate save.

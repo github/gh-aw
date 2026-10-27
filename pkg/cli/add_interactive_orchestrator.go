@@ -279,9 +279,11 @@ func (c *AddInteractiveConfig) resolveWorkflows() error {
 
 	resolved, err := ResolveWorkflows(c.Ctx, c.WorkflowSpecs, c.Verbose)
 	if err != nil {
+		addInteractiveLog.Printf("Failed to resolve workflows: %v", err)
 		return fmt.Errorf("failed to resolve workflows: %w", err)
 	}
 
+	addInteractiveLog.Printf("Resolved %d workflow(s)", len(resolved.Workflows))
 	c.resolvedWorkflows = resolved
 	return nil
 }
@@ -345,6 +347,7 @@ func (c *AddInteractiveConfig) determineFilesToAdd() (workflowFiles []string, in
 		}
 	}
 
+	addInteractiveLog.Printf("Determined %d workflow file(s) to add", len(workflowFiles))
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow files ready to add:"))
 	for _, f := range workflowFiles {
 		fmt.Fprintf(os.Stderr, "  • .github/workflows/%s\n", f)

@@ -12,10 +12,9 @@ var runtimeStepGeneratorLog = logger.New("workflow:runtime_step_generator")
 
 // GenerateRuntimeSetupSteps creates GitHub Actions steps for runtime setup.
 // data is the WorkflowData for the workflow being compiled; it is forwarded to
-// generateSetupStep so that the gh-aw setup-cli step can use the lock-file-aware
-// pin resolver (getActionPinWithData) rather than the static embedded-pins fallback.
-// Pass nil only when WorkflowData is unavailable or when tests specifically
-// target non-gh-aw runtime behavior.
+// generateSetupStep so that setup actions can use lock-file-aware pin resolution
+// rather than the static embedded-pins fallback.
+// Pass nil only when WorkflowData is unavailable.
 func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement, data *WorkflowData) []GitHubActionStep {
 	runtimeStepGeneratorLog.Printf("Generating runtime setup steps: requirement_count=%d", len(requirements))
 	runtimeSetupLog.Printf("Generating runtime setup steps for %d requirements", len(requirements))
@@ -116,23 +115,7 @@ func generateSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubAction
 	runtimeSetupLog.Printf("Generating setup step for runtime: %s, version=%s, if=%s", runtime.ID, version, req.IfCondition)
 
 	if runtime.ID == "gh-aw" {
-		if version == "" {
-			version = getDefaultGhAWRuntimeVersion()
-		}
-
-		step, err := generateGhAwSetupStep(ghAwSetupStepConfig{
-			actionMode:           actionModeForRuntimeSetup(IsRelease()),
-			ifCondition:          req.IfCondition,
-			cliVersion:           version,
-			actionRepo:           runtime.ActionRepo,
-			fallbackActionRefTag: version,
-			workflowData:         data,
-			withFields:           mergeRuntimeWithFields(req),
-		})
-		if err != nil {
-			runtimeStepGeneratorLog.Printf("Failed to resolve pinned setup-cli action reference for %s@%s: %v", runtime.ActionRepo, version, err)
-		}
-		return step
+		return generateGhAWRuntimeSetupStep(req, data)
 	}
 
 	// Use default version if none specified.
@@ -141,17 +124,7 @@ func generateSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubAction
 	}
 
 	// Use SHA-pinned action reference for security if available
-	actionRef := getActionPin(runtime.ActionRepo)
-
-	// If no pin exists (custom action repo), use the action repo with its version
-	if actionRef == "" {
-		if runtime.ActionVersion != "" {
-			actionRef = fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
-		} else {
-			// Fallback to just the repo name (shouldn't happen in practice)
-			actionRef = runtime.ActionRepo
-		}
-	}
+	actionRef := resolveRuntimeSetupActionRef(runtime, data)
 
 	step := GitHubActionStep{
 		"      - name: Setup " + runtime.Name,
@@ -195,6 +168,36 @@ func generateSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubAction
 	}
 
 	return appendSortedWithFieldEntries(step, withFields)
+}
+
+func resolveRuntimeSetupActionRef(runtime *Runtime, data *WorkflowData) string {
+	if ref := getActionPinForData(runtime.ActionRepo, data); ref != "" {
+		return ref
+	}
+	if runtime.ActionVersion != "" {
+		return fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
+	}
+	return runtime.ActionRepo
+}
+
+func generateGhAWRuntimeSetupStep(req *RuntimeRequirement, data *WorkflowData) GitHubActionStep {
+	version := req.Version
+	if version == "" {
+		version = getDefaultGhAWRuntimeVersion()
+	}
+	step, err := generateGhAwSetupStep(ghAwSetupStepConfig{
+		actionMode:           actionModeForRuntimeSetup(IsRelease()),
+		ifCondition:          req.IfCondition,
+		cliVersion:           version,
+		actionRepo:           req.Runtime.ActionRepo,
+		fallbackActionRefTag: version,
+		workflowData:         data,
+		withFields:           mergeRuntimeWithFields(req),
+	})
+	if err != nil {
+		runtimeStepGeneratorLog.Printf("Failed to resolve pinned setup-cli action reference for %s@%s: %v", req.Runtime.ActionRepo, version, err)
+	}
+	return step
 }
 
 func actionModeForRuntimeSetup(isRelease bool) ActionMode {

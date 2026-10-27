@@ -41,6 +41,7 @@ func parseRepositoryPackageSpec(spec string) (*RepoSpec, bool, error) {
 		if cleanedPath == "." {
 			packagePath = ""
 		} else if cleanedPath == ".." || strings.HasPrefix(cleanedPath, "../") {
+			addPackageManifestLog.Printf("Rejecting repository package spec %q: package path %q escapes the repository root", spec, packagePath)
 			return nil, true, fmt.Errorf("invalid repository package path %q: path traversal outside the repository is not allowed. Use a path relative to the repository root. Example: packages/my-package", packagePath)
 		} else {
 			packagePath = cleanedPath
@@ -151,9 +152,11 @@ func resolveRepositoryPackageDefaultBranch(ctx context.Context, repoSlug, host s
 // previously resolved package ref when available.
 func repositoryPackageEffectiveRef(repoSpec *RepoSpec, pkg *resolvedRepositoryPackage) string {
 	if repoSpec != nil && repoSpec.Version != "" {
+		addPackageManifestLog.Printf("Using explicit repository package version %q", repoSpec.Version)
 		return repoSpec.Version
 	}
 	if pkg != nil && pkg.ResolvedRef != "" {
+		addPackageManifestLog.Printf("Using previously resolved repository package ref %q", pkg.ResolvedRef)
 		return pkg.ResolvedRef
 	}
 	return ""

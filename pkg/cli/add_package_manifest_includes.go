@@ -175,10 +175,12 @@ func parseManifestIncludeMapping(mapping map[string]any, manifestPath string) (r
 func cleanManifestRelativePath(p string) (string, error) {
 	slashed := filepath.ToSlash(p)
 	if slashed != "" && ((slashed[0] == '/' || slashed[0] == '\\') || filepath.IsAbs(p) || isWindowsDriveRelativePath(slashed)) {
+		addPackageManifestLog.Printf("Rejecting manifest path %q: absolute paths are not allowed", p)
 		return "", errors.New("absolute paths are not allowed")
 	}
 	cleaned := path.Clean(slashed)
 	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		addPackageManifestLog.Printf("Rejecting manifest path %q: path traversal outside the root is not allowed", p)
 		return "", errors.New("path traversal outside the root is not allowed")
 	}
 	return cleaned, nil
@@ -479,12 +481,14 @@ func expandManifestWildcardCandidates(include repositoryPackageInclude, parent s
 		return nil, err
 	}
 	if include.isMapping() {
+		addPackageManifestLog.Printf("Expanded wildcard %q under %s to %d file match(es)", include.Source, parent, len(expanded))
 		return expanded, nil
 	}
 	dirMatches, err := expandManifestWildcardMatches(include, parent, dirCandidates, isSupportedSkillDirPath)
 	if err != nil {
 		return nil, err
 	}
+	addPackageManifestLog.Printf("Expanded wildcard %q under %s to %d file match(es), %d dir match(es)", include.Source, parent, len(expanded), len(dirMatches))
 	return append(expanded, dirMatches...), nil
 }
 
