@@ -26,6 +26,17 @@ function values(overrides = {}) {
 }
 
 describe("failure report structure", () => {
+  it("preserves typed diagnostic and pull-request slots without reparsing literal text", () => {
+    const diagnostic = { type: "paragraph", children: [{ type: "text", value: "## literal <!-- not metadata -->", agentTainted: true }], agentTainted: true };
+    const pullRequest = { type: "paragraph", children: [{ type: "code", value: "PR #123", agentTainted: false }], agentTainted: false };
+    const ast = buildFailureReport("{missing_tool_context}\n\n{pull_request_context}", "Failure", values({ missing_tool_context: [diagnostic], pull_request_info: [pullRequest] }));
+    expect(ast.children).toEqual([diagnostic, pullRequest]);
+    const { body } = renderReport(ast);
+    expect(body).toContain("\\#\\# literal &lt;");
+    expect(body).not.toContain("<!-- not metadata -->");
+    expect(body).toContain("`PR #123`");
+  });
+
   it("has a fixed overview, next step, and details order with one debugging prompt", () => {
     const ast = buildFailureReport(
       template,

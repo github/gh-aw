@@ -5,13 +5,28 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getMessages } = require("./messages_core.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { getPullRequestCreatedMessage, getIssueCreatedMessage, getCommitPushedMessage } = require("./messages_run_status.cjs");
+const { buildCreatedMessageBlocks } = require("./messages_run_status.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { generateXMLMarker } = require("./generate_footer.cjs");
-const { getFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { getFooterMessageParts, buildFooterBlocks, getDetectionCautionBlocks } = require("./messages_footer.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { resolveTopLevelDiscussionCommentId } = require("./github_api_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+
+/**
+ * @param {import("./report_ast.cjs").ReportBlock[]} body
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildActivationMessage(body, workflowName, runUrl) {
+  return [
+    ...getDetectionCautionBlocks(workflowName, runUrl),
+    ...body,
+    ...buildFooterBlocks(getFooterMessageParts({ workflowName, runUrl })),
+    ...parseReportMarkdown(generateXMLMarker(workflowName, runUrl), { allowMetadata: true, agentTainted: false }),
+  ];
+}
 
 /**
  * Record a link message appended to the activation comment and export the
@@ -42,13 +57,10 @@ async function updateActivationComment(github, context, core, itemUrl, itemNumbe
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
   const invocationContext = resolveInvocationContext(context);
   const runUrl = buildWorkflowRunUrl(context, invocationContext.workflowRepo);
-  const body = itemType === "issue" ? getIssueCreatedMessage({ itemNumber, itemUrl }) : getPullRequestCreatedMessage({ itemNumber, itemUrl });
-  const footerMessage = getFooterMessage({ workflowName, runUrl });
-  const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-  const cautionSection = detectionCaution ? `${detectionCaution}\n\n` : "";
-  const linkMessage = `\n\n${cautionSection}${body}\n\n${footerMessage}\n\n${generateXMLMarker(workflowName, runUrl)}`;
+  const body = buildCreatedMessageBlocks(itemType === "issue" ? "issue" : "pull_request", { itemNumber, itemUrl });
+  const linkMessage = buildActivationMessage(body, workflowName, runUrl);
   if (await updateActivationCommentWithMessage(github, context, core, linkMessage, itemLabel, {})) {
-    recordActivationCommentLink(core, body, options.activationCommentLinks ?? []);
+    recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Created item", children: body }).body, options.activationCommentLinks ?? []);
   }
 }
 
@@ -71,13 +83,13 @@ async function updateActivationCommentWithCommit(github, context, core, commitSh
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
   const invocationContext = resolveInvocationContext(context);
   const runUrl = buildWorkflowRunUrl(context, invocationContext.workflowRepo);
-  const footerMessage = getFooterMessage({ workflowName, runUrl });
-  const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-  const cautionSection = detectionCaution ? `${detectionCaution}\n\n` : "";
-  const commitMessage = [getCommitPushedMessage({ commitSha, shortSha, commitUrl }), options.additionalMessage].filter(Boolean).join("\n\n");
-  const message = `\n\n${cautionSection}${commitMessage}\n\n${footerMessage}\n\n${generateXMLMarker(workflowName, runUrl)}`;
+  const commitMessage = buildCreatedMessageBlocks("commit", { commitSha, shortSha, commitUrl });
+  if (options.additionalMessage) {
+    commitMessage.push(...parseReportMarkdown(options.additionalMessage, { agentTainted: false }));
+  }
+  const message = buildActivationMessage(commitMessage, workflowName, runUrl);
   if (await updateActivationCommentWithMessage(github, context, core, message, "commit", options)) {
-    recordActivationCommentLink(core, commitMessage, options.activationCommentLinks ?? []);
+    recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Pushed commit", children: commitMessage }).body, options.activationCommentLinks ?? []);
   }
 }
 
@@ -86,7 +98,7 @@ async function updateActivationCommentWithCommit(github, context, core, commitSh
  * @param {any} github - GitHub REST API instance
  * @param {any} context - GitHub Actions context
  * @param {any} core - GitHub Actions core
- * @param {string} message - Message to append to the comment
+ * @param {string | import("./report_ast.cjs").ReportBlock[]} message - Message to append to the comment
  * @param {string} label - Optional label for log messages (e.g., "pull request", "issue", "commit")
  * @param {object} [options] - Optional configuration
  * @param {number} [options.targetIssueNumber] - PR/issue number to post a new comment on if no activation comment exists
@@ -107,6 +119,13 @@ async function updateActivationCommentWithMessage(github, context, core, message
     core.info("activation-comments is disabled: skipping activation comment update");
     return false;
   }
+  const messageNodes = typeof message === "string" ? parseReportMarkdown(sanitizeContent(message), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }) : message;
+  const renderMessage = (currentBody = "") =>
+    renderSizedReport({
+      type: "report",
+      title: "Workflow activation",
+      children: [...parseReportMarkdown(sanitizeContent(currentBody), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }), ...messageNodes],
+    }).body;
 
   // Parse comment repo (format: "owner/repo") with validation
   let repoOwner = context.repo.owner;
@@ -168,7 +187,7 @@ async function updateActivationCommentWithMessage(github, context, core, message
               }
             }`;
 
-        const sanitizedMessage = sanitizeContent(message);
+        const sanitizedMessage = renderMessage();
         const variables = replyToId ? { dId: discussionId, body: sanitizedMessage, replyToId } : { dId: discussionId, body: sanitizedMessage };
         const result = await github.graphql(mutation, variables);
         const created = result?.addDiscussionComment?.comment;
@@ -186,7 +205,7 @@ async function updateActivationCommentWithMessage(github, context, core, message
         return false;
       }
 
-      const sanitizedMessage = sanitizeContent(message);
+      const sanitizedMessage = renderMessage();
       const response = await github.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
         owner: repoOwner,
         repo: repoName,
@@ -230,7 +249,7 @@ async function updateActivationCommentWithMessage(github, context, core, message
 
       core.info(`No activation comment to update (GH_AW_COMMENT_ID not set), creating new comment on ${fallbackOwner}/${fallbackRepo}#${targetNumber}`);
       try {
-        const sanitizedMessage = sanitizeContent(message);
+        const sanitizedMessage = renderMessage();
         const response = await fallbackClient.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
           owner: fallbackOwner,
           repo: fallbackRepo,
@@ -280,7 +299,7 @@ async function updateActivationCommentWithMessage(github, context, core, message
         return false;
       }
       const currentBody = currentComment.node.body;
-      const updatedBody = currentBody + message;
+      const updatedBody = renderMessage(currentBody);
 
       // Update discussion comment using GraphQL
       const result = await github.graphql(
@@ -318,7 +337,7 @@ async function updateActivationCommentWithMessage(github, context, core, message
         return false;
       }
       const currentBody = currentComment.data.body;
-      const updatedBody = sanitizeContent(currentBody + message);
+      const updatedBody = renderMessage(currentBody);
 
       // Update issue/PR comment using REST API
       const response = await github.request("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", {

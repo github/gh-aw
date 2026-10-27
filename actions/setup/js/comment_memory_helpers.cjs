@@ -67,11 +67,11 @@ function extractCommentMemoryEntries(commentBody, warn = () => {}) {
 
   // New format: ``````gh-aw-comment-memory:<id>\ncontent\n``````
   // Use a broad character class and then validate with isSafeMemoryId() to keep validation in one place.
-  const codeFenceOpenerPattern = new RegExp(`${ESCAPED_COMMENT_MEMORY_CODE_FENCE}${COMMENT_MEMORY_TAG}:([^\\n]{1,${MAX_MEMORY_ID_LENGTH}})\\n([\\s\\S]*?)\\n${ESCAPED_COMMENT_MEMORY_CODE_FENCE}(?:\\n|$)`, "g");
+  const codeFenceOpenerPattern = new RegExp(`(?:^|\\n)(\`{6,})${COMMENT_MEMORY_TAG}:([^\\n]{1,${MAX_MEMORY_ID_LENGTH}})\\n([\\s\\S]*?)\\n\\1(?=\\n|$)`, "g");
   let match;
   while ((match = codeFenceOpenerPattern.exec(commentBody)) !== null) {
-    const memoryId = match[1];
-    const content = match[2].trim();
+    const memoryId = match[2];
+    const content = match[3].trim();
     if (isSafeMemoryId(memoryId)) {
       entries.push({ memoryId, content });
       seenIds.add(memoryId);

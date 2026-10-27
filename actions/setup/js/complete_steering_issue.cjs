@@ -3,6 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 async function main() {
   const issueNumber = Number.parseInt(process.env.GH_AW_STEERING_ISSUE_NUMBER || "", 10);
@@ -34,8 +35,13 @@ async function main() {
 
   const pullRequestNumber = Number.parseInt(process.env.GH_AW_CREATED_PR_NUMBER || "", 10);
   const pullRequestUrl = process.env.GH_AW_CREATED_PR_URL || "";
-  const body =
-    Number.isFinite(pullRequestNumber) && pullRequestNumber > 0 && pullRequestUrl ? `The workflow completed successfully and created [pull request #${pullRequestNumber}](${pullRequestUrl}).` : "The workflow completed successfully.";
+  /** @type {import("./report_ast.cjs").ReportInline[]} */
+  const children = [{ type: "text", value: "The workflow completed successfully", agentTainted: false }];
+  if (Number.isFinite(pullRequestNumber) && pullRequestNumber > 0 && pullRequestUrl) {
+    children.push({ type: "text", value: " and created ", agentTainted: false }, { type: "link", url: pullRequestUrl, children: [{ type: "text", value: `pull request #${pullRequestNumber}`, agentTainted: false }] });
+  }
+  children.push({ type: "text", value: ".", agentTainted: false });
+  const body = renderSizedReport({ type: "report", title: "Workflow completed", children: [{ type: "paragraph", children }] }).body;
   try {
     await github.rest.issues.createComment({
       owner: context.repo.owner,

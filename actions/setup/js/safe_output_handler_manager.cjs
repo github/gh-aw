@@ -22,8 +22,10 @@ const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getAssignToAgentAssigned, getAssignToAgentErrors, getAssignToAgentErrorCount, writeAssignToAgentSummary } = require("./assign_to_agent.cjs");
 const { createPrReviewBufferRegistry } = require("./pr_review_buffer.cjs");
-const { appendExecutionProvenance } = require("./execution_provenance.cjs");
-const { generateWorkflowIdMarker, generateWorkflowCallIdMarker } = require("./generate_footer.cjs");
+const { appendExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
+const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
@@ -1249,9 +1251,29 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         if (codePushFallbackInfo) {
           const fallbackNote =
             codePushFallbackInfo.fallbackTargetType === "pull_request"
-              ? `\n\n---\n> [!NOTE]\n> Direct push to the original pull request branch was not possible (diverged/non-fast-forward). A fallback pull request was created instead: [#${codePushFallbackInfo.number}](${codePushFallbackInfo.url})\n\n`
-              : `\n\n---\n> [!NOTE]\n> The pull request was not created — a fallback review issue was created instead due to protected file changes: [#${codePushFallbackInfo.number}](${codePushFallbackInfo.url})\n\n`;
-          effectiveMessage = { ...effectiveMessage, body: fallbackNote + (effectiveMessage.body || "") };
+              ? "Direct push to the original pull request branch was not possible (diverged/non-fast-forward). A fallback pull request was created instead: "
+              : "The pull request was not created — a fallback review issue was created instead due to protected file changes: ";
+          effectiveMessage = {
+            ...effectiveMessage,
+            [COMMENT_PREAMBLE]: [
+              { type: "separator", agentTainted: false },
+              {
+                type: "alert",
+                kind: "NOTE",
+                agentTainted: false,
+                children: [
+                  {
+                    type: "paragraph",
+                    agentTainted: false,
+                    children: [
+                      { type: "text", value: fallbackNote, agentTainted: false },
+                      { type: "link", url: codePushFallbackInfo.url, children: [{ type: "text", value: `#${codePushFallbackInfo.number}`, agentTainted: false }], agentTainted: false },
+                    ],
+                  },
+                ],
+              },
+            ],
+          };
           core.info(`Prepending fallback correction note to add_comment body (fallback ${codePushFallbackInfo.fallbackTargetType}: #${codePushFallbackInfo.number})`);
         }
         // If a previous code-push operation failed outright (e.g. patch application error),
@@ -1259,8 +1281,30 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         // code changes were not applied.
         if (codePushFailures.length > 0) {
           const failure = codePushFailures[0];
-          const failureNote = `\n\n---\n> [!WARNING]\n> The \`${failure.type}\` operation failed: ${failure.error}. The code changes were not applied.\n\n`;
-          effectiveMessage = { ...effectiveMessage, body: failureNote + (effectiveMessage.body || "") };
+          effectiveMessage = {
+            ...effectiveMessage,
+            [COMMENT_PREAMBLE]: [
+              { type: "separator", agentTainted: false },
+              {
+                type: "alert",
+                kind: "WARNING",
+                agentTainted: false,
+                children: [
+                  {
+                    type: "paragraph",
+                    agentTainted: false,
+                    children: [
+                      { type: "text", value: "The ", agentTainted: false },
+                      { type: "code", value: failure.type, agentTainted: false },
+                      { type: "text", value: " operation failed: ", agentTainted: false },
+                      { type: "text", value: `${failure.error}. The code changes were not applied.`, agentTainted: true },
+                    ],
+                  },
+                ],
+              },
+              ...(effectiveMessage[COMMENT_PREAMBLE] || []),
+            ],
+          };
           core.info(`Prepending code push failure note to add_comment body (${failure.type}: ${failure.error})`);
         }
       }
@@ -1646,7 +1690,7 @@ async function updateIssueBody(github, context, repo, issueNumber, updatedBody, 
     owner,
     repo: repoName,
     issue_number: issueNumber,
-    body: appendExecutionProvenance(sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions), process.env.GH_AW_WORKFLOW_NAME || "Workflow", buildWorkflowRunUrl(context, context.repo)),
+    body: sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions, context),
   });
 
   core.info(`✓ Updated issue ${repo}#${issueNumber}`);
@@ -1672,7 +1716,7 @@ async function updatePullRequestBody(github, context, repo, prNumber, updatedBod
     owner,
     repo: repoName,
     pull_number: prNumber,
-    body: appendExecutionProvenance(sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions), process.env.GH_AW_WORKFLOW_NAME || "Workflow", buildWorkflowRunUrl(context, context.repo)),
+    body: sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions, context),
   });
 
   core.info(`✓ Updated pull request ${repo}#${prNumber}`);
@@ -1727,7 +1771,7 @@ async function updateDiscussionBody(github, context, repo, discussionNumber, upd
 
   await github.graphql(mutation, {
     discussionId,
-    body: appendExecutionProvenance(sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions), process.env.GH_AW_WORKFLOW_NAME || "Workflow", buildWorkflowRunUrl(context, context.repo)),
+    body: sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions, context),
   });
 
   core.info(`✓ Updated discussion ${repo}#${discussionNumber}`);
@@ -1750,7 +1794,7 @@ async function updateCommentBody(github, context, repo, commentId, updatedBody, 
 
   core.info(`Updating comment ${commentId} body with resolved temporary IDs`);
 
-  const body = appendExecutionProvenance(sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions), process.env.GH_AW_WORKFLOW_NAME || "Workflow", buildWorkflowRunUrl(context, context.repo));
+  const body = sanitizeSyntheticUpdateBody(updatedBody, allowedAliases, maxMentions, context);
 
   if (isDiscussion) {
     // For discussion comments, we need to use GraphQL
@@ -1787,14 +1831,16 @@ async function updateCommentBody(github, context, repo, commentId, updatedBody, 
  * @param {string} body
  * @param {string[]} allowedAliases
  * @param {number} maxMentions
+ * @param {any} ctx
  * @returns {string}
  */
-function sanitizeSyntheticUpdateBody(body, allowedAliases, maxMentions) {
+function sanitizeSyntheticUpdateBody(body, allowedAliases, maxMentions, ctx) {
   const sanitizedBody = sanitizeContent(body, { allowedAliases, maxMentions });
-  const groupingMarkers = [];
-  if (process.env.GH_AW_WORKFLOW_ID) groupingMarkers.push(generateWorkflowIdMarker(process.env.GH_AW_WORKFLOW_ID));
-  if (process.env.GH_AW_CALLER_WORKFLOW_ID) groupingMarkers.push(generateWorkflowCallIdMarker(process.env.GH_AW_CALLER_WORKFLOW_ID));
-  return [sanitizedBody, ...groupingMarkers].filter(Boolean).join("\n\n");
+  const children = parseReportMarkdown(stripExecutionProvenance(sanitizedBody), { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions: allowedAliases, agentTainted: true });
+  if (process.env.GH_AW_WORKFLOW_ID) children.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: process.env.GH_AW_WORKFLOW_ID, agentTainted: false });
+  if (process.env.GH_AW_CALLER_WORKFLOW_ID) children.push({ type: "xml_marker", name: "gh-aw-workflow-call-id", value: process.env.GH_AW_CALLER_WORKFLOW_ID, agentTainted: false });
+  children.push(...parseReportMarkdown(appendExecutionProvenance("", process.env.GH_AW_WORKFLOW_NAME || "Workflow", buildWorkflowRunUrl(ctx, ctx.repo)), { allowMetadata: true, agentTainted: false }));
+  return renderSizedReport({ type: "report", title: "Updated body", children }).body;
 }
 
 /**

@@ -7,7 +7,9 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
-const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { getBodyFooterBlocks, getDetectionCautionBlocks } = require("./messages_footer.cjs");
+const { buildGeneratedFooterBlocks } = require("./markdown_body_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { getPRNumber } = require("./update_context_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
@@ -16,7 +18,7 @@ const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
-const { fitMarkdownBody } = require("./report_size.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 /**
  * Type constant for handler identification
@@ -177,20 +179,15 @@ async function main(config = {}) {
       }
 
       // Inject CAUTION at top of body unconditionally if threat detection warning was raised
-      let finalBody = sanitizeContent(body, { allowedAliases: allowedMentionAliases, maxMentions });
-      const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-      let suffix = "";
+      const sanitizedBody = sanitizeContent(body, { allowedAliases: allowedMentionAliases, maxMentions });
+      const children = [...getDetectionCautionBlocks(workflowName, runUrl), ...parseReportMarkdown(sanitizedBody, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true, allowedMentions: allowedMentionAliases })];
 
       // Append footer with workflow information when enabled
       if (includeFooter) {
-        const footer = generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, undefined, triggeringPRNumber, undefined, undefined, { skipDetectionCaution: true });
-        suffix += "\n\n" + footer;
+        children.push(...buildGeneratedFooterBlocks({ workflowName, runUrl, workflowSource, workflowSourceURL, triggeringPRNumber }));
       }
-      const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
-      if (bodyFooter) {
-        suffix = suffix.trimEnd() + "\n\n" + bodyFooter.trimEnd();
-      }
-      finalBody = fitMarkdownBody(includeFooter || bodyFooter ? finalBody.trimEnd() : finalBody, { prefix: detectionCaution ? detectionCaution + "\n\n" : "", suffix, allowedMentions: allowedMentionAliases });
+      children.push(...getBodyFooterBlocks(config.body_footer, { workflowName, runUrl }));
+      const finalBody = renderSizedReport({ type: "report", title: "Review reply", children }).body;
 
       core.info(`Replying to review comment ${numericCommentId} on PR #${targetPRNumber} (${owner}/${repo})`);
 

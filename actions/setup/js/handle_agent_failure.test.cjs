@@ -6,7 +6,31 @@ import { syncRuntimePromptTemplates } from "./test_prompt_templates.js";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const require = createRequire(import.meta.url);
+const nodeRequire = createRequire(import.meta.url);
+const { renderReport } = nodeRequire("./report_ast.cjs");
+const { parseReportMarkdown } = nodeRequire("./report_markdown.cjs");
+
+// Keep content assertions at the final render boundary; production builders return trees.
+function require(id) {
+  const exports = nodeRequire(id);
+  if (id !== "./handle_agent_failure.cjs") return exports;
+  return Object.fromEntries(
+    Object.entries(exports).map(([name, value]) => {
+      if (typeof value !== "function" || !/^build.*Context$/.test(name)) return [name, value];
+      return [
+        name,
+        (...args) => {
+          if (name === "buildFailureDiagnosticsContext" && typeof args[0]?.engineFailureContext === "string") {
+            args[0] = { ...args[0], engineFailureContext: parseReportMarkdown(args[0].engineFailureContext) };
+          }
+          const render = children => (children.length ? renderReport({ type: "report", title: "Workflow failure", children, agentTainted: false }).body : "");
+          const result = value(...args);
+          return result instanceof Promise ? result.then(render) : render(result);
+        },
+      ];
+    })
+  );
+}
 const previousRunnerTemp = process.env.RUNNER_TEMP;
 const promptRoot = mkdtempSync(join(realpathSync(process.cwd()), ".gh-aw-failure-prompts-"));
 process.env.RUNNER_TEMP = promptRoot;
@@ -80,6 +104,58 @@ describe("handle_agent_failure", () => {
     delete process.env.GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS;
     delete process.env.GH_AW_AGENT_CONCLUSION;
     delete process.env.GH_AW_GROUP_REPORTS;
+  });
+
+  describe("typed diagnostic reports", () => {
+    it("keeps generated diagnostics literal until the publication render", () => {
+      const { buildCodePushFailureContext } = nodeRequire("./handle_agent_failure.cjs");
+      const { buildFailureReport } = nodeRequire("./failure_report.cjs");
+      const { renderSizedReport } = nodeRequire("./report_size.cjs");
+      const hostile = "</details> # Forged section <!-- gh-aw-failure-issue: attacker -->";
+      const children = buildCodePushFailureContext(`push\`code:${hostile}`, { number: 12, html_url: "https://github.com/o/r/pull/12" });
+      expect(Array.isArray(children)).toBe(true);
+      expect(JSON.stringify(children)).toContain('"type":"code","value":"push`code"');
+      expect(JSON.stringify(children)).toContain(hostile);
+      expect(JSON.stringify(children)).not.toContain('"type":"xml_marker"');
+      const report = buildFailureReport("{code_push_failure_context}", "Workflow failure", { code_push_failure_context: children });
+      const body = renderSizedReport(report).body;
+      expect(body).toContain("[\\#12](https://github.com/o/r/pull/12)");
+      expect(body).not.toContain("\n# Forged section");
+      expect(body).not.toContain("<!-- gh-aw-failure-issue: attacker -->");
+      expect(body).toContain("&lt;/details&gt;");
+    });
+
+    it("parses original permission templates with block lists and scalar code content", () => {
+      const { buildPermissionDeniedContext } = nodeRequire("./handle_agent_failure.cjs");
+      vi.stubEnv("GH_AW_PROMPTS_DIR", nodeRequire("node:url").fileURLToPath(new URL("../md", import.meta.url)));
+      try {
+        const children = buildPermissionDeniedContext([{ type: "missing_tool", tool: "tool/permission", reason: "permission denied", denied_commands: ["bash(git push)", "bash(npm test)"] }], "workflow#name");
+        expect(children.some(node => node.type === "list")).toBe(true);
+        const body = renderReport({ type: "report", title: "Workflow failure", children }).body;
+        expect(body).toContain("- `bash(git push)`");
+        expect(body).toContain("The agentic workflow workflow#name");
+        expect(body).toContain("bash(git push), bash(npm test)");
+        expect(body).not.toContain("[object Object]");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("retains authoritative failure metadata when diagnostic text is sized", () => {
+      const { buildCodePushFailureContext } = nodeRequire("./handle_agent_failure.cjs");
+      const { renderSizedReport } = nodeRequire("./report_size.cjs");
+      const children = buildCodePushFailureContext(`push:${"untrusted diagnostic ".repeat(1000)}`);
+      const report = {
+        type: "report",
+        title: "Workflow failure",
+        children,
+        agentTainted: false,
+        footer: { type: "footer", children: [], markers: [{ type: "xml_marker", name: "gh-aw-failure-issue", value: "true", agentTainted: false }], agentTainted: false },
+      };
+      const body = renderSizedReport(report, 1000).body;
+      expect(body.length).toBeLessThanOrEqual(1000);
+      expect(body).toContain("<!-- gh-aw-failure-issue: true -->");
+    });
   });
 
   describe("model/endpoint mismatch context", () => {
@@ -823,12 +899,12 @@ describe("handle_agent_failure", () => {
           engineFailureContext: "**Driver exit code:** `1`\n\n",
         })
       ).toBe(
-        "\n### Failure Diagnostics\n\n" +
+        "#### Failure Diagnostics\n\n" +
           "**Agent job:** `agent`  \n" +
           "**Agent job conclusion:** `failure`  \n" +
           "**Failing step:** `Run agent`\n\n" +
           "**Driver exit code:** `1`\n\n" +
-          "_Only runtime metadata is shown; agent-generated text is excluded._\n\n"
+          "*Only runtime metadata is shown; agent-generated text is excluded.*\n"
       );
     });
 
@@ -1332,7 +1408,7 @@ describe("handle_agent_failure", () => {
 
       try {
         await main();
-        expect(capturedCommentBody).toContain("> Generated from [Test Workflow](https://github.com/owner/repo/actions/runs/123456) · ~3 AIC");
+        expect(capturedCommentBody).toContain("> Generated from [Test Workflow](https://github.com/owner/repo/actions/runs/123456) · \\~3 AIC");
       } finally {
         delete process.env.GH_AW_AGENT_OUTPUT;
       }
@@ -2186,7 +2262,7 @@ describe("handle_agent_failure", () => {
       expect(body.match(/\*\*Driver exit code:\*\*/g)).toHaveLength(1);
       expect(body.match(/### Failure Diagnostics/g)).toHaveLength(1);
       expect(body).toContain("Completion signal: agent reported incomplete (reason and details excluded)");
-      expect(body).toContain(`${existingIssue ? "_" : "*"}Only runtime metadata is shown; agent-generated text is excluded.${existingIssue ? "_" : "*"}`);
+      expect(body).toContain("*Only runtime metadata is shown; agent-generated text is excluded.*");
       expect(body).toContain("The workflow recorded a `report_incomplete` signal");
       expect(body).not.toContain("agent-generated diagnostic");
       expect(body).not.toContain("infrastructure_error");
@@ -3263,7 +3339,7 @@ describe("handle_agent_failure", () => {
             "Agent assignment credential validation failed: Bad credentials (HTTP 401). Agent assignment credential source: GH_AW_GITHUB_TOKEN. Dedicated assignment credential: present. Credential format: fine-grained PAT.";
           const result = buildAssignmentErrorsContext(diagnostic);
 
-          expect(result).toContain(`- ${diagnostic}`);
+          expect(result).toContain(`- ${diagnostic.replaceAll("_", "\\_")}`);
           expect(result).not.toContain("PR #");
           expect(result).not.toContain("Issue #");
         } finally {
@@ -3282,8 +3358,8 @@ describe("handle_agent_failure", () => {
           const result = buildAssignmentErrorsContext("issue:42:copilot:Bad credentials\npr:7:copilot:copilot coding agent is not available for this repository");
 
           expect(result).toContain("Agent Assignment Failed");
-          expect(result).toContain("Issue #42 (agent: copilot): Bad credentials");
-          expect(result).toContain("PR #7 (agent: copilot): copilot coding agent is not available for this repository");
+          expect(result).toContain("Issue \\#42 (agent: copilot): Bad credentials");
+          expect(result).toContain("PR \\#7 (agent: copilot): copilot coding agent is not available for this repository");
           expect(result).toContain("GH_AW_AGENT_TOKEN");
           expect(result).toContain("metadata: read");
           expect(result).toContain("GitHub App installation token");
@@ -3312,7 +3388,7 @@ describe("handle_agent_failure", () => {
           const result = buildAssignCopilotFailureContext(true, "issue:42:copilot:Bad credentials");
 
           expect(result).toContain("Copilot Assignment Failed");
-          expect(result).toContain("Issue #42: Bad credentials");
+          expect(result).toContain("Issue \\#42: Bad credentials");
           expect(result).toContain("GH_AW_AGENT_TOKEN");
           expect(result).toContain("metadata");
           expect(result).toContain("GitHub App installation token");
@@ -6520,7 +6596,8 @@ describe("handle_agent_failure", () => {
       const { extractShellCommandPreview } = require("./handle_agent_failure.cjs");
       const command = extractShellCommandPreview({ args: ["build", "a  b", "`id`", "``literal``"] });
       const result = buildToolDenialsExceededContext([{ denialCount: 5, threshold: 5, reason: "denied", recentToolCalls: [`go(${command})`, "bash(git status)"] }]);
-      expect(result).toContain("- ```go(build 'a  b' '`id`' '``literal``')```");
+      expect(result).toContain("go(build 'a  b' '`id`' '``literal``')");
+      expect(result).toContain("- ```text");
       expect(result).toContain("- `bash(git status)`");
     });
 
@@ -6556,8 +6633,8 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("daily-spdd-spec-planner");
       expect(result).toContain("> [!WARNING]");
       expect(result).toContain("<details>");
-      expect(result).toContain("<summary><strong>Last denied request</strong></summary>");
-      expect(result).toContain("<summary><strong>Last 5 tool calls</strong></summary>");
+      expect(result).toContain("<summary><b>Last denied request</b></summary>");
+      expect(result).toContain("<summary><b>Last 5 tool calls</b></summary>");
       expect(result).toContain("```text");
       expect(result).toContain("\nread\n");
       expect(result).toContain("- `read(...)`");
@@ -6966,6 +7043,25 @@ describe("handle_agent_failure", () => {
     /** @type {string} */
     let promptsDir;
 
+    function mockCancelledAgentMetadata(annotations = []) {
+      global.github.paginate = vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            name: "agent",
+            conclusion: "cancelled",
+            check_run_url: "https://api.github.com/repos/owner/repo/check-runs/456",
+            steps: [
+              { name: "Custom setup", conclusion: "cancelled" },
+              { name: "Run agent", conclusion: "skipped" },
+            ],
+          },
+        ])
+        .mockResolvedValue(annotations);
+      global.github.rest.actions = { listJobsForWorkflowRun: vi.fn() };
+      global.github.rest.checks = { listAnnotations: vi.fn() };
+    }
+
     beforeEach(() => {
       vi.stubEnv("GITHUB_RUN_ID", "12345");
       vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
@@ -7056,6 +7152,7 @@ describe("handle_agent_failure", () => {
           issues: { create: createIssueMock, createComment: createCommentMock },
         },
       };
+      mockCancelledAgentMetadata();
 
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();
@@ -7065,6 +7162,87 @@ describe("handle_agent_failure", () => {
       expect(createCommentMock).not.toHaveBeenCalled();
       expect(searchMock).not.toHaveBeenCalled();
       expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("(conclusion: cancelled), skipping failure handling"));
+    });
+
+    it.each(["job-timeout", "engine-timeout", "annotations-denied", "annotations-invalid", "jobs-denied"])("preserves cancelled startup failure reporting with %s evidence", async evidence => {
+      process.env.GH_AW_AGENT_CONCLUSION = "cancelled";
+      if (evidence === "engine-timeout") process.env.GH_AW_AGENTIC_ENGINE_TIMEOUT = "true";
+      syncRuntimePromptTemplates(import.meta.url);
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [{ type: "report_incomplete", reason: "agent_startup_failure", failureCause: "agent_startup_failure" }],
+          collectorEmptyOutputCause: "agent_startup_failure",
+          collectorFailureCause: "agent_startup_failure",
+        })
+      );
+      const create = vi.fn(async () => {
+        throw new Error("stop after capturing issue");
+      });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      mockCancelledAgentMetadata(evidence === "job-timeout" ? [{ annotation_level: "failure", message: "The job has exceeded the maximum execution time of 1m0s" }] : []);
+      if (evidence === "annotations-denied") global.github.paginate.mockRejectedValueOnce({ status: 403 });
+      if (evidence === "annotations-invalid") global.github.paginate.mockResolvedValueOnce(null);
+      if (evidence === "jobs-denied") global.github.paginate.mockReset().mockRejectedValue({ status: 403 });
+
+      const { main: mainFn } = require("./handle_agent_failure.cjs");
+      await mainFn();
+
+      expect(create).toHaveBeenCalledOnce();
+      expect(create.mock.calls[0][0].title).toBe("[aw] Test Workflow: failed before agent execution started");
+      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      expect(categories).toContain("agent_startup_failure");
+      if (evidence === "job-timeout" || evidence === "engine-timeout") expect(categories).toContain("timed_out");
+      if (evidence === "job-timeout") {
+        expect(create.mock.calls[0][0].body).toContain("Failing step:** `Custom setup`");
+        expect(global.github.paginate).toHaveBeenCalledWith(global.github.rest.checks.listAnnotations, { owner: "owner", repo: "repo", check_run_id: 456, per_page: 100 });
+      }
+      if (evidence.endsWith("denied") || evidence === "annotations-invalid") expect(global.core.warning).toHaveBeenCalled();
+    });
+
+    it.each(["GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR", "GH_AW_MODEL_NOT_SUPPORTED_ERROR"])("preserves cancelled startup classification alongside %s", async signal => {
+      process.env.GH_AW_AGENT_CONCLUSION = "cancelled";
+      process.env[signal] = "true";
+      process.env.GH_AW_FAILURE_CATEGORIES_FILTER = JSON.stringify(["agent_startup_failure"]);
+      syncRuntimePromptTemplates(import.meta.url);
+      fs.writeFileSync(path.join(tmpDir, "agent_execution.json"), JSON.stringify({ version: 1, component: "agent", run_id: 12345, run_attempt: 1, state: "not_started" }));
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [{ type: "report_incomplete", reason: "agent_startup_failure", failureCause: "agent_startup_failure" }],
+          collectorEmptyOutputCause: "agent_startup_failure",
+          collectorFailureCause: "agent_startup_failure",
+        })
+      );
+      const create = vi.fn(async () => {
+        throw new Error("stop after capturing issue");
+      });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create },
+          pulls: { get: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+      mockCancelledAgentMetadata();
+
+      const { main: mainFn } = require("./handle_agent_failure.cjs");
+      await mainFn();
+
+      expect(create).toHaveBeenCalledOnce();
+      expect(create.mock.calls[0][0].title).toBe("[aw] Test Workflow: failed before agent execution started");
+      expect(create.mock.calls[0][0].body).toContain("Failure classification: agent_startup_failure");
+      const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
+      expect(categories).toContain("agent_startup_failure");
+      expect(categories).toContain(signal === "GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR" ? "model_endpoint_mismatch" : "model_not_supported_error");
     });
 
     it.each(["missing_terminal_safe_output", "agent_startup_failure"])("reports agent-authored %s without collector corroboration", async reason => {
@@ -7115,6 +7293,7 @@ describe("handle_agent_failure", () => {
         },
         graphql: vi.fn(),
       };
+      mockCancelledAgentMetadata();
 
       const { main: mainFn } = require("./handle_agent_failure.cjs");
       await mainFn();

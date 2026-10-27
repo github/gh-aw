@@ -10,7 +10,7 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 
 const MAX_BODY_LENGTH = 65536;
 const SIZE_NOTICE = "Content redacted to fit size limit.";
-const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "marker", "expiration", "closing_reference"]);
+const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "review_marker", "marker", "expiration", "closing_reference"]);
 
 /** @param {ReportBlock | ReportInline} node */
 function isSizeRedactable(node) {
@@ -85,7 +85,7 @@ function replaceSelected(report, selected) {
 }
 
 /**
- * Measure fully rendered output, replacing only agent-owned subtrees. Metadata
+ * Trim trailing whitespace before measuring publication output, replacing only agent-owned subtrees. Metadata
  * and footers are reserved in full; structured data is replaced only as a unit.
  * @param {Report} report
  * @param {number} [maxLength]
@@ -93,7 +93,12 @@ function replaceSelected(report, selected) {
  */
 function renderSizedReport(report, maxLength = MAX_BODY_LENGTH) {
   if (!Number.isSafeInteger(maxLength) || maxLength < 1) throw new TypeError("Report body size limit must be a positive integer");
-  const original = reportAST.renderReport(report);
+  /** @param {Report} document */
+  function render(document) {
+    const result = reportAST.renderReport(document);
+    return { ...result, body: result.body.trimEnd() };
+  }
+  const original = render(report);
   if (original.body.length <= maxLength) return original;
   const normalized = reportAST.redactReportForRendering(report);
   reportAST.assertRedactedReport(normalized);
@@ -124,10 +129,10 @@ function renderSizedReport(report, maxLength = MAX_BODY_LENGTH) {
     remaining -= Math.max(0, candidate.size - SIZE_NOTICE.length);
     if (remaining <= 0) break;
   }
-  const fitted = reportAST.renderReport(replaceSelected(normalized, selected));
+  const fitted = render(replaceSelected(normalized, selected));
   if (fitted.body.length <= maxLength) return fitted;
   for (const candidate of candidates) selected.add(candidate.node);
-  const minimal = reportAST.renderReport(replaceSelected(normalized, selected));
+  const minimal = render(replaceSelected(normalized, selected));
   if (minimal.body.length <= maxLength) return minimal;
   throw new Error(`${ERR_VALIDATION}: Report body exceeds maximum length of ${maxLength} characters; protected markers, footers, and framework content cannot be reduced`);
 }
@@ -144,8 +149,7 @@ function fitMarkdownBody(body, { prefix = "", suffix = "", maxLength = MAX_BODY_
   const budget = maxLength - prefix.length - suffix.length;
   if (budget < 1) throw new Error(`${ERR_VALIDATION}: Protected markers and footers exceed the maximum body length of ${maxLength} characters`);
   const children = parseReportMarkdown(body, { agentTainted: true, allowMetadata: true, minimumHeadingLevel: 2, allowedMentions });
-  // Report serialization includes a terminal newline that string callers omit.
-  return prefix + renderSizedReport({ type: "report", title: "Comment", children }, budget + 1).body.trimEnd() + suffix;
+  return prefix + renderSizedReport({ type: "report", title: "Comment", children }, budget).body + suffix;
 }
 
 module.exports = { MAX_BODY_LENGTH, SIZE_NOTICE, renderSizedReport, fitMarkdownBody };

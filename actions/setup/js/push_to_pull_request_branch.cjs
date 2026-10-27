@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { createReportIssue } = require("./issue_report.cjs");
+const { createReportIssue, buildIssueReport } = require("./issue_report.cjs");
 const { getWorkflowCompilationNotice, isWorkflowYamlFile } = require("./workflow_file_exclusions.cjs");
 const { getStalePullRequestReason, StalePullRequestError } = require("./pr_lifecycle.cjs");
 
@@ -23,7 +23,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { checkFileProtection, checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { ERR_SYSTEM, POLICY_FILE_PROTECTION_DENIED_REASON_CODE } = require("./error_codes.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
-const { renderTemplateFromFile, buildProtectedFileList, getPromptPath } = require("./messages_core.cjs");
+const { buildProtectedFileBlocks, getPromptPath } = require("./messages_core.cjs");
 const { withGitHubHostToken } = require("./git_auth_helpers.cjs");
 const gitHelpers = require("./git_helpers.cjs");
 const { ensureFullHistoryForBundle, importLocalBundle, offlineGitOptions, linearizeRangeAsCommit, ensureSafeDirectoryTrust } = gitHelpers;
@@ -32,7 +32,7 @@ const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { getThreatWarningPresentation, getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
-const { buildManualBranchApplyCommands, withTransientPushRetry } = require("./create_pull_request_helpers.cjs");
+const { buildManualBranchApplyCommands, buildFallbackIssueBlocks, withTransientPushRetry } = require("./create_pull_request_helpers.cjs");
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -1020,9 +1020,9 @@ async function main(config = {}) {
       const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
       const prUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/pull/${pullNumber}`;
       const issueTitle = `[gh-aw] Protected Files: ${prTitle || `PR #${pullNumber}`}`;
-      const fileList = buildProtectedFileList(files, githubServer, repoParts.owner, repoParts.repo, branchName);
+      const fileList = buildProtectedFileBlocks(files, githubServer, repoParts.owner, repoParts.repo, branchName);
       const templatePath = getPromptPath("manifest_protection_push_to_pr_fallback.md");
-      const issueBody = renderTemplateFromFile(templatePath, {
+      const issueBody = buildFallbackIssueBlocks(templatePath, {
         files: fileList,
         pull_number: pullNumber,
         pr_url: prUrl,
@@ -1036,13 +1036,16 @@ async function main(config = {}) {
         const { data: issue } = await withRetry(
           () => {
             transport.assertUnchanged();
-            return createReportIssue(githubClient, {
-              owner: repoParts.owner,
-              repo: repoParts.repo,
-              title: issueTitle,
-              body: issueBody,
-              labels: ["agentic-workflows"],
-            });
+            return createReportIssue(
+              githubClient,
+              {
+                owner: repoParts.owner,
+                repo: repoParts.repo,
+                title: issueTitle,
+                labels: ["agentic-workflows"],
+              },
+              buildIssueReport(issueTitle, issueBody)
+            );
           },
           RATE_LIMIT_RETRY_CONFIG,
           `create manifest-protection review issue in ${repoParts.owner}/${repoParts.repo}`

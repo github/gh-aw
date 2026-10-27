@@ -6,9 +6,9 @@ const { createReportIssue } = require("./issue_report.cjs");
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_SYSTEM } = require("./error_codes.cjs");
-const { sanitizeContent } = require("./sanitize_content.cjs");
-const { generateFooterWithExpiration } = require("./ephemerals.cjs");
-const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
 const { loadAgentOutput, shouldIgnoreTaskCompleteRegistrationReports } = require("./load_agent_output.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
@@ -90,18 +90,21 @@ async function ensureAgentRunsIssue() {
     throw new Error(`${ERR_SYSTEM}: Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
 
-  const parentBody = generateFooterWithExpiration({
-    footerText: parentBodyContent,
-    expiresHours: 24 * 30, // 30 days
-  });
-
-  const { data: newIssue } = await createReportIssue(github, {
-    owner,
-    repo,
-    title: parentTitle,
-    body: parentBody,
-    labels: [parentLabel],
-  });
+  const { data: newIssue } = await createReportIssue(
+    github,
+    {
+      owner,
+      repo,
+      title: parentTitle,
+      labels: [parentLabel],
+    },
+    {
+      type: "report",
+      title: parentTitle,
+      agentTainted: false,
+      children: [...parseReportMarkdown(parentBodyContent, { agentTainted: false }), { type: "expiration", expiresAt: new Date(Date.now() + 24 * 30 * 60 * 60 * 1000).toISOString(), agentTainted: false }],
+    }
+  );
 
   core.info(`✓ Created no-op runs issue #${newIssue.number}: ${newIssue.html_url}`);
   return {
@@ -164,14 +167,13 @@ function buildAmbientContextSuffix() {
 }
 
 /**
- * Build a markdown history link for use in comment footers.
- * Returns a string like " · [◷](url)" or "" when not available.
- * @returns {string}
+ * Build a history link for use in comment footers.
+ * @returns {import("./report_ast.cjs").ReportInline[]}
  */
 function buildHistoryLink() {
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
   if (!workflowId) {
-    return "";
+    return [];
   }
   const { owner, repo } = context.repo;
   const historyUrl = generateHistoryUrl({
@@ -181,7 +183,12 @@ function buildHistoryLink() {
     workflowId,
     serverUrl: context.serverUrl,
   });
-  return historyUrl ? ` · [◷](${historyUrl})` : "";
+  return historyUrl
+    ? [
+        { type: "text", value: " · ", agentTainted: false },
+        { type: "link", url: historyUrl, children: [{ type: "text", value: "◷", agentTainted: false }], agentTainted: false },
+      ]
+    : [];
 }
 
 /**
@@ -196,16 +203,20 @@ function buildHistoryLink() {
 function buildNoopCommentBody(workflowName, agentConclusion, runUrl, hasIncompleteReport) {
   const outcome = classifyNoopOutcome(agentConclusion, hasIncompleteReport);
   const commentTemplatePath = getPromptPath("noop_comment.md");
-  const commentBody = renderTemplateFromFile(commentTemplatePath, {
-    workflow_name: workflowName,
-    category: outcome.category,
-    description: outcome.description,
-    run_url: runUrl,
-    aic_suffix: buildAICSuffix(),
-    ambient_context_suffix: buildAmbientContextSuffix(),
-    history_link: buildHistoryLink(),
+  const children = parseReportMarkdown(fs.readFileSync(commentTemplatePath, "utf8"), {
+    context: {
+      workflow_name: workflowName,
+      category: outcome.category,
+      description: outcome.description,
+      run_url: runUrl,
+      aic_suffix: buildAICSuffix(),
+      ambient_context_suffix: buildAmbientContextSuffix(),
+      history_link: { type: "inline_slot", children: buildHistoryLink() },
+    },
+    minimumHeadingLevel: 2,
+    agentTainted: false,
   });
-  return sanitizeContent(commentBody, { maxLength: 65000 });
+  return renderSizedReport({ type: "report", title: "No-op run", children, agentTainted: false }, 65000).body;
 }
 
 /**

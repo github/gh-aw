@@ -21,10 +21,6 @@ func workQueueLogicalContractWithCache(path string, cache *parser.ImportCache) (
 	return workQueueLogicalContractFromContentWithCache(path, string(content), cache)
 }
 
-func workQueueLogicalContractFromContent(path, content string) (string, error) {
-	return workQueueLogicalContractFromContentWithCache(path, content, parser.NewImportCache(filepath.Dir(path)))
-}
-
 func workQueueLogicalContractFromContentWithCache(path, content string, cache *parser.ImportCache) (string, error) {
 	result, err := parser.ExtractFrontmatterFromContent(content)
 	if err != nil {

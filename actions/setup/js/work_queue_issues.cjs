@@ -15,7 +15,7 @@ const { MAX_PROJECTION_TARGETS, LABELS_PAGE_SIZE, STATUSES, statusLabelName, ens
 const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { validateJournal } = require("./work_queue_issue_journal.cjs");
-const { issueBody, issueTitle, renderSummary, renderClaim, runLink } = require("./work_queue_issue_messages.cjs");
+const { issueBodyReport, issueTitle, renderSummary, renderClaim, runLink } = require("./work_queue_issue_messages.cjs");
 const { transitionProjectionTargets } = require("./work_queue_issue_transitions.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("issues");
 
@@ -81,25 +81,65 @@ function workIssueStatus(state, work, at) {
   return dependencyStatus(state, work, at).ready && work.retry_not_before <= at ? "Queued" : "Blocked";
 }
 
+/** @returns {import("./report_ast.cjs").ReportBlock[]} */
 function jobDiagnostics(value) {
   const results = typeof value === "string" ? parseStrictJSON(value, { maxBytes: 1024 * 1024 }) : value;
   if (results === undefined) return [];
   if (!results || typeof results !== "object" || Array.isArray(results)) throw queueError("projection_invalid", "native job diagnostics must be an object");
   return Object.entries(results)
     .filter(([name, job]) => /^[A-Za-z_][A-Za-z0-9_-]*$/.test(name) && ["failure", "cancelled"].includes(job?.result))
-    .map(([name, job]) => `Native job \`${name}\`: **${job.result}**. This does not establish Work cancellation or Result.`);
+    .map(([name, job]) => ({
+      type: "paragraph",
+      agentTainted: false,
+      children: [
+        { type: "text", value: "Native job ", agentTainted: false },
+        { type: "code", value: name, agentTainted: false },
+        { type: "text", value: ": ", agentTainted: false },
+        { type: "strong", children: [{ type: "text", value: job.result, agentTainted: false }], agentTainted: false },
+        { type: "text", value: ". This does not establish Work cancellation or Result.", agentTainted: false },
+      ],
+    }));
 }
 
+/** @param {string} value @param {boolean} [agentTainted] @returns {import("./report_ast.cjs").ReportBlock} */
+function projectionParagraph(value, agentTainted = false) {
+  return { type: "paragraph", agentTainted, children: [{ type: "text", value, agentTainted }] };
+}
+
+/** @param {any} state @param {any} work @param {number} at @param {import("./report_ast.cjs").ReportBlock[]} [diagnostics] @param {string} [branch] @param {any} [run] */
 function summaryBody(state, work, at, diagnostics = [], branch = "work-queue", run = undefined) {
   const lines = [...diagnostics];
+  /** @type {import("./report_ast.cjs").ReportBlock[][]} */
   const claimHistory = [];
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
   const outcomes = [];
-  if (work.barrier === "failed") lines.push(`Delivery needs attention (${work.disposition}); Completion is not a verified Result.`);
-  if (work.state === "cancelled") lines.push(`Cancellation: ${work.cancellation_reason}.`);
+  if (work.barrier === "failed") lines.push(projectionParagraph(`Delivery needs attention (${work.disposition}); Completion is not a verified Result.`));
+  if (work.state === "cancelled")
+    lines.push({
+      type: "paragraph",
+      agentTainted: false,
+      children: [
+        { type: "text", value: "Cancellation: ", agentTainted: false },
+        { type: "code", value: work.cancellation_reason, agentTainted: true },
+        { type: "text", value: ".", agentTainted: false },
+      ],
+    });
   for (const claim of state.claims.values()) {
     if (claim.work_id !== work.work_id) continue;
     const dispatch = state.dispatches.get(claim.dispatch_id);
-    if (dispatch?.run) claimHistory.push(`- Claim \`${claim.claim_id}\`: [View attempt](${runLink(dispatch.run)})`);
+    if (dispatch?.run)
+      claimHistory.push([
+        {
+          type: "paragraph",
+          agentTainted: false,
+          children: [
+            { type: "text", value: "Claim ", agentTainted: false },
+            { type: "code", value: claim.claim_id, agentTainted: false },
+            { type: "text", value: ": ", agentTainted: false },
+            { type: "link", url: runLink(dispatch.run), children: [{ type: "text", value: "View attempt", agentTainted: false }], agentTainted: false },
+          ],
+        },
+      ]);
   }
   if (work.result) {
     for (const output of work.result.outputs || []) {
@@ -111,7 +151,19 @@ function summaryBody(state, work, at, diagnostics = [], branch = "work-queue", r
         ((typeof number === "string" && /^[1-9][0-9]{0,255}$/.test(number)) || (Number.isSafeInteger(number) && number > 0)) &&
         ["issue", "pull_request"].includes(resource.kind)
       )
-        outcomes.push(`Verified ${resource.kind}: https://github.com/${resource.repository}/${resource.kind === "issue" ? "issues" : "pull"}/${resource.number}`);
+        outcomes.push({
+          type: "paragraph",
+          agentTainted: false,
+          children: [
+            { type: "text", value: `Verified ${resource.kind}: `, agentTainted: false },
+            {
+              type: "link",
+              url: `https://github.com/${resource.repository}/${resource.kind === "issue" ? "issues" : "pull"}/${resource.number}`,
+              children: [{ type: "text", value: `${resource.repository}#${resource.number}`, agentTainted: false }],
+              agentTainted: false,
+            },
+          ],
+        });
     }
   }
   const origin = run || state.workCreators?.get(work.work_id);
@@ -120,15 +172,16 @@ function summaryBody(state, work, at, diagnostics = [], branch = "work-queue", r
     {
       work_id: work.work_id.slice(0, 12),
       ledger_url: `https://github.com/${state.repository}/blob/${branch}/work-queue.jsonl`,
-      claim_history: claimHistory.join("\n") || "No authenticated worker run yet.",
-      outcome_links: outcomes.join("\n"),
-      diagnostics: lines.join("\n"),
+      claim_history: claimHistory.length ? [{ type: "list", ordered: false, items: claimHistory, agentTainted: false }] : [projectionParagraph("No authenticated worker run yet.")],
+      outcome_links: outcomes,
+      diagnostics: lines,
     },
     origin,
     workIssueStatus(state, work, at)
   );
 }
 
+/** @param {any} state @param {any} claim @param {number} at @param {import("./report_ast.cjs").ReportBlock[]} [diagnostics] */
 function claimBody(state, claim, at, diagnostics = []) {
   const work = state.works.get(claim.work_id);
   const dispatch = state.dispatches.get(claim.dispatch_id);
@@ -139,7 +192,21 @@ function claimBody(state, claim, at, diagnostics = []) {
       claim_handle: claim.handle,
       run_url: runLink(dispatch.run),
       outcome: `${claim.state}${claim.keep_open ? `; Work kept open; delivery ${claim.barrier}` : ownResult && claim.state === "completed" ? `; ${workIssueStatus(state, work, at)}` : ""}`,
-      diagnostics: [...(claim.cancellation_reason ? [`Reason: ${claim.cancellation_reason}`] : []), ...diagnostics].join("\n"),
+      diagnostics: [
+        ...(claim.cancellation_reason
+          ? [
+              /** @type {import("./report_ast.cjs").ReportBlock} */ {
+                type: "paragraph",
+                agentTainted: false,
+                children: [
+                  { type: "text", value: "Reason: ", agentTainted: false },
+                  { type: "code", value: claim.cancellation_reason, agentTainted: true },
+                ],
+              },
+            ]
+          : []),
+        ...diagnostics,
+      ],
     },
     dispatch.run
   );
@@ -276,6 +343,8 @@ async function projectBatch(options, initial, origin, assignment, config, target
     // configured secret environment. An empty mask scan cannot establish that
     // ledger payloads are safe; omit them without an explicit trusted context.
     const displayWork = publicationMasks === undefined ? { ...work, payload: undefined } : work;
+    const title = issueTitle(displayWork, config, publicationMasks);
+    const report = { ...issueBodyReport(current.state, displayWork, origin, config, current.branch, publicationMasks), title };
     journal.create = { nonce: projectionNonce(), origin: actor, ref: origin.ref, ...(target.authority_claim_id ? { authority_claim_id: target.authority_claim_id } : {}) };
     creates.push({
       key: target.work_id,
@@ -283,10 +352,10 @@ async function projectBatch(options, initial, origin, assignment, config, target
       type: "CreateIssueInput",
       input: {
         repositoryId: discovered.repositoryId,
-        title: issueTitle(displayWork, config, publicationMasks),
-        body: issueBody(current.state, displayWork, origin, config, current.branch, publicationMasks),
+        title,
         labelIds: [discovered.labelId, statusLabels.get(`${origin.repository}:${status}`)],
       },
+      report,
       selection: `issue { ${ISSUE_SELECTION} }`,
     });
   }

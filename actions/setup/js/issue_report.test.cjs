@@ -29,7 +29,7 @@ describe("issue report publication boundary", () => {
     expect(client.rest.issues.create).toHaveBeenCalledWith({
       ...parameters,
       title: "\u00e9vidence failed",
-      body: "## Evidence\n\n&lt;img src=x&gt;\n\nunsafe (link unavailable: invalid HTTPS URL)\n",
+      body: "## Evidence\n\n&lt;img src=x&gt;\n\nunsafe (link unavailable: invalid HTTPS URL)",
     });
   });
 
@@ -80,7 +80,7 @@ describe("issue report publication boundary", () => {
     expect(rendered.body).toContain("<details>\n<summary>Evidence</summary>");
     expect(rendered.body).toContain("````text\n```\n<!-- not-metadata: in-code -->\n````");
     expect(extractExpirationDate(rendered.body)?.toISOString()).toBe(expiresAt.toISOString());
-    expect(renderIssueParameters(rendered)).toEqual(rendered);
+    expect(renderIssueParameters(rendered)).toEqual({ ...rendered, body: rendered.body.trimEnd() });
     expect(normalizeReport(normalizeReport(report))).toEqual(normalizeReport(report));
   });
 
@@ -107,7 +107,7 @@ describe("issue report publication boundary", () => {
     expect(JSON.parse(encoded)).toEqual(metadata);
     expect(body).not.toContain("<tag>");
     expect(body).not.toContain("spaces <tag> -->");
-    expect(renderIssueParameters({ title: "Metadata", body }).body).toBe(body);
+    expect(renderIssueParameters({ title: "Metadata", body }).body).toBe(body.trimEnd());
   });
 
   it("does not promote diagnostic comments to metadata without an explicit trusted import", () => {
@@ -132,7 +132,7 @@ describe("issue report publication boundary", () => {
     });
     expect(body).toContain("<sub>Estimates are approximate.</sub>");
     expect(body).toContain("```html\n<details><summary>literal</summary>\n```");
-    expect(body).toContain("<summary>Install workflow</summary>");
+    expect(body).toContain("<summary><sub>Install workflow</sub></summary>");
     expect(renderIssueParameters({ title: "Notes", body }).body).toBe(body);
   });
 
@@ -153,7 +153,8 @@ describe("issue report publication boundary", () => {
     };
     const client = { rest: { issues: { create: vi.fn().mockResolvedValue({ data: {} }) } } };
     await createReportIssue(client, { owner: "o", repo: "r", title: "unused" }, report);
-    expect(client.rest.issues.create.mock.calls[0][0]).toEqual({ owner: "o", repo: "r", ...renderReport(report) });
+    const rendered = renderReport(report);
+    expect(client.rest.issues.create.mock.calls[0][0]).toEqual({ owner: "o", repo: "r", ...rendered, body: rendered.body.trimEnd() });
   });
 
   it("renders a prepared issue once and reuses the same payload across publication retries", async () => {
@@ -223,24 +224,24 @@ describe("issue report publication boundary", () => {
     const parameters = renderIssueParameters({ owner: "o", repo: "r", title: "Report", body: "Original" });
     parameters.body = "<img src=x>";
     await createReportIssue(client, parameters);
-    expect(client.rest.issues.create.mock.calls[0][0].body).toBe("&lt;img src=x&gt;\n");
+    expect(client.rest.issues.create.mock.calls[0][0].body).toBe("&lt;img src=x&gt;");
     await createReportIssue(client, { ...parameters });
     expect(render).toHaveBeenCalledTimes(3);
     parameters.body = "<x>".repeat(10000);
     await createReportIssue(client, parameters);
     expect(client.rest.issues.create).toHaveBeenCalledTimes(3);
-    expect(client.rest.issues.create.mock.calls[2][0].body).toBe("Content redacted to fit size limit.\n");
+    expect(client.rest.issues.create.mock.calls[2][0].body).toBe("Content redacted to fit size limit.");
   });
 
   it("redacts secrets and fits oversized rendered content before any API write", async () => {
     vi.stubEnv("GH_AW_SECRET_NAMES", "REPORT_FIXTURE");
     vi.stubEnv("SECRET_REPORT_FIXTURE", "issue-report-fixture");
     expect(renderIssueParameters({ title: "issue-report-fixture", body: "issue-report-fixture" }).body).not.toContain("issue-report-fixture");
-    expect(renderIssueParameters({ title: "Report", body: "x".repeat(65535) }).body).toHaveLength(65536);
+    expect(renderIssueParameters({ title: "Report", body: "x".repeat(65536) }).body).toHaveLength(65536);
     const client = { rest: { issues: { create: vi.fn() } } };
     await createReportIssue(client, { owner: "o", repo: "r", title: "Report", body: "<x>".repeat(10000) });
     expect(client.rest.issues.create).toHaveBeenCalledTimes(1);
-    expect(client.rest.issues.create.mock.calls[0][0].body).toBe("Content redacted to fit size limit.\n");
+    expect(client.rest.issues.create.mock.calls[0][0].body).toBe("Content redacted to fit size limit.");
     expect(() => createReportIssue(client, { owner: "o", repo: "r", title: "Report", body: "<!-- custom: " + "m".repeat(65536) + " -->" })).toThrow("maximum length");
     expect(() => createReportIssue(client, { owner: "o", repo: "r", title: "\u0000", body: "valid" })).toThrow("must not be empty");
     expect(client.rest.issues.create).toHaveBeenCalledTimes(1);
@@ -267,7 +268,7 @@ describe("issue report publication boundary", () => {
     const copy = structuredClone(operations);
     const result = await mutateIssues(github, operations);
     const [, variables] = github.graphql.mock.calls[0];
-    expect(variables.m0).toEqual({ ...operations[0].input, title: "Work title", body: "&lt;img src=x&gt;\n\n<!-- work-id: abc -->\n" });
+    expect(variables.m0).toEqual({ ...operations[0].input, title: "Work title", body: "&lt;img src=x&gt;\n\n<!-- work-id: abc -->" });
     expect(variables.m1).toBe(operations[1].input);
     expect(operations).toEqual(copy);
     expect(result.results[0].operation).toBe(operations[0]);

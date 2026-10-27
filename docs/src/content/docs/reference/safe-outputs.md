@@ -1726,6 +1726,8 @@ Failure reports keep error diagnostics in fenced code blocks inside collapsed de
 
 Empty-output reports preserve recognized engine failure categories as concise summaries, without copying raw error payloads. Unrecognized failure formats require inspecting the workflow run logs; reports do not publish a fallback log preview.
 
+Cancelled startup failures are suppressed only when check annotations rule out a job timeout and no independent model configuration error is present. If timeout annotations cannot be read, the startup failure remains reportable. The compiler grants the conclusion job and its generated GitHub App reporting tokens `checks: read` when failure issue reporting is enabled. Custom reporting tokens also need this permission.
+
 #### Simple Boolean (Opt-Out All Failures)
 
 Set to `false` to suppress automatic failure issue creation for a specific workflow:

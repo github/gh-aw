@@ -9,6 +9,10 @@
 
 const { getMessages, renderTemplate, renderTemplateFromFile, toSnakeCase, getPromptPath } = require("./messages_core.cjs");
 const { getDetectionReasonText, getThreatDetectedMarkerTemplate, getThreatEngineErrorMarkerTemplate, normalizeThreatKinds, isToolingFailureReason } = require("./threat_detection_warning.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const PULL_REQUEST_CREATED = "Pull request created: [#{item_number}]({item_url})";
+const ISSUE_CREATED = "Issue created: [#{item_number}]({item_url})";
+const COMMIT_PUSHED = "Commit pushed: [`{short_sha}`]({commit_url})";
 
 /**
  * Renders a message using a custom template from config or a default template.
@@ -99,7 +103,7 @@ function getDetectionFailureMessage(ctx) {
  * @returns {string} Pull-request-created message
  */
 function getPullRequestCreatedMessage(ctx) {
-  return renderConfiguredMessage("pullRequestCreated", "Pull request created: [#{item_number}]({item_url})", ctx);
+  return renderConfiguredMessage("pullRequestCreated", PULL_REQUEST_CREATED, ctx);
 }
 
 /**
@@ -114,7 +118,7 @@ function getPullRequestCreatedMessage(ctx) {
  * @returns {string} Issue-created message
  */
 function getIssueCreatedMessage(ctx) {
-  return renderConfiguredMessage("issueCreated", "Issue created: [#{item_number}]({item_url})", ctx);
+  return renderConfiguredMessage("issueCreated", ISSUE_CREATED, ctx);
 }
 
 /**
@@ -130,7 +134,18 @@ function getIssueCreatedMessage(ctx) {
  * @returns {string} Commit-pushed message
  */
 function getCommitPushedMessage(ctx) {
-  return renderConfiguredMessage("commitPushed", "Commit pushed: [`{short_sha}`]({commit_url})", ctx);
+  return renderConfiguredMessage("commitPushed", COMMIT_PUSHED, ctx);
+}
+
+/**
+ * @param {"issue" | "pull_request" | "commit"} kind
+ * @param {PullRequestCreatedContext | CommitPushedContext} ctx
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildCreatedMessageBlocks(kind, ctx) {
+  const key = kind === "issue" ? "issueCreated" : kind === "commit" ? "commitPushed" : "pullRequestCreated";
+  const fallback = kind === "issue" ? ISSUE_CREATED : kind === "commit" ? COMMIT_PUSHED : PULL_REQUEST_CREATED;
+  return parseReportMarkdown(getMessages()?.[key] ?? fallback, { context: toSnakeCase(ctx), agentTainted: false });
 }
 
 /**
@@ -166,13 +181,35 @@ function getDetectionWarningMessage(ctx) {
   return renderTemplateFromFile(getPromptPath(templateFile), toSnakeCase({ ...ctx, reasonText, threat_detected_marker: markerTemplate, threatKinds: normalizeThreatKinds(ctx.reason) })).trimEnd();
 }
 
+/**
+ * @param {DetectionWarningContext} ctx
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function getDetectionWarningBlocks(ctx) {
+  const isEngineError = isToolingFailureReason(ctx.reason);
+  const key = isEngineError ? "detectionEngineError" : "detectionWarning";
+  const template = getMessages()?.[key] || renderTemplateFromFile(getPromptPath(isEngineError ? "threat_detection_engine_error.md" : "threat_detection_caution.md"), {});
+  return parseReportMarkdown(template, {
+    agentTainted: false,
+    allowFlagMarkers: true,
+    context: toSnakeCase({
+      ...ctx,
+      reasonText: getDetectionReasonText(ctx.reason),
+      threatKinds: normalizeThreatKinds(ctx.reason),
+      threat_detected_marker: [{ type: "marker", name: isEngineError ? "gh-aw-threat-engine-error" : "gh-aw-threat-detected", agentTainted: false }],
+    }),
+  });
+}
+
 module.exports = {
   getRunStartedMessage,
   getRunSuccessMessage,
   getRunFailureMessage,
   getDetectionFailureMessage,
   getDetectionWarningMessage,
+  getDetectionWarningBlocks,
   getPullRequestCreatedMessage,
   getIssueCreatedMessage,
   getCommitPushedMessage,
+  buildCreatedMessageBlocks,
 };

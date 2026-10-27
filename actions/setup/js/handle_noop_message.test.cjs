@@ -832,7 +832,7 @@ safe-outputs:
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).toContain(` · ${formatted} AIC`);
+    expect(commentCall.body).toContain(` · ${formatted.replace("~", "\\~")} AIC`);
   });
 
   it("should include detection AIC in the footer total when GH_AW_THREAT_DETECTION_AIC is set", async () => {
@@ -856,7 +856,7 @@ safe-outputs:
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).toContain("sonnet46 · ~1 AIC · ⌖ ~1 AIC");
+    expect(commentCall.body).toContain("sonnet46 · \\~1 AIC · ⌖ \\~1 AIC");
   });
 
   it("should include evals AIC in the footer breakdown when GH_AW_EVALS_AIC is set", async () => {
@@ -880,7 +880,7 @@ safe-outputs:
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).toContain("sonnet46 · ~1 AIC · ◇ ~1 AIC");
+    expect(commentCall.body).toContain("sonnet46 · \\~1 AIC · ◇ \\~1 AIC");
   });
 
   it("should place evals AIC after detection AIC in the footer breakdown", async () => {
@@ -905,7 +905,7 @@ safe-outputs:
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
-    expect(commentCall.body).toContain("sonnet46 · ~1 AIC · ⌖ ~1 AIC · ◇ ~1 AIC");
+    expect(commentCall.body).toContain("sonnet46 · \\~1 AIC · ⌖ \\~1 AIC · ◇ \\~1 AIC");
   });
 
   it("should not include AIC suffix in comment footer when GH_AW_AIC is not set", async () => {

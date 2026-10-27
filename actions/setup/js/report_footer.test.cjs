@@ -88,7 +88,7 @@ describe("structured report footer", () => {
     ]);
     expect(parseHTMLCommentMetadata(body, "gh-aw-agentic-workflow")?.workflow_id).toBe("smoke-copilot");
     expect(parseHTMLCommentMetadata(body, "gh-aw-failure-issue")?.failure_categories).toBe("missing_tool|report_incomplete");
-    expect(getFooterAgentFailureIssueMessage(ctx)).toContain("{triggering_number} {unknownField} {__proto__} {constructor}");
+    expect(getFooterAgentFailureIssueMessage(ctx)).toContain("{triggering\\_number} {unknownField} {\\_\\_proto\\_\\_} {constructor}");
   });
 
   it("does not reparse placeholder-like attribution values into fields or Markdown", () => {

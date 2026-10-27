@@ -20,13 +20,30 @@ describe("appendConfiguredBodyFooter", () => {
     expect(appendConfiguredBodyFooter("Body", undefined)).toBe("Body");
   });
 
+  it.each([undefined, "Footer"])("preserves only explicitly allowed mentions while rendering with footer %s", footer => {
+    const body = appendConfiguredBodyFooter("Please ask @copilot and @someone-else", footer, { allowedMentions: ["copilot"], maxLength: 100 });
+    expect(body).toBe(`Please ask @copilot and \`@someone-else\`${footer ? "\n\nFooter" : ""}`);
+  });
+
+  it("preserves the sanitizer's runtime bot mention aliases", () => {
+    expect(appendConfiguredBodyFooter("Please ask @copilot", "Footer", { allowedMentions: ["copilot-swe-agent"] })).toBe("Please ask @copilot\n\nFooter");
+  });
+
+  it("neutralizes all mentions by default", () => {
+    expect(appendConfiguredBodyFooter("Please ask @copilot", "Footer")).toBe("Please ask `@copilot`\n\nFooter");
+  });
+
+  it("does not reactivate mentions neutralized by the caller's mention limit", () => {
+    expect(appendConfiguredBodyFooter("Please ask @copilot and `@teammate`", "Footer", { allowedMentions: ["copilot", "teammate"] })).toBe("Please ask @copilot and `@teammate`\n\nFooter");
+  });
+
   it("redacts oversized body text without shortening or omitting the footer", () => {
     const body = "x".repeat(100);
     expect(appendConfiguredBodyFooter(body, "Footer", { maxLength: 100 })).toBe("Content redacted to fit size limit.\n\nFooter");
   });
 
   it("fails explicitly when the footer alone cannot fit", () => {
-    expect(() => appendConfiguredBodyFooter("Body", "f".repeat(101), { maxLength: 100 })).toThrow("Protected markers and footers");
+    expect(() => appendConfiguredBodyFooter("Body", "f".repeat(101), { maxLength: 100 })).toThrow("protected markers, footers, and framework content");
   });
 
   it("appends the footer when the composed body fits the destination limit", () => {

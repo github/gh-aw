@@ -16,11 +16,14 @@
  * Fails the activation job when validation fails.
  */
 
-const { createReportIssue } = require("./issue_report.cjs");
+const { createReportIssue, renderIssueParameters } = require("./issue_report.cjs");
+const fs = require("node:fs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
 const { ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED, ERR_COMPILE_AGENTIC_VERSION_BLOCKED, ERR_COMPILE_AGENTIC_VERSION_OUTDATED } = require("./error_codes.cjs");
 
 const CONFIG_URL = "https://raw.githubusercontent.com/github/gh-aw-actions/main/.github/aw/compat.json";
@@ -76,16 +79,6 @@ function buildBlockedVersionIssueTitle(compiledVersion) {
 }
 
 /**
- * Return a Markdown-safe inline-code representation.
- *
- * @param {string} value
- * @returns {string}
- */
-function markdownCode(value) {
-  return `\`${String(value).replace(/`/g, "\\`")}\``;
-}
-
-/**
  * Build a link to the current workflow run when the GitHub Actions context is available.
  *
  * @returns {string}
@@ -107,14 +100,50 @@ function getRunUrl() {
  * @returns {string}
  */
 function buildBlockedVersionIssueBody(compiledVersion) {
+  return renderSizedReport(buildBlockedVersionIssueReport(compiledVersion)).body;
+}
+
+/** @param {string} compiledVersion @returns {import("./report_ast.cjs").Report} */
+function buildBlockedVersionIssueReport(compiledVersion) {
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || (typeof context !== "undefined" ? context.workflow : "") || "unknown";
   const runUrl = getRunUrl();
-  return renderTemplateFromFile(getPromptPath("blocked_compiler_version_issue.md"), {
-    compiled_version: compiledVersion,
-    compiled_version_code: markdownCode(compiledVersion),
-    workflow_name_code: markdownCode(workflowName),
-    run_url_line: runUrl ? `- Run: ${runUrl}` : "",
-  });
+  return {
+    type: "report",
+    title: buildBlockedVersionIssueTitle(compiledVersion),
+    agentTainted: false,
+    children: [
+      { type: "xml_marker", name: "gh-aw-blocked-compiler-version", value: compiledVersion, agentTainted: false },
+      ...parseReportMarkdown(fs.readFileSync(getPromptPath("blocked_compiler_version_issue.md"), "utf8").replace(/^<!-- gh-aw-blocked-compiler-version: .* -->\r?\n/, ""), {
+        context: {
+          compiled_version: compiledVersion,
+          compiled_version_code: { type: "inline_slot", children: [{ type: "code", value: compiledVersion, agentTainted: false }] },
+          workflow_name_code: { type: "inline_slot", children: [{ type: "code", value: workflowName, agentTainted: false }] },
+          run_url_line: runUrl
+            ? [
+                {
+                  type: "list",
+                  ordered: false,
+                  items: [
+                    [
+                      {
+                        type: "paragraph",
+                        children: [
+                          { type: "text", value: "Run: ", agentTainted: false },
+                          { type: "link", url: runUrl, children: [{ type: "text", value: runUrl, agentTainted: false }], agentTainted: false },
+                        ],
+                      },
+                    ],
+                  ],
+                  agentTainted: false,
+                },
+              ]
+            : [],
+        },
+        agentTainted: false,
+        minimumHeadingLevel: 2,
+      }),
+    ],
+  };
 }
 
 /**
@@ -168,21 +197,25 @@ async function reportBlockedVersionIssue(compiledVersion) {
 
   const { owner, repo } = context.repo;
   const title = buildBlockedVersionIssueTitle(compiledVersion);
-  const body = buildBlockedVersionIssueBody(compiledVersion);
+  const report = buildBlockedVersionIssueReport(compiledVersion);
 
   try {
     const existing = await findExistingBlockedVersionIssue(owner, repo, compiledVersion);
     if (existing) {
       const updatedIssue = await withRetry(
         () =>
-          github.rest.issues.update({
-            owner,
-            repo,
-            issue_number: existing.number,
-            title,
-            body,
-            headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-          }),
+          github.rest.issues.update(
+            renderIssueParameters(
+              {
+                owner,
+                repo,
+                issue_number: existing.number,
+                title,
+                headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+              },
+              report
+            )
+          ),
         {},
         "update blocked compiler version issue"
       );
@@ -192,13 +225,16 @@ async function reportBlockedVersionIssue(compiledVersion) {
 
     const newIssue = await withRetry(
       () =>
-        createReportIssue(github, {
-          owner,
-          repo,
-          title,
-          body,
-          headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-        }),
+        createReportIssue(
+          github,
+          {
+            owner,
+            repo,
+            title,
+            headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+          },
+          report
+        ),
       {},
       "create blocked compiler version issue"
     );

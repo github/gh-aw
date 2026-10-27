@@ -370,7 +370,7 @@ async function main(config = {}, githubClient = null) {
       const status = validateStatus(output.status);
       const startDate = formatDate(output.start_date);
       const targetDate = formatDate(output.target_date);
-      const body = appendConfiguredBodyFooter(sanitizeContent(String(output.body), { allowedAliases: allowedMentionAliases, maxMentions }), config.body_footer);
+      const body = appendConfiguredBodyFooter(sanitizeContent(String(output.body), { allowedAliases: allowedMentionAliases, maxMentions }), config.body_footer, { allowedMentions: allowedMentionAliases });
 
       core.info(`Creating status update: ${status} (${startDate} → ${targetDate})`);
       core.info(`Body preview: ${body.substring(0, 100)}${body.length > 100 ? "..." : ""}`);

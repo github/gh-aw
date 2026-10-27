@@ -4,7 +4,8 @@
 const { createReportIssue } = require("./issue_report.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { generateXMLMarker } = require("./messages_footer.cjs");
+const { getAgenticWorkflowMetadata } = require("./messages_footer.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 
@@ -106,22 +107,7 @@ async function main() {
 
       const sanitizedOutput = prepareValidationOutput(combinedOutput);
 
-      const xmlMarker = generateXMLMarker(workflowName, runUrl);
-      const commentBody = `Validation still has findings (exit code: ${exitCode}).
-
-<details>
-<summary>Validation output</summary>
-
-\`\`\`
-${sanitizedOutput}
-\`\`\`
-
-</details>
-
-[View workflow run](${runUrl})
-
----
-${xmlMarker}`;
+      const commentBody = renderSizedReport(buildValidationReport({ title: issueTitle, output: sanitizedOutput, exitCode, runUrl, workflowName, fullCmd, cmdPrefixStr, repository, comment: true })).body;
 
       await github.rest.issues.createComment({
         owner,
@@ -147,56 +133,19 @@ ${xmlMarker}`;
 
   const sanitizedOutput = prepareValidationOutput(combinedOutput);
 
-  const xmlMarker = generateXMLMarker(workflowName, runUrl);
-  const issueBody = `## Problem
-
-Workflow validation found errors or warnings that need to be addressed.
-
-**Validation command:** \`${fullCmd}\`
-**Exit code:** ${exitCode}
-
-## Validation Output
-
-<details>
-<summary>Full output</summary>
-
-\`\`\`
-${sanitizedOutput}
-\`\`\`
-
-</details>
-
-## Instructions
-
-Fix the reported issues and re-run validation:
-
-\`\`\`bash
-${cmdPrefixStr} compile --validate --no-emit --zizmor --actionlint --poutine --verbose
-\`\`\`
-
-Or use the validate shorthand:
-
-\`\`\`bash
-${cmdPrefixStr} validate
-\`\`\`
-
-## References
-
-- **Repository:** ${repository}
-- **Workflow run:** [View run](${runUrl})
-
----
-${xmlMarker}
-`;
+  const report = buildValidationReport({ title: issueTitle, output: sanitizedOutput, exitCode, runUrl, workflowName, fullCmd, cmdPrefixStr, repository, comment: false });
 
   try {
-    const newIssue = await createReportIssue(github, {
-      owner,
-      repo,
-      title: issueTitle,
-      body: issueBody,
-      labels: ["agentic-workflows", "maintenance"],
-    });
+    const newIssue = await createReportIssue(
+      github,
+      {
+        owner,
+        repo,
+        title: issueTitle,
+        labels: ["agentic-workflows", "maintenance"],
+      },
+      report
+    );
 
     core.info(`✓ Created issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
 
@@ -209,6 +158,50 @@ ${xmlMarker}
   if (hasErrors) {
     core.setFailed("Workflow validation failed. See created issue for details.");
   }
+}
+
+/**
+ * @param {{title: string, output: string, exitCode: number, runUrl: string, workflowName: string, fullCmd: string, cmdPrefixStr: string, repository: string, comment: boolean}} options
+ * @returns {import("./report_ast.cjs").Report}
+ */
+function buildValidationReport({ title, output, exitCode, runUrl, workflowName, fullCmd, cmdPrefixStr, repository, comment }) {
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportInline} */
+  const text = value => ({ type: "text", value, agentTainted: false });
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+  const paragraph = value => ({ type: "paragraph", children: [text(value)], agentTainted: false });
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+  const heading = value => ({ type: "heading", level: 2, children: [text(value)], agentTainted: false });
+  const [workflow, ...fields] = getAgenticWorkflowMetadata(workflowName, runUrl);
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const outputNodes = [{ type: "details", summary: comment ? "Validation output" : "Full output", children: [{ type: "code_block", language: "", value: output, agentTainted: true }], agentTainted: false }];
+  /** @type {import("./report_ast.cjs").ReportBlock} */
+  const runLink = { type: "paragraph", children: [{ type: "link", url: runUrl, children: [text(comment ? "View workflow run" : "View run")], agentTainted: false }], agentTainted: false };
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const children = comment
+    ? [paragraph(`Validation still has findings (exit code: ${exitCode}).`), ...outputNodes, runLink]
+    : [
+        heading("Problem"),
+        paragraph("Workflow validation found errors or warnings that need to be addressed."),
+        {
+          type: "paragraph",
+          children: [{ type: "strong", children: [text("Validation command:")] }, text(" "), { type: "code", value: fullCmd }, { type: "soft_break" }, { type: "strong", children: [text("Exit code:")] }, text(` ${exitCode}`)],
+        },
+        heading("Validation Output"),
+        ...outputNodes,
+        heading("Instructions"),
+        paragraph("Fix the reported issues and re-run validation:"),
+        { type: "code_block", language: "bash", value: `${cmdPrefixStr} compile --validate --no-emit --zizmor --actionlint --poutine --verbose` },
+        paragraph("Or use the validate shorthand:"),
+        { type: "code_block", language: "bash", value: `${cmdPrefixStr} validate` },
+        heading("References"),
+        { type: "list", ordered: false, items: [[paragraph(`Repository: ${repository}`)], [{ ...runLink, children: [text("Workflow run: "), ...runLink.children] }]] },
+      ];
+  return {
+    type: "report",
+    title,
+    agentTainted: false,
+    children: [...children, { type: "separator", agentTainted: false }, { type: "xml_marker", name: "gh-aw-agentic-workflow", value: workflow.value, fields, agentTainted: false }],
+  };
 }
 
 module.exports = { main, prepareValidationOutput };

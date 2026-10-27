@@ -1,13 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
+import { createRequire } from "module";
 import * as threatDetectionWarning from "./threat_detection_warning.cjs";
 const createTestableFunction = scriptContent => {
   const beforeMainCall = scriptContent.match(/^([\s\S]*?)\s*module\.exports\s*=\s*{[\s\S]*?};?\s*$/);
   if (!beforeMainCall) throw new Error("Could not extract script content before module.exports");
   let scriptBody = beforeMainCall[1];
   // Mock the error_helpers and messages_core modules
-  const mockRequire = (module, threatDetectionWarning) => {
+  const mockRequire = (module, threatDetectionWarning, actualRequire) => {
+    if (["./report_markdown.cjs", "./report_size.cjs", "./messages_run_status.cjs", "./messages_footer.cjs"].includes(module)) return actualRequire(module);
     if (module === "./error_helpers.cjs") {
       return { getErrorMessage: error => (error instanceof Error ? error.message : String(error)) };
     }
@@ -160,11 +162,13 @@ const createTestableFunction = scriptContent => {
     }
     throw new Error(`Module ${module} not mocked in test`);
   };
-  return new Function(
-    `\n    const { github, core, context, process, threatDetectionWarning } = arguments[0];\n    const mockRequire = ${mockRequire.toString()};\n    const require = module => mockRequire(module, threatDetectionWarning);\n    \n    ${scriptBody}\n    \n    return { updateActivationComment, updateActivationCommentWithCommit, updateActivationCommentWithMessage };\n  `
+  const run = new Function(
+    `\n    const { github, core, context, process, threatDetectionWarning } = arguments[0];\n    const actualRequire = arguments[1];\n    const mockRequire = ${mockRequire.toString()};\n    const require = module => mockRequire(module, threatDetectionWarning, actualRequire);\n    \n    ${scriptBody}\n    \n    return { updateActivationComment, updateActivationCommentWithCommit, updateActivationCommentWithMessage };\n  `
   );
+  return options => run(options, createRequire(import.meta.url));
 };
 describe("update_activation_comment.cjs", () => {
+  afterEach(() => vi.unstubAllEnvs());
   let createFunctionFromScript, mockDependencies;
   (beforeEach(() => {
     const scriptPath = path.join(process.cwd(), "update_activation_comment.cjs"),
@@ -235,6 +239,9 @@ describe("update_activation_comment.cjs", () => {
       mockDependencies.process.env.GH_AW_COMMENT_ID = "";
       mockDependencies.process.env.GH_AW_DETECTION_CONCLUSION = "warning";
       mockDependencies.process.env.GH_AW_DETECTION_REASON = reason;
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "warning");
+      vi.stubEnv("GH_AW_DETECTION_REASON", reason);
+      vi.stubEnv("GH_AW_PROMPTS_DIR", path.join(process.cwd(), "../md"));
       mockDependencies.context = {
         ...mockDependencies.context,
         runId: 12345,
@@ -312,6 +319,20 @@ describe("update_activation_comment.cjs", () => {
         "activation_comment_links",
         "Pull request created: [#42](https://github.com/testowner/testrepo/pull/42)\n\nCommit pushed: [`abcdef1`](https://github.com/testowner/testrepo/commit/abcdef1234567890)"
       );
+    }),
+    it("should preserve workflow compilation notices in commit comments and exported links", async () => {
+      mockDependencies.process.env.GH_AW_COMMENT_ID = "123456";
+      mockDependencies.core.setOutput = vi.fn();
+      mockDependencies.github.request.mockImplementation(async method =>
+        method.startsWith("GET") ? { data: { body: "Agentic workflow triggered." } } : { data: { id: 123456, html_url: "https://github.com/testowner/testrepo/issues/1#issuecomment-123456" } }
+      );
+      const { WORKFLOW_COMPILATION_NOTICE } = createRequire(import.meta.url)("./workflow_file_exclusions.cjs");
+      const { updateActivationCommentWithCommit } = createFunctionFromScript(mockDependencies);
+      const options = { additionalMessage: WORKFLOW_COMPILATION_NOTICE, activationCommentLinks: [] };
+      await updateActivationCommentWithCommit(mockDependencies.github, mockDependencies.context, mockDependencies.core, "abcdef1234567890", "https://github.com/testowner/testrepo/commit/abcdef1234567890", options);
+      expect(mockDependencies.github.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining(WORKFLOW_COMPILATION_NOTICE) }));
+      expect(options.activationCommentLinks).toEqual([`Commit pushed: [\`abcdef1\`](https://github.com/testowner/testrepo/commit/abcdef1234567890)\n\n${WORKFLOW_COMPILATION_NOTICE}`]);
+      expect(mockDependencies.core.setOutput).toHaveBeenLastCalledWith("activation_comment_links", options.activationCommentLinks[0]);
     }),
     it("should isolate independent accumulators without reloading the module", async () => {
       mockDependencies.process.env.GH_AW_COMMENT_ID = "123456";

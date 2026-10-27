@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 // @safe-outputs-exempt SEC-004 — the issue body is only parsed for structured XML comment markers
+const { renderSizedReport } = require("./report_size.cjs");
 // (<!-- gh-aw-agentic-workflow: ..., run: ... --> / <!-- gh-aw-run-url: ... -->); all
 // createComment bodies are hardcoded template strings and never reflect raw user-controlled content.
 
@@ -78,13 +79,37 @@ async function main() {
       owner,
       repo,
       issue_number: issueNumber,
-      body:
-        `> [!WARNING]\n` +
-        `> **Could not apply safe outputs**\n>\n` +
-        `> No workflow run reference was found in this issue's body. ` +
-        `The \`${APPLY_SAFE_OUTPUTS_LABEL}\` label can only be used on issues that were created by an agentic workflow ` +
-        `(they contain a \`<!-- gh-aw-agentic-workflow: ..., run: https://... -->\` marker with a run URL).\n>\n` +
-        `> To apply safe outputs manually, use the maintenance workflow with the \`safe_outputs\` operation and supply the run URL.`,
+      body: renderSizedReport({
+        type: "report",
+        title: "Safe outputs warning",
+        children: [
+          {
+            type: "alert",
+            kind: "WARNING",
+            children: [
+              { type: "paragraph", children: [{ type: "strong", children: [{ type: "text", value: "Could not apply safe outputs", agentTainted: false }] }] },
+              {
+                type: "paragraph",
+                children: [
+                  { type: "text", value: "No workflow run reference was found in this issue's body. The ", agentTainted: false },
+                  { type: "code", value: APPLY_SAFE_OUTPUTS_LABEL, agentTainted: false },
+                  { type: "text", value: " label can only be used on issues that were created by an agentic workflow (they contain a ", agentTainted: false },
+                  { type: "code", value: "<!-- gh-aw-agentic-workflow: ..., run: https://... -->", agentTainted: false },
+                  { type: "text", value: " marker with a run URL).", agentTainted: false },
+                ],
+              },
+              {
+                type: "paragraph",
+                children: [
+                  { type: "text", value: "To apply safe outputs manually, use the maintenance workflow with the ", agentTainted: false },
+                  { type: "code", value: "safe_outputs", agentTainted: false },
+                  { type: "text", value: " operation and supply the run URL.", agentTainted: false },
+                ],
+              },
+            ],
+          },
+        ],
+      }).body,
     });
     core.setFailed(`${ERR_NOT_FOUND}: No run URL marker found in issue #${issueNumber}`);
     return;
@@ -106,24 +131,78 @@ async function main() {
       owner,
       repo,
       issue_number: issueNumber,
-      body:
-        `> [!WARNING]\n` +
-        `> **Failed to apply safe outputs from run \`${runUrl}\`**\n>\n` +
-        `> ${msg}\n>\n` +
-        `> Please check the [workflow run logs](${process.env.GITHUB_SERVER_URL || "https://github.com"}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID || ""}) for details.`,
+      body: renderSizedReport({
+        type: "report",
+        title: "Safe outputs failed",
+        children: [
+          {
+            type: "alert",
+            kind: "WARNING",
+            children: [
+              {
+                type: "paragraph",
+                children: [
+                  {
+                    type: "strong",
+                    children: [
+                      { type: "text", value: "Failed to apply safe outputs from run ", agentTainted: false },
+                      { type: "code", value: runUrl, agentTainted: false },
+                    ],
+                  },
+                ],
+              },
+              { type: "paragraph", children: [{ type: "text", value: msg, agentTainted: false }] },
+              {
+                type: "paragraph",
+                children: [
+                  { type: "text", value: "Please check the ", agentTainted: false },
+                  {
+                    type: "link",
+                    url: `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID || ""}`,
+                    children: [{ type: "text", value: "workflow run logs", agentTainted: false }],
+                  },
+                  { type: "text", value: " for details.", agentTainted: false },
+                ],
+              },
+            ],
+          },
+        ],
+      }).body,
     });
     core.setFailed(`Failed to apply safe outputs: ${msg}`);
     return;
   }
 
   core.info(`Successfully applied safe outputs from run ${runUrl}`);
+  const runLink = /^\d+$/.test(runUrl) ? `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${owner}/${repo}/actions/runs/${runUrl}` : runUrl;
 
   // Post a success comment on the issue
   await github.rest.issues.createComment({
     owner,
     repo,
     issue_number: issueNumber,
-    body: `✅ Safe outputs from [run \`${runUrl}\`](${runUrl}) have been applied.\n\n` + `<!-- gh-aw-comment-type: safe-outputs-applied -->`,
+    body: renderSizedReport({
+      type: "report",
+      title: "Safe outputs applied",
+      children: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "text", value: "✅ Safe outputs from ", agentTainted: false },
+            {
+              type: "link",
+              url: runLink,
+              children: [
+                { type: "text", value: "run ", agentTainted: false },
+                { type: "code", value: runUrl, agentTainted: false },
+              ],
+            },
+            { type: "text", value: " have been applied.", agentTainted: false },
+          ],
+        },
+        { type: "xml_marker", name: "gh-aw-comment-type", value: "safe-outputs-applied", agentTainted: false },
+      ],
+    }).body,
   });
 
   core.info(`Posted success comment on issue #${issueNumber}`);

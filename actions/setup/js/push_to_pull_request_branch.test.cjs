@@ -4003,7 +4003,7 @@ ${diffs}
       const pushSignedSpy = vi.spyOn(pushSignedCommitsModule, "pushSignedCommits").mockResolvedValue("remote-head-after");
       const promptsDir = path.join(tempDir, "prompts");
       fs.mkdirSync(promptsDir, { recursive: true });
-      fs.writeFileSync(path.join(promptsDir, "manifest_protection_push_to_pr_fallback.md"), "Protected files: {{files}}", "utf8");
+      fs.writeFileSync(path.join(promptsDir, "manifest_protection_push_to_pr_fallback.md"), "Protected files:\n\n{files}", "utf8");
       process.env.GH_AW_PROMPTS_DIR = promptsDir;
       mockExec.getExecOutput.mockImplementation(async (cmd, args) => {
         if (cmd === "git" && Array.isArray(args) && args[0] === "ls-remote") {

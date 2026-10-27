@@ -1375,6 +1375,7 @@ jobs:
     # Review the called workflow's job-level permissions in ./.github/workflows/smoke-workflow-call.lock.yml.
     permissions:
       actions: read
+      checks: read
       contents: read
       id-token: write
       issues: write
@@ -1412,6 +1413,7 @@ jobs:
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
+      checks: read
       issues: write
       pull-requests: read
     concurrency:

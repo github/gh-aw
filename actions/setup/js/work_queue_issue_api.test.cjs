@@ -8,6 +8,28 @@ const collisionMessage = "Name has already been taken ghp_secret_collision_error
 const collisionError = { type: "UNPROCESSABLE", path: ["createLabel"], message: collisionMessage };
 
 describe("safe projection diagnostics and label rejection recovery", () => {
+  it("renders prepared Issue and comment trees only at the GraphQL mutation boundary", async () => {
+    const report = {
+      type: "report",
+      title: "Work",
+      children: [
+        { type: "paragraph", children: [{ type: "text", value: "## literal <!-- injected -->", agentTainted: true }] },
+        { type: "xml_marker", name: "work-id", value: "abc", agentTainted: false },
+      ],
+    };
+    const graphql = vi.fn().mockResolvedValue({ m0: { issue: { id: "issue" } }, m1: { commentEdge: { node: { id: "comment" } } } });
+    await mutateIssues({ graphql }, [
+      { name: "createIssue", type: "CreateIssueInput", input: { repositoryId: "repo", title: "Work" }, report, selection: "issue { id }" },
+      { name: "addComment", type: "AddCommentInput", input: { subjectId: "issue" }, report, selection: "commentEdge { node { id } }" },
+    ]);
+    const variables = graphql.mock.calls[0][1];
+    expect(variables.m0.body).toContain("\\#\\# literal &lt;");
+    expect(variables.m1.body).toBe(variables.m0.body.trimEnd());
+    expect(variables.m1.title).toBeUndefined();
+    expect(variables.m0.report).toBeUndefined();
+    expect(variables.m0.body).toContain("<!-- work-id: abc -->");
+  });
+
   let stderr;
   beforeEach(() => {
     stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
