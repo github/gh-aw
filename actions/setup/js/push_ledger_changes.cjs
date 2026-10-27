@@ -273,7 +273,7 @@ async function persistLedgerAppends({ appends, config, githubClient, owner, repo
           }
         : undefined,
     });
-    if (!pushed) throw new Error(`Failed to persist records to ${branchName}`);
+    if (pushed === false) throw new Error(`Failed to persist records to ${branchName}`);
     return { persisted, already_present: alreadyPresent, reconciled: alreadyPresent, persisted_ids: persistedIds };
   } finally {
     if (ledger) ledger.close();

@@ -29,7 +29,8 @@ function pickOutcomeField(result, field) {
  * @returns {SafeOutputOutcome}
  */
 function classifySafeOutputResult(result) {
-  if (result?.delegated === true) return "delegated";
+  if (pickOutcomeField(result, "delegated") === true) return "delegated";
+  if (result?.type === "ledger_append" && pickOutcomeField(result, "queued") === true) return "delegated";
   if (pickOutcomeField(result, "cancelled")) return "cancelled";
   if (pickOutcomeField(result, "deferred")) return "deferred";
   // A skipped operation did not apply a mutation, even when it carries a warning.

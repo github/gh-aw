@@ -19,7 +19,7 @@ func rewriteArcDindPath(path string) string {
 func rewriteArcDindEngineCommand(command string) string {
 	arcDindPathLog.Print("Rewriting engine command for arc-dind topology")
 	rewritten := rewriteArcDindPath(command)
-	return fmt.Sprintf("export HOME=%s\n%s", awfArcDindHomePathExpr, rewritten)
+	return fmt.Sprintf("export HOME=%s\nexport GH_AW_HARNESS_TELEMETRY_DIR=\"%s/sandbox/agent\"\n%s", awfArcDindHomePathExpr, awfArcDindRootPathExpr, rewritten)
 }
 
 // buildAWFImageTagWithDigests returns an image tag value for AWF's --image-tag flag.

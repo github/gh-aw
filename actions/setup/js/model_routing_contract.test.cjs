@@ -181,7 +181,7 @@ describe("cross-module model routing contract", () => {
   const expectedEffort = {
     copilot: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, effort])),
     claude: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, ["low", "medium", "high", "xhigh", "max"].includes(effort) ? effort : null])),
-    codex: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, ["minimal", "low", "medium", "high", "xhigh"].includes(effort) ? effort : null])),
+    codex: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, effort])),
     pi: Object.fromEntries(ROUTING_REASONING_EFFORTS.map(effort => [effort, effort === "none" ? "off" : effort])),
   };
 

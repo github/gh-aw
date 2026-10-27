@@ -1483,6 +1483,7 @@ jobs:
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent_usage.jsonl
             /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/agent/harness_retry.json
             /tmp/gh-aw/agent/model-endpoint-mismatch.json
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl
@@ -1519,6 +1520,7 @@ jobs:
             /tmp/gh-aw/agent/model-endpoint-mismatch.json
             /tmp/gh-aw/agent/model-resolution.json
             /tmp/gh-aw/agent-stdio.log
+            /tmp/gh-aw/agent/harness_retry.json
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
@@ -1568,6 +1570,7 @@ jobs:
       GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"admission\":\"admission\",\"agent\":\"agent\",\"conclusion\":\"conclusion\",\"conclusion_admission\":\"conclusion_admission\",\"detection\":\"detection\",\"evals\":\"evals\",\"pre_activation\":\"pre_activation\",\"push_evals_state\":\"push_evals_state\",\"push_repo_memory\":\"push_repo_memory\",\"safe_outputs\":\"safe_outputs\",\"upload_assets\":\"upload_assets\"}"
       GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"admission\":{\"result\":\"${{ needs.admission.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"detection\":{\"result\":\"${{ needs.detection.result }}\"},\"evals\":{\"result\":\"${{ needs.evals.result }}\"},\"push_evals_state\":{\"result\":\"${{ needs.push_evals_state.result }}\"},\"push_repo_memory\":{\"result\":\"${{ needs.push_repo_memory.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"},\"upload_assets\":{\"result\":\"${{ needs.upload_assets.result }}\"}}"
       GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"admission\":true,\"agent\":true,\"conclusion\":true,\"conclusion_admission\":true,\"detection\":true,\"evals\":true,\"pre_activation\":true,\"push_evals_state\":true,\"push_repo_memory\":true,\"safe_outputs\":true,\"upload_assets\":true}"
+      GH_AW_MEMORY_SAVE_RESULTS: "{\"default\":{\"branch\":${{ toJSON(needs.push_repo_memory.outputs.save_branch_default) }},\"commit\":${{ toJSON(needs.push_repo_memory.outputs.save_commit_default) }},\"jobResult\":\"${{ needs.push_repo_memory.result }}\",\"outcome\":\"${{ needs.push_repo_memory.outputs.save_outcome_default }}\",\"status\":\"${{ needs.push_repo_memory.outputs.save_status_default }}\"}}"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       admission_compact_session: ${{ steps.admission-conclusion-metadata.outputs.compact_session }}
@@ -1915,8 +1918,10 @@ jobs:
             /tmp/gh-aw/usage/agent/token_usage.jsonl
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
@@ -1950,8 +1955,10 @@ jobs:
             /tmp/gh-aw/usage/agent/token_usage.jsonl
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
@@ -2876,6 +2883,10 @@ jobs:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       patch_size_exceeded_default: ${{ steps.push_repo_memory_default.outputs.patch_size_exceeded }}
+      save_branch_default: ${{ steps.push_repo_memory_default.outputs.save_branch }}
+      save_commit_default: ${{ steps.push_repo_memory_default.outputs.save_commit }}
+      save_outcome_default: ${{ steps.push_repo_memory_default.outcome }}
+      save_status_default: ${{ steps.push_repo_memory_default.outputs.save_status }}
       validation_error_default: ${{ steps.push_repo_memory_default.outputs.validation_error }}
       validation_failed_default: ${{ steps.push_repo_memory_default.outputs.validation_failed }}
     steps:
@@ -2971,7 +2982,7 @@ jobs:
       - agent
       - detection
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest # Safe-output code publication checks out repository files; ubuntu-slim is limited to 15 minutes.
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       contents: write
@@ -3115,6 +3126,7 @@ jobs:
           name: safe-outputs-items
           path: |
             /tmp/gh-aw/safe-output-items.jsonl
+            /tmp/gh-aw/safe-output-outcomes.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore

@@ -52,6 +52,7 @@ const {
   removeCodexRoutingOverrides,
   applyCodexRoutingEffort,
   resolveCodexModelRouting,
+  getCodexRoutingFailureCode,
   resolveCodexConfiguredModel,
 } = require("./codex_harness.cjs");
 const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
@@ -324,12 +325,57 @@ describe("codex_harness.cjs", () => {
       expect(applyCodexRoutingEffort(["exec", "--json"], "high")).toEqual(["exec", "-c", 'model_reasoning_effort="high"', "--json"]);
     });
 
-    it("rejects an effort that Codex does not support", () => {
-      const reflect = {
-        ...reflectData,
-        routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, effort: "max" } },
-      };
-      expect(resolveCodexModelRouting(reflect, ["exec"]).error).toContain('"max"');
+    // Derived fixtures: the recorded /reflect from run 38945917145 (routing: null) with an
+    // added selected routing block for gpt-5.6-luna, which advertises none..max there.
+    const runRoutedHarness = effort => {
+      const dir = makeHarnessTempDir("routed-effort-");
+      const { result, calls } = runHarnessFixture("process.exit(0);", {
+        args: ["--model", "fixed-model", "-c", 'model_reasoning_effort="low"'],
+        env: { GH_AW_MODEL_ROUTING: "1", GH_AW_MODEL_AGENT_CODEX: "fixed-model", GH_AW_LLM_PROVIDER: "github", GH_AW_TMP_DIR: dir },
+        reflectData: reflectFixtures.withRoutingSelection("gpt-5.6-luna", effort),
+      });
+      const outcomePath = path.join(dir, "agent", "awf-routing-outcome.json");
+      const outcome = fs.existsSync(outcomePath) ? JSON.parse(fs.readFileSync(outcomePath, "utf8")) : null;
+      return { result, calls, outcome };
+    };
+
+    it.each([
+      ["routed_codex_max_starts_with_selected_effort", "max"],
+      ["routed_codex_none_starts_with_selected_effort", "none"],
+    ])("%s", (_name, effort) => {
+      const direct = resolveCodexModelRouting(reflectFixtures.withRoutingSelection("gpt-5.6-luna", effort), ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"]);
+      expect(direct.error).toBeNull();
+      expect(direct.args).toEqual(["exec", "-c", `model_reasoning_effort="${effort}"`, "--model", "gpt-5.6-luna", "--json", "-"]);
+
+      const { result, calls, outcome } = runRoutedHarness(effort);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).not.toContain("unsupported_effort");
+      expect(result.stderr).toContain(`inference routing: mode=awf-routed model=gpt-5.6-luna effort=${effort} endpoint=/responses`);
+      expect(calls).toHaveLength(1);
+      const efforts = calls[0].args.filter(arg => arg.startsWith("model_reasoning_effort="));
+      expect(efforts).toEqual([`model_reasoning_effort="${effort}"`]);
+      expect(calls[0].args).toContain("gpt-5.6-luna");
+      expect(calls[0].args).not.toContain("fixed-model");
+      expect(outcome).toMatchObject({ status: "selected", wire_model: "gpt-5.6-luna", endpoint: "/responses", effort, applied_effort: effort });
+      expect(outcome).not.toHaveProperty("failure_code");
+    });
+
+    it.each([
+      ["AWF /reflect returned unsupported reasoning effort ultra", "unsupported_effort"],
+      ["AWF model routing selection has none compatible endpoints", "unsupported_endpoint"],
+    ])("classifies Codex routing failure %s", (error, expectedCode) => {
+      expect(getCodexRoutingFailureCode(error)).toBe(expectedCode);
+    });
+
+    it("routed_codex_out_of_contract_effort_is_rejected", () => {
+      const direct = resolveCodexModelRouting(reflectFixtures.withRoutingSelection("gpt-5.6-luna", "ultra"), ["exec"]);
+      expect(direct.error).toBe("AWF /reflect returned unsupported reasoning effort ultra");
+
+      const { result, calls, outcome } = runRoutedHarness("ultra");
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("unsupported reasoning effort ultra; refusing to start Codex");
+      expect(calls).toHaveLength(0);
+      expect(outcome).toMatchObject({ status: "rejected", failure_code: "unsupported_effort", detail: "AWF /reflect returned unsupported reasoning effort ultra" });
     });
 
     it("starts Codex with the routed model and effort from AWF reflection", () => {

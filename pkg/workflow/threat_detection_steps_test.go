@@ -327,6 +327,7 @@ func TestBuildUploadDetectionLogStep(t *testing.T) {
 		"            /tmp/gh-aw/threat-detection/detection.log",
 		"            /tmp/gh-aw/threat-detection/detection_usage.json",
 		"            /tmp/gh-aw/threat-detection/detection_usage.jsonl",
+		"            /tmp/gh-aw/threat-detection/detection_harness_retry.json",
 		"if-no-files-found: ignore",
 	}
 

@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { buildSafeOutputOutcomes } from "./safe_output_outcomes.cjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -129,6 +130,7 @@ describe("upload_artifact.cjs", () => {
 
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(results[0].success).toBe(true);
+      expect(results[0].staged).toBe(false);
       expect(mockArtifactClient.uploadArtifact).toHaveBeenCalledOnce();
       const [name, files, rootDir, opts] = mockArtifactClient.uploadArtifact.mock.calls[0];
       expect(name).toBe("report.json");
@@ -399,18 +401,24 @@ describe("upload_artifact.cjs", () => {
 
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(results[0].success).toBe(true);
+      expect(results[0].staged).toBe(true);
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
       expect(mockCore.setOutput).toHaveBeenCalledWith("slot_0_tmp_id", expect.stringMatching(/^aw_[A-Za-z0-9]{8}$/));
     });
 
     it("skips upload client call when staged=true in config", async () => {
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED = "false";
       writeStaging("report.json");
 
       const results = await runHandler(buildConfig({ staged: true }), [{ type: "upload_artifact", path: "report.json" }]);
 
       expect(mockCore.setFailed).not.toHaveBeenCalled();
       expect(results[0].success).toBe(true);
+      expect(results[0].staged).toBe(true);
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+      const [outcome] = buildSafeOutputOutcomes([{ type: "upload_artifact", messageIndex: 0, success: true, result: results[0] }], false);
+      expect(outcome).toMatchObject({ type: "upload_artifact", status: "staged", staged: true });
+      expect(outcome).not.toHaveProperty("url");
     });
 
     it("emits a staged mode preview summary when staged mode is active", async () => {

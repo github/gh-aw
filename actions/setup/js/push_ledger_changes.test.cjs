@@ -242,7 +242,7 @@ test("invalid note vote targets are rejected and audited without counting durabl
   }
 });
 
-test("appends canonical ledger state without a configured Git identity and delegates the upstream push", async () => {
+test.each(["b".repeat(40), undefined, false])("appends canonical ledger state without a configured Git identity (push result: %s)", async pushed => {
   const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-persist-"));
   const largeTransaction = transaction({ subject: "x".repeat(32500) });
   const config = { ...ledgerConfigs[0], max_patch_kb: 100 };
@@ -256,24 +256,30 @@ test("appends canonical ledger state without a configured Git identity and deleg
     });
     const baseRef = execSync("git rev-parse HEAD", { cwd: workspaceDir, encoding: "utf8" }).trim();
     assert.doesNotThrow(() => validateTransactions(largeTransaction, [config]));
-    const persisted = await persistLedgerAppends({
-      appends: largeTransaction.ledgers.findings.appends,
-      config,
-      githubClient: {},
-      owner: "octo",
-      repo: "repo",
-      token: "test-token",
-      serverHost: "github.com",
-      workspaceDir,
-      checkoutLedgerBranchFn: async ({ branchName }) => {
-        execGitSync(["checkout", "-b", branchName], { cwd: workspaceDir, stdio: "pipe" });
-        return baseRef;
-      },
-      pushChangesFn: async options => {
-        pushCalls.push(options);
-        return true;
-      },
-    });
+    const persist = () =>
+      persistLedgerAppends({
+        appends: largeTransaction.ledgers.findings.appends,
+        config,
+        githubClient: {},
+        owner: "octo",
+        repo: "repo",
+        token: "test-token",
+        serverHost: "github.com",
+        workspaceDir,
+        checkoutLedgerBranchFn: async ({ branchName }) => {
+          execGitSync(["checkout", "-b", branchName], { cwd: workspaceDir, stdio: "pipe" });
+          return baseRef;
+        },
+        pushChangesFn: async options => {
+          pushCalls.push(options);
+          return pushed;
+        },
+      });
+    if (pushed === false) {
+      await assert.rejects(persist, /Failed to persist records to ledgers\/findings/);
+      return;
+    }
+    const persisted = await persist();
     const shard = execFileSync("git", ["ls-tree", "-r", "--name-only", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim();
     const canonical = execFileSync("git", ["show", `ledgers/findings:${shard}`], { cwd: workspaceDir, encoding: "utf8" });
     assert.equal(execFileSync("git", ["log", "-1", "--format=%an <%ae>", "ledgers/findings"], { cwd: workspaceDir, encoding: "utf8" }).trim(), "github-actions[bot] <github-actions[bot]@users.noreply.github.com>");

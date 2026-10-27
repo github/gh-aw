@@ -12868,6 +12868,19 @@
                   "type": "string",
                   "description": "Output configuration for the safe job"
                 },
+                "outputs": {
+                  "type": "object",
+                  "description": "Optional safe-job outcome outputs using GitHub Actions output expressions.",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
                 "max": {
                   "type": "integer",
                   "minimum": 1,
