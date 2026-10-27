@@ -744,8 +744,26 @@ func TestSecurityRegressionKnownVulnerabilities(t *testing.T) {
 		{
 			name:        "tab_in_expression",
 			content:     "${{ github\t.workflow }}",
-			shouldBlock: true, // Malformed expression
-			description: "Tabs in expressions should be handled",
+			shouldBlock: false,
+			description: "Tabs between tokens in allowed references follow the Actions grammar",
+		},
+		{
+			name:        "tab_in_secrets_expression",
+			content:     "${{ secrets\t.TOKEN }}",
+			shouldBlock: true,
+			description: "Tabs must not bypass the secrets restriction",
+		},
+		{
+			name:        "tab_in_unknown_reference",
+			content:     "${{ github\t.not_allowed }}",
+			shouldBlock: true,
+			description: "Tabs must not bypass the reference allowlist",
+		},
+		{
+			name:        "tab_in_unsafe_fallback",
+			content:     "${{ github\t.workflow || secrets\t.TOKEN }}",
+			shouldBlock: true,
+			description: "An allowed tab-separated reference must not hide an unsafe fallback",
 		},
 	}
 

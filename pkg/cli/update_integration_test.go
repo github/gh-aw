@@ -194,7 +194,7 @@ func TestUpdateCommand_RemovedFlags(t *testing.T) {
 	setup := setupUpdateIntegrationTest(t)
 	defer setup.cleanup()
 
-	removedFlags := []string{"--merge", "--no-actions", "--audit", "--dry-run", "--json"}
+	removedFlags := []string{"--merge", "--no-actions", "--audit", "--json"}
 
 	for _, flag := range removedFlags {
 		t.Run(flag, func(t *testing.T) {
@@ -207,6 +207,19 @@ func TestUpdateCommand_RemovedFlags(t *testing.T) {
 			assert.Contains(t, outputStr, "unknown flag", "Should report %s as unknown flag, output: %s", flag, outputStr)
 		})
 	}
+}
+
+func TestUpdateCommand_DryRunRequiresOrgOrEnterprise(t *testing.T) {
+	setup := setupUpdateIntegrationTest(t)
+	defer setup.cleanup()
+
+	cmd := exec.Command(setup.binaryPath, "update", "--dry-run")
+	cmd.Dir = setup.tempDir
+	output, err := cmd.CombinedOutput()
+
+	require.Error(t, err, "Should reject --dry-run outside org or enterprise mode")
+	assert.NotContains(t, string(output), "unknown flag", "The --dry-run flag should be recognized")
+	assert.Contains(t, string(output), "require --org or --enterprise")
 }
 
 // TestUpdateCommand_HelpText verifies the update command help text is correct.
@@ -228,6 +241,8 @@ func TestUpdateCommand_HelpText(t *testing.T) {
 	assert.Contains(t, outputStr, "repo", "Help should document --repo flag")
 	assert.Contains(t, outputStr, "org", "Help should document --org flag")
 	assert.Contains(t, outputStr, "repos", "Help should document --repos flag")
+	assert.Contains(t, outputStr, "--dry-run", "Help should document --dry-run flag")
+	assert.Contains(t, outputStr, "Preview an org or enterprise rollout without creating or closing PRs or issues")
 	assert.Contains(t, outputStr, "3-way merge", "Help should explain merge behavior")
 
 	// Should reference upgrade for other features
@@ -237,7 +252,6 @@ func TestUpdateCommand_HelpText(t *testing.T) {
 
 	// Should NOT mention removed flags
 	assert.NotContains(t, outputStr, "--audit", "Help should not mention removed --audit flag")
-	assert.NotContains(t, outputStr, "--dry-run", "Help should not mention removed --dry-run flag")
 }
 
 // TestUpdateCommand_RepoFlag verifies that --repo is recognized.
