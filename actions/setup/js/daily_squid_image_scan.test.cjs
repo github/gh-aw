@@ -45,7 +45,9 @@ describe("daily container image scan analysis", () => {
     expect(pins[0].split("@")[0]).toBe(image);
     expect(new Set(pins).size).toBe(1);
     if (image === "ghcr.io/github/gh-aw-node") {
-      expect(pins[0]).not.toBe("ghcr.io/github/gh-aw-node@sha256:23746305eeded20dc2726ab18bb081962d66ee3b2e09a54291afd1869ab3ef6d");
+      const blockedDigest = "ghcr.io/github/gh-aw-node@sha256:23746305eeded20dc2726ab18bb081962d66ee3b2e09a54291afd1869ab3ef6d";
+      // This build contains the vulnerable brotli-libs and libcurl packages found by the scanner.
+      expect(pins[0], `Do not use ${blockedDigest}: it contains vulnerable brotli-libs and libcurl packages`).not.toBe(blockedDigest);
     }
     const workflowDir = new URL("../../../.github/workflows/", import.meta.url);
     let references = 0;
