@@ -176,6 +176,8 @@ func CompileWorkflows(ctx context.Context, config CompileConfig) ([]*workflow.Wo
 		return workflowDataList, err
 	}
 
+	// Run repository-wide post-processing once after either pipeline succeeds,
+	// including generation of all auxiliary workflows, not once per file or directory.
 	if config.ActionsLock {
 		if err := runCompileActionsLock(ctx); err != nil {
 			return workflowDataList, err

@@ -32,6 +32,7 @@ func TestCompileWorkflowsActionsLock(t *testing.T) {
 		{name: "directory", config: CompileConfig{ActionsLock: true}, wantCall: true},
 		{name: "specific file", config: CompileConfig{ActionsLock: true, MarkdownFiles: []string{"test"}}, wantCall: true},
 		{name: "JSON output", config: CompileConfig{ActionsLock: true, JSONOutput: true}, wantCall: true},
+		{name: "dry-run", config: CompileConfig{ActionsLock: true, DryRun: true}, wantErr: "--actions-lock cannot be used with --dry-run"},
 		{name: "compilation failure", config: CompileConfig{ActionsLock: true}, invalid: true, wantErr: "failed"},
 		{name: "missing extension", config: CompileConfig{ActionsLock: true}, extensionErr: true, wantCall: true, wantErr: "gh extension install github/gh-actions-lock"},
 	} {
@@ -54,6 +55,11 @@ Test workflow.
 				source = "---\non: [\n---\nInvalid workflow.\n"
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "test.md"), []byte(source), 0o644))
+			actionsLockPath := filepath.Join(workflowsDir, "actions.lock")
+			const existingActionsLock = "existing actions lock\n"
+			if tt.config.DryRun {
+				require.NoError(t, os.WriteFile(actionsLockPath, []byte(existingActionsLock), 0o644))
+			}
 
 			binDir := t.TempDir()
 			t.Setenv("GH_AW_ACTIONS_LOCK_TEST_LOG", filepath.Join(root, "gh-args.log"))
@@ -66,6 +72,7 @@ printf '%s\n' "$*" >> "$GH_AW_ACTIONS_LOCK_TEST_LOG"
 test "$1" = actions-lock || exit 98
 test "$2" = --no-narrow && test "$#" = 2 || exit 97
 test -f .github/workflows/test.lock.yml || exit 96
+printf '%s\n' 'updated actions lock' > .github/workflows/actions.lock
 printf '%s\n' 'extension stdout'
 `
 			if tt.extensionErr {
@@ -94,6 +101,11 @@ printf '%s\n' 'extension stdout'
 			} else {
 				require.True(t, os.IsNotExist(readErr), "extension must not run: %s", args)
 			}
+			if tt.config.DryRun {
+				actionsLock, err := os.ReadFile(actionsLockPath)
+				require.NoError(t, err)
+				require.Equal(t, existingActionsLock, string(actionsLock), "dry-run must not rewrite actions.lock")
+			}
 			if tt.config.JSONOutput {
 				output, err := os.ReadFile(stdout.Name())
 				require.NoError(t, err)
@@ -114,6 +126,7 @@ func TestCompileActionsLockRejectsIncompatibleModes(t *testing.T) {
 		{name: "--no-emit", config: CompileConfig{ActionsLock: true, NoEmit: true}},
 		{name: "--read-only", config: CompileConfig{ActionsLock: true, ReadOnly: true}},
 		{name: "--watch", config: CompileConfig{ActionsLock: true, Watch: true}},
+		{name: "--dry-run", config: CompileConfig{ActionsLock: true, DryRun: true}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateCompileConfig(tt.config)
@@ -135,7 +148,7 @@ func TestRunCompileActionsLockUsesRepositoryRoot(t *testing.T) {
 
 	binDir := t.TempDir()
 	t.Setenv("GH_AW_ACTIONS_LOCK_TEST_LOG", filepath.Join(root, "cwd"))
-	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte("#!/bin/sh\npwd > \"$GH_AW_ACTIONS_LOCK_TEST_LOG\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte("#!/bin/sh\npwd -P > \"$GH_AW_ACTIONS_LOCK_TEST_LOG\"\n"), 0o755))
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	require.NoError(t, runCompileActionsLock(context.Background()))

@@ -196,6 +196,9 @@ func validateCompileConfig(config CompileConfig) error {
 		return err
 	}
 	if config.ActionsLock {
+		if config.DryRun {
+			return errors.New("--actions-lock cannot be used with --dry-run: the extension performs repository-wide post-processing beyond emitted compiler files")
+		}
 		if config.NoEmit || config.ReadOnly {
 			return errors.New("--actions-lock cannot be used with --no-emit or --read-only")
 		}
