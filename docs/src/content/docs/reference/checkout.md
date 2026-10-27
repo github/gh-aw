@@ -201,6 +201,13 @@ read access to the triggering PR; a failed state lookup is an error, not proof o
 closure. PR-branch pushes also refuse to recreate deleted target branches.
 These checks cannot make a PR-state lookup and a later GitHub write atomic.
 
+For body-only review loops, a bot explicitly listed in `on.bots` can trigger PR
+checkout through `pull_request: edited` without pushing a commit. The event sender
+must be a Bot whose login matches the triggering actor, and the runtime, PR head,
+and PR base repository IDs must match. Unlisted bots and fork PRs still require
+write-or-higher collaborator permission. Filter body edits with an `if:` condition
+on `github.event.changes.body` to avoid re-reviewing unrelated edits.
+
 ## Disabling the PR Branch Checkout
 
 To keep the normal repository checkout but suppress the compiler-generated "Checkout PR branch" step and its associated base-config snapshot/restore steps, set `pull-request: false` under `checkout`:

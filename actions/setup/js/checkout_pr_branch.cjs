@@ -321,7 +321,7 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
   if (
     (context.eventName === "pull_request" || context.eventName === "pull_request_target") &&
     typeof context.payload.action === "string" &&
-    TRUSTED_BOT_PR_ACTIONS.includes(context.payload.action) &&
+    (TRUSTED_BOT_PR_ACTIONS.includes(context.payload.action) || (context.payload.action === "edited" && isAllowedBot(actor, parseAllowedBots()))) &&
     senderType === "Bot" &&
     context.payload.sender?.login === actor &&
     context.payload.repository !== undefined &&

@@ -418,6 +418,69 @@ If the pull request is still open, verify that:
         expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
       });
 
+      describe.each(["pull_request", "pull_request_target"])("allow-listed bot edited events on %s", eventName => {
+        beforeEach(() => {
+          mockContext.eventName = eventName;
+          mockContext.actor = "automation[bot]";
+          mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+          mockContext.payload.action = "edited";
+          mockContext.payload.changes = { body: { from: "Original PR description" } };
+          mockContext.payload.repository.id = 42;
+          mockContext.payload.pull_request.head.repo.id = 42;
+          mockContext.payload.pull_request.base.repo.id = 42;
+          process.env.GH_AW_ALLOWED_BOTS = "automation";
+          mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+        });
+
+        it.each(["automation", "automation[bot]"])("should check out a same-repository PR when on.bots contains %s", async bots => {
+          process.env.GH_AW_ALLOWED_BOTS = bots;
+
+          await runScript();
+
+          expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+          expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+          expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin", "+refs/pull/123/head:refs/remotes/origin/pr-head"]), { silent: true, ignoreReturnCode: true });
+          expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "refs/remotes/origin/pr-head"]);
+        });
+
+        it.each([
+          ["unlisted bot", { bots: "other-app" }],
+          ["missing allowlist", { bots: undefined }],
+          ["fork PR", { headId: 43 }],
+          ["missing head repository ID", { headId: undefined }],
+          ["missing base repository ID", { baseId: undefined }],
+          ["mismatched base repository ID", { baseId: 43 }],
+          ["missing runtime repository ID", { repositoryId: undefined }],
+          ["invalid runtime repository ID", { repositoryId: 0, headId: 0, baseId: 0 }],
+          ["different sender", { sender: { login: "other[bot]", type: "Bot" } }],
+          ["non-bot sender", { sender: { login: "automation[bot]", type: "User" } }],
+          ["missing sender", { sender: undefined }],
+          ["untrusted action", { action: "labeled" }],
+        ])("should retain permission checks for %s", async (_reason, overrides) => {
+          if ("bots" in overrides) {
+            if (overrides.bots === undefined) {
+              delete process.env.GH_AW_ALLOWED_BOTS;
+            } else {
+              process.env.GH_AW_ALLOWED_BOTS = overrides.bots;
+            }
+          }
+          if ("headId" in overrides) mockContext.payload.pull_request.head.repo.id = overrides.headId;
+          if ("baseId" in overrides) mockContext.payload.pull_request.base.repo.id = overrides.baseId;
+          if ("repositoryId" in overrides) mockContext.payload.repository.id = overrides.repositoryId;
+          if ("sender" in overrides) mockContext.payload.sender = overrides.sender;
+          if ("action" in overrides) mockContext.payload.action = overrides.action;
+
+          await runScript();
+
+          expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "automation[bot]" }));
+          expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+          expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
+          expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+          expect(mockExec.exec).not.toHaveBeenCalled();
+        });
+      });
+
       it.each(["pull_request", "pull_request_target"])("should require collaborator permission for a same-repository GitHub App PR on %s with action labeled", async eventName => {
         mockContext.eventName = eventName;
         mockContext.actor = "automation[bot]";
