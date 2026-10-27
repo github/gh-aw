@@ -16,6 +16,15 @@ beforeEach(() => vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "github.com,example.com,exa
 afterEach(() => vi.unstubAllEnvs());
 
 describe("report AST", () => {
+  it.each(["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"])("parses and renders %s as a structured GitHub alert", kind => {
+    const source = `> [!${kind}]\n> **Guidance:** safe text.`;
+    const children = parseReportMarkdown(source, { agentTainted: false });
+    expect(children).toMatchObject([{ type: "alert", kind, agentTainted: false, children: [{ type: "paragraph", children: [{ type: "strong" }, { type: "text" }] }] }]);
+    const body = renderReport(report(children)).body;
+    expect(body).toBe(source + "\n");
+    expect(parseReportMarkdown(body, { agentTainted: false })).toEqual(children);
+  });
+
   it("preserves compact marker identities and substitutes metadata scalars without parsing their contents", () => {
     const children = parseReportMarkdown("<!-- gh-aw-work-issue:{work_id} -->", { context: { work_id: "work_123" }, allowMetadata: true, agentTainted: false });
     expect(children).toEqual([{ type: "xml_marker", name: "gh-aw-work-issue", value: "work_123", compact: true, agentTainted: false }]);
@@ -39,6 +48,20 @@ describe("report AST", () => {
   it("keeps emphasis and subscript structure when templates use underscored scalar names", () => {
     const children = parseReportMarkdown("<sub><em>{workflow_name}</em></sub>\n\n*{workflow_name}*", { context: { workflow_name: "Worker" }, agentTainted: false });
     expect(renderReport(report(children)).body).toBe("<sub><em>Worker</em></sub>\n\n*Worker*\n");
+  });
+
+  it.each(["<details><summary>", "<details>\n<summary>"])("preserves subscript summaries imported from %s", opening => {
+    const children = parseReportMarkdown(`${opening}<sub>{label}</sub></summary>\n\nInstructions\n\n</details>`, {
+      context: { label: "Add this agentic workflow to your repo" },
+      agentTainted: false,
+    });
+    expect(children[0]).toMatchObject({
+      type: "details",
+      summary: [{ type: "subscript", agentTainted: false, children: [{ type: "text", value: "Add this agentic workflow to your repo", agentTainted: false }] }],
+    });
+    const body = renderReport(report(children)).body;
+    expect(body).toContain("<summary><sub>Add this agentic workflow to your repo</sub></summary>");
+    expect(renderReport(report(parseReportMarkdown(body, { agentTainted: false }))).body).toBe(body);
   });
 
   it("parses long unmatched emphasis with placeholder-like text without exponential backtracking", () => {

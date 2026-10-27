@@ -208,7 +208,6 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
    * @returns {string | ReportInline[]}
    */
   function summary(source) {
-    source = source.replace(/^<sub>(.*)<\/sub>$/, "$1");
     /** @type {Record<string, "strong" | "emphasis" | "strike" | "subscript">} */
     const formats = { b: "strong", strong: "strong", i: "emphasis", em: "emphasis", s: "strike", del: "strike", sub: "subscript" };
     /** @type {Array<{name: string, raw: string, children: ReportInline[]}>} */

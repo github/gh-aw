@@ -132,7 +132,7 @@ describe("issue report publication boundary", () => {
     });
     expect(body).toContain("<sub>Estimates are approximate.</sub>");
     expect(body).toContain("```html\n<details><summary>literal</summary>\n```");
-    expect(body).toContain("<summary>Install workflow</summary>");
+    expect(body).toContain("<summary><sub>Install workflow</sub></summary>");
     expect(renderIssueParameters({ title: "Notes", body }).body).toBe(body);
   });
 

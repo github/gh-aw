@@ -47,6 +47,10 @@ const report = {
 
 Use `heading`, `paragraph`, `list`, `table`, `details`, `quote`, `alert`,
 `separator`, `code_block`, and typed inline nodes instead of Markdown punctuation.
+GitHub `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]`
+map to `alert` nodes with the matching `kind`; the renderer emits their markers.
+Keep alerts separate rather than nesting them inside another alert, which GitHub
+does not support. Preserve supported `<sub>` formatting in details summaries.
 Use `xml_marker`, `json_marker`, `expiration`, and `closing_reference` for machine
 metadata and closing links. Preserve `xml_marker.compact` for identifiers whose
 exact spelling is used by cleanup. Use `review_marker` for the durable,

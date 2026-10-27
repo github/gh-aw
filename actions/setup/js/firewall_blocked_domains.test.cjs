@@ -16,6 +16,7 @@ describe("firewall_blocked_domains.cjs", () => {
   let extractAndSanitizeDomain;
   let getBlockedDomains;
   let generateBlockedDomainsSection;
+  let generateBlockedDomainsReportSection;
   let testDir;
 
   beforeEach(async () => {
@@ -30,6 +31,7 @@ describe("firewall_blocked_domains.cjs", () => {
     extractAndSanitizeDomain = module.extractAndSanitizeDomain;
     getBlockedDomains = module.getBlockedDomains;
     generateBlockedDomainsSection = module.generateBlockedDomainsSection;
+    generateBlockedDomainsReportSection = module.generateBlockedDomainsReportSection;
   });
 
   afterEach(() => {
@@ -451,9 +453,12 @@ describe("firewall_blocked_domains.cjs", () => {
       expect(result).toContain("> <details>");
       expect(result).toContain("> <summary>Firewall blocked 1 domain</summary>");
       expect(result).toContain("> - `api.github.com`");
-      expect(result).toContain("> **Tip:**");
-      expect(result).not.toContain("[!TIP]");
+      expect(result).toContain("> </details>\n\n> [!TIP]");
       expect(result).not.toContain("\\[\\!TIP\\]");
+      expect(generateBlockedDomainsReportSection(["api.github.com"], TEMPLATE_PATH)).toMatchObject([
+        { type: "alert", kind: "WARNING", children: [{ type: "details" }] },
+        { type: "alert", kind: "TIP" },
+      ]);
       expect(result).toContain("`tools.github.mode: gh-proxy`");
       expect(result).toContain("> ```yaml\n> tools:\n>   github:\n>     mode: gh-proxy\n> ```");
       expect(result).toContain("> See [GitHub Tools](https://github.github.com/gh-aw/reference/github-tools/) for more information on `gh-proxy` mode.");
@@ -477,7 +482,8 @@ describe("firewall_blocked_domains.cjs", () => {
       const result = generateBlockedDomainsSection(["other.example.com"], TEMPLATE_PATH);
 
       expect(result).not.toContain("gh-proxy");
-      expect(result).not.toContain("**Tip:**");
+      expect(result).not.toContain("[!TIP]");
+      expect(generateBlockedDomainsReportSection(["other.example.com"], TEMPLATE_PATH)).toMatchObject([{ type: "alert", kind: "WARNING" }]);
       expect(result).not.toContain("GitHub Tools");
       expect(result).toContain("> See [Network Configuration](https://github.github.com/gh-aw/reference/network/) for more information.");
     });
