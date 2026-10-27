@@ -192,10 +192,7 @@ func GetLatestActionPinByRepo(repo string) (ActionPin, bool) {
 		actionPinsLog.Printf("No action pins found for repo=%s", repo)
 		return ActionPin{}, false
 	}
-	for _, pin := range pins {
-		return cloneActionPin(pin), true
-	}
-	return ActionPin{}, false
+	return cloneActionPin(pins[0]), true
 }
 
 // GetContainerPin returns a pinned container image by its original image reference.
