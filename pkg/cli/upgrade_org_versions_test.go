@@ -79,6 +79,7 @@ func TestPreviewUpgradeRepoCheckoutVersionSetWithoutAPI(t *testing.T) {
 	assert.Equal(t, 2, preview.TotalWorkflows)
 	assert.Equal(t, []string{"v1.0.0", "v1.2.3"}, preview.CurrentVersions)
 	assert.Equal(t, 2, preview.UnknownVersionLocks)
+	assert.Equal(t, 2, preview.MissingWorkflowLocks)
 
 	encoded, err := json.Marshal(orgRolloutResult{Status: "planned", Preview: &preview})
 	require.NoError(t, err)
@@ -121,7 +122,7 @@ func TestRenderOrgUpgradeReportVersionSets(t *testing.T) {
 }
 
 func TestOrgRolloutTUIUpgradeVersions(t *testing.T) {
-	for _, status := range []string{"planned", "created", "unchanged"} {
+	for _, status := range []string{"planned", "created", "unchanged", orgUpgradeVersionMatchStatus} {
 		model := orgRolloutTUI{opts: orgRolloutOptions{command: "upgrade"}, rows: []orgRolloutRow{{repo: "acme/repo"}}}
 		next, _ := model.Update(orgRolloutEvent{index: 0, result: orgRolloutResult{
 			Status: status, Preview: &orgRepoPreview{CurrentVersions: []string{"v1.0.0", "v1.2.3"}},

@@ -14,6 +14,25 @@ import (
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
+const (
+	orgUpgradeVersionMatchStatus = "skipped: compiler version matches"
+	orgUpgradeNoWorkflowsStatus  = "skipped: no workflow Markdown files"
+)
+
+func upgradeRepoMatchesVersion(preview orgRepoPreview, target string) bool {
+	target = normalizeDisplayVersion(target)
+	if target == "" || preview.TotalWorkflows == 0 || len(preview.CurrentVersions) == 0 ||
+		preview.UnknownVersionLocks > 0 || preview.MissingWorkflowLocks > 0 {
+		return false
+	}
+	for _, version := range preview.CurrentVersions {
+		if normalizeDisplayVersion(version) != target {
+			return false
+		}
+	}
+	return true
+}
+
 func extractCompilerVersionsFromWorkflowsDir(directory string) ([]string, int, error) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
@@ -90,6 +109,9 @@ func formatUpgradeCompilerVersions(preview orgRepoPreview) string {
 	versions = slices.Compact(versions)
 	if preview.UnknownVersionLocks > 0 {
 		versions = append(versions, fmt.Sprintf("unknown (%d lock file(s))", preview.UnknownVersionLocks))
+	}
+	if preview.MissingWorkflowLocks > 0 {
+		versions = append(versions, fmt.Sprintf("uncompiled (%d workflow(s))", preview.MissingWorkflowLocks))
 	}
 	if len(versions) == 0 {
 		return "unknown"

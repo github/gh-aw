@@ -67,8 +67,9 @@ type orgRepoPreview struct {
 	Workflows      []orgWorkflowPreview
 	OldestEdit     time.Time
 	// Compiler versions are populated only by the upgrade scan.
-	CurrentVersions     []string
-	UnknownVersionLocks int
+	CurrentVersions      []string
+	UnknownVersionLocks  int
+	MissingWorkflowLocks int
 }
 
 func runUpdateForOrg(ctx context.Context, org string, repoGlobs []string, opts UpdateWorkflowsOptions, createPR bool, createIssue bool, verbose bool) error {
