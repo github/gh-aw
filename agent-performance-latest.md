@@ -76,3 +76,6 @@ metrics/latest.json (2026-10-25T03:02Z) complete 24h: 440 executed / 112 failed 
 
 ## Run 2026-10-26T14:21Z
 metrics/latest.json (2026-10-26) partial but usable: 443 runs/123 workflows, 85.6% overall success, 236 safe outputs. Report discussion filed. Flagged: ai-moderator 25% success (18/24 failed, max 24120s vs 5min timeout), Matt Pocock reviewer 0 outputs/31 runs, Design Decision Gate 15 comments/32 runs, 23 workflows with 1/1 failed runs.
+
+## Run 2026-10-27T13:00Z
+latest.json (2026-10-27, partial): 405 runs, 84.4% success. ai-moderator 3/22 ok; smoke-gemini/pi 0/2; DDG 87%; Pocock 94% (718k tokens, redesign candidate); impeccable 0 runs. Discussion posted; no issues.
