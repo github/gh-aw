@@ -1,0 +1,15 @@
+
+# 2026-10-27 16:33:48.385403
++/run workspace="$(pwd -P)" && go list -f '{{if and (not .TestGoFiles) (not .XTestGoFiles)}}{{.Dir}} {{.Name}}{{end}}' ./... > /tmp/gh-aw/agent/aider-untested-packages && count=0 && while IFS= read -r row; do if [ -n "$row" ]; then directory="${row% *}"; package="${row##* }"; resolved="$(realpath -- "$directory")" || exit 1; case "$resolved" in "$workspace"|"$workspace"/*) ;; *) printf 'Refusing to write outside workspace: %s\n' "$resolved" >&2; exit 1 ;; esac; (set -C; printf 'package %s\n\nimport "testing"\n\nfunc TestPlaceholder_TODO(t *testing.T) {\n\tt.Skip("not yet implemented")\n}\n' "$package" > "$resolved/${package}_test.go") || exit 1; printf '%s %s\n' "$resolved" "$package"; count=$((count + 1)); if [ "$count" -eq 3 ]; then break; fi; fi; done < /tmp/gh-aw/agent/aider-untested-packages
+
+# 2026-10-27 16:33:53.813394
++/run make fmt-go
+
+# 2026-10-27 16:33:56.234791
++/run go test ./... -run '^TestPlaceholder_TODO$'
+
+# 2026-10-27 16:36:24.296382
++/run git checkout -b add-test-stubs-$GITHUB_RUN_ID
+
+# 2026-10-27 16:36:24.390757
++/run git add -A
