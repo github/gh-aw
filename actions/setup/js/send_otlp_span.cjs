@@ -16,6 +16,7 @@ const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
 const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
+const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -2575,6 +2576,12 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // When no agent span is emitted the attributes fall through to the conclusion span
   // so a single query is still sufficient for observability.
   const usageAttrs = [];
+  const harnessRetry = jobEmitsOwnTokenUsage ? normalizeHarnessRetryRecord(readJSONIfExists(getGhAwPath(jobName === "detection" ? "threat-detection/detection_harness_retry.json" : "agent/harness_retry.json"))) : undefined;
+  if (harnessRetry) {
+    const retryReasons = harnessRetry.attemptResults.flatMap(attempt => attempt.failureClasses);
+    usageAttrs.push(buildAttr("gh-aw.harness.attempts", harnessRetry.attempts));
+    usageAttrs.push(buildArrayAttr("gh-aw.harness.retry_reasons", retryReasons));
+  }
   if (typeof aiCredits === "number") {
     usageAttrs.push(buildDoubleAttr("gh-aw.aic", aiCredits));
   }

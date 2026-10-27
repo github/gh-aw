@@ -30,7 +30,7 @@ import "embed"
 //go:embed js/log_parser_bootstrap.cjs js/log_parser_format.cjs js/log_parser_shared.cjs
 //go:embed js/protected_command_output.cjs
 //go:embed js/log_parser_step_summary_builder.cjs js/markdown_unfencing.cjs
-//go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs
+//go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_outcomes.cjs js/safe_outputs_status.cjs
 //go:embed js/otlp_header_helpers.cjs
 //go:embed js/work_queue_claim_scope.cjs js/work_queue_codec.cjs js/work_queue_resource_scope.cjs
 //go:embed js/work_queue_host.cjs
@@ -68,7 +68,7 @@ import "embed"
 //go:embed js/glob_pattern_helpers.cjs js/handler_auth.cjs js/invocation_context_helpers.cjs
 //go:embed js/read_buffer.cjs js/repo_helpers.cjs js/safe_output_helpers.cjs js/staged_preview.cjs
 //go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
-//go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs
+//go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs js/harness_retry_record.cjs
 //go:embed js/engine_log_parser.cjs
 //go:embed js/routing_analytics.cjs js/resolve_model_alias.cjs
 //go:embed js/parse_kiro_log.cjs

@@ -157,8 +157,12 @@ These attributes carry model, token, and stop-reason data on built-in agent span
     <tr><td><code>gen_ai.usage.cache_read.input_tokens</code></td><td>Cache-read token count.</td></tr>
     <tr><td><code>gen_ai.usage.cache_creation.input_tokens</code></td><td>Cache-write token count.</td></tr>
     <tr><td><code>gen_ai.usage.total_tokens</code></td><td>Total input plus output tokens.</td></tr>
+    <tr><td><code>gh-aw.harness.attempts</code></td><td>Integer count of started harness attempts, including the initial attempt.</td></tr>
+    <tr><td><code>gh-aw.harness.retry_reasons</code></td><td>String array of failure classes in attempt order, including terminal failures. Repeated classes are preserved; first-attempt success produces an empty array.</td></tr>
   </tbody>
 </table>
+
+Harness retry attributes appear only on the span that owns the job's token usage: the dedicated agent span when present, otherwise the executing job's conclusion span. They remain available after retry exhaustion even when token accounting is missing; missing token counts are not synthesized. The usage artifact preserves per-attempt exit codes and failure classes in `agent/harness_retry.json` and `detection/harness_retry.json` when available.
 
 ## Model-routing attributes
 

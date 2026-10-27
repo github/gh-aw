@@ -1851,6 +1851,7 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.Contains(t, content, "Upload Safe Outputs Items")
 	assert.Contains(t, content, "if: always()")
 	assert.Contains(t, content, "/tmp/gh-aw/safe-output-items.jsonl")
+	assert.Contains(t, content, "/tmp/gh-aw/safe-output-outcomes.jsonl")
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
 }
@@ -1884,6 +1885,7 @@ func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.
 			require.NotContains(t, content, "/tmp/gh-aw/claims/*/delivery-receipt.json")
 			if test.worker {
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-items.jsonl")
+				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-outcomes.jsonl")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/temporary-id-map.json")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-errors.json")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/claim-delivery-errors.json")

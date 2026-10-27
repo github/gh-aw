@@ -18,6 +18,7 @@ Use this pattern when a workflow must perform a controlled write action after th
 - Include a generated-by footer and workflow provenance annotations on published content so tracking is preserved. For GitHub issues, use the [stable issue-creation API](https://github.github.com/gh-aw/reference/custom-safe-outputs/#issue-creation-api).
 - Use warnings for skippable invalid items and fail the job only for fatal errors.
 - If a step reads an agent-written file outside the compiler's built-in known paths, declare it under `artifacts:` (array of `/tmp/gh-aw/`-rooted paths — files, directories, or globs). Undeclared paths are silently dropped and never reach the job.
+- Expose execution evidence through `outputs.status` and `outputs.url`, mapped to step outputs. Use `success`, `failure`, `cancelled`, or `skipped`; use `skipped` for staged previews. Publish only the canonical absolute resource URI returned by the service. Conclusion records these as `safe_output.result` in the unified session; an Actions failure, cancellation, or skip overrides a reported success.
 
 ## Minimal Shape
 

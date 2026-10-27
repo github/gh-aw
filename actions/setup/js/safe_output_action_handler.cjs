@@ -109,6 +109,7 @@ async function main(config = {}) {
 
       return {
         success: true,
+        delegated: true,
         action_name: actionName,
         payload: payloadJSON,
       };
