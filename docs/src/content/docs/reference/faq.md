@@ -84,6 +84,9 @@ head:
 
 GitHub Agentic Workflows lets developers define AI-powered repository automation and run AI agents through GitHub Actions. Authors write Markdown instructions with YAML frontmatter, then `gh aw compile` generates the `.lock.yml` GitHub Actions workflow. Built-in AI engines include GitHub Copilot, Claude Code, OpenAI Codex, Google Gemini, and Pi.
 
+> [!NOTE]
+> GitHub Agentic Workflows is in Public Preview.
+
 Start with the [GitHub Agentic Workflows quickstart](/gh-aw/setup/quick-start/), learn how to [create an agentic workflow](/gh-aw/setup/creating-workflows/), or browse the [gallery by repository task](/gh-aw/gallery/).
 
 ## Determinism
