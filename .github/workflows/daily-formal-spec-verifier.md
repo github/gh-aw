@@ -6,7 +6,7 @@ description: >
   Picks one specification from specs/ daily, formalizes its properties using
   Lean/F*/Z3/Coq/TLA+ notation (as a reasoning methodology, no runtime dependency),
   and generates a Go testify unit-test suite covering all inferred behaviors.
-  Results are published as a GitHub issue.
+  Results are delivered as a validated test-suite pull request.
 on:
   schedule: daily
   workflow_dispatch:
@@ -27,12 +27,9 @@ network:
   allowed: [defaults, go]
 
 imports:
-  - uses: shared/daily-issue-base.md
-    with:
-      title-prefix: "[formal-spec] "
-      expires: 7d
-      labels: [automation, formal-verification, testing, specifications]
-      assignees: [copilot]
+  - shared/lock-safe-pull-request.md
+  - shared/activation-app.md
+  - shared/reporting.md
   - shared/otlp.md
 
 sandbox:
@@ -59,6 +56,12 @@ tools:
     - "sed *"
 
 safe-outputs:
+  create-pull-request:
+    exclude-lock-yml: true
+    title-prefix: "[formal-spec] "
+    expires: 7d
+    labels: [automation, formal-verification, testing, specifications]
+    max: 1
   mentions: false
   allowed-github-references: []
   max-bot-mentions: 1
@@ -75,7 +78,7 @@ You are a formal methods expert and Go test engineer. Your mission is to:
 1. Select one specification file from `specs/` that has not been recently processed.
 2. Analyze it using formal verification reasoning (Lean 4 / F* / Z3 / Coq / TLA+ methodologies — as a notation and reasoning discipline, **not** as code to be executed).
 3. Generate a complete Go testify unit-test suite from the inferred formal model.
-4. Publish the formalization + test suite as a GitHub issue.
+4. Add and validate the test suite in the relevant package and publish a pull request with the formalization.
 
 ---
 
@@ -133,7 +136,7 @@ Use built-in file inspection tools for note files; do not combine note and cache
 
 Read the selected spec file in full with built-in file inspection tools (or an allowed standalone `cat specs/*.md` command for a top-level spec). Do not combine reads or pipe them through `head`.
 
-Use built-in file inspection tools only for read-only analysis when bash output is insufficient. Do not modify repository files.
+Use built-in file inspection tools for analysis when bash output is insufficient. Modify only the selected specification's focused test suite and directly required test helpers.
 
 Extract:
 
@@ -180,27 +183,29 @@ Produce a complete Go test file that:
 - Includes a leading comment block that references the specification file and lists the formal predicates the tests encode.
 - All assertions include a descriptive message string.
 
-Use existing types, functions, and interfaces from the codebase where possible (read relevant `.go` files in `pkg/` with bash). When no concrete implementation exists yet, write the test against a **minimal stub interface** at the top of the test file, clearly marked `// stub — replace with real implementation`.
+Use existing types, functions, and interfaces from the codebase (read relevant `.go` files in `pkg/`). Do not deliver placeholder stub interfaces or tests that merely test their own fake implementation. If no concrete implementation exists, report that blocker with `report_incomplete`.
 
 ---
 
-## Step 5 — Create Issue
+## Step 5 — Validate and Create a Pull Request
 
-Create exactly one issue using the `create_issue` safe output.
+Write the complete test file into its package, run `gofmt` and focused `go test` selectors,
+and commit locally. Create exactly one pull request using `create_pull_request` with
+`title`, `body`, and the committed local `branch`.
 
 ### Output Contract (Required)
 
-1. Draft the title and body locally first if needed, but emit exactly one final `create_issue` safe output only after the full payload is complete.
-2. Use the configured safe-output transport. With `cli-proxy`, direct safe-output MCP tools are not exposed. Invoke `safeoutputs create_issue '<JSON>'` from `bash` with a complete JSON object containing `title` and `body` as one single-quoted argument. Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes as `\\`, and apostrophes as `\u0027`; Unicode can remain literal. Stdin is also supported with `safeoutputs create_issue .`, but prefer inline JSON without auxiliary tools, pipelines, temporary files, or shell expansion. Transport support does not grant extra shell permissions. If a direct safe-output tool is actually exposed instead, call it with the same arguments.
-3. Do **not** use `python3`, `node`, `jq`, or any other scripting runtime to construct or validate the issue payload — build the body string inline. Do not redirect it to a file.
-4. Never retry `create_issue` with empty, placeholder, or partial arguments.
-5. If the quality checks below cannot be met, emit `report_incomplete` through the same transport instead of `create_issue`. With `cli-proxy`, use `safeoutputs report_incomplete '{"reason":"<concrete blocker>"}'`; never substitute a prose-only failure report.
+1. Draft the title and body locally first if needed, but emit exactly one final `create_pull_request` only after implementation and validation are complete.
+2. Use the configured safe-output transport. With `cli-proxy`, invoke `safeoutputs create_pull_request '<JSON>'` with a complete JSON object containing `title`, `body`, and `branch`. Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes as `\\`, and apostrophes as `\u0027`; Unicode can remain literal. If a direct safe-output tool is exposed instead, call it with the same arguments.
+3. Do **not** use `python3`, `node`, `jq`, or any other scripting runtime to construct or validate the pull request payload — build the body string inline. Do not redirect it to a file.
+4. Never retry `create_pull_request` with empty, placeholder, or partial arguments.
+5. If the quality checks below cannot be met, emit `report_incomplete` through the same transport. With `cli-proxy`, use `safeoutputs report_incomplete '{"reason":"<concrete blocker>"}'`; never substitute a prose-only failure report.
 
-### Issue format
+### Pull request format
 
 Title: `[formal-spec] <SpecFileName> — Formal model & test suite — <YYYY-MM-DD>`
 
-Use `###` or lower for all headers in your report. Never use `#` (h1) or `##` (h2) — these are reserved for the issue title rendered by GitHub.
+Use `###` or lower for all headers in your report. Never use `#` (h1) or `##` (h2) — these are reserved for the pull request title rendered by GitHub.
 
 Wrap long sections (>5 items, detailed lists, raw data) in `<details><summary><b>Section Name</b></summary>` blocks to keep the report scannable.
 
@@ -246,9 +251,9 @@ One-paragraph description of the spec and what was formalized.
 
 ### Usage
 
-1. Copy the test file to the appropriate package directory.
-2. Replace any `// stub` interfaces with real implementations.
-3. Run: `go test ./... -run Formal`
+1. Identify the committed test file in its package directory.
+2. Describe the real implementation APIs exercised.
+3. Include the exact focused `go test` command and observed result.
 
 ### Context
 
@@ -259,19 +264,19 @@ One-paragraph description of the spec and what was formalized.
 
 ### Output quality bar
 
-Before emitting `create_issue`, verify the body:
+Before emitting `create_pull_request`, verify the body and committed tests:
 - Contains all required sections (`Summary`, `Specification`, `Formal Model`, `Behavioral Coverage Map`, `Generated Test Suite`, `Usage`, `Context`).
 - Has at least 5 rows in the Behavioral Coverage Map.
-- The generated test file has no obvious syntax errors — **visual review only**: scan for mismatched braces, missing imports, and undefined identifiers. Do **not** run `go build`, `go test`, `go version`, `python3`, `node`, `jq`, or any compiler or runtime to verify.
+- The generated test file is formatted and its focused Go tests passed against real implementation APIs.
 - Is at least 1200 characters long.
 
-If these checks cannot be met, emit `report_incomplete` through the configured safe-output transport instead of `create_issue`.
+If these checks cannot be met, emit `report_incomplete` instead of an unvalidated pull request.
 
 ---
 
 ## Step 6 — Persist Rotation State
 
-After `create_issue` succeeds, write updated `rotation.json` to
+After `create_pull_request` is staged successfully, write updated `rotation.json` to
 `/tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json`:
 
 - Increment `last_index`.
@@ -328,9 +333,9 @@ file back.
 
 ## Constraints
 
-- **No runtime dependency on Lean, F*, Z3, Coq, or TLA+.** All formal notation is illustrative only — embedded as quoted blocks in the issue body.
+- **No runtime dependency on Lean, F*, Z3, Coq, or TLA+.** All formal notation is illustrative only, embedded as quoted blocks in the pull request body.
 - **No network calls** beyond what the tools provide.
 - **Keep the prompt-body loop tight**: read the spec once, formalize once, write the test file once.
 - Use `noop` with a brief explanation if no spec can be selected (e.g. all were processed today).
-- **Before finishing, confirm you called exactly one terminal safe output:** `create_issue`, `report_incomplete`, or `noop`.
-- **Tool budget awareness**: If you are approaching the tool call limit, emit a partial result immediately rather than continuing to gather more data. Use this priority order: (1) if the formalization and test suite sections are both substantially complete (at least 5 predicates and 3 test functions), emit a partial `create_issue` with what is available; (2) otherwise, emit `report_incomplete` immediately.
+- **Before finishing, confirm you called exactly one terminal safe output:** `create_pull_request`, `report_incomplete`, or `noop`.
+- **Tool budget awareness**: Reserve time for focused validation and delivery. If the quality bar or validation cannot be completed, emit `report_incomplete`; never publish a partial or unvalidated test suite.

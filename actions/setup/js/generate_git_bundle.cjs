@@ -120,6 +120,34 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
 
   const bundlePath = options.repoSlug ? getBundlePathForBranchInRepo(branchName, options.repoSlug) : getBundlePathForBranch(branchName);
 
+  // Every baseline strategy must apply the same exclusions as patch validation.
+  if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
+    const patchResult = await generateGitPatch(branchName, baseBranch, options);
+    if (!patchResult.success) {
+      return { success: false, error: patchResult.error || "Failed to generate filtered patch for bundle synthesis", bundlePath };
+    }
+    const tempWorktree = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-"));
+    // Repository hooks such as Git LFS must not run during internal synthesis.
+    const tempHooksDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-hooks-"));
+    const noHooksArgs = ["-c", `core.hooksPath=${tempHooksDir}`];
+    try {
+      execGitSync([...noHooksArgs, "worktree", "add", "--detach", tempWorktree, patchResult.baseCommit], { cwd });
+      execGitSync([...noHooksArgs, "am", "--3way", patchResult.patchPath], { cwd: tempWorktree });
+      execGitSync([...noHooksArgs, "bundle", "create", bundlePath, `${patchResult.baseCommit}..HEAD`], { cwd: tempWorktree });
+      return { success: true, bundlePath, bundleSize: fs.statSync(bundlePath).size, baseCommit: patchResult.baseCommit };
+    } catch (error) {
+      return { success: false, error: `Failed to generate filtered bundle: ${getErrorMessage(error)}`, bundlePath };
+    } finally {
+      try {
+        execGitSync([...noHooksArgs, "worktree", "remove", "--force", tempWorktree], { cwd });
+      } catch (error) {
+        core.warning(`Failed to remove temporary filtered-bundle worktree: ${getErrorMessage(error)}`);
+      }
+      fs.rmSync(tempWorktree, { recursive: true, force: true });
+      fs.rmSync(tempHooksDir, { recursive: true, force: true });
+    }
+  }
+
   // Validate baseBranch early to avoid confusing git errors (e.g., origin/undefined)
   if (typeof baseBranch !== "string" || baseBranch.trim() === "") {
     const errorMessage = "baseBranch is required and must be a non-empty string (received: " + String(baseBranch) + ")";
@@ -273,55 +301,23 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
           // In incremental mode, also exclude origin/<defaultBranch> when present so
           // a "merge base branch into PR branch" workflow does not re-embed upstream
           // commits that the remote already has.
-          if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
-            const patchResult = await generateGitPatch(branchName, baseBranch, options);
-            if (!patchResult.success) {
-              return {
-                success: false,
-                error: patchResult.error || "Failed to generate filtered patch for bundle synthesis",
-                bundlePath,
-              };
+          const bundleCreateArgs = ["bundle", "create", bundlePath, `${baseRef}..${branchName}`];
+          if (mode === "incremental") {
+            const defaultBranchRefResult = ensureOriginRemoteTrackingRef(defaultBranch, {
+              cwd,
+              token: options.token,
+              suppressLogs: true,
+            });
+            if (defaultBranchRefResult.exists) {
+              bundleCreateArgs.push(`^origin/${defaultBranch}`);
+              debugLog(`Strategy 1 (incremental): excluding origin/${defaultBranch} from bundle prerequisites`);
+            } else {
+              const warningMessage = `Strategy 1 (incremental): origin/${defaultBranch} not present locally and remote fetch failed (likely private repo without credentials in MCP server); bundle will include base-branch history. Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this optimisation.`;
+              debugLog(warningMessage);
+              core.warning(warningMessage);
             }
-
-            const tempWorktree = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-"));
-            // Repository hooks (post-checkout, pre-applypatch, ...) must not run for these
-            // internal synthesis operations: a repository configured for Git LFS (or any other
-            // hook requiring tooling absent from the safe-outputs environment) would otherwise
-            // fail `git worktree add` / `git am` and make a valid branch look unusable.
-            const tempHooksDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-hooks-"));
-            const noHooksArgs = ["-c", `core.hooksPath=${tempHooksDir}`];
-            try {
-              execGitSync([...noHooksArgs, "worktree", "add", "--detach", tempWorktree, baseCommitSha], { cwd });
-              execGitSync([...noHooksArgs, "am", "--3way", patchResult.patchPath], { cwd: tempWorktree });
-              execGitSync([...noHooksArgs, "bundle", "create", bundlePath, `${baseCommitSha}..HEAD`], { cwd: tempWorktree });
-            } finally {
-              try {
-                execGitSync([...noHooksArgs, "worktree", "remove", "--force", tempWorktree], { cwd });
-              } catch (removeError) {
-                debugLog(`Failed to remove temporary filtered-bundle worktree ${tempWorktree}: ${getErrorMessage(removeError)}`);
-              }
-              fs.rmSync(tempWorktree, { recursive: true, force: true });
-              fs.rmSync(tempHooksDir, { recursive: true, force: true });
-            }
-          } else {
-            const bundleCreateArgs = ["bundle", "create", bundlePath, `${baseRef}..${branchName}`];
-            if (mode === "incremental") {
-              const defaultBranchRefResult = ensureOriginRemoteTrackingRef(defaultBranch, {
-                cwd,
-                token: options.token,
-                suppressLogs: true,
-              });
-              if (defaultBranchRefResult.exists) {
-                bundleCreateArgs.push(`^origin/${defaultBranch}`);
-                debugLog(`Strategy 1 (incremental): excluding origin/${defaultBranch} from bundle prerequisites`);
-              } else {
-                const warningMessage = `Strategy 1 (incremental): origin/${defaultBranch} not present locally and remote fetch failed (likely private repo without credentials in MCP server); bundle will include base-branch history. Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this optimisation.`;
-                debugLog(warningMessage);
-                core.warning(warningMessage);
-              }
-            }
-            execGitSync(bundleCreateArgs, { cwd });
           }
+          execGitSync(bundleCreateArgs, { cwd });
 
           if (fs.existsSync(bundlePath)) {
             const stat = fs.statSync(bundlePath);

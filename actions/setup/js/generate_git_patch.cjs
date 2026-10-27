@@ -24,6 +24,7 @@ const {
   describeGitFailure,
 } = require("./git_patch_utils.cjs");
 const { normalizeCommitSHA } = require("./commit_sha_helpers.cjs");
+const { getExcludedWorkflowFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 
 // sanitizeForFilename is re-exported below for backward compatibility with
 // existing callers that imported it from this module.
@@ -483,6 +484,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
             // Record GITHUB_SHA as the base commit
             baseCommitSha = githubSha;
+            resolvedTipRef = currentHead;
 
             // Count commits between GITHUB_SHA and HEAD
             const commitCount = parseInt(execGitSync(["rev-list", "--count", `${githubSha}..HEAD`], { cwd }).trim(), 10);
@@ -572,6 +574,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
               if (bestBaseCommit) {
                 baseCommitSha = bestBaseCommit;
+                resolvedTipRef = branchName;
                 debugLog(`Strategy 3: Selected merge-base ${bestBaseCommit} with ref ${bestBaseRef} (commitCount=${bestCommitCount})`);
                 const patchContent = execGitSync(["format-patch", `${bestBaseCommit}..${branchName}`, "--stdout", ...excludeArgs()], { cwd });
 
@@ -595,6 +598,16 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
     }
   } catch (error) {
     errorMessage = `Failed to generate patch: ${getErrorMessage(error)}`;
+  }
+
+  let excludedWorkflowFiles = [];
+  if (options.excludedFiles?.length && baseCommitSha && resolvedTipRef) {
+    try {
+      const changedFiles = execGitSync(["diff", "--name-only", "--no-renames", "-z", baseCommitSha, resolvedTipRef, "--", ".github/workflows/"], { cwd }).split("\0").filter(Boolean);
+      excludedWorkflowFiles = getExcludedWorkflowFiles(changedFiles, options.excludedFiles);
+    } catch (error) {
+      return { success: false, error: `Failed to detect excluded workflow files: ${getErrorMessage(error)}`, patchPath };
+    }
   }
 
   // Check if patch was generated and has content
@@ -714,6 +727,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
       patchLines: patchLines,
       diffSize: diffSize,
       baseCommit: baseCommitSha,
+      excludedWorkflowFiles,
     };
   }
 
@@ -721,8 +735,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   debugLog(`Final: FAILED - ${errorMessage || "No changes to commit - no commits found"}`);
   return {
     success: false,
-    error: errorMessage || "No changes to commit - no commits found",
+    error: excludedWorkflowFiles.length > 0 ? `${errorMessage || "No changes remain after workflow YAML exclusions."}\n\n${WORKFLOW_COMPILATION_NOTICE}` : errorMessage || "No changes to commit - no commits found",
     patchPath: patchPath,
+    excludedWorkflowFiles,
   };
 }
 

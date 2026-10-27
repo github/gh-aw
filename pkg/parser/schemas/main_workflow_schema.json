@@ -9110,6 +9110,11 @@
                   "description": "When true (and preserve-branch-name is true), allows the handler to force-delete an existing remote branch ref and recreate it from the agent's local HEAD. When false (default), if the agent-specified branch already exists on the remote with preserve-branch-name enabled, the handler falls back (e.g. opens an issue) rather than overwriting the remote ref. Useful for long-lived reusable branches whose previous PR was merged.",
                   "default": false
                 },
+                "exclude-lock-yml": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Exclude .lock.yml files under .github/workflows from both patch and bundle transports to avoid GitHub Actions token workflow-write restrictions. When workflow YAML changes are omitted, the pull request includes a reminder to rerun gh aw compile. Other workflow YAML files are not excluded."
+                },
                 "excluded-files": {
                   "type": "array",
                   "items": {
@@ -11412,6 +11417,11 @@
                     "type": "string"
                   },
                   "description": "Exclusive allowlist of glob patterns. When set, every file in the patch must match at least one pattern \u2014 files outside the list are always refused, including normal source files. This is a restriction, not an exception: setting allowed-files: [\".github/workflows/*\"] blocks all other files. To allow multiple sets of files, list all patterns explicitly. Acts independently of the protected-files policy; both checks must pass. To modify a protected file, it must both match allowed-files and be permitted by protected-files (e.g. protected-files: allowed). Supports * (any characters except /) and ** (any characters including /)."
+                },
+                "exclude-lock-yml": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Exclude .lock.yml files under .github/workflows from both patch and bundle transports to avoid GitHub Actions token workflow-write restrictions. When workflow YAML changes are omitted, the push summary and pull request comment include a reminder to rerun gh aw compile. Other workflow YAML files are not excluded."
                 },
                 "excluded-files": {
                   "type": "array",

@@ -4,7 +4,7 @@ on:
   - cron: daily around 10:00
   skip-if-match:
     max: 3
-    query: is:issue is:open in:title "[ab-advisor] " label:experiments
+    query: is:pr is:open in:title "[ab-advisor] " label:experiments
   workflow_dispatch: null
 max-daily-ai-credits: 10000
 permissions:
@@ -17,21 +17,22 @@ network:
   allowed:
   - defaults
 imports:
+- shared/lock-safe-pull-request.md
 - shared/otlp.md
 - shared/graders.md
 safe-outputs:
-  create-issue:
-    close-older-issues: true
+  create-pull-request:
+    exclude-lock-yml: true
+    close-older-pull-requests: true
     close-older-key: ab-testing-advisor
     expires: 14d
-    group: true
     labels:
     - automation
     - experiments
     - ai-generated
     max: 2
     title-prefix: "[ab-advisor] "
-description: Daily A/B testing advisor that picks a random agentic workflow without an experiments section, devises an experiment campaign to improve it, and creates a GitHub issue with the implementation task
+description: Daily A/B testing advisor that selects a workflow without experiments and implements a validated experiment campaign pull request
 emoji: 🧪
 model: openai/gpt-6.1-sol
 engine:
@@ -54,7 +55,7 @@ features:
   gh-aw-detection: true
 evals:
   - id: experiment_issue_created
-    question: Did the agent create a GitHub issue with an A/B experiment campaign for a selected workflow?
+    question: Did the agent implement a validated A/B experiment campaign pull request for a selected workflow?
   - id: workflow_targeted
     question: Did the agent identify and target a workflow that lacks an experiments section?
 
@@ -104,7 +105,7 @@ grep -rl 'experiments:' .github/workflows/*.md 2>/dev/null || echo "none"
 grep -rL 'experiments:' .github/workflows/*.md 2>/dev/null | grep -v shared | sort
 ```
 
-From the list of workflows **without** an `experiments:` section, pick one at random — **excluding any workflow whose basename appears in the `recently_analyzed` list above** — and store the chosen path in `SELECTED`:
+From the list of workflows **without** an `experiments:` section, pick one at random — **excluding workflows with a `source:` provenance entry or a basename in `recently_analyzed`** — and store the chosen path in `SELECTED`. Apply these exclusions to every selection command below:
 
 ```bash
 SELECTED=$(grep -rL 'experiments:' .github/workflows/*.md 2>/dev/null | grep -v shared | shuf -n 1)
@@ -181,9 +182,9 @@ For the chosen dimension, define:
 
 Design 2–3 specific variant values for the `experiments:` YAML field. Keep names lowercase with underscores (e.g., `prompt_style: [concise, detailed, step_by_step]`).
 
-### Step 4 — Create a GitHub Issue
+### Step 4 — Implement the Campaign and Create a Pull Request
 
-Create a GitHub issue with:
+Implement the experiment configuration, paired evals, and conditional prompt branches in the selected workflow. Compile that workflow, verify both variants, commit locally, then call `create_pull_request` with:
 
 **Title**: `Experiment campaign for <workflow-name>: A/B test <dimension>`
 
@@ -225,7 +226,6 @@ experiments:
     min_samples: <n_per_variant>
     weight: [50, 50]
     start_date: "<YYYY-MM-DD>"
-    issue: <this_issue_number>
 ```
 
 Add the paired eval to the workflow's `evals:` section (create it if the workflow doesn't have one yet):
@@ -282,7 +282,7 @@ Show the concrete before/after diff.
 
 ## Step 5 — Update Cache Memory
 
-After creating the campaign issue, record the selected workflow in the recently-analyzed cache to prevent it from being picked again in the next 14 runs:
+After staging the campaign pull request, record the selected workflow in the recently-analyzed cache to prevent it from being picked again in the next 14 runs:
 
 ```bash
 mkdir -p /tmp/gh-aw/cache-memory/ab-testing-advisor
@@ -303,7 +303,7 @@ echo "✅ Cache updated — recently analyzed: $(echo "$UPDATED" | jq -r '.recen
 
 ## Side Quest: Improve the Experiment Infrastructure
 
-After completing the primary quest, include a **second issue** (sub-issue of the first) proposing improvements to the experiments infrastructure.
+After completing the primary quest, implement at most one independent, verified experiment-infrastructure improvement in a **second pull request**. Skip speculative or already-supported changes; do not create sub-issues or empty proposal-only pull requests.
 
 Use the `field-presence-checker` agent with file paths `pkg/workflow/compiler_experiments.go` and `actions/setup/js/pick_experiment.cjs`, and field names `analysis_type`, `tags`, `notify`. Use the returned `present`/`evidence` results when deciding which fields are genuinely absent.
 
@@ -337,7 +337,7 @@ Using the `field-presence-checker` results, check whether the following **genuin
 - **`tags`** — free-form labels for filtering experiments in dashboards
 - **`notify`** — destination for significance alerts when an experiment concludes (e.g., discussion, issue comment)
 
-**Only create the sub-issue if** at least one of these three fields is genuinely absent from the compiler and `pick_experiment.cjs`. If all three are already fully implemented and surfaced in run artifacts, skip the sub-issue and note in the campaign issue body that infrastructure is complete.
+**Only implement the second pull request if** at least one of these three fields is genuinely absent from the compiler and `pick_experiment.cjs`. If all three are implemented and surfaced in run artifacts, skip it and note in the campaign PR body that infrastructure is complete.
 
 ### Area 2: Reporting & Dashboards
 
@@ -357,20 +357,20 @@ Propose how experiments should integrate with `gh aw audit` and OTEL observabili
 - Compare the Working-Set Rebuild Factor (`working_set.rebuild_factor` in `gh aw audit` output) across variants to detect context-efficiency regressions alongside cost and quality metrics
 - Add experiment metadata to the step summary generated by `pick_experiment.cjs`
 
-**Create the sub-issue with title**: `[ab-advisor] Improve experiment infrastructure: schema, reporting & audit`
+**Title for a validated infrastructure pull request**: `[ab-advisor] Improve experiment infrastructure: schema, reporting & audit`
 
 ---
 
 ## Output Constraints
 
-- Create **exactly 2 issues** total when the sub-issue is warranted (see Area 1 gate above): one for the experiment campaign, one sub-issue for infrastructure improvements
-- If the Area 1 gate determines all three fields (`analysis_type`, `tags`, `notify`) are fully implemented, create **only 1 issue** (the campaign) and note infrastructure is complete
-- Use `###` headers (never `##` or `#`) inside issue bodies
-- Wrap long analysis sections in `<details><summary>View Details</summary>` tags to keep the issue body scannable.
+- Create **at most 2 validated pull requests**: one experiment campaign and, only when warranted by Area 1, one independent infrastructure fix
+- If all three fields (`analysis_type`, `tags`, `notify`) are implemented, create only the campaign PR and note infrastructure is complete
+- Use `###` headers (never `##` or `#`) inside pull request bodies
+- Wrap long analysis sections in `<details><summary>View Details</summary>` tags
 - Be specific and actionable — include concrete YAML snippets and diff-style changes
-- The experiment campaign issue title must clearly identify the workflow and dimension
-- Do not create issues for workflows that already have `experiments:` defined
-- If all eligible workflows are filtered out (all have experiments), create a single issue celebrating this and suggesting advanced multi-experiment designs
+- The campaign PR title must identify the workflow and dimension
+- Do not modify workflows that already have `experiments:` or declare upstream-managed `source:`
+- If no eligible workflow remains, call `noop` rather than creating an empty celebration PR
 ## agent: `workflow-characterizer`
 ---
 description: Read a selected workflow file and return a concise structured characterization for experiment design
