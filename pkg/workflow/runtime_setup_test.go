@@ -579,6 +579,13 @@ func TestNodeSetupSteps_ActionPins(t *testing.T) {
 	}{
 		{name: "workflow setup for detection and evals", generate: generateNodeJsSetupStepForWorkflow},
 		{name: "default setup", generate: generateNodeJsSetupStep},
+		{name: "npm engine installation", generate: func(data *WorkflowData) GitHubActionStep {
+			data.Runtimes = map[string]any{"node": map[string]any{"version": "22"}}
+			steps := buildStandardNpmEngineInstallSteps("test-cli", "1.0.0", "Install CLI", "test-cli", data, true)
+			require.NotEmpty(t, steps)
+			assert.Contains(t, steps[0], "          node-version: '"+string(constants.DefaultNodeVersion)+"'")
+			return steps[0]
+		}},
 		{name: "existing installation step", generate: func(data *WorkflowData) GitHubActionStep {
 			return applyNodeSetupOverrides([]GitHubActionStep{GenerateNodeJsSetupStep()}, data)[0]
 		}},

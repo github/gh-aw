@@ -229,17 +229,18 @@ func buildStandardNpmEngineInstallSteps(
 		stepName,
 		cacheKeyPrefix,
 		NPMInstallOptions{
-			IncludeNodeSetup:  true,
+			IncludeNodeSetup:  false,
 			RunInstallScripts: false,
 			CooldownEnabled:   cooldownEnabled,
 		},
 	)
+	steps = append([]GitHubActionStep{generateNodeJsSetupStep(workflowData)}, steps...)
 	if isNVXRuntime(workflowData) {
 		steps = append(steps, GenerateMicroVMNpmCLIInstallStep(
 			packageName, version, stepName+" in microVM path", cacheKeyPrefix, false, cooldownEnabled,
 		))
 	}
-	return applyNodeSetupOverrides(steps, workflowData)
+	return steps
 }
 
 // BuildNpmEngineInstallStepsWithAWF injects an AWF installation step between the Node.js
