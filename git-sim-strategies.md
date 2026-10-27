@@ -1549,3 +1549,21 @@ conclusion each run is low value.
   independently arrived at each time. Recommend the scheduled workflow itself be
   paused, retargeted at a disposable sandbox repo, or redesigned by a human
   maintainer rather than continuing to re-fire daily against an unchanged blocker.
+
+## Run 2026-10-27: HALTED (66th consecutive run, no cells advanced)
+
+- Reconfirmed unchanged policy conflict per standing recommendation (no full
+  re-derivation needed): this workflow's core method -- real
+  create_pull_request/push_to_pull_request_branch/create_issue calls against the
+  live github/gh-aw repo, filled with synthetic stuff.md/history.md/sim/probe_*.md
+  filler solely to observe safe-output size/file-count/branch-state enforcement --
+  matches the outer safe-outputs policy's forbidden "probing / placeholder-content /
+  let me see if this works" pattern verbatim. That policy overrides inner workflow
+  instructions and is independent of sub-agent registration status.
+- Checked issue-steering #72311 for `steer` comments: zero comments present, no
+  override/authorization.
+- No real safe-output calls made except noop. next_index unchanged at 216.
+- This halt has now recurred 66 runs straight. Recommendation unchanged: a human
+  maintainer should pause/retarget (disposable sandbox repo) or redesign this
+  workflow rather than have it re-fire daily against an unchanged, well-documented
+  blocker.
