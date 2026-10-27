@@ -47,14 +47,14 @@ describe("Unified conclusion session", () => {
       safeJobNames: '["publish","archive"]',
       jobResults: JSON.stringify({
         agent: { result: "success", outputs: { url: "https://example.com/untrusted" } },
-        publish: { result: "success", outputs: { status: "success", url: "https://example.com/resources/42?access_token=URL_TOKEN#signature", secret: "PRIVATE" } },
+        publish: { result: "success", outputs: { status: "success", url: "https://github.com/owner/repo/issues/42?access_token=URL_TOKEN#signature", secret: "PRIVATE" } },
         archive: { result: "success", outputs: { url: "s3://bucket/resource" } },
       }),
     });
     const outcomes = events.filter(event => event.type === "safe_output.result");
     expect(outcomes.map(event => event.data)).toEqual([
-      { type: "archive", status: "success", url: "s3://bucket/resource" },
-      { type: "publish", status: "success", url: "https://example.com/resources/42" },
+      { type: "archive", status: "success" },
+      { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/42" },
     ]);
     expect(outcomes.every(event => event.provenance.component === "safe_output" && event.provenance.phase === "safe_outputs")).toBe(true);
     expect(JSON.stringify(outcomes)).not.toContain("PRIVATE");
@@ -73,8 +73,8 @@ describe("Unified conclusion session", () => {
   it("publishes safe job and script outcomes together in the canonical session", () => {
     process.env.GH_AW_SAFE_JOB_NAMES = '["publish"]';
     process.env.GH_AW_JOB_RESULTS = JSON.stringify({ agent: { result: "success" }, publish: { result: "success" } });
-    process.env.GH_AW_SAFE_JOB_RESULTS = JSON.stringify({ publish: { result: "success", outputs: { url: "https://example.com/resources/job" } } });
-    write("safe-output-items.jsonl", [{ type: "notify", status: "success", url: "https://example.com/resources/script" }]);
+    process.env.GH_AW_SAFE_JOB_RESULTS = JSON.stringify({ publish: { result: "success", outputs: { url: "https://github.com/owner/repo/issues/43" } } });
+    write("safe-output-items.jsonl", [{ type: "notify", status: "success", url: "https://github.com/owner/repo/issues/42" }]);
     const outputPath = path.join(root, "usage/aw_session.jsonl");
     writeUnifiedSession({ rootDir: root, outputPath });
     const events = fs
@@ -83,8 +83,8 @@ describe("Unified conclusion session", () => {
       .split("\n")
       .map(line => JSON.parse(line));
     expect(events.filter(event => event.type === "safe_output.result").map(event => event.data)).toEqual([
-      { type: "notify", status: "success", url: "https://example.com/resources/script" },
-      { type: "publish", status: "success", url: "https://example.com/resources/job" },
+      { type: "notify", status: "success", url: "https://github.com/owner/repo/issues/42" },
+      { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/43" },
     ]);
     expect(validateSession(fs.readFileSync(outputPath, "utf8"))).toBe(events.length);
     expect(events.filter(event => event.type === "workflow.job_result").map(event => event.data.jobId)).toEqual(["agent", "publish"]);

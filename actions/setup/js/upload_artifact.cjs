@@ -796,6 +796,7 @@ async function main(config = {}) {
 
     const result = {
       success: true,
+      staged: isStaged,
       tmpId,
       temporaryId: tmpId,
       artifactName,

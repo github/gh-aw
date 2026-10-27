@@ -461,7 +461,7 @@ engine:
           "firewall.http_access", "firewall.token_usage", "firewall.model_routing",
           "firewall.upstream_error", "firewall.steering", "firewall.event", "model_routing.outcome",
           "model_endpoint.mismatch", "model.resolution", "model.config", "model.baseline_estimate",
-          "safe_output.request", "safe_output.result", "safe_output.error",
+          "safe_output.request", "safe_output.result", "safe_output.outcome", "safe_output.error",
           "experiment.state", "experiment.assignment", "grader.manifest", "grader.result",
           "eval.result", "github_api.rate_limit", "usage.report", "execution.result",
           "guardrail.admission", "guardrail.daily_aic", "guard.tool_denials_exceeded", "workflow.info", "workflow.job_result", "memory.push",

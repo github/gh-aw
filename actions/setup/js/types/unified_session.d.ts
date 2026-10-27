@@ -379,13 +379,13 @@ export interface SafeOutputData {
   identifier?: JsonValue;
   url?: JsonValue;
   status?: JsonValue;
-  message?: JsonValue;
-  error?: JsonValue;
   errorCode?: JsonValue;
+  messageIndex?: number;
+  staged?: boolean;
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {
-  errors?: (SafeOutputData | string | number | boolean | null | JsonValue[])[];
+  errors?: SafeOutputData[];
 }
 
 export interface ExperimentStateData {
@@ -757,6 +757,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
   "safe_output.result": SafeOutputData;
+  "safe_output.outcome": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;

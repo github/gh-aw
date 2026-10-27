@@ -57,10 +57,10 @@ const trace = [
 
 describe("unified session publication views", () => {
   it("renders safe-output execution status alongside its canonical resource URI", () => {
-    const events = [header, event("safe_output.result", { type: "publish", status: "success", url: "https://example.com/resources/42" }, "safe_output", 0)];
+    const events = [header, event("safe_output.result", { type: "publish", status: "success", url: "https://github.com/owner/repo/issues/42" }, "safe_output", 0)];
     for (const output of [generatePlainTextSummary(events), generateCopilotCliStyleSummary(events), generateConversationMarkdown(events, { formatToolCallback: formatToolUse, formatInitCallback: formatInitializationSummary }).markdown]) {
       expect(output).toContain("status=success");
-      expect(output).toContain("https://example.com/resources/42");
+      expect(output).toContain("https://github.com/owner/repo/issues/42");
     }
   });
 

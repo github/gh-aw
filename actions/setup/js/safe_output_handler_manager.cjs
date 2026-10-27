@@ -15,6 +15,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
+const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
@@ -28,7 +29,16 @@ const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveAllowedMentionsFromPayload } = require("./resolve_mentions_from_payload.cjs");
 const { getDefaultTargetRepo, parseRepoSlug } = require("./repo_helpers.cjs");
-const { createManifestLogger, ensureManifestExists, extractCreatedItemFromResult, writeTemporaryIdMapFile, writeSafeOutputErrorReport, SAFE_OUTPUT_ERRORS_FILE_PATH, CLAIM_DELIVERY_ERRORS_FILE_NAME } = require("./safe_output_manifest.cjs");
+const {
+  createManifestLogger,
+  ensureManifestExists,
+  extractCreatedItemFromResult,
+  writeTemporaryIdMapFile,
+  writeSafeOutputErrorReport,
+  writeSafeOutputOutcomes,
+  SAFE_OUTPUT_ERRORS_FILE_PATH,
+  CLAIM_DELIVERY_ERRORS_FILE_NAME,
+} = require("./safe_output_manifest.cjs");
 const { loadCustomSafeOutputJobTypes, loadCustomSafeOutputScriptHandlers, loadCustomSafeOutputActionHandlers, isStagedMode } = require("./safe_output_helpers.cjs");
 const { emitSafeOutputActionOutputs } = require("./safe_outputs_action_outputs.cjs");
 const { listCommentMemoryFiles, COMMENT_MEMORY_DIR } = require("./comment_memory_helpers.cjs");
@@ -2114,6 +2124,8 @@ async function main(options = {}) {
   /** @type {Array<{type?: string, errorCode?: string, error?: string}>} */
   let failureDetails = [];
   let statusOutputsSet = false;
+  /** @type {any[]} */
+  let outcomeResults = [];
 
   try {
     core.info("Safe Output Handler Manager starting...");
@@ -2168,6 +2180,8 @@ async function main(options = {}) {
     const messageHandlers = await loadHandlers(config, prReviewBufferRegistry, undefined, activationCommentLinks);
 
     if (messageHandlers.size === 0) {
+      const delegatedTypes = new Set([...STANDALONE_STEP_TYPES, ...loadCustomSafeOutputJobTypes()]);
+      outcomeResults = allMessages.map((message, messageIndex) => ({ type: message.type, messageIndex, skipped: true, delegated: delegatedTypes.has(message.type) }));
       core.info("No handlers loaded - nothing to process");
       // Ensure manifest file exists even when no handlers are loaded (skip in staged mode)
       if (!isStaged) ensureManifestExists();
@@ -2189,6 +2203,7 @@ async function main(options = {}) {
 
     // Process all messages in order of appearance
     const processingResult = await processMessages(messageHandlers, allMessages, logCreatedItem);
+    outcomeResults = processingResult.results;
     await finalizeLedgerAppend(config, messageHandlers);
 
     // Finalize buffered PR reviews — one review submission per distinct PR
@@ -2214,6 +2229,7 @@ async function main(options = {}) {
           }
           const reviewResult = await reviewBuffer.submitReview();
           if (reviewResult.success && !reviewResult.skipped) {
+            finalizeBufferedReviewOutcomes(processingResult.results, reviewRepo, reviewPrNum, reviewResult);
             logCreatedItemFromResult(logCreatedItem, "submit_pull_request_review", reviewResult);
             logCreatedItemFromResult(
               logCreatedItem,
@@ -2445,6 +2461,11 @@ async function main(options = {}) {
     core.setFailed(handlerError);
     return undefined;
   } finally {
+    try {
+      writeSafeOutputOutcomes(outcomeResults, isStaged);
+    } catch {
+      core.warning("Safe-output application outcomes could not be persisted");
+    }
     // Guarantee the manifest file exists for artifact upload even when the handler fails.
     // This is a no-op if the file was already created by createManifestLogger().
     if (!isStaged) {
