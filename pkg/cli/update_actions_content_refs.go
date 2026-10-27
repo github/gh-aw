@@ -178,7 +178,7 @@ func parseFrontmatterKey(trimmed string) (string, bool) {
 	if trimmed == "" {
 		return "", false
 	}
-	if quote := trimmed[0]; quote == '\'' || quote == '"' {
+	if strings.HasPrefix(trimmed, "'") || strings.HasPrefix(trimmed, `"`) {
 		key, rest, ok := cutQuotedYAMLScalar(trimmed)
 		if !ok || !strings.HasPrefix(strings.TrimLeft(rest, " \t"), ":") {
 			return "", false
@@ -198,6 +198,9 @@ func parseFrontmatterKey(trimmed string) (string, bool) {
 // and unicode escapes such as \n or \uXXXX are not, since frontmatter keys and repository
 // references never contain them.
 func cutQuotedYAMLScalar(value string) (string, string, bool) {
+	if value == "" {
+		return "", "", false
+	}
 	quote := value[0]
 	var body strings.Builder
 	for i := 1; i < len(value); i++ {
@@ -327,7 +330,7 @@ func yamlValueEnd(line string) int {
 			case '\'', '"':
 				quote = current
 			case '#':
-				if i == 0 || line[i-1] == ' ' || line[i-1] == '\t' {
+				if i == 0 || strings.HasSuffix(line[:i], " ") || strings.HasSuffix(line[:i], "\t") {
 					return i
 				}
 			}
@@ -349,10 +352,11 @@ func yamlValueEnd(line string) int {
 }
 
 func isBackslashEscaped(value string, index int) bool {
-	backslashes := 0
-	for index--; index >= 0 && value[index] == '\\'; index-- {
-		backslashes++
+	if index <= 0 || index > len(value) {
+		return false
 	}
+	prefix := value[:index]
+	backslashes := len(prefix) - len(strings.TrimRight(prefix, `\`))
 	return backslashes%2 == 1
 }
 
@@ -392,10 +396,46 @@ func updateSkillRefValue(
 	return true, spec + "@" + latestRef, nil
 }
 
+func actionUpdateCurrentVersion(ref, comment string) string {
+	if !IsCommitSHA(ref) {
+		return ref
+	}
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(comment), "#"))
+}
+
 //nolint:largefunc
 func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDeps, content string, cache map[string]latestReleaseResult, coolDownCache map[string]coolDownCheckResult, allowMajor, verbose bool, coolDown time.Duration) (bool, string, error) {
 	changed := false
 	lines := strings.Split(content, "\n")
+	resolutions := make(map[string]*cachedLatestRelease)
+	var jobs []func()
+	for _, line := range lines {
+		match := actionRefPattern.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		repo := match[2]
+		effectiveAllowMajor := allowMajor || isCoreAction(repo)
+		if !effectiveAllowMajor {
+			continue
+		}
+		currentVersion := actionUpdateCurrentVersion(match[3], match[4])
+		key := repo + "|" + currentVersion
+		if _, found := cache[key]; found {
+			continue
+		}
+		if _, found := resolutions[key]; found {
+			continue
+		}
+		result := &cachedLatestRelease{}
+		resolutions[key] = result
+		jobs = append(jobs, func() {
+			result.version, result.sha, result.err = deps.getLatestRelease(ctx, repo, currentVersion, effectiveAllowMajor, verbose)
+		})
+	}
+	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
+		return false, content, err
+	}
 
 	for i, line := range lines {
 		match := actionRefPattern.FindStringSubmatchIndex(line)
@@ -424,32 +464,19 @@ func updateActionRefsInContentWithDeps(ctx context.Context, deps actionUpdateDep
 
 		// Determine the "current version" to pass to the latest-release resolver.
 		isSHA := IsCommitSHA(ref)
-		currentVersion := ref
-		if isSHA {
-			// Extract version from comment (e.g., " # v6.0.2" -> "v6.0.2")
-			if comment != "" {
-				commentVersion := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(comment), "#"))
-				if commentVersion != "" {
-					currentVersion = commentVersion
-				} else {
-					currentVersion = ""
-				}
-			} else {
-				currentVersion = ""
-			}
-		}
+		currentVersion := actionUpdateCurrentVersion(ref, comment)
 
 		// Resolve latest version/SHA, using the cache to avoid redundant API calls.
 		// Use "|" as separator since GitHub repo names cannot contain "|".
 		cacheKey := repo + "|" + currentVersion
 		result, cached := cache[cacheKey]
 		if !cached {
-			latestVersion, latestSHA, err := deps.getLatestRelease(ctx, repo, currentVersion, effectiveAllowMajor, verbose)
-			if err != nil {
-				updateLog.Printf("Failed to get latest release for %s: %v", repo, err)
+			resolution := resolutions[cacheKey]
+			if resolution.err != nil {
+				updateLog.Printf("Failed to get latest release for %s: %v", repo, resolution.err)
 				continue
 			}
-			result = latestReleaseResult{version: latestVersion, sha: latestSHA}
+			result = latestReleaseResult{version: resolution.version, sha: resolution.sha}
 			cache[cacheKey] = result
 		}
 		latestVersion := result.version

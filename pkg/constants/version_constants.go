@@ -7,7 +7,7 @@ package constants
 //
 // Example usage:
 //
-//	const DefaultCopilotVersion Version = "1.0.101"
+//	const DefaultCopilotVersion Version = "1.0.103"
 //	func InstallTool(name string, version Version) error { ... }
 type Version string
 
@@ -32,18 +32,20 @@ func (v Version) IsValid() bool {
 type ModelName string
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.300"
+const DefaultClaudeCodeVersion Version = "2.1.310"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // When unpinning or upgrading this version, verify:
 //   - MCPs are not blocked from loading (tools.mcp configuration still works end-to-end)
 //   - /models does not silently fail on PATs (check that model listing works with PAT auth)
-const DefaultCopilotVersion Version = "1.0.101"
+const DefaultCopilotVersion Version = "1.0.103"
 
 // DefaultCopilotChecksumsSHA256 authenticates DefaultCopilotVersion's SHA256SUMS.txt.
 // Update both constants with scripts/update-copilot-version.sh after reviewing the release pin.
-const DefaultCopilotChecksumsSHA256 = "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
+// Reviewed 2026-10-26 against GitHub API metadata for mutable release asset 666400170:
+// https://api.github.com/repos/github/copilot-cli/releases/assets/666400170
+const DefaultCopilotChecksumsSHA256 = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
 
 // CopilotSessionIDMinVersion is the minimum Copilot CLI version that supports
 // the exact session selector injected by the model-verification harness.
@@ -53,7 +55,7 @@ const CopilotSessionIDMinVersion Version = "1.0.35"
 const DefaultCopilotSDKVersion Version = "1.0.16"
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
-const DefaultCodexVersion Version = "0.163.0"
+const DefaultCodexVersion Version = "0.164.0"
 
 // DefaultGeminiVersion is the default version of the Google Gemini CLI
 const DefaultGeminiVersion Version = "0.64.0"
@@ -63,10 +65,10 @@ const DefaultAgyVersion Version = "1.3.6"
 const AgyDefaultModel = "gemini-3.8-flash-medium"
 
 // DefaultPiVersion is the default version of the Pi CLI
-const DefaultPiVersion Version = "1.3.0"
+const DefaultPiVersion Version = "1.4.0"
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
-const DefaultGitHubMCPServerVersion Version = "v2.0.2"
+const DefaultGitHubMCPServerVersion Version = "v2.0.3"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
 //
@@ -76,7 +78,10 @@ const DefaultGitHubMCPServerVersion Version = "v2.0.2"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.28.70"
+const DefaultFirewallVersion Version = "v0.29.0"
+
+// AWFProtectedCommandOutputMinVersion supports native, isolated command output capture.
+const AWFProtectedCommandOutputMinVersion Version = "v0.28.67"
 
 // AWFFallbackModelsMinVersion is the first AWF release with ordered request-level fallback.
 const AWFFallbackModelsMinVersion Version = "v0.28.31"
@@ -261,7 +266,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.4.37"
+const DefaultMCPGatewayVersion Version = "v0.5.0"
 
 // MCPGIntegrityReactionsMinVersion is the minimum MCPG version that supports
 // endorsement-reactions and disapproval-reactions in the allow-only policy.

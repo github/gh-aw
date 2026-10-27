@@ -36,6 +36,7 @@ describe("safe_output_action_handler", () => {
       const result = await handler(message, {}, new Map());
 
       expect(result.success).toBe(true);
+      expect(result.delegated).toBe(true);
       expect(result.action_name).toBe("add_label");
 
       // 'type' (an INTERNAL_MESSAGE_FIELDS member) must be stripped from the exported payload

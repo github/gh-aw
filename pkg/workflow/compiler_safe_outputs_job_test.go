@@ -568,7 +568,7 @@ func TestCompileSafeOutputsTimeoutMinutesFromFrontmatter(t *testing.T) {
 		expectedTimeout string
 	}{
 		{
-			name: "default timeout is 45 minutes",
+			name: "API-only default timeout is capped at 15 minutes",
 			frontmatter: `---
 on:
   workflow_dispatch: {}
@@ -580,7 +580,7 @@ safe-outputs:
 ---
 # Test
 `,
-			expectedTimeout: "timeout-minutes: 45",
+			expectedTimeout: "timeout-minutes: 15",
 		},
 		{
 			name: "custom timeout of 30 minutes from frontmatter",
@@ -1851,6 +1851,7 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.Contains(t, content, "Upload Safe Outputs Items")
 	assert.Contains(t, content, "if: always()")
 	assert.Contains(t, content, "/tmp/gh-aw/safe-output-items.jsonl")
+	assert.Contains(t, content, "/tmp/gh-aw/safe-output-outcomes.jsonl")
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
 }
@@ -1884,6 +1885,7 @@ func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.
 			require.NotContains(t, content, "/tmp/gh-aw/claims/*/delivery-receipt.json")
 			if test.worker {
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-items.jsonl")
+				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-outcomes.jsonl")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/temporary-id-map.json")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/safe-output-errors.json")
 				require.Contains(t, content, "/tmp/gh-aw/claims/*/claim-delivery-errors.json")

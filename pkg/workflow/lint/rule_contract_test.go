@@ -34,6 +34,18 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"bash-case-pattern": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    steps:\n      - run: 'matched=$(case \"$ref\" in $pattern) echo yes ;; esac)'\n",
+			safe:   contractJob + "    steps:\n      - run: 'matched=$(case \"$ref\" in ($pattern) echo yes ;; esac)'\n",
+			path:   "jobs.check.steps[0].run",
+		},
+		"step-reference": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: contractJob + "    outputs: {value: '${{ steps.PRIVATE_VALUE.outputs.value }}'}\n" + contractSafeSteps,
+			safe:   contractJob + "    outputs: {value: '${{ steps.producer.outputs.value }}'}\n    steps: [{id: producer, run: echo public}]\n",
+			path:   "jobs.check.outputs.value",
+		},
 		"needs-consistency": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: "jobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo build}]\n  check:\n    runs-on: ubuntu-latest\n    if: needs.build.result == 'success'\n    steps: [{run: echo check}]\n",

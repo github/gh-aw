@@ -251,6 +251,8 @@ func permitted(role, kind string) bool {
 	switch kind {
 	case "Policy":
 		return role == "administrator" || role == "producer" || role == "dispatcher"
+	case "PoolInstall":
+		return role == "administrator" || role == "producer" || role == "dispatcher"
 	case "Control", "Checkpoint":
 		return role == "administrator"
 	case "Deployment":
@@ -288,7 +290,7 @@ func validateRequest(commit QueueCommit) error {
 		return err
 	}
 	kinds := map[string][]string{
-		"policy": {"Policy"}, "deployment": {"Deployment"}, "control": {"Control", "WorkPriority"}, "submit": {"Policy", "Work"},
+		"policy": {"Policy"}, "pool_install": {"PoolInstall"}, "deployment": {"Deployment"}, "control": {"Control", "WorkPriority"}, "submit": {"Policy", "Work"},
 		"dispatch_next": {"Observation", "Claim"}, "finish": {"Completion", "ClaimCancellation", "WorkCancellation"},
 		"observe": {"Observation"}, "dispatch": {"Dispatch"}, "release": {"ClaimCancellation", "WorkCancellation", "Release"},
 		"result": {"Result"}, "delivery_failure": {"DeliveryFailure"},

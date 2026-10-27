@@ -3,11 +3,16 @@ import { describe, expect, it } from "vitest";
 import checks from "./work_queue_claim_scope_checks.cjs";
 import { normalizeAssignment } from "./work_queue_claim_scope.cjs";
 import { digest } from "./work_queue_codec.cjs";
-import { validateDeliveryContract, verifyClaimDelivery, verifyBuiltinDeliveryOutput } from "./work_queue_delivery.cjs";
+import { createClaimDeliveryVerifier, validateDeliveryContract, verifyClaimDelivery, verifyBuiltinDeliveryOutput } from "./work_queue_delivery.cjs";
 
 checks.registerTests({ describe, it });
 
 describe("historical diagnostic delivery contracts", () => {
+  it("uses standardized codes for invalid verifier configuration", () => {
+    const original = assignment([{ type: "create_issue", min: 1, max: 1 }]);
+    expect(() => createClaimDeliveryVerifier({ assignment: original })).toThrow(/^ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED:/);
+  });
+
   const assignment = outputs =>
     normalizeAssignment({
       version: 3,
@@ -28,6 +33,10 @@ describe("historical diagnostic delivery contracts", () => {
       results: messages.map((_, messageIndex) => ({ messageIndex, success: true, result: { number: 42 } })),
       ...options,
     });
+
+  it("requires independent delivery readback with a stable error code", () => {
+    expect(() => createClaimDeliveryVerifier({ assignment: assignment([]) })).toThrow("ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED: Claim delivery verifier requires trusted independent readback");
+  });
 
   for (const legacy of ["missing_tool", "missing_data"]) {
     const canonical = `report_${legacy}`;

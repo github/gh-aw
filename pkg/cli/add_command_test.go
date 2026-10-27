@@ -159,6 +159,7 @@ func TestAddCommandAutoMergePropagation(t *testing.T) {
 				return nil, enableErr
 			}
 			cmd := NewAddCommand(validateEngineStub)
+			cmd.SetContext(context.Background())
 			for _, flag := range []string{prFlag, "auto-merge", "no-gitattributes"} {
 				require.NoError(t, cmd.Flags().Set(flag, "true"))
 			}

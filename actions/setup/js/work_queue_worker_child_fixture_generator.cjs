@@ -23,6 +23,7 @@ function buildFixtures() {
   const base = structuredClone(source.commits.slice(0, 8));
   const policy = base[0].operations[0].policy;
   policy.accounting_weights = { "": 1, tenant: 7 };
+  delete policy.authorization;
   policy.producers = { "11": { pools: ["default"], priorities: [1], fairness_keys: ["tenant"] } };
   policy.pools.default.profiles.default.principal = "22";
   policy.pools.other = structuredClone(policy.pools.default);

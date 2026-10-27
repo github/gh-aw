@@ -18,7 +18,6 @@ copy_optional_file() {
 }
 
 mkdir -p "${PROMPT_DETECTION_DIR}"
-rm -f "${SOURCE_DIR}/agent_usage.json"
 
 copy_optional_file "${PROMPT_SOURCE_DIR}/prompt.txt" "${PROMPT_DETECTION_DIR}/prompt.txt"
 if [ ! -s "${PROMPT_DETECTION_DIR}/prompt.txt" ]; then

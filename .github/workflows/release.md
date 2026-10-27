@@ -615,7 +615,7 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Download release binaries
         uses: actions/download-artifact@v8.0.2

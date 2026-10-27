@@ -118,6 +118,7 @@ func (m *Miner) findBestMatchingCluster(tokens []string) (*MatchResult, bool) {
 func (m *Miner) prepare(evt AgentEvent) ([]string, error) {
 	tokens := Tokenize(m.masker.Mask(FlattenEvent(evt, m.cfg.ExcludeFields)))
 	if len(tokens) == 0 {
+		minerLog.Printf("prepare: stage=%s produced zero tokens after masking", evt.Stage)
 		return nil, errors.New("agentdrain: empty event after masking")
 	}
 	return tokens, nil

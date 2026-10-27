@@ -99,6 +99,20 @@ const safeOutputsFiles = parseSetupShArray("SAFE_OUTPUTS_FILES");
 // Its deps must also be covered by SAFE_OUTPUTS_FILES
 const safeOutputsRoots = [...safeOutputsFiles, "safe-outputs-mcp-server.cjs"];
 
+describe("work queue pool-install packaging", () => {
+  it.each([
+    ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
+    ["SAFE_OUTPUTS_FILES", safeOutputsFiles],
+  ])("deploys the pool-install module in %s", (_name, files) => {
+    expect(files).toContain("work_queue_pool_install.cjs");
+  });
+
+  it("embeds the pool-install module for standalone bundles", () => {
+    const sources = readFileSync(resolve(__dirname, "../session_parsers.go"), "utf8");
+    expect(sources).toMatch(/^\/\/go:embed .*js\/work_queue_pool_install\.cjs(?:\s|$)/m);
+  });
+});
+
 describe("setup.sh isolated redaction dependencies", () => {
   it.each([
     ["MCP_SCRIPTS_FILES", mcpScriptsFiles],

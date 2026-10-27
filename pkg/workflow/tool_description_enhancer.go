@@ -122,9 +122,9 @@ func formatStringList(items []string) string {
 	if len(items) == 0 {
 		return "[]"
 	}
-	quoted := make([]string, len(items))
-	for i, item := range items {
-		quoted[i] = fmt.Sprintf("%q", item)
+	quoted := make([]string, 0, len(items))
+	for _, item := range items {
+		quoted = append(quoted, fmt.Sprintf("%q", item))
 	}
 	return "[" + strings.Join(quoted, " ") + "]"
 }
@@ -189,8 +189,11 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 	}
 
 	toolDescriptionEnhancerLog.Printf("Added %d constraints to tool description: tool=%s", len(constraints), toolName)
-	// Add constraints as a new paragraph at the end of the description
-	return baseDescription + " CONSTRAINTS: " + strings.Join(constraints, " ")
+	constraintText := strings.Join(constraints, " ")
+	if strings.Contains(baseDescription, "CONSTRAINTS:") {
+		return baseDescription + " " + constraintText
+	}
+	return baseDescription + " CONSTRAINTS: " + constraintText
 }
 
 func buildToolDescriptionConstraints(toolName string, safeOutputs *SafeOutputsConfig) []string {
@@ -448,9 +451,9 @@ func replaceLabelConstraints(config *ReplaceLabelConfig) []string {
 	return buildConstraints(config, func(config *ReplaceLabelConfig, constraints *[]string) {
 		appendMaxConstraint(constraints, config.Max, "Maximum %d label replacement(s) allowed.")
 		if len(config.AllowedTransitions) > 0 {
-			pairs := make([]string, len(config.AllowedTransitions))
-			for i, transition := range config.AllowedTransitions {
-				pairs[i] = fmt.Sprintf("%q → %q", transition.From, transition.To)
+			pairs := make([]string, 0, len(config.AllowedTransitions))
+			for _, transition := range config.AllowedTransitions {
+				pairs = append(pairs, fmt.Sprintf("%q → %q", transition.From, transition.To))
 			}
 			*constraints = append(*constraints, fmt.Sprintf("Only these label transitions are allowed: %s.", formatStringList(pairs)))
 		}

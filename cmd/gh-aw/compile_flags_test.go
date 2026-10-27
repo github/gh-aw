@@ -47,15 +47,15 @@ func TestCompileCommandShortFlags(t *testing.T) {
 	}
 }
 
-func TestCompileSkipLintFlag(t *testing.T) {
+func TestCompileNoLintFlag(t *testing.T) {
 	t.Parallel()
-	flag := compileCmd.Flags().Lookup("skip-lint")
+	flag := compileCmd.Flags().Lookup("no-lint")
 	if flag == nil || flag.DefValue != "false" {
-		t.Fatal("expected --skip-lint to default to false")
+		t.Fatal("expected --no-lint to default to false")
 	}
 	for _, skip := range []bool{false, true} {
 		cmd := &cobra.Command{}
-		cmd.Flags().Bool("skip-lint", skip, "")
+		cmd.Flags().Bool("no-lint", skip, "")
 		options := getCompileCmdOptions(cmd)
 		config := options.toCompileConfig(nil)
 		if config.SkipLint != skip {

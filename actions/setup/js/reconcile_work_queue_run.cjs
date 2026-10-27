@@ -2,6 +2,7 @@
 "use strict";
 
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("run");
+const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { canonical, digest } = require("./work_queue_codec.cjs");
 const { actorFromContext } = require("./work_queue_policy.cjs");
 const { API_VERSION, nativeId, authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
@@ -11,11 +12,17 @@ const { assignmentForDispatch } = require("./work_queue_replay.cjs");
 const { lifecycleEvidence, releaseAssignment, reconcileQueue } = require("./work_queue_reconciler.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { readQueueMetadata } = require("./work_queue_read_retry.cjs");
+const { ERR_WORK_QUEUE_RECONCILIATION } = require("./error_codes.cjs");
+
+const reconciliationError = message => {
+  const error = new Error(`${ERR_VALIDATION}: ${message}`);
+  return Object.assign(error, { code: message.split(";", 1)[0], category: ERR_WORK_QUEUE_RECONCILIATION });
+};
 
 async function quiescenceReceipt(options, runId) {
   const names = options.jobNames ?? JSON.parse(process.env.GH_AW_JOB_DISPLAY_NAMES || "null");
   const needs = options.jobResults ?? JSON.parse(process.env.GH_AW_JOB_RESULTS || "null");
-  if (!names || !needs || typeof names.conclusion !== "string" || !Object.keys(needs).length) throw new Error("work_queue_worker_job_context_invalid");
+  if (!names || !needs || typeof names.conclusion !== "string" || !Object.keys(needs).length) throw reconciliationError("work_queue_worker_job_context_invalid");
   const finalizerName = names.conclusion;
   const jobs = [];
   for (let page = 1; page <= 4; page++) {
@@ -34,28 +41,28 @@ async function quiescenceReceipt(options, runId) {
       "run.jobs.read",
       options.sleepFn
     );
-    if (response.status !== 200 || !Array.isArray(response.data?.jobs) || response.data.jobs.length > 100) throw new Error("work_queue_worker_jobs_unavailable");
+    if (response.status !== 200 || !Array.isArray(response.data?.jobs) || response.data.jobs.length > 100) throw reconciliationError("work_queue_worker_jobs_unavailable");
     jobs.push(...response.data.jobs);
     if (response.data.jobs.length < 100) {
-      if (response.data.total_count !== jobs.length) throw new Error("work_queue_worker_jobs_incomplete");
+      if (response.data.total_count !== jobs.length) throw reconciliationError("work_queue_worker_jobs_incomplete");
       break;
     }
-    if (page === 4) throw new Error("work_queue_worker_jobs_limit");
+    if (page === 4) throw reconciliationError("work_queue_worker_jobs_limit");
   }
   const finalizers = jobs.filter(job => job.name === finalizerName);
-  if (finalizers.length !== 1 || finalizers[0].status !== "in_progress") throw new Error("work_queue_worker_finalizer_invalid");
+  if (finalizers.length !== 1 || finalizers[0].status !== "in_progress") throw reconciliationError("work_queue_worker_finalizer_invalid");
   for (const [id, dependency] of Object.entries(needs)) {
     const name = names[id];
-    if (typeof name !== "string" || name === finalizerName || !["success", "failure", "cancelled", "skipped"].includes(dependency?.result)) throw new Error("work_queue_worker_job_context_invalid");
+    if (typeof name !== "string" || name === finalizerName || !["success", "failure", "cancelled", "skipped"].includes(dependency?.result)) throw reconciliationError("work_queue_worker_job_context_invalid");
     const matches = jobs.filter(job => job.name === name || job.name?.startsWith(`${name} (`) || job.name?.startsWith(`${name} / `));
-    if (!matches.length && dependency.result !== "skipped") throw new Error("work_queue_worker_jobs_incomplete");
+    if (!matches.length && dependency.result !== "skipped") throw reconciliationError("work_queue_worker_jobs_incomplete");
   }
   const ids = new Set();
   for (const job of jobs) {
     const id = nativeId(job.id);
-    if (ids.has(id) || nativeId(job.run_id) !== runId || (job.run_attempt !== undefined && nativeId(job.run_attempt) !== "1")) throw new Error("work_queue_worker_job_identity_invalid");
+    if (ids.has(id) || nativeId(job.run_id) !== runId || (job.run_attempt !== undefined && nativeId(job.run_attempt) !== "1")) throw reconciliationError("work_queue_worker_job_identity_invalid");
     ids.add(id);
-    if (job !== finalizers[0] && (job.status !== "completed" || typeof job.conclusion !== "string" || !job.conclusion)) throw new Error("work_queue_worker_jobs_active");
+    if (job !== finalizers[0] && (job.status !== "completed" || typeof job.conclusion !== "string" || !job.conclusion)) throw reconciliationError("work_queue_worker_jobs_active");
   }
   log.debug("run.jobs.quiescent", { jobs: jobs.length });
   return digest(jobs.map(job => ({ id: nativeId(job.id), status: job.status, conclusion: job.conclusion })).sort((a, b) => a.id.localeCompare(b.id)));
@@ -70,7 +77,7 @@ async function main(options = {}) {
       log.debug("run.reconcile.ignored", { unsupported_event: true });
       return { status: "ignored" };
     }
-    if (context.job !== "conclusion" || nativeId(context.runAttempt ?? process.env.GITHUB_RUN_ATTEMPT ?? "1") !== "1") throw new Error("work_queue_worker_finalizer_context_invalid");
+    if (context.job !== "conclusion" || nativeId(context.runAttempt ?? process.env.GITHUB_RUN_ATTEMPT ?? "1") !== "1") throw reconciliationError("work_queue_worker_finalizer_context_invalid");
     if (isStagedMode(options) || isStagedMode(options.config)) {
       log.debug("run.reconcile.staged");
       return { status: "staged_preview" };
@@ -85,7 +92,7 @@ async function main(options = {}) {
     }
     if (candidates.length !== 1) {
       log.debug("run.binding.ambiguous");
-      throw new Error("work_queue_run_binding_ambiguous");
+      throw reconciliationError("work_queue_run_binding_ambiguous");
     }
     const assignment = assignmentForDispatch(latest.projection, candidates[0].dispatch_id);
     const { dispatch, profile } = validateStoredAssignment(latest.projection, assignment, { allowReleased: true });
@@ -138,8 +145,8 @@ async function maintenance(options = {}) {
     }
   }
   log.diagnostic("maintenance.projection.complete", { pending: pending.length });
-  if (unresolved) throw new Error("work_queue_maintenance_reconciliation_unresolved");
-  if (pending.length && !options.deferIssueFailure) throw new Error("work_queue_issue_synchronization_pending; queue transitions are committed; recover exact requests with work-queue sync-issues --request-id");
+  if (unresolved) throw reconciliationError("work_queue_maintenance_reconciliation_unresolved");
+  if (pending.length && !options.deferIssueFailure) throw reconciliationError("work_queue_issue_synchronization_pending; queue transitions are committed; recover exact requests with work-queue sync-issues --request-id");
   return { ...result, issue_sync_pending: pending };
 }
 

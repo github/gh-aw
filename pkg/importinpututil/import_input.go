@@ -74,9 +74,9 @@ func marshalValue(value any) (string, bool) {
 }
 
 func normalizeSlice(rv reflect.Value) []any {
-	normalized := make([]any, rv.Len())
+	normalized := make([]any, 0, rv.Len())
 	for i := range rv.Len() {
-		normalized[i] = rv.Index(i).Interface()
+		normalized = append(normalized, rv.Index(i).Interface())
 	}
 	return normalized
 }

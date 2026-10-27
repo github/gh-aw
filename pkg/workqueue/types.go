@@ -161,6 +161,13 @@ type PoolPolicy struct {
 	Reconciliation      ReconciliationPolicy     `json:"reconciliation"`
 }
 
+type PoolInstallOperation struct {
+	Kind      string     `json:"kind"`
+	Pool      string     `json:"pool"`
+	Config    PoolPolicy `json:"config"`
+	ConfigRef string     `json:"config_ref,omitempty"`
+}
+
 type WorkerProfile struct {
 	LogicalContract string `json:"logical_contract,omitempty"`
 	Workflow        string `json:"workflow"`

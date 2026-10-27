@@ -70,6 +70,11 @@ func loadHealthRunSummary(run WorkflowRun, config HealthConfig) (*RunSummary, st
 		if summary, checked := config.collection.cacheSummaries[key]; checked {
 			return summary, dir
 		}
+		if checkHealthTimeBudget(config.collection) != nil {
+			recordHealthCacheEvidence(run, nil, config.collection.Reason, config.collection)
+			config.collection.cacheSummaries[key] = nil
+			return nil, dir
+		}
 	}
 	summary, reason := readHealthCache(dir)
 	if reason != "" {

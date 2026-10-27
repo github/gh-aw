@@ -20,10 +20,15 @@ async function ensureLabel(github, repositoryId, label, name) {
   if (label) {
     if (label.name !== name || typeof label.id !== "string") throw queueError("projection_label_pending", "tracking label identity is invalid");
     if (label.color?.toUpperCase() !== QUEUE_LABEL_COLOR) {
-      const response = await labelMutation(github, "mutation WorkQueueLabelColor($input:UpdateLabelInput!) { updateLabel(input:$input) { label { id name color } } }", {
-        input: { id: label.id, color: QUEUE_LABEL_COLOR },
-        request: { retries: 0, timeout: 15000 },
-      });
+      const response = await labelMutation(
+        github,
+        "mutation WorkQueueLabelColor($input:UpdateLabelInput!) { updateLabel(input:$input) { label { id name color } } }",
+        {
+          input: { id: label.id, color: QUEUE_LABEL_COLOR },
+          request: { retries: 0, timeout: 15000 },
+        },
+        "updateLabel"
+      );
       if (response?.updateLabel?.label?.id !== label.id || response.updateLabel.label.name !== name || response.updateLabel.label.color?.toUpperCase() !== QUEUE_LABEL_COLOR)
         throw queueError("projection_write_ambiguous", "work queue label color update is uncertain");
     }
@@ -36,6 +41,7 @@ async function ensureLabel(github, repositoryId, label, name) {
       input: { repositoryId, name, color: QUEUE_LABEL_COLOR, description: "Git-backed Work queue" },
       request: { retries: 0, timeout: 15000 },
     },
+    "createLabel",
     true
   );
   if (!response?.createLabel?.label?.id || response.createLabel.label.name !== name || response.createLabel.label.color?.toUpperCase() !== QUEUE_LABEL_COLOR)
@@ -43,13 +49,13 @@ async function ensureLabel(github, repositoryId, label, name) {
   return response.createLabel.label.id;
 }
 
-async function labelMutation(github, query, variables, allowDuplicate = false) {
+async function labelMutation(github, query, variables, operationContext, allowDuplicate = false) {
   try {
     return await github.graphql(query, variables);
   } catch (error) {
     if (allowDuplicate && labelAlreadyExists(error)) throw error;
     const failure = error.originalError || error;
-    logMutationFailure("projection.label.failed", failure);
+    logMutationFailure("projection.label.failed", failure, operationContext);
     if (isConfirmedRejectionBeforeExecution(failure) || isConfirmedMutationRejection(failure)) throw queueError("projection_label_pending", "label mutation was rejected without a native write");
     throw queueError("projection_write_ambiguous", "label mutation has no exact native acknowledgement");
   }
@@ -243,7 +249,7 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
     result = operations.some(operation => operation.name === "createIssue") ? await retryCreation(send, sleep) : await send();
   } catch (error) {
     const nativeError = error.originalError || error;
-    logMutationFailure("projection.mutation.failed", nativeError);
+    logMutationFailure("projection.mutation.failed", nativeError, "projection");
     result = nativeError.data;
     errors = nativeError.errors || [];
     ambiguous = !Array.isArray(nativeError.errors) || nativeError.errors.length === 0;
@@ -282,7 +288,7 @@ async function retryCreation(send, sleep) {
     } catch (error) {
       if (attempt === 3 || !isRetryableBeforeExecution(error)) throw error;
       // The generic retry helper logs raw API messages, which may contain secrets.
-      logMutationFailure("projection.creation.rejected", error);
+      logMutationFailure("projection.creation.rejected", error, "projection");
       log.diagnostic("projection.creation.retry", { attempt: attempt + 1 });
       await sleep(1000 * 2 ** attempt);
     }
@@ -294,8 +300,8 @@ function isConfirmedMutationRejection(error) {
   return error.errors.every(item => ["FORBIDDEN", "NOT_FOUND", "GRAPHQL_VALIDATION_FAILED"].includes(item?.type)) && Object.values(error.data || {}).every(value => value == null);
 }
 
-function logMutationFailure(event, error) {
-  log.failure(event, error, true);
+function logMutationFailure(event, error, operationContext) {
+  log.failure(event, error, true, operationContext);
   if (!Array.isArray(error?.errors)) return;
   const types = new Set(error.errors.map(item => item?.type));
   log.diagnostic("projection.graphql.failed", {

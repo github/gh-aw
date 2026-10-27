@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -21,13 +22,13 @@ import (
 
 var containerPinsLog = logger.New("cli:update_container_pins")
 
-// imageFailure pairs a container image tag with the human-readable reason it
-// could not be pinned, so the summary can surface actionable details.
-type imageFailure struct {
-	// image is the container image tag, e.g. "ghcr.io/github/github-mcp-server:v0.32.0".
-	image string
-	// reason is the human-readable error message explaining why digest resolution failed.
-	reason string
+type containerDigestResolutionError struct {
+	reason  string
+	details string
+}
+
+func (e *containerDigestResolutionError) Error() string {
+	return "could not resolve container digest without downloading image layers (" + e.reason + "): " + e.details
 }
 
 // dockerImagesArgPattern matches the download_docker_images.sh invocation in lock files
@@ -42,6 +43,8 @@ var dockerImagesArgPattern = regexp.MustCompile(`download_docker_images\.sh"?\s+
 // other hash algorithms (SHA-384, SHA-512) are not used by OCI image manifests
 // in practice and are not expected here.
 var buildxDigestPattern = regexp.MustCompile(`(?m)^Digest:\s+(sha256:[a-f0-9]{64})`)
+
+var registryAuthErrorPattern = regexp.MustCompile(`(?i)(?:^|[\s:])(denied|unauthorized|forbidden):`)
 
 type containerPinUpdateDeps struct {
 	fetchDigest func(ctx context.Context, image string, verbose bool) (string, error)
@@ -64,8 +67,8 @@ func defaultContainerPinUpdateDeps() containerPinUpdateDeps {
 // as they are already pinned. Images without a cached pin are queried via the
 // Docker CLI ("docker buildx imagetools inspect").
 //
-// When Docker is unavailable the function logs a warning and returns nil so that
-// the overall upgrade flow is not interrupted.
+// Resolution failures produce a short informational summary and return nil so
+// that the overall upgrade flow is not interrupted.
 //
 // Returns true when new container pins were added and lock files should be
 // recompiled to embed the digest references.
@@ -129,10 +132,30 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		pinnedImage string // image@sha256:...
 	}
 	var updatedImages []pinnedEntry
-	var failedImages []imageFailure
+	failedCount := 0
+	failureReasons := make(map[string]struct{})
 	var skippedImages []string
 
-	for _, image := range images {
+	type digestResult struct {
+		digest string
+		err    error
+	}
+	results := make([]digestResult, len(images))
+	jobs := make([]func(), 0, len(images))
+	for i, image := range images {
+		pin, found := actionCache.GetContainerPin(image)
+		if found && pin.Digest != "" && !opts.refreshExisting {
+			continue
+		}
+		jobs = append(jobs, func() {
+			results[i].digest, results[i].err = deps.fetchDigest(ctx, image, verbose)
+		})
+	}
+	if err := runUpdateNetworkJobs(ctx, jobs); err != nil {
+		return false, err
+	}
+
+	for i, image := range images {
 		existingPin, hasExistingPin := actionCache.GetContainerPin(image)
 		if hasExistingPin && existingPin.Digest != "" && !opts.refreshExisting {
 			if verbose {
@@ -142,10 +165,19 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 			continue
 		}
 
-		digest, resolveErr := deps.fetchDigest(ctx, image, verbose)
+		digest, resolveErr := results[i].digest, results[i].err
 		if resolveErr != nil {
+			if errors.Is(resolveErr, context.Canceled) || errors.Is(resolveErr, context.DeadlineExceeded) {
+				return false, resolveErr
+			}
 			containerPinsLog.Printf("Failed to resolve digest for %s: %v", image, resolveErr)
-			failedImages = append(failedImages, imageFailure{image: image, reason: resolveErr.Error()})
+			failedCount++
+			reason := "registry metadata lookup failed"
+			var digestErr *containerDigestResolutionError
+			if errors.As(resolveErr, &digestErr) {
+				reason = digestErr.reason
+			}
+			failureReasons[reason] = struct{}{}
 			continue
 		}
 
@@ -186,12 +218,8 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		fmt.Fprintln(os.Stderr, "")
 	}
 
-	if len(failedImages) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to resolve digest for %d image(s) (Docker/crane may be unavailable):", len(failedImages))))
-		for _, f := range failedImages {
-			fmt.Fprintf(os.Stderr, "  %s: %s\n", f.image, f.reason)
-		}
-		fmt.Fprintln(os.Stderr, "")
+	if failedCount > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Container pins could not be updated: "+strings.Join(sliceutil.SortedKeys(failureReasons), "; ")+"."))
 	}
 
 	if len(updatedImages) > 0 || prunedCount > 0 {
@@ -201,8 +229,8 @@ func updateContainerPins(ctx context.Context, deps containerPinUpdateDeps, workf
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated container pins in actions-lock.json"))
 	}
 
-	if len(failedImages) > 0 && opts.failOnResolveErrors {
-		return len(updatedImages) > 0, fmt.Errorf("failed to resolve digest for %d image(s)", len(failedImages))
+	if failedCount > 0 && opts.failOnResolveErrors {
+		return len(updatedImages) > 0, fmt.Errorf("failed to resolve digest for %d image(s)", failedCount)
 	}
 
 	return len(updatedImages) > 0, nil
@@ -261,18 +289,17 @@ func collectImagesFromLockFiles(workflowDir string) ([]string, error) {
 }
 
 // dockerCmdTimeout is the maximum time allowed for a single Docker CLI operation.
-// 60 seconds is sufficient for most registry metadata lookups and short pulls
+// 60 seconds is sufficient for most registry metadata lookups
 // while still bounding any hung Docker daemon or slow network connections.
 const dockerCmdTimeout = 60 * time.Second
 
 // fetchContainerDigest returns the SHA-256 content digest for the given image tag.
-// It tries three strategies in order:
-//  1. "docker buildx imagetools inspect" (no pull, preferred — works when docker daemon is running)
+// It tries two metadata-only strategies in order:
+//  1. "docker buildx imagetools inspect" (no image layers downloaded)
 //  2. "crane digest" (no pull, no daemon — works in CI without Docker)
-//  3. "docker pull" + "docker inspect" (fallback that pulls the full image)
 //
-// Returns an error when all three strategies fail.
-func fetchContainerDigest(ctx context.Context, image string, verbose bool) (string, error) {
+// Returns an error when both strategies fail; it never pulls image layers.
+func fetchContainerDigest(ctx context.Context, image string, _ bool) (string, error) {
 	containerPinsLog.Printf("Resolving digest for container image: %s", image)
 
 	type strategy struct {
@@ -288,15 +315,21 @@ func fetchContainerDigest(ctx context.Context, image string, verbose bool) (stri
 			name: "crane digest",
 			fn:   func() (string, error) { return resolveDigestViaCrane(ctx, image) },
 		},
-		{
-			name: "docker pull + inspect",
-			fn:   func() (string, error) { return resolveDigestViaPull(ctx, image, verbose) },
-		},
 	}
 
 	var errs []string
+	unavailable := 0
+	reason := "registry metadata lookup failed"
 	for _, s := range strategies {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		finish := ctxutil.StartOperation(ctx, s.name+" "+image)
 		digest, err := s.fn()
+		finish(err)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
 		if err == nil && digest != "" {
 			containerPinsLog.Printf("Resolved %s via %s: %s", image, s.name, digest)
 			return digest, nil
@@ -304,9 +337,41 @@ func fetchContainerDigest(ctx context.Context, image string, verbose bool) (stri
 		msg := fmt.Sprintf("%s: %v", s.name, err)
 		containerPinsLog.Printf("Strategy %q failed for %s: %v", s.name, image, err)
 		errs = append(errs, msg)
+		if errors.Is(err, exec.ErrNotFound) ||
+			(s.name == "docker buildx imagetools" &&
+				(strings.Contains(msg, "is not a docker command") ||
+					strings.Contains(msg, `unknown command "buildx"`) ||
+					strings.Contains(msg, "unknown command: docker buildx"))) {
+			unavailable++
+		}
+		// Preserve the first authorization cause in resolver preference order.
+		if authReason := containerRegistryAuthReason(msg); authReason != "" && reason == "registry metadata lookup failed" {
+			reason = authReason
+		}
 	}
 
-	return "", errors.New(strings.Join(errs, "; "))
+	if unavailable == len(strategies) {
+		reason = "Docker Buildx and crane are unavailable"
+	}
+	return "", &containerDigestResolutionError{reason: reason, details: strings.Join(errs, "; ")}
+}
+
+func containerRegistryAuthReason(message string) string {
+	message = strings.ToLower(message)
+	switch {
+	case strings.Contains(message, "403 forbidden"):
+		return "registry access denied (HTTP 403)"
+	case strings.Contains(message, "401 unauthorized"):
+		return "registry authentication required (HTTP 401)"
+	}
+	authError := registryAuthErrorPattern.FindString(message)
+	if strings.Contains(authError, "unauthorized") {
+		return "registry authentication required"
+	}
+	if authError != "" {
+		return "registry access denied"
+	}
+	return ""
 }
 
 // resolveDigestViaBuildx uses "docker buildx imagetools inspect" to get the content
@@ -348,33 +413,4 @@ func resolveDigestViaCrane(ctx context.Context, image string) (string, error) {
 		return "", fmt.Errorf("unexpected digest format from crane: %q", digest)
 	}
 	return digest, nil
-}
-
-// resolveDigestViaPull pulls the image and then reads its RepoDigests field.
-func resolveDigestViaPull(ctx context.Context, image string, verbose bool) (string, error) {
-	if verbose {
-		fmt.Fprintf(os.Stderr, "  Pulling %s to resolve digest...\n", image)
-	}
-
-	pullCtx, pullCancel := context.WithTimeout(ctx, dockerCmdTimeout)
-	defer pullCancel()
-	if out, err := exec.CommandContext(pullCtx, "docker", "pull", "--quiet", image).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("docker pull failed: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-
-	inspectCtx, inspectCancel := context.WithTimeout(ctx, dockerCmdTimeout)
-	defer inspectCancel()
-	out, err := exec.CommandContext(inspectCtx, "docker", "inspect",
-		"--format", "{{index .RepoDigests 0}}", image).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("docker inspect failed: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-
-	// RepoDigest format: "registry/image@sha256:..."  or "image@sha256:..."
-	repoDigest := strings.TrimSpace(string(out))
-	idx := strings.Index(repoDigest, "@sha256:")
-	if idx < 0 {
-		return "", fmt.Errorf("no sha256 digest in repo digest %q", repoDigest)
-	}
-	return repoDigest[idx+1:], nil // return "sha256:..."
 }

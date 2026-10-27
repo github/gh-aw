@@ -201,7 +201,7 @@ func TestCompileToolBoundsHugeDebugStderr(t *testing.T) {
 				require.Len(t, validation.Errors, 1)
 				assert.Equal(t, "config_error", validation.Errors[0].Type)
 				message := validation.Errors[0].Message
-				assert.True(t, strings.HasPrefix(message, "✗ "+compileDependencyCause), message)
+				assert.True(t, strings.HasPrefix(message, "| ✗ "+compileDependencyCause), message)
 				assert.Contains(t, message, compileDependencyRemediation)
 				assert.LessOrEqual(t, len(message), maxMCPCompileDiagnosticBytes)
 				assert.True(t, utf8.ValidString(message))
@@ -257,7 +257,7 @@ func TestMCPCompileDiagnosticsStreaming(t *testing.T) {
 			}
 			diagnostics.finishLine()
 			message := diagnostics.failureMessage(errors.New("exit status 1"))
-			assert.True(t, strings.HasPrefix(message, tt.expected), message)
+			assert.True(t, strings.HasPrefix(message, sanitizeMCPUntrustedText(tt.expected)), message)
 			assert.LessOrEqual(t, len(message), maxMCPCompileDiagnosticBytes)
 		})
 	}
@@ -289,8 +289,8 @@ func TestMCPCompileDiagnosticsExcludeScannerFindingsFromFailure(t *testing.T) {
 		require.NoError(t, err)
 		diagnostics.finishLine()
 		assert.Empty(t, diagnostics.message)
-		assert.Equal(t, "⚠ dependency unavailable", diagnostics.warning)
-		assert.Equal(t, "⚠ dependency unavailable", diagnostics.failureMessage(errors.New("exit status 1")))
+		assert.Equal(t, "| ⚠ dependency unavailable", diagnostics.warning)
+		assert.Equal(t, "| ⚠ dependency unavailable", diagnostics.failureMessage(errors.New("exit status 1")))
 		assert.Contains(t, diagnostics.shellcheck.String(), header)
 		assert.Contains(t, diagnostics.shellcheck.String(), "SC2086")
 	}
@@ -343,8 +343,8 @@ func TestMCPCompileDiagnosticsExcludeMultilineDebugWarnings(t *testing.T) {
 			var results []ValidationResult
 			require.NoError(t, json.Unmarshal([]byte(output), &results))
 			message := results[0].Errors[0].Message
-			assert.Contains(t, message, "actionable warning\nretain this remediation")
-			assert.Contains(t, message, "another actionable warning\nretain this too")
+			assert.Contains(t, message, "actionable warning\n| retain this remediation")
+			assert.Contains(t, message, "another actionable warning\n| retain this too")
 			assert.NotContains(t, message, "workflow:prompts")
 			assert.NotContains(t, message, "workflow_dispatch")
 			assert.NotContains(t, message, "debug payload")
@@ -365,6 +365,44 @@ func TestMCPCompileDiagnosticsPreserveShellcheck(t *testing.T) {
 	assert.NotContains(t, diagnostics.shellcheck.String(), "cli:test")
 }
 
+func TestInjectDevelopmentShellcheckDiagnosticsSkipsStructuredFindings(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		valid    bool
+		errors   []ValidationIssue
+		warnings []ValidationIssue
+	}{
+		{
+			name: "low-only", valid: true,
+			warnings: []ValidationIssue{{Type: "shellcheck_finding", Message: "structured advisory", Severity: "info"}},
+		},
+		{
+			name: "blocking", valid: false,
+			errors: []ValidationIssue{{Type: "shellcheck_finding", Message: "structured blocking finding", Severity: "medium"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			input, err := json.Marshal([]ValidationResult{{
+				Scope: "batch", Workflow: "shellcheck", Valid: tc.valid,
+				Errors: tc.errors, Warnings: tc.warnings,
+			}})
+			require.NoError(t, err)
+			output := injectDevelopmentShellcheckDiagnostics(
+				string(input),
+				"⚠ shellcheck findings in test.lock.yml:\nscript: line 1: SC2086 quote variable\n\n",
+			)
+			var results []ValidationResult
+			require.NoError(t, json.Unmarshal([]byte(output), &results))
+			require.Len(t, results, 1)
+			assert.Equal(t, tc.valid, results[0].Valid)
+			assert.Equal(t, tc.errors, results[0].Errors)
+			assert.Equal(t, tc.warnings, results[0].Warnings)
+		})
+	}
+}
+
 func TestMCPCompileDiagnosticTextByteBoundaries(t *testing.T) {
 	t.Parallel()
 	for _, text := range []string{
@@ -377,13 +415,16 @@ func TestMCPCompileDiagnosticTextByteBoundaries(t *testing.T) {
 			diagnostic.Write([]byte{char})
 		}
 		assert.Equal(t, text, diagnostic.String())
-		assert.Equal(t, text, boundMCPCompileDiagnostic(text))
+		bounded := boundMCPCompileDiagnostic(text)
+		assert.True(t, utf8.ValidString(bounded))
+		assert.LessOrEqual(t, len(bounded), maxMCPCompileDiagnosticBytes)
+		assert.True(t, strings.HasPrefix(bounded, "| "))
 	}
 	message := "cause\n" + strings.Repeat("界", maxMCPCompileDiagnosticBytes) + "\nremediation"
 	bounded := boundMCPCompileDiagnostic(message)
 	assert.True(t, utf8.ValidString(bounded))
-	assert.True(t, strings.HasPrefix(bounded, "cause\n"))
-	assert.True(t, strings.HasSuffix(bounded, "\nremediation"))
+	assert.True(t, strings.HasPrefix(bounded, "| cause\n"))
+	assert.True(t, strings.HasSuffix(bounded, "\n| remediation"))
 	assert.LessOrEqual(t, len(bounded), maxMCPCompileDiagnosticBytes)
 	assert.Contains(t, bounded, "truncated")
 	var streamed compileDiagnosticText
@@ -414,7 +455,7 @@ func TestMCPCompileFallbackByteBudget(t *testing.T) {
 		assert.Equal(t, "batch", results[0].Scope)
 		assert.False(t, results[0].Valid)
 		diagnostic := results[0].Errors[0].Message
-		assert.True(t, strings.HasPrefix(diagnostic, "dependency cause"))
+		assert.True(t, strings.HasPrefix(diagnostic, "| dependency cause"))
 		assert.Contains(t, diagnostic, "remediation")
 		assert.Contains(t, diagnostic, "334 workflows")
 		assert.Contains(t, diagnostic, "per-workflow entries omitted")
@@ -476,7 +517,7 @@ func TestMCPCompileOutputRequestIsolation(t *testing.T) {
 			stdout, diagnostics, err := runMCPCompileOutput(context.Background(), mockCommandWithOutput(`[]`, "✗ "+marker+"\n"))
 			require.NoError(t, err)
 			assert.Equal(t, `[]`, string(stdout))
-			assert.Equal(t, "✗ "+marker, diagnostics.failureMessage(errors.New("unused")))
+			assert.Equal(t, "| ✗ "+marker, diagnostics.failureMessage(errors.New("unused")))
 		})
 	}
 }

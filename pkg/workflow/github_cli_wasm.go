@@ -70,3 +70,6 @@ func SetDefaultGHHost(_ string) {}
 
 // getDefaultGHHost always returns "" in Wasm builds.
 func getDefaultGHHost() string { return "" }
+
+// GitHubCLIHost returns no host in Wasm, where GitHub CLI calls are unavailable.
+func GitHubCLIHost() string { return "" }

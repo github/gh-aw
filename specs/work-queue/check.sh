@@ -10,9 +10,9 @@ fi
 
 SPEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${TLC_MODEL_FILTER:-}" in
-    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|ClaimDeliveryHealth|ClaimDeliveryRecovery|QueueService|QueueLifecycle|DispatchReservationRecovery|IssueProjection|IssueClosureCancellation|QueueBootstrap|WorkerEvolution|WorkerDeploymentBoundary|WorkExpiration) ;;
+    ""|WorkQueue|FairWorkQueue|ClaimScopedWorker|ClaimDeliveryHealth|ClaimDeliveryRecovery|QueueService|QueueLifecycle|DispatchReservationRecovery|IssueProjection|IssueClosureCancellation|QueueBootstrap|QueuePoolInstall|WorkerEvolution|WorkerDeploymentBoundary|WorkExpiration) ;;
     *)
-        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, ClaimDeliveryHealth, ClaimDeliveryRecovery, QueueService, QueueLifecycle, DispatchReservationRecovery, IssueProjection, IssueClosureCancellation, QueueBootstrap, WorkerEvolution, WorkerDeploymentBoundary, or WorkExpiration when set." >&2
+        echo "TLC_MODEL_FILTER must be WorkQueue, FairWorkQueue, ClaimScopedWorker, ClaimDeliveryHealth, ClaimDeliveryRecovery, QueueService, QueueLifecycle, DispatchReservationRecovery, IssueProjection, IssueClosureCancellation, QueueBootstrap, QueuePoolInstall, WorkerEvolution, WorkerDeploymentBoundary, or WorkExpiration when set." >&2
         exit 1
         ;;
 esac
@@ -211,6 +211,17 @@ run_model BootstrapLostResponseFailureWitness NoLostResponseFailure Invariant 12
 run_model BrokenBootstrapHost TrustedAWAuthority Invariant 12 QueueBootstrap
 run_model BrokenBootstrapEnrollment NoEnrollmentGate Invariant 12 QueueBootstrap
 run_model BootstrapTrustedAWWitness NoTrustedAWBootstrap Invariant 12 QueueBootstrap
+run_model PoolInstall "" Invariant 0 QueuePoolInstall
+run_model PoolInstallExpandedRepositoryAllowlist "" Invariant 0 QueuePoolInstall
+run_model PoolInstallInvalidProposal "" Invariant 0 QueuePoolInstall
+run_model PoolInstallInvalidPool "" Invariant 0 QueuePoolInstall
+run_model PoolInstallInvalidRoute "" Invariant 0 QueuePoolInstall
+run_model PoolInstallUnapprovedRoute "" Invariant 0 QueuePoolInstall
+run_model PoolInstallUnauthorized "" Invariant 0 QueuePoolInstall
+run_model PoolInstallProducerWitness NoProducerInstall Invariant 12 QueuePoolInstall
+run_model PoolInstallNewWorker "" Invariant 0 QueuePoolInstall
+run_model PoolInstallExistingPool "" Invariant 0 QueuePoolInstall
+run_model PoolInstallNewWorkerWitness NoNewWorkerInstall Invariant 12 QueuePoolInstall
 run_model WorkerEvolution "" Invariant 0 WorkerEvolution
 run_model WorkerEvolutionPrincipal "" Invariant 0 WorkerEvolution
 run_model BrokenEvolutionCAS DeploymentCAS Invariant 12 WorkerEvolution

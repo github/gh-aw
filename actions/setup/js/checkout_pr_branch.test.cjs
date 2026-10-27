@@ -387,21 +387,64 @@ If the pull request is still open, verify that:
         ["missing runtime repository ID", 42, undefined, 42, "automation[bot]", "Bot", "opened"],
         ["different sender", 42, 42, 42, "other[bot]", "Bot", "opened"],
         ["non-bot sender", 42, 42, 42, "automation[bot]", "User", "opened"],
-        ["metadata-only PR event", 42, 42, 42, "automation[bot]", "Bot", "labeled"],
+        ["untrusted PR action", 42, 42, 42, "automation[bot]", "Bot", "edited"],
         ["missing base repository ID", 42, 42, undefined, "automation[bot]", "Bot", "opened"],
         ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot", "opened"],
         ["forked PR marked ready for review", 43, 42, 42, "automation[bot]", "Bot", "ready_for_review"],
         ["reopened forked PR", 43, 42, 42, "automation[bot]", "Bot", "reopened"],
+        ["labeled forked PR", 43, 42, 42, "automation[bot]", "Bot", "labeled"],
         ["ready_for_review event with mismatched base", 42, 42, 43, "automation[bot]", "Bot", "ready_for_review"],
         ["reopened event with mismatched base", 42, 42, 43, "automation[bot]", "Bot", "reopened"],
+        ["labeled event with mismatched base", 42, 42, 43, "automation[bot]", "Bot", "labeled"],
         ["ready_for_review event with different sender", 42, 42, 42, "other[bot]", "Bot", "ready_for_review"],
         ["reopened event with different sender", 42, 42, 42, "other[bot]", "Bot", "reopened"],
+        ["labeled event with different sender", 42, 42, 42, "other[bot]", "Bot", "labeled"],
         ["ready_for_review event with non-bot sender", 42, 42, 42, "automation[bot]", "User", "ready_for_review"],
         ["reopened event with non-bot sender", 42, 42, 42, "automation[bot]", "User", "reopened"],
+        ["labeled event with non-bot sender", 42, 42, 42, "automation[bot]", "User", "labeled"],
       ])("should not bypass permission verification for a %s", async (_reason, headId, repositoryId, baseId, senderLogin, senderType, action) => {
         mockContext.actor = "automation[bot]";
         mockContext.payload.sender = { login: senderLogin, type: senderType };
         mockContext.payload.action = action;
+        mockContext.payload.repository.id = repositoryId;
+        mockContext.payload.pull_request.head.repo.id = headId;
+        mockContext.payload.pull_request.base.repo.id = baseId;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalled();
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+      });
+
+      it.each(["pull_request", "pull_request_target"])("should require collaborator permission for a same-repository GitHub App PR on %s with action labeled", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+        mockContext.payload.action = "labeled";
+        mockContext.payload.repository.id = 42;
+        mockContext.payload.pull_request.head.repo.id = 42;
+        mockContext.payload.pull_request.base.repo.id = 42;
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+
+        await runScript();
+
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "automation[bot]" }));
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+        expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+      });
+
+      it.each([
+        ["forked PR", 43, 42, 42, "automation[bot]", "Bot"],
+        ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot"],
+        ["different sender", 42, 42, 42, "other[bot]", "Bot"],
+        ["non-bot sender", 42, 42, 42, "automation[bot]", "User"],
+      ])("should retain permission checks for a pull_request_target labeled event with %s", async (_reason, headId, repositoryId, baseId, senderLogin, senderType) => {
+        mockContext.eventName = "pull_request_target";
+        mockContext.actor = "automation[bot]";
+        mockContext.payload.sender = { login: senderLogin, type: senderType };
+        mockContext.payload.action = "labeled";
         mockContext.payload.repository.id = repositoryId;
         mockContext.payload.pull_request.head.repo.id = headId;
         mockContext.payload.pull_request.base.repo.id = baseId;

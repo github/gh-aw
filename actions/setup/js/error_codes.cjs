@@ -45,6 +45,36 @@ const ERR_SYSTEM = "ERR_SYSTEM";
 /** @type {string} Admission failures (diagnostics must not expose remote details) */
 const ERR_ADMISSION = "ERR_ADMISSION";
 
+/** @type {string} Compiled workflows missing required execution provenance */
+const ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED = "ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED";
+
+/** @type {string} Blocked compile-agentic versions */
+const ERR_COMPILE_AGENTIC_VERSION_BLOCKED = "ERR_COMPILE_AGENTIC_VERSION_BLOCKED";
+
+/** @type {string} Outdated compile-agentic versions */
+const ERR_COMPILE_AGENTIC_VERSION_OUTDATED = "ERR_COMPILE_AGENTIC_VERSION_OUTDATED";
+
+/** @type {string} Invalid grader session input */
+const ERR_GRADER_SESSION_INVALID = "ERR_GRADER_SESSION_INVALID";
+
+/** @type {string} Model pin checks missing required reflection input */
+const ERR_MODEL_PIN_REFLECT_REQUIRED = "ERR_MODEL_PIN_REFLECT_REQUIRED";
+
+/** @type {string} Work-queue Claim scope validation failures */
+const ERR_WORK_QUEUE_CLAIM_SCOPE = "ERR_WORK_QUEUE_CLAIM_SCOPE";
+
+/** @type {string} Work-queue delivery verifier missing independent readback */
+const ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED = "ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED";
+
+/** @type {string} Safe-output tool deep-copy failures */
+const ERR_SAFE_OUTPUT_TOOL_COPY_FAILED = "ERR_SAFE_OUTPUT_TOOL_COPY_FAILED";
+
+/** @type {string} Work-queue reconciliation failures */
+const ERR_WORK_QUEUE_RECONCILIATION = "ERR_WORK_QUEUE_RECONCILIATION";
+
+/** @type {string} Safe-output MCP gateway configuration failures */
+const ERR_SAFE_OUTPUTS_GATEWAY_CONFIG = "ERR_SAFE_OUTPUTS_GATEWAY_CONFIG";
+
 /** @type {string} Safe output validation/input errors (legacy numeric taxonomy) */
 const SAFE_OUTPUT_E001 = "E001";
 
@@ -86,6 +116,16 @@ module.exports = {
   ERR_PARSE,
   ERR_SYSTEM,
   ERR_ADMISSION,
+  ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED,
+  ERR_COMPILE_AGENTIC_VERSION_BLOCKED,
+  ERR_COMPILE_AGENTIC_VERSION_OUTDATED,
+  ERR_GRADER_SESSION_INVALID,
+  ERR_MODEL_PIN_REFLECT_REQUIRED,
+  ERR_WORK_QUEUE_CLAIM_SCOPE,
+  ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED,
+  ERR_SAFE_OUTPUT_TOOL_COPY_FAILED,
+  ERR_WORK_QUEUE_RECONCILIATION,
+  ERR_SAFE_OUTPUTS_GATEWAY_CONFIG,
   SAFE_OUTPUT_E001,
   SAFE_OUTPUT_E002,
   SAFE_OUTPUT_E007,

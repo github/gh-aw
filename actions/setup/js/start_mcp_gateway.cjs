@@ -38,6 +38,7 @@ const path = require("path");
 const { renderLogToStdout } = require("./render_log_to_stdout.cjs");
 const { lstatGuard } = require("./symlink_guard.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { ERR_SAFE_OUTPUTS_GATEWAY_CONFIG } = require("./error_codes.cjs");
 const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
 const { applyGatewayRuntimeTimeouts } = require("./tool_timeouts.cjs");
 const { fetchMCPToolsResult } = require("./mount_mcp_as_cli.cjs");
@@ -45,6 +46,16 @@ const { writeMcpConfiguration } = require("./mcp_configuration.cjs");
 const { PROXY_ENV_NAMES } = require("./constants.cjs");
 const { redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
 const { prepareMCPServerCAs } = require("./mcp_server_ca.cjs");
+const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
+
+function codedError(message, code = ERR_SYSTEM, options) {
+  return new Error(`${code}: ${message}`, options);
+}
+
+function setFailed(message) {
+  const text = String(message).replace(/^(?:ERROR|FATAL):\s*/, "");
+  core.setFailed(/^ERR_[A-Z]+:/.test(text) ? text : `${ERR_SYSTEM}: ${text}`);
+}
 
 /** @type {number | null} */
 let activeGatewayPid = null;
@@ -73,12 +84,12 @@ async function retryGatewayStartup(probe, retryConfig, deadline, label, shouldRe
   for (let attempt = 1; attempt <= retryConfig.maxTotalAttempts; attempt += 1) {
     const remainingMs = deadline - nowMs();
     if (remainingMs <= 0) {
-      throw new Error(`${label} startup deadline exceeded`);
+      throw codedError(`${label} startup deadline exceeded`);
     }
     try {
       await probe(remainingMs);
       if (nowMs() >= deadline) {
-        throw new Error(`${label} startup deadline exceeded`);
+        throw codedError(`${label} startup deadline exceeded`);
       }
       return;
     } catch (err) {
@@ -260,10 +271,10 @@ async function waitForSafeOutputsReadiness(config, gatewayPort, agentId, retryCo
     return;
   }
   if (!gatewayPort || !/^\d+$/.test(gatewayPort)) {
-    throw new Error("MCP gateway safeoutputs readiness requires a numeric MCP_GATEWAY_PORT");
+    throw new Error(`${ERR_SAFE_OUTPUTS_GATEWAY_CONFIG}: MCP gateway safeoutputs readiness requires a numeric MCP_GATEWAY_PORT`);
   }
   if (!agentId) {
-    throw new Error("MCP gateway safeoutputs readiness requires MCP_GATEWAY_AGENT_ID");
+    throw new Error(`${ERR_SAFE_OUTPUTS_GATEWAY_CONFIG}: MCP gateway safeoutputs readiness requires MCP_GATEWAY_AGENT_ID`);
   }
 
   const serverUrl = `http://localhost:${gatewayPort}/mcp/${serverName}`;
@@ -280,7 +291,7 @@ async function waitForSafeOutputsReadiness(config, gatewayPort, agentId, retryCo
         if (remainingMs < 750) {
           insufficientBudget = true;
           lastProbe = "insufficient startup budget for a readiness probe (requires at least 750ms)";
-          throw new Error(lastProbe);
+          throw codedError(lastProbe);
         }
         attempts += 1;
         // Each probe performs at most three HTTP requests.
@@ -292,10 +303,10 @@ async function waitForSafeOutputsReadiness(config, gatewayPort, agentId, retryCo
             : "shared startup deadline exceeded after tools/list";
         permanentFailure = !result.emptyWasSuccessful && !result.retryable;
         if (permanentFailure) {
-          throw new Error("safeoutputs authentication or protocol failure");
+          throw codedError("safeoutputs authentication or protocol failure");
         }
         if (result.tools.length === 0) {
-          throw new Error("safeoutputs tools/list has no registered tools");
+          throw codedError("safeoutputs tools/list has no registered tools");
         }
         if (nowMs() < deadline) {
           core.info(`MCP gateway safeoutputs is ready with ${result.tools.length} tool(s) after ${attempts} attempt(s)`);
@@ -307,12 +318,13 @@ async function waitForSafeOutputsReadiness(config, gatewayPort, agentId, retryCo
       () => !permanentFailure && !insufficientBudget
     );
   } catch (err) {
-    throw new Error(
+    throw codedError(
       `MCP gateway safeoutputs readiness failed after ${attempts} attempt(s): ` +
         (permanentFailure
           ? "permanent authentication or MCP protocol failure. The agent will not start. Check gateway credentials and MCP backend configuration."
           : "no tools registered or backend unavailable. The agent will not start. Check MCP gateway startup logs for connection resets (ECONNRESET) or delayed backend registration.") +
         ` Last probe: ${lastProbe}.`,
+      ERR_SYSTEM,
       { cause: err }
     );
   }
@@ -477,16 +489,16 @@ function injectCustomGatewayEnvArgs(args, env = process.env) {
   try {
     names = JSON.parse(env[customGatewayEnvNamesVar] || "[]");
   } catch (err) {
-    throw new Error(`${customGatewayEnvNamesVar} must be valid JSON: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`${customGatewayEnvNamesVar} must be valid JSON: ${getErrorMessage(err)}`, ERR_CONFIG, { cause: err });
   }
   if (!Array.isArray(names) || !names.every(name => typeof name === "string" && customGatewayEnvNamePattern.test(name))) {
-    throw new Error(`${customGatewayEnvNamesVar} must be an array of valid environment variable names`);
+    throw codedError(`${customGatewayEnvNamesVar} must be an array of valid environment variable names`, ERR_CONFIG);
   }
   if (names.some(name => name.startsWith(customGatewayReservedEnvPrefix))) {
-    throw new Error(`${customGatewayEnvNamesVar} must not contain names reserved by the ${customGatewayReservedEnvPrefix} namespace`);
+    throw codedError(`${customGatewayEnvNamesVar} must not contain names reserved by the ${customGatewayReservedEnvPrefix} namespace`, ERR_CONFIG);
   }
   if (new Set(names).size !== names.length) {
-    throw new Error(`${customGatewayEnvNamesVar} must not contain duplicate environment variable names`);
+    throw codedError(`${customGatewayEnvNamesVar} must not contain duplicate environment variable names`, ERR_CONFIG);
   }
 
   // Missing indexed transport values intentionally become empty container env vars.
@@ -751,7 +763,7 @@ function httpGet(url, timeoutMs) {
 function assertNotSymlink(p) {
   try {
     if (lstatGuard(p) === null) {
-      core.setFailed(`ERROR: ${p} is a symlink — possible symlink attack, aborting`);
+      setFailed(`${ERR_CONFIG}: ${p} is a symlink — possible symlink attack, aborting`);
       return false;
     }
   } catch (error) {
@@ -760,7 +772,7 @@ function assertNotSymlink(p) {
       // Path does not exist yet — ignored, that's fine.
       return true;
     }
-    core.setFailed(`ERROR: failed to inspect ${p} for symlink safety: ${getErrorMessage(error)}`);
+    setFailed(`${ERR_SYSTEM}: failed to inspect ${p} for symlink safety: ${getErrorMessage(error)}`);
     return false;
   }
   return true;
@@ -783,7 +795,7 @@ function assertNotSymlink(p) {
 function resolveCopilotConfigPaths() {
   const home = process.env.HOME;
   if (!home) {
-    throw new Error("HOME environment variable is not set; cannot locate Copilot CLI config directory");
+    throw codedError("HOME environment variable is not set; cannot locate Copilot CLI config directory", ERR_CONFIG);
   }
   const dir = path.join(home, ".copilot");
   return { dir, file: path.join(dir, "mcp-config.json") };
@@ -859,13 +871,13 @@ async function main() {
   // Validate required env vars
   // -----------------------------------------------------------------------
   if (!dockerCommand) {
-    core.setFailed("ERROR: MCP_GATEWAY_DOCKER_COMMAND must be set (command-based execution is not supported per MCP Gateway Specification v1.0.0)");
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_DOCKER_COMMAND must be set (command-based execution is not supported per MCP Gateway Specification v1.0.0)`);
     return;
   }
 
   // Validate port is numeric to prevent injection in shell commands and URLs
   if (gatewayPort && !/^\d+$/.test(gatewayPort)) {
-    core.setFailed(`ERROR: MCP_GATEWAY_PORT must be a numeric value, got: '${gatewayPort}'`);
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_PORT must be a numeric value, got: '${gatewayPort}'`);
     return;
   }
 
@@ -890,7 +902,7 @@ async function main() {
   try {
     fs.mkdirSync("/tmp/gh-aw/mcp-logs", { recursive: true });
   } catch (err) {
-    throw new Error(`Failed to create directory /tmp/gh-aw/mcp-logs: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`Failed to create directory /tmp/gh-aw/mcp-logs: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
 
   // Symlink attack prevention on the config directory
@@ -900,7 +912,7 @@ async function main() {
   try {
     fs.mkdirSync(configDir, { recursive: true });
   } catch (err) {
-    throw new Error(`Failed to create directory ${configDir}: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`Failed to create directory ${configDir}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
   // Post-creation check
   if (!assertNotSymlink(configDir)) {
@@ -909,7 +921,7 @@ async function main() {
   try {
     fs.chmodSync(configDir, 0o700);
   } catch (err) {
-    throw new Error(`Failed to set permissions on ${configDir}: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`Failed to set permissions on ${configDir}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
 
   // -----------------------------------------------------------------------
@@ -918,19 +930,19 @@ async function main() {
   if (!/^docker run/.test(dockerCommand)) {
     core.error("ERROR: MCP_GATEWAY_DOCKER_COMMAND has incorrect syntax");
     core.error("Expected: docker run command with image and arguments");
-    core.setFailed(`ERROR: MCP_GATEWAY_DOCKER_COMMAND has incorrect syntax — got: ${dockerCommand}`);
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_DOCKER_COMMAND has incorrect syntax; expected docker run command with image and arguments`);
     return;
   }
   if (!/-i/.test(dockerCommand)) {
-    core.setFailed("ERROR: MCP_GATEWAY_DOCKER_COMMAND must include -i flag for interactive mode");
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_DOCKER_COMMAND must include -i flag for interactive mode`);
     return;
   }
   if (!/--rm/.test(dockerCommand)) {
-    core.setFailed("ERROR: MCP_GATEWAY_DOCKER_COMMAND must include --rm flag for cleanup");
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_DOCKER_COMMAND must include --rm flag for cleanup`);
     return;
   }
   if (!/--network/.test(dockerCommand)) {
-    core.setFailed("ERROR: MCP_GATEWAY_DOCKER_COMMAND must include --network flag for networking");
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_DOCKER_COMMAND must include --network flag for networking`);
     return;
   }
 
@@ -946,7 +958,7 @@ async function main() {
     // Avoid Node's UTF-8 pipe short-read overflow (nodejs/node#66341).
     mcpConfig = fs.readFileSync(0).toString("utf8");
   } catch (err) {
-    throw new Error(`Failed to read MCP configuration from stdin: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`Failed to read MCP configuration from stdin: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
   const normalizedConfig = normalizeSinkVisibilityEncoding(mcpConfig);
   if (normalizedConfig !== mcpConfig) {
@@ -973,7 +985,7 @@ async function main() {
     if (parseContext) {
       core.error(`Likely offending location: line ${parseContext.line}, column ${parseContext.column}`);
     }
-    core.setFailed("ERROR: Configuration is not valid JSON");
+    setFailed(`${ERR_CONFIG}: Configuration is not valid JSON`);
     return;
   }
 
@@ -982,7 +994,7 @@ async function main() {
   const gw = configObj.gateway;
   if (!gw || typeof gw !== "object") {
     core.error("Per MCP Gateway Specification v1.0.0 section 4.1.3, the gateway section is required");
-    core.setFailed("ERROR: Configuration is missing required 'gateway' section");
+    setFailed(`${ERR_CONFIG}: Configuration is missing required 'gateway' section`);
     return;
   }
   applyAgenticWorkflowsRunnerIdentity(configObj);
@@ -990,16 +1002,16 @@ async function main() {
   const caMountArgs = prepareMCPServerCAs(configObj);
   mcpConfig = JSON.stringify(configObj);
   if (!("port" in gw) || gw.port == null) {
-    core.setFailed("ERROR: Gateway configuration is missing required 'port' field");
+    setFailed(`${ERR_CONFIG}: Gateway configuration is missing required 'port' field`);
     return;
   }
   if (!("domain" in gw) || gw.domain == null) {
-    core.setFailed("ERROR: Gateway configuration is missing required 'domain' field");
+    setFailed(`${ERR_CONFIG}: Gateway configuration is missing required 'domain' field`);
     return;
   }
   const agentIdentifierError = validateGatewayAgentIdentifiers(gw);
   if (agentIdentifierError) {
-    core.setFailed(agentIdentifierError);
+    setFailed(`${ERR_CONFIG}: ${agentIdentifierError.replace(/^ERROR:\s*/, "")}`);
     return;
   }
 
@@ -1050,7 +1062,7 @@ async function main() {
   let args = Array.from(dockerCommand.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || []);
   const cmd = args.shift();
   if (!cmd) {
-    core.setFailed("ERROR: MCP_GATEWAY_DOCKER_COMMAND did not contain an executable command");
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_DOCKER_COMMAND did not contain an executable command`);
     return;
   }
   const gatewayEnv = { ...process.env };
@@ -1077,7 +1089,7 @@ async function main() {
   // Write configuration to stdin then close
   if (!child.stdin) {
     stopGatewayProcess(activeGatewayPid);
-    core.setFailed("ERROR: Gateway process stdin is not available");
+    setFailed(`${ERR_SYSTEM}: Gateway process stdin is not available`);
     return;
   }
   child.stdin.write(JSON.stringify(configObj));
@@ -1088,7 +1100,7 @@ async function main() {
 
   const gatewayPid = child.pid;
   if (!gatewayPid) {
-    core.setFailed("ERROR: Failed to start gateway container");
+    setFailed(`${ERR_SYSTEM}: Failed to start gateway container`);
     return;
   }
 
@@ -1102,7 +1114,7 @@ async function main() {
     core.error("ERROR: Gateway process exited immediately after start");
     core.error("");
     printGatewayStartupDiagnostics(stderrPath, outputPath);
-    core.setFailed("ERROR: Gateway process exited immediately after start");
+    setFailed(`${ERR_SYSTEM}: Gateway process exited immediately after start`);
     return;
   }
   core.info("");
@@ -1118,7 +1130,7 @@ async function main() {
     core.error(`ERROR: Gateway process (PID: ${gatewayPid}) exited during initialization`);
     core.error("");
     printGatewayStartupDiagnostics(stderrPath, outputPath);
-    core.setFailed(`ERROR: Gateway process (PID: ${gatewayPid}) exited during initialization`);
+    setFailed(`${ERR_SYSTEM}: Gateway process (PID: ${gatewayPid}) exited during initialization`);
     return;
   }
   core.info(`Gateway process is still running (PID: ${gatewayPid})`);
@@ -1166,7 +1178,7 @@ async function main() {
           core.info(`✓ Health check succeeded on attempt ${attemptsMade} (${elapsedSec}s elapsed)`);
           return;
         }
-        throw new Error(`Health endpoint not ready (HTTP ${httpCode || 0})`);
+        throw codedError(`Health endpoint not ready (HTTP ${httpCode || 0})`);
       },
       healthRetryConfig,
       startupDeadline,
@@ -1234,7 +1246,7 @@ async function main() {
     } catch {
       // ignore
     }
-    core.setFailed("ERROR: Gateway failed to become ready");
+    setFailed(`${ERR_SYSTEM}: Gateway failed to become ready`);
     return;
   }
   core.info("");
@@ -1278,7 +1290,7 @@ async function main() {
     } catch {
       // ignore
     }
-    core.setFailed("ERROR: Gateway did not write output configuration");
+    setFailed(`${ERR_SYSTEM}: Gateway did not write output configuration`);
     return;
   }
 
@@ -1286,7 +1298,7 @@ async function main() {
   try {
     fs.chmodSync(outputPath, 0o600);
   } catch (err) {
-    throw new Error(`Failed to set permissions on ${outputPath}: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`Failed to set permissions on ${outputPath}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
 
   // Check for error payload
@@ -1294,7 +1306,7 @@ async function main() {
   try {
     gatewayOutput = JSON.parse(fs.readFileSync(outputPath, "utf8"));
   } catch (err) {
-    throw new Error("Failed to parse gateway output file " + outputPath + ": " + getErrorMessage(err), { cause: err });
+    throw codedError("Failed to parse gateway output file " + outputPath + ": " + getErrorMessage(err), ERR_SYSTEM, { cause: err });
   }
   if (gatewayOutput.error) {
     core.error("ERROR: Gateway returned an error payload instead of configuration");
@@ -1308,7 +1320,7 @@ async function main() {
     } catch {
       // ignore
     }
-    core.setFailed("ERROR: Gateway returned an error payload instead of configuration");
+    setFailed(`${ERR_CONFIG}: Gateway returned an error payload instead of configuration`);
     return;
   }
 
@@ -1323,7 +1335,7 @@ async function main() {
   if (!agentId) {
     stopGatewayProcess(gatewayPid);
     core.error("This variable should be set in the workflow before calling start_mcp_gateway.cjs");
-    core.setFailed("ERROR: MCP_GATEWAY_AGENT_ID environment variable must be set for converter scripts");
+    setFailed(`${ERR_CONFIG}: MCP_GATEWAY_AGENT_ID environment variable must be set for converter scripts`);
     return;
   }
 
@@ -1352,7 +1364,7 @@ async function main() {
       execFileSync("node", [converterPath], { stdio: "inherit", env: process.env, timeout: CONFIG_CONVERTER_TIMEOUT_MS });
     } catch (err) {
       stopGatewayProcess(gatewayPid);
-      core.setFailed(`ERROR: MCP config converter failed: ${getErrorMessage(err)}`);
+      setFailed(getErrorMessage(err));
       return;
     }
   } else {
@@ -1361,7 +1373,7 @@ async function main() {
       ({ dir: copilotConfigDir, file: copilotConfigFile } = resolveCopilotConfigPaths());
     } catch (err) {
       stopGatewayProcess(gatewayPid);
-      core.setFailed(`ERROR: ${getErrorMessage(err)}`);
+      setFailed(getErrorMessage(err));
       return;
     }
     core.info(`No agent-specific converter found for engine: ${engineType}`);
@@ -1370,7 +1382,7 @@ async function main() {
     try {
       fs.mkdirSync(copilotConfigDir, { recursive: true });
     } catch (err) {
-      throw new Error(`Failed to create directory ${copilotConfigDir}: ${getErrorMessage(err)}`, { cause: err });
+      throw codedError(`Failed to create directory ${copilotConfigDir}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
     }
     const cliServersRaw = process.env.GH_AW_MCP_CLI_SERVERS;
     if (cliServersRaw) {
@@ -1392,21 +1404,21 @@ async function main() {
         try {
           fs.copyFileSync(outputPath, copilotConfigFile);
         } catch (err) {
-          throw new Error(`Failed to copy file ${outputPath} to ${copilotConfigFile}: ${getErrorMessage(err)}`, { cause: err });
+          throw codedError(`Failed to copy file ${outputPath} to ${copilotConfigFile}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
         }
       }
     } else {
       try {
         fs.copyFileSync(outputPath, copilotConfigFile);
       } catch (err) {
-        throw new Error(`Failed to copy file ${outputPath} to ${copilotConfigFile}: ${getErrorMessage(err)}`, { cause: err });
+        throw codedError(`Failed to copy file ${outputPath} to ${copilotConfigFile}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
       }
     }
     let copilotConfigContent;
     try {
       copilotConfigContent = fs.readFileSync(copilotConfigFile, "utf8");
     } catch (err) {
-      throw new Error(`Failed to read file ${copilotConfigFile}: ${getErrorMessage(err)}`, { cause: err });
+      throw codedError(`Failed to read file ${copilotConfigFile}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
     }
     core.info(copilotConfigContent);
   }
@@ -1439,7 +1451,7 @@ async function main() {
       } catch {
         // ignore
       }
-      core.setFailed("ERROR: MCP server checks failed - no servers could be connected");
+      setFailed(`${ERR_SYSTEM}: MCP server checks failed - no servers could be connected`);
       return;
     }
     printTiming(mcpCheckStart, "MCP server connectivity checks");
@@ -1456,7 +1468,7 @@ async function main() {
   try {
     fs.mkdirSync(cliDir, { recursive: true });
   } catch (err) {
-    throw new Error(`Failed to create directory ${cliDir}: ${getErrorMessage(err)}`, { cause: err });
+    throw codedError(`Failed to create directory ${cliDir}: ${getErrorMessage(err)}`, ERR_SYSTEM, { cause: err });
   }
 
   try {
@@ -1535,7 +1547,7 @@ if (require.main === module) {
     const message = getErrorMessage(err);
     const stack = err instanceof Error ? err.stack : undefined;
     if (stack) core.error(stack);
-    core.setFailed(`FATAL: ${message}`);
+    setFailed(message);
   });
 }
 
@@ -1553,16 +1565,16 @@ function applyAgenticWorkflowsRunnerIdentity(config, uid = process.getuid?.(), g
   if (!server || typeof server !== "object" || !("container" in server) || typeof server.container !== "string" || !server.container) return;
   const args = "args" in server ? server.args : [];
   if (!Array.isArray(args) || !args.every(arg => typeof arg === "string")) {
-    throw new Error("Invalid agenticworkflows container arguments");
+    throw codedError("Invalid agenticworkflows container arguments", ERR_CONFIG);
   }
   // Docker parses any suffix after -u as a username or UID, including -uroot.
   if (args.some(arg => arg === "--user" || arg === "-u" || arg.startsWith("--user=") || (arg.startsWith("-u") && !arg.startsWith("--")))) return;
   if (!Number.isSafeInteger(uid) || !Number.isSafeInteger(gid) || uid === undefined || gid === undefined || uid < 0 || gid < 0) {
-    throw new Error("Runner identity is required for the agenticworkflows container");
+    throw codedError("Runner identity is required for the agenticworkflows container", ERR_CONFIG);
   }
   const env = "env" in server ? server.env : {};
   if (!env || typeof env !== "object" || Array.isArray(env)) {
-    throw new Error("Invalid agenticworkflows container environment");
+    throw codedError("Invalid agenticworkflows container environment", ERR_CONFIG);
   }
   Object.assign(server, {
     args: [...args, "--user", `${uid}:${gid}`],

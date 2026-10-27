@@ -332,11 +332,12 @@ func (c *Compiler) addActivationInfoArtifactUploadStep(ctx *activationJobBuildCo
 	)
 }
 
-// buildActivationEnvironment returns manual-approval environment YAML, with ANSI removed.
+// buildActivationEnvironment prefers the manual-approval environment and otherwise
+// inherits the workflow environment so activation uses the configured protection rules.
 func (c *Compiler) buildActivationEnvironment(ctx *activationJobBuildContext) string {
-	if ctx.data.ManualApproval == "" {
-		return ""
+	if ctx.data.ManualApproval != "" {
+		compilerActivationJobLog.Print("Activation job uses manual-approval environment gate")
+		return "environment: " + stringutil.StripANSI(ctx.data.ManualApproval)
 	}
-	compilerActivationJobLog.Print("Activation job uses manual-approval environment gate")
-	return "environment: " + stringutil.StripANSI(ctx.data.ManualApproval)
+	return c.indentYAMLLines(ctx.data.Environment, "    ")
 }

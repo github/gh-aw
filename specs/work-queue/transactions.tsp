@@ -220,6 +220,14 @@ model PolicyOperation {
   policy: QueuePolicy;
 }
 @jsonSchema
+model PoolInstallOperation {
+  kind: "PoolInstall";
+  pool: Identity;
+  config: PoolPolicy;
+  // Trusted publication verifies newly introduced workers at this default revision.
+  config_ref?: Revision;
+}
+@jsonSchema
 model ControlOperation {
   kind: "Control";
   control: "admission_paused" | "grants_paused" | "credential_generation";
@@ -391,7 +399,7 @@ model IssueCommentOperation {
 }
 @jsonSchema
 union QueueOperation {
-  PolicyOperation, DeploymentOperation, ControlOperation, WorkOperation, ClaimOperation,
+  PolicyOperation, PoolInstallOperation, DeploymentOperation, ControlOperation, WorkOperation, ClaimOperation,
   CompletionOperation, ResultOperation, DeliveryFailureOperation,
   ObservationOperation, ClaimCancellationOperation, WorkCancellationOperation,
   DispatchOperation, ReleaseOperation, WorkPriorityOperation, CheckpointOperation,
@@ -441,7 +449,7 @@ union RequestParameters {
 @jsonSchema
 model QueueRequest {
   id: Identity;
-  kind: "policy" | "deployment" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "checkpoint" | "issue_link";
+  kind: "policy" | "pool_install" | "deployment" | "control" | "submit" | "dispatch_next" | "finish" | "observe" | "dispatch" | "release" | "result" | "delivery_failure" | "cancel_work" | "cancel_claim" | "checkpoint" | "issue_link";
   parameters: RequestParameters;
   fingerprint: Digest;
 }

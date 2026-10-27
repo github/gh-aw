@@ -49,9 +49,16 @@ in either scan remain fatal.
 Built-in experimental-feature notices are low-severity and nonblocking;
 `--allow-experimental` additionally records explicit acknowledgement.
 Their counts remain visible in the dry-run summary. Validation errors, unclassified
-compiler warnings, model-inventory failures, and scanner execution/parsing failures
-remain fatal. Neither this policy nor explicit acknowledgement grants live
-execution or policy-installation authorization.
+compiler warnings, model-inventory failures, built-in Actions/AW AST lint findings,
+and scanner execution/parsing failures remain fatal. Neither this policy nor
+explicit acknowledgement grants live execution or policy-installation authorization.
+
+Built-in AST lint now runs by default as part of every compile, before zizmor/
+actionlint/poutine and before the lock file is emitted; it is distinct from those
+opt-in scanners. `--no-lint` disables it but is rejected together with
+`--dry-run`, so dry-run diagnostics always include lint findings — fix them
+rather than treating them as advisory. `add`, `update`, and `validate` also lint
+whenever they recompile but do not expose `--no-lint`.
 
 `validate` uses `--no-emit`, which skips zizmor, actionlint and poutine. Only the
 scanner-enabled compile command above runs them; a passing `validate` command

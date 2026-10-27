@@ -16,6 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGitHubCLIHostPrecedence(t *testing.T) {
+	originalHost := getDefaultGHHost()
+	t.Cleanup(func() { SetDefaultGHHost(originalHost) })
+	SetDefaultGHHost("detected.example.com")
+	t.Setenv("GH_HOST", "")
+	assert.Equal(t, "detected.example.com", GitHubCLIHost())
+	t.Setenv("GH_HOST", "explicit.example.com")
+	assert.Equal(t, "explicit.example.com", GitHubCLIHost())
+}
+
 func TestExecGH(t *testing.T) {
 	tests := []struct {
 		name          string

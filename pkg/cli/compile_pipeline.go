@@ -26,11 +26,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 
@@ -136,6 +138,7 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 				Message: err.Error(),
 			})
 			*validationResults = append(*validationResults, result)
+			writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
 			continue
 		}
 		compileOrchestrationLog.Printf("Resolved to: %s", resolvedFile)
@@ -209,6 +212,7 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 		}
 
 		*validationResults = append(*validationResults, fileResult.validationResult)
+		writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
 	}
 
 	workflowDir := ""
@@ -292,7 +296,7 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 
 	// Compile all markdown files in the specified workflow directory
 	workflowsDir := filepath.Join(gitRoot, workflowDir)
-	if _, err := os.Stat(workflowsDir); os.IsNotExist(err) {
+	if _, err := os.Stat(workflowsDir); errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("the %s directory does not exist in git root (%s)", workflowDir, gitRoot)
 	}
 
@@ -436,6 +440,7 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 		}
 
 		*validationResults = append(*validationResults, fileResult.validationResult)
+		writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
 	}
 
 	dryRunWorkflowDir := ""
@@ -523,6 +528,42 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 	}
 
 	return workflowDataList, developmentErr
+}
+
+func writeMCPCompileProgress(progressPath string, results []ValidationResult) {
+	if progressPath == "" {
+		return
+	}
+	sanitizedResults := make([]ValidationResult, 0, len(results))
+	for _, result := range results {
+		sanitizedErrors := make([]ValidationIssue, 0, len(result.Errors))
+		for _, issue := range result.Errors {
+			issue.Message = boundMCPCompileDiagnostic(issue.Message)
+			sanitizedErrors = append(sanitizedErrors, issue)
+		}
+		result.Errors = sanitizedErrors
+		sanitizedWarnings := make([]ValidationIssue, 0, len(result.Warnings))
+		for _, issue := range result.Warnings {
+			issue.Message = boundMCPCompileDiagnostic(issue.Message)
+			sanitizedWarnings = append(sanitizedWarnings, issue)
+		}
+		result.Warnings = sanitizedWarnings
+		sanitizedResults = append(sanitizedResults, result)
+	}
+	output, err := formatValidationOutput(sanitizedResults)
+	if err != nil {
+		compileOrchestrationLog.Printf("Failed to format MCP compile progress: %v", err)
+		return
+	}
+	temporaryPath := progressPath + ".tmp"
+	if err := os.WriteFile(temporaryPath, []byte(output), constants.FilePermSensitive); err != nil {
+		compileOrchestrationLog.Printf("Failed to write MCP compile progress: %v", err)
+		return
+	}
+	if err := os.Rename(temporaryPath, progressPath); err != nil {
+		_ = os.Remove(temporaryPath)
+		compileOrchestrationLog.Printf("Failed to publish MCP compile progress: %v", err)
+	}
 }
 
 type batchToolsOptions struct {
@@ -731,6 +772,11 @@ func runBatchExternalTools(
 	stats *CompilationStats,
 	validationResults *[]ValidationResult,
 ) (strictGrantErr error, batchToolErr error) {
+	scannerResults := make(map[string]error)
+	ctx = context.WithValue(ctx, compileScannerReporterKey{}, func(tool string, err error) {
+		scannerResults[tool] = err
+	})
+	previousReport := opts.reportResult
 	if config.DryRun {
 		if config.dryRunBaseline != nil {
 			opts.filterResult = func(tool string, err error) error {
@@ -745,8 +791,23 @@ func runBatchExternalTools(
 		}
 		opts.reportResult = func(tool string, inputs int, err error) {
 			recordDryRunScannerResult(config.dryRunReport, tool, inputs, err)
-			if err != nil {
-				appendDevelopmentBatchDiagnostics(tool, appendValidationErrors(nil, tool+"_error", err), stats, validationResults)
+			appendDryRunScannerResult(tool, scannerResults[tool], err, stats, validationResults)
+			if previousReport != nil {
+				previousReport(tool, inputs, err)
+			}
+		}
+	} else {
+		opts.reportResult = func(tool string, inputs int, err error) {
+			diagnostics, reported := scannerResults[tool]
+			if !reported {
+				diagnostics = err
+			}
+			// Grant already emits its strict batch result.
+			if tool != "grant" || !config.Strict {
+				appendCompileScannerResult(tool, diagnostics, config.Strict && err != nil, stats, validationResults)
+			}
+			if previousReport != nil {
+				previousReport(tool, inputs, err)
 			}
 		}
 	}
@@ -809,14 +870,16 @@ func appendDuplicateWorkflowNameWarnings(workflowDataList []*workflow.WorkflowDa
 			reportedNames[workflowData.Name] = struct{}{}
 		}
 
-		if workflowIndex >= len(validationResultIndexes) {
+		if workflowIndex < 0 || workflowIndex >= len(validationResultIndexes) {
 			return nil, fmt.Errorf("missing validation result index for workflow %q", workflowData.WorkflowID)
 		}
 		resultIndex := validationResultIndexes[workflowIndex]
-		if resultIndex < 0 || resultIndex >= len(*validationResults) {
+		results := *validationResults
+		if resultIndex < 0 || resultIndex >= len(results) {
 			return nil, fmt.Errorf("validation result index %d for workflow %q is out of range", resultIndex, workflowData.WorkflowID)
 		}
-		(*validationResults)[resultIndex].Warnings = append((*validationResults)[resultIndex].Warnings, warning)
+		result := &results[resultIndex]
+		result.Warnings = append(result.Warnings, warning)
 	}
 
 	return warnings, nil

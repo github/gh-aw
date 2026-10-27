@@ -1,9 +1,14 @@
-import { execFileSync } from "node:child_process";
+import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { ensureSecureDirectory, writeFileSecure } from "../.github/scripts/secure_write.cjs";
+import "../actions/setup/js/shim.cjs";
+import { withRetry, isTransientError } from "../actions/setup/js/error_recovery.cjs";
+
+const execFile = promisify(execFileCallback);
 
 const marker = "<!-- gh-aw-pr-sous-chef-nudge -->";
 const statePattern = /Sous-chef state: ([a-f0-9]{64})/;
@@ -249,25 +254,47 @@ export function classify(pr, detail, comments, runs, now = Date.now()) {
   };
 }
 
-function gh(args) {
-  return JSON.parse(
-    execFileSync("gh", args, {
-      encoding: "utf8",
-      timeout: 60_000,
-      maxBuffer: 32 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "inherit"],
-    })
+export async function gh(args, run = execFile, retryConfig = {}) {
+  const stdout = await withRetry(
+    async () => {
+      try {
+        const result = await run("gh", args, {
+          encoding: "utf8",
+          timeout: 60_000,
+          maxBuffer: 32 * 1024 * 1024,
+        });
+        return result.stdout;
+      } catch (error) {
+        const message = error.killed && error.signal === "SIGTERM" && error.code !== "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ? "GitHub CLI request timeout after 60000ms" : error.stderr?.trim() || error.message;
+        const failure = new Error(message);
+        // A child-process exit code is not an HTTP status.
+        failure.status = Number(message.match(/\bHTTP (\d{3})\b/)?.[1]) || undefined;
+        throw failure;
+      }
+    },
+    {
+      maxRetries: 2,
+      ...retryConfig,
+      shouldRetry: error => error.status !== 401 && error.status !== 403 && isTransientError(error),
+    },
+    `GitHub CLI ${args[0]} ${args[1]}`
   );
+  return JSON.parse(stdout);
 }
 
-export function fetchActiveRuns(repo, api = gh, branch) {
+export async function fetchActiveRuns(repo, api = gh, branch) {
   const branchFilter = branch ? `&branch=${encodeURIComponent(branch)}` : "";
-  return [...activeStatuses].flatMap(status => api(["api", `repos/${repo}/actions/runs?status=${status}&per_page=100${branchFilter}`, "--paginate", "--slurp"]).flatMap(page => page.workflow_runs));
+  const runs = [];
+  for (const status of activeStatuses) {
+    const pages = await api(["api", `repos/${repo}/actions/runs?status=${status}&per_page=100${branchFilter}`, "--paginate", "--slurp"]);
+    runs.push(...pages.flatMap(page => page.workflow_runs));
+  }
+  return runs;
 }
 
-function inspect(repo, pr, runs, api = gh, now = Date.now()) {
+async function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   const [owner, name] = repo.split("/");
-  const response = api([
+  const response = await api([
     "api",
     "graphql",
     "-f",
@@ -287,17 +314,17 @@ function inspect(repo, pr, runs, api = gh, now = Date.now()) {
   ]);
   if (response.errors?.length) throw new Error(`PR #${pr.number}: ${JSON.stringify(response.errors)}`);
   // Issue comments do not support sort/direction: paginate, then sort locally.
-  const comments = api(["api", `repos/${repo}/issues/${pr.number}/comments?per_page=100`, "--paginate", "--slurp"]).flat();
+  const comments = (await api(["api", `repos/${repo}/issues/${pr.number}/comments?per_page=100`, "--paginate", "--slurp"])).flat();
   return classify(pr, response.data.repository.pullRequest, comments, runs, now);
 }
 
 const prFields = "number,updatedAt,author,isDraft,state,labels";
 
-export function fetchCandidate(repo, number, api = gh, now) {
+export async function fetchCandidate(repo, number, api = gh, now) {
   // The proxy can mistake REST PR labels for the response collection and return [].
   // Use an explicit repository-scoped query, without gh pr view's union fragments.
   const [owner, name] = repo.split("/");
-  const response = api([
+  const response = await api([
     "api",
     "graphql",
     "-f",
@@ -335,8 +362,8 @@ export function fetchCandidate(repo, number, api = gh, now) {
     mergeStateStatus: candidate.mergeStateStatus === "DIRTY" ? "CONFLICTING" : candidate.mergeStateStatus,
   };
   if (now !== undefined && metadataSkip(metadata, now)) return metadata;
-  const checkRuns = api(["api", `repos/${repo}/commits/${candidate.headRefOid}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"]).flatMap(page => page.check_runs);
-  const statuses = api(["api", `repos/${repo}/commits/${candidate.headRefOid}/status?per_page=100`, "--paginate", "--slurp"]).flatMap(page => page.statuses);
+  const checkRuns = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/check-runs?per_page=100&filter=latest`, "--paginate", "--slurp"])).flatMap(page => page.check_runs);
+  const statuses = (await api(["api", `repos/${repo}/commits/${candidate.headRefOid}/status?per_page=100`, "--paginate", "--slurp"])).flatMap(page => page.statuses);
   return {
     ...metadata,
     statusCheckRollup: [
@@ -358,14 +385,14 @@ export function fetchCandidate(repo, number, api = gh, now) {
   };
 }
 
-export function buildQueue(candidates, inspectCandidate, now = Date.now()) {
+export async function buildQueue(candidates, inspectCandidate, now = Date.now()) {
   const skipped = [];
   const eligible = [];
   for (const pr of candidates) {
     let result;
     const skip = metadataSkip(pr, now);
     if (skip) result = { skip_reason: skip };
-    else result = inspectCandidate(pr);
+    else result = await inspectCandidate(pr);
     if (result.skip_reason) skipped.push({ pr_number: pr.number, ...result });
     else eligible.push(result);
   }
@@ -412,8 +439,8 @@ export function formatNudge(pr) {
   ].join("\n");
 }
 
-export function checkRateLimit(api = gh) {
-  const response = api(["api", "rate_limit"]);
+export async function checkRateLimit(api = gh) {
+  const response = await api(["api", "rate_limit"]);
   const resources = ["core", "graphql", "search"].map(resource => {
     const budget = response.resources?.[resource];
     if (!budget || !Number.isInteger(budget.limit) || !Number.isInteger(budget.remaining) || !Number.isInteger(budget.reset) || budget.limit < 0 || budget.remaining < 0 || budget.remaining > budget.limit)
@@ -424,8 +451,8 @@ export function checkRateLimit(api = gh) {
   return { low: resources.some(budget => budget.remaining <= budget.threshold), resources };
 }
 
-export function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
-  let rateLimit = checkRateLimit(api);
+export async function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
+  let rateLimit = await checkRateLimit(api);
   const limitedQueue = () => ({
     fetched: 0,
     generated_at: new Date(now).toISOString(),
@@ -436,22 +463,22 @@ export function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
   });
   if (rateLimit.low) return limitedQueue();
   const candidates = checkNumber
-    ? [fetchCandidate(repo, checkNumber, api, now)]
-    : api(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
+    ? [await fetchCandidate(repo, checkNumber, api, now)]
+    : await api(["pr", "list", "--repo", repo, "--state", "open", "--search", "is:pr is:open -is:draft -author:app/dependabot -author:app/renovate -label:broccoli sort:updated-desc", "--limit", "200", "--json", prFields]);
   if (!Array.isArray(candidates)) throw new Error("PR queue must be an array");
   let runs;
-  const output = buildQueue(
+  const output = await buildQueue(
     candidates,
-    pr => {
-      if (!rateLimit.low) rateLimit = checkRateLimit(api);
+    async pr => {
+      if (!rateLimit.low) rateLimit = await checkRateLimit(api);
       if (rateLimit.low) return { skip_reason: "rate_limit" };
-      const current = checkNumber ? pr : fetchCandidate(repo, pr.number, api, now);
+      const current = checkNumber ? pr : await fetchCandidate(repo, pr.number, api, now);
       const skip = metadataSkip(current, now) || checkSkip(current, now);
       if (skip) return { skip_reason: skip };
-      runs ??= fetchActiveRuns(repo, api, checkNumber ? current.headRefName : undefined);
+      runs ??= await fetchActiveRuns(repo, api, checkNumber ? current.headRefName : undefined);
       if (activeAgent(current, runs)) return { skip_reason: "agent_active" };
       const approvals = current.statusCheckRollup.some(check => (check.conclusion ?? check.state) === "ACTION_REQUIRED" || check.status === "WAITING")
-        ? api(["api", `repos/${repo}/actions/runs?status=action_required&per_page=100&branch=${encodeURIComponent(current.headRefName)}`, "--paginate", "--slurp"]).flatMap(page => page.workflow_runs)
+        ? (await api(["api", `repos/${repo}/actions/runs?status=action_required&per_page=100&branch=${encodeURIComponent(current.headRefName)}`, "--paginate", "--slurp"])).flatMap(page => page.workflow_runs)
         : [];
       return inspect(repo, current, [...runs, ...approvals], api, now);
     },
@@ -461,7 +488,7 @@ export function fetchQueue(repo, checkNumber, api = gh, now = Date.now()) {
   return { ...output, rate_limit: rateLimit };
 }
 
-function main() {
+async function main() {
   const repo = process.env.PR_SOUS_CHEF_REPOSITORY ?? process.env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) throw new Error("PR_SOUS_CHEF_REPOSITORY must be owner/repo");
   const args = process.argv.slice(2);
@@ -469,7 +496,7 @@ function main() {
   const numbers = args.filter(arg => arg !== "--simulate");
   const checkNumber = numbers[0];
   if (numbers.length > 1 || (checkNumber && !/^[1-9]\d*$/.test(checkNumber))) throw new Error("Expected [PR number] [--simulate]");
-  const output = fetchQueue(repo, checkNumber);
+  const output = await fetchQueue(repo, checkNumber);
   if (simulate)
     output.nudges = output.prs.flatMap(pr => {
       const body = formatNudge(pr);
@@ -500,4 +527,9 @@ export function formatSummary(output) {
   return `### PR Sous Chef prefilter\n\nFetched: ${output.fetched}; eligible: ${output.prs.length}; deferred: ${output.deferred}\n\n${decision}\n\n| Skip reason | Count |\n|---|---|\n${[...counts].map(([reason, count]) => `| ${reason} | ${count} |`).join("\n")}\n${budget}`;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

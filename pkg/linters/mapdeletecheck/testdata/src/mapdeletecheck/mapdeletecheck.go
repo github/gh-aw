@@ -34,6 +34,36 @@ func badWithComments() {
 	}
 }
 
+func badWithParens() {
+	m := map[string]int{"a": 1}
+	k := "a"
+
+	// want +1 `redundant existence check before delete`
+	if _, ok := m[(k)]; ok {
+		delete(m, k)
+	}
+
+	// want +1 `redundant existence check before delete`
+	if _, ok := m[k]; ok {
+		delete(m, (k))
+	}
+
+	// want +1 `redundant existence check before delete`
+	if _, ok := (m)[k]; ok {
+		delete(m, k)
+	}
+
+	// want +1 `redundant existence check before delete`
+	if _, ok := m[k]; ok {
+		delete((m), k)
+	}
+
+	// want +1 `redundant existence check before delete`
+	if _, ok := (m)[(k)]; ok {
+		delete((m), (k))
+	}
+}
+
 func good() {
 	m := map[string]int{"a": 1}
 	k := "a"

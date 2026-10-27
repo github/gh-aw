@@ -51,7 +51,7 @@ const {
   claudeSafeOutputsOffset,
   removeClaudePlugin,
 } = require("./claude_runtime.cjs");
-const { captureExecutionEvidenceConfiguration, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
@@ -621,6 +621,7 @@ async function main() {
   const softTimeoutGuard = buildSoftTimeoutGuard(driverStartTime);
 
   const retryRun = await runHarnessRetryLoop({
+    telemetryPath: resolveHarnessRetryTelemetryPath(),
     maxRetries,
     initialDelayMs,
     backoffMultiplier,
@@ -698,6 +699,21 @@ async function main() {
       const permissionDeniedCount = denials.count;
       const hasNumerousPermissionDenied = permissionDeniedCount >= 3;
       const crashSignalName = crashSignalNameForExitCode(result.exitCode);
+      result.failureClasses = Object.entries({
+        overloaded_error: isOverloaded,
+        rate_limit_error: isRateLimit,
+        authentication_failed: isAuthenticationFailed,
+        max_turns: isMaxTurns,
+        no_deferred_marker: isNoDeferredMarker,
+        invalid_model: isInvalidModel,
+        invalid_json_body: isInvalidJsonBody,
+        connection_refused: isConnectionRefused,
+        permission_denied: hasNumerousPermissionDenied,
+        sandbox_runtime_crash: !!crashSignalName,
+        cancelled_or_timed_out: isSignalTerminationExitCode(result.exitCode),
+      })
+        .filter(([, detected]) => detected)
+        .map(([reason]) => reason);
       log(
         `attempt ${attempt + 1} failed:` +
           ` exitCode=${result.exitCode}` +

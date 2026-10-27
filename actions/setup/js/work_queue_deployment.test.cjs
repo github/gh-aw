@@ -11,6 +11,7 @@ import { launchAssignment, acceptedSubmissionParameters } from "./work_queue_dis
 import { synchronizeDeployments } from "./work_queue_deployment_control.cjs";
 import { createWorkQueueSubmitTool, readWorkQueueState } from "./work_queue_mcp_server.cjs";
 import { readStagedIntents } from "./work_queue_intents.cjs";
+import { policyForAcceptedRequest } from "./work_queue_policy.cjs";
 import { queueFixture, REF, WORKFLOW, REPOSITORY, DISPATCHER } from "./work_queue_lifecycle.test_helpers.cjs";
 
 const CONTRACT = "a".repeat(64);
@@ -55,6 +56,38 @@ function deploy(f, name = "default", ref = NEW_REF, contract = CONTRACT, availab
 }
 
 describe("prospective drain-free worker evolution", () => {
+  it("recovers accepted submissions in additive pools before and after later epochs and repeated checkpoints", () => {
+    const f = fixture();
+    const pool = structuredClone(f.state.policy.pools.default);
+    f.append("pool_install", { operations: [{ kind: "PoolInstall", pool: "added", config: pool }] }, f.dispatcher);
+    const original = { nodes: [{ graph_id: "added-retry", pool: "added", payload: { task: "accepted" } }] };
+    const parameters = normalizeSubmitParameters(original, f.state.policy, 5000, f.state);
+    f.append("submit", parameters, f.dispatcher, "added-submit");
+    const prior = f.state.requests.get("added-submit");
+    const context = { ...f.dispatcher, authenticated: true, roles: ["dispatcher"], created_at: 5000 };
+    f.append("pool_install", { operations: [{ kind: "PoolInstall", pool: "later", config: pool }] }, f.dispatcher);
+    const verify = state => {
+      const accepted = state.requests.get(prior.request.id);
+      const historical = policyForAcceptedRequest(state, accepted);
+      expect(historical.pools.added).toEqual(pool);
+      expect(historical.pools).not.toHaveProperty("later");
+      expect(historical.class_weights).toEqual([8, 4, 2, 1, 1]);
+      expect(acceptedSubmissionParameters(state, context, original, accepted)).toEqual(parameters);
+    };
+    verify(f.state);
+    verify(replayTransactions(compactTransactions(f.transactions, "c".repeat(40), f.administrator, f.at)));
+    const before = canonical(f.transactions);
+    expect(f.append("submit", parameters, f.dispatcher, prior.request.id).idempotent).toBe(true);
+    expect(canonical(f.transactions)).toBe(before);
+    for (const work of f.state.works.values()) f.append("cancel_work", { operations: [{ kind: "WorkCancellation", work_id: work.work_id, reason: "drain" }] });
+    const next = structuredClone(f.state.policy);
+    next.class_weights = [1, 1, 1, 1, 1];
+    f.append("policy", { operations: [{ kind: "Policy", epoch: "e2", policy: next }] });
+    verify(f.state);
+    const checkpoint = compactTransactions(f.transactions, "d".repeat(40), f.administrator, f.at);
+    verify(replayTransactions(compactTransactions(checkpoint, "e".repeat(40), f.administrator, f.at)));
+  });
+
   it("keeps checkpoint and serialized deployments immutable while publishing subsequent worker updates", () => {
     const f = fixture();
     const checkpoint = compactTransactions(f.transactions, "c".repeat(40), f.administrator, f.at);

@@ -42,7 +42,11 @@ type checkpointSnapshot struct {
 }
 
 func checkpointTraceOperation(operation Operation) (Operation, error) {
-	if kind, err := operationKind(operation); err == nil && kind == "Deployment" {
+	return checkpointTraceOperationWithPolicyHistory(operation, false)
+}
+
+func checkpointTraceOperationWithPolicyHistory(operation Operation, omitPolicyHistory bool) (Operation, error) {
+	if kind, err := operationKind(operation); err == nil && (kind == "Deployment" || !omitPolicyHistory && (kind == "Policy" || kind == "PoolInstall")) {
 		return Canonical(operation)
 	}
 	event, err := traceEventForOperation(operation)
@@ -257,6 +261,36 @@ func checkpointState(ordered []QueueCommit, state Projection, lastAt int64) (che
 	return snapshot, nil
 }
 
+func omitCheckpointPolicyHistory(snapshot checkpointSnapshot, priorReceipts []checkpointReceipt) (checkpointSnapshot, error) {
+	priorRequests := make(map[string]struct{}, len(priorReceipts))
+	for _, receipt := range priorReceipts {
+		priorRequests[receipt.RequestID] = struct{}{}
+	}
+	requests := make([]checkpointReceipt, 0, len(snapshot.Requests))
+	for _, receipt := range snapshot.Requests {
+		if _, prior := priorRequests[receipt.RequestID]; !prior {
+			events := make([]Operation, 0, len(receipt.Events))
+			for _, operation := range receipt.Events {
+				kind, err := operationKind(operation)
+				if err != nil {
+					return checkpointSnapshot{}, err
+				}
+				if kind == "Policy" || kind == "PoolInstall" {
+					operation, err = checkpointTraceOperationWithPolicyHistory(operation, true)
+					if err != nil {
+						return checkpointSnapshot{}, err
+					}
+				}
+				events = append(events, operation)
+			}
+			receipt.Events = events
+		}
+		requests = append(requests, receipt)
+	}
+	snapshot.Requests = requests
+	return snapshot, nil
+}
+
 // CompactCheckpoint constructs a minimal state checkpoint from validated
 // history; priorGitSHA names the Git commit containing the prior ledger.
 func CompactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, at int64) ([]QueueCommit, error) {
@@ -271,14 +305,18 @@ func reconstructCheckpoint(commits []QueueCommit, priorGitSHA string, actor Acto
 }
 
 func reconstructCheckpointForHost(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, expectedStateSHA, host string) ([]QueueCommit, error) {
-	for _, legacy := range []bool{false, true} {
-		checkpoint, err := compactCheckpointForHost(commits, priorGitSHA, actor, at, legacy, host)
-		if err != nil {
-			continue
-		}
-		op, err := decodeCheckpointOperation(checkpoint[0])
-		if err == nil && op.StateSHA256 == expectedStateSHA {
-			return checkpoint, nil
+	for _, omitPolicyHistory := range []bool{false, true} {
+		for _, legacy := range []bool{false, true} {
+			checkpoint, err := compactCheckpointForHostWithPolicyHistory(commits, priorGitSHA, actor, at, legacy, host, omitPolicyHistory)
+			if err != nil {
+				continue
+			}
+			for _, commit := range checkpoint {
+				op, err := decodeCheckpointOperation(commit)
+				if err == nil && op.StateSHA256 == expectedStateSHA {
+					return checkpoint, nil
+				}
+			}
 		}
 	}
 	return nil, queueError("checkpoint_invalid", "checkpoint does not match its Git parent history")
@@ -289,6 +327,10 @@ func compactCheckpoint(commits []QueueCommit, priorGitSHA string, actor Actor, a
 }
 
 func compactCheckpointForHost(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, legacy bool, host string) ([]QueueCommit, error) {
+	return compactCheckpointForHostWithPolicyHistory(commits, priorGitSHA, actor, at, legacy, host, false)
+}
+
+func compactCheckpointForHostWithPolicyHistory(commits []QueueCommit, priorGitSHA string, actor Actor, at int64, legacy bool, host string, omitPolicyHistory bool) ([]QueueCommit, error) {
 	if !revisionPattern.MatchString(priorGitSHA) || actor.Role != "administrator" {
 		return nil, queueError("checkpoint_invalid", "checkpoint requires an administrator and a prior Git commit SHA")
 	}
@@ -307,7 +349,9 @@ func compactCheckpointForHost(commits []QueueCommit, priorGitSHA string, actor A
 				return nil, queueError("checkpoint_invalid", "deadline-bearing history requires the committed time watermark")
 			}
 		}
-		lastAt = ordered[len(ordered)-1].At
+		for _, commit := range ordered {
+			lastAt = commit.At
+		}
 	}
 	if actor.Repository != state.Repository || at < lastAt || at > MaxTimestamp {
 		return nil, queueError("checkpoint_invalid", "checkpoint repository or time is invalid")
@@ -320,6 +364,16 @@ func compactCheckpointForHost(commits []QueueCommit, priorGitSHA string, actor A
 	if err != nil {
 		return nil, err
 	}
+	if omitPolicyHistory {
+		snapshot, err = omitCheckpointPolicyHistory(snapshot, state.CheckpointReceipts)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return encodeCheckpointForHost(snapshot, state, data, priorGitSHA, actor, at, host)
+}
+
+func encodeCheckpointForHost(snapshot checkpointSnapshot, state Projection, data []byte, priorGitSHA string, actor Actor, at int64, host string) ([]QueueCommit, error) {
 	logicalSnapshotData, err := canonicalValue(snapshot)
 	if err != nil {
 		return nil, err

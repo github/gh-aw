@@ -68,6 +68,7 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 
 	// Collect agent stdio logs path for unified upload
 	paths = append(paths, logFileFull)
+	paths = append(paths, constants.TmpGhAwDirSlash+"agent/harness_retry.json")
 
 	// Include the pre-agent audit file (file listing of agent-related directories captured
 	// before agent execution) so it is available in the agent artifact for post-run inspection.
@@ -172,7 +173,9 @@ func (c *Compiler) collectArtifactPaths(data *WorkflowData, engine CodingAgentEn
 // AWF reflect summary, and observability summary.
 func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine) {
 	// Parse agent logs for GITHUB_STEP_SUMMARY
-	c.generateLogParsing(yaml, data, engine)
+	if protectedSessionCaptureParserID(engine) == "" {
+		c.generateLogParsing(yaml, data, engine)
+	}
 
 	// Parse mcp-scripts logs for GITHUB_STEP_SUMMARY (if mcp-scripts is enabled)
 	if IsMCPScriptsEnabled(data.MCPScripts) {
@@ -295,15 +298,20 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	// and creates a nested directory layout that breaks downstream artifact downloads.
 	// See gh-aw#34896 Bug B.
 	if isArcDindTopology(data) {
-		c.generateArcDindArtifactConsolidationStep(yaml)
+		c.generateArcDindArtifactConsolidationStep(yaml, arcDindArtifactCopy{
+			sourcePath: "sandbox/agent/harness_retry.json",
+			targetPath: "agent/harness_retry.json",
+		})
 	}
 
 	// Generate single unified artifact upload with all collected paths.
 	// In workflow_call context, apply the per-invocation prefix to avoid name clashes.
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
 	compilerYamlLog.Printf("Emitting unified agent artifact upload with %d path(s)", len(artifactPaths))
-	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix)
-	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, data)
+	behaviorEngine, protectedSessionCapture := engine.(*BehaviorDefinedEngine)
+	protectedSessionCapture = protectedSessionCapture && behaviorEngine.protectedSessionCaptureEnabled()
+	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix, protectedSessionCapture)
+	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, data, protectedSessionCapture)
 
 	// In dev mode the setup action is referenced via a local path (./actions/setup), so its files
 	// live in the workspace. When a checkout: entry targets an external repository without a path

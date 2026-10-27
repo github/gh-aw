@@ -115,7 +115,7 @@ class TransportRunnerTest(unittest.TestCase):
 
 class RuntimePinTest(unittest.TestCase):
     def test_release_pin_matches_workflow_and_documentation(self):
-        expected = "5bd7b64db99ae4c6c35f290de5e809c0ee41af43f8699cf696099ffb6452b1e2"
+        expected = "d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"
         self.assertEqual(check.JAR_SHA256, expected)
         workflow = (check.ROOT.parents[1] / ".github/workflows/daily-workflow-security-model.md").read_text()
         self.assertIn("https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
@@ -127,6 +127,8 @@ class RuntimePinTest(unittest.TestCase):
         )
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), expected)
+        lock = (check.ROOT.parents[1] / ".github/workflows/daily-workflow-security-model.lock.yml").read_text()
+        self.assertIn(expected, lock)
         self.assertIn(expected, (check.ROOT / "README.md").read_text())
 
     def test_missing_or_mismatched_jar_fails_before_execution(self):
@@ -313,8 +315,8 @@ class RuntimeCheckoutModelTest(unittest.TestCase):
                 check.main()
             report = json.loads((results / "results.json").read_text())
             self.assertEqual(report["additional_models"],
-                             ["RuntimeRepositoryCheckout", "MCPCompile", "ActivationAdmission",
-                              "AdmissionConclusion"])
+                             ["RuntimeRepositoryCheckout", "StatusOnlyJob", "MCPCompile",
+                              "ActivationAdmission", "AdmissionConclusion"])
             cases = {case["case"] for case in report["cases"]
                      if case["model"] == "RuntimeRepositoryCheckout"}
             self.assertEqual(cases, {"secure-runtime-checkout"} |

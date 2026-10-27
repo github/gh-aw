@@ -17,7 +17,6 @@ var shellLog = logger.New("workflow:taint:shell")
 type shell struct {
 	a                     *analyzer
 	path                  string
-	step                  string
 	bindings              scope
 	persisted             scope
 	files                 scope
@@ -75,11 +74,7 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 		constants:    make(map[string]string), constantValues: make(map[string]map[string]struct{}),
 		constantUnknown: make(map[string]bool),
 	}
-	id, err := optionalField[string](fields, "id", path)
-	if err != nil {
-		return nil, nil, err
-	}
-	s.step = id
+	s.setConstants("GITHUB_OUTPUT", []string{"$GITHUB_OUTPUT"}, false)
 	for key, sources := range bindings {
 		if name, ok := strings.CutPrefix(key, "shell."); ok {
 			s.vars[name] = sources
@@ -355,22 +350,25 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 				s.a.gapAt(s.path, int(redir.Pos().Line()), "dynamic file targets are not modeled")
 			}
 			for _, target := range targets {
-				s.write(target, out, commandOutputName(stmt.Cmd, s.markers), int(stmt.Pos().Line()))
+				s.write(target, out, s.outputName(stmt.Cmd, target), int(stmt.Pos().Line()), stmt.Cmd)
 			}
 			return
 		}
-		payload := commandOutputName(stmt.Cmd, s.markers)
+		payload := s.outputName(stmt.Cmd, target)
 		if payload == "" {
 			for _, source := range stmt.Redirs {
 				if source.Hdoc != nil {
 					payload = heredocOutputName(source.Hdoc, s.constants, s.markers)
+					if target == "$GITHUB_OUTPUT" {
+						payload = "" // A heredoc can contain several output records.
+					}
 					if payload != "" {
 						break
 					}
 				}
 			}
 		}
-		s.write(target, out, payload, int(stmt.Pos().Line()))
+		s.write(target, out, payload, int(stmt.Pos().Line()), stmt.Cmd)
 	case ">&":
 		if staticWord(redir.Word) == "2" {
 			s.a.emit(Site{Kind: Log, Path: s.path, Line: int(stmt.Pos().Line())}, out)
@@ -379,7 +377,7 @@ func (s *shell) redirectOutput(stmt *syntax.Stmt, redir *syntax.Redirect, out va
 }
 
 func (s *shell) pathFor(path string) string {
-	if filepath.IsAbs(path) || s.workingDirectory == "" {
+	if specialTarget(path) || filepath.IsAbs(path) || s.workingDirectory == "" {
 		return filepath.Clean(path)
 	}
 	return filepath.Clean(filepath.Join(s.workingDirectory, path))
@@ -424,7 +422,7 @@ func (s *shell) readPaths(pattern string) ([]string, bool) {
 func (s *shell) readFileWord(word *syntax.Word) value {
 	targets, known := s.paths(word)
 	pathSources := s.word(word)
-	relevant := s.files.hasSources() || len(pathSources) > 0
+	relevant := s.files.hasSources() || s.persisted.hasSources() || len(pathSources) > 0
 	if !known && relevant {
 		s.a.gapAt(s.path, int(word.Pos().Line()), "dynamic file targets are not modeled")
 	}
@@ -641,13 +639,13 @@ func (s *shell) callCommand(cmd *syntax.CallExpr, captured bool, stdin value) va
 				}
 				for _, target := range targets {
 					if target != "" && !strings.HasPrefix(target, "-") {
-						s.write(target, stdin, "", line)
+						s.write(target, stdin, "", line, nil)
 					}
 				}
 			}
 		}
 	case "curl", "wget":
-		s.network(cmd.Args[1:], line, stdin)
+		s.network(name, cmd.Args[1:], line, stdin)
 	case "set":
 		if len(cmd.Args) == 1 {
 			for _, sources := range s.vars {
@@ -764,26 +762,26 @@ func (s *shell) environmentOutput() value {
 	return out
 }
 
-func (s *shell) network(args []*syntax.Word, line int, stdin value) {
+func (s *shell) network(command string, args []*syntax.Word, line int, stdin value) {
 	var request value
 	for index := 0; index < len(args); index++ {
 		word, ok := sliceAt(args, index)
 		if !ok {
-			break
+			continue
 		}
 		arg := staticWord(word)
 		if arg == "-H" || arg == "--header" {
 			if header, ok := sliceAt(args, index+1); ok {
 				index++
 				if !authenticationHeader(staticWord(header)) {
-					request = union(request, s.word(header))
+					request = union(request, s.networkHeader(command, header, stdin, ""))
 				}
 			}
 			continue
 		}
 		if header, found := strings.CutPrefix(arg, "--header="); found {
 			if !authenticationHeader(header) {
-				request = union(request, s.word(word))
+				request = union(request, s.networkHeader(command, word, stdin, "--header="))
 			}
 			continue
 		}
@@ -795,78 +793,102 @@ func (s *shell) network(args []*syntax.Word, line int, stdin value) {
 		if arg == "--post-file" || arg == "-T" || arg == "--upload-file" {
 			if file, ok := sliceAt(args, index+1); ok {
 				index++
-				request = union(request, s.networkFileBody(file))
+				request = union(request, s.networkFileBody(file, stdin, arg != "--post-file", ""))
 			}
 			continue
 		}
-		if option, file, found := strings.Cut(arg, "="); found && (option == "--post-file" || option == "--upload-file") {
-			request = union(request, s.networkFileBodyValue(file))
+		if option, _, found := strings.Cut(arg, "="); found && (option == "--post-file" || option == "--upload-file") {
+			request = union(request, s.networkFileBody(word, stdin, option != "--post-file", option+"="))
 			continue
 		}
 		if strings.HasPrefix(arg, "--user=") || strings.HasPrefix(arg, "--oauth2-bearer=") {
 			continue
 		}
 		if arg == "-d" || arg == "--data" || arg == "--data-binary" ||
-			arg == "--data-urlencode" || arg == "--json" || arg == "-F" || arg == "--form" {
+			arg == "--data-urlencode" || arg == "--json" || arg == "-F" || arg == "--form" ||
+			arg == "--data-raw" || arg == "--form-string" {
 			if body, ok := sliceAt(args, index+1); ok {
 				index++
-				request = union(request, s.networkBody(body, stdin))
+				request = union(request, s.networkBody(body, stdin, arg, ""))
 			}
 			continue
 		}
-		if strings.HasPrefix(arg, "--data=") || strings.HasPrefix(arg, "--data-binary=") ||
-			strings.HasPrefix(arg, "--data-urlencode=") || strings.HasPrefix(arg, "--json=") ||
-			strings.HasPrefix(arg, "--form=") {
-			request = union(request, s.networkBody(word, stdin))
-			continue
+		if option, _, found := strings.Cut(arg, "="); found {
+			switch option {
+			case "--data", "--data-binary", "--data-urlencode", "--json", "--form", "--data-raw", "--form-string":
+				request = union(request, s.networkBody(word, stdin, option, option+"="))
+				continue
+			}
 		}
 		request = union(request, s.word(word))
 	}
 	s.a.emit(Site{Kind: Network, Path: s.path, Line: line}, request)
 }
 
-func (s *shell) networkBody(word *syntax.Word, stdin value) value {
-	text := staticWord(word)
-	if _, body, found := strings.Cut(text, "="); found {
-		text = body
-	}
-	if body, found := strings.CutPrefix(text, "@"); found {
-		if body == "-" {
-			return stdin
-		}
-		texts, known := wordTexts(word, s.constants, s.constantValues, s.constantUnknown)
-		for _, target := range texts {
-			if containsMarker(target, s.markers) {
-				known = false
-			}
-		}
-		if !known {
-			s.a.gap(s.path, "dynamic network upload files are not modeled")
-		}
-		var contents value
-		for _, target := range texts {
-			if _, body, found := strings.Cut(target, "="); found {
-				target = body
-			}
-			target, _ = strings.CutPrefix(target, "@")
-			if target == "-" {
-				contents = union(contents, stdin)
-				continue
-			}
-			files, modeled := s.readPaths(s.pathFor(target))
-			if !modeled {
-				s.a.gap(s.path, "dynamic network upload files are not modeled")
-			}
-			for _, file := range files {
-				contents = union(contents, s.files[file])
-			}
-		}
-		return contents
+func (s *shell) networkHeader(command string, word *syntax.Word, stdin value, prefix string) value {
+	if command == "curl" {
+		return s.networkBody(word, stdin, "--header", prefix)
 	}
 	return s.word(word)
 }
 
-func (s *shell) networkFileBody(word *syntax.Word) value {
+func (s *shell) networkBody(word *syntax.Word, stdin value, option, prefix string) value {
+	direct := s.word(word)
+	contents := direct
+	if option == "--data-raw" || option == "--form-string" {
+		return contents
+	}
+	texts, known := wordTexts(word, s.constants, s.constantValues, s.constantUnknown)
+	for _, text := range texts {
+		text = strings.TrimPrefix(text, prefix)
+		if containsMarker(text, s.markers) {
+			known = false
+			continue
+		}
+		var targets []string
+		switch option {
+		case "-F", "--form":
+			_, body, found := strings.Cut(text, "=")
+			if found {
+				if target, upload := strings.CutPrefix(body, "@"); upload {
+					targets = strings.Split(target, ",")
+				} else if target, file := strings.CutPrefix(body, "<"); file {
+					targets = []string{target}
+				}
+				for index, target := range targets {
+					targets[index], _, _ = strings.Cut(target, ";")
+				}
+			}
+		case "--data-urlencode":
+			// An '=' before '@' selects literal content, not a filename.
+			if name, target, found := strings.Cut(text, "@"); found && !strings.Contains(name, "=") {
+				targets = []string{target}
+			}
+		default:
+			if target, found := strings.CutPrefix(text, "@"); found {
+				targets = []string{target}
+			}
+		}
+		for _, target := range targets {
+			// Curl's quoted multipart filenames need their own escaping parser.
+			if (option == "-F" || option == "--form") && strings.ContainsAny(target, "\"\\") {
+				s.a.gap(s.path, "quoted multipart upload files are not modeled")
+				continue
+			}
+			if target == "-" {
+				contents = union(contents, stdin)
+				continue
+			}
+			contents = union(contents, s.networkFileBodyValue(target, stdin, false))
+		}
+	}
+	if !known && ((len(direct) == 0 && (s.files.hasSources() || len(stdin) > 0)) || strings.Contains(staticWord(word), "@")) {
+		s.a.gap(s.path, "dynamic network upload files are not modeled")
+	}
+	return contents
+}
+
+func (s *shell) networkFileBody(word *syntax.Word, stdin value, stdinUpload bool, prefix string) value {
 	texts, known := wordTexts(word, s.constants, s.constantValues, s.constantUnknown)
 	var contents value
 	for _, text := range texts {
@@ -874,7 +896,7 @@ func (s *shell) networkFileBody(word *syntax.Word) value {
 			known = false
 			continue
 		}
-		contents = union(contents, s.networkFileBodyValue(text))
+		contents = union(contents, s.networkFileBodyValue(strings.TrimPrefix(text, prefix), stdin, stdinUpload))
 	}
 	if !known {
 		s.a.gap(s.path, "dynamic network upload files are not modeled")
@@ -882,7 +904,11 @@ func (s *shell) networkFileBody(word *syntax.Word) value {
 	return contents
 }
 
-func (s *shell) networkFileBodyValue(path string) value {
+func (s *shell) networkFileBodyValue(path string, stdin value, stdinUpload bool) value {
+	// Curl accepts "-" and "." as stdin; wget --post-file requires a regular file.
+	if stdinUpload && (path == "-" || path == ".") {
+		return stdin
+	}
 	if path == "" {
 		return nil
 	}
@@ -1107,6 +1133,151 @@ func commandOutputName(command syntax.Command, markers scope) string {
 	return ""
 }
 
+func (s *shell) outputName(command syntax.Command, target string) string {
+	if target != "$GITHUB_OUTPUT" {
+		return commandOutputName(command, s.markers)
+	}
+	// Compound output may contain several distinct records. Track the union
+	// under a wildcard rather than treating its first name as the entire write.
+	call, ok := command.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return ""
+	}
+	commandWord, _ := sliceAt(call.Args, 0)
+	first, _ := sliceAt(call.Args, 1)
+	name := literalShellWord(commandWord)
+	if name == "echo" && len(call.Args) == 2 && singleOutputWord(first) {
+		return literalOutputName(first, s.markers)
+	}
+	if name == "printf" && len(call.Args) == 3 {
+		second, _ := sliceAt(call.Args, 2)
+		format := strings.TrimSuffix(literalShellWord(first), `\n`)
+		if format == "%s" && singleOutputWord(second) {
+			return literalOutputName(second, s.markers)
+		}
+		if key, ok := strings.CutSuffix(format, "=%s"); ok && outputIdentifier.MatchString(key) && !containsMarker(key, s.markers) && singleOutputWord(second) {
+			return key + "="
+		}
+	}
+	return ""
+}
+
+func singleOutputWord(word *syntax.Word) bool {
+	if strings.ContainsAny(staticWord(word), "\r\n\\") {
+		return false
+	}
+	known := true
+	syntax.Walk(word, func(node syntax.Node) bool {
+		if quoted, ok := node.(*syntax.SglQuoted); ok && quoted.Dollar {
+			// ANSI-C escapes are raw in the AST and may introduce extra records
+			// or change names. Do not infer transport names without decoding them.
+			known = false
+		}
+		return known
+	})
+	return known
+}
+
+func (s *shell) outputMayBeMultiline(command syntax.Command) bool {
+	call, ok := command.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return true
+	}
+	commandWord, exists := sliceAt(call.Args, 0)
+	if !exists {
+		return true
+	}
+	name := literalShellWord(commandWord)
+	wordIndex := 1
+	if name == "printf" {
+		wordIndex = 2
+	}
+	word, exists := sliceAt(call.Args, wordIndex)
+	if !exists {
+		return true
+	}
+	uncertain := false
+	syntax.Walk(word, func(node syntax.Node) bool {
+		switch n := node.(type) {
+		case *syntax.ParamExp, *syntax.CmdSubst:
+			uncertain = true
+		case *syntax.Lit:
+			uncertain = uncertain || strings.ContainsAny(n.Value, "\\\r\n")
+		case *syntax.SglQuoted:
+			uncertain = uncertain || n.Dollar || strings.ContainsAny(n.Value, "\\\r\n")
+		case *syntax.Word, *syntax.DblQuoted:
+		default:
+			uncertain = true
+		}
+		return !uncertain
+	})
+	return uncertain
+}
+
+func (s *shell) outputRecordComplete(command syntax.Command) bool {
+	call, ok := command.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return false
+	}
+	commandWord, exists := sliceAt(call.Args, 0)
+	if !exists {
+		return false
+	}
+	switch literalShellWord(commandWord) {
+	case "echo":
+		return true
+	case "printf":
+		format, exists := sliceAt(call.Args, 1)
+		if !exists {
+			return false
+		}
+		texts, known := wordTexts(format, s.constants, s.constantValues, s.constantUnknown)
+		text, hasText := sliceAt(texts, 0)
+		return known && hasText && len(texts) == 1 && strings.HasSuffix(text, `\n`)
+	default:
+		return false
+	}
+}
+
+// The name must precede every expansion. wordText alone is insufficient:
+// command substitutions are deliberately omitted from its diagnostic text.
+func literalOutputName(word *syntax.Word, markers scope) string {
+	var prefix strings.Builder
+	known, complete := true, false
+	syntax.Walk(word, func(node syntax.Node) bool {
+		if node == nil || !known || complete {
+			return false
+		}
+		switch n := node.(type) {
+		case *syntax.Word, *syntax.DblQuoted:
+			return true
+		case *syntax.Lit:
+			prefix.WriteString(n.Value)
+		case *syntax.SglQuoted:
+			prefix.WriteString(n.Value)
+		default:
+			known = false
+			return false
+		}
+		text := prefix.String()
+		name, _, found := strings.Cut(text, "=")
+		if !found {
+			name, _, found = strings.Cut(text, "<<")
+		}
+		if found {
+			complete = true
+			prefix.Reset()
+			prefix.WriteString(name)
+		}
+		return false
+	})
+	name := prefix.String()
+	if !known || !complete || containsMarker(name, markers) || !outputIdentifier.MatchString(name) {
+		return ""
+	}
+	return name + "="
+}
+
 func containsMarker(text string, markers scope) bool {
 	for marker := range markers {
 		if strings.Contains(text, marker) {
@@ -1214,7 +1385,7 @@ func wordText(word *syntax.Word, constants map[string]string) string {
 	return text.String()
 }
 
-func (s *shell) write(target string, sources value, payload string, line int) {
+func (s *shell) write(target string, sources value, payload string, line int, command syntax.Command) {
 	site := Site{Path: s.path, Line: line}
 	switch target {
 	case "$GITHUB_STEP_SUMMARY":
@@ -1228,14 +1399,8 @@ func (s *shell) write(target string, sources value, payload string, line int) {
 		name = strings.TrimSpace(name)
 		if target == "$GITHUB_OUTPUT" {
 			site.Kind = Output
-			s.a.emit(site, sources)
-			if name == "" {
-				name = "*"
-			}
-			if s.step != "" {
-				key := "steps." + strings.ToLower(s.step) + ".outputs." + strings.ToLower(name)
-				s.bindings[key] = union(s.bindings[key], sources)
-			}
+			s.files[target] = union(s.files[target], sources)
+			s.a.transportOutputRecord(site, name, sources, s.a.stepOutput, s.outputMayBeMultiline(command), s.outputRecordComplete(command))
 		} else if name != "" {
 			key := "env." + strings.ToLower(name)
 			s.persisted[key] = union(s.persisted[key], sources)

@@ -441,6 +441,84 @@ func TestBuildThreatDetectionAWFConfigCACert(t *testing.T) {
 	}
 }
 
+func TestBuildThreatDetectionAWFConfigTargets(t *testing.T) {
+	tests := []struct {
+		name            string
+		detectionEngine string
+		wantTargets     bool
+	}{
+		{name: "same engine inherits targets", detectionEngine: "copilot", wantTargets: true},
+		{name: "different engine does not inherit targets", detectionEngine: "claude"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agentTargets := map[string]*AgentAPIProxyTargetConfig{
+				"copilot": {
+					ExtraHeaders:    map[string]string{"x-gateway-id": "my-id"},
+					ExtraBodyFields: map[string]string{"provider": "anthropic"},
+					SessionId:       "agent-session",
+				},
+			}
+			data := &WorkflowData{
+				AI: "copilot",
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{Targets: agentTargets},
+				},
+			}
+
+			detectionData := buildThreatDetectionWorkflowData(data, tt.detectionEngine)
+			configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName:   tt.detectionEngine,
+				WorkflowData: detectionData,
+			})
+			if err != nil {
+				t.Fatalf("BuildAWFConfigJSON() error = %v", err)
+			}
+
+			var config struct {
+				APIProxy struct {
+					Targets map[string]struct {
+						ExtraHeaders    map[string]string `json:"extraHeaders"`
+						ExtraBodyFields map[string]string `json:"extraBodyFields"`
+						SessionID       string            `json:"sessionId"`
+					} `json:"targets"`
+				} `json:"apiProxy"`
+			}
+			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+				t.Fatalf("unmarshal AWF config: %v", err)
+			}
+
+			target, exists := config.APIProxy.Targets["copilot"]
+			if !tt.wantTargets {
+				if exists {
+					t.Fatal("detection config must not inherit targets for a different engine")
+				}
+				return
+			}
+			if !exists {
+				t.Fatal("detection config is missing inherited Copilot target")
+			}
+			if target.ExtraHeaders["x-gateway-id"] != "my-id" {
+				t.Errorf("extraHeaders = %v, want gateway header", target.ExtraHeaders)
+			}
+			if target.ExtraBodyFields["provider"] != "anthropic" {
+				t.Errorf("extraBodyFields = %v, want provider field", target.ExtraBodyFields)
+			}
+			if target.SessionID != "agent-session" {
+				t.Errorf("sessionId = %q, want agent-session", target.SessionID)
+			}
+
+			detectionData.SandboxConfig.Agent.Targets["copilot"].ExtraHeaders["x-gateway-id"] = "changed"
+			detectionData.SandboxConfig.Agent.Targets["copilot"].ExtraBodyFields["provider"] = "changed"
+			if agentTargets["copilot"].ExtraHeaders["x-gateway-id"] != "my-id" ||
+				agentTargets["copilot"].ExtraBodyFields["provider"] != "anthropic" {
+				t.Error("detection targets must not mutate the agent targets")
+			}
+		})
+	}
+}
+
 func TestDetectionExecutionStepsCACert(t *testing.T) {
 	compiler := NewCompiler()
 	for _, engine := range []string{"claude", "codex", "copilot"} {

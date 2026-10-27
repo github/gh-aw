@@ -59,6 +59,7 @@ func parseRepositoryPackageManifest(manifestPath string, content []byte) (*repos
 func parseRepositoryPackageManifestRoot(manifestPath string, content []byte) (map[string]any, string, error) {
 	var raw any
 	if err := yaml.Unmarshal(content, &raw); err != nil {
+		addPackageManifestLog.Printf("Failed to parse manifest %s as YAML: %v", manifestPath, err)
 		return nil, "", fmt.Errorf("invalid Agentic Workflow manifest %q: %s. Ensure the manifest is valid YAML. Example:\nname: My Package", manifestPath, parser.FormatYAMLError(err, 1, string(content)))
 	}
 
@@ -75,6 +76,7 @@ func parseRepositoryPackageManifestRoot(manifestPath string, content []byte) (ma
 	}
 
 	if err := parser.ValidateRepositoryPackageManifestWithSchemaAndLocation(root, manifestPath); err != nil {
+		addPackageManifestLog.Printf("Manifest %s failed schema validation: %v", manifestPath, err)
 		return nil, "", fmt.Errorf("invalid Agentic Workflow manifest %q: %w", manifestPath, err)
 	}
 
@@ -228,6 +230,7 @@ func populateRepositoryPackageManifestDescription(manifest *repositoryPackageMan
 	if description, ok := stringValue(root["description"]); ok {
 		manifest.Description = description
 		if len(description) > 255 {
+			addPackageManifestLog.Printf("Manifest %s description is %d characters, exceeding the 255-character marketplace display limit", manifestPath, len(description))
 			return []string{fmt.Sprintf("Manifest %s description exceeds the 255-character marketplace display limit", manifestPath)}
 		}
 	}
@@ -250,6 +253,7 @@ func validateUniqueManifestInstallDestinations(installables []resolvedPackageIns
 }
 
 func validateManifestInstallableWorkflowPrivacy(manifestPath string, installationSources []resolvedPackageInstallable, readWorkflow func(string) ([]byte, error)) error {
+	addPackageManifestLog.Printf("Validating workflow privacy for %d installable(s) in %s", len(installationSources), manifestPath)
 	for _, installable := range installationSources {
 		installationSource := installable.SourcePath
 		if isActionWorkflowPath(installationSource) {
@@ -329,9 +333,11 @@ func validateRepositoryPackageManifestIcon(icon string, resources []repositoryPa
 
 	// Look like a path or SVG file but not in resources?
 	if strings.HasSuffix(strings.ToLower(iconStr), ".svg") || strings.Contains(iconStr, "/") {
+		addPackageManifestLog.Printf("Rejecting manifest %s icon %q: looks like a resource path but is not declared in resources", manifestPath, iconStr)
 		return fmt.Errorf("invalid Agentic Workflow manifest %q: icon file %q must be declared in package resources", manifestPath, iconStr)
 	}
 
+	addPackageManifestLog.Printf("Rejecting manifest %s icon %q: does not match any recognized icon format", manifestPath, iconStr)
 	return fmt.Errorf("invalid Agentic Workflow manifest %q: icon %q is invalid: must be an emoji, a GitHub primer octicon name (e.g. :check-circle:), or an SVG file declared in package resources", manifestPath, iconStr)
 }
 

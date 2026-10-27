@@ -245,6 +245,7 @@ func localPackageImportRoot(packageDir string) string {
 func readLocalImportedManifest(manifestPath, importRoot string) ([]byte, error) {
 	evaluatedPath, err := filepath.EvalSymlinks(manifestPath)
 	if err != nil {
+		addPackageManifestLog.Printf("Failed to resolve symlinks for imported manifest %q: %v", manifestPath, err)
 		return nil, err
 	}
 	evaluatedRoot, err := filepath.EvalSymlinks(importRoot)
@@ -265,6 +266,7 @@ func readLocalImportedManifest(manifestPath, importRoot string) ([]byte, error) 
 		return nil, err
 	}
 	if filepath.Clean(relative) != filepath.Clean(declaredRelative) {
+		addPackageManifestLog.Printf("Rejecting imported manifest %q: resolved path %q diverges from declared path %q (symbolic link)", manifestPath, relative, declaredRelative)
 		return nil, errors.New("imported manifests must not use symbolic links")
 	}
 	return os.ReadFile(manifestPath)

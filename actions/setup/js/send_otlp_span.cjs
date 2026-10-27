@@ -16,6 +16,7 @@ const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
 const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
 const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
+const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 
 function getGhAwPath(relativePath) {
   const root = (process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw";
@@ -2211,10 +2212,11 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   const detectionReason = process.env.GH_AW_DETECTION_REASON || "";
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
-  const agentUsageFilePath = "/tmp/gh-aw/agent_usage.json";
+  const agentUsageFilePath = jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_usage.json" : "/tmp/gh-aw/agent_usage.json";
   const agentUsageRaw = readJSONIfExists(agentUsageFilePath);
   const agentUsageNormalized = normalizeRuntimeTokenUsage(agentUsageRaw);
-  const agentUsage = agentUsageNormalized || runtimeMetrics.tokenUsage || {};
+  // Detection uses its own counters and must not inherit usage from downloaded agent logs.
+  const agentUsage = jobName === "detection" ? (detectionConclusion === "skipped" ? {} : agentUsageNormalized || {}) : agentUsageNormalized || runtimeMetrics.tokenUsage || {};
   // Mark the span as an error when the agent job failed, timed out, or was cancelled.
   const isAgentTimedOut = agentConclusion === "timed_out";
   const isAgentFailure = agentConclusion === "failure" || isAgentTimedOut;
@@ -2574,6 +2576,12 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // When no agent span is emitted the attributes fall through to the conclusion span
   // so a single query is still sufficient for observability.
   const usageAttrs = [];
+  const harnessRetry = jobEmitsOwnTokenUsage ? normalizeHarnessRetryRecord(readJSONIfExists(getGhAwPath(jobName === "detection" ? "threat-detection/detection_harness_retry.json" : "agent/harness_retry.json"))) : undefined;
+  if (harnessRetry) {
+    const retryReasons = harnessRetry.attemptResults.flatMap(attempt => attempt.failureClasses);
+    usageAttrs.push(buildAttr("gh-aw.harness.attempts", harnessRetry.attempts));
+    usageAttrs.push(buildArrayAttr("gh-aw.harness.retry_reasons", retryReasons));
+  }
   if (typeof aiCredits === "number") {
     usageAttrs.push(buildDoubleAttr("gh-aw.aic", aiCredits));
   }

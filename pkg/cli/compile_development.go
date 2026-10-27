@@ -69,7 +69,7 @@ func validateDevelopmentCompileMode(config CompileConfig) error {
 		{config.Watch, "--watch"},
 		{config.Approve, "--approve"},
 		{config.AllowActionRefs, "--allow-action-refs"},
-		{config.SkipLint, "--skip-lint"},
+		{config.SkipLint, "--no-lint"},
 	} {
 		if option.enabled {
 			return fmt.Errorf("--dry-run cannot be combined with %s: development testing requires emitted lock files, complete checks, and an unchanged safe-update baseline", option.name)
@@ -90,6 +90,9 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 	ignoredLowSeverityWarnings := compiler.GetExperimentalWarningCount()
 	ignoredWorkflowWarnings := 0
 	for _, result := range *results {
+		if result.Scope == "batch" {
+			continue
+		}
 		for _, warning := range result.Warnings {
 			if isLowSeverityWarning(warning) {
 				ignoredWorkflowWarnings++
@@ -104,7 +107,7 @@ func enforceDevelopmentDiagnostics(config CompileConfig, compiler *workflow.Comp
 		appendDevelopmentBatchDiagnostics("models", modelInventoryWarnings(config), stats, results)
 	}
 	for _, err := range scanErrors {
-		for _, issue := range appendValidationErrors(nil, "scanner_error", err) {
+		for _, issue := range scannerValidationIssues("scanner", err) {
 			if !hasDevelopmentBatchDiagnostic(*results, issue.Message) {
 				appendDevelopmentBatchDiagnostics("scanners", []ValidationIssue{issue}, stats, results)
 			}

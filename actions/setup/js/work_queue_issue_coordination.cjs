@@ -67,7 +67,7 @@ async function withGraphQLProjectionLocks({ githubClient, repositoryId, head, ke
   try {
     response = await githubClient.graphql(`mutation WorkQueueProjectionLocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: { retries: 0, timeout: 30000 } });
   } catch (error) {
-    log.failure("projection.locks.acquire.failed", error, true);
+    log.failure("projection.locks.acquire.failed", error, true, "lock");
     response = error.data;
     errors = error.errors || [];
   }
@@ -102,7 +102,13 @@ async function withGraphQLProjectionLocks({ githubClient, repositoryId, head, ke
       const variables = Object.fromEntries(release.map((lock, index) => [`u${index}`, { refId: lock.id, clientMutationId: nonce }]));
       const declarations = release.map((_, index) => `$u${index}:DeleteRefInput!`);
       const selections = release.map((_, index) => `u${index}: deleteRef(input:$u${index}) { clientMutationId }`);
-      const result = await githubClient.graphql(`mutation WorkQueueProjectionUnlocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: { retries: 0, timeout: 30000 } });
+      let result;
+      try {
+        result = await githubClient.graphql(`mutation WorkQueueProjectionUnlocks(${declarations.join(",")}) { ${selections.join("\n")} }`, { ...variables, request: { retries: 0, timeout: 30000 } });
+      } catch (error) {
+        log.failure("projection.locks.release.failed", error, true, "unlock");
+        throw error;
+      }
       if (release.some((_, index) => result?.[`u${index}`]?.clientMutationId !== nonce)) throw queueError("projection_coordination_pending", "coordination release is uncertain");
     }
   }

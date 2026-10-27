@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [activation]
     steps:
-      - uses: my-org/custom-action@v1
+      - uses: my-org/custom-action@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ---
 
 # Safe Update Action Test
@@ -162,10 +163,26 @@ func TestSafeUpdateFirstCompileCreatesBaselineForActions(t *testing.T) {
 	require.NoError(t, err, "first compile should succeed (warnings don't fail the build)\nOutput:\n%s", outputStr)
 	assert.Contains(t, outputStr, "SECURITY REVIEW REQUIRED",
 		"first compile should emit safe update warnings so the agent reviews newly introduced actions")
-	// Lock file must be written
+	// Lock file must record the new action as the baseline.
 	lockFilePath := filepath.Join(setup.workflowsDir, "safe-update-action.lock.yml")
-	_, statErr := os.Stat(lockFilePath)
-	require.NoError(t, statErr, "lock file should be written after first compile")
+	lockContent, readErr := os.ReadFile(lockFilePath)
+	require.NoError(t, readErr, "lock file should be written after first compile")
+	manifest, manifestErr := workflow.ExtractGHAWManifestFromLockFile(string(lockContent))
+	require.NoError(t, manifestErr)
+	require.NotNil(t, manifest, "lock file should contain the manifest baseline")
+	assert.Contains(t, manifest.Actions, workflow.GHAWManifestAction{
+		Repo:    "my-org/custom-action",
+		SHA:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Version: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	},
+		"manifest should include the pinned custom action")
+
+	recompileCmd := exec.Command(setup.binaryPath, "compile", workflowPath)
+	recompileCmd.Env = append(os.Environ(), "GH_AW_ACTION_MODE=release")
+	recompileOutput, recompileErr := recompileCmd.CombinedOutput()
+	require.NoError(t, recompileErr, "recompile should accept the action baseline\nOutput:\n%s", recompileOutput)
+	assert.NotContains(t, string(recompileOutput), "SECURITY REVIEW REQUIRED",
+		"unchanged action should not require another security review")
 	t.Logf("First compile correctly emitted warnings for new action.\nOutput:\n%s", outputStr)
 }
 

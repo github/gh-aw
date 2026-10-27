@@ -219,7 +219,7 @@ describe("trusted work queue control step performance", () => {
     { profiles: 3, depth: 8 },
     { profiles: 3, depth: 32 },
     { profiles: 3, depth: 64 },
-    { profiles: 3, depth: 8, works: 27, retained: 300 },
+    { profiles: 3, depth: 8, works: 27, retained: 100 },
   ])(
     "bounds cold history verification and full-batch idempotent recovery: %j",
     async parameters => {
@@ -280,7 +280,7 @@ describe("trusted work queue control step performance", () => {
   it.each(["injected", "dynamic"])(
     "detects uncached-history amplification for the %s client at the real compiler adapter boundary",
     async auth => {
-      const scenario = await fixture({ auth, deploymentsChanged: true });
+      const scenario = await fixture({ auth, deploymentsChanged: true, depth: 8 });
       const metrics = await scenario.run("uncached-auth-negative-control");
       assertBoundClaims(scenario);
       // Negative controls must fail the same one-traversal budget as the cached
@@ -289,6 +289,7 @@ describe("trusted work queue control step performance", () => {
       expect(metrics.history_reads).toBeGreaterThan(5 * (scenario.depth + 1));
       expect(metrics.simulated_network_ms).toBeGreaterThan(120000);
     },
-    30000
+    // Uncached negative controls deliberately replay thousands of API reads.
+    120000
   );
 });

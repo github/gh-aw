@@ -65,7 +65,13 @@ event log.
      delivery or a ready DAG successor. Report the oldest eligible Work's age
      only when a trusted admission time is available; causal FIFO position is
      not a client timestamp. Do not expose Work/Claim identifiers, payloads, or
-     accounting keys belonging to other principals.
+     accounting keys belonging to other principals. Paginate the returned `works`
+     through `next_offset` (up to 100 items), reconcile item totals and states
+     with aggregate counts, and summarize barriers, cancellation reasons, and
+     `worker_profile` from those items. Attribute a delivery problem to a worker
+     profile only when the item-level records support it; if inspection is capped
+     or incomplete, label the breakdown as a sample or unavailable rather than
+     inferring it from workflow names.
    - The Issue Monster queue: open issues with the `cookie` label, excluding
      labels in `issue-monster.md` that make an item ineligible. Show both the
      total approved backlog and the eligible subset, plus new/closed items in
@@ -80,9 +86,13 @@ event log.
 2. Use read-only GitHub tools to query issue and PR state. Use the repository
    and the filters from the current workflow sources, not guesses based on
    labels or titles. Paginate where supported and give exact totals from search
-   metadata when available. Bound item-level inspection to 100 recent items
-   per queue; if a source is capped or pagination fails, mark its count as a
-   lower bound or unavailable, never as zero. Do not count PRs as issues.
+   metadata when available. For counts of 100 or fewer, inspect every returned
+   item and cross-check its eligibility against the workflow's exclusions,
+   including dynamic campaign exclusions; compare the item count with search
+   metadata. For larger queues, bound item-level inspection to 100 recent items
+   and label it as a sample. If counts disagree, a source is capped, or
+   pagination fails, report the discrepancy and mark the count unverified, a
+   lower bound, or unavailable, never as zero. Do not count PRs as issues.
 3. Publish one issue titled `Daily Work Queues Report - YYYY-MM-DD` (UTC).
    Include an overview and a table with each queue, source, current count by
    state, 24-hour changes when observable, oldest waiting age when available,

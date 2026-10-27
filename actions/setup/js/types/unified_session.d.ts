@@ -379,13 +379,13 @@ export interface SafeOutputData {
   identifier?: JsonValue;
   url?: JsonValue;
   status?: JsonValue;
-  message?: JsonValue;
-  error?: JsonValue;
   errorCode?: JsonValue;
+  messageIndex?: number;
+  staged?: boolean;
 }
 
 export interface SafeOutputErrorData extends SafeOutputData {
-  errors?: (SafeOutputData | string | number | boolean | null | JsonValue[])[];
+  errors?: SafeOutputData[];
 }
 
 export interface ExperimentStateData {
@@ -464,12 +464,40 @@ export interface ExecutionResultData {
   finishedAt?: JsonValue;
 }
 
+export interface HarnessRetryAttemptData {
+  /** @asType integer @minimum 1 @maximum 101 */
+  attempt: number;
+  /** @asType integer */
+  exitCode: number;
+  failureClasses: string[];
+}
+
+export interface HarnessRetryData {
+  /** @asType integer @minimum 0 @maximum 101 */
+  attempts: number;
+  /** @asType integer */
+  exitCode: number;
+  attemptResults: HarnessRetryAttemptData[];
+}
+
 /** Conclusion's dependency snapshot, not the still-running conclusion job. */
 export interface WorkflowJobResultData {
   /** @pattern ^[A-Za-z_][A-Za-z0-9_-]*$ */
   jobId: string;
   result: "success" | "failure" | "cancelled" | "skipped";
   durationMs?: SessionCount;
+}
+
+/** Trusted persistence evidence, separate from an agent's request to save memory. */
+export interface MemorySaveResultData {
+  memoryId: string;
+  jobResult: "success" | "failure" | "cancelled" | "skipped";
+  outcome?: "success" | "failure" | "cancelled" | "skipped";
+  status: "saved" | "unchanged" | "skipped" | "failure" | "cancelled" | "unknown";
+  /** Target branch of a successful push. */
+  branch?: string;
+  /** Commit that landed remotely, which may differ from the local commit. */
+  commit?: string;
 }
 
 /** Validated admission allowances, not spend or credentials. */
@@ -614,6 +642,7 @@ export interface CollectionData {
 /** Known essential payloads. Unknown native extensions remain open. */
 export interface UnifiedSessionEventDataMap {
   "workflow.job_result": WorkflowJobResultData;
+  "memory.push": MemorySaveResultData;
   "model.inventory": ModelInventoryData;
   "model.config": ModelConfigData;
   "model.baseline_estimate": ModelBaselineEstimateData;
@@ -728,6 +757,7 @@ export interface UnifiedSessionEventDataMap {
   "firewall.event": RuntimeObservationData;
   "safe_output.request": SafeOutputData;
   "safe_output.result": SafeOutputData;
+  "safe_output.outcome": SafeOutputData;
   "safe_output.error": SafeOutputErrorData;
   "experiment.state": ExperimentStateData;
   "experiment.assignment": ExperimentAssignmentData;
@@ -736,6 +766,7 @@ export interface UnifiedSessionEventDataMap {
   "eval.result": EvalResultData;
   "usage.report": UsageReportData;
   "execution.result": ExecutionResultData;
+  "harness.retry": HarnessRetryData;
   "detection.result": DetectionResultData;
   "guardrail.admission": AdmissionDecisionData;
   "guardrail.daily_aic": DailyAICDecisionData;

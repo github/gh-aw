@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 84 active analyzers:
+// All 85 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -52,6 +52,7 @@
 //   - packagelevelmutableslicemap — reports mutation of package-level slice/map variables from inside function bodies, which risks data races and cross-call state leaks
 //   - panic-in-library-code — flags panic() calls in library packages
 //   - rawloginlib — flags direct usage of the standard log package in library packages
+//   - readerstringconv — flags strings.NewReader(string(b)) and bytes.NewReader([]byte(s)) calls that copy data only to change reader type
 //   - reflectdeepequalusage — flags reflect.DeepEqual calls that should use typed equality or type-specific comparison functions
 //   - regexpcompileinfunction — flags regexp.MustCompile/Compile calls inside functions
 //   - regexpdynamicpattern — flags regexp compile calls whose pattern is not a compile-time constant

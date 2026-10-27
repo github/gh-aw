@@ -428,6 +428,24 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     }
   });
 
+  it("daily_arxiv_agents_inherit_main_without_resolving_unverified_models", async () => {
+    const run = codexLayout();
+    const source = fs.readFileSync(path.join(repoRoot, ".github/workflows/daily-arxiv-researcher.md"), "utf8");
+    const agents = extractInlineSubAgents(extractFrontmatterAndBody(source).markdown).agents;
+    expect(agents).toHaveLength(4);
+    expect(agents.every(agent => frontmatterOf(agent.content).model === undefined)).toBe(true);
+    stageInline(run, "codex", Object.fromEntries(agents.map(agent => [agent.name, agent.content])));
+
+    const outcome = await apply(run);
+
+    expect(outcome).toMatchObject({ ok: true, failures: [], resolutions: [] });
+    expect(run.records()).toEqual([]);
+    expect(roleFiles(run)).toEqual(["opportunity-extractor.toml", "paper-screener.toml", "preliminary-investigator.toml", "relevance-ranker.toml"]);
+    for (const name of roleFiles(run).map(file => file.slice(0, -".toml".length))) {
+      expect(readRole(run, name)).not.toHaveProperty("model");
+    }
+  });
+
   it.each([
     ["triple quotes", "Write \"\"\"docstrings\"\"\" and '''literals''' verbatim."],
     ["control characters", "Tab\there, bell \u0007, escape \u001b[0m, backspace \b, form feed \f, DEL \u007f and NUL-adjacent \u0001 stay."],
@@ -580,16 +598,17 @@ describe("Codex sub-agent models (daily-arxiv-researcher run 39394965127)", () =
     expect(run.logs.join("\n")).not.toMatch(/not applied/);
   });
 
-  it("fails closed for an alias effort Codex does not accept", async () => {
+  it("applies an alias effort Codex accepts", async () => {
     const run = codexLayout();
     run.env.GH_AW_MODEL_ALIASES = JSON.stringify({ fast: ["openai/gpt-5.4-mini?effort=none"] });
     stageInline(run, "codex", { "paper-screener": arxivAgents()["paper-screener"].replace("model: openai/gpt-5.4-mini", "model: fast") });
 
     const outcome = await apply(run);
 
-    expect(outcome.ok).toBe(false);
-    expect(run.logs).toContainEqual(expect.stringMatching(/codex sub-agent 'paper-screener': model 'fast' resolves with effort 'none': .*not supported by the codex engine.*Refusing to start Codex/));
-    expect(roleFiles(run)).toEqual([]);
+    expect(outcome.ok).toBe(true);
+    expect(outcome.resolutions).toEqual([{ name: "paper-screener", configuredModel: "fast", model: "gpt-5.4-mini", status: "resolved", params: { effort: "none" } }]);
+    expect(readRole(run, "paper-screener")).toMatchObject({ model: "gpt-5.4-mini", model_reasoning_effort: "none" });
+    expect(run.logs.join("\n")).not.toMatch(/not applied/);
   });
 
   it.each([

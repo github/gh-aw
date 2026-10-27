@@ -121,7 +121,7 @@ func fetchWorkflowRunLogsArchive(ctx context.Context, runID int64, verbose bool,
 	}
 
 	args := []string{"api", endpoint}
-	if hostname != "" && hostname != "github.com" {
+	if hostname != "" {
 		args = append(args, "--hostname", hostname)
 	}
 

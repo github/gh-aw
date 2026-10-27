@@ -48,7 +48,7 @@ func buildWorkflowRunAPIArgs(runID int64, owner, repo, hostname string) []string
 		endpoint = fmt.Sprintf("repos/%s/%s/actions/runs/%d", owner, repo, runID)
 	}
 	args := []string{"api"}
-	if hostname != "" && hostname != "github.com" {
+	if hostname != "" {
 		args = append(args, "--hostname", hostname)
 	}
 	return append(args, endpoint)
@@ -102,7 +102,7 @@ func resolveWorkflowDisplayName(ctx context.Context, workflowPath, owner, repo, 
 	}
 
 	args := []string{"api"}
-	if hostname != "" && hostname != "github.com" {
+	if hostname != "" {
 		args = append(args, "--hostname", hostname)
 	}
 	args = append(args, endpoint, "--jq", ".name")

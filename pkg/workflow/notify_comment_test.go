@@ -16,11 +16,11 @@ import (
 func TestUsageActivityGenerationIncludesJobResults(t *testing.T) {
 	for _, hasGuardrail := range []bool{false, true} {
 		for _, reuseJobDurations := range []bool{false, true} {
-			steps := strings.Join(buildUsageActivityGenerationStep(hasGuardrail, reuseJobDurations, func(action string) string { return action }), "")
+			steps := strings.Join(buildUsageActivityGenerationStep(false, hasGuardrail, reuseJobDurations, func(action string) string { return action }), "")
 			assert.NotContains(t, steps, "GH_AW_JOB_RESULTS:", "result-only metadata is inherited from the conclusion job environment")
 			assert.Equal(t, reuseJobDurations, strings.Contains(steps, "GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}"))
-			assert.Contains(t, steps, "        env:\n")
-			assert.Contains(t, steps, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}")
+			assert.Equal(t, hasGuardrail || reuseJobDurations, strings.Contains(steps, "        env:\n"))
+			assert.NotContains(t, steps, "GH_AW_ADMISSION_")
 			assert.Equal(t, hasGuardrail, strings.Contains(steps, "GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS:"))
 			assert.NotContains(t, steps[strings.Index(steps, "          script:"):], "${{ toJSON(needs) }}")
 		}
@@ -1510,6 +1510,11 @@ func TestConclusionJobIncludesUsageArtifactSteps(t *testing.T) {
 	}
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/agent/execution.json") {
 		t.Errorf("Expected usage artifact to include agent execution evidence path.\nGenerated steps:\n%s", allSteps)
+	}
+	for _, component := range []string{"agent", "detection"} {
+		if !strings.Contains(allSteps, "/tmp/gh-aw/usage/"+component+"/harness_retry.json") {
+			t.Errorf("Expected usage artifact to include %s harness retry telemetry.\nGenerated steps:\n%s", component, allSteps)
+		}
 	}
 	if !strings.Contains(allSteps, "/tmp/gh-aw/usage/detection/token_usage.jsonl") {
 		t.Errorf("Expected usage artifact to include detection token usage path.\nGenerated steps:\n%s", allSteps)

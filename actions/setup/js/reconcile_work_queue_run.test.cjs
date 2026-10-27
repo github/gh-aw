@@ -35,6 +35,17 @@ function setup(fixtureOptions = {}) {
 }
 
 describe("inline trusted worker termination", () => {
+  it("prefixes invalid worker job context with a stable error code", async () => {
+    const { options } = setup();
+    options.jobNames = {};
+
+    await expect(main(options)).rejects.toMatchObject({
+      message: "ERR_VALIDATION: work_queue_worker_job_context_invalid",
+      code: "work_queue_worker_job_context_invalid",
+      category: "ERR_WORK_QUEUE_RECONCILIATION",
+    });
+  });
+
   it.each(["success", "failure", "cancelled", "skipped"])("releases after predecessor jobs end with %s while the run is still active", async conclusion => {
     const { fixture, jobs, nativeRun, options } = setup();
     jobs[1].conclusion = conclusion;
@@ -178,7 +189,7 @@ describe("inline trusted worker termination", () => {
     const { options } = setup();
     if (kind === "rerun") options.context.runAttempt = 2;
     else options.context.job = "safe_outputs";
-    await expect(main(options)).rejects.toThrow("work_queue_worker_finalizer_context_invalid");
+    await expect(main(options)).rejects.toThrow("ERR_VALIDATION: work_queue_worker_finalizer_context_invalid");
     expect(options.readWorkQueueLog).not.toHaveBeenCalled();
   });
 
@@ -294,8 +305,13 @@ describe("scheduled work queue recovery", () => {
     const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work", title_prefix: "[work queue]" });
     const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockResolvedValue({ pending: pending ? [{ reason: "unavailable" }] : [] });
     try {
-      if (pending && !deferIssueFailure) await expect(maintenance({ ...options, projectIssues: true, deferIssueFailure })).rejects.toThrow(/queue transitions are committed/);
-      else expect(await maintenance({ ...options, projectIssues: true, deferIssueFailure })).toMatchObject({ issue_sync_pending: pending ? [{ reason: "unavailable" }] : [] });
+      if (pending && !deferIssueFailure) {
+        await expect(maintenance({ ...options, projectIssues: true, deferIssueFailure })).rejects.toMatchObject({
+          message: expect.stringMatching(/^ERR_VALIDATION: work_queue_issue_synchronization_pending; queue transitions are committed/),
+          code: "work_queue_issue_synchronization_pending",
+          category: "ERR_WORK_QUEUE_RECONCILIATION",
+        });
+      } else expect(await maintenance({ ...options, projectIssues: true, deferIssueFailure })).toMatchObject({ issue_sync_pending: pending ? [{ reason: "unavailable" }] : [] });
       expect(projection).toHaveBeenCalledOnce();
       const args = projection.mock.calls[0][0];
       expect(args.trustedContext).toMatchObject({ role: "reconciler", workflow: publisher.path, event: "schedule" });

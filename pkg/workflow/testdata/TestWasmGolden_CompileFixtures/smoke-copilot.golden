@@ -1942,8 +1942,6 @@ jobs:
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'default' }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
-          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
@@ -2184,6 +2182,7 @@ jobs:
             /tmp/gh-aw/agent_execution_exit_code.txt
             /tmp/gh-aw/agent_usage.jsonl
             /tmp/gh-aw/agent_usage.json
+            /tmp/gh-aw/agent/harness_retry.json
             /tmp/gh-aw/agent/model-endpoint-mismatch.json
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
             /tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl
@@ -2219,6 +2218,7 @@ jobs:
             /tmp/gh-aw/agent/model-endpoint-mismatch.json
             /tmp/gh-aw/agent/model-resolution.json
             /tmp/gh-aw/agent-stdio.log
+            /tmp/gh-aw/agent/harness_retry.json
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
@@ -2535,12 +2535,10 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}
           GH_AW_GRADER_MANIFEST_0: '{"version":2,"graders":[]}'
           GH_AW_GRADER_MANIFEST_CHUNKS: '1'
+          GH_AW_SAFE_JOB_NAMES: "[\"send_slack_message\"]"
+          GH_AW_SAFE_JOB_RESULTS: "{\"send_slack_message\":{\"result\":${{ toJSON(needs.send_slack_message.result) }},\"outputs\":{}}}"
           GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}
           GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
           GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
@@ -2576,8 +2574,10 @@ jobs:
             /tmp/gh-aw/usage/agent/token_usage.jsonl
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
@@ -2611,8 +2611,10 @@ jobs:
             /tmp/gh-aw/usage/agent/token_usage.jsonl
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
@@ -2691,6 +2693,9 @@ jobs:
           if [ -f "/tmp/gh-aw/agent_output.json" ]; then
             echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
           fi
+      - name: Clear agent token usage
+        if: always()
+        run: rm -f /tmp/gh-aw/agent_usage.json
       - name: Checkout repository for patch context
         if: needs.agent.outputs.has_patch == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -2787,8 +2792,6 @@ jobs:
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'detection' }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}
-          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_HARNESS_MAX_RETRIES: 0
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS || '400' }}
@@ -3055,7 +3058,7 @@ jobs:
       discussions: write
       issues: write
       pull-requests: write
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
       GH_AW_AIC: ${{ needs.agent.outputs.aic }}
@@ -3173,6 +3176,7 @@ jobs:
           name: safe-outputs-items
           path: |
             /tmp/gh-aw/safe-output-items.jsonl
+            /tmp/gh-aw/safe-output-outcomes.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore

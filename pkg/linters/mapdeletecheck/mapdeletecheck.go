@@ -167,6 +167,8 @@ func matchMapIndexAssign(pass *analysis.Pass, stmt ast.Stmt) (mapExpr, keyExpr a
 
 // sameExpr reports whether two expressions refer to the same entity.
 func sameExpr(pass *analysis.Pass, a, b ast.Expr) bool {
+	a = astutil.UnwrapParenExpr(a)
+	b = astutil.UnwrapParenExpr(b)
 	switch aExpr := a.(type) {
 	case *ast.Ident:
 		bExpr, ok := b.(*ast.Ident)
@@ -179,9 +181,6 @@ func sameExpr(pass *analysis.Pass, a, b ast.Expr) bool {
 	case *ast.BasicLit:
 		bExpr, ok := b.(*ast.BasicLit)
 		return ok && aExpr.Kind == bExpr.Kind && aExpr.Value == bExpr.Value
-	case *ast.ParenExpr:
-		bExpr, ok := b.(*ast.ParenExpr)
-		return ok && sameExpr(pass, aExpr.X, bExpr.X)
 	case *ast.SelectorExpr:
 		bExpr, ok := b.(*ast.SelectorExpr)
 		if !ok {

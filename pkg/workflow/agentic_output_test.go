@@ -49,7 +49,7 @@ func TestOutputCollectionDoesNotUseMentionCredentials(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var yaml strings.Builder
-			require.NoError(t, NewCompiler().generateOutputCollectionStep(&yaml, &WorkflowData{SafeOutputs: tt.safeOutputs}))
+			require.NoError(t, NewCompiler().generateOutputCollectionStep(&yaml, &WorkflowData{SafeOutputs: tt.safeOutputs}, false))
 			assert.NotContains(t, yaml.String(), "github-token:")
 			assert.NotContains(t, yaml.String(), "MENTIONS_PAT")
 			assert.NotContains(t, yaml.String(), "safe-outputs-ingestion-app-token")

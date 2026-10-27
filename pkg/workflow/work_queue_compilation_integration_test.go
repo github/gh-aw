@@ -348,6 +348,14 @@ func TestWorkQueueRepositoryObserverCompilation(t *testing.T) {
 	}
 }
 
+func TestDailyWorkQueuesReportRequiresItemLevelCrossChecks(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "daily-work-queues-report.md"))
+	require.NoError(t, err)
+	for _, requirement := range []string{"next_offset", "worker_profile", "item-level records", "cross-check its eligibility", "dynamic campaign exclusions", "mark the count unverified"} {
+		require.Contains(t, string(source), requirement)
+	}
+}
+
 func TestWorkQueueStorageFieldRejected(t *testing.T) {
 	for _, storage := range []string{"git", "issues", "null"} {
 		t.Run(storage, func(t *testing.T) {

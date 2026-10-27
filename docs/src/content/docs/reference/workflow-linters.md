@@ -14,6 +14,7 @@ The compiler threat IDs reference the [Compiler Threat Detection Specification](
 | `action-pin` | `CTR-002` | AW, Actions | All action and reusable-workflow references are well-formed literals without expressions, control characters, or whitespace. Remote references use full commit SHAs; Docker actions use digests. Local paths are exempt from immutable pinning, not format validation. |
 | `job-timeout` | `CTR-026` | AW, Actions | An explicit workflow/job timeout is a positive integer literal, not an expression. Omission is allowed. |
 | `needs-consistency` | — | AW, Actions | Dependencies name existing jobs without self-edges or cycles. Literal `needs` accesses name direct dependencies and declared job outputs; prompt references must be available during activation. Ordering-only dependencies are valid. |
+| `step-reference` | — | AW, Actions | Literal `steps` accesses name a step ID declared in the same job. Checks expressions, including bare `if` conditions, without requiring output declarations or step ordering. |
 | `template-injection` | `CTR-006` | AW, Actions | Known attacker-controlled expressions are not interpolated into executable `run` or `actions/github-script` code. Use environment bindings and quoted shell expansions or `process.env` instead. |
 | `workflow-run-scope` | `CTR-021` | AW, Actions | `workflow_run` selects workflows and has a positive branch scope, not just wildcard, negated-only, or empty branch filters. |
 | `secret-leak` | `CTR-017` | AW, Actions | Symbolic secrets do not reach modeled disclosure sinks. AW-only checks report missing generated execution coverage. |
@@ -37,13 +38,14 @@ The compiler threat IDs reference the [Compiler Threat Detection Specification](
 | `gateway-dispatch-literals` | — | AW | Every key and value inside `on.gateway-dispatch` is literal. Rejects strings containing `${{`, including incomplete expressions, throughout nested objects and lists. Shares the compiler's mandatory check before gateway normalization/lowering. Expressions outside this section and compiler-generated dispatch metadata are unaffected. |
 | `safe-output-shell-expansion` | `CTR-009` | AW | Authored `safe-outputs.steps[*].run` scripts avoid the shell expansion patterns blocked by the compiler/harness: parameter transformation, indirect expansion, command substitution, and backticks. Arithmetic and ordinary variables remain allowed. |
 | `firewall-ssl-bump` | `CTR-011` | AW | Nonempty literal `--allow-urls` in `sandbox.agent.args` requires `--ssl-bump` in the same list. Unsupported legacy `network.firewall` blocks require migration, even with `ssl-bump: true`. Does not prove runtime HTTPS enforcement. |
-| `custom-job-detection` | `CTR-005` | AW, Actions | Custom jobs run before `agent` or after successful `detection`, including transitive dependencies. Checks every `||` branch when a status function overrides Actions' implicit success gate. Compiler-owned jobs and disabled detection are exempt. |
+| `custom-job-detection` | `CTR-005` | AW, Actions | Custom jobs run before `agent` or after successful `detection`, including transitive dependencies. Checks every `||` branch when a status function overrides Actions' implicit success gate. Contract-valid leaf jobs with `detection-gate: status-only` may report job results after detection failure. Compiler-owned jobs and disabled detection are exempt. |
 | `grader-file-io` | — | AW | Custom `graders.<id>.script` JavaScript ASTs do not access filesystem/host capabilities or load modules. Requires the optional native JavaScript parser; missing parser configuration produces a visible coverage warning. |
 | `grader-shell-file-write` | — | AW | Repository-owned `graders.operational-value.run` Bash ASTs avoid detected file writes and unchecked shell execution. Loads confined evaluator source without executing it; no optional JavaScript parser required. |
-| `artipacked` | — | AW, Actions | `actions/checkout` explicitly disables credential persistence. Omitted, enabled, or dynamic persistence produces a review warning; later authenticated Git operations may require it. |
+| `artipacked` | — | AW, Actions | `actions/checkout` explicitly disables credential persistence. Omitted, enabled, or dynamic persistence produces a review warning; later authenticated Git operations may require it. During compilation only, exact compiler-generated blocks can exempt PR checkouts in `safe_outputs` whose trusted handlers require retained credentials, or agent checkouts immediately followed by compiler-owned credential cleanup and verification when their paths are statically within discovery coverage (at most 13 directory components beneath the workspace). Deeper or unknown paths retain warnings. Authored steps and standalone `gh aw lint` checks remain unchanged. |
 | `cache-poisoning` | — | AW, Actions | Release-event and tag-push workflows avoid cache restoration through `actions/cache`, `actions/cache/restore`, `actions/setup-go`, and `actions/setup-node`. Save-only and lookup-only actions are exempt. |
 | `excessive-permissions` | `CTR-001` | Actions | Workflow-wide write grants are moved to the jobs that require them. Job-level writes and AW root grants are not workflow-wide permissions. |
 | `obfuscation` | — | AW, Actions | Runner-interpolated fields avoid literal-only string expressions such as `${{ '' }}`. Ordinary expressions, fallback strings, and boolean conditions are unaffected. |
+| `bash-case-pattern` | — | AW, Actions | Bash `case` patterns inside `$(...)` use balanced `(pattern)` syntax for Bash 3.2 compatibility. Intentional variable glob matching remains unquoted. Reports warnings without executing scripts or requiring ShellCheck. |
 
 ### Historical zizmor regressions
 
@@ -95,6 +97,12 @@ sandbox:
 
 The compiler rejects `network.firewall` regardless of its SSL setting. Remove that legacy block and use `network.allowed` for domain policy; do not add `network.firewall.ssl-bump` as a remedy.
 
+### Step references
+
+`step-reference` reports warnings in either strict mode when expressions reference a missing step in the same job, including job outputs and step `if`, `with`, `env`, and `run` fields. It catches dangling reporting-step references such as those fixed in [#71898](https://github.com/github/gh-aw/pull/71898). Dot and literal bracket accesses are case-insensitive. Quoted expression text, whole-context reads, wildcard projections, and dynamic indexes do not select a known step ID; literal references nested inside computed indexes are still checked. Output names are not validated because external actions can provide arbitrary outputs. This rule does not validate context availability or execution ordering.
+
+The compiled Actions graph is authoritative when supplied. AW-only analysis checks complete explicit custom `jobs`, `safe-jobs`, and `safe-outputs.jobs` scopes, including post-steps and custom job setup/pre-steps. Root steps, `safe-outputs` steps, compiler-owned job overrides, and jobs with `restore-memory` defer to the compiled graph. Unresolved AW imports or dynamic step IDs also defer missing-step checks because they may supply producers not visible in authored source.
+
 ### Needs consistency
 
 `needs-consistency` reports warnings in either strict mode. Dot and literal bracket accesses, including bare job and step `if` conditions, are parsed as Actions expressions. A transitive dependency is not available in `needs`: the consumer must declare the producer directly. Job properties are `result` and `outputs`. Output accesses require a producer `outputs` entry; reusable-workflow outputs are exempt because their declarations are external. Native Actions parsing already rejects missing dependency targets and cycles before linting.
@@ -124,6 +132,8 @@ jobs:
 ```
 
 `needs.detection.result != 'skipped'` is insufficient: failed detection must block the job too. The rule parses Actions expressions rather than matching text; quoted guards and an unguarded `||` branch do not satisfy it. Complex equivalent predicates that cannot be proven safe should use the explicit equality guard.
+
+For a notification that must run after failed or warn-mode detection, a downstream leaf custom job may set `detection-gate: status-only`. The compiler preserves its authored condition and adds `detection` to `needs`, but rejects artifact downloads, references to non-detection-gated job outputs, `GH_AW_AGENT_OUTPUT`, agent/safe-output file paths, and opaque reusable workflow calls. It permits job results and outputs from compiler-owned jobs gated on detection, such as `safe_outputs`. The linter reports violations of the same contract.
 
 The compiler independently adds a direct `detection` dependency and an outer guard requiring both `needs.detection.result == 'success'` and `needs.detection.outputs.detection_success == 'true'` to downstream custom jobs, including reusable workflow calls. This blocks failed, cancelled, skipped, or missing detection results and warn-mode findings even when detection's job status is successful. Custom `if` expressions cannot override this guard. A job required by detection that also depends on agent is rejected because adding the guard would create a cycle.
 
@@ -174,19 +184,109 @@ job; microVM isolation is future work.
 
 ## Secret-flow analysis
 
-The `secret-leak` rule tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs/bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values; formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize subsequent uses.
+The `secret-leak` rule tracks symbolic secret references, `github.token`, and known app-token action outputs through environment scopes, shell assignments, step outputs, and dependent job outputs. It detects disclosures to logs, step summaries, workflow outputs, request URLs/bodies, known publication inputs, cache keys, and artifacts containing modeled secret-bearing files. Authentication headers, token inputs, network credential consumption in [safe-output integration jobs](#safe-output-integration-credentials), and the reusable workflow `secrets:` channel are not disclosure sinks. Boolean comparisons and predicates filter secret values; formatting, JSON serialization, encoding, and `add-mask` registration do not sanitize subsequent uses.
+
+Named step outputs are same-job transport, not disclosure, when the analyzer can identify the producing step and propagate the value to downstream consumers. For example, a credential resolver can write `credential=$TOKEN` to `$GITHUB_OUTPUT` and pass `${{ steps.resolver.outputs.credential }}` to checkout's `token` input. The output name grants no trust: the value remains tainted through aliases, expressions, and environment bindings. Logging it, uploading a file containing it, publishing it, sending it to an unauthorized network sink, or exposing it as a job/workflow output still reports a disclosure.
+
+This distinction also applies to modeled JavaScript `core.setOutput` calls and GitHub Script return values when downstream output bindings are available. Standalone JavaScript analysis does not assume a private workflow handoff. Unknown or dynamic output names, unresolved step identities, and unmodeled boundaries retain conservative findings or coverage warnings. Custom taint rules keep their own output-sink policy; this transport distinction belongs to `secret-leak`.
 
 In Bash/sh, recognized `test`/`[` string and file predicates and the `:`, `true`, and `false` builtins do not disclose their arguments. Presence-only alternate expansions such as `${TOKEN:+present}` do not contain the token, but secret-bearing replacements remain tainted. Nested command disclosures, parameter-expansion error messages, and `set -x` output are still checked. Numeric comparisons, malformed tests, and potentially word-splitting predicates retain coverage warnings because their error diagnostics can expose operands.
 
 Unknown file reads produce secret-flow coverage warnings when they could select a modeled secret-bearing file or involve a secret-bearing filename. Unknown output targets warn when the output or filename is tainted; unrelated public file operations do not introduce secret-flow warnings.
 
+### Safe-output integration credentials
+
+Safe-output jobs are declared third-party integration boundaries. In `safe-outputs.jobs` (including imported jobs and legacy `safe-jobs`), secrets may be consumed through network endpoints, headers, request fields, and SDK calls without a comment or separate opt-in:
+
+```aw wrap
+safe-outputs:
+  jobs:
+    notify:
+      description: Send a private notification to an external service
+      runs-on: ubuntu-latest
+      max: 1
+      permissions: {}
+      steps:
+        - env:
+            DESTINATION: ${{ secrets.PRIVATE_NOTIFICATION_ENDPOINT }}
+            SERVICE_TOKEN: ${{ secrets.NOTIFICATION_SERVICE_TOKEN }}
+          run: |
+            jq -c '{text: .summary}' "$GH_AW_AGENT_OUTPUT" |
+              curl --fail -sS -H 'Content-Type: application/json' \
+                -H "X-Service-Token: $SERVICE_TOKEN" --data @- "$DESTINATION"
+```
+
+The same policy permits an SDK to consume a credential, for example in an `actions/github-script` step within a declared safe-output job:
+
+```yaml wrap
+- uses: actions/github-script@v8
+  env:
+    SERVICE_TOKEN: ${{ secrets.NOTIFICATION_SERVICE_TOKEN }}
+  with:
+    script: |
+      const client = getOctokit(process.env.SERVICE_TOKEN);
+      await client.rest.users.getAuthenticated();
+```
+
+This is a job-provenance policy, not a curl option allow-list or a requirement for direct, immutable secret bindings. The integration declaration establishes intended credential use, not verification of the secret's value, host, protocol, or recipient. Authors remain responsible for client configuration, recipient trust, and runtime network isolation.
+
+This does not disable secret-leak lint for the job. Secrets remain tainted for explicit logs, xtrace, summaries, workflow outputs, artifacts, and known publication sinks, even when those disclosures accompany a network operation. Network request bodies and headers inside the declared integration are credential-consumption channels, not proof of a leak. Ordinary jobs and native Actions inputs without AW integration provenance retain conservative network checks; neither job/secret names nor comments grant an exemption. Compiler analysis includes imported safe-output jobs. Standalone lint can identify declarations in the supplied AW source or companion Markdown but does not resolve imports.
+
+SDK use does not imply SDK implementation coverage: JavaScript inspection remains opt-in, and external modules or unmodeled calls retain the limitations below. The integration boundary does not authorize explicit publication of credentials or sanitize their later uses.
+
+For upload bodies, curl `-T`/`--upload-file` treats both `-` and `.` as stdin (`.` selects non-blocking mode). Wget `--post-file` instead reads a regular file; neither spelling consumes piped stdin.
+
+Ordinary-job network checks also follow tracked files and stdin referenced by curl headers (`-H @file`, `--header=@-`), multipart fields (`-F 'name=<file'`, `--form='name=@-'`), and URL-encoded fields (`--data-urlencode 'name@file'`). Resolved shell variables work in separate and inline operands. Literal `--data-raw` and `--form-string` values are not treated as file references; unresolved file sources and quoted or escaped multipart filenames produce coverage gaps.
+
+### Scope and limitations
+
 For `.lock.yml` inputs, a companion `.md` adds authored-policy and prompt checks to the existing execution graph. Native `.yml`/`.yaml` inputs never acquire an assumed AW companion. Explicit `.md` inputs inspect the AW AST independently: the prompt, top-level `steps`/`post-steps`, authored `jobs` and `safe-outputs.jobs` (including legacy `safe-jobs`), and script hooks. No compiled graph is fabricated. Secret analysis retains a coverage warning for missing imports, generated steps, cross-job flows, and compiler defaults; scripts without an observable shell remain unknown.
 
-Analysis is conservative within Bash/sh control flow and can report infeasible paths. It does not execute analyzed code or inspect external actions, sourced shell scripts, Python/PowerShell programs, dynamically constructed shell code, or arbitrary filesystem operations. JavaScript inspection requires the explicit configuration below. Imported runtime prompt files are not recursively loaded. Authentication arguments are treated as intentional credential use; endpoint trust is not inferred. A clean result is not proof that a workflow cannot leak secrets.
+Analysis is conservative within Bash/sh control flow and can report infeasible paths. It does not execute analyzed code or inspect external actions, sourced shell scripts, Python/PowerShell programs, dynamically constructed shell code, or arbitrary filesystem operations. JavaScript inspection requires the explicit configuration below. Imported runtime prompt files are not recursively loaded. Authentication arguments are treated as intentional credential use; outside declared integration jobs, endpoint trust is not inferred. A clean result is not proof that a workflow cannot leak secrets.
 
 ## Diagnostics
 
 Text findings include the linter rule ID and its known compiler threat ID, for example `[safe-output-shell-expansion] (CTR-009)`. `--list-rules` includes the same threat ID after the rule description. JSON diagnostics contain the file, rule ID, optional `threat_rule_id`, severity, AST path, optional script-relative line, message, and symbolic source locations, never resolved secrets or script contents. The threat ID is omitted for unmapped rules. Errors produce a nonzero exit status; coverage warnings alone do not.
+
+`gh aw compile --json --actionlint --shellcheck` also preserves optional external-linter findings in batch-scoped results (`scope: "batch"`, `workflow: "actionlint"` or `"shellcheck"`). Issues include `rule_id`, normalized `severity`, and `file`. Actionlint supplies YAML `line` and `column`; standalone ShellCheck uses a `script` location with snippet-relative coordinates and a one-based `step_index` when available, rather than misleading YAML coordinates. Free-text job, step, source, and resource identities remain internal and are omitted from JSON. `script.sanitized` identifies snippets whose Actions expressions were replaced before analysis. Tool invocation or parsing failures have a distinct `*_error` type rather than appearing as a clean scan.
+
+Default non-strict compilation keeps these issues in `warnings` and preserves its existing exit-status policy, even for high-severity findings. Explicit `--strict` reports them in `errors`, marks the batch result invalid, and fails compilation. Individual workflow results still describe compilation, not the batch scan. The separate `--dry-run` gate retains its existing severity and scanner-coverage requirements; it is not needed merely to collect diagnostics.
+
+### Bash case-pattern compatibility
+
+`bash-case-pattern` checks parsed `run` scripts with an omitted shell or an explicit Bash invocation. It ignores comments, quoted script data, and explicit non-Bash interpreters. It checks authored execution blocks or the compiled Actions graph when available; it does not load imports, execute expressions, validate every shell construct, or replace `bash -n` and ShellCheck. Findings identify the script-relative line without reproducing the pattern:
+
+```bash
+matched=$(case "$remote_ref" in ($source_ref) printf 1 ;; esac)
+```
+
+The opening parenthesis avoids Bash 3.2 command-substitution parsing ambiguity. Quoting `$source_ref` instead would change intentional glob matching to literal matching. The fetch-generator syntax tests run `bash -n` independently of optional ShellCheck availability. The macOS CI job selects system Bash for syntax checks; run `go test ./pkg/workflow -run TestGenerateFetchStep -count=1` with Bash 3.2 and a modern Bash separately on `PATH` for execution coverage too (the generated script requires GNU `base64`).
+
+### Comparing compiler revisions
+
+Build the candidate from the intended source revision, rather than reusing an installed release binary:
+
+```bash
+make build
+git rev-parse HEAD
+./gh-aw version
+sha256sum ./gh-aw
+actionlint --version
+shellcheck --version
+```
+
+Record dirty-tree changes as well as the revision, binary checksum, external linter versions, and repository source SHAs. Use identical disposable source snapshots, existing locks, action-pin caches, and compiler flags for baseline and candidate. Select action mode explicitly: source builds can default to development mode, which adds Docker build actions absent from release locks. Pin the same checked-in setup-action SHA in both runs:
+
+```bash
+/absolute/path/to/compiler compile \
+  --action-mode release --action-tag "$SETUP_ACTION_SHA" \
+  --no-check-update --actionlint --shellcheck --json \
+  > compile.json 2> compile.stderr
+```
+
+Retain exit status, stdout, stderr, and emitted locks separately for each run. For the downstream regression set, use actionlint 1.7.12 and ShellCheck 0.11.0; retain `--use-samples` for gh-aw-test compilers that support it and `--strict --schedule-seed githubnext/gh-cao --show-all` for CAO. Record any unsupported baseline/candidate flags rather than silently comparing different modes.
+
+Compare normalized diagnostics by repository-relative workflow, tool/rule, severity, AST or script location, and message. Remove disposable-directory prefixes and presentation escapes, not real findings; generated line shifts may require matching the job/step and script-relative location. Include stderr-only findings from older compilers. Keep unchanged baseline findings separate from added diagnostics. Exit 0 alone is not evidence of a clean lint run. Do not use `--approve`, blanket security exceptions, or workflow dispatches to normalize a comparison.
 
 ## Optional native JavaScript analysis
 
@@ -201,7 +301,7 @@ gh aw lint --rules secret-leak --json \
   --javascript-root /path/to/repository
 ```
 
-The checker follows literal `node`/`nodejs` file and `--eval` invocations, `--print` expressions, `shell: node {0}`, `actions/github-script` scripts, and available relative CommonJS/ES module imports. It tracks symbolic environment/argument/stdin sources, aliases, object members, local function calls, selected stdin callbacks, JSON/string transformations, and known file writes/reads. Object rest preserves member shapes: credential-bearing environment members do not taint an unrelated public timeout, while a secret-derived timeout remains tainted. Logging, summaries, outputs, and non-authentication request fields are disclosure sinks. Comparison/presence results and type-proven public length/index metadata remove values; arbitrary object properties and numeric coercions do not. Genuine escaped, single-record stdout `add-mask` registrations are recognized without sanitizing later uses or captured stdout. Dynamic reads remain explicit gaps rather than invented all-environment return values.
+The checker follows literal `node`/`nodejs` file and `--eval` invocations, `--print` expressions, `shell: node {0}`, `actions/github-script` scripts, and available relative CommonJS/ES module imports. It tracks symbolic environment/argument/stdin sources, aliases, object members, local function calls, selected stdin callbacks, JSON/string transformations, and known file writes/reads. Object rest preserves member shapes: credential-bearing environment members do not taint an unrelated public timeout, while a secret-derived timeout remains tainted. Logging, summaries, and outputs remain disclosure sinks. Non-authentication request fields are also disclosure sinks outside declared safe-output integration jobs; within those jobs, the network credential-consumption policy above applies. Comparison/presence results and type-proven public length/index metadata remove values; arbitrary object properties and numeric coercions do not. Genuine escaped, single-record stdout `add-mask` registrations are recognized without sanitizing later uses or captured stdout. Dynamic reads remain explicit gaps rather than invented all-environment return values.
 
 `--javascript-mode fast` is the CLI default when JavaScript is enabled. With a companion AW document, it analyzes authored JavaScript rather than generated runtime wrappers, while retaining the compiled shell, prompt, and job/output checks. Native Actions files without an AW companion retain their explicit JavaScript entry points. Entry sources across Markdown inputs are deduplicated and parsed in bounded native batches; syntax failures are isolated per script. Additional sources discovered through data flow are parsed on demand.
 

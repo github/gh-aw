@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/github/gh-aw/pkg/stringutil"
 )
@@ -22,6 +27,7 @@ const (
 var compileDebugLinePattern = regexp.MustCompile(`^` + compileDebugNamespace + ` .* \+[0-9]+(?:\.[0-9]+)?(?:ns|[µμ]s|ms|s|m|h)$`)
 var compileDebugStartPattern = regexp.MustCompile(`^` + compileDebugNamespace + ` `)
 var compileDebugEndPattern = regexp.MustCompile(`(?:^| )\+[0-9]+(?:\.[0-9]+)?(?:ns|[µμ]s|ms|s|m|h)$`)
+var mcpInstructionRolePattern = regexp.MustCompile(`(?i)\b(system|assistant|user)([ \t]*:)`)
 
 // compileDiagnosticText retains both ends of a line without buffering debug floods.
 type compileDiagnosticText struct {
@@ -60,18 +66,45 @@ func (text *compileDiagnosticText) String() string {
 // Shellcheck findings are retained separately so bounding execution failures does
 // not discard scanner diagnostics accompanying structured compiler stdout.
 type mcpCompileDiagnostics struct {
-	line       compileDiagnosticText
-	message    string
-	inBlock    bool
-	errorSeen  bool
-	omitted    bool
-	warning    string
-	warnings   strings.Builder
-	inWarning  bool
-	shellcheck strings.Builder
-	inFinding  bool
-	debugLines []string
-	debugBytes int
+	line         compileDiagnosticText
+	message      string
+	inBlock      bool
+	errorSeen    bool
+	omitted      bool
+	warning      string
+	warnings     strings.Builder
+	inWarning    bool
+	shellcheck   strings.Builder
+	inFinding    bool
+	debugLines   []string
+	debugBytes   int
+	progressDir  string
+	progressFile string
+	timeoutNote  string
+}
+
+func (diagnostics *mcpCompileDiagnostics) cleanup() {
+	if diagnostics != nil && diagnostics.progressDir != "" {
+		_ = os.RemoveAll(diagnostics.progressDir)
+	}
+}
+
+func validateMCPCompileProgressPath(path string) error {
+	if path == "" {
+		return nil
+	}
+	cleanPath := filepath.Clean(path)
+	dir := filepath.Dir(cleanPath)
+	if filepath.Base(cleanPath) != "results.json" ||
+		filepath.Dir(dir) != filepath.Clean(os.TempDir()) ||
+		!strings.HasPrefix(filepath.Base(dir), "gh-aw-mcp-compile-") {
+		return errors.New("MCP compile progress file must be inside a private temporary directory")
+	}
+	info, err := os.Lstat(dir)
+	if err != nil || !info.IsDir() || info.Mode().Perm() != 0o700 {
+		return errors.New("MCP compile progress directory must be a private temporary directory")
+	}
+	return nil
 }
 
 func (diagnostics *mcpCompileDiagnostics) Write(data []byte) (int, error) {
@@ -279,28 +312,76 @@ func (diagnostics *mcpCompileDiagnostics) failureMessage(err error) string {
 }
 
 func boundMCPCompileDiagnostic(message string) string {
-	message = strings.ToValidUTF8(message, "")
+	message = sanitizeMCPUntrustedText(message)
 	if len(message) <= maxMCPCompileDiagnosticBytes {
 		return message
 	}
-	budget := maxMCPCompileDiagnosticBytes - len(compileDiagnosticTruncation) - 1
-	head := strings.ToValidUTF8(message[:budget/2], "")
-	tail := strings.ToValidUTF8(message[len(message)-(budget-budget/2):], "")
+	budget := maxMCPCompileDiagnosticBytes - len(compileDiagnosticTruncation) - 3
+	headSize := budget / 2
+	tailSize := budget - headSize - 2
+	head := strings.ToValidUTF8(message[:headSize], "")
+	tail := strings.ToValidUTF8(message[len(message)-tailSize:], "")
+	tail = "| " + strings.TrimPrefix(tail, "| ")
 	return head + compileDiagnosticTruncation + "\n" + tail
+}
+
+func sanitizeMCPUntrustedText(message string) string {
+	message = strings.ToValidUTF8(message, "\uFFFD")
+	var sanitized strings.Builder
+	for _, char := range message {
+		if unicode.IsControl(char) && char != '\n' && char != '\t' {
+			continue
+		}
+		if char == '\u200B' {
+			continue
+		}
+		sanitized.WriteRune(char)
+		if strings.ContainsRune("`<>@{}", char) {
+			sanitized.WriteRune('\u200B')
+		}
+	}
+	message = mcpInstructionRolePattern.ReplaceAllString(sanitized.String(), "$1\u200B$2")
+	lines := strings.Split(message, "\n")
+	for i := range lines {
+		if !strings.HasPrefix(lines[i], "| ") {
+			lines[i] = "| " + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func runMCPCompileOutput(ctx context.Context, execCmd execCmdFunc, args ...string) ([]byte, *mcpCompileDiagnostics, error) {
 	diagnostics := &mcpCompileDiagnostics{}
 	if err := defaultMCPSubprocessGuardrail.acquire(ctx); err != nil {
-		return nil, diagnostics, err
+		return nil, diagnostics, &mcpStageError{stage: "subprocess_slot", err: err}
 	}
 	defer defaultMCPSubprocessGuardrail.release()
+	if progressDir, err := os.MkdirTemp("", "gh-aw-mcp-compile-"); err == nil {
+		diagnostics.progressDir = progressDir
+		diagnostics.progressFile = filepath.Join(progressDir, "results.json")
+		progressArgs := []string{"--mcp-progress-file", diagnostics.progressFile}
+		inserted := false
+		for index, arg := range args {
+			if arg == "--" {
+				args = append(args[:index], append(progressArgs, args[index:]...)...)
+				inserted = true
+				break
+			}
+		}
+		if !inserted {
+			args = append(args, progressArgs...)
+		}
+	}
 	cmd := execCmd(ctx, args...)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = diagnostics
+	cmd.WaitDelay = time.Second
 	err := cmd.Run()
 	diagnostics.finishLine()
+	if err != nil && ctx.Err() != nil {
+		err = &mcpStageError{stage: "compilation", err: ctx.Err()}
+	}
 	return stdout.Bytes(), diagnostics, err
 }
 

@@ -15,6 +15,7 @@ func TestExperimentalFeatureNoticeClassification(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.SetBatchMode(batch)
 		data := &WorkflowData{
+			Features:    map[string]any{"gh-aw-detection": true},
 			LSP:         map[string]LSPServerConfig{"typescript": {}},
 			SafeOutputs: &SafeOutputsConfig{Steer: true},
 		}

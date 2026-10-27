@@ -15,18 +15,18 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.300"},
-		{"Copilot CLI", DefaultCopilotVersion, "1.0.101"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.310"},
+		{"Copilot CLI", DefaultCopilotVersion, "1.0.103"},
 		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
-		{"Codex", DefaultCodexVersion, "0.163.0"},
+		{"Codex", DefaultCodexVersion, "0.164.0"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.64.0"},
 		{"Agy CLI", DefaultAgyVersion, "1.3.6"},
-		{"Pi CLI", DefaultPiVersion, "1.3.0"},
-		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.0.2"},
-		{"Firewall", DefaultFirewallVersion, "v0.28.70"},
+		{"Pi CLI", DefaultPiVersion, "1.4.0"},
+		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.0.3"},
+		{"Firewall", DefaultFirewallVersion, "v0.29.0"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.37"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.0"},
 		{"Threat Detect", DefaultThreatDetectVersion, "v0.5.3"},
 	}
 
@@ -38,6 +38,15 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 				t.Fatalf("%s default version = %q, want %q", tt.name, tt.got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDefaultCopilotChecksumsSHA256(t *testing.T) {
+	t.Parallel()
+
+	const expected = "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
+	if DefaultCopilotChecksumsSHA256 != expected {
+		t.Fatalf("DefaultCopilotChecksumsSHA256 = %q, want the reviewed v1.0.103 manifest digest %q", DefaultCopilotChecksumsSHA256, expected)
 	}
 }
 

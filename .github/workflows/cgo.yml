@@ -2359,6 +2359,14 @@ jobs:
     - name: Build gh-aw binary
       run: make build
 
+    - name: Check generated fetch syntax with macOS Bash
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        export PATH="/bin:$PATH"
+        bash --version
+        go test ./pkg/workflow -run '^TestGenerateFetchStepSyntax$' -count=1
+
     - name: Scan built binary with Microsoft Defender
       if: runner.os == 'Windows'
       shell: pwsh

@@ -54,7 +54,7 @@ async function createAssignToAgentGitHubClient(config) {
 }
 
 /**
- * Add credential guidance only after an assignment attempt fails.
+ * Build sanitized credential guidance after validation or an assignment fails.
  * @param {Object} config
  * @param {string} errorMessage
  * @returns {string}
@@ -70,6 +70,27 @@ function describeAssignmentCredentialFailure(config, errorMessage) {
   const presence = token ? "present" : "absent (using the step-level client)";
   const tokenFormat = classifyTokenFormat(token);
   return `${errorMessage}. Agent assignment credential source: ${source}. Dedicated assignment credential: ${presence}. Credential format: ${tokenFormat} (validity and permissions unverified). ${remedy}`;
+}
+
+/**
+ * Validate the selected credential once before processing assignment messages.
+ * @param {Object} githubClient
+ * @param {Object} config
+ * @returns {Promise<void>}
+ */
+async function validateAssignmentCredential(githubClient, config) {
+  try {
+    await githubClient.request("GET /rate_limit");
+  } catch (error) {
+    const status = Number(error && typeof error === "object" ? error.status || error.response?.status || 0 : 0);
+    const errorMessage = getErrorMessage(error);
+    if (status !== 401 && !/\b(?:bad credentials|not authenticated)\b/i.test(errorMessage)) {
+      core.debug("Assignment credential preflight did not identify an authentication failure");
+      return;
+    }
+
+    throw new Error(`Agent assignment credential validation failed: ${describeAssignmentCredentialFailure(config, "Bad credentials (HTTP 401)")}`);
+  }
 }
 
 /**
@@ -117,16 +138,21 @@ function countHardFailures(allResults) {
 
 /**
  * @param {Array<{issue_number: number|null, pull_number: number|null, agent: string, owner: string|null, repo: string|null, pull_request_repo?: string|null, success: boolean, skipped?: boolean, error?: string}>} allResults
+ * @param {string} batchError
  * @returns {Promise<void>}
  */
-async function writeAssignSummary(allResults) {
+async function writeAssignSummary(allResults, batchError = "") {
   const successResults = allResults.filter(r => r.success && !r.skipped);
   const skippedResults = allResults.filter(r => r.skipped);
   const failedResults = allResults.filter(r => !r.success && !r.skipped);
 
-  if (allResults.length === 0) return;
+  if (allResults.length === 0 && !batchError) return;
 
   let summaryContent = "## Agent Assignment\n\n";
+
+  if (batchError) {
+    summaryContent += `⚠️ Assignments skipped: ${batchError}\n\n`;
+  }
 
   if (successResults.length > 0) {
     summaryContent += `✅ Successfully assigned ${successResults.length} agent(s):\n\n`;
@@ -229,7 +255,7 @@ async function main(config = {}) {
   core.info(`Default target repo: ${defaultTargetRepo}`);
   if (allowedRepos.size > 0) core.info(`Allowed repos: ${[...allowedRepos].join(", ")}`);
 
-  // Resolve pull request repo upfront (if globally configured)
+  // Validate pull request repo configuration before processing messages.
   /** @type {any} */
   let pullRequestOwner = null;
   /** @type {any} */
@@ -247,15 +273,6 @@ async function main(config = {}) {
       pullRequestOwner = parts[0];
       pullRequestRepo = parts[1];
       core.info(`Using pull request repository: ${pullRequestOwner}/${pullRequestRepo}`);
-      try {
-        const resolved = await resolvePullRequestRepo(githubClient, pullRequestOwner, pullRequestRepo, configuredBaseBranch);
-        effectiveBaseBranch = resolved.effectiveBaseBranch;
-        if (!configuredBaseBranch && effectiveBaseBranch) {
-          core.info(`Resolved pull request repository default branch: ${effectiveBaseBranch}`);
-        }
-      } catch (error) {
-        throw new Error(`Failed to fetch pull request repository for ${pullRequestOwner}/${pullRequestRepo}: ${getErrorMessage(error)}`, { cause: error });
-      }
     } else {
       core.warning(`Invalid pull-request-repo format: ${pullRequestRepoConfig}. Expected owner/repo. PRs will be created in issue repository.`);
     }
@@ -267,6 +284,12 @@ async function main(config = {}) {
   const allResults = [];
   const agentCache = {};
   const processedAssignmentTargets = new Set();
+  /** @type {Promise<void>|undefined} */
+  let credentialPreflight;
+  let credentialError = "";
+  let repositoryError = "";
+  /** @type {Promise<void>|undefined} */
+  let pullRequestRepoResolution;
 
   /**
    * Message processor — called once per assign_to_agent message by the handler manager.
@@ -300,6 +323,34 @@ async function main(config = {}) {
         },
       });
       return { success: true, skipped: true };
+    }
+
+    credentialPreflight ??= validateAssignmentCredential(githubClient, config).catch(error => {
+      credentialError = getErrorMessage(error);
+      core.warning(credentialError);
+    });
+    await credentialPreflight;
+    if (credentialError) {
+      return { success: true, skipped: true };
+    }
+
+    if (pullRequestOwner && pullRequestRepo) {
+      pullRequestRepoResolution ??= (async () => {
+        try {
+          const resolved = await resolvePullRequestRepo(githubClient, pullRequestOwner, pullRequestRepo, configuredBaseBranch);
+          effectiveBaseBranch = resolved.effectiveBaseBranch;
+          if (!configuredBaseBranch && effectiveBaseBranch) {
+            core.info(`Resolved pull request repository default branch: ${effectiveBaseBranch}`);
+          }
+        } catch (error) {
+          repositoryError = `Failed to fetch pull request repository for ${pullRequestOwner}/${pullRequestRepo}: ${getErrorMessage(error)}`;
+          core.warning(repositoryError);
+        }
+      })();
+      await pullRequestRepoResolution;
+      if (repositoryError) {
+        return { success: true, skipped: true };
+      }
     }
 
     const agentName = message.agent ?? defaultAgent;
@@ -625,9 +676,9 @@ async function main(config = {}) {
   };
 
   handleMessage.getAssignToAgentAssigned = () => formatAssignedOutput(allResults);
-  handleMessage.getAssignToAgentErrors = () => formatErrorsOutput(allResults);
-  handleMessage.getAssignToAgentErrorCount = () => countHardFailures(allResults);
-  handleMessage.writeAssignToAgentSummary = () => writeAssignSummary(allResults);
+  handleMessage.getAssignToAgentErrors = () => credentialError || repositoryError || formatErrorsOutput(allResults);
+  handleMessage.getAssignToAgentErrorCount = () => (repositoryError || (credentialError && !ignoreIfError) ? 1 : countHardFailures(allResults));
+  handleMessage.writeAssignToAgentSummary = () => writeAssignSummary(allResults, credentialError || repositoryError);
 
   return handleMessage;
 }
@@ -644,7 +695,7 @@ function getAssignToAgentAssigned(handler) {
 /**
  * Returns the "assignment_errors" output string for step outputs.
  * Format: "issue:N:agent:error" or "pr:N:agent:error" per failure/skipped-with-error,
- * newline-separated.
+ * newline-separated, or a single batch diagnostic.
  * @returns {string}
  */
 function getAssignToAgentErrors(handler) {

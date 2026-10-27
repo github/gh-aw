@@ -27,7 +27,7 @@ func buildRepoFlag(owner, repo, hostname string) string {
 	if owner == "" || repo == "" {
 		return ""
 	}
-	if hostname != "" && hostname != "github.com" {
+	if hostname != "" {
 		return path.Join(hostname, owner, repo)
 	}
 	return path.Join(owner, repo)
@@ -102,7 +102,7 @@ func listRunArtifactNames(ctx context.Context, runID int64, owner, repo, hostnam
 	}
 
 	args := []string{"api", "--paginate", endpoint, "--jq", ".artifacts[].name"}
-	if hostname != "" && hostname != "github.com" {
+	if hostname != "" {
 		args = append(args, "--hostname", hostname)
 	}
 

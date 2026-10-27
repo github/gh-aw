@@ -54,6 +54,12 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	// Use agent-downstream prefix since this job depends on the agent job.
 	agentArtifactPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 	steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
+	// Do not attribute the agent's usage to detection, even when its scan is skipped.
+	steps = append(steps,
+		"      - name: Clear agent token usage\n",
+		"        if: always()\n",
+		"        run: rm -f /tmp/gh-aw/agent_usage.json\n",
+	)
 
 	// Download experiment artifact so the detection agent can read the current variant assignments.
 	// The experiment artifact is uploaded by the activation job.
@@ -79,33 +85,55 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	// Detection job depends on agent job and activation job (for trace ID)
 	needs := []string{string(constants.AgentJobName), string(constants.ActivationJobName)}
 
-	// Scan the effective detection engine env values for needs.<customJob>.outputs.*
+	// Scan the effective detection engine config for needs.<customJob>.outputs.*
 	// expressions and add the referenced custom jobs as direct dependencies of the
-	// detection job. Use the effective env (same-engine inheritance + detection-specific overrides) so
-	// that expressions from the main engine.env are not missed when a detection
-	// engine config exists.
+	// detection job. Use the effective env (same-engine inheritance + detection-specific overrides)
+	// so expressions from the main engine.env are not missed when a detection engine config exists.
 	var detectionSpecificEnv map[string]string
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.EngineConfig != nil {
 		detectionSpecificEnv = data.SafeOutputs.ThreatDetection.EngineConfig.Env
 	}
-	effectiveDetectionEnv := mergeThreatDetectionEngineEnv(data, c.getThreatDetectionEngineID(data), detectionSpecificEnv)
-	if len(effectiveDetectionEnv) > 0 {
-		var engineEnvBuilder strings.Builder
-		for _, envValue := range effectiveDetectionEnv {
-			engineEnvBuilder.WriteByte('\n')
-			engineEnvBuilder.WriteString(envValue)
+	detectionEngineID := c.getThreatDetectionEngineID(data)
+	effectiveDetectionEnv := mergeThreatDetectionEngineEnv(data, detectionEngineID, detectionSpecificEnv)
+	var engineConfigBuilder strings.Builder
+	for _, envValue := range effectiveDetectionEnv {
+		engineConfigBuilder.WriteByte('\n')
+		engineConfigBuilder.WriteString(envValue)
+	}
+	if ResolveEngineID(data) == detectionEngineID {
+		if agentConfig := getAgentConfig(data); agentConfig != nil {
+			for _, targetName := range sliceutil.SortedKeys(agentConfig.Targets) {
+				target := agentConfig.Targets[targetName]
+				if target == nil {
+					continue
+				}
+				engineConfigBuilder.WriteByte('\n')
+				engineConfigBuilder.WriteString(target.AuthHeader)
+				engineConfigBuilder.WriteByte('\n')
+				engineConfigBuilder.WriteString(target.SessionId)
+				for _, key := range sliceutil.SortedKeys(target.ExtraHeaders) {
+					engineConfigBuilder.WriteByte('\n')
+					engineConfigBuilder.WriteString(target.ExtraHeaders[key])
+				}
+				for _, key := range sliceutil.SortedKeys(target.ExtraBodyFields) {
+					engineConfigBuilder.WriteByte('\n')
+					engineConfigBuilder.WriteString(target.ExtraBodyFields[key])
+				}
+			}
 		}
-		engineEnvContent := engineEnvBuilder.String()
-		hasNeedsReference := strings.Contains(engineEnvContent, "needs.")
+	}
+	engineConfigContent := engineConfigBuilder.String()
+	if engineConfigContent != "" {
+		hasNeedsReference := strings.Contains(engineConfigContent, "needs.")
 		if len(data.Jobs) > 0 {
-			engineEnvJobs := c.getReferencedCustomJobs(engineEnvContent, data.Jobs)
-			for _, jobName := range engineEnvJobs {
+			engineConfigJobs := c.getReferencedCustomJobs(engineConfigContent, data.Jobs)
+			for _, jobName := range engineConfigJobs {
 				if isBuiltinJobName(jobName) {
 					continue
 				}
 				if !slices.Contains(needs, jobName) {
 					needs = append(needs, jobName)
-					threatLog.Printf("Added custom job '%s' to detection needs because it's referenced in engine.env", jobName)
+					threatLog.Printf("Added custom job '%s' to detection needs because it's referenced in engine configuration", jobName)
 				}
 			}
 		}
@@ -114,9 +142,9 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 				if slices.Contains(needs, builtinJobName) {
 					continue
 				}
-				if strings.Contains(engineEnvContent, fmt.Sprintf("needs.%s.", builtinJobName)) {
+				if strings.Contains(engineConfigContent, fmt.Sprintf("needs.%s.", builtinJobName)) {
 					warningMsg := fmt.Sprintf(
-						"engine.env references built-in job '%s' in a detection-job needs expression. "+
+						"Detection engine configuration references built-in job '%s' in a detection-job needs expression. "+
 							"Built-in jobs are managed by the compiler and cannot be added as direct detection dependencies; "+
 							"this expression will silently evaluate to an empty string at runtime.",
 						builtinJobName,

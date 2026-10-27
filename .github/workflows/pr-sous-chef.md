@@ -70,6 +70,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts
+            actions/setup/js
             .github/scripts
       - name: Fetch actionable PR queue
         id: fetch-prs
@@ -160,8 +161,10 @@ Explicit `/souschef` invocations may start the agent for acknowledgement only
 when the API budgets are healthy. If a refresh finds this flag true, call `noop`
 with those budget/reset details and stop
 without any writes, including a slash-command acknowledgement or report issue.
-The same rule applies to each fresh eligibility check and simulation. An API error
-or malformed rate-limit response is a failed read, not a successful no-op.
+The same rule applies to each fresh eligibility check and simulation. GitHub CLI
+reads retry transient failures at most twice with exponential backoff and jitter;
+authentication and permission errors fail immediately. An exhausted API read or
+malformed rate-limit response is a failed read, not a successful no-op.
 
 PRs are idle only after at least ten minutes without a commit, PR update, comment,
 review, or reply. A fresh Copilot request also restarts this ten-minute interval.

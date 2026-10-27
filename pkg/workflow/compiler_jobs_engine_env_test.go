@@ -222,6 +222,92 @@ func TestBuildDetectionJobEngineEnvBuiltinWarning(t *testing.T) {
 		"built-in jobs that cannot become direct detection dependencies should emit a warning")
 }
 
+func TestBuildDetectionJobInheritedTargetNeedsReferences(t *testing.T) {
+	tests := []struct {
+		name              string
+		sessionID         string
+		detectionEngineID string
+		jobs              map[string]any
+		wantNeed          string
+		wantNoNeed        bool
+		wantWarningChange bool
+	}{
+		{
+			name:      "custom job output adds a direct dependency",
+			sessionID: "${{ needs.prepare.outputs.session }}",
+			jobs: map[string]any{
+				"prepare": map[string]any{
+					"runs-on": "ubuntu-latest",
+					"steps":   []any{map[string]any{"run": "echo session=ready >> $GITHUB_OUTPUT"}},
+				},
+			},
+			wantNeed: "prepare",
+		},
+		{
+			name:              "built-in job output emits a warning",
+			sessionID:         "${{ needs.safe_outputs.outputs.session }}",
+			wantWarningChange: true,
+		},
+		{
+			name:              "different detection engine does not inherit target dependencies",
+			sessionID:         "${{ needs.prepare.outputs.session }}",
+			detectionEngineID: "claude",
+			jobs: map[string]any{
+				"prepare": map[string]any{"runs-on": "ubuntu-latest"},
+			},
+			wantNoNeed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.stepOrderTracker = NewStepOrderTracker()
+			detectionConfig := &ThreatDetectionConfig{}
+			if tt.detectionEngineID != "" {
+				detectionConfig.EngineConfig = &EngineConfig{ID: tt.detectionEngineID}
+			}
+			workflowData := &WorkflowData{
+				Name:         "Test Workflow",
+				AI:           "copilot",
+				EngineConfig: &EngineConfig{ID: "copilot"},
+				Jobs:         tt.jobs,
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						Targets: map[string]*AgentAPIProxyTargetConfig{
+							"copilot": {SessionId: tt.sessionID},
+						},
+					},
+				},
+				SafeOutputs: &SafeOutputsConfig{
+					ThreatDetection: detectionConfig,
+					Jobs:            map[string]*SafeJobConfig{"create-issue": {}},
+				},
+			}
+
+			initialWarnings := compiler.GetWarningCount()
+			job, err := compiler.buildDetectionJob(workflowData)
+			require.NoError(t, err, "buildDetectionJob should succeed")
+			require.NotNil(t, job, "detection job should be created")
+
+			if tt.wantNeed != "" {
+				assert.Contains(t, job.Needs, tt.wantNeed,
+					"detection job must directly depend on the custom job referenced only in an inherited API target")
+			}
+			if tt.wantNoNeed {
+				assert.NotContains(t, job.Needs, "prepare",
+					"detection jobs using a different engine must not depend on jobs referenced only in agent API targets")
+			}
+			wantWarnings := initialWarnings
+			if tt.wantWarningChange {
+				wantWarnings++
+			}
+			assert.Equal(t, wantWarnings, compiler.GetWarningCount(),
+				"built-in target references that cannot become direct detection dependencies should emit a warning")
+		})
+	}
+}
+
 // TestBuildDetectionJobEngineEnvNeedsExpression verifies that the detection job scans the
 // effective merged detection engine env (main + detection-specific overrides) when resolving
 // custom job dependencies. Both the detection-specific env and the main engine env are

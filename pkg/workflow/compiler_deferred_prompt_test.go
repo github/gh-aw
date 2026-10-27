@@ -1,15 +1,40 @@
 package workflow
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow/actions"
+	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestExpressionMappingEnvironmentValue(t *testing.T) {
+	for _, content := range []string{
+		"needs.release.outputs.id",
+		"'authored literal'",
+		"'first' || 'second'",
+		"needs.release.outputs.id || 'fallback'",
+	} {
+		mapping := &ExpressionMapping{Content: content}
+		assert.Equal(t, "${{ "+content+" }}", mapping.environmentValue(), "authored expressions remain expressions")
+	}
+	for _, content := range []string{"__GH_AW_DEFERRED_1234__", "", "true", "quote: \"value\"\nnext\\line"} {
+		mapping := &ExpressionMapping{EnvVar: "VALUE", Content: content, IsLiteral: true}
+		var environment map[string]any
+		require.NoError(t, yaml.Unmarshal([]byte("VALUE: "+mapping.environmentValue()), &environment))
+		assert.Equal(t, content, environment["VALUE"])
+		var substitution strings.Builder
+		generatePlaceholderEnvironment(&substitution, []*ExpressionMapping{mapping}, "")
+		require.NoError(t, yaml.Unmarshal([]byte(substitution.String()), &environment))
+		assert.Equal(t, content, environment["VALUE"])
+	}
+}
 
 func TestRewriteDeferredPromptExpressions(t *testing.T) {
 	jobs := map[string]any{
@@ -45,7 +70,10 @@ func TestRewriteDeferredPromptExpressions(t *testing.T) {
 			if tt.deferred {
 				require.Len(t, deferred, 1)
 				assert.Equal(t, tt.expression, deferred[0].Content)
-				assert.Equal(t, "'__"+deferred[0].EnvVar+"__'", got[0].Content)
+				assert.Equal(t, "__"+deferred[0].EnvVar+"__", got[0].Content)
+				assert.True(t, got[0].IsLiteral)
+				assert.False(t, deferred[0].IsLiteral)
+				assert.False(t, original.IsLiteral)
 				assert.Equal(t, original.EnvVar, got[0].EnvVar)
 			} else {
 				assert.Empty(t, deferred)
@@ -186,8 +214,8 @@ jobs:
 }
 
 func TestDeferredPromptCompilation(t *testing.T) {
-	for _, inline := range []bool{false, true} {
-		t.Run(map[bool]string{false: "runtime", true: "inline"}[inline], func(t *testing.T) {
+	for _, mode := range []string{"runtime", "inline", "inlined-imports"} {
+		t.Run(mode, func(t *testing.T) {
 			dir := t.TempDir()
 			source := `---
 on: workflow_dispatch
@@ -203,13 +231,20 @@ jobs:
         run: echo "id=123" >> "$GITHUB_OUTPUT"
 ---
 Release ID: ${{ needs.release.outputs.release_id }}
+Release ID again: ${{ needs.release.outputs.release_id }}
+Release result: ${{ needs.release.result }}
 `
+			if mode == "inlined-imports" {
+				source = strings.Replace(source, "engine: copilot\n", "engine: copilot\ninlined-imports: true\n", 1)
+			}
 			path := filepath.Join(dir, "release.md")
 			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
 			compiler := NewCompiler()
 			compiler.SetQuiet(true)
-			compiler.inlinePrompt = inline
-			require.NoError(t, compiler.CompileWorkflow(path))
+			compiler.inlinePrompt = mode == "inline"
+			data, err := compiler.ParseWorkflowFile(path)
+			require.NoError(t, err)
+			require.NoError(t, compiler.CompileWorkflowData(data, path))
 			content, err := os.ReadFile(filepath.Join(dir, "release.lock.yml"))
 			require.NoError(t, err)
 			lock := string(content)
@@ -222,6 +257,50 @@ Release ID: ${{ needs.release.outputs.release_id }}
 			assert.Contains(t, lock[agent:], "GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt")
 			assert.Contains(t, lock[agent:], "${{ needs.release.outputs.release_id }}")
 			assert.Less(t, strings.Index(lock[agent:], "Download activation artifact"), strings.Index(lock[agent:], "Resolve deferred prompt expressions"))
+
+			require.Len(t, data.DeferredPromptExpressions, 2)
+			var document struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Name string         `yaml:"name"`
+						Env  map[string]any `yaml:"env"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal(content, &document))
+			for _, name := range []string{
+				"Create prompt with built-in context",
+				"Interpolate variables and render templates",
+				"Substitute placeholders",
+			} {
+				found := false
+				for _, step := range document.Jobs["activation"].Steps {
+					if step.Name != name {
+						continue
+					}
+					found = true
+					for _, mapping := range data.DeferredPromptExpressions {
+						original := NewExpressionExtractor().generateEnvVarName(mapping.Content)
+						assert.Equal(t, "__"+mapping.EnvVar+"__", step.Env[original], name)
+					}
+				}
+				assert.True(t, found, name)
+			}
+			foundResolver := false
+			for _, step := range document.Jobs["agent"].Steps {
+				if step.Name == "Resolve deferred prompt expressions" {
+					foundResolver = true
+					for _, mapping := range data.DeferredPromptExpressions {
+						assert.Equal(t, "${{ "+mapping.Content+" }}", step.Env[mapping.EnvVar])
+					}
+				}
+			}
+			assert.True(t, foundResolver)
+			compiled, err := actions.Parse(content)
+			require.NoError(t, err)
+			diagnostics, err := workflowlint.ObfuscationRule().Check(context.Background(), workflowlint.Input{Workflow: compiled})
+			require.NoError(t, err)
+			assert.Empty(t, diagnostics, "generated constants must not require linter exemptions")
 		})
 	}
 }

@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { actorFromContext, decimal, defaultPolicy, validateActor, validatePolicy, validateProfile, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
+const { actorFromContext, decimal, defaultPolicy, policyForAcceptedRequest, validateActor, validatePolicy, validateProfile, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
 const { replayTransactions } = require("./work_queue_replay.cjs");
 const { administrator, context, dispatcher, genesis, operationCommit } = require("./work_queue_test_helpers.cjs");
 const sharedContract = require("../../../specs/work-queue/fixtures/contract.json");
@@ -60,6 +60,31 @@ function registerTests({ describe, it }) {
       const unboundedBackoff = structuredClone(policy);
       unboundedBackoff.pools.default.retry.backoff_ms = 3600001;
       assert.throws(() => validatePolicy(unboundedBackoff));
+    });
+    it("rejects reserved pool identities in historical checkpoint events without mutating policy objects", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      const original = structuredClone(policy);
+      const accepted = { request: { id: "accepted" }, policy_epoch: "initial", operations: [] };
+      for (const pool of ["__proto__", "constructor", "prototype"]) {
+        const history = [
+          { request: { id: "policy" }, checkpoint_events: [{ kind: "Policy", epoch: "initial", policy }] },
+          { request: { id: "install" }, checkpoint_events: [{ kind: "PoolInstall", pool, config: policy.pools.default }] },
+          accepted,
+        ];
+        const state = { requests: new Map(history.map(commit => [commit.request.id, commit])), policy_epoch: "initial", policy };
+        assert.throws(() => policyForAcceptedRequest(state, accepted), { code: "policy_invalid" }, pool);
+        assert.deepEqual(policy, original);
+        assert.equal(Object.getPrototypeOf(policy.pools), Object.prototype);
+      }
+    });
+    it("never substitutes a later Policy epoch for an accepted request with incomplete checkpoint history", () => {
+      const policy = defaultPolicy({ repository: "owner/repo", principal: "1001" });
+      const accepted = { request: { id: "accepted" }, policy_epoch: "initial", operations: [] };
+      const history = [{ request: { id: "policy" }, checkpoint_events: [{ kind: "Policy" }] }, accepted, { request: { id: "next-policy" }, operations: [{ kind: "Policy", epoch: "later", policy }] }];
+      const state = { requests: new Map(history.map(commit => [commit.request.id, commit])), policy_epoch: "later", policy };
+      assert.throws(() => policyForAcceptedRequest(state, accepted), /work_queue_policy_missing/);
+      state.policy_epoch = "initial";
+      assert.equal(policyForAcceptedRequest(state, accepted), policy);
     });
     it("matches all independent shared request-role combinations, including unknown request kinds", () => {
       const kinds = [...new Set(Object.values(sharedContract.request_roles).flat()), "unknown"];

@@ -177,6 +177,7 @@ describe("check_version_updates", () => {
     await runMain();
     expect(mockFetch).toHaveBeenCalled();
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("v0.91.10 or newer"));
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/^ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED:/));
     expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("run `gh aw compile`"));
     expect(mockCore.summary.write).toHaveBeenCalled();
   });
@@ -373,6 +374,7 @@ describe("check_version_updates", () => {
     mockFetchSuccess(JSON.stringify({ blockedVersions: ["v1.1.0", "v1.2.0"], minimumVersion: "" }));
     await runMain();
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Blocked compile-agentic version"));
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/^ERR_COMPILE_AGENTIC_VERSION_BLOCKED: Blocked compile-agentic version:/));
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("v1.1.0"));
   });
 
@@ -580,6 +582,7 @@ describe("check_version_updates", () => {
     mockFetchSuccess(JSON.stringify({ blockedVersions: [], minimumVersion: "v1.0.0" }));
     await runMain();
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Outdated compile-agentic version"));
+    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/^ERR_COMPILE_AGENTIC_VERSION_OUTDATED: Outdated compile-agentic version:/));
     expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("v0.91.10"));
   });
 

@@ -154,14 +154,14 @@ describe.skipIf(process.platform === "darwin" || (process.platform === "linux" &
 
   it.skipIf(process.platform !== "linux")("exports native CLI loaders and keeps Node subprocesses on the portable entrypoint", () => {
     fs.mkdirSync(path.join(hostRoot, "bin"));
-    fs.copyFileSync("/bin/echo", path.join(hostRoot, "bin", "copilot"));
+    fs.copyFileSync(process.execPath, path.join(hostRoot, "bin", "copilot"));
     stage(environment, state);
     const runtime = path.join(workspace, ".gh-aw-nvx", "gh-aw");
     const copilot = path.join(runtime, "bin", "copilot");
     const interpreter = readELFInterpreter(copilot);
     expect(interpreter?.startsWith(`${runtime}/lib/`)).toBe(true);
     expect(fs.existsSync(interpreter || "")).toBe(true);
-    const cliResult = spawnSync(copilot, ["literal $HOME; $(exit 1)"], { encoding: "utf8" });
+    const cliResult = spawnSync(copilot, ["-e", "process.stdout.write(process.argv.at(-1))", "literal $HOME; $(exit 1)"], { argv0: "node", encoding: "utf8" });
     expect(cliResult.status, cliResult.stderr).toBe(0);
     expect(cliResult.stdout.trim()).toBe("literal $HOME; $(exit 1)");
     const node = path.join(runtime, "bin", "node");
@@ -279,6 +279,7 @@ process.exit(17);
     fs.writeFileSync(cleanup, "trusted cleanup");
     fs.writeFileSync(path.join(root, "state", "actions-source", "actions", "setup", "clean.sh"), "untrusted cleanup");
     fs.writeFileSync(path.join(root, "state", "gateway-secret"), "untrusted secret");
+    fs.writeFileSync(path.join(root, "state", "agent", "harness_retry.json"), '{"attempts":1}');
     fs.writeFileSync(path.join(root, "state", "pi-streaming.jsonl"), "pi events");
     fs.writeFileSync(path.join(root, "state", "sandbox/agent/logs/pi-streaming.jsonl"), "writable pi events");
     fs.writeFileSync(path.join(root, "state", "claude-debug.log"), "claude events");
@@ -295,6 +296,7 @@ process.exit(17);
     for (const name of ["agent", "threat-detection", "sandbox/agent/logs"]) {
       expect(fs.readFileSync(path.join(state, name, "fixture.txt"), "utf8")).toBe("guest artifact");
     }
+    expect(fs.readFileSync(path.join(state, "agent", "harness_retry.json"), "utf8")).toBe('{"attempts":1}');
     expect(fs.readFileSync(path.join(state, "pi-streaming.jsonl"), "utf8")).toBe("pi events");
     expect(fs.readFileSync(path.join(state, "sandbox/agent/logs/pi-streaming.jsonl"), "utf8")).toBe("writable pi events");
     expect(fs.readFileSync(path.join(state, "claude-debug.log"), "utf8")).toBe("claude events");

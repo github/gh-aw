@@ -6,6 +6,27 @@ const { performance } = require("node:perf_hooks");
 
 /** @type {Map<string, number>} */
 const lastEmittedAt = new Map();
+const MAX_GRAPHQL_ERRORS = 50;
+const MAX_GRAPHQL_ERROR_DETAILS = 5;
+/** @typedef {"lock" | "unlock" | "projection" | "createLabel" | "updateLabel"} GraphQLOperationContext */
+const GRAPHQL_ERROR_FIELDS = new Map([
+  ["RATE_LIMITED", "graphql_rate_limited"],
+  ["FORBIDDEN", "graphql_forbidden"],
+  ["UNPROCESSABLE", "graphql_unprocessable"],
+  ["NOT_FOUND", "graphql_not_found"],
+  ["GRAPHQL_VALIDATION_FAILED", "graphql_validation_failed"],
+  ["INTERNAL", "graphql_internal"],
+]);
+const GRAPHQL_OPERATIONS = new Map([
+  ["createLabel", "graphql_operation_create_label"],
+  ["updateLabel", "graphql_operation_update_label"],
+]);
+const MAX_GRAPHQL_ALIASES = 50;
+const GRAPHQL_ALIAS_KINDS = new Map([
+  ["l", { context: "lock", field: "graphql_lock_alias", operation: "graphql_operation_create_ref" }],
+  ["m", { context: "projection", field: "graphql_projection_alias", operation: "graphql_operation_issue_projection" }],
+  ["u", { context: "unlock", field: "graphql_unlock_alias", operation: "graphql_operation_delete_ref" }],
+]);
 
 const CONTROL_ERROR_CODES = new Set([
   "checkpoint_invalid",
@@ -25,6 +46,9 @@ const CONTROL_ERROR_CODES = new Set([
   "work_queue_assignment_mismatch",
   "work_queue_assignment_profile_missing",
   "work_queue_policy_proposal_mismatch",
+  "work_queue_pool_not_installed",
+  "work_queue_profile_not_approved",
+  "work_queue_worker_not_compiler_approved",
   "work_queue_dispatch_credential_kind_invalid",
   "work_queue_dispatch_app_metadata_missing",
   "work_queue_dispatch_credential_metadata_conflict",
@@ -67,6 +91,12 @@ function queueControlErrorExplanation(code) {
       return "The stored assignment does not match a valid approved worker route. Inspect the original Claim and installed deployment; do not rebuild an assignment from task text or a stale snapshot.";
     case "work_queue_policy_proposal_mismatch":
       return "The proposed queue policy differs from the installed policy. Refresh compatible worker deployments, or use an explicit administrator policy update only after the queue is quiescent.";
+    case "work_queue_pool_not_installed":
+      return "The requested pool could not be installed on demand. Declare it in aw.json, publish new workers' Markdown and compiled locks to the default branch, and recompile the producer or dispatcher. Installed pool settings and profiles must remain unchanged; other changes require an administrator Policy update after the queue is quiescent.";
+    case "work_queue_profile_not_approved":
+      return "The requested worker profile could not be registered on demand. Publish its tools.work-queue.worker source and compiled lock to the default branch, then recompile the producer or dispatcher. Existing worker authority cannot be changed by additive registration.";
+    case "work_queue_worker_not_compiler_approved":
+      return "The worker route is not compiler-approved. New workers require a published default-branch AW worker source, matching compiled contract and active registration. Check the caller's dispatch allowlist; existing authority cannot be replaced by registration.";
     case "checkpoint_invalid":
     case "queue_control_checkpoint_invalid":
       return "The queue checkpoint failed validation. Inspect the authoritative ledger and restore a valid causal history; do not delete the queue or reset its scheduling debt.";
@@ -108,6 +138,11 @@ function ownValue(value, key) {
   }
 }
 
+/** @param {unknown} error */
+function responseHeaders(error) {
+  return ownValue(ownValue(error, "response"), "headers") ?? ownValue(error, "headers");
+}
+
 /** @param {unknown} headers @param {string} name */
 function headerInteger(headers, name) {
   const value = ownValue(headers, name);
@@ -116,10 +151,38 @@ function headerInteger(headers, name) {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
+/** @param {unknown} error @param {unknown} data @param {number} index @param {GraphQLOperationContext} [operationContext] */
+function graphqlErrorMetadata(error, data, index, operationContext) {
+  /** @type {Record<string, number | boolean>} */
+  const fields = { index };
+  const type = ownValue(error, "type");
+  fields[GRAPHQL_ERROR_FIELDS.get(type) || "graphql_unknown_type"] = true;
+  const path = ownValue(error, "path");
+  const depth = ownValue(path, "length");
+  fields.graphql_path_present = Number.isSafeInteger(depth) && depth > 0;
+  const root = fields.graphql_path_present ? ownValue(path, "0") : undefined;
+  const alias = typeof root === "string" && root.length <= 3 ? /^(l|m|u)(0|[1-9][0-9]?)$/.exec(root) : null;
+  let operation = operationContext && root === operationContext ? GRAPHQL_OPERATIONS.get(operationContext) : undefined;
+  const kind = alias && GRAPHQL_ALIAS_KINDS.get(alias[1]);
+  if (alias && kind && kind.context === operationContext && Number(alias[2]) < MAX_GRAPHQL_ALIASES) {
+    fields[kind.field] = Number(alias[2]);
+    operation = kind.operation;
+  }
+  if (operation) {
+    fields[operation] = true;
+    fields.graphql_result_present = ownValue(data, root) != null;
+  } else if (fields.graphql_path_present) {
+    fields.graphql_path_unclassified = true;
+  }
+  // Exact provider wording is diagnostic evidence only, never proof of no write.
+  if (type === "UNPROCESSABLE" && operation === "graphql_operation_create_ref" && ownValue(error, "message") === "A reference with that name already exists.") fields.graphql_reference_already_exists = true;
+  return fields;
+}
+
 /** @param {unknown} error */
 function githubFailureMetadata(error) {
   const response = ownValue(error, "response");
-  const headers = ownValue(response, "headers") ?? ownValue(error, "headers");
+  const headers = responseHeaders(error);
   /** @type {Record<string, number | boolean>} */
   const fields = {};
   for (const [header, field] of [
@@ -161,15 +224,17 @@ function githubFailureMetadata(error) {
     if (transportCodes.includes(code)) fields[`transport_${code.toLowerCase()}`] = true;
   }
   const count = ownValue(errors, "length");
-  if (Number.isSafeInteger(count) && count > 0 && count <= 50) {
+  if (Number.isSafeInteger(count) && count > 0) {
     fields.graphql_errors = count;
-    for (let index = 0; index < count; index++) {
-      const type = ownValue(ownValue(errors, String(index)), "type");
-      if (type === "RATE_LIMITED") fields.graphql_rate_limited = true;
-      if (type === "FORBIDDEN") fields.graphql_forbidden = true;
-      if (type === "UNPROCESSABLE") fields.graphql_unprocessable = true;
-      if (type === "NOT_FOUND") fields.graphql_not_found = true;
-      if (type === "GRAPHQL_VALIDATION_FAILED") fields.graphql_validation_failed = true;
+    if (count > MAX_GRAPHQL_ERRORS) {
+      fields.graphql_errors_truncated = true;
+      fields.graphql_error_types_inspected = false;
+    } else {
+      for (let index = 0; index < count; index++) {
+        const type = ownValue(ownValue(errors, String(index)), "type");
+        const field = GRAPHQL_ERROR_FIELDS.get(type);
+        if (field) fields[field] = true;
+      }
     }
   }
   return fields;
@@ -235,8 +300,8 @@ function createWorkQueueLogger(component) {
     if (!debugEnabled(namespace)) return;
     diagnostic(event, fields);
   }
-  /** @param {string} event @param {unknown} error @param {boolean} [always] */
-  function failure(event, error, always = false) {
+  /** @param {string} event @param {unknown} error @param {boolean} [always] @param {GraphQLOperationContext} [operationContext] */
+  function failure(event, error, always = false, operationContext) {
     if (!always && !debugEnabled(namespace)) return;
     // Do not use debugError: API errors may contain request bodies and tokens.
     const response = ownValue(error, "response");
@@ -244,10 +309,14 @@ function createWorkQueueLogger(component) {
     const message = ownValue(ownValue(response, "data"), "message");
     const boundedMessage = typeof message === "string" && message.length <= 8192 ? message : "";
     const metadata = githubFailureMetadata(error);
+    const count = typeof metadata.graphql_errors === "number" && debugEnabled(namespace) ? Math.min(metadata.graphql_errors, MAX_GRAPHQL_ERROR_DETAILS) : 0;
+    if (typeof metadata.graphql_errors === "number" && metadata.graphql_errors > count) metadata.graphql_error_details_omitted = metadata.graphql_errors - count;
     const code = queueControlErrorCode(error, metadata);
-    const requestId = ownValue(ownValue(response, "headers"), "x-github-request-id");
-    const validRequestId = typeof requestId === "string" && !/\s/.test(requestId) && /^[0-9a-f]{1,16}(?::[0-9a-f]{1,16}){4}$/i.test(requestId);
-    const requestDiagnostic = Number.isInteger(status) && status >= 100 && status <= 599 ? ` GitHub request ID: ${validRequestId ? requestId : "unknown"}.` : "";
+    const headers = responseHeaders(error);
+    const requestId = [ownValue(ownValue(response, "headers"), "x-github-request-id"), ownValue(ownValue(error, "headers"), "x-github-request-id")].find(
+      value => typeof value === "string" && value.length <= 84 && !/\s/.test(value) && /^[0-9a-f]{1,16}(?::[0-9a-f]{1,16}){4}$/i.test(value)
+    );
+    const requestDiagnostic = (Number.isInteger(status) && status >= 100 && status <= 599) || headers !== undefined || metadata.graphql_errors ? ` GitHub request ID: ${requestId ?? "unknown"}.` : "";
     diagnostic(
       event,
       {
@@ -265,6 +334,13 @@ function createWorkQueueLogger(component) {
       },
       queueControlErrorExplanation(code) + requestDiagnostic
     );
+    const errors = ownValue(error, "errors");
+    const data = ownValue(error, "data") ?? ownValue(ownValue(response, "data"), "data");
+    for (let index = 0; index < count; index++) {
+      const detail = graphqlErrorMetadata(ownValue(errors, String(index)), data, index, operationContext);
+      if (metadata.graphql_errors_truncated) detail.graphql_error_sample_only = true;
+      diagnostic(`${event}.graphql_error`, detail);
+    }
   }
   return { debug, diagnostic, failure };
 }

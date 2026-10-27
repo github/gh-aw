@@ -34,6 +34,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Configuration | `context`, `Activate`, `TrustedConfiguration` | Trusted activation instructions; PR-base provenance is an implementation obligation. |
 | Untrusted data | `AgentRequest`, `requestValid`, `target`, `request.private` | Declarative operation, schema validity, repository selection, and private-source classification remain separate from artifact origin. |
 | Jobs and steps | `status`, `step`, `started`, `safeOutputResult`, `appTokenPost`, `Dependencies` | Ordered host setup, agent execution, detection, validation, credential minting, effects, and the app-token action post step. |
+| Status-only custom job | [`StatusOnlyJob.tla`](StatusOnlyJob.tla) | A separate bounded model checks that an opted-in leaf status job waits for detection to finish, can proceed after failure or warn-mode findings, and satisfies the no-agent-data contract. The abstract capability flags do not verify the Actions expression parser or validator implementation. |
 | Artifacts | `artifacts`, `Consume`, `GoodOrigin` | Existence, producing job, run and invocation identity, naming prefix, instruction trust, secret/private labels. Current-run agent artifacts are still untrusted payloads. |
 | Outputs and logs | `transfers` | Artifact, output, and log channels carry independently tracked secret labels. This abstracts covered redaction, not arbitrary encoded-secret detection. |
 | Permissions | `grants`, `TokenPermissions`, `ValidatedEffects` | Repository read, issue write, content write, and inference capabilities are distinct. Workspace edits are not repository-resource writes. |
@@ -43,7 +44,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Runtime repository-list checkout | [`RuntimeRepositoryCheckout.tla`](RuntimeRepositoryCheckout.tla) | Trusted policy, bounded whole-batch validation, visibility, entry authentication, agent/privileged finalization, job-local manifests, staged isolation, and failure reporting. |
 | Pull-request fork admission | [`PullRequestForkAdmission.tla`](PullRequestForkAdmission.tla) | Same-repository default, repository-pattern or explicit author-association admission, non-PR trigger preservation, and permission independence. |
 | `pull_request_target` checkout policy | [`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) | Strict warning acknowledgment, explicit checkout disablement, trusted base checkout, exact allowlisted external checkout, and fail-closed `fetch` handling. |
-| PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions plus the stricter allow-listed comment/review exception. |
+| PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions; `labeled` and other unlisted actions retain the collaborator permission floor, as does the stricter allow-listed comment/review exception. |
 | Patch/bundle application | [`SafeOutputTransport.tla`](SafeOutputTransport.tla) | Captured bytes, trusted transformations, private snapshots, publication retries, sticky failures, bounded local checking cost, and finally cleanup. |
 | Bundle Git operations | [`SafeOutputGit.tla`](SafeOutputGit.tla) | Explicit prerequisite recovery, offline optional discovery, bounded comparison/history work, credential roles, and separate size/protection provenance. |
 | Host-side MCP compilation | [`MCPCompile.tla`](MCPCompile.tla) | Startup write capability, actor authorization, early option rejection, filesystem isolation, cached-only imports, repository-root cache selection, validation, and write-enabled emission. |
@@ -508,7 +509,7 @@ checks; the real-Git `.gitmodules` regression is not replaced by this abstractio
 
 [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) exhaustively
 models `pull_request` and `pull_request_target` actions `opened`, `synchronize`,
-`ready_for_review`, and `reopened`, as well as `issue_comment`,
+`ready_for_review`, `reopened`, `labeled`, and other unlisted actions, as well as `issue_comment`,
 `pull_request_review_comment`, and `pull_request_review`. The branch-event
 exception requires a Bot sender whose login exactly matches the runtime actor
 and matching positive runtime, PR-head, and PR-base repository identities. The
@@ -648,15 +649,27 @@ implementation and unit-test mapping in compiler threat §7.3.
 Use Java 21, Python 3 (standard library only), the repository's Go toolchain,
 and official [TLA+ Tools v1.8.0](https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0).
 The runner verifies this jar SHA-256 before executing it (the v1.8.0 release
-asset SHA-256 published by GitHub for asset `644223998`, updated on
-2026-10-15; the release notes publish SHA-1):
+asset SHA-256 published by GitHub for asset `670958559`, updated on
+2026-10-24; the release notes publish SHA-1):
 
 ```text
-5bd7b64db99ae4c6c35f290de5e809c0ee41af43f8699cf696099ffb6452b1e2
+d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f
 ```
 
-When updating the release pin, verify the downloaded bytes against the release
-asset metadata and update the workflow, runner, and this digest together.
+Upstream rebuilds this release asset and moves the `v1.8.0` tag; its versioned
+URL is not immutable. This pin identifies the 4,502,259-byte asset uploaded by
+[upstream build 40049599214](https://github.com/tlaplus/tlaplus/actions/runs/40049599214)
+at source commit `2ef2af8c767b76e5db5cba2878f027ac07aad36c`.
+The downloaded SHA-256 matches both GitHub's asset metadata and that build's
+upload log. This correlation is not an independent build attestation.
+
+When upstream replaces the asset again, verification must fail closed. Do not
+derive the expected checksum dynamically or bypass either runtime check.
+When intentionally updating the release pin, verify the downloaded bytes
+against the release asset metadata and the upstream build's upload log, then
+update the workflow and generated lock, runner, regression test, and this digest
+together. An immutable, vetted distribution would be needed to prevent future
+release-URL drift.
 Existing example reports retain the jar digest used to generate their evidence.
 
 ```bash

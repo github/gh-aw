@@ -29,10 +29,9 @@ ignore-images:
 # variants of the MCP server and runtime images, the Debian-based
 # ghcr.io/github/github-mcp-server image, and the Ubuntu 22.04 based
 # ghcr.io/github/gh-aw-firewall/agent image) and the Node/npm runtime those
-# images ship. These packages come with the upstream base image, are never linked
-# into or redistributed with gh-aw, and are therefore accepted as a documented
-# policy exception. The allowlist above still applies to every other package in
-# those images.
+# images ship. These packages are accepted as documented policy exceptions;
+# see CONTRIBUTING.md, including the vendored gh-aw-node runtime exception.
+# The allowlist above still applies to every other package in those images.
 ignore-packages:
   # Alpine base OS
   - alpine-baselayout
@@ -64,6 +63,11 @@ ignore-packages:
   - git-init-template
   - libapk
   - libassuan
+  # Approved Node Alpine runtime exception: inherited unchanged in gh-aw-node.
+  # Alpine's GCC-wide metadata omits libatomic's GCC Runtime Library Exception.
+  # Upstream notices: GPL-3.0-or-later WITH GCC-exception-3.1.
+  # This package-name exception does not waive redistribution obligations.
+  - libatomic
   - libblkid
   - libbz2
   - libcap2

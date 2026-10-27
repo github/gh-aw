@@ -1,12 +1,14 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 var notifyCommentLog = logger.New("workflow:notify_comment")
@@ -59,6 +61,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		Steps:       steps,
 		Needs:       needs,
 		Outputs:     buildConclusionJobOutputs(data),
+		Env:         buildConclusionMemorySaveEnv(data),
 	}, nil
 }
 
@@ -123,8 +126,19 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	if err != nil {
 		return nil, fmt.Errorf("cannot serialize grader configuration: %w", err)
 	}
+	safeJobNames := configuredUsageSafeJobNames(data)
+	usageEnv := []string{gradersEnv}
+	if len(safeJobNames) > 0 {
+		namesJSON, err := json.Marshal(safeJobNames)
+		if err != nil {
+			return nil, fmt.Errorf("cannot serialize safe-job names: %w", err)
+		}
+		usageEnv = append(usageEnv, fmt.Sprintf("          GH_AW_SAFE_JOB_NAMES: %q\n", namesJSON), buildUsageSafeJobResultsEnv(safeJobNames, data.SafeOutputs.Jobs))
+	}
 	steps = append(steps, buildUsageArtifactCollectionStep(IsDetectionJobEnabled(data.SafeOutputs))...)
-	steps = append(steps, buildUsageActivityGenerationStep(hasMaxDailyAICGuardrail(data), conclusionReportFailedJobsEnabled(data), c.getActionPin, gradersEnv)...)
+	// Admission still runs in dry-run mode; record its decision without applying
+	// its budget to agent, detection, or evals execution.
+	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
 	if data.AdmissionEnabled {
 		steps = append(steps, c.buildConclusionAdmissionMetadataStep(data)...)
 	}
@@ -133,6 +147,18 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 	return steps, nil
+}
+
+func configuredUsageSafeJobNames(data *WorkflowData) []string {
+	var names []string
+	// Work-queue jobs only prepare adapters; they do not execute safe jobs.
+	if data.SafeOutputs != nil && !isWorkQueueParticipant(data) {
+		for name := range data.SafeOutputs.Jobs {
+			names = append(names, stringutil.NormalizeSafeOutputIdentifier(name))
+		}
+		slices.Sort(names)
+	}
+	return names
 }
 
 // computeConclusionJobPermissions resolves the GITHUB_TOKEN permissions for the conclusion
@@ -302,7 +328,7 @@ func buildUsageArtifactUploadSteps(prefix string, hasEvals bool, experimentArtif
 
 func buildUsageArtifactPublishSteps(prefix string, hasDetection, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
 	steps := buildUsageArtifactCollectionStep(hasDetection)
-	steps = append(steps, buildUsageActivityGenerationStep(hasDailyAICGuardrail, reuseJobDurations, pinAction, gradersEnv...)...)
+	steps = append(steps, buildUsageActivityGenerationStep(false, hasDailyAICGuardrail, reuseJobDurations, pinAction, gradersEnv...)...)
 	return append(steps, buildUsageArtifactUploadStep(prefix, pinAction)...)
 }
 
@@ -327,8 +353,10 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/agent/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/model-routing.jsonl\n",
 		"            /tmp/gh-aw/usage/agent/execution.json\n",
+		"            /tmp/gh-aw/usage/agent/harness_retry.json\n",
 		"            /tmp/gh-aw/usage/detection/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/detection/execution.json\n",
+		"            /tmp/gh-aw/usage/detection/harness_retry.json\n",
 		"            /tmp/gh-aw/usage/detection/detection_result.json\n",
 		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/evals/execution.json\n",
@@ -388,32 +416,62 @@ func buildUsageArtifactCollectionStep(hasDetection bool) []string {
 	return collectionStep
 }
 
-func buildUsageActivityGenerationStep(hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
+func buildUsageSafeJobResultsEnv(safeJobNames []string, jobs map[string]*SafeJobConfig) string {
+	// Keep private dependency outputs outside the collector's environment.
+	// toJSON on each scalar preserves quotes and newlines in output values.
+	configured := make(map[string]*SafeJobConfig, len(jobs))
+	for name, config := range jobs {
+		configured[stringutil.NormalizeSafeOutputIdentifier(name)] = config
+	}
+	var results []string
+	for _, name := range safeJobNames {
+		fields := fmt.Sprintf("\"result\":${{ toJSON(needs.%s.result) }}", name)
+		var outputs []string
+		for _, field := range []string{"status", "url"} {
+			if config := configured[name]; config != nil {
+				if _, declared := config.Outputs[field]; declared {
+					outputs = append(outputs, fmt.Sprintf("%q:${{ toJSON(needs.%s.outputs.%s) }}", field, name, field))
+				}
+			}
+		}
+		fields += ",\"outputs\":{" + strings.Join(outputs, ",") + "}"
+		results = append(results, fmt.Sprintf("%q:{%s}", name, fields))
+	}
+	return fmt.Sprintf("          GH_AW_SAFE_JOB_RESULTS: %q\n", "{"+strings.Join(results, ",")+"}")
+}
+
+func buildUsageActivityGenerationStep(hasAdmission, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
 	steps := []string{
 		"      - name: Generate usage activity summary and unified session\n",
 		"        if: always()\n",
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
 	}
-	steps = append(steps,
-		"        env:\n",
-		"          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}\n",
-		"          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}\n",
-		"          GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}\n",
-		"          GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}\n",
-	)
-	steps = append(steps, gradersEnv...)
+	var env []string
+	if hasAdmission {
+		env = append(env,
+			"          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}\n",
+			"          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}\n",
+			"          GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}\n",
+			"          GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}\n",
+		)
+	}
+	env = append(env, gradersEnv...)
 	if reuseJobDurations {
-		steps = append(steps, "          GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}\n")
+		env = append(env, "          GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}\n")
 	}
 	if hasDailyAICGuardrail {
-		steps = append(steps,
+		env = append(env,
 			"          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}\n",
 			"          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}\n",
 			"          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}\n",
 			"          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}\n",
 			"          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}\n",
 		)
+	}
+	if len(env) > 0 {
+		steps = append(steps, "        env:\n")
+		steps = append(steps, env...)
 	}
 	steps = append(steps,
 		"        with:\n",

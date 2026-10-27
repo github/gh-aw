@@ -117,10 +117,10 @@ function registerTests({ describe, it }) {
         assert.equal(decision.reason, fixture.reason);
         assert.equal(canonical(serializeProjection(state)), before);
       });
-    it("shared Go/JS: independently generated canonical wire, all twelve operations and every causal prefix", () => {
+    it("shared Go/JS: independently generated canonical wire, all thirteen operations and every causal prefix", () => {
       assert.equal(serializeTransactionLog(sharedPrefixes.commits), sharedPrefixes.canonical);
       assert.equal(canonical(parseTransactionLog(sharedPrefixes.canonical)), canonical(sharedPrefixes.commits));
-      assert.equal(new Set(sharedPrefixes.commits.flatMap(commit => commit.operations.map(operation => operation.kind))).size, 12);
+      assert.equal(new Set(sharedPrefixes.commits.flatMap(commit => commit.operations.map(operation => operation.kind))).size, 13);
       for (let index = 0; index < sharedPrefixes.prefixes.length; index++) {
         const expected = sharedPrefixes.prefixes[index];
         const state = replayTransactions(sharedPrefixes.commits.slice(0, index + 1));

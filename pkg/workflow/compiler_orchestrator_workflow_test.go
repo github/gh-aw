@@ -16,6 +16,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestProtectedSessionCaptureRejectsEvals(t *testing.T) {
+	definition := &EngineDefinition{
+		ID: "protected",
+		Behaviors: &EngineBehaviorDefinition{
+			Execution: &EngineExecutionDefinition{ProtectedSessionCapture: true},
+			LogParser: `function parseLog() { return { markdown: "", logEntries: [] }; }`,
+		},
+	}
+	engine, err := NewBehaviorDefinedEngine(definition)
+	require.NoError(t, err)
+
+	evals := &EvalsConfig{Questions: []EvalDefinition{{ID: "review", Question: "Does the answer match?"}}}
+	ctx := &workflowBuildContext{
+		cleanPath:    "protected.md",
+		engineSetup:  &engineSetupResult{agenticEngine: engine},
+		workflowData: &WorkflowData{Evals: evals},
+	}
+	err = NewCompiler().validateWorkflowBuildContext(ctx)
+	require.ErrorContains(t, err, "secondary engine invocation that reads evals.log")
+	assert.Contains(t, err.Error(), "protected-session-capture: false")
+
+	require.NoError(t, validateProtectedSessionCaptureEvals(engine, nil))
+	definition.Behaviors.Execution.ProtectedSessionCapture = false
+	unprotectedEngine, err := NewBehaviorDefinedEngine(definition)
+	require.NoError(t, err)
+	require.NoError(t, validateProtectedSessionCaptureEvals(unprotectedEngine, evals))
+}
+
 // TestBuildInitialWorkflowData_BasicFields tests that buildInitialWorkflowData correctly populates basic fields
 func TestBuildInitialWorkflowData_BasicFields(t *testing.T) {
 	compiler := NewCompiler()

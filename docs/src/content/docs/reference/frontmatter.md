@@ -429,6 +429,8 @@ timeout-minutes: 30                  # Agentic step timeout, defaults to 20 minu
 
 `runs-on` applies to the main agent job only. `runs-on-slim` applies to all framework/generated jobs (activation, safe-outputs, unlock, etc.), accepts the same string, array, or runner-group object forms as `runs-on`, and defaults to `ubuntu-slim`. `safe-outputs.runs-on` and `safe-outputs.threat-detection.runs-on` accept the same runner forms and take precedence where applicable.
 
+`ubuntu-slim` supports job timeouts of at most 15 minutes. A literal timeout configured by the workflow that exceeds 15 minutes switches a compiler-default framework runner to `ubuntu-latest`; an explicit `ubuntu-slim` runner with such a timeout produces a compilation error. Compiler-default timeouts do not trigger the check and are capped at 15 minutes on `ubuntu-slim`. Safe-output jobs that create or push pull requests use `ubuntu-latest` by default because they check out and publish repository code; API-only safe-output jobs remain eligible for `ubuntu-slim`. Runner and timeout expressions are not evaluated by this check.
+
 `timeout-minutes` accepts an integer or a GitHub Actions expression string such as `${{ inputs.timeout }}`. It bounds the `agentic_execution` step and defaults to `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` before a 20-minute fallback. Generated jobs are bounded separately by `jobs.agent.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES }}` or 60 minutes) and `jobs.detection.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES }}` or 10 minutes). It applies to the workflow being compiled, **not** to plain caller jobs that invoke a reusable workflow with job-level `uses:`.
 
 **Supported runners for `runs-on:`**
@@ -594,6 +596,8 @@ Specifies the environment for deployment protection rules and environment-specif
 ```yaml wrap
 environment: production
 ```
+
+The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment takes precedence for the activation job.
 
 See [GitHub Actions environment docs](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment).
 

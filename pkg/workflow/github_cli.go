@@ -38,6 +38,15 @@ func getDefaultGHHost() string {
 	return defaultGHHost.host
 }
 
+// GitHubCLIHost returns the host used by gh helpers, including repository detection.
+// An empty result lets go-gh resolve the host from the user's gh configuration.
+func GitHubCLIHost() string {
+	if host := lookupProcessEnv("GH_HOST"); host != "" {
+		return host
+	}
+	return getDefaultGHHost()
+}
+
 // setupGHCommand creates an exec.Cmd for gh CLI with proper token configuration.
 // This is the core implementation shared by ExecGH and ExecGHContext.
 // When ctx is nil, it falls back to context.Background().
@@ -139,7 +148,20 @@ func enrichGHError(err error) error {
 // runGHWithSpinnerContext executes a gh CLI command with context support, a spinner,
 // and returns the output. This is the core implementation for all RunGH* functions.
 // If stdin is non-nil it is attached to the command's standard input.
-func runGHWithSpinnerContext(ctx context.Context, spinnerMessage string, combined bool, stdin io.Reader, args ...string) ([]byte, error) {
+func runGHWithSpinnerContext(ctx context.Context, spinnerMessage string, combined bool, stdin io.Reader, args ...string) (result []byte, resultErr error) {
+	var operation strings.Builder
+	operation.WriteString("GitHub CLI: ")
+	operation.WriteString(spinnerMessage)
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "/repos/") || strings.HasPrefix(arg, "repos/") {
+			endpoint, _, _ := strings.Cut(arg, "?")
+			operation.WriteByte(' ')
+			operation.WriteString(endpoint)
+			break
+		}
+	}
+	finish := ctxutil.StartOperation(ctx, operation.String())
+	defer func() { finish(resultErr) }()
 	cmd := ExecGHContext(ctx, args...)
 	if stdin != nil {
 		cmd.Stdin = stdin

@@ -80,6 +80,7 @@ export const noAdHocJsonlParserRule = createRule({
         const init = initializer(node);
         return !!init && isLineSource(init, seen);
       }
+      if (node.type === "ConditionalExpression") return isLineSource(node.consequent, seen) || isLineSource(node.alternate, seen);
       if (node.type !== "CallExpression") return false;
       if (rawLineReaders.has(importedName(node.callee, helpers) ?? "")) return true;
       if (importedName(node.callee, /^(?:node:)?readline(?:\/promises)?$/) === "createInterface") return true;
@@ -129,6 +130,7 @@ export const noAdHocJsonlParserRule = createRule({
         const variable = binding(node);
         return (!!variable && lineBindings.has(variable)) || fromLine(initializer(node), seen);
       }
+      if (node.type === "ConditionalExpression") return fromLine(node.consequent, seen) || fromLine(node.alternate, seen);
       if (node.type === "ArrayExpression") return node.elements.some(element => fromLine(element ?? undefined, seen));
       if (node.type === "MemberExpression" && node.computed) return isLineSource(node.object);
       if (node.type === "CallExpression" && node.callee.type === "MemberExpression" && propertyName(node.callee) === "shift") return isLineSource(node.callee.object);

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { captureExecutionEvidenceConfiguration, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
 
 describe("harness_retry_runner.cjs", () => {
   let directory;
@@ -27,6 +27,106 @@ describe("harness_retry_runner.cjs", () => {
       ...overrides,
     };
   }
+
+  function telemetryOptions(exitCodes = [0]) {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), "harness-retry-"));
+    return {
+      telemetryPath: path.join(directory, "harness_retry.json"),
+      maxRetries: 2,
+      initialDelayMs: 1,
+      backoffMultiplier: 2,
+      maxDelayMs: 10,
+      driverStartTime: Date.now(),
+      harnessName: "Test harness",
+      log: () => {},
+      softTimeoutGuard: null,
+      runAttempt: async attempt => ({ exitCode: exitCodes[attempt], output: "private output", hasOutput: true }),
+      handleFailure: ({ result }) => {
+        result.failureClasses = ["rate_limit_error"];
+        return { action: "retry" };
+      },
+      sleepFn: async () => {},
+    };
+  }
+
+  it.each([
+    [{}, "/tmp/gh-aw/agent/harness_retry.json"],
+    [{ GH_AW_PHASE: "detection" }, "/tmp/gh-aw/threat-detection/detection_harness_retry.json"],
+    [{ GH_AW_TMP_DIR: "/custom" }, "/custom/agent/harness_retry.json"],
+    [{ GH_AW_HARNESS_TELEMETRY_DIR: "/shared/sandbox/agent" }, "/shared/sandbox/agent/harness_retry.json"],
+    [{ GH_AW_HARNESS_TELEMETRY_DIR: "/shared/sandbox/agent", GH_AW_PHASE: "detection" }, "/shared/sandbox/agent/detection_harness_retry.json"],
+  ])("resolves the phase-isolated telemetry path for %j", (env, expected) => {
+    expect(resolveHarnessRetryTelemetryPath(env)).toBe(expected);
+  });
+
+  it.each([
+    { exitCodes: [0], attempts: 1, exitCode: 0 },
+    { exitCodes: [1, 1, 0], attempts: 3, exitCode: 0 },
+    { exitCodes: [1, 1, 1], attempts: 3, exitCode: 1 },
+  ])("persists attempt telemetry for $exitCodes", async ({ exitCodes, attempts, exitCode }) => {
+    const options = telemetryOptions(exitCodes);
+    fs.writeFileSync(options.telemetryPath, '{"attempts":99}');
+    const result = await runHarnessRetryLoop(options);
+    const content = fs.readFileSync(options.telemetryPath, "utf8");
+    expect(result).toMatchObject({ attempts, exitCode });
+    expect(JSON.parse(content)).toEqual({
+      attempts,
+      exit_code: exitCode,
+      attempt_results: exitCodes.map((code, index) => ({ attempt: index + 1, exit_code: code, failure_classes: code === 0 ? [] : ["rate_limit_error"] })),
+    });
+    expect(content).not.toContain("private output");
+    expect(fs.existsSync(`${options.telemetryPath}.tmp`)).toBe(false);
+  });
+
+  it("records cancellation without invoking the failure handler", async () => {
+    const options = telemetryOptions();
+    options.runAttempt = async () => ({ exitCode: 143, output: "", hasOutput: false, cancelled: true });
+    await runHarnessRetryLoop(options);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toMatchObject({
+      attempts: 1,
+      exit_code: 143,
+      attempt_results: [{ attempt: 1, exit_code: 143, failure_classes: ["cancelled"] }],
+    });
+  });
+
+  it("does not count attempts prevented by the soft deadline", async () => {
+    const options = telemetryOptions();
+    options.softTimeoutGuard = { timeoutMinutes: 1, softDeadlineMs: Date.now() - 1 };
+    await runHarnessRetryLoop(options);
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toEqual({ attempts: 0, exit_code: 1, attempt_results: [] });
+  });
+
+  it("checkpoints started attempts even if execution throws", async () => {
+    const options = telemetryOptions();
+    options.runAttempt = async () => {
+      expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempts).toBe(1);
+      throw new Error("spawn failed");
+    };
+    await expect(runHarnessRetryLoop(options)).rejects.toThrow("spawn failed");
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toEqual({
+      attempts: 1,
+      exit_code: 1,
+      attempt_results: [{ attempt: 1, exit_code: null, failure_classes: [] }],
+    });
+  });
+
+  it("does not change the harness outcome when telemetry cannot be written", async () => {
+    const options = telemetryOptions();
+    fs.mkdirSync(options.telemetryPath);
+    const logs = [];
+    options.log = message => logs.push(message);
+    await expect(runHarnessRetryLoop(options)).resolves.toMatchObject({ exitCode: 0, attempts: 1 });
+    expect(logs.some(message => message.includes("could not record harness retry telemetry"))).toBe(true);
+  });
+
+  it("does not propagate telemetry diagnostic failures", async () => {
+    const options = telemetryOptions();
+    fs.mkdirSync(options.telemetryPath);
+    options.log = message => {
+      if (message.includes("could not record harness retry telemetry")) throw new Error("logging failed");
+    };
+    await expect(runHarnessRetryLoop(options)).resolves.toMatchObject({ exitCode: 0, attempts: 1 });
+  });
 
   it.each(["agent", "detection", "evals"])("records run-scoped zero-use evidence for a pre-flight %s noop", component => {
     const env = executionEnv({ GH_AW_AWF_EXECUTION_COMPONENT: component });

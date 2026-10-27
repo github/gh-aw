@@ -5,8 +5,9 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { canonical } = require("./work_queue_codec.cjs");
 const { administrator, genesis, operationCommit, submission } = require("./work_queue_test_helpers.cjs");
-const { compactTransactions, prepareCheckpoint, replayTransactions, serializeProjection } = require("./work_queue_replay.cjs");
-const { legacyCheckpoint } = require("./work_queue_checkpoint_regression_helpers.cjs");
+const { compactTransactions, prepareCheckpoint, reconstructCheckpoint, replayTransactions, serializeProjection } = require("./work_queue_replay.cjs");
+const { legacyCheckpoint, rewriteCheckpoint } = require("./work_queue_checkpoint_regression_helpers.cjs");
+const { acceptedSubmissionParameters } = require("./work_queue_dispatch.cjs");
 
 function expiringLog() {
   const log = [genesis()];
@@ -15,6 +16,23 @@ function expiringLog() {
 }
 
 describe("checkpoint and expiration internal-state regressions", () => {
+  it("recovers checkpoints written before full Policy receipt history and retains current-epoch submit recovery", () => {
+    const log = [genesis()];
+    log.push(submission(log, ["accepted"]));
+    const current = compactTransactions(log, "a".repeat(40), administrator, 100);
+    const legacy = rewriteCheckpoint(current, snapshot => {
+      for (const receipt of snapshot.requests) receipt.events = receipt.events.map(event => (["Policy", "PoolInstall"].includes(event.kind) ? { kind: event.kind } : event));
+    });
+    assert.notEqual(legacy[0].operations[0].state_sha256, current[0].operations[0].state_sha256);
+    const recovered = reconstructCheckpoint(log, "a".repeat(40), administrator, 100, legacy[0].operations[0].state_sha256);
+    assert.equal(canonical(recovered), canonical(legacy));
+    const state = replayTransactions(recovered);
+    const prior = state.requests.get(log[1].request.id);
+    const original = { nodes: log[1].request.parameters.nodes.map(({ kind, batch_trust_domain, enqueued, ...node }) => node) };
+    const context = { ...prior.actor, authenticated: true, roles: [prior.actor.role], created_at: log[1].at };
+    assert.deepEqual(acceptedSubmissionParameters(state, context, original, prior), prior.request.parameters);
+  });
+
   it("refreshes every public view after an isolated as-of expiration pass", () => {
     const log = expiringLog();
     const original = canonical(log);

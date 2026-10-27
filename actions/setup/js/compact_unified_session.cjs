@@ -3,6 +3,7 @@
 
 const fs = require("node:fs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 
 const COMPACT_UNIFIED_SESSION_VERSION = 1;
 const MAX_COMPACT_SESSION_BYTES = 16 * 1024;
@@ -20,7 +21,9 @@ const EVENT_FIELDS = {
   "guardrail.admission": ["status", "maxAiCredits", "threatDetectionMaxAiCredits", "evalsMaxAiCredits"],
   "guardrail.daily_aic": ["status", "exceeded", "total", "estimated", "threshold"],
   "workflow.job_result": ["jobId", "result", "durationMs"],
+  "memory.push": ["memoryId", "jobResult", "outcome", "status", "branch", "commit"],
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
+  "harness.retry": ["attempts", "exitCode"],
   "grader.result": ["id", "status", "value", "score", "unit", "passed", "direction", "threshold", "enabled", "min", "max", "version"],
 };
 EVENT_FIELDS["firewall.token_usage"] = EVENT_FIELDS["usage.report"];
@@ -54,6 +57,11 @@ function projectEvent(event) {
   if (!isRecord(event) || typeof event.type !== "string" || !Object.hasOwn(EVENT_FIELDS, event.type) || !isRecord(event.data)) return undefined;
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
+  if (event.type === "harness.retry") {
+    const retry = normalizeHarnessRetryRecord(event.data);
+    if (!retry) return undefined;
+    Object.assign(data, retry);
+  }
   if (["session.result", "usage.report", "firewall.token_usage"].includes(event.type) && isRecord(event.data.usage)) data.usage = projectScalars(event.data.usage, USAGE_FIELDS);
   if (event.type === "grader.result" && isRecord(event.data.run)) data.run = projectScalars(event.data.run, GRADER_RUN_FIELDS);
   /** @type {Record<string, unknown>} */

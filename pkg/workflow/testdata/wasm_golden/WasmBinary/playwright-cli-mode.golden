@@ -17,11 +17,17 @@ concurrency:
 
 run-name: "Test Playwright CLI Mode"
 
+env:
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
+  OTEL_SERVICE_NAME: gh-aw.playwright-cli-mode
+  OTEL_RESOURCE_ATTRIBUTES: 'gh-aw.workflow.name=Test%20Playwright%20CLI%20Mode,gh-aw.repository=${{ github.repository }},gh-aw.run.id=${{ github.run_id }},github.run_id=${{ github.run_id }},gh-aw.engine.id=copilot'
+  OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}
+  GH_AW_OTLP_ENDPOINTS: '[{"url":"${{ secrets.GH_AW_DEFAULT_OTLP_ENDPOINT || vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}","headers":"${{ secrets.GH_AW_DEFAULT_OTLP_HEADERS }}"}]'
+  GH_AW_OTLP_IF_MISSING: ignore
+
 jobs:
   activation:
     name: activation
-    needs: pre_activation
-    if: needs.pre_activation.outputs.activated == 'true'
     runs-on: ubuntu-slim
     # Permissions for the activation job (workflow permissions default to none).
     permissions:
@@ -65,8 +71,6 @@ jobs:
         with:
           destination: ${{ runner.temp }}/gh-aw/actions
           job-name: ${{ github.job }}
-          trace-id: ${{ needs.pre_activation.outputs.setup-trace-id }}
-          parent-span-id: ${{ needs.pre_activation.outputs.setup-parent-span-id || needs.pre_activation.outputs.setup-span-id }}
           safe-output-artifact-client: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Test Playwright CLI Mode"
@@ -75,6 +79,8 @@ jobs:
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
+      - name: Mask OTLP telemetry headers
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
       - name: Generate agentic run info
         id: generate_aw_info
         env:
@@ -84,6 +90,7 @@ jobs:
           GH_AW_INFO_VERSION: "COPILOT_VERSION"
           GH_AW_INFO_AGENT_VERSION: "COPILOT_VERSION"
           GH_AW_INFO_WORKFLOW_NAME: "Test Playwright CLI Mode"
+          GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GH_AW_INFO_EXPERIMENTAL: "false"
           GH_AW_INFO_SUPPORTS_TOOLS_ALLOWLIST: "true"
           GH_AW_INFO_STAGED: "false"
@@ -93,6 +100,9 @@ jobs:
           GH_AW_INFO_AWMG_VERSION: ""
           GH_AW_INFO_FIREWALL_TYPE: "squid"
           GH_AW_INFO_AGENT_RUNTIME: ""
+          GH_AW_INFO_ENGINE_HARNESS: "copilot-cli"
+          GH_AW_INFO_MODEL_CONFIG: '{"routing":{"enabled":false},"models":{"allowed":[],"blocked":[]},"max_ai_credits_source":"default"}'
+          GH_AW_INFO_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_COMPILED_STRICT: "true"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -105,7 +115,7 @@ jobs:
             await main(core, context);
       - name: Restore daily AIC scan observations
         id: restore-daily-aic-cache-fallback
-        if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
+        if: ${{ env.GH_AW_ADMISSION_RESULT != 'admitted' && env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_HAS_SLASH_COMMAND: "false"
@@ -121,7 +131,7 @@ jobs:
             await main();
       - name: Check daily workflow token guardrail
         id: daily-ai-credits-workflow-guardrail
-        if: ${{ env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
+        if: ${{ env.GH_AW_ADMISSION_RESULT != 'admitted' && env.GH_AW_MAX_DAILY_AI_CREDITS != '' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_WORKFLOW_NAME: "Test Playwright CLI Mode"
@@ -143,7 +153,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'check_daily_aic_workflow_guardrail.cjs'));
             await main();
       - name: Publish daily AIC scan observations
-        if: always() && env.GH_AW_MAX_DAILY_AI_CREDITS != ''
+        if: always() && env.GH_AW_ADMISSION_RESULT != 'admitted' && env.GH_AW_MAX_DAILY_AI_CREDITS != ''
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -206,7 +216,8 @@ jobs:
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"github_mcp_tools_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"}],\"system_item_count\":9}"
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_auto_create_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"}],\"system_item_count\":15}"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -216,9 +227,11 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
-          GH_AW_PROMPT_CONTENT_0002: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0003: "# Test Playwright CLI Mode\n\nThis workflow tests the `mode: cli` configuration for the Playwright tool.\n\nWhen `mode: cli` is set, the compiler installs `@playwright/cli` via npm instead\nof launching the Docker-based MCP server, providing a token-efficient alternative\nfor coding agents.\n\nPlease perform the following tasks:\n\n1. Run `playwright-cli open http://127.0.0.1:4321` to navigate to a local page\n2. Run `playwright-cli screenshot` to capture the current page\n3. Create an issue confirming that Playwright CLI mode is working correctly\n\n"
+          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_issue\n"
+          GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
+          GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
+          GH_AW_PROMPT_CONTENT_0004: "</system>\n"
+          GH_AW_PROMPT_CONTENT_0005: "# Test Playwright CLI Mode\n\nThis workflow tests the `mode: cli` configuration for the Playwright tool.\n\nWhen `mode: cli` is set, the compiler installs `@playwright/cli` via npm instead\nof launching the Docker-based MCP server, providing a token-efficient alternative\nfor coding agents.\n\nPlease perform the following tasks:\n\n1. Run `playwright-cli open http://127.0.0.1:4321` to navigate to a local page\n2. Run `playwright-cli screenshot` to capture the current page\n3. Create an issue confirming that Playwright CLI mode is working correctly\n\n"
         with:
           script: |
             const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
@@ -254,7 +267,7 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
+          GH_AW_MCP_CLI_SERVERS_LIST: "- `github` — run `github --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools"
         with:
           script: |
             const path = require('path');
@@ -276,7 +289,7 @@ jobs:
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED
+                GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST
               }
             });
       - name: Validate prompt placeholders
@@ -345,7 +358,19 @@ jobs:
     permissions: read-all
     timeout-minutes: 60
     env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      GH_AW_ASSETS_ALLOWED_EXTS: ""
+      GH_AW_ASSETS_BRANCH: ""
+      GH_AW_ASSETS_MAX_SIZE_KB: 0
+      GH_AW_MCP_LOG_DIR: /tmp/gh-aw/mcp-logs/safeoutputs
+      GH_AW_PR_HEAD_BASE_BRANCH: ""
+      GH_AW_PR_HEAD_BASE_PR_NUMBER: ""
+      GH_AW_PR_HEAD_BASE_REF: ""
+      GH_AW_PR_HEAD_BASE_REPO: ""
+      GH_AW_PR_HEAD_BASE_SHA: ""
+      GH_AW_PR_HEAD_REPO: ""
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
+      GH_AW_TARGET_REPO_SLUG: ""
       GH_AW_WORKFLOW_ID_SANITIZED: playwrightclimode
       PLAYWRIGHT_MCP_SANDBOX: false
     outputs:
@@ -353,7 +378,9 @@ jobs:
       ai_credits_rate_limit_error: ${{ steps.parse-mcp-gateway.outputs.ai_credits_rate_limit_error || 'false' }}
       aic: ${{ steps.parse-token-usage.outputs.aic }}
       ambient_context: ${{ steps.parse-token-usage.outputs.ambient_context }}
+      checkout_pr_invalidated: ${{ steps.checkout-pr.outputs.checkout_pr_invalidated || 'false' }}
       checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
+      has_patch: ${{ steps.collect_output.outputs.has_patch }}
       http_400_response_error: ${{ steps.detect-agent-errors.outputs.http_400_response_error || 'false' }}
       inference_access_error: ${{ steps.detect-agent-errors.outputs.inference_access_error || 'false' }}
       invocation_cap_exceeded: ${{ steps.detect-agent-errors.outputs.invocation_cap_exceeded || 'false' }}
@@ -364,6 +391,8 @@ jobs:
       model: ${{ needs.activation.outputs.model }}
       model_endpoint_mismatch_error: ${{ steps.detect-agent-errors.outputs.model_endpoint_mismatch_error || 'false' }}
       model_not_supported_error: ${{ steps.detect-agent-errors.outputs.model_not_supported_error || 'false' }}
+      output: ${{ steps.collect_output.outputs.output }}
+      output_types: ${{ steps.collect_output.outputs.output_types }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -394,6 +423,23 @@ jobs:
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
+      - name: Set runtime paths
+        id: set-runtime-paths
+        env:
+          GH_AW_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
+        run: | # zizmor: ignore[github-env] - runner.tool_cache is set by GitHub Actions, not user input.
+          if [ -z "${RUNNER_TOOL_CACHE:-}" ]; then
+            echo "RUNNER_TOOL_CACHE=${GH_AW_RUNNER_TOOL_CACHE}" >> "$GITHUB_ENV"
+          fi
+          {
+            echo "GH_AW_SAFE_OUTPUTS=${RUNNER_TEMP}/gh-aw/safeoutputs/outputs.jsonl"
+            echo "GH_AW_SAFE_OUTPUTS_CONFIG_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/config.json"
+            echo "GH_AW_SAFE_OUTPUTS_TOOLS_PATH=${RUNNER_TEMP}/gh-aw/safeoutputs/tools.json"
+          } >> "$GITHUB_OUTPUT"
+      - name: Mask OTLP telemetry headers
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Check OTLP telemetry configuration
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/check_otlp_default_credentials.sh"
       - name: Checkout repository (gh-aw default)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -438,10 +484,10 @@ jobs:
             const { main } = require(path.join(actionsDir, 'checkout_pr_branch.cjs'));
             await main();
       - name: Install GitHub Copilot CLI
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh"
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" COPILOT_VERSION --checksums-sha256 COPILOT_CHECKSUMS_SHA256 --prefer-toolcache
         env:
           GH_HOST: github.com
-          GH_AW_COMPILED_VERSION: dev
+          GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Install Playwright CLI
@@ -488,15 +534,100 @@ jobs:
           GH_AW_SKILL_DIR: ".github/skills"
         run: bash "${RUNNER_TEMP}/gh-aw/actions/restore_inline_skills.sh"
       - name: Download container images
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:AWF_VERSION ghcr.io/github/gh-aw-firewall/api-proxy:AWF_VERSION ghcr.io/github/gh-aw-firewall/squid:AWF_VERSION ghcr.io/github/gh-aw-mcpg:MCPG_VERSION ghcr.io/github/github-mcp-server:GH_MCP_VERSION
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:AWF_VERSION ghcr.io/github/gh-aw-firewall/api-proxy:AWF_VERSION ghcr.io/github/gh-aw-firewall/squid:AWF_VERSION ghcr.io/github/gh-aw-mcpg:MCPG_VERSION ghcr.io/github/gh-aw-node ghcr.io/github/github-mcp-server:GH_MCP_VERSION
+      - name: Prepare Safe Outputs Directories
+        run: |
+          mkdir -p "${RUNNER_TEMP}/gh-aw/safeoutputs"
+          mkdir -p /tmp/gh-aw/safeoutputs
+          mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
+      - name: Generate Safe Outputs Config
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
+          GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_issue\":{\"labels\":[\"playwright-cli-mode\"],\"max\":1,\"title_prefix\":\"[playwright-cli-mode]\"}}"
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'create_files.cjs'));
+            await main();
+      - name: Generate Safe Outputs Tools
+        env:
+          GH_AW_TOOLS_META_JSON: |
+            {
+              "description_suffixes": {
+                "create_issue": " CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[playwright-cli-mode]\". Labels [\"playwright-cli-mode\"] will be automatically added."
+              },
+              "repo_params": {},
+              "dynamic_tools": []
+            }
+          GH_AW_VALIDATION_JSON: |
+            {
+              "create_issue": {
+                "defaultMax": 1,
+                "fields": {
+                  "blocked_by": {},
+                  "body": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 65000,
+                    "minLength": 20
+                  },
+                  "fields": {
+                    "type": "array"
+                  },
+                  "labels": {
+                    "type": "array",
+                    "itemType": "string",
+                    "itemSanitize": true,
+                    "itemMaxLength": 128
+                  },
+                  "parent": {
+                    "issueOrPRNumber": true
+                  },
+                  "repo": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "temporary_id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "required": true,
+                    "type": "string",
+                    "sanitize": true,
+                    "maxLength": 128
+                  }
+                },
+                "collapseData": true
+              }
+            }
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'generate_safe_outputs_tools.cjs'));
+            await main();
       - name: Start MCP Gateway
         id: start-mcp-gateway
         env:
           DEBUG: ${{ env.DEBUG || runner.debug == '1' && '*' || '' }}
+          GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST: ${{ vars.GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST || 'true' }}
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_SAFE_OUTPUTS_CONFIG_PATH: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_CONFIG_PATH }}
+          GH_AW_SAFE_OUTPUTS_TOOLS_PATH: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_TOOLS_PATH }}
           GH_AW_SINK_VISIBILITY: ${{ steps.determine-automatic-lockdown.outputs.visibility }}
           GITHUB_MCP_GUARD_MIN_INTEGRITY: ${{ steps.determine-automatic-lockdown.outputs.min_integrity }}
           GITHUB_MCP_GUARD_REPOS: ${{ steps.determine-automatic-lockdown.outputs.repos }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           mkdir -p "${RUNNER_TEMP}/gh-aw/mcp-config"
@@ -528,7 +659,7 @@ jobs:
           MCP_GATEWAY_UID=$(id -u 2>/dev/null || echo '0')
           MCP_GATEWAY_GID=$(id -g 2>/dev/null || echo '0')
           source "${RUNNER_TEMP}/gh-aw/actions/resolve_docker_socket_gid.sh"
-          export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network bridge -p 127.0.0.1:'"${MCP_GATEWAY_PORT}"':'"${MCP_GATEWAY_PORT}"' --name awmg-mcpg --add-host host.docker.internal:host-gateway --user '"${MCP_GATEWAY_UID}"':'"${MCP_GATEWAY_GID}"' --group-add '"${DOCKER_SOCK_GID}"' -v '"${DOCKER_SOCK_PATH}"':/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_AGENT_ID -e MCP_GATEWAY_PAYLOAD_DIR -e MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD -e DOCKER_HOST=unix:///var/run/docker.sock -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_TARGET_REPO_SLUG -e GH_AW_PR_HEAD_BASE_BRANCH -e GH_AW_PR_HEAD_BASE_SHA -e GH_AW_PR_HEAD_BASE_REPO -e GH_AW_PR_HEAD_BASE_PR_NUMBER -e GH_AW_PR_HEAD_BASE_REF -e GH_AW_PR_HEAD_REPO -e GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_GUARD_MIN_INTEGRITY -e GITHUB_MCP_GUARD_REPOS -e GH_AW_SINK_VISIBILITY -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e RUNNER_TEMP -e RUNNER_TOOL_CACHE -e MCP_GATEWAY_ALLOWED_MOUNT_ROOTS -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw -v '"${RUNNER_TEMP}"'/gh-aw/safeoutputs:'"${RUNNER_TEMP}"'/gh-aw/safeoutputs:rw ghcr.io/github/gh-aw-mcpg:MCPG_VERSION'
+          export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network bridge -p 127.0.0.1:'"${MCP_GATEWAY_PORT}"':'"${MCP_GATEWAY_PORT}"' --name awmg-mcpg --add-host host.docker.internal:host-gateway --user '"${MCP_GATEWAY_UID}"':'"${MCP_GATEWAY_GID}"' --group-add '"${DOCKER_SOCK_GID}"' -v '"${DOCKER_SOCK_PATH}"':/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_AGENT_ID -e MCP_GATEWAY_PAYLOAD_DIR -e MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD -e DOCKER_HOST=unix:///var/run/docker.sock -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_TARGET_REPO_SLUG -e GH_AW_PR_HEAD_BASE_BRANCH -e GH_AW_PR_HEAD_BASE_SHA -e GH_AW_PR_HEAD_BASE_REPO -e GH_AW_PR_HEAD_BASE_PR_NUMBER -e GH_AW_PR_HEAD_BASE_REF -e GH_AW_PR_HEAD_REPO -e GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_GUARD_MIN_INTEGRITY -e GITHUB_MCP_GUARD_REPOS -e GH_AW_SINK_VISIBILITY -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e RUNNER_TEMP -e RUNNER_TOOL_CACHE -e MCP_GATEWAY_ALLOWED_MOUNT_ROOTS -e GITHUB_AW_OTEL_TRACE_ID -e GITHUB_AW_OTEL_PARENT_SPAN_ID -e OTEL_EXPORTER_OTLP_HEADERS -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw -v '"${RUNNER_TEMP}"'/gh-aw/safeoutputs:'"${RUNNER_TEMP}"'/gh-aw/safeoutputs:rw ghcr.io/github/gh-aw-mcpg:MCPG_VERSION'
 
           mkdir -p "$HOME/.copilot"
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
@@ -551,6 +682,48 @@ jobs:
                     "repos": "$GITHUB_MCP_GUARD_REPOS"
                   }
                 }
+              },
+              "safeoutputs": {
+                "type": "stdio",
+                "container": "ghcr.io/github/gh-aw-node",
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "args": ["-w", "\${GITHUB_WORKSPACE}"],
+                "entrypoint": "sh",
+                "entrypointArgs": ["-c", "sh ${RUNNER_TEMP}/gh-aw/safeoutputs/start_safe_outputs_mcp.sh"],
+                "env": {
+                  "DEBUG": "\${DEBUG}",
+                  "DEFAULT_BRANCH": "\${DEFAULT_BRANCH}",
+                  "GH_AW_ASSETS_ALLOWED_EXTS": "\${GH_AW_ASSETS_ALLOWED_EXTS}",
+                  "GH_AW_ASSETS_BRANCH": "\${GH_AW_ASSETS_BRANCH}",
+                  "GH_AW_ASSETS_MAX_SIZE_KB": "\${GH_AW_ASSETS_MAX_SIZE_KB}",
+                  "GH_AW_MCP_LOG_DIR": "\${GH_AW_MCP_LOG_DIR}",
+                  "GH_AW_SAFE_OUTPUTS": "\${GH_AW_SAFE_OUTPUTS}",
+                  "GH_AW_SAFE_OUTPUTS_CONFIG_PATH": "\${GH_AW_SAFE_OUTPUTS_CONFIG_PATH}",
+                  "GH_AW_SAFE_OUTPUTS_TOOLS_PATH": "\${GH_AW_SAFE_OUTPUTS_TOOLS_PATH}",
+                  "GH_AW_TARGET_REPO_SLUG": "\${GH_AW_TARGET_REPO_SLUG}",
+                  "GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST": "\${GH_AW_POLICY_ALLOW_CREATE_PULL_REQUEST}",
+                  "GH_AW_PR_HEAD_BASE_BRANCH": "\${GH_AW_PR_HEAD_BASE_BRANCH}",
+                  "GH_AW_PR_HEAD_BASE_SHA": "\${GH_AW_PR_HEAD_BASE_SHA}",
+                  "GH_AW_PR_HEAD_BASE_REPO": "\${GH_AW_PR_HEAD_BASE_REPO}",
+                  "GH_AW_PR_HEAD_BASE_PR_NUMBER": "\${GH_AW_PR_HEAD_BASE_PR_NUMBER}",
+                  "GH_AW_PR_HEAD_BASE_REF": "\${GH_AW_PR_HEAD_BASE_REF}",
+                  "GH_AW_PR_HEAD_REPO": "\${GH_AW_PR_HEAD_REPO}",
+                  "GITHUB_EVENT_NAME": "\${GITHUB_EVENT_NAME}",
+                  "GITHUB_EVENT_PATH": "\${GITHUB_EVENT_PATH}",
+                  "GITHUB_REPOSITORY": "\${GITHUB_REPOSITORY}",
+                  "GITHUB_SHA": "\${GITHUB_SHA}",
+                  "GITHUB_TOKEN": "\${GITHUB_TOKEN}",
+                  "GITHUB_WORKSPACE": "\${GITHUB_WORKSPACE}",
+                  "RUNNER_TEMP": "\${RUNNER_TEMP}"
+                },
+                "guard-policies": {
+                  "write-sink": {
+                    "accept": [
+                      "*"
+                    ],
+                    "sink-visibility": "${GH_AW_SINK_VISIBILITY}"
+                  }
+                }
               }
             },
             "gateway": {
@@ -558,10 +731,31 @@ jobs:
               "domain": "${MCP_GATEWAY_DOMAIN}",
               "agentId": "${MCP_GATEWAY_AGENT_ID}",
               "payloadDir": "${MCP_GATEWAY_PAYLOAD_DIR}",
-              "startupTimeout": 120
+              "startupTimeout": 120,
+              "opentelemetry": {
+                "endpoint": "${OTEL_EXPORTER_OTLP_ENDPOINT}",
+                "traceId": "${GITHUB_AW_OTEL_TRACE_ID}",
+                "spanId": "${GITHUB_AW_OTEL_PARENT_SPAN_ID}"
+              }
             }
           }
           GH_AW_MCP_CONFIG_NORM_EOF
+      - name: Mount MCP servers as CLIs
+        id: mount-mcp-clis
+        continue-on-error: true
+        env:
+          MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}
+          MCP_GATEWAY_DOMAIN: ${{ steps.start-mcp-gateway.outputs.gateway-domain }}
+          MCP_GATEWAY_PORT: ${{ steps.start-mcp-gateway.outputs.gateway-port }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require(path.join(actionsDir, 'mount_mcp_as_cli.cjs'));
+            await main();
       - name: Clean credentials
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/clean_git_credentials.sh"
@@ -586,16 +780,19 @@ jobs:
         id: agentic_execution
         # Copilot CLI tool arguments (sorted):
         # --allow-tool github
+        # --allow-tool safeoutputs
         # --allow-tool shell(cat)
         # --allow-tool shell(curl:*)
         # --allow-tool shell(date)
         # --allow-tool shell(echo)
+        # --allow-tool shell(github:*)
         # --allow-tool shell(grep)
         # --allow-tool shell(head)
         # --allow-tool shell(ls)
         # --allow-tool shell(playwright-cli:*)
         # --allow-tool shell(printf)
         # --allow-tool shell(pwd)
+        # --allow-tool shell(safeoutputs:*)
         # --allow-tool shell(sort)
         # --allow-tool shell(tail)
         # --allow-tool shell(uniq)
@@ -633,6 +830,22 @@ jobs:
           if [[ ! "$GH_AW_MAX_AI_CREDITS" =~ ^[0-9]+$ ]]; then
             GH_AW_MAX_AI_CREDITS="1000"
           fi
+          if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -z "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
+            echo "ERR_ADMISSION: Missing required runtime admission allowance." >&2
+            exit 1
+          fi
+
+          if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_AI_CREDITS:-}" ]]; then
+            if [[ ! "$GH_AW_ADMISSION_MAX_AI_CREDITS" =~ ^[1-9][0-9]{0,9}$ ]] || (( GH_AW_ADMISSION_MAX_AI_CREDITS > 2147483647 )); then
+              echo "ERR_ADMISSION: Invalid runtime admission allowance." >&2
+              exit 1
+            fi
+            GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"
+            echo "Admission allowance applied (value withheld)."
+          else
+            echo "No component admission allowance; retaining existing budget policy (value withheld)."
+          fi
+          unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS
           printf '%s\n' "AWF_CONFIG_PAYLOAD" > "${RUNNER_TEMP}/gh-aw/awf-config.json"
           cp "${RUNNER_TEMP}/gh-aw/awf-config.json" /tmp/gh-aw/awf-config.json
           export GH_AW_MODELS_JSON_PATH="/tmp/gh-aw/models.json"
@@ -662,20 +875,21 @@ jobs:
           GH_AW_AWF_LOG_FILE=/tmp/gh-aw/agent-stdio.log \
           GH_AW_AWF_ATTEMPT_LOG_NAME=copilot \
           bash "${RUNNER_TEMP}/gh-aw/actions/run_awf_with_startup_retries.sh" -- \
-            awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_ENGINE_STEP_TIMEOUT_MINUTES:+--agent-timeout "$GH_AW_ENGINE_STEP_TIMEOUT_MINUTES"} ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GITHUB_MCP_SERVER_TOKEN --exclude-env MCP_GATEWAY_AGENT_ID --mount /tmp/gh-aw:/tmp/gh-aw:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
-            -- /bin/bash -c 'set +o histexpand; : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" "${RUNNER_TEMP}/gh-aw/actions/copilot_harness.cjs" "${RUNNER_TEMP}/gh-aw/bin/copilot" --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --disable-builtin-mcps --no-ask-user --allow-tool github --allow-tool '\''shell(cat)'\'' --allow-tool '\''shell(curl:*)'\'' --allow-tool '\''shell(date)'\'' --allow-tool '\''shell(echo)'\'' --allow-tool '\''shell(grep)'\'' --allow-tool '\''shell(head)'\'' --allow-tool '\''shell(ls)'\'' --allow-tool '\''shell(playwright-cli:*)'\'' --allow-tool '\''shell(printf)'\'' --allow-tool '\''shell(pwd)'\'' --allow-tool '\''shell(sort)'\'' --allow-tool '\''shell(tail)'\'' --allow-tool '\''shell(uniq)'\'' --allow-tool '\''shell(wc)'\'' --allow-tool '\''shell(yq)'\'' --allow-tool write --deny-tool workflow --allow-all-paths --add-dir "${GITHUB_WORKSPACE}" --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt'
+            awf --config "${RUNNER_TEMP}/gh-aw/awf-config.json" --container-workdir "${GITHUB_WORKSPACE}" --mount "${RUNNER_TEMP}/gh-aw:${RUNNER_TEMP}/gh-aw:ro" --mount "${RUNNER_TEMP}/gh-aw:/host${RUNNER_TEMP}/gh-aw:ro" ${GH_AW_ENGINE_STEP_TIMEOUT_MINUTES:+--agent-timeout "$GH_AW_ENGINE_STEP_TIMEOUT_MINUTES"} ${GH_AW_TOOL_CACHE_MOUNT:+--mount "$GH_AW_TOOL_CACHE_MOUNT"} ${GH_AW_DOCKER_HOST:+--docker-host "$GH_AW_DOCKER_HOST"} --env-all --exclude-env ACTIONS_ID_TOKEN_REQUEST_TOKEN --exclude-env ACTIONS_ID_TOKEN_REQUEST_URL --exclude-env COPILOT_GITHUB_TOKEN --exclude-env GH_AW_OTLP_ALL_HEADERS --exclude-env GH_AW_OTLP_ENDPOINTS --exclude-env GITHUB_MCP_SERVER_TOKEN --exclude-env MCP_GATEWAY_AGENT_ID --exclude-env OTEL_EXPORTER_OTLP_ENDPOINT --exclude-env OTEL_EXPORTER_OTLP_HEADERS --mount /tmp/gh-aw:/tmp/gh-aw:rw --log-level info --session-state-dir /tmp/gh-aw/sandbox/agent/session-state --skip-pull \
+            -- /bin/bash -c 'set +o histexpand; export PATH="${RUNNER_TEMP}/gh-aw/mcp-cli/bin:$PATH" && : "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" "${RUNNER_TEMP}/gh-aw/actions/copilot_harness.cjs" "${RUNNER_TEMP}/gh-aw/bin/copilot" --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --disable-builtin-mcps --no-ask-user --allow-tool github --allow-tool safeoutputs --allow-tool '\''shell(cat)'\'' --allow-tool '\''shell(curl:*)'\'' --allow-tool '\''shell(date)'\'' --allow-tool '\''shell(echo)'\'' --allow-tool '\''shell(github:*)'\'' --allow-tool '\''shell(grep)'\'' --allow-tool '\''shell(head)'\'' --allow-tool '\''shell(ls)'\'' --allow-tool '\''shell(playwright-cli:*)'\'' --allow-tool '\''shell(printf)'\'' --allow-tool '\''shell(pwd)'\'' --allow-tool '\''shell(safeoutputs:*)'\'' --allow-tool '\''shell(sort)'\'' --allow-tool '\''shell(tail)'\'' --allow-tool '\''shell(uniq)'\'' --allow-tool '\''shell(wc)'\'' --allow-tool '\''shell(yq)'\'' --allow-tool write --deny-tool workflow --allow-all-paths --add-dir "${GITHUB_WORKSPACE}" --prompt-file /tmp/gh-aw/aw-prompts/prompt.txt'
         env:
           AWF_REFLECT_ENABLED: 1
           COPILOT_AGENT_RUNNER_TYPE: STANDALONE
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          COPILOT_MODEL: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'default' }}
+          COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'default' }}
           GH_AW_ENGINE_STEP_TIMEOUT_MINUTES: ${{ fromJSON(vars.GH_AW_DEFAULT_TIMEOUT_MINUTES || '20') }}
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
           GH_AW_PHASE: agent
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
           GH_AW_TIMEOUT_MINUTES: ${{ fromJSON(vars.GH_AW_DEFAULT_TIMEOUT_MINUTES || '20') }}
           GH_AW_VERSION: dev
           GITHUB_API_URL: ${{ github.api_url }}
@@ -764,11 +978,36 @@ jobs:
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
+      - name: Copy Safe Outputs
+        if: always()
+        env:
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+        run: |
+          mkdir -p /tmp/gh-aw
+          cp "$GH_AW_SAFE_OUTPUTS" /tmp/gh-aw/safeoutputs.jsonl 2>/dev/null || true
+      - name: Ingest agent output
+        id: collect_output
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,cdn.playwright.dev,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,playwright.download.prss.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_API_URL: ${{ github.api_url }}
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'collect_ndjson_output.cjs'));
+            await main();
       - name: Parse agent logs for step summary
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_AGENT_OUTPUT: /tmp/gh-aw/sandbox/agent/logs/
+          GH_AW_SAFE_OUTPUTS: ${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS }}
         with:
           script: |
             const path = require('path');
@@ -820,6 +1059,23 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'awf_reflect_summary.cjs'));
             await main();
+      - name: Generate observability summary
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'generate_observability_summary.cjs'));
+            await main(core);
+      - name: Write agent output placeholder if missing
+        if: always()
+        run: |
+          if [ ! -f /tmp/gh-aw/agent_output.json ]; then
+            echo '{"items":[]}' > /tmp/gh-aw/agent_output.json
+          fi
       - name: Upload agent artifacts
         if: always() && steps.redact_secrets.outcome == 'success'
         continue-on-error: true
@@ -842,9 +1098,15 @@ jobs:
             /tmp/gh-aw/runtime/aw_info.json
             /tmp/gh-aw/agent_usage.jsonl
             /tmp/gh-aw/agent/model-endpoint-mismatch.json
+            /tmp/gh-aw/agent/model-resolution.json
             /tmp/gh-aw/agent-stdio.log
+            /tmp/gh-aw/agent/harness_retry.json
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
+            /tmp/gh-aw/otel.jsonl
+            /tmp/gh-aw/otlp-export-errors.jsonl
+            /tmp/gh-aw/safeoutputs.jsonl
+            /tmp/gh-aw/agent_output.json
             /tmp/gh-aw/awf-config.json
             /tmp/gh-aw/awf-resolved-config.json
             /tmp/gh-aw/sandbox/firewall/logs/
@@ -853,20 +1115,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
 
-  pre_activation:
-    name: pre_activation
+  conclusion:
+    name: conclusion
+    needs:
+      - activation
+      - agent
+      - safe_outputs
+    if: >
+      always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' ||
+      needs.activation.outputs.oauth_token_check_failed == 'true' || needs.activation.outputs.stale_lock_file_failed == 'true' ||
+      needs.activation.outputs.secret_verification_result == 'failed' || needs.activation.outputs.daily_ai_credits_exceeded == 'true' ||
+      needs.activation.outputs.daily_ai_credits_guardrail_status == 'structural_error' || needs.activation.outputs.daily_ai_credits_guardrail_status == 'transient_error')
     runs-on: ubuntu-slim
-    # Permissions for the pre_activation job (workflow permissions default to none).
+    # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
-      contents: read
+      actions: read
+      issues: write
+      pull-requests: read
+    concurrency:
+      group: "gh-aw-conclusion-playwright-cli-mode"
+      cancel-in-progress: false
+      queue: max
     env:
+      GH_AW_JOB_DISPLAY_NAMES: "{\"activation\":\"activation\",\"agent\":\"agent\",\"conclusion\":\"conclusion\",\"safe_outputs\":\"safe_outputs\"}"
+      GH_AW_JOB_RESULTS: "{\"activation\":{\"result\":\"${{ needs.activation.result }}\"},\"agent\":{\"result\":\"${{ needs.agent.result }}\"},\"safe_outputs\":{\"result\":\"${{ needs.safe_outputs.result }}\"}}"
+      GH_AW_JOB_TIMING_ELIGIBLE: "{\"activation\":true,\"agent\":true,\"conclusion\":true,\"safe_outputs\":true}"
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
-    outputs:
-      activated: ${{ steps.check_membership.outputs.is_team_member == 'true' }}
-      matched_command: ''
-      setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
-      setup-span-id: ${{ steps.setup.outputs.span-id }}
-      setup-trace-id: ${{ steps.setup.outputs.trace-id }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -883,6 +1157,8 @@ jobs:
         with:
           destination: ${{ runner.temp }}/gh-aw/actions
           job-name: ${{ github.job }}
+          trace-id: ${{ needs.activation.outputs.setup-trace-id }}
+          parent-span-id: ${{ needs.activation.outputs.setup-parent-span-id || needs.activation.outputs.setup-span-id }}
         env:
           GH_AW_SETUP_WORKFLOW_NAME: "Test Playwright CLI Mode"
           GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/playwright-cli-mode.lock.yml@${{ github.ref }}
@@ -890,17 +1166,328 @@ jobs:
           GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
           GH_AW_INFO_ENGINE_ID: "copilot"
           GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
-      - name: Check team membership for workflow
-        id: check_membership
+      - name: Download agent output artifact
+        id: download-agent-output
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: "{agent,agent-output-fallback}"
+          merge-multiple: true
+          path: /tmp/gh-aw/
+      - name: Setup agent output environment variable
+        id: setup-agent-output-env
+        if: steps.download-agent-output.outcome == 'success'
+        run: |
+          mkdir -p /tmp/gh-aw/
+          find "/tmp/gh-aw/" -type f -print
+          if [ -f "/tmp/gh-aw/agent_output.json" ]; then
+            echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Restore runtime model metadata
+        if: always()
+        run: |
+          if [ -f /tmp/gh-aw/runtime/aw_info.json ]; then cp /tmp/gh-aw/runtime/aw_info.json /tmp/gh-aw/aw_info.json; fi
+      - name: Download Safe Outputs Items Manifest
+        id: download-safe-outputs-manifest
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: safe-outputs-items
+          merge-multiple: true
+          path: /tmp/gh-aw/
+      - name: Handle agent failure
+        id: handle_agent_failure
+        if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_REQUIRED_ROLES: ""
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_WORKFLOW_NAME: "Test Playwright CLI Mode"
+          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
+          GH_AW_WORKFLOW_ID: "playwright-cli-mode"
+          GH_AW_ACTION_FAILURE_ISSUE_EXPIRES_HOURS: "12"
+          GH_AW_ENGINE_ID: "copilot"
+          GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.activation.outputs.secret_verification_result }}
+          GH_AW_ENGINE_SECRET_FAILURE_MESSAGE: "**Alternative**: If your organization has a Copilot subscription, you can avoid the need for a personal access token by adding a top-level `permissions` block to your workflow file. This enables Copilot inference through the org using the built-in GitHub Actions token.\n\n```yaml\npermissions:\n  copilot-requests: write\n```\n\nSee: https://github.github.com/gh-aw/reference/engines/#github-copilot-default"
+          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
+          GH_AW_CHECKOUT_PR_INVALIDATED: ${{ needs.agent.outputs.checkout_pr_invalidated }}
+          GH_AW_AI_CREDITS_RATE_LIMIT_ERROR: ${{ needs.agent.outputs.ai_credits_rate_limit_error || 'false' }}
+          GH_AW_UNKNOWN_MODEL_AI_CREDITS: ${{ needs.agent.outputs.unknown_model_ai_credits || 'false' }}
+          GH_AW_AIC: ${{ needs.agent.outputs.aic }}
+          GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
+          GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF: "true"
+          GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
+          GH_AW_MCP_POLICY_ERROR: ${{ needs.agent.outputs.mcp_policy_error }}
+          GH_AW_AGENTIC_ENGINE_TIMEOUT: ${{ needs.agent.outputs.agentic_engine_timeout }}
+          GH_AW_MODEL_NOT_SUPPORTED_ERROR: ${{ needs.agent.outputs.model_not_supported_error }}
+          GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR: ${{ needs.agent.outputs.model_endpoint_mismatch_error }}
+          GH_AW_HTTP_400_RESPONSE_ERROR: ${{ needs.agent.outputs.http_400_response_error }}
+          GH_AW_MAX_CACHE_MISSES_EXCEEDED: ${{ needs.agent.outputs.max_cache_misses_exceeded }}
+          GH_AW_MISSING_MODEL_PRICING_ERROR: ${{ needs.agent.outputs.missing_model_pricing_error }}
+          GH_AW_MISSING_MODEL_PRICING_MODEL_NAME: ${{ needs.agent.outputs.missing_model_pricing_model_name }}
+          GH_AW_SHELL_EXPANSION_GUARD_REJECTED: ${{ needs.agent.outputs.shell_expansion_guard_rejected }}
+          GH_AW_ENGINE_API_HOSTS: "api.enterprise.githubcopilot.com,api.githubcopilot.com,api.business.githubcopilot.com,api.individual.githubcopilot.com"
+          GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
+          GH_AW_OAUTH_TOKEN_CHECK_FAILED: ${{ needs.activation.outputs.oauth_token_check_failed }}
+          GH_AW_STALE_LOCK_FILE_FAILED: ${{ needs.activation.outputs.stale_lock_file_failed }}
+          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
+          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
+          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_ERROR: ${{ needs.activation.outputs.daily_ai_credits_guardrail_error }}
+          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
+          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}
+          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+          GH_AW_DAILY_AI_CREDITS_CONTINUE_ON_ERROR: "false"
+          GH_AW_GROUP_REPORTS: "false"
+          GH_AW_FAILURE_REPORT_AS_ISSUE: "true"
+          GH_AW_MISSING_TOOL_REPORT_AS_FAILURE: "true"
+          GH_AW_MISSING_DATA_REPORT_AS_FAILURE: "true"
+          GH_AW_TIMEOUT_MINUTES: "${{ fromJSON(vars.GH_AW_DEFAULT_TIMEOUT_MINUTES || '20') }}"
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const path = require('path');
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'check_membership.cjs'));
+            const { main } = require(path.join(actionsDir, 'handle_agent_failure.cjs'));
             await main();
+      - name: Report failed jobs
+        id: report_failed_jobs
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_WORKFLOW_NAME: "Test Playwright CLI Mode"
+          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_AW_REPORT_FAILED_JOBS: "true"
+        with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'report_failed_jobs.cjs'));
+            await main();
+      - name: Collect usage artifact files
+        if: always()
+        continue-on-error: true
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
+      - name: Generate usage activity summary and unified session
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_GRADER_MANIFEST_0: '{"version":2,"graders":[]}'
+          GH_AW_GRADER_MANIFEST_CHUNKS: '1'
+          GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}
+          GH_AW_DAILY_AI_CREDITS_GUARDRAIL_STATUS: ${{ needs.activation.outputs.daily_ai_credits_guardrail_status }}
+          GH_AW_DAILY_AI_CREDITS_EXCEEDED: ${{ needs.activation.outputs.daily_ai_credits_exceeded }}
+          GH_AW_DAILY_AI_CREDITS_TOTAL: ${{ needs.activation.outputs.daily_ai_credits_total }}
+          GH_AW_DAILY_AI_CREDITS_ESTIMATED: ${{ needs.activation.outputs.daily_ai_credits_estimated }}
+          GH_AW_DAILY_AI_CREDITS_THRESHOLD: ${{ needs.activation.outputs.daily_ai_credits_threshold }}
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'generate_usage_artifacts.cjs'));
+            await main();
+      - name: Upload usage artifact
+        id: upload-usage-artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: usage
+          path: |
+            /tmp/gh-aw/usage/aw_session.jsonl
+            /tmp/gh-aw/usage/aw_info.json
+            /tmp/gh-aw/usage/aw-info.jsonl
+            /tmp/gh-aw/usage/agent_usage.json
+            /tmp/gh-aw/usage/agent_usage.jsonl
+            /tmp/gh-aw/usage/detection_usage.jsonl
+            /tmp/gh-aw/usage/evals.jsonl
+            /tmp/gh-aw/usage/graders/grader_manifest.json
+            /tmp/gh-aw/usage/graders/grader_results.json
+            /tmp/gh-aw/usage/github_rate_limits.jsonl
+            /tmp/gh-aw/usage/agent/token_usage.jsonl
+            /tmp/gh-aw/usage/agent/model-routing.jsonl
+            /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/detection/token_usage.jsonl
+            /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
+            /tmp/gh-aw/usage/detection/detection_result.json
+            /tmp/gh-aw/usage/evals/token_usage.jsonl
+            /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/experiment/state.jsonl
+            /tmp/gh-aw/usage/experiment/state.json
+            /tmp/gh-aw/usage/experiment/assignments.json
+            /tmp/gh-aw/usage/activity/summary.json
+          if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
+      - name: Wait before retrying usage artifact upload
+        if: always() && steps.upload-usage-artifact.outcome == 'failure'
+        run: sleep 10
+      - name: Retry upload usage artifact
+        id: upload-usage-artifact-retry
+        if: always() && steps.upload-usage-artifact.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: usage
+          path: |
+            /tmp/gh-aw/usage/aw_session.jsonl
+            /tmp/gh-aw/usage/aw_info.json
+            /tmp/gh-aw/usage/aw-info.jsonl
+            /tmp/gh-aw/usage/agent_usage.json
+            /tmp/gh-aw/usage/agent_usage.jsonl
+            /tmp/gh-aw/usage/detection_usage.jsonl
+            /tmp/gh-aw/usage/evals.jsonl
+            /tmp/gh-aw/usage/graders/grader_manifest.json
+            /tmp/gh-aw/usage/graders/grader_results.json
+            /tmp/gh-aw/usage/github_rate_limits.jsonl
+            /tmp/gh-aw/usage/agent/token_usage.jsonl
+            /tmp/gh-aw/usage/agent/model-routing.jsonl
+            /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
+            /tmp/gh-aw/usage/detection/token_usage.jsonl
+            /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
+            /tmp/gh-aw/usage/detection/detection_result.json
+            /tmp/gh-aw/usage/evals/token_usage.jsonl
+            /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/experiment/state.jsonl
+            /tmp/gh-aw/usage/experiment/state.json
+            /tmp/gh-aw/usage/experiment/assignments.json
+            /tmp/gh-aw/usage/activity/summary.json
+          if-no-files-found: ignore
+          overwrite: true
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
+
+  safe_outputs:
+    name: safe_outputs
+    needs:
+      - activation
+      - agent
+    if: (!cancelled()) && needs.agent.result != 'skipped'
+    runs-on: ubuntu-slim
+    # Permissions for the safe_outputs job (workflow permissions default to none).
+    permissions:
+      issues: write
+    timeout-minutes: 45
+    env:
+      GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
+      GH_AW_AIC: ${{ needs.agent.outputs.aic }}
+      GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
+      GH_AW_CALLER_WORKFLOW_ID: "${{ github.repository }}/playwright-cli-mode"
+      GH_AW_ENGINE_ID: "copilot"
+      GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+      GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
+      GH_AW_WORKFLOW_ID: "playwright-cli-mode"
+      GH_AW_WORKFLOW_NAME: "Test Playwright CLI Mode"
+    outputs:
+      code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
+      code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
+      create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
+      create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
+      created_issue_number: ${{ steps.process_safe_outputs.outputs.created_issue_number }}
+      created_issue_url: ${{ steps.process_safe_outputs.outputs.created_issue_url }}
+      process_safe_outputs_items_applied: ${{ steps.process_safe_outputs.outputs.items_applied }}
+      process_safe_outputs_items_cancelled: ${{ steps.process_safe_outputs.outputs.items_cancelled }}
+      process_safe_outputs_items_deferred: ${{ steps.process_safe_outputs.outputs.items_deferred }}
+      process_safe_outputs_items_failed: ${{ steps.process_safe_outputs.outputs.items_failed }}
+      process_safe_outputs_items_skipped: ${{ steps.process_safe_outputs.outputs.items_skipped }}
+      process_safe_outputs_items_succeeded: ${{ steps.process_safe_outputs.outputs.items_succeeded }}
+      process_safe_outputs_items_warnings: ${{ steps.process_safe_outputs.outputs.items_warnings }}
+      process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
+      process_safe_outputs_status: ${{ steps.process_safe_outputs.outputs.status }}
+    steps:
+      - name: Checkout actions folder
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: github/gh-aw
+          sparse-checkout: |
+            actions
+          fetch-depth: 1
+          clean: false
+          persist-credentials: false
+      - name: Setup Scripts
+        id: setup
+        uses: ./actions/setup
+        with:
+          destination: ${{ runner.temp }}/gh-aw/actions
+          job-name: ${{ github.job }}
+          trace-id: ${{ needs.activation.outputs.setup-trace-id }}
+          parent-span-id: ${{ needs.activation.outputs.setup-parent-span-id || needs.activation.outputs.setup-span-id }}
+        env:
+          GH_AW_SETUP_WORKFLOW_NAME: "Test Playwright CLI Mode"
+          GH_AW_CURRENT_WORKFLOW_REF: ${{ github.repository }}/.github/workflows/playwright-cli-mode.lock.yml@${{ github.ref }}
+          GH_AW_INFO_VERSION: "COPILOT_VERSION"
+          GH_AW_INFO_AWF_VERSION: "vAWF_VERSION"
+          GH_AW_INFO_ENGINE_ID: "copilot"
+          GH_AW_SETUP_AW_CONTEXT: ${{ inputs.aw_context }}
+      - name: Mask OTLP telemetry headers
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/mask_otlp_headers.sh"
+      - name: Download agent output artifact
+        id: download-agent-output
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: "{agent,agent-output-fallback}"
+          merge-multiple: true
+          path: /tmp/gh-aw/
+      - name: Setup agent output environment variable
+        id: setup-agent-output-env
+        if: steps.download-agent-output.outcome == 'success'
+        run: |
+          mkdir -p /tmp/gh-aw/
+          find "/tmp/gh-aw/" -type f -print
+          if [ -f "/tmp/gh-aw/agent_output.json" ]; then
+            echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/agent_output.json" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Configure GH_HOST for enterprise compatibility
+        id: ghes-host-config
+        shell: bash
+        run: | # zizmor: ignore[github-env] - GITHUB_SERVER_URL is set by GitHub Actions, not user input.
+          # Derive GH_HOST from GITHUB_SERVER_URL so the gh CLI targets the correct
+          # GitHub instance (GHES/GHEC). On github.com this is a harmless no-op.
+          GH_HOST="${GITHUB_SERVER_URL#https://}"
+          GH_HOST="${GH_HOST#http://}"
+          echo "GH_HOST=${GH_HOST}" >> "$GITHUB_ENV"
+      - name: Process Safe Outputs
+        id: process_safe_outputs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
+          GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}
+          GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,cdn.playwright.dev,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,playwright.download.prss.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"playwright-cli-mode\"],\"max\":1,\"title_prefix\":\"[playwright-cli-mode]\"}}"
+          GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
+        with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
+            const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
+            await main();
+      - name: Upload Safe Outputs Items
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: safe-outputs-items
+          path: |
+            /tmp/gh-aw/safe-output-items.jsonl
+            /tmp/gh-aw/temporary-id-map.json
+            /tmp/gh-aw/safe-output-errors.json
+          if-no-files-found: ignore
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}

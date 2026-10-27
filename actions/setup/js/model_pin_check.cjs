@@ -33,6 +33,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { ERR_CONFIG, ERR_MODEL_PIN_REFLECT_REQUIRED } = require("./error_codes.cjs");
 const { parseDocument } = require("./work_queue_yaml.cjs");
 const { extractInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { buildProviderCatalog, canonicalModelProvider, isLiveModelId, loadBuiltinModelAliases, ModelAliasResolutionError, resolveConfiguredModel, resolveModelAlias, splitModelIdentifier } = require("./resolve_model_alias.cjs");
@@ -862,7 +863,7 @@ function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const match = argv[index].match(/^--([a-z-]+)(?:=(.*))?$/);
-    if (!match) throw new Error(`unexpected argument: ${argv[index]}`);
+    if (!match) throw new Error(`${ERR_CONFIG}: unexpected argument: ${argv[index]}`);
     args[match[1]] = match[2] !== undefined ? match[2] : argv[++index] || "";
   }
   return args;
@@ -875,7 +876,7 @@ function parseArgs(argv) {
  */
 function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
-  if (!args.reflect) throw new Error("--reflect <path to /reflect JSON> is required");
+  if (!args.reflect) throw new Error(`${ERR_MODEL_PIN_REFLECT_REQUIRED}: --reflect <path to /reflect JSON> is required`);
   const repoRoot = path.resolve(args.repo || process.cwd());
   const collected = collectModelPins({ repoRoot, workflowsDir: args["workflows-dir"] });
   const report = buildModelPinReport({ ...collected, reflectData: readReflect(args.reflect) });

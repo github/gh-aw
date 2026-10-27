@@ -17,6 +17,10 @@ const { loadTemporaryIdMapFromFile, replaceTemporaryIdReferencesInPatch } = requ
 
 const JSONL_MERGE_ATTRIBUTE = "*.jsonl merge=union";
 
+function setOutput(name, value) {
+  if (typeof core.setOutput === "function") core.setOutput(name, value);
+}
+
 function redactFailureSummary(message) {
   let safeMessage = String(message);
   for (const secret of [process.env.GH_TOKEN, process.env.GITHUB_TOKEN, process.env.GITHUB_APP_TOKEN]) {
@@ -149,6 +153,7 @@ function reconcileRepoMemoryRetry({ workspaceDir, branchName, repoUrl, previousB
  * @param {string} [opts.originUrlForPush]
  * @param {string} [opts.repoUrlForRetry]
  * @param {() => void} [opts.validateBeforePush]
+ * @returns {Promise<string | undefined | false>} Remote commit, unchanged replay, or failure.
  */
 async function pushRepoMemoryChangesWithRetry({
   githubClient,
@@ -196,7 +201,7 @@ async function pushRepoMemoryChangesWithRetry({
       }
     }
     try {
-      await pushSignedCommitsFn({
+      const commit = await pushSignedCommitsFn({
         githubClient,
         owner: targetOwner,
         repo: targetRepoName,
@@ -207,8 +212,8 @@ async function pushRepoMemoryChangesWithRetry({
         allowGitPushFallback: !validateBeforePush,
         requireBaseRefMatch: Boolean(validateBeforePush),
       });
-      core.info(`Successfully pushed changes to ${branchName} branch`);
-      return true;
+      core.info(commit ? `Successfully pushed changes to ${branchName} branch` : `No changes left to push to ${branchName} branch`);
+      return commit;
     } catch (error) {
       const errMsg = getErrorMessage(error);
       if (isDeterministicPushValidationError(errMsg)) {
@@ -351,6 +356,7 @@ function applyTemporaryIdSubstitutions(files, memoryDir, temporaryIdMap, current
  */
 
 async function main() {
+  setOutput("save_status", "skipped");
   const artifactDir = process.env.ARTIFACT_DIR;
   const memoryId = process.env.MEMORY_ID;
   const targetRepo = process.env.TARGET_REPO;
@@ -854,8 +860,8 @@ async function main() {
       if (customValidation.stderr) {
         core.error(`Custom repo-memory validation stderr:\n${redactFailureSummary(customValidation.stderr)}`);
       }
-      core.setOutput("validation_failed", "true");
-      core.setOutput("validation_error", errorMessage);
+      setOutput("validation_failed", "true");
+      setOutput("validation_error", errorMessage);
       await setPushRepoMemoryFailure(errorMessage);
       return;
     }
@@ -901,6 +907,7 @@ async function main() {
 
   if (changedFileCount === 0) {
     core.info("No changes detected after copying files");
+    setOutput("save_status", "unchanged");
     await writeLedgerSummary();
     return;
   }
@@ -960,7 +967,7 @@ async function main() {
       } catch (statError) {
         core.warning(`Could not retrieve diff stat: ${getErrorMessage(statError)}`);
       }
-      core.setOutput("patch_size_exceeded", "true");
+      setOutput("patch_size_exceeded", "true");
       await setPushRepoMemoryFailure(
         `Patch diff size (${patchSizeKb} KB, ${patchSizeBytes} bytes) exceeds maximum allowed size (${effectiveMaxPatchSizeKb} KB, ${effectiveMaxPatchSize} bytes, configured limit: ${maxPatchSizeKb} KB with 20% overhead allowance). Reduce the number or size of changes, or increase max-patch-size.`
       );
@@ -993,7 +1000,7 @@ async function main() {
   // strict signed-commits ruleset that fallback will also be rejected —
   // that is expected behaviour: remove the unsupported file types and
   // re-run.
-  ledgerActivity.saving.pushed = await pushRepoMemoryChangesWithRetry({
+  const pushedCommit = await pushRepoMemoryChangesWithRetry({
     githubClient: github,
     targetOwner,
     targetRepoName,
@@ -1025,6 +1032,14 @@ async function main() {
           }
         : undefined,
   });
+  ledgerActivity.saving.pushed = Boolean(pushedCommit);
+  if (pushedCommit) {
+    setOutput("save_branch", branchName);
+    setOutput("save_commit", pushedCommit);
+    setOutput("save_status", "saved");
+  } else if (pushedCommit !== false) {
+    setOutput("save_status", "unchanged");
+  }
   await writeLedgerSummary();
 }
 

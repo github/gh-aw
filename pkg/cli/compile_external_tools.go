@@ -42,7 +42,11 @@ var compileExternalToolsLog = logger.New("cli:compile_external_tools")
 // This is more efficient than running actionlint once per file.
 func RunActionlintOnFiles(ctx context.Context, lockFiles []string, verbose bool, strict bool) error {
 	return runBatchLockFileTool("actionlint", lockFiles, verbose, strict, func(files []string, runVerbose bool, runStrict bool) error {
-		return runActionlintOnFiles(ctx, files, runVerbose, runStrict)
+		err := runActionlintOnFiles(ctx, files, runVerbose, runStrict)
+		if err != nil {
+			reportCompileScannerResult(ctx, "actionlint", err)
+		}
+		return err
 	})
 }
 
@@ -93,7 +97,8 @@ func RunShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 	}
 
 	compileExternalToolsLog.Printf("Running batch shellcheck on %d lock files and %d frontmatter resources", len(lockFiles), len(resources))
-	return handleBatchToolError("shellcheck", runShellcheckOnLockFilesAndResources(ctx, lockFiles, resources, verbose, strict), strict, verbose)
+	err := runShellcheckOnLockFilesAndResources(ctx, lockFiles, resources, verbose, strict)
+	return handleBatchToolError("shellcheck", err, strict, verbose)
 }
 
 // RunSyftOnLockFiles runs the syft SBOM scanner on container images extracted

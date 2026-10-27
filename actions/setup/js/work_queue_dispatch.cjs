@@ -7,7 +7,7 @@ const log = require("./work_queue_logging.cjs").createWorkQueueLogger("dispatch"
 const { queueControlErrorCode, queueControlErrorExplanation } = require("./work_queue_logging.cjs");
 
 const { canonical, closed, digest, integer, queueError } = require("./work_queue_codec.cjs");
-const { actorFromContext, dispatchPrincipal } = require("./work_queue_policy.cjs");
+const { actorFromContext, dispatchPrincipal, policyForAcceptedRequest } = require("./work_queue_policy.cjs");
 const { gateKey } = require("./work_queue_graph.cjs");
 const { observationRefreshBudget } = require("./work_queue_limits.cjs");
 const { assignmentsForRequest, generateRequestOperations, validateWorkerContinuation } = require("./work_queue_replay.cjs");
@@ -26,6 +26,7 @@ const { normalizeDispatchCredential, createDispatchCredentialValidator, isDispat
 const { verifyWorkerRoute } = require("./work_queue_provisioning.cjs");
 const { futurePolicy } = require("./work_queue_deployment.cjs");
 const { approvedWorkerProfiles, synchronizeDeployments } = require("./work_queue_deployment_control.cjs");
+const { installWorkQueuePools } = require("./work_queue_pool_install.cjs");
 
 function assertQueueControlRole(options) {
   const runtime = resolveWorkQueueRuntime(options.context?.payload, { role: options.role, requireAssignment: options.requireAssignment });
@@ -72,7 +73,7 @@ function approvedSubmissionParameters(state, trustedContext, parameters, config)
     nodes: parameters.nodes.map(node => {
       const poolName = node.pool === undefined ? "default" : node.pool;
       const pool = state.policy.pools[poolName];
-      if (!pool) throw queueError("work_queue_profile_not_approved", "submission pool has no installed worker routes");
+      if (!pool) throw queueError("work_queue_pool_not_installed", "submission pool has no installed worker routes");
       const ownProfile = parent?.pool === poolName ? parent.worker_profile : undefined;
       let profileName = node.worker_profile;
       if (profileName === undefined) {
@@ -382,9 +383,7 @@ function inheritWorkerSubmission(state, trustedContext, parameters) {
 
 function acceptedSubmissionParameters(state, trustedContext, parameters, prior) {
   if (prior.request.kind !== "submit" || canonical(prior.actor) !== canonical(actorFromContext(trustedContext))) throw new Error("work_queue_request_reused");
-  const policy =
-    state.transactions.flatMap(commit => commit.operations).find(operation => operation.kind === "Policy" && operation.epoch === prior.policy_epoch)?.policy ?? (prior.policy_epoch === state.policy_epoch ? state.policy : undefined);
-  if (!policy) throw new Error("work_queue_policy_missing");
+  const policy = policyForAcceptedRequest(state, prior);
   let inherited = parameters;
   if (trustedContext.role === "worker") {
     // Reconstruct an accepted request's immutable metadata without granting fresh continuation authority.
@@ -463,6 +462,13 @@ async function dispatchQueueIntent(options) {
   const stableId = requestIdForIntent(trustedContext, message.intent_id);
   const prior = latest.projection.requests.get(stableId);
   if (!prior) {
+    if (!Object.hasOwn(latest.projection.policy.pools, requested.pool)) {
+      const proposal = policyProposalFor(configured);
+      if (proposal && Object.hasOwn(proposal.pools, requested.pool)) normalizeDispatchParameters(requested, proposal, options.remainingDispatches);
+    }
+    await installWorkQueuePools(configured, trustedContext, [requested.pool]);
+    latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
+    if (!Object.hasOwn(latest.projection.policy.pools, requested.pool)) throw queueError("work_queue_pool_not_installed", "dispatch pool is not installed in Policy");
     await synchronizeDeployments(configured, trustedContext, [requested.pool]);
     latest = await loadQueue({ ...configured, policyProposal: undefined, initializationContext: undefined });
   }
@@ -587,7 +593,18 @@ async function processParsedWorkQueueIntents(options, runtime, intents, errors) 
         const prior = latest.projection.requests.get(requestIdForIntent(trustedContext, intent.intent_id));
         if (!prior) {
           if (!Array.isArray(intent.parameters.nodes)) throw new Error("work_queue_graph_limit");
-          await synchronizeDeployments(options, trustedContext, [...new Set(intent.parameters.nodes.map(node => node.pool ?? "default"))]);
+          const pools = [...new Set(intent.parameters.nodes.map(node => node.pool ?? "default"))];
+          if (latest.projection.policy) {
+            await installWorkQueuePools(options, trustedContext, pools);
+            latest = await loadQueue({ ...options, policyProposal: undefined, initializationContext: undefined });
+          }
+          const bootstrapPolicy = !latest.projection.policy && latest.sha === null && ["producer", "dispatcher"].includes(trustedContext.role) ? policyProposalFor(options) : undefined;
+          const candidatePolicy = latest.projection.policy ?? bootstrapPolicy;
+          if (candidatePolicy) {
+            for (const pool of new Set(intent.parameters.nodes.map(node => node.pool ?? "default")))
+              if (!Object.hasOwn(candidatePolicy.pools, pool)) throw queueError("work_queue_pool_not_installed", "submission pool is not installed in Policy");
+          }
+          if (latest.projection.policy) await synchronizeDeployments(options, trustedContext, pools);
           latest = await loadQueue({ ...options, policyProposal: undefined, initializationContext: undefined });
         }
         const bootstrapPolicy = !latest.projection.policy && latest.sha === null && ["producer", "dispatcher"].includes(trustedContext.role) ? policyProposalFor(options) : undefined;

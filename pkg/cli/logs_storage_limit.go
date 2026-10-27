@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -139,7 +140,7 @@ func logsDirectorySize(path string) (int64, error) {
 	var total int64
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
-			if os.IsNotExist(walkErr) {
+			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
@@ -153,7 +154,7 @@ func logsDirectorySize(path string) (int64, error) {
 		total += info.Size()
 		return nil
 	})
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return 0, nil
 	}
 	return total, err
@@ -192,7 +193,7 @@ func computeLogsCacheStats(path string, fileLimit int) (int64, []logsFolderSize,
 	fileCount := 0
 	err = filepath.Walk(path, func(filePath string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
-			if os.IsNotExist(walkErr) {
+			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
@@ -218,7 +219,7 @@ func computeLogsCacheStats(path string, fileLimit int) (int64, []logsFolderSize,
 		}
 		return nil
 	})
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return 0, nil, nil, 0, nil
 	}
 	if err != nil {
@@ -241,7 +242,7 @@ func computeLogsCacheStats(path string, fileLimit int) (int64, []logsFolderSize,
 
 func initialLogsFolderSizes(path string) (map[string]int64, error) {
 	entries, err := os.ReadDir(path)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
@@ -277,6 +278,12 @@ func (l *logsStorageLimit) runDownloadWithPruning(ctx context.Context, storagePa
 			return err
 		}
 	}
+	if err := l.admitDownload(storagePath); err != nil {
+		if !reserved {
+			return errors.Join(err, l.finalizeDownload(storagePath))
+		}
+		return err
+	}
 
 	sizeBefore, err := logsDirectorySize(storagePath)
 	if err != nil {
@@ -291,9 +298,9 @@ func (l *logsStorageLimit) runDownloadWithPruning(ctx context.Context, storagePa
 	return errors.Join(downloadErr, pruneErr)
 }
 
-// reserve checks the shared budget state and protects the download path from
-// pruning under a short-lived lock. It never holds the lock across the actual
-// download, so concurrent downloads keep running in parallel.
+// reserve protects the path from pruning and checks the budget for new runs.
+// Existing runs may still be read from cache; admitDownload checks the budget
+// again if a cache miss requires additional downloads.
 func (l *logsStorageLimit) reserve(storagePath string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -305,23 +312,37 @@ func (l *logsStorageLimit) reserve(storagePath string) error {
 	_, wasCompleted := l.completed[cleanPath]
 	delete(l.completed, cleanPath)
 	l.active++
-	restoreAndReject := func() error {
+	restoreAndReject := func(err error) error {
 		l.active--
 		if wasCompleted {
 			l.completed[cleanPath] = struct{}{}
 		}
-		return errLogsStorageLimitReached
+		return err
 	}
-	if l.reached.Load() && !l.pruneOlderRuns && l.active == 1 && !wasCompleted {
-		return restoreAndReject()
+	if l.reached.Load() && !l.pruneOlderRuns && !wasCompleted {
+		return restoreAndReject(errLogsStorageLimitReached)
 	}
 	if l.usedBytes >= l.maxBytes {
 		if err := l.pruneLocked(storagePath); err != nil {
-			l.active--
+			return restoreAndReject(err)
+		}
+		if l.usedBytes >= l.maxBytes && !wasCompleted {
+			return restoreAndReject(errLogsStorageLimitReached)
+		}
+	}
+	return nil
+}
+
+func (l *logsStorageLimit) admitDownload(storagePath string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.usedBytes >= l.maxBytes {
+		if err := l.pruneLocked(storagePath); err != nil {
 			return err
 		}
-		if l.usedBytes >= l.maxBytes && l.active == 1 && !wasCompleted {
-			return restoreAndReject()
+		if l.usedBytes >= l.maxBytes {
+			return errLogsStorageLimitReached
 		}
 	}
 	return nil
@@ -336,7 +357,7 @@ func (l *logsStorageLimit) initialize() error {
 	l.usedBytes = size
 	err = filepath.Walk(l.outputDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
-			if os.IsNotExist(walkErr) {
+			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
@@ -347,7 +368,7 @@ func (l *logsStorageLimit) initialize() error {
 		}
 		return nil
 	})
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("failed to identify completed runs: %w", err)
 	}
 	if l.usedBytes >= l.maxBytes {
@@ -551,7 +572,7 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 	var candidates []logsPruneCandidate
 	err := filepath.Walk(path, func(candidatePath string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
-			if os.IsNotExist(walkErr) {
+			if errors.Is(walkErr, fs.ErrNotExist) {
 				return nil
 			}
 			return walkErr
@@ -571,7 +592,7 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 		}
 		return nil
 	})
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return 0, nil
 	}
 	if err != nil {
@@ -590,7 +611,7 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 			break
 		}
 		if err := os.Remove(candidate.path); err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 			return freed, err
@@ -647,11 +668,11 @@ func invalidatePrunedArtifactMarkers(prunedPath, root string) error {
 				if entry.IsDir() || !isAgentArtifactMarker(entry.Name()) {
 					continue
 				}
-				if err := os.Remove(filepath.Join(markerDir, entry.Name())); err != nil && !os.IsNotExist(err) {
+				if err := os.Remove(filepath.Join(markerDir, entry.Name())); err != nil && !errors.Is(err, fs.ErrNotExist) {
 					return err
 				}
 			}
-		} else if !os.IsNotExist(err) {
+		} else if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		if dir == root || dir == "." || dir == filepath.Dir(dir) {

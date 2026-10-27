@@ -538,11 +538,20 @@ func IsByteSlice(pass *analysis.Pass, expr ast.Expr) bool {
 
 // IsByteSliceConversion reports whether conv is a []byte or []uint8 conversion expression.
 func IsByteSliceConversion(pass *analysis.Pass, conv *ast.CallExpr) bool {
-	funTypeInfo, ok := pass.TypesInfo.Types[conv.Fun]
+	funTypeInfo, ok := pass.TypesInfo.Types[UnwrapParenExpr(conv.Fun)]
 	if !ok || !funTypeInfo.IsType() {
 		return false
 	}
 	return IsByteSlice(pass, conv)
+}
+
+// IsStringConversion reports whether conv is a string conversion expression.
+func IsStringConversion(pass *analysis.Pass, conv *ast.CallExpr) bool {
+	funTypeInfo, ok := pass.TypesInfo.Types[UnwrapParenExpr(conv.Fun)]
+	if !ok || !funTypeInfo.IsType() {
+		return false
+	}
+	return IsStringType(pass, conv)
 }
 
 // IsStringType reports whether expr has underlying type string (or a named string type).

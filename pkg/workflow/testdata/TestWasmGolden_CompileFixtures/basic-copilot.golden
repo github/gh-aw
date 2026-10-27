@@ -847,8 +847,6 @@ jobs:
           COPILOT_DUMMY_BYOK: dummy-byok-key-for-offline-mode
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_MODEL: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'default' }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
-          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
@@ -1064,6 +1062,7 @@ jobs:
             /tmp/gh-aw/agent/model-endpoint-mismatch.json
             /tmp/gh-aw/agent/model-resolution.json
             /tmp/gh-aw/agent-stdio.log
+            /tmp/gh-aw/agent/harness_retry.json
             /tmp/gh-aw/pre-agent-audit.txt
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/otel.jsonl
@@ -1242,10 +1241,6 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS_THREAT_DETECTION: ${{ needs.activation.outputs.admission-max-ai-credits-threat-detection }}
-          GH_AW_ADMISSION_MAX_AI_CREDITS_EVALS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}
           GH_AW_GRADER_MANIFEST_0: '{"version":2,"graders":[]}'
           GH_AW_GRADER_MANIFEST_CHUNKS: '1'
           GH_AW_JOB_DURATIONS: ${{ steps.report_failed_jobs.outputs.job_durations }}
@@ -1283,8 +1278,10 @@ jobs:
             /tmp/gh-aw/usage/agent/token_usage.jsonl
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
@@ -1318,8 +1315,10 @@ jobs:
             /tmp/gh-aw/usage/agent/token_usage.jsonl
             /tmp/gh-aw/usage/agent/model-routing.jsonl
             /tmp/gh-aw/usage/agent/execution.json
+            /tmp/gh-aw/usage/agent/harness_retry.json
             /tmp/gh-aw/usage/detection/token_usage.jsonl
             /tmp/gh-aw/usage/detection/execution.json
+            /tmp/gh-aw/usage/detection/harness_retry.json
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
@@ -1341,7 +1340,7 @@ jobs:
     # Permissions for the safe_outputs job (workflow permissions default to none).
     permissions:
       issues: write
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
       GH_AW_AIC: ${{ needs.agent.outputs.aic }}
@@ -1450,6 +1449,7 @@ jobs:
           name: safe-outputs-items
           path: |
             /tmp/gh-aw/safe-output-items.jsonl
+            /tmp/gh-aw/safe-output-outcomes.jsonl
             /tmp/gh-aw/temporary-id-map.json
             /tmp/gh-aw/safe-output-errors.json
           if-no-files-found: ignore

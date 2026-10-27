@@ -30,7 +30,7 @@ require("./shim.cjs");
 
 const fs = require("fs");
 const path = require("path");
-const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_PARSE, ERR_SAFE_OUTPUT_TOOL_COPY_FAILED, ERR_SYSTEM } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const normalizeToolName = name => normalizeSafeOutputName(String(name).replace(/-/g, "_").toLowerCase());
@@ -349,7 +349,7 @@ async function main() {
       try {
         enhancedTool = structuredClone(tool);
       } catch (err) {
-        throw new Error(`${ERR_CONFIG}: ` + "Failed to deep-copy tool " + tool.name + ": " + getErrorMessage(err), { cause: err });
+        throw new Error(`${ERR_SAFE_OUTPUT_TOOL_COPY_FAILED}: Failed to deep-copy tool ${tool.name}: ${getErrorMessage(err)}`, { cause: err });
       }
       if (tool.name === "ledger_append" && Array.isArray(configuredLedgers)) {
         const generalNames = generalLedgers.map(ledger => ledger.name);

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -34,6 +35,7 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 	if err != nil {
 		return nil, err
 	}
+	allowedOutputJobs := customJobDetectionAllowedOutputs(input, graph)
 	var diagnostics []Diagnostic
 	for _, id := range sliceutil.SortedKeys(jobs) {
 		if err := ctx.Err(); err != nil {
@@ -66,13 +68,62 @@ func checkCustomJobDetection(ctx context.Context, input Input) ([]Diagnostic, er
 			})
 			continue
 		}
-		found, err := customJobDetectionDiagnostics(ctx, fields, "jobs."+id)
+		statusOnly := aw.IsStatusOnlyJob(fields)
+		if statusOnly {
+			diagnostics = append(diagnostics, customJobDetectionStatusOnlyDiagnostics(id, fields, jobs, graph, allowedOutputJobs)...)
+		}
+		found, err := customJobDetectionDiagnostics(ctx, fields, "jobs."+id, statusOnly)
 		diagnostics = append(diagnostics, found...)
 		if err != nil {
 			return diagnostics, err
 		}
 	}
 	return diagnostics, nil
+}
+
+func customJobDetectionStatusOnlyDiagnostics(id string, fields map[string]any, jobs map[string]any, graph aw.JobDependencyGraph, allowedOutputJobs map[string]struct{}) []Diagnostic {
+	var diagnostics []Diagnostic
+	for _, dependent := range sliceutil.SortedKeys(jobs) {
+		if dependent != id && !constants.IsCompilerOwnedJobName(dependent) && graph.DependsOn(dependent, id) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:    "jobs." + id + ".detection-gate",
+				Message: fmt.Sprintf("Jobs that continue after detection errors cannot have dependent custom job %s; apply the same contract to a leaf job instead", dependent),
+			})
+			break
+		}
+	}
+	for _, violation := range aw.ValidateStatusOnlyJob(id, fields, allowedOutputJobs) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Path:    violation.Path,
+			Message: violation.Message,
+		})
+	}
+	return diagnostics
+}
+
+func customJobDetectionAllowedOutputs(input Input, graph aw.JobDependencyGraph) map[string]struct{} {
+	allowed := make(map[string]struct{})
+	if input.Workflow == nil {
+		allowed[string(constants.SafeOutputsJobName)] = struct{}{}
+		return allowed
+	}
+	for _, job := range input.Workflow.Jobs {
+		id := string(job.ID)
+		condition := ""
+		if job.If != nil {
+			var err error
+			condition, err = actions.RenderExpression(job.If, job.ID, input.Workflow, false)
+			if err != nil {
+				continue
+			}
+		}
+		if constants.IsCompilerOwnedJobName(id) &&
+			graph.DependsOn(id, string(constants.DetectionJobName)) &&
+			aw.HasSuccessfulDetectionCondition(condition) {
+			allowed[id] = struct{}{}
+		}
+	}
+	return allowed
 }
 
 func customJobDetectionJobs(ctx context.Context, input Input) (map[string]any, aw.JobDependencyGraph, error) {
@@ -120,13 +171,13 @@ func customJobDetectionActions(input Input) (map[string]any, aw.JobDependencyGra
 				continue
 			}
 		}
-		fields := map[string]any{"needs": needs}
+		fields := make(map[string]any, len(job.Needs)+1)
 		if input.Document != nil {
 			if sourceFields, ok := authored[id].(map[string]any); ok {
-				fields["uses"] = sourceFields["uses"]
-				fields["runs-on"] = sourceFields["runs-on"]
+				maps.Copy(fields, sourceFields)
 			}
 		}
+		fields["needs"] = needs
 		if job.If != nil {
 			condition, err := actions.RenderExpression(job.If, job.ID, input.Workflow, false)
 			if err != nil {
@@ -199,7 +250,7 @@ func customJobDetectionNeeds(ctx context.Context, fields map[string]any, path st
 	return needs, nil
 }
 
-func customJobDetectionDiagnostics(ctx context.Context, fields map[string]any, path string) ([]Diagnostic, error) {
+func customJobDetectionDiagnostics(ctx context.Context, fields map[string]any, path string, statusOnly bool) ([]Diagnostic, error) {
 	needs, err := customJobDetectionNeeds(ctx, fields, path)
 	if err != nil {
 		return nil, err
@@ -209,6 +260,9 @@ func customJobDetectionDiagnostics(ctx context.Context, fields map[string]any, p
 			Path:    path + ".needs",
 			Message: "Custom jobs downstream of agent must also need detection; add detection to needs and require needs.detection.result == 'success' when using a status override",
 		}}, nil
+	}
+	if statusOnly {
+		return nil, nil
 	}
 	gated, err := customJobDetectionCondition(fields["if"])
 	if err != nil {

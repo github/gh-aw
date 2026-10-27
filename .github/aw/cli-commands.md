@@ -76,17 +76,24 @@ gh aw compile --validate          # Enable workflow, image, and action SHA valid
 gh aw compile --fail-fast         # Stop at first error
 gh aw compile --purge             # Remove orphaned .lock.yml files
 gh aw compile --approve           # Approve new secrets / action changes
+gh aw compile --no-lint           # Disable default built-in AST lint (rejected with --dry-run)
 ```
 
 **MCP equivalent**: `compile` tool
 
 For debugging, follow the [compilation guide](debug-compilation.md) for required
-checks, optional Docker scanners, warning severity, diagnostic preservation and
-results. Low-severity/informational notices are not blanket failures.
+checks, optional Docker scanners, warning severity, and diagnostic preservation.
+Low-severity/informational notices are not blanket failures; validation errors,
+unclassified compiler warnings, model-inventory failures, built-in AST lint findings,
+and scanner execution/parsing failures remain fatal to the dry-run gate.
 `validate` uses `--no-emit` and skips zizmor, actionlint and poutine; a successful
-`validate` does not establish scanner coverage.
-The compile MCP input `validate_images: true` opts into `--validate-images`,
-including with `dry_run: true`; it fails when Docker is unavailable.
+`validate` does not establish scanner coverage. MCP `validate_images: true` opts
+into `--validate-images` (works with `dry_run: true`) and fails when Docker is
+unavailable. Built-in Actions/AW AST lint runs by default, including under
+`--no-emit`/`validate`, and fails on findings; `--no-lint` (MCP `skip_lint: true`)
+opts out but is rejected with `--dry-run`. `add`/`update`/`validate` lint too
+without exposing `--no-lint`; for JS driver/grader checks use
+`gh aw lint --javascript-module <path>`.
 
 ---
 ### `gh aw run`
@@ -96,21 +103,9 @@ including with `dry_run: true`; it fails when Docker is unavailable.
 
 Trigger a workflow on demand using `workflow_dispatch`.
 
-For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md):
-respect explicit no-dispatch contexts, and handle `403 Forbidden` from a
-permitted run attempt by stopping live debugging and returning to diagnosis/
-patching. Do not retry unchanged or bypass the denial. `--dry-run` is a compilation
-profile, not run access or authorization. Revalidate each source/lock revision;
-a valid [session authorization](debug-security-review.md#session-authorization)
-can cover in-scope iterations without repeated human approval.
+For troubleshooting, first follow the shared [strategy](debug-agentic-workflow.md): respect explicit no-dispatch contexts, and handle `403 Forbidden` from a permitted run attempt by stopping live debugging and returning to diagnosis/patching. Do not retry unchanged or bypass the denial. `--dry-run` is a compilation profile, not run access or authorization. Revalidate each source/lock revision; a valid [session authorization](debug-security-review.md#session-authorization) can cover in-scope iterations without repeated human approval.
 
-Follow the [live-outcome table](debug-live-testing.md#live-debug-loop) for unknown dispatch results, moved refs,
-run-SHA mismatches and audit/log denial. `--repeat` requires an approved matching
-run-count budget; examples below do not grant approval.
-
-Codespaces may still return SAML-related 403 responses. Check the active token source
-and SSO authorization using the shared credential triage; environment tokens override
-stored CLI credentials. Do not automatically replace tokens or retry a denied run.
+Follow the [live-outcome table](debug-live-testing.md#live-debug-loop) for unknown dispatch results, moved refs, run-SHA mismatches and audit/log denial. `--repeat` requires an approved matching run-count budget; examples below do not grant approval. Codespaces may still return SAML-related 403 responses — check the active token source and SSO authorization using the shared credential triage (environment tokens override stored CLI credentials); do not automatically replace tokens or retry a denied run.
 
 ```bash
 gh aw run                           # Interactive mode — pick workflow and fill inputs

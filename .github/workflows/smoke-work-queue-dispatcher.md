@@ -130,5 +130,7 @@ comments produced by the repository's enabled Issue projection are permitted
 smoke effects. Neither agent may create or modify source content or request
 other Issue mutations.
 
-An already-installed Policy needs an explicit, quiescent administrator Policy
-update to adopt new scheduling pools; never reset or reseed an existing queue.
+Trusted processing installs the configured pool and verifies the published
+default-revision smoke worker on first use, without draining existing work.
+Only changes to installed authority or scheduling limits require a quiescent
+administrator Policy update; never reset or reseed an existing queue.

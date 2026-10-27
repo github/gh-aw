@@ -623,6 +623,14 @@ describe("safe_outputs_tools_loader", () => {
   });
 
   describe("registerPredefinedTools", () => {
+    it("reports tool deep-copy failures with a stable error code", () => {
+      const tools = [{ name: "create_issue", description: "Create issue", inputSchema: { unsupported: () => {} } }];
+      const registerTool = vi.fn();
+      const normalizeTool = name => name.replace(/-/g, "_");
+
+      expect(() => registerPredefinedTools(mockServer, tools, { create_issue: {} }, registerTool, normalizeTool)).toThrow(/ERR_SAFE_OUTPUT_TOOL_COPY_FAILED: Failed to deep-copy tool create_issue:/);
+    });
+
     it("should register enabled tools", () => {
       const tools = [
         { name: "create_pull_request", description: "Create PR" },
@@ -826,6 +834,11 @@ describe("safe_outputs_tools_loader", () => {
           description: expect.stringContaining("real PR branch update intent"),
         })
       );
+    });
+
+    it("uses a standardized code when a tool definition cannot be cloned", () => {
+      const tools = [{ name: "add_comment", description: "Add comment", cloneFailure: () => {} }];
+      expect(() => registerPredefinedTools(mockServer, tools, { add_comment: {} }, vi.fn(), name => name)).toThrow(/^ERR_SAFE_OUTPUT_TOOL_COPY_FAILED:/);
     });
   });
 

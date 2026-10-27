@@ -5,6 +5,7 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -55,6 +56,34 @@ func TestParseCronField_RangeWithStep(t *testing.T) {
 	vals, err := parseCronField("0-12/3", 0, 23)
 	require.NoError(t, err, "range with step should parse without error")
 	assert.Equal(t, []int{0, 3, 6, 9, 12}, vals, "0-12/3 should step by 3 within range")
+}
+
+func TestParseCronField_StepBoundaries(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		field string
+		max   int
+		want  []int
+	}{
+		{"maximum hour step", fmt.Sprintf("1/%d", math.MaxInt), 23, []int{1}},
+		{"maximum day step", fmt.Sprintf("1/%d", math.MaxInt), 7, []int{1}},
+		{"maximum range step", fmt.Sprintf("1-23/%d", math.MaxInt), 23, []int{1}},
+		{"maximum wildcard step", fmt.Sprintf("*/%d", math.MaxInt), 23, []int{0}},
+		{"last hour", fmt.Sprintf("23/%d", math.MaxInt), 23, []int{23}},
+		{"last day", fmt.Sprintf("7/%d", math.MaxInt), 7, []int{7}},
+		{"standard hour step", "1/4", 23, []int{1, 5, 9, 13, 17, 21}},
+		{"standard day step", "1/2", 7, []int{1, 3, 5, 7}},
+		{"exact range endpoint", "1-7/3", 7, []int{1, 4, 7}},
+		{"step beyond endpoint", "6/3", 7, []int{6}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vals, err := parseCronField(tt.field, 0, tt.max)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, vals)
+		})
+	}
 }
 
 func TestParseCronField_CommaSeparated(t *testing.T) {
@@ -168,6 +197,40 @@ func TestBuildScheduleGrid_SingleDailyCron(t *testing.T) {
 	for day := range 7 {
 		assert.Equal(t, 1, grid[day][20], "hour 20 should have count 1 on every day")
 		assert.Equal(t, 0, grid[day][0], "hour 0 should be empty")
+	}
+}
+
+func TestBuildScheduleGrid_StepBoundaries(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		cron  string
+		hours []int
+		days  []int
+	}{
+		{"maximum hour step", fmt.Sprintf("0 1/%d * * 1", math.MaxInt), []int{1}, []int{1}},
+		{"maximum day step", fmt.Sprintf("0 0 * * 1/%d", math.MaxInt), []int{0}, []int{1}},
+		{"both maximum steps", fmt.Sprintf("0 1/%d * * 1/%d", math.MaxInt, math.MaxInt), []int{1}, []int{1}},
+		{"Sunday endpoint", fmt.Sprintf("0 23/%d * * 7/%d", math.MaxInt, math.MaxInt), []int{23}, []int{0}},
+		{"standard steps", "0 1/4 * * 1/2", []int{1, 5, 9, 13, 17, 21}, []int{1, 3, 5, 0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hours, days, err := parseCronSchedule(tt.cron)
+			require.NoError(t, err)
+			assert.Equal(t, tt.hours, hours)
+			assert.Equal(t, tt.days, days)
+
+			grid := buildScheduleGrid([]*WorkflowStats{{Schedules: []string{tt.cron}}})
+			require.NotNil(t, grid)
+			var want scheduleGrid
+			for _, day := range tt.days {
+				for _, hour := range tt.hours {
+					want[day][hour]++
+				}
+			}
+			assert.Equal(t, want, *grid)
+		})
 	}
 }
 

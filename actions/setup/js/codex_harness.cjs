@@ -39,7 +39,7 @@ const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require(".
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
-const { captureExecutionEvidenceConfiguration, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -529,6 +529,18 @@ async function resolveCodexConfiguredModel(options) {
 }
 
 /**
+ * Classify a Codex routing selection error. An effort outside the routing contract
+ * (for example Codex-native "ultra") is rejected by the shared selection validator
+ * before the Codex effort mapper runs; report it as unsupported_effort, like a mapper
+ * rejection. Every other error keeps the shared classification.
+ * @param {string|null|undefined} error
+ * @returns {string}
+ */
+function getCodexRoutingFailureCode(error) {
+  return /^AWF \/reflect returned unsupported reasoning effort /.test(error || "") ? "unsupported_effort" : getAWFModelRoutingFailureCode(error);
+}
+
+/**
  * Resolve and apply AWF's selection to a Codex invocation.
  * @param {any} reflectData
  * @param {string[]} args
@@ -539,7 +551,7 @@ function resolveCodexModelRouting(reflectData, args) {
   if (result.error || !result.selection) {
     recordAWFModelRoutingOutcome({
       status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
-      failure_code: reflectData?.routing?.failure_code || getAWFModelRoutingFailureCode(result.error),
+      failure_code: reflectData?.routing?.failure_code || getCodexRoutingFailureCode(result.error),
       detail: result.error,
     });
     return { selection: null, model: "", args, error: result.error || "AWF model routing selection is missing" };
@@ -1044,6 +1056,7 @@ async function main() {
       ` pollIntervalMs=${contextRebuildCircuitBreaker.pollIntervalMs}`
   );
   const retryRun = await runHarnessRetryLoop({
+    telemetryPath: resolveHarnessRetryTelemetryPath(),
     maxRetries: MAX_RETRIES,
     initialDelayMs: INITIAL_DELAY_MS,
     backoffMultiplier: BACKOFF_MULTIPLIER,
@@ -1174,6 +1187,19 @@ async function main() {
       const isInvalidRequest = invalidRequestErrorCode !== null;
       const permissionDeniedCount = countPermissionDeniedIssues(result.output);
       const hasNumerousPermissionDenied = hasNumerousPermissionDeniedIssues(result.output);
+      result.failureClasses = Object.entries({
+        rate_limit_error: isRateLimit,
+        token_per_minute_rate_limit: isTokenPerMinuteRateLimit,
+        authentication_failed: isAuthenticationFailed,
+        missing_api_key: isMissingApiKey,
+        server_error: isServer,
+        invalid_model: isInvalidModel,
+        unsupported_model_tools: isUnsupportedModelTools,
+        invalid_request: isInvalidRequest,
+        permission_denied: hasNumerousPermissionDenied,
+      })
+        .filter(([, detected]) => detected)
+        .map(([reason]) => reason);
       log(
         `attempt ${attempt + 1} failed:` +
           ` exitCode=${result.exitCode}` +
@@ -1375,6 +1401,7 @@ if (typeof module !== "undefined" && module.exports) {
     removeCodexRoutingOverrides,
     applyCodexRoutingEffort,
     resolveCodexModelRouting,
+    getCodexRoutingFailureCode,
     getCodexModelEnvVar,
     resolvePostResultWatchdogIdleTimeoutMs,
     createMCPCallWatchdog,

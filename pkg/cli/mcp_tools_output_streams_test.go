@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCompileToolSkipLint(t *testing.T) {
+func TestCompileToolNoLint(t *testing.T) {
 	t.Parallel()
 	for _, skip := range []bool{false, true} {
 		t.Run(fmt.Sprintf("skip=%t", skip), func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestCompileToolSkipLint(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.False(t, result.IsError)
-			assert.Equal(t, skip, slices.Contains(capturedArgs, "--skip-lint"))
+			assert.Equal(t, skip, slices.Contains(capturedArgs, "--no-lint"))
 
 			capturedArgs = nil
 			result, err = session.CallTool(t.Context(), &mcp.CallToolParams{
@@ -42,10 +42,10 @@ func TestCompileToolSkipLint(t *testing.T) {
 			})
 			if skip {
 				if err != nil {
-					assert.Contains(t, err.Error(), "--skip-lint")
+					assert.Contains(t, err.Error(), "--no-lint")
 				} else {
 					require.True(t, result.IsError)
-					assert.Contains(t, extractTextResult(t, result), "--skip-lint")
+					assert.Contains(t, extractTextResult(t, result), "--no-lint")
 				}
 				assert.Nil(t, capturedArgs)
 			} else {

@@ -15,6 +15,7 @@ const { sessionTimestamp, orderSessionSources } = require("./unified_session_ord
 const { normalizeOtelEvents } = require("./unified_session_otel.cjs");
 const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
+const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -158,10 +159,21 @@ function parseEngineSession(content, engine) {
 /**
  * Collect only known runtime directories; never follow artifact symlinks.
  * Replicated firewall files use logs > audit > legacy precedence, including empty files.
- * @param {{rootDir?: string, engine?: string, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, admission?: NodeJS.ProcessEnv, jobResults?: string, jobDurations?: Record<string, number>}} [options]
+ * @param {{rootDir?: string, engine?: string, protectedSessionCapture?: boolean, warn?: (message: string) => void, dailyAIC?: NodeJS.ProcessEnv, admission?: NodeJS.ProcessEnv, jobResults?: string, safeJobNames?: string, safeJobResults?: string, jobDurations?: Record<string, number>}} [options]
  * @returns {{events: import("./types/unified_session").UnifiedSession, maskedValues: string[]}}
  */
-function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message => console.warn(message), dailyAIC = process.env, admission = process.env, jobResults = process.env.GH_AW_JOB_RESULTS, jobDurations = {} } = {}) {
+function collectUnifiedSession({
+  rootDir = "/tmp/gh-aw",
+  engine,
+  protectedSessionCapture = false,
+  warn = message => console.warn(message),
+  dailyAIC = process.env,
+  admission = process.env,
+  jobResults = process.env.GH_AW_JOB_RESULTS,
+  safeJobNames = process.env.GH_AW_SAFE_JOB_NAMES,
+  safeJobResults = process.env.GH_AW_SAFE_JOB_RESULTS,
+  jobDurations = {},
+} = {}) {
   let currentRunId = dailyAIC.GITHUB_RUN_ID;
   let currentRunAttempt = dailyAIC.GITHUB_RUN_ATTEMPT;
   /** @type {SessionSource[]} */
@@ -376,15 +388,18 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   }
   const stdio = path.join(rootDir, "agent-stdio.log");
   // Masks can be registered in stdio even when native session events are preferred.
-  const stdioContent = exists(stdio) ? read(stdio) : "";
+  const stdioContent = !protectedSessionCapture && exists(stdio) ? read(stdio) : "";
   const canonical = path.join(rootDir, "agent-session.jsonl");
-  const native = walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
+  const native = protectedSessionCapture ? [] : walk(path.join(rootDir, "sandbox/agent/logs/copilot-session-state")).filter(file => path.basename(file) === "events.jsonl");
   let agentEvents = add(canonical, "agent", "agent", undefined);
   const canonicalSource = sources.find(source => source.component === "agent" && source.path === "agent-session.jsonl");
+  if (protectedSessionCapture && (!canonicalSource?.events.length || incompleteSources.has(canonical))) {
+    throw new Error(`${ERR_VALIDATION}: Protected session collection requires a complete verified canonical session`);
+  }
   const sessionId = event => (["session.start", "session.init"].includes(event?.type) && typeof event.data?.sessionId === "string" && event.data.sessionId ? event.data.sessionId : undefined);
   /** @param {SessionEvent} event @returns {Record<string, unknown>} */
   const nativeProvenance = event => (event.provenance && typeof event.provenance === "object" && !Array.isArray(event.provenance) ? Object.fromEntries(Object.entries(event.provenance)) : {});
-  const canonicalCopilot = engine === "copilot" || canonicalSource?.events.some(event => event.data.sourceEngine === "copilot" || isNativePath(nativeProvenance(event).path));
+  const canonicalCopilot = !protectedSessionCapture && (engine === "copilot" || canonicalSource?.events.some(event => event.data.sourceEngine === "copilot" || isNativePath(nativeProvenance(event).path)));
   const representedIds = new Set(canonicalCopilot ? canonicalSource?.events.map(sessionId).filter(Boolean) : []);
   /** @type {Map<string, {file: string, records: any[], start?: number}>} */
   const snapshots = new Map();
@@ -482,7 +497,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       }
     }
   }
-  if (!agentEvents) {
+  if (!protectedSessionCapture && !agentEvents) {
     const file = choose(["sandbox/agent/logs/pi-streaming.jsonl", "pi-streaming.jsonl", "agent-stdio.log"]);
     if (file) {
       const content = read(file);
@@ -502,6 +517,16 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     ["", "agent"],
     ["threat-detection/", "detection"],
   ]) {
+    const retryFile = path.join(rootDir, prefix, prefix ? "detection_harness_retry.json" : "agent/harness_retry.json");
+    if (exists(retryFile)) {
+      const record = records(retryFile)[0];
+      const data = normalizeHarnessRetryRecord(record);
+      if (data) {
+        sources.push({ component: "harness", phase, path: path.relative(rootDir, retryFile), events: [{ type: "harness.retry", data }] });
+      } else {
+        report(retryFile, "invalid_harness_retry", undefined);
+      }
+    }
     for (const candidates of [[`${prefix}agent/awf-reflect.json`, `${prefix}sandbox/firewall/awf-reflect.json`], [`${prefix}sandbox/firewall/models.json`]]) {
       for (const candidate of candidates) {
         const file = path.join(rootDir, candidate);
@@ -537,6 +562,7 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     [["agent/awf-routing-outcome.json"], "agent", "agent", "model_routing.outcome"],
     [["safeoutputs.jsonl"], "safe_output", "agent", "safe_output.request"],
     [["safe-output-items.jsonl"], "safe_output", "safe_outputs", "safe_output.result"],
+    [["safe-output-outcomes.jsonl"], "safe_output", "safe_outputs", "safe_output.outcome"],
     [["safe-output-errors.json"], "safe_output", "safe_outputs", "safe_output.error"],
     [["experiments/state.jsonl", "usage/experiment/state.jsonl"], "experiment", "activation", "experiment.state"],
     [["experiments/state.json", "usage/experiment/state.json"], "experiment", "activation", "experiment.state"],
@@ -605,8 +631,11 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
     }
     if (file) add(file, component, phase, type);
   }
+  for (const file of walk(path.join(rootDir, "claims"))) {
+    if (path.basename(file) === "safe-output-outcomes.jsonl") add(file, "safe_output", "safe_outputs", "safe_output.outcome");
+  }
   const executionFile = path.join(rootDir, "agent-errors.jsonl");
-  add(executionFile, "agent", "agent", undefined);
+  if (!protectedSessionCapture) add(executionFile, "agent", "agent", undefined);
   const agentSources = sources.filter(source => source.component === "agent");
   const finalCopilotSource = agentSources.filter(source => copilotSources.has(source)).at(-1);
   const executionAgentSources = finalCopilotSource ? agentSources.filter(source => !copilotSources.has(source) || source === finalCopilotSource) : agentSources;
@@ -704,6 +733,28 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
   }
   if (jobResults) {
     const file = path.join(rootDir, "usage/aw_session.jsonl");
+    const safeJobs = new Set();
+    let safeResults;
+    if (safeJobResults) {
+      try {
+        safeResults = JSON.parse(safeJobResults);
+        if (!safeResults || typeof safeResults !== "object" || Array.isArray(safeResults)) throw new SyntaxError();
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        safeResults = {};
+        report(file, "invalid_safe_job_results", undefined);
+      }
+    }
+    if (safeJobNames) {
+      try {
+        const names = JSON.parse(safeJobNames);
+        if (!Array.isArray(names) || names.some(name => typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name))) throw new SyntaxError();
+        for (const name of names) safeJobs.add(name);
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        report(file, "invalid_safe_job_names", undefined);
+      }
+    }
     let needs;
     try {
       needs = JSON.parse(jobResults);
@@ -717,6 +768,8 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
       } else {
         /** @type {SessionEvent[]} */
         const events = [];
+        /** @type {SessionEvent[]} */
+        const outcomes = [];
         for (const [jobId, job] of Object.entries(needs).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))) {
           if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(jobId) || !job || typeof job !== "object" || Array.isArray(job) || !["success", "failure", "cancelled", "skipped"].includes(job.result)) {
             report(file, "invalid_job_result", undefined);
@@ -724,12 +777,45 @@ function collectUnifiedSession({ rootDir = "/tmp/gh-aw", engine, warn = message 
           }
           const durationMs = jobDurations[jobId];
           events.push({ type: "workflow.job_result", data: { jobId, result: job.result, ...(job.result !== "skipped" && Number.isSafeInteger(durationMs) && durationMs >= 0 ? { durationMs } : {}) } });
+          if (safeJobs.has(jobId)) {
+            const rawOutputs = safeResults === undefined ? job.outputs : safeResults[jobId]?.outputs;
+            const outputs = rawOutputs && typeof rawOutputs === "object" && !Array.isArray(rawOutputs) ? rawOutputs : {};
+            let status = job.result;
+            let validStatus = true;
+            if (job.result === "success" && outputs.status) {
+              if (["success", "failure", "cancelled", "skipped"].includes(outputs.status)) status = outputs.status;
+              else {
+                validStatus = false;
+                report(file, "invalid_safe_job_status", undefined);
+              }
+            }
+            /** @type {{type: string, status: string, url?: string}} */
+            const data = { type: jobId, status };
+            if (validStatus && status === "success" && outputs.url) {
+              try {
+                if (typeof outputs.url !== "string" || /[\s\x00-\x1f\x7f]/.test(outputs.url)) throw new TypeError();
+                const uri = new URL(outputs.url);
+                if (uri.username || uri.password) throw new TypeError();
+                uri.search = "";
+                uri.hash = "";
+                data.url = uri.toString();
+              } catch {
+                report(file, "invalid_safe_job_url", undefined);
+              }
+            }
+            outcomes.push({ type: "safe_output.result", data });
+          }
         }
         if (events.length) sources.push({ component: "workflow", phase: "conclusion", path: "usage/aw_session.jsonl", events });
+        if (outcomes.length) sources.push({ component: "safe_output", phase: "safe_outputs", path: "usage/aw_session.jsonl", events: outcomes });
       }
     }
   }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));
+  const memorySaves = require("./memory_save_results.cjs").readMemorySaveResults();
+  if (memorySaves.length) {
+    sources.push({ component: "memory", phase: "conclusion", path: "usage/aw_session.jsonl", events: memorySaves.map(data => ({ type: "memory.push", data: { ...data } })) });
+  }
   const coverageWarnings = [...warnings];
   for (const event of persistedWarnings) {
     const data = event.data;

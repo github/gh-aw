@@ -12,15 +12,22 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/repoutil"
 )
 
 type healthLocalGit struct {
 	dir string
+	ctx context.Context
 }
 
 func runHealthGit(dir string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	return runHealthGitContext(context.Background(), dir, args...)
+}
+
+func runHealthGitContext(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	ctx = ctxutil.OrBackground(ctx)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-c", "protocol.allow=never"}, args...)...)
 	cmd.Dir = dir
@@ -29,11 +36,14 @@ func runHealthGit(dir string, args ...string) ([]byte, error) {
 }
 
 func enableHealthLocalGit(run WorkflowRun, collection *HealthCollection) {
+	if checkHealthTimeBudget(collection) != nil {
+		return
+	}
 	if collection.localGitChecked {
 		return
 	}
 	collection.localGitChecked = true
-	remote, err := runHealthGit("", "remote", "get-url", "origin")
+	remote, err := runHealthGitContext(collection.context(), "", "remote", "get-url", "origin")
 	if err != nil {
 		healthLog.Printf("Local workflow objects unavailable: %v; using GitHub API", err)
 		return
@@ -49,12 +59,12 @@ func enableHealthLocalGit(run WorkflowRun, collection *HealthCollection) {
 		healthLog.Print("Local checkout does not match health target; using GitHub API")
 		return
 	}
-	root, err := runHealthGit("", "rev-parse", "--show-toplevel")
+	root, err := runHealthGitContext(collection.context(), "", "rev-parse", "--show-toplevel")
 	if err != nil {
 		healthLog.Printf("Local workflow root unavailable: %v; using GitHub API", err)
 		return
 	}
-	collection.localGit = &healthLocalGit{dir: strings.TrimSpace(string(root))}
+	collection.localGit = &healthLocalGit{dir: strings.TrimSpace(string(root)), ctx: collection.context()}
 }
 
 func healthRemoteMatches(remote, host, repository string) bool {
@@ -76,7 +86,7 @@ func (local *healthLocalGit) workflowFiles(sha string) (map[string]string, error
 	if !validHealthBlobSHA(sha) {
 		return nil, errors.New("local workflow lookup requires an immutable commit SHA")
 	}
-	out, err := runHealthGit(local.dir, "ls-tree", "-z", sha+":.github/workflows")
+	out, err := runHealthGitContext(local.ctx, local.dir, "ls-tree", "-z", sha+":.github/workflows")
 	if err != nil {
 		return nil, fmt.Errorf("local workflow tree unavailable: %w", err)
 	}
@@ -102,5 +112,5 @@ func (local *healthLocalGit) blob(sha string) ([]byte, error) {
 	if !validHealthBlobSHA(sha) {
 		return nil, errors.New("local workflow lookup requires a valid blob SHA")
 	}
-	return runHealthGit(local.dir, "cat-file", "blob", sha)
+	return runHealthGitContext(local.ctx, local.dir, "cat-file", "blob", sha)
 }

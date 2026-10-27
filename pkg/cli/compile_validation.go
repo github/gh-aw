@@ -252,13 +252,17 @@ func sanitizeValidationResults(results []ValidationResult) []ValidationResult {
 	compileValidationLog.Printf("Sanitizing validation results: workflow_count=%d", len(results))
 
 	sanitizeError := func(e ValidationIssue) ValidationIssue {
-		return ValidationIssue{
-			Type:     e.Type,
-			Message:  stringutil.SanitizeErrorMessage(e.Message),
-			Line:     e.Line,
-			File:     e.File,
-			Severity: e.Severity,
+		e.Message = stringutil.SanitizeErrorMessage(e.Message)
+		if e.Script != nil {
+			script := *e.Script
+			script.JobID = stringutil.SanitizeErrorMessage(script.JobID)
+			script.StepID = stringutil.SanitizeErrorMessage(script.StepID)
+			script.StepName = stringutil.SanitizeErrorMessage(script.StepName)
+			script.Source = stringutil.SanitizeErrorMessage(script.Source)
+			script.Resource = stringutil.SanitizeErrorMessage(script.Resource)
+			e.Script = &script
 		}
+		return e
 	}
 
 	return sliceutil.Map(results, func(result ValidationResult) ValidationResult {

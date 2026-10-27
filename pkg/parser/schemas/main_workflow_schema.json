@@ -3100,6 +3100,11 @@
             ],
             "description": "List of job IDs that must complete successfully before this job runs. Creates job dependencies for workflow orchestration."
           },
+          "detection-gate": {
+            "type": "string",
+            "enum": ["status-only"],
+            "description": "Allow a downstream custom job to run after failed or warn-mode detection only when it reads job results and detection-gated compiler-owned outputs."
+          },
           "env": {
             "type": "object",
             "description": "Environment variables for the job",
@@ -12863,6 +12868,19 @@
                   "type": "string",
                   "description": "Output configuration for the safe job"
                 },
+                "outputs": {
+                  "type": "object",
+                  "description": "Optional safe-job outcome outputs using GitHub Actions output expressions.",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
                 "max": {
                   "type": "integer",
                   "minimum": 1,
@@ -16477,6 +16495,10 @@
                     },
                     "provider-env-mode": {
                       "type": "string"
+                    },
+                    "protected-session-capture": {
+                      "type": "boolean",
+                      "description": "Parse only the final stderr attempt from native AWF protected command output (v0.28.67+, non-TTY Docker only). Requires an isolated recorder and verifying log parser; raw streams remain private and incomplete capture or structural redaction collisions fail publication."
                     },
                     "env": {
                       "type": "object",

@@ -45,7 +45,7 @@ func TestCreateAndConfigureCompiler_SkipLint(t *testing.T) {
 		compiler := createAndConfigureCompiler(CompileConfig{SkipLint: skip})
 		require.Equal(t, !skip, reflect.ValueOf(compiler).Elem().FieldByName("lint").Bool())
 	}
-	require.ErrorContains(t, validateDevelopmentCompileMode(CompileConfig{DryRun: true, SkipLint: true}), "--skip-lint")
+	require.ErrorContains(t, validateDevelopmentCompileMode(CompileConfig{DryRun: true, SkipLint: true}), "--no-lint")
 }
 
 func TestCreateAndConfigureCompiler_LintsByDefault(t *testing.T) {

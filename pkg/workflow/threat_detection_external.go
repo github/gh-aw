@@ -129,6 +129,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		CachedPermissions:    data.CachedPermissions,
 		ModelCosts:           data.ModelCosts,
 		IsDetectionRun:       true,
+		AdmissionEnabled:     admissionBudgetOutputsEnabled(data),
 		RunnerConfig:         data.RunnerConfig,
 		TimeoutMinutes:       "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
 		CompiledVersion:      data.CompiledVersion,
@@ -147,6 +148,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	}
 	delete(detectionData.SandboxConfig.Agent.Images, awfImageRoleRouter)
 	if ResolveEngineID(data) == engineID {
+		detectionData.SandboxConfig.Agent.Targets = cloneAgentAPITargets(data)
 		detectionData.ModelMappings = data.ModelMappings
 	} else {
 		detectionData.ModelMappings = MergeImportedModelAliases(nil, nil)
@@ -169,8 +171,28 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if len(detectionData.SandboxConfig.Agent.Images) == 0 {
 		detectionData.SandboxConfig.Agent.Images = buildThreatDetectionContainerImages(detectionData)
 	}
-
 	return detectionData
+}
+
+func cloneAgentAPITargets(data *WorkflowData) map[string]*AgentAPIProxyTargetConfig {
+	agent := getAgentConfig(data)
+	if agent == nil || agent.Targets == nil {
+		return nil
+	}
+
+	targets := agent.Targets
+	cloned := make(map[string]*AgentAPIProxyTargetConfig, len(targets))
+	for name, target := range targets {
+		if target == nil {
+			cloned[name] = nil
+			continue
+		}
+		targetCopy := *target
+		targetCopy.ExtraHeaders = maps.Clone(target.ExtraHeaders)
+		targetCopy.ExtraBodyFields = maps.Clone(target.ExtraBodyFields)
+		cloned[name] = &targetCopy
+	}
+	return cloned
 }
 
 func getAWFChecksumsSHA256(data *WorkflowData) string {

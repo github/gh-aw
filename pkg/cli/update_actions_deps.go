@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/syncutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
@@ -44,93 +45,77 @@ type cachedLatestRelease struct {
 	err     error
 }
 
-type cachedSHA struct {
-	sha string
-	err error
-}
-
 // newCachedActionUpdateDeps memoizes GitHub reads for the full update command.
 // This cache is shared by actions-lock.json updates and Markdown action refs.
 func newCachedActionUpdateDeps(base actionUpdateDeps) actionUpdateDeps {
 	var mu sync.Mutex
-	latestReleases := make(map[string]cachedLatestRelease)
-	releaseLists := make(map[string]struct {
-		output []byte
-		err    error
-	})
-	shas := make(map[string]cachedSHA)
-	cooldowns := make(map[string]coolDownCheckResult)
+	latestReleases := make(map[string]*syncutil.OnceLoader[cachedLatestRelease])
+	releaseLists := make(map[string]*syncutil.OnceLoader[[]byte])
+	shas := make(map[string]*syncutil.OnceLoader[string])
+	cooldowns := make(map[string]*syncutil.OnceLoader[coolDownCheckResult])
 
 	cached := base
 	cached.getLatestRelease = func(ctx context.Context, repo, currentVersion string, allowMajor, verbose bool) (string, string, error) {
+		repo = gitutil.ExtractBaseRepo(repo)
 		key := fmt.Sprintf("%s|%s|%t", repo, currentVersion, allowMajor)
-		mu.Lock()
-		result, ok := latestReleases[key]
-		mu.Unlock()
-		if ok {
-			return result.version, result.sha, result.err
-		}
-		version, sha, err := base.getLatestRelease(ctx, repo, currentVersion, allowMajor, verbose)
-		mu.Lock()
-		latestReleases[key] = cachedLatestRelease{version: version, sha: sha, err: err}
-		mu.Unlock()
-		return version, sha, err
+		result, err := loadActionUpdateResult(&mu, latestReleases, key, func() (cachedLatestRelease, error) {
+			var version, sha string
+			var err error
+			if base.getLatestRelease != nil {
+				version, sha, err = base.getLatestRelease(ctx, repo, currentVersion, allowMajor, verbose)
+			} else {
+				version, sha, err = getLatestActionReleaseWithDeps(ctx, cached, repo, currentVersion, allowMajor, verbose)
+			}
+			return cachedLatestRelease{version: version, sha: sha}, err
+		})
+		return result.version, result.sha, err
 	}
 	cached.runGHReleasesAPI = func(ctx context.Context, repo string) ([]byte, error) {
-		mu.Lock()
-		result, ok := releaseLists[repo]
-		mu.Unlock()
-		if ok {
-			return result.output, result.err
-		}
-		output, err := base.runGHReleasesAPI(ctx, repo)
-		mu.Lock()
-		releaseLists[repo] = struct {
-			output []byte
-			err    error
-		}{output: output, err: err}
-		mu.Unlock()
-		return output, err
+		return loadActionUpdateResult(&mu, releaseLists, repo, func() ([]byte, error) {
+			return base.runGHReleasesAPI(ctx, repo)
+		})
 	}
 	cached.getActionSHAForTag = func(ctx context.Context, repo, tag string) (string, error) {
+		repo = gitutil.ExtractBaseRepo(repo)
 		key := repo + "|" + tag
-		mu.Lock()
-		result, ok := shas[key]
-		mu.Unlock()
-		if ok {
-			return result.sha, result.err
-		}
-		sha, err := base.getActionSHAForTag(ctx, repo, tag)
-		mu.Lock()
-		shas[key] = cachedSHA{sha: sha, err: err}
-		mu.Unlock()
-		return sha, err
+		return loadActionUpdateResult(&mu, shas, key, func() (string, error) {
+			return base.getActionSHAForTag(ctx, repo, tag)
+		})
 	}
 	cached.checkCoolDown = func(ctx context.Context, repo, tag string, coolDown time.Duration) coolDownCheckResult {
 		key := fmt.Sprintf("%s|%s|%s", repo, tag, coolDown)
-		mu.Lock()
-		result, ok := cooldowns[key]
-		mu.Unlock()
-		if ok {
-			return result
-		}
-		result = base.checkCoolDown(ctx, repo, tag, coolDown)
-		mu.Lock()
-		cooldowns[key] = result
-		mu.Unlock()
+		result, _ := loadActionUpdateResult(&mu, cooldowns, key, func() (coolDownCheckResult, error) {
+			return base.checkCoolDown(ctx, repo, tag, coolDown), nil
+		})
 		return result
 	}
 	return cached
 }
 
+func loadActionUpdateResult[T any](mu *sync.Mutex, cache map[string]*syncutil.OnceLoader[T], key string, fetch func() (T, error)) (T, error) {
+	loader := func() *syncutil.OnceLoader[T] {
+		mu.Lock()
+		defer mu.Unlock()
+		loader := cache[key]
+		if loader == nil {
+			loader = &syncutil.OnceLoader[T]{}
+			cache[key] = loader
+		}
+		return loader
+	}()
+	return loader.Get(fetch)
+}
+
 func defaultActionUpdateDeps() actionUpdateDeps {
-	return actionUpdateDeps{
-		getLatestRelease:       getLatestActionRelease,
+	return newCachedActionUpdateDeps(actionUpdateDeps{
 		getLatestReleaseViaGit: getLatestActionReleaseViaGit,
 		checkCoolDown:          checkReleaseCoolDown,
 		runGHReleasesAPI: func(ctx context.Context, baseRepo string) ([]byte, error) {
-			return workflow.RunGHCombinedContext(ctx, "Fetching releases...", "api", "--paginate", fmt.Sprintf("/repos/%s/releases", baseRepo), "--jq", ".[].tag_name")
+			if client := updateGitHubClientFromContext(ctx); client != nil {
+				return client.releaseTags(ctx, baseRepo)
+			}
+			return workflow.RunGHCombinedContext(ctx, "Fetching releases...", "api", "--paginate", fmt.Sprintf("/repos/%s/releases?per_page=100", baseRepo), "--jq", ".[].tag_name")
 		},
 		getActionSHAForTag: getActionSHAForTag,
-	}
+	})
 }

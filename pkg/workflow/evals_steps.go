@@ -214,6 +214,7 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 		CachedPermissions: data.CachedPermissions,
 		IsDetectionRun:    false,
 		IsEvalsRun:        true,
+		AdmissionEnabled:  admissionBudgetOutputsEnabled(data),
 		TimeoutMinutes:    data.TimeoutMinutes,
 		RunnerConfig:      data.RunnerConfig,    // propagate runner.topology (e.g. arc-dind) to the evals job
 		ModelMappings:     data.ModelMappings,   // propagate alias map so evals awf-config.json can resolve model aliases

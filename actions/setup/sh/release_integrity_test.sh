@@ -29,14 +29,16 @@ copilot_digest="$(shasum -a 256 "$TEMP_DIR/SHA256SUMS.txt" | awk '{print $1}')"
 sed -e "s/0b03f6ea5b638356a799fa541ade4fd7902a6ac8d7c3f0252ee09d8259a4ce8f/$manifest_digest/" \
     -e "s/372f0c8d3d50076455cd19ef080dc59dc2a32401d8b2d4f77ce190c8ab13bc59/$copilot_digest/" \
     -e "s/018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be/$copilot_digest/" \
+    -e "s/26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2/$copilot_digest/" \
   "$SCRIPT_DIR/release_integrity.sh" >"$TEMP_DIR/scripts/release_integrity.sh"
 
 cat >"$TEMP_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-if [ "${1:-}" = "--help" ]; then exit 0; fi
+if [ "${1:-}" = "--help" ]; then echo '--retry-all-errors'; exit 0; fi
 printf '%s\n' "$*" >>"$TEST_ROOT/curl.log"
 out=""
+write_out=""
 https_only=false
 https_redirects=false
 while [ "$#" -gt 0 ]; do
@@ -50,11 +52,17 @@ while [ "$#" -gt 0 ]; do
       https_redirects=true
       shift 2 ;;
     -o) out="$2"; shift 2 ;;
+    --write-out) write_out="$2"; shift 2 ;;
     *) url="$1"; shift ;;
   esac
 done
 if [ "$https_only" != true ] || [ "$https_redirects" != true ]; then
   echo "missing HTTPS-only initial/redirect policy" >&2; exit 96
+fi
+if [ "${AWF_TEST_FAIL_ASSET:-}" = "${url##*/}" ]; then
+  printf 'incomplete download\n' >"$out"
+  if [ -n "$write_out" ]; then printf '%s' "${AWF_TEST_HTTP_STATUS:-504}"; fi
+  exit "${AWF_TEST_CURL_EXIT:-22}"
 fi
 case "$url" in
   */compat.json) cp "$TEST_ROOT/compat.json" "$out" ;;
@@ -65,6 +73,7 @@ case "$url" in
   */copilot-linuxmusl-x64.tar.gz) cp "$TEST_ROOT/copilot-linuxmusl-x64.tar.gz" "$out" ;;
   *) echo "unexpected download: $url" >&2; exit 97 ;;
 esac
+if [ -n "$write_out" ]; then printf '200'; fi
 EOF
 cat >"$TEMP_DIR/bin/node" <<'EOF'
 #!/usr/bin/env bash
@@ -100,32 +109,76 @@ run_awf v0.28.62 --rootless
 test -x "$TEMP_DIR/home/.local/bin/awf"
 grep -q EXECUTED "$TEMP_DIR/executions"
 echo "PASS: authenticated AWF bundle installs and executes"
+
+for failure in '504 22' '404 22' '000 28' '200 23'; do
+  read -r http_status curl_exit <<<"$failure"
+  rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"
+  installer_exit=0
+  AWF_TEST_FAIL_ASSET=checksums.txt AWF_TEST_HTTP_STATUS="$http_status" AWF_TEST_CURL_EXIT="$curl_exit" \
+    run_awf v0.28.62 --rootless || installer_exit=$?
+  test "$installer_exit" = "$curl_exit"
+  grep -qF "Failed to download checksums.txt from github/gh-aw-firewall v0.28.62 (HTTP $http_status, curl exit $curl_exit)" "$TEMP_DIR/output"
+  if [ "$curl_exit" = 23 ]; then
+    grep -qF 'Local write failure; check free disk space and permissions' "$TEMP_DIR/output"
+  elif grep -qF 'Local write failure' "$TEMP_DIR/output"; then
+    echo "FAIL: network error misdiagnosed as a local write failure" >&2; exit 1
+  fi
+  test ! -e "$TEMP_DIR/executions"
+  test ! -e "$TEMP_DIR/home/.local/bin/awf"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
+done
+echo "PASS: failed checksum downloads preserve HTTP/curl diagnostics and never install or execute partial files"
+
+for http_status in 404 504; do
+  rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions"
+  AWF_TEST_FAIL_ASSET=awf-bundle.js AWF_TEST_HTTP_STATUS="$http_status" run_awf v0.28.62 --rootless
+  grep -qF "HTTP $http_status, curl exit 22" "$TEMP_DIR/output"
+  grep -q '/awf-linux-x64' "$TEMP_DIR/curl.log"
+  grep -q EXECUTED "$TEMP_DIR/executions"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 3
+  if grep '/awf-bundle.js' "$TEMP_DIR/curl.log" | grep -q -- '--retry-all-errors'; then
+    echo "FAIL: optional bundle retries permanent HTTP failures" >&2; exit 1
+  fi
+done
+echo "PASS: bundle download failure retains the authenticated platform-binary fallback"
+
+rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"
+installer_exit=0
+AWF_TEST_NODE_VERSION=v18.0.0 AWF_TEST_FAIL_ASSET=awf-linux-x64 \
+  run_awf v0.28.62 --rootless || installer_exit=$?
+test "$installer_exit" = 22
+grep -qF 'Failed to download awf-linux-x64 from github/gh-aw-firewall v0.28.62 (HTTP 504, curl exit 22)' "$TEMP_DIR/output"
+test ! -e "$TEMP_DIR/executions"
+test ! -e "$TEMP_DIR/home/.local/bin/awf"
+test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
+echo "PASS: failed platform-binary downloads cannot install or execute partial files"
+
 run_copilot --rootless
 test -x "$TEMP_DIR/home/.local/bin/copilot"
-grep -q '/v1.0.101/copilot-linux-x64.tar.gz' "$TEMP_DIR/curl.log"
+grep -q '/v1.0.103/copilot-linux-x64.tar.gz' "$TEMP_DIR/curl.log"
 echo "PASS: default Copilot release installs with its reviewed manifest pin"
 run_copilot 1.0.98 --rootless
 test -x "$TEMP_DIR/home/.local/bin/copilot"
 rm -f "$TEMP_DIR/home/.local/bin/copilot"
 echo "PASS: authenticated Copilot archive installs and executes"
 
-printf '%s\n' '{"agent-compat-v1":{"copilot":[{"min-gh-aw":"0.72.0","max-gh-aw":"*","min-agent":"1.0.21","max-agent":"1.0.101"}]}}' >"$TEMP_DIR/compat.json"
+printf '%s\n' '{"agent-compat-v1":{"copilot":[{"min-gh-aw":"0.72.0","max-gh-aw":"*","min-agent":"1.0.21","max-agent":"1.0.103"}]}}' >"$TEMP_DIR/compat.json"
 PIN_TEST_COMPILED_VERSION=v0.93.0 PIN_TEST_MIN_VERSION=1.0.35 run_copilot --rootless
 grep -q 'installation complete' "$TEMP_DIR/output"
 echo "PASS: compat-selected release installs on a runner with an empty toolcache"
 
-sed 's/1.0.101/9.9.9/' "$TEMP_DIR/compat.json" >"$TEMP_DIR/compat-next.json"
+sed 's/1.0.103/9.9.9/' "$TEMP_DIR/compat.json" >"$TEMP_DIR/compat-next.json"
 cp "$TEMP_DIR/compat-next.json" "$TEMP_DIR/compat.json"
 rm -f "$TEMP_DIR/curl.log"
 PIN_TEST_COMPILED_VERSION=v0.93.0 PIN_TEST_MIN_VERSION=1.0.35 run_copilot --rootless
-grep -q 'falling back to reviewed default 1.0.101' "$TEMP_DIR/output"
-grep -q '/v1.0.101/copilot-linux-x64.tar.gz' "$TEMP_DIR/curl.log"
+grep -q 'falling back to reviewed default 1.0.103' "$TEMP_DIR/output"
+grep -q '/v1.0.103/copilot-linux-x64.tar.gz' "$TEMP_DIR/curl.log"
 if grep -q '/v9.9.9/' "$TEMP_DIR/curl.log"; then
   echo "FAIL: downloaded an unreviewed compat target" >&2; exit 1
 fi
 echo "PASS: unpinned compat target falls back to an authenticated in-window default"
 
-for bounds in '1.0.102 9.9.9' '1.0.21 1.0.97'; do
+for bounds in '1.0.104 9.9.9' '1.0.21 1.0.97'; do
   read -r min_agent max_agent <<<"$bounds"
   printf '{"agent-compat-v1":{"copilot":[{"min-gh-aw":"0.72.0","max-gh-aw":"*","min-agent":"%s","max-agent":"%s"}]}}\n' \
     "$min_agent" "$max_agent" >"$TEMP_DIR/compat.json"
@@ -137,7 +190,7 @@ for bounds in '1.0.102 9.9.9' '1.0.21 1.0.97'; do
 done
 cp "$TEMP_DIR/compat-next.json" "$TEMP_DIR/compat.json"
 rm -f "$TEMP_DIR/curl.log"
-if PIN_TEST_COMPILED_VERSION=v0.93.0 PIN_TEST_MIN_VERSION=1.0.102 run_copilot --rootless; then
+if PIN_TEST_COMPILED_VERSION=v0.93.0 PIN_TEST_MIN_VERSION=1.0.104 run_copilot --rootless; then
   echo "FAIL: default fallback bypassed the feature minimum" >&2; exit 1
 fi
 test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
@@ -290,8 +343,12 @@ done
 echo "PASS: missing-pin errors explain upgrade, recompile, and independently trusted manifest overrides"
 
 test -n "$(release_artifact_sha256 github/gh-aw-firewall v0.28.62 checksums.txt)"
+test "$(release_artifact_sha256 github/gh-aw-firewall v0.29.0 checksums.txt)" = \
+  "2d49727b3b65630b5d0ba5375168687a852afac319d05c911d4769c43fa2ed61"
 test "$(release_artifact_sha256 github/copilot-cli v1.0.101 SHA256SUMS.txt)" = \
   "018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be"
+test "$(release_artifact_sha256 github/copilot-cli v1.0.103 SHA256SUMS.txt)" = \
+  "26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2"
 if release_artifact_sha256 github/gh-aw-firewall v0.28.62 wrong-asset >/dev/null 2>&1; then
   echo "FAIL: digest pin was not asset-bound" >&2; exit 1
 fi

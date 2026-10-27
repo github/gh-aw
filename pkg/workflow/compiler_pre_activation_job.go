@@ -453,6 +453,9 @@ func buildPreActivationActivatedExpression(data *WorkflowData, conditions []Cond
 	if err != nil {
 		return "", err
 	}
+	if literal, ok := activatedNode.(*StringLiteralNode); ok {
+		return fmt.Sprintf("%q", literal.Value), nil
+	}
 	return fmt.Sprintf("${{ %s }}", activatedNode.Render()), nil
 }
 

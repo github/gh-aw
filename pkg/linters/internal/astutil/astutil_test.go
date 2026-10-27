@@ -575,13 +575,16 @@ func TestByteStringTypeHelpers(t *testing.T) {
 	const src = `package p
 
 func g(s string) []byte { return nil }
+func h(s string) string { return s }
 
 func f(s string, b []byte) {
 	type myString string
 	var ms myString
 
 	_ = []byte(s)
+	_ = string(b)
 	_ = g(s)
+	_ = h(s)
 	_ = b
 	_ = s
 	_ = ms
@@ -610,29 +613,37 @@ func f(s string, b []byte) {
 		}
 		rhsExprs = append(rhsExprs, assign.Rhs[0])
 	}
-	if len(rhsExprs) != 5 {
-		t.Fatalf("found %d assignment expressions in f, want 5", len(rhsExprs))
+	if len(rhsExprs) != 7 {
+		t.Fatalf("found %d assignment expressions in f, want 7", len(rhsExprs))
 	}
 
 	byteConv, ok := rhsExprs[0].(*ast.CallExpr)
 	if !ok {
 		t.Fatalf("rhs[0] type = %T, want *ast.CallExpr", rhsExprs[0])
 	}
-	gCall, ok := rhsExprs[1].(*ast.CallExpr)
+	stringConv, ok := rhsExprs[1].(*ast.CallExpr)
 	if !ok {
 		t.Fatalf("rhs[1] type = %T, want *ast.CallExpr", rhsExprs[1])
 	}
-	bIdent, ok := rhsExprs[2].(*ast.Ident)
+	gCall, ok := rhsExprs[2].(*ast.CallExpr)
 	if !ok {
-		t.Fatalf("rhs[2] type = %T, want *ast.Ident", rhsExprs[2])
+		t.Fatalf("rhs[2] type = %T, want *ast.CallExpr", rhsExprs[2])
 	}
-	sIdent, ok := rhsExprs[3].(*ast.Ident)
+	stringCall, ok := rhsExprs[3].(*ast.CallExpr)
 	if !ok {
-		t.Fatalf("rhs[3] type = %T, want *ast.Ident", rhsExprs[3])
+		t.Fatalf("rhs[3] type = %T, want *ast.CallExpr", rhsExprs[3])
 	}
-	msIdent, ok := rhsExprs[4].(*ast.Ident)
+	bIdent, ok := rhsExprs[4].(*ast.Ident)
 	if !ok {
 		t.Fatalf("rhs[4] type = %T, want *ast.Ident", rhsExprs[4])
+	}
+	sIdent, ok := rhsExprs[5].(*ast.Ident)
+	if !ok {
+		t.Fatalf("rhs[5] type = %T, want *ast.Ident", rhsExprs[5])
+	}
+	msIdent, ok := rhsExprs[6].(*ast.Ident)
+	if !ok {
+		t.Fatalf("rhs[6] type = %T, want *ast.Ident", rhsExprs[6])
 	}
 
 	if !IsByteSlice(pass, bIdent) {
@@ -647,6 +658,12 @@ func f(s string, b []byte) {
 	}
 	if IsByteSliceConversion(pass, gCall) {
 		t.Fatal("IsByteSliceConversion(g(s)) = true, want false")
+	}
+	if !IsStringConversion(pass, stringConv) {
+		t.Fatal("IsStringConversion(string(b)) = false, want true")
+	}
+	if IsStringConversion(pass, stringCall) {
+		t.Fatal("IsStringConversion(h(s)) = true, want false")
 	}
 
 	if !IsStringType(pass, sIdent) {

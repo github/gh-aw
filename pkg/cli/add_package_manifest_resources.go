@@ -33,6 +33,7 @@ func extractManifestResources(value any, manifestPath string) ([]repositoryPacka
 		}
 		key := strings.ToLower(resource.Destination)
 		if previous, exists := seenDestinations[key]; exists {
+			addPackageManifestLog.Printf("Rejecting manifest %s: duplicate resource destination %q for entries %q and %q", manifestPath, resource.Destination, previous, resource.Source)
 			return nil, fmt.Errorf("invalid Agentic Workflow manifest %q: resources entries %q and %q both install to %q. Each resource must have a unique destination", manifestPath, previous, resource.Source, resource.Destination)
 		}
 		seenDestinations[key] = resource.Source
@@ -130,6 +131,7 @@ func normalizeLocalPackageResourcePaths(resources []repositoryPackageResource, p
 			DestinationPath: resource.Destination,
 		})
 	}
+	addPackageManifestLog.Printf("Normalized %d local resource path(s) (package dir=%q)", len(normalized), packageDir)
 	return normalized, nil
 }
 
