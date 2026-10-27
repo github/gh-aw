@@ -1176,6 +1176,8 @@ Org mode (`--org`) previews or creates upgrade pull requests across every reposi
 
 Upgrade also supports `--enterprise`, `--interactive`, `--dry-run`, `--concurrency`, and `--replace-existing`; see [organization and enterprise rollouts](#organization-and-enterprise-rollouts). Rollout workers use the currently running CLI version consistently across repositories; update the CLI before starting the rollout to target a newer compiler.
 
+Upgrade rollouts scan every `.lock.yml` comment header in each selected repository's `.github/workflows` directory and read `compiler_version` from `gh-aw-metadata` before making changes. Reports show the sorted, distinct compiler versions per repository and across the rollout, including mixed-version repositories. Lock files without compiler metadata are reported as unknown; unreadable files or invalid metadata fail that repository's scan. The scan reads headers from the existing shallow sparse checkout, so it adds no per-lock-file GitHub API requests and does not read generated workflow bodies. Interactive results also display the detected versions as workers complete.
+
 Use `--disable-codemod` (repeatable) to skip specific codemod IDs during the embedded fix step. This flag is ignored when `--no-fix` is set.
 
 Unlike `gh aw compile --fix`, `gh aw upgrade` runs codemods, action version updates, and workflow compilation by default and uses `--no-fix` to skip all three steps.

@@ -230,11 +230,11 @@ func prepareOrgRolloutWorker(ctx context.Context, repo, marker string) ([]orgRol
 	return existing, false, nil
 }
 
-func finishOrgRolloutWorker(ctx context.Context, repo string, existing []orgRolloutPR, prURL string) error {
+func finishOrgRolloutWorker(ctx context.Context, repo string, existing []orgRolloutPR, prURL string, preview *orgRepoPreview) error {
 	if opts := orgRolloutFromContext(ctx); opts == nil || !opts.worker {
 		return nil
 	}
-	if err := emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL}); err != nil {
+	if err := emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL, Preview: preview}); err != nil {
 		return err
 	}
 	for _, pr := range existing {

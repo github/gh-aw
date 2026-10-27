@@ -137,7 +137,7 @@ func TestOrgRolloutExistingPRPolicy(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, skip)
 	assert.Zero(t, mutations, "old PR remains open until replacement exists")
-	require.NoError(t, finishOrgRolloutWorker(ctx, "acme/repo", existing, "https://github.com/acme/repo/pull/43"))
+	require.NoError(t, finishOrgRolloutWorker(ctx, "acme/repo", existing, "https://github.com/acme/repo/pull/43", nil))
 	assert.Equal(t, 1, mutations)
 }
 
@@ -146,7 +146,7 @@ func TestOrgRolloutReplacementCloseError(t *testing.T) {
 		return nil, errors.New("HTTP 403")
 	})
 	ctx := context.WithValue(context.Background(), orgRolloutKey{}, &orgRolloutOptions{worker: true, replace: true})
-	err := finishOrgRolloutWorker(ctx, "acme/repo", []orgRolloutPR{{Number: 42}}, "https://github.com/acme/repo/pull/43")
+	err := finishOrgRolloutWorker(ctx, "acme/repo", []orgRolloutPR{{Number: 42}}, "https://github.com/acme/repo/pull/43", nil)
 	require.ErrorContains(t, err, "replacement https://github.com/acme/repo/pull/43 created")
 	require.ErrorContains(t, err, "could not close old PR #42")
 }

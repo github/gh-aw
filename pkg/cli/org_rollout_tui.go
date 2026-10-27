@@ -97,6 +97,9 @@ func (m orgRolloutTUI) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.result.URL != "" {
 				m.rows[msg.index].status += " " + msg.result.URL
 			}
+			if msg.result.Preview != nil && m.opts.command == "upgrade" {
+				m.rows[msg.index].status += " | compilers: " + formatUpgradeCompilerVersions(*msg.result.Preview)
+			}
 		}
 		if msg.result.Status != "running" {
 			m.results = append(m.results, msg.result)

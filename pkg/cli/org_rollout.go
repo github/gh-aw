@@ -193,6 +193,9 @@ func runOrgRolloutPlain(ctx context.Context, rows []orgRolloutRow, opts orgRollo
 		}
 		result := event.result
 		fmt.Fprintf(os.Stderr, "%s: %s %s\n", result.Repo, result.Status, result.URL)
+		if result.Preview != nil && opts.command == "upgrade" {
+			fmt.Fprintln(os.Stderr, "  compilers: "+formatUpgradeCompilerVersions(*result.Preview))
+		}
 		if result.Status != "running" {
 			results = append(results, result)
 		}
@@ -207,7 +210,7 @@ func reportOrgRolloutResults(ctx context.Context, results []orgRolloutResult, cb
 		failures = append(failures, runErr)
 	}
 	for _, result := range results {
-		if result.Preview != nil && result.Status == "planned" {
+		if result.Preview != nil && (result.Status == "planned" || opts.command == "upgrade") {
 			previews = append(previews, *result.Preview)
 		}
 		if result.Error != "" {
@@ -217,8 +220,8 @@ func reportOrgRolloutResults(ctx context.Context, results []orgRolloutResult, cb
 			fmt.Fprintf(os.Stderr, "%s: %s %s\n", result.Repo, result.Status, result.URL)
 		}
 	}
-	if opts.dryRun {
-		cbs.ReportFn(previews, false)
+	if opts.dryRun || (opts.command == "upgrade" && len(previews) > 0) {
+		cbs.ReportFn(previews, !opts.dryRun)
 	}
 	if ctx.Err() != nil {
 		failures = append(failures, ctx.Err())

@@ -94,13 +94,13 @@ func renderOrgActionSummary(preview orgRepoPreview, action string) {
 			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(fmt.Sprintf("%s: %s -> %s", wf.Name, wf.CurrentRef, wf.LatestRef)))
 		}
 	}
-	currentVersion := normalizeDisplayVersion(preview.CurrentVersion)
+	currentVersion := formatUpgradeCompilerVersions(preview)
 	targetVersion := normalizeDisplayVersion(GetVersion())
-	if currentVersion != "" {
+	if len(preview.CurrentVersions) > 0 || preview.UnknownVersionLocks > 0 {
 		if targetVersion != "" && targetVersion != currentVersion {
-			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(fmt.Sprintf("Compiler version: %s -> %s", currentVersion, targetVersion)))
+			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(fmt.Sprintf("Compiler versions: %s -> %s", currentVersion, targetVersion)))
 		} else {
-			fmt.Fprintln(os.Stderr, console.FormatListItemStderr("Compiler version: "+currentVersion))
+			fmt.Fprintln(os.Stderr, console.FormatListItemStderr("Compiler versions: "+currentVersion))
 		}
 	}
 }

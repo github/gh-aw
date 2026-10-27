@@ -446,7 +446,7 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 			return err
 		}
 		if prURL != "" {
-			return finishOrgRolloutWorker(ctx, targetRepo, existing, prURL)
+			return finishOrgRolloutWorker(ctx, targetRepo, existing, prURL, nil)
 		}
 		return nil
 	}
