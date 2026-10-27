@@ -562,7 +562,11 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 
 	// Merge jobs from imported YAML workflows
 	if importsResult.MergedJobs != "" && importsResult.MergedJobs != "{}" {
-		workflowData.Jobs = c.mergeJobsFromYAMLImports(workflowData.Jobs, importsResult.MergedJobs)
+		mergedJobs, err := c.mergeJobsFromYAMLImports(workflowData.Jobs, importsResult.MergedJobs)
+		if err != nil {
+			return err
+		}
+		workflowData.Jobs = mergedJobs
 	}
 
 	workflowData.Roles = c.extractRoles(frontmatter)

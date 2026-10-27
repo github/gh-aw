@@ -55,17 +55,18 @@ tools:
     mode: local
     toolsets: [default, issues]
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     expires: 2d
     title-prefix: "[performance] "
     labels: [performance, automation, cookie]
     max: 3
-    group: true
   add-comment:
     max: 5
 timeout-minutes: 20
 strict: true
 imports:
+  - shared/lock-safe-pull-request.md
   - shared/mcp-pagination.md
   - uses: shared/daily-audit-base.md
     with:
@@ -94,11 +95,11 @@ evals:
 
 # Daily CLI Performance Agent
 
-You are the Daily CLI Performance Agent - an expert system that monitors compilation performance, tracks benchmarks over time, detects regressions, and opens issues when performance problems are found.
+You are the Daily CLI Performance Agent - an expert system that monitors compilation performance, tracks benchmarks over time, detects regressions, and implements validated fixes in pull requests.
 
 ## Mission
 
-Run daily performance benchmarks for workflow compilation, store results in cache memory, analyze trends, and open issues if performance regressions are detected.
+Run daily performance benchmarks for workflow compilation, store results in cache memory, analyze trends, and implement confirmed performance regressions as validated pull requests.
 
 **Repository**: ${{ github.repository }}
 **Run ID**: ${{ github.run_id }}
@@ -453,7 +454,7 @@ chmod +x /tmp/gh-aw/agent/benchmarks/analyze_trends.py
 python3 /tmp/gh-aw/agent/benchmarks/analyze_trends.py
 ```
 
-## Phase 4: Open Issues for Regressions
+## Phase 4: Fix Confirmed Regressions
 
 ### 4.1 Check for Performance Problems
 
@@ -465,18 +466,18 @@ echo "=== Performance Analysis Summary ==="
 cat /tmp/gh-aw/agent/benchmarks/analysis.json | python3 -m json.tool
 ```
 
-### 4.2 Open Issues for Regressions
+### 4.2 Create Pull Requests for Confirmed Regressions
 
-If regressions are detected, open issues with detailed information.
+If regressions are detected, identify and implement a focused fix, rerun the affected benchmark, and create a pull request with the before/after evidence.
 
-**Rules for opening issues:**
-1. Do **not** open regression issues when the analysis reports `"likely_environment_noise": true` (many unrelated benchmarks regressing at once indicates a noisy runner, not a code regression) — mention it in the report instead and recommend a re-run
-2. Otherwise, open one issue per regression detected (max 3 as per safe-outputs config)
+**Rules for creating pull requests:**
+1. Do **not** create regression pull requests when the analysis reports `"likely_environment_noise": true` (many unrelated benchmarks regressing at once indicates a noisy runner, not a code regression) — mention it in the report instead and recommend a re-run
+2. Otherwise, implement one focused pull request per independently fixable regression (max 3). Do not submit a PR unless the affected benchmark demonstrates improvement and focused tests pass.
 3. Include benchmark name, current performance, historical median, and change percentage
 4. Add "performance" and "automation" labels
 5. Use title format: `[performance] Regression in [BenchmarkName]: X% slower`
 
-**Issue template:**
+**Pull request template:**
 
 ```markdown
 ### 📊 Performance Regression Detected
@@ -526,13 +527,13 @@ If regressions are detected, open issues with detailed information.
 
 ### 4.3 Implementation
 
-Parse the analysis and create issues:
+Parse the analysis to select confirmed regressions for implementation:
 
 ```bash
-cat > /tmp/gh-aw/agent/benchmarks/create_issues.py << 'EOF'
+cat > /tmp/gh-aw/agent/benchmarks/select_regressions.py << 'EOF'
 #!/usr/bin/env python3
 """
-Create GitHub issues for performance regressions
+Select performance regressions for validated remediation pull requests
 """
 import json
 import os
@@ -560,7 +561,7 @@ def main():
     
     if analysis['summary'].get('likely_environment_noise'):
         print(f"⏭️ {len(regressions)} regression(s) detected across unrelated benchmarks — "
-              "classified as likely environment noise, no regression issues will be opened.")
+              "classified as likely environment noise, no regression pull requests will be created.")
         with open('/tmp/gh-aw/agent/benchmarks/regressions.json', 'w') as f:
             json.dump([], f, indent=2)
         return
@@ -577,11 +578,14 @@ if __name__ == '__main__':
     main()
 EOF
 
-chmod +x /tmp/gh-aw/agent/benchmarks/create_issues.py
-python3 /tmp/gh-aw/agent/benchmarks/create_issues.py
+chmod +x /tmp/gh-aw/agent/benchmarks/select_regressions.py
+python3 /tmp/gh-aw/agent/benchmarks/select_regressions.py
 ```
 
-Now, for each regression found in `regressions.json` (empty when the run was classified as likely environment noise), use the `create issue` tool to open an issue with the details.
+For each confirmed regression in `regressions.json` (empty when likely environment noise),
+implement and validate the fix, commit locally, and call `create_pull_request` with the branch
+and measured before/after details. Use `noop` for noise or no regressions; use
+`report_incomplete` for a confirmed regression that cannot be safely fixed or validated.
 
 ## Phase 5: Generate Performance Report
 
@@ -738,7 +742,7 @@ A successful daily run will:
 ✅ **Store in memory** - Append results to `benchmark_history.jsonl` in cache-memory (pruned to last 14 entries)  
 ✅ **Analyze trends** - Compare current performance with recent historical average (bounded to last 14 entries)  
 ✅ **Detect regressions** - Identify benchmarks that are >10% slower  
-✅ **Open issues** - Create GitHub issues for each regression detected (max 3)  
+✅ **Fix regressions** - Create validated pull requests for confirmed regressions (max 3)
 ✅ **Generate report** - Display comprehensive performance summary
 
 ## Performance Baselines

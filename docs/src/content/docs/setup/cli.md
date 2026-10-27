@@ -341,6 +341,10 @@ Available codemods include:
 - `expires-integer-to-string` — converts bare integer `expires` values (e.g., `expires: 7`) to the preferred day-string format (e.g., `expires: 7d`) in all `safe-outputs` blocks.
 - `steps-run-secrets-to-env` — rewrites **all** `${{ ... }}` expressions in step `run:` commands to `$VARNAME` references (or `$env:VARNAME` for PowerShell steps) and adds step-level `env` bindings. Secrets, `env.*`, and `github.token` use stable legacy names; all other expressions receive `EXPR_*` names. Required for strict-mode compliance.
 - `engine-env-secrets-to-engine-config` — removes secret-bearing entries from `engine.env` that are unsafe under strict mode, preserving required engine credential keys.
+- `pull-request-target-restrict-roles` — removes `read` and `all` from `on.roles` for strict `pull_request_target` workflows. Other listed roles are retained; when none remain, the codemod uses `[admin, maintainer, write]`.
+- `pull-request-target-guided-error` — reports remaining unsafe checkouts or admission roles after automatic fixes. The existing `pull-request-target-checkout-false` codemod still disables checkout only in eligible workflows without configured checkout mappings/lists or detected checkout commands.
+
+Remaining `pull_request_target` risks require a manual choice: switch to `pull_request` after reviewing permission and secret requirements, disable unnecessary checkout, configure a trusted checkout, or restrict admission roles. `on.pull_request_target.acknowledge-risk: true` suppresses only the trigger-risk warning; it does not bypass checkout or role restrictions and is never added automatically. A guided error prevents all edits to that workflow from being written, even with `--write`; resolve its manual blockers and rerun `fix`. These checks inspect authored configuration; run `gh aw compile --strict` to validate the resolved workflow, including imports.
 
 Run `gh aw fix --list-codemods` to see all available codemods.
 
@@ -391,6 +395,7 @@ gh aw compile --strict --zizmor            # Security scan (fails on findings)
 gh aw compile --grant                      # License scan container images
 gh aw compile --yamllint                   # Lint generated YAML output
 gh aw compile --dependabot                 # Generate dependency manifests
+gh aw compile --actions-lock               # Update the standard Actions dependency lockfile
 gh aw compile --purge                      # Remove orphaned .lock.yml files
 ```
 
@@ -400,7 +405,11 @@ If the repository root contains an [`aw.yml` manifest](/gh-aw/reference/aw-yml-p
 
 Unlike `gh aw upgrade`, `gh aw compile` does not run codemods unless you pass `--fix`.
 
-**Options:** `--action-mode`, `--action-tag`, `--actionlint`, `--actions-repo`, `--allow-action-refs`, `--allow-experimental`, `--approve`, `--dependabot`, `--dry-run`, `--dir/-d`, `--engine/-e`, `--environment`, `--fail-fast`, `--fix`, `--force/-f`, `--force-refresh-action-pins`, `--force-refresh-container-pins`, `--gh-aw-ref`, `--ghes`, `--grant`, `--grype`, `--json/-j`, `--logical-repo/-l`, `--models`, `--no-check-update`, `--no-emit`, `--no-lint`, `--no-logo`, `--poutine`, `--purge`, `--refresh-stop-time`, `--require-self-hosted-runners`, `--runner-guard`, `--schedule-seed`, `--shellcheck`, `--show-all`, `--staged`, `--stats`, `--strict`, `--syft`, `--trial`, `--validate`, `--validate-images`, `--watch/-w`, `--yamllint`, `--zizmor`
+**Options:** `--action-mode`, `--action-tag`, `--actionlint`, `--actions-lock`, `--actions-repo`, `--allow-action-refs`, `--allow-experimental`, `--approve`, `--dependabot`, `--dry-run`, `--dir/-d`, `--engine/-e`, `--environment`, `--fail-fast`, `--fix`, `--force/-f`, `--force-refresh-action-pins`, `--force-refresh-container-pins`, `--gh-aw-ref`, `--ghes`, `--grant`, `--grype`, `--json/-j`, `--logical-repo/-l`, `--models`, `--no-check-update`, `--no-emit`, `--no-lint`, `--no-logo`, `--poutine`, `--purge`, `--refresh-stop-time`, `--require-self-hosted-runners`, `--runner-guard`, `--schedule-seed`, `--shellcheck`, `--show-all`, `--staged`, `--stats`, `--strict`, `--syft`, `--trial`, `--validate`, `--validate-images`, `--watch/-w`, `--yamllint`, `--zizmor`
+
+**`--actions-lock` flag:** After successful compilation and companion workflow generation, run `gh actions-lock --no-narrow` from the repository root to update `.github/workflows/actions.lock`. The extension scans all workflows in its default directory, even when compiling specific files or using `--dir`. `--no-narrow` preserves SHA-pinned action references. Install the extension separately with `gh extension install github/gh-actions-lock`; compilation never installs it. Extension failures fail the command without rolling back compiled files. Extension output goes to stderr, preserving `--json` output on stdout. Cannot be combined with `--no-emit`, `--read-only`, `--watch`, or `--dry-run`: the extension performs repository-wide post-processing beyond emitted compiler files. This integration does not replace `.github/aw/actions-lock.json` or change existing pin resolution.
+
+The extension inherits the environment through the standard GitHub CLI helper, including `GH_HOST`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GH_ACTIONS_LOCK_GITHUB_COM_TOKEN`, `GH_CONFIG_DIR`, and certificate settings. When `GH_HOST` is unset, the host detected from the origin remote is forwarded. Existing `GH_TOKEN` precedence and `GITHUB_TOKEN` fallback are preserved. Host support depends on the installed extension.
 
 **`--no-lint` flag:** Disable default built-in Actions/AW AST linting. By default, compilation checks the generated execution graph and authored source before emitting a lock file, including with `--no-emit`, and fails on lint errors. This flag does not disable existing compiler validation or opt-in external scanners and cannot be combined with `--dry-run`. The compile MCP input is `skip_lint`. Native Actions YAML and downstream dispatch targets require a separate `gh aw lint` invocation.
 
@@ -509,6 +518,8 @@ gh aw trial ./workflow.md --dry-run                # Preview without executing
 **Options:** `--engine/-e`, `--repeat`, `--delete-host-repo-after`, `--logical-repo/-l`, `--clone-repo`, `--trigger-context`, `--host-repo`, `--dry-run`, `--append`, `--auto-merge-prs`, `--no-security-scanner`, `--delete-host-repo-before`, `--json/-j`, `--timeout`, `--yes/-y`
 
 Unlike `run --repo/-r`, `trial` has no `--repo/-r`: `--logical-repo/-l` sets the simulated `github.repository` context, while `--host-repo` selects where the trial actually runs. `--json/-j` is available for trial output.
+
+`--timeout` sets the execution timeout in integer minutes (default: `30`; `0` disables the timeout). For example, use `--timeout 10`, not `--timeout 10m`.
 
 **Secret Handling:** API keys required for the selected engine are automatically checked. If missing from the target repository, they are prompted for interactively and uploaded.
 
@@ -668,7 +679,7 @@ gh aw logs --runtime cloud-hypervisor                    # Filter to runs using 
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
-When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets.
+When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes (for example, `--timeout 10`); the default `0` disables the timeout.
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
 
@@ -1028,6 +1039,8 @@ gh aw forecast --eval                       # Backtest forecast quality against 
 **Options:** `--concurrency`, `--days`, `--period`, `--sample`, `--eval`, `--timeout`, `--repo/-r`, `--json/-j`
 
 The `--days` flag accepts only `7` or `30` (default: `30`). Other values produce an error.
+
+`--timeout` gracefully stops computation after the specified number of integer minutes (for example, `--timeout 10`). The default `0` disables the timeout.
 
 #### `experiments`
 

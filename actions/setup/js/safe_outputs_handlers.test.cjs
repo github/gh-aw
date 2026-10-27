@@ -3163,10 +3163,13 @@ describe("safe_outputs_handlers", () => {
         }
       });
 
-      it("rejects disallowed files introduced after the existing PR head", async () => {
+      it.each(["am", "bundle"])("rejects disallowed files introduced and reverted after the existing PR head despite YAML exclusions (%s)", async format => {
         const { repoDir } = createRepoWithDisallowedHistoryFile();
+        const workflowDir = path.join(repoDir, ".github/workflows/nested");
+        fs.mkdirSync(workflowDir, { recursive: true });
+        fs.writeFileSync(path.join(workflowDir, "omitted.yaml"), "name: excluded\n");
         fs.writeFileSync(path.join(repoDir, "agent.js"), "console.log('agent');\n");
-        execSync("git add agent.js", { cwd: repoDir, stdio: "pipe" });
+        execSync("git add .", { cwd: repoDir, stdio: "pipe" });
         execSync("git commit -m 'agent script'", { cwd: repoDir, stdio: "pipe" });
         execSync("git rm agent.js", { cwd: repoDir, stdio: "pipe" });
         execSync("git commit -m 'revert agent script'", { cwd: repoDir, stdio: "pipe" });
@@ -3174,7 +3177,7 @@ describe("safe_outputs_handlers", () => {
         process.env.GITHUB_BASE_REF = "main";
         process.env.GITHUB_WORKSPACE = repoDir;
         const localHandlers = createHandlers(mockServer, mockAppendSafeOutput, {
-          push_to_pull_request_branch: { allowed_files: ["*.md"] },
+          push_to_pull_request_branch: { allowed_files: ["*.md"], excluded_files: ["*.yml", "*.yaml"], patch_format: format },
         });
         try {
           const result = await localHandlers.pushToPullRequestBranchHandler({ branch: "feature/work" });

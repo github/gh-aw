@@ -266,7 +266,7 @@ describe("AW-owned authorization with queue-owned scheduling and delivery", () =
     await expect(launchAssignment({ ...options, policyProposal: changed }, fixture.assignment)).rejects.toThrow(/active/);
     expect(post).not.toHaveBeenCalled();
     expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).state).toBe("reserved");
-    expect(fixture.githubClient.rest.repos.getContent).toHaveBeenCalledWith({ owner: "owner", repo: "repo", path: WORKFLOW, ref: REF });
+    expect(fixture.githubClient.rest.repos.getContent).toHaveBeenCalledWith({ owner: "owner", repo: "repo", path: WORKFLOW, ref: REF, request: { retries: 0, retryCount: 0, signal: expect.any(AbortSignal) } });
   });
 
   it("releases a never-started AW reservation with authenticated prelaunch evidence without inventing a worker identity", async () => {

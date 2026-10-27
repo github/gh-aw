@@ -2,7 +2,7 @@
 private: true
 emoji: "🧌"
 name: LintMonster
-description: Daily workflow that runs custom linters, groups findings, and launches up to three Copilot agent sessions to fix lint issues
+description: Daily workflow that runs custom linters, groups findings, and opens up to three validated remediation pull requests
 on:
   schedule: daily
   workflow_dispatch:
@@ -65,10 +65,10 @@ steps:
         await collectIssues({ github, context, core });
 
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     title-prefix: "[lint-monster] "
     labels: [automation, lint, cookie]
-    deduplicate-by-title: false
     max: 3
   close-issue:
     max: 10
@@ -78,10 +78,6 @@ safe-outputs:
     max: 10
     required-labels: [automation, lint, cookie]
     target: "*"
-  assign-to-agent:
-    max: 3
-    target: "*"
-    allowed: [copilot]
   create-discussion:
     expires: 2d
     category: audits
@@ -91,6 +87,7 @@ safe-outputs:
   noop:
 
 imports:
+  - shared/lock-safe-pull-request.md
   - shared/otlp.md
   - shared/reporting.md
 ---
@@ -103,7 +100,7 @@ You are **LintMonster**, a daily custom-linter remediation orchestrator.
 
 ## Mission
 
-Use the pre-check lint output from `make golint-custom`. If lint is clean, do nothing. If lint issues exist, group them and launch up to three Copilot agent sessions to resolve the groups.
+Use the pre-check lint output from `make golint-custom`. If lint is clean, call `noop`. Otherwise group the findings, implement fixes, validate with `make golint-custom`, and create up to three focused pull requests.
 
 ## Runtime Inputs
 
@@ -126,7 +123,7 @@ Use these fused constraints while creating remediation instructions:
 - Prefer minimal, targeted code edits.
 <!-- End fusion -->
 
-Convert fused guidance into clear, actionable instructions that Copilot can execute for each lint group issue.
+Apply the fused guidance directly when implementing each lint group's remediation.
 
 ## Required flow
 
@@ -137,30 +134,29 @@ Convert fused guidance into clear, actionable instructions that Copilot can exec
    - `ignored-results`: unchecked/ignored errors and discarded return or type-assertion results; title `Handle ignored errors and discarded results`.
    - `function-length`: all `largefunc` / long-function / function-length findings in `pkg/workflow` and `pkg/cli`; title `function-length refactoring`.
    - For other root causes, use a stable category slug and title, and check the full inventory for existing work. Never split a category into path slices or "part 1 / part 2" issues. Record skipped categories rather than merging unrelated findings to fit the three-group limit.
-4. For **every** selected category, find/update before create:
-   - Follow its inventory plan: `action: update` means use the explicit `issue_number` with `update_issue` and do **not** call `create_issue` for that category. Prefer an existing marked tracker, otherwise the oldest matching open issue. Inspect candidate bodies to verify category scope; title matching only identifies candidates, not proven duplicates.
+4. For **every** selected category, find existing work before implementation:
+   - Follow the inventory to identify an existing tracker. Prefer an existing marked tracker, otherwise the oldest matching open issue. Inspect candidate bodies to verify category scope; title matching only identifies candidates, not proven duplicates. Also search open pull requests; skip categories already covered by active implementation work.
    - Inspect `ambiguous_issues` separately: mixed legacy titles or multiple category markers are not authoritative candidates or automatic duplicates. Never update one issue for multiple categories. Preserve mixed-scope work, link any dedicated category trackers, and report deferred consolidation.
    - Refresh the authoritative issue with the current diagnostic count, affected paths, representative diagnostics, and a concise remediation checklist using fused skill guidance. Keep counts and dates in the body, not the stable title. Include `<!-- lint-monster-category: CATEGORY -->`, substituting the stable slug. Use `update_issue` with `operation: "replace"` and a full replacement body based on `persistent_body`, not an append-only update. Preserve maintainer notes, completed checklist items, outstanding work outside the current scan, and workflow provenance. Re-read the current issue before staging the update and incorporate any newer maintainer edits; remove every `<!-- gh-aw-expires: ... -->` marker and its generated expiration checkbox line from that body. Verify the replacement contains no expiration markers before proceeding.
    - Before creating when the plan says `create`, inspect the remaining open inventory and recent closed LintMonster issues for legacy or mixed-scope tracking work. Reuse a matching open issue rather than opening a new count snapshot. Do not reopen completed work blindly; explain any genuine recurrence.
-   - Only when no matching open tracker exists, create one issue using the category's exact stable title (the safe output supplies `[lint-monster] `) and marker.
-   - Repository title deduplication is disabled because it also suppresses genuine recurrence after a completed tracker is closed. Use the complete open inventory and serialized runs for deduplication. Only assign a Copilot agent when a genuinely new open issue was created and needs execution now; never reassign an existing tracker.
+   - Implement a minimal fix on a separate local branch for each selected category. Run `make golint-custom` and focused tests, commit locally, then call `create_pull_request` with the category's stable title (the safe output supplies `[lint-monster] `) and marker.
+   - When an authoritative tracker exists, reference it in the pull request with a closing keyword only if the entire outstanding scope is fixed. Do not close it merely because a pull request was staged. Do not create new implementation issues or assign another agent.
 5. Consolidate proven open duplicates for each category using `close_issue` with a pointer comment to the authoritative issue:
    - Read each candidate's body and comments and check assignments and linked open PRs before closing. A changing count or wording alone is not sufficient evidence.
    - Close only when its entire outstanding scope is already tracked by the authoritative issue. Mixed indexing/type-assertion or error/idiom reports are not automatically duplicates; preserve and link their extra work before any closure.
    - Preserve issues with active independent work or unclear scope; report why consolidation was deferred. Never close the authoritative issue, unrelated findings, or historical closed issues.
    - Update the authoritative issue successfully **before** closing duplicates. Respect the ten-closure limit and report any remaining duplicates for the next run.
-6. If at least one assignment succeeded **or** you updated/closed an existing tracking issue in **any category**, create one discussion report containing:
+6. If at least one pull request was staged **or** you updated/closed an existing tracking issue in **any category**, create one discussion report containing:
    - Daily lint scan summary
    - Group definitions and finding counts
-   - Issues created or updated, plus any duplicate issues closed
-   - Agent assignments, if any
+   - Pull requests staged and existing issues updated, plus any duplicate issues closed
+   - Implemented changes and validation results
    - Any groups skipped and why
-7. If no assignments were made and no existing tracking issue was updated/closed, call `noop` with a short reason.
+7. If no actionable change remains and no existing tracking issue was updated/closed, call `noop`; report concrete implementation or validation blockers with `report_incomplete`.
 
 ## Output rules
 
-- Launch **no more than three** agent sessions total.
-- Never assign the same group twice.
-- Keep one authoritative open issue per finding category; never create a new issue for a category already tracked by an open issue.
-- Always use safe outputs for issue creation, issue updates, comments, assignment, and discussion creation.
-- Final action must be `create_discussion` when agents were launched or when existing tracking issues in any category were updated/closed; otherwise `noop`.
+- Create **no more than three** focused pull requests total, with no duplicate active work per category.
+- Preserve authoritative existing trackers; new findings are implemented directly rather than filed as new issues.
+- Always use safe outputs for pull request creation, issue updates, duplicate closures, and discussion creation.
+- Final action must be `create_discussion` when pull requests were staged or existing tracking issues were updated/closed; otherwise `noop` or `report_incomplete`.
