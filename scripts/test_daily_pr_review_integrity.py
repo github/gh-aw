@@ -1,7 +1,18 @@
-"""Regression checks for the daily PR review's integrity and coverage contract."""
+"""Regression checks for the daily PR review's integrity and coverage contract.
+
+Optional runtime check (no Docker or live GitHub access): set MCPG_RUNTIME_SOURCE
+to the pinned gateway source directory and AWMG_WASM_GUARD_PATH to the GitHub guard
+WASM extracted from the lock's pinned image. Requires Go and Node.js. The test
+uses local mock GitHub/MCP servers, not a workflow dispatch.
+
+    MCPG_RUNTIME_SOURCE=... AWMG_WASM_GUARD_PATH=... \\
+        python3 scripts/test_daily_pr_review_integrity.py
+"""
 
 import json
+import os
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -9,6 +20,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / ".github/workflows/daily-pr-review-cursor.md"
 LOCK = ROOT / ".github/workflows/daily-pr-review-cursor.lock.yml"
+
+
+def compiled_guard_policies():
+    decoder = json.JSONDecoder()
+    resolved = re.sub(r"\$\{GH_AW_GUARD_[A-Z_]+\}", "[]", LOCK.read_text())
+    return [
+        decoder.raw_decode(resolved[match.end():].lstrip())[0]
+        for match in re.finditer(r'"guard-policies":', resolved)
+    ]
 
 
 class DailyPRReviewIntegrityTests(unittest.TestCase):
@@ -119,12 +139,7 @@ class DailyPRReviewIntegrityTests(unittest.TestCase):
 
     def test_generated_lock_enforces_scoped_untrusted_reads(self):
         lock = LOCK.read_text()
-        decoder = json.JSONDecoder()
-        resolved = re.sub(r"\$\{GH_AW_GUARD_[A-Z_]+\}", "[]", lock)
-        policies = [
-            decoder.raw_decode(resolved[match.end():].lstrip())[0]
-            for match in re.finditer(r'"guard-policies":', resolved)
-        ]
+        policies = compiled_guard_policies()
         read_policies = [policy["allow-only"] for policy in policies if "allow-only" in policy]
         self.assertTrue(read_policies, "Missing compiled GitHub read policy")
         for policy in read_policies:
@@ -164,6 +179,54 @@ class DailyPRReviewIntegrityTests(unittest.TestCase):
             config = json.loads(json.loads(tool_config))
         for capability in ("bash", "edit", "webFetch", "webSearch", "dynamicWorkflows", "cliProxy"):
             self.assertFalse(config["capabilities"][capability], capability)
+
+
+@unittest.skipUnless(os.environ.get("MCPG_RUNTIME_SOURCE"), "requires pinned gateway source and WASM")
+class DailyPRReviewGatewayRuntimeTests(unittest.TestCase):
+    def test_effective_runtime_repository_scope_and_sink_visibility(self):
+        source = Path(os.environ["MCPG_RUNTIME_SOURCE"]).resolve()
+        wasm = Path(os.environ["AWMG_WASM_GUARD_PATH"]).resolve()
+        self.assertTrue(wasm.is_file())
+        lock = LOCK.read_text()
+        command = next(line for line in lock.splitlines() if "export MCP_GATEWAY_DOCKER_COMMAND=" in line)
+        self.assertIn("__GH_AW_MCP_GATEWAY_CUSTOM_ENV__", command)
+        transport = {}
+        for name in ("GH_AW_MCP_GATEWAY_CUSTOM_ENV_NAMES", "GH_AW_MCP_GATEWAY_ENV_0"):
+            value = re.search(rf"^\s+{name}: (.+)$", lock, re.MULTILINE)
+            self.assertIsNotNone(value)
+            transport[name] = json.loads(value[1])
+        args = json.loads(subprocess.check_output(
+            ["node", "-e", """
+const {injectCustomGatewayEnvArgs} = require("./actions/setup/js/start_mcp_gateway.cjs");
+console.log(JSON.stringify(injectCustomGatewayEnvArgs(
+    ["run", "__GH_AW_MCP_GATEWAY_CUSTOM_ENV__", "gateway"], JSON.parse(process.argv[1]))));
+""", json.dumps(transport)], cwd=ROOT, text=True,
+        ))
+        self.assertIn("MCP_GATEWAY_FORCE_PUBLIC_REPOS=false", args)
+        policy = next(policy for policy in compiled_guard_policies() if "allow-only" in policy)
+        env = {
+            **os.environ,
+            "AWMG_WASM_GUARD_PATH": str(wasm),
+            "DAILY_REVIEW_READ_POLICY": json.dumps(policy).replace("${{ github.repository }}", "github/gh-aw"),
+        }
+        for index, arg in enumerate(args[:-1]):
+            if arg == "-e":
+                name, value = args[index + 1].split("=", 1)
+                env[name] = value
+        overlay = source / "daily-review-test-overlay.json"
+        self.assertFalse(overlay.exists(), "refusing to overwrite an existing overlay")
+        overlay.write_text(json.dumps({"Replace": {
+            str(source / "internal/server/daily_review_runtime_test.go"):
+                str(ROOT / "scripts/testdata/daily_pr_review_gateway_runtime_test.go"),
+        }}))
+        try:
+            subprocess.run(
+                ["go", "test", f"-overlay={overlay}", "./internal/server",
+                 "-run", "^TestDailyPRReviewRuntime", "-count=1", "-v"],
+                cwd=source, env=env, check=True, timeout=180,
+            )
+        finally:
+            overlay.unlink()
 
 
 if __name__ == "__main__":
