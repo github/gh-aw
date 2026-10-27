@@ -342,8 +342,8 @@ async function rewriteBundleBranchAsSingleCommit(baseBranch, execApi, bundleFile
 
 // NOTE: isLabelTransientError, LABEL_MAX_RETRIES, LABEL_INITIAL_DELAY_MS, LABEL_MAX_DELAY_MS,
 // parseAllowedBaseBranches, isBaseBranchAllowed, parseStringListConfig, mergeFallbackIssueLabels,
-// sanitizeFallbackAssignees, neutralizeClosingKeywordsForIssueBody, generatePatchPreview,
-// buildManifestProtectionCreatePrUrl, and renderManifestProtectionFallbackBody
+// sanitizeFallbackAssignees, neutralizeClosingKeywordsForIssueBody, buildPatchPreviewBlocks,
+// buildManifestProtectionCreatePrUrl, and buildFallbackIssueBlocks
 // are imported from create_pull_request_helpers.cjs above.
 
 /**
@@ -552,8 +552,6 @@ function enforcePullRequestLimits(patchContent, maxFiles = MAX_FILES) {
     );
   }
 }
-
-// NOTE: generatePatchPreview is imported from create_pull_request_helpers.cjs above.
 
 /**
  * Check whether the remote branch already exists and, if so, either reuse it

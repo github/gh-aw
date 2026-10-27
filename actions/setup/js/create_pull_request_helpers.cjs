@@ -8,9 +8,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { isTransientError, isWorkflowsScopeTimeoutError, withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
 const { MAX_ASSIGNEES } = require("./constants.cjs");
-const { encodePathSegments, renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
+const { encodePathSegments, renderTemplateFromFile } = require("./messages_core.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
-const { renderReport } = require("./report_ast.cjs");
 
 /** @type {string} Label always added to fallback issues so the triage system can find them */
 const MANAGED_FALLBACK_ISSUE_LABEL = "agentic-workflows";
@@ -223,16 +222,7 @@ function neutralizeClosingKeywordsForIssueBody(content) {
 }
 
 /**
- * Generate a patch preview with max 500 lines and 2000 chars for issue body
- * @param {string} patchContent - The full patch content
- * @returns {string} Formatted patch preview
- */
-function generatePatchPreview(patchContent) {
-  const children = buildPatchPreviewBlocks(patchContent);
-  return children.length ? "\n\n" + renderReport({ type: "report", title: "Patch preview", children }).body.trimEnd() : "";
-}
-
-/**
+ * Build a patch preview with max 500 lines and 2000 chars for an issue body.
  * @param {string} patchContent
  * @returns {import("./report_ast.cjs").ReportBlock[]}
  */
@@ -274,6 +264,8 @@ function buildFallbackIssueBlocks(templatePath, values) {
 }
 
 /**
+ * Build typed push-error content, expanding unsupported signed-commit shapes
+ * into cause-specific remediation. Other errors use the sanitized message.
  * @param {string} rawErrorMessage
  * @param {string} sanitizedErrorMessage
  * @returns {import("./report_ast.cjs").ReportBlock[]}
@@ -372,35 +364,6 @@ function buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch,
     createPrUrl += `&body=${encodeURIComponent(`Closes #${fallbackIssueNumber}`)}`;
   }
   return createPrUrl;
-}
-
-/**
- * Build a formatted markdown error section for a push-failure note block.
- *
- * When the raw error message matches the `pushSignedCommits: refusing unsigned push`
- * pattern the section is expanded into a structured block that names the cause and
- * lists remediation steps. For all other errors it degrades gracefully to a single
- * `**Original error:**` line using the sanitised, whitespace-collapsed form.
- *
- * The returned string contains one or more blockquote lines (lines starting with `>`)
- * with no leading or trailing blank lines. It is designed to be embedded directly
- * inside a `> [!NOTE]` block in a GitHub issue body, for example:
- *
- * ```
- * > [!NOTE]
- * > Intro sentence.
- * >
- * ${buildPushErrorSection(rawMsg, sanitizedMsg)}
- * >
- * > **Workflow Run:** [details](url)
- * ```
- *
- * @param {string} rawErrorMessage - Unprocessed error message; used for pattern detection and cause extraction.
- * @param {string} sanitizedErrorMessage - Sanitised, whitespace-collapsed message; used as the fallback line.
- * @returns {string} One or more blockquote lines for the error section (no leading/trailing blank lines).
- */
-function buildPushErrorSection(rawErrorMessage, sanitizedErrorMessage) {
-  return renderReport({ type: "report", title: "Push error", children: [{ type: "quote", agentTainted: false, children: buildPushErrorBlocks(rawErrorMessage, sanitizedErrorMessage) }] }).body.trimEnd();
 }
 
 /**
@@ -543,25 +506,6 @@ function buildManualBranchApplyCommands({ hasBundleFile, runId, artifactFileName
   ].join("\n");
 }
 
-/**
- * Renders protected-files fallback issue body with a prefilled compare URL.
- * @param {string} mainBodyContent
- * @param {string} footerContent
- * @param {string} fileList
- * @param {string} createPrUrl
- * @returns {string}
- */
-function renderManifestProtectionFallbackBody(mainBodyContent, footerContent, fileList, createPrUrl) {
-  const templatePath = getPromptPath("manifest_protection_create_pr_fallback.md");
-  const children = buildFallbackIssueBlocks(templatePath, {
-    main_body: parseReportMarkdown(mainBodyContent, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }),
-    footer: parseReportMarkdown(footerContent, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: false }),
-    files: parseReportMarkdown(fileList, { agentTainted: false }),
-    create_pr_url: createPrUrl,
-  });
-  return renderReport({ type: "report", title: "Protected files", children }).body.trimEnd();
-}
-
 module.exports = {
   MANAGED_FALLBACK_ISSUE_LABEL,
   LABEL_MAX_RETRIES,
@@ -578,14 +522,11 @@ module.exports = {
   mergeFallbackIssueLabels,
   sanitizeFallbackAssignees,
   neutralizeClosingKeywordsForIssueBody,
-  generatePatchPreview,
   buildPatchPreviewBlocks,
   buildFallbackIssueBlocks,
   buildPushErrorBlocks,
   buildPushFailureIssueBlocks,
   buildManifestProtectionCreatePrUrl,
-  renderManifestProtectionFallbackBody,
-  buildPushErrorSection,
   buildManualBranchRecoveryCommands,
   buildManualBranchApplyCommands,
 };

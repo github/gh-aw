@@ -33,14 +33,16 @@ const {
   mergeFallbackIssueLabels,
   sanitizeFallbackAssignees,
   neutralizeClosingKeywordsForIssueBody,
-  generatePatchPreview,
+  buildPatchPreviewBlocks,
+  buildFallbackIssueBlocks,
   buildManifestProtectionCreatePrUrl,
-  buildPushErrorSection,
+  buildPushErrorBlocks,
   buildManualBranchRecoveryCommands,
   buildManualBranchApplyCommands,
   withTransientPushRetry,
 } = require("./create_pull_request_helpers.cjs");
 const { TransportIntegrityError } = require("./transport_integrity.cjs");
+const { renderReport } = require("./report_ast.cjs");
 
 function runGit(args, cwd) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -565,53 +567,75 @@ describe("neutralizeClosingKeywordsForIssueBody", () => {
 });
 
 // ---------------------------------------------------------------------------
-// generatePatchPreview
+// buildPatchPreviewBlocks
 // ---------------------------------------------------------------------------
-describe("generatePatchPreview", () => {
-  it("returns empty string for empty/whitespace-only input", () => {
-    expect(generatePatchPreview("")).toBe("");
-    expect(generatePatchPreview("   ")).toBe("");
+describe("buildPatchPreviewBlocks", () => {
+  it("returns no blocks for empty/whitespace-only input", () => {
+    expect(buildPatchPreviewBlocks("")).toEqual([]);
+    expect(buildPatchPreviewBlocks("   ")).toEqual([]);
     // @ts-ignore
-    expect(generatePatchPreview(null)).toBe("");
+    expect(buildPatchPreviewBlocks(null)).toEqual([]);
   });
 
-  it("wraps content in a <details> block with a diff code fence", () => {
-    const result = generatePatchPreview("diff --git a/file b/file\n+changed");
-    expect(result).toContain("<details>");
-    expect(result).toContain("</details>");
-    expect(result).toContain("```diff");
-    expect(result).toContain("```");
+  it("returns typed details and diff code blocks that render as a fenced preview", () => {
+    const patch = "diff --git a/file b/file\n+changed";
+    const children = buildPatchPreviewBlocks(patch);
+    expect(children).toEqual([{ type: "details", summary: "Show patch (2 lines)", agentTainted: false, children: [{ type: "code_block", language: "diff", value: patch, agentTainted: true }] }]);
+    const { body } = renderReport({ type: "report", title: "Patch preview", children });
+    expect(body).toContain("<details>");
+    expect(body).toContain("</details>");
+    expect(body).toContain("```diff");
   });
 
   it("shows total line count in summary when under both limits", () => {
     const patch = Array.from({ length: 5 }, (_, i) => `line${i}`).join("\n");
-    const result = generatePatchPreview(patch);
-    expect(result).toContain("Show patch (5 lines)");
-    expect(result).not.toContain("truncated");
+    const result = buildPatchPreviewBlocks(patch);
+    expect(result).toMatchObject([{ summary: "Show patch (5 lines)", children: [{ value: patch }] }]);
   });
 
   it("truncates and indicates truncation when over 500 lines", () => {
     const patch = Array.from({ length: 600 }, (_, i) => (i === 500 ? "omitted-line" : "x")).join("\n");
-    const result = generatePatchPreview(patch);
-    expect(result).toContain("Show patch preview (500 of 600 lines)");
-    expect(result).toContain("... (truncated)");
-    // Content from line 500+ must not appear
-    expect(result).not.toContain("omitted-line");
+    const result = buildPatchPreviewBlocks(patch);
+    expect(result).toMatchObject([{ summary: "Show patch preview (500 of 600 lines)", children: [{ value: `${Array(500).fill("x").join("\n")}\n... (truncated)` }] }]);
   });
 
   it("truncates and indicates truncation when over 2000 characters", () => {
     // 3 lines totaling well over 2000 chars
     const longLine = "x".repeat(1000);
     const patch = `${longLine}\n${longLine}\n${longLine}`;
-    const result = generatePatchPreview(patch);
-    expect(result).toContain("Show patch preview (2 of 3 lines)");
-    expect(result).toContain("... (truncated)");
+    const result = buildPatchPreviewBlocks(patch);
+    expect(result).toMatchObject([{ summary: "Show patch preview (2 of 3 lines)", children: [{ value: `${patch.slice(0, 2000)}\n... (truncated)` }] }]);
   });
 
   it("includes patch content in the output when within limits", () => {
     const patch = "diff --git a/foo b/foo\n+hello";
-    const result = generatePatchPreview(patch);
-    expect(result).toContain("+hello");
+    const result = buildPatchPreviewBlocks(patch);
+    expect(result).toMatchObject([{ children: [{ value: patch }] }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildFallbackIssueBlocks
+// ---------------------------------------------------------------------------
+describe("buildFallbackIssueBlocks", () => {
+  it("composes protected-files fallback content as typed blocks with a compare link", () => {
+    const mainBody = { type: "paragraph", children: [{ type: "text", value: "Original PR description", agentTainted: true }], agentTainted: true };
+    const footer = { type: "paragraph", children: [{ type: "text", value: "Workflow footer", agentTainted: false }], agentTainted: false };
+    const createPrUrl = "https://github.com/my-org/my-repo/compare/main...feature?expand=1";
+    const children = buildFallbackIssueBlocks(require.resolve("../md/manifest_protection_create_pr_fallback.md"), {
+      main_body: [mainBody],
+      footer: [footer],
+      files: [{ type: "paragraph", children: [{ type: "code", value: ".github/workflows/test.yml", agentTainted: false }], agentTainted: false }],
+      create_pr_url: createPrUrl,
+    });
+
+    expect(children).toContainEqual(mainBody);
+    expect(children).toContainEqual(footer);
+    const { body } = renderReport({ type: "report", title: "Protected files", children });
+    expect(body).toContain(`[Create the pull request](${createPrUrl})`);
+    expect(body).toContain("Original PR description");
+    expect(body).toContain("`.github/workflows/test.yml`");
+    expect(body).toContain("Workflow footer");
   });
 });
 
@@ -657,9 +681,9 @@ describe("buildManifestProtectionCreatePrUrl", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildPushErrorSection
+// buildPushErrorBlocks
 // ---------------------------------------------------------------------------
-describe("buildPushErrorSection", () => {
+describe("buildPushErrorBlocks", () => {
   const SIGNED_COMMITS_RAW =
     "pushSignedCommits: refusing unsigned push for branch 'my-branch': merge commit detected. " +
     "GitHub's createCommitOnBranch GraphQL mutation cannot represent merge commits, symlinks (mode 120000), " +
@@ -668,26 +692,39 @@ describe("buildPushErrorSection", () => {
     "or set signed-commits: false if the repository does not require signed commits.";
   const SIGNED_COMMITS_SANITIZED = SIGNED_COMMITS_RAW.replace(/\s+/g, " ").trim();
 
-  it("returns a generic fallback line for non-signed-commits errors", () => {
-    const raw = "Some other push error occurred";
+  it("returns a generic fallback paragraph using the sanitized message for other errors", () => {
+    const raw = "Some\nother\tpush error occurred";
     const sanitized = "Some other push error occurred";
-    const result = buildPushErrorSection(raw, sanitized);
-    expect(result).toBe(`> **Original error:** ${sanitized}`);
+    const result = buildPushErrorBlocks(raw, sanitized);
+    expect(result).toEqual([
+      {
+        type: "paragraph",
+        agentTainted: false,
+        children: [
+          { type: "strong", children: [{ type: "text", value: "Original error:", agentTainted: false }], agentTainted: false },
+          { type: "text", value: ` ${sanitized}`, agentTainted: true },
+        ],
+      },
+    ]);
   });
 
   it("returns structured markdown for a signed-commits refusal", () => {
-    const result = buildPushErrorSection(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
-    expect(result).toContain("> **Error:** Signed commit push refused");
+    const children = buildPushErrorBlocks(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    expect(children[0]).toMatchObject({ type: "paragraph", children: [{ type: "strong" }, { type: "text", value: " Signed commit push refused — merge commit detected", agentTainted: true }] });
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
+    expect(result).toContain("**Error:** Signed commit push refused");
     expect(result).not.toContain("Original error:");
   });
 
   it("extracts the cause from the error message", () => {
-    const result = buildPushErrorSection(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const children = buildPushErrorBlocks(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("merge commit detected");
   });
 
   it("lists all unsupported commit shapes", () => {
-    const result = buildPushErrorSection(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const children = buildPushErrorBlocks(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("Merge commits");
     expect(result).toContain("Symlinks");
     expect(result).toContain("Submodule entries");
@@ -695,14 +732,17 @@ describe("buildPushErrorSection", () => {
   });
 
   it("includes merge-commit-specific remediation (git rebase) and signed-commits: false", () => {
-    const result = buildPushErrorSection(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const children = buildPushErrorBlocks(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("git rebase");
     expect(result).toContain("signed-commits: false");
   });
 
-  it("produces only blockquote lines (each line starts with '>')", () => {
-    const result = buildPushErrorSection(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
-    const lines = result.split("\n");
+  it("composes into a typed note alert with only blockquote lines", () => {
+    const children = buildPushErrorBlocks(SIGNED_COMMITS_RAW, SIGNED_COMMITS_SANITIZED);
+    const { body } = renderReport({ type: "report", title: "Push error", children: [{ type: "alert", kind: "NOTE", agentTainted: false, children }] });
+    expect(body).toContain("> [!NOTE]");
+    const lines = body.trimEnd().split("\n");
     for (const line of lines) {
       expect(line.startsWith(">")).toBe(true);
     }
@@ -711,14 +751,23 @@ describe("buildPushErrorSection", () => {
   it("falls back to generic error line for PushSignedCommitsPolicyViolation (no cannot-represent boilerplate)", () => {
     const raw = "pushSignedCommits: refusing unsigned push for branch 'my-branch': " + "E003: Signed-commit payload exceeds max-patch-files (10). Synthesized payload touches 15 file(s): a.txt, b.txt.";
     const sanitized = raw.replace(/\s+/g, " ").trim();
-    const result = buildPushErrorSection(raw, sanitized);
-    expect(result).toBe(`> **Original error:** ${sanitized}`);
+    const result = buildPushErrorBlocks(raw, sanitized);
+    expect(result).toMatchObject([
+      {
+        type: "paragraph",
+        children: [
+          { type: "strong", children: [{ value: "Original error:" }] },
+          { value: ` ${sanitized}`, agentTainted: true },
+        ],
+      },
+    ]);
   });
 
   it("uses a generic cause when the cause pattern does not match", () => {
     // Has the boilerplate but lacks the standard 'for branch ...' extraction pattern.
     const malformed = "pushSignedCommits: refusing unsigned push without branch info. " + "GitHub's createCommitOnBranch GraphQL mutation cannot represent merge commits.";
-    const result = buildPushErrorSection(malformed, malformed);
+    const children = buildPushErrorBlocks(malformed, malformed);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("unsupported commit shape");
   });
 
@@ -729,7 +778,8 @@ describe("buildPushErrorSection", () => {
       "submodule entries (mode 160000), or executable bits (mode 100755). " +
       "Rewrite the commits to use only regular files (mode 100644) with no merge commits, " +
       "or set signed-commits: false if the repository does not require signed commits.";
-    const result = buildPushErrorSection(raw, raw);
+    const children = buildPushErrorBlocks(raw, raw);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("merge commit detected");
     expect(result).not.toContain("unsupported commit shape");
   });
@@ -741,7 +791,8 @@ describe("buildPushErrorSection", () => {
       "submodule entries (mode 160000), or executable bits (mode 100755). " +
       "Rewrite the commits to use only regular files (mode 100644) with no merge commits, " +
       "or set signed-commits: false if the repository does not require signed commits.";
-    const result = buildPushErrorSection(raw, raw);
+    const children = buildPushErrorBlocks(raw, raw);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("submodule change detected");
     expect(result).toContain("Remove the submodule entry");
     expect(result).not.toContain("git rebase");
@@ -754,7 +805,8 @@ describe("buildPushErrorSection", () => {
       "submodule entries (mode 160000), or executable bits (mode 100755). " +
       "Rewrite the commits to use only regular files (mode 100644) with no merge commits, " +
       "or set signed-commits: false if the repository does not require signed commits.";
-    const result = buildPushErrorSection(raw, raw);
+    const children = buildPushErrorBlocks(raw, raw);
+    const { body: result } = renderReport({ type: "report", title: "Push error", children });
     expect(result).toContain("symlink file mode requires git push fallback");
     expect(result).toContain("Remove the symlink");
     expect(result).not.toContain("git rebase");
