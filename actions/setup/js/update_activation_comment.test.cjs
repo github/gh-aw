@@ -1,13 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
+import { createRequire } from "module";
 import * as threatDetectionWarning from "./threat_detection_warning.cjs";
 const createTestableFunction = scriptContent => {
   const beforeMainCall = scriptContent.match(/^([\s\S]*?)\s*module\.exports\s*=\s*{[\s\S]*?};?\s*$/);
   if (!beforeMainCall) throw new Error("Could not extract script content before module.exports");
   let scriptBody = beforeMainCall[1];
   // Mock the error_helpers and messages_core modules
-  const mockRequire = (module, threatDetectionWarning) => {
+  const mockRequire = (module, threatDetectionWarning, actualRequire) => {
+    if (["./report_markdown.cjs", "./report_size.cjs", "./messages_run_status.cjs", "./messages_footer.cjs"].includes(module)) return actualRequire(module);
     if (module === "./error_helpers.cjs") {
       return { getErrorMessage: error => (error instanceof Error ? error.message : String(error)) };
     }
@@ -160,11 +162,13 @@ const createTestableFunction = scriptContent => {
     }
     throw new Error(`Module ${module} not mocked in test`);
   };
-  return new Function(
-    `\n    const { github, core, context, process, threatDetectionWarning } = arguments[0];\n    const mockRequire = ${mockRequire.toString()};\n    const require = module => mockRequire(module, threatDetectionWarning);\n    \n    ${scriptBody}\n    \n    return { updateActivationComment, updateActivationCommentWithCommit, updateActivationCommentWithMessage };\n  `
+  const run = new Function(
+    `\n    const { github, core, context, process, threatDetectionWarning } = arguments[0];\n    const actualRequire = arguments[1];\n    const mockRequire = ${mockRequire.toString()};\n    const require = module => mockRequire(module, threatDetectionWarning, actualRequire);\n    \n    ${scriptBody}\n    \n    return { updateActivationComment, updateActivationCommentWithCommit, updateActivationCommentWithMessage };\n  `
   );
+  return options => run(options, createRequire(import.meta.url));
 };
 describe("update_activation_comment.cjs", () => {
+  afterEach(() => vi.unstubAllEnvs());
   let createFunctionFromScript, mockDependencies;
   (beforeEach(() => {
     const scriptPath = path.join(process.cwd(), "update_activation_comment.cjs"),
@@ -235,6 +239,9 @@ describe("update_activation_comment.cjs", () => {
       mockDependencies.process.env.GH_AW_COMMENT_ID = "";
       mockDependencies.process.env.GH_AW_DETECTION_CONCLUSION = "warning";
       mockDependencies.process.env.GH_AW_DETECTION_REASON = reason;
+      vi.stubEnv("GH_AW_DETECTION_CONCLUSION", "warning");
+      vi.stubEnv("GH_AW_DETECTION_REASON", reason);
+      vi.stubEnv("GH_AW_PROMPTS_DIR", path.join(process.cwd(), "../md"));
       mockDependencies.context = {
         ...mockDependencies.context,
         runId: 12345,

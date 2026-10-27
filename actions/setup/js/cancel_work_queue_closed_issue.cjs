@@ -13,6 +13,7 @@ const { workExpired } = require("./work_queue_expiration.cjs");
 const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { readCheckedQueue } = require("./work_queue_checked_transport.cjs");
 const { expectedGitHubHost } = require("./work_queue_host.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const REASON = "related_issue_closed";
 
@@ -133,15 +134,37 @@ async function main(options = {}) {
   const terminal = finalWork?.state === "completed" ? finalWork.completion_id : finalWork?.state === "cancelled" ? finalWork.cancellation_commit_id || committedExpiration : undefined;
   if (!terminal || (result?.publishedNow === true && !ownReceipt)) return { status: "pending" };
   const state = finalWork.state;
-  const marker = `<!-- gh-aw-issue-closure:${closureIdentity(resource, work.work_id)} -->`;
+  const identity = closureIdentity(resource, work.work_id);
+  const marker = `<!-- gh-aw-issue-closure:${identity} -->`;
   if (!(await (options.hasConfirmation || hasConfirmation)(githubClient, context, number, marker))) {
     const outcome =
       state === "cancelled"
         ? ownReceipt
-          ? "Cancellation was recorded in the work queue ledger. New state: **cancelled**. The work is now canceled."
-          : "The work was already cancelled in the work queue ledger; this Issue closure did not change it. New state: **cancelled**."
-        : "The work was already completed in the work queue ledger; this Issue closure did not cancel it. New state: **completed**.";
-    const body = `${outcome}\n\n[View the work queue ledger](https://github.com/${repository}/blob/work-queue/work-queue.jsonl).\n\n${marker}`;
+          ? "Cancellation was recorded in the work queue ledger. New state: "
+          : "The work was already cancelled in the work queue ledger; this Issue closure did not change it. New state: "
+        : "The work was already completed in the work queue ledger; this Issue closure did not cancel it. New state: ";
+    const body = renderSizedReport({
+      type: "report",
+      title: "Work queue closure",
+      children: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "text", value: outcome, agentTainted: false },
+            { type: "strong", children: [{ type: "text", value: state, agentTainted: false }] },
+            { type: "text", value: state === "cancelled" && ownReceipt ? ". The work is now canceled." : ".", agentTainted: false },
+          ],
+        },
+        {
+          type: "paragraph",
+          children: [
+            { type: "link", url: `https://github.com/${repository}/blob/work-queue/work-queue.jsonl`, children: [{ type: "text", value: "View the work queue ledger", agentTainted: false }] },
+            { type: "text", value: ".", agentTainted: false },
+          ],
+        },
+        { type: "xml_marker", name: "gh-aw-issue-closure", value: identity, compact: true, agentTainted: false },
+      ],
+    }).body.trimEnd();
     try {
       await githubClient.rest.issues.createComment({ ...context.repo, issue_number: number, body, request: { retries: 0, timeout: 15000 } });
     } catch (error) {

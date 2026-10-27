@@ -49,6 +49,7 @@ describe("automatic report size redaction", () => {
     const protectedNodes = [
       { type: "xml_marker", name: "custom", value: "MARKER-INTACT" },
       { type: "json_marker", name: "evidence", data: { payload: "METADATA-INTACT" } },
+      { type: "review_marker", workflowCallId: "owner/repo/CALLER-INTACT" },
       { type: "marker", name: "gh-aw-threat-detected" },
       { type: "expiration", expiresAt: "2030-01-01T00:00:00.000Z" },
       { type: "paragraph", children: [{ type: "closing_reference", action: "fixes", target: { number: "42" }, enabled: true }] },

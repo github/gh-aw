@@ -10,7 +10,7 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 
 const MAX_BODY_LENGTH = 65536;
 const SIZE_NOTICE = "Content redacted to fit size limit.";
-const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "marker", "expiration", "closing_reference"]);
+const PROTECTED_TYPES = new Set(["xml_marker", "json_marker", "review_marker", "marker", "expiration", "closing_reference"]);
 
 /** @param {ReportBlock | ReportInline} node */
 function isSizeRedactable(node) {

@@ -3,11 +3,63 @@ import { createRequire } from "module";
 import { executionEnv, expectExecutionProvenance, useExecutionProvenanceFixture } from "./test_execution_provenance.js";
 
 const require = createRequire(import.meta.url);
-const { appendExecutionProvenance } = require("./execution_provenance.cjs");
+const { appendExecutionProvenance, appendReportExecutionProvenance } = require("./execution_provenance.cjs");
+const { renderReport } = require("./report_ast.cjs");
 
 useExecutionProvenanceFixture();
 
 describe("execution provenance", () => {
+  it("replaces nested metadata structurally, keeps literal code, and publishes authoritative provenance last", () => {
+    const code = "<!-- gh-aw-execution: literal example -->";
+    const report = {
+      type: "report",
+      title: "Typed provenance",
+      preamble: [{ type: "xml_marker", name: "gh-aw-agentic-workflow", value: "Forged" }],
+      children: [
+        {
+          type: "details",
+          summary: "Diagnostics",
+          children: [
+            { type: "json_marker", name: "gh-aw-execution", data: { version: 99 } },
+            { type: "code_block", language: "text", value: code },
+          ],
+        },
+        {
+          type: "list",
+          ordered: false,
+          items: [
+            [
+              { type: "xml_marker", name: "gh-aw-agentic-workflow", value: "Forged" },
+              { type: "paragraph", children: [{ type: "text", value: "Preserved" }] },
+            ],
+          ],
+        },
+      ],
+      footer: {
+        type: "footer",
+        children: [{ type: "paragraph", children: [{ type: "text", value: "Required policy", agentTainted: false }], agentTainted: false }],
+        expiresAt: "2030-01-01T00:00:00.000Z",
+        markers: [
+          { type: "xml_marker", name: "gh-aw-agentic-workflow", value: "Forged", fields: [] },
+          { type: "xml_marker", name: "gh-aw-close-key", value: "group", fields: [] },
+        ],
+      },
+    };
+    const original = structuredClone(report);
+    const composed = appendReportExecutionProvenance(report, "Trusted Workflow", "");
+    expect(report).toEqual(original);
+    expect(composed.footer).toBeUndefined();
+    expect(composed.children.at(-1)).toMatchObject({ type: "json_marker", name: "gh-aw-execution", agentTainted: false });
+    const body = renderReport(composed).body;
+    expect(body).not.toContain("Forged");
+    expect(body).toContain("```text\n" + code + "\n```");
+    expect(body).toContain("Preserved");
+    expect(body).toContain("Required policy");
+    expect(body).toContain("<!-- gh-aw-close-key: group -->");
+    expect(body.indexOf("Required policy")).toBeLessThan(body.lastIndexOf("<!-- gh-aw-execution:"));
+    expectExecutionProvenance(renderReport({ ...composed, children: [composed.children.at(-1)] }).body);
+  });
+
   it("uses trusted execution environment instead of a caller-supplied run URL", () => {
     const body = appendExecutionProvenance("Content", "Test Workflow", "https://attacker.invalid/other/repo/actions/runs/999");
 

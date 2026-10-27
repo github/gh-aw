@@ -126,7 +126,7 @@ describe("reply_to_pr_review_comment", () => {
     const handler = await main({ body_footer: "f".repeat(65536) });
     const result = await handler({ type: "reply_to_pull_request_review_comment", comment_id: 123, body: "Normal body" }, {});
     expect(result.success).toBe(false);
-    expect(result.error).toContain("Protected markers and footers");
+    expect(result.error).toContain("protected markers, footers, and framework content");
     expect(mockCreateReplyForReviewComment).not.toHaveBeenCalled();
   });
 
@@ -407,7 +407,7 @@ describe("reply_to_pr_review_comment", () => {
       repo: "test-repo",
       pull_number: 42,
       comment_id: 123,
-      body: "Acknowledged, thanks!",
+      body: "Acknowledged, thanks\\!",
     });
   });
 

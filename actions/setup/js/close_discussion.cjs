@@ -7,7 +7,9 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
-const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { getBodyFooterBlocks } = require("./messages_footer.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -312,14 +314,15 @@ async function main(config = {}) {
           core.info("close_discussion: allow-body is false — closing without a comment");
         }
       } else if (item.body) {
-        let sanitizedBody = sanitizeContent(item.body, { allowedAliases: allowedMentionAliases, maxMentions });
+        const sanitizedBody = sanitizeContent(item.body, { allowedAliases: allowedMentionAliases, maxMentions });
         const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
         const runUrl = buildWorkflowRunUrl(context, context.repo);
-        const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
-        if (bodyFooter) {
-          sanitizedBody += "\n\n" + bodyFooter.trimEnd();
-        }
-        const comment = await addDiscussionComment(githubClient, discussion.id, sanitizedBody);
+        const body = renderSizedReport({
+          type: "report",
+          title: "Discussion closed",
+          children: [...parseReportMarkdown(sanitizedBody, { allowedMentions: allowedMentionAliases, agentTainted: true, minimumHeadingLevel: 2 }), ...getBodyFooterBlocks(config.body_footer, { workflowName, runUrl })],
+        }).body.trimEnd();
+        const comment = await addDiscussionComment(githubClient, discussion.id, body);
         core.info(`Added comment to discussion #${discussionNumber}: ${comment.url}`);
         commentUrl = comment.url;
       }

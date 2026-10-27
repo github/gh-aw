@@ -17,6 +17,8 @@ const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { isBlankOptionalField, normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
 const { normalizeSafeOutputName, normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderReport } = require("./report_ast.cjs");
 
 /**
  * Default max body length for GitHub content
@@ -893,13 +895,12 @@ function validateItem(item, itemType, lineNum, options) {
     // If this safe-output type supports a body field, append structured data
     // as fenced JSON so it survives body sanitization.
     if (Object.prototype.hasOwnProperty.call(typeConfig.fields, "body")) {
-      const fencedData = `\`\`\`json\n${dataJSON}\n\`\`\``;
-      const dataBlock = typeConfig.collapseData === true ? `<details>\n<summary>Structured data</summary>\n\n${fencedData}\n\n</details>` : `${STRUCTURED_DATA_LABEL}\n${fencedData}`;
-      if (typeof normalizedItem.body === "string" && normalizedItem.body.length > 0) {
-        normalizedItem.body = `${normalizedItem.body}\n\n${dataBlock}`;
-      } else {
-        normalizedItem.body = dataBlock;
-      }
+      const children = parseReportMarkdown(normalizedItem.body || "", { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions: options?.allowedAliases || [], agentTainted: true });
+      /** @type {import("./report_ast.cjs").ReportBlock} */
+      const dataBlock = { type: "structured_data", data: JSON.parse(dataJSON), agentTainted: true };
+      if (typeConfig.collapseData === true) children.push({ type: "details", summary: "Structured data", agentTainted: false, children: [dataBlock] });
+      else children.push({ type: "paragraph", agentTainted: false, children: [{ type: "text", value: STRUCTURED_DATA_LABEL, agentTainted: false }] }, dataBlock);
+      normalizedItem.body = renderReport({ type: "report", title: "Safe output", children }).body.trimEnd();
     }
   }
 

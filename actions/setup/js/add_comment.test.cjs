@@ -192,7 +192,7 @@ describe("add_comment", () => {
       const handler = await eval(`(async () => { ${script}; return await main({ body_footer: "f".repeat(65536) }); })()`);
       const result = await handler({ type: "add_comment", body: "Normal body" }, {});
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Protected markers and footers");
+      expect(result.error).toContain("protected markers, footers, and framework content");
       expect(createComment).not.toHaveBeenCalled();
     });
 
@@ -227,7 +227,7 @@ describe("add_comment", () => {
       if (success) {
         expect(createComment).toHaveBeenCalledOnce();
         const postedBody = createComment.mock.calls[0][0].body;
-        expect(postedBody).toContain(body.trim());
+        expect(postedBody).toContain("[https://github.com/owner/repo/issues/42](https://github.com/owner/repo/issues/42) ".repeat(count).trim());
         if (config.footer !== false) {
           expect((postedBody.match(/https?:\/\//g) || []).length).toBeGreaterThan(count);
         }
@@ -2704,7 +2704,7 @@ describe("add_comment", () => {
         expect(request.issue_number).toBe(8535);
         expect(request.body).toContain("Review complete.");
         expect(request.body).not.toContain("<!-- gh-aw-state:");
-        const serializedData = request.body.match(/Structured data:\n```json\n([\s\S]*?)\n```/)?.[1];
+        const serializedData = request.body.match(/Structured data:\n\n```json\n([\s\S]*?)\n```/)?.[1];
         expect(JSON.parse(serializedData || "")).toEqual(data);
       });
     });
@@ -2756,7 +2756,7 @@ describe("add_comment", () => {
           })
         );
         const { body } = capturedRequest;
-        expect(body).toContain("User content with <b>safe HTML</b>");
+        expect(body).toContain("User content with **safe HTML**");
         if (trackerId) {
           expect(body).toContain("\n\n<!-- gh-aw-tracker-id: test-tracker-123 -->");
         } else {

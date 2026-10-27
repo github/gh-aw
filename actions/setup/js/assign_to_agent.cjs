@@ -9,7 +9,7 @@ const { isTemporaryId, normalizeTemporaryId, resolveRepoIssueTarget } = require(
 const { sleep } = require("./error_recovery.cjs");
 const { parseAllowedRepos, validateRepo, resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { resolvePullRequestRepo } = require("./pr_helpers.cjs");
-const { sanitizeContent } = require("./sanitize_content.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
 
@@ -663,7 +663,24 @@ async function main(config = {}) {
           owner: effectiveOwner,
           repo: effectiveRepo,
           issue_number: number,
-          body: sanitizeContent(`⚠️ **Assignment failed**: Failed to assign ${agentName} coding agent to this ${type}.\n\nError: ${errorMessage}`, { maxLength: 65000 }),
+          body: renderSizedReport(
+            {
+              type: "report",
+              title: "Assignment failed",
+              children: [
+                {
+                  type: "paragraph",
+                  children: [
+                    { type: "text", value: "⚠️ ", agentTainted: false },
+                    { type: "strong", children: [{ type: "text", value: "Assignment failed", agentTainted: false }] },
+                    { type: "text", value: `: Failed to assign ${agentName} coding agent to this ${type}.`, agentTainted: false },
+                  ],
+                },
+                { type: "paragraph", children: [{ type: "text", value: `Error: ${errorMessage}`, agentTainted: false }] },
+              ],
+            },
+            65000
+          ).body.trimEnd(),
         });
         core.info(`Posted failure comment on ${type} #${number} in ${effectiveOwner}/${effectiveRepo}`);
       } catch (commentError) {

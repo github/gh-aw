@@ -136,7 +136,7 @@ describe("create_pr_review_comment.cjs", () => {
     expect(comment.body.length).toBeLessThanOrEqual(65536);
     expect(comment.body).toContain("Content redacted to fit size limit.");
     expect(comment.body).toContain(bodyFooter);
-    expect(comment.bodyFooter).toBe("\n\n" + bodyFooter);
+    expect(comment.bodyFooterBlocks).toEqual([{ type: "paragraph", agentTainted: false, children: [{ type: "text", value: bodyFooter, agentTainted: false }] }]);
   });
 
   it("should buffer a multi-line PR review comment", async () => {

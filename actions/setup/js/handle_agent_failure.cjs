@@ -8,16 +8,19 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
-const { getDetectionCautionAlert, getFooterAgentFailureCommentMessage } = require("./messages.cjs");
-const { renderTemplate, renderTemplateFromFile, getPromptPath, renderFilesList } = require("./messages_core.cjs");
-const { buildFailureReport } = require("./failure_report.cjs");
-const { normalizeReportTitle } = require("./report_ast.cjs");
+const { getDetectionCautionBlocks, getFooterAgentFailureCommentBlocks } = require("./messages_footer.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
+const { buildFailureReport, failureNodes: nodes } = require("./failure_report.cjs");
+/** @typedef {import("./report_ast.cjs").ReportBlock} ReportBlock */
+/** @typedef {import("./report_ast.cjs").ReportInline} ReportInline */
+const { normalizeReportTitle, renderReport } = require("./report_ast.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { buildFailureReportFooter } = require("./report_footer.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
-const { createExpirationLine, extractExpirationDate, generateFooterWithExpiration } = require("./ephemerals.cjs");
+const { createExpirationLine, extractExpirationDate } = require("./ephemerals.cjs");
 const { MAX_SUB_ISSUES, getSubIssueCount } = require("./sub_issue_helpers.cjs");
-const { formatMissingData, formatMissingTools } = require("./missing_info_formatter.cjs");
+const { generateMissingInfoReportSections } = require("./missing_messages_helper.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { AWF_INFRA_LINE_RE } = require("./log_parser_shared.cjs");
 const { applyAddMaskRedaction, collectAddMaskedValues, isAddMaskCommandLine } = require("./add_mask_redaction.cjs");
@@ -146,17 +149,17 @@ function extractRunId(runUrl) {
  * Build a GitHub markdown warning alert line.
  * @param {string} title
  * @param {string} message
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildWarningAlertLine(title, message) {
-  return `\n> [!WARNING]\n> **${title}**: ${message}\n`;
+  return nodes.warning(title, message);
 }
 
 /**
  * Render an allowed-files error using progressive disclosure for the file list.
  * @param {string} type
  * @param {string} error
- * @returns {string|null}
+ * @returns {ReportBlock[]|null}
  */
 function renderAllowedFilesError(type, error) {
   const match = error.match(ALLOWED_FILES_ERROR_RE);
@@ -170,25 +173,17 @@ function renderAllowedFilesError(type, error) {
   const fileCount = files.length;
   const fileWord = fileCount === 1 ? "file" : "files";
 
-  return `- \`${type}\`: ${summary}. ${remediation}
-
-<details>
-<summary>Show ${fileCount} blocked ${fileWord}</summary>
-
-${renderFilesList(files)}
-
-</details>
-`;
+  return [nodes.list([[nodes.paragraph([nodes.code(type), nodes.text(`: ${summary}. ${remediation}`)]), nodes.details(`Show ${fileCount} blocked ${fileWord}`, [nodes.list(files.map(file => [nodes.paragraph([nodes.code(file)])]))])]])];
 }
 
 /**
  * Render a prompt template from runtime prompts.
  * @param {string} templateName
- * @param {Record<string, string|number|boolean|undefined>} [context]
- * @returns {string}
+ * @param {import("./report_markdown.cjs").ReportContext} [context]
+ * @returns {ReportBlock[]}
  */
 function renderPromptTemplate(templateName, context = {}) {
-  return renderTemplateFromFile(getPromptPath(templateName), context);
+  return nodes.prompt(templateName, context);
 }
 
 /**
@@ -406,9 +401,9 @@ function readModelEndpointMismatch() {
   }
 }
 
-/** @param {import("./types/unified_session").ModelEndpointMismatchData | undefined} mismatch @returns {string} */
+/** @param {import("./types/unified_session").ModelEndpointMismatchData | undefined} mismatch @returns {ReportBlock[]} */
 function buildModelEndpointMismatchContext(mismatch, detectionJobResult = process.env.GH_AW_DETECTION_JOB_RESULT) {
-  if (!mismatch || !isModelEndpointMismatchData(mismatch)) return "";
+  if (!mismatch || !isModelEndpointMismatchData(mismatch)) return [];
   const text = redactAndBoundDiagnostics(
     [
       `Phase: ${mismatch.phase}`,
@@ -423,11 +418,7 @@ function buildModelEndpointMismatchContext(mismatch, detectionJobResult = proces
       ...(detectionJobResult === "failure" ? ["Threat detection also failed while using this engine configuration; its missing result may be a consequence of the same model/endpoint mismatch."] : []),
     ].join("\n")
   );
-  const fence = safeMarkdownCodeFence([text]);
-  return `\n> [!WARNING]\n> **Model/Endpoint Mismatch**\n>\n> ${fence}text\n${text
-    .split("\n")
-    .map(line => `> ${line}`)
-    .join("\n")}\n> ${fence}\n`;
+  return [{ type: "alert", kind: "WARNING", children: [nodes.paragraph([nodes.strong([nodes.text("Model/Endpoint Mismatch")])]), nodes.codeBlock(text)], agentTainted: false }];
 }
 
 /**
@@ -853,16 +844,36 @@ async function ensureParentIssue(previousParentNumber = null, ownerOverride, rep
   const creationReason = previousParentNumber ? `creating new parent (previous #${previousParentNumber} reached limit)` : "creating first parent";
   core.info(`No suitable parent issue found, ${creationReason}`);
 
-  let parentBodyContent = `This issue tracks all failures from agentic workflows in this repository. Each failed workflow run creates a sub-issue linked here for organization and easy filtering.`;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const parentNodes = [
+    {
+      type: "paragraph",
+      children: [{ type: "text", value: "This issue tracks all failures from agentic workflows in this repository. Each failed workflow run creates a sub-issue linked here for organization and easy filtering.", agentTainted: false }],
+      agentTainted: false,
+    },
+  ];
 
   // Add reference to previous parent if this is a continuation
   if (previousParentNumber) {
-    parentBodyContent += `
-
-> **Note:** This is a continuation parent issue. The previous parent issue #${previousParentNumber} reached the maximum of ${MAX_SUB_ISSUES} sub-issues.`;
+    parentNodes.push({
+      type: "quote",
+      agentTainted: false,
+      children: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "strong", children: [{ type: "text", value: "Note:", agentTainted: false }], agentTainted: false },
+            { type: "text", value: " This is a continuation parent issue. The previous parent issue ", agentTainted: false },
+            { type: "issue_reference", number: String(previousParentNumber), agentTainted: false },
+            { type: "text", value: ` reached the maximum of ${MAX_SUB_ISSUES} sub-issues.`, agentTainted: false },
+          ],
+          agentTainted: false,
+        },
+      ],
+    });
   }
 
-  parentBodyContent += `
+  const parentTemplate = `
 
 ### Purpose
 
@@ -921,22 +932,21 @@ gh aw audit <run-id>
 
 > This issue is automatically managed by GitHub Agentic Workflows. Do not close this issue manually.`;
 
-  // Add expiration marker inside the quoted section using helper
-  const footer = generateFooterWithExpiration({
-    footerText: parentBodyContent,
-    expiresHours,
-  });
-  const parentBody = footer;
+  parentNodes.push(...parseReportMarkdown(parentTemplate, { minimumHeadingLevel: 2, agentTainted: false }));
+  if (expiresHours > 0) parentNodes.push({ type: "expiration", expiresAt: new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString(), agentTainted: false });
 
   try {
-    const newIssue = await createReportIssue(github, {
-      owner,
-      repo,
-      title: parentTitle,
-      body: parentBody,
-      labels: [parentLabel],
-      headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-    });
+    const newIssue = await createReportIssue(
+      github,
+      {
+        owner,
+        repo,
+        title: parentTitle,
+        labels: [parentLabel],
+        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+      },
+      { type: "report", title: parentTitle, children: parentNodes, agentTainted: false }
+    );
 
     core.info(`✓ Created parent issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
     return {
@@ -994,14 +1004,16 @@ async function linkSubIssue(parentNodeId, subIssueNodeId, parentNumber, subIssue
 /**
  * Build create_discussion errors context string from error environment variable
  * @param {string} createDiscussionErrors - Newline-separated error strings
- * @returns {string} Formatted error context for display
+ * @returns {ReportBlock[]}
  */
 function buildCreateDiscussionErrorsContext(createDiscussionErrors) {
   if (!createDiscussionErrors) {
-    return "";
+    return [];
   }
 
-  let context = buildWarningAlertLine("Create Discussion Failed", "Failed to create one or more discussions.") + "\n**Discussion Errors:**\n";
+  const context = [...buildWarningAlertLine("Create Discussion Failed", "Failed to create one or more discussions."), nodes.paragraph([nodes.strong([nodes.text("Discussion Errors:")])])];
+  /** @type {ReportBlock[][]} */
+  const errors = [];
   const errorLines = createDiscussionErrors.split("\n").filter(line => line.trim());
   for (const errorLine of errorLines) {
     const parts = errorLine.split(":");
@@ -1010,22 +1022,28 @@ function buildCreateDiscussionErrorsContext(createDiscussionErrors) {
       const repo = parts[2];
       const title = parts[3];
       const error = parts.slice(4).join(":"); // Rest is the error message
-      context += `- Discussion "${title}" in ${repo}: ${error}\n`;
+      errors.push([nodes.paragraph([nodes.text(`Discussion "${title}" in ${repo}: ${error}`)])]);
     }
   }
-  context += "\n";
+  if (errors.length) context.push(nodes.list(errors));
   return context;
 }
 
 /**
  * Build a fork context hint string when the repository is a fork.
- * @returns {string} Fork hint string, or empty string if not a fork
+ * @returns {ReportBlock[]}
  */
 function buildForkContextHint() {
   if (context.payload?.repository?.fork) {
-    return "\n💡 **This repository is a fork.** If this failure is due to missing API keys or tokens, note that secrets from the parent repository are not inherited. Configure the required secrets directly in your fork's Settings → Secrets and variables → Actions.\n";
+    return [
+      nodes.paragraph([
+        nodes.text("💡 "),
+        nodes.strong([nodes.text("This repository is a fork.")]),
+        nodes.text(" If this failure is due to missing API keys or tokens, note that secrets from the parent repository are not inherited. Configure the required secrets directly in your fork's Settings → Secrets and variables → Actions."),
+      ]),
+    ];
   }
-  return "";
+  return [];
 }
 
 /**
@@ -1035,11 +1053,11 @@ function buildForkContextHint() {
  * @param {string} codePushFailureErrors - Newline-separated list of "type:error" entries
  * @param {{number: number, html_url: string, head_sha?: string, mergeable?: boolean | null, mergeable_state?: string, updated_at?: string} | null} pullRequest - PR info if available
  * @param {string} [runUrl] - URL of the current workflow run, used to provide patch download instructions
- * @returns {string} Formatted context string, or empty string if no failures
+ * @returns {ReportBlock[]}
  */
 function buildCodePushFailureContext(codePushFailureErrors, pullRequest = null, runUrl = "") {
   if (!codePushFailureErrors) {
-    return "";
+    return [];
   }
 
   // Split errors into protected-file protection refusals, patch size errors, patch apply failures, and other push failures
@@ -1065,47 +1083,45 @@ function buildCodePushFailureContext(codePushFailureErrors, pullRequest = null, 
     }
   }
 
-  let context = "";
+  /** @type {ReportBlock[]} */
+  const context = [];
+  const addPR = () => {
+    if (pullRequest) context.push(nodes.paragraph([nodes.strong([nodes.text("Target Pull Request:")]), nodes.text(" "), nodes.link(`#${pullRequest.number}`, pullRequest.html_url)]));
+  };
+  /** @param {{type: string, error: string}[]} errors @param {string} label */
+  const addErrors = (errors, label) => context.push(nodes.paragraph([nodes.strong([nodes.text(label)])]), nodes.list(errors.map(({ type, error }) => [nodes.paragraph([nodes.code(type), nodes.text(`: ${error}`)])])));
 
   // Protected file protection section — shown before generic failures
   if (manifestErrors.length > 0) {
-    context +=
-      "\n**🛡️ Protected Files**: The code push was refused because the patch modifies protected files (package manifests, agent instruction files, or repository security configuration). " +
-      "This protection guards against unintended supply chain changes.\n";
-    if (pullRequest) {
-      context += `\n**Target Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})\n`;
-    }
-    context += "\n**Blocked Operations:**\n";
-    for (const { type, error } of manifestErrors) {
-      context += `- \`${type}\`: ${error}\n`;
-    }
+    context.push(
+      nodes.paragraph([
+        nodes.strong([nodes.text("🛡️ Protected Files")]),
+        nodes.text(
+          ": The code push was refused because the patch modifies protected files (package manifests, agent instruction files, or repository security configuration). This protection guards against unintended supply chain changes."
+        ),
+      ])
+    );
+    addPR();
+    addErrors(manifestErrors, "Blocked Operations:");
     // Build a dynamic YAML snippet listing only the safe output types that were actually blocked
     const typeToYamlKey = {
       create_pull_request: "create-pull-request",
       push_to_pull_request_branch: "push-to-pull-request-branch",
     };
     const blockedTypes = [...new Set(manifestErrors.map(e => e.type))];
-    let yamlSnippet = "```yaml\nsafe-outputs:\n";
+    let yamlSnippet = "safe-outputs:\n";
     for (const type of blockedTypes) {
       const yamlKey = typeToYamlKey[type] || type.replace(/_/g, "-");
       yamlSnippet += `  ${yamlKey}:\n    protected-files: fallback-to-issue\n`;
     }
-    yamlSnippet += "```\n";
-    context += "\n<details>\n<summary>⚙️ Configure <code>protected-files: fallback-to-issue</code></summary>\n\n";
-    context += yamlSnippet;
-    context += "</details>\n";
+    context.push(nodes.details([nodes.text("⚙️ Configure "), nodes.code("protected-files: fallback-to-issue")], [nodes.codeBlock(yamlSnippet.trimEnd(), "yaml")]));
   }
 
   // Patch size exceeded section
   if (patchSizeErrors.length > 0) {
-    context += "\n**📦 Patch Size Exceeded**: The code push was rejected because the generated patch is too large.\n";
-    if (pullRequest) {
-      context += `\n**Target Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})\n`;
-    }
-    context += "\n**Errors:**\n";
-    for (const { type, error } of patchSizeErrors) {
-      context += `- \`${type}\`: ${error}\n`;
-    }
+    context.push(nodes.paragraph([nodes.strong([nodes.text("📦 Patch Size Exceeded")]), nodes.text(": The code push was rejected because the generated patch is too large.")]));
+    addPR();
+    addErrors(patchSizeErrors, "Errors:");
     // Build a dynamic YAML snippet listing only the safe output types that had patch size errors
     const typeToYamlKey = {
       create_pull_request: "create-pull-request",
@@ -1116,21 +1132,22 @@ function buildCodePushFailureContext(codePushFailureErrors, pullRequest = null, 
     const maxAllowedMatch = patchSizeErrors[0]?.error.match(/maximum allowed size \((\d+) KB\)/);
     const maxAllowedKb = maxAllowedMatch ? Number.parseInt(maxAllowedMatch[1], 10) : 4096;
     const suggestedKb = maxAllowedKb * 2;
-    let yamlSnippet = "```yaml\nsafe-outputs:\n";
+    let yamlSnippet = "safe-outputs:\n";
     for (const type of affectedTypes) {
       const yamlKey = typeToYamlKey[type] || type.replace(/_/g, "-");
       yamlSnippet += `  ${yamlKey}:\n    max-patch-size: ${suggestedKb}  # Example: double the default limit (in KB, default: ${maxAllowedKb})\n`;
     }
-    yamlSnippet += "```\n";
-    context += "\nTo allow larger patches, increase `max-patch-size` in your workflow's front matter (value in KB):\n";
-    context += yamlSnippet;
+    context.push(nodes.paragraph([nodes.text("To allow larger patches, increase "), nodes.code("max-patch-size"), nodes.text(" in your workflow's front matter (value in KB):")]), nodes.codeBlock(yamlSnippet.trimEnd(), "yaml"));
 
     // Provide download instructions so the user can inspect what the agent generated
     const runId = extractRunId(runUrl);
 
-    context += "\n<details>\n<summary>📥 Download the oversized patch to inspect or apply manually</summary>\n\n";
+    /** @type {ReportBlock[]} */
+    const download = [];
     if (runId) {
-      context += `\`\`\`sh
+      download.push(
+        nodes.codeBlock(
+          `
 # Download the patch artifact from the workflow run
 gh run download ${runId} -n agent -D /tmp/agent-${runId}
 
@@ -1145,31 +1162,37 @@ git checkout -b aw/manual-apply
 git am --3way /tmp/agent-${runId}/YOUR_PATCH_FILE.patch
 git push origin aw/manual-apply
 gh pr create --head aw/manual-apply
-\`\`\`
-\nThe patch artifact is available at: [View run and download artifacts](${runUrl})\n`;
+`.trim(),
+          "sh"
+        ),
+        nodes.paragraph([nodes.text("The patch artifact is available at: "), nodes.link("View run and download artifacts", runUrl)])
+      );
     } else {
-      context += "Download the patch artifact from the workflow run, then inspect or apply it with `git am --3way <patch-file>`.\n";
+      download.push(nodes.paragraph([nodes.text("Download the patch artifact from the workflow run, then inspect or apply it with "), nodes.code("git am --3way <patch-file>"), nodes.text(".")]));
     }
-    context += "\n</details>\n";
+    context.push(nodes.details("📥 Download the oversized patch to inspect or apply manually", download));
   }
 
   // Patch apply failure section — shown when the patch could not be applied (e.g. merge conflict)
   if (patchApplyErrors.length > 0) {
-    context += "\n**🔀 Patch Apply Failed**: The patch could not be applied to the current state of the repository. " + "This is typically caused by a merge conflict between the agent's changes and recent commits on the target branch.\n";
-    if (pullRequest) {
-      context += `\n**Target Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})\n`;
-    }
-    context += "\n**Failed Operations:**\n";
-    for (const { type, error } of patchApplyErrors) {
-      context += `- \`${type}\`: ${error}\n`;
-    }
+    context.push(
+      nodes.paragraph([
+        nodes.strong([nodes.text("🔀 Patch Apply Failed")]),
+        nodes.text(": The patch could not be applied to the current state of the repository. This is typically caused by a merge conflict between the agent's changes and recent commits on the target branch."),
+      ])
+    );
+    addPR();
+    addErrors(patchApplyErrors, "Failed Operations:");
 
     // Extract run ID from runUrl for use in the download command
     const runId = extractRunId(runUrl);
 
-    context += "\n<details>\n<summary>📋 Apply the patch manually</summary>\n\n";
+    /** @type {ReportBlock[]} */
+    const apply = [];
     if (runId) {
-      context += `\`\`\`sh
+      apply.push(
+        nodes.codeBlock(
+          `
 # Download the patch artifact from the workflow run
 gh run download ${runId} -n agent -D /tmp/agent-${runId}
 
@@ -1189,66 +1212,69 @@ git am --3way /tmp/agent-${runId}/YOUR_PATCH_FILE.patch
 # Push and create a pull request
 git push origin aw/manual-apply
 gh pr create --head aw/manual-apply
-\`\`\`
-\nThe patch artifact is available at: [View run and download artifacts](${runUrl})\n`;
+`.trim(),
+          "sh"
+        ),
+        nodes.paragraph([nodes.text("The patch artifact is available at: "), nodes.link("View run and download artifacts", runUrl)])
+      );
     } else {
-      context += "Download the patch artifact from the workflow run, then apply it with `git am --3way <patch-file>`.\n";
+      apply.push(nodes.paragraph([nodes.text("Download the patch artifact from the workflow run, then apply it with "), nodes.code("git am --3way <patch-file>"), nodes.text(".")]));
     }
-    context += "\n</details>\n";
+    context.push(nodes.details("📋 Apply the patch manually", apply));
   }
 
   // Generic code-push failure section
   if (otherErrors.length > 0) {
-    context += buildWarningAlertLine("Code Push Failed", "A code push safe output failed, and subsequent safe outputs were cancelled.");
+    context.push(...buildWarningAlertLine("Code Push Failed", "A code push safe output failed, and subsequent safe outputs were cancelled."));
     if (pullRequest) {
-      context += `\n**Target Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})`;
+      addPR();
 
       // Add PR state diagnostics
       const workflowSha = process.env.GITHUB_SHA || "";
+      /** @type {ReportBlock[][]} */
       const prDetails = [];
 
       // Check for merge conflicts
       if (pullRequest.mergeable === false) {
-        prDetails.push("❌ **Merge conflicts detected** - the PR has conflicts that need resolution");
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("❌ Merge conflicts detected")]), nodes.text(" - the PR has conflicts that need resolution")])]);
       } else if (pullRequest.mergeable_state === "dirty") {
-        prDetails.push("❌ **PR is in dirty state** - likely has merge conflicts");
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("❌ PR is in dirty state")]), nodes.text(" - likely has merge conflicts")])]);
       } else if (pullRequest.mergeable_state === "blocked") {
-        prDetails.push("**PR is blocked** - required status checks or reviews may be missing");
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("PR is blocked")]), nodes.text(" - required status checks or reviews may be missing")])]);
       } else if (pullRequest.mergeable_state === "behind") {
-        prDetails.push("**PR is behind base branch** - may need to be updated");
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("PR is behind base branch")]), nodes.text(" - may need to be updated")])]);
       }
 
       // Check if branch was updated since workflow started
       if (workflowSha && pullRequest.head_sha && workflowSha !== pullRequest.head_sha) {
-        prDetails.push(`**Branch was updated** - workflow started at \`${workflowSha.substring(0, 7)}\`, PR head is now \`${pullRequest.head_sha.substring(0, 7)}\``);
+        prDetails.push([
+          nodes.paragraph([
+            nodes.strong([nodes.text("Branch was updated")]),
+            nodes.text(" - workflow started at "),
+            nodes.code(workflowSha.substring(0, 7)),
+            nodes.text(", PR head is now "),
+            nodes.code(pullRequest.head_sha.substring(0, 7)),
+          ]),
+        ]);
       }
 
       // Add SHA info for debugging
       if (pullRequest.head_sha) {
-        prDetails.push(`**PR head SHA:** \`${pullRequest.head_sha.substring(0, 7)}\``);
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("PR head SHA:")]), nodes.text(" "), nodes.code(pullRequest.head_sha.substring(0, 7))])]);
       }
       if (workflowSha) {
-        prDetails.push(`**Workflow SHA:** \`${workflowSha.substring(0, 7)}\``);
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("Workflow SHA:")]), nodes.text(" "), nodes.code(workflowSha.substring(0, 7))])]);
       }
       if (pullRequest.mergeable_state && pullRequest.mergeable_state !== "unknown") {
-        prDetails.push(`**Mergeable state:** ${pullRequest.mergeable_state}`);
+        prDetails.push([nodes.paragraph([nodes.strong([nodes.text("Mergeable state:")]), nodes.text(` ${pullRequest.mergeable_state}`)])]);
       }
 
       if (prDetails.length > 0) {
-        context += "\n\n**PR State at Push Time:**\n";
-        for (const detail of prDetails) {
-          context += `- ${detail}\n`;
-        }
+        context.push(nodes.paragraph([nodes.strong([nodes.text("PR State at Push Time:")])]), nodes.list(prDetails));
       }
     }
-    context += "\n**Code Push Errors:**\n";
-    for (const { type, error } of otherErrors) {
-      context += renderAllowedFilesError(type, error) || `- \`${type}\`: ${error}\n`;
-    }
-    context += "\n";
-  } else if (manifestErrors.length > 0 || patchSizeErrors.length > 0 || patchApplyErrors.length > 0) {
-    // Only manifest, patch size, or patch apply errors — ensure trailing newline
-    context += "\n";
+    context.push(nodes.paragraph([nodes.strong([nodes.text("Code Push Errors:")])]));
+    for (const { type, error } of otherErrors) context.push(...(renderAllowedFilesError(type, error) || [nodes.list([[nodes.paragraph([nodes.code(type), nodes.text(`: ${error}`)])]])]));
   }
 
   return context;
@@ -1259,29 +1285,64 @@ gh pr create --head aw/manual-apply
  * @param {boolean} hasPushRepoMemoryFailure - Whether the push_repo_memory job failed
  * @param {string[]} repoMemoryPatchSizeExceededIDs - Memory IDs that exceeded the patch size limit
  * @param {string} runUrl - URL of the current workflow run
- * @returns {string} Formatted context string, or empty string if no failure
+ * @returns {ReportBlock[]}
  */
 function buildPushRepoMemoryFailureContext(hasPushRepoMemoryFailure, repoMemoryPatchSizeExceededIDs, runUrl) {
   if (!hasPushRepoMemoryFailure) {
-    return "";
+    return [];
   }
   if (repoMemoryPatchSizeExceededIDs.length > 0) {
-    let context = "\n**📦 Repo-Memory Patch Size Exceeded**: The repo-memory push failed because the memory data is too large.\n";
-    context += "\n**Affected memories:** " + repoMemoryPatchSizeExceededIDs.map(id => `\`${id}\``).join(", ") + "\n";
-    context += "\nTo allow larger memory snapshots, increase `max-patch-size` in your workflow's `repo-memory` front matter (value in bytes):\n";
-    context += "```yaml\nrepo-memory:\n";
-    for (const memoryID of repoMemoryPatchSizeExceededIDs) {
-      context += `  - id: ${memoryID}\n    max-patch-size: 51200  # Example: 5x the default limit (in bytes, default: 10240, max: 102400)\n`;
+    /** @type {ReportInline[]} */
+    const memories = [];
+    for (const id of repoMemoryPatchSizeExceededIDs) {
+      if (memories.length) memories.push(nodes.text(", "));
+      memories.push(nodes.code(id));
     }
-    context += "```\n\n";
-    return context;
+    return [
+      nodes.paragraph([nodes.strong([nodes.text("📦 Repo-Memory Patch Size Exceeded")]), nodes.text(": The repo-memory push failed because the memory data is too large.")]),
+      nodes.paragraph([nodes.strong([nodes.text("Affected memories:")]), nodes.text(" "), ...memories]),
+      nodes.paragraph([nodes.text("To allow larger memory snapshots, increase "), nodes.code("max-patch-size"), nodes.text(" in your workflow's "), nodes.code("repo-memory"), nodes.text(" front matter (value in bytes):")]),
+      nodes.codeBlock(["repo-memory:", ...repoMemoryPatchSizeExceededIDs.map(id => `  - id: ${id}\n    max-patch-size: 51200  # Example: 5x the default limit (in bytes, default: 10240, max: 102400)`)].join("\n"), "yaml"),
+    ];
   }
-  return (
-    buildWarningAlertLine(
-      "Repo-Memory Push Failed",
-      "The push-repo-memory job failed to write memory back to the repository. This may indicate a permission issue, a configuration error, or a network problem. Check the [workflow run](" + runUrl + ") for details."
-    ) + "\n"
-  );
+  return nodes.warning("Repo-Memory Push Failed", [
+    nodes.text("The push-repo-memory job failed to write memory back to the repository. This may indicate a permission issue, a configuration error, or a network problem. Check the "),
+    nodes.link("workflow run", runUrl),
+    nodes.text(" for details."),
+  ]);
+}
+
+/** @param {{memoryID: string, errorMessage: string}[]} errors @param {{number: number, html_url: string} | null} pullRequest @returns {ReportBlock[]} */
+function buildRepoMemoryValidationContext(errors, pullRequest) {
+  if (!errors.length) return [];
+  return [
+    ...buildWarningAlertLine("Repo-Memory Validation Failed", "Invalid file types detected in repo-memory."),
+    ...buildPullRequestContext(pullRequest),
+    nodes.paragraph([nodes.strong([nodes.text("Validation Errors:")])]),
+    nodes.list(errors.map(({ memoryID, errorMessage }) => [nodes.paragraph([nodes.text(`Memory "${memoryID}": ${errorMessage}`)])])),
+  ];
+}
+
+/** @param {{number: number, html_url: string} | null} pullRequest @returns {ReportBlock[]} */
+function buildPullRequestContext(pullRequest) {
+  return pullRequest ? [nodes.paragraph([nodes.strong([nodes.text("Pull Request:")]), nodes.text(" "), nodes.link(`#${pullRequest.number}`, pullRequest.html_url)])] : [];
+}
+
+/** @param {boolean} enabled @param {{number: number, html_url: string} | null} pullRequest @param {boolean} reportedIncomplete @returns {ReportBlock[]} */
+function buildMissingSafeOutputsContext(enabled, pullRequest, reportedIncomplete) {
+  if (!enabled) return [];
+  return [
+    ...buildWarningAlertLine("No Safe Outputs Generated", "The agent job succeeded but did not produce any safe outputs."),
+    ...buildPullRequestContext(pullRequest),
+    nodes.paragraph([nodes.text("This typically indicates:")]),
+    nodes.list([
+      [nodes.paragraph([nodes.text("The safe output server failed to run")])],
+      [nodes.paragraph([nodes.text("The prompt failed to generate any meaningful result")])],
+      [nodes.paragraph([nodes.text("The agent should have called "), nodes.code("noop"), nodes.text(" to explicitly indicate no action was taken")])],
+      [nodes.paragraph([nodes.text("A "), nodes.code("safeoutputs"), nodes.text(" CLI command was malformed and never invoked the CLI")])],
+    ]),
+    ...(reportedIncomplete ? [] : buildSafeOutputsCliInvocationContext()),
+  ];
 }
 
 /**
@@ -1356,13 +1417,13 @@ function resolveCacheMemoryRestored() {
  * @param {boolean} cacheMemoryEnabled - Whether cache-memory is configured for this workflow
  * @param {boolean} cacheMemoryRestored - Whether cache restore matched an existing cache key in this run
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
- * @returns {string} Formatted missing data context
+ * @returns {ReportBlock[]}
  */
 function buildMissingDataContext(cacheMemoryEnabled, cacheMemoryRestored, items) {
   const missingDataMessages = loadMissingDataMessages(items);
 
   if (missingDataMessages.length === 0) {
-    return "";
+    return [];
   }
 
   core.info(`Found ${missingDataMessages.length} missing_data message(s)`);
@@ -1376,18 +1437,21 @@ function buildMissingDataContext(cacheMemoryEnabled, cacheMemoryRestored, items)
   const shouldShowCacheWarning = cacheMemoryEnabled && cacheMemoryRestored && hasCacheMiss;
   const displayableMissingData = shouldShowCacheWarning ? missingDataMessages.filter(m => m.reason !== "cache_memory_miss") : missingDataMessages;
 
-  let context = "";
+  /** @type {ReportBlock[]} */
+  const context = [];
   if (displayableMissingData.length > 0) {
-    const formattedList = formatMissingData(displayableMissingData);
-    context += buildWarningAlertLine("Missing Data Reported", "The agent reported missing data during execution.") + "\n**Missing Data:**\n";
-    context += formattedList;
-    context += "\n\n";
+    const section = generateMissingInfoReportSections({ missingData: displayableMissingData })[0];
+    context.push(
+      ...buildWarningAlertLine("Missing Data Reported", "The agent reported missing data during execution."),
+      nodes.paragraph([nodes.strong([nodes.text("Missing Data:")])]),
+      ...(section?.type === "details" ? section.children : [])
+    );
   }
 
   if (shouldShowCacheWarning) {
     core.info("Cache-miss detected after a successful cache restore — likely a configuration problem");
     const templatePath = getPromptPath("cache_memory_miss.md");
-    context += "\n" + renderTemplateFromFile(templatePath, {}) + "\n";
+    context.push(...nodes.fragment(fs.readFileSync(templatePath, "utf8")));
   }
 
   return context;
@@ -1584,24 +1648,19 @@ function isPermissionDeniedMissingTool(message) {
 /**
  * Build missing_tool context string for display in failure issues/comments.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
- * @returns {string} Formatted missing tool context
+ * @returns {ReportBlock[]}
  */
 function buildMissingToolContext(items) {
   const missingToolMessages = loadMissingToolMessages(items).filter(message => !isPermissionDeniedMissingTool(message));
 
   if (missingToolMessages.length === 0) {
-    return "";
+    return [];
   }
 
   core.info(`Found ${missingToolMessages.length} missing_tool message(s)`);
 
-  const formattedList = formatMissingTools(missingToolMessages);
-
-  let context = buildWarningAlertLine("Missing Tools Reported", "The agent reported missing tools during execution.") + "\n**Missing Tools:**\n";
-  context += formattedList;
-  context += "\n\n";
-
-  return context;
+  const section = generateMissingInfoReportSections({ missingTools: missingToolMessages })[0];
+  return [...buildWarningAlertLine("Missing Tools Reported", "The agent reported missing tools during execution."), nodes.paragraph([nodes.strong([nodes.text("Missing Tools:")])]), ...(section?.type === "details" ? section.children : [])];
 }
 
 /**
@@ -1609,14 +1668,14 @@ function buildMissingToolContext(items) {
  * Reads denied_commands from any missing_tool message with tool === "tool/permission".
  * @param {Array<any>} [items] - Optional pre-loaded agent output items.
  * @param {string} [workflowId] - Workflow ID for the suggested fix prompt placeholder.
- * @returns {string} Formatted permission denied context, or empty string if not applicable.
+ * @returns {ReportBlock[]}
  */
 function buildPermissionDeniedContext(items, workflowId) {
   const missingToolMessages = loadMissingToolMessages(items);
   const permissionItems = missingToolMessages.filter(isPermissionDeniedMissingTool);
 
   if (permissionItems.length === 0) {
-    return "";
+    return [];
   }
 
   // Aggregate denied commands across all permission items and deduplicate.
@@ -1629,23 +1688,22 @@ function buildPermissionDeniedContext(items, workflowId) {
   }
 
   if (allDenied.size === 0) {
-    return "";
+    return [];
   }
 
   core.info(`Found ${allDenied.size} denied command(s) in permission_denied context`);
 
   const deniedArray = [...allDenied];
-  const deniedCommandsList = deniedArray.map(cmd => `- \`${cmd}\``).join("\n");
-  const deniedCommandsInline = deniedArray.map(cmd => `\`${cmd}\``).join(", ");
+  const deniedCommandsList = [nodes.list(deniedArray.map(cmd => [nodes.paragraph([nodes.code(cmd)])]))];
   const deniedCount = String(deniedArray.length);
 
   const rendered = renderPromptTemplate("permission_denied_context.md", {
     denied_count: deniedCount,
     denied_commands_list: deniedCommandsList,
-    denied_commands_inline: deniedCommandsInline,
+    denied_commands_inline: deniedArray.join(", "),
     workflow_id: workflowId || "the workflow",
   });
-  return "\n" + rendered;
+  return rendered;
 }
 
 /**
@@ -1710,11 +1768,11 @@ function loadToolDenialsExceededEvents() {
  * Build context for max-tool-denials guardrail failures from Copilot SDK events.
  * @param {Array<{denialCount: number, threshold: number, reason: string, recentToolCalls?: Array<string>, timestamp?: string}>} events
  * @param {string} [workflowId]
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildToolDenialsExceededContext(events, workflowId) {
   if (!Array.isArray(events) || events.length === 0) {
-    return "";
+    return [];
   }
   // Select the event with the newest ISO timestamp so the correct lead-up context is
   // shown when guard events arrive from multiple session directories in arbitrary order.
@@ -1730,16 +1788,13 @@ function buildToolDenialsExceededContext(events, workflowId) {
   // Normalize the reason for display: multi-line programs (e.g. Python 3 heredocs) are
   // collapsed to a single-line summary so the issue body renders cleanly.
   const normalizedReason = normalizeDeniedPermissionCommand(reason);
-  const recentToolCallsList =
-    Array.isArray(latestEvent.recentToolCalls) && latestEvent.recentToolCalls.length > 0
-      ? latestEvent.recentToolCalls
-          .map(toolCall => {
-            const backticks = toolCall.match(/`+/g) || [];
-            const delimiter = "`".repeat(backticks.reduce((max, run) => Math.max(max, run.length), 0) + 1);
-            return `- ${delimiter}${toolCall}${delimiter}`;
-          })
-          .join("\n")
-      : "- _No tool calls captured_";
+  const recentToolCallsList = [
+    nodes.list(
+      latestEvent.recentToolCalls?.length
+        ? latestEvent.recentToolCalls.map(call => [/\s{2}|\n/.test(call) ? nodes.codeBlock(call) : nodes.paragraph([nodes.code(call)])])
+        : [[nodes.paragraph([{ type: "emphasis", children: [nodes.text("No tool calls captured")], agentTainted: false }])]]
+    ),
+  ];
 
   const templatePath = getPromptPath("tool_denials_exceeded_context.md");
   let template;
@@ -1748,16 +1803,13 @@ function buildToolDenialsExceededContext(events, workflowId) {
   } catch (err) {
     throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
-  return (
-    "\n" +
-    renderTemplate(template, {
-      denial_count: denialCount,
-      threshold,
-      reason: normalizedReason,
-      recent_tool_calls_list: recentToolCallsList,
-      workflow_id: workflowId || "the workflow",
-    })
-  );
+  return nodes.fragment(template, {
+    denial_count: denialCount,
+    threshold,
+    reason: normalizedReason,
+    recent_tool_calls_list: recentToolCallsList,
+    workflow_id: workflowId || "the workflow",
+  });
 }
 
 /**
@@ -1800,26 +1852,26 @@ function loadReportIncompleteMessages(items) {
  * distinguish an incomplete task from a confirmed task outcome.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
  * @param {{collectorEmptyOutputCause?: string, rootDir?: string}} [options]
- * @returns {string} Formatted report_incomplete context
+ * @returns {ReportBlock[]}
  */
 function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir } = {}) {
   const messages = loadReportIncompleteMessages(items);
 
   if (messages.length === 0) {
-    return "";
+    return [];
   }
 
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
-  let context = buildWarningAlertLine("Task Could Not Be Completed", "The workflow recorded a `report_incomplete` signal: the task was not completed or completion could not be confirmed.");
+  const context = nodes.warning("Task Could Not Be Completed", [nodes.text("The workflow recorded a "), nodes.code("report_incomplete"), nodes.text(" signal: the task was not completed or completion could not be confirmed.")]);
   // Rebuild collector diagnostics from runtime evidence, never from message text.
   if (typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause)) {
     const outcome = buildEmptyOutputOutcome(collectorEmptyOutputCause === "invalid_safe_outputs" ? ["validation_failed"] : [], rootDir);
-    if (outcome.details) context += renderErrorDetails(outcome.details);
+    if (outcome.details) context.push(...renderErrorDetails(outcome.details));
   } else {
-    context += renderErrorDetails(["Completion signal: agent reported incomplete (reason and details excluded)", ...buildCompletionEvidence(rootDir)].join("\n"));
+    context.push(...renderErrorDetails(["Completion signal: agent reported incomplete (reason and details excluded)", ...buildCompletionEvidence(rootDir)].join("\n")));
   }
-  context += "\nA comment or other safe output does not confirm that the requested task was completed. Only inferred runtime status and error codes are reported; agent text is excluded.\n\n";
+  context.push(nodes.paragraph([nodes.text("A comment or other safe output does not confirm that the requested task was completed. Only inferred runtime status and error codes are reported; agent text is excluded.")]));
 
   return context;
 }
@@ -1935,13 +1987,21 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: string, checkoutError?: string, items?: Array<any>}} options
- * @returns {string}
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>}} options
+ * @returns {ReportBlock[]}
  */
 function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", attributionUnavailable = "", stepError = "", engineFailureContext, checkoutError = "", items = [] }) {
   const checkoutContext = checkoutError
-    ? `\n### Runtime Checkout Rejected\n\n${renderSafeInlineCodeSpan(checkoutError)}\n\nThe checkout job failed before creating the selected checkouts. Update the explicit repository list or its \`allowed-repos\` policy; public workflows cannot check out private or internal repositories.\n\n`
-    : "";
+    ? [
+        nodes.heading("Runtime Checkout Rejected"),
+        nodes.paragraph([nodes.code(checkoutError)]),
+        nodes.paragraph([
+          nodes.text("The checkout job failed before creating the selected checkouts. Update the explicit repository list or its "),
+          nodes.code("allowed-repos"),
+          nodes.text(" policy; public workflows cannot check out private or internal repositories."),
+        ]),
+      ]
+    : [];
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
   const isGenericFailure = Boolean(stepError) || failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || failureCategories.includes("agent_startup_failure") || infrastructureMessages.length > 0;
   const hasModelEndpointMismatch = failureCategories.includes("model_endpoint_mismatch");
@@ -1949,38 +2009,38 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
     return checkoutContext;
   }
 
-  let context = checkoutContext + "\n### Failure Diagnostics\n\n";
-  context += "**Agent job:** `agent`  \n";
+  const context = [...checkoutContext, nodes.heading("Failure Diagnostics")];
+  /** @type {ReportInline[]} */
+  const metadata = [nodes.strong([nodes.text("Agent job:")]), nodes.text(" "), nodes.code("agent"), { type: "hard_break" }];
   if (agentConclusion) {
     const validatedConclusion = ALLOWED_AGENT_CONCLUSIONS.has(agentConclusion) ? agentConclusion : "unknown";
-    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(validatedConclusion)}  \n`;
+    metadata.push(nodes.strong([nodes.text("Agent job conclusion:")]), nodes.text(" "), nodes.code(validatedConclusion), { type: "hard_break" });
   } else if (attributionUnavailable) {
     const rawConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
     const conclusion = ALLOWED_AGENT_CONCLUSIONS.has(rawConclusion) ? rawConclusion : "unknown";
-    context += `**Agent job conclusion:** ${renderSafeInlineCodeSpan(conclusion)} (from workflow dependency results)  \n`;
+    metadata.push(nodes.strong([nodes.text("Agent job conclusion:")]), nodes.text(" "), nodes.code(conclusion), nodes.text(" (from workflow dependency results)"), { type: "hard_break" });
   }
   if (failingStep) {
-    context += `**Failing step:** ${renderSafeInlineCodeSpan(failingStep)}\n\n`;
+    metadata.push(nodes.strong([nodes.text("Failing step:")]), nodes.text(" "), nodes.code(failingStep));
   } else if (attributionUnavailable) {
-    context += "**Failing step:** Unavailable\n\n";
-  } else {
-    context += "\n";
+    metadata.push(nodes.strong([nodes.text("Failing step:")]), nodes.text(" Unavailable"));
   }
+  context.push(nodes.paragraph(metadata));
   if (stepError) {
-    context += renderErrorDetails(stepError) + "\n\n";
-  } else if (engineFailureContext.trim()) {
-    context += engineFailureContext.trim() + "\n\n";
+    context.push(...renderErrorDetails(stepError));
+  } else if (engineFailureContext.length) {
+    context.push(...engineFailureContext);
   } else if (hasModelEndpointMismatch) {
-    context += "The model/endpoint mismatch above is the classified cause.\n\n";
+    context.push(nodes.paragraph([nodes.text("The model/endpoint mismatch above is the classified cause.")]));
   } else if (checkoutError) {
-    context += "Runtime checkout validation above is the failure cause.\n\n";
+    context.push(nodes.paragraph([nodes.text("Runtime checkout validation above is the failure cause.")]));
   } else {
-    context += "No additional engine error was captured. Check the reported failure signals and linked run for details.\n\n";
+    context.push(nodes.paragraph([nodes.text("No additional engine error was captured. Check the reported failure signals and linked run for details.")]));
   }
   if (attributionUnavailable) {
-    context += `<details>\n<summary>Why step details are unavailable</summary>\n\n${attributionUnavailable}\n\n</details>\n\n`;
+    context.push(nodes.details("Why step details are unavailable", [nodes.paragraph([nodes.text(attributionUnavailable)])]));
   }
-  context += "_Only runtime metadata is shown; agent-generated text is excluded._\n\n";
+  context.push(nodes.paragraph([{ type: "emphasis", children: [nodes.text("Only runtime metadata is shown; agent-generated text is excluded.")], agentTainted: false }]));
 
   return context;
 }
@@ -1989,18 +2049,18 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
  * Build a context string with a frontmatter hint when the agent timed out.
  * @param {boolean} isTimedOut - Whether the agent job timed out
  * @param {string} timeoutMinutes - Current timeout value in minutes (e.g. "20")
- * @returns {string} Formatted timeout context string, or empty string if not timed out
+ * @returns {ReportBlock[]}
  */
 function buildTimeoutContext(isTimedOut, timeoutMinutes) {
   if (!isTimedOut) {
-    return "";
+    return [];
   }
 
   const currentMinutes = parseInt(timeoutMinutes || "20", 10);
   const suggestedMinutes = currentMinutes + 10;
 
   const templatePath = getPromptPath("agent_timeout.md");
-  return "\n" + renderTemplateFromFile(templatePath, { current_minutes: currentMinutes, suggested_minutes: suggestedMinutes });
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), { current_minutes: currentMinutes, suggested_minutes: suggestedMinutes });
 }
 
 /**
@@ -2044,11 +2104,11 @@ function setFailureIssueOutputs(issue) {
 /**
  * Build a context string when the Copilot CLI failed due to the token lacking inference access.
  * @param {boolean} hasInferenceAccessError - Whether an inference access error was detected
- * @returns {string} Formatted context string, or empty string if no error
+ * @returns {ReportBlock[]}
  */
 function buildInferenceAccessErrorContext(hasInferenceAccessError) {
   if (!hasInferenceAccessError) {
-    return "";
+    return [];
   }
 
   const templatePath = getPromptPath("inference_access_error.md");
@@ -2058,20 +2118,20 @@ function buildInferenceAccessErrorContext(hasInferenceAccessError) {
   } catch (err) {
     throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
-  return "\n" + template;
+  return nodes.fragment(template);
 }
 
 /**
  * Build remediation for Copilot failures caused by unavailable organization billing.
  * @param {boolean} hasCopilotOrgBillingError
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildCopilotOrgBillingErrorContext(hasCopilotOrgBillingError) {
   if (!hasCopilotOrgBillingError) {
-    return "";
+    return [];
   }
 
-  return "\n" + renderPromptTemplate("copilot_org_billing_error.md");
+  return renderPromptTemplate("copilot_org_billing_error.md");
 }
 
 /**
@@ -2079,123 +2139,103 @@ function buildCopilotOrgBillingErrorContext(hasCopilotOrgBillingError) {
  * of the agent identifier that was requested, the agents Copilot reported as available, and
  * the filesystem diagnostics recorded at plugin-install time (if any).
  * @param {CopilotAgentNotFoundDetection|null} detection
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildCopilotAgentNotFoundContext(detection) {
   if (!detection) {
-    return "";
+    return [];
   }
 
   const requestedAgent = sanitizeContent(detection.requestedAgent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH);
-  const availableAgents =
-    detection.availableAgents.length > 0
-      ? detection.availableAgents.map(agent => renderSafeInlineCodeSpan(sanitizeContent(agent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH))).join(", ")
-      : "_(none — Copilot CLI discovered no loadable agents)_";
-  const diagnosticsLog = readPluginDiagnosticsLog();
-  const pluginDiagnostics = diagnosticsLog ? renderPluginDiagnosticsDetails(diagnosticsLog) : "";
-
-  return (
-    "\n" +
-    renderPromptTemplate("copilot_agent_not_found.md", {
-      requested_agent: renderSafeInlineCodeSpan(requestedAgent),
-      available_agents: availableAgents,
-      plugin_diagnostics: pluginDiagnostics,
-    })
-  );
-}
-
-/**
- * Render a value as an inline Markdown code span using a delimiter longer than any backtick run
- * present in the value.
- * @param {string} value
- * @returns {string}
- */
-function renderSafeInlineCodeSpan(value) {
-  const text = value.replace(/\s+/g, " ").trim();
-  let longestBacktickRun = 0;
-  for (const run of text.match(/`+/g) || []) {
-    longestBacktickRun = Math.max(longestBacktickRun, run.length);
+  /** @type {ReportInline[]} */
+  const availableAgents = [];
+  for (const agent of detection.availableAgents) {
+    if (availableAgents.length) availableAgents.push(nodes.text(", "));
+    availableAgents.push(nodes.code(sanitizeContent(agent, COPILOT_AGENT_NOT_FOUND_AGENT_MAX_LENGTH)));
   }
-  const fence = "`".repeat(longestBacktickRun + 1);
-  const padding = text.startsWith("`") || text.endsWith("`") ? " " : "";
-  return `${fence}${padding}${text}${padding}${fence}`;
+  if (!availableAgents.length) availableAgents.push({ type: "emphasis", children: [nodes.text("(none — Copilot CLI discovered no loadable agents)")], agentTainted: false });
+  const diagnosticsLog = readPluginDiagnosticsLog();
+  const pluginDiagnostics = diagnosticsLog ? renderPluginDiagnosticsDetails(diagnosticsLog) : [];
+  return renderPromptTemplate("copilot_agent_not_found.md", {
+    requested_agent: requestedAgent,
+    available_agents: { type: "inline_slot", children: availableAgents },
+    plugin_diagnostics: pluginDiagnostics,
+  });
 }
 
 /**
  * Render sanitized plugin diagnostics inside a code fence that cannot be closed by the log.
  * @param {string} diagnosticsLog
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function renderPluginDiagnosticsDetails(diagnosticsLog) {
   const sanitizedDiagnostics = sanitizeContent(diagnosticsLog, { maxLength: PLUGIN_DIAGNOSTICS_MAX_LENGTH });
-  const fence = safeMarkdownCodeFence([sanitizedDiagnostics]);
-  return `\n\n<details>\n<summary>Plugin installation diagnostics</summary>\n\n${fence}\n${sanitizedDiagnostics}\n${fence}\n\n</details>\n`;
+  return [nodes.details("Plugin installation diagnostics", [nodes.codeBlock(sanitizedDiagnostics, "")])];
 }
 
 /**
  * Render error diagnostics as literal text with progressive disclosure.
  * @param {string} diagnostics
  * @param {string[]} [maskedValues]
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function renderErrorDetails(diagnostics, maskedValues = []) {
   const sanitized = redactAndBoundDiagnostics(diagnostics, { maskedValues });
-  const fence = safeMarkdownCodeFence([sanitized]);
-  return `\n\n<details>\n<summary>Error details:</summary>\n\n${fence}text\n${sanitized}\n${fence}\n\n</details>\n\n`;
+  return [nodes.details("Error details:", [nodes.codeBlock(sanitized)])];
 }
 
 /**
  * Build a context string when MCP servers were blocked by enterprise/organization policy.
  * This is a persistent configuration error — retrying will not help.
  * @param {boolean} hasMCPPolicyError - Whether an MCP policy error was detected
- * @returns {string} Formatted context string, or empty string if no error
+ * @returns {ReportBlock[]}
  */
 function buildMCPPolicyErrorContext(hasMCPPolicyError) {
   if (!hasMCPPolicyError) {
-    return "";
+    return [];
   }
 
-  return "\n" + renderPromptTemplate("mcp_policy_error.md");
+  return renderPromptTemplate("mcp_policy_error.md");
 }
 
 /**
  * Build a context string when the requested model is not supported for the subscription tier.
  * This is a persistent configuration error — retrying will not help.
  * @param {boolean} hasModelNotSupportedError - Whether a model-not-supported error was detected
- * @returns {string} Formatted context string, or empty string if no error
+ * @returns {ReportBlock[]}
  */
 function buildModelNotSupportedErrorContext(hasModelNotSupportedError) {
   if (!hasModelNotSupportedError) {
-    return "";
+    return [];
   }
 
-  return "\n" + renderPromptTemplate("model_not_supported_error.md");
+  return renderPromptTemplate("model_not_supported_error.md");
 }
 
 /**
  * Build a context string when the agentic engine returned a generic HTTP 400 Bad Request response.
  * @param {boolean} hasHTTP400ResponseError - Whether a generic HTTP 400 response error was detected
- * @returns {string} Formatted context string, or empty string if no error
+ * @returns {ReportBlock[]}
  */
 function buildHTTP400ResponseErrorContext(hasHTTP400ResponseError) {
   if (!hasHTTP400ResponseError) {
-    return "";
+    return [];
   }
 
-  return "\n" + renderPromptTemplate("http_400_response_error.md");
+  return renderPromptTemplate("http_400_response_error.md");
 }
 
 /**
  * Builds the unknown_model_ai_credits failure context block for templates.
  * @param {boolean} hasUnknownModelAICreditsError
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildUnknownModelAICreditsContext(hasUnknownModelAICreditsError) {
   if (!hasUnknownModelAICreditsError) {
-    return "";
+    return [];
   }
 
-  return "\n" + renderPromptTemplate("unknown_model_ai_credits.md");
+  return renderPromptTemplate("unknown_model_ai_credits.md");
 }
 
 /**
@@ -2308,14 +2348,14 @@ function quoteYAMLKey(value) {
 }
 
 /**
- * Build a frontmatter YAML pricing snippet for the missing model.
+ * Build a literal frontmatter YAML pricing block for the missing model.
  * Returns null when pricing data is unavailable.
  * @param {string} modelName
  * @param {string} engineId
  * @param {{input: number, output: number, cacheRead?: number, cacheWrite?: number}|null} pricing Per-million-token values from models.dev
- * @returns {string|null}
+ * @returns {ReportBlock|null}
  */
-function buildModelPricingFrontmatterSnippet(modelName, engineId, pricing, isPlaceholderPricing = false) {
+function buildModelPricingFrontmatterBlock(modelName, engineId, pricing, isPlaceholderPricing = false) {
   if (!modelName || !pricing) return null;
   const provider = inferProviderKeyFromEngineId(engineId);
   const inputStr = formatPerTokenPrice(pricing.input);
@@ -2333,25 +2373,28 @@ function buildModelPricingFrontmatterSnippet(modelName, engineId, pricing, isPla
   if (pricing.cacheWrite !== undefined) {
     costBlock += `            cache_write: "${formatPerTokenPrice(pricing.cacheWrite)}" # $${pricing.cacheWrite.toFixed(2)} per million cache-write tokens\n`;
   }
-  return `\`\`\`yaml
-models:
+  return nodes.codeBlock(
+    `models:
   providers:
     ${provider}:
       models:
         ${quotedModelName}:
           cost:
-${costBlock.trimEnd()}
-\`\`\``;
+${costBlock.trimEnd()}`,
+    "yaml"
+  );
 }
 
 /**
- * Build a frontmatter YAML pricing skeleton for manual completion when live pricing is unavailable.
+ * Compatibility renderer; failure publishers retain the pricing block until publication.
  * @param {string} modelName
  * @param {string} engineId
+ * @param {{input: number, output: number, cacheRead?: number, cacheWrite?: number}|null} pricing
  * @returns {string|null}
  */
-function buildManualModelPricingFrontmatterSnippet(modelName, engineId) {
-  return buildModelPricingFrontmatterSnippet(modelName, engineId, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, true);
+function buildModelPricingFrontmatterSnippet(modelName, engineId, pricing, isPlaceholderPricing = false) {
+  const block = buildModelPricingFrontmatterBlock(modelName, engineId, pricing, isPlaceholderPricing);
+  return block ? renderReport({ type: "report", title: "Model pricing", children: [block], agentTainted: false }).body.trimEnd() : null;
 }
 
 /**
@@ -2360,20 +2403,20 @@ function buildManualModelPricingFrontmatterSnippet(modelName, engineId) {
  * @param {boolean} hasMissingModelPricingError
  * @param {string} modelName
  * @param {string} engineId
- * @returns {Promise<string>}
+ * @returns {Promise<ReportBlock[]>}
  */
 async function buildMissingModelPricingContext(hasMissingModelPricingError, modelName, engineId) {
   if (!hasMissingModelPricingError) {
-    return "";
+    return [];
   }
 
   const resolvedModelName = modelName || "unknown";
-  let pricingSnippet = buildManualModelPricingFrontmatterSnippet(resolvedModelName, engineId) || "";
+  let pricingSnippet = buildModelPricingFrontmatterBlock(resolvedModelName, engineId, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, true);
   if (modelName) {
     try {
       const pricing = await fetchModelPricingFromModelsDev(modelName, inferProviderKeyFromEngineId(engineId));
       if (pricing) {
-        const snippet = buildModelPricingFrontmatterSnippet(resolvedModelName, engineId, pricing);
+        const snippet = buildModelPricingFrontmatterBlock(resolvedModelName, engineId, pricing);
         if (snippet) {
           pricingSnippet = snippet;
         }
@@ -2383,15 +2426,12 @@ async function buildMissingModelPricingContext(hasMissingModelPricingError, mode
     }
   }
 
-  return (
-    "\n" +
-    renderPromptTemplate("missing_model_pricing.md", {
-      model_name: resolvedModelName,
-      model_name_yaml_key: quoteYAMLKey(resolvedModelName),
-      pricing_snippet: pricingSnippet,
-      has_pricing_snippet: pricingSnippet ? "true" : "",
-    })
-  );
+  return renderPromptTemplate("missing_model_pricing.md", {
+    model_name: resolvedModelName,
+    model_name_yaml_key: quoteYAMLKey(resolvedModelName),
+    pricing_snippet: pricingSnippet ? [pricingSnippet] : [],
+    has_pricing_snippet: pricingSnippet ? "true" : "",
+  });
 }
 
 /**
@@ -2441,22 +2481,22 @@ function hasEngineRateLimit429InOTELMirror(otelJsonlPathOverride) {
 /**
  * Build dedicated context for engine 429/rate-limit failures.
  * @param {string} engineLabel
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildEngineRateLimit429Context(engineLabel) {
   const normalizedEngineLabel = engineLabel.trim() || "AI";
-  return "\n" + renderPromptTemplate("engine_rate_limit_429.md", { engine_label: normalizedEngineLabel });
+  return renderPromptTemplate("engine_rate_limit_429.md", { engine_label: normalizedEngineLabel });
 }
 
 /**
  * Build dedicated context for max-runs guardrail failures.
  * Renders the max-runs-exceeded prompt template with the active engine label.
  * @param {string} [engineLabel]
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildEngineMaxRunsExceededContext(engineLabel) {
   const normalizedEngineLabel = (typeof engineLabel === "string" ? engineLabel : "").trim() || "AI";
-  return "\n" + renderPromptTemplate("engine_max_runs_exceeded.md", { engine_label: normalizedEngineLabel });
+  return renderPromptTemplate("engine_max_runs_exceeded.md", { engine_label: normalizedEngineLabel });
 }
 
 /**
@@ -2490,24 +2530,24 @@ function hasShellExpansionGuardRejectedSignal(content) {
 /**
  * Build dedicated context for sandbox shell-expansion guard rejections.
  * @param {boolean} hasShellExpansionGuardRejected
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildShellExpansionGuardRejectedContext(hasShellExpansionGuardRejected) {
   if (!hasShellExpansionGuardRejected) {
-    return "";
+    return [];
   }
-  return "\n" + renderPromptTemplate("shell_expansion_guard_rejected.md");
+  return renderPromptTemplate("shell_expansion_guard_rejected.md");
 }
 
 /**
  * Build dedicated context for max consecutive cache misses failures.
  * Renders the max-cache-misses-exceeded prompt template with the active engine label.
  * @param {string} [engineLabel]
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildEngineMaxCacheMissesExceededContext(engineLabel) {
   const normalizedEngineLabel = (typeof engineLabel === "string" ? engineLabel : "").trim() || "AI";
-  return "\n" + renderPromptTemplate("max_cache_misses_exceeded.md", { engine_label: normalizedEngineLabel });
+  return renderPromptTemplate("max_cache_misses_exceeded.md", { engine_label: normalizedEngineLabel });
 }
 
 /**
@@ -2545,11 +2585,11 @@ function readTokenUsageMarkdown() {
  * @param {string} maxAICredits
  * @param {string} runUrl
  * @param {boolean} [isBudgetExceeded] - true when the agent exceeded the configured max-ai-credits budget; false when the 429 was a throughput throttle
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildAICreditsRateLimitErrorContext(hasAICreditsRateLimitError, aiCredits, maxAICredits, runUrl, isBudgetExceeded = false) {
   if (!hasAICreditsRateLimitError) {
-    return "";
+    return [];
   }
 
   const numericAICredits = Number(aiCredits);
@@ -2560,15 +2600,16 @@ function buildAICreditsRateLimitErrorContext(hasAICreditsRateLimitError, aiCredi
   const formattedOverage = Number.isFinite(overage) && overage > 0 ? formatAIC(overage) : "";
 
   // Build inline metrics summary (no table, no run URL)
-  let metricsSummary = "";
+  /** @type {ReportInline[]} */
+  const metricsSummary = [];
   if (formattedAICredits && formattedMaxAICredits) {
-    metricsSummary = ` Used \`${formattedAICredits}\` of \`${formattedMaxAICredits}\` max`;
+    metricsSummary.push(nodes.text(" Used "), nodes.code(formattedAICredits), nodes.text(" of "), nodes.code(formattedMaxAICredits), nodes.text(" max"));
     if (formattedOverage) {
-      metricsSummary += ` (over by \`${formattedOverage}\`)`;
+      metricsSummary.push(nodes.text(" (over by "), nodes.code(formattedOverage), nodes.text(")"));
     }
-    metricsSummary += ".";
+    metricsSummary.push(nodes.text("."));
   } else if (formattedAICredits) {
-    metricsSummary = ` Used \`${formattedAICredits}\`.`;
+    metricsSummary.push(nodes.text(" Used "), nodes.code(formattedAICredits), nodes.text("."));
   }
 
   // Use the budget-exceeded template when the agent exhausted its configured limit;
@@ -2589,13 +2630,10 @@ function buildAICreditsRateLimitErrorContext(hasAICreditsRateLimitError, aiCredi
   }
 
   try {
-    return (
-      "\n" +
-      renderTemplateFromFile(templatePath, {
-        metrics_summary: metricsSummary,
-        suggested_credits: suggestedCredits,
-      })
-    );
+    return nodes.fragment(fs.readFileSync(templatePath, "utf8"), {
+      metrics_summary: { type: "inline_slot", children: metricsSummary },
+      suggested_credits: suggestedCredits,
+    });
   } catch (error) {
     throw new Error(`failed to render template at ${templatePath}: ${getErrorMessage(error)}; verify template syntax and required placeholders: metrics_summary, suggested_credits`, { cause: error });
   }
@@ -2604,25 +2642,25 @@ function buildAICreditsRateLimitErrorContext(hasAICreditsRateLimitError, aiCredi
 /**
  * Build a context string when a GitHub App token minting step failed.
  * @param {boolean} hasAppTokenMintingFailed - Whether any GitHub App token minting step failed
- * @returns {string} Formatted context string, or empty string if no error
+ * @returns {ReportBlock[]}
  */
 function buildAppTokenMintingFailedContext(hasAppTokenMintingFailed) {
   if (!hasAppTokenMintingFailed) {
-    return "";
+    return [];
   }
 
   const templatePath = "/opt/gh-aw/prompts/app_token_minting_failed.md";
-  return "\n" + renderTemplateFromFile(templatePath, {});
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"));
 }
 
 /**
  * Build a context string when the lockdown check step failed in the activation job.
  * @param {boolean} hasLockdownCheckFailed - Whether the lockdown check failed
- * @returns {string} Formatted context string, or empty string if no failure
+ * @returns {ReportBlock[]}
  */
 function buildLockdownCheckFailedContext(hasLockdownCheckFailed) {
   if (!hasLockdownCheckFailed) {
-    return "";
+    return [];
   }
 
   const templatePath = getPromptPath("lockdown_check_failed.md");
@@ -2632,7 +2670,7 @@ function buildLockdownCheckFailedContext(hasLockdownCheckFailed) {
   } catch (err) {
     throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
-  return "\n" + template;
+  return nodes.fragment(template);
 }
 
 /**
@@ -2641,11 +2679,11 @@ function buildLockdownCheckFailedContext(hasLockdownCheckFailed) {
  * with fine-grained Personal Access Tokens.
  * @param {boolean} hasOAuthTokenCheckFailed - Whether an OAuth token was detected
  * @param {string} runUrl - The workflow run URL for reference in the message
- * @returns {string} Formatted context string, or empty string if no failure
+ * @returns {ReportBlock[]}
  */
 function buildOAuthTokenCheckFailedContext(hasOAuthTokenCheckFailed, runUrl) {
   if (!hasOAuthTokenCheckFailed) {
-    return "";
+    return [];
   }
 
   const templatePath = getPromptPath("oauth_token_check_failed.md");
@@ -2655,7 +2693,7 @@ function buildOAuthTokenCheckFailedContext(hasOAuthTokenCheckFailed, runUrl) {
   } catch (err) {
     throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
-  return "\n" + renderTemplate(template, { run_url: runUrl });
+  return nodes.fragment(template, { run_url: runUrl });
 }
 
 /**
@@ -2663,11 +2701,11 @@ function buildOAuthTokenCheckFailedContext(hasOAuthTokenCheckFailed, runUrl) {
  * activation job. This surfaces remediation guidance — including how to disable the check —
  * directly in the failure issue / comment.
  * @param {boolean} hasStaleLockFileFailed - Whether the stale lock file check failed
- * @returns {string} Formatted context string, or empty string if no failure
+ * @returns {ReportBlock[]}
  */
 function buildStaleLockFileFailedContext(hasStaleLockFileFailed) {
   if (!hasStaleLockFileFailed) {
-    return "";
+    return [];
   }
 
   const templatePath = getPromptPath("stale_lock_file_failed.md");
@@ -2677,7 +2715,7 @@ function buildStaleLockFileFailedContext(hasStaleLockFileFailed) {
   } catch (err) {
     throw new Error(`Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
-  return "\n" + template;
+  return nodes.fragment(template);
 }
 
 /**
@@ -2686,11 +2724,11 @@ function buildStaleLockFileFailedContext(hasStaleLockFileFailed) {
  * @param {boolean} hasDailyAICExceeded - Whether the daily workflow quota was exceeded
  * @param {string} totalAIC - Aggregated AIC usage across the last 24 hours
  * @param {string} threshold - Configured daily workflow threshold
- * @returns {string} Formatted context string, or empty string if no failure
+ * @returns {ReportBlock[]}
  */
 function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold, estimatedAIC = "") {
   if (!hasDailyAICExceeded) {
-    return "";
+    return [];
   }
 
   const templatePath = getPromptPath("daily_workflow_aic_exceeded.md");
@@ -2704,16 +2742,13 @@ function buildDailyAICExceededContext(hasDailyAICExceeded, totalAIC, threshold, 
     : estimated > 0
       ? "Estimated credits represent conservative per-run maximums where accounting is unavailable, not confirmed consumption. Subsequent scans retry unresolved accounting and replace estimates if recorded usage becomes available. Otherwise, these estimates stop counting when the affected runs leave the rolling 24-hour window."
       : "The agent will resume automatically once the rolling 24-hour total falls below the threshold. No action is required if the current limit is appropriate for your usage.";
-  return (
-    "\n" +
-    renderTemplateFromFile(templatePath, {
-      total_aic: formattedTotalAIC || "unknown",
-      recorded_aic: hasBreakdown ? formatAICCredits(total - estimated) || "0" : "unknown",
-      estimated_aic: hasBreakdown ? formatAICCredits(estimated) || "0" : "unknown",
-      threshold: formattedThreshold || "unknown",
-      estimate_guidance: estimateGuidance,
-    })
-  );
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), {
+    total_aic: formattedTotalAIC || "unknown",
+    recorded_aic: hasBreakdown ? formatAICCredits(total - estimated) || "0" : "unknown",
+    estimated_aic: hasBreakdown ? formatAICCredits(estimated) || "0" : "unknown",
+    threshold: formattedThreshold || "unknown",
+    estimate_guidance: estimateGuidance,
+  });
 }
 
 /**
@@ -2743,26 +2778,27 @@ function buildDailyAICGuardrailGuidance(status, error) {
  * @param {boolean} [continueOnError] - When true, the guardrail is configured in warning mode:
  *   the agent still ran despite the unverifiable accounting, so the impact wording must not
  *   claim the agent was never started.
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, error, continueOnError) {
   if (!hasDailyAICGuardrailError) {
-    return "";
+    return [];
   }
 
   const impactNote = continueOnError
-    ? "The daily guardrail could not prove complete AI Credits accounting for earlier workflow runs. The guardrail is configured in warning mode (`continue-on-error: true`), so the agent still ran; this report is informational."
-    : "The agent was not started because the daily guardrail could not prove complete AI Credits accounting for earlier workflow runs.";
+    ? [
+        nodes.text("The daily guardrail could not prove complete AI Credits accounting for earlier workflow runs. The guardrail is configured in warning mode ("),
+        nodes.code("continue-on-error: true"),
+        nodes.text("), so the agent still ran; this report is informational."),
+      ]
+    : [nodes.text("The agent was not started because the daily guardrail could not prove complete AI Credits accounting for earlier workflow runs.")];
 
-  return (
-    "\n" +
-    renderTemplateFromFile(getPromptPath("daily_workflow_aic_unknown.md"), {
-      impact_note: impactNote,
-      status: sanitizeContent(status, 100) || "unknown_error",
-      error: sanitizeContent(error, 2000) || "The daily guardrail did not provide an error reason.",
-      guidance: buildDailyAICGuardrailGuidance(status, error),
-    })
-  );
+  return nodes.prompt("daily_workflow_aic_unknown.md", {
+    impact_note: { type: "inline_slot", children: impactNote },
+    status: sanitizeContent(status, 100) || "unknown_error",
+    error: sanitizeContent(error, 2000) || "The daily guardrail did not provide an error reason.",
+    guidance: buildDailyAICGuardrailGuidance(status, error),
+  });
 }
 
 /**
@@ -2781,12 +2817,12 @@ function buildDailyAICGuardrailErrorContext(hasDailyAICGuardrailError, status, e
  * @param {boolean} options.hasToolDenialsExceeded     - max-tool-denials guardrail triggered
  * @param {boolean} options.isTimedOut                 - timeout / max-turns guardrail triggered
  * @param {string}  options.runUrl                     - URL to the failed workflow run
- * @returns {string} Rendered section or empty string when no guardrail was triggered
+ * @returns {ReportBlock[]}
  */
 function buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, isTimedOut, runUrl }) {
   const guardrailTriggered = maxAICreditsExceeded || hasDailyAICExceeded || hasToolDenialsExceeded || isTimedOut;
   if (!guardrailTriggered) {
-    return "";
+    return [];
   }
 
   let guardrailName = "guardrail limit";
@@ -2796,7 +2832,7 @@ function buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAI
   else if (isTimedOut) guardrailName = "max-turns / timeout";
 
   const templatePath = getPromptPath("optimize_token_consumption_context.md");
-  return renderTemplateFromFile(templatePath, { guardrail_name: guardrailName, run_url: runUrl });
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), { guardrail_name: guardrailName, run_url: runUrl });
 }
 
 // Maps engine ID (GH_AW_ENGINE_ID) to credential name for use with GH_AW_ENGINE_API_HOSTS.
@@ -2942,7 +2978,7 @@ function parseFirewallAuthErrors(auditJsonlPath) {
  * a remediation hint for each affected provider in the failure issue/comment.
  *
  * @param {string} [auditJsonlPathOverride] - Path override for testing
- * @returns {string} Formatted context string, or empty string if no auth errors
+ * @returns {ReportBlock[]}
  */
 function buildCredentialAuthErrorContext(auditJsonlPathOverride) {
   const auditJsonlPath = resolveFirewallAuditLogPath(auditJsonlPathOverride);
@@ -2950,30 +2986,31 @@ function buildCredentialAuthErrorContext(auditJsonlPathOverride) {
   const authErrors = parseFirewallAuthErrors(auditJsonlPath);
 
   if (authErrors.length === 0) {
-    return "";
+    return [];
   }
 
   core.info(`Firewall audit log: detected ${authErrors.length} credential auth rejection(s) for: ${authErrors.map(e => e.provider).join(", ")}`);
 
-  const providersList = authErrors.map(e => `- ${e.provider} (${e.credential})`).join("\n");
+  const providersList = [nodes.list(authErrors.map(e => [nodes.paragraph([nodes.text(`${e.provider} (`), ...e.credential.split("`").map((part, index) => (index % 2 ? nodes.code(part) : nodes.text(part))), nodes.text(")")])]))];
 
   const templatePath = getPromptPath("credential_auth_error.md");
-  return "\n" + renderTemplateFromFile(templatePath, { providers: providersList });
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), { providers: providersList });
 }
 
 /**
  * Build a context string when assign_to_agent reported assignment errors.
  * Includes remediation guidance for token and Copilot access setup.
  * @param {string} assignmentErrors
- * @returns {string}
+ * @returns {ReportBlock[]}
  */
 function buildAssignmentErrorsContext(assignmentErrors) {
   if (!assignmentErrors || !assignmentErrors.trim()) {
-    return "";
+    return [];
   }
 
   const errorLines = assignmentErrors.split("\n").filter(line => line.trim());
-  let renderedErrors = "";
+  /** @type {ReportBlock[][]} */
+  const renderedErrors = [];
   for (const errorLine of errorLines) {
     const parts = errorLine.split(":");
     if (parts.length >= 4 && (parts[0] === "issue" || parts[0] === "pr")) {
@@ -2981,31 +3018,32 @@ function buildAssignmentErrorsContext(assignmentErrors) {
       const number = parts[1];
       const agent = parts[2];
       const error = parts.slice(3).join(":");
-      renderedErrors += `- ${type === "issue" ? "Issue" : "PR"} #${number} (agent: ${agent}): ${error}\n`;
+      renderedErrors.push([nodes.paragraph([nodes.text(`${type === "issue" ? "Issue" : "PR"} #${number} (agent: ${agent}): ${error}`)])]);
     } else {
-      renderedErrors += `- ${errorLine}\n`;
+      renderedErrors.push([nodes.paragraph([nodes.text(errorLine)])]);
     }
   }
 
   const templatePath = getPromptPath("copilot_assignment_errors_context.md");
-  return renderTemplateFromFile(templatePath, {
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), {
     warning_line: buildWarningAlertLine("Agent Assignment Failed", "Failed to assign agent to issues or pull requests."),
-    assignment_errors: renderedErrors.trimEnd(),
+    assignment_errors: [nodes.list(renderedErrors)],
   });
 }
 /**
  * Build a context string when assigning the Copilot coding agent to created issues failed.
  * @param {boolean} hasAssignCopilotFailures - Whether any copilot assignments failed
  * @param {string} assignCopilotErrors - Newline-separated list of "issue:number:copilot:error" entries
- * @returns {string} Formatted context string, or empty string if no failures
+ * @returns {ReportBlock[]}
  */
 function buildAssignCopilotFailureContext(hasAssignCopilotFailures, assignCopilotErrors) {
   if (!hasAssignCopilotFailures) {
-    return "";
+    return [];
   }
 
   // Build a list of failed issue assignments
-  let issueList = "";
+  /** @type {ReportBlock[][]} */
+  const issueList = [];
   if (assignCopilotErrors) {
     const errorLines = assignCopilotErrors.split("\n").filter(line => line.trim());
     for (const errorLine of errorLines) {
@@ -3013,27 +3051,28 @@ function buildAssignCopilotFailureContext(hasAssignCopilotFailures, assignCopilo
       if (parts.length >= 4) {
         const number = parts[1];
         const error = parts.slice(3).join(":"); // Rest is the error message
-        issueList += `- Issue #${number}: ${error}\n`;
+        issueList.push([nodes.paragraph([nodes.text(`Issue #${number}: ${error}`)])]);
       }
     }
   }
 
   const templatePath = getPromptPath("assign_copilot_to_created_issues_failure.md");
-  return "\n" + renderTemplateFromFile(templatePath, { issues: issueList });
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), { issues: issueList.length ? [nodes.list(issueList)] : [] });
 }
 
 /**
  * Build a context string when frontmatter skill installation failed.
  * @param {boolean} hasSkillInstallFailures - Whether any skill installs failed
  * @param {string} skillInstallErrors - Newline-separated list of "skill<TAB>error" entries
- * @returns {string} Formatted context string, or empty string if no failures
+ * @returns {ReportBlock[]}
  */
 function buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallErrors) {
   if (!hasSkillInstallFailures) {
-    return "";
+    return [];
   }
 
-  let skillList = "";
+  /** @type {ReportBlock[][]} */
+  const skillList = [];
   if (skillInstallErrors) {
     const errorLines = skillInstallErrors.split("\n").filter(line => line.trim());
     for (const errorLine of errorLines) {
@@ -3042,22 +3081,22 @@ function buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallEr
       if (tabIdx >= 0) {
         const skill = errorLine.slice(0, tabIdx);
         const error = errorLine.slice(tabIdx + 1);
-        skillList += `- \`${skill}\`: ${error}\n`;
+        skillList.push([nodes.paragraph([nodes.code(skill), nodes.text(`: ${error}`)])]);
         continue;
       }
       const colonIdx = errorLine.indexOf(":");
       if (colonIdx >= 0) {
         const skill = errorLine.slice(0, colonIdx);
         const error = errorLine.slice(colonIdx + 1);
-        skillList += `- \`${skill}\`: ${error}\n`;
+        skillList.push([nodes.paragraph([nodes.code(skill), nodes.text(`: ${error}`)])]);
       } else {
-        skillList += `- ${errorLine}\n`;
+        skillList.push([nodes.paragraph([nodes.text(errorLine)])]);
       }
     }
   }
 
   const templatePath = getPromptPath("skill_install_failure.md");
-  return "\n" + renderTemplateFromFile(templatePath, { skills: skillList });
+  return nodes.fragment(fs.readFileSync(templatePath, "utf8"), { skills: skillList.length ? [nodes.list(skillList)] : [] });
 }
 
 /**
@@ -3065,19 +3104,20 @@ function buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallEr
  * to enable Copilot inference through the org without a personal access token.
  * @param {string} secretVerificationResult - The secret verification result ("failed" or other)
  * @param {string} engineSecretFailureMessage - Engine-specific failure message from GH_AW_ENGINE_SECRET_FAILURE_MESSAGE
- * @returns {string} Formatted context string, or empty string if verification did not fail
+ * @returns {ReportBlock[]}
  */
 function buildSecretVerificationContext(secretVerificationResult, engineSecretFailureMessage) {
   if (secretVerificationResult !== "failed") {
-    return "";
+    return [];
   }
 
-  let context =
-    buildWarningAlertLine("Secret Verification Failed", "The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.") +
-    "\nFor more information on configuring tokens, see: https://github.github.com/gh-aw/reference/engines/\n";
+  const context = [
+    ...buildWarningAlertLine("Secret Verification Failed", "The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings."),
+    nodes.paragraph([nodes.text("For more information on configuring tokens, see: "), nodes.link("https://github.github.com/gh-aw/reference/engines/", "https://github.github.com/gh-aw/reference/engines/")]),
+  ];
 
   if (engineSecretFailureMessage) {
-    context += "\n" + engineSecretFailureMessage + "\n";
+    context.push(...parseReportMarkdown(engineSecretFailureMessage, { minimumHeadingLevel: 4, agentTainted: false }));
   }
 
   return context;
@@ -3231,7 +3271,7 @@ function detectEngineRateLimit429Failure() {
  * The log file is available in the conclusion job after the agent artifact is downloaded.
  * @param {{suppressEngineRateLimit429?: boolean, maxCacheMissesExceeded?: boolean, shellExpansionGuardRejected?: boolean, metadataOnly?: boolean}} [options]
  * When metadataOnly is set, only the validated driver exit code is used, without reading engine logs.
- * @returns {string} Formatted context string, or empty string if no engine failure found
+ * @returns {ReportBlock[]}
  */
 function buildEngineFailureContext(options = {}) {
   const suppressEngineRateLimit429 = options.suppressEngineRateLimit429 === true;
@@ -3244,14 +3284,16 @@ function buildEngineFailureContext(options = {}) {
 
   // Include engine ID in failure messages when available (e.g. "copilot", "claude", "codex")
   const engineId = process.env.GH_AW_ENGINE_ID || "";
-  const engineLabel = engineId ? ` \`${engineId}\`` : " AI";
+  const engineLabel = engineId ? ` ${engineId}` : " AI";
+  /** @param {string} title @param {string} before @param {string} after */
+  const engineWarning = (title, before, after) => nodes.warning(title, [nodes.text(before), ...(engineId ? [nodes.text(" "), nodes.code(engineId)] : [nodes.text(" AI")]), nodes.text(after)]);
   const hasStructuredMaxCacheMissesSignal = maxCacheMissesExceededFromDetection || parseMaxCacheMissesExceededFromEventLog();
 
   try {
     const exitCodeText = fs.existsSync(exitCodePath) ? fs.readFileSync(exitCodePath, "utf8").trim() : "";
-    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : "";
+    const exitDetails = /^[1-9]\d{0,2}$/.test(exitCodeText) && Number(exitCodeText) <= 255 ? renderErrorDetails(`Driver exit code: ${exitCodeText}`) : [];
     if (options.metadataOnly === true) {
-      return exitDetails ? renderPromptTemplate("engine_driver_failure.md", { driver_exit_code: exitCodeText }) : "";
+      return exitDetails.length ? renderPromptTemplate("engine_driver_failure.md", { driver_exit_code: exitCodeText }) : [];
     }
     if (!fs.existsSync(stdioLogPath)) {
       if (shellExpansionGuardRejectedFromDetection) {
@@ -3263,7 +3305,7 @@ function buildEngineFailureContext(options = {}) {
         return buildEngineMaxCacheMissesExceededContext(engineLabel);
       }
       core.info(`agent-stdio.log not found at ${stdioLogPath}`);
-      return exitDetails ? buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails : "";
+      return exitDetails.length ? [...engineWarning("Engine Failure", "The", " engine terminated before producing output."), ...exitDetails] : [];
     }
 
     const logContent = fs.readFileSync(stdioLogPath, "utf8");
@@ -3276,7 +3318,7 @@ function buildEngineFailureContext(options = {}) {
         core.info("agent-stdio.log is empty, but structured max cache misses signal was detected — using dedicated context message");
         return buildEngineMaxCacheMissesExceededContext(engineLabel);
       }
-      return exitDetails ? buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails : "";
+      return exitDetails.length ? [...engineWarning("Engine Failure", "The", " engine terminated before producing output."), ...exitDetails] : [];
     }
 
     const lines = logContent.split("\n");
@@ -3295,7 +3337,7 @@ function buildEngineFailureContext(options = {}) {
     // Use the already-loaded logContent directly to avoid a redundant file read.
     if (/"terminal_reason"[ ]?:[ ]?"completed"/.test(logContent)) {
       core.info("Agent completed successfully (terminal_reason: completed) — suppressing engine failure context");
-      return "";
+      return [];
     }
 
     if (!suppressEngineRateLimit429 && (hasEngineRateLimit429Signal(logContent) || hasEngineRateLimit429InOTELMirror())) {
@@ -3427,7 +3469,7 @@ function buildEngineFailureContext(options = {}) {
         core.info("Detected cyber_policy_violation error — using dedicated context message");
         const templatePath = getPromptPath("cyber_policy_violation.md");
         try {
-          return "\n" + renderTemplateFromFile(templatePath, {});
+          return nodes.fragment(fs.readFileSync(templatePath, "utf8"));
         } catch {
           // Template not available — fall through to generic engine failure message
           core.info(`cyber_policy_violation template not found at ${templatePath}, using generic message`);
@@ -3438,20 +3480,22 @@ function buildEngineFailureContext(options = {}) {
       const { isFirewallFailed, hasDNSFailure, hasDNSEAIAgain } = detectAWFStartupSignals(logContent, errorMessages);
       if (isFirewallFailed) {
         core.info("Detected AWF firewall startup failure — using dedicated context message");
-        let context = buildWarningAlertLine("AWF Firewall Startup Failure", `The AWF firewall failed to start — the${engineLabel} agent was never invoked.`) + "\n";
+        const context = engineWarning("AWF Firewall Startup Failure", "The AWF firewall failed to start — the", " agent was never invoked.");
         if (hasDNSFailure) {
           const dnsDiagnosis = hasDNSEAIAgain
             ? "**Diagnosis:** DNS resolution of `awmg-cli-proxy` returned `EAI_AGAIN` (temporary DNS failure). The DIFC probe exhausted its retry budget before the name resolved.\n\n"
             : "**Diagnosis:** The DIFC proxy (`awmg-cli-proxy`) failed to respond (`diagnosis=unknown`). The probe exhausted its retry budget before the service became reachable.\n\n";
-          context += dnsDiagnosis;
+          context.push(...nodes.fragment(dnsDiagnosis));
         }
-        context += renderErrorDetails([...errorMessages].join("\n"), maskedValues);
-        context += `See [Diagnosing AWF Failures](https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md) for troubleshooting guidance.\n\n`;
+        context.push(
+          ...renderErrorDetails([...errorMessages].join("\n"), maskedValues),
+          nodes.paragraph([nodes.text("See "), nodes.link("Diagnosing AWF Failures", "https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md"), nodes.text(" for troubleshooting guidance.")])
+        );
         return context;
       }
 
-      const diagnostics = [...(exitDetails ? [`Driver exit code: ${exitCodeText}`] : []), ...errorMessages].join("\n");
-      return buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + renderErrorDetails(diagnostics, maskedValues);
+      const diagnostics = [...(exitDetails.length ? [`Driver exit code: ${exitCodeText}`] : []), ...errorMessages].join("\n");
+      return [...engineWarning("Engine Failure", "The", " engine terminated before producing output."), ...renderErrorDetails(diagnostics, maskedValues)];
     }
 
     // AWF infrastructure lines written by the firewall/container wrapper — not produced by
@@ -3489,7 +3533,7 @@ function buildEngineFailureContext(options = {}) {
     // Classify startup failures without publishing arbitrary engine output.
     const nonEmptyLines = lines.map((line, index) => ({ line, index })).filter(entry => entry.line.trim());
     if (nonEmptyLines.length === 0) {
-      return "";
+      return [];
     }
 
     // Exclude AWF infrastructure lines when checking for actual engine output.
@@ -3505,14 +3549,14 @@ function buildEngineFailureContext(options = {}) {
       const { isFirewallFailed: isAWFFirewallStartupFailedInfra, hasDNSFailure: hasDNSFailureInfra, hasDNSEAIAgain: hasDNSEAIAgainInfra } = detectAWFStartupSignals(logContent);
       if (isAWFFirewallStartupFailedInfra) {
         core.info("Detected AWF firewall startup failure in infra-only log — using dedicated context message");
-        let context = buildWarningAlertLine("AWF Firewall Startup Failure", `The AWF firewall failed to start — the${engineLabel} agent was never invoked.`) + "\n";
+        const context = engineWarning("AWF Firewall Startup Failure", "The AWF firewall failed to start — the", " agent was never invoked.");
         if (hasDNSFailureInfra) {
           const dnsDiagnosis = hasDNSEAIAgainInfra
             ? "**Diagnosis:** DNS resolution of `awmg-cli-proxy` returned `EAI_AGAIN` (temporary DNS failure). The DIFC probe exhausted its retry budget before the name resolved.\n\n"
             : "**Diagnosis:** The DIFC proxy (`awmg-cli-proxy`) failed to respond (`diagnosis=unknown`). The probe exhausted its retry budget before the service became reachable.\n\n";
-          context += dnsDiagnosis;
+          context.push(...nodes.fragment(dnsDiagnosis));
         }
-        context += `\nSee [Diagnosing AWF Failures](https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md) for troubleshooting guidance.\n\n`;
+        context.push(nodes.paragraph([nodes.text("See "), nodes.link("Diagnosing AWF Failures", "https://github.com/github/gh-aw-firewall/blob/main/docs/diagnosing-awf-failures.md"), nodes.text(" for troubleshooting guidance.")]));
         return context;
       }
 
@@ -3523,16 +3567,22 @@ function buildEngineFailureContext(options = {}) {
         process.env.GH_AW_ENGINE_ID === "copilot"
           ? "If this failure recurs, check the GitHub Copilot status page and review the firewall audit logs.\n\n"
           : "If this failure recurs, check the provider status page (if available) and review the firewall audit logs.\n\n";
-      let context = buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated before producing output.`) + "\n" + exitDetails;
-      context += "The engine exited immediately without producing any output. This often indicates a transient infrastructure issue (e.g., service unavailable, API rate limiting). " + recurringFailureGuidance;
+      const context = [...engineWarning("Engine Failure", "The", " engine terminated before producing output."), ...exitDetails];
+      context.push(
+        nodes.paragraph([nodes.text("The engine exited immediately without producing any output. This often indicates a transient infrastructure issue (e.g., service unavailable, API rate limiting). " + recurringFailureGuidance.trim())])
+      );
       return context;
     }
 
     core.info("No specific error patterns found; omitting raw agent output from the failure report");
-    return buildWarningAlertLine("Engine Failure", `The${engineLabel} engine terminated unexpectedly.`) + "\n" + exitDetails + "Review the workflow run logs for diagnostics. Raw agent output is omitted because it may contain secrets.\n\n";
+    return [
+      ...engineWarning("Engine Failure", "The", " engine terminated unexpectedly."),
+      ...exitDetails,
+      nodes.paragraph([nodes.text("Review the workflow run logs for diagnostics. Raw agent output is omitted because it may contain secrets.")]),
+    ];
   } catch (error) {
     core.info(`Failed to read agent-stdio.log for engine failure context: ${getErrorMessage(error)}`);
-    return "";
+    return [];
   }
 }
 
@@ -3607,28 +3657,13 @@ function isDroppedPipeSafeOutputsCommand(line) {
 }
 
 /**
- * Choose a Markdown fence that cannot be closed by the command excerpts.
- * @param {string[]} commands - Redacted command excerpts
- * @returns {string}
- */
-function safeMarkdownCodeFence(commands) {
-  let longestBacktickRun = 0;
-  for (const command of commands) {
-    for (const run of command.match(/`+/g) || []) {
-      longestBacktickRun = Math.max(longestBacktickRun, run.length);
-    }
-  }
-  return "`".repeat(Math.max(3, longestBacktickRun + 1));
-}
-
-/**
  * Extract `safeoutputs` CLI commands from the agent transcript so that a run
  * ending with zero safe outputs is self-diagnosing: it distinguishes "the agent
  * never tried to emit anything" from "the agent tried and the shell command
  * silently skipped the CLI".
  *
  * @param {string} [stdioLogPathOverride] - Optional explicit transcript path (testing)
- * @returns {string} Markdown context block, or an empty string when nothing was found
+ * @returns {ReportBlock[]}
  */
 function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
   const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
@@ -3639,7 +3674,7 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
     logContent = fs.readFileSync(stdioLogPath, "utf8");
   } catch {
     core.info(`agent-stdio.log not readable at ${stdioLogPath}; skipping safeoutputs CLI invocation context`);
-    return "";
+    return [];
   }
 
   const maskedValues = collectAddMaskedValues(logContent);
@@ -3667,18 +3702,28 @@ function buildSafeOutputsCliInvocationContext(stdioLogPathOverride) {
 
   if (commands.length === 0) {
     core.info("No safeoutputs CLI commands found in agent-stdio.log");
-    return "";
+    return [];
   }
 
   core.info(`Found ${commands.length} safeoutputs CLI command(s) in agent-stdio.log${hasDroppedPipe ? " (dropped-pipe pattern detected)" : ""}`);
 
-  const fence = safeMarkdownCodeFence(commands);
-  let context = `**\`safeoutputs\` commands found in the agent transcript:**\n\n${fence}bash\n`;
-  context += commands.join("\n");
-  context += `\n${fence}\n\n`;
+  const context = [nodes.paragraph([nodes.strong([nodes.code("safeoutputs"), nodes.text(" commands found in the agent transcript:")])]), nodes.codeBlock(commands.join("\n"), "bash")];
   if (hasDroppedPipe) {
-    context += "A command writes a JSON payload with `printf`/`echo` but has no `|` before `safeoutputs`, so the payload was printed and the CLI never ran (exit code 0, no safe output). ";
-    context += 'Pass the payload inline instead: `safeoutputs <tool> \'{"key":"value"}\'`.\n\n';
+    context.push(
+      nodes.paragraph([
+        nodes.text("A command writes a JSON payload with "),
+        nodes.code("printf"),
+        nodes.text("/"),
+        nodes.code("echo"),
+        nodes.text(" but has no "),
+        nodes.code("|"),
+        nodes.text(" before "),
+        nodes.code("safeoutputs"),
+        nodes.text(" so the payload was printed and the CLI never ran (exit code 0, no safe output). Pass the payload inline instead: "),
+        nodes.code('safeoutputs <tool> \'{"key":"value"}\''),
+        nodes.text("."),
+      ])
+    );
   }
   return context;
 }
@@ -3815,21 +3860,33 @@ async function findOrCreateDailyCapRollupIssue(owner, repo) {
   }
 
   // No existing issue found — create one
-  const body = renderTemplateFromFile(getPromptPath("daily_cap_rollup_issue.md"), {
-    cap: FAILURE_ISSUE_CATEGORY_DAILY_CAP,
-    window_hours: FAILURE_ISSUE_DEDUP_WINDOW_HOURS,
-  });
+  /** @type {import("./report_ast.cjs").Report} */
+  const report = {
+    type: "report",
+    title: DAILY_CAP_ROLLUP_TITLE,
+    agentTainted: false,
+    children: parseReportMarkdown(fs.readFileSync(getPromptPath("daily_cap_rollup_issue.md"), "utf8"), {
+      context: {
+        cap: FAILURE_ISSUE_CATEGORY_DAILY_CAP,
+        window_hours: FAILURE_ISSUE_DEDUP_WINDOW_HOURS,
+      },
+      agentTainted: false,
+    }),
+  };
 
   try {
     await ensureLabelExists(owner, repo, DAILY_CAP_ROLLUP_LABEL);
-    const newIssue = await createReportIssue(github, {
-      owner,
-      repo,
-      title: DAILY_CAP_ROLLUP_TITLE,
-      body,
-      labels: ["agentic-workflows", DAILY_CAP_ROLLUP_LABEL],
-      headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-    });
+    const newIssue = await createReportIssue(
+      github,
+      {
+        owner,
+        repo,
+        title: DAILY_CAP_ROLLUP_TITLE,
+        labels: ["agentic-workflows", DAILY_CAP_ROLLUP_LABEL],
+        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+      },
+      report
+    );
     core.info(`✓ Created daily cap rollup issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
     return { number: newIssue.data.number, html_url: newIssue.data.html_url };
   } catch (err) {
@@ -3871,29 +3928,65 @@ async function detectAndHandleFailureCascade(owner, repo, triggeringIssueNumber)
     await ensureLabelExists(owner, repo, CASCADE_ROLLUP_LABEL);
 
     // Build rollup body
-    const affectedList = recentIssues.map(i => `- [#${i.number}](${i.html_url}) — ${i.title}`).join("\n");
     const windowStart = new Date(Date.now() - CASCADE_WINDOW_MS);
-    const rollupBody = [
-      `## ⚠️ Failure Cascade Detected`,
-      ``,
-      `**${issueNumbers.size} \`[aw] * failed\` issues** were filed within the last **${CASCADE_WINDOW_MINUTES} minutes** (since ${windowStart.toUTCString()}).`,
-      ``,
-      `This volume suggests a common root cause (e.g., lockfile drift, provider outage, infrastructure change) rather than isolated workflow failures.`,
-      ``,
-      `### Affected Workflows`,
-      ``,
-      affectedList || `_(none indexed yet — search indexing may lag)_`,
-      ``,
-      `### What to Do`,
-      ``,
-      `1. Identify the common root cause (check recent infra changes, provider status, lockfile drift).`,
-      `2. Once the root cause is resolved, batch-close the \`${CASCADE_LABEL}\`-labeled issues.`,
-      `3. Close this rollup issue when the cascade is resolved.`,
-      ``,
-      `### Labels`,
-      ``,
-      `Each individual failure issue in the cascade window has been labeled \`${CASCADE_LABEL}\` so you can filter and batch-close them once the root cause is patched.`,
-    ].join("\n");
+    /** @param {string} value @returns {import("./report_ast.cjs").ReportInline} */
+    const text = value => ({ type: "text", value, agentTainted: false });
+    /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+    const paragraph = value => ({ type: "paragraph", children: [text(value)], agentTainted: false });
+    /** @param {string} value @param {number} level @returns {import("./report_ast.cjs").ReportBlock} */
+    const heading = (value, level) => ({ type: "heading", level, children: [text(value)], agentTainted: false });
+    /** @type {import("./report_ast.cjs").ReportBlock[]} */
+    const affected = recentIssues.length
+      ? [
+          {
+            type: "list",
+            ordered: false,
+            items: recentIssues.map(issue => [
+              { type: "paragraph", children: [{ type: "link", url: issue.html_url, children: [text(`#${issue.number}`)], agentTainted: false }, text(" — "), { type: "text", value: issue.title, agentTainted: true }] },
+            ]),
+          },
+        ]
+      : [paragraph("(none indexed yet — search indexing may lag)")];
+    /** @type {import("./report_ast.cjs").Report} */
+    const rollupReport = {
+      type: "report",
+      title: CASCADE_ROLLUP_TITLE,
+      agentTainted: false,
+      children: [
+        heading("⚠️ Failure Cascade Detected", 2),
+        {
+          type: "paragraph",
+          children: [
+            { type: "strong", children: [text(`${issueNumbers.size} `), { type: "code", value: "[aw] * failed", agentTainted: false }, text(" issues")] },
+            text(" were filed within the last "),
+            { type: "strong", children: [text(`${CASCADE_WINDOW_MINUTES} minutes`)] },
+            text(` (since ${windowStart.toUTCString()}).`),
+          ],
+        },
+        paragraph("This volume suggests a common root cause (e.g., lockfile drift, provider outage, infrastructure change) rather than isolated workflow failures."),
+        heading("Affected Workflows", 3),
+        ...affected,
+        heading("What to Do", 3),
+        {
+          type: "list",
+          ordered: true,
+          items: [
+            [paragraph("Identify the common root cause (check recent infra changes, provider status, lockfile drift).")],
+            [{ type: "paragraph", children: [text("Once the root cause is resolved, batch-close the "), { type: "code", value: CASCADE_LABEL, agentTainted: false }, text("-labeled issues.")] }],
+            [paragraph("Close this rollup issue when the cascade is resolved.")],
+          ],
+        },
+        heading("Labels", 3),
+        {
+          type: "paragraph",
+          children: [
+            text("Each individual failure issue in the cascade window has been labeled "),
+            { type: "code", value: CASCADE_LABEL, agentTainted: false },
+            text(" so you can filter and batch-close them once the root cause is patched."),
+          ],
+        },
+      ],
+    };
 
     // Create or update the cascade rollup issue
     const existing = await findExistingCascadeRollupIssue(owner, repo);
@@ -3902,19 +3995,22 @@ async function detectAndHandleFailureCascade(owner, repo, triggeringIssueNumber)
         owner,
         repo,
         issue_number: existing.number,
-        body: rollupBody,
+        body: renderSizedReport(rollupReport).body,
         headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
       });
       core.info(`✓ Updated cascade rollup issue #${existing.number}: ${existing.html_url}`);
     } else {
-      const newRollup = await createReportIssue(github, {
-        owner,
-        repo,
-        title: CASCADE_ROLLUP_TITLE,
-        body: rollupBody,
-        labels: ["agentic-workflows", CASCADE_ROLLUP_LABEL],
-        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-      });
+      const newRollup = await createReportIssue(
+        github,
+        {
+          owner,
+          repo,
+          title: CASCADE_ROLLUP_TITLE,
+          labels: ["agentic-workflows", CASCADE_ROLLUP_LABEL],
+          headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+        },
+        rollupReport
+      );
       core.info(`✓ Created cascade rollup issue #${newRollup.data.number}: ${newRollup.data.html_url}`);
     }
 
@@ -4700,18 +4796,7 @@ async function main() {
         const codePushFailureContext = hasCodePushFailures ? buildCodePushFailureContext(codePushFailureErrors, pullRequest, runUrl) : "";
 
         // Build repo-memory validation errors context
-        let repoMemoryValidationContext = "";
-        if (repoMemoryValidationErrors.length > 0) {
-          repoMemoryValidationContext = buildWarningAlertLine("Repo-Memory Validation Failed", "Invalid file types detected in repo-memory.");
-          if (pullRequest) {
-            repoMemoryValidationContext += `\n\n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})`;
-          }
-          repoMemoryValidationContext += "\n\n**Validation Errors:**\n";
-          for (const { memoryID, errorMessage } of repoMemoryValidationErrors) {
-            repoMemoryValidationContext += `- Memory "${memoryID}": ${errorMessage}\n`;
-          }
-          repoMemoryValidationContext += "\n";
-        }
+        const repoMemoryValidationContext = buildRepoMemoryValidationContext(repoMemoryValidationErrors, pullRequest);
 
         // Build push_repo_memory job failure context
         const pushRepoMemoryFailureContext = buildPushRepoMemoryFailureContext(hasPushRepoMemoryFailure, repoMemoryPatchSizeExceededIDs, runUrl);
@@ -4732,19 +4817,7 @@ async function main() {
         const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
 
         // Build missing safe outputs context
-        let missingSafeOutputsContext = "";
-        if (hasMissingSafeOutputs) {
-          missingSafeOutputsContext = buildWarningAlertLine("No Safe Outputs Generated", "The agent job succeeded but did not produce any safe outputs.");
-          if (pullRequest) {
-            missingSafeOutputsContext += `\n\n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})`;
-          }
-          missingSafeOutputsContext += "\n\nThis typically indicates:\n";
-          missingSafeOutputsContext += "- The safe output server failed to run\n";
-          missingSafeOutputsContext += "- The prompt failed to generate any meaningful result\n";
-          missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n";
-          missingSafeOutputsContext += "- A `safeoutputs` CLI command was malformed and never invoked the CLI\n\n";
-          if (!hasReportedIncomplete) missingSafeOutputsContext += buildSafeOutputsCliInvocationContext();
-        }
+        const missingSafeOutputsContext = buildMissingSafeOutputsContext(hasMissingSafeOutputs, pullRequest, hasReportedIncomplete);
 
         // Build fork context hint
         const forkContext = buildForkContextHint();
@@ -4761,14 +4834,14 @@ async function main() {
           isTimedOut,
           missingModelPricingError,
           shellExpansionGuardRejected,
-          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext)
+          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext.length)
         )
           ? buildEngineFailureContext({
               suppressEngineRateLimit429: maxAICreditsExceeded,
               maxCacheMissesExceeded,
               metadataOnly: needsFailureDiagnostics || hasReportedIncomplete,
             })
-          : "";
+          : [];
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,
           ...failureDiagnostics,
@@ -4782,7 +4855,7 @@ async function main() {
         // Build inference access error context
         const copilotOrgBillingErrorContext = buildCopilotOrgBillingErrorContext(copilotOrgBillingError);
         const copilotAgentNotFoundContext = buildCopilotAgentNotFoundContext(copilotAgentNotFound);
-        const inferenceAccessErrorContext = copilotOrgBillingErrorContext ? "" : buildInferenceAccessErrorContext(inferenceAccessError);
+        const inferenceAccessErrorContext = copilotOrgBillingErrorContext.length ? [] : buildInferenceAccessErrorContext(inferenceAccessError);
 
         // Build MCP policy error context
         const mcpPolicyErrorContext = buildMCPPolicyErrorContext(mcpPolicyError);
@@ -4814,7 +4887,7 @@ async function main() {
         const skillInstallFailureContext = buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallErrors);
 
         // Build credential auth error context (firewall audit.jsonl 401/403 from provider endpoints)
-        const credentialAuthErrorContext = copilotOrgBillingErrorContext || maxAICreditsExceeded ? "" : buildCredentialAuthErrorContext();
+        const credentialAuthErrorContext = copilotOrgBillingErrorContext.length || maxAICreditsExceeded ? [] : buildCredentialAuthErrorContext();
 
         // Create template context
         const templateContext = {
@@ -4867,7 +4940,7 @@ async function main() {
         };
 
         // Render the comment template
-        const commentBody = renderTemplate(commentTemplate, templateContext);
+        const commentReport = buildFailureReport(commentTemplate, "Workflow failure", templateContext);
 
         // Generate footer for the comment using templated message
         const ctx = {
@@ -4879,14 +4952,12 @@ async function main() {
           aiCredits,
         };
         core.info(`Generating failure comment footer with aiCredits context: ${aiCredits || "(none)"}`);
-        const footer = getFooterAgentFailureCommentMessage(ctx);
+        const footer = getFooterAgentFailureCommentBlocks(ctx);
 
         // Prepend detection caution alert (when present) so it appears first in the comment body
-        const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-        const fullCommentBodyRaw = detectionCaution ? `${detectionCaution}\n\n${commentBody}\n\n${footer}` : `${commentBody}\n\n${footer}`;
-
-        // Combine comment body with footer
-        const fullCommentBody = sanitizeContent(fullCommentBodyRaw, { maxLength: 65000 });
+        commentReport.preamble = getDetectionCautionBlocks(workflowName, runUrl);
+        commentReport.children.push(...footer);
+        const fullCommentBody = renderSizedReport(commentReport, 65000).body;
 
         await github.rest.issues.createComment({
           owner,
@@ -4919,16 +4990,25 @@ async function main() {
           try {
             const rollupIssue = await findOrCreateDailyCapRollupIssue(owner, repo);
             if (rollupIssue) {
-              const commentBody = sanitizeContent(
-                renderTemplateFromFile(getPromptPath("daily_cap_rollup_comment.md"), {
-                  workflow_name: workflowName,
-                  run_url: runUrl,
-                  summary,
-                  cap: FAILURE_ISSUE_CATEGORY_DAILY_CAP,
-                  window_hours: FAILURE_ISSUE_DEDUP_WINDOW_HOURS,
-                }),
-                { maxLength: 65000 }
-              );
+              const commentBody = renderSizedReport(
+                {
+                  type: "report",
+                  title: "Daily failure cap",
+                  agentTainted: false,
+                  children: parseReportMarkdown(fs.readFileSync(getPromptPath("daily_cap_rollup_comment.md"), "utf8"), {
+                    context: {
+                      workflow_name: workflowName,
+                      run_url: runUrl,
+                      summary,
+                      cap: FAILURE_ISSUE_CATEGORY_DAILY_CAP,
+                      window_hours: FAILURE_ISSUE_DEDUP_WINDOW_HOURS,
+                    },
+                    minimumHeadingLevel: 2,
+                    agentTainted: false,
+                  }),
+                },
+                65000
+              ).body;
               await github.rest.issues.createComment({
                 owner,
                 repo,
@@ -4957,18 +5037,7 @@ async function main() {
         const codePushFailureContext = hasCodePushFailures ? buildCodePushFailureContext(codePushFailureErrors, pullRequest, runUrl) : "";
 
         // Build repo-memory validation errors context
-        let repoMemoryValidationContext = "";
-        if (repoMemoryValidationErrors.length > 0) {
-          repoMemoryValidationContext = buildWarningAlertLine("Repo-Memory Validation Failed", "Invalid file types detected in repo-memory.");
-          if (pullRequest) {
-            repoMemoryValidationContext += `\n\n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})`;
-          }
-          repoMemoryValidationContext += "\n\n**Validation Errors:**\n";
-          for (const { memoryID, errorMessage } of repoMemoryValidationErrors) {
-            repoMemoryValidationContext += `- Memory "${memoryID}": ${errorMessage}\n`;
-          }
-          repoMemoryValidationContext += "\n";
-        }
+        const repoMemoryValidationContext = buildRepoMemoryValidationContext(repoMemoryValidationErrors, pullRequest);
 
         // Build push_repo_memory job failure context
         const pushRepoMemoryFailureContext = buildPushRepoMemoryFailureContext(hasPushRepoMemoryFailure, repoMemoryPatchSizeExceededIDs, runUrl);
@@ -4990,19 +5059,7 @@ async function main() {
         const permissionDeniedContext = hasToolDenialsExceeded ? "" : buildPermissionDeniedContext(agentOutputResult.items, workflowID);
 
         // Build missing safe outputs context
-        let missingSafeOutputsContext = "";
-        if (hasMissingSafeOutputs) {
-          missingSafeOutputsContext = buildWarningAlertLine("No Safe Outputs Generated", "The agent job succeeded but did not produce any safe outputs.");
-          if (pullRequest) {
-            missingSafeOutputsContext += `\n\n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})`;
-          }
-          missingSafeOutputsContext += "\n\nThis typically indicates:\n";
-          missingSafeOutputsContext += "- The safe output server failed to run\n";
-          missingSafeOutputsContext += "- The prompt failed to generate any meaningful result\n";
-          missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n";
-          missingSafeOutputsContext += "- A `safeoutputs` CLI command was malformed and never invoked the CLI\n\n";
-          if (!hasReportedIncomplete) missingSafeOutputsContext += buildSafeOutputsCliInvocationContext();
-        }
+        const missingSafeOutputsContext = buildMissingSafeOutputsContext(hasMissingSafeOutputs, pullRequest, hasReportedIncomplete);
 
         // Build fork context hint
         const forkContext = buildForkContextHint();
@@ -5019,10 +5076,10 @@ async function main() {
           isTimedOut,
           missingModelPricingError,
           shellExpansionGuardRejected,
-          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext)
+          Boolean(terminalOutputFailureCause || modelEndpointMismatchContext.length)
         )
           ? buildEngineFailureContext({ suppressEngineRateLimit429: maxAICreditsExceeded, metadataOnly: needsFailureDiagnostics || hasReportedIncomplete })
-          : "";
+          : [];
         const failureDiagnosticsContext = buildFailureDiagnosticsContext({
           failureCategories,
           ...failureDiagnostics,
@@ -5037,7 +5094,7 @@ async function main() {
         // Build inference access error context
         const copilotOrgBillingErrorContext = buildCopilotOrgBillingErrorContext(copilotOrgBillingError);
         const copilotAgentNotFoundContext = buildCopilotAgentNotFoundContext(copilotAgentNotFound);
-        const inferenceAccessErrorContext = copilotOrgBillingErrorContext ? "" : buildInferenceAccessErrorContext(inferenceAccessError);
+        const inferenceAccessErrorContext = copilotOrgBillingErrorContext.length ? [] : buildInferenceAccessErrorContext(inferenceAccessError);
 
         // Build MCP policy error context
         const mcpPolicyErrorContext = buildMCPPolicyErrorContext(mcpPolicyError);
@@ -5069,7 +5126,7 @@ async function main() {
         const skillInstallFailureContext = buildSkillInstallFailureContext(hasSkillInstallFailures, skillInstallErrors);
 
         // Build credential auth error context (firewall audit.jsonl 401/403 from provider endpoints)
-        const credentialAuthErrorContext = copilotOrgBillingErrorContext || maxAICreditsExceeded ? "" : buildCredentialAuthErrorContext();
+        const credentialAuthErrorContext = copilotOrgBillingErrorContext.length || maxAICreditsExceeded ? [] : buildCredentialAuthErrorContext();
 
         // Build optimize token consumption context (shown when a guardrail was the failure root cause)
         const optimizeTokenConsumptionContext = buildOptimizeTokenConsumptionContext({ maxAICreditsExceeded, hasDailyAICExceeded, hasToolDenialsExceeded, isTimedOut, runUrl });
@@ -5083,7 +5140,7 @@ async function main() {
           history_url: historyUrl || "",
           workflow_source_url: workflowSourceURL || "#",
           branch: currentBranch,
-          pull_request_info: pullRequest ? `  \n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})` : "",
+          pull_request_info: buildPullRequestContext(pullRequest),
           secret_verification_failed: String(hasSecretVerificationFailed),
           secret_verification_context: buildSecretVerificationContext(secretVerificationResult, engineSecretFailureMessage),
           credential_auth_error_context: credentialAuthErrorContext,
@@ -5150,8 +5207,7 @@ async function main() {
           }),
         });
 
-        const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-        report.preamble = parseReportMarkdown(detectionCaution, { allowFlagMarkers: true, agentTainted: false });
+        report.preamble = getDetectionCautionBlocks(workflowName, runUrl);
         const request = renderIssueParameters({ owner, repo, title: issueTitle, labels: ["agentic-workflows"], headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION } }, report);
         const { title: reportTitle, body: issueBody } = request;
 

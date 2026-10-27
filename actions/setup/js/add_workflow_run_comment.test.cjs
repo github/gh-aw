@@ -998,6 +998,25 @@ describe("add_workflow_run_comment", () => {
   });
 
   describe("buildCommentBody()", () => {
+    it("imports workflow names as text rather than Markdown template syntax", async () => {
+      const { buildCommentBody } = await importAddWorkflowRunComment();
+      const body = buildCommentBody("issues", "https://github.com/testowner/testrepo/actions/runs/99", "name](https://github.com/forged/repo)\n\n### Forged heading");
+      expect(body).not.toContain("\n### Forged heading");
+      expect(body).toContain("\\#\\#\\# Forged heading");
+      expect(body.match(/(?<!\\)\]\(https:/g)).toHaveLength(1);
+    });
+
+    it("closes a template fence before appending lock notices and metadata", async () => {
+      process.env.GH_AW_SAFE_OUTPUT_MESSAGES = JSON.stringify({ runStarted: "```markdown\nStarted" });
+      process.env.GH_AW_LOCK_FOR_AGENT = "true";
+      process.env.GITHUB_WORKFLOW = "test-workflow";
+      const { buildCommentBody } = await importAddWorkflowRunComment();
+      const body = buildCommentBody("issues", "https://github.com/testowner/testrepo/actions/runs/99");
+      expect(body).toMatch(/```markdown\nStarted\n```\n\n🔒/);
+      expect(body.indexOf("<!-- gh-aw-workflow-id: test-workflow -->")).toBeGreaterThan(body.indexOf("🔒"));
+      expect(body).toMatch(/<!-- gh-aw-comment-type: reaction -->$/);
+    });
+
     it("should include the run URL in the comment body", async () => {
       const { buildCommentBody } = await importAddWorkflowRunComment();
       const body = buildCommentBody("issues", "https://github.com/testowner/testrepo/actions/runs/99");
@@ -1007,7 +1026,7 @@ describe("add_workflow_run_comment", () => {
     it("should use workflow emoji from environment in the started status line", async () => {
       process.env.GH_AW_WORKFLOW_EMOJI = "🤖";
       const { buildCommentBody } = await importAddWorkflowRunComment();
-      const body = buildCommentBody("issues", "https://example.com/run/1");
+      const body = buildCommentBody("issues", "https://github.com/testowner/testrepo/actions/runs/99");
       expect(body).toContain("🤖 [");
       expect(body).not.toContain("🚀 [");
     });
@@ -1028,14 +1047,14 @@ describe("add_workflow_run_comment", () => {
     it("should use GITHUB_WORKFLOW as workflow name when GH_AW_WORKFLOW_NAME is not set", async () => {
       process.env.GITHUB_WORKFLOW = "Agentic Commands";
       const { buildCommentBody } = await importAddWorkflowRunComment();
-      const body = buildCommentBody("issue_comment", "https://example.com/run/1");
+      const body = buildCommentBody("issue_comment", "https://github.com/testowner/testrepo/actions/runs/99");
       expect(body).toContain("[Agentic Commands]");
     });
 
     it("should prefer explicit workflow name override over environment defaults", async () => {
       process.env.GH_AW_WORKFLOW_NAME = "Agentic Commands";
       const { buildCommentBody } = await importAddWorkflowRunComment();
-      const body = buildCommentBody("issue_comment", "https://example.com/run/1", "archie");
+      const body = buildCommentBody("issue_comment", "https://github.com/testowner/testrepo/actions/runs/99", "archie");
       expect(body).toContain("[archie]");
       expect(body).not.toContain("[Agentic Commands]");
     });

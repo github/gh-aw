@@ -2,7 +2,10 @@
 /// <reference types="@actions/github-script" />
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
-const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
+const { appendConfiguredReportFooter } = require("./body_footer.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { getRepositoryUrl } = require("./get_repository_url.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -56,15 +59,12 @@ function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber, bodyF
 
   // Inject CAUTION at top of body if threat detection warning was raised.
   // Caller is responsible for sanitizing body before passing it here.
-  const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-  const bodyWithCaution = detectionCaution ? detectionCaution + "\n\n" + body.trim() : body.trim();
-  let finalBody =
-    bodyWithCaution + getTrackerID("markdown") + "\n\n" + generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, undefined, undefined, { skipDetectionCaution: true });
-  const bodyFooter = getBodyFooterMessage(bodyFooterTemplate, { workflowName, runUrl });
-  if (bodyFooter) {
-    finalBody += "\n\n" + bodyFooter.trimEnd();
-  }
-  return finalBody;
+  const { detectionCaution, footer } = assembleReportBodyParts({ includeFooter: true, workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber });
+  const children = [...detectionCaution, ...parseReportMarkdown(body, { minimumHeadingLevel: 2, agentTainted: true })];
+  const trackerID = getTrackerID();
+  if (trackerID) children.push({ type: "xml_marker", name: "gh-aw-tracker-id", value: trackerID, agentTainted: false });
+  children.push(...footer);
+  return renderSizedReport(appendConfiguredReportFooter({ type: "report", title: "Entity closed", children }, bodyFooterTemplate)).body.trimEnd();
 }
 
 /**

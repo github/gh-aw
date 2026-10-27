@@ -15,6 +15,51 @@ beforeEach(() => vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "github.com,example.com,exa
 afterEach(() => vi.unstubAllEnvs());
 
 describe("report AST", () => {
+  it("preserves compact marker identities and substitutes metadata scalars without parsing their contents", () => {
+    const children = parseReportMarkdown("<!-- gh-aw-work-issue:{work_id} -->", { context: { work_id: "work_123" }, allowMetadata: true, agentTainted: false });
+    expect(children).toEqual([{ type: "xml_marker", name: "gh-aw-work-issue", value: "work_123", compact: true, agentTainted: false }]);
+    expect(renderReport(report(children)).body).toBe("<!-- gh-aw-work-issue:work_123 -->\n");
+  });
+
+  it("imports a durable review marker as its own block and retains its encoded identity", () => {
+    const source = 'Review summary\n[gh-aw-workflow-call-id]: # "owner%2Frepo%2FWorkflow%20name"';
+    const children = parseReportMarkdown(source, { allowMetadata: true, agentTainted: false });
+    expect(children[1]).toEqual({ type: "review_marker", workflowCallId: "owner/repo/Workflow name", agentTainted: false });
+    expect(renderReport(report(children)).body).toBe(source.replace("\n[", "\n\n[") + "\n");
+  });
+
+  it.each(["%", "%FF", "%E0%A4"])("keeps malformed review metadata %s literal instead of failing publication", encoded => {
+    const children = parseReportMarkdown(`[gh-aw-workflow-call-id]: # "${encoded}"`, { allowMetadata: true, agentTainted: true });
+    expect(children).toHaveLength(1);
+    expect(children[0].type).toBe("paragraph");
+    expect(renderReport(report(children)).body).not.toContain("[gh-aw-workflow-call-id]:");
+  });
+
+  it("keeps emphasis and subscript structure when templates use underscored scalar names", () => {
+    const children = parseReportMarkdown("<sub><em>{workflow_name}</em></sub>\n\n*{workflow_name}*", { context: { workflow_name: "Worker" }, agentTainted: false });
+    expect(renderReport(report(children)).body).toBe("<sub><em>Worker</em></sub>\n\n*Worker*\n");
+  });
+
+  it("does not turn multiline literal data into lists or separators", () => {
+    const children = parseReportMarkdown("Value: {value}", { context: { value: "first\n- item\n+ another\n1. numbered\n2) alternate\n---" }, agentTainted: true });
+    expect(children).toHaveLength(1);
+    expect(renderReport(report(children)).body).toBe("Value: first - item + another 1. numbered 2) alternate ---\n");
+    expect(renderReport(report([paragraph("Value: first\n- item\n+ another\n1. numbered\n2) alternate\n---")])).body).toBe("Value: first - item + another 1. numbered 2) alternate ---\n");
+  });
+
+  it("roundtrips tagged code blocks with a minimum fence longer than embedded backticks", () => {
+    const value = "text\n````````\n<!-- gh-aw-execution: literal example -->";
+    const body = renderReport(report([{ type: "code_block", language: "gh-aw-comment-memory:notes", fenceLength: 6, value, agentTainted: true }])).body;
+    expect(body).toBe("`````````gh-aw-comment-memory:notes\n" + value + "\n`````````\n");
+    const imported = parseReportMarkdown(body, { allowMetadata: true, agentTainted: true });
+    expect(imported).toEqual([{ type: "code_block", language: "gh-aw-comment-memory:notes", fenceLength: 9, value, agentTainted: true }]);
+    expect(renderReport(report(imported)).body).toBe(body);
+  });
+
+  it.each([2, 3.5, 129])("rejects invalid minimum fence length %s", fenceLength => {
+    expect(() => renderReport(report([{ type: "code_block", language: "text", value: "example", fenceLength }]))).toThrow(TypeError);
+  });
+
   it("requires a non-forgeable redaction pass before a tree can be concretized", () => {
     const input = { ...report([paragraph("Safe agent text")]), agentTainted: false };
     expect(() => assertRedactedReport(input)).toThrow("must pass redaction");

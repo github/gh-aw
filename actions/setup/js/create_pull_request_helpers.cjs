@@ -9,6 +9,8 @@ const { isTransientError, isWorkflowsScopeTimeoutError, withRetry, RATE_LIMIT_RE
 const { tryEnforceArrayLimit } = require("./limit_enforcement_helpers.cjs");
 const { MAX_ASSIGNEES } = require("./constants.cjs");
 const { encodePathSegments, renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderReport } = require("./report_ast.cjs");
 
 /** @type {string} Label always added to fallback issues so the triage system can find them */
 const MANAGED_FALLBACK_ISSUE_LABEL = "agentic-workflows";
@@ -226,8 +228,17 @@ function neutralizeClosingKeywordsForIssueBody(content) {
  * @returns {string} Formatted patch preview
  */
 function generatePatchPreview(patchContent) {
+  const children = buildPatchPreviewBlocks(patchContent);
+  return children.length ? "\n\n" + renderReport({ type: "report", title: "Patch preview", children }).body.trimEnd() : "";
+}
+
+/**
+ * @param {string} patchContent
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildPatchPreviewBlocks(patchContent) {
   if (!patchContent || !patchContent.trim()) {
-    return "";
+    return [];
   }
 
   const lines = patchContent.split("\n");
@@ -248,7 +259,97 @@ function generatePatchPreview(patchContent) {
   const shownLines = preview.split("\n").length;
   const summary = truncated ? `Show patch preview (${shownLines} of ${lines.length} lines)` : `Show patch (${lines.length} lines)`;
 
-  return `\n\n<details><summary>${summary}</summary>\n\n\`\`\`diff\n${preview}${truncated ? "\n... (truncated)" : ""}\n\`\`\`\n\n</details>`;
+  return [{ type: "details", summary, agentTainted: false, children: [{ type: "code_block", language: "diff", value: preview + (truncated ? "\n... (truncated)" : ""), agentTainted: true }] }];
+}
+
+/**
+ * Import a configured fallback template before substituting scalar data.
+ * Markdown fields must be passed as typed blocks, not rendered fragments.
+ * @param {string} templatePath
+ * @param {import("./report_markdown.cjs").ReportContext} values
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildFallbackIssueBlocks(templatePath, values) {
+  return parseReportMarkdown(renderTemplateFromFile(templatePath, {}), { context: values, minimumHeadingLevel: 2, allowMetadata: true, agentTainted: false });
+}
+
+/**
+ * @param {string} rawErrorMessage
+ * @param {string} sanitizedErrorMessage
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildPushErrorBlocks(rawErrorMessage, sanitizedErrorMessage) {
+  if (!/pushSignedCommits: refusing unsigned push/.test(rawErrorMessage) || !/createCommitOnBranch GraphQL mutation cannot represent/.test(rawErrorMessage)) {
+    return [
+      {
+        type: "paragraph",
+        agentTainted: false,
+        children: [
+          { type: "strong", children: [{ type: "text", value: "Original error:", agentTainted: false }], agentTainted: false },
+          { type: "text", value: ` ${sanitizedErrorMessage}`, agentTainted: true },
+        ],
+      },
+    ];
+  }
+  const causeMatch = rawErrorMessage.match(/refusing unsigned push for branch '.*?': ([^.]+?)(?=\. GitHub's createCommitOnBranch)/);
+  const cause = causeMatch ? causeMatch[1].trim() : "unsupported commit shape";
+  return [
+    {
+      type: "paragraph",
+      agentTainted: false,
+      children: [
+        { type: "strong", children: [{ type: "text", value: "Error:", agentTainted: false }], agentTainted: false },
+        { type: "text", value: ` Signed commit push refused — ${cause}`, agentTainted: true },
+      ],
+    },
+    ...parseReportMarkdown("GitHub's `createCommitOnBranch` GraphQL API cannot represent:\n\n- Merge commits\n- Symlinks (mode `120000`)\n- Submodule entries (mode `160000`)\n- Executable files (mode `100755`)", { agentTainted: false }),
+    ...parseReportMarkdown(
+      _remediationForCause(cause)
+        .map(line => line.replace(/^> ?/, ""))
+        .join("\n"),
+      { agentTainted: false }
+    ),
+  ];
+}
+
+/**
+ * @param {{mainBody: import("./report_ast.cjs").ReportBlock[], error: import("./report_ast.cjs").ReportBlock[], runUrl: string, artifact: "bundle" | "patch", commands: string, patchPreview?: import("./report_ast.cjs").ReportBlock[]}} options
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildPushFailureIssueBlocks({ mainBody, error, runUrl, artifact, commands, patchPreview = [] }) {
+  return [
+    ...mainBody,
+    { type: "separator", agentTainted: false },
+    {
+      type: "alert",
+      kind: "NOTE",
+      agentTainted: false,
+      children: [
+        { type: "paragraph", agentTainted: false, children: [{ type: "text", value: "This was originally intended as a pull request, but the git push operation failed.", agentTainted: false }] },
+        ...error,
+        {
+          type: "paragraph",
+          agentTainted: false,
+          children: [
+            { type: "strong", children: [{ type: "text", value: "Workflow Run:", agentTainted: false }], agentTainted: false },
+            { type: "text", value: " ", agentTainted: false },
+            { type: "link", url: runUrl, children: [{ type: "text", value: `View run details and download ${artifact} artifact`, agentTainted: false }], agentTainted: false },
+          ],
+        },
+        {
+          type: "paragraph",
+          agentTainted: false,
+          children: [
+            { type: "text", value: `The ${artifact} file is available in the `, agentTainted: false },
+            { type: "code", value: "agent", agentTainted: false },
+            { type: "text", value: " artifact in the workflow run linked above.", agentTainted: false },
+          ],
+        },
+      ],
+    },
+    { type: "details", summary: "Create the pull request manually", agentTainted: false, children: [{ type: "code_block", language: "sh", value: commands, agentTainted: true }] },
+    ...patchPreview,
+  ];
 }
 
 /**
@@ -299,32 +400,7 @@ function buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch,
  * @returns {string} One or more blockquote lines for the error section (no leading/trailing blank lines).
  */
 function buildPushErrorSection(rawErrorMessage, sanitizedErrorMessage) {
-  // Only render the structured block for PushSignedCommitsUnsupportedShape errors,
-  // identified by the unique "cannot represent" boilerplate text. PushSignedCommitsPolicyViolation
-  // errors also start with "refusing unsigned push" but lack this boilerplate, so they fall
-  // through to the sanitized original-error fallback.
-  if (!/pushSignedCommits: refusing unsigned push/.test(rawErrorMessage) || !/createCommitOnBranch GraphQL mutation cannot represent/.test(rawErrorMessage)) {
-    return `> **Original error:** ${sanitizedErrorMessage}`;
-  }
-
-  // Extract the specific cause (e.g. "merge commit detected") anchored to the boilerplate.
-  // Using '.*?' (lazy) instead of '[^']*' (restricted) handles apostrophes in branch names.
-  const causeMatch = rawErrorMessage.match(/refusing unsigned push for branch '.*?': ([^.]+?)(?=\. GitHub's createCommitOnBranch)/);
-  const cause = causeMatch ? causeMatch[1].trim() : "unsupported commit shape";
-
-  const remediationLines = _remediationForCause(cause);
-
-  return [
-    `> **Error:** Signed commit push refused — ${cause}`,
-    `>`,
-    `> GitHub's \`createCommitOnBranch\` GraphQL API cannot represent:`,
-    `> - Merge commits`,
-    `> - Symlinks (mode \`120000\`)`,
-    `> - Submodule entries (mode \`160000\`)`,
-    `> - Executable files (mode \`100755\`)`,
-    `>`,
-    ...remediationLines,
-  ].join("\n");
+  return renderReport({ type: "report", title: "Push error", children: [{ type: "quote", agentTainted: false, children: buildPushErrorBlocks(rawErrorMessage, sanitizedErrorMessage) }] }).body.trimEnd();
 }
 
 /**
@@ -477,12 +553,13 @@ function buildManualBranchApplyCommands({ hasBundleFile, runId, artifactFileName
  */
 function renderManifestProtectionFallbackBody(mainBodyContent, footerContent, fileList, createPrUrl) {
   const templatePath = getPromptPath("manifest_protection_create_pr_fallback.md");
-  return renderTemplateFromFile(templatePath, {
-    main_body: mainBodyContent,
-    footer: footerContent,
-    files: fileList,
+  const children = buildFallbackIssueBlocks(templatePath, {
+    main_body: parseReportMarkdown(mainBodyContent, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }),
+    footer: parseReportMarkdown(footerContent, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: false }),
+    files: parseReportMarkdown(fileList, { agentTainted: false }),
     create_pr_url: createPrUrl,
   });
+  return renderReport({ type: "report", title: "Protected files", children }).body.trimEnd();
 }
 
 module.exports = {
@@ -502,6 +579,10 @@ module.exports = {
   sanitizeFallbackAssignees,
   neutralizeClosingKeywordsForIssueBody,
   generatePatchPreview,
+  buildPatchPreviewBlocks,
+  buildFallbackIssueBlocks,
+  buildPushErrorBlocks,
+  buildPushFailureIssueBlocks,
   buildManifestProtectionCreatePrUrl,
   renderManifestProtectionFallbackBody,
   buildPushErrorSection,

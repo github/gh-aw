@@ -13,6 +13,8 @@ const path = require("path");
 const { sanitizeDomainName } = require("./sanitize_content_core.cjs");
 const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderReport } = require("./report_ast.cjs");
 
 // Internal AWF sidecar container hostnames added to network.topologyAttach by
 // gh-aw itself (e.g. the MCP Gateway and the CLI proxy). These are
@@ -202,8 +204,18 @@ function getBlockedDomains(logsDir) {
  * @returns {string} GitHub warning alert with details section, or empty string if no blocked domains
  */
 function generateBlockedDomainsSection(blockedDomains, templatePath) {
+  const children = generateBlockedDomainsReportSection(blockedDomains, templatePath);
+  return children.length ? "\n\n" + renderReport({ type: "report", title: "Firewall blocked domains", children }).body : "";
+}
+
+/**
+ * @param {string[]} blockedDomains
+ * @param {string} [templatePath]
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function generateBlockedDomainsReportSection(blockedDomains, templatePath) {
   if (!blockedDomains || blockedDomains.length === 0) {
-    return "";
+    return [];
   }
 
   const domainCount = blockedDomains.length;
@@ -211,10 +223,11 @@ function generateBlockedDomainsSection(blockedDomains, templatePath) {
   const verb = domainCount === 1 ? "was" : "were";
 
   // Build domain bullet list lines
-  const domainList = blockedDomains.map(domain => `> - \`${domain}\`\n`).join("");
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const domainList = [{ type: "list", ordered: false, agentTainted: false, items: blockedDomains.map(domain => [{ type: "paragraph", agentTainted: false, children: [{ type: "code", value: domain, agentTainted: true }] }]) }];
 
   // Build YAML network.allowed list lines
-  const yamlNetworkList = blockedDomains.map(domain => `>     - "${domain}"\n`).join("");
+  const yamlNetworkList = blockedDomains.map(domain => `    - ${JSON.stringify(domain)}`).join("\n");
 
   const hasGitHubApiBlocked = blockedDomains.includes("api.github.com");
 
@@ -230,18 +243,18 @@ function generateBlockedDomainsSection(blockedDomains, templatePath) {
   // renderMarkdownTemplate's isTruthy() correctly evaluates the
   // {{#if {has_github_api_blocked}}} conditional in the template
   // (isTruthy("false") === false per the template engine's explicit check).
-  const rendered = renderTemplateFromFile(resolvedTemplatePath, {
-    domain_count: domainCount,
-    domain_word: domainWord,
-    verb,
-    domain_list: domainList,
-    yaml_network_list: yamlNetworkList,
-    has_github_api_blocked: hasGitHubApiBlocked ? "true" : "false",
+  const template = renderMarkdownTemplate(renderTemplateFromFile(resolvedTemplatePath, { has_github_api_blocked: hasGitHubApiBlocked ? "true" : "false" }));
+  return parseReportMarkdown(template, {
+    agentTainted: false,
+    context: {
+      domain_count: domainCount,
+      domain_word: domainWord,
+      verb,
+      domain_list: domainList,
+      yaml_network_list: yamlNetworkList,
+      has_github_api_blocked: hasGitHubApiBlocked ? "true" : "false",
+    },
   });
-
-  // Second pass: evaluate {{#if ...}} conditional blocks (e.g. the gh-proxy tip section)
-  // Template starts without leading newlines; prepend separator expected by callers
-  return "\n\n" + renderMarkdownTemplate(rendered);
 }
 
 module.exports = {
@@ -250,4 +263,5 @@ module.exports = {
   extractAndSanitizeDomain,
   getBlockedDomains,
   generateBlockedDomainsSection,
+  generateBlockedDomainsReportSection,
 };

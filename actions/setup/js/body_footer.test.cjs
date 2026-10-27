@@ -26,7 +26,7 @@ describe("appendConfiguredBodyFooter", () => {
   });
 
   it("fails explicitly when the footer alone cannot fit", () => {
-    expect(() => appendConfiguredBodyFooter("Body", "f".repeat(101), { maxLength: 100 })).toThrow("Protected markers and footers");
+    expect(() => appendConfiguredBodyFooter("Body", "f".repeat(101), { maxLength: 100 })).toThrow("protected markers, footers, and framework content");
   });
 
   it("appends the footer when the composed body fits the destination limit", () => {

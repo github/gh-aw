@@ -10,13 +10,14 @@ const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_help
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
-const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { getBodyFooterBlocks } = require("./messages_footer.cjs");
 const { isTemplatableTrue, isStagedMode, logStagedPreviewInfo, checkRequiredFilter } = require("./safe_output_helpers.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
-const { fitMarkdownBody } = require("./report_size.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "create_pull_request_review_comment";
@@ -378,15 +379,20 @@ async function main(config = {}) {
     });
 
     // Buffer the comment instead of posting it individually
-    let body = sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions });
-    const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
-    body = fitMarkdownBody(body, { suffix: bodyFooter ? "\n\n" + bodyFooter.trimEnd() : "", allowedMentions: allowedMentionAliases });
+    const rawBody = sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions });
+    const bodyFooterBlocks = getBodyFooterBlocks(config.body_footer, { workflowName, runUrl });
+    const body = renderSizedReport({
+      type: "report",
+      title: "Review comment",
+      children: [...parseReportMarkdown(rawBody, { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions: allowedMentionAliases, agentTainted: true }), ...bodyFooterBlocks],
+    }).body.trimEnd();
     /** @type {import('./pr_review_buffer.cjs').BufferedComment} */
     const bufferedComment = {
       path: commentItem.path,
       line: line,
       body,
-      ...(bodyFooter ? { bodyFooter: "\n\n" + bodyFooter.trimEnd() } : {}),
+      rawBody,
+      ...(bodyFooterBlocks.length ? { bodyFooterBlocks } : {}),
       side: side,
     };
 

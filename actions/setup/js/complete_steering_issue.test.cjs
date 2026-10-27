@@ -50,7 +50,7 @@ describe("complete_steering_issue", () => {
     expect(global.github.rest.issues.createComment).toHaveBeenCalledWith(
       expect.objectContaining({
         issue_number: 42,
-        body: "The workflow completed successfully and created [pull request #7](https://github.com/owner/repo/pull/7).",
+        body: "The workflow completed successfully and created [pull request \\#7](https://github.com/owner/repo/pull/7).",
       })
     );
     expect(global.github.rest.issues.update).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 42, state: "closed", state_reason: "completed" }));

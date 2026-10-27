@@ -2,6 +2,7 @@
 "use strict";
 
 const { renderIssueParameters } = require("./issue_report.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const { queueError } = require("./work_queue_codec.cjs");
 const { nativeId } = require("./work_queue_native.cjs");
@@ -238,7 +239,8 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
   const selections = [];
   operations.forEach((operation, index) => {
     declarations.push(`$m${index}:${operation.type}!`);
-    variables[`m${index}`] = operation.name === "createIssue" ? renderIssueParameters(operation.input) : operation.input;
+    variables[`m${index}`] =
+      operation.name === "createIssue" ? renderIssueParameters(operation.input, operation.report) : operation.report ? { ...operation.input, body: renderSizedReport(operation.report).body.trimEnd() } : operation.input;
     selections.push(`m${index}: ${operation.name}(input:$m${index}) { ${operation.selection} }`);
   });
   let result;

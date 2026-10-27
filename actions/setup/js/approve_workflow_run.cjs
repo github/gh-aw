@@ -15,7 +15,9 @@ const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 const { getRunStartedMessage } = require("./messages_run_status.cjs");
-const { generateFooterWithMessages } = require("./messages_footer.cjs");
+const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 
@@ -201,9 +203,15 @@ function buildApprovalCommentBody(runHtmlUrl, pullRequestNumber) {
   const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
   const runUrl = buildWorkflowRunUrl(context, context.repo);
 
-  const message = sanitizeContent(getRunStartedMessage({ workflowName, runUrl: runHtmlUrl, eventType: "pull request" }));
-  const footer = generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, undefined, pullRequestNumber, undefined, undefined);
-  return `${message}\n\n${footer}`;
+  const message = sanitizeContent(getRunStartedMessage({ workflowName: "{workflow_name}", runUrl: "{run_url}", eventType: "pull request" }));
+  const templateContext = Object.fromEntries(Array.from(message.matchAll(/\{(\w+)\}/g), match => [match[1], match[0]]));
+  Object.assign(templateContext, { workflow_name: sanitizeContent(workflowName), run_url: runHtmlUrl });
+  const { detectionCaution, footer } = assembleReportBodyParts({ includeFooter: true, workflowName, runUrl, workflowSource, workflowSourceURL, triggeringPRNumber: pullRequestNumber });
+  return renderSizedReport({
+    type: "report",
+    title: "Workflow approved",
+    children: [...parseReportMarkdown(message, { context: templateContext, agentTainted: false, minimumHeadingLevel: 2 }), ...detectionCaution, ...footer],
+  }).body.trimEnd();
 }
 
 /**

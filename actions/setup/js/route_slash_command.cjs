@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 // @safe-outputs-exempt SEC-004 — event body text is read only for slash-command parsing; outbound /help comments are built from internal metadata.
+const { renderSizedReport } = require("./report_size.cjs");
 
 const { REACTION_MAP } = require("./add_reaction.cjs");
 const { createOrReuseStatusComment } = require("./add_workflow_run_comment.cjs");
@@ -489,40 +490,23 @@ function parseHelpCommandsMetadata() {
   }
 }
 
-/**
- * Regex matching bare GitHub @mentions outside inline code spans.
- * Captures the preceding non-word character (p1) and the username (p2).
- */
-const GITHUB_MENTION_RE = /(^|[^\w`])@([A-Za-z0-9](?:[A-Za-z0-9_-]{0,37}[A-Za-z0-9])?)/g;
-
-/**
- * Neutralizes bare @mentions in a description string so they do not trigger
- * GitHub notifications. Wraps matched mentions in backticks.
- * @param {string} description
- * @returns {string}
- */
-function neutralizeDescriptionMentions(description) {
-  return description.replace(GITHUB_MENTION_RE, (_, p1, p2) => `${p1}\`@${p2}\``);
-}
-
-function buildCommandBulletLine(entry) {
-  const desc = entry.description ? neutralizeDescriptionMentions(entry.description) : "";
-  const suffix = desc ? ` — ${desc}` : "";
-  const commandText = `\`/${entry.command}\``;
-  if (entry.source_file) {
+/** @returns {import("./report_ast.cjs").ReportBlock[]} */
+function buildCommandBullet(entry, label = false) {
+  /** @type {import("./report_ast.cjs").ReportInline} */
+  const command = { type: "code", value: label ? entry.command : `/${entry.command}`, agentTainted: false };
+  /** @type {import("./report_ast.cjs").ReportInline[]} */
+  const children = [];
+  if (!label && entry.source_file) {
     const owner = context.repo.owner;
     const repo = context.repo.repo;
     const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
     const sourceUrl = `${githubServer}/${owner}/${repo}/blob/HEAD/.github/workflows/${entry.source_file}.md`;
-    return `- [${commandText}](${sourceUrl})${suffix}`;
+    children.push({ type: "link", url: sourceUrl, children: [command] });
+  } else {
+    children.push(command);
   }
-  return `- ${commandText}${suffix}`;
-}
-
-function buildLabelBulletLine(entry) {
-  const desc = entry.description ? neutralizeDescriptionMentions(entry.description) : "";
-  const suffix = desc ? ` — ${desc}` : "";
-  return `- \`${entry.command}\`${suffix}`;
+  if (entry.description) children.push({ type: "text", value: ` — ${entry.description}`, agentTainted: false });
+  return [{ type: "paragraph", children }];
 }
 
 function buildHelpCommentBody(helpCommands) {
@@ -533,38 +517,34 @@ function buildHelpCommentBody(helpCommands) {
   const decentralized = helpCommands.filter(entry => entry.decentralized && !centralizedNames.has(entry.command));
   const labels = helpCommands.filter(entry => entry.label);
 
-  const lines = ["### Agentic Workflow Commands", "", "**Centralized slash commands**"];
-  if (centralized.length === 0) {
-    lines.push("- _None_");
-  } else {
-    for (const entry of centralized) {
-      lines.push(buildCommandBulletLine(entry));
-    }
-  }
-
-  lines.push("", "**Non-centralized slash commands**");
-  if (decentralized.length === 0) {
-    lines.push("- _None_");
-  } else {
-    for (const entry of decentralized) {
-      lines.push(buildCommandBulletLine(entry));
-    }
-  }
-
-  lines.push("", "**Label commands**");
-  if (labels.length === 0) {
-    lines.push("- _None_");
-  } else {
-    for (const entry of labels) {
-      lines.push(buildLabelBulletLine(entry));
-    }
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const children = [{ type: "heading", level: 3, children: [{ type: "text", value: "Agentic Workflow Commands", agentTainted: false }] }];
+  for (const [title, entries, label] of [
+    ["Centralized slash commands", centralized, false],
+    ["Non-centralized slash commands", decentralized, false],
+    ["Label commands", labels, true],
+  ]) {
+    children.push(
+      { type: "paragraph", children: [{ type: "strong", children: [{ type: "text", value: title, agentTainted: false }] }] },
+      {
+        type: "list",
+        ordered: false,
+        items: entries.length ? entries.map(entry => buildCommandBullet(entry, label)) : [[{ type: "paragraph", children: [{ type: "emphasis", children: [{ type: "text", value: "None", agentTainted: false }] }] }]],
+      }
+    );
   }
 
   const docsUrl = (process.env.GH_AW_SLASH_COMMAND_DOCS_URL || "").trim();
   if (docsUrl) {
-    lines.push("", `Learn more: [Slash command documentation](${docsUrl})`);
+    children.push({
+      type: "paragraph",
+      children: [
+        { type: "text", value: "Learn more: ", agentTainted: false },
+        { type: "link", url: docsUrl, children: [{ type: "text", value: "Slash command documentation", agentTainted: false }] },
+      ],
+    });
   }
-  return lines.join("\n");
+  return renderSizedReport({ type: "report", title: "Agentic Workflow Commands", children }).body.trimEnd();
 }
 
 async function postBuiltinHelpComment(commentBody) {

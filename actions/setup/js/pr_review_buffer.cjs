@@ -19,21 +19,22 @@
  *   await buffer.submitReview();
  */
 
-const { generateFooterWithMessages, getBodyFooterMessage, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { getDetectionCautionBlocks } = require("./messages_footer.cjs");
+const { toSnakeCase } = require("./messages_core.cjs");
+const { buildGeneratedFooterBlocks } = require("./markdown_body_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { generateWorkflowCallIdReviewMarker, matchesWorkflowCallIdReviewMarker, matchesWorkflowId } = require("./generate_footer.cjs");
+const { matchesWorkflowCallIdReviewMarker, matchesWorkflowId } = require("./generate_footer.cjs");
 const { attachExecutionState, fetchPullRequestReviewState } = require("./safe_output_execution_metadata.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG, isTransientError, sleep } = require("./error_recovery.cjs");
 const { ERR_API } = require("./error_codes.cjs");
-const { fitMarkdownBody, SIZE_NOTICE } = require("./report_size.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const SUPERSEDE_REVIEW_MESSAGE = "Superseded by updated review from same workflow.";
 const MAX_SUPERSEDE_REVIEW_PAGES = 10;
 const MAX_REVIEW_BODY_LENGTH = 65000;
 const DEFAULT_FALLBACK_EXCERPT_LENGTH = 500;
-const FALLBACK_SECTION_HEADER = "### Comments that could not be inline-anchored";
-const FALLBACK_EMPTY_COMMENT_BODY = "_(empty comment body)_";
 // GitHub API message fragment returned when a PR is locked and review submission is rejected.
 // Must be lowercase — compared against errorMessage.toLowerCase() for case-insensitive matching.
 const LOCKED_PR_REVIEW_MESSAGE = "lock prevents review";
@@ -64,6 +65,8 @@ const REVIEW_RATE_LIMIT_RETRY_CONFIG = {
  * @property {number} line - Line number (end line for multi-line)
  * @property {string} body - Comment body text
  * @property {string} [bodyFooter] - Trusted suffix reserved intact during fallback size fitting
+ * @property {import("./report_ast.cjs").ReportBlock[]} [bodyFooterBlocks] - Configured footer kept as nodes for fallback publication
+ * @property {string} [rawBody] - Imported agent Markdown before the configured footer was rendered
  * @property {number} [start_line] - Start line for multi-line comments
  * @property {string} [side] - LEFT or RIGHT
  * @property {string} [start_side] - start_side for multi-line comments
@@ -328,8 +331,10 @@ function createReviewBuffer() {
     // Determine review event and body
     let event = reviewMetadata ? reviewMetadata.event : "COMMENT";
     let body = reviewMetadata ? reviewMetadata.body : "";
-    let bodyPrefix = "";
-    let bodySuffix = "";
+    /** @type {import("./report_ast.cjs").ReportBlock[]} */
+    const bodyPrefix = [];
+    /** @type {import("./report_ast.cjs").ReportBlock[]} */
+    const bodySuffix = [];
 
     // Determine if we should add footer based on footer mode
     let shouldAddFooter = footerMode === "always";
@@ -342,9 +347,9 @@ function createReviewBuffer() {
     // Inject CAUTION at top of body unconditionally if threat detection warning was raised,
     // independent of footer inclusion so the alert is never silently dropped.
     if (footerContext) {
-      const detectionCaution = getDetectionCautionAlert(footerContext.workflowName, footerContext.runUrl);
-      if (detectionCaution) {
-        bodyPrefix = detectionCaution + "\n\n";
+      const detectionCaution = getDetectionCautionBlocks(footerContext.workflowName, footerContext.runUrl);
+      if (detectionCaution.length) {
+        bodyPrefix.push(...detectionCaution);
         // When CAUTION is present, ensure the footer (and XML marker) is always included
         // so the review body is not empty of metadata, and re-evaluate shouldAddFooter.
         shouldAddFooter = true;
@@ -353,46 +358,34 @@ function createReviewBuffer() {
 
     // Add footer to review body if we should and we have footer context
     if (shouldAddFooter && footerContext) {
-      bodySuffix +=
-        "\n\n" +
-        generateFooterWithMessages(
-          footerContext.workflowName,
-          footerContext.runUrl,
-          footerContext.workflowSource,
-          footerContext.workflowSourceURL,
-          footerContext.triggeringIssueNumber,
-          footerContext.triggeringPRNumber,
-          footerContext.triggeringDiscussionNumber,
-          undefined,
-          { skipDetectionCaution: true }
-        );
+      bodySuffix.push(...buildGeneratedFooterBlocks(footerContext));
     }
     if (footerContext) {
-      const bodyFooter = getBodyFooterMessage(footerContext.bodyFooter, footerContext);
-      if (bodyFooter) {
-        if (bodySuffix) bodySuffix = bodySuffix.trimEnd();
-        else body = body.trimEnd();
-        bodySuffix += "\n\n" + bodyFooter.trimEnd();
+      if (footerContext.bodyFooter) {
+        bodySuffix.push(...parseReportMarkdown(footerContext.bodyFooter, { context: toSnakeCase(footerContext), minimumHeadingLevel: 2, allowMetadata: true, agentTainted: false }));
       }
     }
-    const hasReviewBody = Boolean((bodyPrefix + body + bodySuffix).trim());
     // GitHub strips HTML comments from review bodies. A Markdown reference
     // survives even when the visible footer is disabled.
+    const hasReviewBody = Boolean(body.trim() || bodyPrefix.length || bodySuffix.length);
     const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID || "";
     if (callerWorkflowId) {
-      if (bodySuffix) bodySuffix = bodySuffix.trimEnd();
-      else body = body.trimEnd();
-      bodySuffix += (hasReviewBody ? "\n\n" : "") + generateWorkflowCallIdReviewMarker(callerWorkflowId);
+      bodySuffix.push({ type: "review_marker", workflowCallId: callerWorkflowId, agentTainted: false });
     }
     const agentBody = body;
-    body = fitMarkdownBody(agentBody, { prefix: bodyPrefix, suffix: bodySuffix, maxLength: MAX_REVIEW_BODY_LENGTH });
+    const bodyNodes = parseReportMarkdown(agentBody, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true });
+    body = renderSizedReport({ type: "report", title: "Pull request review", children: [...bodyPrefix, ...bodyNodes, ...bodySuffix] }, MAX_REVIEW_BODY_LENGTH + 1).body.trimEnd();
     /** @type {WeakMap<BufferedComment, string | undefined>} */
     const commentFooters = new WeakMap();
+    /** @type {WeakMap<BufferedComment, import("./report_ast.cjs").ReportBlock[] | undefined>} */
+    const commentFooterBlocks = new WeakMap();
+    /** @type {WeakMap<BufferedComment, string | undefined>} */
+    const commentBodies = new WeakMap();
     /** @param {BufferedComment[]} fallbackComments */
     const appendFallbackComments = fallbackComments =>
       appendUnanchoredCommentsSection(
-        agentBody,
-        fallbackComments.map(comment => ({ ...comment, bodyFooter: commentFooters.get(comment) })),
+        bodyNodes,
+        fallbackComments.map(comment => ({ ...comment, bodyFooter: commentFooters.get(comment), bodyFooterBlocks: commentFooterBlocks.get(comment), rawBody: commentBodies.get(comment) })),
         { prefix: bodyPrefix, suffix: bodySuffix }
       );
 
@@ -405,6 +398,8 @@ function createReviewBuffer() {
         body: comment.body,
       };
       commentFooters.set(apiComment, comment.bodyFooter);
+      commentFooterBlocks.set(apiComment, comment.bodyFooterBlocks);
+      commentBodies.set(apiComment, comment.rawBody);
 
       if (comment.start_line !== undefined) {
         apiComment.start_line = comment.start_line;
@@ -1050,51 +1045,33 @@ function extractUnresolvableCommentIndices(error, totalComments) {
 
 /**
  * Append a fallback section that preserves inline comment content when comments cannot be anchored.
- * @param {string} reviewBody
+ * @param {import("./report_ast.cjs").ReportBlock[]} reviewBody
  * @param {BufferedComment[]} comments
- * @param {{prefix: string, suffix: string}} frame
+ * @param {{prefix: import("./report_ast.cjs").ReportBlock[], suffix: import("./report_ast.cjs").ReportBlock[]}} frame
  * @returns {string}
  */
 function appendUnanchoredCommentsSection(reviewBody, comments, frame) {
-  const sectionPrefix = reviewBody || frame.prefix || frame.suffix ? `\n\n${FALLBACK_SECTION_HEADER}\n\n` : `${FALLBACK_SECTION_HEADER}\n\n`;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
   const detailsBlocks = comments.map(comment => {
     const footer = comment.bodyFooter || "";
-    const rawBody = footer && comment.body.endsWith(footer) ? comment.body.slice(0, -footer.length).trim() : (comment.body || "").trim();
-    const excerpt = fitMarkdownBody(rawBody, { suffix: footer, maxLength: Math.max(DEFAULT_FALLBACK_EXCERPT_LENGTH, footer.length + SIZE_NOTICE.length + 1) });
-    return renderUnanchoredCommentBlock(comment, excerpt || FALLBACK_EMPTY_COMMENT_BODY);
+    const rawBody = comment.rawBody ?? (footer && comment.body.endsWith(footer) ? comment.body.slice(0, -footer.length).trim() : (comment.body || "").trim());
+    const excerpt = rawBody.length > DEFAULT_FALLBACK_EXCERPT_LENGTH ? `${rawBody.slice(0, DEFAULT_FALLBACK_EXCERPT_LENGTH)}...` : rawBody;
+    return {
+      type: "details",
+      summary: `${comment.path}:${comment.line}`,
+      agentTainted: false,
+      children: [
+        { type: "paragraph", children: [{ type: "text", value: excerpt || "(empty comment body)", agentTainted: true }], agentTainted: true },
+        ...(comment.bodyFooterBlocks || parseReportMarkdown(footer, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: false })),
+      ],
+    };
   });
-  return fitMarkdownBody(reviewBody, { prefix: frame.prefix, suffix: frame.suffix + sectionPrefix + detailsBlocks.join("\n\n"), maxLength: MAX_REVIEW_BODY_LENGTH });
-}
-
-/**
- * @param {BufferedComment} comment
- * @param {string} bodyText
- * @returns {string}
- */
-function renderUnanchoredCommentBlock(comment, bodyText) {
-  const summaryText = `${comment.path}:${comment.line}`;
-  return `<details><summary>${escapeHtml(summaryText)}</summary>\n\n${escapeHtml(bodyText)}\n\n</details>`;
-}
-
-/**
- * @param {string} value
- * @returns {string}
- */
-function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, character => {
-    switch (character) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      default:
-        return character;
-    }
-  });
+  return renderSizedReport(
+    {
+      type: "report",
+      title: "Pull request review",
+      children: [...frame.prefix, ...reviewBody, { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comments that could not be inline-anchored", agentTainted: false }] }, ...detailsBlocks, ...frame.suffix],
+    },
+    MAX_REVIEW_BODY_LENGTH + 1
+  ).body.trimEnd();
 }

@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { MAX_CLOSE_COUNT: SHARED_MAX_CLOSE_COUNT } = require("./close_older_entities.cjs");
 const { searchOlderEntitiesByMarker } = require("./close_older_search_helpers.cjs");
 const { createCloseOlderSearchAdapter, closeOlderWithDescriptor } = require("./close_older_handler_factory.cjs");
@@ -132,13 +133,34 @@ async function closePullRequest(github, owner, repo, prNumber) {
  * @returns {string} Closing message
  */
 function getCloseOlderPullRequestMessage({ newPullRequestUrl, newPullRequestNumber, workflowName, runUrl }) {
-  return `This pull request is being closed as superseded. A newer pull request has been created: #${newPullRequestNumber}
-
-[View newer pull request](${newPullRequestUrl})
-
----
-
-*This action was performed automatically by the [\`${workflowName}\`](${runUrl}) workflow.*`;
+  return renderSizedReport({
+    type: "report",
+    title: "Superseded pull request",
+    children: [
+      {
+        type: "paragraph",
+        children: [
+          { type: "text", value: "This pull request is being closed as superseded. A newer pull request has been created: ", agentTainted: false },
+          { type: "issue_reference", number: String(newPullRequestNumber), agentTainted: false },
+        ],
+      },
+      { type: "paragraph", children: [{ type: "link", url: newPullRequestUrl, children: [{ type: "text", value: "View newer pull request", agentTainted: false }] }] },
+      { type: "separator" },
+      {
+        type: "paragraph",
+        children: [
+          {
+            type: "emphasis",
+            children: [
+              { type: "text", value: "This action was performed automatically by the ", agentTainted: false },
+              { type: "link", url: runUrl, children: [{ type: "code", value: workflowName, agentTainted: false }] },
+              { type: "text", value: " workflow.", agentTainted: false },
+            ],
+          },
+        ],
+      },
+    ],
+  }).body.trimEnd();
 }
 
 /**

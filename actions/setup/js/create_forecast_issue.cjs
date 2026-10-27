@@ -5,7 +5,9 @@
 const { createReportIssue } = require("./issue_report.cjs");
 
 const fs = require("node:fs");
-const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 const FORECAST_REPORT_PATH = "./.cache/gh-aw/forecast/report.json";
@@ -103,6 +105,27 @@ function getLegacyP50(workflow) {
  * @returns {string}
  */
 function buildForecastIssueBody(report, options) {
+  return renderSizedReport(buildForecastIssueReport(report, options)).body.trim();
+}
+
+/**
+ * @param {Record<string, any>|null} report
+ * @param {{owner: string, repo: string, serverUrl: string, runID?: string, generatedAtISO?: string, outcome?: string, errorMessage?: string}} options
+ * @returns {import("./report_ast.cjs").Report}
+ */
+function buildForecastIssueReport(report, options) {
+  /** @param {unknown} value @returns {import("./report_ast.cjs").ReportInline[]} */
+  const text = value => [{ type: "text", value: String(value ?? ""), agentTainted: false }];
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+  const paragraph = value => ({ type: "paragraph", children: text(value), agentTainted: false });
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+  const heading = value => ({ type: "heading", level: 3, children: text(value), agentTainted: false });
+  /** @param {Record<string, any>} workflow @returns {import("./report_ast.cjs").ReportInline[]} */
+  const workflowLink = workflow => {
+    const children = text(workflow?.workflow_id);
+    const workflowPath = typeof workflow?.workflow_path === "string" ? workflow.workflow_path.trim() : "";
+    return workflowPath ? [{ type: "link", url: `${options.serverUrl}/${options.owner}/${options.repo}/actions/workflows/${encodeURIComponent(workflowPath)}`, children, agentTainted: false }] : children;
+  };
   const workflows = Array.isArray(report?.workflows) ? [...report.workflows] : [];
   workflows.sort((a, b) => monthlyCost(b) - monthlyCost(a));
 
@@ -112,7 +135,8 @@ function buildForecastIssueBody(report, options) {
     const hasForecastData = [p50PerRun, monthly.p50, monthly.high, monthly.low].some(hasPositiveAIC);
     return {
       workflow,
-      row: [renderWorkflowLink(workflow, options), toFiniteNumber(workflow.sampled_runs), p50PerRun, monthly.low, monthly.p50, monthly.high, monthly.stddev],
+      row: [workflowLink(workflow), text(toFiniteNumber(workflow.sampled_runs)), ...[p50PerRun, monthly.low, monthly.p50, monthly.high, monthly.stddev].map(value => text(formatAIC(value)))],
+      monthly,
       hasForecastData,
     };
   });
@@ -124,11 +148,11 @@ function buildForecastIssueBody(report, options) {
   const legacyRows = hasNewFields
     ? null
     : workflows
+        .filter(workflow => hasPositiveAIC(getLegacyP50(workflow)))
         .map(workflow => {
           const p50 = getLegacyP50(workflow);
-          return [escapeCell(workflow.workflow_id), toFiniteNumber(workflow.sampled_runs), toFiniteNumber(p50)];
-        })
-        .filter(([, , p50]) => hasPositiveAIC(p50));
+          return [text(workflow.workflow_id), text(toFiniteNumber(workflow.sampled_runs)), text(formatAIC(p50))];
+        });
   const legacyNoDataWorkflows = hasNewFields
     ? []
     : workflows.filter(workflow => {
@@ -136,44 +160,37 @@ function buildForecastIssueBody(report, options) {
         return !hasPositiveAIC(p50);
       });
 
-  const allMonthlyZero = tableRows.length > 0 && tableRows.every(([, , , , monthlyP50]) => Number(monthlyP50) === 0);
-  const allProjectedZero = legacyRows ? legacyRows.length > 0 && legacyRows.every(([, , p50]) => Number(p50) === 0) : allMonthlyZero;
-
+  const allMonthlyZero = tableRows.length > 0 && categorized.filter(item => item.hasForecastData).every(item => item.monthly.p50 === 0);
+  const allProjectedZero = legacyRows ? false : allMonthlyZero;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
   let reportTable;
   if (legacyRows) {
     reportTable =
       legacyRows.length > 0
-        ? ["| Workflow | Sampled runs | Forecast AIC (P50) |", "| --- | ---: | ---: |", ...legacyRows.map(([workflowID, sampledRuns, p50]) => `| ${workflowID} | ${sampledRuns} | ${formatAIC(p50)} |`)].join("\n")
-        : "_No forecast rows were produced._";
+        ? [{ type: "table", headers: ["Workflow", "Sampled runs", "Forecast AIC (P50)"].map(text), rows: legacyRows, agentTainted: false }]
+        : [{ type: "paragraph", children: [{ type: "emphasis", children: text("No forecast rows were produced.") }] }];
   } else {
     if (tableRows.length === 0) {
-      reportTable = "_No forecast rows were produced._";
+      reportTable = [{ type: "paragraph", children: [{ type: "emphasis", children: text("No forecast rows were produced.") }] }];
     } else {
-      const totalMonthly = tableRows.reduce((s, [, , , , monthly]) => s + Number(monthly), 0);
-      const dataRows = tableRows.map(
-        ([workflowID, sampledRuns, p50Run, monthlyLow, monthlyP50, monthlyHigh, monthlyStdDev]) =>
-          `| ${workflowID} | ${sampledRuns} | ${formatAIC(p50Run)} | ${formatAIC(monthlyLow)} | ${formatAIC(monthlyP50)} | ${formatAIC(monthlyHigh)} | ${formatAIC(monthlyStdDev)} |`
-      );
+      const totalMonthly = categorized.filter(item => item.hasForecastData).reduce((sum, item) => sum + item.monthly.p50, 0);
+      const dataRows = [...tableRows];
       if (tableRows.length > 1) {
-        dataRows.push(`| **TOTAL** | | | | **${formatAIC(totalMonthly)}** | | |`);
+        dataRows.push([[{ type: "strong", children: text("TOTAL") }], [], [], [], [{ type: "strong", children: text(formatAIC(totalMonthly)) }], [], []]);
       }
-      reportTable = ["| Workflow | Runs | P50/Run | Monthly (Low) | Monthly (P50) | Monthly (High) | Monthly (Stdev) |", "| --- | ---: | ---: | ---: | ---: | ---: | ---: |", ...dataRows].join("\n");
+      reportTable = [{ type: "table", headers: ["Workflow", "Runs", "P50/Run", "Monthly (Low)", "Monthly (P50)", "Monthly (High)", "Monthly (Stdev)"].map(text), rows: dataRows, agentTainted: false }];
     }
   }
   const withoutDataWorkflows = legacyRows ? legacyNoDataWorkflows : workflowsWithoutData;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
   const withoutDataSection =
     withoutDataWorkflows.length === 0
-      ? ""
+      ? []
       : [
-          "### AW without data",
-          "",
-          "| Workflow | Runs used |",
-          "| --- | ---: |",
-          ...withoutDataWorkflows.map(workflow => `| ${renderWorkflowLink(workflow, options)} | 0 |`),
-          "",
-          "- AIC = 0 is treated as missing data and excluded from forecast computation.",
-          "",
-        ].join("\n");
+          heading("AW without data"),
+          { type: "table", headers: ["Workflow", "Runs used"].map(text), rows: withoutDataWorkflows.map(workflow => [workflowLink(workflow), text("0")]), agentTainted: false },
+          { type: "list", ordered: false, items: [[paragraph("AIC = 0 is treated as missing data and excluded from forecast computation.")]], agentTainted: false },
+        ];
 
   const repoSlug = `${options.owner}/${options.repo}`;
   const period = report?.period || "month";
@@ -181,42 +198,68 @@ function buildForecastIssueBody(report, options) {
   const runURL = runID ? `${options.serverUrl}/${repoSlug}/actions/runs/${runID}` : "";
   const outcome = (options.outcome || "success").toLowerCase();
 
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
   const reportReadingSection =
     tableRows.length === 0
-      ? ""
+      ? []
       : [
-          "### How to read this report",
-          "",
-          "- **P50/Run** is the median per-run AIC from sampled historical runs.",
-          "- **Monthly (Low/P50/High)** are the Monte Carlo P10 / P50 / P90 total-AIC bounds over 30 days.",
-          "- **Monthly (Stdev)** is the Monte Carlo standard deviation of the 30-day total-AIC distribution.",
-          "- Monthly values come from the Monte Carlo distribution and are not a direct `P50/Run × runs` multiplication.",
-          "",
-        ].join("\n");
+          heading("How to read this report"),
+          {
+            type: "list",
+            ordered: false,
+            items: [
+              [paragraph("P50/Run is the median per-run AIC from sampled historical runs.")],
+              [paragraph("Monthly (Low/P50/High) are the Monte Carlo P10 / P50 / P90 total-AIC bounds over 30 days.")],
+              [paragraph("Monthly (Stdev) is the Monte Carlo standard deviation of the 30-day total-AIC distribution.")],
+              [paragraph("Monthly values come from the Monte Carlo distribution and are not a direct P50/Run × runs multiplication.")],
+            ],
+            agentTainted: false,
+          },
+        ];
 
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
   const allProjectedZeroNote = allProjectedZero
     ? [
-        "> [!NOTE]",
-        "> All projected AIC values are 0 even after cache warm-up. This usually means cached run summaries do not include token usage for sampled runs.",
-        "> Verify gh aw logs fetched recent runs and that run_summary.json files include token usage.",
-        "",
-      ].join("\n")
-    : "";
-  const sourceRunLine = runURL ? `_Forecast source run: [#${runID}](${runURL})._` : "";
-  const errorSection = outcome === "success" ? "" : ["> [!WARNING]", `> Forecast outcome: ${outcome}.`, `> ${options.errorMessage || "Forecast computation did not complete successfully."}`].join("\n");
+        {
+          type: "alert",
+          kind: "NOTE",
+          children: [
+            paragraph("All projected AIC values are 0 even after cache warm-up. This usually means cached run summaries do not include token usage for sampled runs."),
+            paragraph("Verify gh aw logs fetched recent runs and that run_summary.json files include token usage."),
+          ],
+          agentTainted: false,
+        },
+      ]
+    : [];
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const sourceRunLine = runURL
+    ? [{ type: "paragraph", children: [{ type: "emphasis", children: [...text("Forecast source run: "), { type: "link", url: runURL, children: text(`#${runID}`), agentTainted: false }, ...text(".")] }], agentTainted: false }]
+    : [];
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const errorSection =
+    outcome === "success" ? [] : [{ type: "alert", kind: "WARNING", children: [paragraph(`Forecast outcome: ${outcome}.`), paragraph(options.errorMessage || "Forecast computation did not complete successfully.")], agentTainted: false }];
 
-  return renderTemplateFromFile(getPromptPath(FORECAST_ISSUE_TEMPLATE), {
-    repository: repoSlug,
-    generated_at: options.generatedAtISO || new Date().toISOString(),
-    period,
-    report_table: reportTable,
-    without_data_section: withoutDataSection,
-    report_reading_section: reportReadingSection,
-    all_projected_zero_note: allProjectedZeroNote,
-    run_samples_section: "",
-    error_section: errorSection,
-    source_run_line: sourceRunLine,
-  }).trim();
+  return {
+    type: "report",
+    title: outcome === "success" ? FORECAST_ISSUE_TITLE : FORECAST_ERROR_ISSUE_TITLE,
+    agentTainted: false,
+    children: parseReportMarkdown(fs.readFileSync(getPromptPath(FORECAST_ISSUE_TEMPLATE), "utf8"), {
+      context: {
+        repository: repoSlug,
+        generated_at: options.generatedAtISO || new Date().toISOString(),
+        period,
+        report_table: reportTable,
+        without_data_section: withoutDataSection,
+        report_reading_section: reportReadingSection,
+        all_projected_zero_note: allProjectedZeroNote,
+        run_samples_section: [],
+        error_section: errorSection,
+        source_run_line: sourceRunLine,
+      },
+      agentTainted: false,
+      minimumHeadingLevel: 2,
+    }),
+  };
 }
 
 /**
@@ -333,7 +376,7 @@ async function main() {
 
   const isErrorOutcome = outcome !== "success";
 
-  const body = buildForecastIssueBody(report, {
+  const issueReport = buildForecastIssueReport(report, {
     owner: context.repo.owner,
     repo: context.repo.repo,
     serverUrl: context.serverUrl,
@@ -350,13 +393,16 @@ async function main() {
     await core.summary.addRaw(summary).write();
   }
 
-  const createdIssue = await createReportIssue(github, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    title: isErrorOutcome ? FORECAST_ERROR_ISSUE_TITLE : FORECAST_ISSUE_TITLE,
-    body,
-    labels: ["agentic-workflows"],
-  });
+  const createdIssue = await createReportIssue(
+    github,
+    {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      title: isErrorOutcome ? FORECAST_ERROR_ISSUE_TITLE : FORECAST_ISSUE_TITLE,
+      labels: ["agentic-workflows"],
+    },
+    issueReport
+  );
 
   core.info(`Created issue #${createdIssue.data.number}: ${createdIssue.data.html_url}`);
 }

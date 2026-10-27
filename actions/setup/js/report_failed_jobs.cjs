@@ -6,9 +6,12 @@ const { createReportIssue } = require("./issue_report.cjs");
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { fetchAndLogRateLimit } = require("./github_rate_limit_logger.cjs");
-const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
-const { generateFooterWithExpiration, createExpirationLine } = require("./ephemerals.cjs");
-const { generateXMLMarker } = require("./messages.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
+const { createExpirationLine } = require("./ephemerals.cjs");
+const { getAgenticWorkflowMetadata } = require("./messages_footer.cjs");
+const fs = require("node:fs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { redactBuiltInPatterns } = require("./redact_secrets.cjs");
@@ -35,7 +38,7 @@ async function getStatePushError(jobId) {
     const detail = redactBuiltInPatterns(errors.slice(-20).join("\n"))
       .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
       .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
-    return sanitizeContent(detail, 4000).replace(/```/g, "``\u200b`");
+    return sanitizeContent(detail, 4000);
   } catch {
     core.warning(`Could not retrieve error details for state-push job ${jobId}; see the job log`);
     return "";
@@ -78,25 +81,45 @@ function isActionsReadPermissionError(error) {
  * @returns {string}
  */
 function formatFailedJobsList(jobs) {
-  return jobs
-    .map(job => {
-      const safeName = sanitizeContent(job.name);
-      const steps = job.failed_steps
-        ? `\n\n  Failed step numbers (up to ${MAX_FAILED_STEPS_REPORTED}): ${job.failed_steps.length ? job.failed_steps.map(number => `\`${number}\``).join(", ") : "unavailable"}. See the linked job for details.`
-        : "";
-      const detail = job.error_detail
-        ? `\n\n  \`\`\`text\n${job.error_detail
-            .split("\n")
-            .map(line => `  ${line}`)
-            .join("\n")}\n  \`\`\`\n`
-        : "";
-      if (job.html_url && job.html_url.startsWith("https://")) {
-        const safeUrl = sanitizeContent(job.html_url);
-        return `- [\`${safeName}\`](${safeUrl})${steps}${detail}`;
-      }
-      return `- \`${safeName}\`${steps}${detail}`;
-    })
-    .join("\n");
+  return renderSizedReport({ type: "report", title: "Failed jobs", children: buildFailedJobsList(jobs) }).body.trimEnd();
+}
+
+/**
+ * @param {Array<{name: string, html_url: string | null, error_detail?: string, failed_steps?: number[]}>} jobs
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildFailedJobsList(jobs) {
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportInline} */
+  const text = value => ({ type: "text", value, agentTainted: false });
+  if (!jobs.length) return [];
+  return [
+    {
+      type: "list",
+      ordered: false,
+      agentTainted: false,
+      items: jobs.map(job => {
+        /** @type {import("./report_ast.cjs").ReportInline[]} */
+        const name = [{ type: "code", value: sanitizeContent(job.name), agentTainted: false }];
+        /** @type {import("./report_ast.cjs").ReportBlock[]} */
+        const children = [{ type: "paragraph", children: job.html_url?.startsWith("https://") ? [{ type: "link", url: job.html_url, children: name, agentTainted: false }] : name, agentTainted: false }];
+        if (job.failed_steps) {
+          /** @type {import("./report_ast.cjs").ReportInline[]} */
+          const steps = [];
+          for (const number of job.failed_steps) {
+            if (steps.length) steps.push(text(", "));
+            steps.push({ type: "code", value: String(number), agentTainted: false });
+          }
+          children.push({
+            type: "paragraph",
+            children: [text(`Failed step numbers (up to ${MAX_FAILED_STEPS_REPORTED}): `), ...(steps.length ? steps : [text("unavailable")]), text(". See the linked job for details.")],
+            agentTainted: false,
+          });
+        }
+        if (job.error_detail) children.push({ type: "code_block", language: "text", value: job.error_detail, agentTainted: true });
+        return children;
+      }),
+    },
+  ];
 }
 
 /**
@@ -242,34 +265,45 @@ async function main() {
     core.info(`Found ${failedJobs.length} failed non-builtin job(s): ${failedJobs.map(j => j.name).join(", ")}`);
 
     // Render the issue body from template
-    const failedJobsList = formatFailedJobsList(failedJobs);
+    const failedJobsList = buildFailedJobsList(failedJobs);
     const templatePath = getPromptPath("failed_jobs_issue.md");
-    const issueBodyContent = renderTemplateFromFile(templatePath, {
-      workflow_name: workflowName,
-      workflow_source_url: workflowSourceURL,
-      run_url: runUrl,
-      failed_jobs_list: failedJobsList,
+    const issueBodyContent = parseReportMarkdown(fs.readFileSync(templatePath, "utf8"), {
+      context: {
+        workflow_name: workflowName,
+        workflow_source_url: workflowSourceURL,
+        run_url: runUrl,
+        failed_jobs_list: failedJobsList,
+      },
+      minimumHeadingLevel: 2,
+      agentTainted: false,
     });
-
-    const xmlMarker = generateXMLMarker(workflowName, runUrl);
-    const issueBody = generateFooterWithExpiration({
-      footerText: `${issueBodyContent}\n\n${xmlMarker}`,
-      expiresHours: FAILED_JOBS_ISSUE_EXPIRES_HOURS,
-    });
+    const [workflow, ...fields] = getAgenticWorkflowMetadata(workflowName, runUrl);
 
     const issueTitle = `[aw] Failed jobs: ${workflowName}`;
 
     core.info(`Creating failed jobs issue: "${issueTitle}"`);
 
     try {
-      const newIssue = await createReportIssue(github, {
-        owner,
-        repo,
-        title: issueTitle,
-        body: issueBody,
-        labels: ["agentic-workflows"],
-        headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
-      });
+      const newIssue = await createReportIssue(
+        github,
+        {
+          owner,
+          repo,
+          title: issueTitle,
+          labels: ["agentic-workflows"],
+          headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION },
+        },
+        {
+          type: "report",
+          title: issueTitle,
+          children: [
+            ...issueBodyContent,
+            { type: "expiration", expiresAt: new Date(Date.now() + FAILED_JOBS_ISSUE_EXPIRES_HOURS * 60 * 60 * 1000).toISOString(), agentTainted: false },
+            { type: "xml_marker", name: "gh-aw-agentic-workflow", value: workflow.value, fields, agentTainted: false },
+          ],
+          agentTainted: false,
+        }
+      );
 
       core.info(`Created failed jobs issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
     } catch (error) {

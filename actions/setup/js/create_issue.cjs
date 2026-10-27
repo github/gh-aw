@@ -3,13 +3,15 @@
 
 const { createReportIssue, renderIssueParameters } = require("./issue_report.cjs");
 const { normalizeReportText, normalizeReportTitle } = require("./report_ast.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { sanitizeContent, expandAllowedAliases } = require("./sanitize_content.cjs");
 const { normalizeCloseOlderKey } = require("./generate_footer.cjs");
-const { appendExecutionProvenance } = require("./execution_provenance.cjs");
-const { buildIssueBodyReport } = require("./issue_body.cjs");
+const { appendExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
+const { buildIssueBodyReport, ISSUE_BODY_SUFFIX } = require("./issue_body.cjs");
 const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, getOrGenerateTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
@@ -18,7 +20,6 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { renderTemplateFromFile } = require("./messages_core.cjs");
-const { createExpirationLine, addExpirationToFooter } = require("./ephemerals.cjs");
 const { MAX_SUB_ISSUES, getSubIssueCount, linkSubIssue } = require("./sub_issue_helpers.cjs");
 const { closeOlderIssues, searchOlderIssues } = require("./close_older_issues.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
@@ -234,15 +235,19 @@ async function findOrCreateParentIssue({ githubClient, groupId, owner, repo, tit
   core.info(`Creating new parent issue for group: ${groupId}`);
   try {
     const template = createParentIssueTemplate(groupId, titlePrefix, workflowName, workflowSourceURL, expiresHours);
+    template.children.push(...parseReportMarkdown(appendExecutionProvenance("", workflowName, ""), { allowMetadata: true, agentTainted: false }));
     const { data: parentIssue } = await withRetry(
       () =>
-        createReportIssue(githubClient, {
-          owner,
-          repo,
-          title: template.title,
-          body: appendExecutionProvenance(template.body, workflowName, ""),
-          labels: labels,
-        }),
+        createReportIssue(
+          githubClient,
+          {
+            owner,
+            repo,
+            title: template.title,
+            labels: labels,
+          },
+          template
+        ),
       { initialDelayMs: 15000, maxDelayMs: 45000, jitterMs: 10000 },
       `create_parent_issue for group ${groupId}`
     );
@@ -262,7 +267,7 @@ async function findOrCreateParentIssue({ githubClient, groupId, owner, repo, tit
  * @param {string} workflowName - Name of the workflow
  * @param {string} workflowSourceURL - URL to the workflow source
  * @param {number} [expiresHours=0] - Hours until expiration (0 means no expiration)
- * @returns {any} - Template with title and body
+ * @returns {import("./report_ast.cjs").Report}
  */
 function createParentIssueTemplate(groupId, titlePrefix, workflowName, workflowSourceURL, expiresHours = 0) {
   // Use applyTitlePrefix to ensure proper spacing after prefix
@@ -277,17 +282,24 @@ function createParentIssueTemplate(groupId, titlePrefix, workflowName, workflowS
 
   // Load and render the issue template
   const issueTemplatePath = `${process.env.RUNNER_TEMP}/gh-aw/prompts/issue_group_parent.md`;
-  let body = renderTemplateFromFile(issueTemplatePath, templateContext);
-
-  // Add footer with workflow information
-  const footer = `\n\n> Workflow: [${workflowName}](${workflowSourceURL})`;
-
-  // Add expiration to footer if configured using ephemerals helper
-  const footerWithExpiration = addExpirationToFooter(footer, expiresHours, "Parent Issue");
-
-  body = `${body}${footerWithExpiration}`;
-
-  return { title, body };
+  const children = parseReportMarkdown(renderTemplateFromFile(issueTemplatePath, {}), { context: templateContext, minimumHeadingLevel: 2, allowMetadata: true, agentTainted: false });
+  /** @type {import("./report_ast.cjs").ReportInline[]} */
+  const workflowLabel = [{ type: "text", value: workflowName, agentTainted: false }];
+  /** @type {import("./report_ast.cjs").ReportInline[]} */
+  const workflowReference = workflowSourceURL ? [{ type: "link", url: workflowSourceURL, children: workflowLabel, agentTainted: false }] : workflowLabel;
+  children.push({
+    type: "quote",
+    agentTainted: false,
+    children: [
+      {
+        type: "paragraph",
+        agentTainted: false,
+        children: [{ type: "text", value: "Workflow: ", agentTainted: false }, ...workflowReference],
+      },
+    ],
+  });
+  if (expiresHours > 0) children.push({ type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt: new Date(Date.now() + expiresHours * 60 * 60 * 1000).toISOString(), agentTainted: false }] });
+  return { type: "report", title, children };
 }
 
 /**
@@ -995,7 +1007,8 @@ async function main(config = {}) {
     // Sanitize body content to neutralize @mentions, URLs, and other security risks
     processedBody = sanitizeContent(normalizeReportText(processedBody, { preserveImageAttributes: true }), { allowedAliases: allowedMentionAliases, maxMentions });
 
-    const bodyLines = processedBody.split("\n");
+    const bodyNodes = parseReportMarkdown(stripExecutionProvenance(processedBody), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true, allowedMentions: expandAllowedAliases(allowedMentionAliases) });
+    bodyNodes.push(...(message[ISSUE_BODY_SUFFIX] || []));
 
     if (!title) {
       // Use the first non-empty line of the body as the title fallback rather than
@@ -1094,11 +1107,21 @@ async function main(config = {}) {
     if (effectiveParentIssueNumber) {
       core.info("Detected issue context, parent issue " + effectiveParentRepo + "#" + effectiveParentIssueNumber);
       // Use full repo reference if cross-repo, short reference if same repo
-      if (effectiveParentRepo === qualifiedItemRepo) {
-        bodyLines.push(`Related to #${effectiveParentIssueNumber}`);
-      } else {
-        bodyLines.push(`Related to ${effectiveParentRepo}#${effectiveParentIssueNumber}`);
-      }
+      bodyNodes.push({
+        type: "paragraph",
+        agentTainted: false,
+        children: [
+          { type: "text", value: "Related to ", agentTainted: false },
+          effectiveParentRepo === qualifiedItemRepo
+            ? { type: "issue_reference", number: String(effectiveParentIssueNumber), agentTainted: false }
+            : {
+                type: "link",
+                url: `${context.serverUrl || "https://github.com"}/${effectiveParentRepo}/issues/${effectiveParentIssueNumber}`,
+                children: [{ type: "text", value: `${effectiveParentRepo}#${effectiveParentIssueNumber}`, agentTainted: false }],
+                agentTainted: false,
+              },
+        ],
+      });
     }
 
     const workflowName = process.env.GH_AW_WORKFLOW_NAME ?? "Workflow";
@@ -1106,7 +1129,7 @@ async function main(config = {}) {
     const workflowId = process.env.GH_AW_WORKFLOW_ID ?? "";
     const callerWorkflowId = process.env.GH_AW_CALLER_WORKFLOW_ID ?? "";
     const runUrl = buildWorkflowRunUrl(context, context.repo);
-    const report = buildIssueBodyReport(title, bodyLines.join("\n"), {
+    const report = buildIssueBodyReport(title, bodyNodes, {
       repo: repoParts,
       footer: includeFooter,
       bodyFooter: config.body_footer,
@@ -1394,7 +1417,21 @@ async function main(config = {}) {
               owner: repoParts.owner,
               repo: repoParts.repo,
               issue_number: effectiveParentIssueNumber,
-              body: appendExecutionProvenance(`Created related issue: #${issue.number}`, workflowName, runUrl),
+              body: renderSizedReport({
+                type: "report",
+                title: "Related issue",
+                children: [
+                  {
+                    type: "paragraph",
+                    agentTainted: false,
+                    children: [
+                      { type: "text", value: "Created related issue: ", agentTainted: false },
+                      { type: "issue_reference", number: String(issue.number), agentTainted: false },
+                    ],
+                  },
+                  ...parseReportMarkdown(appendExecutionProvenance("", workflowName, runUrl), { allowMetadata: true, agentTainted: false }),
+                ],
+              }).body.trimEnd(),
             });
             core.info("✓ Added comment to parent issue #" + effectiveParentIssueNumber + " (sub-issue linking not available)");
           } catch (commentError) {

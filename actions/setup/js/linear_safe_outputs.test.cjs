@@ -79,7 +79,7 @@ describe("Linear safe outputs", () => {
     const input = JSON.parse(fetch.mock.calls[0][1].body).variables.input;
     expect(input.title).toBe("\u00e9vidence report");
     expect(input.description).toContain("## Evidence");
-    expect(input.description).toContain("&lt;b&gt;HTML&lt;/b&gt;");
+    expect(input.description).toContain("**HTML**");
     expect(input.description).toContain("- [ ] Review");
   });
 

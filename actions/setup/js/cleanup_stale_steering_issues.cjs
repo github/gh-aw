@@ -3,13 +3,19 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const STEERING_ISSUE_TITLE_PREFIX = "[WIP] ";
 const STEERING_ISSUE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_COMMENT_MARKER = "<!-- gh-aw:stale-steering-issue-cleanup -->";
-const CLEANUP_COMMENT = `This steering issue was left open after its linked workflow run completed successfully. Closing it during scheduled agentic maintenance.
-
-${CLEANUP_COMMENT_MARKER}`;
+const CLEANUP_COMMENT = renderSizedReport({
+  type: "report",
+  title: "Stale steering issue closed",
+  children: [
+    { type: "paragraph", children: [{ type: "text", value: "This steering issue was left open after its linked workflow run completed successfully. Closing it during scheduled agentic maintenance.", agentTainted: false }] },
+    { type: "xml_marker", name: "gh-aw", value: "stale-steering-issue-cleanup", compact: true, agentTainted: false },
+  ],
+}).body.trimEnd();
 
 const OPEN_ISSUES_QUERY = `
   query($owner: String!, $repo: String!, $cursor: String) {

@@ -533,7 +533,7 @@ describe("safe_output_type_validator", () => {
       const result = validateItem({ type, ...fields, body, data }, type, 1, { dataEnabled: true });
 
       expect(result.isValid).toBe(true);
-      expect(result.normalizedItem.body).toBe(`${body}\n\nStructured data:\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``);
+      expect(result.normalizedItem.body).toBe(`${body}\n\nStructured data:\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``);
       expect(result.normalizedItem.body).not.toContain("<details>");
       expect(result.normalizedItem.data).toEqual(data);
     });

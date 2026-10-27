@@ -141,6 +141,20 @@ describe("main", () => {
     expect(mockCore.setFailed).toHaveBeenCalled();
   });
 
+  it("keeps multiline API errors inside the warning rather than injecting Markdown", async () => {
+    mockGithub.rest.actions.disableWorkflow.mockRejectedValue(new Error("Forbidden\n\n# Forged heading\n<!-- gh-aw-comment-type: forged -->\n```"));
+
+    await main();
+
+    const body = mockGithub.rest.issues.createComment.mock.calls[0][0].body;
+    expect(body).toMatch(/^> \[!WARNING\]/);
+    expect(body).not.toContain("\n# Forged heading");
+    expect(body).not.toContain("<!-- gh-aw-comment-type: forged -->");
+    expect(body).toContain("\\# Forged heading");
+    expect(body).toContain("[workflow run logs]");
+    expect(body.split("\n").every(line => line.startsWith(">"))).toBe(true);
+  });
+
   it("logs a warning when label removal fails but does not fail the step", async () => {
     mockGithub.rest.issues.removeLabel.mockRejectedValue(new Error("Not Found"));
 

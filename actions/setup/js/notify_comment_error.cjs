@@ -13,7 +13,10 @@ const { sanitizeContent } = require("./sanitize_content.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { parseBoolTemplatable } = require("./templatable.cjs");
 const { resolveTopLevelDiscussionCommentId } = require("./github_api_helpers.cjs");
-const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+const { normalizeReportAllowedURL } = require("./report_ast.cjs");
 const { buildNoopConclusionSummary } = require("./conclusion_summary.cjs");
 
 /**
@@ -195,57 +198,62 @@ async function main() {
   if (detectionConclusion && detectionConclusion === "failure") {
     // Detection job failed in error mode - report this prominently
     message = getDetectionFailureMessage({
-      workflowName,
-      runUrl,
+      workflowName: "{workflow_name}",
+      runUrl: "{run_url}",
     });
   } else if (detectionConclusion && detectionConclusion === "warning") {
     // Detection job produced a warning (continue-on-error mode)
     // Show success message but append caution section with progressive disclosure
     if (agentConclusion === "success" && assignToAgentErrorCount === 0 && safeOutputsResult !== "failure") {
       message = getRunSuccessMessage({
-        workflowName,
-        runUrl,
+        workflowName: "{workflow_name}",
+        runUrl: "{run_url}",
       });
     } else {
       message = getRunFailureMessage({
-        workflowName,
-        runUrl,
+        workflowName: "{workflow_name}",
+        runUrl: "{run_url}",
         status: getRunFailureStatusText(agentConclusion, assignToAgentErrorCount, safeOutputsResult),
       });
     }
     // Build the caution section for detection warning
     detectionWarningMessage = getDetectionWarningMessage({
-      workflowName,
-      runUrl,
+      workflowName: "{workflow_name}",
+      runUrl: "{run_url}",
       reason: detectionReason,
     });
   } else if (agentConclusion === "success" && assignToAgentErrorCount === 0 && safeOutputsResult !== "failure") {
     message = getRunSuccessMessage({
-      workflowName,
-      runUrl,
+      workflowName: "{workflow_name}",
+      runUrl: "{run_url}",
     });
   } else {
     message = getRunFailureMessage({
-      workflowName,
-      runUrl,
+      workflowName: "{workflow_name}",
+      runUrl: "{run_url}",
       status: getRunFailureStatusText(agentConclusion, assignToAgentErrorCount, safeOutputsResult),
     });
   }
 
-  // Append detection warning caution section if present
+  const templateContext = Object.fromEntries(Array.from((message + detectionWarningMessage).matchAll(/\{(\w+)\}/g), match => [match[1], match[0]]));
+  Object.assign(templateContext, { workflow_name: sanitizeContent(workflowName), run_url: runUrl });
+  const children = parseReportMarkdown(sanitizeContent(message), { context: templateContext, agentTainted: false, minimumHeadingLevel: 2 });
+
+  // Import template and existing Markdown separately so an unclosed fence cannot
+  // consume the following status sections or generated metadata.
   if (detectionWarningMessage) {
-    message += "\n\n" + detectionWarningMessage;
+    children.push(...parseReportMarkdown(sanitizeContent(detectionWarningMessage), { context: templateContext, agentTainted: false, minimumHeadingLevel: 2 }));
   }
 
   // Preserve links (e.g. "Pull request created: #X") that safe outputs appended to the
   // activation comment; otherwise this final status update would overwrite them.
   if (activationCommentLinks) {
-    message += "\n\n" + activationCommentLinks;
+    children.push(...parseReportMarkdown(sanitizeContent(activationCommentLinks), { agentTainted: false, minimumHeadingLevel: 2 }));
   }
 
   // Never fall back to raw agent prose in a public comment if rendering failed.
   if (noopCommentBody) {
-    message += "\n\n" + noopCommentBody;
+    children.push(...parseReportMarkdown(sanitizeContent(noopCommentBody), { agentTainted: true, minimumHeadingLevel: 2 }));
   } else if (noopMessages.length > 0) {
     core.warning("No categorized no-op comment body is available; omitting agent messages from the public comment");
   }
@@ -253,9 +261,15 @@ async function main() {
   // Collect generated asset URLs from safe output jobs
   const generatedAssets = collectGeneratedAssets();
   if (generatedAssets.length > 0) {
-    message += "\n\n";
     generatedAssets.forEach(url => {
-      message += `${url}\n`;
+      /** @type {import("./report_ast.cjs").ReportInline} */
+      let asset = { type: "text", value: sanitizeContent(url), agentTainted: false };
+      try {
+        asset = { type: "link", url: normalizeReportAllowedURL(url), children: [asset] };
+      } catch {
+        // Keep a sanitized visible value when an asset is not an allowed URL.
+      }
+      children.push({ type: "paragraph", children: [asset] });
     });
   }
 
@@ -266,7 +280,7 @@ async function main() {
   const triggeringIssueNumber = context.payload?.issue?.number;
   const triggeringPRNumber = context.payload?.pull_request?.number;
   const triggeringDiscussionNumber = context.payload?.discussion?.number;
-  const markdownParts = assembleMarkdownBodyParts({
+  const markdownParts = assembleReportBodyParts({
     includeFooter: true,
     workflowName,
     runUrl,
@@ -276,7 +290,7 @@ async function main() {
     triggeringPRNumber,
     triggeringDiscussionNumber,
   });
-  const footer = markdownParts.footer;
+  const sanitizedMessage = renderSizedReport({ type: "report", title: "Workflow status", children: [...children, ...markdownParts.footer] }).body.trimEnd();
 
   // Add "needs-review" label when detection produced a warning
   if (detectionConclusion === "warning") {
@@ -329,7 +343,6 @@ async function main() {
               }
             }`;
 
-        const sanitizedMessage = sanitizeContent(message) + "\n\n" + footer;
         const variables = replyToId ? { dId: discussionId, body: sanitizedMessage, replyToId } : { dId: discussionId, body: sanitizedMessage };
         const result = await github.graphql(mutation, variables);
         const created = result?.addDiscussionComment?.comment;
@@ -346,7 +359,6 @@ async function main() {
         return;
       }
 
-      const sanitizedMessage = sanitizeContent(message) + "\n\n" + footer;
       const response = await github.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
         owner: repoOwner,
         repo: repoName,
@@ -383,8 +395,6 @@ async function main() {
 
   // Check if this is a discussion comment (GraphQL node ID format)
   const isDiscussionComment = commentId.startsWith("DC_");
-
-  const sanitizedMessage = sanitizeContent(message) + "\n\n" + footer;
 
   try {
     if (isDiscussionComment) {

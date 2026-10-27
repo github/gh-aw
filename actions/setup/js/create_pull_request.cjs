@@ -1,7 +1,10 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { createReportIssue } = require("./issue_report.cjs");
+const { createReportIssue, buildIssueReport, renderIssueParameters } = require("./issue_report.cjs");
+const { buildIssueBodyReport } = require("./issue_body.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 /** @type {typeof import("fs")} */
 const fs = require("fs");
@@ -20,7 +23,7 @@ const { addExpirationToFooter } = require("./ephemerals.cjs");
 const { generateWorkflowIdMarker, generateWorkflowCallIdMarker, generateCloseKeyMarker, normalizeCloseOlderKey } = require("./generate_footer.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
 const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
-const { appendExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
+const { appendExecutionProvenance, appendReportExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
 const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
 const { getBodyFooterMessage } = require("./messages_footer.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
@@ -33,7 +36,7 @@ const { getBaseBranch } = require("./get_base_branch.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { checkFileProtection, checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
-const { renderTemplateFromFile, renderFilesList, buildProtectedFileList, getPromptPath } = require("./messages_core.cjs");
+const { renderTemplateFromFile, renderFilesList, buildProtectedFileBlocks, getPromptPath } = require("./messages_core.cjs");
 const { withGitHubHostToken } = require("./git_auth_helpers.cjs");
 const { COPILOT_REVIEWER_BOT, FAQ_CREATE_PR_PERMISSIONS_URL } = require("./constants.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
@@ -62,10 +65,11 @@ const {
   mergeFallbackIssueLabels,
   sanitizeFallbackAssignees,
   neutralizeClosingKeywordsForIssueBody,
-  generatePatchPreview,
+  buildPatchPreviewBlocks,
+  buildFallbackIssueBlocks,
   buildManifestProtectionCreatePrUrl,
-  renderManifestProtectionFallbackBody,
-  buildPushErrorSection,
+  buildPushErrorBlocks,
+  buildPushFailureIssueBlocks,
   buildManualBranchRecoveryCommands,
   shellQuote,
 } = require("./create_pull_request_helpers.cjs");
@@ -351,26 +355,24 @@ async function rewriteBundleBranchAsSingleCommit(baseBranch, execApi, bundleFile
  * @param {any} githubClient - Authenticated GitHub client
  * @param {{owner: string, repo: string}} repoParts - Repository owner and name
  * @param {string} title - Issue title
- * @param {string} body - Issue body
+ * @param {string | import("./report_ast.cjs").ReportBlock[] | import("./report_ast.cjs").Report} body - Issue body or complete tree
  * @param {string[]} labels - Issue labels
  * @param {string[] | null} assignees - Sanitized assignees (null = omit field)
  * @param {() => void} assertUnchanged - Check captured transport before each publication attempt
  * @returns {Promise<{data: any, issueRepoParts: {owner: string, repo: string}}>}
  */
 async function createFallbackIssue(githubClient, repoParts, title, body, labels, assignees, assertUnchanged) {
-  body = appendExecutionProvenance(body, process.env.GH_AW_WORKFLOW_NAME || "Workflow", "");
-  if (body.length > MAX_GITHUB_BODY_LENGTH) {
-    throw new Error(`Fallback issue body exceeds GitHub's maximum length of ${MAX_GITHUB_BODY_LENGTH} characters`);
-  }
-
-  const payload = {
-    owner: repoParts.owner,
-    repo: repoParts.repo,
-    title,
-    body,
-    labels,
-    ...(assignees && assignees.length > 0 && { assignees }),
-  };
+  let report = appendReportExecutionProvenance(typeof body === "object" && !Array.isArray(body) ? body : buildIssueReport(title, body), process.env.GH_AW_WORKFLOW_NAME || "Workflow", "");
+  let payload = renderIssueParameters(
+    {
+      owner: repoParts.owner,
+      repo: repoParts.repo,
+      title,
+      labels,
+      ...(assignees && assignees.length > 0 && { assignees }),
+    },
+    report
+  );
 
   const parseRepo = slug => {
     const s = (slug || "").trim();
@@ -404,7 +406,23 @@ async function createFallbackIssue(githubClient, repoParts, title, body, labels,
         // Mutate payload in-place so that any subsequent withRetry attempts also
         // omit assignees and do not re-trigger the same 422 path.
         delete payload.assignees;
-        payload.body = `${payload.body}\n\n> [!NOTE]\n> Assignees (${removedAssignees}) could not be set on this issue due to an API error.`;
+        report = appendReportExecutionProvenance(
+          {
+            ...report,
+            children: [
+              ...report.children,
+              {
+                type: "alert",
+                kind: "NOTE",
+                agentTainted: false,
+                children: [{ type: "paragraph", children: [{ type: "text", value: `Assignees (${removedAssignees}) could not be set on this issue due to an API error.`, agentTainted: false }], agentTainted: false }],
+              },
+            ],
+          },
+          process.env.GH_AW_WORKFLOW_NAME || "Workflow",
+          ""
+        );
+        payload = renderIssueParameters(payload, report);
         return await innerCreate();
       }
 
@@ -425,8 +443,7 @@ async function createFallbackIssue(githubClient, repoParts, title, body, labels,
 
         if (alt) {
           core.warning(`Issues are disabled in ${originalTarget}; retrying fallback issue creation in ${alt.owner}/${alt.repo}`);
-          payload.owner = alt.owner;
-          payload.repo = alt.repo;
+          payload = renderIssueParameters({ ...payload, owner: alt.owner, repo: alt.repo }, report);
           return await innerCreate();
         }
 
@@ -1232,7 +1249,7 @@ async function main(config = {}) {
         const fallbackTitle = applyTitlePrefix(sanitizeTitle(rawFallbackTitle, titlePrefix), titlePrefix);
         const fallbackLabels = mergeFallbackIssueLabels(configFallbackLabels.length > 0 ? configFallbackLabels : envLabels);
         const fallbackTemplatePath = getPromptPath("e003_file_limit_fallback.md");
-        const fallbackBody = renderTemplateFromFile(fallbackTemplatePath, {
+        const fallbackBody = buildFallbackIssueBlocks(fallbackTemplatePath, {
           error_message: errorMessage,
           suggested_limit: patchFileCount,
         });
@@ -1435,6 +1452,12 @@ async function main(config = {}) {
 
       // Sanitize body content to neutralize @mentions, URLs, and other security risks
       processedBody = sanitizeContent(processedBody, { allowedAliases: allowedMentionAliases, maxMentions });
+      const fallbackAgentBody = parseReportMarkdown(neutralizeClosingKeywordsForIssueBody(stripExecutionProvenance(processedBody)), {
+        minimumHeadingLevel: 2,
+        allowMetadata: true,
+        agentTainted: true,
+        allowedMentions: allowedMentionAliases,
+      });
 
       // Auto-add "Fixes #N" closing keyword if triggered from an issue and not already present.
       // This ensures the triggering issue is auto-closed when the PR is merged.
@@ -1444,6 +1467,23 @@ async function main(config = {}) {
         const hasClosingKeyword = /(?:fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+#\d+/i.test(processedBody);
         if (!hasClosingKeyword) {
           processedBody = processedBody.trimEnd() + `\n\n- Fixes #${triggeringIssueNumber}`;
+          fallbackAgentBody.push({
+            type: "list",
+            ordered: false,
+            agentTainted: false,
+            items: [
+              [
+                {
+                  type: "paragraph",
+                  agentTainted: false,
+                  children: [
+                    { type: "text", value: "Related to ", agentTainted: false },
+                    { type: "issue_reference", number: String(triggeringIssueNumber), agentTainted: false },
+                  ],
+                },
+              ],
+            ],
+          });
           core.info(`Auto-added "Fixes #${triggeringIssueNumber}" closing keyword to PR body as bullet point`);
         }
       } else if (triggeringIssueNumber && !autoCloseIssue) {
@@ -1563,15 +1603,51 @@ async function main(config = {}) {
         core.info(`Added stacked pull request metadata to body: ${stackMetadataLines.join(" ")}`);
       }
 
-      // Snapshot the body content (without footer) for use in protected-files fallback ordering.
-      // The protected-files section must appear before the footer (including guard notices such as
-      // the integrity-filtering note) so that the footer always comes last in the issue body.
-      const mainBodyContent = stripExecutionProvenance(bodyLines.join("\n").trim());
-      const issueSafeMainBodyContent = neutralizeClosingKeywordsForIssueBody(mainBodyContent);
+      /** @type {import("./report_ast.cjs").ReportInline[]} */
+      const protectedFileNames = [];
+      for (const file of manifestProtectionRequestReview || []) {
+        if (protectedFileNames.length) protectedFileNames.push({ type: "text", value: ", ", agentTainted: false });
+        protectedFileNames.push({ type: "code", value: file, agentTainted: true });
+      }
+      /** @type {import("./report_ast.cjs").ReportBlock[]} */
+      const fallbackMainBody = [
+        ...(manifestProtectionRequestReview?.length
+          ? buildFallbackIssueBlocks(getPromptPath("manifest_protection_request_review.md"), {
+              files: {
+                type: "inline_slot",
+                children: protectedFileNames,
+              },
+            })
+          : []),
+        ...fallbackAgentBody,
+        ...dependsOnPullRequests.map(number => /** @type {import("./report_ast.cjs").ReportBlock} */ ({
+          type: "paragraph",
+          agentTainted: false,
+          children: [
+            { type: "text", value: "Depends on ", agentTainted: false },
+            { type: "issue_reference", number: String(number), agentTainted: false },
+          ],
+        })),
+      ];
+      if (stackMetadataLines.length)
+        fallbackMainBody.push({
+          type: "json_marker",
+          name: "gh-aw-stack",
+          agentTainted: false,
+          data: {
+            ...(isStackedPullRequest ? { base: baseBranch } : {}),
+            ...(stackMetadata.position !== null ? { position: stackMetadata.position } : {}),
+            ...(stackMetadata.root ? { root: stackMetadata.root } : {}),
+            ...(stackDependencyBranches.length ? { dependencies: stackDependencyBranches } : {}),
+            ...(dependsOnPullRequests.length ? { depends_on: dependsOnPullRequests } : {}),
+          },
+        });
+      /** @param {import("./report_ast.cjs").ReportBlock[]} children */
+      const fallbackFrame = children =>
+        buildIssueBodyReport(title, children, { repo: repoParts, footer: includeFooter, bodyFooter: config.body_footer, expiresHours, closeOlderKey, allowedMentions: allowedMentionAliases, runUrl, itemType: "pull_request" });
 
       // Generate footer using messages template system (respects custom messages.footer config)
       // When footer is disabled, only add XML markers (no visible footer content)
-      const footerParts = [];
       if (includeFooter) {
         const historyUrl =
           generateHistoryUrl({
@@ -1599,14 +1675,12 @@ async function main(config = {}) {
           footer += "\n\n<!-- gh-aw-expires-type: pull-request -->";
         }
         bodyLines.push(``, footer);
-        footerParts.push(footer);
       }
 
       const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
       if (bodyFooter) {
         const renderedBodyFooter = bodyFooter.trimEnd();
         bodyLines.push(``, renderedBodyFooter);
-        footerParts.push(renderedBodyFooter);
       }
 
       // Add standalone workflow-id marker for searchability (consistent with comments)
@@ -1614,9 +1688,7 @@ async function main(config = {}) {
       if (workflowId) {
         const workflowIdMarker = generateWorkflowIdMarker(workflowId);
         // Add to bodyLines for the normal PR body path.
-        // Add to footerParts so the fallback issue body places it after the protected-files section.
         bodyLines.push(``, workflowIdMarker);
-        footerParts.push(workflowIdMarker);
       }
 
       // Embed gh-aw-workflow-call-id marker so callers sharing the same reusable workflow
@@ -1634,12 +1706,6 @@ async function main(config = {}) {
 
       // Prepare the body content
       const body = appendExecutionProvenance(bodyLines.join("\n").trim(), workflowName, runUrl);
-      const issueSafeBody = neutralizeClosingKeywordsForIssueBody(body);
-      // Footer section (footer + workflow-id marker) used when ordering protected-files notices
-      const footerContent = appendExecutionProvenance(footerParts.join("\n\n"), workflowName, runUrl);
-      const issueSafeFooterContent = neutralizeClosingKeywordsForIssueBody(footerContent);
-      const hiddenFallbackMetadata = [callerWorkflowId && generateWorkflowCallIdMarker(callerWorkflowId), closeOlderKey && generateCloseKeyMarker(closeOlderKey)].filter(Boolean).join("\n");
-      const issueSafeFallbackFooter = [issueSafeFooterContent, hiddenFallbackMetadata].filter(Boolean).join("\n");
 
       // Build labels array - merge config labels with message labels
       let labels = [...envLabels];
@@ -1861,40 +1927,25 @@ async function main(config = {}) {
                 const pushFailureMessage = sanitizeContent(neutralizeClosingKeywordsForIssueBody(getErrorMessage(pushError)), { allowedAliases: allowedMentionAliases, maxMentions })
                   .replace(/\s+/g, " ")
                   .trim();
-                const pushErrorSection = buildPushErrorSection(getErrorMessage(pushError), pushFailureMessage);
-                const fallbackBody = `${issueSafeMainBodyContent}
-
----
-
-> [!NOTE]
-> This was originally intended as a pull request, but the git push operation failed.
->
-${pushErrorSection}
->
-> **Workflow Run:** [View run details and download bundle artifact](${runUrl})
->
-> The bundle file is available in the \`agent\` artifact in the workflow run linked above.
-
-<details>
-<summary>Create the pull request manually</summary>
-
-\`\`\`sh
-${recoveryInstructions}
-
-# Push the branch to the target remote
-git push ${shellQuote(pushRemoteUrl || "origin")} ${shellQuote(branchName)}
-
-# Create the pull request
-gh pr create --title ${shellQuote(title)} --base ${shellQuote(baseBranch)} --head ${shellQuote(getPullRequestHeadRef(branchName))} --repo ${shellQuote(`${repoParts.owner}/${repoParts.repo}`)}
-\`\`\`
-
-</details>
-
-${issueSafeFallbackFooter}`;
+                const fallbackBody = buildPushFailureIssueBlocks({
+                  mainBody: fallbackMainBody,
+                  error: buildPushErrorBlocks(getErrorMessage(pushError), pushFailureMessage),
+                  runUrl,
+                  artifact: "bundle",
+                  commands: [
+                    recoveryInstructions,
+                    "",
+                    "# Push the branch to the target remote",
+                    `git push ${shellQuote(pushRemoteUrl || "origin")} ${shellQuote(branchName)}`,
+                    "",
+                    "# Create the pull request",
+                    `gh pr create --title ${shellQuote(title)} --base ${shellQuote(baseBranch)} --head ${shellQuote(getPullRequestHeadRef(branchName))} --repo ${shellQuote(`${repoParts.owner}/${repoParts.repo}`)}`,
+                  ].join("\n"),
+                });
 
                 try {
                   transport.assertUnchanged();
-                  const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackBody, mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
+                  const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackFrame(fallbackBody), mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
 
                   core.info(`Created fallback issue #${issue.number}: ${issue.html_url}`);
                   await assignCopilotToFallbackIssueIfEnabled(issueRepoParts.owner, issueRepoParts.repo, issue.number);
@@ -2219,7 +2270,7 @@ ${issueSafeFallbackFooter}`;
                 const runId = context.runId;
 
                 // Read patch content for preview
-                let patchPreview = "";
+                let patchPreview = buildPatchPreviewBlocks("");
                 if (patchFilePath && fs.existsSync(patchFilePath)) {
                   let patchContent;
                   try {
@@ -2227,7 +2278,7 @@ ${issueSafeFallbackFooter}`;
                   } catch (err) {
                     throw new Error(`Failed to read file ${patchFilePath}: ${getErrorMessage(err)}`, { cause: err });
                   }
-                  patchPreview = generatePatchPreview(patchContent);
+                  patchPreview = buildPatchPreviewBlocks(patchContent);
                 }
 
                 const patchFileName = patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
@@ -2241,41 +2292,26 @@ ${issueSafeFallbackFooter}`;
                 const pushFailureMessage = sanitizeContent(neutralizeClosingKeywordsForIssueBody(getErrorMessage(pushError)), { allowedAliases: allowedMentionAliases, maxMentions })
                   .replace(/\s+/g, " ")
                   .trim();
-                const pushErrorSection = buildPushErrorSection(getErrorMessage(pushError), pushFailureMessage);
-                const fallbackBody = `${issueSafeMainBodyContent}
-
----
-
-> [!NOTE]
-> This was originally intended as a pull request, but the git push operation failed.
->
-${pushErrorSection}
->
-> **Workflow Run:** [View run details and download patch artifact](${runUrl})
->
-> The patch file is available in the \`agent\` artifact in the workflow run linked above.
-
-<details>
-<summary>Create the pull request manually</summary>
-
-\`\`\`sh
-${recoveryInstructions}
-
-# Push the branch to the target remote
-git push ${shellQuote(pushRemoteUrl || "origin")} ${shellQuote(branchName)}
-
-# Create the pull request
-gh pr create --title ${shellQuote(title)} --base ${shellQuote(baseBranch)} --head ${shellQuote(getPullRequestHeadRef(branchName))} --repo ${shellQuote(`${repoParts.owner}/${repoParts.repo}`)}
-\`\`\`
-
-</details>
-${patchPreview}
-
-${issueSafeFallbackFooter}`;
+                const fallbackBody = buildPushFailureIssueBlocks({
+                  mainBody: fallbackMainBody,
+                  error: buildPushErrorBlocks(getErrorMessage(pushError), pushFailureMessage),
+                  runUrl,
+                  artifact: "patch",
+                  patchPreview,
+                  commands: [
+                    recoveryInstructions,
+                    "",
+                    "# Push the branch to the target remote",
+                    `git push ${shellQuote(pushRemoteUrl || "origin")} ${shellQuote(branchName)}`,
+                    "",
+                    "# Create the pull request",
+                    `gh pr create --title ${shellQuote(title)} --base ${shellQuote(baseBranch)} --head ${shellQuote(getPullRequestHeadRef(branchName))} --repo ${shellQuote(`${repoParts.owner}/${repoParts.repo}`)}`,
+                  ].join("\n"),
+                });
 
                 try {
                   transport.assertUnchanged();
-                  const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackBody, mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
+                  const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackFrame(fallbackBody), mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
 
                   core.info(`Created fallback issue #${issue.number}: ${issue.html_url}`);
                   await assignCopilotToFallbackIssueIfEnabled(issueRepoParts.owner, issueRepoParts.repo, issue.number);
@@ -2420,7 +2456,7 @@ ${issueSafeFallbackFooter}`;
         // Use head branch (branchName) for links when push succeeded; fall back to baseBranch
         // for the push-failed case where the head branch is not yet on the remote.
         const branchForLinks = manifestProtectionPushFailedError ? baseBranch : branchName;
-        const fileList = buildProtectedFileList(allFound, githubServer, repoParts.owner, repoParts.repo, branchForLinks);
+        const fileList = buildProtectedFileBlocks(allFound, githubServer, repoParts.owner, repoParts.repo, branchForLinks);
 
         let fallbackBody;
         if (manifestProtectionPushFailedError) {
@@ -2438,9 +2474,9 @@ ${issueSafeFallbackFooter}`;
             tempRef: createBundleTempRef(branchName),
           });
           const pushFailedTemplatePath = getPromptPath("manifest_protection_push_failed_fallback.md");
-          fallbackBody = renderTemplateFromFile(pushFailedTemplatePath, {
-            main_body: issueSafeMainBodyContent,
-            footer: issueSafeFooterContent,
+          fallbackBody = buildFallbackIssueBlocks(pushFailedTemplatePath, {
+            main_body: fallbackMainBody,
+            footer: [],
             files: fileList,
             apply_instructions: applyInstructions,
             branch_name: branchName,
@@ -2451,19 +2487,29 @@ ${issueSafeFallbackFooter}`;
         } else {
           // Normal case — push succeeded, provide compare URL.
           const createPrUrl = buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch, branchName, title, undefined, getPullRequestHeadRef(branchName));
-          fallbackBody = renderManifestProtectionFallbackBody(issueSafeMainBodyContent, issueSafeFooterContent, fileList, createPrUrl);
+          fallbackBody = buildFallbackIssueBlocks(getPromptPath("manifest_protection_create_pr_fallback.md"), {
+            main_body: fallbackMainBody,
+            footer: [],
+            files: fileList,
+            create_pr_url: createPrUrl,
+          });
         }
 
         try {
           transport.assertUnchanged();
-          const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackBody, mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
+          const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackFrame(fallbackBody), mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
 
           core.info(`Created protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
 
           if (!manifestProtectionPushFailedError) {
             try {
               const createPrUrl = buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch, branchName, title, issue.number, getPullRequestHeadRef(branchName));
-              const fallbackBodyWithCloseKeyword = renderManifestProtectionFallbackBody(issueSafeMainBodyContent, issueSafeFooterContent, fileList, createPrUrl);
+              const fallbackBodyWithCloseKeyword = buildFallbackIssueBlocks(getPromptPath("manifest_protection_create_pr_fallback.md"), {
+                main_body: fallbackMainBody,
+                footer: [],
+                files: fileList,
+                create_pr_url: createPrUrl,
+              });
 
               await withRetry(
                 () =>
@@ -2471,7 +2517,7 @@ ${issueSafeFallbackFooter}`;
                     owner: issueRepoParts.owner,
                     repo: issueRepoParts.repo,
                     issue_number: issue.number,
-                    body: fallbackBodyWithCloseKeyword,
+                    body: renderSizedReport(fallbackFrame(fallbackBodyWithCloseKeyword)).body.trimEnd(),
                   }),
                 RATE_LIMIT_RETRY_CONFIG,
                 `update protected-file-protection fallback issue #${issue.number} with auto-close link`
@@ -2613,12 +2659,16 @@ ${issueSafeFallbackFooter}`;
           }
         }
 
+        /** @type {import("./report_ast.cjs").ReportBlock[][]} */
         const requestChangesSections = [];
         if (manifestProtectionRequestReview && manifestProtectionRequestReview.length > 0) {
           const protectedFilesReviewTemplatePath = getPromptPath("manifest_protection_request_changes_review.md");
           requestChangesSections.push(
-            renderTemplateFromFile(protectedFilesReviewTemplatePath, {
-              files: renderFilesList(manifestProtectionRequestReview),
+            buildFallbackIssueBlocks(protectedFilesReviewTemplatePath, {
+              files: {
+                type: "inline_slot",
+                children: protectedFileNames,
+              },
             })
           );
         }
@@ -2626,14 +2676,24 @@ ${issueSafeFallbackFooter}`;
           const detectionReason = process.env.GH_AW_DETECTION_REASON || "unknown";
           const detectionWarningReviewTemplatePath = getPromptPath("threat_warning_request_changes_review.md");
           requestChangesSections.push(
-            renderTemplateFromFile(detectionWarningReviewTemplatePath, {
+            buildFallbackIssueBlocks(detectionWarningReviewTemplatePath, {
               detectionReason,
               runUrl,
             })
           );
         }
         if (requestChangesSections.length > 0) {
-          const requestChangesBody = requestChangesSections.join("\n\n---\n\n");
+          /** @type {import("./report_ast.cjs").ReportBlock[]} */
+          const requestChangesChildren = [];
+          for (const section of requestChangesSections) {
+            if (requestChangesChildren.length) requestChangesChildren.push({ type: "separator", agentTainted: false });
+            requestChangesChildren.push(...section);
+          }
+          const requestChangesBody = renderSizedReport({
+            type: "report",
+            title: "Changes require review",
+            children: requestChangesChildren,
+          }).body.trimEnd();
           /** @type {{ owner: string, repo: string, pull_number: number, event: "REQUEST_CHANGES" | "COMMENT", body: string, commit_id?: string }} */
           const requestChangesParams = {
             owner: repoParts.owner,
@@ -2793,7 +2853,7 @@ ${issueSafeFallbackFooter}`;
           const createPrUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/compare/${encodedBase}...${encodedHead}?expand=1&title=${encodeURIComponent(title)}`;
 
           // Read patch content for preview
-          let patchPreview = "";
+          let patchPreview = buildPatchPreviewBlocks("");
           if (patchFilePath && fs.existsSync(patchFilePath)) {
             let patchContent;
             try {
@@ -2801,13 +2861,13 @@ ${issueSafeFallbackFooter}`;
             } catch (err) {
               throw new Error(`Failed to read file ${patchFilePath}: ${getErrorMessage(err)}`, { cause: err });
             }
-            patchPreview = generatePatchPreview(patchContent);
+            patchPreview = buildPatchPreviewBlocks(patchContent);
           }
 
           const fallbackTemplatePath = getPromptPath("pr_permission_denied_fallback.md");
-          const fallbackBody = renderTemplateFromFile(fallbackTemplatePath, {
-            main_body: issueSafeMainBodyContent,
-            footer: issueSafeFallbackFooter,
+          const fallbackBody = buildFallbackIssueBlocks(fallbackTemplatePath, {
+            main_body: fallbackMainBody,
+            footer: [],
             branch_name: branchName,
             create_pr_url: createPrUrl,
             faq_url: FAQ_CREATE_PR_PERMISSIONS_URL,
@@ -2816,7 +2876,7 @@ ${issueSafeFallbackFooter}`;
 
           try {
             transport.assertUnchanged();
-            const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackBody, mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
+            const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackFrame(fallbackBody), mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
 
             core.info(`Created fallback issue #${issue.number}: ${issue.html_url}`);
             await assignCopilotToFallbackIssueIfEnabled(issueRepoParts.owner, issueRepoParts.repo, issue.number);
@@ -2860,7 +2920,7 @@ ${issueSafeFallbackFooter}`;
         const branchUrl = `${githubServer}/${pushRepoParts.owner}/${pushRepoParts.repo}/tree/${branchName}`;
 
         // Read patch content for preview
-        let patchPreview = "";
+        let patchPreview = buildPatchPreviewBlocks("");
         if (patchFilePath && fs.existsSync(patchFilePath)) {
           let patchContent;
           try {
@@ -2868,30 +2928,43 @@ ${issueSafeFallbackFooter}`;
           } catch (err) {
             throw new Error(`Failed to read file ${patchFilePath}: ${getErrorMessage(err)}`, { cause: err });
           }
-          patchPreview = generatePatchPreview(patchContent);
+          patchPreview = buildPatchPreviewBlocks(patchContent);
         }
 
-        const fallbackBody = `${issueSafeMainBodyContent}
-
----
-
-> [!NOTE]
-> This was originally intended as a pull request, but PR creation failed. The changes have been pushed to the branch [\`${branchName}\`](${branchUrl}).
->
-> **Original error:** ${errorMessage}
-
-To create the pull request manually:
-
-\`\`\`sh
-gh pr create --title "${title}" --base ${baseBranch} --head ${getPullRequestHeadRef(branchName)} --repo ${repoParts.owner}/${repoParts.repo}
-\`\`\`
-${patchPreview}
-
-${issueSafeFallbackFooter}`;
+        /** @type {import("./report_ast.cjs").ReportBlock[]} */
+        const fallbackBody = [
+          ...fallbackMainBody,
+          { type: "separator", agentTainted: false },
+          {
+            type: "alert",
+            kind: "NOTE",
+            agentTainted: false,
+            children: [
+              {
+                type: "paragraph",
+                agentTainted: false,
+                children: [
+                  { type: "text", value: "This was originally intended as a pull request, but PR creation failed. The changes have been pushed to the branch ", agentTainted: false },
+                  { type: "link", url: branchUrl, children: [{ type: "code", value: branchName, agentTainted: true }], agentTainted: false },
+                  { type: "text", value: ".", agentTainted: false },
+                ],
+              },
+              ...buildPushErrorBlocks("", errorMessage),
+            ],
+          },
+          { type: "paragraph", agentTainted: false, children: [{ type: "text", value: "To create the pull request manually:", agentTainted: false }] },
+          {
+            type: "code_block",
+            language: "sh",
+            value: `gh pr create --title ${shellQuote(title)} --base ${shellQuote(baseBranch)} --head ${shellQuote(getPullRequestHeadRef(branchName))} --repo ${shellQuote(`${repoParts.owner}/${repoParts.repo}`)}`,
+            agentTainted: true,
+          },
+          ...patchPreview,
+        ];
 
         try {
           transport.assertUnchanged();
-          const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackBody, mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
+          const { data: issue, issueRepoParts } = await createFallbackIssue(githubClient, repoParts, title, fallbackFrame(fallbackBody), mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees, transport.assertUnchanged);
 
           core.info(`Created fallback issue #${issue.number}: ${issue.html_url}`);
           await assignCopilotToFallbackIssueIfEnabled(issueRepoParts.owner, issueRepoParts.repo, issue.number);

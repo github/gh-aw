@@ -177,7 +177,7 @@ describe("disabled safe-output behavioral parity", () => {
     expect(global.getOctokit).toHaveBeenCalledWith("configured-test-token");
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0][0]).toMatchObject({ owner: "owner", repo: "repo", title: "Ordinary issue" });
-    expect(create.mock.calls[0][0].body).toContain("Body\nRelated to #42");
+    expect(create.mock.calls[0][0].body).toContain("Body\n\nRelated to #42");
     expect(create.mock.calls[0][0].body).toContain("<!-- gh-aw-execution:");
     const entry = JSON.parse(fs.readFileSync(constants.MANIFEST_FILE_PATH, "utf8").trim());
     expect(entry).toMatchObject({ type: "create_issue", number: 19, repo: "owner/repo" });

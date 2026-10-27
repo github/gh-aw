@@ -5,31 +5,27 @@
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
 
-const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
-const { appendExecutionProvenance } = require("./execution_provenance.cjs");
-const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { buildIssueBodyReport, COMMENT_PREAMBLE } = require("./issue_body.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { stripExecutionProvenance } = require("./execution_provenance.cjs");
 const { generateWorkflowCallIdMarker, matchesWorkflowId } = require("./generate_footer.cjs");
 const { getRepositoryUrl } = require("./get_repository_url.cjs");
 const { replaceTemporaryIdReferences, resolveSafeOutputIssueTarget } = require("./temporary_id.cjs");
-const { getTrackerID } = require("./get_tracker_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { parseBoolTemplatable, parseIntTemplatable } = require("./templatable.cjs");
 const { resolveTarget, isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
-const { getMissingInfoSections } = require("./missing_messages_helper.cjs");
 const { getMessages } = require("./messages_core.cjs");
-const { getBodyHeader, getDisclosureHeader } = require("./messages_header.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { MAX_COMMENT_LENGTH, MAX_COMMENT_INPUT_LENGTH, MAX_MENTIONS, MAX_LINKS, enforceCommentLimits } = require("./comment_limit_helpers.cjs");
-const { fitMarkdownBody } = require("./report_size.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { createDiscussionComment, resolveTopLevelDiscussionCommentId } = require("./github_api_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { ERR_CONFIG, ERR_NOT_FOUND } = require("./error_codes.cjs");
 const { isPayloadUserBot } = require("./resolve_mentions.cjs");
 const { getMentionsGithubClient, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
-const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 
 /** @type {string} Safe output type handled by this module */
@@ -829,92 +825,21 @@ async function main(config = {}) {
     }
 
     const linkBody = processedBody;
-    const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
     const runUrl = buildWorkflowRunUrl(context, effectiveEventContext.workflowRepo ?? context.repo);
-    const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE ?? "";
-    const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL ?? "";
-
-    // Compute caution first so prefix assembly preserves the original execution order.
-    const detectionCaution = assembleMarkdownBodyParts({
-      includeFooter: false,
-      workflowName,
+    const bodyNodes = parseReportMarkdown(stripExecutionProvenance(linkBody), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true, allowedMentions: allowedMentionAliases });
+    const report = buildIssueBodyReport("Comment", [...(message[COMMENT_PREAMBLE] || []), ...bodyNodes], {
+      repo: repoParts,
+      footer: includeFooter,
+      bodyFooter: config.body_footer,
+      allowedMentions: allowedMentionAliases,
+      itemType: isDiscussion ? "discussion_comment" : "comment",
       runUrl,
-    }).detectionCaution;
-
-    // Inject body header and disclosure header if configured (placed after caution, before user content)
-    const bodyHeader = getBodyHeader({ workflowName, runUrl });
-    const disclosureHeader = getDisclosureHeader({ workflowName, runUrl });
-
-    // Build prefix: caution (if any) → disclosure header (if any) → body header (if any) → user content
-    const prefixParts = [detectionCaution, disclosureHeader, bodyHeader].filter(Boolean);
-    const bodyPrefix = prefixParts.length > 0 ? prefixParts.join("\n\n") + "\n\n" : "";
-    let bodySuffix = "";
-
-    // Add tracker ID and footer
-    const trackerIDComment = getTrackerID("markdown");
-    if (trackerIDComment) {
-      bodySuffix += "\n\n" + trackerIDComment;
-    }
-
-    // Get triggering context for footer
-    const triggeringIssueNumber = context.payload.issue?.number;
-    const triggeringPRNumber = context.payload.pull_request?.number;
-    const triggeringDiscussionNumber = context.payload.discussion?.number;
-
-    // Generate history URL with type= based on execution context
-    const historyUrl =
-      generateHistoryUrl({
-        owner: repoParts.owner,
-        repo: repoParts.repo,
-        itemType: isDiscussion ? "discussion_comment" : "comment",
-        workflowCallId: callerWorkflowId,
-        workflowId,
-        serverUrl: context.serverUrl,
-      }) || undefined;
-
-    const markdownParts = assembleMarkdownBodyParts({
-      includeFooter,
-      workflowName,
-      runUrl,
-      workflowSource,
-      workflowSourceURL,
-      triggeringIssueNumber,
-      triggeringPRNumber,
-      triggeringDiscussionNumber,
-      historyUrl,
-      markerWhenFooterDisabled: "xml",
+      workflowIdMarker: false,
     });
-
-    if (includeFooter) {
-      // When footer is enabled, add full footer with attribution and XML markers.
-      bodySuffix += "\n\n" + markdownParts.footer;
-    } else {
-      // When footer is disabled, only add XML marker for searchability (no visible attribution text)
-      bodySuffix += "\n\n" + markdownParts.noFooterMarker;
-    }
-    const bodyFooter = getBodyFooterMessage(config.body_footer, { workflowName, runUrl });
-    if (bodyFooter) {
-      bodySuffix += "\n\n" + bodyFooter.trimEnd();
-    }
-
-    // Add workflow-call-id marker when available to allow close-older-comments to
-    // distinguish callers that share the same reusable workflow (and GH_AW_WORKFLOW_ID)
-    if (callerWorkflowId) {
-      bodySuffix += "\n" + generateWorkflowCallIdMarker(callerWorkflowId);
-    }
-
-    const framedBody = bodyPrefix + linkBody + bodySuffix;
-    processedBody = appendExecutionProvenance(framedBody, workflowName, runUrl);
     // Enforce max limits again after adding footer and metadata
     // Length and mention limits include metadata; only agent content counts toward the link limit.
     try {
-      if (processedBody.length > MAX_COMMENT_LENGTH) {
-        // Provenance replaces reserved markers; reserve its actual net overhead, not duplicate markers.
-        const fittingLimit = MAX_COMMENT_LENGTH + framedBody.length - processedBody.length;
-        if (fittingLimit < 1) throw new Error(`E006: Protected execution metadata exceeds the maximum body length of ${MAX_COMMENT_LENGTH} characters`);
-        processedBody = fitMarkdownBody(linkBody, { prefix: bodyPrefix, suffix: bodySuffix, maxLength: fittingLimit, allowedMentions: allowedMentionAliases });
-        processedBody = appendExecutionProvenance(processedBody, workflowName, runUrl);
-      }
+      processedBody = renderSizedReport(report, MAX_COMMENT_LENGTH + 1).body.trimEnd();
       enforceCommentLimits(processedBody, { maxLinks, linkBody });
     } catch (error) {
       const errorMessage = getErrorMessage(error);

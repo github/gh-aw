@@ -5,7 +5,9 @@
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
 
-const { generateFooterWithMessages, getDetectionCautionAlert } = require("./messages_footer.cjs");
+const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
@@ -234,11 +236,12 @@ async function main(config = {}) {
       const sanitizedReason = sanitizeContent(item.reason);
 
       // Inject CAUTION at top of body if threat detection warning was raised
-      const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
-      const cautionPrefix = detectionCaution ? detectionCaution + "\n\n" : "";
-
-      const footer = generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber, undefined, { skipDetectionCaution: true });
-      const commentBody = `${cautionPrefix}${sanitizedReason}\n\n${footer}`;
+      const { detectionCaution, footer } = assembleReportBodyParts({ includeFooter: true, workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber });
+      const commentBody = renderSizedReport({
+        type: "report",
+        title: "Pull request ready for review",
+        children: [...detectionCaution, ...parseReportMarkdown(sanitizedReason, { agentTainted: true, minimumHeadingLevel: 2 }), ...footer],
+      }).body.trimEnd();
 
       await addPullRequestComment(githubClient, prOwner, prRepo, prNumber, commentBody);
 

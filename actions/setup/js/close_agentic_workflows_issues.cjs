@@ -3,6 +3,7 @@
 
 const { resolveExecutionOwnerRepo } = require("./repo_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const TARGET_LABEL = "agentic-workflows";
 // Keep a conservative, explicit upper bound for comment sanitization.
@@ -41,7 +42,18 @@ async function closeIssueAsNotPlanned(issueId) {
  * @returns {string}
  */
 function getNoReproCommentBody(sanitize = sanitizeContent) {
-  const body = sanitize(NO_REPRO_MESSAGE, { maxLength: MAX_COMMENT_BODY_LENGTH });
+  const generatedBody = renderSizedReport(
+    {
+      type: "report",
+      title: "Issue closed",
+      children: [
+        { type: "paragraph", children: [{ type: "text", value: "Closing as no repro.", agentTainted: false }] },
+        { type: "paragraph", children: [{ type: "text", value: "If this is still reproducible, please open a new issue with clear reproduction steps.", agentTainted: false }] },
+      ],
+    },
+    MAX_COMMENT_BODY_LENGTH
+  ).body.trimEnd();
+  const body = sanitize(generatedBody, { maxLength: MAX_COMMENT_BODY_LENGTH });
   if (typeof body !== "string") {
     throw new Error("Close comment body sanitization must return a string");
   }

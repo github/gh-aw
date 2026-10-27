@@ -3,7 +3,8 @@
 
 const { getRunStartedMessage } = require("./messages_run_status.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { ERR_NOT_FOUND, ERR_VALIDATION } = require("./error_codes.cjs");
 const { getMessages } = require("./messages_core.cjs");
@@ -361,29 +362,31 @@ function buildCommentBody(eventName, runUrl, workflowNameOverride, workflowEmoji
   const eventTypeDescription = EVENT_TYPE_DESCRIPTIONS[eventName] ?? "event";
 
   // Sanitize before adding markers (defense in depth for custom message templates)
-  let body = sanitizeContent(getRunStartedMessage({ workflowName, runUrl, eventType: eventTypeDescription, emoji: workflowEmoji }));
+  const template = getRunStartedMessage({ workflowName: "{workflow_name}", runUrl: "{run_url}", eventType: "{event_type}", emoji: "{emoji}" });
+  const templateContext = Object.fromEntries(Array.from(template.matchAll(/\{(\w+)\}/g), match => [match[1], match[0]]));
+  Object.assign(templateContext, { workflow_name: sanitizeContent(workflowName), run_url: runUrl, event_type: eventTypeDescription, emoji: workflowEmoji?.trim() || "🚀" });
+  const children = parseReportMarkdown(sanitizeContent(template), { context: templateContext, agentTainted: false });
 
   // Add lock notice if lock-for-agent is enabled for issues or issue_comment
   if (process.env.GH_AW_LOCK_FOR_AGENT === "true" && (eventName === "issues" || eventName === "issue_comment")) {
-    body += "\n\n🔒 This issue has been locked while the workflow is running to prevent concurrent modifications.";
+    children.push({ type: "paragraph", children: [{ type: "text", value: "🔒 This issue has been locked while the workflow is running to prevent concurrent modifications.", agentTainted: false }] });
   }
 
   // Add workflow-id marker for hide-older-comments feature
   const workflowId = process.env.GITHUB_WORKFLOW || "";
   if (workflowId) {
-    body += `\n\n${generateWorkflowIdMarker(workflowId)}`;
+    children.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: workflowId, agentTainted: false });
   }
 
   // Add tracker-id marker for backwards compatibility
   const trackerId = process.env.GH_AW_TRACKER_ID || "";
   if (trackerId) {
-    body += `\n\n<!-- gh-aw-tracker-id: ${trackerId} -->`;
+    children.push({ type: "xml_marker", name: "gh-aw-tracker-id", value: trackerId, agentTainted: false });
   }
 
   // Identify this as a reaction comment (prevents it from being hidden by hide-older-comments)
-  body += `\n\n<!-- gh-aw-comment-type: reaction -->`;
-
-  return body;
+  children.push({ type: "xml_marker", name: "gh-aw-comment-type", value: "reaction", agentTainted: false });
+  return renderSizedReport({ type: "report", title: "Workflow status", children }).body.trimEnd();
 }
 
 /**

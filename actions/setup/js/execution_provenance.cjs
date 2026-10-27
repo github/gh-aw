@@ -104,6 +104,39 @@ function appendExecutionProvenance(body, workflowName, _runUrl) {
 }
 
 /**
+ * Replace reserved attribution structurally before the final document render.
+ * @param {import("./report_ast.cjs").Report} report
+ * @param {string} workflowName
+ * @param {string} runUrl
+ * @returns {import("./report_ast.cjs").Report}
+ */
+function appendReportExecutionProvenance(report, workflowName, runUrl) {
+  const { parseReportMarkdown } = require("./report_markdown.cjs");
+  /** @param {import("./report_ast.cjs").ReportBlock[]} nodes @returns {import("./report_ast.cjs").ReportBlock[]} */
+  const blocks = nodes =>
+    nodes
+      .filter(node => !((node.type === "xml_marker" || node.type === "json_marker") && ["gh-aw-agentic-workflow", "gh-aw-execution"].includes(node.name)))
+      .map(node => {
+        if (node.type === "quote" || node.type === "alert" || node.type === "details") return { ...node, children: blocks(node.children) };
+        if (node.type === "list") return { ...node, items: node.items.map(blocks) };
+        return node;
+      });
+  const { footer, ...document } = report;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const footerBlocks = [];
+  if (footer) {
+    footerBlocks.push(...blocks(footer.children));
+    if (footer.expiresAt) footerBlocks.push({ type: "quote", agentTainted: false, children: [{ type: "expiration", expiresAt: footer.expiresAt, agentTainted: false }] });
+    footerBlocks.push(...footer.markers.filter(marker => !["gh-aw-agentic-workflow", "gh-aw-execution"].includes(marker.name)));
+  }
+  return {
+    ...document,
+    children: [...blocks(report.children), ...footerBlocks, ...parseReportMarkdown(appendExecutionProvenance("", workflowName, runUrl), { allowMetadata: true, agentTainted: false })],
+    ...(report.preamble ? { preamble: blocks(report.preamble) } : {}),
+  };
+}
+
+/**
  * Resolve an execution marker to an Actions job without relying on job names.
  * The client must have Actions read access in the execution repository.
  * @param {any} github
@@ -136,4 +169,4 @@ async function resolvePublishingJobId(github, metadata) {
   return String(matches[0].id);
 }
 
-module.exports = { appendExecutionProvenance, stripExecutionProvenance, resolvePublishingJobId };
+module.exports = { appendExecutionProvenance, appendReportExecutionProvenance, stripExecutionProvenance, resolvePublishingJobId };

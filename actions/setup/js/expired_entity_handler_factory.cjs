@@ -1,7 +1,10 @@
 // @ts-check
 // <reference types="@actions/github-script" />
 
-const { generateExpiredEntityFooter, getExpiredEntityCautionAlert } = require("./generate_footer.cjs");
+const { getExpiredEntityCautionAlert } = require("./generate_footer.cjs");
+const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { formatDateInProjectTimeZone } = require("./project_timezone.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 
@@ -37,10 +40,36 @@ function createClosedRecord(entity) {
  * @returns {string}
  */
 function createExpiredEntityClosingMessage({ entity, entityNoun, workflowName, workflowId, runUrl, footerSuffix = "" }) {
-  const cautionAlert = getExpiredEntityCautionAlert(workflowName, runUrl);
+  const cautionAlert = getExpiredEntityCautionAlert(workflowName, "{run_url}");
   const expirationText = `This ${entityNoun} was automatically closed because it expired on ${formatDateInProjectTimeZone(entity.expirationDate) || entity.expirationDate.toISOString()}.`;
 
-  return (cautionAlert ? cautionAlert + "\n\n" : "") + expirationText + generateExpiredEntityFooter(workflowName, runUrl, workflowId) + footerSuffix;
+  const { noFooterMarker } = assembleReportBodyParts({ includeFooter: false, workflowName, runUrl, markerWhenFooterDisabled: "xml" });
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const children = [
+    ...parseReportMarkdown(cautionAlert, { context: { run_url: runUrl }, agentTainted: false, allowFlagMarkers: true }),
+    { type: "paragraph", children: [{ type: "text", value: expirationText, agentTainted: false }] },
+    {
+      type: "quote",
+      children: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "text", value: "Closed by ", agentTainted: false },
+            { type: "link", url: runUrl, children: [{ type: "text", value: workflowName, agentTainted: false }] },
+          ],
+        },
+      ],
+    },
+    { type: "xml_marker", name: "gh-aw-expired-comments", agentTainted: false },
+  ];
+  if (workflowId) children.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: workflowId, agentTainted: false });
+  children.push(...noFooterMarker);
+  if (footerSuffix.trim() === "<!-- gh-aw-closed -->") {
+    children.push({ type: "xml_marker", name: "gh-aw-closed", agentTainted: false });
+  } else {
+    children.push(...parseReportMarkdown(footerSuffix, { allowMetadata: true, agentTainted: false }));
+  }
+  return renderSizedReport({ type: "report", title: "Expired entity closed", children }).body.trimEnd();
 }
 
 /**

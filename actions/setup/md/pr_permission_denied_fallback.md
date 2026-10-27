@@ -18,6 +18,8 @@
 
 > The changes have been pushed to branch `{branch_name}` and are ready to review.
 
-To fix the permissions issue, go to **Settings** → **Actions** → **General** and enable **Allow GitHub Actions to create and approve pull requests**. See also: [gh-aw FAQ]({faq_url}){patch_preview}
+To fix the permissions issue, go to **Settings** → **Actions** → **General** and enable **Allow GitHub Actions to create and approve pull requests**. See also: [gh-aw FAQ]({faq_url})
+
+{patch_preview}
 
 {footer}

@@ -8,7 +8,7 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const promptsDir = path.join(os.tmpdir(), "gh-aw-test-prompts");
 fs.mkdirSync(promptsDir, { recursive: true });
-fs.writeFileSync(path.join(promptsDir, "missing_tool_issue.md"), "# Incomplete\n\n{{incomplete_signals_list}}\n");
+fs.writeFileSync(path.join(promptsDir, "missing_tool_issue.md"), "# Incomplete\n\n{incomplete_signals_list}\n");
 process.env.GH_AW_PROMPTS_DIR = promptsDir;
 
 const mockCore = {

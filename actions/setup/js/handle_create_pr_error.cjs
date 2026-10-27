@@ -3,7 +3,7 @@
 
 const { createReportIssue } = require("./issue_report.cjs");
 
-const { sanitizeContent } = require("./sanitize_content.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { FAQ_CREATE_PR_PERMISSIONS_URL } = require("./constants.cjs");
 
@@ -36,31 +36,65 @@ async function main() {
 
   const issueTitle = "[aw] GitHub Actions needs permission to create pull requests";
 
-  const issueBody =
-    "## GitHub Actions Permission Required\n\n" +
-    "The workflow **" +
-    workflowName +
-    "** attempted to create a pull request but failed because GitHub Actions is not permitted to create or approve pull requests in this repository.\n\n" +
-    "### How to Fix\n\n" +
-    "1. Go to **Settings** → **Actions** → **General**\n" +
-    "2. Scroll to the **Workflow permissions** section\n" +
-    "3. Check the box: **Allow GitHub Actions to create and approve pull requests**\n" +
-    "4. Click **Save**\n\n" +
-    "### Documentation\n\n" +
-    "For more information, see:\n" +
-    "- [gh-aw FAQ: Why is my create-pull-request workflow failing?](" +
-    FAQ_CREATE_PR_PERMISSIONS_URL +
-    ")\n" +
-    "- [Managing GitHub Actions settings for a repository](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests)\n\n" +
-    "### Workflow Details\n\n" +
-    "- **Workflow**: " +
-    workflowName +
-    "\n" +
-    "- **Run**: " +
-    runUrl +
-    "\n" +
-    (workflowSourceURL ? "- **Source**: [" + workflowSource + "](" + workflowSourceURL + ")\n" : "") +
-    "\n";
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportInline} */
+  const text = value => ({ type: "text", value, agentTainted: false });
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+  const paragraph = value => ({ type: "paragraph", children: [text(value)], agentTainted: false });
+  /** @param {string} value @param {number} level @returns {import("./report_ast.cjs").ReportBlock} */
+  const heading = (value, level) => ({ type: "heading", level, children: [text(value)], agentTainted: false });
+  /** @param {string} label @param {string} url @returns {import("./report_ast.cjs").ReportInline} */
+  const link = (label, url) => ({ type: "link", url, children: [text(label)], agentTainted: false });
+  /** @type {import("./report_ast.cjs").ReportBlock[][]} */
+  const sourceItem = workflowSourceURL ? [[{ type: "paragraph", children: [text("Source: "), link(workflowSource, workflowSourceURL)] }]] : [];
+  /** @type {import("./report_ast.cjs").Report} */
+  const report = {
+    type: "report",
+    title: issueTitle,
+    agentTainted: false,
+    children: [
+      heading("GitHub Actions Permission Required", 2),
+      {
+        type: "paragraph",
+        children: [
+          text("The workflow "),
+          { type: "strong", children: [text(workflowName)] },
+          text(" attempted to create a pull request but failed because GitHub Actions is not permitted to create or approve pull requests in this repository."),
+        ],
+      },
+      heading("How to Fix", 3),
+      {
+        type: "list",
+        ordered: true,
+        items: ["Go to Settings → Actions → General", "Scroll to the Workflow permissions section", "Check the box: Allow GitHub Actions to create and approve pull requests", "Click Save"].map(value => [paragraph(value)]),
+      },
+      heading("Documentation", 3),
+      paragraph("For more information, see:"),
+      {
+        type: "list",
+        ordered: false,
+        items: [
+          [{ type: "paragraph", children: [link("gh-aw FAQ: Why is my create-pull-request workflow failing?", FAQ_CREATE_PR_PERMISSIONS_URL)] }],
+          [
+            {
+              type: "paragraph",
+              children: [
+                link(
+                  "Managing GitHub Actions settings for a repository",
+                  "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests"
+                ),
+              ],
+            },
+          ],
+        ],
+      },
+      heading("Workflow Details", 3),
+      {
+        type: "list",
+        ordered: false,
+        items: [[paragraph(`Workflow: ${workflowName}`)], [{ type: "paragraph", children: [text("Run: "), ...(runUrl ? [link(runUrl, runUrl)] : [])] }], ...sourceItem],
+      },
+    ],
+  };
 
   // Search for existing issue with the same title
   const searchQuery = "repo:" + owner + "/" + repo + ' is:issue is:open in:title "' + issueTitle + '"';
@@ -76,7 +110,7 @@ async function main() {
       core.info("Issue already exists: #" + existingIssue.number);
 
       // Add a comment with run details
-      const commentBody = sanitizeContent("This error occurred again in workflow run: " + runUrl);
+      const commentBody = renderSizedReport({ type: "report", title: issueTitle, children: [{ type: "paragraph", children: [text("This error occurred again in workflow run: "), ...(runUrl ? [link(runUrl, runUrl)] : [])] }] }).body;
       await github.rest.issues.createComment({
         owner,
         repo,
@@ -86,13 +120,16 @@ async function main() {
       core.info("Added comment to existing issue #" + existingIssue.number);
     } else {
       // Create new issue
-      const { data: issue } = await createReportIssue(github, {
-        owner,
-        repo,
-        title: issueTitle,
-        body: sanitizeContent(issueBody),
-        labels: ["agentic-workflows", "configuration"],
-      });
+      const { data: issue } = await createReportIssue(
+        github,
+        {
+          owner,
+          repo,
+          title: issueTitle,
+          labels: ["agentic-workflows", "configuration"],
+        },
+        report
+      );
       core.info("Created issue #" + issue.number + ": " + issue.html_url);
     }
   } catch (error) {
