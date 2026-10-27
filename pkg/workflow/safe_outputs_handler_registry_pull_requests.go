@@ -40,6 +40,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 			AddStringSlice("allowed_files", c.AllowedFiles).
 			AddStringSlice("excluded_files", c.ExcludedFiles).
+			AddIfTrue("exclude_lock_yml", c.ExcludeLockYml).
 			AddIfNotEmpty("patch_format", c.PatchFormat).
 			AddBoolPtr("fallback_as_pull_request", c.FallbackAsPullRequest).
 			AddBoolPtr("signed_commits", c.SignedCommits).
@@ -286,6 +287,7 @@ func newCreatePullRequestHandlerConfigBuilder(cfg *SafeOutputsConfig, c *CreateP
 		AddStringSlice("_protected_files_exclude", defaultProtectedFilesExclude(c.ProtectedFilesExclude)).
 		AddStringSlice("allowed_files", c.AllowedFiles).
 		AddStringSlice("excluded_files", c.ExcludedFiles).
+		AddIfTrue("exclude_lock_yml", c.ExcludeLockYml).
 		AddIfTrue("preserve_branch_name", c.PreserveBranchName).
 		AddIfTrue("recreate_ref", c.RecreateRef).
 		AddIfNotEmpty("patch_format", c.PatchFormat).

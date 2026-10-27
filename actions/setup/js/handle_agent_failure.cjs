@@ -4235,7 +4235,7 @@ async function main() {
     }
     const taskCompleteRegistrationIssueOnlyReportIncomplete = agentOutputResult.success && shouldIgnoreTaskCompleteRegistrationReports(agentOutputResult.items);
     const collectorEmptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
-    const isCancelledMissingTerminalOutput = agentConclusion === "cancelled" && collectorEmptyOutputCause === "missing_terminal_safe_output";
+    const isCancelledEmptyOutput = agentConclusion === "cancelled" && ["missing_terminal_safe_output", "agent_startup_failure"].includes(collectorEmptyOutputCause);
 
     if (agentConclusion === "success") {
       if (!agentOutputResult.success || !agentOutputResult.items || agentOutputResult.items.length === 0) {
@@ -4278,8 +4278,8 @@ async function main() {
     // safe outputs such as add_comment, preventing a tool-failure narrative from being
     // classified as a successful review or other completed task.
     if (agentOutputResult.success && agentOutputResult.items && agentOutputResult.items.length > 0) {
-      // Cancellation can interrupt the agent before it emits a terminal safe output.
-      const reportIncompleteItems = agentOutputResult.items.filter(item => item.type === "report_incomplete" && !(isCancelledMissingTerminalOutput && item.reason === collectorEmptyOutputCause));
+      // Cancellation can interrupt the agent before it starts or emits a terminal safe output.
+      const reportIncompleteItems = agentOutputResult.items.filter(item => item.type === "report_incomplete" && !(isCancelledEmptyOutput && item.reason === collectorEmptyOutputCause));
       if (reportIncompleteItems.length > 0) {
         if (taskCompleteRegistrationIssueOnlyReportIncomplete) {
           core.info("Ignoring report_incomplete signal(s) caused only by task_complete registration trouble after successful task-level outputs");
@@ -4500,14 +4500,14 @@ async function main() {
     const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
     // A model mismatch explains generic empty output, but not a fatal final runtime signal.
     const hasModelConfigurationError = hasModelEndpointMismatch || modelNotSupportedError;
-    const collectorFailureCause = agentOutputResult.success && !isCancelledMissingTerminalOutput ? agentOutputResult.collectorFailureCause : undefined;
+    const collectorFailureCause = agentOutputResult.success && !isCancelledEmptyOutput ? agentOutputResult.collectorFailureCause : undefined;
     const modelConfigurationExplainsEmptyOutput = hasModelConfigurationError && !failureDiagnostics.secretRedactionFailed && !["agent_startup_failure", "driver_crash"].includes(collectorFailureCause);
-    const emptyOutputCause = modelConfigurationExplainsEmptyOutput || isCancelledMissingTerminalOutput ? undefined : collectorEmptyOutputCause;
+    const emptyOutputCause = modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorEmptyOutputCause;
     const terminalOutputFailureCause = failureDiagnostics.secretRedactionFailed ? "secret_redaction_failure" : modelConfigurationExplainsEmptyOutput ? undefined : collectorFailureCause;
     const reportItems = (Array.isArray(agentOutputResult.items) ? agentOutputResult.items : []).filter(
       item =>
         !(modelConfigurationExplainsEmptyOutput && collectorEmptyOutputCause && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause && typeof item.failureCause === "string") &&
-        !(isCancelledMissingTerminalOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
+        !(isCancelledEmptyOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
     );
     const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
     const issueTitle = buildFailureIssueTitle({
