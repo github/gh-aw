@@ -1,16 +1,16 @@
 # PR Triage Summary
 
-- Run: 2026-10-26T18:38:27Z
-- Open Copilot PRs: 5
-- Eligible PRs: 1
-- Skipped by cooldown: 4
+- Run: 2026-10-27T00:56:52Z
+- Open Copilot PRs: 0
+- Eligible PRs: 0
+- Skipped by cooldown: 6
 
 ## Selected candidates
-- #70952 — Model routing: accept none/max for pinned Codex and add routed Codex smoke
+- None
 
 ## Batch
 - None
 
 ## Notes
-- Only one app/github-copilot PR was outside the 1-hour eligibility window.
-- The remaining open Copilot PRs were updated within the last hour and were skipped per policy.
+- No open app/github-copilot PRs were identified in github/gh-aw.
+- All open PRs in this repository were updated within the last hour and were skipped under the 1-hour cooldown policy.

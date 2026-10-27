@@ -1,65 +1,23 @@
 {
-  "run_date": "2026-10-26T18:41:46.641432Z",
-  "run_id": "40378965524",
+  "run_date": "2026-10-27T00:56:52Z",
+  "run_id": "40429308880",
   "source": "pr-triage",
-  "eligible_total": 1,
-  "cooldown_skipped": 4,
-  "open_copilot_prs": 5,
-  "category_counts": {
-    "feature": 1
-  },
-  "risk_counts": {
-    "medium": 1
-  },
-  "priority_counts": {
-    "high": 1
-  },
-  "action_counts": {
-    "fast_track": 1
-  },
+  "eligible_total": 0,
+  "cooldown_skipped": 6,
+  "open_copilot_prs": 0,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
+  "action_counts": {},
   "batches": [],
-  "selected_candidates": [
-    70952
-  ],
+  "selected_candidates": [],
   "skipped_prs": [
-    {
-      "number": 72146,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72138,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 72133,
-      "reason": "opened/updated within the past hour"
-    },
-    {
-      "number": 71934,
-      "reason": "opened/updated within the past hour"
-    }
+    {"number": 72259, "reason": "opened/updated within the past hour"},
+    {"number": 72258, "reason": "opened/updated within the past hour"},
+    {"number": 72217, "reason": "opened/updated within the past hour"},
+    {"number": 72164, "reason": "opened/updated within the past hour"},
+    {"number": 72157, "reason": "opened/updated within the past hour"},
+    {"number": 71506, "reason": "opened/updated within the past hour"}
   ],
-  "notes": "Only one eligible app/github-copilot PR remained outside the 1-hour cooldown window. Four open Copilot PRs were updated within the last hour and skipped per policy.",
-  "pr_details": [
-    {
-      "number": 70952,
-      "title": "Model routing: accept none/max for pinned Codex and add routed Codex smoke",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "high",
-      "score": 72,
-      "impact": 34,
-      "urgency": 20,
-      "quality": 18,
-      "action": "fast_track",
-      "ci": "mixed",
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot"
-      ]
-    }
-  ]
+  "notes": "No open app/github-copilot PRs were found in github/gh-aw. All current open PRs were updated within the last hour and remained under the 1-hour cooldown window."
 }
