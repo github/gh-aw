@@ -296,6 +296,22 @@
         "Smoke Copilot failed 1/1 on copilot/harness-retries-telemetry -- flagged for manual review.",
         "0/10 open PRs orphaned (max gate=3) -> NORMAL, 54th healthy day. Standard run (roll=50)."
       ]
+    },
+    {
+      "date": "2026-10-27",
+      "sessions_analyzed": 50,
+      "completion_rate": 40.0,
+      "average_duration_minutes": 9.717,
+      "median_duration_minutes": 0.0,
+      "orphaned_rate": 0.0,
+      "orphan_candidates": 0,
+      "experimental_strategy": null,
+      "key_insights": [
+        "40.0% completion (20/50), -34pts vs 10-26 (74.0%), reverting to the ~30-day mean (41.7%)",
+        "3/50 events.jsonl transcripts recovered (3rd consecutive logged day, same 3 review-bot workflow names as 10-21/10-26): PR Code Quality Reviewer, Matt Pocock Skills Reviewer, Test Quality Sentinel; combined tool success 93/94=98.9%; 1 bash call hard-denied by workflow tool permissions",
+        "provenance 94.4% bot-driven (17/18 non-ambiguous successes); true-agentic 1/1=100%",
+        "2 branches (82%/18% split); orphan 0/5 open PRs -> NORMAL, 55th consecutive healthy day"
+      ]
     }
   ],
   "last_updated": "2026-10-26",
