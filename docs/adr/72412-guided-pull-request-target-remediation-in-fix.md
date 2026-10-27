@@ -1,52 +1,52 @@
 # ADR-72412: Guided pull_request_target Remediation in `gh aw fix` with Conservative Role Restriction
 
-**Date**: 2026-05-06
-**Status**: Draft
-**Deciders**: pelikhan, Copilot (PR #72412) [TODO: verify]
+**Date**: 2026-10-27
+**Status**: Proposed
+**Deciders**: @pelikhan (user and PR author)
+
+@pelikhan approved the scope below during planning. This record documents that decision for [PR #72412](https://github.com/github/gh-aw/pull/72412), which remains under review; it does not claim approval from other maintainers.
 
 ---
 
 ### Context
 
-Strict-mode compilation rejects risky `pull_request_target` workflows: ones where checkout is enabled without a trusted ref, or where `on.roles` admits `read` or `all`. These are "pwn request" attack vectors that expose repository secrets to untrusted contributors. The daily cross-repo compatibility audit (#72369) found real repositories (`vaadin/flow`, `ohcnetwork/care_fe`) stuck on these errors. `gh aw fix --write` offered no remediation, so users had to choose a fix by hand and were tempted to use blanket `strict: false` opt-outs. Any fix tooling must not weaken security on its own. In particular, it must never add `acknowledge-risk: true` automatically, because doing so would silently approve a security trade-off on the user's behalf.
+Strict-mode compilation rejects `pull_request_target` workflows with unsafe checkouts or `on.roles` admitting `read` or `all`, because privileged execution can expose repository secrets to untrusted contributors. The [cross-repo compatibility audit in #72369](https://github.com/github/gh-aw/issues/72369) identified missing remediation guidance for these failures. The existing checkout auto-fix handles some workflows, but cannot resolve every unsafe configuration or choose a workflow's intended trust boundary. Fix tooling must provide a path forward without adding risk acknowledgments, checkout allowlists, or security-loosening settings on the user's behalf.
 
 ### Decision
 
-We will add two codemods to `gh aw fix`. The first, `pull-request-target-restrict-roles`, is an automatic early codemod. It removes `read`/`all` from `on.roles`, keeps any other explicitly listed valid roles, and falls back to `[admin, maintainer, write]` when no roles remain. The second, `pull-request-target-guided-error`, is a late codemod that does not modify the file (it is marked `Guided: true`). It runs the same lint rules the compiler enforces (`PullRequestTargetCheckoutRule`, `PullRequestTargetRolesRule`) after all automatic migrations. If problems remain, it returns an actionable error that lists the manual options. This error blocks every write to that workflow, so `fix` never saves a partly remediated file. Automatic changes are limited to edits that only tighten security. Any change that requires judgment is left to a human, and compiler enforcement is unchanged.
+Add two codemods to `gh aw fix`, combining automatic role restriction with manual guidance as explicitly chosen by @pelikhan. The automatic `pull-request-target-restrict-roles` codemod removes `read` and `all` from `on.roles`, preserving the other explicitly listed supported roles; only when removing unsafe roles leaves none does it use `[admin, maintainer, write]`.
+
+The non-mutating `pull-request-target-guided-error` codemod runs after automatic migrations and reuses the compiler's authored security lint rules for checkout and role restrictions, rather than duplicating detection policy or resolving imports. Remaining errors explain manual choices, including disabling unnecessary checkout, selecting a trusted base checkout, reviewing an exact external repository/ref allowlist, or switching to `pull_request` after reviewing permission and secret requirements.
+
+A guided error prevents all pending codemod edits to that workflow from being written, preserving atomic per-file remediation rather than saving a partially fixed workflow. Both new codemods skip explicit `strict: false` and workflows without `pull_request_target`; the existing checkout auto-fix and compiler enforcement remain unchanged. Neither new codemod adds `acknowledge-risk`, `allowed-checkouts`, or security-loosening settings automatically: acknowledgment suppresses only the trigger-risk warning, not checkout or role restrictions.
 
 ### Alternatives Considered
 
 #### Alternative 1: Guided error only (no automatic changes)
 
-Emit only a manual-fix message and change nothing. This is the cheapest option and was listed first in #72369. It was not chosen because restricting roles is a security-tightening change with a clear safe default. Making users perform it by hand adds friction for no safety benefit.
+Emit only manual guidance for the new remediation cases. This minimizes automatic edits and leaves admission choices entirely to workflow authors. @pelikhan instead chose automatic role restriction as well, because removing untrusted roles tightens admission while preserving explicitly listed supported roles and avoids an unnecessary manual migration.
 
 #### Alternative 2: Fully automatic remediation, including risk acknowledgment or trigger switching
 
-Have `fix` pick a fix on its own, for example by adding `on.pull_request_target.acknowledge-risk: true`, switching to `pull_request`, or rewriting checkouts. This was rejected because acknowledgment silently weakens security. A trigger switch changes permission and secret semantics, which the tool cannot evaluate. Checkout choices such as trusted refs or `allowed-checkouts` require a human to review the repository and ref.
+Automatically choose every remaining fix, for example by adding `on.pull_request_target.acknowledge-risk: true`, switching to `pull_request`, or rewriting explicitly configured checkouts. This could eliminate manual intervention, but acknowledgment cannot satisfy checkout or role restrictions and must not silently approve risk. Trigger changes alter permissions and secret availability, and choosing a trusted ref or an `allowed-checkouts` entry requires repository-specific judgment. These choices remain manual without changing the existing conservative checkout auto-fix.
 
 #### Alternative 3: Implement separate detection logic inside the codemod
 
-Write standalone YAML inspection in the codemod instead of reusing `pkg/workflow/lint` rules. This was rejected because two implementations could drift and give different answers. Reusing the compiler's lint rules keeps `fix` guidance consistent with what compilation rejects.
+Detect unsafe checkouts and role admission independently in the guided codemod instead of reusing `pkg/workflow/lint` rules. Although this could tailor detection to the fix command, parallel policy implementations could drift. Reusing the authored lint rules keeps guidance aligned with compiler policy without claiming the fix command performs full compilation.
 
 ### Consequences
 
 #### Positive
 - Users get one-step remediation for unsafe roles, plus explicit guidance on the remaining choices, instead of a dead-end compile error.
-- No automatic action weakens security: acknowledgment is never added, and compiler enforcement is unchanged.
-- Detection reuses the compiler's lint rules, so `fix` and `compile` agree on what is unsafe.
+- The new codemods never add risk acknowledgments, checkout allowlists, or security opt-outs, and compiler enforcement is unchanged.
+- Reusing authored lint rules reduces policy drift between guidance and compilation.
 - Blocking all writes when a manual issue remains keeps per-workflow edits atomic, so no partially fixed file is saved.
 
 #### Negative
-- The fallback roles `[admin, maintainer, write]` may be stricter than some workflows intend, and the authors of those workflows must widen the list again by hand.
+- Removing `read` or `all` narrows admission and can exclude previously admitted contributors; authors must review whether the remaining trusted roles or fallback fit their workflow.
 - When a guided error fires, other unrelated codemod changes to the same workflow are also held back until the manual blocker is resolved.
-- The checks look at authored configuration only. Issues brought in through imports still surface only at `gh aw compile --strict`.
-- Codemods with invalid or non-string role entries return errors instead of fixing them, which adds another failure mode users must handle.
+- The guided check does not resolve imports or validate the complete effective workflow. Successful remediation is not a substitute for `gh aw compile --strict`.
 
 #### Neutral
 - Order matters: the role codemod runs early, and the guided check runs after all automatic migrations (including the existing `pull-request-target-checkout-false` codemod).
 - Both codemods skip workflows that declare `strict: false` or have no `pull_request_target` trigger.
-- The CLI reference docs now state that `acknowledge-risk` only suppresses the trigger warning and does not bypass checkout or role restrictions.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*

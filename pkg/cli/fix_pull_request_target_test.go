@@ -69,6 +69,59 @@ func TestFixPullRequestTargetGuidedFailureIsAtomic(t *testing.T) {
 	}
 }
 
+func TestFixPullRequestTargetUnknownRoleDoesNotBlockOtherMigrations(t *testing.T) {
+	t.Parallel()
+	content := "---\non: {pull_request_target: null}\nroles: [admin, maintainers]\n---\n\n# Prompt\n"
+	file := filepath.Join(t.TempDir(), "workflow.md")
+	require.NoError(t, os.WriteFile(file, []byte(content), 0600))
+	fixed, fixes, err := processWorkflowFileWithInfo(file, GetAllCodemods(), true, false)
+	require.NoError(t, err)
+	assert.True(t, fixed)
+	assert.Contains(t, fixes, getRolesToOnRolesCodemod().Name)
+	assert.Contains(t, fixes, getPullRequestTargetCheckoutFalseCodemod().Name)
+	assert.NotContains(t, fixes, getPullRequestTargetRolesCodemod().Name)
+	written, err := os.ReadFile(file)
+	require.NoError(t, err)
+	document, err := aw.Parse(string(written))
+	require.NoError(t, err)
+	assert.Equal(t, false, document.Frontmatter["checkout"])
+	assert.Equal(t, []any{"admin", "maintainers"}, document.Frontmatter["on"].(map[string]any)["roles"])
+}
+
+func TestFixPullRequestTargetInvalidRestrictedRoleIsAtomic(t *testing.T) {
+	t.Parallel()
+	content := "---\non: {pull_request_target: null}\nroles: [maintainers, read]\n---\n\n# Prompt\n"
+	file := filepath.Join(t.TempDir(), "workflow.md")
+	require.NoError(t, os.WriteFile(file, []byte(content), 0600))
+	fixed, fixes, err := processWorkflowFileWithInfo(file, GetAllCodemods(), true, false)
+	require.ErrorContains(t, err, "on.roles")
+	assert.False(t, fixed)
+	assert.Empty(t, fixes)
+	written, err := os.ReadFile(file)
+	require.NoError(t, err)
+	assert.Equal(t, content, string(written))
+}
+
+func TestRunFormatPullRequestTargetUnknownRoleContinues(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "a-target.md")
+	later := filepath.Join(dir, "b-later.md")
+	require.NoError(t, os.WriteFile(target, []byte("---\non: {pull_request_target: null, roles: [admin, maintainers]}\nengine: copilot\n---\n# Target\n"), 0600))
+	require.NoError(t, os.WriteFile(later, []byte("---\non: push\ntimeout_minutes: 30\nengine: copilot\n---\n# Later\n"), 0600))
+	require.NoError(t, runFormatCommand(nil, dir, false))
+	written, err := os.ReadFile(target)
+	require.NoError(t, err)
+	document, err := aw.Parse(string(written))
+	require.NoError(t, err)
+	assert.Equal(t, false, document.Frontmatter["checkout"])
+	assert.Equal(t, []any{"admin", "maintainers"}, document.Frontmatter["on"].(map[string]any)["roles"])
+	written, err = os.ReadFile(later)
+	require.NoError(t, err)
+	assert.Contains(t, string(written), "timeout-minutes: 30")
+	assert.NotContains(t, string(written), "timeout_minutes:")
+}
+
 func TestFixPullRequestTargetDisabledRoleMigration(t *testing.T) {
 	t.Parallel()
 	mods, err := GetCodemods([]string{"pull-request-target-restrict-roles"})

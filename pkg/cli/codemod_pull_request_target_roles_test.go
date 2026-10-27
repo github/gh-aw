@@ -39,6 +39,13 @@ func TestPullRequestTargetRolesCodemod(t *testing.T) {
 		{"acknowledgment cannot bypass", "on: {pull_request_target: {acknowledge-risk: true}, roles: read}\ncheckout: false", []string{"admin", "maintainer", "write"}},
 		{"trusted list", "on: {pull_request_target: null, roles: [admin, write]}", nil},
 		{"trusted scalar", "on: {pull_request_target: null, roles: write}", nil},
+		{"unknown role without restriction", "on: {pull_request_target: null, roles: [admin, maintainers]}", nil},
+		{"unknown scalar without restriction", "on: {pull_request_target: null, roles: maintainers}", nil},
+		{"nonstring entry without restriction", "on: {pull_request_target: null, roles: [admin, true]}", nil},
+		{"mapping entry without restriction", "on: {pull_request_target: null, roles: [admin, {key: value}]}", nil},
+		{"null without restriction", "on: {pull_request_target: null, roles: null}", nil},
+		{"boolean without restriction", "on: {pull_request_target: null, roles: true}", nil},
+		{"mapping without restriction", "on: {pull_request_target: null, roles: {key: value}}", nil},
 		{"default roles", "on: {pull_request_target: null}", nil},
 		{"non target", "on: {pull_request: null, roles: read}", nil},
 		{"exact trigger", "on: {pull_request_target_staging: null, roles: all}", nil},
@@ -92,7 +99,7 @@ func TestPullRequestTargetRolesCodemodPreservesSource(t *testing.T) {
 
 func TestPullRequestTargetRolesCodemodMalformedRoles(t *testing.T) {
 	t.Parallel()
-	for _, raw := range []string{"null", "true", "{key: value}", "[admin, {key: value}, read]", "[unknown, read]"} {
+	for _, raw := range []string{"[admin, {key: value}, read]", "[unknown, read]", "[admin, true, all]", "[read, null]", "[read, 1]", "[read, maintainers]"} {
 		t.Run(raw, func(t *testing.T) {
 			t.Parallel()
 			content := "---\non: {pull_request_target: null, roles: " + raw + "}\n---\n"

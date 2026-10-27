@@ -2,8 +2,10 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow/codemod"
 )
 
@@ -51,29 +53,36 @@ func restrictedPullRequestTargetRoles(raw any) ([]string, error) {
 	case []any:
 		entries = roles
 	default:
-		return nil, errors.New("on.roles must be a role string or a list of role strings; correct it before restricting pull_request_target roles")
+		return nil, nil
 	}
-	var retained []string
 	unsafe := false
 	for _, entry := range entries {
-		role, ok := entry.(string)
-		if !ok {
-			return nil, errors.New("on.roles must contain only role strings; correct it before restricting pull_request_target roles")
-		}
-		switch role {
-		case "read", "all":
+		if role, ok := entry.(string); ok && (role == "read" || role == "all") {
 			unsafe = true
-		case "admin", "maintainer", "maintain", "write", "triage":
-			retained = append(retained, role)
-		default:
-			return nil, errors.New("on.roles contains an invalid role; use supported repository roles before restricting pull_request_target roles")
+			break
 		}
 	}
 	if !unsafe {
 		return nil, nil
 	}
+	var retained []string
+	for _, entry := range entries {
+		role, ok := entry.(string)
+		if !ok {
+			return nil, errors.New("on.roles must contain only role strings; correct it before restricting pull_request_target roles")
+		}
+		if role != "read" && role != "all" {
+			retained = append(retained, role)
+		}
+	}
 	if len(retained) == 0 {
 		retained = []string{"admin", "maintainer", "write"}
+	}
+	// Validate only the replacement roles so unrelated legacy fields do not block other codemods.
+	if err := parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": map[string]any{"roles": retained},
+	}, ""); err != nil {
+		return nil, fmt.Errorf("on.roles must contain supported repository roles before restricting pull_request_target roles: %w", err)
 	}
 	return retained, nil
 }
