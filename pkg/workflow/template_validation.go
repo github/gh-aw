@@ -90,7 +90,7 @@ func validateNoIncludesInTemplateRegions(markdown string) error {
 	}
 
 	// Use pre-compiled regex from package level for performance
-	matches := templateRegionPattern.FindAllStringSubmatch(markdown, -1)
+	matches := (conditionalPattern{templateRegionPattern}).FindAllStringSubmatch(markdown, -1)
 	templateValidationLog.Printf("Found %d template regions to validate", len(matches))
 
 	// Collect all validation errors
@@ -140,8 +140,8 @@ func validateNoPreExpandedExperimentPlaceholders(markdown string) error {
 	}
 
 	// Collect conditions from both {{#if ...}} and all elseif variants
-	ifConditions := TemplateIfPattern.FindAllStringSubmatch(markdown, -1)
-	elseifConditions := TemplateElseIfPattern.FindAllStringSubmatch(markdown, -1)
+	ifConditions := (conditionalPattern{TemplateIfPattern}).FindAllStringSubmatch(markdown, -1)
+	elseifConditions := (conditionalPattern{TemplateElseIfPattern}).FindAllStringSubmatch(markdown, -1)
 	allConditions := append(ifConditions, elseifConditions...)
 	templateValidationLog.Printf("Found %d template condition(s) to validate", len(allConditions))
 
@@ -184,8 +184,8 @@ func detectDoubleQuotedExperimentComparisons(markdown string) []string {
 		return nil
 	}
 
-	ifConditions := TemplateIfPattern.FindAllStringSubmatch(markdown, -1)
-	elseifConditions := TemplateElseIfPattern.FindAllStringSubmatch(markdown, -1)
+	ifConditions := (conditionalPattern{TemplateIfPattern}).FindAllStringSubmatch(markdown, -1)
+	elseifConditions := (conditionalPattern{TemplateElseIfPattern}).FindAllStringSubmatch(markdown, -1)
 	allConditions := append(ifConditions, elseifConditions...)
 
 	var warnings []string
@@ -224,7 +224,7 @@ func detectMidlineTemplateSeparators(markdown string) []string {
 	var warnings []string
 
 	for i, line := range lines {
-		matches := templateSeparatorPattern.FindAllStringIndex(line, -1)
+		matches := (conditionalPattern{templateSeparatorPattern}).FindAllStringIndex(line, -1)
 		if len(matches) == 0 {
 			continue
 		}

@@ -2,6 +2,8 @@
 import { describe, it, expect, vi } from "vitest";
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
+const interpolationVectors = require("../../../pkg/parser/testdata/frontmatter_hash_interpolation_vectors.json");
 const {
   computeFrontmatterHash,
   computeBodyHash,
@@ -21,6 +23,30 @@ const {
 } = require("./frontmatter_hash_pure.cjs");
 
 describe("frontmatter_hash_pure (text-based)", () => {
+  describe("shared interpolation hash vectors", () => {
+    it.each(interpolationVectors)("$name", async ({ markdown, relevant, all }) => {
+      expect(extractRelevantTemplateExpressions(markdown)).toEqual(relevant);
+      expect(extractAllTemplateExpressions(markdown)).toEqual(all);
+      for (const runtimeImport of [false, true]) {
+        const workflowPath = ".github/workflows/vector.md";
+        const body = runtimeImport ? "{{#runtime-import prompts/vector.md}}" : markdown;
+        const expressions = runtimeImport ? all : relevant;
+        const canonical = { "frontmatter-text": "engine: copilot" };
+        if (expressions.length > 0) canonical["template-expressions"] = expressions;
+        const expected = crypto.createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+        const files = new Map([
+          [workflowPath, "---\nengine: copilot\n---\n" + body],
+          [".github/prompts/vector.md", markdown],
+        ]);
+        const fileReader = async filePath => {
+          if (!files.has(filePath)) throw new Error(`Missing fixture: ${filePath}`);
+          return files.get(filePath);
+        };
+        expect(await computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" })).toBe(expected);
+      }
+    });
+  });
+
   describe("extractFrontmatterAndBody", () => {
     it("should extract frontmatter text and body", () => {
       const content = `---

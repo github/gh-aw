@@ -253,7 +253,6 @@ func addWorkQueuePreparedAdapterNeeds(job *Job, names []string) {
 		return
 	}
 	job.Needs = slices.Concat(job.Needs, names)
-	condition := strings.TrimSpace(job.If)
-	condition = strings.TrimPrefix(strings.TrimSuffix(condition, "}}"), "${{")
+	condition := stripExpressionWrapper(job.If)
 	job.If = "always() && (" + strings.TrimSpace(condition) + ")"
 }

@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 const (
@@ -19,7 +20,12 @@ const (
 	jiraAllowedToolsWildcard = "*"
 )
 
-var jiraSecretExpressionPattern = regexp.MustCompile(`^\$\{\{\s*secrets\.[A-Z_][A-Z0-9_]*\s*\}\}$`)
+var jiraSecretExpressionPattern = actionslanguageservice.ReferencePattern(true, false, func(path []string) []string {
+	if len(path) == 2 && path[0] == "secrets" && credentialIdentifier(path[1], false) && strings.ToUpper(path[1]) == path[1] {
+		return []string{}
+	}
+	return nil
+})
 
 // jiraApprovedReadOnlyToolsList is the fixed, ordered set of Jira MCP tools
 // that may ever be enabled. "*" in tools.jira.allowed is expanded to exactly

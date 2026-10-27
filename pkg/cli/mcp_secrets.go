@@ -3,14 +3,24 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/errorutil"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var mcpSecretsLog = logger.New("cli:mcp_secrets")
+
+func simpleMCPSecretName(value string) string {
+	if !parser.IsSimpleSecretExpression(value) {
+		return ""
+	}
+	expression, _ := actionslanguageservice.WrappedExpression(value)
+	path, _ := actionslanguageservice.Reference(expression)
+	return path[1]
+}
 
 // checkAndSuggestSecrets checks if required secrets exist in the repository and suggests CLI commands to add them
 func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
@@ -22,9 +32,7 @@ func checkAndSuggestSecrets(toolConfig map[string]any, verbose bool) error {
 	if mcpSection, ok := toolConfig["mcp"].(map[string]any); ok {
 		if env, hasEnv := mcpSection["env"].(map[string]string); hasEnv {
 			for _, value := range env {
-				// Extract secret name from GitHub Actions syntax: ${{ secrets.SECRET_NAME }}
-				if strings.HasPrefix(value, "${{ secrets.") && strings.HasSuffix(value, " }}") {
-					secretName := value[12 : len(value)-3] // Remove "${{ secrets." and " }}"
+				if secretName := simpleMCPSecretName(value); secretName != "" {
 					requiredSecrets = append(requiredSecrets, secretName)
 				}
 			}

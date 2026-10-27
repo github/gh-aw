@@ -8,23 +8,14 @@ import (
 	"testing"
 )
 
-// Helper constants for secret syntax validation in tests
-const (
-	testSecretPrefix = "${{ secrets."
-	testSecretSuffix = " }}"
-)
-
 // testIsSecretSyntax checks if a value matches GitHub Actions secret syntax (test helper)
 func testIsSecretSyntax(value string) bool {
-	return strings.HasPrefix(value, testSecretPrefix) && strings.HasSuffix(value, testSecretSuffix)
+	return simpleMCPSecretName(value) != ""
 }
 
 // testExtractSecretName extracts the secret name from GitHub Actions secret syntax (test helper)
 func testExtractSecretName(value string) string {
-	if !testIsSecretSyntax(value) {
-		return ""
-	}
-	return value[len(testSecretPrefix) : len(value)-len(testSecretSuffix)]
+	return simpleMCPSecretName(value)
 }
 
 func TestCheckAndSuggestSecrets(t *testing.T) {
@@ -337,13 +328,14 @@ func TestSecretExtractionEdgeCases(t *testing.T) {
 		{
 			name:          "extra spaces before closing - still valid",
 			value:         "${{ secrets.KEY  }}",
-			shouldExtract: true,   // Has extra spaces but still matches pattern
-			extractedName: "KEY ", // Will include one trailing space (string is trimmed by 3 chars from end)
+			shouldExtract: true,
+			extractedName: "KEY",
 		},
 		{
 			name:          "extra spaces after opening",
 			value:         "${{  secrets.KEY }}",
-			shouldExtract: false, // Different format
+			shouldExtract: true,
+			extractedName: "KEY",
 		},
 		{
 			name:          "single closing brace",

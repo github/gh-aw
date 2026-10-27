@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -12,14 +11,7 @@ import (
 	"github.com/github/gh-aw/pkg/semverutil"
 )
 
-var pluginGitHubTokenExpressionRegexp = regexp.MustCompile(
-	`^\$\{\{\s*(` +
-		`secrets\.[A-Za-z_][A-Za-z0-9_]*(\s*\|\|\s*secrets\.[A-Za-z_][A-Za-z0-9_]*)*` +
-		`|needs\.[A-Za-z_][A-Za-z0-9_]*\.outputs\.[A-Za-z_][A-Za-z0-9_]*` +
-		`|steps\.[A-Za-z_][A-Za-z0-9_-]*\.outputs\.[A-Za-z_][A-Za-z0-9_-]*` +
-		`|env\.[A-Za-z_][A-Za-z0-9_]*` +
-		`)\s*\}\}$`,
-)
+var pluginGitHubTokenExpressionRegexp = credentialExpressionPattern(true, true, true)
 
 // hasPathTraversalSegment reports whether repoPath contains a "." or ".."
 // path segment, which would let pluginCheckoutSubpath escape the plugin's

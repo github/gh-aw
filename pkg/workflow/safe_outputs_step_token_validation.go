@@ -8,12 +8,12 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var safeOutputsStepTokenValidationLog = logger.New("workflow:safe_outputs_step_token_validation")
 
-// stepOutputReferencePattern captures the step id of a `steps.<id>.outputs.<name>` reference.
-var stepOutputReferencePattern = regexp.MustCompile(`steps\.([A-Za-z_][A-Za-z0-9_-]*)\.outputs\.`)
+var yamlAssignmentPattern = regexp.MustCompile(`^\s*[A-Za-z0-9_.-]+:\s*`)
 
 // collectSafeOutputStepTokenIDs returns the set of step ids referenced by
 // safe-outputs `github-token` expressions of the form `${{ steps.<id>.outputs.<name> }}`,
@@ -25,8 +25,10 @@ func collectSafeOutputStepTokenIDs(config *SafeOutputsConfig) map[string]struct{
 	}
 
 	collect := func(token string) {
-		for _, match := range stepOutputReferencePattern.FindAllStringSubmatch(token, -1) {
-			ids[match[1]] = struct{}{}
+		for _, path := range interpolationReferences(token) {
+			if len(path) >= 4 && strings.EqualFold(path[0], "steps") && strings.EqualFold(path[2], "outputs") {
+				ids[path[1]] = struct{}{}
+			}
 		}
 	}
 
@@ -64,13 +66,23 @@ func jobStepIDDeclarationIndex(jobYAML string, stepID string) int {
 // consume the step output. Free-form occurrences inside run scripts or prompt text are
 // ignored so documentation-like content does not trigger false positives.
 func jobStepOutputConsumptionIndex(jobYAML string, stepID string) int {
-	//nolint:regexpdynamicpattern // The step id is escaped with regexp.QuoteMeta before compilation.
-	pattern := regexp.MustCompile(`(?m)^\s*[A-Za-z0-9_.-]+:\s*.*\$\{\{[^}]*steps\.` + regexp.QuoteMeta(stepID) + `\.outputs\.`)
-	loc := pattern.FindStringIndex(jobYAML)
-	if loc == nil {
-		return -1
+	spans, _ := actionslanguageservice.ExtractExpressions(jobYAML)
+	for _, span := range spans {
+		lineStart := strings.LastIndex(jobYAML[:span.Start], "\n") + 1
+		if !yamlAssignmentPattern.MatchString(jobYAML[lineStart:span.Start]) {
+			continue
+		}
+		expression, err := actionslanguageservice.ParseSyntax(span.Content)
+		if err != nil {
+			continue
+		}
+		for _, path := range actionslanguageservice.References(expression) {
+			if len(path) >= 4 && strings.EqualFold(path[0], "steps") && path[1] == stepID && strings.EqualFold(path[2], "outputs") {
+				return lineStart
+			}
+		}
 	}
-	return loc[0]
+	return -1
 }
 
 // stepMintingHint returns the frontmatter field an author should use to inject a
