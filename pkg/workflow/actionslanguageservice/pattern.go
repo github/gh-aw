@@ -73,7 +73,8 @@ func (p Pattern) matches(source string, limit int) []patternMatch {
 		} else {
 			expr, err := ParseSyntax(span.Content)
 			if err != nil || expr == nil {
-				patternLog.Printf("Cannot match invalid expression %q: %v", span.Content, err)
+				// Parser errors can include the source, so log only location metadata.
+				patternLog.Printf("Cannot match invalid expression: start=%d end=%d length=%d", span.Start, span.End, len(span.Content))
 				continue
 			}
 			captures = p.Filter(span.Content, expr)

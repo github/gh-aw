@@ -262,7 +262,7 @@ func extractHashTemplateExpressions(markdown string) []actionslanguageservice.In
 	matches, err := actionslanguageservice.ExtractExpressions(markdown)
 	if err != nil {
 		frontmatterHashLog.Printf("Cannot scan template expressions for hashing: %v", err)
-		// Preserve complete expressions preceding an unclosed suffix. Syntax
+		// Preserve complete expressions before and after malformed openings. Syntax
 		// validation, rather than freshness hashing, rejects malformed input.
 	}
 	return matches

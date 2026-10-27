@@ -30,6 +30,24 @@
     "all": ["${{ env.A }}"]
   },
   {
+    "name": "unclosed quote before complete expressions",
+    "markdown": "${{ 'unclosed }}\n${{ env.KEY }} ${{ github.actor }}",
+    "relevant": ["${{ env.KEY }}"],
+    "all": ["${{ env.KEY }}", "${{ github.actor }}"]
+  },
+  {
+    "name": "unclosed quote between complete expressions and unclosed suffix",
+    "markdown": "${{ env.A }} ${{ 'unclosed }} ${{ vars.KEY }} ${{ env.SUFFIX",
+    "relevant": ["${{ env.A }}", "${{ vars.KEY }}"],
+    "all": ["${{ env.A }}", "${{ vars.KEY }}"]
+  },
+  {
+    "name": "opening delimiter inside complete quoted expression",
+    "markdown": "${{ format('${{ env.INNER }} {0}', vars.KEY) }}",
+    "relevant": ["${{ format('${{ env.INNER }} {0}', vars.KEY) }}"],
+    "all": ["${{ format('${{ env.INNER }} {0}', vars.KEY) }}"]
+  },
+  {
     "name": "single closing brace",
     "markdown": "${{ format('a } b {0}', env.KEY) }}",
     "relevant": ["${{ format('a } b {0}', env.KEY) }}"],

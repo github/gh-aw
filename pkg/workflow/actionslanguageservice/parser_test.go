@@ -33,6 +33,19 @@ func TestExtractExpressions(t *testing.T) {
 	require.ErrorContains(t, err, "without matching closing")
 }
 
+func TestExtractExpressionsRecoversAfterUnclosedQuote(t *testing.T) {
+	source := "${{ env.BEFORE }} ${{ 'unclosed }}\n${{ env.AFTER }} ${{ env.SUFFIX"
+	expressions, err := ExtractExpressions(source)
+	require.ErrorContains(t, err, "opening '${{' at position 18")
+	require.ErrorContains(t, err, "unclosed single quote")
+	require.Len(t, expressions, 2)
+	assert.Equal(t, " env.BEFORE ", expressions[0].Content)
+	assert.Equal(t, " env.AFTER ", expressions[1].Content)
+	for _, expression := range expressions {
+		assert.Equal(t, "${{"+expression.Content+"}}", source[expression.Start:expression.End])
+	}
+}
+
 func TestWorkflowValidation(t *testing.T) {
 	for _, test := range []struct {
 		name, fields, want string

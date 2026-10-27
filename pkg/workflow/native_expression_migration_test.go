@@ -22,6 +22,7 @@ func TestNativeExpressionExtraction(t *testing.T) {
 	for _, invalid := range []string{
 		"${{ inputs.branch", "${{ inputs.branch || }}", "${{ }}",
 		"${{ inputs.branch || \"main\" }}", "${{ format('unterminated) }}",
+		"${{ 'unclosed }}\n${{ env.KEY }}",
 	} {
 		_, err := NewExpressionExtractor().ExtractExpressions(invalid)
 		require.Error(t, err, invalid)

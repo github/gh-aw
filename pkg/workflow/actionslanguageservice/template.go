@@ -18,8 +18,10 @@ type Interpolation struct {
 
 // ExtractExpressions finds interpolations without mistaking quoted braces for
 // closing delimiters. It does not interpret ordinary text outside expressions.
+// Malformed openings return an error, but scanning continues for complete spans.
 func ExtractExpressions(source string) ([]Interpolation, error) {
 	var result []Interpolation
+	var firstErr error
 	for offset := 0; offset < len(source); {
 		start := strings.Index(source[offset:], "${{")
 		if start < 0 {
@@ -28,12 +30,16 @@ func ExtractExpressions(source string) ([]Interpolation, error) {
 		start += offset
 		end, err := expressionEnd(source, start+3)
 		if err != nil {
-			return result, fmt.Errorf("opening '${{' at position %d without matching closing '}}': %w", start, err)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("opening '${{' at position %d without matching closing '}}': %w", start, err)
+			}
+			offset = start + 3
+			continue
 		}
 		result = append(result, Interpolation{Start: start, End: end + 2, Content: source[start+3 : end]})
 		offset = end + 2
 	}
-	return result, nil
+	return result, firstErr
 }
 
 // template follows the upstream quote-aware interpolation scanner. Braces and

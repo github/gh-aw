@@ -359,7 +359,7 @@ function extractAllTemplateExpressions(markdown) {
 /**
  * Scan interpolation boundaries without interpreting Actions grammar.
  * Single quotes protect closing braces; doubled quotes preserve quote state.
- * An unclosed suffix does not discard preceding complete expressions.
+ * Unclosed openings do not discard complete expressions before or after them.
  * @param {string} source
  * @returns {{expression: string, content: string}[]}
  */
@@ -378,7 +378,10 @@ function scanTemplateExpressions(source) {
         break;
       }
     }
-    if (end === source.length) break;
+    if (end === source.length) {
+      offset = start + 3;
+      continue;
+    }
     expressions.push({ expression: source.slice(start, end + 2), content: source.slice(start + 3, end) });
     offset = end + 2;
   }
