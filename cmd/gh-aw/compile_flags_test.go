@@ -64,6 +64,22 @@ func TestCompileNoLintFlag(t *testing.T) {
 	}
 }
 
+func TestCompileActionsLockFlag(t *testing.T) {
+	t.Parallel()
+	flag := compileCmd.Flags().Lookup("actions-lock")
+	if flag == nil || flag.DefValue != "false" {
+		t.Fatal("expected --actions-lock to default to false")
+	}
+	for _, enabled := range []bool{false, true} {
+		cmd := &cobra.Command{}
+		cmd.Flags().Bool("actions-lock", enabled, "")
+		options := getCompileCmdOptions(cmd)
+		if config := options.toCompileConfig(nil); config.ActionsLock != enabled {
+			t.Fatalf("expected ActionsLock=%t, got %t", enabled, config.ActionsLock)
+		}
+	}
+}
+
 func TestCompileDevelopmentRejectsExplicitFalseFlags(t *testing.T) {
 	t.Parallel()
 	for _, name := range cli.DryRunRequiredBoolFlags() {

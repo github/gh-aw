@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue } = require("./issue_report.cjs");
+const { getWorkflowCompilationNotice, isWorkflowYamlFile } = require("./workflow_file_exclusions.cjs");
 const { getStalePullRequestReason, StalePullRequestError } = require("./pr_lifecycle.cjs");
 
 /** @type {typeof import("fs")} */
@@ -382,7 +383,7 @@ async function detectWorkflowFileChanges(exec, gitOptions, baseBranch, coreLogge
           result.stdout
             .split("\n")
             .map(f => f.trim())
-            .filter(Boolean)
+            .filter(isWorkflowYamlFile)
         ),
       ];
       if (baseline !== primary) {
@@ -424,7 +425,7 @@ async function runWorkflowScopePreflightCheck(exec, gitOptions, allowWorkflows, 
   if (workflowFiles.length > 0) {
     coreLogger.info(`Pre-flight check: branch history contains workflow file changes (${workflowFiles.join(", ")}). Failing before push attempt.`);
     if (agentChangedFiles !== undefined) {
-      const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
+      const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
       if (agentWorkflowFiles.length === 0) {
         return buildWorkflowsScopeSkip(context, coreLogger);
       }
@@ -563,6 +564,8 @@ async function main(config = {}) {
    */
   return withTransportIntegrity(async function handlePushToPullRequestBranch(message, resolvedTemporaryIds, transport) {
     const exec = transport.guardExec(globalThis.exec);
+    const compilationNotice = getWorkflowCompilationNotice(message, config);
+    if (compilationNotice) core.warning(compilationNotice);
     // Check max count
     if (maxCount > 0 && processedCount >= maxCount) {
       core.info(`Skipping message - max count (${maxCount}) reached`);
@@ -1528,7 +1531,7 @@ async function main(config = {}) {
             // when the token lacks the 'workflows' scope.  Distinguish between the
             // agent's own workflow files (hard error) and pre-existing commits (skip).
             if (isWorkflowsScopeRejection(reviewPushStderr)) {
-              const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
+              const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
               if (agentWorkflowFiles.length === 0) {
                 return buildWorkflowsScopeSkip("Review branch", core);
               }
@@ -1555,6 +1558,7 @@ async function main(config = {}) {
             "",
             `This PR contains changes that were originally intended for PR #${pullNumber} (\`${branchName}\`).`,
             "Please review the changes carefully before merging.",
+            ...(compilationNotice ? ["", compilationNotice] : []),
           ].join("\n");
 
           transport.assertUnchanged();
@@ -1632,7 +1636,7 @@ async function main(config = {}) {
         }
       }
 
-      const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
+      const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
       if (!allowWorkflows && agentWorkflowFiles.length > 0) {
         return buildWorkflowsScopeError("Branch", core);
       }
@@ -1752,7 +1756,7 @@ async function main(config = {}) {
             if (fallbackPushOutput.exitCode !== 0) {
               const fallbackPushStderr = (fallbackPushOutput.stderr || "").trim();
               if (isWorkflowsScopeRejection(fallbackPushStderr)) {
-                const agentWorkflowFiles = agentChangedFiles.filter(f => f.startsWith(".github/workflows/"));
+                const agentWorkflowFiles = agentChangedFiles.filter(isWorkflowYamlFile);
                 if (agentWorkflowFiles.length === 0) {
                   return buildWorkflowsScopeSkip("Fallback branch", core);
                 }
@@ -1765,6 +1769,7 @@ async function main(config = {}) {
             const fallbackHeadRef = pushRemoteUrl ? `${pushRepoParts.owner}:${fallbackBranchName}` : fallbackBranchName;
 
             const fallbackBody = [
+              ...(compilationNotice ? [compilationNotice, ""] : []),
               "> [!NOTE]",
               isNonFastForward
                 ? "> Direct push to the original pull request branch failed because the branch diverged (non-fast-forward)."
@@ -1893,6 +1898,7 @@ async function main(config = {}) {
           targetIssueNumber: pullNumber,
           targetRepo: `${repoParts.owner}/${repoParts.repo}`,
           targetGithubClient: githubClient,
+          ...(compilationNotice ? { additionalMessage: compilationNotice } : {}),
         });
       }
     }
@@ -1913,7 +1919,7 @@ async function main(config = {}) {
 - **URL**: [${pushUrl}](${pushUrl})
 `;
 
-    await core.summary.addRaw(summaryContent).write();
+    await core.summary.addRaw(compilationNotice ? `${summaryContent}\n${compilationNotice}` : summaryContent).write();
 
     // Push an extra empty commit if a token is configured and exactly 1 new commit was pushed.
     // This works around the GITHUB_TOKEN limitation where pushes don't trigger CI events.

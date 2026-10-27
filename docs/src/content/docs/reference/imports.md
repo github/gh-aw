@@ -308,6 +308,7 @@ Shared workflow files (without `on:` field) can define the fields below. Other f
 | `env` | Workflow-level environment variables |
 | `pre-agent-steps` | Steps that run after artifacts download, before engine execution |
 | `post-steps` | Steps that run after engine execution |
+| `jobs` | Additional jobs and supported built-in job customizations |
 | `github-app` | GitHub App credentials for token minting |
 | `checkout` | Checkout configuration for the agent job |
 | `engine.mcp` | MCP gateway settings (`tool-timeout`, `session-timeout`); engine identifier itself is always inherited from the importing workflow |
@@ -332,7 +333,7 @@ Imported step fields use dependency order: a file's steps are processed after th
 | `steps:` | Imported steps are prepended to main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
 | `pre-agent-steps:` | Imported pre-agent steps are prepended to main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
 | `post-steps:` | Imported post-steps are appended after main in dependency order; prerequisites precede dependents and unrelated siblings retain declaration order. |
-| `jobs:` | Not merged; define only in the main workflow. Use `safe-outputs.jobs` for importable jobs. |
+| `jobs:` | Imported jobs are added; main job definitions take precedence. Same-named jobs combine injected step fields and merge `outputs` by name, with main output values winning. |
 | `safe-outputs.jobs` | Names must be unique; duplicates fail. Order is determined by `needs:` dependencies. |
 | `env:` | Main env vars take precedence. Duplicate keys across imports fail compilation; move the override to the main workflow. |
 
@@ -515,6 +516,12 @@ Review the build output in /tmp/build-output and suggest improvements.
 ```
 
 In the compiled lock file, the `build` job appears alongside `activation` and `agent`, ordered by each job's `needs` declarations.
+
+When imports and the main workflow define the same job, `jobs.<job-id>.outputs` combines output names. The main workflow wins on duplicate output names; across imports, later-discovered values win. An output-only contribution (a job mapping whose sole field is `outputs`) preserves the existing job body, including its injected steps.
+
+Main workflow job fields retain precedence. Among imports, an injected-step merge uses the later job body; otherwise the earlier body is retained. Other scalar and map fields come from that selected body, not a deep merge. Regular steps from conflicting custom jobs are not concatenated.
+
+Compilation rejects final output expressions that reference regular step IDs discarded by job-body selection, using either dot or literal bracket notation. References satisfied by retained regular, setup, or pre-steps are allowed. Output precedence is applied first, so a main-workflow override can replace an unsafe imported expression. This check does not validate unrelated unknown step references.
 
 ### Importing Jobs via `safe-outputs.jobs`
 

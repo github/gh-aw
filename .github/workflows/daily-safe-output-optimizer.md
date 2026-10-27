@@ -2,7 +2,7 @@
 private: true
 emoji: "⚡"
 name: Daily Safe Output Tool Optimizer
-description: Analyzes gateway logs for errored safe output tool calls and creates issues to improve tool descriptions
+description: Analyzes gateway logs for errored safe output tool calls and implements validated tool-description or workflow-prompt fixes
 on:
   schedule: daily
   workflow_dispatch:
@@ -21,7 +21,8 @@ engine:
   mcp:
     tool-timeout: 10m
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     expires: 2d
     title-prefix: "[safeoutputs] "
     labels: [bug, safe-outputs, tool-improvement, automated-analysis, cookie]
@@ -33,9 +34,11 @@ max-ai-credits: 1500
 strict: true
 
 imports:
+  - shared/lock-safe-pull-request.md
   - uses: shared/skip-if-issue-open.md
     with:
       title-prefix: "[safeoutputs]"
+      kind: pr
   - uses: shared/aw-logs-24h-fetch-setup.md
   - shared/activation-app.md
   - ../skills/jqschema/SKILL.md
@@ -58,14 +61,14 @@ experiments:
     metric: run_duration_ms
     secondary_metrics: [ai_credits_consumed, mcp_tool_call_count]
     guardrail_metrics:
-      - name: issue_creation_success_rate
+      - name: eval:pull_requests_created_or_noop
         direction: min
         threshold: 0.80
     analysis_type: mann_whitney
     tags: [daily, log-fetching, efficiency, claude]
     min_samples: 20
     continual:
-      seed: daily-safe-output-log-fetch-v1
+      seed: daily-safe-output-log-fetch-pr-v2
       ramp: [10, 25, 50]
     start_date: "2026-06-09"
     issue: 38094
@@ -73,15 +76,15 @@ experiments:
 evals:
   - id: errored_calls_analyzed
     question: Did the agent analyze gateway logs for errored safe output tool calls?
-  - id: issues_created_or_noop
-    question: Were issues created to improve tool descriptions for errored calls, or was noop used when no errors were found?
+  - id: pull_requests_created_or_noop
+    question: Were validated pull requests created to correct tool descriptions or workflow prompts, or was noop used when no actionable errors were found?
 features:
   gh-aw-detection: true
 ---
 
 # Safe Output Tool Optimizer
 
-You are the Safe Output Tool Optimizer - an expert system that analyzes gateway logs to identify errors in safe output tool usage and creates actionable issues to improve tool descriptions.
+You are the Safe Output Tool Optimizer. Analyze gateway logs to identify safe-output usage errors, then implement and validate tool-description or workflow-prompt corrections.
 
 ## Mission
 
@@ -90,7 +93,7 @@ Daily analyze all agentic workflow runs from the last 24 hours to identify cases
 - Had missing required fields
 - Provided data with incorrect schema
 
-Create issues to improve tool descriptions when the workflow prompt is correct but agents still make mistakes.
+Implement focused tool-description fixes when the workflow prompt is correct but agents still make mistakes; implement prompt corrections when the prompt itself is wrong. Validate each change and deliver it in a pull request.
 
 ## Current Context
 
@@ -202,7 +205,7 @@ The workflow's prompt is unclear, incorrect, or misleading about how to use the 
 - Same workflow has repeated error → likely prompt issue
 
 **Action if workflow prompt is the issue:**
-- Create an issue titled: `[safeoutputs] Fix incorrect safe output usage in [workflow-name] prompt`
+- Correct the workflow prompt and create a validated pull request titled: `[safeoutputs] Fix incorrect safe output usage in [workflow-name] prompt`
 - Label: `bug`, `workflow-issue`, `safe-outputs`
 - Body should include:
   - Which workflow has the issue
@@ -224,7 +227,7 @@ The workflow prompt is correct, but the agent still makes mistakes due to unclea
 
 **Action if tool description is the issue:**
 - Collect this error for Phase 4 (aggregate multiple errors)
-- Don't create individual issues yet
+- Collect related errors for one focused implementation pull request
 
 ### Phase 4: Aggregate Tool Description Issues
 
@@ -268,11 +271,15 @@ Use the cache memory folder `/tmp/gh-aw/cache-memory/` to build persistent knowl
    - Track which tools have most errors
    - Record common field confusions
 
-### Phase 6: Create Issue for Tool Description Improvements
+### Phase 6: Implement Tool Description Improvements
 
-**ONLY create an issue if:**
+**ONLY create a pull request if:**
 - You found at least one tool description error (not workflow prompt error)
-- No existing open issue matches the same tool improvement (skip-if-match handles this)
+- No existing open pull request covers the same improvement (skip-if-match handles this)
+
+Implement the selected correction, run focused schema/tool-description tests, commit locally,
+and call `create_pull_request` with the evidence below and actual validation results.
+If there is no actionable change, call `noop`; report concrete blockers with `report_incomplete`.
 
 **Issue Structure:**
 
@@ -420,11 +427,11 @@ After updating the tool description:
 - **Be evidence-based**: Show actual error examples, not assumptions
 - **Be actionable**: Recommend specific description improvements
 
-### Issue Creation Rules
+### Pull Request Creation Rules
 
-- **Skip if no tool description issues found**: Don't create issue for workflow prompt issues only
-- **One issue per run**: The `max: 1` configuration ensures only one issue created
-- **Include multiple patterns**: If multiple error patterns exist, include all in one issue
+- **Skip if no actionable error is found**: Use `noop` when neither prompts nor tool descriptions need correction
+- **One pull request per run**: The `max: 1` configuration permits one focused implementation
+- **Group related patterns only**: Do not combine unrelated fixes
 - **Priority ranking**: If multiple tools have issues, focus on the one with most errors
 
 ### Security and Safety
@@ -451,8 +458,8 @@ Organize persistent data in `/tmp/gh-aw/cache-memory/safe-output-optimizer/`:
 Your output must:
 - ✅ Analyze all safe output errors from last 24 hours
 - ✅ Distinguish workflow prompt issues from tool description issues
-- ✅ Create issue ONLY if tool description issues found (not for prompt issues)
-- ✅ Aggregate multiple error patterns into single comprehensive issue
+- ✅ Implement a correction only for evidence-backed tool-description or prompt errors
+- ✅ Aggregate related patterns into one focused pull request
 - ✅ Provide specific, actionable improvements to tool descriptions
 - ✅ Include evidence (run IDs, error examples, affected workflows)
 - ✅ Update cache memory with findings for trend analysis
@@ -463,9 +470,9 @@ A successful run:
 - ✅ Downloads and analyzes all logs from last 24 hours
 - ✅ Identifies and classifies safe output tool errors
 - ✅ Distinguishes between prompt issues and tool description issues
-- ✅ Creates comprehensive issue with specific improvement recommendations
+- ✅ Creates a validated pull request implementing the selected improvement
 - ✅ Includes evidence and examples from actual workflow runs
 - ✅ Updates cache memory for historical tracking
-- ✅ Skips issue creation if no tool description issues found
+- ✅ Uses `noop` if no actionable change is found
 
-Begin your analysis now. Download logs, identify safe output tool errors, classify root causes, and create an issue if tool description improvements are needed.
+Download logs, classify safe-output errors, implement the highest-value correction, validate it, and call `create_pull_request` or the appropriate no-op/blocker output.

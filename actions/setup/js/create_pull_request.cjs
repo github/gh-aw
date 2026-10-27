@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue } = require("./issue_report.cjs");
+const { getExcludedFiles } = require("./workflow_file_exclusions.cjs");
 
 /** @type {typeof import("fs")} */
 const fs = require("fs");
@@ -1793,7 +1794,7 @@ async function main(config = {}) {
               core.warning("Signed push rejected merge commit topology from bundle; rewriting branch and retrying signed push");
               try {
                 await rewriteBundleBranchAsSingleCommit(baseBranch, exec, bundleFilePath, {
-                  excludedFiles: Array.isArray(config.excluded_files) ? config.excluded_files : [],
+                  excludedFiles: getExcludedFiles(config),
                 });
                 const runRetryPush = async () => {
                   transport.assertUnchanged();

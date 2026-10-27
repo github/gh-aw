@@ -15,22 +15,31 @@ engine: claude
 network:
   allowed: [defaults, go]
 tools:
+  edit:
   github:
     mode: local
   cache-memory: true
   timeout: 600
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     expires: 7d
     title-prefix: "[static-analysis] "
     labels: [security, automation, cookie]
     max: 4
-    close-older-issues: true
+    close-older-pull-requests: false
+  create-discussion:
+    category: audits
+    title-prefix: "[static-analysis] "
+    expires: 7d
+    max: 1
+    close-older-discussions: true
   add-comment:
     max: 3
 timeout-minutes: 45
 strict: true
 imports:
+  - shared/lock-safe-pull-request.md
   - uses: shared/meta-analysis-base.md
     with:
       toolsets: [default, actions]
@@ -381,11 +390,11 @@ Use the cache memory folder `/tmp/gh-aw/cache-memory/` to build persistent knowl
    ```
    ```
 
-### Phase 5: Create Issue Report
+### Phase 5: Implement Fixes and Publish the Scan Report
 
-**ALWAYS create a comprehensive issue report** with your static analysis findings, regardless of whether issues were found or not.
+**Always publish the comprehensive scan report with `create_discussion`**, including clean scans. For actionable findings, implement focused fixes and validate with the affected scanner and relevant tests before staging `create_pull_request`. Do not create report-only pull requests.
 
-Create an issue with:
+Create a discussion with:
 - **Summary**: Overview of static analysis findings from all eight tools
 - **Statistics**: Total findings by tool, by severity, by type
 - **Clustered Findings**: Issues grouped by tool and type with counts
@@ -394,9 +403,9 @@ Create an issue with:
 - **Recommendations**: Prioritized actions to improve security and code quality
 - **Historical Trends**: Comparison with previous scans
 
-**Issue Template**:
+**Discussion Template**:
 
-Use `###` or lower for all headers in your report. Never use `#` (h1) or `##` (h2) — these are reserved for the issue title rendered by GitHub.
+Use `###` or lower for all headers in your report. Never use `#` (h1) or `##` (h2) — these are reserved for the discussion title rendered by GitHub.
 
 Wrap long sections (>5 items, detailed lists, raw data) in `<details><summary><b>Section Name</b></summary>` blocks to keep the report scannable.
 
@@ -459,7 +468,7 @@ Runner-Guard Score: [SCORE]/100 (Grade: [LETTER])
 |---------|------|----------|--------------------|
 | [RGS-XXX] | [name] | [level] | [workflow names] |
 
-Issues created: [list of issue links for Critical/High findings, or "none"]
+Pull requests staged: [links or temporary references for implemented Critical/High fixes, or "none"]
 
 #### Grype Container Vulnerability Findings
 
@@ -554,7 +563,7 @@ Issues created: [list of issue links for Critical/High findings, or "none"]
 - [ ] Consider adding all eight tools to pre-commit hooks
 ```
 
-Use the title `[static-analysis] Report - [DATE]` for the issue.
+Use the title `[static-analysis] Report - [DATE]` for the discussion.
 
 ### Phase 6: Analyze Runner-Guard Findings
 
@@ -569,10 +578,10 @@ Runner-guard has performed source-to-sink vulnerability scanning as part of the 
    - Note the Runner-Guard Score (0-100) and grade if present
    - For each finding, extract: rule ID (e.g. RGS-001), name, severity, affected file, line number, description, remediation
 
-3. **Create Issues for Critical/High Findings (max 3)**:
-   For up to 3 of the most critical findings (by severity, then rule ID), create a GitHub issue.
+3. **Implement Pull Requests for Critical/High Findings (max 3)**:
+   For up to 3 critical/high findings (by severity, then rule ID), implement a focused fix, validate it, commit locally, and call `create_pull_request` with the local branch.
 
-   Before creating issues, apply the following deduplication logic for **each finding** (rule ID + affected file):
+   Before implementing pull requests, apply the following deduplication logic for **each finding** (rule ID + affected file):
 
    **Step A — Search for existing issues (open AND closed)**:
    - Search for issues whose title contains `[static-analysis]` and the rule ID (e.g. `RGS-004`) **and** the affected file name
@@ -583,13 +592,13 @@ Runner-guard has performed source-to-sink vulnerability scanning as part of the 
    **Step B — Decide what to do based on search results**:
    - If a **closed** issue exists for the same rule ID + affected file → **skip** (do not recreate it; the finding was already reviewed and closed)
    - If an **open** issue exists for the same rule ID + affected file → **add a comment** to the existing issue with the latest scan date and run link instead of creating a duplicate
-   - If **no issue** (open or closed) exists for the same rule ID + affected file → **create a new issue**
+   - If **no issue** (open or closed) exists for the same rule ID + affected file, search open pull requests, then implement a fix only when no active PR covers it
 
    **Additional constraints**:
-   - Only create issues for Critical and High severity findings
-   - Maximum 3 new issues total across all runner-guard findings per run (comments on existing issues do not count toward this limit)
+   - Only create runner-guard pull requests for Critical and High severity findings
+   - Maximum 3 runner-guard pull requests and 4 pull requests total per run (comments on existing issues do not count toward this limit)
 
-   Issue format:
+   Pull request format (include the implemented remediation and validation results):
    ```
    Title: [static-analysis] <RuleID>: <FindingName> in <AffectedFile>
 
@@ -630,7 +639,7 @@ Runner-guard has performed source-to-sink vulnerability scanning as part of the 
    ```
 
 4. **Add to Discussion**:
-   Include a "Runner-Guard Analysis" section in the Phase 5 issue report.
+   Include a "Runner-Guard Analysis" section in the Phase 5 discussion report.
 
 ## Important Guidelines
 
@@ -672,7 +681,7 @@ Organize your persistent data in `/tmp/gh-aw/cache-memory/`:
 
 ## Output Requirements
 
-Your output must be well-structured and actionable. **You must create an issue** for every scan with the findings from all eight tools.
+Your output must be well-structured and actionable. Publish a discussion for every scan with findings from all eight tools, and pull requests only for implemented and validated fixes.
 
 Update cache memory with today's scan data for future reference and trend analysis.
 
@@ -683,10 +692,10 @@ A successful static analysis scan:
 - ✅ Clusters findings by tool and issue type
 - ✅ Generates a detailed fix prompt for at least one issue type
 - ✅ Updates cache memory with findings from all tools
-- ✅ Creates a comprehensive issue report with findings
+- ✅ Creates a comprehensive discussion report with findings
 - ✅ Provides actionable recommendations
 - ✅ Maintains historical context for trend analysis
 - ✅ Reads and analyzes runner-guard source-to-sink findings
-- ✅ Creates up to 3 GitHub issues for Critical/High runner-guard findings (avoiding duplicates)
+- ✅ Creates up to 3 validated pull requests for Critical/High runner-guard findings (avoiding duplicates)
 
-Begin your static analysis scan now. Read and parse the compilation output from `/tmp/gh-aw/agent/compile-output.txt`, analyze the findings from all eight tools (zizmor, poutine, actionlint, runner-guard, syft, grype, yamllint, shellcheck), cluster them, generate fix suggestions, create up to 3 issues for critical runner-guard findings, and create an issue with your complete analysis.
+Read and parse `/tmp/gh-aw/agent/compile-output.txt`, analyze all eight tools, cluster findings, implement and validate selected fixes, and publish the full analysis as a discussion. Report concrete implementation blockers explicitly rather than creating empty pull requests.
