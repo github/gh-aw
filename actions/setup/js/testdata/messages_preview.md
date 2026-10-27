@@ -1030,7 +1030,7 @@ _Step diagnostics contain only bounded runtime metadata; step names, agent text,
 > - `api.github.com`
 > - `synthetic.example.test`
 >
-> \[\!TIP\]
+> **Tip:**
 > `api.github.com` is blocked because GitHub API access uses the built-in GitHub tools by default. Instead of adding `api.github.com` to `network.allowed`, use `tools.github.mode: gh-proxy` for direct pre-authenticated GitHub CLI access without requiring network access to `api.github.com`:
 >
 > ```yaml
