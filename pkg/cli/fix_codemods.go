@@ -84,6 +84,7 @@ func getEarlyCodemods() []Codemod {
 		getBashAllowlistUnsupportedEngineCodemod(),    // Detect restricted tools.bash on engines that ignore it and emit guided error
 		getActivationOutputsCodemod(),                 // Transform needs.activation.outputs.* to steps.sanitized.outputs.*
 		getRolesToOnRolesCodemod(),                    // Move top-level roles to on.roles
+		getPullRequestTargetRolesCodemod(),            // Restrict untrusted admission roles before guided validation
 		getBotsToOnBotsCodemod(),                      // Move top-level bots to on.bots
 		getEngineStepsToTopLevelCodemod(),             // Move engine.steps to top-level steps
 		getEngineMaxRunsToTopLevelCodemod(),           // Move engine.max-runs to top-level max-turns
@@ -139,6 +140,7 @@ func getLaterCodemods() []Codemod {
 		getEngineCopilotSDKDriverToDriverCodemod(),        // Rename deprecated engine.copilot-sdk-driver to engine.driver
 		getRequestReviewPolicyCodemod(),                   // Normalize legacy request_review protected-file policies
 		getPostStepsSafeOutputsGuidedErrorCodemod(),       // Detect direct safe-outputs file access in post-steps and emit guided error
+		getPullRequestTargetGuidedErrorCodemod(),          // Report remaining risky trigger configurations after automatic fixes
 	}
 }
 
