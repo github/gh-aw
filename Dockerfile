@@ -3,7 +3,7 @@
 
 # Use Google's Docker Hub mirror to avoid unauthenticated pull limits and auth outages.
 # Keep the official Alpine digest so the mirrored image is identical.
-FROM mirror.gcr.io/library/alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+FROM mirror.gcr.io/library/alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
 # Install required dependencies
 RUN apk add --no-cache \

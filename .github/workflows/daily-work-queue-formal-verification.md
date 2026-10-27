@@ -60,7 +60,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Java 21
-        uses: actions/setup-java@v6.0.1
+        uses: actions/setup-java@v6.1.0
         with:
           distribution: temurin
           java-version: "21"

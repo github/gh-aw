@@ -205,7 +205,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 	if workflowData != nil && workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		var steps []GitHubActionStep
 		if behavior.HarnessScript != "" {
-			steps = append(steps, GenerateNodeJsSetupStep())
+			steps = append(steps, generateNodeJsSetupStep(workflowData))
 		}
 		return buildNpmEngineInstallStepsWithAWF(steps, workflowData, false)
 	}
@@ -221,7 +221,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 			// firewall sandbox, so the AWF binary must be installed.
 			return BuildNpmEngineInstallStepsWithAWF(nil, workflowData)
 		}
-		return BuildNpmEngineInstallStepsWithAWF([]GitHubActionStep{GenerateNodeJsSetupStep()}, workflowData)
+		return BuildNpmEngineInstallStepsWithAWF([]GitHubActionStep{generateNodeJsSetupStep(workflowData)}, workflowData)
 	}
 
 	install := behavior.Installation
