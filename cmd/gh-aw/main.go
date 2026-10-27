@@ -428,6 +428,7 @@ type compileCmdOptions struct {
 	noLogo                    bool
 	trial                     bool
 	dependabot                bool
+	actionsLock               bool
 	forceOverwrite            bool
 	refreshStopTime           bool
 	forceRefreshActionPins    bool
@@ -478,7 +479,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	requireSelfHostedRunners, _ := cmd.Flags().GetBool("require-self-hosted-runners")
 	trial, _ := cmd.Flags().GetBool("trial")
 	logicalRepo, _ := cmd.Flags().GetString("logical-repo")
-	dependabot, _ := cmd.Flags().GetBool("dependabot")
+	dependabot, actionsLock := getCompileDependencyOptions(cmd)
 	forceOverwrite, _ := cmd.Flags().GetBool("force")
 	refreshStopTime, _ := cmd.Flags().GetBool("refresh-stop-time")
 	forceRefreshActionPins, _ := cmd.Flags().GetBool("force-refresh-action-pins")
@@ -514,7 +515,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile, mcpProgressFile: mcpProgressFile,
 		environment: environment, dryRun: dryRun, allowExperimental: allowExperimental,
 		validate: validate, watch: watch, noEmit: noEmit, readOnly: readOnly, noLogo: noLogo, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
-		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
+		actionsLock: actionsLock, forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
 		zizmor: zizmor, poutine: poutine, actionlint: actionlint, skipLint: skipLint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
 		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
 		staged: staged, approve: approve, validateImages: validateImages, ghes: ghes, verbose: verbose, useSamples: useSamples,
@@ -525,6 +526,12 @@ func getCompileInternalFileOptions(cmd *cobra.Command) (priorManifestFile, mcpPr
 	priorManifestFile, _ = cmd.Flags().GetString("prior-manifest-file")
 	mcpProgressFile, _ = cmd.Flags().GetString("mcp-progress-file")
 	return priorManifestFile, mcpProgressFile
+}
+
+func getCompileDependencyOptions(cmd *cobra.Command) (dependabot, actionsLock bool) {
+	dependabot, _ = cmd.Flags().GetBool("dependabot")
+	actionsLock, _ = cmd.Flags().GetBool("actions-lock")
+	return dependabot, actionsLock
 }
 
 func getCompileReadOnlyOptions(cmd *cobra.Command) (noEmit, readOnly, noCheckUpdate bool) {
@@ -572,7 +579,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		NoEmit: o.noEmit, ReadOnly: o.readOnly, NoLogo: o.noLogo, Purge: o.purge, TrialMode: o.trial, TrialLogicalRepoSlug: o.logicalRepo, Strict: o.strict,
 		RequireSelfHostedRunners: o.requireSelfHostedRunners,
 		EnvironmentOverride:      o.environment, DryRun: o.dryRun, AllowExperimental: o.allowExperimental,
-		Dependabot: o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
+		Dependabot: o.dependabot, ActionsLock: o.actionsLock, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
 		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, SkipLint: o.skipLint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
 		Stats: o.stats, Models: o.models, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
@@ -841,6 +848,7 @@ func configureCompileBuildFlags() {
 }
 
 func configureCompileToolFlags() {
+	compileCmd.Flags().Bool("actions-lock", false, "Run gh actions-lock --no-narrow after successful compilation (requires the separately installed github/gh-actions-lock extension)")
 	compileCmd.Flags().Bool("dependabot", false, "Generate dependency manifests (package.json, requirements.txt, go.mod) and Dependabot config when dependencies are detected")
 	compileCmd.Flags().BoolP("force", "f", false, "Force overwrite of existing dependency files (only applies when --dependabot is set; e.g., dependabot.yml)")
 	compileCmd.Flags().Bool("refresh-stop-time", false, "Force regeneration of stop-after times instead of preserving existing values from lock files")

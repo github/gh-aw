@@ -1606,7 +1606,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       try {
         createPatchFile("should-fallback-after-timeout-with-workflows-permission");
-        mockGitForPrimaryPush(".github/workflows/ci.yml\n");
+        mockGitForPrimaryPush(".github/workflows/ci.yml\0");
 
         const module = await loadModule();
         const handler = await module.main({ allow_workflows: true });
@@ -1663,7 +1663,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
       try {
         createPatchFile("should-fail-before-push-without-workflows-permission");
-        mockGitForPrimaryPush(".github/workflows/ci.yml\n");
+        mockGitForPrimaryPush(".github/workflows/ci.yml\0");
 
         const module = await loadModule();
         const handler = await module.main({});
@@ -1675,6 +1675,27 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         expect(mockGithub.rest.pulls.create).not.toHaveBeenCalled();
       } finally {
         pushSignedSpy.mockRestore();
+      }
+    });
+
+    it("pushes retained workflow Markdown and includes the compiler callout", async () => {
+      const notice = require("./workflow_file_exclusions.cjs").WORKFLOW_COMPILATION_NOTICE;
+      const pushSpy = vi.spyOn(require("./push_signed_commits.cjs"), "pushSignedCommits").mockResolvedValue("remote-head-after");
+      const commentSpy = vi.spyOn(require("./update_activation_comment.cjs"), "updateActivationCommentWithCommit").mockResolvedValue(undefined);
+      try {
+        const branch = "retained-workflow-markdown";
+        createPatchFile(branch);
+        mockGitForPrimaryPush(".github/workflows/source.md\0");
+        const module = await loadModule();
+        const handler = await module.main({ exclude_lock_yml: true });
+        const result = await handler({ branch, message: notice }, {});
+        expect(result.success).toBe(true);
+        expect(pushSpy).toHaveBeenCalled();
+        expect(commentSpy).toHaveBeenCalledWith(mockGithub, mockContext, mockCore, expect.any(String), expect.any(String), expect.objectContaining({ additionalMessage: notice }));
+        expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining(notice));
+      } finally {
+        pushSpy.mockRestore();
+        commentSpy.mockRestore();
       }
     });
 
@@ -1941,6 +1962,19 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
       expect(params.body).not.toContain(unexpectedMarker);
     });
 
+    it("preserves the compiler callout when changes require a separate review PR", async () => {
+      process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+      const notice = require("./workflow_file_exclusions.cjs").WORKFLOW_COMPILATION_NOTICE;
+      const branch = "review-branch-compiler-callout";
+      createPatchFile(branch);
+      const module = await loadModule();
+      const handler = await module.main({ exclude_lock_yml: true });
+      const result = await handler({ branch, message: notice }, {});
+      expect(result.success).toBe(true);
+      expect(result.review_pr).toBe(true);
+      expect(mockGithub.rest.pulls.create.mock.calls.at(-1)[0].body).toContain(notice);
+    });
+
     it("should include head_repo for a review PR from a same-organization fork", async () => {
       process.env.GH_AW_DETECTION_CONCLUSION = "warning";
       mockContext.payload.pull_request.head.repo.full_name = "test-owner/automation-fork";
@@ -2131,7 +2165,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         }
         // Agent's post-apply diff includes a workflow file
         if (cmd === "git" && argList[0] === "diff" && argList[1] === "--name-only" && argList[2] === "--no-renames") {
-          return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
+          return { exitCode: 0, stdout: ".github/workflows/ci.yml\0", stderr: "" };
         }
         if (cmd === "git" && argList[0] === "push" && argList[1] === "origin") {
           throw new Error("git push should not be called when pre-flight fires a hard error");
@@ -2166,7 +2200,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         }
         // Agent's post-apply diff includes a workflow file
         if (cmd === "git" && argList[0] === "diff" && argList[1] === "--name-only" && argList[2] === "--no-renames") {
-          return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
+          return { exitCode: 0, stdout: ".github/workflows/ci.yml\0", stderr: "" };
         }
         // Push is rejected for workflows scope
         if (cmd === "git" && argList[0] === "push" && argList[1] === "origin") {
@@ -2223,7 +2257,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         }
         // Agent's post-apply diff includes a workflow file
         if (argList[0] === "diff" && argList[1] === "--name-only" && argList[2] === "--no-renames") {
-          return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
+          return { exitCode: 0, stdout: ".github/workflows/ci.yml\0", stderr: "" };
         }
         if (argList[0] === "diff-tree") {
           return { exitCode: 0, stdout: "", stderr: "" };
@@ -2277,7 +2311,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         }
         // Agent's post-apply diff includes a workflow file
         if (argList[0] === "diff" && argList[1] === "--name-only" && argList[2] === "--no-renames") {
-          return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
+          return { exitCode: 0, stdout: ".github/workflows/ci.yml\0", stderr: "" };
         }
         if (argList[0] === "diff-tree") {
           return { exitCode: 0, stdout: "", stderr: "" };
@@ -2368,7 +2402,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
         }
         // Agent's post-apply diff includes a workflow file
         if (cmd === "git" && argList[0] === "diff" && argList[1] === "--name-only" && argList[2] === "--no-renames") {
-          return { exitCode: 0, stdout: ".github/workflows/ci.yml\n", stderr: "" };
+          return { exitCode: 0, stdout: ".github/workflows/ci.yml\0", stderr: "" };
         }
         if (cmd === "git" && argList[0] === "push" && argList[1] === "origin") {
           throw new Error("git push should not be called when pre-flight fires a hard error");

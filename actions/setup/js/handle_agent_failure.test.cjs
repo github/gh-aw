@@ -7114,9 +7114,8 @@ describe("handle_agent_failure", () => {
       expect(createCommentMock).not.toHaveBeenCalled();
     });
 
-    it("skips cancelled agents with collector-reported missing terminal output", async () => {
+    it.each(["missing_terminal_safe_output", "agent_startup_failure"])("skips cancelled agents with collector-reported %s", async reason => {
       process.env.GH_AW_AGENT_CONCLUSION = "cancelled";
-      const reason = "missing_terminal_safe_output";
       fs.writeFileSync(
         path.join(tmpDir, "agent_output.json"),
         JSON.stringify({
@@ -7145,10 +7144,10 @@ describe("handle_agent_failure", () => {
       expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining("(conclusion: cancelled), skipping failure handling"));
     });
 
-    it("reports an agent-authored missing terminal output without collector corroboration", async () => {
+    it.each(["missing_terminal_safe_output", "agent_startup_failure"])("reports agent-authored %s without collector corroboration", async reason => {
       process.env.GH_AW_AGENT_CONCLUSION = "cancelled";
       syncRuntimePromptTemplates(import.meta.url);
-      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "report_incomplete", reason: "missing_terminal_safe_output" }] }));
+      fs.writeFileSync(path.join(tmpDir, "agent_output.json"), JSON.stringify({ items: [{ type: "report_incomplete", reason }] }));
       const createIssueMock = vi.fn(async () => {
         throw new Error("stop after capturing issue");
       });
@@ -7168,18 +7167,18 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).toHaveBeenCalled();
     });
 
-    it("omits collector missing-terminal diagnostics from mixed-output cancellation reports", async () => {
+    it.each(["missing_terminal_safe_output", "agent_startup_failure"])("omits collector %s diagnostics from mixed-output cancellation reports", async reason => {
       process.env.GH_AW_AGENT_CONCLUSION = "cancelled";
       syncRuntimePromptTemplates(import.meta.url);
       fs.writeFileSync(
         path.join(tmpDir, "agent_output.json"),
         JSON.stringify({
           items: [
-            { type: "report_incomplete", reason: "missing_terminal_safe_output", failureCause: "missing_terminal_safe_output", details: "private cancellation diagnostics" },
+            { type: "report_incomplete", reason, failureCause: reason, details: "private cancellation diagnostics" },
             { type: "missing_tool", tool: "private-tool", reason: "private tool unavailable" },
           ],
-          collectorEmptyOutputCause: "missing_terminal_safe_output",
-          collectorFailureCause: "missing_terminal_safe_output",
+          collectorEmptyOutputCause: reason,
+          collectorFailureCause: reason,
         })
       );
       const createIssueMock = vi.fn(async () => {
@@ -7200,12 +7199,13 @@ describe("handle_agent_failure", () => {
       expect(createIssueMock).toHaveBeenCalledOnce();
       const { title, body } = createIssueMock.mock.calls[0][0];
       expect(title).not.toContain("finished without a terminal safe output");
+      expect(title).not.toContain("failed before agent execution started");
       expect(body).toContain("private-tool");
       expect(body).not.toContain("private cancellation diagnostics");
-      expect(body).not.toContain("Failure classification: missing_terminal_safe_output");
+      expect(body).not.toContain(`Failure classification: ${reason}`);
       const categories = JSON.parse(fs.readFileSync("/tmp/gh-aw/failure_categories.json", "utf8"));
       expect(categories).toContain("missing_tool");
-      expect(categories).not.toContain("missing_terminal_safe_output");
+      expect(categories).not.toContain(reason);
       expect(categories).not.toContain("report_incomplete");
     });
 
@@ -7213,6 +7213,9 @@ describe("handle_agent_failure", () => {
       ["success", "missing_terminal_safe_output"],
       ["failure", "missing_terminal_safe_output"],
       ["timed_out", "missing_terminal_safe_output"],
+      ["success", "agent_startup_failure"],
+      ["failure", "agent_startup_failure"],
+      ["timed_out", "agent_startup_failure"],
       ["cancelled", "mcp_crash"],
     ])("preserves failure reporting for %s agents with %s", async (conclusion, reason) => {
       process.env.GH_AW_AGENT_CONCLUSION = conclusion;
@@ -7221,7 +7224,7 @@ describe("handle_agent_failure", () => {
         path.join(tmpDir, "agent_output.json"),
         JSON.stringify({
           items: [{ type: "report_incomplete", reason }],
-          ...(reason === "missing_terminal_safe_output" ? { collectorEmptyOutputCause: reason } : {}),
+          ...(["missing_terminal_safe_output", "agent_startup_failure"].includes(reason) ? { collectorEmptyOutputCause: reason } : {}),
         })
       );
       const createIssueMock = vi.fn(async () => {

@@ -320,6 +320,20 @@ describe("update_activation_comment.cjs", () => {
         "Pull request created: [#42](https://github.com/testowner/testrepo/pull/42)\n\nCommit pushed: [`abcdef1`](https://github.com/testowner/testrepo/commit/abcdef1234567890)"
       );
     }),
+    it("should preserve workflow compilation notices in commit comments and exported links", async () => {
+      mockDependencies.process.env.GH_AW_COMMENT_ID = "123456";
+      mockDependencies.core.setOutput = vi.fn();
+      mockDependencies.github.request.mockImplementation(async method =>
+        method.startsWith("GET") ? { data: { body: "Agentic workflow triggered." } } : { data: { id: 123456, html_url: "https://github.com/testowner/testrepo/issues/1#issuecomment-123456" } }
+      );
+      const { WORKFLOW_COMPILATION_NOTICE } = createRequire(import.meta.url)("./workflow_file_exclusions.cjs");
+      const { updateActivationCommentWithCommit } = createFunctionFromScript(mockDependencies);
+      const options = { additionalMessage: WORKFLOW_COMPILATION_NOTICE, activationCommentLinks: [] };
+      await updateActivationCommentWithCommit(mockDependencies.github, mockDependencies.context, mockDependencies.core, "abcdef1234567890", "https://github.com/testowner/testrepo/commit/abcdef1234567890", options);
+      expect(mockDependencies.github.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining(WORKFLOW_COMPILATION_NOTICE) }));
+      expect(options.activationCommentLinks).toEqual([`Commit pushed: [\`abcdef1\`](https://github.com/testowner/testrepo/commit/abcdef1234567890)\n\n${WORKFLOW_COMPILATION_NOTICE}`]);
+      expect(mockDependencies.core.setOutput).toHaveBeenLastCalledWith("activation_comment_links", options.activationCommentLinks[0]);
+    }),
     it("should isolate independent accumulators without reloading the module", async () => {
       mockDependencies.process.env.GH_AW_COMMENT_ID = "123456";
       mockDependencies.core.setOutput = vi.fn();

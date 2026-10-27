@@ -76,6 +76,7 @@ async function updateActivationComment(github, context, core, itemUrl, itemNumbe
  * @param {string} [options.targetRepo] - Target repo "owner/repo" for fallback comment (cross-repo scenarios)
  * @param {any} [options.targetGithubClient] - Authenticated GitHub client for the target repo (cross-repo scenarios)
  * @param {string[]} [options.activationCommentLinks] - Invocation-scoped link accumulator
+ * @param {string} [options.additionalMessage] - Additional notice included with the commit link
  */
 async function updateActivationCommentWithCommit(github, context, core, commitSha, commitUrl, options = {}) {
   const shortSha = commitSha.substring(0, 7);
@@ -83,6 +84,9 @@ async function updateActivationCommentWithCommit(github, context, core, commitSh
   const invocationContext = resolveInvocationContext(context);
   const runUrl = buildWorkflowRunUrl(context, invocationContext.workflowRepo);
   const commitMessage = buildCreatedMessageBlocks("commit", { commitSha, shortSha, commitUrl });
+  if (options.additionalMessage) {
+    commitMessage.push(...parseReportMarkdown(options.additionalMessage, { agentTainted: false }));
+  }
   const message = buildActivationMessage(commitMessage, workflowName, runUrl);
   if (await updateActivationCommentWithMessage(github, context, core, message, "commit", options)) {
     recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Pushed commit", children: commitMessage }).body, options.activationCommentLinks ?? []);

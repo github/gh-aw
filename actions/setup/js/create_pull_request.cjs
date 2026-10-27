@@ -5,6 +5,7 @@ const { createReportIssue, buildIssueReport, renderIssueParameters } = require("
 const { buildIssueBodyReport } = require("./issue_body.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
+const { getExcludedFiles } = require("./workflow_file_exclusions.cjs");
 
 /** @type {typeof import("fs")} */
 const fs = require("fs");
@@ -1857,7 +1858,7 @@ async function main(config = {}) {
               core.warning("Signed push rejected merge commit topology from bundle; rewriting branch and retrying signed push");
               try {
                 await rewriteBundleBranchAsSingleCommit(baseBranch, exec, bundleFilePath, {
-                  excludedFiles: Array.isArray(config.excluded_files) ? config.excluded_files : [],
+                  excludedFiles: getExcludedFiles(config),
                 });
                 const runRetryPush = async () => {
                   transport.assertUnchanged();

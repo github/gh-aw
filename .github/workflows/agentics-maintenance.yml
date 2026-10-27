@@ -1045,7 +1045,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
+      plan_created: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' }}
       plans_uploaded: ${{ steps.upload_plans.outcome == 'success' }}
       plan_0_created: ${{ steps.plan_0.outputs.plan_created }}
       plan_1_created: ${{ steps.plan_1.outputs.plan_created }}
@@ -1053,6 +1053,7 @@ jobs:
       plan_3_created: ${{ steps.plan_3.outputs.plan_created }}
       plan_4_created: ${{ steps.plan_4.outputs.plan_created }}
       plan_5_created: ${{ steps.plan_5.outputs.plan_created }}
+      plan_6_created: ${{ steps.plan_6.outputs.plan_created }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1067,11 +1068,90 @@ jobs:
         with:
           destination: ${{ runner.temp }}/gh-aw/actions
 
+      - name: Plan ledger compaction (arxiv-papers, untrusted, read-only)
+        if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'arxiv-papers' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        id: plan_0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/arxiv-papers",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "id",
+              "max_patch_kb": 50,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "arxiv-papers",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "analyzed_at": {
+                    "type": "string"
+                  },
+                  "area": {
+                    "type": "string"
+                  },
+                  "categories": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "opportunity": {
+                    "type": "string"
+                  },
+                  "published": {
+                    "type": "string"
+                  },
+                  "relevant": {
+                    "type": "boolean"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "url",
+                  "published",
+                  "categories",
+                  "relevant",
+                  "analyzed_at"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_plan.cjs'));
+            await main();
+
       - name: Plan ledger compaction (audit-history, untrusted, read-only)
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'audit-history' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_0
+        id: plan_1
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1170,7 +1250,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
         with:
           script: |
             const path = require('path');
@@ -1184,7 +1264,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'awf-feature-reviews' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_1
+        id: plan_2
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1202,7 +1282,7 @@ jobs:
               "name": "awf-feature-reviews"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
         with:
           script: |
             const path = require('path');
@@ -1216,7 +1296,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'caveman-run-history' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_2
+        id: plan_3
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1275,7 +1355,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
         with:
           script: |
             const path = require('path');
@@ -1289,7 +1369,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'centralization' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_3
+        id: plan_4
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1423,7 +1503,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
         with:
           script: |
             const path = require('path');
@@ -1437,7 +1517,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'concurrency-audits' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_4
+        id: plan_5
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1455,7 +1535,7 @@ jobs:
               "name": "concurrency-audits"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
         with:
           script: |
             const path = require('path');
@@ -1469,7 +1549,7 @@ jobs:
         if: ${{ inputs.operation != 'compact_ledger' || inputs.ledger == '' || inputs.ledger == 'smoke' }}
         continue-on-error: true
         timeout-minutes: 15
-        id: plan_5
+        id: plan_6
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1513,7 +1593,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
         with:
           script: |
             const path = require('path');
@@ -1524,7 +1604,7 @@ jobs:
             await main();
 
       - name: Upload ledger compaction plans
-        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' }}
+        if: ${{ steps.plan_0.outputs.plan_created == 'true' || steps.plan_1.outputs.plan_created == 'true' || steps.plan_2.outputs.plan_created == 'true' || steps.plan_3.outputs.plan_created == 'true' || steps.plan_4.outputs.plan_created == 'true' || steps.plan_5.outputs.plan_created == 'true' || steps.plan_6.outputs.plan_created == 'true' }}
         id: upload_plans
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1533,7 +1613,7 @@ jobs:
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: error
       - name: Report ledger compaction planning failures
-        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' }}
+        if: ${{ steps.plan_0.outcome == 'failure' || steps.plan_1.outcome == 'failure' || steps.plan_2.outcome == 'failure' || steps.plan_3.outcome == 'failure' || steps.plan_4.outcome == 'failure' || steps.plan_5.outcome == 'failure' || steps.plan_6.outcome == 'failure' }}
         run: exit 1
 
   ledger_compaction_apply:
@@ -1564,9 +1644,88 @@ jobs:
           name: ledger-compaction-plans
           path: ${{ runner.temp }}/gh-aw/ledger-compaction
 
-      - name: Validate and apply ledger compaction (audit-history, trusted)
+      - name: Validate and apply ledger compaction (arxiv-papers, trusted)
         if: ${{ needs.ledger_compaction_plan.outputs.plan_0_created == 'true' }}
         id: apply_0
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_AW_LEDGER_COMPACTION_CONFIG: |-
+            {
+              "branch_name": "ledgers/arxiv-papers",
+              "compaction": {
+                "schedule": "daily",
+                "min_segments": 32,
+                "max_segments": 128
+              },
+              "key": "id",
+              "max_patch_kb": 50,
+              "max_record_kb": 4,
+              "max_segment_kb": 100,
+              "name": "arxiv-papers",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "analyzed_at": {
+                    "type": "string"
+                  },
+                  "area": {
+                    "type": "string"
+                  },
+                  "categories": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "opportunity": {
+                    "type": "string"
+                  },
+                  "published": {
+                    "type": "string"
+                  },
+                  "relevant": {
+                    "type": "boolean"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "url",
+                  "published",
+                  "categories",
+                  "relevant",
+                  "analyzed_at"
+                ],
+                "type": "object"
+              },
+              "type": "table"
+            }
+          GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
+            await main();
+
+      - name: Validate and apply ledger compaction (audit-history, trusted)
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_1_created == 'true' }}
+        id: apply_1
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -1666,7 +1825,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-0.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1678,8 +1837,8 @@ jobs:
             await main();
 
       - name: Validate and apply ledger compaction (awf-feature-reviews, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_1_created == 'true' }}
-        id: apply_1
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_2_created == 'true' }}
+        id: apply_2
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -1698,7 +1857,7 @@ jobs:
               "name": "awf-feature-reviews"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-1.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1710,8 +1869,8 @@ jobs:
             await main();
 
       - name: Validate and apply ledger compaction (caveman-run-history, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_2_created == 'true' }}
-        id: apply_2
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
+        id: apply_3
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -1771,7 +1930,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-2.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1783,8 +1942,8 @@ jobs:
             await main();
 
       - name: Validate and apply ledger compaction (centralization, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_3_created == 'true' }}
-        id: apply_3
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
+        id: apply_4
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -1919,7 +2078,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-3.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1931,8 +2090,8 @@ jobs:
             await main();
 
       - name: Validate and apply ledger compaction (concurrency-audits, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_4_created == 'true' }}
-        id: apply_4
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
+        id: apply_5
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -1951,7 +2110,7 @@ jobs:
               "name": "concurrency-audits"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-4.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -1963,8 +2122,8 @@ jobs:
             await main();
 
       - name: Validate and apply ledger compaction (smoke, trusted)
-        if: ${{ needs.ledger_compaction_plan.outputs.plan_5_created == 'true' }}
-        id: apply_5
+        if: ${{ needs.ledger_compaction_plan.outputs.plan_6_created == 'true' }}
+        id: apply_6
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -2009,7 +2168,7 @@ jobs:
               "type": "table"
             }
           GH_AW_LEDGER_COMPACTION_TRIGGER: ${{ inputs.operation == 'compact_ledger' && 'requested' || 'scheduled' }}
-          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-5.json
+          GH_AW_LEDGER_COMPACTION_PLAN_FILE: ${{ runner.temp }}/gh-aw/ledger-compaction/plan-6.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -2020,7 +2179,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'ledger_compaction_apply.cjs'));
             await main();
       - name: Report ledger compaction application failures
-        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' }}
+        if: ${{ steps.apply_0.outcome == 'failure' || steps.apply_1.outcome == 'failure' || steps.apply_2.outcome == 'failure' || steps.apply_3.outcome == 'failure' || steps.apply_4.outcome == 'failure' || steps.apply_5.outcome == 'failure' || steps.apply_6.outcome == 'failure' }}
         run: exit 1
 
   work_queue_compaction:
