@@ -314,6 +314,18 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
     throw new Error(`${ERR_PERMISSION}: ` + "Refusing PR checkout: unable to determine triggering actor");
   }
 
+  const changes = context.payload.changes;
+  const isAllowedBotBodyEdit =
+    context.payload.action === "edited" &&
+    isAllowedBot(actor, parseAllowedBots()) &&
+    changes !== null &&
+    typeof changes === "object" &&
+    Object.prototype.hasOwnProperty.call(changes, "body") &&
+    changes.body !== null &&
+    typeof changes.body === "object" &&
+    !Array.isArray(changes.body) &&
+    Object.keys(changes).every(key => key === "body");
+
   // Apps are not collaborators: their permission endpoint returns "none" even
   // when they can write to the repository. A bot that triggered a PR event for
   // a branch in this repository can have its checkout trusted instead. Other
@@ -321,7 +333,7 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
   if (
     (context.eventName === "pull_request" || context.eventName === "pull_request_target") &&
     typeof context.payload.action === "string" &&
-    (TRUSTED_BOT_PR_ACTIONS.includes(context.payload.action) || (context.payload.action === "edited" && isAllowedBot(actor, parseAllowedBots()))) &&
+    (TRUSTED_BOT_PR_ACTIONS.includes(context.payload.action) || isAllowedBotBodyEdit) &&
     senderType === "Bot" &&
     context.payload.sender?.login === actor &&
     context.payload.repository !== undefined &&

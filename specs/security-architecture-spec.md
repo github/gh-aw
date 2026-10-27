@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.1.5<br>
+**Version**: 1.1.6<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -1013,7 +1013,7 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 2. **Actor trust**: The triggering actor MUST satisfy `assertTrustedCheckoutRuntime()`, which enforces two properties with different scopes:
    - **Fork-runtime rejection** (`workflow_dispatch` PR replay ONLY): the runtime repository MUST NOT be a fork. This check MUST NOT be evaluated for other PR-capable triggers (`pull_request`, `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `issue_comment`), because a structurally forked base repository is a legitimate topology for those triggers and rejecting it produces a false positive (see the risk matrix below). The payload MUST contain `repository.fork` as the boolean `false`; missing or malformed fork metadata MUST fail closed rather than be treated as trusted.
    - **Permission floor** (all PR checkout paths except the same-repository bot cases below): the actor MUST hold write-or-higher repository permission. For centralized command or label dispatches where the runtime actor is `github-actions[bot]`, the platform-set `sender.type` MUST be `Bot`, a command/label marker MUST be present, and the originating `aw_context.actor` MUST be a different identity with write-or-higher permission. Missing or inconsistent identity metadata MUST fail closed before permission lookup.
-   - **Same-repository bot PR events**: `pull_request` or `pull_request_target` `opened`, `synchronize`, `ready_for_review`, or `reopened` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` matches the triggering actor, and the positive runtime repository ID, PR head repository ID, and PR base repository ID are equal. `edited` events MAY also use this exception under the same identity and repository checks, but only when the actor is explicitly listed in `on.bots` (the App slug and its `[bot]` form are equivalent). `ready_for_review` and `reopened` are lifecycle events, not evidence of a branch push; they are trusted only as explicitly allowed event actions under the same Bot identity and same-repository provenance checks. Missing or inconsistent identity or repository metadata, forked PRs, unlisted actors on `edited` events, and all other event actions, including `labeled`, MUST NOT use this exception and MUST satisfy the permission floor.
+   - **Same-repository bot PR events**: `pull_request` or `pull_request_target` `opened`, `synchronize`, `ready_for_review`, or `reopened` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` matches the triggering actor, and the positive runtime repository ID, PR head repository ID, and PR base repository ID are equal. `edited` events MAY also use this exception under the same identity and repository checks, but only when the actor is explicitly listed in `on.bots` (the App slug and its `[bot]` form are equivalent) and `changes` contains a non-null object-valued `body` field and no other fields. Missing or malformed `changes`, edits without a body change, and edits that also change the title or base MUST NOT use this exception. `ready_for_review` and `reopened` are lifecycle events, not evidence of a branch push; they are trusted only as explicitly allowed event actions under the same Bot identity and same-repository provenance checks. Missing or inconsistent identity or repository metadata, forked PRs, unlisted actors on `edited` events, and all other event actions, including `labeled`, MUST NOT use this exception and MUST satisfy the permission floor.
    - **Same-repository allow-listed bot comments and reviews**: `issue_comment`, `pull_request_review_comment`, and `pull_request_review` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` exactly matches `comment.user.login` or `review.user.login` as appropriate, the sender login is canonically equivalent to the triggering actor (the App slug and its `[bot]` form are equivalent), the actor is explicitly listed in `on.bots`, and the positive runtime repository ID equals both the fetched PR head and base repository IDs. Missing or mismatched identities, an unlisted actor, missing or mismatched repository IDs, and fork PRs MUST NOT use this exception and MUST satisfy the permission floor. Failure to fetch or verify the PR details MUST fail closed.
 3. **Parse resilience** (`workflow_dispatch` PR contexts): Malformed `aw_context` JSON MUST be caught; the implementation MUST emit a warning and skip checkout rather than propagating the parse error.
 4. **Ref isolation**: The PR head MUST be fetched exclusively via `refs/pull/N/head` from the current repository's origin, using array-based execution (no shell interpolation).
@@ -2091,6 +2091,14 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 ---
 
 ## Change Log
+
+### Version 1.1.6 (RS-05a Body-Only Bot PR Edits)
+
+**Published**: October 27, 2026
+
+- Allows an explicitly `on.bots`-listed App to bypass the collaborator permission floor for same-repository `pull_request` and `pull_request_target` `edited` events only when `changes` contains a non-null object-valued `body` field and no other fields.
+- Retains the permission floor for missing change metadata, title/base or mixed edits, unlisted bots, fork PRs, unsupported actions, and identity or repository mismatches.
+- Updates the RS-05a validation mapping and bounded TLA+ model; targeted formal revalidation is pending in `security-architecture-spec-validation.md` §7b.
 
 ### Version 1.1.5 (RS-05a Labeled PR Permission Floor)
 

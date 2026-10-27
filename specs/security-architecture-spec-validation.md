@@ -1,7 +1,7 @@
 # Security Architecture Specification Validation
 
 **Document**: Validation of `security-architecture-spec.md` against compiled `.lock.yml` files  
-**Date**: October 26, 2026<br>
+**Date**: October 27, 2026<br>
 **Last completed targeted formal revalidation**: v1.1.1 (RS-05a) / 2026-10-09
 **Validator**: GitHub Copilot Agent  
 **Scope**: Cross-reference specification requirements with actual implementation
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and the last completed RS-05a targeted formal revalidation, v1.1.1 on 2026-10-09. The v1.1.2 review-checkout update and v1.1.3 and v1.1.5 branch-event updates have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. This document does not claim otherwise. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
+⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and the last completed RS-05a targeted formal revalidation, v1.1.1 on 2026-10-09. The v1.1.2 review-checkout update and v1.1.3, v1.1.5, and v1.1.6 branch-event updates have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. This document does not claim otherwise. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
 
 All major security architecture claims in the specification have been verified against actual workflow implementations:
 - ✅ Job architecture (activation, agent, safe_outputs)
@@ -439,7 +439,7 @@ if (!pullRequest && eventName === "workflow_dispatch") {
 }
 ```
 
-Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call and the `exec.exec("git", [...])` array invocation that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher only when GitHub also supplies `sender.type == "Bot"`; they fail closed when the command/label marker or actor is absent. Bot/app identity does not bypass the write-or-higher permission floor except for the separately verified same-repository `opened`, `synchronize`, `ready_for_review`, or `reopened` PR branch-event path in RS-05a; `labeled` remains subject to that permission floor.
+Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call and the `exec.exec("git", [...])` array invocation that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher only when GitHub also supplies `sender.type == "Bot"`; they fail closed when the command/label marker or actor is absent. Bot/app identity does not bypass the write-or-higher permission floor except for the separately verified same-repository `opened`, `synchronize`, `ready_for_review`, or `reopened` PR branch-event path, or the explicitly allow-listed same-repository `edited` path with only a body change, in RS-05a; `labeled` remains subject to that permission floor.
 
 **Trust-boundary limitation:** `github-actions[bot]` is the shared identity of repository workflows using `GITHUB_TOKEN`, not proof of one specific caller workflow. GitHub does not include an immutable caller-workflow identity in the target `workflow_dispatch` event. This validation therefore assumes that `actions: write` is granted only to trusted repository workflows; any such workflow can construct `aw_context`, so untrusted code must not receive that permission.
 
@@ -478,10 +478,12 @@ async function assertTrustedCheckoutRuntime() {
 | bot/app actor with write-or-higher repository permission allowed | actor trust |
 | bot/app actor without write-or-higher repository permission rejected for `workflow_dispatch`, `issue_comment`, `pull_request_review_comment`, and `pull_request_review` | actor trust |
 | same-repository bot `opened`, `synchronize`, `ready_for_review`, and `reopened` PR events allowed only when sender and runtime, head, and base repository IDs match; lifecycle actions are not branch-push evidence | actor trust exception |
+| allow-listed same-repository bot `edited` PR event allowed only when `changes` contains a non-null object-valued `body` field and no other fields, with sender and runtime, head, and base repository IDs matching | actor trust exception |
 | same-repository bot `labeled` PR events retain the collaborator permission floor on both `pull_request` and `pull_request_target` | actor trust exception (negative case) |
 | allow-listed App comments on `issue_comment` and `pull_request_review_comment`, and reviews on `pull_request_review`, allowed only when sender and matching comment/review author match, sender and runtime actor are canonically equivalent, and runtime, head, and base repository IDs match | actor trust exception |
 | unlisted bot comments/reviews, differing sender/comment/review author identities, fork PRs, and missing or mismatched repository IDs retain the collaborator permission floor | actor trust exception (negative cases) |
-| bot exception rejected for forked heads, missing runtime ID, mismatched sender, non-bot sender, actions outside the trusted allowlist such as `labeled` or `edited`, and missing or mismatched base ID | actor trust exception (independent negative cases) |
+| allow-listed bot `edited` events with missing/malformed changes, no body change, a title/base change, or a mixed body/title or body/base edit retain the collaborator permission floor | actor trust exception (negative cases) |
+| bot exception rejected for forked heads, missing runtime ID, mismatched sender, non-bot sender, actions outside the trusted allowlist such as `labeled`, and missing or mismatched base ID | actor trust exception (independent negative cases) |
 | centralized `workflow_dispatch` validates the originating `aw_context.actor`, not `github-actions[bot]` | actor trust |
 | centralized `workflow_dispatch` without `aw_context.actor` is rejected | actor trust (fail closed) |
 | centralized actor propagation without `sender.type == "Bot"` is rejected | actor trust (identity signal) |
@@ -510,7 +512,7 @@ async function assertTrustedCheckoutRuntime() {
 | `workflow_dispatch_uses_refs_pull_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without `refs/pull/N/head` isolation |
 | `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
 
-**Status**: **RUNTIME TESTS PASS; FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; `labeled` remains subject to the collaborator permission floor on both `pull_request` and `pull_request_target`. The branch-event updates in v1.1.3 and v1.1.5 have runtime evidence; v1.1.4 concerns transport security and is outside this branch-event validation. The last completed targeted formal revalidation remains v1.1.1 / 2026-10-09. The Z3 artifact's `pr_action_proves_branch_access` guard abstracts membership in the explicit PR action allowlist; it does not assert that a branch push occurred. Runtime regression cases and the TLA+ model cover the concrete action set and rejection guards. The targeted `checkout_pr_branch.test.cjs` suite passed on 2026-10-26, including fail-closed `labeled` cases. The Z3 solver and pinned TLA+ Tools were unavailable in the validation environment, so the Z3 proof and TLC model were not rerun and targeted formal revalidation remains pending. Existing `workflow_dispatch`, ref-isolation, and fork-runtime evidence remains applicable; the full revalidation policy is in `security-architecture-spec.md` §11.
+**Status**: **RUNTIME TESTS PASS; FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; explicitly allow-listed `edited` events bypass the permission floor only when `changes` contains a non-null object-valued `body` field and no other fields. `labeled` and edits with missing, non-body, malformed, or mixed change metadata remain subject to the collaborator permission floor on both `pull_request` and `pull_request_target`. The branch-event updates in v1.1.3, v1.1.5, and v1.1.6 have runtime evidence; v1.1.4 concerns transport security and is outside this branch-event validation. The last completed targeted formal revalidation remains v1.1.1 / 2026-10-09. The Z3 artifact's `pr_action_proves_branch_access` guard abstracts membership in the explicit PR action allowlist; it does not model webhook change fields or assert that a branch push occurred. The targeted `checkout_pr_branch.test.cjs` suite passed on 2026-10-27. The updated bounded TLA+ model and Z3 proof were not rerun because the pinned TLA+ Tools and Z3 solver are unavailable in this environment; targeted formal revalidation remains pending. Existing `workflow_dispatch`, ref-isolation, and fork-runtime evidence remains applicable; the full revalidation policy is in `security-architecture-spec.md` §11.
 
 ---
 

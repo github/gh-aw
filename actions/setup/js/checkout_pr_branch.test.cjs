@@ -447,6 +447,11 @@ If the pull request is still open, verify that:
         it.each([
           ["unlisted bot", { bots: "other-app" }],
           ["missing allowlist", { bots: undefined }],
+          ["missing changes", { changes: undefined }],
+          ["missing body change", { changes: { title: { from: "Original PR title" } } }],
+          ["invalid body change", { changes: { body: null } }],
+          ["body and title changed", { changes: { body: { from: "Original PR description" }, title: { from: "Original PR title" } } }],
+          ["body and base changed", { changes: { body: { from: "Original PR description" }, base: { ref: "main" } } }],
           ["fork PR", { headId: 43 }],
           ["missing head repository ID", { headId: undefined }],
           ["missing base repository ID", { baseId: undefined }],
@@ -463,6 +468,13 @@ If the pull request is still open, verify that:
               delete process.env.GH_AW_ALLOWED_BOTS;
             } else {
               process.env.GH_AW_ALLOWED_BOTS = overrides.bots;
+            }
+          }
+          if ("changes" in overrides) {
+            if (overrides.changes === undefined) {
+              delete mockContext.payload.changes;
+            } else {
+              mockContext.payload.changes = overrides.changes;
             }
           }
           if ("headId" in overrides) mockContext.payload.pull_request.head.repo.id = overrides.headId;

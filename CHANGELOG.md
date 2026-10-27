@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Security
+
+Allow explicitly `on.bots`-listed Apps to check out same-repository PRs on
+`edited` events only when the webhook reports a non-null object-valued `body`
+change and no other changed fields. Missing change metadata, title/base changes,
+and mixed edits continue to require write-or-higher repository permission.
+
 ### Breaking changes
 
 The `gh aw outcomes` command has been removed. Use `gh aw logs --outcomes`
