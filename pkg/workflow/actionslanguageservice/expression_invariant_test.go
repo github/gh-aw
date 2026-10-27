@@ -113,3 +113,41 @@ func TestExpressionArityInvariants(t *testing.T) {
 		"unary": {}, "index": {}, "binary": {}, "logical": {}, "call": {},
 	}, kinds)
 }
+
+func TestExpressionChildPrecondition(t *testing.T) {
+	expression, err := ParseSyntax("github.ref")
+	require.NoError(t, err)
+	for _, index := range []int{-1, len(expression.Children)} {
+		require.PanicsWithValue(t, "invalid Actions expression AST operand", func() {
+			expression.Child(index)
+		})
+	}
+}
+
+func TestExpressionParserCursorInvariants(t *testing.T) {
+	tokens, err := lex("true")
+	require.NoError(t, err)
+	parser := expressionParser{tokens: tokens}
+	require.Equal(t, "true", parser.next().Kind)
+	require.Equal(t, "true", parser.previous().Kind)
+	require.Equal(t, "eof", parser.next().Kind)
+	require.Equal(t, "eof", parser.next().Kind)
+	require.Equal(t, len(tokens)-1, parser.pos)
+
+	for _, pos := range []int{-1, len(tokens)} {
+		parser := expressionParser{tokens: tokens, pos: pos}
+		expression, err := parser.parse()
+		require.Nil(t, expression)
+		require.ErrorContains(t, err, "invalid Actions expression token cursor")
+	}
+	for _, pos := range []int{0, len(tokens) + 1} {
+		parser := expressionParser{tokens: tokens, pos: pos}
+		require.Equal(t, "eof", parser.previous().Kind)
+		expression, err := parser.parse()
+		require.Nil(t, expression)
+		require.ErrorContains(t, err, "invalid Actions expression previous token")
+	}
+	expression, err := (&expressionParser{}).parse()
+	require.Nil(t, expression)
+	require.ErrorContains(t, err, "invalid Actions expression token cursor")
+}

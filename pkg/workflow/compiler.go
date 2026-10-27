@@ -275,7 +275,7 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 		if parsedWorkflow != nil {
 			schemaErr = c.validateGitHubActionsSchemaFromParsed(parsedWorkflow)
 			if schemaErr == nil {
-				schemaErr = actionslanguageservice.ValidateWorkflow(lockFile, yamlContent)
+				schemaErr = actionslanguageservice.ValidateWorkflowWithCacheMode(lockFile, yamlContent)
 			}
 		} else {
 			schemaErr = c.validateGitHubActionsSchema(yamlContent)

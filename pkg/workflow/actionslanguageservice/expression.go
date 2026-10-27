@@ -19,6 +19,8 @@ type Expression struct {
 
 // Child retrieves a required operand of a parser-created node. A missing operand
 // is an AST construction error, not a recoverable expression syntax error.
+// It panics if index is outside the node's arity; callers must use the operand
+// counts guaranteed by the node's Kind.
 func (e *Expression) Child(index int) *Expression {
 	if index >= 0 && index < len(e.Children) {
 		return e.Children[index]
@@ -61,6 +63,7 @@ type expressionParser struct {
 	contexts   map[string]bool
 	functions  map[string]function
 	syntaxOnly bool
+	err        error
 }
 
 // ParseSyntax uses the official grammar without restricting named contexts.
@@ -99,15 +102,26 @@ func parseExpression(source string, allowedContext []string, syntaxOnly bool) (*
 		}
 		p.functions[strings.ToLower(name)] = function{minimum, maximum}
 	}
+	return p.parse()
+}
+
+func (p *expressionParser) parse() (*Expression, error) {
 	if p.peek().Kind == "eof" {
-		return nil, nil
+		return nil, p.err
 	}
 	result, err := p.expression()
+	if p.err != nil {
+		return nil, p.err
+	}
 	if err != nil {
 		return nil, err
 	}
-	if p.peek().Kind != "eof" {
-		return nil, p.error("unexpected symbol", p.peek())
+	last := p.peek()
+	if p.err != nil {
+		return nil, p.err
+	}
+	if last.Kind != "eof" {
+		return nil, p.error("unexpected symbol", last)
 	}
 	return result, nil
 }
@@ -297,7 +311,10 @@ func (p *expressionParser) peek() Token {
 	if p.pos >= 0 && p.pos < len(p.tokens) {
 		return p.tokens[p.pos]
 	}
-	panic("invalid Actions expression token cursor")
+	if p.err == nil {
+		p.err = fmt.Errorf("invalid Actions expression token cursor %d for %d tokens", p.pos, len(p.tokens))
+	}
+	return Token{Kind: "eof", Offset: len(p.source)}
 }
 
 func (p *expressionParser) previous() Token {
@@ -305,7 +322,10 @@ func (p *expressionParser) previous() Token {
 	if index >= 0 && index < len(p.tokens) {
 		return p.tokens[index]
 	}
-	panic("invalid Actions expression previous token")
+	if p.err == nil {
+		p.err = fmt.Errorf("invalid Actions expression previous token %d for %d tokens", index, len(p.tokens))
+	}
+	return Token{Kind: "eof", Offset: len(p.source)}
 }
 
 func (p *expressionParser) next() Token {

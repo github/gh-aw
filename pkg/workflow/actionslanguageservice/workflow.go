@@ -29,6 +29,10 @@ func ValidateWorkflow(name, content string) error {
 	if err != nil {
 		return err
 	}
+	return validateConditions(name, workflow)
+}
+
+func validateConditions(name string, workflow *Workflow) error {
 	for _, condition := range workflow.conditions {
 		source := scalarText(condition.node)
 		if strings.TrimSpace(source) == "" {
@@ -68,6 +72,10 @@ func ParseWorkflow(name, content string) (*Workflow, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseWorkflow(name, content, schema)
+}
+
+func parseWorkflow(name, content string, schema map[string]definition) (*Workflow, error) {
 	decoder := yaml.NewDecoder(strings.NewReader(content))
 	var document yaml.Node
 	if err := decoder.Decode(&document); err != nil {
