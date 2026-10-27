@@ -3,6 +3,7 @@ package checkoutpolicy
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
@@ -20,7 +21,7 @@ func MatchesExpression(value, expected string) bool {
 		return false
 	}
 	path, ok := actionslanguageservice.Reference(expression)
-	return ok && strings.Join(path, ".") == expected
+	return ok && slices.Equal(path, strings.Split(expected, "."))
 }
 
 // Base accepts the supported base-repository/ref forms. Callers must separately

@@ -17,7 +17,7 @@ const (
 var (
 	githubScriptActionRequirePrefixRE = regexp.MustCompile(`^(\s*)(.*\brequire\()'`)
 	shellActionCommandPrefixRE        = regexp.MustCompile(`\b(node|bash|sh) $`)
-	shellActionCommandPathRE          = regexp.MustCompile(`^/gh-aw/actions/([^ \t\r\n]+)`)
+	shellActionCommandPathRE          = regexp.MustCompile("^/gh-aw/actions/([^ \\t\\r\\n;&|()<>'\"\\\\`]+)")
 	blockScalarHeaderRE               = regexp.MustCompile(`^(\s*)(?:-\s+)?(script|run):\s*[|>]`)
 	singleLineRunRE                   = regexp.MustCompile(`^\s*(?:-\s+)?run:\s+`)
 	singleLineExecutableRE            = regexp.MustCompile(`^\s*(?:-\s+)?(script|run):\s+`)
@@ -37,7 +37,7 @@ func rewriteShellActionCommands(line string) string {
 		}
 		command := shellActionCommandPrefixRE.FindStringSubmatchIndex(line[:span.Start])
 		action := shellActionCommandPathRE.FindStringSubmatchIndex(line[span.End:])
-		if command == nil || action == nil {
+		if command == nil || action == nil || command[0] < last {
 			continue
 		}
 		result.WriteString(line[last:command[0]])

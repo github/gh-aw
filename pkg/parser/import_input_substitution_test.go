@@ -116,6 +116,18 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "VALUE: fallback'literal",
 		},
 		{
+			name:     "multiple escaped quote pairs in literal fallback resolve",
+			content:  `VALUE: ${{ github.aw.import-inputs.missing || 'it''s ''ready''' }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: it's 'ready'",
+		},
+		{
+			name:     "consecutive escaped quote pairs in grouped fallback resolve",
+			content:  `VALUE: ${{ github.aw.import-inputs.missing || ('a''''b') }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: a''b",
+		},
+		{
 			name:     "legacy input participates in fallback chains",
 			content:  `VALUE: ${{ github.aw.inputs.campaign || github.aw.import-inputs.package || 'fallback-literal' }}`,
 			inputs:   map[string]any{"package": "repo-assist"},

@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 	"github.com/goccy/go-yaml"
 )
@@ -225,8 +226,8 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 		}
 		outputs[job][output] = "${{ '' }}"
 	}
-	var visit func(reflect.Value)
-	visit = func(value reflect.Value) {
+	var visit func(reflect.Value, bool)
+	visit = func(value reflect.Value, implicitCondition bool) {
 		if !value.IsValid() {
 			return
 		}
@@ -239,10 +240,18 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 		switch value.Kind() {
 		case reflect.Interface, reflect.Pointer:
 			if !value.IsNil() {
-				visit(value.Elem())
+				visit(value.Elem(), implicitCondition)
 			}
 		case reflect.String:
-			for _, path := range interpolationReferences(value.String()) {
+			paths := interpolationReferences(value.String())
+			// Conditions allow bare expressions; other strings remain literal
+			// unless explicitly wrapped in an Actions interpolation.
+			if implicitCondition && !strings.Contains(value.String(), "${{") && value.Type() != reflect.TypeFor[actions.Literal]() {
+				if expression, err := actionslanguageservice.ParseSyntax(value.String()); err == nil {
+					paths = append(paths, actionslanguageservice.References(expression)...)
+				}
+			}
+			for _, path := range paths {
 				if len(path) >= 4 && (strings.EqualFold(path[0], "needs") || strings.EqualFold(path[0], "jobs")) && strings.EqualFold(path[2], "outputs") {
 					add(path[1], path[3])
 				}
@@ -250,22 +259,22 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 		case reflect.Map:
 			iter := value.MapRange()
 			for iter.Next() {
-				visit(iter.Value())
+				visit(iter.Value(), implicitCondition)
 			}
 		case reflect.Slice, reflect.Array:
 			for i := range value.Len() {
-				visit(value.Index(i))
+				visit(value.Index(i), implicitCondition)
 			}
 		case reflect.Struct:
-			for _, field := range value.Fields() {
+			for definition, field := range value.Fields() {
 				if field.CanInterface() {
-					visit(field)
+					visit(field, implicitCondition || definition.Name == "If")
 				}
 			}
 		}
 	}
 	for _, value := range values {
-		visit(reflect.ValueOf(value))
+		visit(reflect.ValueOf(value), false)
 	}
 	return outputs
 }

@@ -168,7 +168,10 @@ func resolveFallbackLiteralExpression(expression *actionslanguageservice.Express
 	case "null":
 		return fallbackOperandResult{ok: true}
 	case "string":
-		value := expression.Token.Value.(string)
+		// Decode every escaped quote for substitution without changing the
+		// native lexer's upstream-compatible single-replacement Token.Value.
+		text := expression.Token.Text
+		value := strings.ReplaceAll(text[1:len(text)-1], "''", "'")
 		return fallbackOperandResult{value: value, formatted: value, ok: true}
 	case "number":
 		value := expression.Token.Value

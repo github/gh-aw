@@ -43,53 +43,85 @@ func (p *workflowParser) validateYAMLSource(node *yaml.Node, lines []string, ind
 }
 
 func (p *workflowParser) validateFlowSource(node *yaml.Node, lines []string, indent int) error {
-	quote := byte(0)
-	nesting := 0
+	state := yamlFlowSourceState{nodeStart: true}
 	for line := node.Line - 1; line < len(lines); line++ {
 		text := lines[line]
 		column := 0
 		if line == node.Line-1 {
 			column = sourceColumnOffset(text, node.Column)
-		} else if quote != 0 && strings.TrimSpace(text) != "" && len(text)-len(strings.TrimLeft(text, " ")) <= indent {
+		} else if state.quote != 0 && strings.TrimSpace(text) != "" && len(text)-len(strings.TrimLeft(text, " ")) <= indent {
 			return p.error(node, "a multiline quoted scalar must be indented beyond its parent")
 		}
 
 		for i := column; i < len(text); i++ {
 			c := text[i]
-			if quote != 0 {
-				if c == '\\' && quote == '"' {
+			if state.quote != 0 {
+				if c == '\\' && state.quote == '"' {
 					i++
-				} else if c == quote {
-					if quote == '\'' && i+1 < len(text) && text[i+1] == '\'' {
+				} else if c == state.quote {
+					if state.quote == '\'' && i+1 < len(text) && text[i+1] == '\'' {
 						i++
 						continue
 					}
-					quote = 0
-					if nesting == 0 {
+					state.quote = 0
+					state.nodeStart = false
+					if state.nesting == 0 {
 						return nil
 					}
 				}
 				continue
 			}
-			switch c {
-			case '\'', '"':
-				quote = c
-			case '[', '{':
-				nesting++
-			case ']', '}':
-				nesting--
-				if nesting == 0 {
-					if i+1 < len(text) && text[i+1] == '#' {
-						return p.error(node, "comments must be separated from flow collections by whitespace")
-					}
-					return nil
+			i = state.consumeUnquoted(text, i)
+			if state.nesting == 0 && (c == ']' || c == '}') {
+				if i+1 < len(text) && text[i+1] == '#' {
+					return p.error(node, "comments must be separated from flow collections by whitespace")
 				}
-			case '#':
-				if i == 0 || text[i-1] == ' ' || text[i-1] == '\t' {
-					i = len(text)
-				}
+				return nil
 			}
 		}
 	}
 	return nil
+}
+
+type yamlFlowSourceState struct {
+	quote       byte
+	nesting     int
+	nodeStart   bool
+	plainScalar bool
+}
+
+func (s *yamlFlowSourceState) consumeUnquoted(text string, i int) int {
+	switch c := text[i]; c {
+	case '\'', '"':
+		if s.nodeStart {
+			s.quote = c
+		}
+		s.nodeStart = false
+	case '[', '{':
+		s.nesting++
+		s.nodeStart = true
+		s.plainScalar = false
+	case ']', '}':
+		s.nesting--
+		s.nodeStart = false
+	case ',':
+		s.nodeStart = true
+		s.plainScalar = false
+	case ':':
+		s.nodeStart = !s.plainScalar || i+1 == len(text) || strings.ContainsRune(" \t\r[]{},", rune(text[i+1]))
+		if s.nodeStart {
+			s.plainScalar = false
+		}
+	case '#':
+		if i == 0 || text[i-1] == ' ' || text[i-1] == '\t' {
+			return len(text)
+		}
+		s.nodeStart = false
+		s.plainScalar = true
+	case ' ', '\t', '\r':
+	default:
+		s.nodeStart = false
+		s.plainScalar = true
+	}
+	return i
 }

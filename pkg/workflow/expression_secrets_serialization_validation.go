@@ -123,8 +123,28 @@ func replaceStringRanges(input string, ranges [][]int, replacement string) strin
 	return b.String()
 }
 
+// findFrontmatterSecretsSerializationExpressions scans decoded YAML scalars, not
+// their source spelling: YAML quoting and folding can change expression syntax.
+func findFrontmatterSecretsSerializationExpressions(value any) []string {
+	var found []string
+	switch value := value.(type) {
+	case string:
+		found = findSecretsSerializationExpressions(value)
+	case map[string]any:
+		for _, child := range value {
+			found = append(found, findFrontmatterSecretsSerializationExpressions(child)...)
+		}
+	case []any:
+		for _, child := range value {
+			found = append(found, findFrontmatterSecretsSerializationExpressions(child)...)
+		}
+	}
+	return found
+}
+
 // validateSecretsSerializationExpressions scans markdown content and frontmatter
-// YAML for expressions that serialize all secrets, such as ${{ toJSON(secrets) }}.
+// decoded YAML values for expressions that serialize all secrets, such as
+// ${{ toJSON(secrets) }}.
 //
 // Serializing the entire secrets context exposes ALL secrets to the agent, which
 // is a significant security risk. Callers should use specific secret references
@@ -140,10 +160,8 @@ func (c *Compiler) validateSecretsSerializationExpressions(workflowData *Workflo
 		effectiveStrict,
 	)
 
-	var allFound []string
-	for _, content := range []string{workflowData.MarkdownContent, workflowData.FrontmatterYAML} {
-		allFound = append(allFound, findSecretsSerializationExpressions(content)...)
-	}
+	allFound := findSecretsSerializationExpressions(workflowData.MarkdownContent)
+	allFound = append(allFound, findFrontmatterSecretsSerializationExpressions(workflowData.RawFrontmatter)...)
 
 	if len(allFound) == 0 {
 		expressionSecretsSerializationLog.Printf("No secrets serialization expressions found")

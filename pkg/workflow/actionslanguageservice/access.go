@@ -73,7 +73,7 @@ func References(expression *Expression) [][]string {
 func RewriteReferences(source string, replace func([]string) (string, bool)) string {
 	expression, err := ParseSyntax(source)
 	if err != nil {
-		referenceLog.Printf("Cannot rewrite invalid expression: %v", err)
+		referenceLog.Print("Cannot rewrite invalid expression")
 		return source
 	}
 	var result strings.Builder

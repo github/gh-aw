@@ -3,6 +3,9 @@ package actionslanguageservice
 import (
 	"fmt"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func boundaryCases() []conformanceCase {
@@ -55,5 +58,43 @@ func boundaryCases() []conformanceCase {
 	} {
 		add("workflow", fmt.Sprintf("workflow-%d", i), field+"\n"+base)
 	}
+	return append(cases, flowScalarQuoteCases()...)
+}
+
+func flowScalarQuoteCases() []conformanceCase {
+	var cases []conformanceCase
+	for _, test := range []struct {
+		name     string
+		field    string
+		accepted bool
+	}{
+		{"plain-apostrophe", "env: {DESCRIPTION: Why it's needed}", true},
+		{"plain-double-quote", `env: {DESCRIPTION: Say "hello}`, true},
+		{"plain-colon-apostrophe", "env: {DESCRIPTION: Why:it's needed}", true},
+		{"plain-colon-double-quote", `env: {DESCRIPTION: Say:"hello}`, true},
+		{"plain-then-quoted", `env: {FIRST: it's fine, SECOND: 'quoted'}`, true},
+		{"quoted-then-plain", `env: {FIRST: "quoted", SECOND: it's fine}`, true},
+		{"quoted-key-and-value", `env: {"DESCRIPTION":'quoted'}`, true},
+		{"multiline-quoted", "env: {DESCRIPTION: 'first\n  second'}", true},
+		{"unindented-multiline-quoted", "env: {DESCRIPTION: 'first\nsecond'}", false},
+		{"quoted-key-unindented-multiline-value", "env: {\"DESCRIPTION\":'first\nsecond'}", false},
+		{"plain-unseparated-comment", "env: {DESCRIPTION: Why it's needed}#comment", false},
+	} {
+		cases = append(cases, conformanceCase{
+			Name:     "boundaries/flow-quotes/" + test.name,
+			Kind:     "workflow",
+			Source:   test.field + "\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: [{run: echo it's}]\n",
+			Accepted: test.accepted,
+		})
+	}
 	return cases
+}
+
+func TestWorkflowFlowScalarQuotes(t *testing.T) {
+	for _, test := range flowScalarQuoteCases() {
+		t.Run(test.Name, func(t *testing.T) {
+			_, err := ParseWorkflow(test.Name, test.Source)
+			require.Equal(t, test.Accepted, err == nil, "native parser error: %v", err)
+		})
+	}
 }
