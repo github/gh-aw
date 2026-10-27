@@ -88,8 +88,8 @@ function getBundlePathForBranchInRepo(branchName, repoSlug) {
 
 /**
  * Generates a git bundle file for the current changes.
- * Bundle transport preserves merge commit topology and per-commit metadata,
- * unlike format-patch which loses merge resolution content.
+ * Unfiltered bundles preserve merge topology and per-commit metadata. Filtered
+ * bundles use a single resolved-tree patch so merge resolution content survives.
  *
  * @param {string} branchName - The branch name to generate bundle for
  * @param {string} baseBranch - The base branch to diff against (e.g., "main", "master")
@@ -120,7 +120,8 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
 
   const bundlePath = options.repoSlug ? getBundlePathForBranchInRepo(branchName, options.repoSlug) : getBundlePathForBranch(branchName);
 
-  // Every baseline strategy must apply the same exclusions as patch validation.
+  // Filtered patches contain the resolved base-to-tip tree, including merge
+  // resolutions, rather than a replay of the branch's non-merge commits.
   if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
     const patchResult = await generateGitPatch(branchName, baseBranch, options);
     if (!patchResult.success) {

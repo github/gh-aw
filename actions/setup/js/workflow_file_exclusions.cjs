@@ -1,7 +1,5 @@
 // @ts-check
 
-const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
-
 const WORKFLOW_LOCK_PATTERN = ".github/workflows/**.lock.yml";
 const WORKFLOW_COMPILATION_NOTICE =
   "> [!WARNING]\n> Changes to workflow YAML files were excluded from this changeset to avoid GitHub token workflow-write restrictions. Run `gh aw compile` again on this branch and commit the regenerated `.lock.yml` files using credentials permitted to update GitHub Actions workflows before merging.";
@@ -28,12 +26,12 @@ function getExcludedFiles(config) {
 
 /**
  * @param {unknown} files
- * @param {string[]} patterns
+ * @param {string[]} retainedFiles - Files retained by Git's actual exclusion pathspecs.
  * @returns {string[]}
  */
-function getExcludedWorkflowFiles(files, patterns) {
-  const matchers = patterns.map(pattern => globPatternToRegex(pattern));
-  return Array.isArray(files) ? files.filter(file => typeof file === "string" && isWorkflowYamlFile(file) && matchers.some(matcher => matcher.test(file))) : [];
+function getExcludedWorkflowFiles(files, retainedFiles) {
+  const retained = new Set(retainedFiles);
+  return Array.isArray(files) ? files.filter(file => typeof file === "string" && isWorkflowYamlFile(file) && !retained.has(file)) : [];
 }
 
 /**

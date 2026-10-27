@@ -23,7 +23,7 @@ safe-outputs:
     title-prefix: "[Safe Outputs Conformance] "
     labels: ["safe-outputs", "conformance", "automated"]
     expires: 1d
-    close-older-pull-requests: true
+    close-older-pull-requests: false
     max: 10
 timeout-minutes: 20
 imports:
@@ -70,7 +70,7 @@ Your mission is to:
    - Severity level and check ID
    - Specific files or code locations affected
    - Implemented remediation and actual validation results
-4. Close older pull requests from previous runs (auto-handled by expires: 1d and close-older-pull-requests: true)
+4. Preserve independent remediation pull requests from this and previous runs; new fixes do not supersede unrelated work. Unaddressed pull requests still auto-expire after 1 day.
 
 ## Phase 1: Run Conformance Checks
 
@@ -221,7 +221,7 @@ After processing all issues, provide a summary in the workflow output:
 
 - Created [N] pull requests fixing conformance violations
 - Pull requests will auto-expire in 1 day if not addressed
-- Older conformance pull requests automatically closed
+- Independent conformance pull requests preserved until resolved or expired
 
 </details>
 
@@ -294,7 +294,7 @@ This can help with prioritization and identifying chronic problems.
 ✅ Script executed successfully
 ✅ Selected CRITICAL and HIGH violations have validated fixes in pull requests
 ✅ Pull requests describe the implemented changes and validation
-✅ Older conformance pull requests are auto-closed (via expires + close-older-pull-requests)
+✅ Independent conformance pull requests are preserved; unaddressed pull requests auto-expire after 1 day
 ✅ Summary provided in workflow logs
 
 Remember: Your goal is to make conformance issues visible and actionable, not to overwhelm with noise. Focus on issues that truly need attention.

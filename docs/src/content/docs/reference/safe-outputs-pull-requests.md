@@ -136,6 +136,8 @@ By default a random hex suffix is appended to the agent-provided branch name to 
 
 `excluded-files` strips matching files from the patch before the commit is created — they are also exempt from `allowed-files` and `protected-files` checks. `max-patch-files` (default `100`) and `max-patch-size` (default `4096 KB`) guard against unexpectedly large commits; raise them when the workflow intentionally produces many or large generated files.
 
+When exclusions are configured, patch and bundle transports package the retained, resolved base-to-tip tree as a single commit. This preserves merge-resolution changes but not the original commit topology. Exclusions and omitted-workflow warnings use Git's pathspec matching rules, including basename patterns that match nested files.
+
 `exclude-lock-yml: true` excludes `.lock.yml` files under `.github/workflows/` from both patch and bundle transports. This opt-in protection avoids GitHub's workflow-write restrictions when using the GitHub Actions token. It preserves workflow Markdown sources, lock files elsewhere, and other `.yml`/`.yaml` files; those other workflow YAML files still require workflow-write credentials. When exclusions drop workflow YAML changes, the pull request body (or push summary and PR comment) contains a warning to run `gh aw compile` again and commit the regenerated locks with authorized credentials before merging. If only excluded files changed, no branch is pushed and the tool reports that no changes remain.
 
 ### Other notes

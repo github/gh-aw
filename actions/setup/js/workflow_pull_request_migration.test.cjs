@@ -18,17 +18,21 @@ const migrated = [
 ];
 const retained = ["semantic-function-refactor", "go-fan"];
 
+function readWorkflow(id) {
+  const source = fs.readFileSync(new URL(`../../../.github/workflows/${id}.md`, import.meta.url), "utf8");
+  const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)[1];
+  const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
+  expect(document.errors).toEqual([]);
+  return { source, config: document.toJS() };
+}
+
 describe("code-producing issue workflow migration", () => {
   it("converts at least eighty percent while retaining read-only and experiment-sensitive analysis", () => {
     expect(migrated.length / (migrated.length + retained.length)).toBeGreaterThanOrEqual(0.8);
   });
 
   it.each(migrated)("%s delivers protected implementation pull requests (issue #%i -> merged PR #%i)", (id, _issue, _pullRequest) => {
-    const source = fs.readFileSync(new URL(`../../../.github/workflows/${id}.md`, import.meta.url), "utf8");
-    const frontmatter = source.match(/^---\n([\s\S]*?)\n---/)[1];
-    const document = parseDocument(frontmatter, { version: "1.2", uniqueKeys: true });
-    expect(document.errors).toEqual([]);
-    const config = document.toJS();
+    const { config } = readWorkflow(id);
     expect(config.source).toBeUndefined();
     expect(config["safe-outputs"]["create-issue"]).toBeUndefined();
     expect(config["safe-outputs"]["create-pull-request"]["exclude-lock-yml"]).toBe(true);
@@ -36,5 +40,28 @@ describe("code-producing issue workflow migration", () => {
     expect(JSON.stringify(config.imports)).not.toContain("shared/daily-issue-base.md");
     const lock = fs.readFileSync(new URL(`../../../.github/workflows/${id}.lock.yml`, import.meta.url), "utf8");
     expect(lock).toContain('\\"exclude_lock_yml\\":true');
+  });
+
+  it.each(["daily-formal-spec-verifier", "sergo"])("%s explicitly allows Go formatting and focused tests", id => {
+    const { config } = readWorkflow(id);
+    expect(config.tools.bash).toEqual(expect.arrayContaining(["gofmt -w *", "go test *"]));
+    expect(config.tools.bash).not.toContain("*");
+  });
+
+  it.each(["static-analysis-report", "daily-safe-outputs-conformance", "ab-testing-advisor"])("%s preserves independent remediation pull requests", id => {
+    const { config } = readWorkflow(id);
+    const pullRequests = config["safe-outputs"]["create-pull-request"];
+    expect(pullRequests.max).toBeGreaterThan(1);
+    expect(pullRequests["close-older-pull-requests"]).toBe(false);
+    expect(pullRequests["close-older-key"]).toBeUndefined();
+    expect(pullRequests.expires).toBeDefined();
+  });
+
+  it("documents conformance PR preservation separately from age-based expiration", () => {
+    const { source } = readWorkflow("daily-safe-outputs-conformance");
+    expect(source).toContain("Preserve independent remediation pull requests from this and previous runs");
+    expect(source).toContain("Independent conformance pull requests preserved until resolved or expired");
+    expect(source).not.toMatch(/Older conformance pull requests (?:automatically|are auto-)closed/);
+    expect(source).not.toContain("close-older-pull-requests: true");
   });
 });

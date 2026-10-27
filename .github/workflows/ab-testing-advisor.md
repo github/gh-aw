@@ -23,8 +23,7 @@ imports:
 safe-outputs:
   create-pull-request:
     exclude-lock-yml: true
-    close-older-pull-requests: true
-    close-older-key: ab-testing-advisor
+    close-older-pull-requests: false
     expires: 14d
     labels:
     - automation

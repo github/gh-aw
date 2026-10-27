@@ -40,6 +40,8 @@ strict: true
 timeout-minutes: 45
 tools:
   bash:
+  - gofmt -w *
+  - go test *
   - cat go.mod
   - cat go.sum
   - go list -m all

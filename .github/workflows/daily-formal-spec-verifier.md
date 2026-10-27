@@ -47,6 +47,8 @@ tools:
     max-file-size: 65536
   edit: null
   bash:
+    - "gofmt -w *"
+    - "go test *"
     - "find specs -type f -name \"*.md\" | sort"
     - "cat /tmp/gh-aw/cache-memory/formal-spec-verifier/rotation.json"
     - "cat specs/*.md"

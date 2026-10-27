@@ -27,7 +27,7 @@ safe-outputs:
     title-prefix: "[static-analysis] "
     labels: [security, automation, cookie]
     max: 4
-    close-older-pull-requests: true
+    close-older-pull-requests: false
   create-discussion:
     category: audits
     title-prefix: "[static-analysis] "

@@ -212,7 +212,8 @@ describe("setup.sh SAFE_OUTPUTS_FILES", () => {
             const assert = require("node:assert/strict");
             const { createServer, registerTool } = require("./mcp_server_core.cjs");
             const { getExcludedFiles, getExcludedWorkflowFiles } = require("./workflow_file_exclusions.cjs");
-            assert.deepEqual(getExcludedWorkflowFiles([".github/workflows/test.lock.yml", ".github/workflows/test.md"], getExcludedFiles({ exclude_lock_yml: true })), [".github/workflows/test.lock.yml"]);
+            assert.deepEqual(getExcludedFiles({ exclude_lock_yml: true }), [".github/workflows/**.lock.yml"]);
+            assert.deepEqual(getExcludedWorkflowFiles([".github/workflows/test.lock.yml", ".github/workflows/test.md"], [".github/workflows/test.md"]), [".github/workflows/test.lock.yml"]);
             const server = createServer({ name: "safeoutputs", version: "test" });
             registerTool(server, { name: "missing_tool", description: "", inputSchema: { type: "object", properties: {} } });
             assert.deepEqual(Object.keys(server.tools), ["report_missing_tool"]);
