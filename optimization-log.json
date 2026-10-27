@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-07-06",
-    "workflow_name": "Typist - Go Type Analysis",
-    "workflow_file": "typist",
-    "total_aic_analyzed": 261.792,
-    "runs_audited": 22,
-    "recommendations_count": 5,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 42
-  },
-  {
     "date": "2026-07-07",
     "workflow_name": "PR Code Quality Reviewer",
     "workflow_file": "pr-code-quality-reviewer",
@@ -295,5 +285,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 45
+  },
+  {
+    "date": "2026-10-27",
+    "workflow_name": "Smoke OTEL",
+    "workflow_file": "smoke-otel-backends",
+    "total_aic_analyzed": 91.8356,
+    "runs_audited": 1,
+    "recommendations_count": 4,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 75
   }
 ]
