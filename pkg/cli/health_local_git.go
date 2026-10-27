@@ -21,10 +21,6 @@ type healthLocalGit struct {
 	ctx context.Context
 }
 
-func runHealthGit(dir string, args ...string) ([]byte, error) {
-	return runHealthGitContext(context.Background(), dir, args...)
-}
-
 func runHealthGitContext(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	ctx = ctxutil.OrBackground(ctx)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

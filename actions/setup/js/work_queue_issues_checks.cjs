@@ -402,7 +402,7 @@ function registerTests({ describe, it, beforeEach, afterEach }) {
         const title = issue.title.slice(issue.title.indexOf(" — ") + 3);
         const description = issue.body.match(/### Work description\n\n([\s\S]*?)\n\n\| At a glance/)[1].trimEnd();
         assert.ok([...title].length <= 128);
-        assert.ok([...description].length <= 4096);
+        assert.ok([...description].length <= 4096, `Published description exceeds 4096 characters: ${[...description].length}`);
       }
     });
     it("redacts configured secrets and runtime masks from work details", async () => {

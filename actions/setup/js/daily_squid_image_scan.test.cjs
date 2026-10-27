@@ -44,6 +44,11 @@ describe("daily container image scan analysis", () => {
     expect(pins[0]).toMatch(/@sha256:[a-f0-9]{64}$/);
     expect(pins[0].split("@")[0]).toBe(image);
     expect(new Set(pins).size).toBe(1);
+    if (image === "ghcr.io/github/gh-aw-node") {
+      const blockedDigest = "ghcr.io/github/gh-aw-node@sha256:23746305eeded20dc2726ab18bb081962d66ee3b2e09a54291afd1869ab3ef6d";
+      // This build contains the vulnerable brotli-libs and libcurl packages found by the scanner.
+      expect(pins[0], `Do not use ${blockedDigest}: it contains vulnerable brotli-libs and libcurl packages`).not.toBe(blockedDigest);
+    }
     const workflowDir = new URL("../../../.github/workflows/", import.meta.url);
     let references = 0;
     for (const file of readdirSync(workflowDir).filter(file => file.endsWith(".lock.yml"))) {
@@ -239,6 +244,8 @@ fi
   });
 
   it.each([
+    ["ghcr.io/github/gh-aw-node:1:1: error: [Critical] CVE-2026-111497: brotli-libs@1.2.0-r1 (fix: 1.2.1-r0)", 1],
+    ["ghcr.io/github/gh-aw-node:1:1: error: [High] CVE-2026-92392: libcurl@8.22.0-r0 (fix: 8.23.0-r0)", 1],
     ["ghcr.io/github/gh-aw-node@sha256:abc:1:1: warning: [High] CVE-2026-1234: pkg@1 (fix: 2)", 1],
     ["ghcr.io/github/gh-aw-node:latest:1:1: error: [Critical] CVE-2026-1234: pkg@1", 1],
     ["ghcr.io/github/gh-aw-node@sha256:abc:1:1: warning: [High] CVE-2026-1234: pkg@1", 0],

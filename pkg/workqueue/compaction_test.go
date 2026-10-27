@@ -70,7 +70,7 @@ func TestBranchCompactionPreservesCompleteAuthorityAndIsIdempotent(t *testing.T)
 		checkpoint.PriorGitSHA != priorGitSHA || checkpoint.PriorTip != before.Tip {
 		t.Fatal("checkpoint does not bind prior Git commit and logical tip")
 	}
-	_, err = restoreCheckpoint(latest[0])
+	_, err = restoreCheckpointForHost(latest[0], "")
 	expected, _ := Serialize(commits)
 	if err != nil || checkpoint.HistorySHA256 != hashBytes(expected) {
 		t.Fatal("checkpoint did not bind validated prior history digest")
@@ -143,7 +143,7 @@ func TestBranchCompactionRecomputesOnConflictAndRecoversLostAcknowledgment(t *te
 			if err != nil || len(latest) != 1 {
 				t.Fatal(err)
 			}
-			after, err := restoreCheckpoint(latest[0])
+			after, err := restoreCheckpointForHost(latest[0], "")
 			data, _ := Serialize(expected)
 			var op CheckpointOperation
 			_ = json.Unmarshal(latest[0].Operations[0], &op)
