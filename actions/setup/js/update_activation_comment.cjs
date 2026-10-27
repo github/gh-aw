@@ -64,6 +64,7 @@ async function updateActivationComment(github, context, core, itemUrl, itemNumbe
  * @param {string} [options.targetRepo] - Target repo "owner/repo" for fallback comment (cross-repo scenarios)
  * @param {any} [options.targetGithubClient] - Authenticated GitHub client for the target repo (cross-repo scenarios)
  * @param {string[]} [options.activationCommentLinks] - Invocation-scoped link accumulator
+ * @param {string} [options.additionalMessage] - Additional notice included with the commit link
  */
 async function updateActivationCommentWithCommit(github, context, core, commitSha, commitUrl, options = {}) {
   const shortSha = commitSha.substring(0, 7);
@@ -73,7 +74,7 @@ async function updateActivationCommentWithCommit(github, context, core, commitSh
   const footerMessage = getFooterMessage({ workflowName, runUrl });
   const detectionCaution = getDetectionCautionAlert(workflowName, runUrl);
   const cautionSection = detectionCaution ? `${detectionCaution}\n\n` : "";
-  const commitMessage = getCommitPushedMessage({ commitSha, shortSha, commitUrl });
+  const commitMessage = [getCommitPushedMessage({ commitSha, shortSha, commitUrl }), options.additionalMessage].filter(Boolean).join("\n\n");
   const message = `\n\n${cautionSection}${commitMessage}\n\n${footerMessage}\n\n${generateXMLMarker(workflowName, runUrl)}`;
   if (await updateActivationCommentWithMessage(github, context, core, message, "commit", options)) {
     recordActivationCommentLink(core, commitMessage, options.activationCommentLinks ?? []);

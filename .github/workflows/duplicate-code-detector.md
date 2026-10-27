@@ -25,16 +25,16 @@ network:
     - github.com
     - api.github.com
 imports:
+  - shared/lock-safe-pull-request.md
   - shared/go-source-analysis.md
   - shared/otlp.md
   - shared/reporting.md
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     expires: 2d
     title-prefix: "[duplicate-code] "
     labels: [code-quality, automated-analysis, cookie]
-    assignees: copilot
-    group: true
     max: 3
 timeout-minutes: 15
 strict: true
@@ -49,8 +49,8 @@ tools:
 evals:
   - id: analysis-completed
     question: Did the agent analyze the codebase for duplicate code patterns and produce findings?
-  - id: issue-created-or-noop
-    question: Was a code duplication issue created when significant duplication was found, or was noop correctly called when none was detected?
+  - id: pull-request-created-or-noop
+    question: Was significant duplication removed in a validated pull request, or was noop correctly called when none was detected?
 ---
 
 # Duplicate Code Detection
@@ -63,7 +63,7 @@ Detect and report code duplication by:
 
 1. **Analyzing Recent Commits**: Review changes in the latest commits
 2. **Detecting Duplicated Code**: Identify similar or duplicated code patterns using semantic analysis
-3. **Reporting Findings**: Create a detailed issue if significant duplication is detected (threshold: >10 lines or 3+ similar patterns)
+3. **Fixing Findings**: Refactor significant duplication and create a validated pull request (threshold: >10 lines or 3+ similar patterns)
 
 ## Context
 
@@ -127,15 +127,15 @@ Assess findings to identify true code duplication:
 - **Maintainability**: How duplication affects code maintainability
 - **Refactoring Opportunity**: Whether duplication can be easily refactored
 
-### 5. Issue Reporting
+### 5. Implement Refactorings and Create Pull Requests
 
-Create separate issues for each distinct duplication pattern found (maximum 3 patterns per run). Each pattern should get its own issue to enable focused remediation.
+Implement a separate focused refactoring for each distinct duplication pattern (maximum 3 per run), validate preserved behavior, and create one pull request per pattern.
 
-**When to Create Issues**:
-- Only create issues if significant duplication is found (threshold: >10 lines of duplicated code OR 3+ instances of similar patterns)
-- **Create one issue per distinct pattern** - do NOT bundle multiple patterns in a single issue
+**When to Create Pull Requests**:
+- Only create pull requests if significant duplication is found (threshold: >10 lines of duplicated code OR 3+ instances of similar patterns)
+- **Create one pull request per distinct pattern** - do NOT bundle unrelated patterns
 - Limit to the top 3 most significant patterns if more are found
-- Use the `create_issue` tool from safe-outputs MCP **once for each pattern**
+- Use `create_pull_request` from safe outputs **once for each implemented pattern**, with the committed local branch
 
 **When No Issues Are Found**:
 
@@ -149,13 +149,13 @@ Create separate issues for each distinct duplication pattern found (maximum 3 pa
 }
 ```
 
-**DO NOT just write this message in your output text** - you MUST actually invoke the `noop` tool. The workflow will fail if you don't call either `create_issue` or `noop`.
+**DO NOT just write this message in your output text** - invoke `create_pull_request` or `noop`; report concrete implementation blockers with `report_incomplete`.
 
-**Issue Contents for Each Pattern**:
+**Pull Request Contents for Each Pattern**:
 - **Executive Summary**: Brief description of this specific duplication pattern
 - **Duplication Details**: Specific locations and code blocks for this pattern only
 - **Severity Assessment**: Impact and maintainability concerns for this pattern
-- **Refactoring Recommendations**: Suggested approaches to eliminate this pattern
+- **Implemented Refactoring**: How this pattern was eliminated and validated
 - **Code Examples**: Concrete examples with file paths and line numbers for this pattern
 
 ## Detection Scope
@@ -187,9 +187,9 @@ Create separate issues for each distinct duplication pattern found (maximum 3 pa
 - **Cross-Reference**: Look for patterns across .go and .cjs files in the repository
 - **Historical Context**: Consider if duplication is new or existing
 
-## Issue Template
+## Pull Request Template
 
-For each distinct duplication pattern found, create a separate issue using this structure:
+For each implemented duplication refactoring, create a separate pull request using this body structure:
 
 Follow the `reporting` skill (headers `###`+, `<details>` for long content) when filling in this structure:
 
@@ -198,7 +198,7 @@ Follow the `reporting` skill (headers `###`+, `<details>` for long content) when
 
 *Analysis of commit ${{ github.event.head_commit.id }}*
 
-**Assignee**: @copilot
+**Implementation**: Describe the refactoring and actual validation results.
 
 ### Summary
 
@@ -274,16 +274,15 @@ Follow the `reporting` skill (headers `###`+, `<details>` for long content) when
 - Consider language-specific idioms and best practices
 - Provide specific, actionable recommendations
 
-### Issue Creation
-- Create **one issue per distinct duplication pattern** - do NOT bundle multiple patterns in a single issue
+### Pull Request Creation
+- Create **one validated pull request per distinct duplication pattern**; do not bundle unrelated patterns
 - Limit to the top 3 most significant patterns if more are found
-- Only create issues if significant duplication is found
-- Include sufficient detail for SWE agents to understand and act on findings
+- Only create pull requests if significant duplication is found and a refactoring is implemented
+- Include sufficient detail for reviewers to understand the change and preserved behavior
 - Provide concrete examples with file paths and line numbers
-- Suggest practical refactoring approaches
-- Assign issue to @copilot for automated remediation
+- Implement practical refactoring approaches and include focused test results
 - Use descriptive titles that clearly identify the specific pattern (e.g., "Duplicate Code: Error Handling Pattern in Parser Module")
-- **If no significant duplication found, call `noop` tool** - never complete without calling either `create_issue` or `noop`
+- **If no significant duplication is found, call `noop`**; otherwise call `create_pull_request` or report a concrete blocker with `report_incomplete`
 
 ## Tool Usage Sequence
 

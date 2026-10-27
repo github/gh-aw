@@ -449,6 +449,7 @@ SAFE_OUTPUTS_FILES=(
   "estimate_tokens.cjs"
   "generate_git_patch.cjs"
   "generate_git_bundle.cjs"
+  "workflow_file_exclusions.cjs"
   "git_patch_utils.cjs"
   "commit_sha_helpers.cjs"
   "get_base_branch.cjs"

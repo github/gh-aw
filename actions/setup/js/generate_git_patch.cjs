@@ -24,6 +24,7 @@ const {
   describeGitFailure,
 } = require("./git_patch_utils.cjs");
 const { normalizeCommitSHA } = require("./commit_sha_helpers.cjs");
+const { getExcludedWorkflowFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 
 // sanitizeForFilename is re-exported below for backward compatibility with
 // existing callers that imported it from this module.
@@ -70,8 +71,8 @@ function embedBaseCommit(patchContent, baseCommitSha) {
  * @param {string} [options.token] - GitHub token for git authentication. Falls back to GITHUB_TOKEN env var.
  *   Use this for cross-repo scenarios where a custom PAT with access to the target repo is needed.
  * @param {string[]} [options.excludedFiles] - Glob patterns for files to exclude from the patch.
- *   Each pattern is passed to `git format-patch` as a `:(exclude)<pattern>` magic pathspec so
- *   matching files are never included in the generated patch.
+ *   Patterns are applied to the resolved base-to-tip diff as `:(exclude)<pattern>`
+ *   pathspecs. The retained tree is emitted as a single commit, preserving merge resolutions.
  * @param {string} [options.pinnedSha] - SECURITY: When set, use this SHA as the branch tip instead
  *   of resolving refs/heads/<branchName>. Prevents TOCTOU races where the agent flips the branch
  *   ref between patch and bundle generation.
@@ -178,6 +179,62 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   let baseCommitSha = null;
   /** @type {any} */
   let resolvedTipRef = null;
+  /** @type {string[]} */
+  let excludedWorkflowFiles = [];
+
+  function noChangesResult() {
+    return {
+      success: false,
+      error: excludedWorkflowFiles.length > 0 ? `No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}` : "No changes to commit - no commits found",
+      patchPath,
+      excludedWorkflowFiles,
+    };
+  }
+
+  /**
+   * Filter the resolved tree rather than replaying individual commits, which
+   * would omit merge resolutions and can reintroduce already-resolved conflicts.
+   * @param {string} base
+   * @param {string} tip
+   * @returns {string}
+   */
+  function formatPatch(base, tip) {
+    if (excludeArgsArr.length === 0) {
+      return execGitSync(["format-patch", `${base}..${tip}`, "--stdout"], { cwd });
+    }
+    const diffArgs = ["diff", "--no-renames", base, tip];
+    const changedFiles = execGitSync([...diffArgs, "--name-only", "-z", "--"], { cwd })
+      .split("\0")
+      .filter(Boolean);
+    const retainedFiles = execGitSync([...diffArgs, "--name-only", "-z", ...excludeArgs()], { cwd })
+      .split("\0")
+      .filter(Boolean);
+    excludedWorkflowFiles = getExcludedWorkflowFiles(changedFiles, retainedFiles);
+    if (retainedFiles.length === 0) return "";
+
+    const diff = execGitSync(["diff", "--binary", "--full-index", "--no-ext-diff", "--no-textconv", "--no-renames", base, tip, ...excludeArgs()], { cwd });
+    const indexDir = fs.mkdtempSync(path.join(patchDir, "filtered-index-"));
+    try {
+      const identity = execGitSync(["show", "-s", "--format=%an%n%ae%n%aI%n%cn%n%ce%n%cI", tip], { cwd }).trim().split("\n");
+      const env = {
+        ...process.env,
+        GIT_INDEX_FILE: path.join(indexDir, "index"),
+        GIT_AUTHOR_NAME: identity[0],
+        GIT_AUTHOR_EMAIL: identity[1],
+        GIT_AUTHOR_DATE: identity[2],
+        GIT_COMMITTER_NAME: identity[3],
+        GIT_COMMITTER_EMAIL: identity[4],
+        GIT_COMMITTER_DATE: identity[5],
+      };
+      execGitSync(["read-tree", base], { cwd, env });
+      execGitSync(["apply", "--cached", "--binary", "--whitespace=nowarn", "-"], { cwd, env, input: diff });
+      const tree = execGitSync(["write-tree"], { cwd, env }).trim();
+      const commit = execGitSync(["commit-tree", tree, "-p", base, "-m", "Apply filtered changes"], { cwd, env }).trim();
+      return execGitSync(["format-patch", "-1", commit, "--stdout"], { cwd });
+    } finally {
+      fs.rmSync(indexDir, { recursive: true, force: true });
+    }
+  }
 
   try {
     // Strategy 1: If we have a branch name, check if that branch exists and get its diff
@@ -352,7 +409,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
         if (commitCount > 0) {
           // Generate patch from the determined base to the branch
-          const patchContent = execGitSync(["format-patch", `${baseRef}..${tipRef}`, "--stdout", ...excludeArgs()], { cwd });
+          const patchContent = formatPatch(baseCommitSha, tipRef);
 
           if (patchContent && patchContent.trim()) {
             fs.writeFileSync(patchPath, embedBaseCommit(patchContent, baseCommitSha), "utf8");
@@ -368,6 +425,10 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
             patchSize: 0,
             patchLines: 0,
           };
+        }
+
+        if (!patchGenerated && (excludeArgsArr.length > 0 || options.pinnedSha)) {
+          return noChangesResult();
         }
 
         // In incremental mode, the patch must be measured relative to the existing
@@ -417,6 +478,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
             error: getErrorMessage(branchError),
             patchPath: patchPath,
           };
+        }
+        if (excludeArgsArr.length > 0 && baseCommitSha) {
+          return { success: false, error: `Failed to generate filtered patch: ${branchErrorMessage}`, patchPath };
         }
         if (options.pinnedSha) {
           // SECURITY: When pinnedSha is set, fail closed — do not fall through to
@@ -483,6 +547,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
             // Record GITHUB_SHA as the base commit
             baseCommitSha = githubSha;
+            resolvedTipRef = currentHead;
 
             // Count commits between GITHUB_SHA and HEAD
             const commitCount = parseInt(execGitSync(["rev-list", "--count", `${githubSha}..HEAD`], { cwd }).trim(), 10);
@@ -490,15 +555,19 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
             if (commitCount > 0) {
               // Generate patch from GITHUB_SHA to HEAD
-              const patchContent = execGitSync(["format-patch", `${githubSha}..HEAD`, "--stdout", ...excludeArgs()], { cwd });
+              const patchContent = formatPatch(baseCommitSha, currentHead);
 
               if (patchContent && patchContent.trim()) {
                 fs.writeFileSync(patchPath, embedBaseCommit(patchContent, baseCommitSha), "utf8");
                 patchGenerated = true;
                 debugLog(`Strategy 2: SUCCESS - Generated patch with ${patchContent.split("\n").length} lines`);
               }
+              if (!patchGenerated && excludeArgsArr.length > 0) return noChangesResult();
             }
           } catch (ancestorErr) {
+            if (excludeArgsArr.length > 0 && baseCommitSha) {
+              return { success: false, error: `Failed to generate filtered patch: ${getErrorMessage(ancestorErr)}`, patchPath };
+            }
             // GITHUB_SHA is not an ancestor of HEAD - repository state has diverged
             debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${getErrorMessage(ancestorErr)}`);
           }
@@ -572,8 +641,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
               if (bestBaseCommit) {
                 baseCommitSha = bestBaseCommit;
+                resolvedTipRef = branchName;
                 debugLog(`Strategy 3: Selected merge-base ${bestBaseCommit} with ref ${bestBaseRef} (commitCount=${bestCommitCount})`);
-                const patchContent = execGitSync(["format-patch", `${bestBaseCommit}..${branchName}`, "--stdout", ...excludeArgs()], { cwd });
+                const patchContent = formatPatch(baseCommitSha, resolvedTipRef);
 
                 if (patchContent && patchContent.trim()) {
                   fs.writeFileSync(patchPath, embedBaseCommit(patchContent, baseCommitSha), "utf8");
@@ -589,7 +659,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           debugLog(`Strategy 3: No remote refs found`);
         }
       } catch (strategy3Err) {
-        // Strategy 3 failed - no remote refs available at all
+        if (excludeArgsArr.length > 0 && baseCommitSha) {
+          return { success: false, error: `Failed to generate filtered patch: ${getErrorMessage(strategy3Err)}`, patchPath };
+        }
         debugLog(`Strategy 3: Failed - ${getErrorMessage(strategy3Err)}`);
       }
     }
@@ -714,6 +786,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
       patchLines: patchLines,
       diffSize: diffSize,
       baseCommit: baseCommitSha,
+      excludedWorkflowFiles,
     };
   }
 
@@ -721,8 +794,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   debugLog(`Final: FAILED - ${errorMessage || "No changes to commit - no commits found"}`);
   return {
     success: false,
-    error: errorMessage || "No changes to commit - no commits found",
+    error: excludedWorkflowFiles.length > 0 ? `${errorMessage || "No changes remain after workflow YAML exclusions."}\n\n${WORKFLOW_COMPILATION_NOTICE}` : errorMessage || "No changes to commit - no commits found",
     patchPath: patchPath,
+    excludedWorkflowFiles,
   };
 }
 

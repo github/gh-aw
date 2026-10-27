@@ -341,6 +341,10 @@ Available codemods include:
 - `expires-integer-to-string` — converts bare integer `expires` values (e.g., `expires: 7`) to the preferred day-string format (e.g., `expires: 7d`) in all `safe-outputs` blocks.
 - `steps-run-secrets-to-env` — rewrites **all** `${{ ... }}` expressions in step `run:` commands to `$VARNAME` references (or `$env:VARNAME` for PowerShell steps) and adds step-level `env` bindings. Secrets, `env.*`, and `github.token` use stable legacy names; all other expressions receive `EXPR_*` names. Required for strict-mode compliance.
 - `engine-env-secrets-to-engine-config` — removes secret-bearing entries from `engine.env` that are unsafe under strict mode, preserving required engine credential keys.
+- `pull-request-target-restrict-roles` — removes `read` and `all` from `on.roles` for strict `pull_request_target` workflows. Other listed roles are retained; when none remain, the codemod uses `[admin, maintainer, write]`.
+- `pull-request-target-guided-error` — reports remaining unsafe checkouts or admission roles after automatic fixes. The existing `pull-request-target-checkout-false` codemod still disables checkout only in eligible workflows without configured checkout mappings/lists or detected checkout commands.
+
+Remaining `pull_request_target` risks require a manual choice: switch to `pull_request` after reviewing permission and secret requirements, disable unnecessary checkout, configure a trusted checkout, or restrict admission roles. `on.pull_request_target.acknowledge-risk: true` suppresses only the trigger-risk warning; it does not bypass checkout or role restrictions and is never added automatically. A guided error prevents all edits to that workflow from being written, even with `--write`; resolve its manual blockers and rerun `fix`. These checks inspect authored configuration; run `gh aw compile --strict` to validate the resolved workflow, including imports.
 
 Run `gh aw fix --list-codemods` to see all available codemods.
 
