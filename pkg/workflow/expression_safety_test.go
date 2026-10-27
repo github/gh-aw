@@ -6,7 +6,61 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
+
+func TestGatewayEventsWrapperSafety(t *testing.T) {
+	tests := []struct {
+		name        string
+		expression  string
+		validSyntax bool
+		allowed     bool
+	}{
+		{
+			name:        "single_toJSON",
+			expression:  "toJSON(gateway.events.foo)",
+			validSyntax: true,
+			allowed:     true,
+		},
+		{
+			name:        "double_toJSON",
+			expression:  "toJSON(toJSON(gateway.events.foo))",
+			validSyntax: true,
+		},
+		{
+			name:        "known_non_toJSON_wrapper",
+			expression:  "format('{0}', gateway.events.foo)",
+			validSyntax: true,
+		},
+		{
+			name:       "unknown_wrapper",
+			expression: "someOtherFunc(gateway.events.foo)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, syntaxErr := actionslanguageservice.ParseSyntax(tt.expression)
+			if (syntaxErr == nil) != tt.validSyntax {
+				t.Fatalf("ParseSyntax() error = %v, want valid syntax %v", syntaxErr, tt.validSyntax)
+			}
+			if got := isGatewayEventsExpression(tt.expression); got != tt.allowed {
+				t.Errorf("isGatewayEventsExpression() = %v, want %v", got, tt.allowed)
+			}
+			err := validateExpressionSafety("${{ " + tt.expression + " }}")
+			if tt.allowed {
+				if err != nil {
+					t.Fatalf("Expected allowed expression, got: %v", err)
+				}
+			} else if err == nil {
+				t.Fatal("Expected wrapper to be rejected")
+			} else if !strings.Contains(err.Error(), tt.expression) {
+				t.Errorf("Expected error to contain rejected expression %q, got: %v", tt.expression, err)
+			}
+		})
+	}
+}
 
 func TestValidateExpressionSafety(t *testing.T) {
 	tests := []struct {
@@ -243,8 +297,8 @@ func TestValidateExpressionSafetyEdgeCases(t *testing.T) {
 		{
 			name:        "malformed_expression_no_closing",
 			content:     "Malformed: ${{ github.workflow",
-			expectError: false,
-			description: "Malformed expressions (no closing) should be ignored",
+			expectError: true,
+			description: "Unclosed interpolations must fail validation",
 		},
 		{
 			name:        "nested_expressions",
@@ -420,12 +474,12 @@ func TestValidateExpressionSafetyWithParser(t *testing.T) {
 		{
 			name:    "double-quoted string default",
 			content: `${{ inputs.branch || "main" }}`,
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:    "serve command with double-quoted default",
 			content: `${{ inputs.serve_command || "npm run preview" }}`,
-			wantErr: false,
+			wantErr: true,
 		},
 		// Full example from the issue
 		{

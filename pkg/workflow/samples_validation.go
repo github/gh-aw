@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/syncutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 var samplesValidationLog = logger.New("workflow:samples_validation")
 
-var sampleRuntimeExpressionPattern = regexp.MustCompile(`(?s)\$\{\{.*?\}\}`)
+var sampleRuntimeExpressionPattern = actionslanguageservice.Pattern{}
 
 // sampleRuntimeExpressionPlaceholder is the sentinel substituted for any
 // sample value that contains a `${{ ... }}` GitHub Actions expression, used

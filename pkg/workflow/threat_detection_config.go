@@ -283,9 +283,7 @@ func (c *Compiler) parseThreatDetectionEngineField(configMap map[string]any, thr
 // Callers must ensure the input is a valid expression (verified by isExpression()) before
 // calling this function; non-expression strings are returned with no modification.
 func extractRawExpression(expr string) string {
-	s := strings.TrimPrefix(expr, "${{")
-	s = strings.TrimSuffix(s, "}}")
-	return strings.TrimSpace(s)
+	return stripExpressionWrapper(expr)
 }
 
 func parseThreatDetectionEngineTimeout(raw any) *string {

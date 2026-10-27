@@ -1215,6 +1215,65 @@ describe("push_signed_commits integration tests", () => {
   // ──────────────────────────────────────────────────────
 
   describe("git push fallback when GraphQL fails", () => {
+    it.each([
+      "refusing to allow a GitHub App to create or update workflow `.github/workflows/test.lock.yml` without `workflows` permission",
+      "refusing to allow a Personal Access Token to create or update workflow `.github/workflows/ci.yml` without `workflow` scope",
+      "refusing to allow an OAuth App to create or update workflow `.github/workflows/ci.yaml` without `workflow` scope",
+    ])("suggests lock exclusion for a workflow permission rejection: %s", async rejection => {
+      global.exec = {
+        getExecOutput: vi.fn().mockResolvedValue({ exitCode: 1, stdout: "", stderr: `remote: ${rejection}` }),
+      };
+
+      const error = await pushSignedCommits({ githubClient: {}, owner: "owner", repo: "repo", branch: "workflow/test", baseRef: "", cwd: workDir, signedCommits: false }).catch(error => error);
+
+      expect(error.message).toContain(rejection);
+      expect(error.message).toContain("exclude-lock-yml: true");
+      expect(error.message).toContain("safe-outputs.create-pull-request");
+      expect(error.message).toContain("safe-outputs.push-to-pull-request-branch");
+      expect(error.message).toContain("Other workflow YAML changes still require credentials");
+    });
+
+    it.each([
+      "remote: error: GH013: Repository rule violations found for .github/workflows/test.lock.yml",
+      "remote: Permission to owner/repo denied to github-actions[bot].",
+      "remote: refusing to allow a GitHub App to create or update workflow `docs/test.yml` without `workflows` permission",
+      "! [rejected] workflow/test -> workflow/test (non-fast-forward)",
+    ])("does not suggest lock exclusion for an unrelated rejection: %s", async rejection => {
+      global.exec = {
+        getExecOutput: vi.fn().mockResolvedValue({ exitCode: 1, stdout: "", stderr: rejection }),
+      };
+
+      const error = await pushSignedCommits({ githubClient: {}, owner: "owner", repo: "repo", branch: "workflow/test", baseRef: "", cwd: workDir, signedCommits: false }).catch(error => error);
+
+      expect(error.message).toContain(rejection);
+      expect(error.message).not.toContain("exclude-lock-yml");
+    });
+
+    it.each([true, false])("preserves workflow permission guidance when signed push fallback is %s", async allowGitPushFallback => {
+      const rejection = "refusing to allow a GitHub App to create or update workflow `.github/workflows/test.lock.yml` without `workflows` permission";
+      fs.mkdirSync(path.join(workDir, ".github/workflows"), { recursive: true });
+      fs.writeFileSync(path.join(workDir, ".github/workflows/test.lock.yml"), "name: Test\n");
+      execGit(["add", "."], { cwd: workDir });
+      execGit(["commit", "-m", "Add workflow lock"], { cwd: workDir });
+      const realExec = makeRealExec(workDir);
+      global.exec = {
+        ...realExec,
+        getExecOutput: vi.fn((program, args, options) => {
+          if (args[0] === "push") return Promise.resolve({ exitCode: 1, stdout: "", stderr: `remote: ${rejection}` });
+          return realExec.getExecOutput(program, args, options);
+        }),
+      };
+      const githubClient = makeMockGithubClient({ failWithError: new Error(rejection) });
+
+      const error = await pushSignedCommits({ githubClient, owner: "owner", repo: "repo", branch: "main", baseRef: "origin/main", cwd: workDir, allowGitPushFallback }).catch(error => error);
+
+      expect(githubClient.graphql).toHaveBeenCalledOnce();
+      expect(error.message).toContain(rejection);
+      expect(error.message).toContain("exclude-lock-yml: true");
+      expect(error.message).toContain(allowGitPushFallback ? "git push failed" : "git push fallback is disabled");
+      expect(global.exec.getExecOutput.mock.calls.some(([, args]) => args[0] === "push")).toBe(allowGitPushFallback);
+    });
+
     it("preserves git stderr when the exec wrapper only reports the exit code", async () => {
       const realExec = global.exec;
       global.exec = {

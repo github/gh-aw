@@ -9,16 +9,25 @@ import (
 
 var (
 	postStepIssueCreateRE = regexp.MustCompile(`(?i)(?:^|[\s|;&])gh\s+(?:(?:-R|--repo)(?:=|\s+)[^\s]+\s+)*issue\s+create\b`)
-	postStepIssueAPIRE    = regexp.MustCompile(`(?i)(?:^|[/\s"'=])(?:https://api\.github\.com/)?repos/(?:[^/\s"'?]+/[^/\s"'?]+|\$\{\{\s*github\.repository\s*\}\}|\$\{?GITHUB_REPOSITORY\}?)/issues(?:[?"'\s;|&]|$)`)
+	postStepIssueAPIRE    = regexp.MustCompile(`(?i)(?:^|[/\s"'=])(?:https://api\.github\.com/)?repos/(?:[^/\s"'?]+/[^/\s"'?]+|\$\{?GITHUB_REPOSITORY\}?)/issues(?:[?"'\s;|&]|$)`)
 	postStepAPIPostRE     = regexp.MustCompile(`(?i)(?:^|\s)(?:-X\s*POST\b|--method(?:=|\s+)POST\b|-f(?:\s|=)|-F(?:\s|=)|--(?:raw-)?field(?:\s|=)|--input(?:\s|=))`)
 	postStepAPIGetRE      = regexp.MustCompile(`(?i)(?:^|\s)(?:-X\s*GET\b|--method(?:=|\s+)GET\b)`)
 	postStepCurlRE        = regexp.MustCompile(`(?i)(?:^|[\s|;&])curl(?:\s|$)`)
 	postStepOctokitRE     = regexp.MustCompile(`\b(?:github|octokit)(?:\.rest)?\.issues\.create\s*\(`)
 	postStepRequestRE     = regexp.MustCompile(`(?i)\b(?:github|octokit)\.request\s*\(\s*['"\x60]POST\s+/repos/[^/'"\x60]+/[^/'"\x60]+/issues(?:[?#\s'"\x60]|$)`)
 	postStepOutputRE      = regexp.MustCompile(`(?i)(?:\bagent_output\.json\b|(?:safeoutputs|safe-outputs)/output\.json\b|\boutputs\.jsonl\b|\bsafeoutputs\.jsonl\b|\bGH_AW_AGENT_OUTPUT\b|\bGH_AW_SAFE_OUTPUTS\b|steps\.set-runtime-paths\.outputs\.GH_AW_SAFE_OUTPUTS)`)
-	postStepSecretRE      = regexp.MustCompile(`\bsecrets\b`)
-	postStepArtifactRoot  = regexp.MustCompile(`(?i)^(?:/tmp/gh-aw|\$\{?RUNNER_TEMP\}?/gh-aw|\$\{\{\s*runner\.temp\s*\}\}/gh-aw)(?:/\*\*)?/?$`)
+	postStepArtifactRoot  = regexp.MustCompile(`(?i)^(?:/tmp/gh-aw|\$\{?RUNNER_TEMP\}?/gh-aw)(?:/\*\*)?/?$`)
 )
+
+func postStepIssueAPI(value string) bool {
+	value = expressionReferencePattern(false, []string{"github", "repository"}, 2, -1).ReplaceAllString(value, "$GITHUB_REPOSITORY")
+	return postStepIssueAPIRE.MatchString(value)
+}
+
+func postStepArtifactPath(value string) bool {
+	value = expressionReferencePattern(false, []string{"runner", "temp"}, 2, -1).ReplaceAllString(value, "$RUNNER_TEMP")
+	return postStepArtifactRoot.MatchString(value)
+}
 
 var postStepFileInputActions = map[string][]string{
 	"actions/cache":                 {"path"},
@@ -83,7 +92,7 @@ func ValidatePostStepsSafeOutputs(steps []any) error {
 				}
 				for _, match := range ghAPICmdRE.FindAllStringSubmatch(command, -1) {
 					args := regexCapture(match, 1)
-					if args != "" && postStepIssueAPIRE.MatchString(parsePostStepGHAPIEndpoint(args)) &&
+					if args != "" && postStepIssueAPI(parsePostStepGHAPIEndpoint(args)) &&
 						postStepAPIPostRE.MatchString(args) && !postStepAPIGetRE.MatchString(args) {
 						return issueCreationError(location)
 					}
@@ -131,7 +140,12 @@ func issueCreationError(location string) error {
 }
 
 func containsPostStepSecret(value string) bool {
-	return slices.ContainsFunc(InlineExpressionPattern.FindAllString(value, -1), postStepSecretRE.MatchString)
+	for _, path := range interpolationReferences(value) {
+		if strings.EqualFold(path[0], "secrets") {
+			return true
+		}
+	}
+	return false
 }
 
 func containsPostStepSecretEnv(env any) bool {
@@ -162,7 +176,7 @@ func fileInputContainsSafeOutput(path any) bool {
 	switch value := path.(type) {
 	case string:
 		trimmed := strings.Trim(strings.TrimSpace(value), `"'`)
-		return postStepOutputRE.MatchString(value) || postStepArtifactRoot.MatchString(trimmed)
+		return postStepOutputRE.MatchString(value) || postStepArtifactPath(trimmed)
 	case []any:
 		return slices.ContainsFunc(value, fileInputContainsSafeOutput)
 	}
@@ -255,7 +269,7 @@ func curlCreatesIssue(command string) bool {
 			method = "GET"
 		}
 	}
-	return method == "POST" && slices.ContainsFunc(urls, postStepIssueAPIRE.MatchString)
+	return method == "POST" && slices.ContainsFunc(urls, postStepIssueAPI)
 }
 
 func parseCurlRequest(tokens []string) (string, bool, bool, []string) {

@@ -118,6 +118,10 @@ update-golden:
 	go test -v ./pkg/console -run='^TestGolden_' -update
 
 # Wasm golden tests — compare wasm (string API) compiler output against golden files
+.PHONY: test-actions-parser-conformance
+test-actions-parser-conformance:
+	npm test --prefix pkg/workflow/actionslanguageservice/conformance
+
 .PHONY: test-wasm-golden
 test-wasm-golden:
 	@echo "Running wasm golden tests (Go string API path)..."

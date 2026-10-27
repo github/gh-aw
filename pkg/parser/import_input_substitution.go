@@ -4,24 +4,14 @@
 package parser
 
 import (
+	"math"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/importinpututil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
-
-// importInputsFallbackExprRegex matches fallback expressions. The replacement
-// function folds only chains whose operands are all compile-time safe.
-var importInputsFallbackExprRegex = regexp.MustCompile(`\$\{\{\s*([^{}\n]*(?:github\.aw\.import-inputs\.|github\.aw\.inputs\.)[^{}\n]*\|\|[^{}\n]*|[^{}\n]*\|\|[^{}\n]*(?:github\.aw\.import-inputs\.|github\.aw\.inputs\.)[^{}\n]*)\s*\}\}`)
-
-// importInputsExprRegex matches ${{ github.aw.import-inputs.<key> }} and
-// ${{ github.aw.import-inputs.<key>.<subkey> }} expressions in raw content.
-var importInputsExprRegex = regexp.MustCompile(`\$\{\{\s*github\.aw\.import-inputs\.([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)?)\s*\}\}`)
-
-// legacyInputsExprRegex matches ${{ github.aw.inputs.<key> }} (legacy form) in raw content.
-var legacyInputsExprRegex = regexp.MustCompile(`\$\{\{\s*github\.aw\.inputs\.([a-zA-Z0-9_-]+)\s*\}\}`)
 
 // substituteImportInputsInContent performs text-level substitution of
 // ${{ github.aw.import-inputs.* }} and ${{ github.aw.inputs.* }} expressions
@@ -30,81 +20,63 @@ var legacyInputsExprRegex = regexp.MustCompile(`\$\{\{\s*github\.aw\.inputs\.([a
 func substituteImportInputsInContent(content string, inputs map[string]any) string {
 	importLog.Printf("Substituting import-inputs expressions: inputs=%d, contentBytes=%d", len(inputs), len(content))
 
-	result := content
-	if len(inputs) > 0 {
-		result = legacyInputsExprRegex.ReplaceAllStringFunc(result, buildImportInputReplaceFunc(legacyInputsExprRegex, inputs))
+	matches, err := actionslanguageservice.ExtractExpressions(content)
+	if err != nil {
+		importLog.Printf("Cannot scan import-input expressions; preserving original content")
+		return content
 	}
-	result = importInputsFallbackExprRegex.ReplaceAllStringFunc(result, buildImportInputFallbackReplaceFunc(inputs))
-	if len(inputs) > 0 {
-		result = importInputsExprRegex.ReplaceAllStringFunc(result, buildImportInputReplaceFunc(importInputsExprRegex, inputs))
-	}
-	return result
-}
-
-func buildImportInputFallbackReplaceFunc(inputs map[string]any) func(string) string {
-	return func(match string) string {
-		expression, found := firstRegexCapture(importInputsFallbackExprRegex, match)
-		if !found {
-			return match
-		}
-		if !strings.Contains(expression, "github.aw.import-inputs.") && !strings.Contains(expression, "github.aw.inputs.") {
-			return match
-		}
-		operands := splitFallbackOperands(expression)
-		if len(operands) < 2 {
-			return match
-		}
-		fallback := ""
-		hasInputReference := false
-		firstTruthy := ""
-		foundTruthy := false
-		for _, operand := range operands {
-			resolved := resolveFallbackOperand(strings.TrimSpace(operand), inputs)
-			if !resolved.ok {
-				return match
+	var result strings.Builder
+	last := 0
+	for _, match := range matches {
+		result.WriteString(content[last:match.Start])
+		replacement := content[match.Start:match.End]
+		expression, err := actionslanguageservice.ParseSyntax(match.Content)
+		if err != nil || expression == nil {
+			importLog.Printf("Cannot parse import-input expression; preserving original expression")
+		} else {
+			for expression.Kind == "group" {
+				expression = expression.Child(0)
 			}
-			hasInputReference = hasInputReference || resolved.isInputReference
-			fallback = resolved.formatted
-			if isTruthyImportInput(resolved.value) && !foundTruthy {
-				firstTruthy = resolved.formatted
-				foundTruthy = true
+			if expression.Kind == "logical" && expression.Token.Kind == "||" {
+				resolved := resolveFallbackExpression(expression, inputs)
+				if resolved.ok && resolved.isInputReference {
+					replacement = resolved.formatted
+				}
+			} else if path, ok := importInputReference(expression); ok && len(inputs) > 0 {
+				// Preserve the supported depth of standalone import references.
+				reference, _ := actionslanguageservice.Reference(expression)
+				if len(reference) <= 5 && (reference[2] != "inputs" || len(reference) == 4) {
+					if value, found := resolveImportInputPath(inputs, path); found {
+						replacement = value
+					}
+				}
 			}
 		}
-		if !hasInputReference {
-			return match
-		}
-		if foundTruthy {
-			return firstTruthy
-		}
-		return fallback
+		result.WriteString(replacement)
+		last = match.End
 	}
+	result.WriteString(content[last:])
+	return result.String()
 }
 
 func splitFallbackOperands(expression string) []string {
-	operands := make([]string, 0, 2)
-	start := 0
-	inString := false
-	skipNext := false
-	for i, r := range expression {
-		if skipNext {
-			skipNext = false
-			continue
-		}
-		if r == '\'' {
-			if inString && strings.HasPrefix(expression[i+1:], "'") {
-				skipNext = true
-				continue
+	root, err := actionslanguageservice.ParseSyntax(expression)
+	if err != nil || root == nil {
+		importLog.Printf("Cannot parse fallback expression")
+		return nil
+	}
+	var operands []string
+	var split func(*actionslanguageservice.Expression)
+	split = func(node *actionslanguageservice.Expression) {
+		if node.Kind == "logical" && node.Token.Kind == "||" {
+			for _, child := range node.Children {
+				split(child)
 			}
-			inString = !inString
-			continue
-		}
-		if !inString && strings.HasPrefix(expression[i:], "||") {
-			operands = append(operands, expression[start:i])
-			skipNext = true
-			start = i + 2
+		} else {
+			operands = append(operands, expression[node.Start:node.End])
 		}
 	}
-	operands = append(operands, expression[start:])
+	split(root)
 	return operands
 }
 
@@ -120,13 +92,56 @@ type fallbackOperandResult struct {
 }
 
 func resolveFallbackOperand(operand string, inputs map[string]any) fallbackOperandResult {
-	if inputPath, ok := strings.CutPrefix(operand, "github.aw.import-inputs."); ok {
+	expression, err := actionslanguageservice.ParseSyntax(operand)
+	if err != nil || expression == nil {
+		importLog.Printf("Cannot parse fallback operand")
+		return fallbackOperandResult{}
+	}
+	return resolveFallbackExpression(expression, inputs)
+}
+
+func importInputReference(expression *actionslanguageservice.Expression) (string, bool) {
+	path, ok := actionslanguageservice.Reference(expression)
+	if !ok || len(path) < 4 || path[0] != "github" || path[1] != "aw" || (path[2] != "import-inputs" && path[2] != "inputs") {
+		return "", false
+	}
+	for _, segment := range path[3:] {
+		if segment == "" {
+			return "", false
+		}
+		for _, ch := range segment {
+			if ch != '_' && ch != '-' && (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && (ch < '0' || ch > '9') {
+				return "", false
+			}
+		}
+	}
+	return strings.Join(path[3:], "."), true
+}
+
+func resolveFallbackExpression(expression *actionslanguageservice.Expression, inputs map[string]any) fallbackOperandResult {
+	if expression.Kind == "group" {
+		return resolveFallbackExpression(expression.Child(0), inputs)
+	}
+	if expression.Kind == "logical" && expression.Token.Kind == "||" {
+		var selected fallbackOperandResult
+		hasInputReference := false
+		for _, child := range expression.Children {
+			resolved := resolveFallbackExpression(child, inputs)
+			if !resolved.ok {
+				return fallbackOperandResult{}
+			}
+			hasInputReference = hasInputReference || resolved.isInputReference
+			if !isTruthyImportInput(selected.value) {
+				selected = resolved
+			}
+		}
+		selected.isInputReference = hasInputReference
+		return selected
+	}
+	if inputPath, ok := importInputReference(expression); ok {
 		return resolveFallbackInputOperand(inputPath, inputs)
 	}
-	if inputPath, ok := strings.CutPrefix(operand, "github.aw.inputs."); ok {
-		return resolveFallbackInputOperand(inputPath, inputs)
-	}
-	return resolveFallbackLiteralOperand(operand)
+	return resolveFallbackLiteralExpression(expression)
 }
 
 func resolveFallbackInputOperand(inputPath string, inputs map[string]any) fallbackOperandResult {
@@ -141,25 +156,29 @@ func resolveFallbackInputOperand(inputPath string, inputs map[string]any) fallba
 	return fallbackOperandResult{value: value, formatted: formatted, isInputReference: true, ok: true}
 }
 
-func resolveFallbackLiteralOperand(operand string) fallbackOperandResult {
-	switch operand {
+func resolveFallbackLiteralExpression(expression *actionslanguageservice.Expression) fallbackOperandResult {
+	if expression.Kind != "literal" {
+		return fallbackOperandResult{}
+	}
+	switch expression.Token.Kind {
 	case "true":
 		return fallbackOperandResult{value: true, formatted: "true", ok: true}
 	case "false":
 		return fallbackOperandResult{value: false, formatted: "false", ok: true}
 	case "null":
 		return fallbackOperandResult{ok: true}
-	}
-	if strings.HasPrefix(operand, "'") && strings.HasSuffix(operand, "'") && len(operand) >= 2 {
-		value := strings.ReplaceAll(operand[1:len(operand)-1], "''", "'")
+	case "string":
+		// Decode every escaped quote for substitution without changing the
+		// native lexer's upstream-compatible single-replacement Token.Value.
+		text := expression.Token.Text
+		value := strings.ReplaceAll(text[1:len(text)-1], "''", "'")
 		return fallbackOperandResult{value: value, formatted: value, ok: true}
-	}
-	if strings.ContainsAny(operand, ".eE") {
-		if value, err := strconv.ParseFloat(operand, 64); err == nil {
-			return fallbackOperandResult{value: value, formatted: operand, ok: true}
+	case "number":
+		value := expression.Token.Value
+		if integer, err := strconv.ParseInt(expression.Token.Text, 10, 64); err == nil {
+			value = integer
 		}
-	} else if value, err := strconv.ParseInt(operand, 10, 64); err == nil {
-		return fallbackOperandResult{value: value, formatted: operand, ok: true}
+		return fallbackOperandResult{value: value, formatted: expression.Token.Text, ok: true}
 	}
 	return fallbackOperandResult{}
 }
@@ -179,33 +198,10 @@ func isTruthyImportInput(value any) bool {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return reflected.Uint() != 0
 	case reflect.Float32, reflect.Float64:
-		return reflected.Float() != 0
+		return reflected.Float() != 0 && !math.IsNaN(reflected.Float())
 	default:
 		return true
 	}
-}
-
-func buildImportInputReplaceFunc(regex *regexp.Regexp, inputs map[string]any) func(string) string {
-	return func(match string) string {
-		inputPath, found := firstRegexCapture(regex, match)
-		if !found {
-			return match
-		}
-		strVal, found := resolveImportInputPath(inputs, inputPath)
-		if found {
-			return strVal
-		}
-		return match
-	}
-}
-
-func firstRegexCapture(regex *regexp.Regexp, value string) (string, bool) {
-	for index, capture := range regex.FindStringSubmatch(value) {
-		if index == 1 {
-			return capture, true
-		}
-	}
-	return "", false
 }
 
 func resolveImportInputPath(inputs map[string]any, inputPath string) (string, bool) {

@@ -111,7 +111,7 @@ func TestExpressionExtractor_ExtractExpressions(t *testing.T) {
 			name:            "experiments.name === value strict-equality form gets transformed to step output",
 			markdown:        `{{#if ${{ experiments.prompt_style === "concise" }} }}foo{{/if}}`,
 			wantCount:       1,
-			wantExpressions: []string{`steps.pick-experiment.outputs.prompt_style === 'concise'`},
+			wantExpressions: []string{`steps.pick-experiment.outputs.prompt_style == 'concise'`},
 		},
 		{
 			name:            "experiments.name != value inequality form gets transformed to step output",
@@ -123,7 +123,7 @@ func TestExpressionExtractor_ExtractExpressions(t *testing.T) {
 			name:            "experiments.name !== value strict-inequality form gets transformed to step output",
 			markdown:        `{{#if ${{ experiments.reasoning_depth !== "multi_candidate" }} }}foo{{/if}}`,
 			wantCount:       1,
-			wantExpressions: []string{`steps.pick-experiment.outputs.reasoning_depth !== 'multi_candidate'`},
+			wantExpressions: []string{`steps.pick-experiment.outputs.reasoning_depth != 'multi_candidate'`},
 		},
 		{
 			name:            "experiments.name == value with single quotes gets transformed to step output",
@@ -156,10 +156,10 @@ func TestExpressionExtractor_ExtractExpressions(t *testing.T) {
 			wantExpressions: []string{"fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').webhook.event"},
 		},
 		{
-			name:            "aw context syntax sugar with hyphenated field does not transform",
+			name:            "aw context syntax sugar supports official hyphenated properties",
 			markdown:        "Issue: ${{ github.aw.context.item-number }}",
 			wantCount:       1,
-			wantExpressions: []string{"github.aw.context.item-number"},
+			wantExpressions: []string{"fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item-number"},
 		},
 		{
 			name:            "gateway events indexed matching literal",
@@ -447,8 +447,8 @@ func TestTransformActivationOutputs(t *testing.T) {
 		},
 		{
 			name:     "transform with trailing parenthesis",
-			input:    "func(needs.activation.outputs.text)",
-			expected: "func(steps.sanitized.outputs.text)",
+			input:    "toJSON(needs.activation.outputs.text)",
+			expected: "toJSON(steps.sanitized.outputs.text)",
 		},
 		{
 			name:     "partial match followed by valid match",

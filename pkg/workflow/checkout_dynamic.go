@@ -3,15 +3,21 @@ package workflow
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 const defaultCheckoutMaxRepos = 10
 
 // Only direct configuration-variable references establish trusted policy provenance.
-var checkoutAllowedReposVariablePattern = regexp.MustCompile(`^\$\{\{\s*(?i:vars)(?:\.[A-Za-z_][A-Za-z0-9_]*|\[\s*'[A-Za-z_][A-Za-z0-9_]*'\s*\])\s*\}\}$`)
+var checkoutAllowedReposVariablePattern = actionslanguageservice.ReferencePattern(true, false, func(path []string) []string {
+	if len(path) == 2 && strings.EqualFold(path[0], "vars") && credentialIdentifier(path[1], false) {
+		return []string{}
+	}
+	return nil
+})
 
 func validateCheckoutAllowedRepos(values []string) error {
 	for _, value := range values {
