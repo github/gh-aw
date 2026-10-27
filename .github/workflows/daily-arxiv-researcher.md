@@ -58,11 +58,10 @@ steps:
       script: |
         const fs = require('fs');
         const https = require('https');
+        const { execFileSync } = require('child_process');
 
         const BASE_DIR = '/tmp/gh-aw/agent/arxiv';
         const PAPERS_JSON = `${BASE_DIR}/papers.json`;
-        const NEW_PAPERS_JSON = `${BASE_DIR}/new-papers.json`;
-        const SEEN_IDS_JSON = '/tmp/gh-aw/cache-memory/seen-paper-ids.json';
 
         fs.mkdirSync(BASE_DIR, { recursive: true });
 
@@ -123,24 +122,10 @@ steps:
         const fetchedAt = new Date().toISOString().slice(0, 10);
         fs.writeFileSync(PAPERS_JSON, JSON.stringify({ fetched_at: fetchedAt, count: papers.length, papers }, null, 2));
 
-        const seenIds = new Set();
-        if (fs.existsSync(SEEN_IDS_JSON)) {
-          try {
-            const d = JSON.parse(fs.readFileSync(SEEN_IDS_JSON, 'utf8'));
-            for (const id of (d.ids || [])) seenIds.add(id);
-          } catch (_) {}
-        }
+        execFileSync('python3', ['.github/scripts/arxiv_memory.py', 'prepare'], { stdio: 'inherit' });
+        const { new_count } = JSON.parse(fs.readFileSync(`${BASE_DIR}/new-papers.json`, 'utf8'));
 
-        const newPapers = papers.filter(p => !seenIds.has(p.id));
-        fs.writeFileSync(NEW_PAPERS_JSON, JSON.stringify({
-          total_fetched: papers.length,
-          already_seen: papers.length - newPapers.length,
-          new_count: newPapers.length,
-          fetched_at: fetchedAt,
-          papers: newPapers
-        }, null, 2));
-
-        core.info(`Parsed ${papers.length} papers, ${newPapers.length} new`);
+        core.info(`Parsed ${papers.length} papers, ${new_count} new`);
 
 sandbox:
   agent:
@@ -203,39 +188,34 @@ Collect the returned opportunity objects.
 
 ## Step 4: Update the Paper Ledger
 
-Use `python3 -c` to update the ledger, index and dedup cache as one standalone shell command. Read paper data from `new-papers.json` as data, not as shell commands; do not chain shell commands or create a separate script.
+Write `/tmp/gh-aw/agent/arxiv/screened-papers.json` as JSON data with exactly one
+result per paper in `new-papers.json`, including irrelevant papers:
 
-Load `/tmp/gh-aw/repo-memory/default/paper-ledger.md` if it exists; otherwise start with:
-```markdown
-# arXiv Paper Ledger
-
-Papers investigated for GitHub Agentic Workflows improvement opportunities.
+```json
+{"papers": [{"id": "arxiv_id", "relevant": true, "opportunity": "concise action if extracted", "area": "area if extracted"}]}
 ```
 
-Load `/tmp/gh-aw/repo-memory/default/paper-index.json` if it exists; otherwise use `{"papers": []}`.
+Use the Step 2 screening result for `relevant`. Include `opportunity` and `area`
+only when extracted in Step 3. Do not interpolate paper data into shell code.
+Then run this single command:
 
-For every paper processed in Step 2 (all new papers regardless of relevance), append to the ledger:
-
-```markdown
-### [TITLE](URL)
-- **ID**: arxiv_id
-- **Published**: YYYY-MM-DD
-- **Categories**: cat1, cat2
-- **Relevant**: Yes / No
-- **Opportunity**: (if relevant) concise opportunity text; omit line if not relevant
-- **Area**: (if relevant) area; omit line if not relevant
+```bash
+python3 .github/scripts/arxiv_memory.py update
 ```
 
-Append to the index JSON array:
-`{"id": "...", "title": "...", "published": "...", "relevant": true/false, "analyzed_at": "YYYY-MM-DD-HH-MM-SS"}`
+The helper leaves legacy `paper-ledger.md` and `paper-index.json` unchanged and
+appends new history to paired `paper-ledger-NNNN.md` / `paper-index-NNNN.json`
+shards under `/tmp/gh-aw/repo-memory/default`. It rotates before either file
+exceeds 80 KiB of UTF-8, including pretty-printed JSON. It never rewrites or
+copies sealed history into the daily patch. Existing 100 KiB per-file,
+100-file and 50 KiB patch safeguards remain in force; budget exhaustion fails
+explicitly instead of dropping history. Do not bypass these errors or edit
+memory files manually.
 
-Write the updated ledger to `/tmp/gh-aw/repo-memory/default/paper-ledger.md`.
-Write the updated index to `/tmp/gh-aw/repo-memory/default/paper-index.json`.
-
-Update the dedup cache at `/tmp/gh-aw/cache-memory/seen-paper-ids.json`:
-Load existing `{"ids": [...]}` or start with `{"ids": []}`.
-Append all paper IDs from `new-papers.json` (whether relevant or not).
-Write back — no colons in filenames.
+Deduplication is rebuilt from the legacy index and every index shard at the
+start of each run, so an expired cache or a cache saved before a failed
+repo-memory push cannot hide unpersisted papers. The helper also refreshes
+`/tmp/gh-aw/cache-memory/seen-paper-ids.json`.
 
 ## Step 5: Create Discussion or Noop
 
