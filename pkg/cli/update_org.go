@@ -181,6 +181,10 @@ func previewOrgRepoUpdates(ctx context.Context, repo string, opts UpdateWorkflow
 		return orgRepoPreview{}, err
 	}
 
+	return previewOrgRepoCheckout(ctx, repo, checkoutDir, opts, verbose)
+}
+
+func previewOrgRepoCheckout(ctx context.Context, repo, checkoutDir string, opts UpdateWorkflowsOptions, verbose bool) (orgRepoPreview, error) {
 	workflowsDir := filepath.Join(checkoutDir, constants.GetWorkflowDir())
 	workflows, err := findWorkflowsWithSource(workflowsDir, opts.WorkflowNames, verbose)
 	if err != nil {
@@ -195,6 +199,9 @@ func previewOrgRepoUpdates(ctx context.Context, repo string, opts UpdateWorkflow
 	for _, wf := range workflows {
 		sourceSpec, err := parseSourceSpec(wf.SourceSpec)
 		if err != nil {
+			if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+				return orgRepoPreview{}, fmt.Errorf("parsing source for %s/%s: %w", repo, wf.Name, err)
+			}
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s/%s: failed to parse source: %v", repo, wf.Name, err)))
 			orgUpdateLog.Printf("Failed to parse source for %s/%s: %v", repo, wf.Name, err)
 			continue
@@ -202,6 +209,9 @@ func previewOrgRepoUpdates(ctx context.Context, repo string, opts UpdateWorkflow
 		name := normalizeWorkflowID(wf.Name)
 		resolved, err := resolveRedirectedUpdateLocation(ctx, name, sourceSpec, opts.AllowMajor, verbose, opts.NoRedirect, opts.CoolDown)
 		if err != nil {
+			if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+				return orgRepoPreview{}, fmt.Errorf("resolving source for %s/%s: %w", repo, wf.Name, err)
+			}
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Skipping %s/%s: %v", repo, wf.Name, err)))
 			orgUpdateLog.Printf("Failed to resolve update location for %s/%s: %v", repo, wf.Name, err)
 			continue
@@ -256,7 +266,7 @@ func getLatestWorkflowEditTimeFromCheckout(ctx context.Context, checkoutDir, wor
 }
 
 func waitForOrgRateLimit(ctx context.Context, resource string, verbose bool) error {
-	output, err := workflow.RunGHContext(ctx, "Checking rate limit...", "api", "rate_limit")
+	output, err := workflow.RunGHContextWithHost(ctx, "Checking rate limit...", getHostFromOriginRemote(), "api", "rate_limit")
 	if err != nil {
 		return err
 	}
@@ -348,10 +358,12 @@ func buildOrgUpdateIssue(preview orgRepoPreview, releaseTag, releaseURL, xmlMark
 	body.WriteString("**Workflows with updates:**\n\n")
 	for _, wf := range preview.Workflows {
 		// CurrentRef and LatestRef are already resolved to version labels.
-		fmt.Fprintf(&body, "- `%s`: `%s` -> `%s`\n", wf.Name, wf.CurrentRef, wf.LatestRef)
+		line := fmt.Sprintf("- `%s`: `%s` -> `%s`\n", wf.Name, wf.CurrentRef, wf.LatestRef)
+		body.WriteString(line)
 	}
 	if releaseURL != "" {
-		fmt.Fprintf(&body, "\n[View gh-aw release %s](%s)\n", releaseTag, releaseURL)
+		link := fmt.Sprintf("\n[View gh-aw release %s](%s)\n", releaseTag, releaseURL)
+		body.WriteString(link)
 	}
 	body.WriteString("\n### How to execute\n\n")
 	body.WriteString("- **Assign to agent**: Assign this issue to Copilot to automatically apply the update\n")

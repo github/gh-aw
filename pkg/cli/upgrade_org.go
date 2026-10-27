@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -84,7 +85,7 @@ func scanUpgradeRepo(ctx context.Context, repo string, verbose bool) (orgRepoPre
 
 	// Count .md workflow files (excluding lock files).
 	mdCount, err := countWorkflowMDFiles(workflowsDir)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return orgRepoPreview{}, false, fmt.Errorf("failed to scan workflows in %s: %w", repo, err)
 	}
 
@@ -210,6 +211,17 @@ func normalizeDisplayVersion(version string) string {
 // runUpgradeForTargetRepo checks out repo to a temporary directory, runs the
 // upgrade command inside it, and opens a pull request with the resulting changes.
 func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptions, createPR bool, verbose bool) error { //nolint:largefunc // Checkout lifetime, upgrade, and PR creation share ordered cleanup.
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && rollout.dryRun {
+		preview, include, err := scanUpgradeRepoFn(ctx, repo, verbose)
+		if err != nil {
+			return err
+		}
+		return emitOrgRolloutPreview(preview, include)
+	}
+	existing, skip, err := prepareOrgRolloutWorker(ctx, repo, ghawUpgradeMarkerPrefix)
+	if err != nil || skip {
+		return err
+	}
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("--repo/--org requires running inside a git repository: %w", err)
@@ -223,6 +235,16 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	checkoutDir := filepath.Join(updatesDir, sanitizeRepoPath(repo))
 	if err := shallowCloneTargetRepo(ctx, repo, checkoutDir); err != nil {
 		return err
+	}
+
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+		count, err := countWorkflowMDFiles(filepath.Join(checkoutDir, constants.GetWorkflowDir()))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if count == 0 {
+			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"})
+		}
 	}
 
 	// Extend sparse checkout to include .github/skills; upgrade also updates
@@ -262,6 +284,9 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	// workflowDir is intentionally reset: --dir is a local-machine concept and
 	// must not be forwarded to remote repos where that path may not exist.
 	opts.ctx = ctx
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+		opts.ctx = withUpdateGitHubClient(ctx, verbose)
+	}
 	opts.skipExtensionUpgrade = true
 	opts.verbose = verbose
 	opts.workflowDir = ""
@@ -286,6 +311,9 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 		return err
 	}
 	if !changed {
+		if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"})
+		}
 		upgradeOrgLog.Printf("Skipping PR for %s: no pending changes after upgrade", repo)
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Skipping PR for "+repo+": already up to date"))
@@ -305,7 +333,9 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	}
 
 	// Close stale PRs only after the replacement description is validated.
-	closeExistingOrgPRsByMarker(ctx, repo, ghawUpgradeMarkerPrefix, verbose)
+	if orgRolloutFromContext(ctx) == nil {
+		closeExistingOrgPRsByMarker(ctx, repo, ghawUpgradeMarkerPrefix, verbose)
+	}
 
 	prURL, err := createPRWithChanges(ctx, "upgrade-agentic-workflows", "chore: upgrade agentic workflows",
 		"Upgrade agentic workflows", prBody, verbose, opts.autoMerge)
@@ -313,7 +343,13 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 		addLabelToOrgPR(ctx, prURL, agenticWorkflowsLabel, verbose)
 	}
 	if err != nil {
+		if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && prURL != "" {
+			return errors.Join(err, emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL}))
+		}
 		return err
+	}
+	if prURL != "" {
+		return finishOrgRolloutWorker(ctx, repo, existing, prURL)
 	}
 	return nil
 }

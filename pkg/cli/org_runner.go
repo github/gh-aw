@@ -135,7 +135,12 @@ func confirmOrgAction(preview orgRepoPreview, action string, autoYes bool) (bool
 //  6. Calls cbs.ReportFn to display the summary.
 //  7. When createPR or createIssue is set, iterates through results calling
 //     cbs.ApplyFn or cbs.IssueFn, continuing past per-repo errors.
+//
+//nolint:largefunc // Preserve the legacy scan, confirmation, and issue-creation flow for existing callers.
 func runCommandForOrg(ctx context.Context, org string, repoGlobs []string, cbs orgRunCallbacks, createPR bool, createIssue bool, verbose bool) error {
+	if opts := orgRolloutFromContext(ctx); opts != nil && !opts.worker {
+		return runOrgRollout(ctx, org, repoGlobs, cbs, createPR, createIssue, verbose, *opts)
+	}
 	if strings.TrimSpace(org) == "" {
 		return errors.New("--org cannot be empty")
 	}

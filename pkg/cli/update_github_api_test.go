@@ -9,11 +9,40 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestOrgRolloutDependencyCacheSharedBetweenWorkers(t *testing.T) {
+	t.Setenv("GH_TOKEN", "test-token")
+	t.Setenv("GH_HOST", "github.localhost")
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	requests := 0
+	http.DefaultTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		requests++
+		headers := http.Header{"Date": {time.Now().UTC().Format(http.TimeFormat)}}
+		return updateGitHubTestResponse(req, http.StatusOK, `{"default_branch":"main"}`, headers), nil
+	})
+	cacheDir := t.TempDir()
+	for range 2 {
+		ctx := context.WithValue(context.Background(), orgRolloutKey{}, &orgRolloutOptions{worker: true, cacheDir: cacheDir})
+		ctx = withUpdateGitHubClient(ctx, false)
+		client := updateGitHubClientFromContext(ctx)
+		require.NotNil(t, client)
+		assert.Same(t, client, updateGitHubClientFromContext(withUpdateGitHubClient(ctx, false)))
+		var result struct {
+			DefaultBranch string `json:"default_branch"`
+		}
+		_, err := client.get(ctx, "/repos/actions/cache", &result)
+		require.NoError(t, err)
+		assert.Equal(t, "main", result.DefaultBranch)
+	}
+	assert.Equal(t, 1, requests, "isolated workers should reuse identical dependency reads")
+}
 
 func newUpdateGitHubTestClient(t *testing.T, transport roundTripperFunc) (*updateGitHubClient, context.Context) {
 	t.Helper()

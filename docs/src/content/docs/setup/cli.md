@@ -1106,9 +1106,29 @@ gh aw update --org my-org --pr --auto-merge --yes  # Enable auto-merge per repos
 gh aw update --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--repos`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
+**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
 
 Org mode (`--org`) previews or creates workflow update pull requests across every repository in an organization. Use `--repos` to limit matches, `--create-issue` to open an issue in each repository with pending updates, and `--yes/-y` to auto-accept per-repository confirmations in CI.
+
+##### Organization and enterprise rollouts
+
+Both `update` and `upgrade` accept `--org ORGANIZATION` or `--enterprise ENTERPRISE`, together with `--repos` glob filters. Enterprise discovery includes accessible organizations and requires permission to view the enterprise's organization inventory. Run from a Git checkout and authenticate `gh` for the target host; GitHub Enterprise Server uses the checkout's origin host.
+
+```bash wrap
+gh aw update ci-doctor --org my-org --dry-run
+gh aw upgrade --org my-org --interactive --dry-run
+gh aw upgrade --enterprise my-enterprise --repos '*-service' --interactive --pr
+gh aw update --org my-org --pr --yes --concurrency 3
+gh aw upgrade --org my-org --pr --yes --replace-existing
+```
+
+Without a creation flag, org and enterprise modes preview pending work. `--dry-run` also overrides creation flags: it never creates or closes PRs or issues, updates the CLI extension, or commits or pushes changes. Previews use local shallow sparse checkouts under `.github/aw/updates`; they are not full compilation or mergeability checks.
+
+`--interactive` opens a repository picker before checking out repositories. Use arrow keys to navigate, **Space** to select, **a** to toggle filtered repositories, **/** to filter, and **Enter** to run the selection. Only selected repositories are processed, including selections hidden by the filter. The live view displays each worker's status and resulting PR URL. Press **q** or **Ctrl+C** to cancel pending and active workers; completed PRs are not rolled back. Interactive mode requires terminal input and output and is not supported with `--create-issue`.
+
+Open PRs carrying the command's `gh-aw-update` or `gh-aw-upgrade` body marker are detected in batches and skipped by default, including drafts and older versions. Earlier PRs with the generated title and branch prefix are also recognized. `--replace-existing`, or **o** in the picker followed by selecting an existing-PR row, allows a replacement. The old PR stays open unless a new PR is successfully created; unchanged repositories and failed replacements leave it untouched. Workers recheck open PRs before applying changes. Separate, simultaneous CLI invocations are not an atomic distributed lock.
+
+`--concurrency` bounds isolated repository workers (default **3**, range **1–10**). Starts are spaced by at least one second, core API budget checks are reused for 30 seconds, and existing-PR discovery fetches up to 20 repositories per GraphQL request rather than polling every repository. Workers share a temporary, five-minute native API cache for dependency reads; open-PR checks and mutations are never cached. The shared cache is removed when the rollout exits. Discovery falls back to paginated repository inventory when GitHub code search reaches its 1,000-file ceiling or reports incomplete results. That fallback may inspect repositories without workflows; those repositories are left unchanged. API and authentication failures are reported without credential retries, and budget failures stop scheduling additional work. Partial failures produce a nonzero exit status while other selected repositories can finish.
 
 `--no-redirect` makes `update` fail when the source workflow has a [`redirect`](/gh-aw/reference/frontmatter/) field instead of following it. `--repo/-r` runs the update against a different repository by checking out an isolated shallow clone under `.github/aw/updates/<sanitized-repo-id>`; with `--create-pull-request`, the PR targets that repository instead of the current one.
 
@@ -1148,11 +1168,13 @@ gh aw upgrade --audit --json               # Dependency audit in JSON format
 gh aw upgrade --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--repos`, `--yes/-y`, `--audit`, `--json/-j`, `--approve`, `--pre-releases`
+**Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--audit`, `--json/-j`, `--approve`, `--pre-releases`
 
 The dispatcher skill is updated by default. The Copilot custom agent and setup-steps workflow are created only when a workflow uses Copilot (including when the engine is omitted), or updated if the respective file already exists. An explicit `--engine` overrides workflow engine detection. Use `--no-agent`, `--no-mcp`, or `--no-skill` to skip the corresponding files, even when they already exist.
 
 Org mode (`--org`) previews or creates upgrade pull requests across every repository in an organization. Use `--repos` to limit org mode to repositories matching one or more glob patterns, `--create-issue` to open an issue in each org repository with agentic workflows (requires `--org`), and `--yes/-y` to auto-accept org-mode upgrade confirmations (required in CI).
+
+Upgrade also supports `--enterprise`, `--interactive`, `--dry-run`, `--concurrency`, and `--replace-existing`; see [organization and enterprise rollouts](#organization-and-enterprise-rollouts). Rollout workers use the currently running CLI version consistently across repositories; update the CLI before starting the rollout to target a newer compiler.
 
 Use `--disable-codemod` (repeatable) to skip specific codemod IDs during the embedded fix step. This flag is ignored when `--no-fix` is set.
 

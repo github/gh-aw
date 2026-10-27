@@ -75,6 +75,8 @@ This command always upgrades all Markdown files in .github/workflows.`,
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --engine claude             # Override AI engine for compilation
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --repo owner/repo           # Upgrade workflows in another repository
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --org my-org                # Preview upgrade pull requests across an organization
+  ` + string(constants.CLIExtensionPrefix) + ` upgrade --org my-org --interactive --pr  # Select repositories and watch PR creation
+  ` + string(constants.CLIExtensionPrefix) + ` upgrade --enterprise my-enterprise --dry-run  # Preview accessible enterprise organizations
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --org my-org --repos '*-service'  # Limit org mode to matching repositories
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --org my-org --create-pull-request  # Open upgrade pull requests in org repositories
   ` + string(constants.CLIExtensionPrefix) + ` upgrade --org my-org --create-pull-request --yes  # Auto-accept per-repo confirmations for PR creation (required in CI)
@@ -111,6 +113,12 @@ This command always upgrades all Markdown files in .github/workflows.`,
 			targetRepo, _ := cmd.Flags().GetString("repo")
 			targetOrg, _ := cmd.Flags().GetString("org")
 			repoGlobs, _ := cmd.Flags().GetStringSlice("repos")
+
+			var rolloutErr error
+			targetOrg, rolloutErr = configureOrgRollout(cmd, targetOrg, targetRepo, createPR, createIssue)
+			if rolloutErr != nil {
+				return rolloutErr
+			}
 
 			if err := requireAutoMergePR(autoMerge, createPR); err != nil {
 				return err
@@ -221,7 +229,8 @@ This command always upgrades all Markdown files in .github/workflows.`,
 	cmd.Flags().Bool("skip-extension-upgrade", false, "Skip automatic extension upgrade (used internally to prevent recursion after upgrade)")
 	_ = cmd.Flags().MarkHidden("skip-extension-upgrade")
 	cmd.Flags().String("org", "", "Preview or create upgrade pull requests across an organization")
-	cmd.Flags().StringSlice("repos", nil, "Limit --org mode to repositories matching one or more glob patterns")
+	addOrgRolloutFlags(cmd)
+	cmd.Flags().StringSlice("repos", nil, "Limit --org or --enterprise to repositories matching one or more glob patterns")
 	addJSONFlag(cmd)
 
 	// Register completions
