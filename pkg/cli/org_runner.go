@@ -96,7 +96,7 @@ func renderOrgActionSummary(preview orgRepoPreview, action string) {
 	}
 	currentVersion := formatUpgradeCompilerVersions(preview)
 	targetVersion := normalizeDisplayVersion(GetVersion())
-	if len(preview.CurrentVersions) > 0 || preview.UnknownVersionLocks > 0 {
+	if len(preview.CurrentVersions) > 0 || preview.UnknownVersionLocks > 0 || preview.MissingWorkflowLocks > 0 {
 		if targetVersion != "" && targetVersion != currentVersion {
 			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(fmt.Sprintf("Compiler versions: %s -> %s", currentVersion, targetVersion)))
 		} else {

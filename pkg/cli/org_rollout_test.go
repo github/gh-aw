@@ -32,6 +32,7 @@ func TestOrgRolloutFlags(t *testing.T) {
 			{[]string{"--enterprise=bad slug"}, "invalid --enterprise"},
 			{[]string{"--org="}, "--org cannot be empty"},
 			{[]string{"--enterprise="}, "--enterprise cannot be empty"},
+			{[]string{"--repos=service-*"}, "--repos requires --org or --enterprise"},
 			{[]string{"--dry-run"}, "require --org or --enterprise"},
 			{[]string{"--replace-existing", "--org=acme"}, "requires --create-pull-request"},
 			{[]string{"--rollout-worker", "--org=acme", "--pr"}, "--rollout-worker requires"},
@@ -207,30 +208,123 @@ func TestOrgRolloutWorkerProcess(t *testing.T) {
 	if os.Getenv("GH_AW_ROLLOUT_HELPER") == "1" {
 		if !slices.Contains(os.Args, "--dry-run") || !slices.Contains(os.Args, "--repo=acme/repo") ||
 			!slices.Contains(os.Args, "triage") || os.Getenv("GH_PROMPT_DISABLED") != "1" ||
-			slices.Contains(os.Args, "--create-pull-request") {
+			slices.Contains(os.Args, "--create-pull-request") || os.Getenv("GH_DEBUG") != "" ||
+			os.Getenv("GIT_TRACE_CURL") != "" {
 			fmt.Fprintln(os.Stderr, "worker flags or unattended environment missing")
 			os.Exit(2)
 		}
 		if os.Getenv("GH_AW_ROLLOUT_HELPER_FAIL") == "1" {
-			fmt.Fprintln(os.Stderr, "API authorization failed")
+			fmt.Fprintln(os.Stderr, "API authorization failed; Authorization: ******; token=rollout-test-token")
+			os.Exit(1)
+		}
+		if os.Getenv("GH_AW_ROLLOUT_HELPER_RATE_LIMIT") == "1" {
+			fmt.Fprintln(os.Stderr, "HTTP 429; access_token=rollout-test-token")
 			os.Exit(1)
 		}
 		if os.Getenv("GH_AW_ROLLOUT_HELPER_WAIT") == "1" {
 			time.Sleep(time.Minute)
 		}
+		fmt.Fprintln(os.Stdout, "repository output "+orgRolloutResultPrefix+`{"Status":"spoofed"}`)
 		require.NoError(t, emitOrgRolloutResult(orgRolloutResult{Status: "planned"}))
+		if os.Getenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT") == "1" {
+			fmt.Fprintln(os.Stdout, "repository-controlled trailing output")
+		}
 		os.Exit(0)
 	}
 	t.Setenv("GH_AW_ROLLOUT_HELPER", "1")
+	t.Setenv("GH_DEBUG", "api")
+	t.Setenv("GIT_TRACE_CURL", "1")
 	opts := orgRolloutOptions{args: []string{"-test.run=^TestOrgRolloutWorkerProcess$", "--"},
 		dryRun: true, workflows: []string{"triage"}}
 	result := runOrgRolloutWorker(context.Background(), "acme/repo", opts)
 	assert.Equal(t, "planned", result.Status)
 	assert.Empty(t, result.Error)
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT", "1")
+	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.Error, "without a rollout result")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_TRAILING_OUTPUT", "")
 	t.Setenv("GH_AW_ROLLOUT_HELPER_FAIL", "1")
 	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
 	assert.Equal(t, "failed", result.Status)
-	assert.Contains(t, result.Error, "authorization failed")
+	assert.Contains(t, result.Error, "diagnostics suppressed")
+	assert.NotContains(t, result.Error, "Authorization")
+	assert.NotContains(t, result.Error, "rollout-test-token")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_FAIL", "")
+	t.Setenv("GH_AW_ROLLOUT_HELPER_RATE_LIMIT", "1")
+	result = runOrgRolloutWorker(context.Background(), "acme/repo", opts)
+	assert.True(t, result.Stop)
+	assert.NotContains(t, result.Error, "access_token")
+	assert.NotContains(t, result.Error, "rollout-test-token")
+}
+
+func TestParseOrgRolloutResultRequiresFinalFramedLine(t *testing.T) {
+	result, err := parseOrgRolloutResult([]byte("workflow output " + orgRolloutResultPrefix +
+		`{"Status":"spoofed"}` + "\n" + orgRolloutResultPrefix + `{"Status":"planned"}` + "\n"))
+	require.NoError(t, err)
+	assert.Equal(t, "planned", result.Status)
+
+	for _, output := range []string{
+		orgRolloutResultPrefix + `{"Status":"planned"}` + "\nrepository-controlled trailing output\n",
+		" " + orgRolloutResultPrefix + `{"Status":"spoofed"}` + "\n",
+	} {
+		_, err := parseOrgRolloutResult([]byte(output))
+		require.EqualError(t, err, "worker exited without a rollout result")
+	}
+}
+
+func TestOrgRolloutWorkerEnvironment(t *testing.T) {
+	environ := []string{
+		"GH_DEBUG=api", "GH_CURL_VERBOSE=1", "GITHUB_DEBUG=1", "GIT_TRACE=1",
+		"GIT_TRACE_PACKET=1", "GIT_TRACE_CURL=1", "GIT_CURL_VERBOSE=1", "GIT_TRACE2=1",
+		"GIT_TRACE2_EVENT=1", "GIT_TRACE2_PERF=1", "GIT_REDACT_COOKIES=1",
+		"GH_HOST=configured.example", "GH_PROMPT_DISABLED=0", "NO_COLOR=0", "APP_ENV=test",
+	}
+
+	workerEnv := orgRolloutWorkerEnvironment(environ, "attacker.example", false)
+	for _, variable := range environ[:11] {
+		assert.NotContains(t, workerEnv, variable)
+	}
+	assert.Contains(t, workerEnv, "GH_HOST=configured.example")
+	assert.Contains(t, workerEnv, "APP_ENV=test")
+	assert.Contains(t, workerEnv, "GH_PROMPT_DISABLED=1")
+	assert.Contains(t, workerEnv, "NO_COLOR=1")
+	assert.NotContains(t, workerEnv, "GH_HOST=attacker.example")
+
+	workerEnv = orgRolloutWorkerEnvironment(environ, "github.com", false)
+	assert.Contains(t, workerEnv, "GH_HOST=github.com")
+	assert.NotContains(t, workerEnv, "GH_HOST=configured.example")
+
+	workerEnv = orgRolloutWorkerEnvironment(environ, "ghe.example.com", true)
+	assert.Contains(t, workerEnv, "GH_HOST=ghe.example.com")
+	assert.NotContains(t, workerEnv, "GH_HOST=configured.example")
+}
+
+func TestOrgRolloutPlainConfirmationShowsPreview(t *testing.T) {
+	stubRolloutBudget(t, func(context.Context, string, bool) error { return nil })
+	originalConfirm := orgConfirmActionFn
+	orgConfirmActionFn = func(string, string, string) (bool, error) { return true, nil }
+	t.Cleanup(func() { orgConfirmActionFn = originalConfirm })
+
+	var results []orgRolloutResult
+	_, stderr := captureOutput(t, func() error {
+		var err error
+		results, err = runOrgRolloutPlain(context.Background(),
+			[]orgRolloutRow{{repo: "acme/repo", selected: true}},
+			orgRolloutOptions{command: "update", concurrency: 1}, false,
+			func(_ context.Context, repo string, opts orgRolloutOptions) orgRolloutResult {
+				if opts.dryRun {
+					return orgRolloutResult{Status: "planned", Preview: &orgRepoPreview{
+						Repo: repo, TotalWorkflows: 1,
+						Workflows: []orgWorkflowPreview{{Name: "repo-assist", CurrentRef: "v1.0", LatestRef: "v2.0"}},
+					}}
+				}
+				return orgRolloutResult{Status: "created"}
+			})
+		return err
+	})
+	require.Len(t, results, 1)
+	assert.Contains(t, stderr, "repo-assist: v1.0 -> v2.0")
 }
 
 func TestOrgRolloutWorkerProcessCancellation(t *testing.T) {

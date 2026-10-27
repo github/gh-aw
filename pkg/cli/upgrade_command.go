@@ -133,7 +133,7 @@ This command always upgrades all Markdown files in .github/workflows.`,
 			}
 
 			if len(repoGlobs) > 0 && targetOrg == "" {
-				return errors.New("--repos requires --org to be specified")
+				return errors.New("--repos requires --org or --enterprise to be specified")
 			}
 
 			if createIssue && targetOrg == "" {

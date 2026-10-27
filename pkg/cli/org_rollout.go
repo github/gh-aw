@@ -20,6 +20,12 @@ import (
 
 const orgRolloutResultPrefix = "gh-aw-rollout-result:"
 
+var orgRolloutSensitiveEnv = map[string]struct{}{
+	"GH_DEBUG": {}, "GH_CURL_VERBOSE": {}, "GITHUB_DEBUG": {},
+	"GIT_TRACE": {}, "GIT_TRACE_PACKET": {}, "GIT_TRACE_CURL": {}, "GIT_CURL_VERBOSE": {},
+	"GIT_TRACE2": {}, "GIT_TRACE2_EVENT": {}, "GIT_TRACE2_PERF": {}, "GIT_REDACT_COOKIES": {},
+}
+
 type orgRolloutResult struct {
 	Repo    string          `json:"repo,omitempty"`
 	Status  string          `json:"status"`
@@ -111,7 +117,7 @@ func runOrgRollout(ctx context.Context, org string, globs []string, cbs orgRunCa
 	if opts.interactive {
 		results, err = runOrgRolloutTUI(ctx, rows, opts)
 	} else {
-		results, err = runOrgRolloutPlain(ctx, rows, opts, cbs.AutoYes)
+		results, err = runOrgRolloutPlain(ctx, rows, opts, cbs.AutoYes, runOrgRolloutWorker)
 	}
 	return reportOrgRolloutResults(ctx, results, cbs, opts, err)
 }
@@ -170,7 +176,9 @@ func discoverOrgRolloutRows(ctx context.Context, orgs, globs []string, cbs orgRu
 	return rows, nil
 }
 
-func runOrgRolloutPlain(ctx context.Context, rows []orgRolloutRow, opts orgRolloutOptions, autoYes bool) ([]orgRolloutResult, error) {
+func runOrgRolloutPlain(ctx context.Context, rows []orgRolloutRow, opts orgRolloutOptions, autoYes bool,
+	worker func(context.Context, string, orgRolloutOptions) orgRolloutResult,
+) ([]orgRolloutResult, error) {
 	var results []orgRolloutResult
 	for index, value := range rows {
 		row := value
@@ -179,7 +187,24 @@ func runOrgRolloutPlain(ctx context.Context, rows []orgRolloutRow, opts orgRollo
 			fmt.Fprintf(os.Stderr, "  #%d %s\n", pr.Number, pr.URL)
 		}
 		if row.selected && !opts.dryRun && !autoYes {
-			selected, err := confirmOrgAction(orgRepoPreview{Repo: row.repo}, "create a pull request", false)
+			previewOpts := opts
+			previewOpts.dryRun = true
+			previewResult := worker(ctx, row.repo, previewOpts)
+			if previewResult.Status == "failed" {
+				previewResult.Repo = row.repo
+				if previewResult.Error == "" {
+					previewResult.Error = "preview failed"
+				}
+				results = append(results, previewResult)
+				row.selected = false
+				rows[index] = row
+				continue
+			}
+			preview := orgRepoPreview{Repo: row.repo}
+			if previewResult.Preview != nil {
+				preview = *previewResult.Preview
+			}
+			selected, err := confirmOrgAction(preview, "create a pull request", false)
 			if err != nil {
 				return nil, err
 			}
@@ -187,7 +212,7 @@ func runOrgRolloutPlain(ctx context.Context, rows []orgRolloutRow, opts orgRollo
 		}
 		rows[index] = row
 	}
-	for event := range startOrgRolloutJobs(ctx, rows, opts, time.Second, runOrgRolloutWorker) {
+	for event := range startOrgRolloutJobs(ctx, rows, opts, time.Second, worker) {
 		if event.done {
 			break
 		}
@@ -311,6 +336,61 @@ func (output *orgRolloutOutput) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
+func parseOrgRolloutResult(output []byte) (orgRolloutResult, error) {
+	lines := strings.Split(strings.TrimRight(string(output), "\r\n"), "\n")
+	for _, line := range slices.Backward(lines) {
+		line = strings.TrimSuffix(line, "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, orgRolloutResultPrefix) {
+			return orgRolloutResult{}, errors.New("worker exited without a rollout result")
+		}
+		var result orgRolloutResult
+		payload := strings.TrimSpace(strings.TrimPrefix(line, orgRolloutResultPrefix))
+		if err := json.Unmarshal([]byte(payload), &result); err != nil {
+			return orgRolloutResult{}, fmt.Errorf("invalid worker result: %w", err)
+		}
+		return result, nil
+	}
+	return orgRolloutResult{}, errors.New("worker exited without a rollout result")
+}
+
+func orgRolloutWorkerEnvironment(environ []string, host string, allowUntrustedHost bool) []string {
+	setRemoteHost := host == "github.com" || (host != "" && allowUntrustedHost)
+	filtered := make([]string, 0, len(environ)+3)
+	for _, entry := range environ {
+		name, _, _ := strings.Cut(entry, "=")
+		if _, sensitive := orgRolloutSensitiveEnv[name]; sensitive {
+			continue
+		}
+		if name == "GH_PROMPT_DISABLED" || name == "NO_COLOR" || (name == "GH_HOST" && setRemoteHost) {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	filtered = append(filtered, "GH_PROMPT_DISABLED=1", "NO_COLOR=1")
+	if setRemoteHost {
+		filtered = append(filtered, "GH_HOST="+host)
+	}
+	return filtered
+}
+
+func summarizeOrgRolloutWorkerError(err error, diagnostic []byte) (string, bool) {
+	message := strings.ToLower(err.Error() + " " + stringutil.StripANSI(string(diagnostic)))
+	summary := fmt.Sprintf("%v (worker diagnostics suppressed)", err)
+	switch {
+	case strings.Contains(message, "http 429") || strings.Contains(message, "secondary rate limit") ||
+		strings.Contains(message, "api rate limit exceeded"):
+		summary += ": API rate limit"
+	case strings.Contains(message, "http 401"):
+		summary += ": authentication failure"
+	}
+	message = strings.ToLower(summary)
+	stop := strings.Contains(message, "api rate limit") || strings.Contains(message, "authentication failure")
+	return summary, stop
+}
+
 func runOrgRolloutWorker(ctx context.Context, repo string, opts orgRolloutOptions) orgRolloutResult {
 	executable, err := os.Executable()
 	if err != nil {
@@ -334,27 +414,21 @@ func runOrgRolloutWorker(ctx context.Context, repo string, opts orgRolloutOption
 	}
 	cmd := exec.CommandContext(ctx, executable, args...)
 	configureOrgRolloutProcess(cmd)
-	cmd.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "NO_COLOR=1", "GH_HOST="+getHostFromOriginRemote())
+	cmd.Env = orgRolloutWorkerEnvironment(os.Environ(), getHostFromOriginRemote(), lookupEnv("GH_AW_ALLOW_UNTRUSTED_GH_HOST") == "1")
 	output, diagnostic := &orgRolloutOutput{limit: 8 * 1024 * 1024}, &orgRolloutOutput{}
 	cmd.Stdout, cmd.Stderr = output, diagnostic
 	cmd.WaitDelay = 5 * time.Second
 	err = cmd.Run()
-	result := orgRolloutResult{}
-	text := string(output.tail)
-	if index := strings.LastIndex(text, orgRolloutResultPrefix); index >= 0 {
-		line, _, _ := strings.Cut(text[index+len(orgRolloutResultPrefix):], "\n")
-		if decodeErr := json.Unmarshal([]byte(line), &result); decodeErr != nil {
-			return orgRolloutResult{Status: "failed", Error: fmt.Sprintf("invalid worker result: %v", decodeErr)}
-		}
-	} else {
-		result = orgRolloutResult{Status: "failed", Error: "worker exited without a rollout result"}
+	result, parseErr := parseOrgRolloutResult(output.tail)
+	if parseErr != nil && err == nil {
+		return orgRolloutResult{Status: "failed", Error: parseErr.Error()}
+	}
+	if parseErr != nil {
+		result = orgRolloutResult{Status: "failed"}
 	}
 	if err != nil {
 		result.Status = "failed"
-		result.Error = fmt.Sprintf("%v\n%s", err, stringutil.StripANSI(string(diagnostic.tail)))
-		message := strings.ToLower(result.Error)
-		result.Stop = strings.Contains(message, "http 429") || strings.Contains(message, "http 401") ||
-			strings.Contains(message, "secondary rate limit") || strings.Contains(message, "api rate limit exceeded")
+		result.Error, result.Stop = summarizeOrgRolloutWorkerError(err, diagnostic.tail)
 	}
 	return result
 }

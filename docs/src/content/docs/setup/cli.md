@@ -1125,7 +1125,7 @@ Org mode (`--org`) previews or creates workflow update pull requests across ever
 
 ##### Organization and enterprise rollouts
 
-Both `update` and `upgrade` accept `--org ORGANIZATION` or `--enterprise ENTERPRISE`, together with `--repos` glob filters. Enterprise discovery includes accessible organizations and requires permission to view the enterprise's organization inventory. Run from a Git checkout and authenticate `gh` for the target host; GitHub Enterprise Server uses the checkout's origin host.
+Both `update` and `upgrade` accept `--org ORGANIZATION` or `--enterprise ENTERPRISE`, together with `--repos` glob filters. Enterprise discovery includes accessible organizations and requires permission to view the enterprise's organization inventory. Run from a Git checkout and authenticate `gh` for the target host. Workers use the checkout's origin host only for `github.com` by default; for GitHub Enterprise Server, set `GH_HOST` explicitly or opt in to using the origin host with `GH_AW_ALLOW_UNTRUSTED_GH_HOST=1`.
 
 ```bash wrap
 gh aw update ci-doctor --org my-org --dry-run
@@ -1138,6 +1138,8 @@ gh aw upgrade --org my-org --pr --yes --replace-existing
 Without a creation flag, org and enterprise modes preview pending work. `--dry-run` also overrides creation flags: it never creates or closes PRs or issues, updates the CLI extension, or commits or pushes changes. Previews use local shallow sparse checkouts under `.github/aw/updates`; they are not full compilation or mergeability checks.
 
 `--interactive` opens a repository picker before checking out repositories. Use arrow keys to navigate, **Space** to select, **a** to toggle filtered repositories, **/** to filter, and **Enter** to run the selection. Only selected repositories are processed, including selections hidden by the filter. The live view displays each worker's status and resulting PR URL. Press **q** or **Ctrl+C** to cancel pending and active workers; completed PRs are not rolled back. Interactive mode requires terminal input and output and is not supported with `--create-issue`.
+
+Without the repository picker, each per-repository PR confirmation is preceded by a dry-run preview showing the workflow changes or compiler versions to be approved.
 
 Open PRs carrying the command's `gh-aw-update` or `gh-aw-upgrade` body marker are detected in batches and skipped by default, including drafts and older versions. Earlier PRs with the generated title and branch prefix are also recognized. `--replace-existing`, or **o** in the picker followed by selecting an existing-PR row, allows a replacement. The old PR stays open unless a new PR is successfully created; unchanged repositories and failed replacements leave it untouched. Workers recheck open PRs before applying changes. Separate, simultaneous CLI invocations are not an atomic distributed lock.
 
