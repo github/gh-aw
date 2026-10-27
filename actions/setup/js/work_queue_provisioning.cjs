@@ -13,9 +13,13 @@ const MAX_WORKFLOW_BYTES = 1024 * 1024;
 /** @typedef {{rest: {repos: {getContent(options: {owner: string, repo: string, path: string, ref: string, request: object}): Promise<{data: unknown}>}, actions: {getWorkflow(options: {owner: string, repo: string, workflow_id: string, request: object}): Promise<{data: unknown}>}}}} RouteClient */
 /** @typedef {ReturnType<typeof import("./work_queue_policy.cjs").defaultPolicy>["pools"]["default"]["profiles"]["default"]} WorkerProfile */
 
-function metadataRequest() {
+async function metadataRequest(read) {
   // Octokit's fetch transport uses AbortSignal, not the legacy timeout option.
-  return { retries: 0, retryCount: 0, signal: AbortSignal.timeout(15000) };
+  const request = { retries: 0, retryCount: 0, signal: AbortSignal.timeout(15000) };
+  const response = await read(request);
+  // Octokit can swallow a body-read abort and return an empty successful payload.
+  if (request.signal.aborted) throw Object.assign(new Error("work queue metadata request timed out", { cause: request.signal.reason }), { code: "ETIMEDOUT" });
+  return response;
 }
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
@@ -56,7 +60,7 @@ function assignmentInputType(contents) {
 async function readWorkerFile({ githubClient, owner, repo, path, ref, sleepFn }) {
   let file;
   try {
-    file = (await readQueueMetadata(() => githubClient.rest.repos.getContent({ owner, repo, path, ref, request: metadataRequest() }), log, "worker.file.read", sleepFn))?.data;
+    file = (await readQueueMetadata(() => metadataRequest(request => githubClient.rest.repos.getContent({ owner, repo, path, ref, request })), log, "worker.file.read", sleepFn))?.data;
   } catch (error) {
     if (error?.status !== 404) throw error;
     throw queueError("policy_missing", "approved worker route cannot be verified at its immutable revision");
@@ -90,7 +94,7 @@ async function verifyWorkerRoute(options) {
 async function verifyRegisteredWorker({ githubClient, owner, repo, profile, sleepFn }) {
   let registration;
   try {
-    registration = (await readQueueMetadata(() => githubClient.rest.actions.getWorkflow({ owner, repo, workflow_id: posix.basename(profile.workflow), request: metadataRequest() }), log, "worker.registration.read", sleepFn))?.data;
+    registration = (await readQueueMetadata(() => metadataRequest(request => githubClient.rest.actions.getWorkflow({ owner, repo, workflow_id: posix.basename(profile.workflow), request })), log, "worker.registration.read", sleepFn))?.data;
   } catch (error) {
     if (error?.status !== 404) throw error;
     throw queueError("policy_missing", "approved worker route registration cannot be verified");
@@ -123,11 +127,11 @@ function workerContract(contents) {
 
 async function verifiedDefaultReference({ githubClient, owner, repo, sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)) }) {
   const parameters = { owner, repo };
-  const repository = (await readQueueMetadata(() => githubClient.rest.repos.get({ ...parameters, request: metadataRequest() }), log, "deployment.repository.read", sleepFn))?.data;
+  const repository = (await readQueueMetadata(() => metadataRequest(request => githubClient.rest.repos.get({ ...parameters, request })), log, "deployment.repository.read", sleepFn))?.data;
   const branch = repository?.default_branch;
   if (typeof repository?.full_name !== "string" || repository.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase() || typeof branch !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(branch) || branch.includes(".."))
     throw queueError("policy_invalid", "AW deployment requires a verified repository and default worker revision");
-  const reference = (await readQueueMetadata(() => githubClient.rest.git.getRef({ ...parameters, ref: `heads/${branch}`, request: metadataRequest() }), log, "deployment.reference.read", sleepFn))?.data;
+  const reference = (await readQueueMetadata(() => metadataRequest(request => githubClient.rest.git.getRef({ ...parameters, ref: `heads/${branch}`, request })), log, "deployment.reference.read", sleepFn))?.data;
   const revision = reference?.object?.sha;
   if (reference?.ref !== `refs/heads/${branch}` || typeof revision !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(revision) || /^0+$/.test(revision)) throw queueError("policy_invalid", "default worker revision is not immutable");
   return revision;
