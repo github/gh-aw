@@ -456,6 +456,9 @@ describe("generate_safe_outputs_tools", () => {
     const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     expect(result[0].inputSchema.properties.labels.items).toEqual(itemSchema);
     expect(result[0].inputSchema.properties.labels.description).toContain("plain string label names are not permitted");
+    expect(result[0].inputSchema.properties.labels.description).toContain("Required fields: name, confidence");
+    expect(result[0].inputSchema.properties.labels.description).toContain('Example: [{"name":"bug","confidence":"HIGH"}]');
+    expect(result[0].inputSchema.properties.labels.description).not.toContain("rationale");
     expect(result[0].description).not.toContain("INTENT ENCOURAGED:");
   });
 

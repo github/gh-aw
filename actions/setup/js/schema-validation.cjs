@@ -284,16 +284,52 @@ function validateValueAgainstSchema(value, schema, options = {}) {
   return validateSchemaNode(value, schema, "", { ...options, skipRequiredAtRoot: false });
 }
 
-function formatSchemaValidationError(toolName, args, error) {
+/**
+ * Derive the add_labels object-shape guidance (required fields + example) from the tool's
+ * actual configured labels item schema, falling back to the historical default
+ * (name, rationale, confidence) when the schema isn't available or doesn't declare fields.
+ * This keeps the error message in sync with workflows that configure a custom item-schema.
+ * @param {unknown} inputSchema
+ */
+function describeAddLabelsObjectShape(inputSchema) {
+  const DEFAULT_REQUIRED = ["name", "rationale", "confidence"];
+  const DEFAULT_EXAMPLE = '{"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}';
+  const itemSchema = /** @type {any} */ (inputSchema)?.properties?.labels?.items;
+  const objectSchema = itemSchema && Array.isArray(itemSchema.oneOf) ? itemSchema.oneOf.find((/** @type {any} */ s) => s?.type === "object") : itemSchema;
+  const required = Array.isArray(objectSchema?.required) && objectSchema.required.length > 0 ? objectSchema.required : null;
+  if (!required) {
+    return { required: DEFAULT_REQUIRED, example: DEFAULT_EXAMPLE };
+  }
+  const properties = objectSchema?.properties && typeof objectSchema.properties === "object" ? objectSchema.properties : {};
+  const example = {};
+  for (const field of required) {
+    const propSchema = properties[field];
+    if (propSchema && Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
+      example[field] = propSchema.enum[0];
+    } else if (field === "name") {
+      example[field] = "bug";
+    } else if (field === "rationale") {
+      example[field] = "Why this label applies";
+    } else if (field === "confidence") {
+      example[field] = "HIGH";
+    } else {
+      example[field] = "value";
+    }
+  }
+  return { required, example: JSON.stringify(example) };
+}
+
+function formatSchemaValidationError(toolName, args, error, inputSchema) {
   if (toolName === "add_labels" && typeof error?.path === "string" && /^labels\[\d+\]$/.test(error.path) && Array.isArray(args?.labels)) {
     const index = Number(error.path.match(/^labels\[(\d+)\]$/)?.[1] || -1);
     const receivedLabel = index >= 0 ? args.labels[index] : undefined;
     if (typeof receivedLabel === "string") {
+      const { required, example } = describeAddLabelsObjectShape(inputSchema);
       return [
         "Invalid arguments for add_labels:",
         `  ${error.path} must be an object (string shorthand is not supported).`,
-        '  Expected: {"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}',
-        "  Required fields: name, rationale, confidence",
+        `  Expected: ${example}`,
+        `  Required fields: ${required.join(", ")}`,
         `  Received: ${JSON.stringify(receivedLabel)}`,
       ].join("\n");
     }
