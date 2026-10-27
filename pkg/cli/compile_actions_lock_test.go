@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -147,4 +148,81 @@ func TestRunCompileActionsLockUsesRepositoryRoot(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.ErrorIs(t, runCompileActionsLock(ctx), context.Canceled)
+}
+
+func TestCompileActionsLockEnterpriseEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fake gh is not supported on Windows")
+	}
+
+	for _, tt := range []struct {
+		name        string
+		host        string
+		ghToken     string
+		githubToken string
+	}{
+		{name: "explicit host", host: "ghes.example.com", ghToken: "test-gh-token", githubToken: "test-github-token"},
+		{name: "explicit host with GitHub token fallback", host: "ghes.example.com", githubToken: "test-github-token"},
+		{name: "detected host with enterprise tokens only"},
+		{name: "detected host with GitHub token fallback", githubToken: "test-github-token"},
+		{name: "detected host with GH token", ghToken: "test-gh-token"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			workflow.SetDefaultGHHost("")
+			t.Cleanup(func() { workflow.SetDefaultGHHost("") })
+			root := t.TempDir()
+			require.NoError(t, initTestGitRepo(root))
+			require.NoError(t, addOriginRemoteToTestRepo(root, "https://tenant.ghe.com/owner/repo.git"))
+			t.Chdir(root)
+			workflowsDir := filepath.Join(root, ".github", "workflows")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(workflowsDir, "test.md"), []byte(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+strict: false
+---
+Test enterprise environment forwarding.
+`), 0o644))
+
+			t.Setenv("GH_HOST", tt.host)
+			t.Setenv("GH_TOKEN", tt.ghToken)
+			t.Setenv("GITHUB_TOKEN", tt.githubToken)
+			t.Setenv("GH_ENTERPRISE_TOKEN", "test-enterprise-token")
+			t.Setenv("GITHUB_ENTERPRISE_TOKEN", "test-github-enterprise-token")
+			t.Setenv("GH_ACTIONS_LOCK_GITHUB_COM_TOKEN", "test-public-fallback-token")
+			t.Setenv("GH_CONFIG_DIR", filepath.Join(root, "gh-config"))
+			t.Setenv("SSL_CERT_FILE", filepath.Join(root, "enterprise-ca.pem"))
+			t.Setenv("GH_AW_ACTIONS_LOCK_TEST_LOG", filepath.Join(root, "environment"))
+			binDir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte(`#!/bin/sh
+test "$1" = actions-lock || exit 1
+printf '%s\n' "$GH_HOST" "$GH_TOKEN" "$GITHUB_TOKEN" \
+  "$GH_ENTERPRISE_TOKEN" "$GITHUB_ENTERPRISE_TOKEN" \
+  "$GH_ACTIONS_LOCK_GITHUB_COM_TOKEN" "$GH_CONFIG_DIR" "$SSL_CERT_FILE" \
+  > "$GH_AW_ACTIONS_LOCK_TEST_LOG"
+`), 0o755))
+			t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+			_, err := CompileWorkflows(context.Background(), CompileConfig{ActionsLock: true})
+			require.NoError(t, err)
+			wantHost := tt.host
+			if wantHost == "" {
+				wantHost = "tenant.ghe.com"
+			}
+			wantToken := tt.ghToken
+			if wantToken == "" {
+				wantToken = tt.githubToken
+			}
+			environment, err := os.ReadFile(filepath.Join(root, "environment"))
+			require.NoError(t, err)
+			require.Equal(t, strings.Join([]string{
+				wantHost, wantToken, tt.githubToken,
+				"test-enterprise-token", "test-github-enterprise-token",
+				"test-public-fallback-token", filepath.Join(root, "gh-config"),
+				filepath.Join(root, "enterprise-ca.pem"), "",
+			}, "\n"), string(environment))
+		})
+	}
 }
