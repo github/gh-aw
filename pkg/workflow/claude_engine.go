@@ -72,7 +72,7 @@ func (e *ClaudeEngine) GetAPMTarget() string {
 }
 
 // GetRequiredSecretNames returns the list of secrets required by the Claude engine.
-// When Anthropic WIF (github-oidc + provider=anthropic) is configured, no static API key
+// When Anthropic or Vertex WIF is configured, no static API key
 // is needed and only common MCP secrets are returned.
 func (e *ClaudeEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
 	provider := e.ResolveLLMProvider(workflowData)
@@ -91,7 +91,7 @@ func (e *ClaudeEngine) GetSupportedEnvVarKeys() []string {
 }
 
 // GetSecretValidationStep returns the secret validation step for the Claude engine.
-// Returns an empty step if custom command is specified or if Anthropic WIF is configured.
+// Returns an empty step if custom command is specified or if Anthropic or Vertex WIF is configured.
 func (e *ClaudeEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHubActionStep {
 	provider := e.ResolveLLMProvider(workflowData)
 	return BuildEngineSecretValidationStep(workflowData, EngineSecretValidationConfig{
@@ -105,7 +105,7 @@ func (e *ClaudeEngine) GetSecretValidationStep(workflowData *WorkflowData) GitHu
 }
 
 func claudeSkipsStaticSecret(provider LLMProvider, workflowData *WorkflowData) bool {
-	return provider == LLMProviderAnthropic && isAnthropicWIF(workflowData) ||
+	return provider == LLMProviderAnthropic && (isAnthropicWIF(workflowData) || isClaudeVertexWIF(workflowData)) ||
 		provider == LLMProviderGitHub && hasCopilotRequestsWritePermission(workflowData)
 }
 
@@ -117,6 +117,18 @@ func isAnthropicWIF(workflowData *WorkflowData) bool {
 	}
 	auth := workflowData.EngineConfig.Auth
 	return auth.Type == "github-oidc" && auth.Provider == "anthropic"
+}
+
+// isClaudeVertexWIF requires the same GCP WIF fields as the Gemini Vertex path.
+func isClaudeVertexWIF(workflowData *WorkflowData) bool {
+	if workflowData == nil || workflowData.EngineConfig == nil || workflowData.EngineConfig.Auth == nil {
+		return false
+	}
+	auth := workflowData.EngineConfig.Auth
+	return auth.Type == "github-oidc" && auth.Provider == "gcp" &&
+		auth.GoogleWorkloadIdentityProvider != "" &&
+		auth.GoogleServiceAccount != "" &&
+		auth.GoogleProject != ""
 }
 
 func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubActionStep {
@@ -527,7 +539,37 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	applyMCPScriptsSecretEnv(env, workflowData)
 	applyModelRoutingEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
+	if isClaudeVertexWIF(workflowData) {
+		applyClaudeVertexEnv(env, workflowData)
+	}
 	return env
+}
+
+// applyClaudeVertexEnv runs after environment merges so authentication and routing
+// remain sidecar-owned, even when the runner has unrelated Anthropic credentials.
+func applyClaudeVertexEnv(env map[string]string, workflowData *WorkflowData) {
+	auth := workflowData.EngineConfig.Auth
+	env["GH_AW_LLM_PROVIDER"] = "vertex"
+	env["CLAUDE_CODE_USE_VERTEX"] = "1"
+	env["CLAUDE_CODE_SKIP_VERTEX_AUTH"] = "1"
+	env["ANTHROPIC_VERTEX_BASE_URL"] = llmGatewayBaseURL(constants.VertexLLMGatewayPort, workflowData) + "/v1" //nolint:manualpathconcat // This is a URL, not a filesystem path.
+	env["ANTHROPIC_VERTEX_PROJECT_ID"] = auth.GoogleProject
+	location := auth.GoogleLocation
+	if location == "" {
+		location = "global"
+	}
+	env["CLOUD_ML_REGION"] = location
+	// The adapter returns retryable 503s while its first WIF exchange is pending.
+	env["CLAUDE_CODE_MAX_RETRIES"] = "8"
+	env["NO_PROXY"] = constants.AWFVertexNoProxyHosts
+	env["no_proxy"] = constants.AWFVertexNoProxyHosts
+	// Empty expressions shadow inherited credentials without emitting YAML nulls.
+	env["ANTHROPIC_API_KEY"] = "${{ '' }}"
+	env["ANTHROPIC_AUTH_TOKEN"] = "${{ '' }}"
+	env["CLAUDE_CODE_OAUTH_TOKEN"] = "${{ '' }}"
+	env["ANTHROPIC_BASE_URL"] = "${{ '' }}"
+	env["CLAUDE_CODE_USE_BEDROCK"] = "0"
+	env["CLAUDE_CODE_USE_FOUNDRY"] = "0"
 }
 
 // buildClaudeBaseEnvMap returns the initial Claude execution environment with static flags

@@ -414,9 +414,9 @@ When WIF is active, the compiler suppresses the static-key requirement, switches
 Vertex AI backend (`GOOGLE_GENAI_USE_VERTEXAI=true`), and emits `AWF_AUTH_GCP_*` environment variables
 consumed by the AWF firewall api-proxy sidecar.
 
-This supported WIF path remains specific to `engine: gemini`. Agy ADC/WIF and
-Vertex AI support require a separate verified profile; do not migrate a Gemini
-WIF workflow to Agy.
+Claude also supports GCP WIF through the Vertex adapter, as described below.
+Agy ADC/WIF and Vertex AI support require a separate verified profile; do not
+migrate a WIF workflow to Agy.
 
 **Prerequisites:**
 - A Google Cloud Workload Identity Pool and Provider configured for GitHub Actions
@@ -467,6 +467,70 @@ Vertex AI backend env vars for the Gemini CLI:
 | `location` | `GOOGLE_CLOUD_LOCATION` (defaults to `us-central1`) |
 
 Additionally, `GOOGLE_GENAI_USE_VERTEXAI=true` is always set when GCP WIF is active.
+
+#### Claude on Vertex AI
+
+For `engine: claude`, use the same GCP WIF prerequisites and fields, keep the agent
+sandbox enabled, and enable the selected Claude model in the project's
+[Vertex AI Model Garden](https://cloud.google.com/gemini-enterprise-agent-platform/models/partner-models/claude/use-claude).
+Enable the Vertex AI API and ensure that the project has billing and model quota.
+Use a Claude model ID available in your chosen location; do not assume that a
+Gemini region or an Anthropic-hosted model ID is available on Vertex.
+Check the model card and [Claude Code's Vertex documentation](https://code.claude.com/docs/en/google-vertex-ai)
+for current model IDs and regional availability before running.
+
+```yaml wrap
+permissions:
+  contents: read
+  id-token: write
+
+engine:
+  id: claude
+  auth:
+    type: github-oidc
+    provider: gcp
+    workload-identity-provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+    service-account: claude@my-project.iam.gserviceaccount.com
+    project: my-project
+    location: global
+model: claude-sonnet-4-6
+```
+
+Claude defaults `auth.location` to `global`, not Gemini's `us-central1`. Global
+availability is model-specific and does not provide regional data residency.
+Set an explicitly supported regional location when residency is required.
+
+The compiler applies these values after `engine.env` and sandbox environment merges:
+
+| Environment variable | Value |
+|---|---|
+| `CLAUDE_CODE_USE_VERTEX` | `1` |
+| `CLAUDE_CODE_SKIP_VERTEX_AUTH` | `1` (the sidecar authenticates requests) |
+| `ANTHROPIC_VERTEX_BASE_URL` | Internal Vertex adapter URL on port `10004`, ending in `/v1` |
+| `ANTHROPIC_VERTEX_PROJECT_ID` | `auth.project` |
+| `CLOUD_ML_REGION` | `auth.location`, defaulting to `global` |
+| `CLAUDE_CODE_MAX_RETRIES` | `8`, allowing retryable startup 503s during token exchange |
+
+No `ANTHROPIC_API_KEY` secret is required. The execution step clears Anthropic
+API-key, bearer-token, subscription-token, and direct-API URL values so unrelated
+runner credentials cannot select Anthropic authentication. GCP token exchange stays
+in the AWF api-proxy sidecar; do not provide ADC files or access tokens to the agent.
+The adapter URL uses `api-proxy` in isolated Docker/microVM topologies and
+`host.docker.internal` in host-access or standalone detection/eval topologies.
+Both proxy-bypass environment variables include the adapter endpoint.
+
+For projects protected by VPC Service Controls, configure
+[perimeter ingress](https://cloud.google.com/vpc-service-controls/docs/ingress-egress-rules)
+for the runner's origin and impersonated service account to access Vertex AI
+(`aiplatform.googleapis.com`), including Claude prediction methods. Ensure that
+the WIF token exchange can reach `sts.googleapis.com` and
+`iamcredentials.googleapis.com`, with any required perimeter rules for those
+services. WIF configuration alone does not grant perimeter ingress.
+
+> [!NOTE]
+> This configures the compiler's Claude Vertex path, not the firewall adapter itself.
+> The separate [api-proxy issue #71987](https://github.com/github/gh-aw/issues/71987)
+> can still prevent inference. End-to-end inference through gh-aw has not been verified.
 
 ---
 

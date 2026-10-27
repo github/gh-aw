@@ -380,6 +380,19 @@ describe("claude_harness.cjs", () => {
       expect(await buildClaudeChildEnv(undefined, env, () => {})).toMatchObject(env);
     });
 
+    it("resolves Vertex models without an Anthropic endpoint", async () => {
+      const env = {
+        GH_AW_LLM_PROVIDER: "vertex",
+        ANTHROPIC_MODEL: "claude-sonnet-4-6",
+        CLAUDE_CODE_USE_VERTEX: "1",
+        CLAUDE_CODE_SKIP_VERTEX_AUTH: "1",
+        ANTHROPIC_VERTEX_BASE_URL: "http://api-proxy:10004/v1",
+        ANTHROPIC_API_KEY: "",
+      };
+      const reflect = { endpoints: [{ provider: "vertex", configured: true, port: 10004, models: ["claude-sonnet-4-6"] }] };
+      expect(await buildClaudeChildEnv(reflect, env, () => {})).toMatchObject(env);
+    });
+
     it("normalizes a dynamically selected fallback model on the provisioned route", async () => {
       const child = await buildClaudeChildEnv(reflectData, { GH_AW_LLM_PROVIDER: "github", GH_AW_MODEL_FALLBACK: "copilot/claude-sonnet-4.6" }, () => {});
       expect(child.ANTHROPIC_MODEL).toBe("claude-sonnet-4.6");
@@ -1199,6 +1212,40 @@ process.exit(0);
       expect(result.stderr).toContain("output produced but no Claude session progress — retrying startup as fresh run");
     });
 
+    it("retries a pending Vertex token exchange before the first assistant response", () => {
+      const { result, calls } = runHarnessWithStub({
+        extraEnv: {
+          GH_AW_LLM_PROVIDER: "vertex",
+          ANTHROPIC_MODEL: "claude-sonnet-4-6",
+          CLAUDE_CODE_USE_VERTEX: "1",
+          CLAUDE_CODE_SKIP_VERTEX_AUTH: "1",
+          ANTHROPIC_VERTEX_BASE_URL: "http://api-proxy:10004/v1",
+          CLAUDE_CODE_MAX_RETRIES: "8",
+        },
+        stubScript: `
+const fs = require("fs");
+const callsPath = process.env.CLAUDE_HARNESS_STUB_CALLS;
+const pending = !fs.existsSync(callsPath);
+fs.appendFileSync(callsPath, JSON.stringify({
+  args: process.argv.slice(2), stdin: fs.readFileSync(0, "utf8"),
+  vertex: process.env.CLAUDE_CODE_USE_VERTEX, retries: process.env.CLAUDE_CODE_MAX_RETRIES,
+  baseUrl: process.env.ANTHROPIC_VERTEX_BASE_URL
+}) + "\\n");
+console.log(JSON.stringify({ type: "system", subtype: "init", session_id: "vertex-session" }));
+if (pending) {
+  console.log(JSON.stringify({ type: "result", subtype: "error_during_execution", is_error: true, result: "503 service_unavailable: token exchange pending" }));
+  process.exit(1);
+}
+console.log(JSON.stringify({ type: "assistant", session_id: "vertex-session", message: { content: [{ type: "text", text: "Vertex ready" }] } }));
+`,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls).toHaveLength(2);
+      expect(calls.map(call => call.args.includes("--resume"))).toEqual([false, false]);
+      expect(calls[1]).toMatchObject({ vertex: "1", retries: "8", baseUrl: "http://api-proxy:10004/v1" });
+      expect(result.stdout).toContain("Vertex ready");
+    });
+
     it("does not fall through to --continue after no-progress output exhausts startup retries", () => {
       const stubScript = `
 const fs = require("fs");
@@ -1739,6 +1786,26 @@ describe("Claude sub-agent models before spawn (github/gh-aw#70667)", () => {
     const resolved = { engine: "claude", role: "duplicate-type-finder", configured_model: "small", resolved_model: "claude-haiku-5-5", provider: "anthropic", status: "resolved", cause: null };
     expect(calls[0].records).toContainEqual(resolved);
     expect(records).toContainEqual(resolved);
+  });
+
+  it("checks declared sub-agent models against the Vertex catalog", () => {
+    const reflectData = runs.typistReflect();
+    reflectData.endpoints = reflectData.endpoints.filter(endpoint => endpoint.provider === "anthropic");
+    reflectData.endpoints[0].provider = "vertex";
+    reflectData.endpoints[0].port = 10004;
+    const { result, calls, records } = runWithStagedAgent({
+      agentContent: typistAgent().replace("model: small", "model: claude-haiku-5-5"),
+      reflectData,
+      env: {
+        GH_AW_LLM_PROVIDER: "vertex",
+        CLAUDE_CODE_USE_VERTEX: "1",
+        CLAUDE_CODE_SKIP_VERTEX_AUTH: "1",
+        ANTHROPIC_VERTEX_BASE_URL: "http://api-proxy:10004/v1",
+      },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(records).toContainEqual(expect.objectContaining({ role: "duplicate-type-finder", provider: "vertex", resolved_model: "claude-haiku-5-5" }));
   });
 
   it("claude_declared_dead_or_unknown_model_fails_before_spawn", () => {

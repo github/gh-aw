@@ -9,6 +9,8 @@ Run Claude Code on GitHub events using an Anthropic API key or GitHub Copilot in
 
 Set `engine: claude` and add an [`ANTHROPIC_API_KEY`](/gh-aw/reference/auth/#anthropic_api_key) repository secret. For keyless authentication, use [Anthropic WIF](/gh-aw/reference/auth/#anthropic-workload-identity-federation-wif).
 
+To use Google Cloud billing and GCP WIF instead, configure [Claude on Vertex AI](/gh-aw/reference/auth/#claude-on-vertex-ai). This requires Model Garden access and the AWF Vertex adapter; no Anthropic key is needed.
+
 To bill inference through Copilot instead, add `model: copilot/auto` and `permissions: { copilot-requests: write }`. No Anthropic key is needed.
 
 ## Run a daily report

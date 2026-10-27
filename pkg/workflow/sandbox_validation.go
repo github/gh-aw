@@ -119,6 +119,14 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 				"Enable the agent sandbox or select an Anthropic-hosted model.",
 			)
 		}
+		if ResolveEngineID(workflowData) == string(constants.ClaudeEngine) && isClaudeVertexWIF(workflowData) {
+			return NewValidationError(
+				"sandbox.agent",
+				"false",
+				"Claude Vertex WIF requires the agent sandbox for sidecar authentication",
+				"Enable the agent sandbox. Example:\nsandbox:\n  agent: awf",
+			)
+		}
 	}
 
 	// Validate mounts syntax if specified in agent config
