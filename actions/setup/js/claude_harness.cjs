@@ -453,7 +453,7 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log,
     if (resolution.reflectData) reflectData = resolution.reflectData;
     childEnv.ANTHROPIC_MODEL = resolution.engineModel;
   }
-  const resolved = reflectData ? resolveProviderEndpointFromReflect({ provider: copilotProvider ? "github" : provider, reflectData, logger }) : null;
+  const resolved = provider === "vertex" ? null : reflectData ? resolveProviderEndpointFromReflect({ provider: copilotProvider ? "github" : provider, reflectData, logger }) : null;
   if (copilotProvider && (!resolved || !REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(resolved.endpointProvider)))) {
     throw new Error("Claude GitHub Copilot inference requires a configured Copilot endpoint from AWF /reflect; keep the agent sandbox enabled and configure permissions.copilot-requests: write or COPILOT_GITHUB_TOKEN");
   }

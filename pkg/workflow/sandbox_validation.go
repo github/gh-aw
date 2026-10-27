@@ -79,6 +79,25 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 		return nil
 	}
 
+	if ResolveEngineID(workflowData) == string(constants.ClaudeEngine) && isClaudeVertexWIF(workflowData) {
+		if provider := NewClaudeEngine().ResolveLLMProvider(workflowData); provider != LLMProviderAnthropic {
+			return NewValidationError(
+				"engine.model-provider",
+				string(provider),
+				"Claude Vertex WIF cannot be combined with a non-Anthropic engine.model-provider",
+				"Remove engine.model-provider and use a Claude model id or alias supported by Vertex AI.",
+			)
+		}
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(workflowData.Model)), "copilot/") {
+			return NewValidationError(
+				"model",
+				workflowData.Model,
+				"Claude Vertex WIF cannot be combined with a copilot/ model",
+				"Use a Claude model id or alias supported by Vertex AI.",
+			)
+		}
+	}
+
 	if workflowData.SandboxConfig == nil {
 		return nil // No sandbox config is valid
 	}

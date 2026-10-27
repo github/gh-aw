@@ -405,6 +405,10 @@ func (e *ClaudeEngine) buildClaudeCommandString(workflowData *WorkflowData, clau
 		claudeCommand = fmt.Sprintf(`%s${%s:+ --model "$%s"}`, claudeCommand, modelEnvVar, modelEnvVar)
 	}
 
+	if isClaudeVertexWIF(workflowData) {
+		claudeCommand = `export no_proxy="${NO_PROXY:-}" && ` + claudeCommand
+	}
+
 	return claudeCommand
 }
 
@@ -562,7 +566,7 @@ func applyClaudeVertexEnv(env map[string]string, workflowData *WorkflowData) {
 	// The adapter returns retryable 503s while its first WIF exchange is pending.
 	env["CLAUDE_CODE_MAX_RETRIES"] = "8"
 	env["NO_PROXY"] = constants.AWFVertexNoProxyHosts
-	env["no_proxy"] = constants.AWFVertexNoProxyHosts
+	delete(env, "no_proxy")
 	// Empty expressions shadow inherited credentials without emitting YAML nulls.
 	env["ANTHROPIC_API_KEY"] = "${{ '' }}"
 	env["ANTHROPIC_AUTH_TOKEN"] = "${{ '' }}"

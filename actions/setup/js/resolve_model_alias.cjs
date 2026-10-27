@@ -17,7 +17,17 @@ const MODEL_PROVIDER_PREFIXES = Object.freeze({
   copilot: ["copilot", "github-copilot", "github"],
   openai: ["openai", "codex"],
   anthropic: ["anthropic"],
+  vertex: ["vertex"],
   gemini: ["gemini", "google"],
+});
+
+const CLAUDE_VERTEX_ALIAS_PATTERNS = Object.freeze({
+  sonnet: ["vertex/*sonnet*"],
+  "sonnet-6x": ["vertex/*sonnet-4-5-*", "vertex/*sonnet-4-6*", "vertex/*sonnet-5*"],
+  haiku: ["vertex/*haiku*"],
+  opus: ["vertex/*opus*"],
+  fable: ["vertex/*fable*"],
+  any: ["vertex/*"],
 });
 
 /**
@@ -725,7 +735,15 @@ async function resolveEngineModel(options) {
   const env = options.env || process.env;
   const role = options.role || "main";
   const configuredModel = String(options.configuredModel || "").trim();
-  const aliasMap = options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
+  let aliasMap = options.aliasMap !== undefined ? options.aliasMap : loadModelAliasMap({ reflectData: options.reflectData, env });
+  if (options.engine === "claude" && canonicalModelProvider(options.provider || "") === "vertex") {
+    const vertexAliasMap = { ...(aliasMap && typeof aliasMap === "object" && !Array.isArray(aliasMap) ? aliasMap : {}) };
+    for (const [alias, patterns] of Object.entries(CLAUDE_VERTEX_ALIAS_PATTERNS)) {
+      const existingPatterns = Array.isArray(vertexAliasMap[alias]) ? vertexAliasMap[alias] : [];
+      vertexAliasMap[alias] = [...existingPatterns, ...patterns.filter(pattern => !existingPatterns.includes(pattern))];
+    }
+    aliasMap = vertexAliasMap;
+  }
   // Without AWF no /reflect catalogue can exist; an explicit catalogue or /reflect data overrides.
   const noCatalog = options.noCatalog ?? (env.AWF_REFLECT_ENABLED !== "1" && !options.reflectData && !Array.isArray(options.catalog));
   const record = (/** @type {any} */ fields) => {

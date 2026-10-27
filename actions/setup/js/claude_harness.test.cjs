@@ -1788,13 +1788,15 @@ describe("Claude sub-agent models before spawn (github/gh-aw#70667)", () => {
     expect(records).toContainEqual(resolved);
   });
 
-  it("checks declared sub-agent models against the Vertex catalog", () => {
-    const reflectData = runs.typistReflect();
-    reflectData.endpoints = reflectData.endpoints.filter(endpoint => endpoint.provider === "anthropic");
-    reflectData.endpoints[0].provider = "vertex";
-    reflectData.endpoints[0].port = 10004;
+  it("resolves Claude aliases against a Vertex model catalog", async () => {
+    const reflectData = {
+      endpoints: [{ provider: "vertex", configured: true, port: 10004, models: ["claude-sonnet-5", "claude-haiku-5-5"] }],
+    };
+    const child = await buildClaudeChildEnv(reflectData, { GH_AW_LLM_PROVIDER: "vertex", ANTHROPIC_MODEL: "sonnet" }, () => {});
+    expect(child.ANTHROPIC_MODEL).toBe("claude-sonnet-5");
+
     const { result, calls, records } = runWithStagedAgent({
-      agentContent: typistAgent().replace("model: small", "model: claude-haiku-5-5"),
+      agentContent: typistAgent(),
       reflectData,
       env: {
         GH_AW_LLM_PROVIDER: "vertex",
@@ -1805,7 +1807,30 @@ describe("Claude sub-agent models before spawn (github/gh-aw#70667)", () => {
     });
     expect(result.status, result.stderr).toBe(0);
     expect(calls).toHaveLength(1);
-    expect(records).toContainEqual(expect.objectContaining({ role: "duplicate-type-finder", provider: "vertex", resolved_model: "claude-haiku-5-5" }));
+    expect(records).toContainEqual(expect.objectContaining({ role: "duplicate-type-finder", configured_model: "small", provider: "vertex", resolved_model: "claude-haiku-5-5", status: "resolved" }));
+  });
+
+  it("passes through concrete Vertex sub-agent ids when AWF has no Vertex model catalogue", () => {
+    const reflectData = {
+      endpoints: [{ provider: "anthropic", configured: true, port: 10001, models: null, models_url: null }],
+      models_fetch_complete: false,
+    };
+    const concreteModel = "claude-haiku-5-5";
+    const { result, calls, records, workspaceAgent } = runWithStagedAgent({
+      agentContent: typistAgent().replace("model: small", `model: ${concreteModel}`),
+      reflectData,
+      env: {
+        GH_AW_LLM_PROVIDER: "vertex",
+        CLAUDE_CODE_USE_VERTEX: "1",
+        CLAUDE_CODE_SKIP_VERTEX_AUTH: "1",
+        ANTHROPIC_VERTEX_BASE_URL: "http://api-proxy:10004/v1",
+      },
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(records).toContainEqual(expect.objectContaining({ role: "duplicate-type-finder", configured_model: concreteModel, provider: "vertex", resolved_model: concreteModel, status: "exact" }));
+    expect(workspaceAgent).toContain(`model: ${concreteModel}`);
   });
 
   it("claude_declared_dead_or_unknown_model_fails_before_spawn", () => {

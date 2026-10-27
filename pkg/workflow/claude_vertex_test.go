@@ -90,9 +90,8 @@ func TestClaudeVertexEnvironment(t *testing.T) {
 				for _, key := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_BASE_URL"} {
 					assert.Equal(t, "${{ '' }}", env[key], key)
 				}
-				for _, key := range []string{"NO_PROXY", "no_proxy"} {
-					assert.Contains(t, strings.Split(env[key], ","), host+":10004")
-				}
+				assert.Contains(t, strings.Split(env["NO_PROXY"], ","), host+":10004")
+				assert.NotContains(t, env, "no_proxy")
 				proxyURL, err := url.Parse(env["ANTHROPIC_VERTEX_BASE_URL"])
 				require.NoError(t, err)
 				assert.Equal(t, "10004", proxyURL.Port())
@@ -134,7 +133,7 @@ func TestClaudeVertexEnvironmentOverrides(t *testing.T) {
 			assert.Equal(t, "1", env["CLAUDE_CODE_SKIP_VERTEX_AUTH"])
 			assert.Equal(t, "8", env["CLAUDE_CODE_MAX_RETRIES"])
 			assert.Equal(t, constants.AWFVertexNoProxyHosts, env["NO_PROXY"])
-			assert.Equal(t, constants.AWFVertexNoProxyHosts, env["no_proxy"])
+			assert.NotContains(t, env, "no_proxy")
 			for _, key := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_BASE_URL"} {
 				assert.Equal(t, "${{ '' }}", env[key], key)
 			}
@@ -144,6 +143,20 @@ func TestClaudeVertexEnvironmentOverrides(t *testing.T) {
 			assert.Equal(t, "${{ '' }}", filtered["ANTHROPIC_API_KEY"])
 		})
 	}
+}
+
+func TestClaudeVertexRejectsConflictingModelProviders(t *testing.T) {
+	t.Run("GitHub provider", func(t *testing.T) {
+		data := claudeVertexTestData()
+		data.EngineConfig.LLMProvider = "github"
+		require.ErrorContains(t, validateSandboxConfig(data), "Claude Vertex WIF cannot be combined with a non-Anthropic engine.model-provider")
+	})
+	t.Run("Copilot model", func(t *testing.T) {
+		data := claudeVertexTestData()
+		data.EngineConfig.LLMProvider = "anthropic"
+		data.Model = "copilot/auto"
+		require.ErrorContains(t, validateSandboxConfig(data), "Claude Vertex WIF cannot be combined with a copilot/ model")
+	})
 }
 
 func TestClaudeVertexPreservesAnthropicModes(t *testing.T) {
@@ -238,6 +251,8 @@ Call noop once.
 				"CLAUDE_CODE_USE_VERTEX: 1",
 				"CLAUDE_CODE_SKIP_VERTEX_AUTH: 1",
 				"CLAUDE_CODE_MAX_RETRIES: 8",
+				"NO_PROXY: " + constants.AWFVertexNoProxyHosts,
+				`export no_proxy="${NO_PROXY:-}"`,
 				"ANTHROPIC_API_KEY: ${{ '' }}",
 				"ANTHROPIC_AUTH_TOKEN: ${{ '' }}",
 				"CLAUDE_CODE_OAUTH_TOKEN: ${{ '' }}",
@@ -253,6 +268,7 @@ Call noop once.
 				"secrets.UNRELATED_KEY",
 				"unrelated-runner-key",
 				"ANTHROPIC_BASE_URL: https://api.anthropic.com",
+				"no_proxy:",
 				"GOOGLE_APPLICATION_CREDENTIALS:",
 			} {
 				assert.NotContains(t, agent, value)

@@ -177,6 +177,17 @@ function classifyUnlistedModel(reflectData, providers) {
 }
 
 /**
+ * Whether the Vertex provider has no model catalogue endpoint in this AWF response.
+ * @param {any} reflectData
+ * @returns {boolean}
+ */
+function hasNoVertexModelCatalog(reflectData) {
+  if (!reflectData || !Array.isArray(reflectData.endpoints)) return false;
+  const endpoints = reflectData.endpoints.filter(endpoint => endpoint?.configured === true && normalizeReflectProviderName(endpoint.provider) === "vertex");
+  return endpoints.length === 0 || endpoints.every(endpoint => !Array.isArray(endpoint.models) && endpoint.models_url == null);
+}
+
+/**
  * The per-model endpoint metadata (`routing_models`) published by the configured `/reflect`
  * endpoints of the engine's providers, or null when none of them publishes it.
  * @param {any} reflectData
@@ -420,13 +431,17 @@ async function resolveEngineSubagentModels(options) {
     const resolvedNote = model !== configuredModel ? ` (resolved to '${model}')` : "";
     if (liveCheck && !isModelAvailableInReflectData(model, reflectData, providers)) {
       const initialReason = classifyUnlistedModel(reflectData, providers);
-      const refreshed = await refreshOnce();
-      if (!refreshed || !isModelAvailableInReflectData(model, refreshed, providers)) {
-        // A complete catalogue without the model already proves model_unavailable; only an
-        // incomplete one is reclassified, and only when a refreshed catalogue exists.
-        const reason = initialReason === "catalog_unavailable" && refreshed ? classifyUnlistedModel(refreshed, providers) : initialReason;
-        fail(new ModelAliasResolutionError(configuredModel, reason, { provider: result.provider || options.provider }), `Sub-agent model '${configuredModel}'${resolvedNote} is not listed on the configured awf-reflect endpoints.`);
-        continue;
+      if (options.provider === "vertex" && result.status === "exact" && initialReason === "catalog_unavailable" && hasNoVertexModelCatalog(reflectData)) {
+        logger(`claude sub-agent '${agent.name}': Vertex does not publish a model catalogue through awf-reflect; passing through concrete model id '${model}'`);
+      } else {
+        const refreshed = await refreshOnce();
+        if (!refreshed || !isModelAvailableInReflectData(model, refreshed, providers)) {
+          // A complete catalogue without the model already proves model_unavailable; only an
+          // incomplete one is reclassified, and only when a refreshed catalogue exists.
+          const reason = initialReason === "catalog_unavailable" && refreshed ? classifyUnlistedModel(refreshed, providers) : initialReason;
+          fail(new ModelAliasResolutionError(configuredModel, reason, { provider: result.provider || options.provider }), `Sub-agent model '${configuredModel}'${resolvedNote} is not listed on the configured awf-reflect endpoints.`);
+          continue;
+        }
       }
     }
     if (wireApi) {
