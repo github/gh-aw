@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-27",
+  "window_start": "2026-09-28",
+  "window_end": "2026-10-27",
+  "snapshot_utc": "2026-10-27T08:55:00Z",
+  "open_issues_sample": 100,
+  "human_open_issues": 7,
+  "closed_issues_sample": 100,
+  "open_prs": 6,
+  "merged_prs_sample": 50,
+  "merged_since_yesterday_partial": 6,
+  "commits_unique_in_file": 19234,
+  "commits_30d": 1268,
+  "commits_today_partial": 6,
+  "discussions": 50,
+  "discussions_created_today": 10,
+  "changesets": 886,
+  "releases_in_download": 30,
+  "latest_release": "v1.0.0",
+  "prior_release_same_day": "v0.93.6",
+  "top_commit_authors_30d": [["Copilot", 510], ["Peli de Halleux", 488], ["github-actions[bot]", 197], ["dependabot[bot]", 36], ["Don Syme", 16]],
+  "notes": "Morning snapshot. v1.0.0 published 2026-10-26 as a maintenance-framed tag. Issue and PR series are sample-capped; all 100 closed issues in the download closed on 2026-10-27."
+}
