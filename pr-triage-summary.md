@@ -1,9 +1,9 @@
 # PR Triage Summary
 
-- Run: 2026-10-27T00:56:52Z
-- Open Copilot PRs: 0
+- Run: 2026-10-27T12:37:22Z
+- Open Copilot PRs: 10
 - Eligible PRs: 0
-- Skipped by cooldown: 6
+- Skipped by cooldown: 10
 
 ## Selected candidates
 - None
@@ -12,5 +12,5 @@
 - None
 
 ## Notes
-- No open app/github-copilot PRs were identified in github/gh-aw.
-- All open PRs in this repository were updated within the last hour and were skipped under the 1-hour cooldown policy.
+- No open app/github-copilot PRs were eligible after the 1-hour cooldown policy.
+- All current open Copilot PRs in github/gh-aw were opened or updated within the last hour.

@@ -1,31 +1,27 @@
 {
-  "run_date": "2026-10-27T06:42:25Z",
-  "run_id": "40462216332",
+  "run_date": "2026-10-27T12:37:22Z",
+  "run_id": "40504832124",
   "source": "pr-triage",
-  "eligible_total": 2,
-  "cooldown_skipped": 0,
-  "open_copilot_prs": 2,
-  "category_counts": {
-    "feature": 1,
-    "bug": 1
-  },
-  "risk_counts": {
-    "high": 1,
-    "medium": 1
-  },
-  "priority_counts": {
-    "high": 1,
-    "medium": 1
-  },
-  "action_counts": {
-    "fast_track": 1,
-    "batch_review": 1
-  },
+  "eligible_total": 0,
+  "cooldown_skipped": 10,
+  "open_copilot_prs": 10,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
+  "action_counts": {},
   "batches": [],
-  "selected_candidates": [
-    72272,
+  "selected_candidates": [],
+  "skipped_prs": [
+    72432,
+    72423,
+    72418,
+    72415,
+    72413,
+    72409,
+    72403,
+    72382,
+    72381,
     72273
   ],
-  "skipped_prs": [],
-  "notes": "Two open app/github-copilot PRs remained eligible after the 1-hour cooldown and were triaged. No batch clusters reached the 3+ threshold."
+  "notes": "No eligible app/github-copilot PRs remained after the 1-hour cooldown; all open Copilot PRs were opened or updated within the last hour."
 }
