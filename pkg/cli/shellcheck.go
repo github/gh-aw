@@ -30,23 +30,37 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/github/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/goccy/go-yaml"
 )
 
 var shellcheckLog = logger.New("cli:shellcheck")
 var dockerCommandContext = exec.CommandContext
 
-// ghaExpressionRE matches GitHub Actions ${{ ... }} expression syntax so it can
-// be replaced with a shell-safe placeholder before linting.  The (?s) flag lets
-// '.' cross newline boundaries; the non-greedy *? stops at the earliest '}}'.
-var ghaExpressionRE = regexp.MustCompile(`(?s)\$\{\{.*?\}\}`)
-
 // sanitizeGHAExpressions replaces every ${{ ... }} GitHub Actions expression in
 // script with the identifier __GHA_EXPR__.  This prevents shellcheck from
 // generating spurious parse errors (e.g. SC1073, SC1083) caused by the
 // otherwise-invalid dollar-brace-brace substitution syntax.
 func sanitizeGHAExpressions(script string) string {
-	return ghaExpressionRE.ReplaceAllString(script, "__GHA_EXPR__")
+	matches, err := actionslanguageservice.ExtractExpressions(script)
+	if err != nil {
+		shellcheckLog.Printf("Cannot scan Actions expressions for shellcheck: %v", err)
+		return script
+	}
+	var result strings.Builder
+	last := 0
+	for _, match := range matches {
+		result.WriteString(script[last:match.Start])
+		if expression, err := actionslanguageservice.ParseSyntax(match.Content); err != nil || expression == nil {
+			shellcheckLog.Printf("Cannot parse Actions expression for shellcheck: %v", err)
+			result.WriteString(script[match.Start:match.End])
+		} else {
+			result.WriteString("__GHA_EXPR__")
+		}
+		last = match.End
+	}
+	result.WriteString(script[last:])
+	return result.String()
 }
 
 // shellcheckDefaultIgnoreCodes lists SC error codes that are false positives
@@ -57,7 +71,7 @@ func sanitizeGHAExpressions(script string) string {
 //	SC2016: "${{ }}" GitHub Actions expression syntax appears in single-quoted
 //	        strings which shellcheck flags as unexpanded variable references.
 //	        sanitizeGHAExpressions handles most occurrences, but this code is
-//	        retained as a safety net for any edge cases the regex may miss.
+//	        retained as a safety net for malformed expressions.
 //	SC1090: "Can't follow non-constant source" – scripts are downloaded and
 //	        sourced dynamically at runtime; the source path is not resolvable at
 //	        lint time.

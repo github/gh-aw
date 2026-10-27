@@ -19,11 +19,12 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var sandboxValidationLog = logger.New("workflow:sandbox_validation")
 
-var githubActionsExpressionPattern = regexp.MustCompile(`\$\{\{[\s\S]*\}\}`)
+var githubActionsExpressionPattern = actionslanguageservice.Pattern{}
 var mcpGatewayEnvNamePattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 
 // validateMountsSyntax validates that mount strings follow the correct syntax

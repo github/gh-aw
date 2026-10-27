@@ -243,8 +243,8 @@ func TestValidateExpressionSafetyEdgeCases(t *testing.T) {
 		{
 			name:        "malformed_expression_no_closing",
 			content:     "Malformed: ${{ github.workflow",
-			expectError: false,
-			description: "Malformed expressions (no closing) should be ignored",
+			expectError: true,
+			description: "Unclosed interpolations must fail validation",
 		},
 		{
 			name:        "nested_expressions",
@@ -420,12 +420,12 @@ func TestValidateExpressionSafetyWithParser(t *testing.T) {
 		{
 			name:    "double-quoted string default",
 			content: `${{ inputs.branch || "main" }}`,
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name:    "serve command with double-quoted default",
 			content: `${{ inputs.serve_command || "npm run preview" }}`,
-			wantErr: false,
+			wantErr: true,
 		},
 		// Full example from the issue
 		{

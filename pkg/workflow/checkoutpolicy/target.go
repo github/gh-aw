@@ -4,22 +4,23 @@ package checkoutpolicy
 import (
 	"regexp"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var (
-	expressionPattern = regexp.MustCompile(`^\$\{\{\s*([^{}]+?)\s*\}\}$`)
 	repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 	refPattern        = regexp.MustCompile(`^[^\s${}*?\[\\:~^]+$`)
 )
 
 // MatchesExpression accepts only one complete expression naming the expected context.
 func MatchesExpression(value, expected string) bool {
-	const capture = 1
-	matches := expressionPattern.FindStringSubmatch(strings.TrimSpace(value))
-	if len(matches) > capture {
-		return strings.TrimSpace(matches[capture]) == expected
+	expression, ok := actionslanguageservice.WrappedExpression(value)
+	if !ok {
+		return false
 	}
-	return false
+	path, ok := actionslanguageservice.Reference(expression)
+	return ok && strings.Join(path, ".") == expected
 }
 
 // Base accepts the supported base-repository/ref forms. Callers must separately

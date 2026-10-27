@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 const (
@@ -174,11 +175,12 @@ func validateNVXCompatibility(workflowData *WorkflowData, agentConfig *AgentSand
 
 func isNVXPathExpression(value string) bool {
 	value = strings.TrimSpace(value)
-	if !strings.HasPrefix(value, "${{") {
+	spans, err := actionslanguageservice.ExtractExpressions(value)
+	if err != nil || len(spans) == 0 || spans[0].Start != 0 {
 		return false
 	}
-	end := strings.Index(value, "}}")
-	return end > len("${{") && strings.TrimSpace(value[len("${{"):end]) != ""
+	expression, err := actionslanguageservice.ParseSyntax(spans[0].Content)
+	return err == nil && expression != nil
 }
 
 func nvxValidationError(field, value, message, suggestion string) error {

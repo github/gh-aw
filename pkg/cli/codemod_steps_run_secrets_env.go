@@ -4,24 +4,16 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
-	"regexp"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/codemod"
 )
 
-var (
-	stepsAnyExprRe        = regexp.MustCompile(`\$\{\{\s*([^}]+?)\s*\}\}`)
-	stepsSecretBodyExprRe = regexp.MustCompile(`^secrets\.([A-Za-z_][A-Za-z0-9_]*)$`)
-	stepsEnvBodyExprRe    = regexp.MustCompile(`^env\.([A-Za-z_][A-Za-z0-9_]*)$`)
-	stepsSecretRefExprRe  = regexp.MustCompile(`\bsecrets\.([A-Za-z_][A-Za-z0-9_]*)\b`)
-	stepsEnvRefExprRe     = regexp.MustCompile(`\benv\.([A-Za-z_][A-Za-z0-9_]*)\b`)
-	stepsGitHubTokenRe    = regexp.MustCompile(`\bgithub\.token\b`)
-	// Property-access chains receive readable names; other expressions receive hashes.
-	stepsGenericExprRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*(\.[a-zA-Z_][a-zA-Z0-9_-]*)*$`)
-)
+var stepsRunExpressionsLog = logger.New("cli:codemod_steps_run_secrets_env")
 
 // getStepsRunSecretsToEnvCodemod hoists run expressions into step-level environment bindings.
 func getStepsRunSecretsToEnvCodemod() Codemod {
@@ -142,7 +134,11 @@ type stepExpressionBinding struct {
 }
 
 func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBindings map[string]string) (string, []stepExpressionBinding) { //nolint:largefunc // Keep the existing expression deduplication and collision-resolution state machine together.
-	matches := stepsAnyExprRe.FindAllStringSubmatchIndex(line, -1)
+	matches, err := actionslanguageservice.ExtractExpressions(line)
+	if err != nil {
+		stepsRunExpressionsLog.Printf("Cannot scan run expressions: %v", err)
+		return line, nil
+	}
 	if len(matches) == 0 {
 		return line, nil
 	}
@@ -156,15 +152,9 @@ func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBind
 	ordered := make([]stepExpressionBinding, 0, len(matches))
 
 	for _, match := range matches {
-		if len(match) < 4 {
-			continue
-		}
-		var capture [4]int
-		copy(capture[:], match)
-		fullStart, fullEnd := capture[0], capture[1]
-		bodyStart, bodyEnd := capture[2], capture[3]
+		fullStart, fullEnd := match.Start, match.End
 		fullExpression := line[fullStart:fullEnd]
-		body := strings.TrimSpace(line[bodyStart:bodyEnd])
+		body := strings.TrimSpace(match.Content)
 
 		result.WriteString(line[last:fullStart])
 
@@ -214,39 +204,65 @@ func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBind
 }
 
 func mapRunExpressionToEnvBinding(body string) (string, string, bool) {
-	if stepsSecretBodyExprRe.MatchString(body) {
-		secretName := strings.TrimPrefix(body, "secrets.")
-		return secretName, fmt.Sprintf("${{ secrets.%s }}", secretName), true
+	expression, err := actionslanguageservice.ParseSyntax(body)
+	if err != nil || expression == nil {
+		stepsRunExpressionsLog.Printf("Cannot parse run expression: %v", err)
+		return "", "", false
 	}
-
-	if stepsEnvBodyExprRe.MatchString(body) {
-		envName := strings.TrimPrefix(body, "env.")
-		return "GH_AW_ENV_" + envName, fmt.Sprintf("${{ env.%s }}", envName), true
+	path, static := actionslanguageservice.Reference(expression)
+	if static && len(path) == 2 {
+		if path[0] == "secrets" && stepBindingIdentifier(path[1], false) {
+			return path[1], fmt.Sprintf("${{ secrets.%s }}", path[1]), true
+		}
+		if path[0] == "env" && stepBindingIdentifier(path[1], false) {
+			return "GH_AW_ENV_" + path[1], fmt.Sprintf("${{ env.%s }}", path[1]), true
+		}
+		if path[0] == "github" && path[1] == "token" {
+			return "GH_AW_GITHUB_TOKEN", "${{ github.token }}", true
+		}
 	}
-
-	if body == "github.token" {
-		return "GH_AW_GITHUB_TOKEN", "${{ github.token }}", true
+	references := actionslanguageservice.References(expression)
+	for _, context := range []string{"secrets", "env", "github"} {
+		for _, reference := range references {
+			if len(reference) < 2 || reference[0] != context {
+				continue
+			}
+			if context == "github" && reference[1] == "token" {
+				return hashedBindingName("GH_AW_GITHUB_TOKEN", body), fmt.Sprintf("${{ %s }}", body), true
+			}
+			if context != "github" && stepBindingIdentifier(reference[1], false) {
+				prefix := "GH_AW_ENV_"
+				if context == "secrets" {
+					prefix = "GH_AW_SECRET_"
+				}
+				return hashedBindingName(prefix+reference[1], body), fmt.Sprintf("${{ %s }}", body), true
+			}
+		}
 	}
-
-	if secretRef := stepsSecretRefExprRe.FindString(body); secretRef != "" {
-		return hashedBindingName("GH_AW_SECRET_"+strings.TrimPrefix(secretRef, "secrets."), body), fmt.Sprintf("${{ %s }}", body), true
+	readable := static
+	for _, segment := range path {
+		readable = readable && stepBindingIdentifier(segment, true)
 	}
-
-	if envRef := stepsEnvRefExprRe.FindString(body); envRef != "" {
-		return hashedBindingName("GH_AW_ENV_"+strings.TrimPrefix(envRef, "env."), body), fmt.Sprintf("${{ %s }}", body), true
-	}
-
-	if stepsGitHubTokenRe.MatchString(body) {
-		return hashedBindingName("GH_AW_GITHUB_TOKEN", body), fmt.Sprintf("${{ %s }}", body), true
-	}
-
-	if stepsGenericExprRe.MatchString(body) {
-		replacer := strings.NewReplacer(".", "_", "-", "_")
-		name := "EXPR_" + strings.ToUpper(replacer.Replace(body))
+	if readable {
+		name := "EXPR_" + strings.ToUpper(strings.ReplaceAll(strings.Join(path, "_"), "-", "_"))
 		return name, fmt.Sprintf("${{ %s }}", body), true
 	}
 	name := hashedBindingName("EXPR", body)
 	return name, fmt.Sprintf("${{ %s }}", body), true
+}
+
+// stepBindingIdentifier constrains generated shell identifiers, not Actions syntax.
+func stepBindingIdentifier(value string, allowHyphen bool) bool {
+	if value == "" {
+		return false
+	}
+	for i, ch := range value {
+		if ch == '_' || ch >= 'A' && ch <= 'Z' || ch >= 'a' && ch <= 'z' || i > 0 && (ch >= '0' && ch <= '9' || allowHyphen && ch == '-') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // hashedBindingName suffixes a binding name with a stable expression-body hash.

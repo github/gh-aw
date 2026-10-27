@@ -16,6 +16,7 @@ import (
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
 	"github.com/goccy/go-yaml"
 )
@@ -273,6 +274,9 @@ func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownP
 		var schemaErr error
 		if parsedWorkflow != nil {
 			schemaErr = c.validateGitHubActionsSchemaFromParsed(parsedWorkflow)
+			if schemaErr == nil {
+				schemaErr = actionslanguageservice.ValidateWorkflow(lockFile, yamlContent)
+			}
 		} else {
 			schemaErr = c.validateGitHubActionsSchema(yamlContent)
 		}

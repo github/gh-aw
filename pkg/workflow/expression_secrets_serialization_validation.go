@@ -20,26 +20,16 @@ package workflow
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var expressionSecretsSerializationLog = logger.New("workflow:expression_secrets_serialization_validation")
-
-// secretsSerializationPattern matches function calls that pass the entire secrets
-// context as an argument, e.g. toJSON(secrets).
-//
-// GitHub Actions function names are case-insensitive, so (?i) is used. The
-// word-boundary \b before the function name prevents matching substrings
-// (e.g. "nottoJSON"). The pattern deliberately does NOT match
-// toJSON(secrets.SPECIFIC_KEY) because a dot after "secrets" would be consumed
-// by \s*\) only when no further content follows "secrets" before ")".
-var secretsSerializationPattern = regexp.MustCompile(`(?i)\btoJSON\s*\(\s*secrets\s*\)`)
 
 // findSecretsSerializationExpressions scans content for GitHub Actions expressions
 // that serialize the entire secrets context (e.g. ${{ toJSON(secrets) }}).
@@ -77,64 +67,44 @@ func findSecretsSerializationExpressions(content string) []string {
 // "${{ false }}" is a valid literal expression and passes the allowlist check.
 func neutralizeSecretsSerializationExpressions(content string) string {
 	return ExpressionPatternDotAll.ReplaceAllStringFunc(content, func(match string) string {
-		groups := ExpressionPatternDotAll.FindStringSubmatchIndex(match)
-		if len(groups) < 4 {
+		spans, _ := actionslanguageservice.ExtractExpressions(match)
+		if len(spans) != 1 {
 			return match
 		}
 
-		exprContent := match[groups[2]:groups[3]]
+		exprContent := spans[0].Content
 		callRanges := findSecretsSerializationCallRanges(exprContent)
 		if len(callRanges) == 0 {
 			return match
 		}
 
 		neutralized := replaceStringRanges(exprContent, callRanges, "false")
-		return match[:groups[2]] + neutralized + match[groups[3]:]
+		return "${{" + neutralized + "}}"
 	})
 }
 
-// findSecretsSerializationCallRanges returns toJSON(secrets) match ranges in expr,
-// excluding quoted string literals.
+// findSecretsSerializationCallRanges returns AST call ranges, never quoted data.
 func findSecretsSerializationCallRanges(expr string) [][]int {
-	masked := maskQuotedExpressionLiterals(expr)
-	return secretsSerializationPattern.FindAllStringIndex(masked, -1)
-}
-
-// maskQuotedExpressionLiterals replaces quoted content with spaces, preserving
-// string length and indexes for downstream regex range mapping.
-func maskQuotedExpressionLiterals(expr string) string {
-	if expr == "" {
-		return expr
+	expression, err := actionslanguageservice.ParseSyntax(expr)
+	if err != nil {
+		return nil
 	}
-
-	masked := []byte(expr)
-	var quote byte
-	escaped := false
-	for i := range masked {
-		ch := masked[i]
-		if quote == 0 {
-			if ch == '\'' || ch == '"' || ch == '`' {
-				quote = ch
-				masked[i] = ' '
+	var ranges [][]int
+	actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+		if node.Kind == "call" && strings.EqualFold(node.Token.Text, "toJSON") && len(node.Children) == 1 {
+			argument := node.Child(0)
+			for argument.Kind == "group" && len(argument.Children) == 1 {
+				argument = argument.Child(0)
 			}
-			continue
+			path, ok := actionslanguageservice.Reference(argument)
+			if ok && len(path) == 1 && strings.EqualFold(path[0], "secrets") {
+				ranges = append(ranges, []int{node.Start, node.End})
+				return false
+			}
 		}
-
-		masked[i] = ' '
-		if escaped {
-			escaped = false
-			continue
-		}
-		if ch == '\\' {
-			escaped = true
-			continue
-		}
-		if ch == quote {
-			quote = 0
-		}
-	}
-
-	return string(masked)
+		return true
+	})
+	return ranges
 }
 
 func replaceStringRanges(input string, ranges [][]int, replacement string) string {

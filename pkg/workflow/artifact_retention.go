@@ -18,7 +18,7 @@ func artifactRetentionDays(config *RepoConfig, fallback string) string {
 		return config.ArtifactRetentionDays.String()
 	}
 	if isExpression(fallback) {
-		fallback = "(" + strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(fallback, "${{"), "}}")) + ")"
+		fallback = "(" + stripExpressionWrapper(fallback) + ")"
 	} else {
 		fallback = "'" + strings.ReplaceAll(fallback, "'", "''") + "'"
 	}

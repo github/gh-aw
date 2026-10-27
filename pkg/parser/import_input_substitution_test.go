@@ -221,11 +221,10 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "A: eslint-rules\nB: b-default",
 		},
 		{
-			name:     "multiline expression is left untouched",
+			name:     "multiline expression uses Actions syntax",
 			content:  "VALUE: ${{ github.aw.import-inputs.campaign ||\n'fallback-literal' }}",
 			inputs:   map[string]any{},
-			expected: "VALUE: ${{ github.aw.import-inputs.campaign ||\n'fallback-literal' }}",
-			contains: true,
+			expected: "VALUE: fallback-literal",
 		},
 		{
 			name:     "literal-only fallback without input reference is left untouched",
@@ -282,22 +281,22 @@ func TestSplitFallbackOperands(t *testing.T) {
 		{
 			name:     "two simple operands",
 			input:    "github.aw.import-inputs.campaign || 'fallback'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'fallback'"},
+			expected: []string{"github.aw.import-inputs.campaign", "'fallback'"},
 		},
 		{
 			name:     "three operands",
 			input:    "a || b || c",
-			expected: []string{"a ", " b ", " c"},
+			expected: []string{"a", "b", "c"},
 		},
 		{
 			name:     "pipe characters inside single-quoted string are not split",
 			input:    "github.aw.import-inputs.campaign || 'a||b'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'a||b'"},
+			expected: []string{"github.aw.import-inputs.campaign", "'a||b'"},
 		},
 		{
 			name:     "escaped single quote inside string is not treated as string terminator",
 			input:    "github.aw.import-inputs.campaign || 'it''s here'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'it''s here'"},
+			expected: []string{"github.aw.import-inputs.campaign", "'it''s here'"},
 		},
 		{
 			name:     "no fallback operator returns single operand",

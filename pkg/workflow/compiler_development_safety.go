@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -217,8 +216,6 @@ func (c *Compiler) dryRunPlaceholderRunsOn(data *WorkflowData, job *Job) string 
 	return "runs-on: ubuntu-latest"
 }
 
-var dryRunOutputReferencePattern = regexp.MustCompile(`(?i)\b(?:needs|jobs)\s*(?:\.\s*([a-z_][a-z0-9_-]*)|\[\s*'([^']+)'\s*\])\s*(?:\.\s*outputs|\[\s*'outputs'\s*\])\s*(?:\.\s*([a-z_][a-z0-9_-]*)|\[\s*'([^']+)'\s*\])`)
-
 func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 	outputs := make(map[string]map[string]string)
 	add := func(job, output string) {
@@ -245,9 +242,9 @@ func dryRunReferencedOutputs(values ...any) map[string]map[string]string {
 				visit(value.Elem())
 			}
 		case reflect.String:
-			for _, match := range dryRunOutputReferencePattern.FindAllStringSubmatch(value.String(), -1) {
-				if len(match) == 5 {
-					add(match[1]+match[2], match[3]+match[4]) //nolint:uncheckedsliceindex // Four capture groups are checked above.
+			for _, path := range interpolationReferences(value.String()) {
+				if len(path) >= 4 && (strings.EqualFold(path[0], "needs") || strings.EqualFold(path[0], "jobs")) && strings.EqualFold(path[2], "outputs") {
+					add(path[1], path[3])
 				}
 			}
 		case reflect.Map:

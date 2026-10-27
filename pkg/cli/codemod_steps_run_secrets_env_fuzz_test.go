@@ -83,7 +83,7 @@ func FuzzStepsRunSecretsToEnvCodemodExpr(f *testing.F) {
 		section := []string{"pre-steps", "steps", "post-steps", "pre-agent-steps"}[int(sectionSelector)%4]
 
 		// Build a simple two-segment property-access expression like "github.sha".
-		// stepsGenericExprRe requires valid property-chain characters; both
+		// Readable binding names require valid property-chain characters; both
 		// segments are sanitised above.
 		expr := namespace + "." + propName
 		run := fmt.Sprintf(`echo "${{ %s }}"`, expr)
@@ -305,7 +305,7 @@ func sanitizeHoistName(raw string) string {
 }
 
 // sanitizeHoistPropertySegment converts arbitrary fuzz input into a valid
-// GitHub Actions property-access segment accepted by stepsGenericExprRe:
+// GitHub Actions property-access segment eligible for a readable binding name:
 // [a-zA-Z_][a-zA-Z0-9_-]*, max 20 chars.
 func sanitizeHoistPropertySegment(raw string) string {
 	if raw == "" {

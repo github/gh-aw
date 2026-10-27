@@ -9,6 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var knownNeedsLog = logger.New("workflow:known_needs")
@@ -140,20 +141,18 @@ func filterExpressionsForActivation(mappings []*ExpressionMapping, customJobs ma
 
 	filtered := make([]*ExpressionMapping, 0, len(mappings))
 	for _, m := range mappings {
-		// Only examine needs.* expressions
-		if !strings.HasPrefix(m.Content, "needs.") {
-			filtered = append(filtered, m)
-			continue
+		expression, err := actionslanguageservice.ParseSyntax(m.Content)
+		unavailable := false
+		if err == nil {
+			for _, path := range actionslanguageservice.References(expression) {
+				if len(path) >= 3 && strings.EqualFold(path[0], "needs") {
+					if _, isCustomJob := customJobs[path[1]]; isCustomJob && !setutil.Contains(beforeActivationSet, path[1]) {
+						unavailable = true
+					}
+				}
+			}
 		}
-		// Extract the job name (needs.<jobName>.*)
-		rest := m.Content[len("needs."):]
-		jobName, _, ok := strings.Cut(rest, ".")
-		if !ok {
-			filtered = append(filtered, m)
-			continue
-		}
-		// If it's a custom job NOT in beforeActivationJobs, drop it
-		if _, isCustomJob := customJobs[jobName]; isCustomJob && !setutil.Contains(beforeActivationSet, jobName) {
+		if unavailable {
 			knownNeedsLog.Printf("Filtered post-activation expression from activation substitution step: %s", m.Content)
 			continue
 		}

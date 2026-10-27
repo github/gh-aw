@@ -332,22 +332,13 @@ function validateNormalizedFrontmatterHashInputSize(normalizedFrontmatterText, n
  * @returns {string[]} Array of relevant expressions (sorted)
  */
 function extractRelevantTemplateExpressions(markdown) {
-  const expressions = [];
-  const regex = /\$\{\{([^}]+)\}\}/g;
-  let match;
-
-  while ((match = regex.exec(markdown)) !== null) {
-    const expr = match[0]; // Full expression including ${{ }}
-    const content = match[1].trim();
-
-    // Check if it contains env. or vars.
-    if (content.includes("env.") || content.includes("vars.")) {
-      expressions.push(expr);
-    }
-  }
-
-  // Remove duplicates and sort
-  return [...new Set(expressions)].sort();
+  return [
+    ...new Set(
+      scanTemplateExpressions(markdown)
+        .filter(match => match.content.includes("env.") || match.content.includes("vars."))
+        .map(match => match.expression)
+    ),
+  ].sort();
 }
 
 /**
@@ -356,16 +347,42 @@ function extractRelevantTemplateExpressions(markdown) {
  * @returns {string[]}
  */
 function extractAllTemplateExpressions(markdown) {
+  return [
+    ...new Set(
+      scanTemplateExpressions(markdown)
+        .filter(match => match.content.trim())
+        .map(match => match.expression)
+    ),
+  ].sort();
+}
+
+/**
+ * Scan interpolation boundaries without interpreting Actions grammar.
+ * Single quotes protect closing braces; doubled quotes preserve quote state.
+ * An unclosed suffix does not discard preceding complete expressions.
+ * @param {string} source
+ * @returns {{expression: string, content: string}[]}
+ */
+function scanTemplateExpressions(source) {
   const expressions = [];
-  const regex = /\$\{\{([^}]+)\}\}/g;
-  let match;
-
-  while ((match = regex.exec(markdown)) !== null) {
-    if (!match[1].trim()) continue;
-    expressions.push(match[0]);
+  let offset = 0;
+  while (offset < source.length) {
+    const start = source.indexOf("${{", offset);
+    if (start === -1) break;
+    let inString = false;
+    let end = start + 3;
+    for (; end < source.length; end++) {
+      if (source[end] === "'") {
+        inString = !inString;
+      } else if (!inString && source[end] === "}" && source[end + 1] === "}") {
+        break;
+      }
+    }
+    if (end === source.length) break;
+    expressions.push({ expression: source.slice(start, end + 2), content: source.slice(start + 3, end) });
+    offset = end + 2;
   }
-
-  return [...new Set(expressions)].sort();
+  return expressions;
 }
 
 /**

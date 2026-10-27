@@ -129,16 +129,10 @@ func (app *GitHubAppConfig) hasRequiredCredentials() bool {
 // `${{ ... }}` (for example, `${{ secrets.APP_ID }}` -> `secrets.APP_ID`).
 // It returns false for literals and malformed/empty wrappers.
 func extractWrappedGitHubExpression(value string) (string, bool) {
-	trimmed := strings.TrimSpace(value)
-	if !strings.HasPrefix(trimmed, "${{") || !strings.HasSuffix(trimmed, "}}") {
+	if !isExpression(value) {
 		return "", false
 	}
-	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "${{"), "}}"))
-	// Reject wrappers with no usable expression body (e.g. `${{ }}`).
-	if inner == "" {
-		return "", false
-	}
-	return inner, true
+	return stripExpressionWrapper(value), true
 }
 
 // buildGitHubExpressionNonEmptyCheck renders a non-empty check node from wrapped

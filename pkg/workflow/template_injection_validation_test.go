@@ -14,7 +14,7 @@ import (
 // validateNoTemplateInjection is a test helper that parses YAML and validates
 // it for template injection vulnerabilities using validateNoTemplateInjectionFromParsed.
 func validateNoTemplateInjection(yamlContent string) error {
-	if !UnsafeContextPattern.MatchString(yamlContent) {
+	if !mayContainInlineExpression(yamlContent) {
 		return nil
 	}
 	var workflow map[string]any
@@ -22,6 +22,59 @@ func validateNoTemplateInjection(yamlContent string) error {
 		return nil
 	}
 	return validateNoTemplateInjectionFromParsed(workflow)
+}
+
+func TestTemplateInjectionNativeParserFailClosed(t *testing.T) {
+	for _, test := range []struct {
+		expression string
+		unsafe     bool
+		disallowed bool
+	}{
+		{expression: "${{ ${{ github.event.issue.title }} }}", unsafe: true, disallowed: true},
+		{expression: "${{ env.VALUE || }}", unsafe: true, disallowed: true},
+		{expression: "${{ env.VALUE", unsafe: true, disallowed: true},
+		{expression: "${{ format('unclosed, env.VALUE) }}", unsafe: true, disallowed: true},
+		{expression: "${{ }}", unsafe: true, disallowed: true},
+		{expression: "${{ steps[vars.step].outputs.text }}", unsafe: true, disallowed: true},
+		{expression: "${{ steps[vars.step]['outputs']['text'] }}", unsafe: true, disallowed: true},
+		{expression: "${{ steps.build[vars.field].text }}", unsafe: true, disallowed: true},
+		{expression: "${{ github[vars.context].title }}", unsafe: true, disallowed: true},
+		{expression: "${{ format('}}', steps[vars.step].outputs.text) }}", unsafe: true, disallowed: true},
+		{expression: "${{ 'steps[vars.step].outputs.text' }}", disallowed: true},
+		{expression: "${{ github.actor }}", disallowed: true},
+		{expression: "${{ env.VALUE }}"},
+		{expression: "${{ vars.VALUE }}"},
+		{expression: "${{ runner.temp }}"},
+		{expression: "${{ github.repository }}"},
+		{expression: "${{ job.services['redis'].ports['6379'] }}"},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			workflow := map[string]any{
+				"jobs": map[string]any{
+					"test": map[string]any{
+						"steps": []any{map[string]any{"run": "echo " + test.expression}},
+					},
+				},
+			}
+			content, err := yaml.Marshal(workflow)
+			require.NoError(t, err)
+			scan := scanRunContentExpressions(string(content))
+			assert.Equal(t, test.unsafe, scan.hasUnsafe)
+			assert.Equal(t, test.disallowed, scan.hasDisallowed)
+			assert.Equal(t, test.unsafe, validateNoTemplateInjectionFromParsed(workflow) != nil)
+			assert.Equal(t, test.disallowed, validateNoGitHubExpressionsInRunScriptsFromParsed(workflow) != nil)
+
+			compiler := NewCompiler(WithNoEmit(true))
+			for _, parsed := range []map[string]any{workflow, nil} {
+				err := compiler.validateTemplateInjection(string(content), "test.lock.yml", "test.md", parsed)
+				if test.unsafe || test.disallowed {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+			}
+		})
+	}
 }
 
 func TestValidateNoTemplateInjection(t *testing.T) {
@@ -1024,13 +1077,13 @@ func TestTemplateInjectionInvalidYAML(t *testing.T) {
 		description string
 	}{
 		{
-			name: "malformed YAML - missing closing bracket",
+			name: "malformed YAML - unclosed quoted scalar",
 			yaml: `jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Test
-        run: echo "${{ github.event.issue.title"`,
+        run: "echo '${{ github.event.issue.title }}'`,
 			shouldError: false,
 			description: "Invalid YAML should skip validation gracefully (no error)",
 		},

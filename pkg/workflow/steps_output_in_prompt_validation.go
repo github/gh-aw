@@ -8,7 +8,6 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -16,14 +15,6 @@ import (
 )
 
 var stepsOutputInPromptLog = logger.New("workflow:steps_output_in_prompt_validation")
-
-// stepsExprBodyPattern extracts the body of each ${{ ... }} expression so that
-// all operands can be inspected for steps references.
-var stepsExprBodyPattern = regexp.MustCompile(`\$\{\{([\s\S]*?)\}\}`)
-
-// stepsRefInExprPattern matches every steps.STEP_ID occurrence inside an
-// expression body (after stripping the surrounding ${{ }}).
-var stepsRefInExprPattern = regexp.MustCompile(`\bsteps\.([a-zA-Z0-9_-]+)`)
 
 // validateStepsOutputsNotInPrompt checks that no agent-job step outputs are
 // referenced in the prompt body (MarkdownContent). The prompt is rendered in
@@ -37,7 +28,7 @@ func validateStepsOutputsNotInPrompt(workflowData *WorkflowData) error {
 	if workflowData == nil || workflowData.MarkdownContent == "" {
 		return nil
 	}
-	if !strings.Contains(workflowData.MarkdownContent, "${{ steps.") {
+	if !strings.Contains(workflowData.MarkdownContent, "${{") {
 		return nil
 	}
 
@@ -49,21 +40,15 @@ func validateStepsOutputsNotInPrompt(workflowData *WorkflowData) error {
 
 	seen := make(map[string]struct{})
 	var offending []string
-	for _, exprMatch := range stepsExprBodyPattern.FindAllStringSubmatch(workflowData.MarkdownContent, -1) {
-		if len(exprMatch) < 2 {
+	for _, path := range interpolationReferences(workflowData.MarkdownContent) {
+		if len(path) < 2 || !strings.EqualFold(path[0], "steps") {
 			continue
 		}
-		body := exprMatch[1]
-		for _, refMatch := range stepsRefInExprPattern.FindAllStringSubmatch(body, -1) {
-			if len(refMatch) < 2 {
-				continue
-			}
-			stepID := refMatch[1]
-			if _, isAgentStep := agentStepIDs[stepID]; isAgentStep {
-				if _, already := seen[stepID]; !already {
-					offending = append(offending, stepID)
-					seen[stepID] = struct{}{}
-				}
+		stepID := path[1]
+		if _, isAgentStep := agentStepIDs[stepID]; isAgentStep {
+			if _, already := seen[stepID]; !already {
+				offending = append(offending, stepID)
+				seen[stepID] = struct{}{}
 			}
 		}
 	}

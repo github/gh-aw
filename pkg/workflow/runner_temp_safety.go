@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 const (
@@ -14,13 +16,40 @@ const (
 
 var (
 	githubScriptActionRequirePrefixRE = regexp.MustCompile(`^(\s*)(.*\brequire\()'`)
-	shellActionCommandRE              = regexp.MustCompile(`\b(node|bash|sh) \$\{\{\s*runner\.temp\s*\}\}/gh-aw/actions/([^ \t\r\n]+)`)
+	shellActionCommandPrefixRE        = regexp.MustCompile(`\b(node|bash|sh) $`)
+	shellActionCommandPathRE          = regexp.MustCompile(`^/gh-aw/actions/([^ \t\r\n]+)`)
 	blockScalarHeaderRE               = regexp.MustCompile(`^(\s*)(?:-\s+)?(script|run):\s*[|>]`)
 	singleLineRunRE                   = regexp.MustCompile(`^\s*(?:-\s+)?run:\s+`)
 	singleLineExecutableRE            = regexp.MustCompile(`^\s*(?:-\s+)?(script|run):\s+`)
 )
 
 const githubScriptActionRequirePathPrefix = "${{ runner.temp }}/gh-aw/actions/"
+
+func rewriteShellActionCommands(line string) string {
+	var result strings.Builder
+	last := 0
+	spans, _ := actionslanguageservice.ExtractExpressions(line)
+	for _, span := range spans {
+		expression, ok := actionslanguageservice.WrappedExpression(line[span.Start:span.End])
+		path, reference := actionslanguageservice.Reference(expression)
+		if !ok || !reference || len(path) != 2 || !referenceHasPrefix(path, []string{"runner", "temp"}) {
+			continue
+		}
+		command := shellActionCommandPrefixRE.FindStringSubmatchIndex(line[:span.Start])
+		action := shellActionCommandPathRE.FindStringSubmatchIndex(line[span.End:])
+		if command == nil || action == nil {
+			continue
+		}
+		result.WriteString(line[last:command[0]])
+		result.WriteString(line[command[2]:command[3]])
+		result.WriteString(` "${RUNNER_TEMP}/gh-aw/actions/`)
+		result.WriteString(line[span.End+action[2] : span.End+action[3]])
+		result.WriteByte('"')
+		last = span.End + action[1]
+	}
+	result.WriteString(line[last:])
+	return result.String()
+}
 
 // singleQuotedJS renders s as a single-quoted JavaScript string literal for
 // embedding in generated workflow scripts. strconv.Quote produces valid
@@ -107,7 +136,7 @@ func rewriteRunnerTempInExecutableBodies(yamlContent string) string {
 
 		rewrittenLine := lineWithoutNewline
 		if inRunBlock || singleLineRunRE.MatchString(lineWithoutNewline) {
-			rewrittenLine = shellActionCommandRE.ReplaceAllString(lineWithoutNewline, `${1} "$${RUNNER_TEMP}/gh-aw/actions/${2}"`)
+			rewrittenLine = rewriteShellActionCommands(lineWithoutNewline)
 		}
 		if inScriptBlock {
 			if strings.Contains(rewrittenLine, safeActionsDirLine) {
