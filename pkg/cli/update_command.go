@@ -58,6 +58,8 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
   ` + string(constants.CLIExtensionPrefix) + ` update repo-assist.md     # Same (alternative format)
   ` + string(constants.CLIExtensionPrefix) + ` update https://github.com/owner/package  # Reapply an installed package
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org       # Preview workflow updates across an organization
+  ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --interactive --pr  # Select repositories and watch PR creation
+  ` + string(constants.CLIExtensionPrefix) + ` update --enterprise my-enterprise --dry-run  # Preview across accessible enterprise organizations
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --repos '*-service'  # Limit org mode to matching repositories
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --create-issue  # Open issues in repos with pending updates
   ` + string(constants.CLIExtensionPrefix) + ` update --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
@@ -100,6 +102,15 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 			targetRepo, _ := cmd.Flags().GetString("repo")
 			targetOrg, _ := cmd.Flags().GetString("org")
 			repoGlobs, _ := cmd.Flags().GetStringSlice("repos")
+
+			var rolloutErr error
+			targetOrg, rolloutErr = configureOrgRollout(cmd, targetOrg, targetRepo, createPR, createIssue)
+			if rolloutErr != nil {
+				return rolloutErr
+			}
+			if len(repoGlobs) > 0 && targetOrg == "" {
+				return errors.New("--repos requires --org or --enterprise")
+			}
 
 			if err := requireAutoMergePR(autoMerge, createPR); err != nil {
 				return err
@@ -201,7 +212,8 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 	cmd.Flags().Bool("no-compile", false, "Skip recompiling workflows during update (do not modify lock files)")
 	cmd.Flags().Bool("no-redirect", false, "Skip following redirects; refuse updates when redirect frontmatter is present")
 	cmd.Flags().String("org", "", "Preview or create workflow update pull requests across an organization")
-	cmd.Flags().StringSlice("repos", nil, "Limit --org mode to repositories matching one or more glob patterns")
+	addOrgRolloutFlags(cmd)
+	cmd.Flags().StringSlice("repos", nil, "Limit --org or --enterprise to repositories matching one or more glob patterns")
 	addRepoFlag(cmd)
 	cmd.Flags().Bool("create-pull-request", false, "Create a pull request with the update changes")
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
@@ -324,6 +336,20 @@ func recompileAllWorkflows(ctx context.Context, workflowsDir, engineOverride str
 }
 
 func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateWorkflowsOptions, createPR bool, verbose bool) error { //nolint:largefunc
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+		ctx = withUpdateGitHubClient(ctx, verbose)
+	}
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && rollout.dryRun {
+		preview, err := previewOrgRepoUpdatesFn(ctx, targetRepo, opts, verbose)
+		if err != nil {
+			return err
+		}
+		return emitOrgRolloutPreview(preview, len(preview.Workflows) > 0)
+	}
+	existing, skip, err := prepareOrgRolloutWorker(ctx, targetRepo, ghawUpdateMarkerPrefix)
+	if err != nil || skip {
+		return err
+	}
 	gitRoot, err := gitutil.FindGitRoot()
 	if err != nil {
 		return fmt.Errorf("--repo requires running inside a git repository: %w", err)
@@ -337,6 +363,16 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 	checkoutDir := filepath.Join(updatesDir, sanitizeRepoPath(targetRepo))
 	if err := shallowCloneTargetRepo(ctx, targetRepo, checkoutDir); err != nil {
 		return err
+	}
+
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+		preview, err := previewOrgRepoCheckout(ctx, targetRepo, checkoutDir, opts, verbose)
+		if err != nil {
+			return err
+		}
+		if len(preview.Workflows) == 0 {
+			return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"})
+		}
 	}
 
 	if verbose {
@@ -373,6 +409,15 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 	}
 
 	if createPR {
+		if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
+			changed, err := hasPendingChanges()
+			if err != nil {
+				return err
+			}
+			if !changed {
+				return emitOrgRolloutResult(orgRolloutResult{Status: "unchanged"})
+			}
+		}
 		xmlMarker := buildOrgXMLMarker(ghawUpdateMarkerPrefix, normalizeDisplayVersion(GetVersion()))
 
 		prBody, err := updatePRBody(ctx, summary, opts)
@@ -385,7 +430,9 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 		}
 
 		// Close stale PRs only after the replacement description is validated.
-		closeExistingOrgPRsByMarker(ctx, targetRepo, ghawUpdateMarkerPrefix, verbose)
+		if orgRolloutFromContext(ctx) == nil {
+			closeExistingOrgPRsByMarker(ctx, targetRepo, ghawUpdateMarkerPrefix, verbose)
+		}
 
 		prURL, err := createPRWithChanges(ctx, "update-workflows", "chore: update workflows",
 			"Update workflows from source", prBody, verbose, opts.AutoMerge)
@@ -393,7 +440,13 @@ func runUpdateForTargetRepo(ctx context.Context, targetRepo string, opts UpdateW
 			addLabelToOrgPR(ctx, prURL, agenticWorkflowsLabel, verbose)
 		}
 		if err != nil {
+			if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && prURL != "" {
+				return errors.Join(err, emitOrgRolloutResult(orgRolloutResult{Status: "created", URL: prURL}))
+			}
 			return err
+		}
+		if prURL != "" {
+			return finishOrgRolloutWorker(ctx, targetRepo, existing, prURL, nil)
 		}
 		return nil
 	}

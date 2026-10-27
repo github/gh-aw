@@ -2,13 +2,10 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 )
-
-var activationPromptOutputReferenceRegex = regexp.MustCompile(`\bneeds\.activation\.outputs\.([a-zA-Z_][a-zA-Z0-9_-]*)\b`)
 
 // Activation cannot read its own job outputs through needs. Preserve placeholder
 // names while binding prompt environment values to their local producers.
@@ -25,7 +22,7 @@ func rewriteActivationPromptOutputs(content string, outputs map[string]string) (
 		}
 		bindings[name] = BuildStringLiteral(literal).Render()
 	}
-	return rewriteExpressionReferences(content, activationPromptOutputReferenceRegex, func(name string) (string, bool) {
+	return rewriteExpressionReferences(content, activationOutputReferencePrefix, func(name string) (string, bool) {
 		value, declared := bindings[name]
 		return value, declared
 	}), nil

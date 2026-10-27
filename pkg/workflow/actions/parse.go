@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/goccy/go-yaml"
 )
 
@@ -202,8 +203,9 @@ func parseCondition(value any) (Expression, error) {
 		return Boolean(condition), nil
 	case string:
 		text := strings.TrimSpace(condition)
-		if strings.HasPrefix(text, "${{") && strings.HasSuffix(text, "}}") {
-			text = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(text, "${{"), "}}"))
+		spans, err := actionslanguageservice.ExtractExpressions(text)
+		if err == nil && len(spans) == 1 && spans[0].Start == 0 && spans[0].End == len(text) {
+			text = strings.TrimSpace(spans[0].Content)
 		}
 		if text == "true" || text == "false" {
 			return Boolean(text == "true"), nil

@@ -198,13 +198,13 @@ func TestParseExpressionComprehensive(t *testing.T) {
 			name:     "OR with double-quoted literal",
 			input:    `inputs.name || "default-name"`,
 			expected: `inputs.name || "default-name"`,
-			wantErr:  false,
+			wantErr:  true,
 		},
 		{
 			name:     "OR with backtick literal",
 			input:    "inputs.config || `default-config`",
 			expected: "inputs.config || `default-config`",
-			wantErr:  false,
+			wantErr:  true,
 		},
 		{
 			name:     "OR with number literal",
@@ -268,25 +268,25 @@ func TestParseExpressionComprehensive(t *testing.T) {
 			name:        "missing closing parenthesis",
 			input:       "(a && b",
 			wantErr:     true,
-			errorString: "expected ')'",
+			errorString: "unexpected end",
 		},
 		{
 			name:        "missing opening parenthesis",
 			input:       "a && b)",
 			wantErr:     true,
-			errorString: "unexpected token ')'",
+			errorString: "unexpected symbol",
 		},
 		{
 			name:        "empty parentheses",
 			input:       "()",
 			wantErr:     true,
-			errorString: "unexpected token ')'",
+			errorString: "unexpected symbol",
 		},
 		{
 			name:        "mismatched parentheses",
 			input:       "((a && b) || c",
 			wantErr:     true,
-			errorString: "expected ')'",
+			errorString: "unexpected end",
 		},
 
 		// Error cases - invalid operators
@@ -294,37 +294,37 @@ func TestParseExpressionComprehensive(t *testing.T) {
 			name:        "consecutive AND operators",
 			input:       "a && && b",
 			wantErr:     true,
-			errorString: "unexpected token '&&'",
+			errorString: "unexpected symbol",
 		},
 		{
 			name:        "consecutive OR operators",
 			input:       "a || || b",
 			wantErr:     true,
-			errorString: "unexpected token '||'",
+			errorString: "unexpected symbol",
 		},
 		{
 			name:        "operator at end",
 			input:       "a &&",
 			wantErr:     true,
-			errorString: "unexpected token",
+			errorString: "unexpected end",
 		},
 		{
 			name:        "operator at start",
 			input:       "&& a",
 			wantErr:     true,
-			errorString: "unexpected token '&&'",
+			errorString: "unexpected symbol",
 		},
 		{
 			name:        "only operators",
 			input:       "&&",
 			wantErr:     true,
-			errorString: "unexpected token '&&'",
+			errorString: "unexpected symbol",
 		},
 		{
 			name:        "only OR operator",
 			input:       "||",
 			wantErr:     true,
-			errorString: "unexpected token '||'",
+			errorString: "unexpected symbol",
 		},
 
 		// Error cases - NOT operator issues
@@ -332,13 +332,13 @@ func TestParseExpressionComprehensive(t *testing.T) {
 			name:        "NOT at end without operand",
 			input:       "a && !",
 			wantErr:     true,
-			errorString: "unexpected token",
+			errorString: "unexpected end",
 		},
 		{
 			name:        "multiple NOT without operand",
 			input:       "!!",
 			wantErr:     true,
-			errorString: "unexpected token",
+			errorString: "unexpected end",
 		},
 
 		// Edge cases with quotes and escaping
@@ -346,13 +346,18 @@ func TestParseExpressionComprehensive(t *testing.T) {
 			name:     "escaped quotes in string",
 			input:    "github.workflow == 'can\\'t reproduce' && github.repository == 'open'",
 			expected: "(github.workflow == 'can\\'t reproduce') && (github.repository == 'open')",
-			wantErr:  false,
+			wantErr:  true,
 		},
 		{
 			name:     "double quotes with operators",
 			input:    "github.workflow == \"Fix && Improve\" || github.repository",
 			expected: "github.workflow == \"Fix && Improve\" || github.repository",
-			wantErr:  false,
+			wantErr:  true,
+		},
+		{
+			name:     "official doubled single quote escaping",
+			input:    "github.workflow == 'can''t reproduce' && github.repository == 'open'",
+			expected: "(github.workflow == 'can''t reproduce') && (github.repository == 'open')",
 		},
 
 		// Complex integration test cases
@@ -420,8 +425,8 @@ func TestExpressionParserEdgeCases(t *testing.T) {
 		{
 			name:        "deeply nested parentheses",
 			input:       strings.Repeat("(", 50) + "a" + strings.Repeat(")", 50),
-			shouldError: false,
-			description: "Parser should handle deep nesting",
+			shouldError: true,
+			description: "Parser must enforce the official depth limit",
 		},
 		{
 			name:        "expression with many operators",
@@ -438,14 +443,14 @@ func TestExpressionParserEdgeCases(t *testing.T) {
 		{
 			name:        "mixed single and double quotes",
 			input:       "github.workflow == 'single quoted' && github.repository == \"double quoted\"",
-			shouldError: false,
-			description: "Parser should handle mixed quote types",
+			shouldError: true,
+			description: "Actions expressions do not support double-quoted literals",
 		},
 		{
 			name:        "single quotes inside double quotes",
 			input:       "github.workflow == \"hello 'world'\" && github.repository",
-			shouldError: false,
-			description: "Single quotes inside double quotes should not terminate the string",
+			shouldError: true,
+			description: "Single quotes do not make a double-quoted literal valid",
 		},
 		{
 			name:        "double quotes inside single quotes",
