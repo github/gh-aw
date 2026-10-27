@@ -71,6 +71,77 @@ func TestBuildAWFArgsAuditDir(t *testing.T) {
 	})
 }
 
+func TestPrivilegedAWFEnvironmentPreservation(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	require.NoError(t, err)
+	for _, runtime := range []AgentRuntime{AgentRuntimeCloudHypervisor, AgentRuntimeNVX, AgentRuntimeDockerSudoIptables} {
+		t.Run(string(runtime), func(t *testing.T) {
+			data := &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: runtime}}}
+			prefix := GetAWFCommandPrefix(data)
+			assert.Contains(t, prefix, `--preserve-env="$(compgen -e | paste -sd, -)"`)
+			assert.NotContains(t, prefix, "sudo -E")
+
+			// Model sudo-rs: ignore bare --preserve-env, preserve named variables,
+			// and replace PATH with secure_path. Intercept AWF rather than elevate.
+			script := `
+set -euo pipefail
+sudo() {
+  local option="$1"
+  shift
+  local -a preserved=()
+  case "$option" in
+    --preserve-env) ;;
+    --preserve-env=*)
+      local names=",${option#--preserve-env=},"
+      [[ "$names" == *,GITHUB_ACTIONS,* ]] && preserved+=("GITHUB_ACTIONS=$GITHUB_ACTIONS")
+      [[ "$names" == *,RUNNER_ENVIRONMENT,* ]] && preserved+=("RUNNER_ENVIRONMENT=$RUNNER_ENVIRONMENT")
+      [[ "$names" == *,ImageOS,* ]] && preserved+=("ImageOS=$ImageOS")
+      [[ "$names" == *,RUNNER_TEMP,* ]] && preserved+=("RUNNER_TEMP=$RUNNER_TEMP")
+      [[ "$names" == *,COPILOT_GITHUB_TOKEN,* ]] && preserved+=("COPILOT_GITHUB_TOKEN=$COPILOT_GITHUB_TOKEN")
+      [[ "$names" == *,GH_AW_TEST_CUSTOM_ENV,* ]] && preserved+=("GH_AW_TEST_CUSTOM_ENV=$GH_AW_TEST_CUSTOM_ENV")
+      [[ "$names" != *"$COPILOT_GITHUB_TOKEN"* ]]
+      ;;
+    *) return 90 ;;
+  esac
+  [[ "$1" == /usr/bin/env ]]
+  [[ "$2" == "PATH=$PATH" ]]
+  [[ "$3" == /usr/local/bin/awf ]]
+  [[ "$#" == 3 ]]
+  /usr/bin/env -i "${preserved[@]}" PATH=/sudo-secure-path "$1" "$2" "$GH_AW_TEST_BASH" --noprofile --norc -c \
+    'printf "%s\0" "${GITHUB_ACTIONS:-}" "${RUNNER_ENVIRONMENT:-}" "${ImageOS:-}" "${RUNNER_TEMP:-}" "${COPILOT_GITHUB_TOKEN:-}" "${GH_AW_TEST_CUSTOM_ENV:-}" "$PATH"'
+}
+` + prefix
+			path := filepath.Dir(bash) + ":/usr/bin:/bin"
+			custom := "literal 'quotes' \"double quotes\"\n$(exit 99); `exit 98` *"
+			cmd := exec.Command(bash, "--noprofile", "--norc", "-c", script)
+			cmd.Env = []string{
+				"PATH=" + path,
+				"GH_AW_TEST_BASH=" + bash,
+				"GITHUB_ACTIONS=true",
+				"RUNNER_ENVIRONMENT=github-hosted",
+				"ImageOS=ubuntu24",
+				"RUNNER_TEMP=/runner/temp with spaces",
+				"COPILOT_GITHUB_TOKEN=synthetic-test-token",
+				"GH_AW_TEST_CUSTOM_ENV=" + custom,
+			}
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			assert.Equal(t, []string{
+				"true", "github-hosted", "ubuntu24", "/runner/temp with spaces",
+				"synthetic-test-token", custom, path, "",
+			}, strings.Split(string(output), "\x00"))
+
+			oldScript := strings.Replace(script, prefix, `sudo --preserve-env /usr/bin/env PATH="$PATH" /usr/local/bin/awf`, 1)
+			oldCmd := exec.Command(bash, "--noprofile", "--norc", "-c", oldScript)
+			oldCmd.Env = cmd.Env
+			oldOutput, err := oldCmd.CombinedOutput()
+			require.NoError(t, err, "%s", oldOutput)
+			assert.Equal(t, []string{"", "", "", "", "", "", path, ""}, strings.Split(string(oldOutput), "\x00"),
+				"whole-environment preservation loses runner identity and credentials with sudo-rs")
+		})
+	}
+}
+
 func TestBuildAWFArgsCopilotSessionStateDir(t *testing.T) {
 	tests := []struct {
 		name       string

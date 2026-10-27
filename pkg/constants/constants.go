@@ -237,13 +237,18 @@ const OTELSentryEndpointSecretName = "GH_AW_OTEL_SENTRY_ENDPOINT"
 // Strict security (no sudo) is the default since AWF v0.27.32.
 const AWFDefaultCommand CommandPrefix = "awf"
 
+// AWFPrivilegedCommand names exported variables explicitly because sudo-rs ignores
+// whole-environment preservation (-E). Only names, never credential values, enter
+// sudo's arguments. Restore PATH for host tools but execute the trusted system AWF.
+const AWFPrivilegedCommand = `sudo --preserve-env="$(compgen -e | paste -sd, -)" /usr/bin/env PATH="$PATH" /usr/local/bin/awf`
+
 // AWFCloudHypervisorCommand runs AWF with the host privileges required to
 // create a Cloud Hypervisor VM while preserving the runner paths it consumes.
 // sudo supplies SUDO_UID and SUDO_GID for AWF to recover the invoking identity.
-const AWFCloudHypervisorCommand = "sudo --preserve-env awf"
+const AWFCloudHypervisorCommand = AWFPrivilegedCommand
 
 // AWFNVXCommand runs AWF with the host privileges required to create NVX microVMs.
-const AWFNVXCommand = "sudo --preserve-env awf"
+const AWFNVXCommand = AWFPrivilegedCommand
 
 // DefaultCloudHypervisorVCPUs and DefaultCloudHypervisorMemoryMiB are the
 // minimum viable guest sizing defaults for the Cloud Hypervisor agent runtime.
@@ -257,7 +262,7 @@ const (
 
 // AWFLegacySecurityCommand runs the trusted system AWF binary with the runner's
 // PATH restored after sudo applies secure_path.
-const AWFLegacySecurityCommand = `sudo -E /usr/bin/env PATH="$PATH" /usr/local/bin/awf`
+const AWFLegacySecurityCommand = AWFPrivilegedCommand
 
 // AWFProxyLogsDir is the default directory for AWF proxy logs
 const AWFProxyLogsDir FilePath = "/tmp/gh-aw/sandbox/firewall/logs"
