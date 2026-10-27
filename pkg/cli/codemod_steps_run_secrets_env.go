@@ -253,16 +253,7 @@ func mapRunExpressionToEnvBinding(body string) (string, string, bool) {
 
 // stepBindingIdentifier constrains generated shell identifiers, not Actions syntax.
 func stepBindingIdentifier(value string, allowHyphen bool) bool {
-	if value == "" {
-		return false
-	}
-	for i, ch := range value {
-		if ch == '_' || ch >= 'A' && ch <= 'Z' || ch >= 'a' && ch <= 'z' || i > 0 && (ch >= '0' && ch <= '9' || allowHyphen && ch == '-') {
-			continue
-		}
-		return false
-	}
-	return true
+	return actionslanguageservice.ActionsIdentifier(value, allowHyphen)
 }
 
 // hashedBindingName suffixes a binding name with a stable expression-body hash.

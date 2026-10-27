@@ -6,10 +6,35 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRunScriptAccessPathMalformedLiteral(t *testing.T) {
+	for _, kind := range []string{"identifier", "string"} {
+		for _, test := range []struct {
+			name  string
+			value any
+		}{
+			{name: "nil"},
+			{name: "number", value: float64(1)},
+			{name: "boolean", value: true},
+		} {
+			t.Run(kind+"/"+test.name, func(t *testing.T) {
+				expression := &actionslanguageservice.Expression{
+					Kind: "index",
+					Children: []*actionslanguageservice.Expression{
+						{Kind: "context", Token: actionslanguageservice.Token{Text: "github"}},
+						{Kind: "literal", Token: actionslanguageservice.Token{Kind: kind, Value: test.value}},
+					},
+				}
+				assert.Equal(t, []string{"github", "*"}, runScriptAccessPath(expression))
+			})
+		}
+	}
+}
 
 // validateNoTemplateInjection is a test helper that parses YAML and validates
 // it for template injection vulnerabilities using validateNoTemplateInjectionFromParsed.

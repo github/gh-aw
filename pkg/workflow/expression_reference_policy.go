@@ -69,14 +69,8 @@ func secretFallbackExpression(expression *actionslanguageservice.Expression) boo
 	return ok && len(path) == 2 && path[0] == "secrets" && credentialIdentifier(path[1], false)
 }
 
-func credentialIdentifier(value string, hyphen bool) bool {
-	for i, ch := range value {
-		if ch == '_' || ch >= 'A' && ch <= 'Z' || ch >= 'a' && ch <= 'z' || i > 0 && ch >= '0' && ch <= '9' || i > 0 && hyphen && ch == '-' {
-			continue
-		}
-		return false
-	}
-	return value != ""
+func credentialIdentifier(value string, allowHyphen bool) bool {
+	return actionslanguageservice.ActionsIdentifier(value, allowHyphen)
 }
 
 func credentialExpressionPattern(allowNeeds, allowSteps, allowEnv bool) actionslanguageservice.Pattern {

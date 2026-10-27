@@ -149,17 +149,7 @@ func secretsOnlyExpression(expression *actionslanguageservice.Expression) bool {
 }
 
 func secretIdentifier(name string) bool {
-	if name == "" {
-		return false
-	}
-	for i, ch := range name {
-		valid := ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' ||
-			i > 0 && ch >= '0' && ch <= '9'
-		if !valid {
-			return false
-		}
-	}
-	return true
+	return actionslanguageservice.ActionsIdentifier(name, false)
 }
 
 func literalPattern(kind string) actionslanguageservice.Pattern {

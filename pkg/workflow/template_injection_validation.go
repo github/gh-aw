@@ -108,7 +108,9 @@ func runScriptAccessPath(expression *actionslanguageservice.Expression) []string
 		}
 		index := expression.Child(1)
 		if index.Kind == "literal" && (index.Token.Kind == "identifier" || index.Token.Kind == "string") {
-			return append(path, index.Token.Value.(string))
+			if value, ok := index.Token.Value.(string); ok {
+				return append(path, value)
+			}
 		}
 		return append(path, "*")
 	default:
