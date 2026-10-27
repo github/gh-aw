@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -101,5 +103,37 @@ func TestTrialRepositoryActionsSyntax(t *testing.T) {
 	}
 	if _, err := replaceTrialRepositoryExpressions(`${{ github.repository`, "owner/repo"); err == nil {
 		t.Fatal("expected malformed interpolation diagnostic")
+	}
+}
+
+func TestExpressionParserDiagnosticsDoNotLogSource(t *testing.T) {
+	const marker = "sensitive-expression-source-marker"
+	if os.Getenv("GH_AW_TEST_EXPRESSION_LOG_REDACTION") == "1" {
+		sanitizeGHAExpressions("${{ " + marker)
+		sanitizeGHAExpressions("${{ format('" + marker + "', ) }}")
+		_, _ = replaceTrialRepositoryExpressions("${{ format('"+marker+"', ) }}", "owner/repo")
+		mapRunExpressionToEnvBinding("format('" + marker + "', )")
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestExpressionParserDiagnosticsDoNotLogSource$")
+	env := make([]string, 0, len(os.Environ())+3)
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if key != "GH_AW_TEST_EXPRESSION_LOG_REDACTION" && key != "DEBUG" && key != "DEBUG_COLORS" {
+			env = append(env, entry)
+		}
+	}
+	cmd.Env = append(env,
+		"GH_AW_TEST_EXPRESSION_LOG_REDACTION=1",
+		"DEBUG=cli:*",
+		"DEBUG_COLORS=0",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("debug-log subprocess failed: %v\n%s", err, output)
+	}
+	if strings.Contains(string(output), marker) {
+		t.Fatalf("parser source was written to debug logs: %s", output)
 	}
 }

@@ -33,6 +33,18 @@ func TestExtractExpressions(t *testing.T) {
 	require.ErrorContains(t, err, "without matching closing")
 }
 
+func TestExtractExpressionsSkipsDoubledQuotesInsideStrings(t *testing.T) {
+	source := `${{ contains('it''s }} still a literal', secrets.TOKEN) }}-${{ github.ref }}`
+	expressions, err := ExtractExpressions(source)
+	require.NoError(t, err)
+	require.Len(t, expressions, 2)
+	assert.Equal(t, " contains('it''s }} still a literal', secrets.TOKEN) ", expressions[0].Content)
+	assert.Equal(t, " github.ref ", expressions[1].Content)
+	parsed, err := ParseSyntax(expressions[0].Content)
+	require.NoError(t, err)
+	assert.Contains(t, References(parsed), []string{"secrets", "TOKEN"})
+}
+
 func TestExtractExpressionsRecoversAfterUnclosedQuote(t *testing.T) {
 	source := "${{ env.BEFORE }} ${{ 'unclosed }}\n${{ env.AFTER }} ${{ env.SUFFIX"
 	expressions, err := ExtractExpressions(source)

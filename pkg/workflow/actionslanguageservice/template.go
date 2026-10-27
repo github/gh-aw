@@ -101,6 +101,10 @@ func expressionEnd(source string, start int) (int, error) {
 	inString := false
 	for i := start; i >= 0 && i < len(source); i++ {
 		if source[i] == '\'' {
+			if inString && i+1 < len(source) && source[i+1] == '\'' {
+				i++
+				continue
+			}
 			inString = !inString
 		} else if !inString && source[i] == '}' && i+1 < len(source) && source[i+1] == '}' {
 			return i, nil

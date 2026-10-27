@@ -467,7 +467,7 @@ func replaceTrialRepositoryExpressions(content, repository string) (string, erro
 		result.WriteString(content[last:match.Start])
 		expression, err := actionslanguageservice.ParseSyntax(match.Content)
 		if err != nil {
-			trialRepoLog.Printf("Cannot parse trial repository expression: %v", err)
+			trialRepoLog.Printf("Cannot parse trial repository expression")
 		}
 		path, ok := actionslanguageservice.Reference(expression)
 		if ok && len(path) == 2 && path[0] == "github" && path[1] == "repository" {

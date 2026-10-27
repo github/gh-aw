@@ -44,7 +44,7 @@ var dockerCommandContext = exec.CommandContext
 func sanitizeGHAExpressions(script string) string {
 	matches, err := actionslanguageservice.ExtractExpressions(script)
 	if err != nil {
-		shellcheckLog.Printf("Cannot scan Actions expressions for shellcheck: %v", err)
+		shellcheckLog.Printf("Cannot scan Actions expressions for shellcheck; preserving original script")
 		return script
 	}
 	var result strings.Builder
@@ -52,7 +52,7 @@ func sanitizeGHAExpressions(script string) string {
 	for _, match := range matches {
 		result.WriteString(script[last:match.Start])
 		if expression, err := actionslanguageservice.ParseSyntax(match.Content); err != nil || expression == nil {
-			shellcheckLog.Printf("Cannot parse Actions expression for shellcheck: %v", err)
+			shellcheckLog.Printf("Cannot parse Actions expression for shellcheck; preserving original expression")
 			result.WriteString(script[match.Start:match.End])
 		} else {
 			result.WriteString("__GHA_EXPR__")

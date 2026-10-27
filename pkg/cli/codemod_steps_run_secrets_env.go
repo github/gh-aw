@@ -136,7 +136,7 @@ type stepExpressionBinding struct {
 func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBindings map[string]string) (string, []stepExpressionBinding) { //nolint:largefunc // Keep the existing expression deduplication and collision-resolution state machine together.
 	matches, err := actionslanguageservice.ExtractExpressions(line)
 	if err != nil {
-		stepsRunExpressionsLog.Printf("Cannot scan run expressions: %v", err)
+		stepsRunExpressionsLog.Printf("Cannot scan run expressions; preserving original line")
 		return line, nil
 	}
 	if len(matches) == 0 {
@@ -206,7 +206,7 @@ func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBind
 func mapRunExpressionToEnvBinding(body string) (string, string, bool) {
 	expression, err := actionslanguageservice.ParseSyntax(body)
 	if err != nil || expression == nil {
-		stepsRunExpressionsLog.Printf("Cannot parse run expression: %v", err)
+		stepsRunExpressionsLog.Printf("Cannot parse run expression")
 		return "", "", false
 	}
 	path, static := actionslanguageservice.Reference(expression)

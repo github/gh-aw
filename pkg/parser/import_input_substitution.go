@@ -22,7 +22,7 @@ func substituteImportInputsInContent(content string, inputs map[string]any) stri
 
 	matches, err := actionslanguageservice.ExtractExpressions(content)
 	if err != nil {
-		importLog.Printf("Cannot scan import-input expressions: %v", err)
+		importLog.Printf("Cannot scan import-input expressions; preserving original content")
 		return content
 	}
 	var result strings.Builder
@@ -32,7 +32,7 @@ func substituteImportInputsInContent(content string, inputs map[string]any) stri
 		replacement := content[match.Start:match.End]
 		expression, err := actionslanguageservice.ParseSyntax(match.Content)
 		if err != nil || expression == nil {
-			importLog.Printf("Cannot parse import-input expression: %v", err)
+			importLog.Printf("Cannot parse import-input expression; preserving original expression")
 		} else {
 			for expression.Kind == "group" {
 				expression = expression.Child(0)
@@ -62,7 +62,7 @@ func substituteImportInputsInContent(content string, inputs map[string]any) stri
 func splitFallbackOperands(expression string) []string {
 	root, err := actionslanguageservice.ParseSyntax(expression)
 	if err != nil || root == nil {
-		importLog.Printf("Cannot parse fallback expression: %v", err)
+		importLog.Printf("Cannot parse fallback expression")
 		return nil
 	}
 	var operands []string
@@ -94,7 +94,7 @@ type fallbackOperandResult struct {
 func resolveFallbackOperand(operand string, inputs map[string]any) fallbackOperandResult {
 	expression, err := actionslanguageservice.ParseSyntax(operand)
 	if err != nil || expression == nil {
-		importLog.Printf("Cannot parse fallback operand: %v", err)
+		importLog.Printf("Cannot parse fallback operand")
 		return fallbackOperandResult{}
 	}
 	return resolveFallbackExpression(expression, inputs)
