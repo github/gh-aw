@@ -107,6 +107,10 @@
     {
       "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-24",
       "last_run": "2026-10-26"
+    },
+    {
+      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-25",
+      "last_run": "2026-10-27"
     }
   ]
 }
