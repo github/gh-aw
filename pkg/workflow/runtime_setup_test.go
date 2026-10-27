@@ -499,6 +499,115 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 	}
 }
 
+func TestGenerateRuntimeSetupSteps_ActionPins(t *testing.T) {
+	runtime := findRuntimeByID("python")
+	require.NotNil(t, runtime)
+	latest, ok := getLatestActionPinByRepo(runtime.ActionRepo)
+	require.True(t, ok)
+	const cachedSHA = "0123456789abcdef0123456789abcdef01234567"
+
+	tests := []struct {
+		name         string
+		cacheVersion string
+		otherVersion string
+		nilData      bool
+		wantCached   bool
+		failResolve  bool
+		allowRefs    bool
+	}{
+		{name: "newer cached pin", cacheVersion: "v999.0.0", wantCached: true},
+		{name: "semantic version ordering", cacheVersion: "v1000.0.0", otherVersion: "v999.0.0", wantCached: true},
+		{name: "equivalent major tag", cacheVersion: "v999.0.0", otherVersion: "v999", wantCached: true},
+		{name: "equivalent minor tag", cacheVersion: "v999.1.0", otherVersion: "v999.1", wantCached: true},
+		{name: "unparseable entry does not hide newer pin", cacheVersion: "v999.0.0", otherVersion: "zzz", wantCached: true},
+		{name: "newer cached pin resolution errors", cacheVersion: "v999.0.0", failResolve: true},
+		{name: "newer cached pin resolution returns empty", cacheVersion: "v999.0.0", failResolve: true, allowRefs: true},
+		{name: "equal cached version", cacheVersion: latest.Version, wantCached: true},
+		{name: "stale cached pin", cacheVersion: "v1.0.0"},
+		{name: "unparseable cached version", cacheVersion: "not-a-version"},
+		{name: "empty cache"},
+		{name: "no workflow data", nilData: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewActionCache(t.TempDir())
+			if tt.cacheVersion != "" {
+				cache.Set(runtime.ActionRepo, tt.cacheVersion, cachedSHA)
+			}
+			if tt.otherVersion != "" {
+				cache.Set(runtime.ActionRepo, tt.otherVersion, latest.SHA)
+			}
+			resolver := NewActionResolver(cache)
+			if tt.failResolve {
+				t.Setenv("GH_HOST", "github.example.com")
+				resolver.failedResolutions[formatActionCacheKey(runtime.ActionRepo, tt.cacheVersion)] = struct{}{}
+			}
+			data := &WorkflowData{ActionCache: cache, ActionResolver: resolver, AllowActionRefs: tt.allowRefs}
+			if tt.nilData {
+				data = nil
+			}
+
+			steps := GenerateRuntimeSetupSteps([]RuntimeRequirement{{
+				Runtime: runtime,
+				Version: "3.12",
+			}}, data)
+			require.Len(t, steps, 1)
+
+			wantPin := getActionPin(runtime.ActionRepo)
+			if tt.wantCached {
+				wantPin = formatActionReference(runtime.ActionRepo, cachedSHA, tt.cacheVersion)
+				assert.Contains(t, resolver.GetUsedCacheKeys(), formatActionCacheKey(runtime.ActionRepo, tt.cacheVersion))
+			}
+			assert.Contains(t, steps[0], "        uses: "+wantPin)
+			assert.Contains(t, steps[0], "          python-version: '3.12'")
+			if tt.failResolve {
+				assert.NotEmpty(t, data.ActionResolutionFailures)
+				assert.Contains(t, resolver.GetUsedCacheKeys(), formatActionCacheKey(runtime.ActionRepo, latest.Version))
+			}
+		})
+	}
+}
+
+func TestNodeSetupSteps_ActionPins(t *testing.T) {
+	const repo = "actions/setup-node"
+	const version = "v999.0.0"
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	tests := []struct {
+		name     string
+		generate func(*WorkflowData) GitHubActionStep
+	}{
+		{name: "workflow setup for detection and evals", generate: generateNodeJsSetupStepForWorkflow},
+		{name: "default setup", generate: generateNodeJsSetupStep},
+		{name: "npm engine installation", generate: func(data *WorkflowData) GitHubActionStep {
+			data.Runtimes = map[string]any{"node": map[string]any{"version": "22"}}
+			steps := buildStandardNpmEngineInstallSteps("test-cli", "1.0.0", "Install CLI", "test-cli", data, true)
+			require.NotEmpty(t, steps)
+			assert.Contains(t, steps[0], "          node-version: '"+string(constants.DefaultNodeVersion)+"'")
+			return steps[0]
+		}},
+		{name: "existing installation step", generate: func(data *WorkflowData) GitHubActionStep {
+			return applyNodeSetupOverrides([]GitHubActionStep{GenerateNodeJsSetupStep()}, data)[0]
+		}},
+		{name: "runtime action override", generate: func(data *WorkflowData) GitHubActionStep {
+			data.Runtimes = map[string]any{"node": map[string]any{"action-repo": repo}}
+			return generateNodeJsSetupStepForWorkflow(data)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewActionCache(t.TempDir())
+			cache.Set(repo, version, sha)
+			resolver := NewActionResolver(cache)
+			data := &WorkflowData{ActionCache: cache, ActionResolver: resolver}
+			step := tt.generate(data)
+			assert.Contains(t, step, "        uses: "+formatActionReference(repo, sha, version))
+			assert.Contains(t, step, "          package-manager-cache: false")
+			assert.Contains(t, resolver.GetUsedCacheKeys(), formatActionCacheKey(repo, version))
+		})
+	}
+}
+
 func TestGenerateRuntimeSetupSteps_MergesAndSortsRuntimeExtraFields(t *testing.T) {
 	nodeRuntime := findRuntimeByID("node")
 	require.NotNil(t, nodeRuntime)

@@ -7,7 +7,7 @@
     "@actions/github-script": "github:actions/github-script#v9.0.0",
     "@actions/glob": "^0.7.0",
     "@actions/io": "^3.0.2",
-    "@github/copilot-sdk": "^1.0.22",
+    "@github/copilot-sdk": "^1.0.26",
     "@types/node": "26.6.5",
     "@vitest/coverage-v8": "^5.0.5",
     "@vitest/ui": "^5.0.5",
@@ -18,7 +18,7 @@
     "smol-toml": "1.9.1",
     "ts-json-schema-generator": "2.9.0",
     "typescript": "^7.0.2",
-    "vite": "8.3.4",
+    "vite": "8.3.5",
     "vitest": "^5.0.5"
   },
   "overrides": {
