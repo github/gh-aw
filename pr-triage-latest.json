@@ -1,23 +1,31 @@
 {
-  "run_date": "2026-10-27T00:56:52Z",
-  "run_id": "40429308880",
+  "run_date": "2026-10-27T06:42:25Z",
+  "run_id": "40462216332",
   "source": "pr-triage",
-  "eligible_total": 0,
-  "cooldown_skipped": 6,
-  "open_copilot_prs": 0,
-  "category_counts": {},
-  "risk_counts": {},
-  "priority_counts": {},
-  "action_counts": {},
+  "eligible_total": 2,
+  "cooldown_skipped": 0,
+  "open_copilot_prs": 2,
+  "category_counts": {
+    "feature": 1,
+    "bug": 1
+  },
+  "risk_counts": {
+    "high": 1,
+    "medium": 1
+  },
+  "priority_counts": {
+    "high": 1,
+    "medium": 1
+  },
+  "action_counts": {
+    "fast_track": 1,
+    "batch_review": 1
+  },
   "batches": [],
-  "selected_candidates": [],
-  "skipped_prs": [
-    {"number": 72259, "reason": "opened/updated within the past hour"},
-    {"number": 72258, "reason": "opened/updated within the past hour"},
-    {"number": 72217, "reason": "opened/updated within the past hour"},
-    {"number": 72164, "reason": "opened/updated within the past hour"},
-    {"number": 72157, "reason": "opened/updated within the past hour"},
-    {"number": 71506, "reason": "opened/updated within the past hour"}
+  "selected_candidates": [
+    72272,
+    72273
   ],
-  "notes": "No open app/github-copilot PRs were found in github/gh-aw. All current open PRs were updated within the last hour and remained under the 1-hour cooldown window."
+  "skipped_prs": [],
+  "notes": "Two open app/github-copilot PRs remained eligible after the 1-hour cooldown and were triaged. No batch clusters reached the 3+ threshold."
 }
