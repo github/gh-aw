@@ -230,6 +230,7 @@ func populateRepositoryPackageManifestDescription(manifest *repositoryPackageMan
 	if description, ok := stringValue(root["description"]); ok {
 		manifest.Description = description
 		if len(description) > 255 {
+			addPackageManifestLog.Printf("Manifest %s description is %d characters, exceeding the 255-character marketplace display limit", manifestPath, len(description))
 			return []string{fmt.Sprintf("Manifest %s description exceeds the 255-character marketplace display limit", manifestPath)}
 		}
 	}
@@ -332,9 +333,11 @@ func validateRepositoryPackageManifestIcon(icon string, resources []repositoryPa
 
 	// Look like a path or SVG file but not in resources?
 	if strings.HasSuffix(strings.ToLower(iconStr), ".svg") || strings.Contains(iconStr, "/") {
+		addPackageManifestLog.Printf("Rejecting manifest %s icon %q: looks like a resource path but is not declared in resources", manifestPath, iconStr)
 		return fmt.Errorf("invalid Agentic Workflow manifest %q: icon file %q must be declared in package resources", manifestPath, iconStr)
 	}
 
+	addPackageManifestLog.Printf("Rejecting manifest %s icon %q: does not match any recognized icon format", manifestPath, iconStr)
 	return fmt.Errorf("invalid Agentic Workflow manifest %q: icon %q is invalid: must be an emoji, a GitHub primer octicon name (e.g. :check-circle:), or an SVG file declared in package resources", manifestPath, iconStr)
 }
 
