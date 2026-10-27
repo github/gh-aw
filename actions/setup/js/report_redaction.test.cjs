@@ -213,9 +213,10 @@ describe("coarse report redaction", () => {
     expect(redacted).toMatchObject({ title: "Content redacted.", agentTainted: false, children: input.children });
     expect(input).toEqual(copy);
     expect(redactReport(redacted, policy)).toEqual(redacted);
+    expect(renderReport(redacted).body).toBe("Visible body\n");
     const client = { rest: { issues: { create: vi.fn().mockResolvedValue({ data: { number: 42 } }) } } };
     await createReportIssue(client, { owner: "o", repo: "r", title: "Private title" }, redacted);
-    expect(client.rest.issues.create).toHaveBeenCalledWith({ owner: "o", repo: "r", title: "Content redacted.", body: "Visible body\n" });
+    expect(client.rest.issues.create).toHaveBeenCalledWith({ owner: "o", repo: "r", title: "Content redacted.", body: "Visible body" });
     expect(buildIssueReport("Private title", "Visible body", { redact: policy })).toEqual(redacted);
   });
 
@@ -364,9 +365,10 @@ describe("coarse report redaction", () => {
 
   it("supports policy selection at issue import and publishes the redacted AST directly", async () => {
     const input = buildIssueReport("Report", "Visible\n\n```text\nPrivate evidence\n```", { redact: node => node.type === "code_block" });
+    expect(renderReport(input).body).toBe("Visible\n\nContent redacted.\n");
     const client = { rest: { issues: { create: vi.fn().mockResolvedValue({ data: { number: 42 } }) } } };
     await createReportIssue(client, { owner: "o", repo: "r", title: "Report" }, input);
-    expect(client.rest.issues.create.mock.calls[0][0].body).toBe("Visible\n\nContent redacted.\n");
+    expect(client.rest.issues.create.mock.calls[0][0].body).toBe("Visible\n\nContent redacted.");
   });
 
   it("promotes a matching link or image to a complete paragraph or table redaction", () => {
