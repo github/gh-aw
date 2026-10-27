@@ -1,8 +1,8 @@
 # ADR-72407: Merge Imported Job Outputs by Name with Main Workflow Precedence
 
-**Date**: 2026-07-03
-**Status**: Draft
-**Deciders**: pelikhan [TODO: verify additional reviewers]
+**Date**: 2026-10-27
+**Status**: Proposed (pending PR acceptance)
+**Deciders**: @pelikhan (main-workflow precedence explicitly requested)
 
 ---
 
@@ -12,13 +12,17 @@ Shared agentic workflows can be imported into a main workflow, and imports may c
 
 ### Decision
 
-We will merge `jobs.<job-id>.outputs` as a union keyed by output name whenever imports and/or the main workflow define the same job. Main workflow values always win on conflicting names (including explicit empty strings); among imports, later-discovered values win. Output-only contributions are merged without replacing the existing job definition, and all other job fields keep their existing precedence and step-merging rules (regular steps from conflicting custom jobs are still not concatenated). The merge allocates new maps so input job configurations are never mutated.
+Merge `jobs.<job-id>.outputs` as a union keyed by output name whenever imports and/or the main workflow define the same job. Main workflow values always win on conflicting names (including explicit empty strings); among imports, later-discovered values win. Absent or null output collections contribute no entries, as do empty maps; an explicit empty string for an individual output remains an override.
+
+Output-only contributions are merged without replacing the existing job definition, and all other job fields keep their existing precedence and step-merging rules (regular steps from conflicting custom jobs are still not concatenated). The merge allocates new maps so input job configurations are never mutated.
+
+The merge helper does not merge outputs when either collection is a non-null, non-map value; existing job and step precedence remains in effect. It does not introduce new validation errors. The [frontmatter schema](../../pkg/parser/schemas/main_workflow_schema.json) requires job outputs to be objects with string values, and [shared Markdown validation](../../pkg/parser/schema_validation.go) uses the same schema. This means a literal null in Markdown frontmatter is still invalid even though the merge helper tolerates nil values. [YAML workflow imports](../../pkg/parser/yaml_import.go) validate the workflow's shape, not individual output types. Invalid values that survive merging into generated YAML are subject to the compiler's GitHub Actions schema validation when enabled; discarded imported values are not necessarily diagnosed.
 
 ### Alternatives Considered
 
 #### Alternative 1: Keep "main job wins outright" (status quo)
 
-Continue dropping imported outputs for same-named jobs and require authors to redeclare every output in the main workflow. This is the simplest and most predictable rule, but it defeats the purpose of shared workflows that want to publish outputs, and silently discarding configuration is surprising to authors.
+Continue dropping imported outputs for same-named jobs and require authors to redeclare every output in the main workflow. This preserves existing behavior but prevents shared jobs from contributing outputs independently and duplicates declarations in consumers.
 
 #### Alternative 2: Fail compilation on conflicting output names
 
@@ -32,18 +36,18 @@ Recursively merge all job fields (outputs, env, permissions, steps, etc.). This 
 
 #### Positive
 - Shared workflows can expose job outputs that are combined with those defined by the main workflow, including on built-in jobs such as `pre_activation`.
-- Precedence is consistent with existing import rules: main workflow wins, imports are resolved in deterministic discovery order.
+- Main-workflow precedence preserves intentional consumer overrides; deterministic discovery order makes duplicate imported output names reproducible.
 - Input job maps are not mutated, keeping merging side-effect free and testable.
 
 #### Negative
 - Imported outputs can be silently overridden by the main workflow or a later import with no warning, which may hide configuration mistakes.
 - `jobs:` merging now has field-specific rules (steps vs. outputs vs. everything else), increasing the cognitive load for authors and maintainers.
-- Malformed (non-map) `outputs` values are skipped rather than reported, so errors may surface only at runtime. [TODO: verify whether validation catches this elsewhere]
+- The merge helper is not a validator. Markdown schema validation rejects malformed output collections, but invalid values from YAML imports can be discarded by existing conflict precedence without a diagnostic.
 
 #### Neutral
-- Documentation in `reference/imports.md` changes from "jobs: Not merged" to describing the new merge behavior.
-- Existing compiled workflows are unaffected (PR reports no lock-file drift across 349 workflows).
+- The [imports reference](../src/content/docs/reference/imports.md) describes the field-specific merge behavior.
+- Workflows without overlapping job output definitions retain their existing merge behavior. Workflows with overlapping definitions can now expose previously discarded imported outputs.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*This record documents the proposed implementation and does not imply reviewer approval.*

@@ -47,6 +47,18 @@ func TestMergeJobsFromYAMLImports_Outputs(t *testing.T) {
 			want:     map[string]any{"imported": "imported"},
 		},
 		{
+			name:     "null main outputs",
+			mainJobs: map[string]any{"build": map[string]any{"outputs": nil}},
+			imports:  `{"build":{"outputs":{"imported":"imported"}}}`,
+			want:     map[string]any{"imported": "imported"},
+		},
+		{
+			name:     "null imported outputs",
+			mainJobs: map[string]any{"build": map[string]any{"outputs": map[string]any{"main": "main"}}},
+			imports:  `{"build":{"outputs":null}}`,
+			want:     map[string]any{"main": "main"},
+		},
+		{
 			name:     "main outputs only",
 			mainJobs: map[string]any{"build": map[string]any{"outputs": map[string]any{"main": "main"}}},
 			imports:  `{"build":{"runs-on":"macos-latest"}}`,
@@ -57,6 +69,18 @@ func TestMergeJobsFromYAMLImports_Outputs(t *testing.T) {
 			imports: `{"build":{"outputs":{"first":"first","shared":"first"}}}
 {"build":{"outputs":{"second":"second","shared":"second"}}}`,
 			want: map[string]any{"first": "first", "second": "second", "shared": "second"},
+		},
+		{
+			name: "null first import outputs",
+			imports: `{"build":{"outputs":null}}
+{"build":{"outputs":{"second":"second"}}}`,
+			want: map[string]any{"second": "second"},
+		},
+		{
+			name: "null later import outputs",
+			imports: `{"build":{"outputs":{"first":"first"}}}
+{"build":{"outputs":null}}`,
+			want: map[string]any{"first": "first"},
 		},
 		{
 			name:     "multiple imports with main",
@@ -77,6 +101,37 @@ func TestMergeJobsFromYAMLImports_Outputs(t *testing.T) {
 			after, err := json.Marshal(tt.mainJobs)
 			require.NoError(t, err)
 			require.JSONEq(t, string(original), string(after), "main job must not be mutated")
+		})
+	}
+}
+
+func TestMergeJobOutputField_YAMLValues(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		yaml string
+		ok   bool
+	}{
+		{name: "absent", yaml: "{}\n", ok: true},
+		{name: "null", yaml: "outputs: null\n", ok: true},
+		{name: "empty declaration", yaml: "outputs:\n", ok: true},
+		{name: "empty mapping", yaml: "outputs: {}\n", ok: true},
+		{name: "invalid string", yaml: "outputs: invalid\n"},
+		{name: "invalid boolean", yaml: "outputs: false\n"},
+		{name: "invalid sequence", yaml: "outputs: []\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var job map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &job))
+			outputsJob := map[string]any{"outputs": map[string]any{"value": "value"}}
+			for _, jobs := range [][2]any{{job, outputsJob}, {outputsJob, job}} {
+				outputs, ok := mergeJobOutputField(jobs[0], jobs[1])
+				require.Equal(t, tt.ok, ok)
+				if tt.ok {
+					require.Equal(t, map[string]any{"value": "value"}, outputs)
+				} else {
+					require.Nil(t, outputs)
+				}
+			}
 		})
 	}
 }

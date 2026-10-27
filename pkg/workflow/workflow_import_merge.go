@@ -193,7 +193,7 @@ func mergeJobOutputField(mainJob any, importedJob any) (map[string]any, bool) {
 	importedOutputs, hasImportedOutputs := importedMap["outputs"]
 	mainOutputMap, validMainOutputs := mainOutputs.(map[string]any)
 	importedOutputMap, validImportedOutputs := importedOutputs.(map[string]any)
-	if (hasMainOutputs && !validMainOutputs) || (hasImportedOutputs && !validImportedOutputs) || (!hasMainOutputs && !hasImportedOutputs) {
+	if (mainOutputs != nil && !validMainOutputs) || (importedOutputs != nil && !validImportedOutputs) || (!hasMainOutputs && !hasImportedOutputs) {
 		return nil, false
 	}
 	outputs := make(map[string]any)
