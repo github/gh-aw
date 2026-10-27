@@ -410,10 +410,6 @@ func encodeCheckpointForHost(snapshot checkpointSnapshot, state Projection, data
 	return []QueueCommit{checkpoint}, nil
 }
 
-func restoreCheckpoint(commit QueueCommit) (Projection, error) {
-	return restoreCheckpointForHost(commit, "")
-}
-
 func restoreCheckpointForHost(commit QueueCommit, host string) (Projection, error) {
 	invalid := func() (Projection, error) {
 		return Projection{}, queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection")
