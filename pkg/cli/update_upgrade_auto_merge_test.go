@@ -122,40 +122,10 @@ func TestUpdateUpgradeAutoMergeTargetRepoDispatch(t *testing.T) {
 }
 
 func TestUpdateUpgradeAutoMergeOrgDispatchErrors(t *testing.T) {
-	originalUpdateSearch := searchOrgWorkflowReposFn
-	originalUpgradeSearch := searchOrgLockWorkflowReposFn
-	originalPreview := previewOrgRepoUpdatesFn
-	originalScan := scanUpgradeRepoFn
-	originalUpdate := runUpdateForTargetRepoFn
-	originalUpgrade := runUpgradeForTargetRepoFn
 	originalWait := waitForOrgRateLimitFn
 	t.Cleanup(func() {
-		searchOrgWorkflowReposFn = originalUpdateSearch
-		searchOrgLockWorkflowReposFn = originalUpgradeSearch
-		previewOrgRepoUpdatesFn = originalPreview
-		scanUpgradeRepoFn = originalScan
-		runUpdateForTargetRepoFn = originalUpdate
-		runUpgradeForTargetRepoFn = originalUpgrade
 		waitForOrgRateLimitFn = originalWait
 	})
-
-	search := func(context.Context, string, bool) ([]string, error) {
-		return []string{"octo/api", "octo/web"}, nil
-	}
-	searchOrgWorkflowReposFn = func(ctx context.Context, org string, _ []string, verbose bool) ([]string, error) {
-		return search(ctx, org, verbose)
-	}
-	searchOrgLockWorkflowReposFn = search
-	previewOrgRepoUpdatesFn = func(_ context.Context, repo string, _ UpdateWorkflowsOptions, _ bool) (orgRepoPreview, error) {
-		return orgRepoPreview{
-			Repo:           repo,
-			TotalWorkflows: 1,
-			Workflows:      []orgWorkflowPreview{{Name: "repo-assist", CurrentRef: "v1.0.0", LatestRef: "v1.1.0"}},
-		}, nil
-	}
-	scanUpgradeRepoFn = func(_ context.Context, repo string, _ bool) (orgRepoPreview, bool, error) {
-		return orgRepoPreview{Repo: repo, TotalWorkflows: 1}, true, nil
-	}
 	waitForOrgRateLimitFn = func(context.Context, string, bool) error { return nil }
 
 	for _, newCommand := range []func(func(string) error) *cobra.Command{NewUpdateCommand, NewUpgradeCommand} {
@@ -163,38 +133,42 @@ func TestUpdateUpgradeAutoMergeOrgDispatchErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for _, prFlag := range []string{"--pr", "--create-pull-request"} {
 				t.Run(prFlag, func(t *testing.T) {
+					cmd := newCommand(func(string) error { return nil })
+					require.NoError(t, cmd.ParseFlags([]string{"--org", "octo", prFlag, "--auto-merge", "--yes"}))
+					workerArgs := orgRolloutWorkerArgs(cmd)
+					assert.Contains(t, workerArgs, "--auto-merge=true")
+
 					for _, allFail := range []bool{false, true} {
 						t.Run(fmt.Sprintf("all-fail=%t", allFail), func(t *testing.T) {
 							var called []string
-							check := func(repo string, createPR, autoMerge bool) error {
-								called = append(called, repo)
-								assert.True(t, createPR)
-								assert.True(t, autoMerge)
-								if allFail || repo == "octo/api" {
-									return fmt.Errorf("auto-merge failed for https://github.com/%s/pull/1; pull request remains open", repo)
-								}
-								return nil
-							}
-							runUpdateForTargetRepoFn = func(_ context.Context, repo string, opts UpdateWorkflowsOptions, createPR, _ bool) error {
-								return check(repo, createPR, opts.AutoMerge)
-							}
-							runUpgradeForTargetRepoFn = func(_ context.Context, repo string, opts upgradeOptions, createPR, _ bool) error {
-								return check(repo, createPR, opts.autoMerge)
-							}
-							cmd := newCommand(func(string) error { return nil })
-							cmd.SetArgs([]string{"--org", "octo", prFlag, "--auto-merge", "--yes"})
+							opts := orgRolloutOptions{command: name, concurrency: 1, args: workerArgs}
+							var results []orgRolloutResult
+							var runErr error
 							output := captureUpdateOrgStderr(t, func() {
-								err := cmd.Execute()
-								if allFail {
-									require.ErrorContains(t, err, "failed to "+name+" any repository")
-								} else {
-									require.NoError(t, err)
-								}
+								results, runErr = runOrgRolloutPlain(context.Background(), []orgRolloutRow{
+									{repo: "octo/api", selected: true},
+									{repo: "octo/web", selected: true},
+								}, opts, true, func(_ context.Context, repo string, workerOpts orgRolloutOptions) orgRolloutResult {
+									assert.Equal(t, workerArgs, workerOpts.args)
+									called = append(called, repo)
+									result := orgRolloutResult{Status: "created", URL: "https://github.com/" + repo + "/pull/1"}
+									if allFail || repo == "octo/api" {
+										result.Status = "failed"
+										result.Error = fmt.Sprintf("auto-merge failed for https://github.com/%s/pull/1; pull request remains open", repo)
+									}
+									return result
+								})
 							})
+							require.NoError(t, runErr)
+							err := reportOrgRolloutResults(context.Background(), results, orgRunCallbacks{}, opts, runErr)
+							require.ErrorContains(t, err, "auto-merge failed")
+							assert.Contains(t, err.Error(), "remains open")
 							assert.Contains(t, output, "https://github.com/octo/api/pull/1")
-							assert.Contains(t, output, "remains open")
+							assert.Contains(t, output, "https://github.com/octo/web/pull/1")
 							if allFail {
-								assert.Contains(t, output, "https://github.com/octo/web/pull/1")
+								assert.Contains(t, err.Error(), "octo/web")
+							} else {
+								assert.NotContains(t, err.Error(), "octo/web")
 							}
 							assert.ElementsMatch(t, []string{"octo/api", "octo/web"}, called)
 						})
