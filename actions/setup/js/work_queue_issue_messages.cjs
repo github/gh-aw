@@ -8,13 +8,17 @@ const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { normalizeReportText } = require("./report_ast.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { buildAllowedDomains, sanitizeUrlDomains, sanitizeUrlProtocols } = require("./sanitize_content_core.cjs");
 const { redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
 
 function presentationText(value, limit, singleLine = false, maskedValues = [], literal = false) {
   if (typeof value !== "string") return "";
   let text = redactDiagnosticText(value, { maskedValues }).trim();
   if (singleLine) text = text.replace(/\s+/g, " ");
-  if (literal) text = normalizeReportText(text).replace(/\s+/g, " ");
+  if (literal) {
+    // Literal rendering escapes source code delimiters, so URL policy must cover those regions too.
+    text = sanitizeContent(sanitizeUrlDomains(sanitizeUrlProtocols(normalizeReportText(text).replace(/\s+/g, " ")), buildAllowedDomains()));
+  }
   const render = candidate => {
     if (literal) return renderSizedReport({ type: "report", title: "Work description", children: [{ type: "paragraph", children: [{ type: "text", value: candidate, agentTainted: true }] }] }).body;
     let rendered = candidate;

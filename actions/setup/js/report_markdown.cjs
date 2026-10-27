@@ -170,10 +170,10 @@ function bareURL(source) {
  * Inline slots do not enable scalar template substitution in surrounding Markdown.
  * onBlockSlot observes actual typed insertions, not literal placeholder text.
  * @param {string} markdown
- * @param {{context?: ReportContext, inlineSlots?: Record<string, ReportInline[]>, blockSlots?: Record<string, ReportBlock[]>, onBlockSlot?: (key: string) => void, agentTainted?: boolean, minimumHeadingLevel?: number, depth?: number, allowFlagMarkers?: boolean, allowMetadata?: boolean, allowedMentions?: string[]}} [options]
+ * @param {{context?: ReportContext, inlineSlots?: Record<string, ReportInline[]>, blockSlots?: Record<string, ReportBlock[]>, onBlockSlot?: (key: string) => void, agentTainted?: boolean, minimumHeadingLevel?: number, depth?: number, allowFlagMarkers?: boolean, allowMetadata?: boolean, allowedMentions?: string[], deferMentions?: boolean}} [options]
  * @returns {ReportBlock[]}
  */
-function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlockSlot, agentTainted, minimumHeadingLevel = 3, depth = 0, allowFlagMarkers = false, allowMetadata = false, allowedMentions = [] } = {}) {
+function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlockSlot, agentTainted, minimumHeadingLevel = 3, depth = 0, allowFlagMarkers = false, allowMetadata = false, allowedMentions = [], deferMentions = false } = {}) {
   if (depth > 16) throw new TypeError("Report template nesting exceeds the maximum depth");
   if (agentTainted !== undefined && typeof agentTainted !== "boolean") throw new TypeError("Report agent taint must be a boolean");
   const allowedReferences = agentTainted === false ? null : buildAllowedGitHubReferences();
@@ -324,7 +324,7 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
       } else if (
         (match = /^@([A-Za-z0-9](?:[A-Za-z0-9_-]{0,37}[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?)(?![a-zA-Z0-9_/-])/.exec(source)) &&
         !/[A-Za-z0-9]/.test(original[original.length - source.length - 1] || "") &&
-        allowedMentions.some(alias => alias.replace(/^@/, "").toLowerCase() === match[1].toLowerCase())
+        (deferMentions || allowedMentions.some(alias => alias.replace(/^@/, "").toLowerCase() === match[1].toLowerCase()))
       ) {
         nodes.push(fromSource({ type: "mention", login: match[1] }));
       } else if ((match = /^(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/.exec(source))) {
@@ -378,7 +378,7 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
         nodes.push(fromSource({ type: "strong", children: [fromSource({ type: "emphasis", children: inline(match[2], inlineDepth + 2, inLink) })] }));
       } else if ((match = /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/.exec(source))) {
         nodes.push(fromSource({ type: "strong", children: inline(match[2], inlineDepth + 1, inLink) }));
-      } else if ((match = /^([*_])(?=\S)((?:\{\w+\}|[^\n])*?\S)\1/.exec(source)) && (match[1] !== "_" || !/\w/.test(original[original.length - source.length - 1] || ""))) {
+      } else if ((match = /^([*_])(?=\S)((?:\{\w+\}|[^{\n]|\{(?!\w+\}))+?)(?<=\S)\1/.exec(source)) && (match[1] !== "_" || !/\w/.test(original[original.length - source.length - 1] || ""))) {
         nodes.push(fromSource({ type: "emphasis", children: inline(match[2], inlineDepth + 1, inLink) }));
       } else {
         text(source[0]);
@@ -393,7 +393,7 @@ function parseReportMarkdown(markdown, { context, inlineSlots, blockSlots, onBlo
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
   let index = 0;
   const nested = source =>
-    parseReportMarkdown(source, { context, inlineSlots, blockSlots, onBlockSlot, agentTainted, minimumHeadingLevel: Math.max(3, minimumHeadingLevel), depth: depth + 1, allowFlagMarkers, allowMetadata, allowedMentions });
+    parseReportMarkdown(source, { context, inlineSlots, blockSlots, onBlockSlot, agentTainted, minimumHeadingLevel: Math.max(3, minimumHeadingLevel), depth: depth + 1, allowFlagMarkers, allowMetadata, allowedMentions, deferMentions });
   const blockSlot = line => /^\{(\w+)\}$/.exec(line.trim())?.[1];
   const isBlockSlot = line => blockSlots && Object.hasOwn(blockSlots, blockSlot(line) ?? "");
   const isFieldLine = line => /^(?:\{\w+\}\s*)+$/.test(line.trim()) && (!inlineSlots || [...line.matchAll(/\{(\w+)\}/g)].some(field => !Object.hasOwn(inlineSlots, field[1])));

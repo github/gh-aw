@@ -826,7 +826,7 @@ async function main(config = {}) {
 
     const linkBody = processedBody;
     const runUrl = buildWorkflowRunUrl(context, effectiveEventContext.workflowRepo ?? context.repo);
-    const bodyNodes = parseReportMarkdown(stripExecutionProvenance(linkBody), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true, allowedMentions: allowedMentionAliases });
+    const bodyNodes = parseReportMarkdown(stripExecutionProvenance(linkBody, { stripGroupingMarkers: true }), { minimumHeadingLevel: 2, allowMetadata: false, agentTainted: true, allowedMentions: allowedMentionAliases });
     const report = buildIssueBodyReport("Comment", [...(message[COMMENT_PREAMBLE] || []), ...bodyNodes], {
       repo: repoParts,
       footer: includeFooter,

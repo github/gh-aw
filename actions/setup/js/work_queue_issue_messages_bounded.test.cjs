@@ -50,6 +50,21 @@ describe("bounded Work queue Issue payload rendering", () => {
     vi.unstubAllEnvs();
   });
 
+  it.each(["allowed-only", "allowed-or-code-region"])("sanitizes literal description URLs and commands before sizing under %s", policy => {
+    vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "github.com");
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_URLS", policy);
+    vi.stubEnv("GH_AW_COMMANDS", '["bot"]');
+    for (const suffix of ["", "x".repeat(5000)]) {
+      for (const url of ["https://outside.invalid/phish", "`https://outside.invalid/phish`", "https&#58;//outside.invalid/phish", "javascript%3Aalert(1)"]) {
+        const rendered = renderPayload(`/bot ${url} ${suffix}`, "description");
+        assert.doesNotMatch(rendered, /https:\/\/outside\.invalid|https&#58;|javascript%3A|javascript:/i);
+        assert.ok(!rendered.startsWith("/bot"));
+        assertSafeBounded(rendered, 4096, true);
+      }
+    }
+    assert.ok(renderPayload("https://github.com/owner/repo", "description").includes("https://github.com/owner/repo"));
+  });
+
   it.each(["issue", "summary", "claim"])("inserts exactly one attribution footer into the %s report", kind => {
     vi.stubEnv("GH_AW_SAFE_OUTPUT_MESSAGES", "");
     vi.stubEnv("GH_AW_WORKFLOW_NAME", "dispatcher");

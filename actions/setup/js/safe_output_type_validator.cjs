@@ -895,7 +895,7 @@ function validateItem(item, itemType, lineNum, options) {
     // If this safe-output type supports a body field, append structured data
     // as fenced JSON so it survives body sanitization.
     if (Object.prototype.hasOwnProperty.call(typeConfig.fields, "body")) {
-      const children = parseReportMarkdown(normalizedItem.body || "", { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions: options?.allowedAliases || [], agentTainted: true });
+      const children = parseReportMarkdown(normalizedItem.body || "", { minimumHeadingLevel: 2, allowMetadata: false, allowedMentions: options?.allowedAliases || [], deferMentions: options?.deferMentions, agentTainted: true });
       /** @type {import("./report_ast.cjs").ReportBlock} */
       const dataBlock = { type: "structured_data", data: JSON.parse(dataJSON), agentTainted: true };
       if (typeConfig.collapseData === true) children.push({ type: "details", summary: "Structured data", agentTainted: false, children: [dataBlock] });

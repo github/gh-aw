@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createRequire } from "module";
+import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const { normalizeReport, normalizeReportTitle, redactReportForRendering, assertRedactedReport, renderReport } = require("./report_ast.cjs");
@@ -38,6 +39,15 @@ describe("report AST", () => {
   it("keeps emphasis and subscript structure when templates use underscored scalar names", () => {
     const children = parseReportMarkdown("<sub><em>{workflow_name}</em></sub>\n\n*{workflow_name}*", { context: { workflow_name: "Worker" }, agentTainted: false });
     expect(renderReport(report(children)).body).toBe("<sub><em>Worker</em></sub>\n\n*Worker*\n");
+  });
+
+  it("parses long unmatched emphasis with placeholder-like text without exponential backtracking", () => {
+    const output = execFileSync(
+      process.execPath,
+      ["-e", 'const { parseReportMarkdown } = require("./report_markdown.cjs"); const source = "*" + "{a}".repeat(5000); const nodes = parseReportMarkdown(source); process.stdout.write(JSON.stringify(nodes));'],
+      { cwd: import.meta.dirname, timeout: 5000 }
+    );
+    expect(JSON.parse(output.toString())).toEqual([paragraph("*" + "{a}".repeat(5000))]);
   });
 
   it("does not turn multiline literal data into lists or separators", () => {

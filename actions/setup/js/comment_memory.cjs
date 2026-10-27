@@ -44,7 +44,7 @@ function buildCollapsedMemorySection(rawBody, memoryID) {
     type: "details",
     summary: `Peek at saved memory (${memoryID})`,
     agentTainted: false,
-    children: [{ type: "code_block", language: `${COMMENT_MEMORY_TAG}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true }],
+    children: [{ type: "code_block", language: `${COMMENT_MEMORY_TAG}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true, sizeProtected: true }],
   };
 }
 
@@ -219,8 +219,9 @@ async function main(config = {}) {
       triggeringPRNumber,
       bodyFooter: config.body_footer,
     });
-    const managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
+    let managedBody;
     try {
+      managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
       enforceCommentLimits(managedBody);
     } catch (error) {
       core.warning(`comment_memory: body validation failed: ${getErrorMessage(error)}`);

@@ -1,15 +1,10 @@
 // @ts-check
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createRequire } from "module";
-import fs from "fs";
-import os from "os";
 import path from "path";
 
 const require = createRequire(import.meta.url);
-const promptsDir = path.join(os.tmpdir(), "gh-aw-test-prompts");
-fs.mkdirSync(promptsDir, { recursive: true });
-fs.writeFileSync(path.join(promptsDir, "missing_tool_issue.md"), "# Incomplete\n\n{incomplete_signals_list}\n");
-process.env.GH_AW_PROMPTS_DIR = promptsDir;
+process.env.GH_AW_PROMPTS_DIR = path.resolve(import.meta.dirname, "../md");
 
 const mockCore = {
   info: vi.fn(),

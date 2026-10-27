@@ -538,6 +538,19 @@ describe("safe_output_type_validator", () => {
       expect(result.normalizedItem.data).toEqual(data);
     });
 
+    it.each(["Hello @target-author and @other", "> Hello @target-author and @other"])("preserves deferred mentions with structured data in %s", async body => {
+      const { validateItem } = await import("./safe_output_type_validator.cjs");
+      const { sanitizeContent } = await import("./sanitize_content.cjs");
+      const result = validateItem({ type: "add_comment", body, data: {} }, "add_comment", 1, { dataEnabled: true, deferMentions: true, allowedAliases: [] });
+
+      expect(result.isValid).toBe(true);
+      expect(result.normalizedItem.body).toContain(body);
+      const published = sanitizeContent(result.normalizedItem.body, { allowedAliases: ["target-author"] });
+      expect(published).toContain("@target-author");
+      expect(published).not.toContain("`@target-author`");
+      expect(published).toContain("`@other`");
+    });
+
     it.each([
       ["create_issue", false],
       ["add_comment", true],

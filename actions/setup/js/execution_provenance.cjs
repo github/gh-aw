@@ -5,11 +5,13 @@ const { generateXMLMarker } = require("./generate_footer.cjs");
 /**
  * Remove reserved execution markers before adding trusted runtime attribution.
  * @param {string} body
+ * @param {{stripGroupingMarkers?: boolean}} [options] Strip automation markers from raw agent input, including code examples.
  * @returns {string}
  */
-function stripExecutionProvenance(body) {
-  const reservedMarker = /<!--[-!\s]*gh-aw-(?:execution|agentic-workflow)\s*:/i;
-  const unclosedReservedMarker = /(<!--[-!\s]*)(gh-aw-)(?=(?:execution|agentic-workflow)\s*:)/gi;
+function stripExecutionProvenance(body, { stripGroupingMarkers = false } = {}) {
+  const names = stripGroupingMarkers ? "(?:execution|agentic-workflow|workflow-id|workflow-call-id|tracker-id|close-key|comment-type)" : "(?:execution|agentic-workflow)";
+  const reservedMarker = new RegExp(`<!--[-!\\s]*gh-aw-${names}\\s*:`, "i");
+  const unclosedReservedMarker = new RegExp(`(<!--[-!\\s]*)(gh-aw-)(?=${names}\\s*:)`, "gi");
   let result = "";
   let position = 0;
 
