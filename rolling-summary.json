@@ -1,12 +1,5 @@
 [
   {
-    "date": "2026-04-06",
-    "total_tokens": 96544531,
-    "total_cost": 0,
-    "total_runs": 89,
-    "total_action_minutes": 719
-  },
-  {
     "date": "2026-04-07",
     "total_tokens": 87979806,
     "total_cost": 0,
@@ -568,5 +561,11 @@
     "total_aic": 3950.5297,
     "total_runs": 100,
     "total_action_minutes": 1235.0
+  },
+  {
+    "date": "2026-10-27",
+    "total_aic": 2649.6991,
+    "total_runs": 100,
+    "total_action_minutes": 961.0
   }
 ]
