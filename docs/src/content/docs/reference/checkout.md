@@ -193,6 +193,14 @@ checkout errors. Authentication, permission, network, and unknown errors remain
 failures. Workflows triggered on an already closed or merged PR use the retained
 PR head ref and still require a successful checkout.
 
+For `pull_request: edited` and `pull_request_target: edited`, bots listed in
+`on.bots` can check out same-repository PRs even when GitHub's collaborator
+permission API reports `none` for the App. The event sender must match the actor,
+and both the PR head and base repository IDs must match the event repository.
+This supports re-reviewing body-only changes without an extra commit. Unlisted
+bots and fork PRs still require the actor to have write-or-higher collaborator
+permission.
+
 For work triggered while a PR was open, the safe-output manager checks live PR
 state before each handler, deferred retry, and buffered review submission. If the
 PR has closed, remaining effects are recorded as skipped, not applied. Closed-event

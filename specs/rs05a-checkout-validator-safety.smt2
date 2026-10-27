@@ -53,6 +53,7 @@
 (declare-const sender_type_bot Bool)
 (declare-const sender_matches_actor Bool)
 (declare-const pr_action_proves_branch_access Bool)
+(declare-const pr_action_edited Bool)
 (declare-const verified_same_repository_pr Bool)
 (declare-const centralized_marker_present Bool)
 (declare-const propagated_actor_present Bool)
@@ -108,7 +109,8 @@
        (not actor_is_centralized_router)
        (or (and actor_permission_verifiable trusted_permission)
            (and (or (= event pull_request) (= event pull_request_target))
-                pr_action_proves_branch_access
+                (or pr_action_proves_branch_access
+                    (and pr_action_edited allowlisted_bot))
                 sender_type_bot
                 sender_matches_actor
                 verified_same_repository_pr)
@@ -162,7 +164,9 @@
 (assert checkout_executes)
 (assert (not (and actor_permission_verifiable trusted_permission)))
 (assert (not (and (or (and (or (= event pull_request) (= event pull_request_target))
-                          pr_action_proves_branch_access sender_type_bot sender_matches_actor)
+                          (or pr_action_proves_branch_access
+                              (and pr_action_edited allowlisted_bot))
+                          sender_type_bot sender_matches_actor)
                      (and (or (and (or (= event issue_comment)
                                        (= event pull_request_review_comment))
                                    comment_author_matches_sender)
@@ -170,6 +174,30 @@
                           sender_type_bot allowlisted_bot comment_actor_canonical_match))
                   verified_same_repository_pr)))
 (echo "checkout_requires_write_or_same_repo_bot_pr")
+(check-sat)
+(pop)
+
+; EXPECT: unlisted_same_repo_bot_edit_requires_write_permission unsat
+(push)
+(assert checkout_executes)
+(assert (= event pull_request))
+(assert pr_action_edited)
+(assert (not pr_action_proves_branch_access))
+(assert (not allowlisted_bot))
+(assert (not (and actor_permission_verifiable trusted_permission)))
+(echo "unlisted_same_repo_bot_edit_requires_write_permission")
+(check-sat)
+(pop)
+
+; EXPECT: allowlisted_same_repo_bot_edit_can_checkout sat
+(push)
+(assert checkout_executes)
+(assert (= event pull_request))
+(assert pr_action_edited)
+(assert (not pr_action_proves_branch_access))
+(assert allowlisted_bot)
+(assert (not (and actor_permission_verifiable trusted_permission)))
+(echo "allowlisted_same_repo_bot_edit_can_checkout")
 (check-sat)
 (pop)
 

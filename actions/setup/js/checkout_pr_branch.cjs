@@ -316,12 +316,13 @@ async function assertTrustedCheckoutRuntime(awContext, pullRequest) {
 
   // Apps are not collaborators: their permission endpoint returns "none" even
   // when they can write to the repository. A bot that triggered a PR event for
-  // a branch in this repository can have its checkout trusted instead. Other
+  // a branch in this repository can have its checkout trusted instead. Edits
+  // additionally require explicit trust via on.bots. Other
   // events require the collaborator check unless explicitly allow-listed below.
   if (
     (context.eventName === "pull_request" || context.eventName === "pull_request_target") &&
     typeof context.payload.action === "string" &&
-    TRUSTED_BOT_PR_ACTIONS.includes(context.payload.action) &&
+    (TRUSTED_BOT_PR_ACTIONS.includes(context.payload.action) || (context.payload.action === "edited" && isAllowedBot(actor, parseAllowedBots()))) &&
     senderType === "Bot" &&
     context.payload.sender?.login === actor &&
     context.payload.repository !== undefined &&

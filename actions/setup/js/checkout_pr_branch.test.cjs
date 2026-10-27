@@ -382,12 +382,59 @@ If the pull request is still open, verify that:
         expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", expect.arrayContaining(["fetch", "origin"]), { silent: true, ignoreReturnCode: true });
       });
 
+      describe.each(["pull_request", "pull_request_target"])("allowed bot edited events on %s", eventName => {
+        beforeEach(() => {
+          mockContext.eventName = eventName;
+          mockContext.actor = "automation[bot]";
+          mockContext.payload.sender = { login: "automation[bot]", type: "Bot" };
+          mockContext.payload.action = "edited";
+          mockContext.payload.changes = { body: { from: "Previous description" } };
+          mockContext.payload.repository.id = 42;
+          mockContext.payload.pull_request.head.repo.id = 42;
+          mockContext.payload.pull_request.base.repo.id = 42;
+          process.env.GH_AW_ALLOWED_BOTS = "automation";
+          mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "none" } });
+        });
+
+        it("should check out the PR head after a body-only edit without collaborator permission", async () => {
+          await runScript();
+
+          expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).not.toHaveBeenCalled();
+          expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+          expect(mockCore.setFailed).not.toHaveBeenCalled();
+          expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", ["fetch", "origin", "+refs/pull/123/head:refs/remotes/origin/pr-head", "--depth=2"], { silent: true, ignoreReturnCode: true });
+          expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "refs/remotes/origin/pr-head"]);
+        });
+
+        it.each([
+          ["unlisted bot", 42, 42, 42, "automation[bot]", "Bot", "other[bot]"],
+          ["forked PR", 43, 42, 42, "automation[bot]", "Bot", "automation[bot]"],
+          ["missing runtime repository ID", 42, undefined, 42, "automation[bot]", "Bot", "automation[bot]"],
+          ["missing base repository ID", 42, 42, undefined, "automation[bot]", "Bot", "automation[bot]"],
+          ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot", "automation[bot]"],
+          ["different sender", 42, 42, 42, "other[bot]", "Bot", "automation[bot]"],
+          ["non-bot sender", 42, 42, 42, "automation[bot]", "User", "automation[bot]"],
+        ])("should retain permission checks for an edit with %s", async (_reason, headId, repositoryId, baseId, senderLogin, senderType, allowedBots) => {
+          mockContext.payload.repository.id = repositoryId;
+          mockContext.payload.pull_request.head.repo.id = headId;
+          mockContext.payload.pull_request.base.repo.id = baseId;
+          mockContext.payload.sender = { login: senderLogin, type: senderType };
+          process.env.GH_AW_ALLOWED_BOTS = allowedBots;
+
+          await runScript();
+
+          expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "automation[bot]" }));
+          expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+          expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+        });
+      });
+
       it.each([
         ["forked PR", 43, 42, 42, "automation[bot]", "Bot", "opened"],
         ["missing runtime repository ID", 42, undefined, 42, "automation[bot]", "Bot", "opened"],
         ["different sender", 42, 42, 42, "other[bot]", "Bot", "opened"],
         ["non-bot sender", 42, 42, 42, "automation[bot]", "User", "opened"],
-        ["untrusted PR action", 42, 42, 42, "automation[bot]", "Bot", "edited"],
+        ["edited event without on.bots", 42, 42, 42, "automation[bot]", "Bot", "edited"],
         ["missing base repository ID", 42, 42, undefined, "automation[bot]", "Bot", "opened"],
         ["mismatched base repository ID", 42, 42, 43, "automation[bot]", "Bot", "opened"],
         ["forked PR marked ready for review", 43, 42, 42, "automation[bot]", "Bot", "ready_for_review"],

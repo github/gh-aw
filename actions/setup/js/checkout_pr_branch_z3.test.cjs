@@ -29,6 +29,8 @@ describe("RS-05a checkout validator Z3 proof", () => {
     expect(expected.map(result => result.name)).toEqual([
       "workflow_dispatch_requires_verified_non_fork",
       "checkout_requires_write_or_same_repo_bot_pr",
+      "unlisted_same_repo_bot_edit_requires_write_permission",
+      "allowlisted_same_repo_bot_edit_can_checkout",
       "unlisted_same_repo_bot_comment_requires_write_permission",
       "allowlisted_same_repo_bot_comment_can_checkout",
       "review_with_mismatched_author_requires_write_permission",
@@ -42,8 +44,8 @@ describe("RS-05a checkout validator Z3 proof", () => {
       "workflow_dispatch_uses_refs_pull_checkout",
       "non_dispatch_pr_trigger_allows_forked_runtime_after_trust",
     ]);
-    expect(expected.filter(result => result.expected === "unsat")).toHaveLength(11);
-    expect(expected.filter(result => result.expected === "sat")).toHaveLength(3);
+    expect(expected.filter(result => result.expected === "unsat")).toHaveLength(12);
+    expect(expected.filter(result => result.expected === "sat")).toHaveLength(4);
   });
 
   it.runIf(z3Available())("proves every modeled unsafe checkout state is unreachable", () => {
