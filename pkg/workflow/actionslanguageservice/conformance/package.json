@@ -1,0 +1,19 @@
+{
+  "name": "gh-aw-actions-parser-conformance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild oracle.mjs --bundle --platform=node --format=esm --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=oracle.bundle.mjs",
+    "pretest": "npm run build",
+    "test": "GH_AW_ACTIONS_PARSER_CONFORMANCE=1 go test .. -run 'Test.*Conformance' -count=1",
+    "refresh": "npm run build && node refresh.mjs"
+  },
+  "dependencies": {
+    "@actions/expressions": "0.3.61",
+    "@actions/workflow-parser": "0.3.61",
+    "yaml": "2.8.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

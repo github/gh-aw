@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -116,6 +118,18 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "VALUE: fallback'literal",
 		},
 		{
+			name:     "multiple escaped quote pairs in literal fallback resolve",
+			content:  `VALUE: ${{ github.aw.import-inputs.missing || 'it''s ''ready''' }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: it's 'ready'",
+		},
+		{
+			name:     "consecutive escaped quote pairs in grouped fallback resolve",
+			content:  `VALUE: ${{ github.aw.import-inputs.missing || ('a''''b') }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: a''b",
+		},
+		{
 			name:     "legacy input participates in fallback chains",
 			content:  `VALUE: ${{ github.aw.inputs.campaign || github.aw.import-inputs.package || 'fallback-literal' }}`,
 			inputs:   map[string]any{"package": "repo-assist"},
@@ -221,11 +235,10 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "A: eslint-rules\nB: b-default",
 		},
 		{
-			name:     "multiline expression is left untouched",
+			name:     "multiline expression uses Actions syntax",
 			content:  "VALUE: ${{ github.aw.import-inputs.campaign ||\n'fallback-literal' }}",
 			inputs:   map[string]any{},
-			expected: "VALUE: ${{ github.aw.import-inputs.campaign ||\n'fallback-literal' }}",
-			contains: true,
+			expected: "VALUE: fallback-literal",
 		},
 		{
 			name:     "literal-only fallback without input reference is left untouched",
@@ -282,22 +295,22 @@ func TestSplitFallbackOperands(t *testing.T) {
 		{
 			name:     "two simple operands",
 			input:    "github.aw.import-inputs.campaign || 'fallback'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'fallback'"},
+			expected: []string{"github.aw.import-inputs.campaign", "'fallback'"},
 		},
 		{
 			name:     "three operands",
 			input:    "a || b || c",
-			expected: []string{"a ", " b ", " c"},
+			expected: []string{"a", "b", "c"},
 		},
 		{
 			name:     "pipe characters inside single-quoted string are not split",
 			input:    "github.aw.import-inputs.campaign || 'a||b'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'a||b'"},
+			expected: []string{"github.aw.import-inputs.campaign", "'a||b'"},
 		},
 		{
 			name:     "escaped single quote inside string is not treated as string terminator",
 			input:    "github.aw.import-inputs.campaign || 'it''s here'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'it''s here'"},
+			expected: []string{"github.aw.import-inputs.campaign", "'it''s here'"},
 		},
 		{
 			name:     "no fallback operator returns single operand",
@@ -317,7 +330,40 @@ func TestSplitFallbackOperands(t *testing.T) {
 					t.Errorf("splitFallbackOperands(%q)[%d] = %q, want %q", tc.input, i, got[i], tc.expected[i])
 				}
 			}
+
 		})
+	}
+}
+
+func TestImportInputParserDiagnosticsDoNotLogSource(t *testing.T) {
+	const marker = "sensitive-import-expression-marker"
+	if os.Getenv("GH_AW_TEST_IMPORT_LOG_REDACTION") == "1" {
+		content := "${{ format('" + marker + "', ) }}"
+		if got := substituteImportInputsInContent(content, nil); got != content {
+			t.Fatalf("malformed expression changed: %q", got)
+		}
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestImportInputParserDiagnosticsDoNotLogSource$")
+	env := make([]string, 0, len(os.Environ())+3)
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if key != "GH_AW_TEST_IMPORT_LOG_REDACTION" && key != "DEBUG" && key != "DEBUG_COLORS" {
+			env = append(env, entry)
+		}
+	}
+	cmd.Env = append(env,
+		"GH_AW_TEST_IMPORT_LOG_REDACTION=1",
+		"DEBUG=parser:import_processor",
+		"DEBUG_COLORS=0",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("debug-log subprocess failed: %v\n%s", err, output)
+	}
+	if strings.Contains(string(output), marker) {
+		t.Fatalf("parser source was written to debug logs: %s", output)
 	}
 }
 

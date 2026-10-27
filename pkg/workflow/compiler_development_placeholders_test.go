@@ -27,6 +27,7 @@ func TestDryRunPlaceholderReusableOutputContract(t *testing.T) {
 			}
 			consumer := &Job{
 				Name: "consumer", RunsOn: "runs-on: ubuntu-latest", Needs: []string{"prepare"},
+				If:    "needs.prepare.outputs.ready == 'true'",
 				Steps: []string{"      - run: echo '${{ needs.prepare.outputs.value }}'\n"},
 				Env: map[string]string{
 					"BRACKET_OUTPUT": "${{ needs['prepare']['outputs']['bracket-value'] }}",
@@ -52,7 +53,7 @@ func TestDryRunPlaceholderReusableOutputContract(t *testing.T) {
 			}
 			assert.Equal(t, map[string]string{
 				"value": "${{ '' }}", "bracket-value": "${{ '' }}", "typed": "${{ '' }}",
-				"workflow_result": "${{ '' }}",
+				"workflow_result": "${{ '' }}", "ready": "${{ '' }}",
 			}, producer.Outputs)
 			assert.Empty(t, producer.Uses)
 			assert.False(t, producer.SecretsInherit)
@@ -87,6 +88,77 @@ func TestDryRunPlaceholderPreservesTypedDeclarations(t *testing.T) {
 	}, job.Outputs)
 	assert.Nil(t, job.Actions)
 	assert.Equal(t, "permissions: {}", job.Permissions)
+}
+
+func TestDryRunReferencedOutputsImplicitConditions(t *testing.T) {
+	outputs := dryRunReferencedOutputs(
+		&Job{
+			If: "needs.prepare.outputs.ready == 'true' && needs['prepare']['outputs']['bracket-ready'] != ''",
+			Env: map[string]string{
+				"PLAIN_TEXT": "needs.prepare.outputs.not_an_expression",
+				"WRAPPED":    "${{ needs.prepare.outputs.wrapped }}",
+				"if":         "needs.prepare.outputs.not_a_condition",
+			},
+			Actions: &actions.Job{
+				If: actions.Binary{
+					Left:     actions.Context("needs.prepare.outputs.typed == 'true'"),
+					Operator: "&&",
+					Right:    actions.Literal("needs.prepare.outputs.quoted"),
+				},
+			},
+		},
+		&Job{If: "${{ needs.prepare.outputs.explicit == 'true' }}"},
+		&Job{If: "contains('needs.prepare.outputs.literal', 'ready')"},
+	)
+	assert.Equal(t, map[string]map[string]string{
+		"prepare": {
+			"ready": "${{ '' }}", "bracket-ready": "${{ '' }}", "wrapped": "${{ '' }}",
+			"typed": "${{ '' }}", "explicit": "${{ '' }}",
+		},
+	}, outputs)
+}
+
+func TestDryRunPlaceholderBuiltinConditionOutputContract(t *testing.T) {
+	for _, condition := range []string{
+		"needs.prepare.outputs.ready == 'true'",
+		"${{ needs.prepare.outputs.ready == 'true' }}",
+		"always() && needs['prepare']['outputs']['ready'] == 'true'",
+	} {
+		t.Run(condition, func(t *testing.T) {
+			c := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+			c.SetDryRun(true)
+			c.repoConfigLoaded = true
+			c.repoConfig = &RepoConfig{}
+			source := `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+jobs:
+  prepare:
+    uses: owner/repo/.github/workflows/prepare.yml@main
+    secrets: inherit
+  agent:
+    needs: [prepare]
+    if: ` + condition + `
+---
+Analyze the repository.
+`
+			data, err := c.ParseWorkflowString(source, "placeholder.md")
+			require.NoError(t, err)
+			compiled, err := c.CompileToYAML(data, "placeholder.md")
+			require.NoError(t, err)
+			var workflow map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(compiled), &workflow))
+			jobs := workflow["jobs"].(map[string]any)
+			prepare := jobs["prepare"].(map[string]any)
+			assert.Equal(t, map[string]any{"ready": "${{ '' }}"}, prepare["outputs"])
+			assert.Equal(t, "${{ !always() }}", prepare["if"])
+			assert.Equal(t, map[string]any{}, prepare["permissions"])
+			assert.NotContains(t, compiled, "secrets: inherit")
+			assert.NotContains(t, compiled, "owner/repo/.github/workflows/prepare.yml")
+		})
+	}
 }
 
 func TestDryRunPlaceholderStaticRunner(t *testing.T) {

@@ -10,6 +10,8 @@ Beyond basic frontmatter extraction, the package provides a rich import system t
 
 The package is designed for use both in the main CLI binary and in WebAssembly contexts (see `*_wasm.go` files). Build constraints separate platform-specific implementations for remote fetching and filesystem access.
 
+Actions expressions use the native `actionslanguageservice` grammar and quote-aware interpolation scanner. Import-input substitution supports static dot or single-quoted bracket references and compile-time-safe fallback chains, including parenthesized chains. Runtime operands and malformed expressions remain unchanged. Freshness hashing shares quote-aware boundary scanning with JavaScript, retaining complete expressions before an unclosed suffix. Its legacy textual `env.`/`vars.` filter is unchanged; hashing does not validate Actions grammar.
+
 ## Public API
 
 ### Types

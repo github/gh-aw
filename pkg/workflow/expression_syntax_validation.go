@@ -8,92 +8,55 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
-)
 
-// expressionBracesPattern matches GitHub Actions ${{ }} expressions for syntax validation.
-// Uses [^}]* to match non-closing-brace characters within the expression.
-var expressionBracesPattern = regexp.MustCompile(`\$\{\{([^}]*)\}\}`)
-
-// Pre-compiled regexes shared between syntax and safety validation
-var (
-	// stringLiteralRegex matches single-quoted, double-quoted, or backtick-quoted string literals.
-	// Note: escape sequences inside strings are not handled; GitHub Actions uses '' for literal quotes.
-	stringLiteralRegex = regexp.MustCompile(`^'[^']*'$|^"[^"]*"$|^` + "`[^`]*`$")
-	// numberLiteralRegex matches integer and decimal number literals (with optional leading minus)
-	numberLiteralRegex = regexp.MustCompile(`^-?\d+(\.\d+)?$`)
-	// exprPartSplitRe splits expression strings on dot and bracket characters
-	exprPartSplitRe = regexp.MustCompile(`[.\[\]]+`)
-	// exprNumericPartRe matches purely numeric expression parts (array indices)
-	exprNumericPartRe = regexp.MustCompile(`^\d+$`)
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 // validateBalancedBraces checks that all ${{ }} braces are balanced and properly closed
 func validateBalancedBraces(group string) error {
 	expressionValidationLog.Print("Checking balanced braces in expression")
-	openCount := 0
-	i := 0
-	positions := []int{} // Track positions of opening braces for error reporting
-
-	for i < len(group) {
-		// Check for opening ${{
-		if i+2 < len(group) && group[i:i+3] == "${{" {
-			openCount++
-			positions = append(positions, i)
-			i += 3
-			continue
-		}
-
-		// Check for closing }}
-		if i+1 < len(group) && group[i:i+2] == "}}" {
-			if openCount == 0 {
-				return NewValidationError(
-					"expression",
-					"unbalanced closing braces",
-					fmt.Sprintf("found '}}' at position %d without matching opening '${{' in expression: %s", i, group),
-					"Ensure all '}}' have a corresponding opening '${{'. Check for typos or missing opening braces.",
-				)
-			}
-			openCount--
-			if len(positions) > 0 {
-				positions = positions[:len(positions)-1]
-			}
-			i += 2
-			continue
-		}
-
-		i++
-	}
-
-	if openCount > 0 {
-		// Find the position of the first unclosed opening brace
-		pos := positions[0]
-		expressionValidationLog.Printf("Found %d unclosed brace(s) starting at position %d", openCount, pos)
+	expressions, err := actionslanguageservice.ExtractExpressions(group)
+	if err != nil {
 		return NewValidationError(
 			"expression",
 			"unclosed expression braces",
-			fmt.Sprintf("found opening '${{' at position %d without matching closing '}}' in expression: %s", pos, group),
+			err.Error(),
 			"Ensure all '${{' have a corresponding closing '}}'. Add the missing closing braces.",
 		)
 	}
-
+	offset := 0
+	for _, expression := range expressions {
+		if strings.Contains(group[offset:expression.Start], "}}") {
+			return unexpectedClosingBraces(group, offset)
+		}
+		offset = expression.End
+	}
+	if strings.Contains(group[offset:], "}}") {
+		return unexpectedClosingBraces(group, offset)
+	}
 	expressionValidationLog.Print("Brace balance check passed")
 	return nil
 }
 
+func unexpectedClosingBraces(group string, offset int) error {
+	return NewValidationError(
+		"expression",
+		"unbalanced closing braces",
+		fmt.Sprintf("found '}}' at position %d without matching opening '${{' in expression: %s", offset+strings.Index(group[offset:], "}}"), group),
+		"Ensure all '}}' have a corresponding opening '${{'. Check for typos or missing opening braces.",
+	)
+}
+
 // validateExpressionSyntax validates the syntax of expressions within ${{ }}
 func validateExpressionSyntax(group string) error {
-	matches := expressionBracesPattern.FindAllStringSubmatch(group, -1)
-
-	expressionValidationLog.Printf("Found %d expression(s) to validate", len(matches))
-
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
-		}
-
-		exprContent := strings.TrimSpace(match[1])
+	expressions, err := actionslanguageservice.ExtractExpressions(group)
+	if err != nil {
+		return err
+	}
+	expressionValidationLog.Printf("Found %d expression(s) to validate", len(expressions))
+	for _, expression := range expressions {
+		exprContent := strings.TrimSpace(expression.Content)
 		if exprContent == "" {
 			return NewValidationError(
 				"expression",
@@ -114,6 +77,13 @@ func validateExpressionSyntax(group string) error {
 
 // validateExpressionContent validates the content inside ${{ }}
 func validateExpressionContent(expr string, fullGroup string) error {
+	parseErr := actionslanguageservice.ValidateExpression(expr)
+	if parseErr == nil {
+		return nil
+	}
+
+	// Retain the existing actionable diagnostics for common structural errors.
+	// Successful official-grammar parsing takes precedence over these heuristics.
 	// Check for unbalanced parentheses
 	parenCount := 0
 	for i, ch := range expr {
@@ -147,31 +117,20 @@ func validateExpressionContent(expr string, fullGroup string) error {
 		return err
 	}
 
-	// Try to parse complex expressions with logical operators
-	if containsLogicalOperators(expr) {
-		expressionValidationLog.Print("Expression contains logical operators, performing deep validation")
-		if _, err := ParseExpression(expr); err != nil {
-			expressionValidationLog.Printf("Expression parsing failed: %v", err)
-			return NewValidationError(
-				"expression",
-				"invalid expression syntax",
-				"failed to parse expression: "+err.Error(),
-				"Fix the syntax error in your expression. Full expression: "+fullGroup,
-			)
-		}
-	}
-
-	return nil
+	return NewValidationError(
+		"expression",
+		"invalid expression syntax",
+		"failed to parse expression: "+parseErr.Error(),
+		"Fix the syntax error in your expression. Full expression: "+fullGroup,
+	)
 }
 
 // validateBalancedQuotes checks for balanced quotes in an expression
 func validateBalancedQuotes(expr string) error {
-	inSingleQuote := false
-	inDoubleQuote := false
-	inBacktick := false
+	var quote rune
 	escaped := false
 
-	for i, ch := range expr {
+	for _, ch := range expr {
 		if escaped {
 			escaped = false
 			continue
@@ -182,48 +141,34 @@ func validateBalancedQuotes(expr string) error {
 			continue
 		}
 
-		switch ch {
-		case '\'':
-			if !inDoubleQuote && !inBacktick {
-				inSingleQuote = !inSingleQuote
-			}
-		case '"':
-			if !inSingleQuote && !inBacktick {
-				inDoubleQuote = !inDoubleQuote
-			}
-		case '`':
-			if !inSingleQuote && !inDoubleQuote {
-				inBacktick = !inBacktick
-			}
+		if ch == quote {
+			quote = 0
+		} else if quote == 0 && (ch == '\'' || ch == '"' || ch == '`') {
+			quote = ch
 		}
-
-		// Check if we reached end of string with unclosed quote
-		if i == len(expr)-1 {
-			if inSingleQuote {
-				return NewValidationError(
-					"expression",
-					"unclosed single quote",
-					"found unclosed single quote in expression: "+expr,
-					"Add the missing closing single quote (') to your expression.",
-				)
-			}
-			if inDoubleQuote {
-				return NewValidationError(
-					"expression",
-					"unclosed double quote",
-					"found unclosed double quote in expression: "+expr,
-					"Add the missing closing double quote (\") to your expression.",
-				)
-			}
-			if inBacktick {
-				return NewValidationError(
-					"expression",
-					"unclosed backtick",
-					"found unclosed backtick in expression: "+expr,
-					"Add the missing closing backtick (`) to your expression.",
-				)
-			}
-		}
+	}
+	switch quote {
+	case '\'':
+		return NewValidationError(
+			"expression",
+			"unclosed single quote",
+			"found unclosed single quote in expression: "+expr,
+			"Add the missing closing single quote (') to your expression.",
+		)
+	case '"':
+		return NewValidationError(
+			"expression",
+			"unclosed double quote",
+			"found unclosed double quote in expression: "+expr,
+			"Add the missing closing double quote (\") to your expression.",
+		)
+	case '`':
+		return NewValidationError(
+			"expression",
+			"unclosed backtick",
+			"found unclosed backtick in expression: "+expr,
+			"Add the missing closing backtick (`) to your expression.",
+		)
 	}
 
 	return nil

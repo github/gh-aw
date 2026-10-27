@@ -48,6 +48,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/syncutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var schemaValidationLog = logger.New("workflow:schema_validation")
@@ -81,7 +82,10 @@ func (c *Compiler) validateGitHubActionsSchema(yamlContent string) error {
 		return fmt.Errorf("failed to parse YAML for schema validation: %w", err)
 	}
 
-	return c.validateGitHubActionsSchemaFromParsed(workflowData)
+	if err := c.validateGitHubActionsSchemaFromParsed(workflowData); err != nil {
+		return err
+	}
+	return actionslanguageservice.ValidateWorkflow("workflow.yml", yamlContent)
 }
 
 // validateGitHubActionsSchemaFromParsed validates pre-parsed workflow data against the

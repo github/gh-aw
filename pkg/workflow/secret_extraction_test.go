@@ -506,11 +506,9 @@ func TestExtractWorkflowInputExpressionsFromValue(t *testing.T) {
 			},
 		},
 		{
-			name:  "double-quote bracket notation",
-			value: `"base":"${{ inputs["base-branch"] }}"`,
-			expected: map[string]string{
-				"GH_AW_INPUT_BASE_BRANCH": `${{ inputs["base-branch"] }}`,
-			},
+			name:     "invalid double-quote bracket notation",
+			value:    `"base":"${{ inputs["base-branch"] }}"`,
+			expected: map[string]string{},
 		},
 		{
 			name:     "no input expressions",
@@ -609,9 +607,9 @@ func TestContainsJobOutputExpr(t *testing.T) {
 			want:  true,
 		},
 		{
-			name:  "bracket notation with double quotes",
+			name:  "invalid bracket notation with double quotes",
 			value: `${{ needs["auth"].outputs["token"] }}`,
-			want:  true,
+			want:  false,
 		},
 		{
 			name:  "full bracket notation (job and outputs key both in brackets)",

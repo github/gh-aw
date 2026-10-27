@@ -321,12 +321,12 @@ func TestStringLiteralPattern(t *testing.T) {
 		{
 			name:      "double quoted string",
 			input:     `"hello world"`,
-			wantMatch: true,
+			wantMatch: false,
 		},
 		{
 			name:      "backtick quoted string",
 			input:     "`hello world`",
-			wantMatch: true,
+			wantMatch: false,
 		},
 		{
 			name:      "empty single quotes",
