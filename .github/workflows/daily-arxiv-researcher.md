@@ -58,7 +58,6 @@ steps:
       script: |
         const fs = require('fs');
         const https = require('https');
-        const { execFileSync } = require('child_process');
 
         const BASE_DIR = '/tmp/gh-aw/agent/arxiv';
         const PAPERS_JSON = `${BASE_DIR}/papers.json`;
@@ -122,10 +121,145 @@ steps:
         const fetchedAt = new Date().toISOString().slice(0, 10);
         fs.writeFileSync(PAPERS_JSON, JSON.stringify({ fetched_at: fetchedAt, count: papers.length, papers }, null, 2));
 
-        execFileSync('python3', ['.github/scripts/arxiv_memory.py', 'prepare'], { stdio: 'inherit' });
-        const { new_count } = JSON.parse(fs.readFileSync(`${BASE_DIR}/new-papers.json`, 'utf8'));
+        const MEMORY_DIR = '/tmp/gh-aw/repo-memory/default';
+        const CACHE_DIR = '/tmp/gh-aw/cache-memory';
+        const indexNames = fs.existsSync(MEMORY_DIR)
+          ? fs.readdirSync(MEMORY_DIR).filter(name => /^paper-index(?:-\d{4,})?\.json$/.test(name))
+          : [];
+        // A saved cache does not prove that the corresponding repo-memory push succeeded.
+        const seenIds = new Set(indexNames.flatMap(name =>
+          JSON.parse(fs.readFileSync(`${MEMORY_DIR}/${name}`, 'utf8')).papers.map(paper => paper.id)
+        ));
+        const newPapers = papers.filter(paper => !seenIds.has(paper.id));
+        fs.writeFileSync(`${BASE_DIR}/new-papers.json`, JSON.stringify({
+          total_fetched: papers.length,
+          already_seen: papers.length - newPapers.length,
+          new_count: newPapers.length,
+          fetched_at: fetchedAt,
+          papers: newPapers
+        }, null, 2) + '\n');
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+        fs.writeFileSync(`${CACHE_DIR}/seen-paper-ids.json`, JSON.stringify({ ids: [...seenIds].sort() }, null, 2) + '\n');
 
-        core.info(`Parsed ${papers.length} papers, ${new_count} new`);
+        // Materialize the authored inline function so the agent runs it without copying code.
+        fs.writeFileSync(`${BASE_DIR}/update-memory.cjs`, `(${updatePaperMemory.toString()})();\n`);
+
+        function updatePaperMemory() {
+          const fs = require('fs');
+          const memoryDir = '/tmp/gh-aw/repo-memory/default';
+          const dataDir = '/tmp/gh-aw/agent/arxiv';
+          const cacheDir = '/tmp/gh-aw/cache-memory';
+          const maxFileBytes = 102400;
+          const shardBytes = 81920;
+          const maxFiles = 100;
+          const maxPatchBytes = 51200;
+          const header = '# arXiv Paper Ledger\n\nPapers investigated for GitHub Agentic Workflows improvement opportunities.\n';
+          const jsonText = value => JSON.stringify(value, null, 2) + '\n';
+          const readJSON = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+          const line = value => String(value).replace(/\s+/g, ' ').trim();
+          const newPapers = readJSON(`${dataDir}/new-papers.json`).papers;
+          const results = readJSON(`${dataDir}/screened-papers.json`).papers;
+          for (const paper of newPapers) {
+            if (['id', 'title', 'published', 'url'].some(field => typeof paper[field] !== 'string') ||
+                !Array.isArray(paper.categories) || paper.categories.some(category => typeof category !== 'string')) {
+              throw new Error('Paper metadata requires string id, title, published, url and string-array categories');
+            }
+          }
+          const byId = new Map(results.map(result => [result.id, result]));
+          const expected = new Set(newPapers.map(paper => paper.id));
+          if (expected.size !== newPapers.length || byId.size !== results.length ||
+              byId.size !== expected.size || [...byId.keys()].some(id => !expected.has(id))) {
+            throw new Error('Screening results must contain each new paper ID exactly once');
+          }
+          for (const result of results) {
+            if (typeof result.relevant !== 'boolean') {
+              throw new Error(`Screening result for ${result.id} needs a boolean relevant field`);
+            }
+            for (const field of ['opportunity', 'area']) {
+              if (Object.hasOwn(result, field) && typeof result[field] !== 'string') {
+                throw new Error(`Screening result ${field} must be a string`);
+              }
+            }
+          }
+
+          const files = new Map();
+          if (fs.existsSync(memoryDir)) {
+            for (const entry of fs.readdirSync(memoryDir, { withFileTypes: true })) {
+              if (entry.isFile() && /\.(json|md)$/.test(entry.name)) {
+                const text = fs.readFileSync(`${memoryDir}/${entry.name}`, 'utf8');
+                if (Buffer.byteLength(text, 'utf8') > maxFileBytes) {
+                  throw new Error('Existing memory exceeds 100 KiB; repair it before adding papers');
+                }
+                files.set(entry.name, text);
+              }
+            }
+          }
+          const indices = [...files.keys()].filter(name => /^paper-index(?:-\d{4,})?\.json$/.test(name));
+          const seen = new Set(indices.flatMap(name => JSON.parse(files.get(name)).papers.map(paper => paper.id)));
+          const numbers = indices.filter(name => name !== 'paper-index.json')
+            .map(name => Number(name.slice('paper-index-'.length, -'.json'.length)));
+          let number = numbers.length ? Math.max(...numbers) : 1;
+          const planned = new Map(files);
+          const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+          for (const paper of newPapers) {
+            if (seen.has(paper.id)) continue;
+            const result = byId.get(paper.id);
+            const record = {
+              id: paper.id, title: paper.title, published: paper.published,
+              url: paper.url, categories: paper.categories,
+              relevant: result.relevant, analyzed_at: timestamp
+            };
+            for (const field of ['opportunity', 'area']) {
+              if (Object.hasOwn(result, field)) record[field] = result[field];
+            }
+            let entry = `\n### [${line(record.title)}](${line(record.url)})\n` +
+              `- **ID**: ${record.id}\n- **Published**: ${line(record.published)}\n` +
+              `- **Categories**: ${line(record.categories.join(', '))}\n` +
+              `- **Relevant**: ${record.relevant ? 'Yes' : 'No'}\n`;
+            for (const field of ['opportunity', 'area']) {
+              if (record.relevant && record[field]) {
+                entry += `- **${field[0].toUpperCase() + field.slice(1)}**: ${line(record[field])}\n`;
+              }
+            }
+            while (true) {
+              const suffix = String(number).padStart(4, '0');
+              const indexName = `paper-index-${suffix}.json`;
+              const ledgerName = `paper-ledger-${suffix}.md`;
+              if (planned.has(indexName) !== planned.has(ledgerName)) {
+                throw new Error(`Incomplete memory shard ${number}`);
+              }
+              const history = JSON.parse(planned.get(indexName) || '{"papers": []}').papers;
+              const indexText = jsonText({ papers: [...history, record] });
+              const ledgerText = (planned.get(ledgerName) || header) + entry;
+              if (Math.max(Buffer.byteLength(indexText, 'utf8'), Buffer.byteLength(ledgerText, 'utf8')) <= shardBytes) {
+                planned.set(indexName, indexText);
+                planned.set(ledgerName, ledgerText);
+                break;
+              }
+              if (history.length === 0) throw new Error(`Paper ${paper.id} exceeds the 80 KiB shard budget`);
+              number++;
+            }
+            seen.add(paper.id);
+          }
+
+          if (planned.size > maxFiles) {
+            throw new Error('Paper memory reached the 100-file budget; archive history before continuing');
+          }
+          const growth = [...planned].reduce((total, [name, text]) =>
+            total + Math.max(0, Buffer.byteLength(text, 'utf8') - Buffer.byteLength(files.get(name) || '', 'utf8')), 0);
+          if (growth > maxPatchBytes) {
+            throw new Error('Paper update exceeds the 50 KiB patch budget; process a smaller batch');
+          }
+          // Validate the entire candidate before touching memory or advancing dedup.
+          fs.mkdirSync(memoryDir, { recursive: true });
+          for (const [name, text] of planned) {
+            if (files.get(name) !== text) fs.writeFileSync(`${memoryDir}/${name}`, text);
+          }
+          fs.mkdirSync(cacheDir, { recursive: true });
+          fs.writeFileSync(`${cacheDir}/seen-paper-ids.json`, jsonText({ ids: [...seen].sort() }));
+        }
+
+        core.info(`Parsed ${papers.length} papers, ${newPapers.length} new`);
 
 sandbox:
   agent:
@@ -197,13 +331,13 @@ result per paper in `new-papers.json`, including irrelevant papers:
 
 Use the Step 2 screening result for `relevant`. Include `opportunity` and `area`
 only when extracted in Step 3. Do not interpolate paper data into shell code.
-Then run this single command:
+Then run the JavaScript updater prepared by the inline workflow step:
 
 ```bash
-python3 .github/scripts/arxiv_memory.py update
+node /tmp/gh-aw/agent/arxiv/update-memory.cjs
 ```
 
-The helper leaves legacy `paper-ledger.md` and `paper-index.json` unchanged and
+The updater leaves legacy `paper-ledger.md` and `paper-index.json` unchanged and
 appends new history to paired `paper-ledger-NNNN.md` / `paper-index-NNNN.json`
 shards under `/tmp/gh-aw/repo-memory/default`. It rotates before either file
 exceeds 80 KiB of UTF-8, including pretty-printed JSON. It never rewrites or
@@ -214,7 +348,7 @@ memory files manually.
 
 Deduplication is rebuilt from the legacy index and every index shard at the
 start of each run, so an expired cache or a cache saved before a failed
-repo-memory push cannot hide unpersisted papers. The helper also refreshes
+repo-memory push cannot hide unpersisted papers. The updater also refreshes
 `/tmp/gh-aw/cache-memory/seen-paper-ids.json`.
 
 ## Step 5: Create Discussion or Noop
