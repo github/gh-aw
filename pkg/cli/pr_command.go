@@ -551,6 +551,37 @@ func createTransferPRWithAutoMerge(ctx context.Context, targetOwner, targetRepo 
 	return nil
 }
 
+// cloneTransferTargetRepository clones the target repository into a temporary directory and
+// switches the process into it. Callers own cleanup of the returned directory after a
+// successful clone.
+func cloneTransferTargetRepository(targetOwner, targetRepo string, verbose bool) (string, error) {
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Cloning target repository %s/%s...", targetOwner, targetRepo)))
+	}
+
+	tempDir, err := os.MkdirTemp("", "gh-aw-pr-transfer-repo-")
+	if err != nil {
+		return "", fmt.Errorf("could not create temp directory for repo; ensure required prerequisites are configured, then retry: %w", err)
+	}
+	cleanup := func() {
+		if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
+		}
+	}
+
+	cloneCmd := workflow.ExecGH("repo", "clone", fmt.Sprintf("%s/%s", targetOwner, targetRepo), tempDir)
+	if err := cloneCmd.Run(); err != nil {
+		cleanup()
+		return "", fmt.Errorf("could not clone target repository; ensure required prerequisites are configured, then retry: %w", err)
+	}
+
+	if err := os.Chdir(tempDir); err != nil {
+		cleanup()
+		return "", fmt.Errorf("could not change to cloned repository directory; ensure required prerequisites are configured, then retry: %w", err)
+	}
+	return tempDir, nil
+}
+
 func transferPRWithMessage(ctx context.Context, prURL, targetRepo string, verbose, autoMerge bool, message string) error { //nolint:largefunc
 	prLog.Printf("Starting PR transfer: url=%s, targetRepo=%s", prURL, targetRepo)
 
@@ -620,97 +651,28 @@ func transferPRWithMessage(ctx context.Context, prURL, targetRepo string, verbos
 					// We're already in the target repo
 					workingDir = "."
 				} else {
-					// We need to clone the target repository
-					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Cloning target repository %s/%s...", targetOwner, targetRepoName)))
-					}
-					tempDir, err := os.MkdirTemp("", "gh-aw-pr-transfer-repo-")
+					// We need to clone the target repository.
+					workingDir, err = cloneTransferTargetRepository(targetOwner, targetRepoName, verbose)
 					if err != nil {
-						return fmt.Errorf("could not create temp directory for repo; ensure required prerequisites are configured, then retry: %w", err)
+						return err
 					}
-
-					cloneCmd := workflow.ExecGH("repo", "clone", fmt.Sprintf("%s/%s", targetOwner, targetRepoName), tempDir)
-					if err := cloneCmd.Run(); err != nil {
-						// Clean up temporary directory on error
-						if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
-							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
-						}
-						return fmt.Errorf("could not clone target repository; ensure required prerequisites are configured, then retry: %w", err)
-					}
-
-					workingDir = tempDir
 					needsCleanup = true
-
-					// Change to the cloned repository directory
-					if err := os.Chdir(tempDir); err != nil {
-						// Clean up temporary directory on error
-						if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
-							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
-						}
-						return fmt.Errorf("could not change to cloned repository directory; ensure required prerequisites are configured, then retry: %w", err)
-					}
 				}
 			} else {
-				// Error getting current repo, clone anyway
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Cloning target repository %s/%s...", targetOwner, targetRepoName)))
-				}
-				tempDir, err := os.MkdirTemp("", "gh-aw-pr-transfer-repo-")
+				// Error getting current repo, clone anyway.
+				workingDir, err = cloneTransferTargetRepository(targetOwner, targetRepoName, verbose)
 				if err != nil {
-					return fmt.Errorf("could not create temp directory for repo; ensure required prerequisites are configured, then retry: %w", err)
+					return err
 				}
-
-				cloneCmd := workflow.ExecGH("repo", "clone", fmt.Sprintf("%s/%s", targetOwner, targetRepoName), tempDir)
-				if err := cloneCmd.Run(); err != nil {
-					// Clean up temporary directory on error
-					if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
-					}
-					return fmt.Errorf("could not clone target repository; ensure required prerequisites are configured, then retry: %w", err)
-				}
-
-				workingDir = tempDir
 				needsCleanup = true
-
-				// Change to the cloned repository directory
-				if err := os.Chdir(tempDir); err != nil {
-					// Clean up temporary directory on error
-					if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
-						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
-					}
-					return fmt.Errorf("could not change to cloned repository directory; ensure required prerequisites are configured, then retry: %w", err)
-				}
 			}
 		} else {
-			// We're not in a git repository and need to clone
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Cloning target repository %s/%s...", targetOwner, targetRepoName)))
-			}
-			tempDir, err := os.MkdirTemp("", "gh-aw-pr-transfer-repo-")
+			// We're not in a git repository and need to clone.
+			workingDir, err = cloneTransferTargetRepository(targetOwner, targetRepoName, verbose)
 			if err != nil {
-				return fmt.Errorf("could not create temp directory for repo; ensure required prerequisites are configured, then retry: %w", err)
+				return err
 			}
-
-			cloneCmd := workflow.ExecGH("repo", "clone", fmt.Sprintf("%s/%s", targetOwner, targetRepoName), tempDir)
-			if err := cloneCmd.Run(); err != nil {
-				// Clean up temporary directory on error
-				if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
-				}
-				return fmt.Errorf("could not clone target repository; ensure required prerequisites are configured, then retry: %w", err)
-			}
-
-			workingDir = tempDir
 			needsCleanup = true
-
-			// Change to the cloned repository directory
-			if err := os.Chdir(tempDir); err != nil {
-				// Clean up temporary directory on error
-				if rmErr := os.RemoveAll(tempDir); rmErr != nil && verbose {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("failed to clean up temporary directory %s: %v", tempDir, rmErr)))
-				}
-				return fmt.Errorf("could not change to cloned repository directory; ensure required prerequisites are configured, then retry: %w", err)
-			}
 		}
 	} else {
 		// Using current repository as target
