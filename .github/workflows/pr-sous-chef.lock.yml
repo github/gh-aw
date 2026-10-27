@@ -3064,6 +3064,7 @@ jobs:
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: write
+      checks: read
       issues: write
       pull-requests: write
     concurrency:

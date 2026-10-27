@@ -1871,7 +1871,7 @@ async function getSecretRedactionError(jobId, step) {
 /**
  * Find the failed agent step using Actions metadata only, never agent-generated log text.
  * @param {{startupFailure?: boolean}} [options] - Select the first failed step only for a validated collector startup failure.
- * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string}>}
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean}>}
  */
 async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   let jobs;
@@ -1910,16 +1910,35 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (!agentConclusion) {
     return { failingStep: "", attributionUnavailable: "The Actions jobs API returned an invalid agent job conclusion." };
   }
-  if (agentConclusion !== "failure" && agentConclusion !== "timed_out") {
+  let isCancelledTimeout = false;
+  if (startupFailure && agentConclusion === "cancelled") {
+    try {
+      const checkRunId = Number(new URL(agentJob.check_run_url).pathname.match(/\/check-runs\/(\d+)$/)?.[1]);
+      if (!Number.isSafeInteger(checkRunId) || checkRunId <= 0) throw new Error("Invalid agent check run URL");
+      const annotations = await github.paginate(github.rest.checks.listAnnotations, {
+        ...context.repo,
+        check_run_id: checkRunId,
+        per_page: 100,
+      });
+      if (!Array.isArray(annotations)) throw new Error("Invalid check annotations");
+      isCancelledTimeout = annotations.some(annotation => annotation.annotation_level === "failure" && typeof annotation.message === "string" && /^The job has exceeded the maximum execution time of \d/.test(annotation.message));
+      if (!isCancelledTimeout) return { failingStep: "", agentConclusion, cancelledWithoutTimeout: true };
+    } catch {
+      const reason = "Could not verify agent timeout annotations; preserving the startup failure. Ensure the conclusion job grants checks: read.";
+      core.warning(reason);
+      return { failingStep: "", agentConclusion, attributionUnavailable: reason };
+    }
+  }
+  if (agentConclusion !== "failure" && agentConclusion !== "timed_out" && !isCancelledTimeout) {
     return { failingStep: "", agentConclusion };
   }
   const steps = agentJob.steps?.slice();
   if (!startupFailure) steps?.reverse();
   const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && ["failure", "timed_out"].includes(step.conclusion));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
-  const failedStep = (!startupFailure && redactionStep) || steps?.find(step => ["failure", "timed_out"].includes(step.conclusion) && typeof step.name === "string");
+  const failedStep = (!startupFailure && redactionStep) || steps?.find(step => (["failure", "timed_out"].includes(step.conclusion) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
   if (!failedStep) {
-    return { failingStep: "", agentConclusion, attributionUnavailable: "The failed agent job had no failed step metadata." };
+    return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }
 
   const failingStep = sanitizeContent(failedStep.name, 200).replace(/\s+/g, " ").trim();
@@ -1929,6 +1948,7 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   return {
     failingStep,
     agentConclusion,
+    ...(isCancelledTimeout ? { isTimedOut: true } : {}),
     ...(failedStep === redactionStep ? { secretRedactionFailed: true, stepError: await getSecretRedactionError(agentJob.id, redactionStep) } : {}),
   };
 }
@@ -4185,11 +4205,11 @@ async function main() {
     core.info(`Missing data report-as-failure: ${missingDataReportAsFailure}`);
 
     // Check if the agent timed out.
-    // A job-level timeout sets agentConclusion to "timed_out".
+    // A job-level timeout can also be reported as "cancelled"; check annotations below.
     // A step-level timeout (timeout-minutes on the engine execution step) is detected by
     // the detect-copilot-errors step which checks for SIGTERM/SIGKILL/SIGINT signals
     // in the engine output and sets the agentic_engine_timeout output.
-    const isTimedOut = (agentConclusion === "timed_out" || agenticEngineTimeout) && !shellExpansionGuardRejected;
+    let isTimedOut = (agentConclusion === "timed_out" || agenticEngineTimeout) && !shellExpansionGuardRejected;
 
     // Check if there are assignment errors (regardless of agent job status).
     // Use assignment_errors as the single source of truth because it includes
@@ -4235,7 +4255,16 @@ async function main() {
     }
     const taskCompleteRegistrationIssueOnlyReportIncomplete = agentOutputResult.success && shouldIgnoreTaskCompleteRegistrationReports(agentOutputResult.items);
     const collectorEmptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
-    const isCancelledEmptyOutput = agentConclusion === "cancelled" && ["missing_terminal_safe_output", "agent_startup_failure"].includes(collectorEmptyOutputCause);
+    let failureDiagnostics;
+    if (agentConclusion === "cancelled" && collectorEmptyOutputCause === "agent_startup_failure") {
+      failureDiagnostics = await getFailedAgentDiagnostics({ startupFailure: true });
+      isTimedOut = isTimedOut || (Boolean(failureDiagnostics.isTimedOut) && !shellExpansionGuardRejected);
+    }
+    const isCancelledEmptyOutput =
+      agentConclusion === "cancelled" &&
+      !isTimedOut &&
+      (collectorEmptyOutputCause === "missing_terminal_safe_output" ||
+        (collectorEmptyOutputCause === "agent_startup_failure" && failureDiagnostics?.cancelledWithoutTimeout === true && !modelEndpointMismatchError && !modelNotSupportedError));
 
     if (agentConclusion === "success") {
       if (!agentOutputResult.success || !agentOutputResult.items || agentOutputResult.items.length === 0) {
@@ -4387,7 +4416,7 @@ async function main() {
       return;
     }
 
-    const failureDiagnostics = await getFailedAgentDiagnostics({ startupFailure: collectorEmptyOutputCause === "agent_startup_failure" });
+    failureDiagnostics ??= await getFailedAgentDiagnostics({ startupFailure: collectorEmptyOutputCause === "agent_startup_failure" });
     if (failureDiagnostics.hasNoJobs && !hasCheckoutFailure) {
       core.info("Skipping failure reporting: no workflow jobs started; the run may not have been approved.");
       return;
@@ -4500,10 +4529,10 @@ async function main() {
     const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
     // A model mismatch explains generic empty output, but not a fatal final runtime signal.
     const hasModelConfigurationError = hasModelEndpointMismatch || modelNotSupportedError;
-    const collectorFailureCause = agentOutputResult.success && !isCancelledEmptyOutput ? agentOutputResult.collectorFailureCause : undefined;
+    const collectorFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
     const modelConfigurationExplainsEmptyOutput = hasModelConfigurationError && !failureDiagnostics.secretRedactionFailed && !["agent_startup_failure", "driver_crash"].includes(collectorFailureCause);
     const emptyOutputCause = modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorEmptyOutputCause;
-    const terminalOutputFailureCause = failureDiagnostics.secretRedactionFailed ? "secret_redaction_failure" : modelConfigurationExplainsEmptyOutput ? undefined : collectorFailureCause;
+    const terminalOutputFailureCause = failureDiagnostics.secretRedactionFailed ? "secret_redaction_failure" : modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorFailureCause;
     const reportItems = (Array.isArray(agentOutputResult.items) ? agentOutputResult.items : []).filter(
       item =>
         !(modelConfigurationExplainsEmptyOutput && collectorEmptyOutputCause && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause && typeof item.failureCause === "string") &&
