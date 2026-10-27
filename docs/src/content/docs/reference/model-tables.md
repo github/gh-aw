@@ -9,7 +9,11 @@ This page lists the built-in model aliases used by GitHub Agentic Workflows.
 
 ## Model Aliases
 
-Model aliases let you write `engine: copilot` with a human-friendly model name such as `sonnet` or `mini`, and gh-aw resolves it to the best available concrete model at compile time. Each alias holds an ordered list of patterns; the first pattern that matches an available model wins.
+Model aliases let you write `engine: copilot` with a human-friendly model name such as `sonnet` or `mini`, and gh-aw resolves it against the live model catalog before starting the engine. Each alias holds an ordered list of patterns; the first pattern that matches an available model wins.
+
+Copilot wildcard matches exclude internal `utility` variants. When the catalog includes picker or policy metadata, picker-disabled models and models with a policy state other than `enabled` are excluded. Catalogs without that metadata remain supported; availability also depends on the workflow's Copilot integration.
+
+The `detection` alias prefers small models, then falls back to available agent models if that tier is unavailable. It does not require pinning a specific detection model. To control the selection or cost, set `GH_AW_MODEL_DETECTION_COPILOT` as a repository variable.
 
 For details on the alias syntax, fallback resolution algorithm, and how to define your own aliases in workflow frontmatter, see the [Model Alias Format Specification](/gh-aw/specs/model-alias-specification/).
 
@@ -76,7 +80,7 @@ Meta-aliases reference other aliases by name. They are resolved recursively unti
 |------------|------------|
 | `opusplan` | `opus?effort=high` |
 | `small` | `mini` |
-| `detection` | `small` |
+| `detection` | `small` → `small-agent` → `agent` |
 | `evals` | `small` |
 | `mini` | `haiku` → `gpt-5-mini` → `gpt-5-nano` → `gemini-flash-lite` |
 | `large` | `sonnet` → `gpt-6` → `gpt-5-pro` → `gpt-5` → `gemini-pro` |

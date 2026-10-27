@@ -37,6 +37,85 @@ describe("resolve_model_alias", () => {
     expect(matches).toBe("copilot/claude-sonnet-4.6");
   });
 
+  it.each(["auto", "gpt-5.6", "agent", "any"])("excludes Copilot utility variants from %s regardless of catalog ordering", configuredModel => {
+    const models = ["gpt-5.6-luna-utility", "gpt-5.6-luna", "gpt-5.7-utility"];
+    for (const ordered of [models, [...models].reverse()]) {
+      expect(
+        resolveConfiguredCopilotModel({
+          configuredModel,
+          aliasMap: ALIAS_MAP,
+          reflectData: { endpoints: [{ configured: true, provider: "copilot", models: ordered }] },
+        })
+      ).toBe("gpt-5.6-luna");
+    }
+  });
+
+  it("does not select a utility model when no agent model is available", () => {
+    expect(() =>
+      resolveConfiguredCopilotModel({
+        configuredModel: "auto",
+        aliasMap: ALIAS_MAP,
+        reflectData: { endpoints: [{ configured: true, provider: "copilot", models: ["gpt-5.6-luna-utility"] }] },
+      })
+    ).toThrow(expect.objectContaining({ reason: "model_unavailable" }));
+    expect(selectLatestGlobMatch("*", ["gpt-5.6-luna-utility"])).toBeNull();
+  });
+
+  it.each([{ models: [] }, { models: ["gpt-5.6-luna"] }])("reports an unavailable model, not catalog retrieval failure, when no eligible models remain in $models", async ({ models }) => {
+    await expect(
+      resolveEngineModel({
+        engine: "copilot",
+        provider: "copilot",
+        configuredModel: "auto",
+        aliasMap: ALIAS_MAP,
+        reflectData: { endpoints: [{ configured: true, provider: "copilot", models, routing_models: [{ model_id: "gpt-5.6-luna", model_picker_enabled: false }] }] },
+        record: false,
+      })
+    ).rejects.toMatchObject({ reason: "model_unavailable" });
+  });
+
+  it("preserves explicit utility pins and non-Copilot wildcard behavior", () => {
+    expect(
+      resolveConfiguredCopilotModel({
+        configuredModel: "gpt-5.6-luna-utility",
+        aliasMap: ALIAS_MAP,
+        reflectData: null,
+      })
+    ).toBe("gpt-5.6-luna-utility");
+    expect(selectLatestGlobMatch("openai/*", ["openai/example-utility"])).toBe("openai/example-utility");
+  });
+
+  it.each(["copilot", "github-copilot", "github"])("honors picker and policy metadata for %s aliases", async provider => {
+    const routing_models = [
+      { model_id: "gpt-5.9", model_picker_enabled: false },
+      { model_id: "gpt-5.8", policy: { state: "disabled" } },
+      { model_id: "gpt-5.7", policy: { state: "unconfigured" } },
+      { model_id: "gpt-5.6-luna", model_picker_enabled: true, policy: { state: "enabled" } },
+    ];
+    for (const metadata of [{ routing_models }, {}]) {
+      const reflectData = {
+        ...metadata,
+        endpoints: [{ configured: true, provider, models: routing_models.map(model => model.model_id), ...(!metadata.routing_models && { routing_models }) }],
+      };
+      expect((await resolveEngineModel({ engine: "copilot", provider: "copilot", configuredModel: "auto", aliasMap: ALIAS_MAP, reflectData, record: false })).modelId).toBe("gpt-5.6-luna");
+    }
+  });
+
+  it.each([
+    [["claude-haiku-4.5", "gpt-5.6-luna"], "claude-haiku-4.5"],
+    [["gpt-5.6-mini", "gpt-5.6-luna"], "gpt-5.6-mini"],
+    [["gemini-3.8-flash", "gpt-5.6-luna"], "gemini-3.8-flash"],
+    [["gpt-5.6-luna-utility", "gpt-5.6-luna"], "gpt-5.6-luna"],
+  ])("resolves detection against the live catalog %j", (models, expected) => {
+    expect(
+      resolveConfiguredCopilotModel({
+        configuredModel: "detection",
+        aliasMap: ALIAS_MAP,
+        reflectData: { endpoints: [{ configured: true, provider: "copilot", models }] },
+      })
+    ).toBe(expected);
+  });
+
   it("resolves small -> mini -> haiku glob chain", () => {
     const resolved = resolveModelAlias("small", ALIAS_MAP, catalog);
     expect(resolved).toBe("copilot/claude-haiku-4.5");

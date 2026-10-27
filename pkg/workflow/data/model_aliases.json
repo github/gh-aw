@@ -34,7 +34,7 @@
     "gemma": ["copilot/gemma*", "google/gemma*", "gemini/gemma*"],
     "deep-research": ["copilot/deep-research*", "copilot/o3-deep-research*", "copilot/o4-mini-deep-research*", "google/deep-research*", "gemini/deep-research*", "openai/o3-deep-research*", "openai/o4-mini-deep-research*"],
     "small": ["mini"],
-    "detection": ["small"],
+    "detection": ["small", "small-agent", "agent"],
     "evals": ["small"],
     "mini": ["haiku", "gpt-5-mini", "gpt-5-nano", "gemini-flash-lite"],
     "fable": ["copilot/*fable*", "anthropic/*fable*"],

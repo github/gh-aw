@@ -161,7 +161,16 @@ function normalizeReflectProviderName(provider, fallback = "") {
 }
 
 /**
- * Extract model IDs from a provider API response body.
+ * Missing picker/policy metadata is normal for non-Copilot catalogs and older proxies.
+ * @param {any} model
+ * @returns {boolean}
+ */
+function isModelPickerEligible(model) {
+  return model?.model_picker_enabled !== false && (model?.policy?.state == null || model.policy.state === "enabled");
+}
+
+/**
+ * Extract selectable model IDs from a provider API response body.
  *
  * Handles:
  *   - OpenAI / Anthropic / Copilot format: { data: [{ id: "..." }, ...] }
@@ -175,8 +184,9 @@ function extractModelIds(json) {
 
   // OpenAI / Anthropic / Copilot format: { data: [{ id: "..." }, ...] }
   if (Array.isArray(json.data)) {
-    const ids = json.data.map(m => m && (m.id || m.name)).filter(Boolean);
-    return ids.length > 0 ? ids.sort() : null;
+    const entries = json.data.filter(m => m && (m.id || m.name));
+    const ids = entries.filter(isModelPickerEligible).map(m => m.id || m.name);
+    return entries.length > 0 ? ids.sort() : null;
   }
 
   // Gemini format: { models: [{ name: "models/gemini-1.5-pro", ... }, ...] }
@@ -1143,6 +1153,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseReflectTimeoutMs,
     enrichReflectModels,
     extractModelIds,
+    isModelPickerEligible,
     fetchAWFReflect,
     fetchModelsFromUrl,
     waitForProviderListenerReady,

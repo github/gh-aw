@@ -8,6 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { isModelPickerEligible } = require("./awf_reflect.cjs");
 
 /** Runner-written record of configured and resolved models, relative to /tmp/gh-aw. */
 const MODEL_RESOLUTION_RECORD_PATH = "agent/model-resolution.json";
@@ -170,7 +171,14 @@ function compareVersionTuples(left, right) {
  * @returns {string|null}
  */
 function selectLatestGlobMatch(pattern, catalog) {
-  const matches = catalog.filter(entry => globMatch(pattern, entry));
+  const matches = catalog.filter(entry => {
+    // ID-only catalogs cannot expose picker policy. Copilot utility variants are
+    // internal models, not general agents with custom-tool support.
+    const slash = entry.indexOf("/");
+    const copilot = slash < 0 || canonicalModelProvider(entry.slice(0, slash)) === "copilot";
+    const modelId = slash < 0 ? entry : entry.slice(slash + 1);
+    return !(copilot && /(?:^|[-_])utility(?:[-_]|$)/i.test(modelId)) && globMatch(pattern, entry);
+  });
   if (matches.length === 0) {
     return null;
   }
@@ -203,6 +211,11 @@ function buildCatalogFromReflect(reflectData) {
       const modelId = String(model || "").trim();
       if (!modelId) {
         continue;
+      }
+      if (canonicalModelProvider(provider) === "copilot") {
+        const routingModels = Array.isArray(endpoint.routing_models) ? endpoint.routing_models : Array.isArray(reflectData.routing_models) ? reflectData.routing_models : [];
+        const metadata = routingModels.find(entry => entry?.model_id === modelId);
+        if (!isModelPickerEligible(metadata)) continue;
       }
       if (modelId.includes("/")) {
         catalog.add(modelId);
@@ -373,7 +386,7 @@ function buildProviderCatalog(options) {
   let source = options.catalog;
   if (!Array.isArray(source)) {
     const endpoints = Array.isArray(options.reflectData?.endpoints) ? options.reflectData.endpoints : [];
-    source = buildCatalogFromReflect({ endpoints: endpoints.filter(endpoint => endpoint?.configured === true && canonicalModelProvider(endpoint.provider) === scope) });
+    source = buildCatalogFromReflect({ ...options.reflectData, endpoints: endpoints.filter(endpoint => endpoint?.configured === true && canonicalModelProvider(endpoint.provider) === scope) });
   }
   const prefixes = (MODEL_PROVIDER_PREFIXES[scope] || [scope]).filter(prefix => prefix !== "github");
   /** @type {Set<string>} */
@@ -513,6 +526,10 @@ function resolveConfiguredModel(options) {
     return exact;
   }
   if (catalog.length === 0) {
+    const endpoints = (Array.isArray(options.reflectData?.endpoints) ? options.reflectData.endpoints : []).filter(endpoint => endpoint?.configured === true && (!scope || canonicalModelProvider(endpoint.provider) === scope));
+    if (Array.isArray(options.catalog) || (endpoints.length > 0 && endpoints.every(endpoint => Array.isArray(endpoint.models)))) {
+      throw new ModelAliasResolutionError(configuredModel, "model_unavailable", { provider: scope });
+    }
     // Do not silently forward a known alias unchanged: the API proxy rejects unresolved
     // aliases with a misleading "no AI credits pricing" error instead of surfacing the
     // real cause (catalog retrieval failure). Callers should retry/refresh the catalog

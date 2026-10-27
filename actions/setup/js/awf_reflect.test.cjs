@@ -306,6 +306,25 @@ describe("awf_reflect.cjs", () => {
   });
 
   describe("extractModelIds", () => {
+    it("excludes picker-disabled and policy-unavailable entries while tolerating absent metadata", () => {
+      expect(
+        extractModelIds({
+          data: [
+            { id: "gpt-5.6-luna-utility", model_picker_enabled: false },
+            { id: "disabled", model_picker_enabled: true, policy: { state: "disabled" } },
+            { id: "unconfigured", policy: { state: "unconfigured" } },
+            { id: "gpt-5.6-luna", model_picker_enabled: true, policy: { state: "enabled" } },
+            { id: "legacy" },
+          ],
+        })
+      ).toEqual(["gpt-5.6-luna", "legacy"]);
+    });
+
+    it("distinguishes an entirely ineligible catalog from a failed fetch", () => {
+      expect(extractModelIds({ data: [{ id: "hidden", model_picker_enabled: false }] })).toEqual([]);
+      expect(extractModelIds({ data: [null, {}] })).toBeNull();
+    });
+
     it("returns null for null input", () => {
       expect(extractModelIds(null)).toBeNull();
     });

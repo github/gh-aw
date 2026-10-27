@@ -3862,7 +3862,7 @@ reflect.fetchAWFReflect = async () => ({ok: true, reflectData: {endpoints: [{pro
 
     const messages = [
       "400 Cannot translate Copilot request feature 'tools[custom]' between Responses and Chat Completions. Routing model \"gpt-5.6-luna\" to /responses is incompatible",
-      "400 Unsupported Responses custom tool '(unknown)'",
+      "400 Unsupported Responses custom tool '(unknown)'. Only 'apply_patch' is supported through the Copilot compatibility adapter.",
       "400 model_endpoint_incompatible",
       "400 Model gpt-5.6-luna is not accessible via the /chat/completions endpoint",
     ];
