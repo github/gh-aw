@@ -517,7 +517,11 @@ Review the build output in /tmp/build-output and suggest improvements.
 
 In the compiled lock file, the `build` job appears alongside `activation` and `agent`, ordered by each job's `needs` declarations.
 
-When imports and the main workflow define the same job, `jobs.<job-id>.outputs` combines all output names. The main workflow wins on duplicate output names; across imports, later-discovered values win. This also applies when a job customization defines only outputs. Other job fields keep their existing precedence and step-merging rules; regular steps from conflicting custom jobs are not concatenated.
+When imports and the main workflow define the same job, `jobs.<job-id>.outputs` combines output names. The main workflow wins on duplicate output names; across imports, later-discovered values win. An output-only contribution (a job mapping whose sole field is `outputs`) preserves the existing job body, including its injected steps.
+
+Main workflow job fields retain precedence. Among imports, an injected-step merge uses the later job body; otherwise the earlier body is retained. Other scalar and map fields come from that selected body, not a deep merge. Regular steps from conflicting custom jobs are not concatenated.
+
+Compilation rejects final output expressions that reference regular step IDs discarded by job-body selection, using either dot or literal bracket notation. References satisfied by retained regular, setup, or pre-steps are allowed. Output precedence is applied first, so a main-workflow override can replace an unsafe imported expression. This check does not validate unrelated unknown step references.
 
 ### Importing Jobs via `safe-outputs.jobs`
 
