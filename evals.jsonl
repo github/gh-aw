@@ -104,3 +104,5 @@
 {"id":"fixes_proposed_or_noop","question":"Were fixes proposed in a PR or issue, or was noop used when no linting violations were found?","answer":"YES","model":"evals","timestamp":"2026-10-23T07:32:20.950Z","runid":"39917880062"}
 {"id":"elixir_snippets_linted","question":"Did the agent use Credo to lint Elixir snippets found in repository markdown files?","answer":"NO","model":"evals","timestamp":"2026-10-26T07:44:19.609Z","runid":"40287045220"}
 {"id":"fixes_proposed_or_noop","question":"Were fixes proposed in a PR or issue, or was noop used when no linting violations were found?","answer":"YES","model":"evals","timestamp":"2026-10-26T07:44:19.609Z","runid":"40287045220"}
+{"id":"elixir_snippets_linted","question":"Did the agent use Credo to lint Elixir snippets found in repository markdown files?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-27T07:34:46.836Z","runid":"40467404043"}
+{"id":"fixes_proposed_or_noop","question":"Were fixes proposed in a PR or issue, or was noop used when no linting violations were found?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-27T07:34:46.836Z","runid":"40467404043"}
