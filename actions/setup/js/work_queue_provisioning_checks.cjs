@@ -56,9 +56,15 @@ function registerTests({ describe, it }) {
     it("reads exact approved immutable Contents and exact active native registration", async () => {
       const native = nativeRoute();
       await verifyWorkerRoute(options(native));
+      for (const [, call] of native.calls) {
+        assert.equal(call.request.retries, 0);
+        assert.equal(call.request.retryCount, 0);
+        assert.ok(call.request.signal instanceof AbortSignal);
+        assert.equal(call.request.signal.aborted, false);
+      }
       assert.deepEqual(native.calls, [
-        ["contents", { owner: "owner", repo: "repo", path: profile.workflow, ref: profile.ref }],
-        ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml" }],
+        ["contents", { owner: "owner", repo: "repo", path: profile.workflow, ref: profile.ref, request: native.calls[0][1].request }],
+        ["registration", { owner: "owner", repo: "repo", workflow_id: "worker.lock.yml", request: native.calls[1][1].request }],
       ]);
     });
     it("accepts optional string inputs and genuine quoted, flow, alias and merge YAML", async () => {
@@ -149,8 +155,8 @@ function registerTests({ describe, it }) {
           const native = nativeRoute();
           native.state[endpoint] = Object.assign(new Error("native read failed"), { status });
           if (status === 404) await rejected(native);
-          else await assert.rejects(verifyWorkerRoute(options(native)), error => error === native.state[endpoint]);
-          assert.equal(native.calls.length, endpoint === "contentError" ? 1 : 2);
+          else await assert.rejects(verifyWorkerRoute({ ...options(native), sleepFn: async () => {} }), error => error === native.state[endpoint]);
+          assert.equal(native.calls.length, (endpoint === "contentError" ? 0 : 1) + (status === 500 ? 3 : 1));
         }
     });
     it("deduplicates identical routes within one fresh verification, not across calls", async () => {
