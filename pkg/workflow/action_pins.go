@@ -386,7 +386,29 @@ func pinContextWithoutActionMappings(data *WorkflowData) *actionpins.PinContext 
 // getCachedActionPin returns the pinned action reference for a given repository,
 // preferring the dynamic resolver from WorkflowData over the embedded pins.
 func getCachedActionPin(repo string, data *WorkflowData) string {
-	return actionpins.ResolveLatestActionPin(repo, pinContextWithoutActionMappings(data))
+	ctx := pinContextWithoutActionMappings(data)
+	if data != nil && data.ActionResolver != nil && data.ActionResolver.cache != nil {
+		latestEmbedded, hasEmbedded := getLatestActionPinByRepo(repo)
+		newestVersion := semverutil.ParseVersion(latestEmbedded.Version)
+		version := latestEmbedded.Version
+		if hasEmbedded && newestVersion != nil {
+			for _, entry := range data.ActionResolver.cache.Entries {
+				if entry.Repo != repo {
+					continue
+				}
+				if cachedVersion := semverutil.ParseVersion(entry.Version); cachedVersion != nil && cachedVersion.IsNewer(newestVersion) {
+					newestVersion = cachedVersion
+					version = entry.Version
+				}
+			}
+			if version != latestEmbedded.Version {
+				if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
+					return ref
+				}
+			}
+		}
+	}
+	return actionpins.ResolveLatestActionPin(repo, ctx)
 }
 
 // --------------------------------------------------------------------------

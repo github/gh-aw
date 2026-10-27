@@ -499,6 +499,62 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 	}
 }
 
+func TestGenerateRuntimeSetupSteps_ActionPins(t *testing.T) {
+	runtime := findRuntimeByID("python")
+	require.NotNil(t, runtime)
+	latest, ok := getLatestActionPinByRepo(runtime.ActionRepo)
+	require.True(t, ok)
+	const cachedSHA = "0123456789abcdef0123456789abcdef01234567"
+
+	tests := []struct {
+		name         string
+		cacheVersion string
+		otherVersion string
+		nilData      bool
+		wantCached   bool
+	}{
+		{name: "newer cached pin", cacheVersion: "v999.0.0", wantCached: true},
+		{name: "semantic version ordering", cacheVersion: "v1000.0.0", otherVersion: "v999.0.0", wantCached: true},
+		{name: "unparseable entry does not hide newer pin", cacheVersion: "v999.0.0", otherVersion: "zzz", wantCached: true},
+		{name: "equal cached version", cacheVersion: latest.Version, wantCached: true},
+		{name: "stale cached pin", cacheVersion: "v1.0.0"},
+		{name: "unparseable cached version", cacheVersion: "not-a-version"},
+		{name: "empty cache"},
+		{name: "no workflow data", nilData: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewActionCache(t.TempDir())
+			if tt.cacheVersion != "" {
+				cache.Set(runtime.ActionRepo, tt.cacheVersion, cachedSHA)
+			}
+			if tt.otherVersion != "" {
+				cache.Set(runtime.ActionRepo, tt.otherVersion, latest.SHA)
+			}
+			resolver := NewActionResolver(cache)
+			data := &WorkflowData{ActionCache: cache, ActionResolver: resolver}
+			if tt.nilData {
+				data = nil
+			}
+
+			steps := GenerateRuntimeSetupSteps([]RuntimeRequirement{{
+				Runtime: runtime,
+				Version: "3.12",
+			}}, data)
+			require.Len(t, steps, 1)
+
+			wantPin := getActionPin(runtime.ActionRepo)
+			if tt.wantCached {
+				wantPin = formatActionReference(runtime.ActionRepo, cachedSHA, tt.cacheVersion)
+				assert.Contains(t, resolver.GetUsedCacheKeys(), formatActionCacheKey(runtime.ActionRepo, tt.cacheVersion))
+			}
+			assert.Contains(t, steps[0], "        uses: "+wantPin)
+			assert.Contains(t, steps[0], "          python-version: '3.12'")
+		})
+	}
+}
+
 func TestGenerateRuntimeSetupSteps_MergesAndSortsRuntimeExtraFields(t *testing.T) {
 	nodeRuntime := findRuntimeByID("node")
 	require.NotNil(t, nodeRuntime)
