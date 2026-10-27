@@ -101,7 +101,7 @@ function findIsland(body, workflowId) {
  * @returns {string} Updated body content
  */
 function updateBody(params) {
-  return renderSizedReport(buildUpdatedBodyReport(params)).body.trimEnd();
+  return renderSizedReport(buildUpdatedBodyReport(params)).body;
 }
 
 /**
@@ -217,7 +217,7 @@ function buildUpdatedBody({ context, currentBody, newContent, operation, include
     bodyFooter,
     historyUrl,
   });
-  return renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body.trimEnd();
+  return renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
 }
 
 module.exports = {

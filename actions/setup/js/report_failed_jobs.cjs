@@ -81,7 +81,7 @@ function isActionsReadPermissionError(error) {
  * @returns {string}
  */
 function formatFailedJobsList(jobs) {
-  return renderSizedReport({ type: "report", title: "Failed jobs", children: buildFailedJobsList(jobs) }).body.trimEnd();
+  return renderSizedReport({ type: "report", title: "Failed jobs", children: buildFailedJobsList(jobs) }).body;
 }
 
 /**

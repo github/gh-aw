@@ -187,7 +187,7 @@ async function main(config = {}) {
         children.push(...buildGeneratedFooterBlocks({ workflowName, runUrl, workflowSource, workflowSourceURL, triggeringPRNumber }));
       }
       children.push(...getBodyFooterBlocks(config.body_footer, { workflowName, runUrl }));
-      const finalBody = renderSizedReport({ type: "report", title: "Review reply", children }).body.trimEnd();
+      const finalBody = renderSizedReport({ type: "report", title: "Review reply", children }).body;
 
       core.info(`Replying to review comment ${numericCommentId} on PR #${targetPRNumber} (${owner}/${repo})`);
 

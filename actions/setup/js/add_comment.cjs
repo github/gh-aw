@@ -839,7 +839,7 @@ async function main(config = {}) {
     // Enforce max limits again after adding footer and metadata
     // Length and mention limits include metadata; only agent content counts toward the link limit.
     try {
-      processedBody = renderSizedReport(report, MAX_COMMENT_LENGTH + 1).body.trimEnd();
+      processedBody = renderSizedReport(report, MAX_COMMENT_LENGTH).body;
       enforceCommentLimits(processedBody, { maxLinks, linkBody });
     } catch (error) {
       const errorMessage = getErrorMessage(error);

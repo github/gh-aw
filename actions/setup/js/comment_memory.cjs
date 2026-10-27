@@ -90,7 +90,7 @@ function buildManagedMemoryReport(rawBody, memoryID, options) {
 }
 
 function buildManagedMemoryBody(rawBody, memoryID, options) {
-  return renderSizedReport(buildManagedMemoryReport(rawBody, memoryID, options)).body.trimEnd();
+  return renderSizedReport(buildManagedMemoryReport(rawBody, memoryID, options)).body;
 }
 
 async function findManagedComment(github, owner, repo, itemNumber, memoryID) {
@@ -219,7 +219,7 @@ async function main(config = {}) {
       triggeringPRNumber,
       bodyFooter: config.body_footer,
     });
-    const managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body.trimEnd();
+    const managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
     try {
       enforceCommentLimits(managedBody);
     } catch (error) {

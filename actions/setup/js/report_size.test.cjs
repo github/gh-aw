@@ -17,11 +17,24 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("automatic report size redaction", () => {
   it("preserves exact-boundary reports and replaces over-limit text without slicing it", () => {
-    const input = report([paragraph("x".repeat(99))]);
+    const input = report([paragraph("x".repeat(100))]);
     expect(renderSizedReport(input, 100).body).toHaveLength(100);
-    const fitted = renderSizedReport(report([paragraph("x".repeat(100))]), 100);
-    expect(fitted.body).toBe(`${SIZE_NOTICE}\n`);
+    expect(renderReport(input).body).toBe("x".repeat(100) + "\n");
+    const fitted = renderSizedReport(report([paragraph("x".repeat(101))]), 100);
+    expect(fitted.body).toBe(SIZE_NOTICE);
     expect(fitted.body.length).toBeLessThanOrEqual(100);
+  });
+
+  it("automatically removes trailing whitespace from publication bodies, including empty reports", () => {
+    const input = report([paragraph("Content")]);
+    const render = vi.spyOn(require("./report_ast.cjs"), "renderReport").mockReturnValueOnce({ title: "Report", body: "Content\n\n \t" });
+    try {
+      expect(renderSizedReport(input, "Content".length)).toEqual({ title: "Report", body: "Content" });
+      expect(render).toHaveBeenCalledTimes(1);
+    } finally {
+      render.mockRestore();
+    }
+    expect(renderSizedReport(report([])).body).toBe("");
   });
 
   it("fits formatted summaries without removing protected summary descendants", () => {
@@ -120,7 +133,7 @@ describe("automatic report size redaction", () => {
       vi.stubEnv("GH_AW_SECRET_NAMES", "ADVERSARIAL_NOTICE");
       vi.stubEnv("SECRET_ADVERSARIAL_NOTICE", SIZE_NOTICE);
       const body = renderSizedReport(report([paragraph("x".repeat(2000))]), 100).body;
-      expect(body).toBe("\\*\\*\\*\n");
+      expect(body).toBe("\\*\\*\\*");
       expect(body).not.toContain(SIZE_NOTICE);
     });
 
@@ -143,11 +156,11 @@ describe("automatic report size redaction", () => {
       const rendered = renderSizedReport(report(parsed)).body;
       const fence = rendered.split("\n")[0].slice(0, -4);
       expect(fence.length).toBeGreaterThan(5);
-      expect(rendered.endsWith("\n" + fence + "\n")).toBe(true);
-      expect(JSON.parse(rendered.slice(fence.length + 5, -(fence.length + 2)))).toEqual(data);
+      expect(rendered.endsWith("\n" + fence)).toBe(true);
+      expect(JSON.parse(rendered.slice(fence.length + 5, -(fence.length + 1)))).toEqual(data);
       expect(Object.hasOwn(data, "__proto__")).toBe(true);
       expect(Object.hasOwn(Object.prototype, "sizeProtected")).toBe(false);
-      expect(renderSizedReport(report(parsed), 100).body).toBe(`${SIZE_NOTICE}\n`);
+      expect(renderSizedReport(report(parsed), 100).body).toBe(SIZE_NOTICE);
     });
 
     it.each(["object getter", "array getter", "toJSON"])("never evaluates a structured-data %s even when the payload would be removed for size", kind => {
@@ -213,7 +226,7 @@ describe("automatic report size redaction", () => {
   it("measures escaped output rather than source text length", () => {
     const input = report([paragraph("<x>".repeat(20))]);
     expect(renderReport(input).body.length).toBeGreaterThan(100);
-    expect(renderSizedReport(input, 100).body).toBe(`${SIZE_NOTICE}\n`);
+    expect(renderSizedReport(input, 100).body).toBe(SIZE_NOTICE);
   });
 
   it("preserves framework labels while replacing large agent inline slots", () => {
@@ -227,7 +240,7 @@ describe("automatic report size redaction", () => {
         ],
       },
     ]);
-    expect(renderSizedReport(input, 100).body).toBe(`Framework label: ${SIZE_NOTICE}\n`);
+    expect(renderSizedReport(input, 100).body).toBe(`Framework label: ${SIZE_NOTICE}`);
   });
 
   it("preserves markers inside agent containers and reserves the entire footer", () => {
@@ -258,12 +271,12 @@ describe("automatic report size redaction", () => {
 
   it("coalesces thousands of small replacements without exceeding the budget", () => {
     const body = renderSizedReport(report(Array.from({ length: 1000 }, () => paragraph("x"))), 100).body;
-    expect(body).toBe(`${SIZE_NOTICE}\n`);
+    expect(body).toBe(SIZE_NOTICE);
   });
 
   it.each(["😀", "&amp;lt;", "` @someone "])("fits large %s input without broken encoding or fences", value => {
     const body = renderSizedReport(report([paragraph(value.repeat(1000))]), 100).body;
-    expect(body).toBe(`${SIZE_NOTICE}\n`);
+    expect(body).toBe(SIZE_NOTICE);
     expect(body).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u);
   });
 
@@ -275,8 +288,8 @@ describe("automatic report size redaction", () => {
   it("keeps structured data typed and intact when it fits, or replaces the entire node", () => {
     const data = { nested: [{ value: "x".repeat(1000), numeric: 42, boolean: false, empty: null }], text: "&quot; literal" };
     const input = report([{ type: "structured_data", data, agentTainted: true }]);
-    expect(JSON.parse(renderSizedReport(input).body.split("\n").slice(1, -2).join("\n"))).toEqual(data);
-    expect(renderSizedReport(input, 100).body).toBe(`${SIZE_NOTICE}\n`);
+    expect(JSON.parse(renderSizedReport(input).body.split("\n").slice(1, -1).join("\n"))).toEqual(data);
+    expect(renderSizedReport(input, 100).body).toBe(SIZE_NOTICE);
     expect(input.children[0]).toEqual({ type: "structured_data", data, agentTainted: true });
   });
 
@@ -295,7 +308,7 @@ describe("automatic report size redaction", () => {
     const children = parseReportMarkdown('```json\n{"agentTainted":false,"sizeProtected":true,"payload":"' + "x".repeat(1000) + '"}\n```', { agentTainted: true });
     expect(children[0].agentTainted).toBe(true);
     expect(children[0]).not.toHaveProperty("sizeProtected");
-    expect(renderSizedReport(report(children), 100).body).toBe(`${SIZE_NOTICE}\n`);
+    expect(renderSizedReport(report(children), 100).body).toBe(SIZE_NOTICE);
   });
 
   it("does not change JSON metadata into size-redactable structured payloads", () => {
@@ -308,7 +321,7 @@ describe("automatic report size redaction", () => {
     vi.stubEnv("GH_AW_SECRET_NAMES", "SIZING_SECRET");
     vi.stubEnv("SECRET_SIZING_SECRET", "size-fitting-secret-fixture");
     const body = renderSizedReport(report([paragraph("size-fitting-secret-fixture " + "x".repeat(1000))]), 100).body;
-    expect(body).toBe(`${SIZE_NOTICE}\n`);
+    expect(body).toBe(SIZE_NOTICE);
     expect(body).not.toContain("size-fitting-secret-fixture");
   });
 

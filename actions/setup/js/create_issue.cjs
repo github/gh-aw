@@ -1431,7 +1431,7 @@ async function main(config = {}) {
                   },
                   ...parseReportMarkdown(appendExecutionProvenance("", workflowName, runUrl), { allowMetadata: true, agentTainted: false }),
                 ],
-              }).body.trimEnd(),
+              }).body,
             });
             core.info("✓ Added comment to parent issue #" + effectiveParentIssueNumber + " (sub-issue linking not available)");
           } catch (commentError) {

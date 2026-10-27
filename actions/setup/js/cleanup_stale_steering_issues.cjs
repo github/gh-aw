@@ -15,7 +15,7 @@ const CLEANUP_COMMENT = renderSizedReport({
     { type: "paragraph", children: [{ type: "text", value: "This steering issue was left open after its linked workflow run completed successfully. Closing it during scheduled agentic maintenance.", agentTainted: false }] },
     { type: "xml_marker", name: "gh-aw", value: "stale-steering-issue-cleanup", compact: true, agentTainted: false },
   ],
-}).body.trimEnd();
+}).body;
 
 const OPEN_ISSUES_QUERY = `
   query($owner: String!, $repo: String!, $cursor: String) {

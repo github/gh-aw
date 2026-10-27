@@ -374,7 +374,7 @@ function createReviewBuffer() {
     }
     const agentBody = body;
     const bodyNodes = parseReportMarkdown(agentBody, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true });
-    body = renderSizedReport({ type: "report", title: "Pull request review", children: [...bodyPrefix, ...bodyNodes, ...bodySuffix] }, MAX_REVIEW_BODY_LENGTH + 1).body.trimEnd();
+    body = renderSizedReport({ type: "report", title: "Pull request review", children: [...bodyPrefix, ...bodyNodes, ...bodySuffix] }, MAX_REVIEW_BODY_LENGTH).body;
     /** @type {WeakMap<BufferedComment, string | undefined>} */
     const commentFooters = new WeakMap();
     /** @type {WeakMap<BufferedComment, import("./report_ast.cjs").ReportBlock[] | undefined>} */
@@ -1072,6 +1072,6 @@ function appendUnanchoredCommentsSection(reviewBody, comments, frame) {
       title: "Pull request review",
       children: [...frame.prefix, ...reviewBody, { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comments that could not be inline-anchored", agentTainted: false }] }, ...detailsBlocks, ...frame.suffix],
     },
-    MAX_REVIEW_BODY_LENGTH + 1
-  ).body.trimEnd();
+    MAX_REVIEW_BODY_LENGTH
+  ).body;
 }

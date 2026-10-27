@@ -211,7 +211,7 @@ function buildApprovalCommentBody(runHtmlUrl, pullRequestNumber) {
     type: "report",
     title: "Workflow approved",
     children: [...parseReportMarkdown(message, { context: templateContext, agentTainted: false, minimumHeadingLevel: 2 }), ...detectionCaution, ...footer],
-  }).body.trimEnd();
+  }).body;
 }
 
 /**

@@ -164,7 +164,7 @@ function getCloseOlderIssueMessage({ newIssueUrl, newIssueNumber, workflowName, 
         ],
       },
     ],
-  }).body.trimEnd();
+  }).body;
 }
 
 /**

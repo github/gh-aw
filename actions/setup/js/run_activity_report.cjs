@@ -46,7 +46,7 @@ async function runRangeReport(bin, prefixArgs, repoSlug, range, outputDir) {
     heading: range.heading,
     children,
     get body() {
-      return renderSizedReport({ type: "report", title: ISSUE_TITLE, children }).body.trimEnd();
+      return renderSizedReport({ type: "report", title: ISSUE_TITLE, children }).body;
     },
   });
   /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */

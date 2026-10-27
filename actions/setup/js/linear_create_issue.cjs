@@ -104,9 +104,9 @@ async function main(config = {}) {
     const sanitizedTitle = sanitizeTitle(item.title);
     if (!sanitizedTitle) throw new Error(`${ERR_VALIDATION}: linear_create_issue title is empty after sanitization`);
     const report = appendConfiguredReportFooter(buildIssueReport(sanitizedTitle, sanitizeContent(normalizeReportText(item.body, { preserveImageAttributes: true }))), config.body_footer);
-    const rendered = renderSizedReport(report, 65001);
+    const rendered = renderSizedReport(report, 65000);
     const title = rendered.title;
-    const description = rendered.body.trimEnd();
+    const description = rendered.body;
     if (description.length > 65000) throw new Error(`${ERR_VALIDATION}: linear_create_issue rendered body exceeds 65000 characters`);
     if (!description) throw new Error(`${ERR_VALIDATION}: linear_create_issue body is empty after normalization`);
 

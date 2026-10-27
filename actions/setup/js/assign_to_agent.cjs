@@ -680,7 +680,7 @@ async function main(config = {}) {
               ],
             },
             65000
-          ).body.trimEnd(),
+          ).body,
         });
         core.info(`Posted failure comment on ${type} #${number} in ${effectiveOwner}/${effectiveRepo}`);
       } catch (commentError) {

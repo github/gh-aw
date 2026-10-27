@@ -544,7 +544,7 @@ function buildHelpCommentBody(helpCommands) {
       ],
     });
   }
-  return renderSizedReport({ type: "report", title: "Agentic Workflow Commands", children }).body.trimEnd();
+  return renderSizedReport({ type: "report", title: "Agentic Workflow Commands", children }).body;
 }
 
 async function postBuiltinHelpComment(commentBody) {

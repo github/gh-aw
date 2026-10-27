@@ -124,7 +124,7 @@ async function addMaintenanceUpdateComment(owner, repo, pullNumber, runUrl) {
       { type: "paragraph", children: [{ type: "text", value: "🛠️ Agentic Maintenance updated this pull request branch.", agentTainted: false }] },
       { type: "paragraph", children: [{ type: "link", url: runUrl, children: [{ type: "text", value: "View workflow run", agentTainted: false }] }] },
     ],
-  }).body.trimEnd();
+  }).body;
   await github.rest.issues.createComment({
     owner,
     repo,

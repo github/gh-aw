@@ -241,7 +241,7 @@ async function main(config = {}) {
         type: "report",
         title: "Pull request ready for review",
         children: [...detectionCaution, ...parseReportMarkdown(sanitizedReason, { agentTainted: true, minimumHeadingLevel: 2 }), ...footer],
-      }).body.trimEnd();
+      }).body;
 
       await addPullRequestComment(githubClient, prOwner, prRepo, prNumber, commentBody);
 

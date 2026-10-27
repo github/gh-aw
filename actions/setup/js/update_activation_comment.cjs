@@ -60,7 +60,7 @@ async function updateActivationComment(github, context, core, itemUrl, itemNumbe
   const body = buildCreatedMessageBlocks(itemType === "issue" ? "issue" : "pull_request", { itemNumber, itemUrl });
   const linkMessage = buildActivationMessage(body, workflowName, runUrl);
   if (await updateActivationCommentWithMessage(github, context, core, linkMessage, itemLabel, {})) {
-    recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Created item", children: body }).body.trimEnd(), options.activationCommentLinks ?? []);
+    recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Created item", children: body }).body, options.activationCommentLinks ?? []);
   }
 }
 
@@ -85,7 +85,7 @@ async function updateActivationCommentWithCommit(github, context, core, commitSh
   const commitMessage = buildCreatedMessageBlocks("commit", { commitSha, shortSha, commitUrl });
   const message = buildActivationMessage(commitMessage, workflowName, runUrl);
   if (await updateActivationCommentWithMessage(github, context, core, message, "commit", options)) {
-    recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Pushed commit", children: commitMessage }).body.trimEnd(), options.activationCommentLinks ?? []);
+    recordActivationCommentLink(core, renderSizedReport({ type: "report", title: "Pushed commit", children: commitMessage }).body, options.activationCommentLinks ?? []);
   }
 }
 
@@ -121,7 +121,7 @@ async function updateActivationCommentWithMessage(github, context, core, message
       type: "report",
       title: "Workflow activation",
       children: [...parseReportMarkdown(sanitizeContent(currentBody), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }), ...messageNodes],
-    }).body.trimEnd();
+    }).body;
 
   // Parse comment repo (format: "owner/repo") with validation
   let repoOwner = context.repo.owner;

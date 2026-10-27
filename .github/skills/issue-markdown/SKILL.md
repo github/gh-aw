@@ -108,9 +108,11 @@ blocks as well as imported Markdown. For comments, render the complete tree with
 `renderSizedReport` from `report_size.cjs` and pass its body to the existing API.
 Do not render fragments and concatenate or reparse them. Keep one logical render
 boundary, including metadata and trusted footers in its size budget.
-`renderSizedReport` includes a terminal newline: callers that trim it can reserve
-`maxLength + 1`, then check the final publication limit. Never truncate the
-rendered Markdown or trusted policy text to fit.
+`renderSizedReport` trims trailing whitespace automatically and measures the
+publication body against the exact `maxLength`. Do not trim its result or reserve
+an extra character for a terminal newline. Low-level `renderReport` retains its
+terminal newline for Markdown serialization. Never truncate rendered Markdown
+or trusted policy text to fit.
 
 ## Validate the migration
 

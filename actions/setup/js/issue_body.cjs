@@ -29,7 +29,7 @@ const ISSUE_BODY_SUFFIX = Symbol("gh-aw-issue-body-suffix");
  * @returns {string}
  */
 function formatIssueBody(body, options) {
-  return renderSizedReport(buildIssueBodyReport("Issue", body, options)).body.trimEnd();
+  return renderSizedReport(buildIssueBodyReport("Issue", body, options)).body;
 }
 
 /**

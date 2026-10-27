@@ -105,7 +105,7 @@ function getLegacyP50(workflow) {
  * @returns {string}
  */
 function buildForecastIssueBody(report, options) {
-  return renderSizedReport(buildForecastIssueReport(report, options)).body.trim();
+  return renderSizedReport(buildForecastIssueReport(report, options)).body;
 }
 
 /**

@@ -269,7 +269,7 @@ async function addCommentWithWorkflowLink(endpoint, runUrl, eventName, invocatio
     if (workflowId) children.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: workflowId, agentTainted: false });
     if (trackerId) children.push({ type: "xml_marker", name: "gh-aw-tracker-id", value: trackerId, agentTainted: false });
     children.push({ type: "xml_marker", name: "gh-aw-comment-type", value: "reaction", agentTainted: false });
-    const commentBody = renderSizedReport({ type: "report", title: "Workflow status", children }).body.trimEnd();
+    const commentBody = renderSizedReport({ type: "report", title: "Workflow status", children }).body;
 
     if (eventName === "discussion" || eventName === "discussion_comment") {
       if (typeof endpoint !== "string") {

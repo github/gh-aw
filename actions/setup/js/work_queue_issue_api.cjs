@@ -239,8 +239,7 @@ async function mutateIssues(github, operations, { sleep = delay => new Promise(r
   const selections = [];
   operations.forEach((operation, index) => {
     declarations.push(`$m${index}:${operation.type}!`);
-    variables[`m${index}`] =
-      operation.name === "createIssue" ? renderIssueParameters(operation.input, operation.report) : operation.report ? { ...operation.input, body: renderSizedReport(operation.report).body.trimEnd() } : operation.input;
+    variables[`m${index}`] = operation.name === "createIssue" ? renderIssueParameters(operation.input, operation.report) : operation.report ? { ...operation.input, body: renderSizedReport(operation.report).body } : operation.input;
     selections.push(`m${index}: ${operation.name}(input:$m${index}) { ${operation.selection} }`);
   });
   let result;

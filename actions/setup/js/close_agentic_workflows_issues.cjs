@@ -52,7 +52,7 @@ function getNoReproCommentBody(sanitize = sanitizeContent) {
       ],
     },
     MAX_COMMENT_BODY_LENGTH
-  ).body.trimEnd();
+  ).body;
   const body = sanitize(generatedBody, { maxLength: MAX_COMMENT_BODY_LENGTH });
   if (typeof body !== "string") {
     throw new Error("Close comment body sanitization must return a string");

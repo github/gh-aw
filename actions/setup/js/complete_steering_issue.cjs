@@ -41,7 +41,7 @@ async function main() {
     children.push({ type: "text", value: " and created ", agentTainted: false }, { type: "link", url: pullRequestUrl, children: [{ type: "text", value: `pull request #${pullRequestNumber}`, agentTainted: false }] });
   }
   children.push({ type: "text", value: ".", agentTainted: false });
-  const body = renderSizedReport({ type: "report", title: "Workflow completed", children: [{ type: "paragraph", children }] }).body.trimEnd();
+  const body = renderSizedReport({ type: "report", title: "Workflow completed", children: [{ type: "paragraph", children }] }).body;
   try {
     await github.rest.issues.createComment({
       owner: context.repo.owner,

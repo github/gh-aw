@@ -321,7 +321,7 @@ async function main(config = {}) {
           type: "report",
           title: "Discussion closed",
           children: [...parseReportMarkdown(sanitizedBody, { allowedMentions: allowedMentionAliases, agentTainted: true, minimumHeadingLevel: 2 }), ...getBodyFooterBlocks(config.body_footer, { workflowName, runUrl })],
-        }).body.trimEnd();
+        }).body;
         const comment = await addDiscussionComment(githubClient, discussion.id, body);
         core.info(`Added comment to discussion #${discussionNumber}: ${comment.url}`);
         commentUrl = comment.url;

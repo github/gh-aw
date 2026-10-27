@@ -385,7 +385,7 @@ async function main(config = {}) {
       type: "report",
       title: "Review comment",
       children: [...parseReportMarkdown(rawBody, { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions: allowedMentionAliases, agentTainted: true }), ...bodyFooterBlocks],
-    }).body.trimEnd();
+    }).body;
     /** @type {import('./pr_review_buffer.cjs').BufferedComment} */
     const bufferedComment = {
       path: commentItem.path,

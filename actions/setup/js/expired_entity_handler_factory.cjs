@@ -69,7 +69,7 @@ function createExpiredEntityClosingMessage({ entity, entityNoun, workflowName, w
   } else {
     children.push(...parseReportMarkdown(footerSuffix, { allowMetadata: true, agentTainted: false }));
   }
-  return renderSizedReport({ type: "report", title: "Expired entity closed", children }).body.trimEnd();
+  return renderSizedReport({ type: "report", title: "Expired entity closed", children }).body;
 }
 
 /**

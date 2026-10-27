@@ -2517,7 +2517,7 @@ async function main(config = {}) {
                     owner: issueRepoParts.owner,
                     repo: issueRepoParts.repo,
                     issue_number: issue.number,
-                    body: renderSizedReport(fallbackFrame(fallbackBodyWithCloseKeyword)).body.trimEnd(),
+                    body: renderSizedReport(fallbackFrame(fallbackBodyWithCloseKeyword)).body,
                   }),
                 RATE_LIMIT_RETRY_CONFIG,
                 `update protected-file-protection fallback issue #${issue.number} with auto-close link`
@@ -2693,7 +2693,7 @@ async function main(config = {}) {
             type: "report",
             title: "Changes require review",
             children: requestChangesChildren,
-          }).body.trimEnd();
+          }).body;
           /** @type {{ owner: string, repo: string, pull_number: number, event: "REQUEST_CHANGES" | "COMMENT", body: string, commit_id?: string }} */
           const requestChangesParams = {
             owner: repoParts.owner,

@@ -19,7 +19,7 @@ function appendConfiguredBodyFooter(body, template, options = {}) {
   const { workflowRepo, maxLength } = options || {};
   if (!template && maxLength === undefined) return body;
   const report = appendConfiguredReportFooter({ type: "report", title: "Comment", children: parseReportMarkdown(body, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }) }, template, { workflowRepo });
-  return renderSizedReport(report, maxLength === undefined ? undefined : maxLength + 1).body.trimEnd();
+  return renderSizedReport(report, maxLength).body;
 }
 
 /**

@@ -160,7 +160,7 @@ function getCloseOlderPullRequestMessage({ newPullRequestUrl, newPullRequestNumb
         ],
       },
     ],
-  }).body.trimEnd();
+  }).body;
 }
 
 /**

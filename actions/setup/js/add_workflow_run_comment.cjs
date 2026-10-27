@@ -386,7 +386,7 @@ function buildCommentBody(eventName, runUrl, workflowNameOverride, workflowEmoji
 
   // Identify this as a reaction comment (prevents it from being hidden by hide-older-comments)
   children.push({ type: "xml_marker", name: "gh-aw-comment-type", value: "reaction", agentTainted: false });
-  return renderSizedReport({ type: "report", title: "Workflow status", children }).body.trimEnd();
+  return renderSizedReport({ type: "report", title: "Workflow status", children }).body;
 }
 
 /**

@@ -16,7 +16,7 @@ function presentationText(value, limit, singleLine = false, maskedValues = [], l
   if (singleLine) text = text.replace(/\s+/g, " ");
   if (literal) text = normalizeReportText(text).replace(/\s+/g, " ");
   const render = candidate => {
-    if (literal) return renderSizedReport({ type: "report", title: "Work description", children: [{ type: "paragraph", children: [{ type: "text", value: candidate, agentTainted: true }] }] }).body.trimEnd();
+    if (literal) return renderSizedReport({ type: "report", title: "Work description", children: [{ type: "paragraph", children: [{ type: "text", value: candidate, agentTainted: true }] }] }).body;
     let rendered = candidate;
     for (;;) {
       const sanitized = sanitizeContent(redactDiagnosticText(rendered, { maskedValues }));
@@ -142,15 +142,15 @@ function claimReport(values, run) {
 }
 
 function issueBody(state, work, origin, config, branch, maskedValues = []) {
-  return renderSizedReport(issueBodyReport(state, work, origin, config, branch, maskedValues)).body.trimEnd();
+  return renderSizedReport(issueBodyReport(state, work, origin, config, branch, maskedValues)).body;
 }
 
 function renderSummary(values, run, status) {
-  return renderSizedReport(summaryReport(values, run, status)).body.trimEnd();
+  return renderSizedReport(summaryReport(values, run, status)).body;
 }
 
 function renderClaim(values, run) {
-  return renderSizedReport(claimReport(values, run)).body.trimEnd();
+  return renderSizedReport(claimReport(values, run)).body;
 }
 
 module.exports = { issueBody, issueBodyReport, issueTitle, renderSummary, summaryReport, renderClaim, claimReport, runLink };

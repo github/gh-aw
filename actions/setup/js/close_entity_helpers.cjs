@@ -64,7 +64,7 @@ function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber, bodyF
   const trackerID = getTrackerID();
   if (trackerID) children.push({ type: "xml_marker", name: "gh-aw-tracker-id", value: trackerID, agentTainted: false });
   children.push(...footer);
-  return renderSizedReport(appendConfiguredReportFooter({ type: "report", title: "Entity closed", children }, bodyFooterTemplate)).body.trimEnd();
+  return renderSizedReport(appendConfiguredReportFooter({ type: "report", title: "Entity closed", children }, bodyFooterTemplate)).body;
 }
 
 /**

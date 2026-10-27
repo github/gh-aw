@@ -1840,7 +1840,7 @@ function sanitizeSyntheticUpdateBody(body, allowedAliases, maxMentions, ctx) {
   if (process.env.GH_AW_WORKFLOW_ID) children.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: process.env.GH_AW_WORKFLOW_ID, agentTainted: false });
   if (process.env.GH_AW_CALLER_WORKFLOW_ID) children.push({ type: "xml_marker", name: "gh-aw-workflow-call-id", value: process.env.GH_AW_CALLER_WORKFLOW_ID, agentTainted: false });
   children.push(...parseReportMarkdown(appendExecutionProvenance("", process.env.GH_AW_WORKFLOW_NAME || "Workflow", buildWorkflowRunUrl(ctx, ctx.repo)), { allowMetadata: true, agentTainted: false }));
-  return renderSizedReport({ type: "report", title: "Updated body", children }).body.trimEnd();
+  return renderSizedReport({ type: "report", title: "Updated body", children }).body;
 }
 
 /**

@@ -74,7 +74,7 @@ async function main() {
             ],
           },
         ],
-      }).body.trimEnd(),
+      }).body,
     });
     core.setFailed(`${ERR_NOT_FOUND}: No workflow ID marker found in issue #${issueNumber}`);
     return;
@@ -130,7 +130,7 @@ async function main() {
             ],
           },
         ],
-      }).body.trimEnd(),
+      }).body,
     });
     core.setFailed(`Failed to disable workflow '${workflowId}': ${msg}`);
     return;
@@ -165,7 +165,7 @@ async function main() {
         },
         { type: "xml_marker", name: "gh-aw-comment-type", value: "workflow-disabled", agentTainted: false },
       ],
-    }).body.trimEnd(),
+    }).body,
   });
 
   core.info(`Posted disable confirmation comment on issue #${issueNumber}`);

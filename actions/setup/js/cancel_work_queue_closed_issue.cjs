@@ -164,7 +164,7 @@ async function main(options = {}) {
         },
         { type: "xml_marker", name: "gh-aw-issue-closure", value: identity, compact: true, agentTainted: false },
       ],
-    }).body.trimEnd();
+    }).body;
     try {
       await githubClient.rest.issues.createComment({ ...context.repo, issue_number: number, body, request: { retries: 0, timeout: 15000 } });
     } catch (error) {

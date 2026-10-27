@@ -290,7 +290,7 @@ async function main() {
     triggeringPRNumber,
     triggeringDiscussionNumber,
   });
-  const sanitizedMessage = renderSizedReport({ type: "report", title: "Workflow status", children: [...children, ...markdownParts.footer] }).body.trimEnd();
+  const sanitizedMessage = renderSizedReport({ type: "report", title: "Workflow status", children: [...children, ...markdownParts.footer] }).body;
 
   // Add "needs-review" label when detection produced a warning
   if (detectionConclusion === "warning") {

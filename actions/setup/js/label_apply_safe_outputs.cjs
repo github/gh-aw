@@ -109,7 +109,7 @@ async function main() {
             ],
           },
         ],
-      }).body.trimEnd(),
+      }).body,
     });
     core.setFailed(`${ERR_NOT_FOUND}: No run URL marker found in issue #${issueNumber}`);
     return;
@@ -167,7 +167,7 @@ async function main() {
             ],
           },
         ],
-      }).body.trimEnd(),
+      }).body,
     });
     core.setFailed(`Failed to apply safe outputs: ${msg}`);
     return;
@@ -202,7 +202,7 @@ async function main() {
         },
         { type: "xml_marker", name: "gh-aw-comment-type", value: "safe-outputs-applied", agentTainted: false },
       ],
-    }).body.trimEnd(),
+    }).body,
   });
 
   core.info(`Posted success comment on issue #${issueNumber}`);
