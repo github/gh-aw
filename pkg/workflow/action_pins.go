@@ -386,7 +386,46 @@ func pinContextWithoutActionMappings(data *WorkflowData) *actionpins.PinContext 
 // getCachedActionPin returns the pinned action reference for a given repository,
 // preferring the dynamic resolver from WorkflowData over the embedded pins.
 func getCachedActionPin(repo string, data *WorkflowData) string {
-	return actionpins.ResolveLatestActionPin(repo, pinContextWithoutActionMappings(data))
+	ctx := pinContextWithoutActionMappings(data)
+	if data != nil && data.ActionResolver != nil && data.ActionResolver.cache != nil {
+		latestEmbedded, hasEmbedded := getLatestActionPinByRepo(repo)
+		newestVersion := semverutil.ParseVersion(latestEmbedded.Version)
+		version := latestEmbedded.Version
+		if !hasEmbedded || newestVersion == nil {
+			actionPinsLog.Printf("No valid embedded version baseline for cached action pin selection for %s", repo)
+		} else {
+			actionPinsLog.Printf("Comparing cached action pins for %s against embedded version %s", repo, latestEmbedded.Version)
+			if _, entry, found := data.ActionResolver.cache.FindNewestEntryForRepo(repo); found {
+				cachedVersion := semverutil.ParseVersion(entry.Version)
+				if cachedVersion == nil {
+					actionPinsLog.Printf("Ignoring cached action pin with unparseable version for %s: cache=%s", repo, entry.Version)
+				} else if cachedVersion.IsNewer(newestVersion) {
+					actionPinsLog.Printf("Using newer cached action version for %s: cache=%s embedded=%s", repo, entry.Version, latestEmbedded.Version)
+					version = entry.Version
+				} else {
+					actionPinsLog.Printf("Ignoring cached action version that is not newer for %s: cache=%s embedded=%s", repo, entry.Version, latestEmbedded.Version)
+				}
+			} else {
+				actionPinsLog.Printf("No cached action pin found for %s", repo)
+			}
+			if version != latestEmbedded.Version {
+				actionPinsLog.Printf("Resolving selected cached action version for %s: %s", repo, version)
+				if ref, err := actionpins.ResolveActionPin(repo, version, ctx); err == nil && ref != "" {
+					actionPinsLog.Printf("Resolved cached action pin for %s@%s: %s", repo, version, ref)
+					return ref
+				} else if err != nil {
+					actionPinsLog.Printf("Failed to resolve cached action version for %s@%s; falling back: %v", repo, version, err)
+				} else {
+					actionPinsLog.Printf("Resolved cached action version for %s@%s to an empty pin; falling back", repo, version)
+				}
+			}
+		}
+	} else {
+		actionPinsLog.Printf("No workflow action cache available for %s; resolving the latest action pin", repo)
+	}
+	ref := actionpins.ResolveLatestActionPin(repo, ctx)
+	actionPinsLog.Printf("Using latest action pin for %s: %s", repo, ref)
+	return ref
 }
 
 // --------------------------------------------------------------------------

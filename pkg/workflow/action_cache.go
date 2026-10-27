@@ -37,10 +37,12 @@ type ActionCacheEntry struct {
 
 // ActionCache manages cached action pin resolutions.
 type ActionCache struct {
-	Entries       map[string]ActionCacheEntry `json:"entries"`              // key: "repo@version"
-	ContainerPins map[string]ContainerPin     `json:"containers,omitempty"` // key: image tag
-	path          string
-	dirty         bool // tracks if cache has unsaved changes
+	Entries          map[string]ActionCacheEntry `json:"entries"`              // key: "repo@version"
+	ContainerPins    map[string]ContainerPin     `json:"containers,omitempty"` // key: image tag
+	path             string
+	dirty            bool // tracks if cache has unsaved changes
+	newestEntryKeys  map[string]string
+	newestEntryCount int
 }
 
 // NewActionCache creates a new action cache instance
@@ -206,6 +208,7 @@ func (c *ActionCache) Load() error {
 		return err
 	}
 
+	c.newestEntryKeys = nil
 	if err := json.Unmarshal(data, c); err != nil {
 		actionCacheLog.Printf("Failed to unmarshal cache data: %v", err)
 		return err
@@ -445,6 +448,32 @@ func (c *ActionCache) FindAnyEntryForRepo(repo string) (string, ActionCacheEntry
 	return firstKey, entry, true
 }
 
+// FindNewestEntryForRepo returns the newest semantic version, preferring precise
+// tags on ties. The index is rebuilt after Set/Load or entry removal, so repeated
+// lookups during compilation do not scan the full cache.
+func (c *ActionCache) FindNewestEntryForRepo(repo string) (string, ActionCacheEntry, bool) {
+	if c.newestEntryKeys == nil || c.newestEntryCount != len(c.Entries) {
+		c.newestEntryKeys = make(map[string]string)
+		for key, entry := range c.Entries {
+			version := semverutil.ParseVersion(entry.Version)
+			if version == nil {
+				continue
+			}
+			currentKey, found := c.newestEntryKeys[entry.Repo]
+			current := c.Entries[currentKey]
+			currentVersion := semverutil.ParseVersion(current.Version)
+			if !found || version.IsNewer(currentVersion) ||
+				(!currentVersion.IsNewer(version) && (semverutil.IsMorePreciseVersion(entry.Version, current.Version) ||
+					(entry.Version == current.Version && key < currentKey))) {
+				c.newestEntryKeys[entry.Repo] = key
+			}
+		}
+		c.newestEntryCount = len(c.Entries)
+	}
+	key, found := c.newestEntryKeys[repo]
+	return key, c.Entries[key], found
+}
+
 // Set stores a new cache entry, preserving any already-cached inputs when the SHA
 // is unchanged. If the SHA changes (e.g. a moving tag points to a new commit),
 // cached inputs are cleared to stay consistent with the newly-pinned commit.
@@ -470,6 +499,7 @@ func (c *ActionCache) Set(repo, version, sha string) bool {
 	}
 
 	actionCacheLog.Printf("Setting cache entry: key=%s, sha=%s", key, sha)
+	c.newestEntryKeys = nil
 
 	// Preserve previously-cached inputs only when the SHA is unchanged. If the SHA
 	// changes (e.g. for a moving tag that now points to a new commit), drop any

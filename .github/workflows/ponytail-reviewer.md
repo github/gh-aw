@@ -34,7 +34,7 @@ imports:
   - shared/otlp.md
   - shared/pr-diff-data-fetch.md
 skills:
-  - DietrichGebert/ponytail/skills/ponytail-review@2ed6c52c9d7e5e56942508591085fd45dea277d3
+  - DietrichGebert/ponytail/skills/ponytail-review@09c434ab73ca43761c5d8b0c5d341926c2fba710
 cache:
   key: pr-prefetch-v2-${{ github.event.pull_request.number || github.event.issue.number || (fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_type == 'pull_request' && fromJSON(github.event.inputs.aw_context || github.event.client_payload.aw_context || '{}').item_number) }}-${{ github.event.pull_request.head.sha || 'unknown' }}-${{ github.run_id }}-${{ github.run_attempt }}
   path: /tmp/gh-aw/agent
