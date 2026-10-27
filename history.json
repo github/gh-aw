@@ -1,0 +1,40 @@
+{
+  "daily_metrics": [
+    {
+      "date": "2026-10-24",
+      "agent_prs_total": 22,
+      "agent_prs_merged": 21,
+      "agent_prs_merged_from_created": 20,
+      "closed_prs": 2,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 245.7,
+      "success_rate": 0.9091,
+      "note": "gap-fill after ~2-month workflow outage (prior history last entry 2026-08-26, stored at copilot-agent-metrics/history.json which the current repo-memory file-glob does not match - moved to this root-level flat path so future runs persist correctly); true UTC calendar-day window (2026-10-24T00:00:00Z..2026-10-25T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=22, all resolved (0 open); agent_prs_merged_from_created=20, closed_prs=2; agent_success_rate=90.9%; avg_duration created->merged over 20 merged PRs=245.7min; agent_prs_merged (event-scoped, mergedAt in window regardless of createdAt)=21, derived from local 30-day dataset, not independently paginated-verified; avg_comments not collected for this backfilled day"
+    },
+    {
+      "date": "2026-10-25",
+      "agent_prs_total": 30,
+      "agent_prs_merged": 22,
+      "agent_prs_merged_from_created": 23,
+      "closed_prs": 7,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 265.0,
+      "success_rate": 0.7667,
+      "note": "gap-fill; true UTC calendar-day window (2026-10-25T00:00:00Z..2026-10-26T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=30, all resolved (0 open); agent_prs_merged_from_created=23, closed_prs=7; agent_success_rate=76.7%, down from 10-24's 90.9% (-14.2pp, -15.6% relative, significant); avg_duration created->merged over 23 merged PRs=265.0min; agent_prs_merged (event-scoped)=22, derived from local 30-day dataset, not independently paginated-verified; avg_comments not collected for this backfilled day"
+    },
+    {
+      "date": "2026-10-26",
+      "agent_prs_total": 13,
+      "agent_prs_merged": 11,
+      "agent_prs_merged_from_created": 8,
+      "closed_prs": 5,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 223.9,
+      "avg_comments": 7.6,
+      "success_rate": 0.6154,
+      "note": "primary analysis window (2026-10-26T00:00:00Z..2026-10-27T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=13, all resolved (0 open); agent_prs_merged_from_created=8, closed_prs=5 (#72096, #72097, #72098, #72101, #72102 - all had substantive bodies, no WIP placeholders); agent_success_rate=61.5%, down from 10-25's 76.7% (-15.2pp, -19.8% relative, significant), and down from 10-24's 90.9% (-29.4pp over 2 days, significant); avg_duration created->merged over 8 merged PRs=223.9min, down vs 10-25 (265.0->223.9, -15.5%, significant improvement in speed); agent_prs_merged (event-scoped)=11, cross-checked against live GitHub search (is:merged) which returned only 10 due to search-index lag (PR #72100 confirmed merged via direct pull_request_read but missing from is:merged search at collection time) - treat live search as lower bound, local dataset count (11) used instead; avg_comments=7.6 is total issue-thread comments per PR (not filtered to humans; collected via per-PR search, not pull_request_read get_review_comments, due to cost) across the 13 cohort PRs"
+    }
+  ],
+  "last_updated": "2026-10-26",
+  "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward"
+}
