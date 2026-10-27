@@ -1,41 +1,34 @@
 {
-  "last_run_date": "2026-10-26",
+  "last_run_date": "2026-10-27",
   "last_window": {
-    "start": "2026-10-25T08:06:09Z",
-    "end": "2026-10-26T08:06:09Z"
+    "start": "2026-10-26T07:57:28Z",
+    "end": "2026-10-27T07:57:28Z"
   },
   "observed_window": {
-    "metadata_runs": 449,
-    "segments": [
-      {
-        "runs": 154,
-        "first_run": "2026-10-25T08:24:21Z",
-        "last_run": "2026-10-25T13:34:36Z"
-      },
-      {
-        "runs": 295,
-        "coverage": "later segment through workflow start; original compact summary was replaced by continuation report"
-      }
-    ],
-    "coverage": "Continuation exhausted; 392 detailed cached summaries remained after storage pruning. Episode attribution is representative, not exhaustive."
+    "coverage": "Prefetched logs plus required continuation inspected; episode lineage remains partial where recorded parent/root runs were absent. Findings are representative, not fleet-wide.",
+    "representative_audits": [
+      40319540005,
+      40347739299,
+      40373431568,
+      40423631200,
+      40425970824
+    ]
   },
   "key_themes": [
-    "Work queue publication and handoff remain mixed",
-    "Review fan-out moved retry telemetry PR but smoke failed",
-    "Container scan updated issue ledger while gate failed"
+    "Telemetry PR merged after smoke failure",
+    "Installer retry repair merged with mixed PR smoke",
+    "Work queue validation remained mixed across boundaries"
   ],
   "carry_forward_questions": [
-    "Do trusted work queue control and formal verification handoff failures recur?",
-    "Does PR 71934 smoke pass after the follow-up fix?",
-    "Does the container scan gate clear after issue ledger updates?"
+    "Does PR 71934 telemetry appear in successful live runs?",
+    "Does AWF installer recovery handle a repeat of the original transient download failure?",
+    "Do work queue controls and formal handoff pass in later runs?"
   ],
   "representative_runs": [
-    40193973627,
-    40202765536,
-    40231223604,
-    40223984096,
-    40227087812,
-    40272851722,
-    40275180793
+    40319540005,
+    40373431568,
+    40347739299,
+    40396948343,
+    40423631200
   ]
 }
