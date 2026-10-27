@@ -18,6 +18,7 @@ import (
 	deferrerrorunchecked "github.com/github/gh-aw/pkg/linters/deferred-error-unchecked"
 	"github.com/github/gh-aw/pkg/linters/errorfwrapv"
 	"github.com/github/gh-aw/pkg/linters/errormessage"
+	"github.com/github/gh-aw/pkg/linters/errorssentinelcompare"
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
@@ -114,6 +115,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	deferinloop.Analyzer,
 	deferrerrorunchecked.Analyzer,
 	errormessage.Analyzer,
+	errorssentinelcompare.Analyzer,
 	errortypeassertion.Analyzer,
 	fprintlnsprintf.Analyzer,
 	errstringmatch.Analyzer,
