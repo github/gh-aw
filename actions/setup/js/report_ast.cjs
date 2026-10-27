@@ -384,7 +384,8 @@ function normalizeBlocks(nodes, depth) {
         if (!/^[a-zA-Z0-9_+:-]*$/.test(node.language)) throw new TypeError("Invalid report code language");
         if (node.fenceLength !== undefined && (!Number.isSafeInteger(node.fenceLength) || node.fenceLength < 3 || node.fenceLength > 128)) throw new TypeError("Report code fence length must be an integer between 3 and 128");
         const value = normalizeReportText(node.value);
-        if (value.trim()) result.push({ type: "code_block", language: node.language, value, ...(node.fenceLength === undefined ? {} : { fenceLength: node.fenceLength }) });
+        // A protected fence can carry machine-readable identity even with no content.
+        if (value.trim() || node.sizeProtected) result.push({ type: "code_block", language: node.language, value, ...(node.fenceLength === undefined ? {} : { fenceLength: node.fenceLength }) });
         break;
       }
       case "list": {

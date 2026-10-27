@@ -1,7 +1,7 @@
 // @ts-check
-const { renderSizedReport } = require("./report_size.cjs");
 /// <reference types="@actions/github-script" />
 
+const { renderSizedReport } = require("./report_size.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { withRetry, isTransientError, sleep } = require("./error_recovery.cjs");
 const { fetchAndLogRateLimit } = require("./github_rate_limit_logger.cjs");

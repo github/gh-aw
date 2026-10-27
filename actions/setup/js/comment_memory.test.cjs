@@ -80,6 +80,21 @@ describe("comment_memory", () => {
     expect(extractCommentMemoryEntries(body)).toEqual([{ memoryId: "default", content: memory }]);
   });
 
+  it.each(["", " \n ", "<!-- clear memory -->"])("retains an extractable tagged memory block when %j sanitizes to empty", async memory => {
+    const module = await import("./comment_memory.cjs");
+    const body = module.buildManagedMemoryBody(memory, "default", {
+      includeFooter: false,
+      runUrl: "https://example.com/run/1",
+      workflowName: "Workflow",
+      workflowSource: "",
+      workflowSourceURL: "",
+    });
+
+    expect(body).toContain("<summary>Peek at saved memory (default)</summary>");
+    expect(body).toContain("``````gh-aw-comment-memory:default\n\n``````");
+    expect(extractCommentMemoryEntries(body)).toEqual([{ memoryId: "default", content: "" }]);
+  });
+
   it("builds managed comment body with footer when enabled", async () => {
     const module = await import("./comment_memory.cjs");
     const body = module.buildManagedMemoryBody("Persist me", "session", {
@@ -294,6 +309,35 @@ describe("comment_memory", () => {
       expect(mockGithub.rest.issues.updateComment).not.toHaveBeenCalled();
       expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
       expect(extractCommentMemoryEntries(oldBody)).toEqual([{ memoryId: "default", content: "Old memory" }]);
+    });
+
+    it.each([false, true])("keeps the managed comment identity across clearing and rewriting memory (footer=%s)", async footer => {
+      const savedComment = {
+        id: 98,
+        body: "``````gh-aw-comment-memory:default\nOld memory\n``````\n\n<!-- gh-aw-agentic-workflow: Workflow -->",
+        html_url: "https://github.com/owner/repo/issues/42#issuecomment-98",
+      };
+      mockGithub.rest.issues.listComments = vi.fn(async () => ({ data: [savedComment] }));
+      mockGithub.rest.issues.updateComment = vi.fn(async ({ body }) => {
+        savedComment.body = body;
+        return { data: savedComment };
+      });
+      mockGithub.rest.issues.createComment = vi.fn();
+      const handler = await (await import("./comment_memory.cjs")).main({ target: "triggering", footer, max: 2 });
+
+      const cleared = await handler({ type: "comment_memory", body: "<!-- clear memory -->" });
+      expect(cleared.success).toBe(true);
+      expect(cleared.commentId).toBe(98);
+      expect(extractCommentMemoryEntries(savedComment.body)).toEqual([{ memoryId: "default", content: "" }]);
+      expectExecutionProvenance(savedComment.body);
+
+      const rewritten = await handler({ type: "comment_memory", body: "New memory" });
+      expect(rewritten.success).toBe(true);
+      expect(rewritten.commentId).toBe(98);
+      expect(extractCommentMemoryEntries(savedComment.body)).toEqual([{ memoryId: "default", content: "New memory" }]);
+      expect(mockGithub.rest.issues.updateComment).toHaveBeenCalledTimes(2);
+      expect(mockGithub.rest.issues.updateComment.mock.calls.map(([parameters]) => parameters.comment_id)).toEqual([98, 98]);
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
     });
 
     it("publishes execution provenance when updating a managed comment", async () => {

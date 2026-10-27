@@ -93,6 +93,20 @@ describe("report AST", () => {
     expect(() => renderReport(report([{ type: "code_block", language: "text", value: "example", fenceLength }]))).toThrow(TypeError);
   });
 
+  it("preserves protected empty code fences and their wrappers without retaining ordinary empty blocks", () => {
+    /** @type {import("./report_ast.cjs").ReportBlock} */
+    const memory = { type: "code_block", language: "gh-aw-comment-memory:notes", fenceLength: 6, value: "", agentTainted: true, sizeProtected: true };
+    const input = report([
+      { type: "details", summary: "Saved memory", children: [memory] },
+      { type: "details", summary: "Empty diagnostic", children: [{ type: "code_block", language: "text", value: " \n " }] },
+    ]);
+    const normalized = normalizeReport(input);
+
+    expect(normalized.children).toEqual([{ type: "details", summary: "Saved memory", children: [memory] }]);
+    expect(normalizeReport(normalized)).toEqual(normalized);
+    expect(renderReport(input).body).toBe("<details>\n<summary>Saved memory</summary>\n\n``````gh-aw-comment-memory:notes\n\n``````\n\n</details>\n");
+  });
+
   it("requires a non-forgeable redaction pass before a tree can be concretized", () => {
     const input = { ...report([paragraph("Safe agent text")]), agentTainted: false };
     expect(() => assertRedactedReport(input)).toThrow("must pass redaction");

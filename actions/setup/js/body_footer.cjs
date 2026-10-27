@@ -5,20 +5,26 @@ const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { getBodyFooterBlocks } = require("./messages_footer.cjs");
+const { expandAllowedAliases } = require("./sanitize_content.cjs");
 
 /**
  * Append a configured deterministic body footer using the current workflow context.
  * When `maxLength` is provided, fit agent content to the remaining budget without
  * shortening or omitting the configured footer.
+ * Pass the same resolved mention allowlist used to sanitize the body.
  * @param {string} body
  * @param {string|undefined} template
- * @param {{workflowRepo?: any, maxLength?: number}} [options]
+ * @param {{workflowRepo?: any, maxLength?: number, allowedMentions?: string[]}} [options]
  * @returns {string}
  */
 function appendConfiguredBodyFooter(body, template, options = {}) {
-  const { workflowRepo, maxLength } = options || {};
+  const { workflowRepo, maxLength, allowedMentions = [] } = options || {};
   if (!template && maxLength === undefined) return body;
-  const report = appendConfiguredReportFooter({ type: "report", title: "Comment", children: parseReportMarkdown(body, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true }) }, template, { workflowRepo });
+  const report = appendConfiguredReportFooter(
+    { type: "report", title: "Comment", children: parseReportMarkdown(body, { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true, allowedMentions: expandAllowedAliases(allowedMentions) }) },
+    template,
+    { workflowRepo }
+  );
   return renderSizedReport(report, maxLength).body;
 }
 
