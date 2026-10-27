@@ -25,9 +25,13 @@ type NPMInstallOptions struct {
 // Returns a step that installs Node.js using the default version from constants.DefaultNodeVersion
 // Caching is disabled by default to prevent cache poisoning vulnerabilities in release workflows
 func GenerateNodeJsSetupStep() GitHubActionStep {
+	return generateNodeJsSetupStep(nil)
+}
+
+func generateNodeJsSetupStep(data *WorkflowData) GitHubActionStep {
 	return GitHubActionStep{
 		"      - name: Setup Node.js",
-		"        uses: " + getActionPin("actions/setup-node"),
+		"        uses: " + getActionPinForData("actions/setup-node", data),
 		"        with:",
 		fmt.Sprintf("          node-version: '%s'", constants.DefaultNodeVersion),
 		"          package-manager-cache: false",
@@ -79,25 +83,17 @@ func resolveNodeSetupVersion(data *WorkflowData) string {
 
 // resolveNodeSetupActionRef returns the `uses:` reference for the Setup Node.js
 // step when a runtimes.node.action-repo / action-version override is configured,
-// mirroring generateSetupStep. Returns "" when no override is configured.
+// mirroring generateSetupStep, including workflow-aware default action pins.
 func resolveNodeSetupActionRef(data *WorkflowData) string {
 	actionRepo, actionVersion := resolveNodeSetupActionOverride(data)
 	if actionRepo == "" && actionVersion == "" {
-		return ""
+		return getActionPinForData("actions/setup-node", data)
 	}
 	runtime := cloneRuntimeWithActionOverrides(findRuntimeByID("node"), actionRepo, actionVersion)
 	if runtime == nil {
 		return ""
 	}
-	actionRef := getActionPin(runtime.ActionRepo)
-	if actionRef == "" {
-		if runtime.ActionVersion != "" {
-			actionRef = fmt.Sprintf("%s@%s", runtime.ActionRepo, runtime.ActionVersion)
-		} else {
-			actionRef = runtime.ActionRepo
-		}
-	}
-	return actionRef
+	return resolveRuntimeSetupActionRef(runtime, data)
 }
 
 // generateNodeJsSetupStepForWorkflow creates the Setup Node.js step for jobs that
@@ -105,7 +101,7 @@ func resolveNodeSetupActionRef(data *WorkflowData) string {
 // the runtimes.node version and action overrides the same way
 // the main agent job does (see applyRuntimeOverrides and generateSetupStep).
 func generateNodeJsSetupStepForWorkflow(data *WorkflowData) GitHubActionStep {
-	return rewriteNodeSetupStep(GenerateNodeJsSetupStep(), resolveNodeSetupActionRef(data), resolveNodeSetupVersion(data))
+	return rewriteNodeSetupStep(generateNodeJsSetupStep(data), resolveNodeSetupActionRef(data), resolveNodeSetupVersion(data))
 }
 
 // rewriteNodeSetupStep returns a copy of step with its action and version overrides.
@@ -243,7 +239,7 @@ func buildStandardNpmEngineInstallSteps(
 			packageName, version, stepName+" in microVM path", cacheKeyPrefix, false, cooldownEnabled,
 		))
 	}
-	return steps
+	return applyNodeSetupOverrides(steps, workflowData)
 }
 
 // BuildNpmEngineInstallStepsWithAWF injects an AWF installation step between the Node.js

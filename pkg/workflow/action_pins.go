@@ -392,12 +392,8 @@ func getCachedActionPin(repo string, data *WorkflowData) string {
 		newestVersion := semverutil.ParseVersion(latestEmbedded.Version)
 		version := latestEmbedded.Version
 		if hasEmbedded && newestVersion != nil {
-			for _, entry := range data.ActionResolver.cache.Entries {
-				if entry.Repo != repo {
-					continue
-				}
+			if _, entry, found := data.ActionResolver.cache.FindNewestEntryForRepo(repo); found {
 				if cachedVersion := semverutil.ParseVersion(entry.Version); cachedVersion != nil && cachedVersion.IsNewer(newestVersion) {
-					newestVersion = cachedVersion
 					version = entry.Version
 				}
 			}

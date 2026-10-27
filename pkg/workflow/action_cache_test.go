@@ -1129,3 +1129,45 @@ func TestActionCache_SetInputsNilNoOp(t *testing.T) {
 		t.Error("Expected cache to remain clean after nil SetInputs")
 	}
 }
+
+func TestActionCache_FindNewestEntryForRepo(t *testing.T) {
+	cache := NewActionCache(t.TempDir())
+	cache.Set("owner/action", "v999", "major-sha")
+	cache.Set("owner/action", "v999.0.0", "precise-sha")
+	cache.Set("owner/action", "zzz", "branch-sha")
+	cache.Set("other/action", "v1000.0.0", "other-sha")
+
+	check := func(repo, wantVersion, wantSHA string) {
+		t.Helper()
+		key, entry, found := cache.FindNewestEntryForRepo(repo)
+		if !found || entry.Version != wantVersion || entry.SHA != wantSHA || key != formatActionCacheKey(repo, wantVersion) {
+			t.Fatalf("FindNewestEntryForRepo(%q) = %q, %+v, %v; want %s@%s (%s)", repo, key, entry, found, repo, wantVersion, wantSHA)
+		}
+	}
+	for range 100 {
+		check("owner/action", "v999.0.0", "precise-sha")
+	}
+	check("other/action", "v1000.0.0", "other-sha")
+	if _, _, found := cache.FindNewestEntryForRepo("missing/action"); found {
+		t.Fatal("expected no entry for missing repository")
+	}
+
+	cache.Set("owner/action", "v1000.0.0", "newest-sha")
+	check("owner/action", "v1000.0.0", "newest-sha")
+	cache.Set("owner/action", "v1000.0.0", "updated-sha")
+	check("owner/action", "v1000.0.0", "updated-sha")
+	cache.Delete("owner/action", "v1000.0.0")
+	check("owner/action", "v999.0.0", "precise-sha")
+	cache.DeleteByKey("owner/action@v999.0.0")
+	check("owner/action", "v999", "major-sha")
+
+	if err := cache.Save(); err != nil {
+		t.Fatal(err)
+	}
+	cache.Set("owner/action", "v999", "temporary-sha")
+	check("owner/action", "v999", "temporary-sha")
+	if err := cache.Load(); err != nil {
+		t.Fatal(err)
+	}
+	check("owner/action", "v999", "major-sha")
+}

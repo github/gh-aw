@@ -475,7 +475,7 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 
 	if engineRequiresNodeHarness(engine) && !installStepsContainNodeSetup(filteredInstallSteps) {
 		threatLog.Print("Injecting Node.js setup step for external detection engine harness")
-		filteredInstallSteps = append([]GitHubActionStep{GenerateNodeJsSetupStep()}, filteredInstallSteps...)
+		filteredInstallSteps = append([]GitHubActionStep{generateNodeJsSetupStep(data)}, filteredInstallSteps...)
 	}
 
 	filteredInstallSteps = applyNodeSetupOverrides(filteredInstallSteps, data)

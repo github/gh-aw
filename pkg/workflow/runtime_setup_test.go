@@ -512,10 +512,16 @@ func TestGenerateRuntimeSetupSteps_ActionPins(t *testing.T) {
 		otherVersion string
 		nilData      bool
 		wantCached   bool
+		failResolve  bool
+		allowRefs    bool
 	}{
 		{name: "newer cached pin", cacheVersion: "v999.0.0", wantCached: true},
 		{name: "semantic version ordering", cacheVersion: "v1000.0.0", otherVersion: "v999.0.0", wantCached: true},
+		{name: "equivalent major tag", cacheVersion: "v999.0.0", otherVersion: "v999", wantCached: true},
+		{name: "equivalent minor tag", cacheVersion: "v999.1.0", otherVersion: "v999.1", wantCached: true},
 		{name: "unparseable entry does not hide newer pin", cacheVersion: "v999.0.0", otherVersion: "zzz", wantCached: true},
+		{name: "newer cached pin resolution errors", cacheVersion: "v999.0.0", failResolve: true},
+		{name: "newer cached pin resolution returns empty", cacheVersion: "v999.0.0", failResolve: true, allowRefs: true},
 		{name: "equal cached version", cacheVersion: latest.Version, wantCached: true},
 		{name: "stale cached pin", cacheVersion: "v1.0.0"},
 		{name: "unparseable cached version", cacheVersion: "not-a-version"},
@@ -533,7 +539,11 @@ func TestGenerateRuntimeSetupSteps_ActionPins(t *testing.T) {
 				cache.Set(runtime.ActionRepo, tt.otherVersion, latest.SHA)
 			}
 			resolver := NewActionResolver(cache)
-			data := &WorkflowData{ActionCache: cache, ActionResolver: resolver}
+			if tt.failResolve {
+				t.Setenv("GH_HOST", "github.example.com")
+				resolver.failedResolutions[formatActionCacheKey(runtime.ActionRepo, tt.cacheVersion)] = struct{}{}
+			}
+			data := &WorkflowData{ActionCache: cache, ActionResolver: resolver, AllowActionRefs: tt.allowRefs}
 			if tt.nilData {
 				data = nil
 			}
@@ -551,6 +561,42 @@ func TestGenerateRuntimeSetupSteps_ActionPins(t *testing.T) {
 			}
 			assert.Contains(t, steps[0], "        uses: "+wantPin)
 			assert.Contains(t, steps[0], "          python-version: '3.12'")
+			if tt.failResolve {
+				assert.NotEmpty(t, data.ActionResolutionFailures)
+				assert.Contains(t, resolver.GetUsedCacheKeys(), formatActionCacheKey(runtime.ActionRepo, latest.Version))
+			}
+		})
+	}
+}
+
+func TestNodeSetupSteps_ActionPins(t *testing.T) {
+	const repo = "actions/setup-node"
+	const version = "v999.0.0"
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	tests := []struct {
+		name     string
+		generate func(*WorkflowData) GitHubActionStep
+	}{
+		{name: "workflow setup for detection and evals", generate: generateNodeJsSetupStepForWorkflow},
+		{name: "default setup", generate: generateNodeJsSetupStep},
+		{name: "existing installation step", generate: func(data *WorkflowData) GitHubActionStep {
+			return applyNodeSetupOverrides([]GitHubActionStep{GenerateNodeJsSetupStep()}, data)[0]
+		}},
+		{name: "runtime action override", generate: func(data *WorkflowData) GitHubActionStep {
+			data.Runtimes = map[string]any{"node": map[string]any{"action-repo": repo}}
+			return generateNodeJsSetupStepForWorkflow(data)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewActionCache(t.TempDir())
+			cache.Set(repo, version, sha)
+			resolver := NewActionResolver(cache)
+			data := &WorkflowData{ActionCache: cache, ActionResolver: resolver}
+			step := tt.generate(data)
+			assert.Contains(t, step, "        uses: "+formatActionReference(repo, sha, version))
+			assert.Contains(t, step, "          package-manager-cache: false")
+			assert.Contains(t, resolver.GetUsedCacheKeys(), formatActionCacheKey(repo, version))
 		})
 	}
 }
