@@ -35,9 +35,10 @@ sed -e "s/0b03f6ea5b638356a799fa541ade4fd7902a6ac8d7c3f0252ee09d8259a4ce8f/$mani
 cat >"$TEMP_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-if [ "${1:-}" = "--help" ]; then exit 0; fi
+if [ "${1:-}" = "--help" ]; then echo '--retry-all-errors'; exit 0; fi
 printf '%s\n' "$*" >>"$TEST_ROOT/curl.log"
 out=""
+write_out=""
 https_only=false
 https_redirects=false
 while [ "$#" -gt 0 ]; do
@@ -51,11 +52,17 @@ while [ "$#" -gt 0 ]; do
       https_redirects=true
       shift 2 ;;
     -o) out="$2"; shift 2 ;;
+    --write-out) write_out="$2"; shift 2 ;;
     *) url="$1"; shift ;;
   esac
 done
 if [ "$https_only" != true ] || [ "$https_redirects" != true ]; then
   echo "missing HTTPS-only initial/redirect policy" >&2; exit 96
+fi
+if [ "${AWF_TEST_FAIL_ASSET:-}" = "${url##*/}" ]; then
+  printf 'incomplete download\n' >"$out"
+  if [ -n "$write_out" ]; then printf '%s' "${AWF_TEST_HTTP_STATUS:-504}"; fi
+  exit "${AWF_TEST_CURL_EXIT:-22}"
 fi
 case "$url" in
   */compat.json) cp "$TEST_ROOT/compat.json" "$out" ;;
@@ -66,6 +73,7 @@ case "$url" in
   */copilot-linuxmusl-x64.tar.gz) cp "$TEST_ROOT/copilot-linuxmusl-x64.tar.gz" "$out" ;;
   *) echo "unexpected download: $url" >&2; exit 97 ;;
 esac
+if [ -n "$write_out" ]; then printf '200'; fi
 EOF
 cat >"$TEMP_DIR/bin/node" <<'EOF'
 #!/usr/bin/env bash
@@ -101,6 +109,50 @@ run_awf v0.28.62 --rootless
 test -x "$TEMP_DIR/home/.local/bin/awf"
 grep -q EXECUTED "$TEMP_DIR/executions"
 echo "PASS: authenticated AWF bundle installs and executes"
+
+for failure in '504 22' '404 22' '000 28' '200 23'; do
+  read -r http_status curl_exit <<<"$failure"
+  rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"
+  installer_exit=0
+  AWF_TEST_FAIL_ASSET=checksums.txt AWF_TEST_HTTP_STATUS="$http_status" AWF_TEST_CURL_EXIT="$curl_exit" \
+    run_awf v0.28.62 --rootless || installer_exit=$?
+  test "$installer_exit" = "$curl_exit"
+  grep -qF "Failed to download checksums.txt from github/gh-aw-firewall v0.28.62 (HTTP $http_status, curl exit $curl_exit)" "$TEMP_DIR/output"
+  if [ "$curl_exit" = 23 ]; then
+    grep -qF 'Local write failure; check free disk space and permissions' "$TEMP_DIR/output"
+  elif grep -qF 'Local write failure' "$TEMP_DIR/output"; then
+    echo "FAIL: network error misdiagnosed as a local write failure" >&2; exit 1
+  fi
+  test ! -e "$TEMP_DIR/executions"
+  test ! -e "$TEMP_DIR/home/.local/bin/awf"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 1
+done
+echo "PASS: failed checksum downloads preserve HTTP/curl diagnostics and never install or execute partial files"
+
+for http_status in 404 504; do
+  rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions"
+  AWF_TEST_FAIL_ASSET=awf-bundle.js AWF_TEST_HTTP_STATUS="$http_status" run_awf v0.28.62 --rootless
+  grep -qF "HTTP $http_status, curl exit 22" "$TEMP_DIR/output"
+  grep -q '/awf-linux-x64' "$TEMP_DIR/curl.log"
+  grep -q EXECUTED "$TEMP_DIR/executions"
+  test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 3
+  if grep '/awf-bundle.js' "$TEMP_DIR/curl.log" | grep -q -- '--retry-all-errors'; then
+    echo "FAIL: optional bundle retries permanent HTTP failures" >&2; exit 1
+  fi
+done
+echo "PASS: bundle download failure retains the authenticated platform-binary fallback"
+
+rm -f "$TEMP_DIR/curl.log" "$TEMP_DIR/executions" "$TEMP_DIR/home/.local/bin/awf"
+installer_exit=0
+AWF_TEST_NODE_VERSION=v18.0.0 AWF_TEST_FAIL_ASSET=awf-linux-x64 \
+  run_awf v0.28.62 --rootless || installer_exit=$?
+test "$installer_exit" = 22
+grep -qF 'Failed to download awf-linux-x64 from github/gh-aw-firewall v0.28.62 (HTTP 504, curl exit 22)' "$TEMP_DIR/output"
+test ! -e "$TEMP_DIR/executions"
+test ! -e "$TEMP_DIR/home/.local/bin/awf"
+test "$(wc -l <"$TEMP_DIR/curl.log" | tr -d ' ')" = 2
+echo "PASS: failed platform-binary downloads cannot install or execute partial files"
+
 run_copilot --rootless
 test -x "$TEMP_DIR/home/.local/bin/copilot"
 grep -q '/v1.0.103/copilot-linux-x64.tar.gz' "$TEMP_DIR/curl.log"

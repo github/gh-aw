@@ -104,7 +104,7 @@ mcp-servers:
 
 ### OpenCode MCP Tools Not Being Called
 
-OpenCode-compatible engines do not auto-discover MCP servers, so use an explicit `opencode.jsonc` config. Keep the local AWF API proxy at `http://host.docker.internal:10004` when using `--enable-api-proxy`; `MCP_GATEWAY_PORT` and `MCP_GATEWAY_AGENT_ID` are expanded from workflow env at runtime, so substitute concrete values outside a workflow:
+OpenCode-compatible engines do not auto-discover MCP servers, so declare them in an explicit `opencode.jsonc`. `MCP_GATEWAY_PORT` and `MCP_GATEWAY_AGENT_ID` are expanded from workflow env at runtime; substitute concrete values outside a workflow:
 
 ```json
 {
@@ -142,11 +142,9 @@ OpenCode-compatible engines do not auto-discover MCP servers, so use an explicit
 }
 ```
 
-Declare an explicit top-level `mcp` block with routed URLs such as `http://host.docker.internal:${MCP_GATEWAY_PORT}/mcp/<server-name>`. Use `agent.build.permission` (singular), not `permissions`, and enable `external_directory: allow` only when you truly need access outside the workspace because the default `ask` behaves like a deny in non-interactive runs.
+Route MCP servers through URLs such as `http://host.docker.internal:${MCP_GATEWAY_PORT}/mcp/<server-name>`. Use `agent.build.permission` (singular, not `permissions`). Set `external_directory: allow` only when access outside the workspace is needed; the default `ask` acts as a deny in non-interactive runs.
 
-For direct Copilot endpoints (`api.githubcopilot.com`), do **not** append `/v1`. For other OpenAI-compatible providers, use the provider's documented base path so `/chat/completions` is appended correctly.
-
-When using `--enable-api-proxy`, pass `COPILOT_GITHUB_TOKEN` in the execute step's `env:` so the proxy can authenticate:
+Do **not** append `/v1` to direct Copilot endpoints (`api.githubcopilot.com`). For other OpenAI-compatible providers, use the documented base path so `/chat/completions` is appended correctly. With `--enable-api-proxy`, pass `COPILOT_GITHUB_TOKEN` in the execute step's `env:`:
 
 ```yaml wrap
 - name: Execute
@@ -193,7 +191,7 @@ safe-outputs:
   update-issue:     # no configuration required; uses defaults
 ```
 
-If your operation isn't in the [Safe Outputs reference](/gh-aw/reference/safe-outputs/), it may not be supported yet. See the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/) for the full list.
+If an operation isn't in the [Safe Outputs reference](/gh-aw/reference/safe-outputs/), it may not be supported; see the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/).
 
 ### Safe Outputs Not Creating Issues
 
@@ -354,7 +352,7 @@ max-turns: 30            # Claude: max turns
 max-continuations: 5     # Copilot: autopilot continuations
 ```
 
-The post-result watchdog only starts after a terminal safe output is written. It is useful for cleaning up child processes after a result, but it can terminate silent long-running shell commands and builds that continue doing CPU or I/O work without writing stdout or stderr. For quiet monorepo scans or builds, increase the watchdog window:
+The post-result watchdog starts only after a terminal safe output is written. It cleans up child processes but can terminate silent long-running commands that write no stdout or stderr. For quiet monorepo scans or builds, increase the window:
 
 ```yaml wrap
 engine:
@@ -367,7 +365,7 @@ See [Harness Settings and Runtime Tuning Variables](/gh-aw/reference/environment
 
 ### Why Did My Workflow Fail?
 
-Common causes include missing tokens, permission mismatches, network restrictions, disabled tools, and rate limits. The quickest path is usually to give an agent the run URL so it can inspect logs and suggest a fix.
+Common causes: missing tokens, permission mismatches, network restrictions, disabled tools, and rate limits. Usually the quickest path is giving an agent the run URL to inspect logs.
 
 Using Copilot Chat (requires [agentic authoring setup](/gh-aw/setup/working-with-workflows/#configuring-your-repository-for-agentic-authoring)):
 
@@ -386,7 +384,7 @@ For manual investigation, use `gh aw audit <run-id>` and `gh aw logs`, then insp
 
 ### Enable Debug Logging
 
-Enable verbose mode (`--verbose`), set `ACTIONS_STEP_DEBUG = true`, or inspect MCP config (`gh aw mcp inspect`). The `DEBUG` environment variable activates detailed internal logging for any `gh aw` command — output goes to `stderr` and each line shows the namespace (`workflow:compiler`), message, and time since the previous entry. Common namespaces: `cli:compile_command`, `workflow:compiler`, `workflow:expression_extraction`, `parser:frontmatter`. Wildcards match any suffix.
+Use `--verbose`, set `ACTIONS_STEP_DEBUG = true`, or inspect MCP config with `gh aw mcp inspect`. The `DEBUG` environment variable enables internal logging for any `gh aw` command (to `stderr`, showing namespace, message, and elapsed time). Common namespaces: `cli:compile_command`, `workflow:compiler`, `workflow:expression_extraction`, `parser:frontmatter`; wildcards match any suffix.
 
 ```bash
 DEBUG=* gh aw compile                              # all logs

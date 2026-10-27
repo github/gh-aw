@@ -129,7 +129,10 @@ fi
 # Download URLs
 BASE_URL="https://github.com/${AWF_REPO}/releases/download/${AWF_VERSION}"
 CHECKSUMS_URL="${BASE_URL}/checksums.txt"
-CURL_RETRY_OPTS=(--proto '=https' --proto-redir '=https' --retry 5 --retry-delay 10 --retry-max-time 180)
+# Exponential backoff spans longer gateway outages than six fixed-delay attempts.
+# Bound stalled transfers without imposing a total timeout on large binaries.
+CURL_RETRY_OPTS=(--proto '=https' --proto-redir '=https' --retry 8 --retry-max-time 180 --connect-timeout 15)
+CURL_EXTRA_RETRY_OPTS=()
 # --retry-all-errors was added in curl 7.71, so it must not be passed to older curl
 # builds found on some self-hosted runners. Probe the help output instead of parsing
 # `curl --version`, which reports vendor-patched version strings that do not reliably
@@ -138,7 +141,7 @@ CURL_RETRY_OPTS=(--proto '=https' --proto-redir '=https' --retry 5 --retry-delay
 # older builds.
 if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors' ||
   curl --help 2>/dev/null | grep -q -- '--retry-all-errors'; then
-  CURL_RETRY_OPTS+=(--retry-all-errors)
+  CURL_EXTRA_RETRY_OPTS+=(--retry-all-errors)
 fi
 
 # Platform-portable SHA256 function
@@ -158,9 +161,34 @@ sha256_hash() {
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
+download_release_asset() {
+  local asset="$1"
+  local http_status="" curl_exit=0
+  local -a options=("${CURL_RETRY_OPTS[@]}")
+  case "$asset" in
+    awf-linux-*|awf-darwin-*) options+=(--speed-limit 1 --speed-time 60) ;;
+    *) options+=(--max-time 60) ;;
+  esac
+  # A missing optional bundle should fall back immediately, not retry HTTP 404.
+  if [ "$asset" != awf-bundle.js ]; then
+    options+=("${CURL_EXTRA_RETRY_OPTS[@]}")
+  fi
+  if http_status=$(curl -fsSL "${options[@]}" -o "${TEMP_DIR}/${asset}" \
+    --write-out '%{http_code}' "${BASE_URL}/${asset}"); then
+    return 0
+  else
+    curl_exit=$?
+  fi
+  echo "ERROR: Failed to download ${asset} from ${AWF_REPO} ${AWF_VERSION} (HTTP ${http_status:-000}, curl exit ${curl_exit})." >&2
+  if [ "$curl_exit" -eq 23 ]; then
+    echo "ERROR: Local write failure; check free disk space and permissions in ${TEMP_DIR}." >&2
+  fi
+  return "$curl_exit"
+}
+
 # Download checksums
 echo "Downloading checksums from ${CHECKSUMS_URL@Q}..."
-curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
+download_release_asset checksums.txt
 verify_release_digest "${TEMP_DIR}/checksums.txt" "$CHECKSUMS_SHA256"
 
 verify_checksum() {
@@ -213,7 +241,7 @@ install_bundle() {
 
   echo "Node.js >= 20 detected ($(node --version)), using lightweight bundle..."
   echo "Downloading bundle from ${bundle_url@Q}..."
-  if ! curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${bundle_name}" "${bundle_url}"; then
+  if ! download_release_asset "${bundle_name}"; then
     echo "⚠ Bundle download failed (asset may not exist for this version)"
     return 1
   fi
@@ -252,7 +280,7 @@ install_linux_binary() {
 
   local binary_url="${BASE_URL}/${awf_binary}"
   echo "Downloading binary from ${binary_url@Q}..."
-  curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
+  download_release_asset "${awf_binary}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${awf_binary}" "${awf_binary}"
@@ -277,7 +305,7 @@ install_darwin_binary() {
 
   local binary_url="${BASE_URL}/${awf_binary}"
   echo "Downloading binary from ${binary_url@Q}..."
-  curl -fsSL "${CURL_RETRY_OPTS[@]}" -o "${TEMP_DIR}/${awf_binary}" "${binary_url}"
+  download_release_asset "${awf_binary}"
 
   # Verify checksum
   verify_checksum "${TEMP_DIR}/${awf_binary}" "${awf_binary}"

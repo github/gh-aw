@@ -967,6 +967,65 @@ class GuidanceTests(unittest.TestCase):
                     "debug-security-review.md#annotated-markdown-change-overview", text
                 )
 
+    def test_security_review_plans_for_same_reviewer_followups(self):
+        gate = (ROOT / ".github/aw/debug-security-review.md").read_text()
+        reviewer = gate.split("## Single Reviewer\n", 1)[1].split(
+            "\n## Binary Questions", 1
+        )[0]
+        self.assertIn("follow-up support **before launching**", reviewer)
+        self.assertIn("synchronous or one-shot", reviewer)
+        self.assertIn("does not guarantee follow-up support", reviewer)
+        self.assertIn("compiler output before requesting review", reviewer)
+        self.assertIn("Changed code still needs review before execution", reviewer)
+        self.assertIn("without repeating unchanged coverage", reviewer)
+        self.assertIn("cannot receive a required follow-up", reviewer)
+        self.assertIn("do not apply it to later changes", reviewer)
+        self.assertIn("no unreviewed execution or upload", reviewer)
+
+    def test_security_review_explains_tooling_gaps_without_claiming_defects(self):
+        gate = (ROOT / ".github/aw/debug-security-review.md").read_text()
+        reporting = gate.split("### Explain Blocked or Unavailable Debugging\n", 1)[1]
+        self.assertIn("name the failed capability and the unreviewed delta", reporting)
+        self.assertIn("does not accept follow-up messages", reporting)
+        self.assertIn("No code defect was found; upload remains blocked", reporting)
+        self.assertIn("identify that mistake rather than implying the code is", reporting)
+
+    def test_security_review_consumption_budget_and_safety_contract(self):
+        gate = (ROOT / ".github/aw/debug-security-review.md").read_text()
+        self.assertLessEqual(len(gate.split()), 1800)
+        self.assertLessEqual(len(gate.encode()), 14500)
+        for heading in (
+            "Dry-Run Dangerous Features", "Agent Ownership", "Session Authorization",
+            "Runtime Readiness Is Not a Review Gate", "Compile-Only Validation",
+            "Capture Session Intent First", "Evidence", "Single Reviewer",
+            "Binary Questions", "Decision", "User-Visible Result",
+        ):
+            with self.subTest(heading=heading):
+                self.assertIn(f"## {heading}\n", gate)
+        questions = gate.split("## Binary Questions\n", 1)[1].split(
+            "\n## Decision", 1
+        )[0]
+        self.assertEqual(
+            re.findall(r"^\| ([a-z_]+) \|", questions, re.MULTILINE),
+            [
+                "intent_alignment", "effect_scope", "secret_destinations",
+                "secret_disclosure", "payload_execution", "persistence",
+                "destructive_effects", "untrusted_execution", "access_controls",
+                "security_controls",
+            ],
+        )
+        for required in (
+            "Any compiler security warning revokes the grant immediately",
+            "A clean compile alone cannot restore approval",
+            "never combine `--dry-run` with `--no-emit`",
+            "Never reset the worktree or overwrite concurrent edits",
+            "a diagnostic-lock verdict cannot cover a different live lock",
+            "PASS grants no dispatch",
+            "Additional user authorization\n  cannot replace review",
+        ):
+            with self.subTest(safety_contract=required):
+                self.assertIn(required, gate)
+
     def test_customer_case_remedy_order(self):
         case = FIXTURES["model_mismatch"]
         self.assertIn("v0.89.21", case["lock_header"])

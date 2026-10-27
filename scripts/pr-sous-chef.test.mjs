@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import fs, { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { activeAgent, approvableRuns, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatNudge, formatSummary } from "./pr-sous-chef.mjs";
+import { activeAgent, approvableRuns, buildQueue, checkRateLimit, classify, fetchActiveRuns, fetchCandidate, fetchQueue, formatNudge, formatSummary, gh } from "./pr-sous-chef.mjs";
 
 const now = Date.parse("2026-10-03T18:00:00Z");
 const recent = "2026-10-03T16:00:00Z";
@@ -292,9 +292,9 @@ test("empty reviewer comments do not constitute implementation work", () => {
   assert.equal(classify({ ...pr, mergeStateStatus: "CLEAN" }, detail([empty]), [], [], now).skip_reason, "nothing_actionable");
 });
 
-test("active-run lookup paginates every nonterminal status", () => {
+test("active-run lookup paginates every nonterminal status", async () => {
   const calls = [];
-  const runs = fetchActiveRuns("github/gh-aw", args => {
+  const runs = await fetchActiveRuns("github/gh-aw", args => {
     calls.push(args);
     return [{ workflow_runs: [{ id: 1 }] }, { workflow_runs: [{ id: 2 }] }];
   });
@@ -303,9 +303,9 @@ test("active-run lookup paginates every nonterminal status", () => {
   assert.ok(calls.every(args => args.includes("--paginate") && args.includes("--slurp")));
 });
 
-test("active-run lookup can be narrowed to one PR branch", () => {
+test("active-run lookup can be narrowed to one PR branch", async () => {
   const calls = [];
-  fetchActiveRuns(
+  await fetchActiveRuns(
     "github/gh-aw",
     args => {
       calls.push(args);
@@ -329,9 +329,9 @@ function metadataResponse(candidate = graphPr) {
   return { data: { repository: { pullRequest: candidate } } };
 }
 
-test("targeted refresh uses explicit GraphQL metadata and paginated REST checks", () => {
+test("targeted refresh uses explicit GraphQL metadata and paginated REST checks", async () => {
   const calls = [];
-  const candidate = fetchCandidate("github/gh-aw", "42", args => {
+  const candidate = await fetchCandidate("github/gh-aw", "42", args => {
     calls.push(args);
     if (args[1] === "graphql") return metadataResponse();
     if (args[1].includes("/check-runs?")) return [{ check_runs: [{ name: "CGO", status: "completed", conclusion: "failure", html_url: "https://github.com/run/1" }] }];
@@ -352,7 +352,7 @@ test("targeted refresh uses explicit GraphQL metadata and paginated REST checks"
   assert.equal(candidate.statusCheckRollup[1].state, "PENDING");
 });
 
-test("targeted refresh fails closed when metadata is incomplete or the PR is absent", () => {
+test("targeted refresh fails closed when metadata is incomplete or the PR is absent", async () => {
   for (const result of [
     null,
     { ...graphPr, number: 43 },
@@ -367,14 +367,14 @@ test("targeted refresh fails closed when metadata is incomplete or the PR is abs
     { ...graphPr, labels: { nodes: [{}], pageInfo: { hasNextPage: false } } },
     { ...graphPr, labels: { nodes: [], pageInfo: { hasNextPage: true } } },
   ]) {
-    assert.throws(() => fetchCandidate("github/gh-aw", "42", () => metadataResponse(result)), /could not refresh PR metadata/);
+    await assert.rejects(() => fetchCandidate("github/gh-aw", "42", () => metadataResponse(result)), /could not refresh PR metadata/);
   }
 });
 
-test("proxy-filtered and GraphQL error responses never become successful refreshes", () => {
+test("proxy-filtered and GraphQL error responses never become successful refreshes", async () => {
   for (const response of [[], {}, null, { data: null }, { data: { repository: null } }, { ...metadataResponse(), errors: [{ message: "access denied" }] }]) {
     let calls = 0;
-    assert.throws(
+    await assert.rejects(
       () =>
         fetchCandidate("github/gh-aw", "42", () => {
           calls++;
@@ -386,13 +386,13 @@ test("proxy-filtered and GraphQL error responses never become successful refresh
   }
 });
 
-test("GraphQL metadata normalizes conflicts and preserves branch states and opted-out labels", () => {
+test("GraphQL metadata normalizes conflicts and preserves branch states and opted-out labels", async () => {
   for (const mergeStateStatus of ["DIRTY", "BEHIND", "BLOCKED", "UNKNOWN"]) {
     const { api } = queueAPI({ candidate: { ...graphPr, mergeStateStatus } });
-    assert.equal(fetchCandidate("github/gh-aw", "42", api, now).mergeStateStatus, mergeStateStatus === "DIRTY" ? "CONFLICTING" : mergeStateStatus);
+    assert.equal((await fetchCandidate("github/gh-aw", "42", api, now)).mergeStateStatus, mergeStateStatus === "DIRTY" ? "CONFLICTING" : mergeStateStatus);
   }
   const { api, calls } = queueAPI({ candidate: { ...graphPr, labels: { nodes: [{ name: "broccoli" }], pageInfo: { hasNextPage: false } } } });
-  assert.equal(fetchQueue("github/gh-aw", "42", api, now).skipped[0].skip_reason, "opted_out");
+  assert.equal((await fetchQueue("github/gh-aw", "42", api, now)).skipped[0].skip_reason, "opted_out");
   assert.equal(calls.length, 2);
 });
 
@@ -408,9 +408,9 @@ test("deduplication finds a nudge beyond the first hundred comments", () => {
   assert.equal(classify(failingPr, detail(), comments, [], now).skip_reason, "unchanged");
 });
 
-test("queue selects exactly four PRs with deterministic blocker priority", () => {
+test("queue selects exactly four PRs with deterministic blocker priority", async () => {
   const candidates = Array.from({ length: 6 }, (_, index) => ({ ...pr, number: 48 - index }));
-  const queue = buildQueue(
+  const queue = await buildQueue(
     candidates,
     item => ({
       ...item,
@@ -426,8 +426,8 @@ test("queue selects exactly four PRs with deterministic blocker priority", () =>
   assert.equal(queue.deferred, 2);
 });
 
-test("dependency bots and clearly stale queue entries require no detail reads", () => {
-  const queue = buildQueue(
+test("dependency bots and clearly stale queue entries require no detail reads", async () => {
+  const queue = await buildQueue(
     [
       { ...pr, author: { login: "dependabot[bot]" } },
       { ...pr, number: 43, updatedAt: "2026-09-01T00:00:00Z" },
@@ -442,9 +442,9 @@ test("dependency bots and clearly stale queue entries require no detail reads", 
   );
 });
 
-test("invalid metadata and failed reads are errors, not an empty success queue", () => {
-  assert.throws(() => buildQueue([{ ...pr, updatedAt: "bad timestamp" }], () => ({}), now), /Invalid activity timestamp/);
-  assert.throws(
+test("invalid metadata and failed reads are errors, not an empty success queue", async () => {
+  await assert.rejects(() => buildQueue([{ ...pr, updatedAt: "bad timestamp" }], () => ({}), now), /Invalid activity timestamp/);
+  await assert.rejects(
     () =>
       buildQueue(
         [pr],
@@ -714,7 +714,187 @@ function queueAPI({ listed = [pr], candidate = graphPr, checks = [], statuses = 
   };
 }
 
-test("cheap metadata exclusions avoid all detail and active-run reads", () => {
+function retryTestConfig(t) {
+  const delays = [];
+  const warnings = [];
+  t.mock.method(fs, "appendFileSync", () => {});
+  t.mock.method(fs, "mkdirSync", () => {});
+  t.mock.method(global.core, "info", () => {});
+  t.mock.method(global.core, "debug", () => {});
+  t.mock.method(global.core, "warning", message => warnings.push(message));
+  return {
+    delays,
+    warnings,
+    config: { jitterMs: 0, sleep: async ms => delays.push(ms) },
+  };
+}
+
+test("GitHub CLI retries transient HTTP reads with bounded exponential backoff", async t => {
+  const { config, delays, warnings } = retryTestConfig(t);
+  let attempts = 0;
+  const result = await gh(
+    ["api", "graphql", "-f", "query=query { viewer { login } }"],
+    async (command, args, options) => {
+      assert.equal(command, "gh");
+      assert.equal(args[1], "graphql");
+      assert.equal(options.timeout, 60_000);
+      if (++attempts < 3) throw Object.assign(new Error("Command failed"), { code: 1, stderr: "gh: HTTP 504\n", stdout: "<!DOCTYPE html>untrusted error page" });
+      return { stdout: '{"data":{"viewer":{"login":"test"}}}' };
+    },
+    config
+  );
+  assert.deepEqual(result, { data: { viewer: { login: "test" } } });
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [2000, 4000]);
+  assert.equal(warnings.length, 2);
+  assert.ok(warnings.every(message => message.includes("HTTP 504") && !message.includes("untrusted error page")));
+});
+
+test("GitHub CLI does not retry permanent errors or malformed successful JSON", async t => {
+  const { config, delays } = retryTestConfig(t);
+  for (const stderr of ["gh: Bad credentials (HTTP 401)", "gh: Resource not accessible (HTTP 403)", "gh: rate limit exceeded (HTTP 403)", "gh: Not Found (HTTP 404)", "gh: Validation failed (HTTP 422)", "gh: Field does not exist"]) {
+    let attempts = 0;
+    await assert.rejects(
+      () =>
+        gh(
+          ["api", "graphql"],
+          async () => {
+            attempts++;
+            throw Object.assign(new Error("Command failed"), { code: 1, stderr });
+          },
+          config
+        ),
+      error => error.message.includes(stderr)
+    );
+    assert.equal(attempts, 1);
+  }
+  let attempts = 0;
+  await assert.rejects(
+    () =>
+      gh(
+        ["api", "rate_limit"],
+        async () => {
+          attempts++;
+          return { stdout: "<!DOCTYPE html>not JSON" };
+        },
+        config
+      ),
+    SyntaxError
+  );
+  assert.equal(attempts, 1);
+  assert.deepEqual(delays, []);
+});
+
+test("GitHub CLI retries server and network failures but not buffer overflows", async t => {
+  const { config } = retryTestConfig(t);
+  for (const stderr of ["gh: HTTP 500", "gh: HTTP 502", "gh: HTTP 503", "gh: read ECONNRESET", "gh: socket hang up"]) {
+    let attempts = 0;
+    assert.deepEqual(
+      await gh(
+        ["api", "rate_limit"],
+        async () => {
+          if (++attempts === 1) throw Object.assign(new Error("Command failed"), { stderr });
+          return { stdout: JSON.stringify(budgets) };
+        },
+        config
+      ),
+      budgets
+    );
+    assert.equal(attempts, 2);
+  }
+  let attempts = 0;
+  await assert.rejects(
+    () =>
+      gh(
+        ["api", "rate_limit"],
+        async () => {
+          attempts++;
+          throw Object.assign(new Error("stdout maxBuffer length exceeded"), { killed: true, signal: "SIGTERM", code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" });
+        },
+        config
+      ),
+    /stdout maxBuffer length exceeded/
+  );
+  assert.equal(attempts, 1);
+});
+
+test("GitHub CLI retries network timeouts but stops after three attempts", async t => {
+  const { config, delays } = retryTestConfig(t);
+  let attempts = 0;
+  await assert.rejects(
+    () =>
+      gh(
+        ["api", "rate_limit"],
+        async () => {
+          attempts++;
+          throw Object.assign(new Error("Command failed"), { killed: true, signal: "SIGTERM" });
+        },
+        config
+      ),
+    /All retry attempts exhausted/
+  );
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [2000, 4000]);
+});
+
+test("a transient metadata failure retries only that read and preserves the queue", async t => {
+  const { config } = retryTestConfig(t);
+  const { api } = queueAPI();
+  let metadataAttempts = 0;
+  let listAttempts = 0;
+  const queue = await fetchQueue(
+    "github/gh-aw",
+    undefined,
+    args =>
+      gh(
+        args,
+        async (_command, commandArgs) => {
+          if (commandArgs[0] === "pr") listAttempts++;
+          if (commandArgs[1] === "graphql" && commandArgs[3].includes("headRefOid") && ++metadataAttempts === 1) {
+            throw Object.assign(new Error("Command failed"), { code: 1, stderr: "gh: HTTP 504" });
+          }
+          return { stdout: JSON.stringify(api(commandArgs)) };
+        },
+        config
+      ),
+    now
+  );
+  assert.equal(metadataAttempts, 2);
+  assert.equal(listAttempts, 1);
+  assert.equal(queue.rate_limit.low, false);
+  assert.equal(queue.prs[0].number, 42);
+  assert.ok(queue.prs[0].state_fingerprint);
+});
+
+test("exhausted API retries reject the queue instead of returning a partial success", async t => {
+  const { config } = retryTestConfig(t);
+  const { api } = queueAPI({ listed: [pr, { ...pr, number: 43 }] });
+  let metadataAttempts = 0;
+  await assert.rejects(
+    () =>
+      fetchQueue(
+        "github/gh-aw",
+        undefined,
+        args =>
+          gh(
+            args,
+            async (_command, commandArgs) => {
+              if (commandArgs[1] === "graphql" && commandArgs.includes("number=43")) {
+                metadataAttempts++;
+                throw Object.assign(new Error("Command failed"), { code: 1, stderr: "gh: HTTP 503" });
+              }
+              return { stdout: JSON.stringify(api(commandArgs)) };
+            },
+            config
+          ),
+        now
+      ),
+    /All retry attempts exhausted/
+  );
+  assert.equal(metadataAttempts, 3);
+});
+
+test("cheap metadata exclusions avoid all detail and active-run reads", async () => {
   for (const [changes, reason] of [
     [{ isDraft: true }, "closed_or_draft"],
     [{ state: "CLOSED" }, "closed_or_draft"],
@@ -724,19 +904,19 @@ test("cheap metadata exclusions avoid all detail and active-run reads", () => {
     [{ author: { login: "dependabot[bot]" } }, "dependency_bot"],
   ]) {
     const { api, calls } = queueAPI({ listed: [{ ...pr, ...changes }] });
-    const queue = fetchQueue("github/gh-aw", undefined, api, now);
+    const queue = await fetchQueue("github/gh-aw", undefined, api, now);
     assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: reason }]);
     assert.equal(calls.length, 2);
   }
   for (const elapsed of [idleMsForTest - 1, idleMsForTest]) {
     const { api, calls } = queueAPI({ listed: [{ ...pr, updatedAt: new Date(now - elapsed).toISOString() }] });
-    const queue = fetchQueue("github/gh-aw", undefined, api, now);
+    const queue = await fetchQueue("github/gh-aw", undefined, api, now);
     assert.equal(calls.length === 2, elapsed < idleMsForTest);
     assert.equal(queue.prs.length, elapsed < idleMsForTest ? 0 : 1);
   }
 });
 
-test("targeted refresh preserves metadata gates before fetching checks", () => {
+test("targeted refresh preserves metadata gates before fetching checks", async () => {
   for (const [changes, reason] of [
     [{ isDraft: true }, "closed_or_draft"],
     [{ state: "CLOSED" }, "closed_or_draft"],
@@ -745,30 +925,30 @@ test("targeted refresh preserves metadata gates before fetching checks", () => {
     [{ author: { login: "renovate[bot]" } }, "dependency_bot"],
   ]) {
     const { api, calls } = queueAPI({ candidate: { ...graphPr, ...changes } });
-    const queue = fetchQueue("github/gh-aw", "42", api, now);
+    const queue = await fetchQueue("github/gh-aw", "42", api, now);
     assert.deepEqual(queue.skipped, [{ pr_number: 42, skip_reason: reason }]);
     assert.equal(calls.length, 2);
   }
 });
 
-test("metadata is rechecked when the PR changed after list enumeration", () => {
+test("metadata is rechecked when the PR changed after list enumeration", async () => {
   const { api, calls } = queueAPI({ candidate: { ...graphPr, updatedAt: "2026-10-03T17:55:00Z" } });
-  assert.equal(fetchQueue("github/gh-aw", undefined, api, now).skipped[0].skip_reason, "not_idle");
+  assert.equal((await fetchQueue("github/gh-aw", undefined, api, now)).skipped[0].skip_reason, "not_idle");
   assert.equal(calls.length, 4);
 });
 
-test("pending checks and active agent checks avoid review and run lookups", () => {
+test("pending checks and active agent checks avoid review and run lookups", async () => {
   for (const [check, reason] of [
     [{ name: "build", status: "queued", created_at: "2026-10-03T17:55:00Z" }, "checks_pending"],
     [{ name: "Copilot coding agent", status: "in_progress", started_at: recent }, "agent_active"],
   ]) {
     const { api, calls } = queueAPI({ checks: [check] });
-    assert.equal(fetchQueue("github/gh-aw", undefined, api, now).skipped[0].skip_reason, reason);
+    assert.equal((await fetchQueue("github/gh-aw", undefined, api, now)).skipped[0].skip_reason, reason);
     assert.ok(!calls.some(args => (args[1] === "graphql" && args[3].includes("reviewThreads")) || args[1].includes("/actions/runs?")));
   }
 });
 
-test("approval-required runs are discovered by conclusion, scoped to the PR branch", () => {
+test("approval-required runs are discovered by conclusion, scoped to the PR branch", async () => {
   for (const check of [
     { name: "CGO", status: "completed", conclusion: "action_required" },
     { name: "CGO", status: "waiting" },
@@ -778,7 +958,7 @@ test("approval-required runs are discovered by conclusion, scoped to the PR bran
       checks: [check],
       approvals: [{ ...waitingRun, status: "completed", conclusion: "action_required" }],
     });
-    const queue = fetchQueue("github/gh-aw", "42", api, now);
+    const queue = await fetchQueue("github/gh-aw", "42", api, now);
     assert.equal(queue.prs[0].nudge_needed, false);
     assert.equal(queue.prs[0].approve_runs[0].run_id, 7);
     const lookup = calls.find(args => args[1].includes("status=action_required"));
@@ -787,19 +967,19 @@ test("approval-required runs are discovered by conclusion, scoped to the PR bran
   }
 });
 
-test("healthy idle PRs and human-only approvals produce empty queues", () => {
+test("healthy idle PRs and human-only approvals produce empty queues", async () => {
   for (const checks of [[], [{ name: "Other CI", status: "completed", conclusion: "action_required" }]]) {
     const { api } = queueAPI({ candidate: { ...graphPr, mergeStateStatus: "CLEAN" }, checks });
-    const queue = fetchQueue("github/gh-aw", undefined, api, now);
+    const queue = await fetchQueue("github/gh-aw", undefined, api, now);
     assert.deepEqual(queue.prs, []);
     assert.equal(queue.skipped[0].skip_reason, checks.length ? "approval_required" : "nothing_actionable");
     assert.match(formatSummary(queue), /Agent skipped: no executable progress actions remain/);
   }
 });
 
-test("approval lookup errors remain failed reads, not a successful no-op", () => {
+test("approval lookup errors remain failed reads, not a successful no-op", async () => {
   const { api } = queueAPI({ checks: [{ name: "CGO", status: "completed", conclusion: "action_required" }] });
-  assert.throws(
+  await assert.rejects(
     () =>
       fetchQueue(
         "github/gh-aw",
@@ -820,25 +1000,26 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /^max-daily-ai-credits: -1$/m);
   assert.match(workflow, /^  skip-if-no-match: .* -label:broccoli"$/m);
   assert.match(workflow, /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef'\)$/m);
+  assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
 });
 
-test("each API budget no-ops at exactly ten percent remaining", () => {
-  assert.equal(checkRateLimit(() => budgets).low, false);
+test("each API budget no-ops at exactly ten percent remaining", async () => {
+  assert.equal((await checkRateLimit(() => budgets)).low, false);
   for (const resource of ["core", "graphql", "search"]) {
     const limited = structuredClone(budgets);
     limited.resources[resource].remaining = Math.ceil(limited.resources[resource].limit * 0.1);
-    assert.equal(checkRateLimit(() => limited).low, true);
+    assert.equal((await checkRateLimit(() => limited)).low, true);
     limited.resources[resource].remaining++;
-    assert.equal(checkRateLimit(() => limited).low, false);
+    assert.equal((await checkRateLimit(() => limited)).low, false);
   }
 });
 
-test("low rate limits stop before any PR lookup, including targeted refreshes", () => {
+test("low rate limits stop before any PR lookup, including targeted refreshes", async () => {
   const limited = structuredClone(budgets);
   limited.resources.graphql.remaining = 200;
   for (const number of [undefined, "42"]) {
     const calls = [];
-    const queue = fetchQueue(
+    const queue = await fetchQueue(
       "github/gh-aw",
       number,
       args => {
@@ -857,11 +1038,11 @@ test("low rate limits stop before any PR lookup, including targeted refreshes", 
   }
 });
 
-test("exhausting the budget after enumeration discards the queue before details", () => {
+test("exhausting the budget after enumeration discards the queue before details", async () => {
   let checks = 0;
   const limited = structuredClone(budgets);
   limited.resources.core.remaining = 100;
-  const queue = fetchQueue(
+  const queue = await fetchQueue(
     "github/gh-aw",
     undefined,
     args => {
@@ -876,8 +1057,8 @@ test("exhausting the budget after enumeration discards the queue before details"
   assert.deepEqual(queue.prs, []);
 });
 
-test("rate-limit read failures and missing budgets are errors, not no-ops", () => {
-  assert.throws(
+test("rate-limit read failures and missing budgets are errors, not no-ops", async () => {
+  await assert.rejects(
     () =>
       checkRateLimit(() => {
         throw new Error("HTTP 403");
@@ -885,6 +1066,6 @@ test("rate-limit read failures and missing budgets are errors, not no-ops", () =
     /HTTP 403/
   );
   for (const response of [{}, { resources: { ...budgets.resources, core: undefined } }, { resources: { ...budgets.resources, core: { limit: 5000, remaining: -1, reset: 1791057600 } } }]) {
-    assert.throws(() => checkRateLimit(() => response), /rate limit/);
+    await assert.rejects(() => checkRateLimit(() => response), /rate limit/);
   }
 });
