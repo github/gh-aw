@@ -307,7 +307,7 @@ on:
   bots: ["dependabot[bot]"]
 ```
 
-Workflows with `workflow_run` triggers include automatic security protections: `workflows` must list at least one non-empty entry (empty or missing values are rejected at compile time, since GitHub silently disables such triggers); the compiler injects repository ID and fork checks; and `branches` is recommended to limit triggering branches (the compiler warns when omitted, or errors in strict mode). Repository identity and a successful producer run do not prove that the producer executed only trusted code. Treat downloaded outputs as [untrusted artifact data](../artifacts/#cross-run-artifact-trust), not scripts to execute in a privileged consumer.
+Workflows with `workflow_run` triggers include automatic security protections: `workflows` must list at least one non-empty entry (empty or missing values are rejected at compile time, since GitHub silently disables such triggers); the compiler injects repository ID and fork checks; and `branches` is recommended to limit triggering branches (the compiler warns when omitted, or errors in strict mode). Repository identity and a successful producer run do not prove that the producer executed only trusted code. Treat downloaded outputs as [untrusted artifact data](/gh-aw/reference/artifacts/#cross-run-artifact-trust), not scripts to execute in a privileged consumer.
 
 #### Conclusion Filtering (`conclusion:`)
 

@@ -56,7 +56,7 @@ Review these boundaries before deployment:
 | Custom executable steps | Keep untrusted event fields and downloaded content as data, not shell/JavaScript source. Avoid `eval` and similar re-interpretation; environment indirection alone does not make later execution safe. |
 | Action and runtime pins | Retain full commit SHA/digest pinning, update to reviewed patched releases, then recompile and review deployed locks. An immutable historical pin does not acquire later fixes. |
 | Policy opt-outs | Review `strict: false`, skipped/suppressed lint, broader roles/bot admission, disabled sandbox/firewall/detection, and custom mounts or credentials as changes to the trust model. Acknowledging a warning is not enforcement. |
-| Host and upstream state | Apply the [self-hosted host isolation checklist](../../reference/self-hosted-runners/#host-isolation-checklist) and [cross-run artifact rules](../../reference/artifacts/#cross-run-artifact-trust). Compilation does not prove host cleanliness, cache provenance, or producer-code trust. |
+| Host and upstream state | Apply the [self-hosted host isolation checklist](/gh-aw/reference/self-hosted-runners/#host-isolation-checklist) and [cross-run artifact rules](/gh-aw/reference/artifacts/#cross-run-artifact-trust). Compilation does not prove host cleanliness, cache provenance, or producer-code trust. |
 
 ---
 
@@ -362,7 +362,7 @@ flowchart TB
 
 The threat detection job is a sub-stage within the SafeOutputs subsystem. After the agent job completes and its outputs are buffered as artifacts, a separate detection job downloads these artifacts and invokes a prompted AI agent to analyze them for suspicious content. This detection agent operates with a security-focused system prompt and examines the agent's outputs, patches, and execution context. Its result informs the configured safe-output policy; detection is defense in depth, not proof that arbitrary code or artifacts are safe.
 
-Detection checks include identification of secret leakage, malicious code patterns, and policy violations. By default, `safe-outputs.threat-detection.continue-on-error: true` applies a warn-mode policy for detected threats and detector failures: reviewable outputs are annotated, branch pushes become review pull requests, and non-reviewable operations are aborted. Set `continue-on-error: false` to fail the detection job and prevent safe outputs on these outcomes. A detector failure or invalid result means no security verdict, not a clean result. See [Threat Detection](../../reference/threat-detection/#error-handling) for the exact behavior.
+Detection checks include identification of secret leakage, malicious code patterns, and policy violations. By default, `safe-outputs.threat-detection.continue-on-error: true` applies a warn-mode policy for detected threats and detector failures: reviewable outputs are annotated, branch pushes become review pull requests, and non-reviewable operations are aborted. Set `continue-on-error: false` to fail the detection job and prevent safe outputs on these outcomes. A detector failure or invalid result means no security verdict, not a clean result. See [Threat Detection](/gh-aw/reference/threat-detection/#error-handling) for the exact behavior.
 
 ```mermaid
 flowchart TB

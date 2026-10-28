@@ -27,7 +27,7 @@ Before admitting untrusted work:
 
 - Provision a clean, disposable VM or equivalent isolated environment for each job and destroy its writable state afterward. For ARC, include the DinD daemon's state and mounted volumes; replacing only the runner pod is insufficient when those persist.
 - Separate trusted release, publish, and deployment jobs from untrusted execution using distinct runner groups and infrastructure. Restrict group access to the intended repositories and workflows; do not share writable disks, Docker daemons, or credentials between trust domains.
-- Isolate or discard local npm/pip caches, build directories, tool caches, installed binaries, home directories, and Docker images/volumes. Audit Actions dependency-cache restores and writers separately from [cache-memory](../cache-memory/); service-side cache restrictions do not protect persistent host caches.
+- Isolate or discard local npm/pip caches, build directories, tool caches, installed binaries, home directories, and Docker images/volumes. Audit Actions dependency-cache restores and writers separately from [cache-memory](/gh-aw/reference/cache-memory/); service-side cache restrictions do not protect persistent host caches.
 - Restrict Docker socket access to trusted runner components, never make the socket world-accessible, and prevent untrusted workloads from reaching other jobs' daemons. Limit host/internal-network and cloud metadata access independently of the agent's firewall.
 - Remove ambient Git, cloud, registry, SSH, and Kubernetes credentials from the host; grant only job-scoped credentials to the components that need them. Verify teardown after cancelled or failed jobs, not just successful runs.
 
