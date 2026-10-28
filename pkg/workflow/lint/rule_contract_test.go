@@ -34,6 +34,18 @@ const contractSafeSteps = "    steps:\n      - shell: bash\n        run: echo pu
 
 func builtInRuleContracts() map[string]ruleContract {
 	return map[string]ruleContract{
+		"privileged-checkout": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: "on: pull_request_target\n" + contractJob + "    steps:\n      - uses: actions/checkout@v7\n        with: {allow-unsafe-pr-checkout: true}\n",
+			safe:   "on: pull_request_target\n" + contractJob + "    steps:\n      - uses: actions/checkout@v7\n        with: {allow-unsafe-pr-checkout: false}\n",
+			path:   "jobs.check.steps[0].with.allow-unsafe-pr-checkout",
+		},
+		"artifact-execution": {
+			targets: ActionsAST | AWAST, severity: Warning,
+			unsafe: "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: bash incoming/run.sh\n",
+			safe:   "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: jq . incoming/data.json\n",
+			path:   "jobs.check.steps[1].run",
+		},
 		"bash-case-pattern": {
 			targets: ActionsAST | AWAST, severity: Warning,
 			unsafe: contractJob + "    steps:\n      - run: 'matched=$(case \"$ref\" in $pattern) echo yes ;; esac)'\n",
