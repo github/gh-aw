@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.77
+**Version**: 1.0.78
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.78` | Unreleased | Documents the implemented cache-memory restore/edit/artifact/publication lifecycle, integrity namespaces and restore scope, and distinct meanings of read-only policies. Maps lifecycle and mode-validation evidence and separates CTR-019 from the host-side MCP read-only and safe-output lifecycle models. Documentation/evidence clarification only; no new runtime behavior, threat identifier, or lock-file compatibility change. |
 | `1.0.77` | Unreleased | Requires parsed, nonempty dependency-cache entries before omitting the detection-enabled agent's read-only cache policy; `cache: []` retains the restriction. Requires trigger-independent validation of authored cache-mode literals before actionlint compatibility suppression. No new threat identifier, frontmatter setting, or lock-file schema change. |
 | `1.0.76` | Unreleased | Replaces the incomplete cache-write event denylist with GitHub's documented write allowlist plus merge-ref-isolated `pull_request`. Publisher and dependency-save guards deny all other and unknown events, including issues/discussions; known-event lint diagnostics share the classification. Generated locks require regeneration; no new threat identifier or frontmatter setting. |
 | `1.0.75` | Unreleased | Blocks detection-separated cache-memory publication on low-trust events, restores trusted dependency-cache saves using trigger-scoped tokens, and shares explicit detection acceptance across cache/drive publishers and custom jobs. Adds job-level actionlint compatibility without suppressing invalid locations or values. Generated locks require regeneration; no new threat identifier or frontmatter setting. |
@@ -230,6 +231,38 @@ Authored workflow- and job-level `cache-mode` values MUST be validated independe
 
 These controls do not authenticate unsigned cache contents or uploaded artifacts, prove arbitrary shell/third-party cache writers safe, or cover persistent runner caches. Conformance evidence MUST cover generated YAML for low-trust, trusted, mixed, dispatch, dry-run, GHES, no-detection, empty dependency-cache lists, and legitimate publisher cases, plus detector-result and acceptance-output combinations and trigger-independent invalid-mode diagnostics.
 
+#### Cache lifecycle and poisoning boundaries
+
+The detection-separated lifecycle has distinct local, artifact, and cache-service effects:
+
+| Phase | Compiler-managed behavior | Trust boundary |
+|---|---|---|
+| Restore and prepare | Restore cache-memory with `actions/cache/restore`, then initialize the integrity-branch workspace and configured pre-agent sanitization. | A cache hit is input, not approval of its producer or contents. |
+| Agent edits | The agent can modify local memory files. Writable entries receive local Git commits and configured post-agent validation. | Local file writes and Git history are not cache-service publication or provenance. |
+| Artifact handoff | Writable entries are uploaded for the downstream publisher, subject to configured validation. These steps can run after agent failure; reusable calls use invocation-specific artifact names. | Artifact existence or a successful upload MUST NOT imply detector acceptance or permission to save a cache. |
+| Publication gate | The publisher requires a successful agent, successful detection, explicit acceptance, and an allowlisted runtime event. | A rejected, failed, missing, or runtime-skipped detection result MUST block publication even if an artifact already exists. This is stricter than safe-output paths that may process valid requests after agent failure. |
+| Validate and save | The publisher downloads the current invocation's memory artifact, checks for content, requires configured validation to succeed, and saves through `actions/cache/save`. If every entry is restore-only, no publisher is generated. | Validation enforces its configured content policy, not general artifact authenticity. The write-only job does not restore caches. |
+| Later restore | Subsequent runs select entries through the integrity/policy namespace and configured restore prefixes, subject to platform cache visibility. | Previously published data remains untrusted input; neither a cache hit nor a prior accepted run proves safe future interpretation. |
+
+Generated cache-memory save and restore keys MUST retain the integrity-level and policy-hash namespace, including when a custom key suffix is configured. The policy hash is a truncated configuration digest, not a signature, producer identity, or collision-resistant authenticity guarantee. Default keys include the workflow identifier and run ID; restore prefixes permit reuse across runs. Repository scope intentionally adds cross-workflow restoration within the namespace. Custom key choices and repository scope MUST NOT be described as universal workflow isolation. These namespaces do not encode event trust, so they MUST NOT replace the runtime publication event gate.
+
+The configured cache-memory `retention-days` is emitted on the intermediate artifact upload; it MUST NOT be described as a cache-service expiry, secure deletion, or revocation policy. GitHub cache visibility, eviction, and already-existing entries remain platform/operator concerns. This hardening does not retroactively authenticate or purge caches created under older policies.
+
+#### Read-only models and evidence limits
+
+| Read-only mechanism | What it restricts | What it does not establish |
+|---|---|---|
+| Job `cache-mode: read` | The GitHub.com job's scoped cache-service write capability. | Local memory immutability, content authenticity, or a restriction on every credential/custom writer available to the job. Repository `permissions: read-all` alone is not this cache-token boundary. |
+| Entry `restore-only: true` | Compiler-managed persistence for that entry: restore instead of combined restore/save, and no post-agent commit, validation/upload, or publisher save for it. | A read-only filesystem or a per-entry token restriction; other configured dependency caches can still require job-wide write capability. |
+| Dry-run | Compiler-managed cache actions are restore-only and the cache-memory publisher is omitted; supported platform tokens are capped to read. | General script side-effect freedom or GHES scoped-token enforcement. |
+| MCP read-only compilation | Compilation-controlled filesystem/image-store preservation and cached-only import use under `MCP-COMPILE-*`. | Runtime Actions cache-token restrictions or the trustworthiness of cached imported content. Ordinary CLI `--no-emit` is not the stronger MCP read-only mode. |
+
+For the scoped platform cache token, `none` disables both reads and writes, `read` permits restoration without writes, `write` permits reads and writes, and `write-only` permits writes without cache reads. Omitting the policy retains platform defaults and applicable caller restrictions; omission MUST NOT be interpreted as `none` or as proof of read-only access. An explicit low-trust write override is a deliberate capability-boundary change, not automatic authenticity.
+
+Compiler job registration and pre-emission validation MUST reject noncanonical cache-mode strings rather than concatenate unchecked policy text into generated YAML. Empty compiler-internal values mean omission, not permission to accept an explicitly empty authored policy. Native Actions scalar serialization MUST preserve YAML structure; parsing or emitting a scalar alone is not enum validation.
+
+[`CompiledWorkflow.tla`](workflow-security/CompiledWorkflow.tla) models job/artifact/credential ordering, while [`SafeOutputTransport.tla`](workflow-security/SafeOutputTransport.tla) and [`SafeOutputGit.tla`](workflow-security/SafeOutputGit.tla) model safe-output transport and Git lifecycles. None models cache-service entries, eviction, event-scoped token grants, or cache-memory publication as a separate principal. [`MCPCompile.tla`](workflow-security/MCPCompile.tla) models host compilation and import-cache mutation, not runtime cache poisoning. CTR-019 evidence therefore comes from the mapped generated-YAML, lifecycle, namespace, and lint tests; passing these bounded models MUST NOT be presented as a proof of cache non-poisonability or compiler refinement.
+
 ### 5.2 Compiler Response Requirements
 
 The compiler MUST produce deterministic, actionable diagnostics and either reject insecure generation or apply a safe rewrite for every active rule in Section 5.1.
@@ -312,7 +345,7 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-016 Compile-Time Manifest Drift | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
 | CTR-017 Secret Leakage via Environment Variables and Telemetry | safe-update, strict env/update, cache, and expression builder; `pkg/workflow/awf_command_builder.go`, `threat_detection_external.go`, `evals_steps.go`; AST subsets: `pkg/workflow/lint/secrets.go`, `otlp_secret_leak.go`, `pkg/workflow/taint/` | corresponding enforcement, secrets, update, cache, and OTLP leak tests; `TestOTLPEnvExcludedFromAWFSandboxes` in `awf_env_test.go`, `TestEvalsOTLPEnvExcludedFromSandbox` in `evals_steps_test.go`, `TestCompiledOTLPEnvExcludedFromAgentDetectionAndEvals` in `threat_detection_isolation_test.go`; `pkg/workflow/taint/taint_test.go`, `pkg/workflow/lint/otlp_secret_leak_test.go` |
 | CTR-018 Version Integrity Bypass | safe-update, strict env/update, cache, and expression builder | corresponding enforcement, secrets, update, and cache tests |
-| CTR-019 Cache-Memory Integrity Enforcement | `pkg/workflow/compiler_main_job.go`, `cache_memory.go`, `cache_steps.go`, shared `cachepolicy/events.go`, `drive_memory.go`, `expression_builder.go`, `compiler_yaml.go`; GHES configuration in `compiler.go`; AST subset: `pkg/workflow/lint/cache_write_overrides.go` | `pkg/workflow/cache_access_test.go`, `cache_memory_threat_detection_test.go`, `compiler_development_test.go`, `drive_memory_test.go`, `expression_builder_detection_test.go`; `pkg/workflow/lint/cache_write_overrides_test.go`, `pkg/cli/lint_cache_mode_test.go` |
+| CTR-019 Cache-Memory Integrity Enforcement | `pkg/workflow/compiler_main_job.go`, `cache_memory.go`, `cache_integrity.go`, `cache_steps.go`, shared `cachepolicy/events.go`, `compiler_yaml_post_agent.go`, `drive_memory.go`, `expression_builder.go`, `compiler_yaml.go`, `jobs_validation.go`; GHES configuration in `compiler.go`; native policy presence/scalar handling in `actions/parse.go`, `actions/lower.go`; AST subset: `pkg/workflow/lint/cache_poisoning.go`, `cache_write_overrides.go` | `pkg/workflow/cache_access_test.go`, `cache_integrity_test.go`, `cache_memory_threat_detection_test.go`, `cache_memory_restore_only_test.go`, `cache_memory_restore_keys_test.go`, `cache_scope_validation_test.go`, `cache_retention_days_validation_test.go`, `compiler_jobs_memory_test.go`, `compiler_development_test.go`, `jobs_cache_mode_test.go`, `drive_memory_test.go`, `expression_builder_detection_test.go`; `pkg/workflow/actions/parse_test.go`, `pkg/workflow/lint/cache_write_overrides_test.go`, `pkg/cli/lint_cache_mode_test.go` |
 | CTR-020 Conditional Import Security | `pkg/parser/import_bfs.go` | `pkg/parser/import_bfs_test.go` |
 | CTR-021 Workflow Run Trigger Branch Scope | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go`; AST subset: `pkg/workflow/lint/workflow_run_scope.go` | workflow-run, bash-allowlist, gitutil, and download tests; `pkg/workflow/lint/workflow_run_scope_test.go` |
 | CTR-022 Git Subprocess Argument Injection | `agent_validation.go`, `agentic_engine.go`, `pkg/gitutil/gitutil.go` | workflow-run, bash-allowlist, gitutil, and download tests |
