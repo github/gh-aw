@@ -49,12 +49,7 @@ func (c *Compiler) extractCustomJobCoreProperties(job *Job, jobName string, conf
 		}
 	}
 
-	// Extract name (display name) for custom jobs
-	if name, hasName := configMap["name"]; hasName {
-		if nameStr, ok := name.(string); ok {
-			job.DisplayName = nameStr
-		}
-	}
+	extractCustomJobDisplayName(job, configMap)
 
 	if err := extractCustomJobTimeoutMinutes(job, jobName, configMap); err != nil {
 		return err
@@ -79,6 +74,14 @@ func (c *Compiler) extractCustomJobCoreProperties(job *Job, jobName string, conf
 	}
 
 	return nil
+}
+
+func extractCustomJobDisplayName(job *Job, configMap map[string]any) {
+	if name, hasName := configMap["name"]; hasName {
+		if nameStr, ok := name.(string); ok {
+			job.DisplayName = nameStr
+		}
+	}
 }
 
 func (c *Compiler) extractCustomJobRunsOn(job *Job, jobName string, configMap map[string]any) error {
@@ -111,42 +114,38 @@ func extractCustomJobTimeoutMinutes(job *Job, jobName string, configMap map[stri
 
 	isGeneratedJob := jobName == string(constants.AgentJobName) || jobName == string(constants.DetectionJobName)
 	const maxLosslessIntFloat64 = float64(1 << 53)
-	timeoutMustBePositiveIntegerErr := func(got any) error {
-		return fmt.Errorf("job '%s' timeout-minutes must be a positive integer, got %v", jobName, got)
-	}
-
 	switch v := timeout.(type) {
 	case int:
 		if v <= 0 {
-			return timeoutMustBePositiveIntegerErr(v)
+			return customJobTimeoutMinutesError(jobName, v)
 		}
 		job.TimeoutMinutes = v
 		job.TimeoutMinutesExpression = ""
 	case int64:
 		if v <= 0 || int64(int(v)) != v {
-			return timeoutMustBePositiveIntegerErr(v)
+			return customJobTimeoutMinutesError(jobName, v)
 		}
 		job.TimeoutMinutes = int(v)
 		job.TimeoutMinutesExpression = ""
 	case uint64:
 		if v == 0 || uint64(int(v)) != v {
-			return timeoutMustBePositiveIntegerErr(v)
+			return customJobTimeoutMinutesError(jobName, v)
 		}
 		job.TimeoutMinutes = int(v)
 		job.TimeoutMinutesExpression = ""
 	case float64:
 		if v <= 0 || math.Trunc(v) != v || v > maxLosslessIntFloat64 {
-			return timeoutMustBePositiveIntegerErr(v)
+			return customJobTimeoutMinutesError(jobName, v)
 		}
 		minutes64 := int64(v)
 		if minutes64 <= 0 || int64(int(minutes64)) != minutes64 {
-			return timeoutMustBePositiveIntegerErr(v)
+			return customJobTimeoutMinutesError(jobName, v)
 		}
 		job.TimeoutMinutes = int(minutes64)
 		job.TimeoutMinutesExpression = ""
 	case string:
 		if strings.TrimSpace(v) == "" {
-			return timeoutMustBePositiveIntegerErr(v)
+			return customJobTimeoutMinutesError(jobName, v)
 		}
 		if isGeneratedJob {
 			return fmt.Errorf("job '%s' timeout-minutes must be a positive integer; expressions are not supported", jobName)
@@ -164,10 +163,14 @@ func extractCustomJobTimeoutMinutes(job *Job, jobName string, configMap map[stri
 			)
 		}
 	default:
-		return timeoutMustBePositiveIntegerErr(v)
+		return customJobTimeoutMinutesError(jobName, v)
 	}
 
 	return nil
+}
+
+func customJobTimeoutMinutesError(jobName string, got any) error {
+	return fmt.Errorf("job '%s' timeout-minutes must be a positive integer, got %v", jobName, got)
 }
 
 func extractCustomJobConcurrency(job *Job, jobName string, configMap map[string]any) error {
@@ -300,7 +303,7 @@ func extractCustomJobOutputs(job *Job, jobName string, configMap map[string]any)
 	job.Outputs = make(map[string]string)
 	for key, val := range outputsMap {
 		if valStr, ok := val.(string); ok {
-			job.Outputs[key] = valStr
+			job.Outputs[key] = fmt.Sprintf("%q", valStr)
 		} else {
 			compilerJobsLog.Printf("Warning: output '%s' in job '%s' has non-string value (type: %T), ignoring", key, jobName, val)
 		}
