@@ -139,6 +139,13 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
   return readVerifiedQueueAtSHA({ githubClient, owner, repo, branch, repository, coreApi }, sha, true, true, eventIds);
 }
 
+/**
+ * @param {QueueReadOptions & {repository: {full_name: string}, coreApi?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} options
+ * @param {string} sha
+ * @param {boolean} [verify]
+ * @param {boolean} [recover]
+ * @param {Array<{work_id: string, claim_id: string}> | undefined} [eventIds]
+ */
 async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = true, eventIds = undefined) {
   const { githubClient, branch, repository, coreApi } = options;
   const scope = queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient));
@@ -168,6 +175,11 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = tru
   };
 }
 
+/**
+ * @param {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string}} options
+ * @param {string} sha
+ * @param {Record<string, unknown> | undefined} [request]
+ */
 async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, request = undefined) {
   const requestOptions = request ? { request } : {};
   const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha, ...requestOptions });
