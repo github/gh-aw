@@ -1343,7 +1343,24 @@ func TestExtractCustomJobOutputs(t *testing.T) {
 				},
 			},
 			expectedOutputs: map[string]string{
-				"result": "${{ steps.run.outputs.result }}",
+				"result": `"${{ steps.run.outputs.result }}"`,
+			},
+		},
+		{
+			name: "outputs stored as YAML string scalars",
+			configMap: map[string]any{
+				"outputs": map[string]any{
+					"boolean":   "true",
+					"number":    "007",
+					"empty":     "",
+					"multiline": "first\nsecond\n",
+				},
+			},
+			expectedOutputs: map[string]string{
+				"boolean":   `"true"`,
+				"number":    `"007"`,
+				"empty":     `""`,
+				"multiline": `"first\nsecond\n"`,
 			},
 		},
 		{
@@ -1354,7 +1371,7 @@ func TestExtractCustomJobOutputs(t *testing.T) {
 					"invalid": 42,
 				},
 			},
-			expectedOutputs: map[string]string{"valid": "some-value"},
+			expectedOutputs: map[string]string{"valid": `"some-value"`},
 		},
 		{
 			name:      "outputs not a map",

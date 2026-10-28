@@ -65,8 +65,8 @@ type Job struct {
 	Env                        map[string]string // Job-level environment variables
 	ContinueOnError            *bool             // continue-on-error flag for the job (nil means unset)
 	Steps                      []string
-	Needs                      []string // Job dependencies (needs clause)
-	Outputs                    map[string]string
+	Needs                      []string          // Job dependencies (needs clause)
+	Outputs                    map[string]string // YAML-ready scalar snippets, emitted verbatim by WriteJobsYAML
 	actionsCondition           bool
 	// Actions contributes typed steps after Steps, and typed conditions,
 	// environment values, and output bindings. It is lowered after all job

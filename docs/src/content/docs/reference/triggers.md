@@ -188,6 +188,10 @@ on:
 
 Strict mode rejects `pull_request_target` when `on.roles` contains `all` or `read`, including in a role list. Non-strict mode warns about this dangerous combination: untrusted contributors can trigger an agent job with access to secrets, including engine credentials and custom secrets. This restriction applies even with `checkout: false`, trusted checkouts, or `on.pull_request_target.acknowledge-risk: true`. To suppress only the non-strict warning, set `features.dangerously-allow-roles-read-and-pull-request-target: true`. Prefer `pull_request`, or retain the default trusted roles `[admin, maintainer, write]`.
 
+GitHub's fork-contributor workflow approval setting does not protect `pull_request_target`. The [default public-repository event policy](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target) has evaluate and enforce modes: evaluate mode reports affected runs without blocking them; enforcement blocks covered runs. Check GitHub's current rollout and enforcement guidance and the effective repository/organization policy rather than assuming either mode applies. That default does not cover private/internal repositories, replace an applicable explicitly configured event policy, or provide a blanket block on `workflow_run`.
+
+`acknowledge-risk: true` acknowledges the trigger warning; it does not bypass separate checkout or role restrictions. The `actions/checkout` input `allow-unsafe-pr-checkout: true` is a different opt-out that permits otherwise refused fork checkout. Neither input makes fork code trusted, and custom Git commands or third-party actions do not inherit `actions/checkout` protections.
+
 #### Fork Filtering (`forks:`)
 
 Pull request workflows block forks by default for security. Use the `forks:` field to allow specific fork patterns:
@@ -303,7 +307,7 @@ on:
   bots: ["dependabot[bot]"]
 ```
 
-Workflows with `workflow_run` triggers include automatic security protections: `workflows` must list at least one non-empty entry (empty or missing values are rejected at compile time, since GitHub silently disables such triggers); the compiler injects repository ID and fork checks to reject cross-repository or fork-triggered runs; and `branches` is recommended to limit triggering branches (the compiler warns when omitted, or errors in strict mode). See the [Security Architecture](/gh-aw/introduction/architecture/) for details.
+Workflows with `workflow_run` triggers include automatic security protections: `workflows` must list at least one non-empty entry (empty or missing values are rejected at compile time, since GitHub silently disables such triggers); the compiler injects repository ID and fork checks; and `branches` is recommended to limit triggering branches (the compiler warns when omitted, or errors in strict mode). Repository identity and a successful producer run do not prove that the producer executed only trusted code. Treat downloaded outputs as [untrusted artifact data](/gh-aw/reference/artifacts/#cross-run-artifact-trust), not scripts to execute in a privileged consumer.
 
 #### Conclusion Filtering (`conclusion:`)
 
@@ -479,6 +483,8 @@ For conditions based on GitHub search results, use [`skip-if-match:`](#skip-if-m
 ### Filtering by Repository Access Roles (`on.roles:`, `on.skip-roles:`)
 
 Controls who can trigger agentic workflows using an **exact-match allowlist** against the actor's repository role. Defaults to `[admin, maintainer, write]`. Use `skip-roles:` to exempt team members from checks that should only apply to external contributors.
+
+Admission uses repository permission checks, not merely an actor's displayed author association. Permission to trigger a workflow is neither human approval through a protected environment nor proof that a comment, dispatch payload, or selected PR revision is safe. Treat payload-selected repositories, refs, and commands as untrusted input even when the sender is authorized.
 
 ```yaml wrap
 on:
@@ -710,6 +716,10 @@ on:
 Sets the `environment` on the activation job for human-in-the-loop approval before execution. The value must match a configured environment in repository Settings → Environments (approval rules, required reviewers, wait timers). See [GitHub's environment documentation](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) for configuration details.
 
 This setting takes precedence over the top-level [`environment:`](/gh-aw/reference/frontmatter/#environment-protection-environment) for the activation job. Without `manual-approval`, activation inherits the top-level environment and its protection rules.
+
+Configure required reviewers and any self-review/bypass restrictions in the environment itself; naming an environment without protection rules does not require human review. The activation gate does not imply that preceding pre-activation steps or custom jobs have been reviewed or are gated.
+
+Environment approval or a maintainer command does not by itself bind a later checkout to the PR SHA that the reviewer inspected. For revision-specific approval, record the approved immutable SHA, execute that exact commit, verify the checked-out SHA, and reject a changed head when freshness is required. Do not treat the built-in PR checkout helper's actor permission check as proof of historical revision approval.
 
 ### Skip-If-Match Condition (`skip-if-match:`)
 
