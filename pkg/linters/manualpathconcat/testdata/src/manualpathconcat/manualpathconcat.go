@@ -68,10 +68,22 @@ func badParenSeparator(dir, file string) string {
 	return dir + ("/") + file // want `manual "/" path concatenation; use filepath\.Join\(dir, file\) \(or path\.Join\) instead`
 }
 
+// badParenLeftChain parenthesizes the left-hand join expression.
+func badParenLeftChain(dir, file string) string {
+	return (dir + "/") + file // want `manual "/" path concatenation; use filepath\.Join\(dir, file\) \(or path\.Join\) instead`
+}
+
 // badParenAddAssignBinary builds a path via += with a parenthesized
 // "/" + Y right-hand side.
 func badParenAddAssignBinary(path, file string) string {
 	path += ("/" + file) // want `manual "/" path concatenation; use filepath\.Join\(path, file\) \(or path\.Join\) instead`
+	return path
+}
+
+// badParenAddAssignSeparator builds a path via += with a parenthesized
+// separator operand.
+func badParenAddAssignSeparator(path, file string) string {
+	path += ("/") + file // want `manual "/" path concatenation; use filepath\.Join\(path, file\) \(or path\.Join\) instead`
 	return path
 }
 
@@ -80,6 +92,11 @@ func badParenAddAssignBinary(path, file string) string {
 func badParenAddAssignEmbedded(path string) string {
 	path += ("/subpath") // want `manual "/" path concatenation; use filepath\.Join\(path, "subpath"\) \(or path\.Join\) instead`
 	return path
+}
+
+// badParenEmbeddedSlash parenthesizes the embedded-slash literal.
+func badParenEmbeddedSlash(dir string) string {
+	return dir + ("/config.yml") // want `manual "/" path concatenation; use filepath\.Join\(dir, "config\.yml"\) \(or path\.Join\) instead`
 }
 
 // goodNolint suppresses the diagnostic with a nolint directive.
@@ -112,6 +129,11 @@ func goodPrefixOnly(name string) string {
 // goodConstant below.
 func goodBareSeparatorLeftOfEmbedded() string {
 	return "/" + "/config.yml"
+}
+
+// goodParenSeparatorOnly is a separator-only prefix and must not be reported.
+func goodParenSeparatorOnly(name string) string {
+	return ("/") + "/" + name
 }
 
 // goodLiteralLeftOfEmbedded is also a compile-time constant (both operands
