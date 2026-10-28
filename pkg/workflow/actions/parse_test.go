@@ -125,6 +125,39 @@ func TestParseJobCacheModes(t *testing.T) {
 	}
 }
 
+func TestCacheModeEmissionPreservesScalarBoundary(t *testing.T) {
+	for _, mode := range []string{
+		"read\n    permissions:\n      contents: write",
+		"read\r    permissions: write-all",
+		"read\r\n    steps:\n      - run: echo injected",
+		" read\t ",
+	} {
+		t.Run(mode, func(t *testing.T) {
+			for _, authored := range []bool{false, true} {
+				input := &Workflow{Jobs: []*Job{{
+					ID: "call", Uses: "./.github/workflows/worker.yml",
+				}}}
+				if authored {
+					var err error
+					input, err = Parse([]byte("jobs:\n  call:\n    uses: ./.github/workflows/worker.yml\n"))
+					require.NoError(t, err)
+				}
+				input.Jobs[0].CacheMode = mode
+				content, err := Emit(input)
+				require.NoError(t, err)
+				var parsed map[string]any
+				require.NoError(t, yaml.Unmarshal([]byte(content), &parsed))
+				jobs := parsed["jobs"].(map[string]any)
+				require.Len(t, jobs, 1)
+				fields := jobs["call"].(map[string]any)
+				require.Len(t, fields, 2)
+				assert.Equal(t, mode, fields["cache-mode"])
+				assert.Equal(t, "./.github/workflows/worker.yml", fields["uses"])
+			}
+		})
+	}
+}
+
 func TestParseMultilineAuthoredConditions(t *testing.T) {
 	condition := "contains(github.event.comment.body, '/q\n') &&\n github.event_name == 'issue_comment'"
 	source := "jobs:\n  call:\n    uses: ./.github/workflows/worker.yml\n    if: " +
