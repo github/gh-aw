@@ -1,25 +1,21 @@
 {
-  "run_date": "2026-10-28T12:26:50Z",
-  "run_id": "40687467201",
+  "run_date": "2026-10-28T18:23:04Z",
+  "run_id": "40744192384",
   "source": "pr-triage",
-  "eligible_total": 2,
+  "eligible_total": 1,
   "cooldown_skipped": 0,
-  "open_copilot_prs": 2,
+  "open_copilot_prs": 1,
   "category_counts": {
-    "feature": 1,
-    "bug": 1
+    "feature": 1
   },
   "risk_counts": {
-    "high": 1,
-    "medium": 1
+    "high": 1
   },
   "priority_counts": {
-    "high": 1,
-    "medium": 1
+    "high": 1
   },
   "action_counts": {
-    "fast_track": 1,
-    "batch_review": 1
+    "fast_track": 1
   },
   "batches": [],
   "selected_candidates": [
@@ -44,30 +40,8 @@
         "pr-action:fast_track",
         "pr-agent:copilot"
       ]
-    },
-    {
-      "number": 72632,
-      "title": "Link work queue footers to creation and completion revisions",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 58,
-      "score_breakdown": {
-        "impact": 25,
-        "urgency": 15,
-        "quality": 18
-      },
-      "updated_at": "2026-10-28T10:57:43Z",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot"
-      ]
     }
   ],
   "skipped_prs": [],
-  "notes": "Two open app/github-copilot PRs were eligible for triage; one high-value auth feature and one medium-risk provenance bugfix were classified and labeled. No 3+ cluster was available for batching."
+  "notes": "One eligible open app/github-copilot PR was triaged and fast-tracked. No batched cluster was available among the eligible set."
 }
