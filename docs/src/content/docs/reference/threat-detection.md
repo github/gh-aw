@@ -254,7 +254,7 @@ AI detection produces a structured JSON response:
 }
 ```
 
-If any threat is detected (`true`), the workflow fails and safe outputs are blocked.
+If any threat is detected (`true`), default warn mode annotates reviewable outputs, converts branch pushes to review pull requests, and aborts non-reviewable outputs; strict mode fails the detection job and blocks safe outputs. Detector failures follow the same mode-dependent policy; see [Error Handling](#error-handling).
 
 ## Custom Prompt Instructions
 

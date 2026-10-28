@@ -738,11 +738,18 @@ flowchart TB
     VERDICT -->|"✅ Safe"| CREATE_ISSUE
     VERDICT -->|"✅ Safe"| ADD_COMMENT
     VERDICT -->|"✅ Safe"| CREATE_PR
-    VERDICT -->|"❌ Threat"| BLOCK_ALL["Block All Safe Outputs"]
+    VERDICT -->|"Threat or detector failure: warn mode"| WARN_POLICY["Annotate / convert / abort by output type"]
+    WARN_POLICY -->|"Annotated"| CREATE_ISSUE
+    WARN_POLICY -->|"Annotated"| ADD_COMMENT
+    WARN_POLICY -->|"Annotated or converted"| CREATE_PR
+    WARN_POLICY -->|"Non-reviewable"| ABORT["Abort Non-Reviewable Outputs"]
+    VERDICT -->|"Threat or detector failure: strict mode"| BLOCK_ALL["Block All Safe Outputs"]
 
     CREATE_ISSUE --> AGGREGATE
     ADD_COMMENT --> AGGREGATE
     CREATE_PR --> AGGREGATE
+    ABORT --> AGGREGATE
+    BLOCK_ALL --> AGGREGATE
     AGGREGATE --> SUMMARY
 ```
 
