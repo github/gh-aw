@@ -793,9 +793,11 @@ on:
     # (optional)
     draft: true
 
-    # When true, allows workflow to run on pull requests from forked repositories with
-    # write permissions. Security consideration: use cautiously as fork PRs run with
-    # base repository permissions.
+    # Filter fork pull requests by repository pattern (string or list).
+    # Same-repository PRs remain allowed; an empty list allows only same-repository
+    # PRs, and '*' allows all forks. Omitting this field adds no fork restriction.
+    # This does not change GitHub's base-repository permissions or secret availability
+    # for pull_request_target.
     # (optional)
     # Accepted formats:
 

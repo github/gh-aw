@@ -68,6 +68,7 @@ type onSectionCleanupState struct {
 	inSkipIfNoMatch              bool
 	inSkipIfCheckFailing         bool
 	inSkipAuthorAssociations     bool
+	skipAuthorAssociationsIndent int
 	inSkipRolesArray             bool
 	inSkipBotsArray              bool
 	inRolesArray                 bool
@@ -78,7 +79,9 @@ type onSectionCleanupState struct {
 	allowedCheckoutsIndent       int
 	inGitHubApp                  bool
 	inOnSteps                    bool
+	onStepsIndent                int
 	inOnPermissions              bool
+	onPermissionsIndent          int
 	commentBlockIndent           string
 	inCommentBlock               bool
 	currentSection               string
@@ -289,9 +292,11 @@ func (s *onSectionCleanupState) enterArraySections(info onSectionLine) {
 	}
 	if !s.inEventSection() && strings.HasPrefix(info.trimmed, "steps:") {
 		s.inOnSteps = true
+		s.onStepsIndent = info.indent
 	}
 	if !s.inEventSection() && !s.inOnPermissions && strings.HasPrefix(info.trimmed, "permissions:") {
 		s.inOnPermissions = true
+		s.onPermissionsIndent = info.indent
 	}
 }
 
@@ -310,6 +315,7 @@ func (s *onSectionCleanupState) enterObjectSections(info onSectionLine) {
 	}
 	if !s.inEventSection() && !s.inSkipAuthorAssociations && strings.HasPrefix(info.trimmed, "skip-author-associations:") && info.trimmed == "skip-author-associations:" {
 		s.inSkipAuthorAssociations = true
+		s.skipAuthorAssociationsIndent = info.indent
 	}
 	if !s.inEventSection() && !s.inGitHubApp && ((strings.HasPrefix(info.trimmed, "github-app:") && info.trimmed == "github-app:") ||
 		(strings.HasPrefix(info.trimmed, "# github-app:") && strings.Contains(info.trimmed, "pre-activation job"))) {
@@ -324,19 +330,19 @@ func (s *onSectionCleanupState) leaveSubsections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) leaveObjectSections(info onSectionLine) {
-	if s.inSkipIfMatch && isLeavingTopLevelObject(info, "skip-if-match:", "# skip-if-match:") {
+	if s.inSkipIfMatch && isLeavingTopLevelObject(info, "skip-if-match:", "# skip-if-match:", 2) {
 		s.inSkipIfMatch = false
 	}
-	if s.inSkipIfNoMatch && isLeavingTopLevelObject(info, "skip-if-no-match:", "# skip-if-no-match:") {
+	if s.inSkipIfNoMatch && isLeavingTopLevelObject(info, "skip-if-no-match:", "# skip-if-no-match:", 2) {
 		s.inSkipIfNoMatch = false
 	}
-	if s.inSkipIfCheckFailing && isLeavingTopLevelObject(info, "skip-if-check-failing:", "# skip-if-check-failing:") {
+	if s.inSkipIfCheckFailing && isLeavingTopLevelObject(info, "skip-if-check-failing:", "# skip-if-check-failing:", 2) {
 		s.inSkipIfCheckFailing = false
 	}
-	if s.inSkipAuthorAssociations && isLeavingTopLevelObject(info, "skip-author-associations:", "# skip-author-associations:") {
+	if s.inSkipAuthorAssociations && isLeavingTopLevelObject(info, "skip-author-associations:", "# skip-author-associations:", s.skipAuthorAssociationsIndent) {
 		s.inSkipAuthorAssociations = false
 	}
-	if s.inGitHubApp && isLeavingTopLevelObject(info, "github-app:", "# github-app:") {
+	if s.inGitHubApp && isLeavingTopLevelObject(info, "github-app:", "# github-app:", 2) {
 		s.inGitHubApp = false
 	}
 }
@@ -366,19 +372,19 @@ func (s *onSectionCleanupState) leaveArraySections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) leaveStepsAndPermissions(info onSectionLine) {
-	if s.inOnSteps && isLeavingArray(info, "steps:", 2) {
+	if s.inOnSteps && isLeavingArray(info, "steps:", s.onStepsIndent) {
 		s.inOnSteps = false
 	}
-	if s.inOnPermissions && isLeavingTopLevelObject(info, "permissions:", "# permissions:") {
+	if s.inOnPermissions && isLeavingTopLevelObject(info, "permissions:", "# permissions:", s.onPermissionsIndent) {
 		s.inOnPermissions = false
 	}
 }
 
-func isLeavingTopLevelObject(info onSectionLine, key, commentedKey string) bool {
+func isLeavingTopLevelObject(info onSectionLine, key, commentedKey string, indent int) bool {
 	return info.trimmed != "" &&
 		!strings.HasPrefix(info.trimmed, key) &&
 		!strings.HasPrefix(info.trimmed, commentedKey) &&
-		info.indent == 2 &&
+		info.indent == indent &&
 		!strings.HasPrefix(info.trimmed, "#")
 }
 

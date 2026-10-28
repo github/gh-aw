@@ -21,6 +21,7 @@ func TestTriggerForkFilterCompilation(t *testing.T) {
 		forks    string
 		expected string
 	}{
+		{"wildcard string", `"*"`, ""},
 		{"wildcard", `["*"]`, ""},
 		{"empty", "[]", "github.event.pull_request.head.repo.id == github.repository_id"},
 		{"exact", `"trusted/repo"`, "github.event.pull_request.head.repo.full_name == 'trusted/repo'"},
@@ -70,6 +71,71 @@ Review the contribution.
 			})
 		}
 	}
+}
+
+func TestTriggerForkFilterCompilationRejectsMalformedValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		forks string
+	}{
+		{"boolean true", "true"},
+		{"boolean false", "false"},
+		{"number", "42"},
+		{"null", "null"},
+		{"empty object", "{}"},
+		{"non-string list item", "[trusted/repo, true]"},
+	}
+	for _, event := range []string{"pull_request", "pull_request_target"} {
+		for _, tt := range tests {
+			t.Run(event+"/"+tt.name, func(t *testing.T) {
+				assertTriggerFilterCompilationRejected(t, event, "forks: "+tt.forks, "forks")
+			})
+		}
+	}
+}
+
+func TestPullRequestTargetCompilationRejectsUnsupportedFilters(t *testing.T) {
+	tests := []struct {
+		name   string
+		filter string
+		field  string
+	}{
+		{"author associations", "forks: {author-association: [OWNER, MEMBER, COLLABORATOR]}", "forks"},
+		{"label string", "names: community-contribution", "names"},
+		{"label list", "names: [community-contribution]", "names"},
+		{"label boolean", "names: true", "names"},
+		{"label number", "names: 42", "names"},
+		{"label object", "names: {label: community-contribution}", "names"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertTriggerFilterCompilationRejected(t, "pull_request_target", tt.filter, tt.field)
+		})
+	}
+}
+
+func assertTriggerFilterCompilationRejected(t *testing.T, event, filter, field string) {
+	t.Helper()
+	workflowFile := filepath.Join(testutil.TempDir(t, "invalid-trigger-filters"), "filters.md")
+	source := fmt.Sprintf(`---
+on:
+  %s:
+    types: [labeled]
+    %s
+engine: copilot
+checkout: false
+permissions:
+  contents: read
+network:
+  allowed: [defaults]
+---
+Review the contribution.
+`, event, filter)
+	require.NoError(t, os.WriteFile(workflowFile, []byte(source), 0644))
+	err := NewCompiler().CompileWorkflow(workflowFile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), field)
+	assert.NoFileExists(t, filepath.Join(filepath.Dir(workflowFile), "filters.lock.yml"))
 }
 
 func compileTriggerFilterFixture(t *testing.T, source string) map[string]any {

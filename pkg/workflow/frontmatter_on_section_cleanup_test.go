@@ -13,38 +13,54 @@ import (
 )
 
 func TestOnSectionFiltersAfterCompilerOnlyFields(t *testing.T) {
-	for _, prefix := range []string{
-		"permissions: {}",
-		"permissions:\n    contents: read",
-		"steps:\n    - name: setup\n      run: echo setup",
-		"skip-author-associations:\n    - BOT",
-	} {
-		for _, event := range []string{"pull_request", "pull_request_target"} {
-			t.Run(prefix+"/"+event, func(t *testing.T) {
-				input := fmt.Sprintf(`on:
+	for _, indent := range []int{2, 4} {
+		for _, prefix := range []string{
+			"permissions: {}",
+			"permissions:\n    contents: read",
+			"steps:\n    - name: setup\n      run: echo setup",
+			"skip-author-associations:\n    - BOT",
+		} {
+			for _, event := range []string{"pull_request", "pull_request_target"} {
+				t.Run(fmt.Sprintf("indent-%d/%s/%s", indent, prefix, event), func(t *testing.T) {
+					names := ""
+					if event == "pull_request" {
+						names = "    names:\n      - community-contribution\n"
+					}
+					input := fmt.Sprintf(`on:
   %s
   %s:
     forks:
       - trusted/*
-    names:
-      - community-contribution
-    types:
+%s    types:
       - labeled
     branches:
       - main
+    paths:
+      - src/**
   workflow_dispatch:
-`, prefix, event)
-				result := NewCompiler().commentOutProcessedFieldsInOnSection(input, nil)
-				var compiled map[string]any
-				require.NoError(t, yaml.Unmarshal([]byte(result), &compiled))
-				on := compiled["on"].(map[string]any)
-				assert.Equal(t, map[string]any{
-					"types":    []any{"labeled"},
-					"branches": []any{"main"},
-				}, on[event])
-				assert.Contains(t, on, "workflow_dispatch")
-				assert.NotContains(t, on, strings.Split(prefix, ":")[0])
-			})
+`, prefix, event, names)
+					if indent == 4 {
+						lines := strings.Split(input, "\n")
+						for i, line := range lines {
+							lineIndent := newOnSectionLine(line).indent
+							lines[i] = strings.Repeat(" ", lineIndent) + line
+						}
+						input = strings.Join(lines, "\n")
+					}
+					result := NewCompiler().commentOutProcessedFieldsInOnSection(input, nil)
+					var compiled map[string]any
+					require.NoError(t, yaml.Unmarshal([]byte(result), &compiled))
+					on, ok := compiled["on"].(map[string]any)
+					require.True(t, ok, "on must retain its native events:\n%s", result)
+					assert.Equal(t, map[string]any{
+						"types":    []any{"labeled"},
+						"branches": []any{"main"},
+						"paths":    []any{"src/**"},
+					}, on[event])
+					assert.Contains(t, on, "workflow_dispatch")
+					assert.NotContains(t, on, strings.Split(prefix, ":")[0])
+				})
+			}
 		}
 	}
 }
