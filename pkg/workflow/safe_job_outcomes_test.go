@@ -24,13 +24,17 @@ func TestSafeJobOutcomeOutputsPropagation(t *testing.T) {
 			"steps":   []any{map[string]any{"id": "publish", "run": "echo published"}},
 		},
 	})
-	require.Equal(t, outputs, jobs["publish-report"].Outputs)
+	renderedOutputs := map[string]string{
+		"status": fmt.Sprintf("%q", outputs["status"]),
+		"url":    fmt.Sprintf("%q", outputs["url"]),
+	}
+	require.Equal(t, renderedOutputs, jobs["publish-report"].Outputs)
 	names, err := c.buildSafeJobs(&WorkflowData{SafeOutputs: &SafeOutputsConfig{Jobs: jobs}}, false)
 	require.NoError(t, err)
 	require.Equal(t, []string{"publish_report"}, names)
 	job, ok := c.jobManager.GetJob("publish_report")
 	require.True(t, ok)
-	require.Equal(t, outputs, job.Outputs)
+	require.Equal(t, renderedOutputs, job.Outputs)
 
 	var rendered strings.Builder
 	c.jobManager.WriteJobsYAML(&rendered)

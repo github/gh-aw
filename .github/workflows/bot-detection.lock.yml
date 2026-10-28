@@ -2149,10 +2149,10 @@ jobs:
       issues: read
       pull-requests: read
     outputs:
-      action: ${{ steps.precompute.outputs.action }}
-      issue_body: ${{ steps.precompute.outputs.issue_body }}
-      issue_number: ${{ steps.precompute.outputs.issue_number }}
-      issue_title: ${{ steps.precompute.outputs.issue_title }}
+      action: "${{ steps.precompute.outputs.action }}"
+      issue_body: "${{ steps.precompute.outputs.issue_body }}"
+      issue_number: "${{ steps.precompute.outputs.issue_number }}"
+      issue_title: "${{ steps.precompute.outputs.issue_title }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
