@@ -59,27 +59,6 @@ func substituteImportInputsInContent(content string, inputs map[string]any) stri
 	return result.String()
 }
 
-func splitFallbackOperands(expression string) []string {
-	root, err := actionslanguageservice.ParseSyntax(expression)
-	if err != nil || root == nil {
-		importLog.Printf("Cannot parse fallback expression")
-		return nil
-	}
-	var operands []string
-	var split func(*actionslanguageservice.Expression)
-	split = func(node *actionslanguageservice.Expression) {
-		if node.Kind == "logical" && node.Token.Kind == "||" {
-			for _, child := range node.Children {
-				split(child)
-			}
-		} else {
-			operands = append(operands, expression[node.Start:node.End])
-		}
-	}
-	split(root)
-	return operands
-}
-
 type fallbackOperandResult struct {
 	// value is the operand's raw value for truthiness checks.
 	value any
@@ -89,15 +68,6 @@ type fallbackOperandResult struct {
 	isInputReference bool
 	// ok is false when the operand is unsupported or cannot be formatted, so folding must abort.
 	ok bool
-}
-
-func resolveFallbackOperand(operand string, inputs map[string]any) fallbackOperandResult {
-	expression, err := actionslanguageservice.ParseSyntax(operand)
-	if err != nil || expression == nil {
-		importLog.Printf("Cannot parse fallback operand")
-		return fallbackOperandResult{}
-	}
-	return resolveFallbackExpression(expression, inputs)
 }
 
 func importInputReference(expression *actionslanguageservice.Expression) (string, bool) {
