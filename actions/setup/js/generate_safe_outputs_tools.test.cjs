@@ -462,6 +462,136 @@ describe("generate_safe_outputs_tools", () => {
     expect(result[0].description).not.toContain("INTENT ENCOURAGED:");
   });
 
+  it("uses boolean and numeric values in configured add_labels examples", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object" }] } },
+            },
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    const itemSchema = {
+      type: "object",
+      required: ["name", "suggest", "priority"],
+      additionalProperties: false,
+      properties: {
+        name: { type: "string" },
+        suggest: { type: "boolean" },
+        priority: { type: "number" },
+      },
+    };
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: itemSchema } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    expect(result[0].inputSchema.properties.labels.description).toContain('Example: [{"name":"bug","suggest":true,"priority":0}]');
+  });
+
+  it("does not present optional add_labels fields as required", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object" }] } },
+            },
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    const itemSchema = {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        suggest: { type: "boolean" },
+      },
+    };
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: itemSchema } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    const description = result[0].inputSchema.properties.labels.description;
+    expect(description).toContain("No required fields are declared by the configured item schema.");
+    expect(description).toContain("Available fields: name, suggest.");
+    expect(description).not.toContain("Required fields:");
+    expect(description).not.toContain("Example:");
+  });
+
+  it("omits add_labels examples when a required value cannot be inferred safely", () => {
+    fs.writeFileSync(
+      toolsSourcePath,
+      JSON.stringify([
+        {
+          name: "add_labels",
+          description: "Adds labels.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              labels: { type: "array", items: { oneOf: [{ type: "string" }, { type: "object" }] } },
+            },
+          },
+        },
+      ])
+    );
+    fs.writeFileSync(configPath, JSON.stringify({ add_labels: {} }));
+    const itemSchema = {
+      type: "object",
+      required: ["slug"],
+      additionalProperties: false,
+      properties: {
+        slug: { type: "string", pattern: "^[A-Z]{3}$" },
+      },
+    };
+    fs.writeFileSync(
+      toolsMetaPath,
+      JSON.stringify({
+        description_suffixes: {},
+        repo_params: {},
+        dynamic_tools: [],
+        item_schemas: { add_labels: { labels: itemSchema } },
+      })
+    );
+
+    runScript();
+
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    const description = result[0].inputSchema.properties.labels.description;
+    expect(description).toContain("Required fields: slug.");
+    expect(description).not.toContain("Example:");
+  });
+
   it("keeps issue-intent requirements and guidance with a narrowed add_labels item schema", () => {
     fs.writeFileSync(
       toolsSourcePath,
@@ -522,6 +652,7 @@ describe("generate_safe_outputs_tools", () => {
     expect(addLabelsTool.inputSchema.properties.labels.items).toEqual(itemSchema);
     expect(addLabelsTool.inputSchema.properties.labels.items.required).toEqual(expect.arrayContaining(["name", "rationale", "confidence"]));
     expect(addLabelsTool.inputSchema.properties.labels.description).toContain("Plain string label names are not permitted");
+    expect(addLabelsTool.inputSchema.properties.labels.description).toContain("confidence (exactly one of: LOW, MEDIUM, HIGH)");
     expect(addLabelsTool.description).toContain("INTENT REQUIRED:");
   });
 

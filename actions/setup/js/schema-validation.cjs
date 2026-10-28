@@ -7,6 +7,8 @@
  * and JSON-schema consumers.
  */
 
+const { buildAddLabelsObjectShape } = require("./add_labels_schema.cjs");
+
 /**
  * Maximum allowed byte length for any single string-typed input parameter (SM-IS-01).
  * 10 KB = 10 * 1024 bytes.
@@ -287,36 +289,21 @@ function validateValueAgainstSchema(value, schema, options = {}) {
 /**
  * Derive the add_labels object-shape guidance (required fields + example) from the tool's
  * actual configured labels item schema, falling back to the historical default
- * (name, rationale, confidence) when the schema isn't available or doesn't declare fields.
+ * (name, rationale, confidence) only when the schema isn't available.
  * This keeps the error message in sync with workflows that configure a custom item-schema.
  * @param {unknown} inputSchema
  */
 function describeAddLabelsObjectShape(inputSchema) {
   const DEFAULT_REQUIRED = ["name", "rationale", "confidence"];
   const DEFAULT_EXAMPLE = '{"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}';
-  const itemSchema = /** @type {any} */ (inputSchema)?.properties?.labels?.items;
-  const objectSchema = itemSchema && Array.isArray(itemSchema.oneOf) ? itemSchema.oneOf.find((/** @type {any} */ s) => s?.type === "object") : itemSchema;
-  const required = Array.isArray(objectSchema?.required) && objectSchema.required.length > 0 ? objectSchema.required : null;
-  if (!required) {
-    return { required: DEFAULT_REQUIRED, example: DEFAULT_EXAMPLE };
+  /** @type {any} */
+  const schema = inputSchema;
+  const itemSchema = schema?.properties?.labels?.items;
+  const shape = buildAddLabelsObjectShape(itemSchema);
+  if (!shape) {
+    return { required: DEFAULT_REQUIRED, fields: [], example: DEFAULT_EXAMPLE, configured: false };
   }
-  const properties = objectSchema?.properties && typeof objectSchema.properties === "object" ? objectSchema.properties : {};
-  const example = {};
-  for (const field of required) {
-    const propSchema = properties[field];
-    if (propSchema && Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
-      example[field] = propSchema.enum[0];
-    } else if (field === "name") {
-      example[field] = "bug";
-    } else if (field === "rationale") {
-      example[field] = "Why this label applies";
-    } else if (field === "confidence") {
-      example[field] = "HIGH";
-    } else {
-      example[field] = "value";
-    }
-  }
-  return { required, example: JSON.stringify(example) };
+  return { ...shape, configured: true };
 }
 
 function formatSchemaValidationError(toolName, args, error, inputSchema) {
@@ -324,14 +311,19 @@ function formatSchemaValidationError(toolName, args, error, inputSchema) {
     const index = Number(error.path.match(/^labels\[(\d+)\]$/)?.[1] || -1);
     const receivedLabel = index >= 0 ? args.labels[index] : undefined;
     if (typeof receivedLabel === "string") {
-      const { required, example } = describeAddLabelsObjectShape(inputSchema);
-      return [
-        "Invalid arguments for add_labels:",
-        `  ${error.path} must be an object (string shorthand is not supported).`,
-        `  Expected: ${example}`,
-        `  Required fields: ${required.join(", ")}`,
-        `  Received: ${JSON.stringify(receivedLabel)}`,
-      ].join("\n");
+      const shape = describeAddLabelsObjectShape(inputSchema);
+      const details = ["Invalid arguments for add_labels:", `  ${error.path} must be an object (string shorthand is not supported).`];
+      if (shape.example) details.push(`  Expected: ${shape.example}`);
+      if (shape.required.length > 0) {
+        details.push(`  Required fields: ${shape.required.join(", ")}`);
+      } else if (shape.configured) {
+        details.push("  No required fields are declared by the configured item schema.");
+        if (shape.fields.length > 0) details.push(`  Available fields: ${shape.fields.join(", ")}`);
+      } else {
+        details.push(`  Required fields: ${shape.required.join(", ")}`);
+      }
+      details.push(`  Received: ${JSON.stringify(receivedLabel)}`);
+      return details.join("\n");
     }
   }
 
