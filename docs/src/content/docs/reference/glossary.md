@@ -49,6 +49,14 @@ Translating Markdown workflows (`.md` files) into GitHub Actions YAML format (`.
 
 The compiled GitHub Actions workflow file from a workflow markdown file (`.md`). Contains complete GitHub Actions YAML with security hardening applied. Both `.md` and `.lock.yml` files should be committed to version control. At runtime, GitHub Actions executes the lock file using a coding agent while referencing the markdown for instructions.
 
+### Lock File Exclusion (`exclude-lock-yml`)
+
+A `create-pull-request` and `push-to-pull-request-branch` safe-output option that omits compiled `.lock.yml` files under `.github/workflows/` from patch and bundle transports. It avoids GitHub's workflow-write restriction when the GitHub Actions token publishes changes. Other workflow YAML files are not excluded and still require workflow-write credentials. When exclusions drop changes, the pull request body warns to re-run `gh aw compile` and commit the regenerated locks with authorized credentials. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
+
+### Actions Lock Integration (`--actions-lock`)
+
+A `gh aw compile` flag that runs the separately installed `gh actions-lock` extension after compilation to update `.github/workflows/actions.lock`. The extension scans all workflows in its default directory, and compilation never installs it. The flag is incompatible with `--no-emit`, `--read-only`, `--watch`, and `--dry-run`, and does not replace `.github/aw/actions-lock.json`. See [CLI Commands](/gh-aw/setup/cli/).
+
 ## Tools and Integration
 
 ### MCP (Model Context Protocol)

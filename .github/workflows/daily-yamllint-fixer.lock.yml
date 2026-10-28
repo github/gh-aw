@@ -2844,8 +2844,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      has_warnings: ${{ steps.run_yamllint.outputs.has_warnings }}
-      warning_count: ${{ steps.run_yamllint.outputs.warning_count }}
+      has_warnings: "${{ steps.run_yamllint.outputs.has_warnings }}"
+      warning_count: "${{ steps.run_yamllint.outputs.warning_count }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

@@ -284,9 +284,9 @@ func (c *Compiler) buildPreActivationMemoryRestoreSteps(data *WorkflowData, step
 			steps = append(steps, strings.Join(configLines, ""))
 			var commentMemorySteps strings.Builder
 			commentMemorySteps.WriteString("      - name: Prepare comment memory files\n")
-			fmt.Fprintf(&commentMemorySteps, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+			fmt.Fprintf(&commentMemorySteps, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 			commentMemorySteps.WriteString("        with:\n")
-			fmt.Fprintf(&commentMemorySteps, "          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken))
+			fmt.Fprintf(&commentMemorySteps, "          github-token: %s\n", resolveSafeOutputGitHubToken(data.CommentMemoryConfig.GitHubToken)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 			commentMemorySteps.WriteString("          script: |\n")
 			commentMemorySteps.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 			commentMemorySteps.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
@@ -318,7 +318,8 @@ func generatePreActivationCacheMemoryRestoreSteps(builder *strings.Builder, data
 			Caches: make([]CacheMemoryEntry, len(data.CacheMemoryConfig.Caches)),
 		},
 	}
-	for i, cache := range data.CacheMemoryConfig.Caches {
+	restoreCaches := make([]CacheMemoryEntry, 0, len(data.CacheMemoryConfig.Caches))
+	for _, cache := range data.CacheMemoryConfig.Caches {
 		cacheCopy := CacheMemoryEntry{
 			ID:          cache.ID,
 			Key:         cache.Key,
@@ -333,8 +334,9 @@ func generatePreActivationCacheMemoryRestoreSteps(builder *strings.Builder, data
 			retentionDays := *cache.RetentionDays
 			cacheCopy.RetentionDays = &retentionDays
 		}
-		preActivationData.CacheMemoryConfig.Caches[i] = cacheCopy
+		restoreCaches = append(restoreCaches, cacheCopy)
 	}
+	preActivationData.CacheMemoryConfig.Caches = restoreCaches
 
 	generateCacheMemorySteps(builder, preActivationData)
 }
@@ -475,13 +477,13 @@ func buildPreActivationActivatedNode(data *WorkflowData, conditions []ConditionN
 		}
 		return nil, errors.New("developer error: pre-activation job created without activation checks or custom steps")
 	}
-	if len(conditions) == 1 {
-		return conditions[0], nil
-	}
-
-	activatedNode := conditions[0]
-	for i := 1; i < len(conditions); i++ {
-		activatedNode = BuildAnd(activatedNode, conditions[i])
+	var activatedNode ConditionNode
+	for i, condition := range conditions {
+		if i == 0 {
+			activatedNode = condition
+			continue
+		}
+		activatedNode = BuildAnd(activatedNode, condition)
 	}
 	return activatedNode, nil
 }
@@ -774,7 +776,7 @@ func extractPreActivationJobOutputs(jobName string, configMap map[string]any) (m
 		if !ok {
 			return nil, fmt.Errorf("jobs.%s.outputs.%s must be a string, got %T. Example:\njobs:\n  %s:\n    outputs:\n      %s: ${{ steps.my_step.outputs.result }}", jobName, key, val, jobName, key)
 		}
-		result[key] = valStr
+		result[key] = fmt.Sprintf("%q", valStr)
 	}
 	compilerActivationJobsLog.Printf("Extracted %d custom outputs from jobs.%s", len(result), jobName)
 	return result, nil

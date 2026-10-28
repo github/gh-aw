@@ -2959,13 +2959,13 @@ jobs:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       activated: ${{ steps.check_membership.outputs.is_team_member == 'true' && steps.check_skip_if_match.outputs.skip_check_ok == 'true' && steps.check_skip_if_no_match.outputs.skip_no_match_check_ok == 'true' && steps.check_skip_if_check_failing.outputs.skip_if_check_failing_ok == 'true' }}
-      has_issues: ${{ steps.search.outputs.has_issues }}
-      issue_context: ${{ steps.search.outputs.issue_context }}
-      issue_count: ${{ steps.search.outputs.issue_count }}
-      issue_list: ${{ steps.search.outputs.issue_list }}
-      issue_numbers: ${{ steps.search.outputs.issue_numbers }}
+      has_issues: "${{ steps.search.outputs.has_issues }}"
+      issue_context: "${{ steps.search.outputs.issue_context }}"
+      issue_count: "${{ steps.search.outputs.issue_count }}"
+      issue_list: "${{ steps.search.outputs.issue_list }}"
+      issue_numbers: "${{ steps.search.outputs.issue_numbers }}"
       matched_command: ''
-      retry_blocked_list: ${{ steps.search.outputs.retry_blocked_list }}
+      retry_blocked_list: "${{ steps.search.outputs.retry_blocked_list }}"
       search_result: ${{ steps.search.outcome }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}

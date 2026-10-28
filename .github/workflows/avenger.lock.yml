@@ -1423,9 +1423,9 @@ jobs:
       actions: read
       contents: read
     outputs:
-      ci_needs_fix: ${{ steps.ci_check.outputs.ci_needs_fix }}
-      ci_run_id: ${{ steps.ci_check.outputs.ci_run_id }}
-      ci_status: ${{ steps.ci_check.outputs.ci_status }}
+      ci_needs_fix: "${{ steps.ci_check.outputs.ci_needs_fix }}"
+      ci_run_id: "${{ steps.ci_check.outputs.ci_run_id }}"
+      ci_status: "${{ steps.ci_check.outputs.ci_status }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

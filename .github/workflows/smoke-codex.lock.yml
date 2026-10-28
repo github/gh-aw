@@ -3045,8 +3045,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      secrets_found: ${{ steps.evaluate.outputs.secrets_found }}
-      secrets_locations: ${{ steps.evaluate.outputs.secrets_locations }}
+      secrets_found: "${{ steps.evaluate.outputs.secrets_found }}"
+      secrets_locations: "${{ steps.evaluate.outputs.secrets_locations }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
