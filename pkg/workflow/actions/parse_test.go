@@ -3,6 +3,7 @@ package actions
 import (
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +90,37 @@ func TestParseRejectsInvalidNativeYAML(t *testing.T) {
 		t.Run(source, func(t *testing.T) {
 			_, err := Parse([]byte(source))
 			require.Error(t, err)
+		})
+	}
+}
+
+func TestParseJobCacheModes(t *testing.T) {
+	for _, mode := range []string{"read", "write", "write-only", "none"} {
+		t.Run(mode, func(t *testing.T) {
+			source := "cache-mode: read\non: issue_comment\njobs:\n  runner:\n    runs-on: ubuntu-latest\n    cache-mode: " +
+				mode + "\n    steps: [{run: echo data}]\n  call:\n    uses: ./.github/workflows/worker.yml\n    cache-mode: " + mode + "\n"
+			input, err := Parse([]byte(source))
+			require.NoError(t, err)
+			for _, job := range input.Jobs {
+				assert.Equal(t, mode, job.CacheMode)
+			}
+			fields, err := Lower(input)
+			require.NoError(t, err)
+			content, err := yaml.Marshal(fields)
+			require.NoError(t, err)
+			var lowered map[string]any
+			require.NoError(t, yaml.Unmarshal(content, &lowered))
+			jobs := lowered["jobs"].(map[string]any)
+			for _, id := range []string{"runner", "call"} {
+				assert.Equal(t, mode, jobs[id].(map[string]any)["cache-mode"])
+			}
+			input.Jobs[0].CacheMode = "none"
+			emitted, err := Emit(input)
+			require.NoError(t, err)
+			reparsed, err := Parse([]byte(emitted))
+			require.NoError(t, err)
+			assert.Equal(t, input.Jobs, reparsed.Jobs)
+			assert.Equal(t, input.CacheMode, reparsed.CacheMode)
 		})
 	}
 }

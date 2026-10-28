@@ -55,6 +55,7 @@ type Job struct {
 	HasWorkflowRunSafetyChecks bool // If true, the job's if condition includes workflow_run safety checks
 	PermissionsComment         string
 	Permissions                string
+	CacheMode                  string
 	TimeoutMinutes             int
 	TimeoutMinutesExpression   string
 	Concurrency                string            // Job-level concurrency configuration
@@ -328,6 +329,9 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 	}
 	if job.Permissions != "" {
 		fmt.Fprintf(b, "    %s\n", job.Permissions)
+	}
+	if job.CacheMode != "" {
+		b.WriteString("    cache-mode: " + job.CacheMode + "\n")
 	}
 
 	// Add concurrency section

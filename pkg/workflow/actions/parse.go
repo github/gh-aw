@@ -33,6 +33,7 @@ type jobYAML struct {
 	Steps           []map[string]any `yaml:"steps"`
 	Outputs         map[string]any   `yaml:"outputs"`
 	Permissions     any              `yaml:"permissions"`
+	CacheMode       string           `yaml:"cache-mode"`
 	Defaults        map[string]any   `yaml:"defaults"`
 	Concurrency     any              `yaml:"concurrency"`
 	Environment     any              `yaml:"environment"`
@@ -104,6 +105,7 @@ func parseJob(id JobID, source *jobYAML) (*Job, error) {
 	job := &Job{
 		ID: id, Name: source.Name, RunsOn: source.RunsOn,
 		Permissions: source.Permissions, Defaults: source.Defaults,
+		CacheMode:   source.CacheMode,
 		Concurrency: source.Concurrency, Environment: source.Environment,
 		Strategy: source.Strategy, Container: source.Container,
 		Services: source.Services, Uses: source.Uses,

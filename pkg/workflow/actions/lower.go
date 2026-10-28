@@ -124,6 +124,7 @@ func nativeJobFields(job *Job) (map[string]any, error) {
 	fields := make(map[string]any)
 	for key, value := range map[string]any{
 		"permissions": job.Permissions, "defaults": optionalMap(job.Defaults),
+		"cache-mode":  optionalString(job.CacheMode),
 		"concurrency": job.Concurrency, "environment": job.Environment,
 		"strategy": optionalMap(job.Strategy), "container": job.Container,
 		"services": optionalMap(job.Services), "uses": optionalString(job.Uses),

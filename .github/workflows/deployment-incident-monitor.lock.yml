@@ -500,6 +500,7 @@ jobs:
       actions: read
       contents: read
       deployments: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
       queue: max

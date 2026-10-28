@@ -480,6 +480,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-claude-${{ github.workflow }}"
       queue: max

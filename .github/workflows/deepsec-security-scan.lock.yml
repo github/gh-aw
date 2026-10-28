@@ -516,6 +516,7 @@ jobs:
       actions: read
       contents: read
       issues: read
+    cache-mode: read
     timeout-minutes: 90
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}

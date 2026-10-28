@@ -158,7 +158,7 @@ The compiler generates git-backed branching steps around the agent. Before the a
 | `unapproved` | `unapproved` + `approved` + `merged` | `none` |
 | `none` | all levels | — |
 
-This prevents a lower-integrity agent from poisoning data that a higher-integrity run would later read.
+These compiler-generated namespaces separate lower- and higher-integrity cache-memory lineages. They do not authenticate cache contents or protect against another cache writer deliberately using the same namespace.
 
 > [!NOTE]
 > Existing caches will get a cache miss on first run after upgrading to a version that includes this feature — intentional, as legacy data has no integrity provenance.
@@ -166,6 +166,20 @@ This prevents a lower-integrity agent from poisoning data that a higher-integrit
 ## Security
 
 Do not store sensitive data in cache memory. It follows repository permissions, and with [threat detection](/gh-aw/reference/threat-detection/) enabled, caches save only after validation succeeds (`restore → modify → upload artifact → validate → save`).
+
+### Cache access boundaries
+
+On GitHub.com, detection-enabled workflows give the agent job `cache-mode: read`. This restricts its scoped cache token, including dependency caches and custom cache actions in that job; selecting a restore-only action alone would not restrict other writers. Frontmatter `cache:` entries also use `actions/cache/restore` in this mode. This applies to every trigger, including mixed-trigger workflows and `repository_dispatch`.
+
+Writable cache-memory entries are published by the separate `update_cache_memory` job with `cache-mode: write-only`. The job requires successful agent and detection jobs and `needs.detection.outputs.detection_success == 'true'`, then applies configured memory validation before saving. Detection warnings, rejected verdicts, missing acceptance outputs, failed jobs, and a detection job skipped by its runtime condition block persistence even when `continue-on-error` permits other safe outputs. The detector's internal no-output short-circuit still reports acceptance; it is not evidence that every cached file was scanned.
+
+The publisher's explicit write capability deliberately overrides GitHub's read-only cache default for triggers such as `pull_request_target`, `issue_comment`, and `workflow_run`. It authorizes this bounded publication path, not arbitrary agent cache writes, and does not authenticate the uploaded artifact or cached content. Treat memory as data, not executable code. A successful detector verdict is not a provenance guarantee.
+
+Dry-run compilation keeps cache access read-only and omits the cache-memory publisher. `restore-only: true` entries are never published. GHES compatibility mode omits `cache-mode` because support depends on the deployed server; restore-only agent actions and the publisher's validation gates remain, but the compiler does not establish a scoped-token cache boundary there.
+
+Without detection, existing same-job cache-memory behavior is unchanged: cache saves depend on the platform's trigger-based defaults. GitHub.com defaults low-trust default-branch triggers to read-only, while `push`, `workflow_dispatch`, and `repository_dispatch` can write by default. Custom jobs have their own cache-access boundary. The [`cache-poisoning` linter](/gh-aw/reference/workflow-linters/) warns about effective explicit write overrides on `pull_request_target`, `issue_comment`, and `workflow_run`; it does not prove a dedicated publisher safe or validate arbitrary shell cache operations.
+
+Cache contents are unsigned and unverified. Cache-memory key isolation does not cover ordinary dependency-cache keys, third-party cache writers, or persistent caches on reused runners. See GitHub's [cache access reference](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#controlling-cache-access-with-cache-mode).
 
 ## Examples
 

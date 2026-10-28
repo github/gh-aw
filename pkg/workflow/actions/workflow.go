@@ -28,6 +28,7 @@ type Job struct {
 	Outputs map[OutputName]Expression
 
 	Permissions              any
+	CacheMode                string
 	Defaults                 map[string]any
 	Concurrency              any
 	Environment              any

@@ -500,6 +500,7 @@ jobs:
       copilot-requests: write
       security-events: read
       vulnerability-alerts: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
       queue: max

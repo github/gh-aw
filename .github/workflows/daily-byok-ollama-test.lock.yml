@@ -474,6 +474,7 @@ jobs:
       contents: read
       copilot-requests: write
       issues: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
       queue: max

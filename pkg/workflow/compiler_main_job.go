@@ -63,6 +63,12 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 
+	cacheMode := ""
+	if !data.GHES && (data.DryRun || IsDetectionJobEnabled(data.SafeOutputs)) {
+		// Restore-only actions alone do not restrict the job's scoped cache token.
+		cacheMode = "read"
+	}
+
 	compilerMainJobLog.Printf("Built main job: steps=%d, needs=%v, outputs=%d", len(steps), depends, len(outputs))
 	return &Job{
 		Name:                     string(constants.AgentJobName),
@@ -72,6 +78,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		Container:                c.indentYAMLLines(data.Container, "    "),
 		Services:                 c.indentYAMLLines(data.Services, "    "),
 		Permissions:              c.indentYAMLLines(permissions, "    "),
+		CacheMode:                cacheMode,
 		Concurrency:              c.indentYAMLLines(agentConcurrency, "    "),
 		Env:                      env,
 		Steps:                    steps,

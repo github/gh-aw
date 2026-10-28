@@ -545,6 +545,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-claude-${{ github.workflow }}"
       queue: max

@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// CachePoisoningRule checks release/tag workflow cache restoration. It does not
-// infer publication from job names or prove the provenance of cached files.
+// CachePoisoningRule checks release/tag restores and explicit low-trust writes.
+// It does not infer trust from job names or prove cached-file provenance.
 func CachePoisoningRule() Rule {
 	return Rule{
-		ID: "cache-poisoning", Description: "Keep release builds from restoring shared dependency caches",
+		ID: "cache-poisoning", Description: "Review shared cache restores and low-trust cache-write overrides",
 		Severity: Warning, Targets: ActionsAST | AWAST, Check: checkCachePoisoning,
 	}
 }
@@ -28,12 +28,23 @@ func checkCachePoisoning(ctx context.Context, input Input) ([]Diagnostic, error)
 		on = input.Document.Frontmatter["on"]
 	}
 	release, err := cacheReleaseTrigger(ctx, on)
-	if err != nil || !release {
+	if err != nil {
+		return nil, err
+	}
+	lowTrust, err := cacheLowTrustTrigger(ctx, on)
+	if err != nil || (!release && !lowTrust) {
 		return nil, err
 	}
 	blocks, err := executionPolicyBlocks(ctx, input)
 	failures := []error{err}
 	var diagnostics []Diagnostic
+	if lowTrust {
+		diagnostics, err = cacheWriteOverrides(ctx, input, blocks)
+		failures = append(failures, err)
+	}
+	if !release {
+		return diagnostics, errors.Join(failures...)
+	}
 	for _, block := range blocks {
 		for _, step := range block.Steps {
 			if err := ctx.Err(); err != nil {

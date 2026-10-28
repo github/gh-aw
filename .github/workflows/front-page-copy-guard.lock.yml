@@ -504,6 +504,7 @@ jobs:
       contents: read
       copilot-requests: write
       pull-requests: read
+    cache-mode: read
     timeout-minutes: 60
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}

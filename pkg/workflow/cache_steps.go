@@ -25,7 +25,7 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 		return
 	}
 	for i, cache := range caches {
-		if data.DryRun {
+		if data.DryRun || (!data.GHES && IsDetectionJobEnabled(data.SafeOutputs)) {
 			writeCacheStepWithAction(builder, cache, i, len(caches), "actions/cache/restore")
 		} else {
 			writeCacheStep(builder, cache, i, len(caches))
