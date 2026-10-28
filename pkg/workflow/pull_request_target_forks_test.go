@@ -20,10 +20,10 @@ func TestPullRequestTargetBoundedForkAdmission(t *testing.T) {
 		allows bool
 	}{
 		{"omitted", "", true},
-		{"wildcard string", "'*'", false},
-		{"wildcard list", "['*']", false},
-		{"mixed wildcard", "[trusted/repo, '*']", false},
-		{"wildcard first", "['*', trusted/repo]", false},
+		{"wildcard string", "'*'", true},
+		{"wildcard list", "['*']", true},
+		{"mixed wildcard", "[trusted/repo, '*']", true},
+		{"wildcard first", "['*', trusted/repo]", true},
 		{"empty list", "[]", true},
 		{"exact string", "trusted/repo", true},
 		{"owner string", "'trusted/*'", true},
@@ -62,7 +62,7 @@ Review the contribution.
 				require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 				err := NewCompiler().CompileWorkflow(file)
 				if strict && !tt.allows {
-					require.ErrorContains(t, err, "requires bounded fork admission")
+					require.ErrorContains(t, err, "requires supported fork patterns")
 					assert.Contains(t, err.Error(), "acknowledge-risk do not bypass")
 					assert.NoFileExists(t, filepath.Join(filepath.Dir(file), "workflow.lock.yml"))
 				} else {
@@ -79,7 +79,7 @@ strict: false
 on:
   pull_request_target:
     acknowledge-risk: true
-    forks: ["*"]
+    forks: ["trusted/repo*"]
 checkout:
   ref: ${{ github.event.pull_request.base.sha }}
 tools:
@@ -91,7 +91,7 @@ Review the contribution.
 	require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
-	require.ErrorContains(t, compiler.CompileWorkflow(file), "requires bounded fork admission")
+	require.ErrorContains(t, compiler.CompileWorkflow(file), "requires supported fork patterns")
 }
 
 func TestPullRequestTargetBoundedForkAdmissionShorthand(t *testing.T) {
@@ -120,12 +120,62 @@ func TestPullRequestTargetBoundedForkAdmissionShorthand(t *testing.T) {
 	}
 }
 
-func TestHasBoundedPullRequestTargetForksRejectsMalformedValues(t *testing.T) {
-	for _, forks := range []any{nil, true, 1, []any{nil}, []any{true}, []any{"trusted/repo", "*"}, map[string]any{"author-association": []any{"OWNER"}}} {
-		assert.False(t, hasBoundedPullRequestTargetForks(map[string]any{
+func TestHasSupportedPullRequestTargetForksRejectsMalformedValues(t *testing.T) {
+	for _, forks := range []any{nil, true, 1, []any{nil}, []any{true}, []any{"*", "trusted/repo*"}, map[string]any{"author-association": []any{"OWNER"}}} {
+		assert.False(t, hasSupportedPullRequestTargetForks(map[string]any{
 			"on": map[string]any{
 				"pull_request_target": map[string]any{"forks": forks},
 			},
 		}), "forks: %#v", forks)
+	}
+}
+
+func TestPullRequestTargetWildcardWarning(t *testing.T) {
+	for _, forks := range []any{"*", []any{"*"}, []any{"trusted/repo", "*"}, []any{"*", "trusted/*"}} {
+		for _, strict := range []bool{false, true} {
+			compiler := NewCompiler()
+			frontmatter := map[string]any{
+				"strict": strict,
+				"on": map[string]any{
+					"pull_request_target": map[string]any{
+						"forks":            forks,
+						"acknowledge-risk": true,
+					},
+				},
+			}
+			data := &WorkflowData{
+				On:                         "on:\n  pull_request_target:\n    types: [labeled]",
+				RawFrontmatter:             frontmatter,
+				CheckoutExplicitlyDisabled: true,
+				Roles:                      []string{"admin", "maintainer", "write"},
+			}
+			output := testutil.CaptureStderr(t, func() {
+				require.NoError(t, compiler.validatePullRequestTargetTrigger(data, "workflow.md"))
+			})
+			if strict {
+				assert.Equal(t, 1, compiler.GetWarningCount(), "forks: %#v", forks)
+				assert.Contains(t, output, "Prefer restricting forks")
+				assert.Contains(t, output, "acknowledge-risk does not suppress")
+			} else {
+				assert.Zero(t, compiler.GetWarningCount())
+				assert.Empty(t, output)
+			}
+			compiler.ResetWarningCount()
+			data.CheckoutExplicitlyDisabled = false
+			err := compiler.validatePullRequestTargetTrigger(data, "workflow.md")
+			if strict {
+				require.ErrorContains(t, err, "checkout enabled is extremely insecure")
+			} else {
+				require.NoError(t, err)
+			}
+			data.CheckoutExplicitlyDisabled = true
+			data.Roles = []string{"all"}
+			err = compiler.validatePullRequestTargetTrigger(data, "workflow.md")
+			if strict {
+				require.ErrorContains(t, err, "on.roles containing 'all' or 'read'")
+			} else {
+				require.NoError(t, err)
+			}
+		}
 	}
 }

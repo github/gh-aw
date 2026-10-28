@@ -20,8 +20,8 @@
 //  3. With on.roles containing all or read: reject in strict mode and warn in
 //     non-strict mode, regardless of checkout or trigger risk acknowledgment.
 //
-//  4. In strict mode, require bounded fork admission regardless of
-//     checkout or trigger risk acknowledgment.
+//  4. In strict mode, warn about unrestricted fork admission and recommend
+//     bounded patterns regardless of checkout or trigger risk acknowledgment.
 //
 // # References
 //
@@ -42,6 +42,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -119,25 +120,42 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		}
 		break
 	}
-	if effectiveStrictMode && !hasBoundedPullRequestTargetForks(workflowData.RawFrontmatter) {
+	if effectiveStrictMode && !hasSupportedPullRequestTargetForks(workflowData.RawFrontmatter) {
 		return formatCompilerError(markdownPath, "error",
-			"pull_request_target requires bounded fork admission in strict mode.\n"+
+			"pull_request_target requires supported fork patterns in strict mode.\n"+
 				"Omit on.pull_request_target.forks for same-repository PRs only, or list exact\n"+
-				"repositories (owner/repo) or trusted owner/* patterns. '*' (including\n"+
-				"inside a list), expressions, and other patterns are not allowed.\n"+
+				"repositories (owner/repo) or trusted owner/* patterns. Expressions and other\n"+
+				"unsupported patterns are not allowed.\n"+
 				"Trusted event actors can still act on attacker-controlled PR content.\n"+
 				"checkout: false and on.pull_request_target.acknowledge-risk do not bypass this requirement.\n"+
 				"Actor authorization and trusted-checkout restrictions remain mandatory.", nil)
 	}
 	var acknowledged bool
+	var unrestrictedForks bool
 	var allowedCheckouts []any
 	if on, ok := workflowData.RawFrontmatter["on"].(map[string]any); ok {
 		if trigger, ok := on["pull_request_target"].(map[string]any); ok {
 			acknowledged = trigger["acknowledge-risk"] == true
+			switch forks := trigger["forks"].(type) {
+			case string:
+				unrestrictedForks = forks == "*"
+			case []any:
+				unrestrictedForks = slices.Contains(forks, any("*"))
+			}
 			if entries, ok := trigger["allowed-checkouts"].([]any); ok {
 				allowedCheckouts = entries
 			}
 		}
+	}
+
+	if effectiveStrictMode && unrestrictedForks {
+		message := "pull_request_target.forks contains '*' and allows PRs from any fork.\n" +
+			"Prefer restricting forks to exact owner/repo entries or deliberately trusted owner/* patterns.\n" +
+			"Omit forks (or use forks: []) for same-repository PRs only.\n" +
+			"Trusted event actors can still act on attacker-controlled PR content, even with checkout disabled.\n" +
+			"acknowledge-risk does not suppress this warning; actor authorization and checkout restrictions remain enforced."
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+		c.IncrementWarningCount()
 	}
 
 	// In strict mode, emit a warning unless the trigger-specific risk is acknowledged,
@@ -204,7 +222,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 	return nil
 }
 
-func hasBoundedPullRequestTargetForks(frontmatter map[string]any) bool {
+func hasSupportedPullRequestTargetForks(frontmatter map[string]any) bool {
 	if on, ok := frontmatter["on"].(string); ok {
 		return on == "pull_request_target"
 	}
@@ -221,11 +239,11 @@ func hasBoundedPullRequestTargetForks(frontmatter map[string]any) bool {
 	}
 	switch forks := trigger["forks"].(type) {
 	case string:
-		return boundedForkPattern.MatchString(forks)
+		return forks == "*" || boundedForkPattern.MatchString(forks)
 	case []any:
 		for _, fork := range forks {
 			pattern, ok := fork.(string)
-			if !ok || !boundedForkPattern.MatchString(pattern) {
+			if !ok || (pattern != "*" && !boundedForkPattern.MatchString(pattern)) {
 				return false
 			}
 		}

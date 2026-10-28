@@ -794,13 +794,14 @@ on:
     draft: true
 
     # Filter fork pull requests by repository pattern (string or list). Omission and
-    # an empty list both allow only same-repository PRs. Strict mode permits exact
-    # owner/repo entries or trusted owner/* patterns and rejects any '*' entry,
-    # expressions, and other patterns. Non-strict mode permits '*' to allow all forks.
+    # an empty list both allow only same-repository PRs. Exact owner/repo entries or
+    # trusted owner/* patterns admit matching forks; '*' allows all forks. Strict mode
+    # warns on any '*' entry and recommends narrower admission, but compilation
+    # continues. Strict mode rejects expressions and unsupported pattern forms.
     # Same-repository PRs remain allowed. Actor authorization and checkout
-    # restrictions remain mandatory in strict mode; acknowledge-risk does not bypass
-    # them. This does not change GitHub's base-repository permissions or secret
-    # availability for pull_request_target.
+    # restrictions remain mandatory in strict mode; acknowledge-risk neither bypasses
+    # them nor suppresses the fork warning. This does not change GitHub's
+    # base-repository permissions or secret availability for pull_request_target.
     # (optional)
     # Accepted formats:
 
@@ -812,8 +813,9 @@ on:
       # Array items: string
 
     # Acknowledge elevated permissions and secret access to suppress only the
-    # strict-mode pull_request_target trigger warning. Bounded fork admission, actor
-    # authorization, and checkout validation remain enforced.
+    # strict-mode pull_request_target trigger warning. The unrestricted-forks warning,
+    # actor authorization, fork-pattern validation, and checkout validation remain
+    # enforced.
     # (optional)
     acknowledge-risk: true
 
