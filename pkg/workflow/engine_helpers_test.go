@@ -256,8 +256,8 @@ func TestGetNpmBinPathSetup_PreservesSelectedRuby(t *testing.T) {
 }
 
 func TestDockerSudoIptablesPreservesSelectedRubyPath(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Skipping shell-based test on non-Linux platform")
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("Skipping shell-based test outside Linux and macOS")
 	}
 
 	root := t.TempDir()
