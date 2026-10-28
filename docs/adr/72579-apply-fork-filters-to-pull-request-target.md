@@ -1,18 +1,18 @@
 # ADR-72579: Compile Fork Filters for Both PR Events, With an Asymmetric Default
 
-**Date**: 2026-07-22
-**Status**: Draft
+**Date**: 2026-10-27
+**Status**: Proposed
 **Deciders**: Unknown (PR #72579)
 
 ---
 
 ### Context
 
-gh-aw lets workflow authors write compiler-only filters such as `forks:` and `names:` under `on.pull_request` / `on.pull_request_target`. GitHub Actions does not accept these keys, so the compiler must convert them into job `if:` conditions and comment them out of the generated `on:` block. Two problems showed up. First, the on-section cleanup state machine (`pkg/workflow/frontmatter_on_section_cleanup.go`) left compiler-only subsections such as `on.permissions`, `on.steps`, or `on.skip-author-associations` only *after* checking for the next event. When one of those fields came before a PR event, `forks`/`names` leaked into the lock file, and `gh aw compile --validate` then rejected it. Second, `applyPullRequestForkFilter` (`pkg/workflow/filters.go`) only read `on.pull_request`. An explicit `forks:` under `pull_request_target` was silently ignored and was never turned into an admission check.
+gh-aw supports compiler-only `forks:` filters under both PR events and label-name filters (`names:`) under `on.pull_request`; these belong in job conditions, not native GitHub Actions trigger properties. The on-section cleanup state machine (`pkg/workflow/frontmatter_on_section_cleanup.go`) checked for the next event before leaving compiler-only subsections such as `on.permissions`, `on.steps`, or `on.skip-author-associations`, so filters after those fields could leak into lock files and fail Actions schema validation. Separately, `applyPullRequestForkFilter` (`pkg/workflow/filters.go`) read only `on.pull_request`, silently ignoring explicit `pull_request_target.forks` restrictions. Correct compilation must enforce configured fork admission without changing the existing behavior of workflows that omit the field.
 
 ### Decision
 
-We will handle fork filters the same way for `pull_request` and `pull_request_target`. Each event gets its own job condition, guarded by `github.event_name != '<event>' || ...`, and the processed `forks` field is removed from the trigger for both events. The defaults stay different on purpose: `pull_request` keeps its existing same-repository-only default when `forks` is omitted, while `pull_request_target` gets no fork restriction unless `forks` is set explicitly. We will also fix the cleanup state machine so it leaves compiler-only subsections *before* it detects the next event section. It now records `forks` indentation, which lets it handle multiline lists at any indent. The main driver is correctness: compiled lock files must pass GitHub Actions schema validation, and a fork restriction the author wrote down must never be silently dropped.
+The compiler will apply explicit fork filters to both `pull_request` and `pull_request_target` using event-scoped job conditions (`github.event_name != '<event>' || ...`), while preserving existing conditions and commenting out processed trigger fields. For configured event objects, omitting `forks` retains the same-repository-only default for `pull_request` and adds no fork restriction for `pull_request_target`; explicit patterns always admit same-repository PRs, `[]` admits only those PRs, and `*` adds no fork restriction. The supported frontmatter schema in `pkg/parser/schemas/main_workflow_schema.json` accepts string and list patterns for both events, but accepts the `forks: {author-association: [...]}` form from [ADR-69374](69374-fork-pr-admission-by-author-association.md) only for `pull_request`; the shared helper's ability to process that object does not make it supported for `pull_request_target`, and this decision does not extend the schema. To produce valid lock files without silently dropping configured admission rules, the cleanup state machine will leave compiler-only subsections before detecting the next event and track `forks` indentation for nested content, including the supported two-space and four-space event layouts.
 
 ### Alternatives Considered
 
@@ -22,7 +22,7 @@ The compiler could treat `forks` as a `pull_request`-only key and raise an error
 
 #### Alternative 2: Apply the same same-repository default to `pull_request_target`
 
-Using one rule for both events would be simpler: omitting `forks` would block forks everywhere. It was rejected because it would quietly change the behavior of existing `pull_request_target` workflows. Many of them exist specifically to handle fork PRs, so recompiling would stop them from running on forks. The asymmetric default keeps existing behavior unless the author opts in.
+Using one rule for both events would be simpler: omitting `forks` would block forks everywhere. It was rejected because it would change the behavior of existing `pull_request_target` workflows that admit fork PRs, even when their authors had not configured a fork restriction. The asymmetric default preserves existing fork-admission behavior unless the author opts in.
 
 #### Alternative 3: Fix only the cleanup leak and keep `pull_request`-only fork filtering
 
@@ -31,7 +31,7 @@ A narrower bug fix would remove the leaked keys and leave admission logic alone.
 ### Consequences
 
 #### Positive
-- Lock files no longer contain `forks`/`names` trigger properties, so `compile --validate` succeeds regardless of where compiler-only `on.*` fields appear.
+- Recognizing PR events after compiler-only `on.*` fields prevents `forks`/`names` from leaking into native triggers and failing Actions schema validation.
 - An explicit `forks:` pattern under `pull_request_target` is now enforced as an event-scoped job condition instead of being ignored.
 - Event-scoped guards let workflows that set both PR events use independent fork filters, and existing `if:` and label (`names`) conditions are kept.
 
@@ -39,12 +39,9 @@ A narrower bug fix would remove the leaked keys and leave admission logic alone.
 - The two PR events now have different defaults for an omitted `forks`, so authors must remember that only `pull_request` blocks forks by default.
 - Recompiling workflows that already had a `forks:` key under `pull_request_target` will start enforcing it. This could stop runs that previously, and unintentionally, admitted all forks.
 - The line-oriented cleanup state machine depends on event-ordering logic and indent tracking, which remain fragile compared with editing the YAML AST.
+- The author-association object form remains unavailable for `pull_request_target`, despite the shared helper accepting it internally.
 
 #### Neutral
-- Documentation (`docs/src/content/docs/reference/triggers.md`) now describes the `pull_request_target` semantics explicitly.
-- Regression tests cover wildcard, empty, exact, multiline, and mixed patterns, with both two-space and four-space indentation.
-- This builds on the fork-admission model in [ADR-69374](69374-fork-pr-admission-by-author-association.md). Whether the author-association object form applies to `pull_request_target` is [TODO: verify].
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+- The [trigger reference](../src/content/docs/reference/triggers.md) describes the `pull_request_target` pattern-filter semantics explicitly.
+- Regression tests in `pkg/workflow/filters_forks_test.go` and `pkg/workflow/frontmatter_on_section_cleanup_test.go` cover fork conditions, generated Actions schema validation, compiler-only field ordering, and two-space/four-space event indentation.
+- Fork admission does not grant permissions or secrets and does not make checking out or executing untrusted fork code safe.
