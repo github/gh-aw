@@ -111,6 +111,10 @@
     {
       "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-25",
       "last_run": "2026-10-27"
+    },
+    {
+      "q": "topic:agentic-workflows pushed:>2026-10-01 fork:false archived:false",
+      "last_run": "2026-10-28"
     }
   ]
 }
