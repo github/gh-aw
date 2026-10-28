@@ -16,7 +16,7 @@ const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_me
 const { parseIntTemplatable } = require("./templatable.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
-const { renderSizedReport } = require("./report_size.cjs");
+const { fitMarkdownBody } = require("./report_size.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 
 /** @type {string} Safe output type handled by this module */
@@ -381,11 +381,11 @@ async function main(config = {}) {
     // Buffer the comment instead of posting it individually
     const rawBody = sanitizeContent(commentItem.body.trim(), { allowedAliases: allowedMentionAliases, maxMentions });
     const bodyFooterBlocks = getBodyFooterBlocks(config.body_footer, { workflowName, runUrl });
-    const body = renderSizedReport({
+    const body = fitMarkdownBody({
       type: "report",
       title: "Review comment",
       children: [...parseReportMarkdown(rawBody, { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions: allowedMentionAliases, agentTainted: true }), ...bodyFooterBlocks],
-    }).body;
+    });
     /** @type {import('./pr_review_buffer.cjs').BufferedComment} */
     const bufferedComment = {
       path: commentItem.path,

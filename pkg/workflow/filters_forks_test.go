@@ -3,8 +3,10 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -12,6 +14,175 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestTriggerForkFilterCompilation(t *testing.T) {
+	tests := []struct {
+		name     string
+		forks    string
+		expected string
+	}{
+		{"wildcard string", `"*"`, ""},
+		{"wildcard", `["*"]`, ""},
+		{"empty", "[]", "github.event.pull_request.head.repo.id == github.repository_id"},
+		{"exact", `"trusted/repo"`, "github.event.pull_request.head.repo.full_name == 'trusted/repo'"},
+		{"patterns", "\n      - trusted/*\n      - partner/repo", "startsWith(github.event.pull_request.head.repo.full_name, 'trusted/') || github.event.pull_request.head.repo.full_name == 'partner/repo'"},
+	}
+	for _, event := range []string{"pull_request", "pull_request_target"} {
+		for _, tt := range tests {
+			t.Run(event+"/"+tt.name, func(t *testing.T) {
+				names := ""
+				if event == "pull_request" {
+					names = "\n    names: [community-contribution]"
+				}
+				source := fmt.Sprintf(`---
+if: ${{ github.event.repository.fork == false }}
+on:
+  permissions: {}
+  %s:
+    types: [labeled]
+    forks: %s%s
+    branches: [main]
+  workflow_dispatch:
+engine: copilot
+checkout: false
+permissions:
+  contents: read
+network:
+  allowed: [defaults]
+---
+Review the contribution.
+`, event, tt.forks, names)
+				compiled := compileTriggerFilterFixture(t, source)
+				on := compiled["on"].(map[string]any)
+				assert.Equal(t, map[string]any{"types": []any{"labeled"}, "branches": []any{"main"}}, on[event])
+				assert.Contains(t, on, "workflow_dispatch")
+				jobs := compiled["jobs"].(map[string]any)
+				condition := jobs["activation"].(map[string]any)["if"].(string)
+				assert.Contains(t, condition, "github.event.repository.fork == false")
+				if tt.expected != "" {
+					assert.Contains(t, condition, "github.event_name != '"+event+"'")
+					assert.Contains(t, condition, tt.expected)
+				} else {
+					assert.NotContains(t, condition, "github.event.pull_request.head.repo")
+				}
+				if names != "" {
+					assert.Contains(t, condition, "github.event.label.name == 'community-contribution'")
+				}
+			})
+		}
+	}
+}
+
+func TestPullRequestTargetDefaultForkFilterCompilation(t *testing.T) {
+	const sameRepo = "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.id == github.repository_id"
+	for _, strict := range []bool{false, true} {
+		for _, on := range []string{
+			"pull_request_target",
+			"\n  pull_request_target: {}",
+			"\n  pull_request_target:\n    types: [labeled]\n  workflow_dispatch:",
+			"\n  pull_request_target:\n    types: [labeled]\n    forks: []\n  workflow_dispatch:",
+			"\n  pull_request_target:\n    types: [labeled]\n  pull_request:\n    forks: ['*']",
+		} {
+			t.Run(fmt.Sprintf("strict=%t/on=%s", strict, on), func(t *testing.T) {
+				compiled := compileTriggerFilterFixture(t, fmt.Sprintf(`---
+strict: %t
+on: %s
+if: github.actor != 'dependabot[bot]'
+checkout: false
+tools:
+  github: false
+---
+Review the contribution.
+`, strict, on))
+				jobs := compiled["jobs"].(map[string]any)
+				condition := jobs["activation"].(map[string]any)["if"].(string)
+				assert.Contains(t, condition, sameRepo)
+				assert.Contains(t, condition, "github.actor != 'dependabot[bot]'")
+				assert.NotContains(t, condition, "startsWith")
+				assert.NotContains(t, condition, "github.event_name != 'pull_request' ||")
+			})
+		}
+	}
+}
+
+func TestTriggerForkFilterCompilationRejectsMalformedValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		forks string
+	}{
+		{"boolean true", "true"},
+		{"boolean false", "false"},
+		{"number", "42"},
+		{"null", "null"},
+		{"empty object", "{}"},
+		{"non-string list item", "[trusted/repo, true]"},
+	}
+	for _, event := range []string{"pull_request", "pull_request_target"} {
+		for _, tt := range tests {
+			t.Run(event+"/"+tt.name, func(t *testing.T) {
+				assertTriggerFilterCompilationRejected(t, event, "forks: "+tt.forks, "forks")
+			})
+		}
+	}
+}
+
+func TestPullRequestTargetCompilationRejectsUnsupportedFilters(t *testing.T) {
+	tests := []struct {
+		name   string
+		filter string
+		field  string
+	}{
+		{"author associations", "forks: {author-association: [OWNER, MEMBER, COLLABORATOR]}", "forks"},
+		{"label string", "names: community-contribution", "names"},
+		{"label list", "names: [community-contribution]", "names"},
+		{"label boolean", "names: true", "names"},
+		{"label number", "names: 42", "names"},
+		{"label object", "names: {label: community-contribution}", "names"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertTriggerFilterCompilationRejected(t, "pull_request_target", tt.filter, tt.field)
+		})
+	}
+}
+
+func assertTriggerFilterCompilationRejected(t *testing.T, event, filter, field string) {
+	t.Helper()
+	workflowFile := filepath.Join(testutil.TempDir(t, "invalid-trigger-filters"), "filters.md")
+	source := fmt.Sprintf(`---
+on:
+  %s:
+    types: [labeled]
+    %s
+engine: copilot
+checkout: false
+permissions:
+  contents: read
+network:
+  allowed: [defaults]
+---
+Review the contribution.
+`, event, filter)
+	require.NoError(t, os.WriteFile(workflowFile, []byte(source), 0644))
+	err := NewCompiler().CompileWorkflow(workflowFile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), field)
+	assert.NoFileExists(t, filepath.Join(filepath.Dir(workflowFile), "filters.lock.yml"))
+}
+
+func compileTriggerFilterFixture(t *testing.T, source string) map[string]any {
+	t.Helper()
+	workflowFile := filepath.Join(testutil.TempDir(t, "trigger-filters"), "filters.md")
+	require.NoError(t, os.WriteFile(workflowFile, []byte(source), 0644))
+	compiler := NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(workflowFile))
+	content, err := os.ReadFile(filepath.Join(filepath.Dir(workflowFile), "filters.lock.yml"))
+	require.NoError(t, err)
+	var compiled map[string]any
+	require.NoError(t, yaml.Unmarshal(content, &compiled))
+	require.NoError(t, compiler.validateGitHubActionsSchemaFromParsed(compiled))
+	return compiled
+}
 
 func TestApplyPullRequestForkFilter(t *testing.T) {
 	const sameRepo = "github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id"
@@ -47,19 +218,22 @@ func TestApplyPullRequestForkFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, existing := range []string{"", "github.actor != 'dependabot[bot]'"} {
-				data := &WorkflowData{If: existing}
-				NewCompiler().applyPullRequestForkFilter(data, map[string]any{
-					"on": map[string]any{"pull_request": tt.pr, "push": nil, "workflow_dispatch": nil},
-				})
-				expected := tt.expected
-				if existing != "" {
-					expected = existing
-					if tt.expected != "" {
-						expected = "(" + existing + ") && (" + tt.expected + ")"
+			for _, event := range []string{"pull_request", "pull_request_target"} {
+				for _, existing := range []string{"", "github.actor != 'dependabot[bot]'"} {
+					data := &WorkflowData{If: existing}
+					NewCompiler().applyPullRequestForkFilter(data, map[string]any{
+						"on": map[string]any{event: tt.pr, "push": nil, "workflow_dispatch": nil},
+					})
+					filter := strings.ReplaceAll(tt.expected, "'pull_request'", "'"+event+"'")
+					expected := filter
+					if existing != "" {
+						expected = existing
+						if filter != "" {
+							expected = "(" + existing + ") && (" + filter + ")"
+						}
 					}
+					assert.Equal(t, expected, data.If, "event: %s", event)
 				}
-				assert.Equal(t, expected, data.If)
 			}
 		})
 	}
@@ -105,4 +279,18 @@ engine: copilot
 	assert.Contains(t, condition, "github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id")
 	assert.Contains(t, condition, `|| contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)`)
 	assert.Contains(t, string(content), "github.event.pull_request.base.sha || github.sha")
+}
+
+func TestApplyPullRequestForkFilterMultipleEvents(t *testing.T) {
+	data := &WorkflowData{}
+	NewCompiler().applyPullRequestForkFilter(data, map[string]any{
+		"on": map[string]any{
+			"pull_request":        map[string]any{"forks": "pr-org/*"},
+			"pull_request_target": map[string]any{"forks": "target-org/*"},
+		},
+	})
+	assert.Equal(t,
+		"(github.event_name != 'pull_request' || github.event.pull_request.head.repo.id == github.repository_id || startsWith(github.event.pull_request.head.repo.full_name, 'pr-org/')) && "+
+			"(github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.id == github.repository_id || startsWith(github.event.pull_request.head.repo.full_name, 'target-org/'))",
+		data.If)
 }

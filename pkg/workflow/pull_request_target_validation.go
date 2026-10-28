@@ -20,6 +20,9 @@
 //  3. With on.roles containing all or read: reject in strict mode and warn in
 //     non-strict mode, regardless of checkout or trigger risk acknowledgment.
 //
+//  4. In strict mode, warn about unrestricted fork admission and recommend
+//     bounded patterns regardless of checkout or trigger risk acknowledgment.
+//
 // # References
 //
 // See: https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
@@ -38,6 +41,8 @@ package workflow
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -48,6 +53,8 @@ import (
 )
 
 var pullRequestTargetLog = logger.New("workflow:pull_request_target_validation")
+
+var boundedForkPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\*)$`)
 
 // validatePullRequestTargetTrigger validates security requirements for pull_request_target triggers.
 //
@@ -87,13 +94,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		return nil
 	}
 
-	onMap, isMap := onData.(map[string]any)
-	if !isMap {
-		return nil
-	}
-
-	_, hasPRT := onMap["pull_request_target"]
-	if !hasPRT {
+	if !frontmatterHasTrigger(onData, "pull_request_target") {
 		return nil
 	}
 
@@ -119,15 +120,42 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		}
 		break
 	}
+	if effectiveStrictMode && !hasSupportedPullRequestTargetForks(workflowData.RawFrontmatter) {
+		return formatCompilerError(markdownPath, "error",
+			"pull_request_target requires supported fork patterns in strict mode.\n"+
+				"Omit on.pull_request_target.forks for same-repository PRs only, or list exact\n"+
+				"repositories (owner/repo) or trusted owner/* patterns. Expressions and other\n"+
+				"unsupported patterns are not allowed.\n"+
+				"Trusted event actors can still act on attacker-controlled PR content.\n"+
+				"checkout: false and on.pull_request_target.acknowledge-risk do not bypass this requirement.\n"+
+				"Actor authorization and trusted-checkout restrictions remain mandatory.", nil)
+	}
 	var acknowledged bool
+	var unrestrictedForks bool
 	var allowedCheckouts []any
 	if on, ok := workflowData.RawFrontmatter["on"].(map[string]any); ok {
 		if trigger, ok := on["pull_request_target"].(map[string]any); ok {
 			acknowledged = trigger["acknowledge-risk"] == true
+			switch forks := trigger["forks"].(type) {
+			case string:
+				unrestrictedForks = forks == "*"
+			case []any:
+				unrestrictedForks = slices.Contains(forks, any("*"))
+			}
 			if entries, ok := trigger["allowed-checkouts"].([]any); ok {
 				allowedCheckouts = entries
 			}
 		}
+	}
+
+	if effectiveStrictMode && unrestrictedForks {
+		message := "pull_request_target.forks contains '*' and allows PRs from any fork.\n" +
+			"Prefer restricting forks to exact owner/repo entries or deliberately trusted owner/* patterns.\n" +
+			"Omit forks (or use forks: []) for same-repository PRs only.\n" +
+			"Trusted event actors can still act on attacker-controlled PR content, even with checkout disabled.\n" +
+			"acknowledge-risk does not suppress this warning; actor authorization and checkout restrictions remain enforced."
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+		c.IncrementWarningCount()
 	}
 
 	// In strict mode, emit a warning unless the trigger-specific risk is acknowledged,
@@ -192,6 +220,37 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 	c.IncrementWarningCount()
 
 	return nil
+}
+
+func hasSupportedPullRequestTargetForks(frontmatter map[string]any) bool {
+	if on, ok := frontmatter["on"].(string); ok {
+		return on == "pull_request_target"
+	}
+	on, ok := frontmatter["on"].(map[string]any)
+	if !ok {
+		return false
+	}
+	trigger, ok := on["pull_request_target"].(map[string]any)
+	if !ok {
+		return false
+	}
+	if _, hasForks := trigger["forks"]; !hasForks {
+		return true
+	}
+	switch forks := trigger["forks"].(type) {
+	case string:
+		return forks == "*" || boundedForkPattern.MatchString(forks)
+	case []any:
+		for _, fork := range forks {
+			pattern, ok := fork.(string)
+			if !ok || (pattern != "*" && !boundedForkPattern.MatchString(pattern)) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func dangerouslyAllowsRolesReadAndPullRequestTarget(workflowData *WorkflowData) bool {
