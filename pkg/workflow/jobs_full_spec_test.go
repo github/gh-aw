@@ -173,8 +173,8 @@ jobs:
 			expectedYAML: []string{
 				"build:",
 				"outputs:",
-				"tag: ${{ steps.version.outputs.tag }}",
-				"version: ${{ steps.version.outputs.version }}",
+				`tag: "${{ steps.version.outputs.tag }}"`,
+				`version: "${{ steps.version.outputs.version }}"`,
 			},
 			shouldError: false,
 		},

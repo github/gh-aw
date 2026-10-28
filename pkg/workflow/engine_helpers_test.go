@@ -256,8 +256,8 @@ func TestGetNpmBinPathSetup_PreservesSelectedRuby(t *testing.T) {
 }
 
 func TestDockerSudoIptablesPreservesSelectedRubyPath(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Skipping shell-based test on non-Linux platform")
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("Skipping shell-based test outside Linux and macOS")
 	}
 
 	root := t.TempDir()
@@ -279,9 +279,9 @@ func TestDockerSudoIptablesPreservesSelectedRubyPath(t *testing.T) {
 	awfScript := fmt.Sprintf("#!/bin/bash\nset -e\nunset GOROOT ERLANG_HOME\n%s\nruby --version\nnpm-agent\n", GetNpmBinPathSetup())
 	require.NoError(t, os.WriteFile(fakeAWF, []byte(awfScript), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(commandBin, "sudo"), []byte(`#!/bin/sh
-if [ "$1" = "-E" ]; then
-  shift
-fi
+case "$1" in
+  -E|--preserve-env=*) shift ;;
+esac
 export PATH="$GH_AW_TEST_SECURE_PATH"
 exec "$@"
 `), 0o755))
