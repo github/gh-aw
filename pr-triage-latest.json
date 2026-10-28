@@ -1,47 +1,35 @@
 {
-  "run_date": "2026-10-27T18:22:25Z",
-  "run_id": "40558840727",
+  "run_date": "2026-10-28T00:44:01Z",
+  "run_id": "40610394429",
   "source": "pr-triage",
-  "eligible_total": 2,
+  "eligible_total": 3,
   "cooldown_skipped": 0,
-  "open_copilot_prs": 2,
+  "open_copilot_prs": 3,
   "category_counts": {
     "bug": 1,
-    "feature": 1
+    "feature": 1,
+    "refactor": 1
   },
   "risk_counts": {
-    "high": 2
+    "high": 1,
+    "medium": 2
   },
   "priority_counts": {
-    "high": 2
+    "high": 1,
+    "medium": 2
   },
   "action_counts": {
-    "fast_track": 2
+    "fast_track": 2,
+    "batch_review": 1
   },
-  "batches": [],
-  "selected_candidates": [
+  "batches": [
     {
-      "number": 72403,
-      "title": "Allow on.bots Apps to check out same-repository PRs on edited events",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 76,
-      "score_breakdown": {
-        "impact": 38,
-        "urgency": 23,
-        "quality": 15
-      },
-      "updated_at": "2026-10-27T16:04:51Z",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot"
-      ]
-    },
+      "id": "pr-batch:agentic-quality-fixes",
+      "members": [72273, 72515, 72517],
+      "category": "quality"
+    }
+  ],
+  "selected_candidates": [
     {
       "number": 72273,
       "title": "Support Claude on Vertex AI with GCP WIF",
@@ -50,21 +38,56 @@
       "priority": "high",
       "action": "fast_track",
       "score": 72,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 18,
-        "quality": 14
-      },
+      "score_breakdown": {"impact": 40, "urgency": 18, "quality": 14},
       "updated_at": "2026-10-27T15:36:43Z",
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
         "pr-priority:high",
         "pr-action:fast_track",
-        "pr-agent:copilot"
+        "pr-agent:copilot",
+        "pr-batch:agentic-quality-fixes"
+      ]
+    },
+    {
+      "number": 72515,
+      "title": "[safeoutputs] Add concrete example to add_labels object-only tool description",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "fast_track",
+      "score": 68,
+      "score_breakdown": {"impact": 30, "urgency": 20, "quality": 18},
+      "updated_at": "2026-10-27T21:27:20Z",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:agentic-quality-fixes"
+      ]
+    },
+    {
+      "number": 72517,
+      "title": "[duplicate-code] Refactor repeated PR transfer repository cloning",
+      "category": "refactor",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 58,
+      "score_breakdown": {"impact": 20, "urgency": 18, "quality": 20},
+      "updated_at": "2026-10-27T22:03:11Z",
+      "labels": [
+        "pr-type:refactor",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agentic-quality-fixes"
       ]
     }
   ],
   "skipped_prs": [],
-  "notes": "Two open app/github-copilot PRs were eligible after the 1-hour cooldown; both were triaged and labeled for fast human review."
+  "notes": "Three open app/github-copilot PRs were eligible for triage; labels and recommendations were applied to each item. The set clusters into a small quality-fixes batch with one high-value feature and two improvement-oriented changes."
 }
