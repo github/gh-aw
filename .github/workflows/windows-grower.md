@@ -33,6 +33,7 @@ jobs:
     # Reusable callers must grant the union of the callee's job permissions.
     permissions:
       actions: read
+      checks: read
       contents: read
       copilot-requests: write
       discussions: write
