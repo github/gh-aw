@@ -1,13 +1,16 @@
 {
-  "date": "2026-10-27",
-  "latest_release": "v1.0.0",
-  "also_released_yesterday": ["v0.93.6"],
-  "commits_30d": 1268,
-  "commits_today_partial": 6,
-  "open_prs": 6,
+  "date": "2026-10-28",
+  "latest_release": "v1.0.1",
+  "prior_release": "v1.0.0",
+  "commits_30d": 1283,
+  "commits_today_partial": 1,
+  "commits_last_7d": 225,
+  "commits_prior_7d": 307,
+  "open_prs": 14,
   "open_issues_sample": 100,
-  "human_open_issues": 7,
-  "changesets": 886,
+  "human_open_issues": 12,
+  "changesets": 888,
   "releases_in_download": 30,
-  "snapshot_utc": "2026-10-27T08:55:00Z"
+  "discussions": 50,
+  "snapshot_utc": "2026-10-28T08:45:00Z"
 }
