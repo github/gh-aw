@@ -32,7 +32,7 @@ To select the current PR head at execution time instead of the triggering event 
 
 ```aw wrap
 checkout:
-  allow-floating-head: true
+  allow-pull-request-floating-head: true
 ```
 
 The default is `false`. With `true`, checkout ignores event/review SHA and comment freshness evidence, resolves the current head through the PR API, and uses the current commit count for fetch depth. It still fetches that specific SHA, rechecks the head after fetch, and verifies actual `HEAD`. A head change during fetch fails; this option does not restore mutable-ref fetching or bypass the server's SHA-fetch requirements.
@@ -78,7 +78,7 @@ checkout:
 | Field | Type | Description |
 |-------|------|-------------|
 | `pull-request` | boolean | Set `false` to disable automatic PR checkout and its paired base-config snapshot/restore steps. The normal repository checkout remains enabled. |
-| `allow-floating-head` | boolean | Select the current API head instead of event/review revision evidence. Defaults to `false`; literal boolean only. Applies workflow-wide if any checkout entry enables it. See [Allow Floating Head](#allow-floating-head). |
+| `allow-pull-request-floating-head` | boolean | Select the current API head instead of event/review revision evidence. Defaults to `false`; literal boolean only. Applies workflow-wide if any checkout entry enables it. See [Allow Floating Head](#allow-pull-request-floating-head). |
 | `repository` | string | Explicit repository in `owner/repo` format, or a newline-separated list with `multi: true`. Without `multi`, expressions must resolve to exactly one repository and need no allowlist. Does not support wildcards. Defaults to the current repository. |
 | `repo` | string | Alias for `repository`; specify only one. Does not support wildcards. |
 | `multi` | boolean | Explicitly enables runtime repository-list expansion and its restrictions. Defaults to `false`; must be a literal boolean. |

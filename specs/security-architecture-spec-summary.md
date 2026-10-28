@@ -12,7 +12,7 @@ The GitHub Agentic Workflows Security Architecture Specification is a formal W3C
 
 ### Floating-Head Opt-In (v1.1.8 / 2026-10-28)
 
-`checkout.allow-floating-head: true` explicitly selects the current API PR head instead of the triggering revision; it is not revision approval. The default remains event revision binding. The opt-in retains SHA fetch and verification, fetch-time head checks, authorization, and checkout-disable policies. Formal revalidation remains pending.
+`checkout.allow-pull-request-floating-head: true` explicitly selects the current API PR head instead of the triggering revision; it is not revision approval. The default remains event revision binding. The opt-in retains SHA fetch and verification, fetch-time head checks, authorization, and checkout-disable policies. Formal revalidation remains pending.
 
 ### RS-05a Update (v1.1.7 / 2026-10-27)
 

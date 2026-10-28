@@ -119,12 +119,12 @@ func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) { //nolint
 		cfg.PullRequest = &b
 	}
 
-	if v, ok := m["allow-floating-head"]; ok {
+	if v, ok := m["allow-pull-request-floating-head"]; ok {
 		b, ok := v.(bool)
 		if !ok {
-			return nil, errors.New("checkout.allow-floating-head must be a literal boolean; use true or false")
+			return nil, errors.New("checkout.allow-pull-request-floating-head must be a literal boolean; use true or false")
 		}
-		cfg.AllowFloatingHead = b
+		cfg.AllowPullRequestFloatingHead = b
 	}
 
 	if v, ok := m["repository"]; ok {

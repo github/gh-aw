@@ -41,8 +41,8 @@ type CheckoutConfig struct {
 	// and its paired agent-config snapshot/restore steps. False disables those steps.
 	PullRequest *bool `json:"-"`
 
-	// AllowFloatingHead selects the current API head instead of event/review revision evidence.
-	AllowFloatingHead bool `json:"-"`
+	// AllowPullRequestFloatingHead selects the current API head instead of event/review revision evidence.
+	AllowPullRequestFloatingHead bool `json:"-"`
 
 	// Repository to checkout in owner/repo format. Defaults to the current repository.
 	Repository string `json:"repository,omitempty"`

@@ -17054,7 +17054,7 @@
           "type": "boolean",
           "description": "Set to false to disable the compiler-generated PR branch checkout and its associated base-config snapshot/restore steps. The normal repository checkout remains enabled."
         },
-        "allow-floating-head": {
+        "allow-pull-request-floating-head": {
           "type": "boolean",
           "default": false,
           "description": "Explicitly allow the compiler-generated PR checkout to select the current API head instead of the triggering event or review revision. Applies workflow-wide if enabled in any checkout entry. The selected SHA is still fetched, rechecked, and verified; this is current-head execution, not revision approval. Does not enable a disabled PR checkout. Requires a literal boolean."

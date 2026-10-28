@@ -86,7 +86,7 @@ function isOrdinaryPREvent() {
 }
 
 function allowsFloatingHead() {
-  return process.env.GH_AW_ALLOW_FLOATING_HEAD === "true";
+  return process.env.GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD === "true";
 }
 
 function usesEventRevision() {
@@ -577,7 +577,7 @@ async function main() {
     const trustedPRDetails = await assertTrustedCheckoutRuntime(workflowDispatchAwContext, pullRequest);
 
     if (allowsFloatingHead()) {
-      core.warning("checkout.allow-floating-head is enabled: selecting the current PR head instead of the triggering revision; this is not revision approval.");
+      core.warning("checkout.allow-pull-request-floating-head is enabled: selecting the current PR head instead of the triggering revision; this is not revision approval.");
     }
 
     // Log detailed context for debugging
