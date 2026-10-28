@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-07-07",
-    "workflow_name": "PR Code Quality Reviewer",
-    "workflow_file": "pr-code-quality-reviewer",
-    "total_aic_analyzed": 764.514,
-    "runs_audited": 50,
-    "recommendations_count": 4,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 85
-  },
-  {
     "date": "2026-09-08",
     "workflow_name": "PR Sous Chef",
     "workflow_file": "pr-sous-chef",
@@ -295,5 +285,15 @@
     "recommendations_count": 4,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 75
+  },
+  {
+    "date": "2026-10-28",
+    "workflow_name": "Claude Code User Documentation Review",
+    "workflow_file": "claude-code-user-docs-review",
+    "total_aic_analyzed": 82.37,
+    "runs_audited": 1,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 20
   }
 ]
