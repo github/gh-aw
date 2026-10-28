@@ -12,24 +12,23 @@ import (
 
 func cacheWriteOverrides(ctx context.Context, input Input, blocks []aw.ExecutionBlock) ([]Diagnostic, error) {
 	var root any
+	var present bool
 	if input.Workflow != nil {
 		root = input.Workflow.CacheMode
+		present = input.Workflow.CacheModeSet || input.Workflow.CacheMode != ""
 	} else {
-		root = input.Document.Frontmatter["cache-mode"]
+		root, present = input.Document.Frontmatter["cache-mode"]
 	}
-	rootMode, err := cachePolicyMode(root, "cache-mode")
-	if err != nil {
-		return nil, err
-	}
+	rootMode, err := cachePolicyMode(root, "cache-mode", present)
 	var diagnostics []Diagnostic
-	var failures []error
+	failures := []error{err}
 	reported := make(map[string]struct{})
-	check := func(value any, path string) {
+	check := func(value any, present bool, path string) {
 		field := "cache-mode"
 		if path != "" {
 			field = path + ".cache-mode"
 		}
-		mode, err := cachePolicyMode(value, field)
+		mode, err := cachePolicyMode(value, field, present)
 		if err != nil {
 			failures = append(failures, err)
 			return
@@ -52,7 +51,7 @@ func cacheWriteOverrides(ctx context.Context, input Input, blocks []aw.Execution
 			if err := ctx.Err(); err != nil {
 				return diagnostics, errors.Join(append(failures, err)...)
 			}
-			check(job.CacheMode, "jobs."+string(job.ID))
+			check(job.CacheMode, job.CacheModeSet || job.CacheMode != "", "jobs."+string(job.ID))
 		}
 	} else {
 		for _, block := range blocks {
@@ -61,7 +60,12 @@ func cacheWriteOverrides(ctx context.Context, input Input, blocks []aw.Execution
 			}
 			if block.Path == "" || strings.HasPrefix(block.Path, "jobs.") ||
 				strings.HasPrefix(block.Path, "safe-jobs.") || strings.HasPrefix(block.Path, "safe-outputs.jobs.") {
-				check(block.Fields["cache-mode"], block.Path)
+				if block.Path != "" {
+					value, present := block.Fields["cache-mode"]
+					check(value, present, block.Path)
+				} else {
+					check(nil, false, "")
+				}
 			}
 		}
 	}
@@ -77,13 +81,13 @@ func cacheLowTrustTrigger(ctx context.Context, on any) (bool, error) {
 	return false, nil
 }
 
-func cachePolicyMode(value any, path string) (string, error) {
-	if value == nil {
+func cachePolicyMode(value any, path string, present bool) (string, error) {
+	if !present {
 		return "", nil
 	}
 	if mode, ok := value.(string); ok {
 		switch mode {
-		case "", "read", "write", "write-only", "none":
+		case "read", "write", "write-only", "none":
 			return mode, nil
 		}
 	}

@@ -21,6 +21,8 @@ func checkCachePoisoning(ctx context.Context, input Input) ([]Diagnostic, error)
 	if err := integrityInput(ctx, input); err != nil {
 		return nil, err
 	}
+	blocks, blockErr := executionPolicyBlocks(ctx, input)
+	diagnostics, modeErr := cacheWriteOverrides(ctx, input, blocks)
 	var on any
 	if input.Workflow != nil {
 		on = input.Workflow.On
@@ -29,19 +31,16 @@ func checkCachePoisoning(ctx context.Context, input Input) ([]Diagnostic, error)
 	}
 	release, err := cacheReleaseTrigger(ctx, on)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(modeErr, err)
 	}
 	lowTrust, err := cacheLowTrustTrigger(ctx, on)
+	if !lowTrust {
+		diagnostics = nil
+	}
 	if err != nil || (!release && !lowTrust) {
-		return nil, err
+		return diagnostics, errors.Join(modeErr, err)
 	}
-	blocks, err := executionPolicyBlocks(ctx, input)
-	failures := []error{err}
-	var diagnostics []Diagnostic
-	if lowTrust {
-		diagnostics, err = cacheWriteOverrides(ctx, input, blocks)
-		failures = append(failures, err)
-	}
+	failures := []error{blockErr, modeErr}
 	if !release {
 		return diagnostics, errors.Join(failures...)
 	}

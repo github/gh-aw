@@ -169,7 +169,7 @@ Do not store sensitive data in cache memory. It follows repository permissions, 
 
 ### Cache access boundaries
 
-On GitHub.com, detection-enabled workflows without frontmatter dependency caches give the agent job `cache-mode: read`. This restricts its scoped cache token; selecting a restore-only action alone would not restrict other writers.
+On GitHub.com, detection-enabled workflows without nonempty frontmatter dependency-cache entries give the agent job `cache-mode: read`. An empty list (`cache: []`) does not enable dependency-cache saves or remove this restriction. This restricts its scoped cache token; selecting a restore-only action alone would not restrict other writers.
 
 Workflows with frontmatter `cache:` entries instead retain the platform's trigger-scoped token defaults so dependency caches can still be populated. Runtime event conditions allow combined restore/save actions only for `push`, `workflow_dispatch`, `repository_dispatch`, `delete`, `registry_package`, `page_build`, `schedule`, and merge-ref-isolated `pull_request` runs. Every other event, including `issues`, `discussion`, `discussion_comment`, and unknown future events, selects restore-only actions. This also applies to mixed-trigger and reusable workflows: the original caller's runtime event controls access. Allowed dependency-cache saves are not detection-gated, and agents on those events retain direct token write capability before detection.
 

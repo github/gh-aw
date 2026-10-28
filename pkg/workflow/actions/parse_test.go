@@ -125,6 +125,53 @@ func TestParseJobCacheModes(t *testing.T) {
 	}
 }
 
+func TestParseCacheModePresence(t *testing.T) {
+	for _, test := range []struct {
+		name, policy string
+		present      bool
+	}{
+		{"absent", "", false},
+		{"read", "cache-mode: read\n", true},
+		{"empty string", "cache-mode: \"\"\n", true},
+		{"empty scalar", "cache-mode:\n", true},
+		{"null", "cache-mode: null\n", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := test.policy + "jobs:\n  check:\n    runs-on: ubuntu-latest\n    steps: [{run: echo data}]\n"
+			if test.policy != "" {
+				source += "    " + test.policy
+			}
+			input, err := Parse([]byte(source))
+			require.NoError(t, err)
+			assert.Equal(t, test.present, input.CacheModeSet)
+			assert.Equal(t, test.present, input.Jobs[0].CacheModeSet)
+			emitted, err := Emit(input)
+			require.NoError(t, err)
+			assert.Equal(t, source, emitted)
+		})
+	}
+}
+
+func TestParseCacheModePresenceThroughAliases(t *testing.T) {
+	source := `cache-mode: &policy null
+jobs:
+  check: &job
+    runs-on: ubuntu-latest
+    cache-mode: *policy
+    steps: [{run: echo data}]
+  inherited:
+    <<: *job
+`
+	input, err := Parse([]byte(source))
+	require.NoError(t, err)
+	assert.True(t, input.CacheModeSet)
+	require.Len(t, input.Jobs, 2)
+	for _, job := range input.Jobs {
+		assert.True(t, job.CacheModeSet)
+		assert.Empty(t, job.CacheMode)
+	}
+}
+
 func TestCacheModeEmissionPreservesScalarBoundary(t *testing.T) {
 	for _, mode := range []string{
 		"read\n    permissions:\n      contents: write",

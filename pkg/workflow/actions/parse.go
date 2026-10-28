@@ -92,10 +92,30 @@ func Parse(content []byte) (*Workflow, error) {
 			return nil, fmt.Errorf("validating job %q: %w", job.ID, err)
 		}
 	}
+	if err := retainCacheModePresence(resolved, content); err != nil {
+		return nil, err
+	}
 	if err := retainWorkflowSource(resolved, content); err != nil {
 		return nil, err
 	}
 	return resolved, nil
+}
+
+func retainCacheModePresence(workflow *Workflow, content []byte) error {
+	// String decoding alone conflates absent, empty, and null policies.
+	var fields map[string]any
+	if err := yaml.Unmarshal(content, &fields); err != nil {
+		return fmt.Errorf("parsing cache-mode presence: %w", err)
+	}
+	_, workflow.CacheModeSet = fields["cache-mode"]
+	if jobs, ok := fields["jobs"].(map[string]any); ok {
+		for _, job := range workflow.Jobs {
+			if fields, ok := jobs[string(job.ID)].(map[string]any); ok {
+				_, job.CacheModeSet = fields["cache-mode"]
+			}
+		}
+	}
+	return nil
 }
 
 func parseJob(id JobID, source *jobYAML) (*Job, error) {

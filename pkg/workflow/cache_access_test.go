@@ -115,9 +115,77 @@ func TestCompiledCacheAccessDryRunAndGHES(t *testing.T) {
 
 func TestCacheMemoryAgentRemainsReadOnlyWithoutDependencyCaches(t *testing.T) {
 	for _, event := range []string{"push", "issue_comment", "issues", "discussion_comment"} {
-		compiled, _ := compileCacheAccessFixture(t, event, "true", false, false, false, false)
+		compiled, _ := compileCacheAccessFixture(t, event, "true", false, false, false, "")
 		agent := compiled["jobs"].(map[string]any)["agent"].(map[string]any)
 		assert.Equal(t, "read", agent["cache-mode"])
+	}
+}
+
+func TestCompiledCacheAccessEmptyDependencyArray(t *testing.T) {
+	for _, trigger := range []string{"push", "issue_comment", "{push: {}, issue_comment: {}}"} {
+		for _, detection := range []string{"true", "false", `"${{ vars.DETECT == 'true' }}"`} {
+			for _, ghes := range []bool{false, true} {
+				for _, dryRun := range []bool{false, true} {
+					t.Run(fmt.Sprintf("%s/detection=%s/ghes=%t/dry-run=%t", trigger, detection, ghes, dryRun), func(t *testing.T) {
+						compiled, content := compileCacheAccessFixture(t, trigger, detection, ghes, dryRun, false, "cache: []\n")
+						jobs := compiled["jobs"].(map[string]any)
+						agent := jobs["agent"].(map[string]any)
+						if !ghes && (dryRun || detection != "false") {
+							assert.Equal(t, "read", agent["cache-mode"])
+						} else {
+							assert.NotContains(t, agent, "cache-mode")
+						}
+						agentSteps := fmt.Sprint(agent["steps"])
+						assert.NotContains(t, agentSteps, "Cache (dependencies)")
+						if dryRun || detection != "false" {
+							assert.NotContains(t, agentSteps, "actions/cache@")
+							assert.NotContains(t, agentSteps, "actions/cache/save@")
+							assert.Contains(t, agentSteps, "actions/cache/restore@")
+						} else {
+							assert.Contains(t, agentSteps, "actions/cache@", "preserve same-job cache-memory writes without detection")
+						}
+						if dryRun || detection == "false" {
+							assert.NotContains(t, jobs, "update_cache_memory")
+						} else {
+							publisher := jobs["update_cache_memory"].(map[string]any)
+							assert.Contains(t, fmt.Sprint(publisher["steps"]), "actions/cache/save@")
+							assert.Contains(t, publisher["if"], "needs.detection.outputs.detection_success == 'true'")
+							if !ghes {
+								assert.Equal(t, "write-only", publisher["cache-mode"])
+							}
+						}
+						if ghes {
+							assert.NotContains(t, content, "cache-mode:")
+						} else if dryRun {
+							assert.Equal(t, "read", compiled["cache-mode"])
+						} else {
+							assert.NotContains(t, compiled, "cache-mode")
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestCompiledCacheAccessNonemptyDependencyArray(t *testing.T) {
+	compiled, _ := compileCacheAccessFixture(t, "{push: {}, issue_comment: {}}", "true", false, false, false,
+		"cache:\n  - key: dependencies\n    path: node_modules\n")
+	jobs := compiled["jobs"].(map[string]any)
+	agent := jobs["agent"].(map[string]any)
+	assert.NotContains(t, agent, "cache-mode", "nonempty dependency caches must retain post-action saves")
+	assertDependencyCacheTrustGates(t, agent)
+	assert.Equal(t, "write-only", jobs["update_cache_memory"].(map[string]any)["cache-mode"])
+}
+
+func TestBuildMainJobRejectsMalformedDependencyCache(t *testing.T) {
+	for _, cache := range []string{"cache: [", "other: []"} {
+		t.Run(cache, func(t *testing.T) {
+			compiler := NewCompiler()
+			job, err := compiler.buildMainJob(&WorkflowData{Cache: cache}, false)
+			require.ErrorContains(t, err, "failed to parse cache configuration:")
+			assert.Nil(t, job)
+		})
 	}
 }
 
@@ -221,7 +289,7 @@ func evaluateCacheTrustGate(t *testing.T, node ConditionNode, values map[string]
 	return evaluateDetectionRedactionGate(t, node, values)
 }
 
-func compileCacheAccessFixture(t *testing.T, trigger, detection string, ghes, dryRun, restoreOnly bool, dependencyCache ...bool) (map[string]any, string) {
+func compileCacheAccessFixture(t *testing.T, trigger, detection string, ghes, dryRun, restoreOnly bool, dependencyCache ...string) (map[string]any, string) {
 	t.Helper()
 	source := fmt.Sprintf(`---
 on: %s
@@ -247,8 +315,8 @@ jobs:
 ---
 Test cache access separation.
 `, trigger, restoreOnly, detection)
-	if len(dependencyCache) > 0 && !dependencyCache[0] {
-		source = strings.Replace(source, "cache:\n  key: dependencies\n  path: node_modules\n", "", 1)
+	if len(dependencyCache) > 0 {
+		source = strings.Replace(source, "cache:\n  key: dependencies\n  path: node_modules\n", dependencyCache[0], 1)
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache.md")

@@ -20,6 +20,14 @@ func isBuiltinJobName(jobName string) bool {
 // The bulk of the construction is delegated to focused helpers in compiler_main_job_helpers.go.
 func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (*Job, error) {
 	workflowLog.Printf("Building main job for workflow: %s", data.Name)
+	hasDependencyCaches := false
+	if data.Cache != "" {
+		caches, err := parseCacheStepConfigs(data.Cache)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse cache configuration: %w", err)
+		}
+		hasDependencyCaches = len(caches) > 0
+	}
 	var steps []string
 
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
@@ -64,7 +72,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	}
 
 	cacheMode := ""
-	if !data.GHES && (data.DryRun || (IsDetectionJobEnabled(data.SafeOutputs) && data.Cache == "")) {
+	if !data.GHES && (data.DryRun || (IsDetectionJobEnabled(data.SafeOutputs) && !hasDependencyCaches)) {
 		// Restore-only actions alone do not restrict the job's scoped cache token.
 		// Dependency caches use the runner's trigger-scoped default instead:
 		// trusted events can save, while low-trust events retain read-only access.

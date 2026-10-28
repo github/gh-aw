@@ -170,3 +170,35 @@ func TestCachePolicyUnrelatedTriggerIgnoresExecution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, diagnostics)
 }
+
+func TestCachePolicyLiteralValidation(t *testing.T) {
+	runner, err := Default().Select("cache-poisoning")
+	require.NoError(t, err)
+	for _, target := range []ASTTargets{ActionsAST, AWAST} {
+		for _, trigger := range []string{"", "push", "workflow_dispatch", "release", "workflow_call", "issue_comment"} {
+			for _, scope := range []string{"workflow", "job"} {
+				for _, mode := range []string{"read-only", `""`, "null", `" read"`, `"read "`, `"${{ 'read' }}"`} {
+					t.Run(target.String()+"/"+trigger+"/"+scope+"/"+mode, func(t *testing.T) {
+						source := ""
+						if trigger != "" {
+							source += "on: " + trigger + "\n"
+						}
+						path := "cache-mode"
+						if scope == "workflow" {
+							source += "cache-mode: " + mode + "\n"
+						}
+						source += contractJob + contractSafeSteps
+						if scope == "job" {
+							source += "    cache-mode: " + mode + "\n"
+							path = "jobs.check.cache-mode"
+						}
+						input := ruleContractInput(t, source, target, false)
+						_, err := runner.Run(context.Background(), input)
+						require.ErrorContains(t, err, path)
+						assert.ErrorContains(t, err, "requires read, write, write-only, or none")
+					})
+				}
+			}
+		}
+	}
+}
