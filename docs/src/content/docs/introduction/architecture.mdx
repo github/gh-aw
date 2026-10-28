@@ -178,9 +178,9 @@ flowchart LR
     LABEL --> API
 ```
 
-The illustration below shows the strict detection path. Default warn mode can publish annotated reviewable outputs even when detection finds a threat or cannot complete.
+The illustration below is a simplified view of permission isolation, not a complete detection-mode decision tree. Its "approved" and "blocked" branches illustrate strict mode only; they do not represent default warn mode, which can publish annotated reviewable outputs even when detection finds a threat or cannot complete.
 
-<Image src={safeOutputsIsolation} alt="Strict-mode permission-isolation diagram: the agent artifact passes through detection before scoped safe-output jobs call the GitHub API. Default warn-mode exceptions are described above." />
+<Image src={safeOutputsIsolation} alt="Simplified permission-isolation diagram: the agent artifact passes through detection before scoped safe-output jobs call the GitHub API. The approved and blocked branches illustrate strict mode only, not default warn-mode behavior." />
 
 <Aside type="tip">
 The SafeOutputs subsystem provides security by design: the agent never requires write permissions because all write operations are performed by separate, validated jobs with minimal scoped permissions.
