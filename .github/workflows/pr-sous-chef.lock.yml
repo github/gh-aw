@@ -4255,9 +4255,9 @@ jobs:
       issues: read
       pull-requests: read
     outputs:
-      eligible_count: ${{ steps.fetch-prs.outputs.eligible_count }}
-      eligible_pull_request_numbers: ${{ steps.fetch-prs.outputs.eligible_pull_request_numbers }}
-      rate_limit_low: ${{ steps.fetch-prs.outputs.rate_limit_low }}
+      eligible_count: "${{ steps.fetch-prs.outputs.eligible_count }}"
+      eligible_pull_request_numbers: "${{ steps.fetch-prs.outputs.eligible_pull_request_numbers }}"
+      rate_limit_low: "${{ steps.fetch-prs.outputs.rate_limit_low }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

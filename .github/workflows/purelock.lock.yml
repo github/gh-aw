@@ -2802,9 +2802,9 @@ jobs:
       contents: read
     timeout-minutes: 45
     outputs:
-      candidate_count: ${{ steps.scan.outputs.candidate_count }}
-      coverage_source: ${{ steps.coverage.outputs.coverage_source }}
-      has_candidates: ${{ steps.scan.outputs.has_candidates }}
+      candidate_count: "${{ steps.scan.outputs.candidate_count }}"
+      coverage_source: "${{ steps.coverage.outputs.coverage_source }}"
+      has_candidates: "${{ steps.scan.outputs.has_candidates }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

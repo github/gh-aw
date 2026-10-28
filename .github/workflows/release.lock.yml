@@ -1943,7 +1943,7 @@ jobs:
       needs.validate_container_pins.result == 'success'
     runs-on: ubuntu-latest
     outputs:
-      release_tag: ${{ steps.compute_config.outputs.release_tag }}
+      release_tag: "${{ steps.compute_config.outputs.release_tag }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
@@ -2920,7 +2920,7 @@ jobs:
       id-token: write
       packages: write
     outputs:
-      release_id: ${{ steps.get_release.outputs.release_id }}
+      release_id: "${{ steps.get_release.outputs.release_id }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
