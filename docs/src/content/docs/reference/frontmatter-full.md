@@ -793,9 +793,15 @@ on:
     # (optional)
     draft: true
 
-    # When true, allows workflow to run on pull requests from forked repositories with
-    # write permissions. Security consideration: use cautiously as fork PRs run with
-    # base repository permissions.
+    # Filter fork pull requests by repository pattern (string or list). Omission and
+    # an empty list both allow only same-repository PRs. Exact owner/repo entries or
+    # trusted owner/* patterns admit matching forks; '*' allows all forks. Strict mode
+    # warns on any '*' entry and recommends narrower admission, but compilation
+    # continues. Strict mode rejects expressions and unsupported pattern forms.
+    # Same-repository PRs remain allowed. Actor authorization and checkout
+    # restrictions remain mandatory in strict mode; acknowledge-risk neither bypasses
+    # them nor suppresses the fork warning. This does not change GitHub's
+    # base-repository permissions or secret availability for pull_request_target.
     # (optional)
     # Accepted formats:
 
@@ -807,7 +813,8 @@ on:
       # Array items: string
 
     # Acknowledge elevated permissions and secret access to suppress only the
-    # strict-mode pull_request_target trigger warning. Checkout validation remains
+    # strict-mode pull_request_target trigger warning. The unrestricted-forks warning,
+    # actor authorization, fork-pattern validation, and checkout validation remain
     # enforced.
     # (optional)
     acknowledge-risk: true

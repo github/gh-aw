@@ -252,5 +252,7 @@ func Default() *Runner {
 		ExcessivePermissionsRule(),
 		ObfuscationRule(),
 		BashCasePatternRule(),
+		PrivilegedCheckoutRule(),
+		ArtifactExecutionRule(),
 	}}
 }
