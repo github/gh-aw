@@ -39,10 +39,10 @@ byproducts are removed before upload, and removal failures block publication.
 │ Threat Detection│ (Analyzes for security issues)
 │ Job             │
 └────────┬────────┘
-         │ approved/blocked
+         │ configured output policy
          ▼
 ┌─────────────────┐
-│ Safe Output Jobs│ (Write permissions, only if safe)
+│ Safe Output Jobs│ (Scoped writes; warn/strict policy)
 │ Create Issues,  │
 │ PRs, Comments   │
 └─────────────────┘
@@ -462,30 +462,19 @@ safe-outputs:
 
 ## Error Handling
 
-**When Threats Are Detected:**
+**Threat Findings and Detector Failures:**
 
-The threat detection job fails with a clear error message and safe output jobs are skipped:
-
-```text
-❌ Threat detected: Potential SQL injection in code changes
-Reasons:
-- Unsanitized user input in database query
-- Missing parameterized query pattern
-```
-
-**When Detection Fails:**
-
-If the detection process itself fails (for example a provider outage, a retired model, or unparseable results), detection concludes with reason `agent_failure` or `parse_error` and no security verdict. What happens next depends on `continue-on-error`:
+A detected threat has reason `threat_detected`. A detector execution failure (for example a provider outage or retired model) has reason `agent_failure`; an invalid result has reason `parse_error`. The latter two mean the security assessment is incomplete, not that a threat was found or that the output is clean. For all three outcomes, enforcement depends on `safe-outputs.threat-detection.continue-on-error`:
 
 - **Warn mode** (`continue-on-error: true`, the default): the run continues and detection concludes `warning`. Safe outputs get the warn-mode policy from the [safe outputs specification](/gh-aw/specs/safe-outputs-specification/) instead of being applied as if detection passed:
-  - Reviewable outputs (such as `create-issue`, `add-comment`, `create-pull-request`) are applied with a `[!WARNING]` block, the `threat detection engine error` label string, and the `<!-- gh-aw-threat-engine-error -->` marker.
+  - Reviewable outputs (such as `create-issue`, `add-comment`, `create-pull-request`) carry a `[!CAUTION]` block, `agentic threat detected` label string, and `<!-- gh-aw-threat-detected -->` marker for an actual threat; detector failures use a `[!WARNING]` block, `threat detection engine error` label string, and `<!-- gh-aw-threat-engine-error -->` marker.
   - `push-to-pull-request-branch` falls back to a review pull request with the same warning.
   - Non-reviewable outputs (such as `merge-pull-request`, `close-issue`, `assign-to-agent`) are not applied and are reported as failures in the step summary.
 - **Strict mode** (`continue-on-error: false`): the detection job fails and safe outputs are not applied.
 
 **When Detection Returns a Warning:**
 
-A warning is a lower-severity signal than a hard threat: the safe output is allowed to proceed, but human review is required before merge. When `create-pull-request` is the safe output, the handler submits a `REQUEST_CHANGES` pull request review whose body includes the detection reason and a link to the workflow run logs. If a `request_review` protected-files gate also fires in the same run, both signals are composed into a single review body separated by a horizontal rule.
+A warning conclusion describes enforcement mode, not the severity or absence of a threat. Reviewable outputs can proceed, but require human review before follow-up automation. When `create-pull-request` is the safe output, the handler submits a `REQUEST_CHANGES` pull request review whose body includes the detection reason and a link to the workflow run logs. If a `request_review` protected-files gate also fires in the same run, both signals are composed into a single review body separated by a horizontal rule. Configure repository merge protections to enforce the intended review requirement; a warning marker or label alone is not a platform approval gate.
 
 **Opting Out of Tracking Issues:**
 

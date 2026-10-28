@@ -47,6 +47,17 @@ AWs also rely on three trusted infrastructure components: (1) a network firewall
 
 AW trusts declarative configuration artifacts, e.g., Action steps, network-firewall policies, MCP server configurations, and the toolchains that interpret them to correctly instantiate system structure and connectivity. The configuration level constrains which components are loaded, how components are connected, which communication channels are permitted, and what component privileges are assigned. Externally minted authentication tokens, e.g., agent API keys and GitHub access tokens, are a critical configuration input and are treated as imported capabilities that bound components' external effects; declarative configuration controls their distribution, e.g., which tokens are loaded into which containers. Security violations arise due to misconfigurations, overly permissive specifications, and limitations of the declarative model. This layer defines what components exist and how they communicate, but it does not constrain how components use those channels over time.
 
+Authored pre-activation, setup/post-steps, custom jobs, detection steps, and safe-output steps/actions are trusted executable code, not automatically confined to the agent sandbox. Their effective job permissions, secrets, host mounts, and network access determine their authority. A read-only `GITHUB_TOKEN` does not remove other credentials or privileged host access. Domain allowlisting constrains destinations, not the safety of every request to an allowed service.
+
+Review these boundaries before deployment:
+
+| Surface | Author/operator responsibility |
+| --- | --- |
+| Custom executable steps | Keep untrusted event fields and downloaded content as data, not shell/JavaScript source. Avoid `eval` and similar re-interpretation; environment indirection alone does not make later execution safe. |
+| Action and runtime pins | Retain full commit SHA/digest pinning, update to reviewed patched releases, then recompile and review deployed locks. An immutable historical pin does not acquire later fixes. |
+| Policy opt-outs | Review `strict: false`, skipped/suppressed lint, broader roles/bot admission, disabled sandbox/firewall/detection, and custom mounts or credentials as changes to the trust model. Acknowledging a warning is not enforcement. |
+| Host and upstream state | Apply the [self-hosted host isolation checklist](../../reference/self-hosted-runners/#host-isolation-checklist) and [cross-run artifact rules](../../reference/artifacts/#cross-run-artifact-trust). Compilation does not prove host cleanliness, cache provenance, or producer-code trust. |
+
 ---
 
 ### Layer 3: Plan-Level Trust
@@ -158,8 +169,8 @@ flowchart LR
     end
 
     OUTPUT -->|"Download Artifact"| ANALYZE
-    ANALYZE -->|"✅ Approved"| SafeJobs
-    ANALYZE -->|"❌ Blocked"| BLOCKED["Workflow Fails"]
+    ANALYZE -->|"Pass or warn-mode review policy"| SafeJobs
+    ANALYZE -->|"Strict-mode failure"| BLOCKED["Workflow Fails"]
 
     ISSUE --> API
     COMMENT --> API
@@ -167,7 +178,9 @@ flowchart LR
     LABEL --> API
 ```
 
-<Image src={safeOutputsIsolation} alt="Diagram showing the agent job writing an agent_output.json artifact, which a threat detection job analyzes for secret leaks and malicious patches; only when approved do scoped safe-output jobs such as create_issue, add_comment, and create_pull_request call the GitHub API, while the agent itself never holds write permissions" />
+The illustration below shows the strict detection path. Default warn mode can publish annotated reviewable outputs even when detection finds a threat or cannot complete.
+
+<Image src={safeOutputsIsolation} alt="Strict-mode permission-isolation diagram: the agent artifact passes through detection before scoped safe-output jobs call the GitHub API. Default warn-mode exceptions are described above." />
 
 <Aside type="tip">
 The SafeOutputs subsystem provides security by design: the agent never requires write permissions because all write operations are performed by separate, validated jobs with minimal scoped permissions.
@@ -347,9 +360,9 @@ flowchart TB
 
 ## Threat Detection Pipeline
 
-The threat detection job is a sub-stage within the SafeOutputs subsystem. After the agent job completes and its outputs are buffered as artifacts, a separate detection job downloads these artifacts and invokes a prompted AI agent to analyze them for suspicious content. This detection agent operates with a security-focused system prompt and examines the agent's outputs, patches, and execution context. The detection job runs in isolation from the original agent and has no access to write permissions; its sole responsibility is to emit a pass/fail verdict that gates the subsequent safe output jobs.
+The threat detection job is a sub-stage within the SafeOutputs subsystem. After the agent job completes and its outputs are buffered as artifacts, a separate detection job downloads these artifacts and invokes a prompted AI agent to analyze them for suspicious content. This detection agent operates with a security-focused system prompt and examines the agent's outputs, patches, and execution context. Its result informs the configured safe-output policy; detection is defense in depth, not proof that arbitrary code or artifacts are safe.
 
-Detection checks include identification of secret leakage, malicious code patterns, and policy violations. If the detection agent identifies threats, the workflow terminates before any writes are externalized. Workflow authors can customize detection behavior by providing additional detection prompts or integrating external security scanners.
+Detection checks include identification of secret leakage, malicious code patterns, and policy violations. By default, `safe-outputs.threat-detection.continue-on-error: true` applies a warn-mode policy for detected threats and detector failures: reviewable outputs are annotated, branch pushes become review pull requests, and non-reviewable operations are aborted. Set `continue-on-error: false` to fail the detection job and prevent safe outputs on these outcomes. A detector failure or invalid result means no security verdict, not a clean result. See [Threat Detection](../../reference/threat-detection/#error-handling) for the exact behavior.
 
 ```mermaid
 flowchart TB
@@ -379,7 +392,8 @@ flowchart TB
 
     subgraph Outcome["Outcome"]
         PROCEED["✅ Safe output jobs proceed"]
-        BLOCK["❌ Workflow fails<br/>No writes externalized"]
+        REVIEW["Warn mode<br/>Annotate / convert / abort by output type"]
+        BLOCK["Strict mode<br/>Safe outputs blocked"]
     end
 
     JSON --> DOWNLOAD
@@ -392,7 +406,8 @@ flowchart TB
     CUSTOM --> SAFE_CHECK
 
     SAFE_CHECK -->|"No"| PROCEED
-    SAFE_CHECK -->|"Yes"| BLOCK
+    SAFE_CHECK -->|"Threat or detector failure: warn mode"| REVIEW
+    SAFE_CHECK -->|"Threat or detector failure: strict mode"| BLOCK
 ```
 
 **Detection Job Properties:**
@@ -400,7 +415,7 @@ flowchart TB
 - **Isolated Execution**: The detection agent runs in a separate job with no write permissions and no access to the original agent's runtime state
 - **Prompted Analysis**: Detection uses the same AI engine as the workflow, but with a security-focused system prompt that instructs the agent to identify threats
 - **Artifact-Based**: The detection agent only sees the buffered artifacts (outputs, patches, context), not live repository state
-- **Blocking Verdict**: The detection job must complete successfully and emit a "safe" verdict before any safe output jobs execute
+- **Configured Enforcement**: Strict mode blocks safe outputs on threats or detector failures; default warn mode applies per-output review/conversion/abort rules
 
 **Detection Mechanisms:**
 
