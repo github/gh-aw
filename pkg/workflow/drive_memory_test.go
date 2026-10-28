@@ -469,20 +469,24 @@ func TestDriveMemoryThreatDetectionJob(t *testing.T) {
 	assert.Equal(t, "runs-on: ubuntu-latest", job.RunsOn)
 	assert.Contains(t, job.Permissions, "drives: write")
 	assert.Contains(t, strings.Join(job.Steps, "\n"), "actions/gh-drives-preview/commit@")
+	assert.Equal(t, driveMemoryAcceptedCondition, job.If)
 
 	node, err := ParseExpression(job.If)
 	require.NoError(t, err)
 	for _, agentResult := range []string{"success", "failure", "cancelled", "skipped", ""} {
 		for _, detectionResult := range []string{"success", "failure", "cancelled", "skipped", ""} {
 			for _, accepted := range []string{"true", "false", ""} {
-				values := map[string]string{
-					"needs.agent.result":                        agentResult,
-					"needs.detection.result":                    detectionResult,
-					"needs.detection.outputs.detection_success": accepted,
+				for _, event := range append(append([]string{}, validGitHubEventTypes...), "", "future_event") {
+					values := map[string]string{
+						"github.event_name":                         event,
+						"needs.agent.result":                        agentResult,
+						"needs.detection.result":                    detectionResult,
+						"needs.detection.outputs.detection_success": accepted,
+					}
+					want := agentResult == "success" && detectionResult == "success" && accepted == "true"
+					assert.Equal(t, want, evaluateDetectionRedactionGate(t, node, values),
+						"event=%q agent=%q detection=%q detection_success=%q", event, agentResult, detectionResult, accepted)
 				}
-				want := agentResult == "success" && detectionResult == "success" && accepted == "true"
-				assert.Equal(t, want, evaluateDetectionRedactionGate(t, node, values),
-					"agent=%q detection=%q detection_success=%q", agentResult, detectionResult, accepted)
 			}
 		}
 	}

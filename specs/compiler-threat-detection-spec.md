@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.78
+**Version**: 1.0.79
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.79` | Unreleased | Distinguishes drive-memory persistence from Actions cache event/token policy. Documents admitted issue/slash-command writes, repository/ref/drive scope, cross-event residual trust, explicit acceptance, and dry-run/restore-only/no-detection boundaries. Adds generated-YAML and event/result evidence; no runtime or lock-file compatibility change. |
 | `1.0.78` | Unreleased | Documents the implemented cache-memory restore/edit/artifact/publication lifecycle, integrity namespaces and restore scope, and distinct meanings of read-only policies. Maps lifecycle and mode-validation evidence and separates CTR-019 from the host-side MCP read-only and safe-output lifecycle models. Documentation/evidence clarification only; no new runtime behavior, threat identifier, or lock-file compatibility change. |
 | `1.0.77` | Unreleased | Requires parsed, nonempty dependency-cache entries before omitting the detection-enabled agent's read-only cache policy; `cache: []` retains the restriction. Requires trigger-independent validation of authored cache-mode literals before actionlint compatibility suppression. No new threat identifier, frontmatter setting, or lock-file schema change. |
 | `1.0.76` | Unreleased | Replaces the incomplete cache-write event denylist with GitHub's documented write allowlist plus merge-ref-isolated `pull_request`. Publisher and dependency-save guards deny all other and unknown events, including issues/discussions; known-event lint diagnostics share the classification. Generated locks require regeneration; no new threat identifier or frontmatter setting. |
@@ -230,6 +231,14 @@ Without detection, existing same-job cache-memory behavior MUST remain unchanged
 Authored workflow- and job-level `cache-mode` values MUST be validated independently of trigger classification before unsupported-key actionlint diagnostics are suppressed. Only literal `read`, `write`, `write-only`, and `none` policies are supported; explicit empty or null values MUST NOT be treated as an absent policy. Unsupported scalars MUST NOT pass lint solely because the event is write-eligible or no cache action exists.
 
 These controls do not authenticate unsigned cache contents or uploaded artifacts, prove arbitrary shell/third-party cache writers safe, or cover persistent runner caches. Conformance evidence MUST cover generated YAML for low-trust, trusted, mixed, dispatch, dry-run, GHES, no-detection, empty dependency-cache lists, and legitimate publisher cases, plus detector-result and acceptance-output combinations and trigger-independent invalid-mode diagnostics.
+
+#### Drive-memory persistence is a separate boundary
+
+The detection-separated drive-memory publisher MUST require successful agent and detection jobs and explicit detection acceptance, including rejection in warning mode. It MUST preserve supported admitted issue and slash-command writes rather than apply the Actions cache event allowlist. The pinned GitHub Drives preview action requests repository/ref/drive-name storage; drive persistence MUST NOT be described as Actions cache storage or as constrained by `cache-mode`.
+
+Runs sharing the requested repository, `GITHUB_REF`, and drive name can exchange persistent content across event types. Detection acceptance, local Git bookkeeping, concurrency checks, and configured validation MUST NOT be described as producer authentication or proof that later interpretation is safe. Detector false negatives and its no-output short-circuit remain residual risks. The compiler does not establish server-side namespace enforcement by the preview service. Deployments requiring stronger producer isolation MUST NOT rely on detection acceptance alone.
+
+Dry-run and restore-only drive entries MUST omit compiler-managed publication. Without detection, writable drives retain their existing same-job publication without a detection gate. Conformance evidence in `drive_memory_test.go` and `drive_memory_event_policy_test.go` MUST cover exact acceptance guards, event/result combinations, mixed and reusable triggers, admitted slash commands, expression-controlled detection, GHES, dry-run, restore-only, and no-detection behavior.
 
 #### Cache lifecycle and poisoning boundaries
 
