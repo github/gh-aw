@@ -42,8 +42,8 @@ func builtInRuleContracts() map[string]ruleContract {
 		},
 		"artifact-execution": {
 			targets: ActionsAST | AWAST, severity: Warning,
-			unsafe: "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: bash incoming/run.sh\n",
-			safe:   "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: jq . incoming/data.json\n",
+			unsafe: "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {github-token: '${{ github.token }}', run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: bash incoming/run.sh\n",
+			safe:   "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n        with: {github-token: '${{ github.token }}', run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n      - run: jq . incoming/data.json\n",
 			path:   "jobs.check.steps[1].run",
 		},
 		"bash-case-pattern": {

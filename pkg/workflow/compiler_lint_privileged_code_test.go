@@ -23,7 +23,7 @@ func TestCompilerLintPrivilegedCodeDiagnostics(t *testing.T) {
 		{
 			name: "cross-run execution",
 			source: "on: {workflow_run: {workflows: [CI], branches: [main]}}\n" + job +
-				"      - uses: actions/download-artifact@" + pin + "\n        with: {run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n" +
+				"      - uses: actions/download-artifact@" + pin + "\n        with: {github-token: '${{ github.token }}', run-id: '${{ github.event.workflow_run.id }}', path: incoming}\n" +
 				"      - run: bash incoming/run.sh\n",
 			safe: "bash incoming/run.sh",
 		},

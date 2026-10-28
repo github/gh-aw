@@ -109,6 +109,8 @@ func privilegedSourceText(ctx context.Context, text, path string) (bool, error) 
 			return strings.HasPrefix(ref, "github.event.pull_request.head.") ||
 				strings.HasPrefix(ref, "github.event.client_payload.") ||
 				ref == "github.head_ref" || ref == "github.event.workflow_run.head_sha" ||
+				ref == "github.event.workflow_run.head_commit.id" ||
+				ref == "github.event.pull_request.merge_commit_sha" ||
 				ref == "github.event.workflow_run.head_branch" ||
 				strings.HasPrefix(ref, "github.event.workflow_run.head_repository.")
 		},
@@ -131,13 +133,31 @@ func privilegedCheckoutCommand(ctx context.Context, call *syntax.CallExpr, scrip
 	if name == "git" {
 		switch operation {
 		case "fetch", "checkout", "switch", "clone":
-			for _, word := range call.Args[2:] {
+			operands := call.Args[2:]
+			if operation == "clone" {
+				// Only plain clones are supported; later operands are destinations,
+				// and options can consume operands of their own.
+				if len(operands) > 2 {
+					return nil, nil
+				}
+				for _, word := range operands {
+					if strings.HasPrefix(policyShellLiteral(word), "-") {
+						return nil, nil
+					}
+				}
+				operands = operands[:1]
+			}
+			for _, word := range operands {
 				text := script[word.Pos().Offset():word.End().Offset()]
 				tainted, err := privilegedSourceText(ctx, text, path)
 				if err != nil {
 					return nil, err
 				}
-				selected = selected || tainted || strings.HasPrefix(policyShellLiteral(word), "refs/pull/")
+				literal := policyShellLiteral(word)
+				if operation == "fetch" {
+					literal = strings.TrimPrefix(literal, "+")
+				}
+				selected = selected || tainted || strings.HasPrefix(literal, "refs/pull/")
 			}
 		}
 	}
@@ -155,15 +175,20 @@ func policyShellCalls(ctx context.Context, input Input, block aw.ExecutionBlock,
 	if !ok {
 		return nil, nil
 	}
-	shell, known := effectiveRunShell(input, block, step)
-	if !known || (shell != "" && shell != "bash" && shell != "sh" &&
+	shell, known := policyRunShell(input, block, step)
+	if !known || (shell != "bash" && shell != "sh" &&
 		!strings.HasPrefix(shell, "bash ") && !strings.HasPrefix(shell, "sh ")) {
 		return nil, nil
 	}
 	path := step.Path + ".run"
 	rendered := []byte(script)
 	err := taint.VisitInterpolations(ctx, script, path, func(start, end, _ int, _ actionlint.ExprNode) error {
-		maskBashRange(rendered[start:end], 'x')
+		// Newlines inside an expression must not split an unquoted operand.
+		// Keep byte offsets stable and recover diagnostic lines from the source.
+		masked := rendered[start:end]
+		for i := range masked {
+			masked[i] = 'x'
+		}
 		return ctx.Err()
 	})
 	if err != nil {
@@ -181,12 +206,84 @@ func policyShellCalls(ctx context.Context, input Input, block aw.ExecutionBlock,
 		}
 		if call, ok := node.(*syntax.CallExpr); ok {
 			found, err := visit(call, script)
+			for i := range found {
+				if found[i].Line > 0 {
+					found[i].Line = strings.Count(script[:call.Pos().Offset()], "\n") + 1
+				}
+			}
 			diagnostics = append(diagnostics, found...)
 			failures = append(failures, err)
 		}
 		return true
 	})
 	return diagnostics, errors.Join(append(failures, ctx.Err())...)
+}
+
+func policyRunShell(input Input, block aw.ExecutionBlock, step aw.ExecutionStep) (string, bool) {
+	if shell, known := effectiveRunShell(input, block, step); !known || shell != "" {
+		return shell, known
+	}
+	var runner, container any
+	if input.Workflow != nil {
+		for _, job := range input.Workflow.Jobs {
+			if block.Path == "jobs."+string(job.ID) {
+				runner, container = job.RunsOn, job.Container
+				break
+			}
+		}
+	} else {
+		runner, container = block.Fields["runs-on"], block.Fields["container"]
+		if runner == nil && block.Path == "safe-outputs" {
+			runner = input.Document.Frontmatter["runs-on-slim"]
+		}
+		if runner == nil && (block.Path == "" || block.Path == "safe-outputs") {
+			runner = "ubuntu-latest"
+		}
+	}
+	if container != nil {
+		return "sh", true
+	}
+	return policyRunnerShell(runner)
+}
+
+func policyRunnerShell(runner any) (string, bool) {
+	switch runner := runner.(type) {
+	case string:
+		label := strings.ToLower(runner)
+		if strings.Contains(label, "${{") {
+			return "", false
+		}
+		switch {
+		case strings.EqualFold(runner, "windows") || strings.HasPrefix(label, "windows-"):
+			return "pwsh", true
+		case strings.EqualFold(runner, "linux"), strings.EqualFold(runner, "macos"), strings.HasPrefix(label, "ubuntu-"), strings.HasPrefix(label, "macos-"):
+			return "bash", true
+		}
+	case []string:
+		labels := make([]any, 0, len(runner))
+		for _, label := range runner {
+			labels = append(labels, label)
+		}
+		return policyRunnerShell(labels)
+	case []any:
+		shell := ""
+		for _, label := range runner {
+			text, ok := label.(string)
+			if !ok || strings.Contains(text, "${{") {
+				return "", false
+			}
+			if candidate, known := policyRunnerShell(text); known {
+				if shell != "" && shell != candidate {
+					return "", false
+				}
+				shell = candidate
+			}
+		}
+		return shell, shell != ""
+	case map[string]any:
+		return policyRunnerShell(runner["labels"])
+	}
+	return "", false
 }
 
 func policyShellLiteral(word *syntax.Word) string {

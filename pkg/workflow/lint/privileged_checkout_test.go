@@ -29,6 +29,8 @@ func TestPrivilegedCheckoutInputs(t *testing.T) {
 		{"head ref", "ref: '${{ github.head_ref }}'", "ref"},
 		{"fork repository", "repository: '${{ github.event.pull_request.head.repo.full_name }}'", "repository"},
 		{"upstream head", "ref: '${{ github.event.workflow_run.head_sha }}'", "ref"},
+		{"upstream head commit", "ref: '${{ github.event.workflow_run.head_commit.id }}'", "ref"},
+		{"pull request merge commit", "ref: '${{ github.event.pull_request.merge_commit_sha }}'", "ref"},
 		{"dispatch ref", "ref: '${{ github.event.client_payload.PRIVATE_VALUE }}'", "ref"},
 		{"literal pull ref", "ref: refs/pull/42/head", "ref"},
 		{"base sha", "ref: '${{ github.event.pull_request.base.sha }}'", ""},
@@ -65,8 +67,17 @@ func TestPrivilegedCheckoutCommands(t *testing.T) {
 		{`echo 'gh pr checkout 42'`, 0},
 		{"# gh pr checkout 42\ngit status", 0},
 		{`git fetch origin refs/pull/42/head`, 1},
+		{`git fetch origin +refs/pull/42/head:refs/remotes/origin/pr`, 1},
+		{`git fetch origin '+refs/pull/42/head:refs/remotes/origin/pr'`, 1},
+		{`git fetch origin +refs/heads/main:refs/remotes/origin/main`, 0},
 		{`git checkout '${{ github.event.pull_request.head.sha }}'`, 1},
 		{`git clone 'https://github.com/${{ github.event.client_payload.PRIVATE_VALUE }}'`, 1},
+		{`git clone https://github.com/trusted/tools '${{ github.event.pull_request.head.sha }}'`, 0},
+		{`git clone https://github.com/trusted/tools refs/pull/42/head`, 0},
+		{`git clone '${{ github.event.pull_request.head.repo.clone_url }}' destination`, 1},
+		{`git clone --branch '${{ github.event.pull_request.head.ref }}' https://github.com/trusted/tools`, 0},
+		{`git clone --depth 1 '${{ github.event.pull_request.head.repo.clone_url }}'`, 0},
+		{`git clone '${{ github.event.pull_request.head.repo.clone_url }}' --bare`, 0},
 		{`git checkout '${{ github.event.pull_request.base.sha }}'`, 0},
 		{`git show '${{ github.event.pull_request.head.sha }}'`, 0},
 		{`git fetch origin main`, 0},
@@ -121,13 +132,15 @@ func TestPrivilegedCodeTraversalAndFailures(t *testing.T) {
 		cancel()
 		_, err = runner.Run(ctx, Input{Document: &aw.Document{}})
 		require.ErrorIs(t, err, context.Canceled)
-		document, err := aw.Parse("---\non: workflow_run\nsteps:\n  - uses: actions/checkout@v7\n    with: [PRIVATE_VALUE]\n---\n")
-		require.NoError(t, err)
-		if rule.ID == "privileged-checkout" {
-			_, err = runner.Run(context.Background(), Input{Document: document})
-			require.Error(t, err)
-			assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
+		action := "actions/checkout@v7"
+		if rule.ID == "artifact-execution" {
+			action = "actions/download-artifact@v4"
 		}
+		document, err := aw.Parse("---\non: workflow_run\nsteps:\n  - uses: " + action + "\n    with: [PRIVATE_VALUE]\n---\n")
+		require.NoError(t, err)
+		_, err = runner.Run(context.Background(), Input{Document: document})
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
 	}
 	for _, scope := range []string{"steps", "post-steps", "safe-outputs.steps", "safe-outputs.post-steps", "safe-jobs.publish.steps", "safe-outputs.jobs.publish.steps"} {
 		var fields string

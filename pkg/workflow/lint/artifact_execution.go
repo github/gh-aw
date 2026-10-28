@@ -1,13 +1,17 @@
 package lint
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/checkoutpolicy"
+	"github.com/github/gh-aw/pkg/workflow/taint"
+	"github.com/rhysd/actionlint"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -22,6 +26,8 @@ type artifactDownload struct {
 	directory string
 	path      string
 }
+
+const artifactWorkspaceRoot = "/__gh_aw__/workspace"
 
 func checkArtifactExecution(ctx context.Context, input Input) ([]Diagnostic, error) {
 	if err := integrityInput(ctx, input); err != nil {
@@ -43,7 +49,7 @@ func checkArtifactExecution(ctx context.Context, input Input) ([]Diagnostic, err
 			failures = append(failures, err)
 			if found {
 				downloads = append(downloads, download)
-				if download.directory == "." || download.directory == "" {
+				if artifactContains(download.directory, artifactWorkspaceRoot) || download.directory == "" {
 					message := "Cross-run artifact extraction may overwrite workspace code or configuration; extract into a dedicated literal directory and consume validated data rather than executable content"
 					if download.directory == "" {
 						message = "Cross-run artifact extraction path is dynamic or unsupported; use a dedicated literal directory and review downstream execution separately"
@@ -80,6 +86,10 @@ func crossRunArtifact(ctx context.Context, step aw.ExecutionStep) (artifactDownl
 	}
 	run, explicit := with[runKey]
 	if name == "actions/download-artifact" {
+		token, supplied := with["github-token"]
+		if !supplied || artifactEmptyToken(token) {
+			return artifactDownload{}, false, nil
+		}
 		if !explicit || run == nil || run == "" {
 			return artifactDownload{}, false, nil
 		}
@@ -87,7 +97,7 @@ func crossRunArtifact(ctx context.Context, step aw.ExecutionStep) (artifactDownl
 	if text, ok := run.(string); ok && checkoutpolicy.MatchesExpression(text, "github.run_id") {
 		return artifactDownload{}, false, nil
 	}
-	directory := "."
+	directory := artifactWorkspaceRoot
 	if raw, explicit := with["path"]; explicit {
 		if text, ok := raw.(string); ok {
 			directory = artifactLiteralPath(text)
@@ -98,21 +108,48 @@ func crossRunArtifact(ctx context.Context, step aw.ExecutionStep) (artifactDownl
 	return artifactDownload{directory: directory, path: step.Path + ".with.path"}, true, nil
 }
 
+func artifactEmptyToken(value any) bool {
+	if value == nil {
+		return true
+	}
+	text, ok := value.(string)
+	if !ok {
+		return false
+	}
+	if strings.TrimSpace(text) == "" {
+		return true
+	}
+	expression, ok := actionslanguageservice.WrappedExpression(text)
+	if !ok {
+		return false
+	}
+	for expression.Kind == "group" {
+		expression = expression.Child(0)
+	}
+	if expression.Kind != "literal" {
+		return false
+	}
+	if text, ok := expression.Token.Value.(string); expression.Token.Kind == "string" && ok {
+		return strings.TrimSpace(text) == ""
+	}
+	return expression.Token.Kind == "null"
+}
+
 func artifactLiteralPath(text string) string {
 	text = strings.TrimSpace(text)
-	if checkoutpolicy.MatchesExpression(text, "github.workspace") {
-		return "."
+	if strings.HasPrefix(text, "${{") {
+		if end := strings.Index(text, "}}"); end >= 0 &&
+			checkoutpolicy.MatchesExpression(text[:end+2], "github.workspace") {
+			suffix := text[end+2:]
+			if suffix == "" || strings.HasPrefix(suffix, "/") {
+				text = artifactWorkspaceRoot + suffix
+			}
+		}
 	}
-	for _, prefix := range []string{"${{ github.workspace }}/", "$GITHUB_WORKSPACE/", "${GITHUB_WORKSPACE}/"} {
-		text = strings.TrimPrefix(text, prefix)
-	}
-	if text == "$GITHUB_WORKSPACE" || text == "${GITHUB_WORKSPACE}" {
-		return "."
-	}
-	if text == "" || strings.ContainsAny(text, "$`\\") {
+	if strings.Contains(text, "${{") || strings.HasPrefix(text, "~") {
 		return ""
 	}
-	return path.Clean(text)
+	return artifactResolvePath(artifactWorkspaceRoot, text)
 }
 
 func artifactStepExecution(ctx context.Context, input Input, block aw.ExecutionBlock, step aw.ExecutionStep, downloads []artifactDownload) ([]Diagnostic, error) {
@@ -137,20 +174,26 @@ func artifactStepExecution(ctx context.Context, input Input, block aw.ExecutionB
 		return diagnostic(related(artifactLiteralPath(uses)), step.Path+".uses", 0), nil
 	}
 	directory := artifactWorkingDirectory(input, block, step)
-	return policyShellCalls(ctx, input, block, step, func(call *syntax.CallExpr, _ string) ([]Diagnostic, error) {
+	return policyShellCalls(ctx, input, block, step, func(call *syntax.CallExpr, script string) ([]Diagnostic, error) {
 		var locations []RelatedLocation
-		for _, file := range artifactCommandFiles(call, directory) {
+		for _, file := range artifactCommandFiles(call, directory, script) {
 			locations = append(locations, related(file)...)
 		}
 		return diagnostic(locations, step.Path+".run", int(call.Pos().Line())), nil
 	})
 }
 
-func artifactCommandFiles(call *syntax.CallExpr, directory string) []string {
+func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []string {
 	if len(call.Args) == 0 || directory == "" {
 		return nil
 	}
-	command, operand := policyShellArgument(call, 0), policyShellArgument(call, 1)
+	argument := func(index int) string {
+		if index >= 0 && index < len(call.Args) {
+			return artifactShellWord(call.Args[index], script)
+		}
+		return ""
+	}
+	command, operand := argument(0), argument(1)
 	switch command {
 	case "bash", "sh", "python", "python3", "node", "source", ".":
 		if len(call.Args) > 1 {
@@ -162,7 +205,11 @@ func artifactCommandFiles(call *syntax.CallExpr, directory string) []string {
 	case "npm":
 		if len(call.Args) > 1 {
 			switch operand {
-			case "ci", "install", "i", "run", "run-script", "test", "start", "exec", "rebuild":
+			case "run", "run-script":
+				if script := argument(2); script != "" && !strings.HasPrefix(script, "-") {
+					return []string{directory}
+				}
+			case "ci", "install", "i", "test", "start", "exec", "rebuild":
 				return []string{directory}
 			}
 		}
@@ -213,23 +260,119 @@ func artifactWorkingDirectory(input Input, block aw.ExecutionBlock, step aw.Exec
 			return ""
 		}
 	}
-	return "."
+	return artifactWorkspaceRoot
 }
 
 func artifactResolvePath(directory, file string) string {
-	file = artifactLiteralPath(file)
-	if file == "" || path.IsAbs(file) {
-		return file
+	if path.IsAbs(file) {
+		return path.Clean(file)
 	}
 	return path.Join(directory, file)
 }
 
 func artifactContains(directory, file string) bool {
-	if directory == "" || file == "" || path.IsAbs(directory) != path.IsAbs(file) {
+	if directory == "" || file == "" {
 		return false
 	}
-	if directory == "." {
-		return file != ".." && !strings.HasPrefix(file, "../")
+	return file == directory || strings.HasPrefix(file, strings.TrimSuffix(directory, "/")+"/")
+}
+
+// Reparse original operands so interpolation masks never become literal paths.
+func artifactShellWord(word *syntax.Word, script string) string {
+	start, end := int(word.Pos().Offset()), int(word.End().Offset())
+	if start < 0 || end > len(script) || start >= end {
+		return ""
 	}
-	return file == directory || strings.HasPrefix(file, directory+"/")
+	raw := script[start:end]
+	var rendered strings.Builder
+	last := 0
+	unknown := false
+	err := taint.VisitInterpolations(context.Background(), raw, "", func(start, end, _ int, _ actionlint.ExprNode) error {
+		rendered.WriteString(raw[last:start])
+		if checkoutpolicy.MatchesExpression(raw[start:end], "github.workspace") {
+			rendered.WriteString(artifactWorkspaceRoot)
+		} else {
+			unknown = true
+		}
+		last = end
+		return nil
+	})
+	if err != nil || unknown {
+		return ""
+	}
+	rendered.WriteString(raw[last:])
+	tree, err := syntax.NewParser().Parse(bytes.NewBufferString(": "+rendered.String()), "")
+	if err != nil || len(tree.Stmts) > 1 {
+		return ""
+	}
+	if len(tree.Stmts) > 0 {
+		call, ok := tree.Stmts[0].Cmd.(*syntax.CallExpr)
+		if !ok || len(call.Args) > 2 {
+			return ""
+		}
+		operand := 1
+		if operand >= 0 && operand < len(call.Args) {
+			var result strings.Builder
+			if artifactShellParts(&result, call.Args[operand].Parts, false) {
+				return result.String()
+			}
+		}
+	}
+	return ""
+}
+
+func artifactShellParts(result *strings.Builder, values []syntax.WordPart, quoted bool) bool {
+	for _, value := range values {
+		switch value := value.(type) {
+		case *syntax.Lit:
+			if !artifactShellLiteral(result, value.Value, quoted) {
+				return false
+			}
+		case *syntax.SglQuoted:
+			if value.Dollar {
+				return false
+			}
+			result.WriteString(value.Value)
+		case *syntax.DblQuoted:
+			if !artifactShellParts(result, value.Parts, true) {
+				return false
+			}
+		case *syntax.ParamExp:
+			if value.Param == nil || value.Param.Value != "GITHUB_WORKSPACE" ||
+				(!value.Short && (value.Excl || value.Length || value.Width || value.Index != nil ||
+					value.Slice != nil || value.Repl != nil || value.Exp != nil)) {
+				return false
+			}
+			result.WriteString(artifactWorkspaceRoot)
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func artifactShellLiteral(result *strings.Builder, text string, quoted bool) bool {
+	skip := false
+	for index, ch := range []byte(text) {
+		if skip {
+			skip = false
+			continue
+		}
+		nextIndex := index + 1
+		if ch == '\\' && nextIndex >= 0 && nextIndex < len(text) {
+			next := text[nextIndex]
+			if !quoted || strings.ContainsRune("$`\"\\\n", rune(next)) {
+				skip = true
+				if next != '\n' {
+					result.WriteByte(next)
+				}
+				continue
+			}
+		}
+		if !quoted && strings.ContainsRune("*?[~", rune(ch)) {
+			return false
+		}
+		result.WriteByte(ch)
+	}
+	return true
 }
