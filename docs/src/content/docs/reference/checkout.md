@@ -247,6 +247,7 @@ To check out a trusted ref such as the base SHA, opt in explicitly with a `check
 on:
   pull_request_target:
     types: [opened, synchronize]
+    forks: []  # Same-repository PRs only
 checkout:
   repository: ${{ github.repository }}
   ref: ${{ github.event.pull_request.base.sha }}
@@ -263,6 +264,7 @@ on:
   pull_request_target:
     types: [closed]
     branches: [main]
+    forks: ["dotnet/*"]
     acknowledge-risk: true
     allowed-checkouts:
       - repository: dotnet/AspNetCore.Docs
@@ -278,7 +280,7 @@ checkout:
 
 `on.pull_request_target.allowed-checkouts` defaults to no additional trusted checkouts. Each entry requires a literal `owner/repository` and a non-empty literal branch, tag, or commit SHA. Matching is exact and case-sensitive; repository/ref pairs cannot be combined across entries. Expressions, wildcards, and `refs/pull/...` refs are rejected in the policy. Every configured checkout must independently satisfy the policy or the existing base-checkout rules. Do not configure `checkout.fetch` for these checkouts: follow-up fetches can add refs beyond the trusted checkout, so they do not satisfy the policy. External repositories with omitted or PR-dependent refs remain rejected. Wiki checkouts are not covered by this allowlist.
 
-`on.pull_request_target.acknowledge-risk` defaults to `false`. Setting it to `true` suppresses **only** the strict-mode dangerous-trigger warning, including for `checkout: false` or a supported base checkout. It neither allows other checkouts nor disables unrelated warnings, strict validation, or safe-update checks. An allowlist without acknowledgment still emits the trigger warning.
+`on.pull_request_target.acknowledge-risk` defaults to `false`. Setting it to `true` suppresses **only** the strict-mode dangerous-trigger warning, including for `checkout: false` or a supported base checkout. It neither allows other checkouts nor bypasses [bounded fork admission](/gh-aw/reference/triggers/#fork-filtering-forks), actor authorization, unrelated warnings, strict validation, or safe-update checks. An allowlist without acknowledgment still emits the trigger warning.
 
 > [!CAUTION]
 > This policy records maintainer trust, not proof that checked-out code is safe. Prefer immutable commit SHAs; literal branches and tags can move. Keep workflow code and helpers on trusted base refs, read source PR changes as data, and never execute PR-controlled code with privileged credentials. Checkout authentication (`github-app` or `github-token`) and safe-output publication must still be configured separately. This example illustrates compilation policy, not runtime authentication or publication validation.

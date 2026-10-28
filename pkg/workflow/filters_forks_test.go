@@ -31,10 +31,14 @@ func TestTriggerForkFilterCompilation(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(event+"/"+tt.name, func(t *testing.T) {
 				names := ""
+				strict := true
 				if event == "pull_request" {
 					names = "\n    names: [community-contribution]"
+				} else if tt.expected == "" {
+					strict = false
 				}
 				source := fmt.Sprintf(`---
+strict: %t
 if: ${{ github.event.repository.fork == false }}
 on:
   permissions: {}
@@ -51,7 +55,7 @@ network:
   allowed: [defaults]
 ---
 Review the contribution.
-`, event, tt.forks, names)
+`, strict, event, tt.forks, names)
 				compiled := compileTriggerFilterFixture(t, source)
 				on := compiled["on"].(map[string]any)
 				assert.Equal(t, map[string]any{"types": []any{"labeled"}, "branches": []any{"main"}}, on[event])

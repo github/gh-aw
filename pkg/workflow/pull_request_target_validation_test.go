@@ -36,6 +36,7 @@ func TestPullRequestTargetValidation(t *testing.T) {
 strict: false
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github: false
@@ -60,6 +61,7 @@ Test workflow content.`,
 strict: false
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github: false
@@ -83,6 +85,7 @@ Test workflow content.`,
 strict: false
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -155,6 +158,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -177,6 +181,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -199,6 +204,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -222,6 +228,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -246,6 +253,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -269,6 +277,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -292,6 +301,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -316,6 +326,7 @@ Test workflow content.`,
 			frontmatter: `---
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -343,6 +354,7 @@ Test workflow content.`,
 strict: false
 on:
   pull_request_target:
+    forks: []
     types: [opened]
 tools:
   github:
@@ -493,6 +505,7 @@ func TestPullRequestTargetPolicy(t *testing.T) { //nolint:largefunc // Table cov
 			content := fmt.Sprintf(`---
 on:
   pull_request_target:
+    forks: []
     types: [closed]
     branches: [main]
 %s
@@ -603,6 +616,7 @@ func TestPullRequestTargetRoleValidation(t *testing.T) {
 strict: %t
 on:
   pull_request_target:
+    forks: []
     types: [opened]
     acknowledge-risk: true
 %scheckout: false
@@ -722,6 +736,7 @@ func TestPullRequestTargetRoleValidationFeatureOptOut(t *testing.T) {
 strict: %t
 on:
   pull_request_target:
+    forks: []
     acknowledge-risk: true
   roles: read
 checkout: false

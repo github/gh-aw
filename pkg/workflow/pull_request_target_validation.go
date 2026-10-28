@@ -20,6 +20,9 @@
 //  3. With on.roles containing all or read: reject in strict mode and warn in
 //     non-strict mode, regardless of checkout or trigger risk acknowledgment.
 //
+//  4. In strict mode, require explicit bounded fork admission regardless of
+//     checkout or trigger risk acknowledgment.
+//
 // # References
 //
 // See: https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
@@ -38,6 +41,7 @@ package workflow
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -48,6 +52,8 @@ import (
 )
 
 var pullRequestTargetLog = logger.New("workflow:pull_request_target_validation")
+
+var boundedForkPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\*)$`)
 
 // validatePullRequestTargetTrigger validates security requirements for pull_request_target triggers.
 //
@@ -87,13 +93,7 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 		return nil
 	}
 
-	onMap, isMap := onData.(map[string]any)
-	if !isMap {
-		return nil
-	}
-
-	_, hasPRT := onMap["pull_request_target"]
-	if !hasPRT {
+	if !frontmatterHasTrigger(onData, "pull_request_target") {
 		return nil
 	}
 
@@ -118,6 +118,16 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 			c.IncrementWarningCount()
 		}
 		break
+	}
+	if effectiveStrictMode && !hasBoundedPullRequestTargetForks(workflowData.RawFrontmatter) {
+		return formatCompilerError(markdownPath, "error",
+			"pull_request_target requires explicit bounded fork admission in strict mode.\n"+
+				"Set on.pull_request_target.forks: [] for same-repository PRs only, or list exact\n"+
+				"repositories (owner/repo) or trusted owner/* patterns. Omission, '*' (including\n"+
+				"inside a list), expressions, and other patterns are not allowed.\n"+
+				"Trusted event actors can still act on attacker-controlled PR content.\n"+
+				"checkout: false and on.pull_request_target.acknowledge-risk do not bypass this requirement.\n"+
+				"Actor authorization and trusted-checkout restrictions remain mandatory.", nil)
 	}
 	var acknowledged bool
 	var allowedCheckouts []any
@@ -192,6 +202,31 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 	c.IncrementWarningCount()
 
 	return nil
+}
+
+func hasBoundedPullRequestTargetForks(frontmatter map[string]any) bool {
+	on, ok := frontmatter["on"].(map[string]any)
+	if !ok {
+		return false
+	}
+	trigger, ok := on["pull_request_target"].(map[string]any)
+	if !ok {
+		return false
+	}
+	switch forks := trigger["forks"].(type) {
+	case string:
+		return boundedForkPattern.MatchString(forks)
+	case []any:
+		for _, fork := range forks {
+			pattern, ok := fork.(string)
+			if !ok || !boundedForkPattern.MatchString(pattern) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func dangerouslyAllowsRolesReadAndPullRequestTarget(workflowData *WorkflowData) bool {

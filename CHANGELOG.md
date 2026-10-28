@@ -13,6 +13,14 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+Strict-mode `pull_request_target` workflows now require explicit bounded fork
+admission. Replace omitted `forks` or any `"*"` entry with `forks: []` for
+same-repository PRs only, exact `owner/repo` entries, or deliberately trusted
+`owner/*` patterns, then recompile. Expressions and other wildcard patterns are
+rejected. Actor authorization and trusted-checkout restrictions remain mandatory;
+`acknowledge-risk`, disabled checkout, and trusted checkout policies do not bypass
+fork admission. Non-strict compilation retains its existing behavior.
+
 The `gh aw outcomes` command has been removed. Use `gh aw logs --outcomes`
 to evaluate selected runs, or pipe a run ID to
 `gh aw logs --stdin --repo owner/repo --outcomes`. JSON reports now carry

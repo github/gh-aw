@@ -182,6 +182,7 @@ Trigger on pull request events in the context of the base repository. Use this o
 on:
   pull_request_target:
     types: [opened, ready_for_review]
+    forks: []  # Same-repository PRs only
 ```
 
 `pull_request_target.types` accepts the same activity names as `pull_request`, including `ready_for_review`.
@@ -203,7 +204,9 @@ Use `["owner/repo"]` for a specific repository, `["owner/*"]` for an entire org/
 
 Alternatively, use `forks: {author-association: [OWNER, MEMBER, COLLABORATOR]}` to allow fork PRs by the author's relationship to the base repository rather than the fork owner. Same-repository PRs remain allowed, and no association is implicitly included. See [author associations](/gh-aw/reference/fork-support/#author-associations) for trust and secret-availability considerations.
 
-`pull_request_target` also supports explicit fork repository patterns; same-repository PRs remain allowed. Omitting `forks:` does not add a fork restriction for this event. Fork filters and `pull_request.names` compile into job conditions, not GitHub Actions trigger properties.
+`pull_request_target` requires explicit bounded fork admission in strict mode: `forks: []` for same-repository PRs only, exact `owner/repo` entries, or deliberately trusted `owner/*` patterns. Same-repository PRs remain allowed. Omission, `"*"`, and any list containing `"*"` are rejected, as are expressions and other wildcard patterns. This requirement applies even with `checkout: false`, trusted checkouts, or `acknowledge-risk: true`; actor authorization and checkout restrictions remain enforced independently.
+
+Non-strict mode retains compatibility: omitting `pull_request_target.forks` or including `"*"` adds no fork restriction. Fork filters and `pull_request.names` compile into job conditions, not GitHub Actions trigger properties. Bounded fork admission is defense in depth, not proof of safe PR content: a trusted actor can label an attacker-controlled PR, and disabling checkout does not prevent an agent from reading malicious content with privileged capabilities.
 
 #### Stacked PR Filtering (`max-stack:`)
 

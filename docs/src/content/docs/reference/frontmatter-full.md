@@ -793,11 +793,14 @@ on:
     # (optional)
     draft: true
 
-    # Filter fork pull requests by repository pattern (string or list).
-    # Same-repository PRs remain allowed; an empty list allows only same-repository
-    # PRs, and '*' allows all forks. Omitting this field adds no fork restriction.
-    # This does not change GitHub's base-repository permissions or secret availability
-    # for pull_request_target.
+    # Filter fork pull requests by repository pattern (string or list). Strict mode
+    # requires an explicit empty list (same-repository PRs only), exact owner/repo
+    # entries, or trusted owner/* patterns; omission and any '*' entry are rejected.
+    # In non-strict mode, omission or '*' adds no fork restriction. Same-repository
+    # PRs remain allowed. Actor authorization and checkout restrictions remain
+    # mandatory in strict mode; acknowledge-risk does not bypass them. This does not
+    # change GitHub's base-repository permissions or secret availability for
+    # pull_request_target.
     # (optional)
     # Accepted formats:
 
@@ -809,8 +812,8 @@ on:
       # Array items: string
 
     # Acknowledge elevated permissions and secret access to suppress only the
-    # strict-mode pull_request_target trigger warning. Checkout validation remains
-    # enforced.
+    # strict-mode pull_request_target trigger warning. Bounded fork admission, actor
+    # authorization, and checkout validation remain enforced.
     # (optional)
     acknowledge-risk: true
 
