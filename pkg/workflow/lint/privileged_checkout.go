@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/aw"
+	"github.com/github/gh-aw/pkg/workflow/checkoutpolicy"
 	"github.com/github/gh-aw/pkg/workflow/taint"
 	"github.com/rhysd/actionlint"
 	"mvdan.cc/sh/v3/syntax"
@@ -52,7 +57,7 @@ func checkPrivilegedCheckouts(ctx context.Context, input Input) ([]Diagnostic, e
 				return diagnostics, errors.Join(append(failures, err)...)
 			}
 			if actionName(step.Fields["uses"]) == "actions/checkout" {
-				found, err := privilegedCheckoutAction(ctx, step)
+				found, err := privilegedCheckoutAction(ctx, input, block, step)
 				diagnostics = append(diagnostics, found...)
 				failures = append(failures, err)
 			}
@@ -66,7 +71,7 @@ func checkPrivilegedCheckouts(ctx context.Context, input Input) ([]Diagnostic, e
 	return diagnostics, errors.Join(failures...)
 }
 
-func privilegedCheckoutAction(ctx context.Context, step aw.ExecutionStep) ([]Diagnostic, error) {
+func privilegedCheckoutAction(ctx context.Context, input Input, block aw.ExecutionBlock, step aw.ExecutionStep) ([]Diagnostic, error) {
 	with, err := policyMapping(step.Fields["with"], step.Path+".with")
 	if err != nil {
 		return nil, err
@@ -90,6 +95,15 @@ func privilegedCheckoutAction(ctx context.Context, step aw.ExecutionStep) ([]Dia
 			continue
 		}
 		path := step.Path + ".with." + key
+		if key == "ref" && checkoutpolicy.MatchesExpression(text, "github.event.pull_request.merge_commit_sha") {
+			merged, err := privilegedMergedGuard(input, block, step)
+			if err != nil {
+				return diagnostics, err
+			}
+			if merged {
+				continue
+			}
+		}
 		selected, err := privilegedSourceText(ctx, text, path)
 		if err != nil {
 			return diagnostics, err
@@ -101,6 +115,74 @@ func privilegedCheckoutAction(ctx context.Context, step aw.ExecutionStep) ([]Dia
 		}
 	}
 	return diagnostics, nil
+}
+
+// A merged-event guard changes merge_commit_sha from a test merge to landed code.
+// Other selectors and unsafe opt-outs remain independent review findings.
+func privilegedMergedGuard(input Input, block aw.ExecutionBlock, step aw.ExecutionStep) (bool, error) {
+	conditions := []any{step.Fields["if"]}
+	if input.Workflow != nil {
+		for _, job := range input.Workflow.Jobs {
+			if block.Path != "jobs."+string(job.ID) || job.If == nil {
+				continue
+			}
+			condition, err := actions.RenderExpression(job.If, job.ID, input.Workflow, false)
+			if err != nil {
+				return false, fmt.Errorf("cannot inspect merged checkout guard at %s.if: invalid Actions condition", block.Path)
+			}
+			conditions = append(conditions, condition)
+		}
+	} else {
+		conditions = append(conditions, block.Fields["if"])
+	}
+	for _, condition := range conditions {
+		text, ok := condition.(string)
+		if !ok {
+			continue
+		}
+		node, wrapped := actionslanguageservice.WrappedExpression(text)
+		if !wrapped {
+			var err error
+			node, err = actionslanguageservice.ParseSyntax(text)
+			if err != nil {
+				continue // An unrecognized condition cannot justify an exemption.
+			}
+		}
+		if privilegedRequiresMerged(node) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func privilegedRequiresMerged(node *actionslanguageservice.Expression) bool {
+	if node == nil {
+		return false
+	}
+	if reference, ok := actionslanguageservice.Reference(node); ok &&
+		slices.Equal(reference, []string{"github", "event", "pull_request", "merged"}) {
+		return true
+	}
+	switch node.Kind {
+	case "group":
+		return privilegedRequiresMerged(node.Child(0))
+	case "logical":
+		if node.Token.Kind == "&&" {
+			return slices.ContainsFunc(node.Children, privilegedRequiresMerged)
+		}
+		if node.Token.Kind == "||" {
+			return len(node.Children) > 0 && !slices.ContainsFunc(node.Children, func(child *actionslanguageservice.Expression) bool {
+				return !privilegedRequiresMerged(child)
+			})
+		}
+	case "binary":
+		if node.Token.Kind == "==" {
+			left, right := node.Child(0), node.Child(1)
+			return (left.Kind == "literal" && left.Token.Kind == "true" && privilegedRequiresMerged(right)) ||
+				(right.Kind == "literal" && right.Token.Kind == "true" && privilegedRequiresMerged(left))
+		}
+	}
+	return false
 }
 
 func privilegedSourceText(ctx context.Context, text, path string) (bool, error) {

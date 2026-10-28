@@ -99,6 +99,62 @@ func TestPrivilegedCheckoutCommands(t *testing.T) {
 	}
 }
 
+func TestPrivilegedCheckoutMergedGuards(t *testing.T) {
+	for _, tt := range []struct {
+		name, condition, ref, inputs string
+		count                        int
+	}{
+		{"unguarded", "", "", "", 1},
+		{"merged boolean", "github.event.pull_request.merged", "", "", 0},
+		{"merged equality", "github.event.pull_request.merged == true", "", "", 0},
+		{"reversed equality", "true == github.event.pull_request.merged", "", "", 0},
+		{"wrapped equality", "${{ github.event.pull_request.merged == true }}", "", "", 0},
+		{"bracket equality", "github['event']['pull_request']['merged'] == true", "", "", 0},
+		{"conjunction", "github.event.action == 'closed' && github.event.pull_request.merged == true", "", "", 0},
+		{"reverse conjunction", "github.event.pull_request.merged && github.actor == 'trusted'", "", "", 0},
+		{"late conjunction", "github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.repo.full_name == github.repository", "", "", 0},
+		{"both disjuncts require merge", "(github.event.pull_request.merged && success()) || (github.event.pull_request.merged && always())", "", "", 0},
+		{"all disjuncts require merge", "github.event.pull_request.merged || github.event.pull_request.merged || github.event.pull_request.merged", "", "", 0},
+		{"grouped equality", "((github.event.pull_request.merged) == true)", "", "", 0},
+		{"false equality", "github.event.pull_request.merged == false", "", "", 1},
+		{"string equality", "github.event.pull_request.merged == 'true'", "", "", 1},
+		{"negated merged", "!github.event.pull_request.merged", "", "", 1},
+		{"negated conjunction", "!(github.event.pull_request.merged && false)", "", "", 1},
+		{"or bypass", "github.event.pull_request.merged || always()", "", "", 1},
+		{"late or bypass", "github.event.pull_request.merged || github.event.pull_request.merged || always()", "", "", 1},
+		{"or nested bypass", "(github.event.pull_request.merged && success()) || github.actor == 'trusted'", "", "", 1},
+		{"quoted reference", "contains('github.event.pull_request.merged', 'merged')", "", "", 1},
+		{"closed is not merged", "github.event.action == 'closed'", "", "", 1},
+		{"trusted actor is not merged", "github.actor == 'renovate[bot]'", "", "", 1},
+		{"head still untrusted", "github.event.pull_request.merged", "${{ github.event.pull_request.head.sha }}", "", 1},
+		{"head fallback still untrusted", "github.event.pull_request.merged", "${{ github.event.pull_request.merge_commit_sha || github.event.pull_request.head.sha }}", "", 1},
+		{"fork repository still untrusted", "github.event.pull_request.merged", "", "repository: '${{ github.event.pull_request.head.repo.full_name }}', ", 1},
+		{"unsafe opt out still warned", "github.event.pull_request.merged", "", "allow-unsafe-pr-checkout: true, ", 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, placement := range []string{"job", "step"} {
+				ref := tt.ref
+				if ref == "" {
+					ref = "${{ github.event.pull_request.merge_commit_sha }}"
+				}
+				source := "on: {pull_request_target: {types: [closed]}}\n" + contractJob
+				if placement == "job" && tt.condition != "" {
+					source += "    if: >-\n      " + tt.condition + "\n"
+				}
+				source += "    steps:\n      - uses: actions/checkout@v7\n"
+				if placement == "step" && tt.condition != "" {
+					source += "        if: >-\n          " + tt.condition + "\n"
+				}
+				source += "        with: {" + tt.inputs + "ref: \"" + ref + "\"}\n"
+				for _, target := range []ASTTargets{AWAST, ActionsAST} {
+					diagnostics := integrityTestRun(t, PrivilegedCheckoutRule(), ruleContractInput(t, source, target, false))
+					assert.Len(t, diagnostics, tt.count, "%s target %v", placement, target)
+				}
+			}
+		})
+	}
+}
+
 func TestPrivilegedCheckoutTriggersAndPins(t *testing.T) {
 	pins := []string{
 		"v6.0.2",

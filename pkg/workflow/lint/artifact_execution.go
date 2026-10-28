@@ -27,7 +27,10 @@ type artifactDownload struct {
 	path      string
 }
 
-const artifactWorkspaceRoot = "/__gh_aw__/workspace"
+const (
+	artifactWorkspaceRoot = "/__gh_aw__/workspace"
+	artifactTempRoot      = "/__gh_aw__/temp"
+)
 
 func checkArtifactExecution(ctx context.Context, input Input) ([]Diagnostic, error) {
 	if err := integrityInput(ctx, input); err != nil {
@@ -138,11 +141,10 @@ func artifactEmptyToken(value any) bool {
 func artifactLiteralPath(text string) string {
 	text = strings.TrimSpace(text)
 	if strings.HasPrefix(text, "${{") {
-		if end := strings.Index(text, "}}"); end >= 0 &&
-			checkoutpolicy.MatchesExpression(text[:end+2], "github.workspace") {
-			suffix := text[end+2:]
-			if suffix == "" || strings.HasPrefix(suffix, "/") {
-				text = artifactWorkspaceRoot + suffix
+		if end := strings.Index(text, "}}"); end >= 0 {
+			root, suffix := artifactExpressionRoot(text[:end+2]), text[end+2:]
+			if root != "" && (suffix == "" || strings.HasPrefix(suffix, "/")) {
+				text = root + suffix
 			}
 		}
 	}
@@ -150,6 +152,18 @@ func artifactLiteralPath(text string) string {
 		return ""
 	}
 	return artifactResolvePath(artifactWorkspaceRoot, text)
+}
+
+func artifactExpressionRoot(text string) string {
+	for expression, root := range map[string]string{
+		"github.workspace": artifactWorkspaceRoot,
+		"runner.temp":      artifactTempRoot,
+	} {
+		if checkoutpolicy.MatchesExpression(text, expression) {
+			return root
+		}
+	}
+	return ""
 }
 
 func artifactStepExecution(ctx context.Context, input Input, block aw.ExecutionBlock, step aw.ExecutionStep, downloads []artifactDownload) ([]Diagnostic, error) {
@@ -289,8 +303,8 @@ func artifactShellWord(word *syntax.Word, script string) string {
 	unknown := false
 	err := taint.VisitInterpolations(context.Background(), raw, "", func(start, end, _ int, _ actionlint.ExprNode) error {
 		rendered.WriteString(raw[last:start])
-		if checkoutpolicy.MatchesExpression(raw[start:end], "github.workspace") {
-			rendered.WriteString(artifactWorkspaceRoot)
+		if root := artifactExpressionRoot(raw[start:end]); root != "" {
+			rendered.WriteString(root)
 		} else {
 			unknown = true
 		}
@@ -338,12 +352,19 @@ func artifactShellParts(result *strings.Builder, values []syntax.WordPart, quote
 				return false
 			}
 		case *syntax.ParamExp:
-			if value.Param == nil || value.Param.Value != "GITHUB_WORKSPACE" ||
+			if value.Param == nil ||
 				(!value.Short && (value.Excl || value.Length || value.Width || value.Index != nil ||
 					value.Slice != nil || value.Repl != nil || value.Exp != nil)) {
 				return false
 			}
-			result.WriteString(artifactWorkspaceRoot)
+			switch value.Param.Value {
+			case "GITHUB_WORKSPACE":
+				result.WriteString(artifactWorkspaceRoot)
+			case "RUNNER_TEMP":
+				result.WriteString(artifactTempRoot)
+			default:
+				return false
+			}
 		default:
 			return false
 		}

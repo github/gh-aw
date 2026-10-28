@@ -210,6 +210,52 @@ func TestArtifactOriginalOperandOffsets(t *testing.T) {
 	}
 }
 
+func TestArtifactTemporaryDirectories(t *testing.T) {
+	for _, tt := range []struct {
+		name, directory, script, workingDirectory string
+		count                                     int
+	}{
+		{"data only", "${{ runner.temp }}/incoming", "cat $RUNNER_TEMP/incoming/data.json", "", 0},
+		{"unrelated workspace code", "${{ runner.temp }}/incoming", "bash run.sh", "", 0},
+		{"direct script", "${{ runner.temp }}/incoming", "bash ${{runner.temp}}/incoming/run.sh", "", 1},
+		{"quoted variable", "${{ runner.temp }}/incoming", `bash "${RUNNER_TEMP}/incoming/run.sh"`, "", 1},
+		{"short variable", "${{ runner.temp }}/incoming", "bash $RUNNER_TEMP/incoming/run.sh", "", 1},
+		{"direct executable", "${{ runner.temp }}/incoming", `"$RUNNER_TEMP/incoming/app"`, "", 1},
+		{"bracket prefix", "${{ runner['temp'] }}/incoming/", "node ${{ runner.temp }}/incoming/run.js", "", 1},
+		{"literal action variable", "$RUNNER_TEMP/incoming", "bash $RUNNER_TEMP/incoming/run.sh", "", 0},
+		{"single quoted shell variable", "${{ runner.temp }}/incoming", `bash '$RUNNER_TEMP/incoming/run.sh'`, "", 0},
+		{"escaped shell variable", "${{ runner.temp }}/incoming", `bash \$RUNNER_TEMP/incoming/run.sh`, "", 0},
+		{"single quoted expression", "${{ runner.temp }}/incoming", "bash '${{runner.temp}}/incoming/run.sh'", "", 1},
+		{"variable modifier unknown", "${{ runner.temp }}/incoming", `bash "${RUNNER_TEMP:-other}/incoming/run.sh"`, "", 0},
+		{"working directory", "${{ runner.temp }}/incoming", "npm ci", "${{runner.temp}}/incoming", 1},
+		{"data-only npm metadata", "${{ runner.temp }}/incoming", "npm run", "${{runner.temp}}/incoming", 0},
+		{"sibling directory", "${{ runner.temp }}/incoming", "bash $RUNNER_TEMP/incoming-other/run.sh", "", 0},
+		{"unknown suffix", "${{ runner.temp }}/${{ vars.DIRECTORY }}", "cat data.json", "", 1},
+		{"unsupported concatenation", "${{ runner.temp }}-suffix/incoming", "cat data.json", "", 1},
+		{"workspace traversal", "${{ runner.temp }}/../workspace", "bash run.sh", "", 2},
+		{"ancestor traversal", "${{ runner.temp }}/..", "bash run.sh", "", 2},
+		{"filesystem root traversal", "${{ runner.temp }}/../..", "bash run.sh", "", 2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			source := artifactTrigger + contractJob + "    steps:\n      - uses: actions/download-artifact@v4\n" +
+				"        with:\n          github-token: ${{ github.token }}\n          run-id: 123\n          path: " + tt.directory +
+				"\n      - run: |\n          " + tt.script + "\n"
+			if tt.workingDirectory != "" {
+				source += "        working-directory: " + tt.workingDirectory + "\n"
+			}
+			for _, target := range []ASTTargets{AWAST, ActionsAST} {
+				diagnostics := integrityTestRun(t, ArtifactExecutionRule(), ruleContractInput(t, source, target, false))
+				assert.Len(t, diagnostics, tt.count)
+				for _, diagnostic := range diagnostics {
+					if diagnostic.Path == "jobs.check.steps[1].run" {
+						assert.Equal(t, []RelatedLocation{{Path: "jobs.check.steps[0].with.path"}}, diagnostic.Related)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestArtifactExecutionOrderingAndScopes(t *testing.T) {
 	cases := []struct {
 		name, source, path string
