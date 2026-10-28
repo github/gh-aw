@@ -96,7 +96,7 @@ func analyzeAssignStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	}
 	var rightExpr ast.Expr
 	var rightOverride string
-	switch rhs := assign.Rhs[0].(type) {
+	switch rhs := astutil.UnwrapParenExpr(assign.Rhs[0]).(type) {
 	case *ast.BinaryExpr:
 		if rhs.Op != token.ADD || !isSlashLiteral(rhs.X) {
 			return
@@ -169,7 +169,7 @@ func matchSlashSeparator(bin *ast.BinaryExpr) (left ast.Expr, rightOverride stri
 
 // isSlashLiteral reports whether expr is the string literal "/".
 func isSlashLiteral(expr ast.Expr) bool {
-	lit, ok := expr.(*ast.BasicLit)
+	lit, ok := astutil.UnwrapParenExpr(expr).(*ast.BasicLit)
 	if !ok || lit.Kind != token.STRING {
 		return false
 	}
@@ -183,7 +183,7 @@ func isSlashLiteral(expr ast.Expr) bool {
 // literal's text quoted without the leading slash (e.g. `"config.yml"`),
 // suitable for a filepath.Join diagnostic argument.
 func embeddedSlashLiteral(expr ast.Expr) (trimmedQuoted string, ok bool) {
-	lit, isLit := expr.(*ast.BasicLit)
+	lit, isLit := astutil.UnwrapParenExpr(expr).(*ast.BasicLit)
 	if !isLit || lit.Kind != token.STRING {
 		return "", false
 	}

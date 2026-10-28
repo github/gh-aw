@@ -62,6 +62,26 @@ func badLongOperand(name string) string {
 	return "a-very-long-literal-base-directory-name-goes-here" + "/" + name // want `manual "/" path concatenation; use filepath\.Join \(or path\.Join\) instead`
 }
 
+// badParenSeparator uses a parenthesized "/" separator, which must still be
+// unwrapped and detected.
+func badParenSeparator(dir, file string) string {
+	return dir + ("/") + file // want `manual "/" path concatenation; use filepath\.Join\(dir, file\) \(or path\.Join\) instead`
+}
+
+// badParenAddAssignBinary builds a path via += with a parenthesized
+// "/" + Y right-hand side.
+func badParenAddAssignBinary(path, file string) string {
+	path += ("/" + file) // want `manual "/" path concatenation; use filepath\.Join\(path, file\) \(or path\.Join\) instead`
+	return path
+}
+
+// badParenAddAssignEmbedded builds a path via += with a parenthesized
+// embedded-slash literal right-hand side.
+func badParenAddAssignEmbedded(path string) string {
+	path += ("/subpath") // want `manual "/" path concatenation; use filepath\.Join\(path, "subpath"\) \(or path\.Join\) instead`
+	return path
+}
+
 // goodNolint suppresses the diagnostic with a nolint directive.
 func goodNolint(dir, file string) string {
 	return dir + "/" + file //nolint:manualpathconcat
