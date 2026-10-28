@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 85 active analyzers:
+// All 86 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -61,6 +61,7 @@
 //   - sortslice — flags sort.Slice / sort.SliceStable calls that should use slices.SortFunc / slices.SortStableFunc
 //   - sprintferrdot — flags redundant .Error() calls on error values passed to fmt format functions
 //   - sprintferrorsnew — flags errors.New(fmt.Sprintf(...)) calls that should use fmt.Errorf instead
+//   - splitindexzero — flags strings.Split(s, sep)[0] and strings.SplitN(s, sep, 2)[0] with a non-empty separator that should use strings.Cut
 //   - sprintfbool — flags fmt.Sprintf("%t", b) calls where b is a single bool value and suggests using strconv.FormatBool(b) instead
 //   - sprintfint — flags fmt.Sprintf calls that format integers that should use strconv.Itoa
 //   - ssljson — validates ssl.json skill artifacts in .github/skills/ against the SSL spec

@@ -60,6 +60,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
+	"github.com/github/gh-aw/pkg/linters/splitindexzero"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
@@ -158,6 +159,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	sprintferrdot.Analyzer,
 	sprintferrorsnew.Analyzer,
 	sprintfbool.Analyzer,
+	splitindexzero.Analyzer,
 	sprintfint.Analyzer,
 	strconvparseignorederror.Analyzer,
 	stringbytesroundtrip.Analyzer,

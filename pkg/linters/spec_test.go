@@ -68,6 +68,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
+	"github.com/github/gh-aw/pkg/linters/splitindexzero"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
 	"github.com/github/gh-aw/pkg/linters/sprintferrorsnew"
@@ -121,7 +122,7 @@ type docAnalyzer struct {
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
-//	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
+//	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, splitindexzero, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
 //	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
@@ -186,6 +187,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"sprintferrdot", sprintferrdot.Analyzer},
 		{"sprintferrorsnew", sprintferrorsnew.Analyzer},
 		{"sprintfbool", sprintfbool.Analyzer},
+		{"splitindexzero", splitindexzero.Analyzer},
 		{"sprintfint", sprintfint.Analyzer},
 		{"ssljson", ssljson.Analyzer},
 		{"strconvparseignorederror", strconvparseignorederror.Analyzer},
