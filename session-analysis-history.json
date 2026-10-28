@@ -312,8 +312,24 @@
         "provenance 94.4% bot-driven (17/18 non-ambiguous successes); true-agentic 1/1=100%",
         "2 branches (82%/18% split); orphan 0/5 open PRs -> NORMAL, 55th consecutive healthy day"
       ]
+    },
+    {
+      "date": "2026-10-28",
+      "sessions_analyzed": 50,
+      "completion_rate": 8.0,
+      "average_duration_minutes": 7.265,
+      "median_duration_minutes": 0.0,
+      "orphaned_rate": 0.0,
+      "orphan_candidates": 0,
+      "experimental_strategy": null,
+      "key_insights": [
+        "8.0% completion (4/50), -32pts vs 10-27 (40.0%), 3rd-lowest of 56 recorded days (behind the 4.0% ties on 08-31/10-24)",
+        "NEW smoke_test_suite_bundle_fire pattern: 40/50 runs (80% branch concentration) = the entire smoke-test matrix (36 engine Smoke-* workflows + 4 others) firing in a single 1-second window on copilot/support-claude-on-vertex-ai, all action_required, 0% success",
+        "provenance 75.0% bot-driven (3/4, n=4 low confidence); true-agentic 1/1=100% (Addressing comment on PR #72403)",
+        "conv/event logs empty again (0/50) after the 10-21/10-26/10-27 partial-recovery streak; orphan 0/13 open PRs -> NORMAL, 56th consecutive healthy day"
+      ]
     }
   ],
-  "last_updated": "2026-10-26",
+  "last_updated": "2026-10-28",
   "version": "1.11"
 }
