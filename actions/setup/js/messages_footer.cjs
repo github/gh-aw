@@ -18,7 +18,7 @@ const { reduceModelNameToIdentifier } = require("./model_aliases.cjs");
 const { getDetectionWarningMessage } = require("./messages_run_status.cjs");
 const { getEffectiveDetectionConclusion } = require("./threat_detection_warning.cjs");
 const { getEffectiveModelLabel, resolveEffectiveModel, validateModelIdentifier } = require("./model_attribution.cjs");
-const { currentClaimHandle, claimIdentity } = require("./work_queue_claim_scope.cjs");
+const { currentClaimHandle, claimIdentity, currentClaimFooterLinks } = require("./work_queue_claim_scope.cjs");
 const reportAST = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 
@@ -32,6 +32,19 @@ function buildWorkQueueClaimFooter() {
   const handle = currentClaimHandle();
   if (!handle) return [];
   const { work_id, claim_id } = claimIdentity(handle);
+  const links = currentClaimFooterLinks();
+  if (links?.work && links?.claim) {
+    return [
+      {
+        type: "quote_line",
+        children: [
+          { type: "link", url: links.work, children: [{ type: "text", value: "Work created" }] },
+          { type: "text", value: " · " },
+          { type: "link", url: links.claim, children: [{ type: "text", value: "Claim finished" }] },
+        ],
+      },
+    ];
+  }
   return [
     {
       type: "quote_line",
