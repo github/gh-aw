@@ -11,7 +11,6 @@ import { noUnsafePromiseCatchErrorPropertyRule } from "./rules/no-unsafe-promise
 import { preferGetErrorMessageRule } from "./rules/prefer-get-error-message";
 import { preferGetErrorMessageOverStringRule } from "./rules/prefer-get-error-message-over-string";
 import { preferNumberIsNanRule } from "./rules/prefer-number-isnan";
-import { noSliceToUncheckedIndexOfRule } from "./rules/no-slice-to-unchecked-indexof";
 import { noMapParseIntCallbackRule } from "./rules/no-map-parseint-callback";
 import { requireAsyncEntrypointCatchRule } from "./rules/require-async-entrypoint-catch";
 import { requireAwaitCoreSummaryWriteRule } from "./rules/require-await-core-summary-write";
@@ -90,7 +89,6 @@ const plugin = {
     "prefer-get-error-message-over-string": preferGetErrorMessageOverStringRule,
     "prefer-number-isnan": preferNumberIsNanRule,
     "no-map-parseint-callback": noMapParseIntCallbackRule,
-    "no-slice-to-unchecked-indexof": noSliceToUncheckedIndexOfRule,
     "require-async-entrypoint-catch": requireAsyncEntrypointCatchRule,
     "require-await-core-summary-write": requireAwaitCoreSummaryWriteRule,
     "require-fs-close-sync": requireFsCloseSyncRule,
