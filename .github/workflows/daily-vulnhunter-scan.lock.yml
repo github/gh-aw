@@ -2678,7 +2678,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      artifact_name: ${{ steps.artifact_name.outputs.value }}
+      artifact_name: "${{ steps.artifact_name.outputs.value }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

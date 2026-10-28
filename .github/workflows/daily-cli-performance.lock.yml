@@ -2855,7 +2855,7 @@ jobs:
     outputs:
       activated: ${{ steps.check_membership.outputs.is_team_member == 'true' }}
       changes_result: ${{ steps.changes.outcome }}
-      has_changes: ${{ steps.changes.outputs.has_changes }}
+      has_changes: "${{ steps.changes.outputs.has_changes }}"
       matched_command: ''
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}

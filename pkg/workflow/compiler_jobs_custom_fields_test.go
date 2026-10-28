@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,80 @@ import (
 // ========================================
 // Custom Job Field Configuration Tests (runs-on, strategy, container)
 // ========================================
+
+func TestAuthoredJobOutputsPreserveStrings(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		jobsPrefix string
+		jobName    string
+	}{
+		{name: "pre_activation", jobsPrefix: "jobs:", jobName: "pre_activation"},
+		{name: "pre-activation alias", jobsPrefix: "jobs:", jobName: "pre-activation"},
+		{name: "custom job", jobsPrefix: "jobs:", jobName: "prepare"},
+		{name: "safe job", jobsPrefix: "safe-outputs:\n  jobs:", jobName: "publish"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			outputs := map[string]string{
+				"actor_trusted": "true",
+				"disabled":      "false",
+				"integer":       "42",
+				"leading_zero":  "007",
+				"decimal":       "1.25",
+				"exponent":      "1e3",
+				"null_value":    "null",
+				"empty":         "",
+				"quoted":        `"true"`,
+				"apostrophe":    "it's trusted",
+				"mapping":       "{trusted: true}",
+				"sequence":      "[true, false]",
+				"colon":         "trusted: true",
+				"comment":       "trusted # not a comment",
+				"multiline":     "first\nsecond\n",
+				"expression":    "${{ steps.context.outputs.value }}",
+			}
+			// Safe jobs are nested one level deeper than ordinary jobs.
+			indent := "  "
+			if tt.name == "safe job" {
+				indent = "    "
+				outputs = map[string]string{
+					"status": "true",
+					"url":    "${{ steps.context.outputs.value }}",
+				}
+			}
+			var config strings.Builder
+			fmt.Fprintf(&config, "%s\n%s%s:\n%s  outputs:\n", tt.jobsPrefix, indent, tt.jobName, indent)
+			for key, value := range outputs {
+				fmt.Fprintf(&config, "%s    %s: %q\n", indent, key, value)
+			}
+			fmt.Fprintf(&config, "%s  steps:\n%s    - id: context\n%s      run: echo context\n", indent, indent, indent)
+			source := "---\non: workflow_dispatch\nengine: copilot\npermissions:\n  contents: read\nnetwork:\n  allowed: [defaults]\n" +
+				config.String() + "---\n\nReview the context.\n"
+			dir := testutil.TempDir(t, "job-output-strings")
+			path := filepath.Join(dir, "outputs.md")
+			require.NoError(t, os.WriteFile(path, []byte(source), 0600))
+
+			compiler := NewCompiler()
+			compiler.SetActionMode(ActionModeRelease)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			content, err := os.ReadFile(filepath.Join(dir, "outputs.lock.yml"))
+			require.NoError(t, err)
+			require.NoError(t, compiler.validateGitHubActionsSchema(string(content)))
+
+			var compiled map[string]any
+			require.NoError(t, yaml.Unmarshal(content, &compiled))
+			jobs, ok := compiled["jobs"].(map[string]any)
+			require.True(t, ok)
+			jobName := strings.ReplaceAll(tt.jobName, "-", "_")
+			job, ok := jobs[jobName].(map[string]any)
+			require.True(t, ok, "missing job %s", jobName)
+			actual, ok := job["outputs"].(map[string]any)
+			require.True(t, ok)
+			for key, value := range outputs {
+				require.Equal(t, value, actual[key], "output %s must retain its string type and value", key)
+			}
+		})
+	}
+}
 
 func TestFormatIndentedYAMLFieldPreservesDefaultsAndSequenceIndent(t *testing.T) {
 	value := map[string]any{

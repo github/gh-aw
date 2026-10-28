@@ -2981,10 +2981,10 @@ jobs:
     permissions:
       contents: read
     outputs:
-      dictionary_path: ${{ steps.run_spellcheck.outputs.dictionary_path }}
-      files_checked: ${{ steps.run_spellcheck.outputs.files_checked }}
-      findings_count: ${{ steps.run_spellcheck.outputs.findings_count }}
-      has_findings: ${{ steps.run_spellcheck.outputs.has_findings }}
+      dictionary_path: "${{ steps.run_spellcheck.outputs.dictionary_path }}"
+      files_checked: "${{ steps.run_spellcheck.outputs.files_checked }}"
+      findings_count: "${{ steps.run_spellcheck.outputs.findings_count }}"
+      has_findings: "${{ steps.run_spellcheck.outputs.has_findings }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

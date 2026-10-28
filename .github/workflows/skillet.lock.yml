@@ -2284,16 +2284,16 @@ jobs:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
       activated: ${{ steps.check_membership.outputs.is_team_member == 'true' && steps.check_command_position.outputs.command_position_ok == 'true' }}
-      available_skills: ${{ steps.match_skill.outputs.available_skills }}
+      available_skills: "${{ steps.match_skill.outputs.available_skills }}"
       matched_command: ${{ steps.check_command_position.outputs.matched_command }}
-      request_text: ${{ steps.match_skill.outputs.request_text }}
+      request_text: "${{ steps.match_skill.outputs.request_text }}"
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
-      should_run: ${{ steps.match_skill.outputs.should_run }}
-      skill_name: ${{ steps.match_skill.outputs.skill_name }}
-      skill_path: ${{ steps.match_skill.outputs.skill_path }}
-      skip_reason: ${{ steps.match_skill.outputs.skip_reason }}
+      should_run: "${{ steps.match_skill.outputs.should_run }}"
+      skill_name: "${{ steps.match_skill.outputs.skill_name }}"
+      skill_path: "${{ steps.match_skill.outputs.skill_path }}"
+      skip_reason: "${{ steps.match_skill.outputs.skip_reason }}"
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

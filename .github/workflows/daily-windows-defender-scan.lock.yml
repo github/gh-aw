@@ -1817,9 +1817,9 @@ jobs:
     permissions:
       contents: read
     outputs:
-      artifact_name: ${{ steps.finalize.outputs.artifact_name }}
-      findings_count: ${{ steps.finalize.outputs.findings_count }}
-      has_findings: ${{ steps.finalize.outputs.has_findings }}
+      artifact_name: "${{ steps.finalize.outputs.artifact_name }}"
+      findings_count: "${{ steps.finalize.outputs.findings_count }}"
+      has_findings: "${{ steps.finalize.outputs.has_findings }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

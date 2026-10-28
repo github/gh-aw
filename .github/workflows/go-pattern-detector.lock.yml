@@ -1388,7 +1388,7 @@ jobs:
     if: (!cancelled()) && needs.activation.result == 'success'
     runs-on: ubuntu-latest
     outputs:
-      found_patterns: ${{ steps.detect.outputs.found_patterns }}
+      found_patterns: "${{ steps.detect.outputs.found_patterns }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config

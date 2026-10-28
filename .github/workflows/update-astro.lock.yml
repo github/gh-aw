@@ -1378,8 +1378,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      has_updates: ${{ steps.check.outputs.has_updates }}
-      updates_summary: ${{ steps.check.outputs.updates_summary }}
+      has_updates: "${{ steps.check.outputs.has_updates }}"
+      updates_summary: "${{ steps.check.outputs.updates_summary }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
