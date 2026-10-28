@@ -205,6 +205,12 @@ func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowDa
 	prLog.Print("PR checkout step configured with GitHub token")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: " + resolvedToken + "\n")
+	for _, checkout := range data.CheckoutConfigs {
+		if checkout != nil && checkout.AllowFloatingHead {
+			yaml.WriteString("          GH_AW_ALLOW_FLOATING_HEAD: \"true\"\n")
+			break
+		}
+	}
 	if len(data.Bots) > 0 {
 		yaml.WriteString("          GH_AW_ALLOWED_BOTS: " + strconv.Quote(strings.Join(data.Bots, ",")) + "\n")
 	}

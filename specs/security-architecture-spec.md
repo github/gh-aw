@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Agentic Workflows Security Architecture Specification
 
-**Version**: 1.1.7<br>
+**Version**: 1.1.8<br>
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -1017,6 +1017,7 @@ if: github.event.pull_request.head.repo.id == github.repository_id
    - **Same-repository allow-listed bot comments and reviews**: `issue_comment`, `pull_request_review_comment`, and `pull_request_review` events MAY bypass the collaborator-permission lookup only when `sender.type == "Bot"`, `sender.login` exactly matches `comment.user.login` or `review.user.login` as appropriate, the sender login is canonically equivalent to the triggering actor (the App slug and its `[bot]` form are equivalent), the actor is explicitly listed in `on.bots`, and the positive runtime repository ID equals both the fetched PR head and base repository IDs. Missing or mismatched identities, an unlisted actor, missing or mismatched repository IDs, and fork PRs MUST NOT use this exception and MUST satisfy the permission floor. Failure to fetch or verify the PR details MUST fail closed.
 3. **Parse resilience** (`workflow_dispatch` PR contexts): Malformed `aw_context` JSON, non-object contexts, and invalid PR item numbers MUST explicitly fail checkout with a diagnostic. Absent context or a valid non-PR context MAY skip PR checkout; invalid supplied context MUST NOT be treated as a successful skip.
 4. **Revision isolation**: The selected revision MUST be a full 40-character hexadecimal commit SHA, fetched from the current repository's `origin` using array-based execution (no shell interpolation). The actual checked-out `HEAD` MUST match that SHA before reporting success or exporting an incremental-patch baseline. A moving `refs/pull/N/head`, an existing local branch, or the previous workspace MUST NOT substitute for the selected commit.
+   - Revision-evidence rules below apply by default. A literal `checkout.allow-floating-head: true` MAY explicitly select current-head execution instead, workflow-wide if any checkout entry enables it. This opt-in MUST warn that it is not revision approval; it MAY ignore event/review SHA and comment freshness evidence, but MUST resolve and validate the current API head, use its commit count for fetch depth, recheck it after fetch, and verify actual `HEAD`. Actor authorization, fork/bot restrictions, dispatch-context validation, credential constraints, and checkout-disable policies MUST remain enforced. The default MUST be `false`.
    - Ordinary `pull_request` events, excluding `labeled` and `unlabeled`, MUST retain their event-recorded head SHA even after head movement or source-branch deletion. Label events and `pull_request_target` MUST bind to the event head SHA and reject a detected head change. Review and review-comment events MUST bind to their `commit_id`, not a later head. Revision-bound and current-head API checkout paths MUST recheck the selected head after fetch.
    - Revision-bound centralized command/label dispatches MUST carry event-recorded revision evidence in `aw_context.pr_head_sha`; missing required evidence, malformed SHAs, API failures, and detected head changes MUST fail checkout.
    - Issue-comment commands MUST be treated as current-head execution, not approval of a revision: issue comments contain no historical PR head SHA. Valid triggering comment creation/edit and PR update timestamps MUST be required; a newer PR update MUST produce a warning, not a claim that the selected revision was approved. Unrelated activity, including router status comments, also updates the PR timestamp. Manual PR dispatch without command/label markers or a supplied revision likewise selects the current head, not an approved revision.
@@ -2098,6 +2099,12 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 
 ## Change Log
 
+### Version 1.1.8 (Explicit Floating-Head Checkout)
+
+**Published**: October 28, 2026
+
+Adds literal `checkout.allow-floating-head`, default `false`, as an explicit current-head/non-approval alternative to event revision binding. Preserves immutable fetch, fetch-time revalidation, actual-HEAD verification, authorization, and checkout-disable policies. Runtime and compiler regressions cover the opt-in; targeted formal revalidation remains pending.
+
 ### Version 1.1.7 (RS-05a Immutable PR Revision Binding)
 
 **Published**: October 27, 2026
@@ -2264,6 +2271,6 @@ Sync check on **2026-08-25** found no new minor-version bump, reported security 
 
 On **2026-10-09**, RS-05a was targeted-revalidated against the allow-listed same-repository App comment implementation, unit tests, and Z3 safety model for Version 1.1.1. Version 1.1.2 extends that contract to `pull_request_review` and updates its conformance mapping and formal model; targeted revalidation of those additions is pending in `security-architecture-spec-validation.md` §7b. Version 1.1.3 extends the same-repository bot branch-event exception to `ready_for_review` and `reopened`; targeted revalidation of those additions is also pending in §7b. This does not replace the full revalidation pass required by the policy. The previous RS-05a branch-event revalidation was completed on 2026-10-01.
 
-Version 1.1.7 aligns RS-05a with immutable revision binding and explicit dispatch-context failures. Its runtime regression mapping is recorded in §7b of the validation document; targeted formal revalidation and the policy-required full revalidation remain pending. The bounded SMT authorization model is not a proof of revision freshness or live GitHub SHA-fetch support.
+Version 1.1.7 aligns RS-05a with immutable revision binding and explicit dispatch-context failures; v1.1.8 adds the explicit floating-head opt-in. Runtime regression mappings are recorded in the validation document; targeted formal revalidation and the policy-required full revalidation remain pending. The bounded SMT authorization model is not a proof of revision freshness or live GitHub SHA-fetch support.
 
 *This specification is provided under the MIT License.*

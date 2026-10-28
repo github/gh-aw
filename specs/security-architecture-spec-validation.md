@@ -10,6 +10,8 @@
 
 ## Executive Summary
 
+The v1.1.8 floating-head opt-in adds current-head/non-approval selection with immutable fetch and actual-HEAD verification. Its parser/schema and compiler wiring tests are `TestCheckoutAllowFloatingHead`, `TestMainWorkflowSchema_AllowFloatingHead`, `TestPRCheckoutFloatingHeadEnvironment`, and `TestCompilePRFloatingHead`; the `explicit floating-head checkout` runtime suite covers moved heads, missing event evidence, fetch-time races, actual-HEAD mismatch, and retained authorization/context failures. This extension has not received targeted formal revalidation. The event-specific mappings below describe the default (`allow-floating-head: false`) policy.
+
 ⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and the last completed RS-05a targeted formal revalidation, v1.1.1 on 2026-10-09. The v1.1.2 review-checkout update, v1.1.3, v1.1.5, and v1.1.6 branch-event updates, and v1.1.7 immutable-revision update have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. This document does not claim otherwise. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
 
 All major security architecture claims in the specification have been verified against actual workflow implementations:

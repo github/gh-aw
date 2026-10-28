@@ -85,6 +85,14 @@ function isOrdinaryPREvent() {
   return context.eventName === "pull_request" && !["labeled", "unlabeled"].includes(context.payload.action || "");
 }
 
+function allowsFloatingHead() {
+  return process.env.GH_AW_ALLOW_FLOATING_HEAD === "true";
+}
+
+function usesEventRevision() {
+  return isOrdinaryPREvent() && !allowsFloatingHead();
+}
+
 /**
  * Issue comments have no historical PR head SHA. They authorize latest-head
  * execution, not approval of a revision. PR update timestamps also advance
@@ -104,7 +112,9 @@ function validateCommentContext(commentTime, pullRequest) {
 
 async function resolvePRHeadSha(pullRequest, awContext) {
   let expectedSha;
-  if (context.eventName === "pull_request_review") {
+  if (allowsFloatingHead()) {
+    expectedSha = pullRequest.head?.sha;
+  } else if (context.eventName === "pull_request_review") {
     expectedSha = context.payload.review?.commit_id;
     if (!isCommitSha(expectedSha)) {
       throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid review commit SHA; trigger a new review event`);
@@ -141,7 +151,7 @@ async function resolvePRHeadSha(pullRequest, awContext) {
   if (!isCommitSha(sha)) {
     throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid PR head SHA; expected a full 40-character hexadecimal commit SHA`);
   }
-  if (expectedSha && !isOrdinaryPREvent() && (!isCommitSha(pullRequest.head?.sha) || pullRequest.head.sha.toLowerCase() !== expectedSha)) {
+  if (expectedSha && !usesEventRevision() && (!isCommitSha(pullRequest.head?.sha) || pullRequest.head.sha.toLowerCase() !== expectedSha)) {
     throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: PR head changed since the triggering revision; trigger a new event for the current revision`);
   }
   return sha.toLowerCase();
@@ -566,10 +576,14 @@ async function main() {
   try {
     const trustedPRDetails = await assertTrustedCheckoutRuntime(workflowDispatchAwContext, pullRequest);
 
+    if (allowsFloatingHead()) {
+      core.warning("checkout.allow-floating-head is enabled: selecting the current PR head instead of the triggering revision; this is not revision approval.");
+    }
+
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);
 
-    if (isOrdinaryPREvent() && isFork === false && !isClosed) {
+    if (usesEventRevision() && isFork === false && !isClosed) {
       // Fetch the event commit, not a branch that may have moved or disappeared.
       const branchName = pullRequest.head.ref;
       // commits is in the payload for pull_request events; +1 to include the merge base
@@ -608,7 +622,7 @@ async function main() {
       const { commitCount: currentCommitCount, headRef, pullRequest: fullPR } = trustedPRDetails || (await fetchPRDetails(prNumber));
       const expectedSha = await resolvePRHeadSha(fullPR, workflowDispatchAwContext);
       // Ordinary PR events select the historical event SHA, not the live head.
-      const commitCount = isOrdinaryPREvent() ? pullRequest.commits : currentCommitCount;
+      const commitCount = usesEventRevision() ? pullRequest.commits : currentCommitCount;
 
       // Re-evaluate fork status with full PR data when it was unknown
       const fullPRForkDetection = detectForkPR(fullPR);
@@ -636,7 +650,7 @@ async function main() {
       core.info(prFetchArgs.length > 0 ? `Fetching with ${prFetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
       // Origin must permit fetching reachable unadvertised commit SHAs.
       await fetchPRHead([`+${expectedSha}:${PR_HEAD_BASE_REF}`, ...prFetchArgs]);
-      if (!isOrdinaryPREvent()) {
+      if (!usesEventRevision()) {
         const currentDetails = await fetchPRDetails(prNumber);
         const currentSha = await resolvePRHeadSha(currentDetails.pullRequest, workflowDispatchAwContext);
         if (currentSha !== expectedSha) {

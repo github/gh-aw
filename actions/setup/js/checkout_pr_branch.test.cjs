@@ -133,6 +133,7 @@ describe("checkout_pr_branch.cjs", () => {
     process.env.GITHUB_TOKEN = "test-token";
     process.env.GITHUB_SERVER_URL = "https://github.com";
     delete process.env.GH_AW_ALLOWED_BOTS;
+    delete process.env.GH_AW_ALLOW_FLOATING_HEAD;
   });
 
   afterEach(() => {
@@ -143,6 +144,7 @@ describe("checkout_pr_branch.cjs", () => {
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_SERVER_URL;
     delete process.env.GH_AW_ALLOWED_BOTS;
+    delete process.env.GH_AW_ALLOW_FLOATING_HEAD;
     vi.clearAllMocks();
   });
 
@@ -275,6 +277,119 @@ If the pull request is still open, verify that:
       await runScript();
       expectRejectedBeforeCheckout();
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    describe("explicit floating-head checkout", () => {
+      beforeEach(() => {
+        process.env.GH_AW_ALLOW_FLOATING_HEAD = "true";
+      });
+
+      it.each(["same-repository", "fork", "closed"])("selects the current API head and depth for a delayed %s PR event", async checkoutPath => {
+        mockContext.payload.action = "synchronize";
+        mockContext.payload.pull_request.head.sha = newerSha;
+        mockContext.payload.pull_request.commits = 10;
+        if (checkoutPath === "fork") mockContext.payload.pull_request.head.repo.full_name = "fork-owner/test-repo";
+        if (checkoutPath === "closed") mockContext.payload.pull_request.state = "closed";
+        await runScript();
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockFetch).toHaveBeenCalledWith("git", ["fetch", "origin", `+${sha}:refs/remotes/origin/pr-head`, "--depth=2"], expect.anything());
+        expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", sha);
+        expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("checkout.allow-floating-head is enabled"));
+      });
+
+      it.each(["pull_request_review", "pull_request_review_comment", "pull_request", "issue_comment", "workflow_dispatch"])("does not require revision/freshness evidence for %s", async eventName => {
+        mockContext.eventName = eventName;
+        mockContext.payload.action = "labeled";
+        delete mockContext.payload.review.commit_id;
+        delete mockContext.payload.comment;
+        delete mockContext.payload.pull_request.head.sha;
+        if (eventName === "workflow_dispatch") {
+          mockContext.payload = {
+            repository: { fork: false },
+            sender: { type: "Bot", login: "github-actions[bot]" },
+            inputs: { aw_context: JSON.stringify({ item_type: "pull_request", item_number: 123, command_name: "test", actor: "test-actor" }) },
+          };
+          mockContext.actor = "github-actions[bot]";
+        }
+        await runScript();
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", sha);
+      });
+
+      it("still rejects a head change during fetch", async () => {
+        const current = (await mockGithub.rest.pulls.get()).data;
+        mockFetch.mockImplementation(async () => {
+          mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...current, head: { ...current.head, sha: newerSha } } });
+          return { exitCode: 0, stdout: "", stderr: "" };
+        });
+        await runScript();
+        expectRejectedBeforeCheckout();
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("PR head changed while fetching"));
+      });
+
+      it.each(["review", "label", "dispatch"])("allows stale %s evidence without treating it as approval", async source => {
+        if (source === "review") {
+          mockContext.eventName = "pull_request_review";
+          mockContext.payload.review.commit_id = newerSha;
+        } else if (source === "label") {
+          mockContext.payload.action = "labeled";
+          mockContext.payload.pull_request.head.sha = newerSha;
+        } else {
+          mockContext.eventName = "workflow_dispatch";
+          mockContext.payload = {
+            repository: { fork: false },
+            inputs: { aw_context: JSON.stringify({ item_type: "pull_request", item_number: 123, trigger_label: "test", pr_head_sha: newerSha }) },
+          };
+        }
+        await runScript();
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", sha);
+        expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("not revision approval"));
+      });
+
+      it("preserves full history without widening the fetch", async () => {
+        const original = mockExec.getExecOutput.getMockImplementation();
+        mockExec.getExecOutput.mockImplementation((cmd, args, options) => (args.includes("--is-shallow-repository") ? { exitCode: 0, stdout: "false\n", stderr: "" } : original(cmd, args, options)));
+        await runScript();
+        expect(mockCore.setFailed).not.toHaveBeenCalled();
+        expect(mockFetch).toHaveBeenCalledWith("git", ["fetch", "origin", `+${sha}:refs/remotes/origin/pr-head`], expect.anything());
+      });
+
+      it("still verifies the actual commit before exporting a baseline", async () => {
+        const original = mockExec.getExecOutput.getMockImplementation();
+        mockExec.getExecOutput.mockImplementation((cmd, args, options) => (args.includes("HEAD^{commit}") ? { exitCode: 0, stdout: newerSha, stderr: "" } : original(cmd, args, options)));
+        await runScript();
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("checked-out HEAD does not match expected commit"));
+        expect(mockCore.exportVariable).not.toHaveBeenCalled();
+      });
+
+      it.each(["invalid head", "API failure", "insufficient permission", "fork dispatch", "cross-repository dispatch", "malformed dispatch"])("fails closed for %s", async failure => {
+        if (failure === "invalid head") {
+          const current = (await mockGithub.rest.pulls.get()).data;
+          mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...current, head: { ...current.head, sha: "main" } } });
+        } else if (failure === "API failure") {
+          mockGithub.rest.pulls.get.mockRejectedValue(new Error("PR API unavailable"));
+        } else if (failure === "insufficient permission") {
+          mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "read" } });
+        } else {
+          mockContext.eventName = "workflow_dispatch";
+          mockContext.payload = {
+            repository: { fork: failure === "fork dispatch" },
+            inputs: { aw_context: failure === "malformed dispatch" ? "{" : JSON.stringify({ item_type: "pull_request", item_number: 123, repo: failure === "fork dispatch" ? "test-owner/test-repo" : "other/repo" }) },
+          };
+        }
+        await runScript();
+        expectRejectedBeforeCheckout();
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it.each(["false", "TRUE", "1"])("does not enable floating checkout with environment value %s", async value => {
+        process.env.GH_AW_ALLOW_FLOATING_HEAD = value;
+        mockContext.eventName = "pull_request_review";
+        mockContext.payload.review.commit_id = newerSha;
+        await runScript();
+        expectRejectedBeforeCheckout();
+      });
     });
 
     it.each(["pull_request_review", "pull_request_review_comment"])("rejects a stale %s even if the PR payload has the current head", async eventName => {

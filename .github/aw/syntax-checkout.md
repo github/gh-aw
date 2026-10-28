@@ -67,6 +67,7 @@ checkout:
 - `safe-outputs-github-app:` - GitHub App used only by safe-output checkout/fetch/push operations for this target; does not change activation/agent checkout authentication
 - `current:` - Marks this checkout as the logical current/primary repository for the workflow (only one entry may set this)
 - `pull-request:` - Set `false` to disable the compiler-generated PR branch checkout and its base-config snapshot/restore steps
+- `allow-floating-head:` - Literal boolean, default `false`. Set `true` to select the current API PR head rather than the event/review revision; applies workflow-wide if enabled in any checkout entry. Still fetches and verifies a specific SHA and rejects fetch-time head changes. This is current-head execution, not revision approval; actor and fork restrictions remain enforced.
 - `force-clean-git-credentials:` - Persist credentials during checkout, then run a post-checkout cleanup step that removes them from root and submodule git configs
 
 ## Multi-repository checkout (`multi: true`)

@@ -3,13 +3,34 @@
 package workflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/require"
 )
+
+func TestCompilePRFloatingHead(t *testing.T) {
+	for _, list := range []bool{false, true} {
+		t.Run(fmt.Sprint(list), func(t *testing.T) {
+			checkout := "  allow-floating-head: true"
+			if list {
+				checkout = "  - allow-floating-head: true"
+			}
+			content := "---\non:\n  pull_request:\n    types: [opened]\npermissions:\n  contents: read\nengine: copilot\ncheckout:\n" + checkout + "\n---\nReview the PR.\n"
+			file := filepath.Join(t.TempDir(), "floating-head.md")
+			require.NoError(t, os.WriteFile(file, []byte(content), 0o600))
+			require.NoError(t, NewCompiler().CompileWorkflow(file))
+			compiled, err := os.ReadFile(strings.TrimSuffix(file, ".md") + ".lock.yml")
+			require.NoError(t, err)
+			require.Contains(t, string(compiled), `GH_AW_ALLOW_FLOATING_HEAD: "true"`)
+			require.Equal(t, 1, strings.Count(string(compiled), "GH_AW_ALLOW_FLOATING_HEAD"))
+		})
+	}
+}
 
 // TestPRBranchCheckout verifies that PR branch checkout is added for comment triggers
 func TestPRBranchCheckout(t *testing.T) {

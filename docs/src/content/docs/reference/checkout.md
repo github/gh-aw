@@ -15,7 +15,7 @@ Use `checkout:` when you need to check out additional branches, check out multip
 
 ## PR Revision Binding
 
-The compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch. Ordinary `pull_request` events use the event's head SHA, even if the branch subsequently moves or is deleted. Review and review-comment events use their `commit_id`; label events use their recorded PR head SHA. These paths reject a detected head change, except ordinary `pull_request` events, which retain the event revision.
+By default, the compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch. Ordinary `pull_request` events use the event's head SHA, even if the branch subsequently moves or is deleted. Review and review-comment events use their `commit_id`; label events use their recorded PR head SHA. These paths reject a detected head change, except ordinary `pull_request` events, which retain the event revision.
 
 Centralized command/label dispatch propagates event-recorded revision evidence in `aw_context.pr_head_sha`. A revision-bound dispatch must provide a full 40-character commit SHA matching the current PR head. Missing required evidence, malformed PR context, API failures, and detected head changes stop checkout rather than continuing on the previous workspace.
 
@@ -25,6 +25,22 @@ These checks preserve the existing actor permission floor and same-repository bo
 
 > [!NOTE]
 > Immutable checkout requires the current repository's `origin` to serve the selected commit by SHA, including reachable unadvertised commits, fork PR commits, and retained commits after branch deletion. Support depends on the Git server's commit availability and upload-pack SHA fetch policy; local tests do not establish compatibility with every GitHub.com or GitHub Enterprise Server configuration. If the server cannot serve that commit, checkout fails with diagnostic guidance rather than falling back to a moving PR ref.
+
+### Allow Floating Head
+
+To select the current PR head at execution time instead of the triggering event or review revision, explicitly opt in:
+
+```aw wrap
+checkout:
+  allow-floating-head: true
+```
+
+The default is `false`. With `true`, checkout ignores event/review SHA and comment freshness evidence, resolves the current head through the PR API, and uses the current commit count for fetch depth. It still fetches that specific SHA, rechecks the head after fetch, and verifies actual `HEAD`. A head change during fetch fails; this option does not restore mutable-ref fetching or bypass the server's SHA-fetch requirements.
+
+> [!WARNING]
+> Floating-head checkout can execute commits pushed after a label, review, or command. It authorizes current-head execution, not approval of those commits. Do not enable it when the triggering event is intended to approve privileged execution of a specific revision.
+
+Actor permissions, fork/bot restrictions, dispatch repository/shape validation, and safe-output lifecycle checks remain enforced. The setting applies workflow-wide when any entry in a `checkout:` list enables it; it does not enable checkout when `checkout: false`, `pull-request: false`, or the compiler's PR-target policy suppresses the PR checkout step. Recompile the workflow with the updated compiler/runtime to apply the setting.
 
 ## Custom Checkout Settings
 
@@ -61,6 +77,8 @@ checkout:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `pull-request` | boolean | Set `false` to disable automatic PR checkout and its paired base-config snapshot/restore steps. The normal repository checkout remains enabled. |
+| `allow-floating-head` | boolean | Select the current API head instead of event/review revision evidence. Defaults to `false`; literal boolean only. Applies workflow-wide if any checkout entry enables it. See [Allow Floating Head](#allow-floating-head). |
 | `repository` | string | Explicit repository in `owner/repo` format, or a newline-separated list with `multi: true`. Without `multi`, expressions must resolve to exactly one repository and need no allowlist. Does not support wildcards. Defaults to the current repository. |
 | `repo` | string | Alias for `repository`; specify only one. Does not support wildcards. |
 | `multi` | boolean | Explicitly enables runtime repository-list expansion and its restrictions. Defaults to `false`; must be a literal boolean. |
