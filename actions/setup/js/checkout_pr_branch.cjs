@@ -7,21 +7,21 @@
  * This script handles checkout for different GitHub event types:
  *
  * 1. pull_request: Runs in merge commit context (PR head + base merged)
- *    - Uses refs/pull/N/head even for same-repository PRs
- *    - The retained PR ref survives head branch deletion after merge
+ *    - Fetches the immutable event head SHA, even after branch deletion
  *
  * 2. pull_request_target: Runs in BASE repository context (not PR head)
  *    - CRITICAL: For fork PRs, the head branch doesn't exist in base repo
- *    - Uses refs/pull/N/head to fetch from origin (works for forks too)
+ *    - Fetches the immutable event head SHA from origin (works for forks too)
  *    - Has write permissions (be cautious with untrusted code)
  *
  * 3. Other PR events (issue_comment, pull_request_review, etc.):
  *    - Also run in base repository context
- *    - Uses refs/pull/N/head to fetch PR branch
+ *    - Review events bind to the review/comment commit; issue comments select
+ *      the current head, not a historically approved revision
  *
  * 4. workflow_dispatch with aw_context:
  *    - When aw_context input contains item_type=="pull_request" and item_number,
- *      the PR number is extracted and the head is fetched via refs/pull/N/head
+ *      the PR number is extracted and a specific head SHA is fetched
  *    - Mirrors the guard in the compiled workflow's if: condition
  *
  * NOTE: This handler operates within the PR context from the workflow event
@@ -66,14 +66,90 @@ async function fetchPRHead(args) {
   }
 }
 
+/** @param {unknown} value @returns {value is string} */
+function isCommitSha(value) {
+  return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
+}
+
+function isOrdinaryPREvent() {
+  return context.eventName === "pull_request" && !["labeled", "unlabeled"].includes(context.payload.action || "");
+}
+
+/**
+ * Issue comments have no historical PR head SHA. They authorize latest-head
+ * execution, not approval of a revision. PR update timestamps also advance
+ * for unrelated activity such as the router's own status comment.
+ */
+function validateCommentContext(commentTime, pullRequest) {
+  const commandTime = typeof commentTime === "string" ? Date.parse(commentTime) : NaN;
+  const updateTime = typeof pullRequest.updated_at === "string" ? Date.parse(pullRequest.updated_at) : NaN;
+  if (!Number.isFinite(commandTime) || !Number.isFinite(updateTime)) {
+    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: comment freshness metadata is missing or invalid; rerun from a PR event or disable PR checkout`);
+  }
+  if (updateTime > commandTime) {
+    core.warning("PR was updated after the triggering comment; selecting the current head, not an approved revision.");
+  }
+  core.warning("Issue comments select the current PR head; they do not prove approval of that revision.");
+}
+
+async function resolvePRHeadSha(pullRequest, awContext) {
+  let expectedSha;
+  if (context.eventName === "pull_request_review") {
+    expectedSha = context.payload.review?.commit_id;
+    if (!isCommitSha(expectedSha)) {
+      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid review commit SHA; trigger a new review event`);
+    }
+  } else if (context.eventName === "pull_request_review_comment") {
+    expectedSha = context.payload.comment?.commit_id;
+    if (!isCommitSha(expectedSha)) {
+      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid review comment commit SHA; trigger a new review comment event`);
+    }
+  } else if (context.eventName === "issue_comment") {
+    validateCommentContext(context.payload.comment?.updated_at ?? context.payload.comment?.created_at, pullRequest);
+  } else if (context.eventName === "workflow_dispatch") {
+    expectedSha = awContext?.pr_head_sha === "" ? undefined : awContext?.pr_head_sha;
+    if (awContext?.command_name || awContext?.trigger_label) {
+      if (awContext.event_type === "issue_comment") {
+        validateCommentContext(awContext.comment_updated_at, pullRequest);
+      } else if (!isCommitSha(expectedSha)) {
+        throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: command/label dispatch has no immutable PR revision context; trigger a new PR/review event through the current router`);
+      }
+    } else if (expectedSha === undefined) {
+      core.warning("Manual PR dispatch selects the current head, not an approved revision.");
+    }
+  } else {
+    expectedSha = context.payload.pull_request?.head?.sha;
+    if (!isCommitSha(expectedSha)) {
+      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid event PR head SHA; trigger a new PR event`);
+    }
+  }
+  if (expectedSha !== undefined && !isCommitSha(expectedSha)) {
+    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: invalid event PR head SHA; expected a full 40-character hexadecimal commit SHA`);
+  }
+  const sha = expectedSha || pullRequest.head?.sha;
+  if (!isCommitSha(sha)) {
+    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid PR head SHA; expected a full 40-character hexadecimal commit SHA`);
+  }
+  if (expectedSha && !isOrdinaryPREvent() && pullRequest.head?.sha !== expectedSha) {
+    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: PR head changed since the triggering revision; trigger a new event for the current revision`);
+  }
+  return sha;
+}
+
+/** @param {string} expectedSha */
+async function assertCheckedOutRevision(expectedSha) {
+  const actualSha = await resolveCheckedOutHeadSha();
+  if (actualSha !== expectedSha) {
+    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: checked-out HEAD does not match expected commit ${expectedSha}; stop and inspect the checkout`);
+  }
+  return actualSha;
+}
+
 /**
  * Resolve the commit SHA actually checked out at HEAD.
  *
- * Payload/API `head.sha` values can go stale if the PR advances between the
- * event/API read and the `git fetch` above, or be absent from a shallow
- * fetch. Resolving `HEAD^{commit}` after checkout reflects exactly what was
- * fetched and checked out, so patch generation never ranges over commits the
- * workflow never saw.
+ * Resolve independently of the payload/API so an unexpected fetch or checkout
+ * result cannot become a successful revision binding or patch baseline.
  *
  * @returns {Promise<string | null>}
  */
@@ -94,13 +170,9 @@ async function resolveCheckedOutHeadSha() {
   }
 }
 
-async function exportPRHeadBaseline({ branchName, baseRepo, headRepo, prNumber }) {
+async function exportPRHeadBaseline({ branchName, baseRepo, headRepo, prNumber, expectedSha }) {
+  const baseSha = await assertCheckedOutRevision(expectedSha);
   if (!branchName) {
-    return;
-  }
-  const baseSha = await resolveCheckedOutHeadSha();
-  if (!baseSha) {
-    core.warning("Could not resolve checked-out HEAD commit; skipping PR head baseline export for incremental patches.");
     return;
   }
   core.exportVariable("GH_AW_PR_HEAD_BASE_BRANCH", branchName);
@@ -429,13 +501,19 @@ async function main() {
     if (awContextStr) {
       try {
         const awContext = JSON.parse(awContextStr);
+        if (!awContext || typeof awContext !== "object" || Array.isArray(awContext)) {
+          throw new Error(`${ERR_PERMISSION}: aw_context must be an object, for example {"item_type":"pull_request","item_number":123}`);
+        }
         workflowDispatchAwContext = awContext;
         const prNumber = parsePullRequestNumber(awContext.item_number);
-        if (awContext.item_type === "pull_request" && prNumber !== null) {
-          if (awContext.repo) {
+        if (awContext.item_type === "pull_request") {
+          if (prNumber === null) {
+            throw new Error(`${ERR_PERMISSION}: aw_context must identify a canonical positive PR number, for example {"item_type":"pull_request","item_number":123}`);
+          }
+          if (awContext.repo !== undefined && awContext.repo !== "") {
             const currentRepo = `${context.repo.owner}/${context.repo.repo}`;
             if (awContext.repo !== currentRepo) {
-              core.warning(`Cross-repository workflow_dispatch is not supported: aw_context.repo (${awContext.repo}) does not match current repository (${currentRepo}), skipping checkout`);
+              throw new Error(`${ERR_PERMISSION}: Cross-repository workflow_dispatch is not supported: aw_context.repo does not match the current repository; dispatch in the PR repository instead`);
             } else {
               pullRequest = {
                 number: prNumber,
@@ -452,7 +530,9 @@ async function main() {
           }
         }
       } catch (e) {
-        core.warning(`Failed to parse aw_context: ${getErrorMessage(e)}`);
+        core.setOutput("checkout_pr_success", "false");
+        core.setFailed(`${ERR_PERMISSION}: Refusing PR checkout: invalid aw_context: ${redactCheckoutDiagnostics(getErrorMessage(e))}`);
+        return;
       }
     }
   }
@@ -478,20 +558,20 @@ async function main() {
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);
 
-    if (eventName === "pull_request" && isFork === false && !isClosed) {
-      // Use the retained PR head ref, not the branch name: the PR may have
-      // merged and its branch disappeared since the webhook was captured.
+    if (isOrdinaryPREvent() && isFork === false && !isClosed) {
+      // Fetch the event commit, not a branch that may have moved or disappeared.
       const branchName = pullRequest.head.ref;
       // commits is in the payload for pull_request events; +1 to include the merge base
       const commitCount = pullRequest.commits || 1;
       const fetchDepth = commitCount + 1;
+      const expectedSha = await resolvePRHeadSha(pullRequest, workflowDispatchAwContext);
 
-      logCheckoutStrategy(eventName, "git fetch refs/pull + checkout", "same-repository pull_request event; retained PR head ref survives branch deletion");
+      logCheckoutStrategy(eventName, "git fetch SHA + checkout", "same-repository pull_request event; immutable event SHA survives branch deletion");
 
-      core.info(`Fetching PR #${pullRequest.number} head via refs/pull/${pullRequest.number}/head (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
+      core.info(`Fetching PR #${pullRequest.number} commit ${expectedSha} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
       const fetchArgs = await depthArgs(fetchDepth);
       core.info(fetchArgs.length > 0 ? `Fetching with ${fetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
-      await fetchPRHead([`+refs/pull/${pullRequest.number}/head:${PR_HEAD_BASE_REF}`, ...fetchArgs]);
+      await fetchPRHead([`+${expectedSha}:${PR_HEAD_BASE_REF}`, ...fetchArgs]);
 
       core.info(`Checking out branch: ${branchName}`);
       await exec.exec("git", ["checkout", "-B", branchName, PR_HEAD_BASE_REF]);
@@ -501,19 +581,20 @@ async function main() {
         baseRepo: pullRequest.base?.repo?.full_name || `${context.repo.owner}/${context.repo.repo}`,
         headRepo: pullRequest.head?.repo?.full_name,
         prNumber: pullRequest.number,
+        expectedSha,
       });
       core.info(`✅ Successfully checked out branch: ${branchName}`);
     } else {
       // For pull_request_target, fork pull_request events, and other PR events,
       // we run in base repository context.
-      // Use refs/pull/N/head which GitHub makes available for all PRs (including forks)
-      // so we don't need `gh pr checkout` and avoid GH_HOST / DIFC proxy issues.
+      // Fetch the resolved SHA from origin for same-repository and fork PRs.
       const prNumber = pullRequest.number;
 
       // Get PR details from API to determine head ref name and commit count.
       // This also gives us the full PR object for accurate fork detection
       // when the event payload only had a minimal PR (e.g. issue_comment).
       const { commitCount, headRef, pullRequest: fullPR } = trustedPRDetails || (await fetchPRDetails(prNumber));
+      const expectedSha = await resolvePRHeadSha(fullPR, workflowDispatchAwContext);
 
       // Re-evaluate fork status with full PR data when it was unknown
       const fullPRForkDetection = detectForkPR(fullPR);
@@ -524,22 +605,29 @@ async function main() {
 
       const strategyReason =
         eventName === "pull_request_target"
-          ? "pull_request_target runs in base repo context; fetching via refs/pull/N/head"
+          ? "pull_request_target runs in base repo context; fetching an immutable PR head SHA"
           : eventName === "pull_request" && actualIsFork
-            ? "pull_request event from fork repository; fetching via refs/pull/N/head"
-            : `${eventName} event runs in base repo context; fetching via refs/pull/N/head`;
+            ? "pull_request event from fork repository; fetching an immutable PR head SHA"
+            : `${eventName} event runs in base repo context; fetching an immutable PR head SHA`;
 
-      logCheckoutStrategy(eventName, "git fetch refs/pull + checkout", strategyReason);
+      logCheckoutStrategy(eventName, "git fetch SHA + checkout", strategyReason);
 
       if (actualIsFork) {
-        core.warning("⚠️ Fork PR detected - fetching via refs/pull/N/head from origin");
+        core.warning("⚠️ Fork PR detected - fetching an immutable PR head SHA from origin");
       }
       const fetchDepth = (commitCount || 1) + 1; // +1 to include the merge base
 
-      core.info(`Fetching PR #${prNumber} head via refs/pull/${prNumber}/head (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
+      core.info(`Fetching PR #${prNumber} commit ${expectedSha} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
       const prFetchArgs = await depthArgs(fetchDepth);
       core.info(prFetchArgs.length > 0 ? `Fetching with ${prFetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
-      await fetchPRHead([`+refs/pull/${prNumber}/head:${PR_HEAD_BASE_REF}`, ...prFetchArgs]);
+      await fetchPRHead([`+${expectedSha}:${PR_HEAD_BASE_REF}`, ...prFetchArgs]);
+      if (!isOrdinaryPREvent()) {
+        const currentDetails = await fetchPRDetails(prNumber);
+        const currentSha = await resolvePRHeadSha(currentDetails.pullRequest, workflowDispatchAwContext);
+        if (currentSha !== expectedSha) {
+          throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: PR head changed while fetching the triggering revision; trigger a new event for the current revision`);
+        }
+      }
 
       const branchName = headRef || `pr-${prNumber}`;
       core.info(`Checking out branch: ${branchName}`);
@@ -550,6 +638,7 @@ async function main() {
         baseRepo: fullPR.base?.repo?.full_name || `${context.repo.owner}/${context.repo.repo}`,
         headRepo: fullPR.head?.repo?.full_name,
         prNumber,
+        expectedSha,
       });
       core.info(`✅ Successfully checked out PR #${prNumber}`);
       core.info(`Current branch: ${branchName}`);

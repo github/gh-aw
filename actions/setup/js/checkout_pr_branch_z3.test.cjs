@@ -39,7 +39,7 @@ describe("RS-05a checkout validator Z3 proof", () => {
       "centralized_dispatch_rejects_router_self_propagation",
       "workflow_dispatch_rejects_cross_repository_aw_context",
       "workflow_dispatch_rejects_noncanonical_pr_number",
-      "workflow_dispatch_uses_refs_pull_checkout",
+      "workflow_dispatch_uses_api_head_checkout",
       "non_dispatch_pr_trigger_allows_forked_runtime_after_trust",
     ]);
     expect(expected.filter(result => result.expected === "unsat")).toHaveLength(11);

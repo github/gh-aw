@@ -5,7 +5,9 @@
 ; - workflow_dispatch aw_context parsing and repository scoping
 ; - assertTrustedCheckoutRuntime fork and actor trust checks
 ; - allow-listed same-repository App comment and review authorization
-; - refs/pull/N/head isolation for workflow_dispatch PR replay
+; - immutable head fetch from origin for workflow_dispatch PR replay
+; Revision identity and freshness are covered by runtime tests, not this
+; authorization model; checkout_executes overapproximates those later gates.
 ;
 ; Every safety query is phrased as "does there exist an unsafe checkout?"
 ; and is expected to be unsatisfiable. The final query is a positive
@@ -137,7 +139,7 @@
        has_payload_pr
        pull_request_same_repo))
 
-(define-fun refs_pull_checkout () Bool
+(define-fun api_head_checkout () Bool
   (and pull_request_context
        trusted_runtime
        (not direct_pull_request_branch_checkout)
@@ -146,7 +148,7 @@
 (define-fun checkout_executes () Bool
   (and pull_request_context
        trusted_runtime
-       (or direct_pull_request_branch_checkout refs_pull_checkout)))
+       (or direct_pull_request_branch_checkout api_head_checkout)))
 
 ; EXPECT: workflow_dispatch_requires_verified_non_fork unsat
 (push)
@@ -303,12 +305,12 @@
 (check-sat)
 (pop)
 
-; EXPECT: workflow_dispatch_uses_refs_pull_checkout unsat
+; EXPECT: workflow_dispatch_uses_api_head_checkout unsat
 (push)
 (assert checkout_executes)
 (assert (= event workflow_dispatch))
-(assert (not refs_pull_checkout))
-(echo "workflow_dispatch_uses_refs_pull_checkout")
+(assert (not api_head_checkout))
+(echo "workflow_dispatch_uses_api_head_checkout")
 (check-sat)
 (pop)
 
@@ -323,7 +325,7 @@
 (assert (= effective_actor_permission perm_write))
 (assert api_pr_details_available)
 (assert checkout_executes)
-(assert refs_pull_checkout)
+(assert api_head_checkout)
 (echo "non_dispatch_pr_trigger_allows_forked_runtime_after_trust")
 (check-sat)
 (pop)

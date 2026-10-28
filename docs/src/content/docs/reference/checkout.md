@@ -13,6 +13,16 @@ Before the agent job, activation separately checks out workflow configuration to
 
 Use `checkout:` when you need to check out additional branches, check out multiple repositories, or to disable checkout entirely for workflows that don't need to access code or can access code dynamically through the GitHub Tools.
 
+## PR Revision Binding
+
+The compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch. Ordinary `pull_request` events use the event's head SHA, even if the branch subsequently moves or is deleted. Review and review-comment events use their `commit_id`; label events use their recorded PR head SHA. These paths reject a detected head change, except ordinary `pull_request` events, which retain the event revision.
+
+Centralized command/label dispatch propagates event-recorded revision evidence in `aw_context.pr_head_sha`. A revision-bound dispatch must provide a full 40-character commit SHA matching the current PR head. Missing required evidence, malformed PR context, API failures, and detected head changes stop checkout rather than continuing on the previous workspace.
+
+Issue comments contain no historical PR head SHA. Comment commands therefore authorize **current-head execution**, not approval of a particular revision. They require valid comment creation/edit and PR update timestamps and warn when the PR was updated after the triggering comment; the resolved head is pinned and checked again after fetch. Timestamps cannot prove which revision was reviewed: unrelated activity, including the router's status comment, also updates the PR. Manual PR dispatch without command/label markers or a supplied revision also selects the current head; it is not revision approval. Workflows requiring revision approval should use a revision-bearing PR/review event or disable automatic PR checkout with `checkout: { pull-request: false }`. A comment command alone is not suitable for approving privileged execution of PR code.
+
+These checks preserve the existing actor permission floor and same-repository bot restrictions. A matching SHA proves commit identity, not that PR code is safe to execute with credentials. Fetching still requires credentials available to the checkout step; the helper does not persist credentials, widen sparse paths, or unshallow a repository.
+
 ## Custom Checkout Settings
 
 You can use `checkout:` to override default checkout settings (e.g., fetch depth, sparse checkout) without needing to define a custom job:
