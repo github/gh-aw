@@ -140,11 +140,15 @@ function renderSizedReport(report, maxLength = MAX_BODY_LENGTH) {
 /**
  * Preserve existing Markdown exactly when it fits. On overflow, reserve the
  * trusted prefix/footer strings verbatim and fit only the agent body tree.
- * @param {string} body
+ * Callers that already assembled a typed Report tree (for example with a
+ * structured footer) MAY pass it directly instead of raw Markdown; it is
+ * measured and fitted the same way, without the raw-string prefix/suffix path.
+ * @param {string | Report} body
  * @param {{prefix?: string, suffix?: string, maxLength?: number, allowedMentions?: string[]}} [options]
  */
 function fitMarkdownBody(body, { prefix = "", suffix = "", maxLength = MAX_BODY_LENGTH, allowedMentions = [] } = {}) {
   if (!Number.isSafeInteger(maxLength) || maxLength < 1) throw new TypeError("Report body size limit must be a positive integer");
+  if (typeof body === "object" && body !== null) return renderSizedReport(body, maxLength).body;
   if (prefix.length + body.length + suffix.length <= maxLength) return prefix + body + suffix;
   const budget = maxLength - prefix.length - suffix.length;
   if (budget < 1) throw new Error(`${ERR_VALIDATION}: Protected markers and footers exceed the maximum body length of ${maxLength} characters`);

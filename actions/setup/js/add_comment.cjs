@@ -19,7 +19,7 @@ const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { getMessages } = require("./messages_core.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { MAX_COMMENT_LENGTH, MAX_COMMENT_INPUT_LENGTH, MAX_MENTIONS, MAX_LINKS, enforceCommentLimits } = require("./comment_limit_helpers.cjs");
-const { renderSizedReport } = require("./report_size.cjs");
+const { fitMarkdownBody } = require("./report_size.cjs");
 const { createDiscussionComment, resolveTopLevelDiscussionCommentId } = require("./github_api_helpers.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { ERR_CONFIG, ERR_NOT_FOUND } = require("./error_codes.cjs");
@@ -839,7 +839,7 @@ async function main(config = {}) {
     // Enforce max limits again after adding footer and metadata
     // Length and mention limits include metadata; only agent content counts toward the link limit.
     try {
-      processedBody = renderSizedReport(report, MAX_COMMENT_LENGTH).body;
+      processedBody = fitMarkdownBody(report, { maxLength: MAX_COMMENT_LENGTH });
       enforceCommentLimits(processedBody, { maxLinks, linkBody });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
