@@ -77,6 +77,38 @@ Review the contribution.
 	}
 }
 
+func TestPullRequestTargetDefaultForkFilterCompilation(t *testing.T) {
+	const sameRepo = "github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.id == github.repository_id"
+	for _, strict := range []bool{false, true} {
+		for _, on := range []string{
+			"pull_request_target",
+			"\n  pull_request_target: {}",
+			"\n  pull_request_target:\n    types: [labeled]\n  workflow_dispatch:",
+			"\n  pull_request_target:\n    types: [labeled]\n    forks: []\n  workflow_dispatch:",
+			"\n  pull_request_target:\n    types: [labeled]\n  pull_request:\n    forks: ['*']",
+		} {
+			t.Run(fmt.Sprintf("strict=%t/on=%s", strict, on), func(t *testing.T) {
+				compiled := compileTriggerFilterFixture(t, fmt.Sprintf(`---
+strict: %t
+on: %s
+if: github.actor != 'dependabot[bot]'
+checkout: false
+tools:
+  github: false
+---
+Review the contribution.
+`, strict, on))
+				jobs := compiled["jobs"].(map[string]any)
+				condition := jobs["activation"].(map[string]any)["if"].(string)
+				assert.Contains(t, condition, sameRepo)
+				assert.Contains(t, condition, "github.actor != 'dependabot[bot]'")
+				assert.NotContains(t, condition, "startsWith")
+				assert.NotContains(t, condition, "github.event_name != 'pull_request' ||")
+			})
+		}
+	}
+}
+
 func TestTriggerForkFilterCompilationRejectsMalformedValues(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -197,9 +229,6 @@ func TestApplyPullRequestForkFilter(t *testing.T) {
 						"on": map[string]any{event: tt.pr, "push": nil, "workflow_dispatch": nil},
 					})
 					filter := strings.ReplaceAll(tt.expected, "'pull_request'", "'"+event+"'")
-					if _, hasForks := tt.pr["forks"]; event == "pull_request_target" && !hasForks {
-						filter = ""
-					}
 					expected := filter
 					if existing != "" {
 						expected = existing

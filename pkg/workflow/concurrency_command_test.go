@@ -23,7 +23,7 @@ func TestCommandConcurrencyCompilation(t *testing.T) {
 		{name: "PR comment alias", on: "  slash_command:\n    name: test-bot\n    events: [pull_request_comment]"},
 		{name: "PR review comment", on: "  slash_command:\n    name: test-bot\n    events: [pull_request_review_comment]"},
 		{name: "PR review", on: "  slash_command: test-bot\n  pull_request_review:\n    types: [submitted]"},
-		{name: "PR target", on: "  slash_command: test-bot\n  pull_request_target:\n    types: [opened]\n    forks: []"},
+		{name: "PR target", on: "  slash_command: test-bot\n  pull_request_target:\n    types: [opened]"},
 		{name: "centralized command", on: "  slash_command:\n    name: test-bot\n    strategy: centralized"},
 		{name: "centralized command and PR", on: "  slash_command:\n    name: test-bot\n    strategy: centralized\n  pull_request:\n    types: [opened, synchronize]", mixedPR: true},
 		{name: "label command only", on: "  label_command: test-bot"},

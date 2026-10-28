@@ -20,7 +20,7 @@
 //  3. With on.roles containing all or read: reject in strict mode and warn in
 //     non-strict mode, regardless of checkout or trigger risk acknowledgment.
 //
-//  4. In strict mode, require explicit bounded fork admission regardless of
+//  4. In strict mode, require bounded fork admission regardless of
 //     checkout or trigger risk acknowledgment.
 //
 // # References
@@ -121,9 +121,9 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 	}
 	if effectiveStrictMode && !hasBoundedPullRequestTargetForks(workflowData.RawFrontmatter) {
 		return formatCompilerError(markdownPath, "error",
-			"pull_request_target requires explicit bounded fork admission in strict mode.\n"+
-				"Set on.pull_request_target.forks: [] for same-repository PRs only, or list exact\n"+
-				"repositories (owner/repo) or trusted owner/* patterns. Omission, '*' (including\n"+
+			"pull_request_target requires bounded fork admission in strict mode.\n"+
+				"Omit on.pull_request_target.forks for same-repository PRs only, or list exact\n"+
+				"repositories (owner/repo) or trusted owner/* patterns. '*' (including\n"+
 				"inside a list), expressions, and other patterns are not allowed.\n"+
 				"Trusted event actors can still act on attacker-controlled PR content.\n"+
 				"checkout: false and on.pull_request_target.acknowledge-risk do not bypass this requirement.\n"+
@@ -205,6 +205,9 @@ func (c *Compiler) validatePullRequestTargetTrigger(workflowData *WorkflowData, 
 }
 
 func hasBoundedPullRequestTargetForks(frontmatter map[string]any) bool {
+	if on, ok := frontmatter["on"].(string); ok {
+		return on == "pull_request_target"
+	}
 	on, ok := frontmatter["on"].(map[string]any)
 	if !ok {
 		return false
@@ -212,6 +215,9 @@ func hasBoundedPullRequestTargetForks(frontmatter map[string]any) bool {
 	trigger, ok := on["pull_request_target"].(map[string]any)
 	if !ok {
 		return false
+	}
+	if _, hasForks := trigger["forks"]; !hasForks {
+		return true
 	}
 	switch forks := trigger["forks"].(type) {
 	case string:

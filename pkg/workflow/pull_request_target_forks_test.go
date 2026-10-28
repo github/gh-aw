@@ -19,7 +19,7 @@ func TestPullRequestTargetBoundedForkAdmission(t *testing.T) {
 		forks  string
 		allows bool
 	}{
-		{"omitted", "", false},
+		{"omitted", "", true},
 		{"wildcard string", "'*'", false},
 		{"wildcard list", "['*']", false},
 		{"mixed wildcard", "[trusted/repo, '*']", false},
@@ -62,7 +62,7 @@ Review the contribution.
 				require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 				err := NewCompiler().CompileWorkflow(file)
 				if strict && !tt.allows {
-					require.ErrorContains(t, err, "requires explicit bounded fork admission")
+					require.ErrorContains(t, err, "requires bounded fork admission")
 					assert.Contains(t, err.Error(), "acknowledge-risk do not bypass")
 					assert.NoFileExists(t, filepath.Join(filepath.Dir(file), "workflow.lock.yml"))
 				} else {
@@ -91,7 +91,7 @@ Review the contribution.
 	require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
-	require.ErrorContains(t, compiler.CompileWorkflow(file), "requires explicit bounded fork admission")
+	require.ErrorContains(t, compiler.CompileWorkflow(file), "requires bounded fork admission")
 }
 
 func TestPullRequestTargetBoundedForkAdmissionShorthand(t *testing.T) {
@@ -99,18 +99,23 @@ func TestPullRequestTargetBoundedForkAdmissionShorthand(t *testing.T) {
 		on        string
 		wantError string
 	}{
-		{"pull_request_target", "requires explicit bounded fork admission"},
+		{"pull_request_target", ""},
 		{"[pull_request_target, workflow_dispatch]", "expected string or object"},
 		{"\n  pull_request_target:", "expected string or object"},
 		{"\n  pull_request_target: null", "expected string or object"},
-		{"\n  pull_request_target: {}", "requires explicit bounded fork admission"},
+		{"\n  pull_request_target: {}", ""},
 	} {
 		t.Run(tt.on, func(t *testing.T) {
 			source := "---\non: " + tt.on + "\ncheckout: false\ntools:\n  github: false\n---\nReview the contribution.\n"
 			file := filepath.Join(testutil.TempDir(t, "bounded-target-shorthand"), "workflow.md")
 			require.NoError(t, os.WriteFile(file, []byte(source), 0600))
-			require.ErrorContains(t, NewCompiler().CompileWorkflow(file), tt.wantError)
-			assert.NoFileExists(t, filepath.Join(filepath.Dir(file), "workflow.lock.yml"))
+			err := NewCompiler().CompileWorkflow(file)
+			if tt.wantError != "" {
+				require.ErrorContains(t, err, tt.wantError)
+				assert.NoFileExists(t, filepath.Join(filepath.Dir(file), "workflow.lock.yml"))
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

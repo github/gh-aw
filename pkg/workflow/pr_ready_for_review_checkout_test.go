@@ -280,7 +280,6 @@ Workflow triggered when a PR is closed.
 			workflowContent: `---
 on:
   pull_request_target:
-    forks: []
     types: [opened]
 permissions:
   contents: read

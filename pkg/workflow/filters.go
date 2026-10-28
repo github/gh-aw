@@ -105,7 +105,7 @@ func (c *Compiler) applyPullRequestDraftFilter(data *WorkflowData, frontmatter m
 
 // applyPullRequestForkFilter applies fork filter conditions for pull_request and pull_request_target triggers.
 // Supports repository patterns or an explicit author-association list.
-// Without an explicit forks field, only pull_request defaults to same-repo PRs.
+// Without an explicit forks field, configured PR events default to same-repo PRs.
 func (c *Compiler) applyPullRequestForkFilter(data *WorkflowData, frontmatter map[string]any) {
 	filtersLog.Print("Applying pull request fork filter")
 
@@ -127,15 +127,19 @@ func (c *Compiler) applyPullRequestForkFilter(data *WorkflowData, frontmatter ma
 	// Check if "on" is an object (not a string)
 	onMap, isOnMap := onValue.(map[string]any)
 	if !isOnMap {
+		if frontmatterHasTrigger(onValue, "pull_request_target") {
+			c.applyPullRequestEventForkFilter(data, "pull_request_target", nil)
+		}
 		return
 	}
 
 	for _, eventName := range []string{"pull_request", "pull_request_target"} {
-		prMap, ok := onMap[eventName].(map[string]any)
-		if !ok {
+		event, exists := onMap[eventName]
+		if !exists {
 			continue
 		}
-		if _, hasForks := prMap["forks"]; eventName == "pull_request_target" && !hasForks {
+		prMap, ok := event.(map[string]any)
+		if !ok && (eventName != "pull_request_target" || event != nil) {
 			continue
 		}
 		c.applyPullRequestEventForkFilter(data, eventName, prMap)

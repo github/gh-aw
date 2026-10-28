@@ -247,7 +247,6 @@ To check out a trusted ref such as the base SHA, opt in explicitly with a `check
 on:
   pull_request_target:
     types: [opened, synchronize]
-    forks: []  # Same-repository PRs only
 checkout:
   repository: ${{ github.repository }}
   ref: ${{ github.event.pull_request.base.sha }}
