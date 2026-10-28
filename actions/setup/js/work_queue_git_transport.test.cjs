@@ -19,7 +19,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 });
 
-function fixture(options = {}) {
+function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-test-"));
   cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
   const env = gitEnvironment();
@@ -29,7 +29,7 @@ function fixture(options = {}) {
       .trim();
   }
   git(["init", "--bare", "--quiet", "--initial-branch=main", "--template="]);
-  const queue = queueFixture({ count: 2, batch: 1, ...options });
+  const queue = queueFixture({ count: 2, batch: 1 });
   let head;
   let serial = 0;
   function store(transactions, { mode = "100644", parents = head ? [head] : [] } = {}) {
@@ -61,27 +61,6 @@ function fixture(options = {}) {
 }
 
 describe("Git-only work queue ledger", { timeout: 30000 }, () => {
-  it("links Work creation and Claim completion to their original Git revisions, even after compaction", async () => {
-    const f = fixture({ bound: true });
-    const created = f.head();
-    const member = f.queue.assignment.claims[0];
-    f.queue.append("finish", { dispatch_id: f.queue.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...f.queue.workerActor, dispatch_id: f.queue.assignment.dispatch_id, claim_handle: member.handle });
-    const finished = f.store(f.queue.transactions);
-    f.store(compactTransactions(f.queue.transactions, finished, f.queue.administrator, f.queue.at));
-    const head = f.head();
-    const links = await f.ledger.workQueueClaimLinks({ head, work_id: member.work_id, claim_id: member.claim_id });
-    const workLine = f.queue.transactions.findIndex(transaction => transaction.operations.some(operation => operation.kind === "Work" && operation.work_id === member.work_id)) + 1;
-    expect(links).toEqual({
-      work: `https://github.com/owner/repo/blob/${created}/work-queue.jsonl#L${workLine}`,
-      claim: `https://github.com/owner/repo/blob/${finished}/work-queue.jsonl#L${f.queue.transactions.length}`,
-    });
-    expect(await f.ledger.workQueueClaimLinks({ head: created, work_id: member.work_id, claim_id: member.claim_id })).toEqual({ work: links.work, claim: undefined });
-    const networkCalls = f.networkCalls.length;
-    expect(await f.ledger.workQueueClaimLinks({ head, work_id: member.work_id, claim_id: member.claim_id })).toBe(links);
-    expect(f.networkCalls).toHaveLength(networkCalls);
-    expect(f.calls).toEqual([]);
-  });
-
   it("looks up unchanged history locally but fetches a changed remote head", async () => {
     const f = fixture();
     const current = await readWorkQueueLog(f.options);

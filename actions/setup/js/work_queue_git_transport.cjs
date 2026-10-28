@@ -86,21 +86,19 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
   const objects = new Map();
   let cachedBytes = 0;
   const commitParents = new Map();
-  const claimLinks = new Map();
-  const operationOrigins = new Map();
   let fetched = false;
   let verifiedHead = "";
   let advertised = new Map();
   let defaultBranch = "";
 
   /** @param {string[]} args @param {string | Buffer | undefined} [input] */
-  function git(args, input = undefined, env = baseEnv, timeout = 120000) {
+  function git(args, input = undefined, env = baseEnv) {
     try {
       return execFileSync("git", ["-c", "credential.helper=", "-c", `core.hooksPath=${os.devNull}`, "-c", "http.followRedirects=false", "-c", "fetch.fsckObjects=true", "--git-dir", directory, ...args], {
         env,
         input,
         maxBuffer: 81 * 1024 * 1024,
-        timeout,
+        timeout: 120000,
         stdio: ["pipe", "pipe", "pipe"],
       });
     } catch (error) {
@@ -280,45 +278,6 @@ function createGitLedgerClient({ githubClient, owner, repo, branch, remote }) {
         result.set(file, new TextDecoder("utf-8", { fatal: true }).decode(await object(oid, "blob")));
       }
       return result;
-    },
-    async workQueueClaimLinks({ head, work_id, claim_id }) {
-      if (!OID.test(head)) throw queueError("ledger_invalid", "invalid queue Git revision");
-      const key = JSON.stringify([head, work_id, claim_id]);
-      if (claimLinks.has(key)) return claimLinks.get(key);
-      await fetchObjects();
-      const deadline = Date.now() + 1000;
-      function historyGit(args) {
-        const remaining = deadline - Date.now();
-        if (remaining <= 0) throw queueError("footer_history_timeout", "queue footer revision lookup exceeded its budget");
-        return git(args, undefined, baseEnv, remaining).toString("utf8").trim();
-      }
-      function operationLink(kind, field, id) {
-        const originKey = JSON.stringify([kind, id]);
-        const origin = operationOrigins.get(originKey);
-        if (origin && historyGit(["merge-base", origin.sha, head]) === origin.sha) return origin.url;
-        const needle = `"${field}":${JSON.stringify(id)}`;
-        const pattern = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const revisions = historyGit(["log", "--reverse", "--format=%H", `-G${pattern}`, head, "--", "work-queue.jsonl"]);
-        for (const sha of revisions ? revisions.split("\n") : []) {
-          const lines = historyGit(["show", `${sha}:work-queue.jsonl`]).split("\n");
-          const line = lines.findIndex(value => {
-            if (!value.includes(needle)) return false;
-            const transaction = JSON.parse(value);
-            return transaction.operations?.some(operation => operation.kind === kind && operation[field] === id);
-          });
-          if (line >= 0) {
-            const url = `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${owner}/${repo}/blob/${sha}/work-queue.jsonl#L${line + 1}`;
-            if (operationOrigins.size >= 128) operationOrigins.delete(operationOrigins.keys().next().value);
-            operationOrigins.set(originKey, { sha, url });
-            return url;
-          }
-        }
-        return undefined;
-      }
-      const links = Object.freeze({ work: operationLink("Work", "work_id", work_id), claim: operationLink("Completion", "claim_id", claim_id) });
-      if (claimLinks.size >= 64) claimLinks.delete(claimLinks.keys().next().value);
-      claimLinks.set(key, links);
-      return links;
     },
     async writeFiles(head, files) {
       await fetchObjects();

@@ -33,15 +33,11 @@ function buildWorkQueueClaimFooter() {
   if (!handle) return [];
   const { work_id, claim_id } = claimIdentity(handle);
   const links = currentClaimFooterLinks();
-  if (links?.work && links?.claim) {
+  if (links?.queue) {
     return [
       {
         type: "quote_line",
-        children: [
-          { type: "link", url: links.work, children: [{ type: "text", value: "Work created" }] },
-          { type: "text", value: " · " },
-          { type: "link", url: links.claim, children: [{ type: "text", value: "Claim finished" }] },
-        ],
+        children: [{ type: "link", url: links.queue, children: [{ type: "text", value: "Work queue" }] }],
       },
     ];
   }

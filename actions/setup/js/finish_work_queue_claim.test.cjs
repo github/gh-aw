@@ -40,9 +40,10 @@ afterEach(() => {
 });
 
 describe("independent trusted Claim finalization", () => {
-  it("adds queue revision links only after Completion authorization and tolerates unavailable history", async () => {
+  it("adds a queue-file link only after Completion authorization without looking up Git history", async () => {
     const { fixture, options } = setup(1);
-    const footer_links = { work: "https://github.com/owner/repo/blob/created/work-queue.jsonl#L2", claim: "https://github.com/owner/repo/blob/finished/work-queue.jsonl#L8" };
+    vi.stubEnv("GITHUB_SERVER_URL", "https://github.com");
+    const footer_links = { queue: "https://github.com/owner/repo/blob/work-queue/work-queue.jsonl" };
     const workQueueClaimLinks = vi.fn().mockResolvedValue(footer_links);
     createRequire(import.meta.url)("./work_queue_git_transport.cjs").registerQueueLedgerClient(fixture.githubClient, { workQueueClaimLinks });
     expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1" })).toMatchObject({ authorized: false });
@@ -50,12 +51,9 @@ describe("independent trusted Claim finalization", () => {
     finish(options, "h1", "completed");
     await reconcileWorkerClaim(options);
     expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1" })).toMatchObject({ authorized: true, footer_links });
-    expect(workQueueClaimLinks).toHaveBeenCalledWith({ head: expect.any(String), work_id: fixture.assignment.claims[0].work_id, claim_id: fixture.assignment.claims[0].claim_id });
-    workQueueClaimLinks.mockClear();
+    expect(workQueueClaimLinks).not.toHaveBeenCalled();
     expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1", includeFooterLinks: false })).not.toHaveProperty("footer_links");
     expect(workQueueClaimLinks).not.toHaveBeenCalled();
-    workQueueClaimLinks.mockRejectedValue(new Error("history unavailable"));
-    expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1" })).toMatchObject({ authorized: true });
   });
 
   it.each([{}, { h1: { authorized: true }, h2: { authorized: false } }])("collapses reconciliation with two empty lines before subsequent Markdown: %j", claims => {

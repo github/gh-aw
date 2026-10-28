@@ -146,11 +146,12 @@ async function authorizeWorkerClaim(options = {}) {
   let footer_links;
   if (options.requireCompletion !== false && options.includeFooterLinks !== false) {
     try {
-      const { queueLedgerClient } = require("./work_queue_git_transport.cjs");
-      const ledger = queueLedgerClient(configured.queueClient || configured.githubClient, configured.context.repo.owner, configured.context.repo.repo, configured.branch);
-      footer_links = await ledger.workQueueClaimLinks?.({ head: latest.sha, work_id: member.work_id, claim_id: member.claim_id });
+      const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
+      const branch = encodeURIComponent(configured.branch || "work-queue");
+      const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
+      footer_links = { queue: new URL(`${repository}/blob/${branch}/work-queue.jsonl`, `${server.origin}/`).href };
     } catch {
-      log.debug("claim.footer.revisions.unavailable");
+      log.debug("claim.footer.link.unavailable");
     }
   }
   return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed", ...(footer_links ? { footer_links } : {}) };
