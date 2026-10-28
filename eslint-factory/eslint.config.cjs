@@ -57,6 +57,7 @@ module.exports = [
       "gh-aw-custom/no-err-stack-then-string-fallback": "warn",
       "gh-aw-custom/no-caught-error-interpolation": "warn",
       "gh-aw-custom/no-map-parseint-callback": "warn",
+      "gh-aw-custom/no-slice-to-unchecked-indexof": "warn",
       "gh-aw-custom/no-split-filter-trim-without-trim-map": "warn",
       "gh-aw-custom/require-fetch-try-catch": "warn",
       "gh-aw-custom/no-core-error-then-setfailed": "warn",

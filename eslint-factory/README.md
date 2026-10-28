@@ -52,6 +52,7 @@ negative controls and validated readable traces without live effects.
 | [`no-json-stringify-set-or-map`](#no-json-stringify-set-or-map) | Disallow `JSON.stringify()` directly on `Set` or `Map` instances |
 | [`no-math-minmax-array-spread`](#no-math-minmax-array-spread) | Disallow spreading a non-literal array into `Math.min(...)` / `Math.max(...)` |
 | [`no-map-parseint-callback`](#no-map-parseint-callback) | Disallow passing `parseInt` directly as an array callback, because the element index is used as the radix |
+| [`no-slice-to-unchecked-indexof`](#no-slice-to-unchecked-indexof) | Disallow `x.slice(…, x.indexOf(…))` without checking for `-1`, which silently drops the last item |
 | [`no-misplaced-error-code-definition`](#no-misplaced-error-code-definition) | Require exported error-code constants to be defined in `error_codes.cjs` |
 | [`no-single-char-string-replace`](#no-single-char-string-replace) | Disallow `String.prototype.replace()` with a single-character string pattern, which replaces only the first occurrence |
 | [`no-split-filter-trim-without-trim-map`](#no-split-filter-trim-without-trim-map) | Require split values to be trimmed before filtering out empty entries |
@@ -233,6 +234,10 @@ Disallow spreading an array of unknown size into `Math.min(...)` / `Math.max(...
 
 **Safe alternative:**
 - `values.reduce((a, b) => Math.max(a, b), -Infinity)` / `values.reduce((a, b) => Math.min(a, b), Infinity)` — folds the array without expanding it into arguments, using the same identity value `Math.max()` / `Math.min()` return on an empty array so the empty-input result matches the spread form instead of throwing.
+
+### `no-slice-to-unchecked-indexof`
+
+Flags `x.slice(start, x.indexOf(…))` (or `lastIndexOf`) on the same value. When nothing is found the index is `-1`, so the slice silently drops the last character/element. Store the index, check for `-1`, then slice.
 
 ### `no-map-parseint-callback`
 
