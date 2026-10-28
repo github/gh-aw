@@ -16,6 +16,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 | Version | Change |
 |---|---|
+| 1.0.74 | Specifies the default Actions/AW `privileged-checkout` and `artifact-execution` warning contracts and maps adversarial, benign, registry, and compiler integration evidence. Separates unsafe checkout opt-outs and direct source selection from authorization, and cross-run workspace extraction or modeled execution from artifact authenticity. Preserves data-only consumers, current-run artifacts, strict PRT policy, direct template-injection protections, offline compilation, and full-SHA pinning. Unknown or historical SHAs are not assigned invented vulnerability status. No new threat identifier, runtime enforcement, permission grant, or lock-file schema change. |
 | 1.0.72 | Audit-only clarification that same-repository bot PR `labeled` events remain subject to the RS-05a collaborator permission floor. No new threat identifier, permission grant, or lock-file schema change. |
 | 1.0.71 | Added a separate compiler-only `artipacked` exception for agent checkouts immediately followed by compiler-owned credential cleanup and verification. Requires current-compilation provenance, unique full-block parsed-field matching, exact adjacency, and statically proven discovery coverage; altered, authored, ambiguous, interrupted, deep-path, and unknown-path blocks remain warned. Preserves runtime YAML, per-checkout authentication, other diagnostics, and standalone lint. Maps adversarial, discovery-depth boundary, multi-repository, sparse-checkout, compilation, and provenance-reset regressions. |
 | 1.0.70 | Specifies generated admission-output gating for agent, threat-detection, evals, and conclusion usage/session steps. Disabled admission emits no activation admission-output references; dry-run component execution omits admission environment bindings. Preserves component-specific budget selection and independent grader, daily-credit, and job-duration bindings. Also specifies the compiler-only `artipacked` warning exception for retained-credential checkouts in the exact generated `safe_outputs` PR checkout/authentication block, requiring current-compilation provenance, a unique full-block parsed-field match, and provenance reset between workflows; modified or ambiguous blocks remain ineligible. Preserves authored-step and other-job diagnostics, other rules, errors, analysis failures, standalone lint, and runtime authentication. Maps admission-only lint compilation, component/usage, exclusion, multi-repository, compiler integration, and reuse regressions. Regeneration removes stale references; no new threat identifier, permission grant, or lock-file schema change. |
@@ -67,6 +68,12 @@ This changelog records the version history and the dated mapping audits for `spe
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-10-27)
+
+Reviewed the bounded privileged custom-code diagnostics in [PR #72542](https://github.com/github/gh-aw/pull/72542). The default AST registry now warns on explicit checkout guard opt-outs, supported direct PR/dispatch/upstream source selection, recognized cross-run workspace extraction, and later modeled artifact execution in the same execution block. Section 7.4.2 records the implementation and regression evidence without reclassifying the warnings as strict rejection or runtime provenance enforcement.
+
+The contracts preserve safe base checkouts, current-run downloads, dedicated-directory data-only consumers, and independent actor guards and template-injection protections. Compilation remains offline; existing action-pin metadata does not establish a complete vulnerable-version inventory. Arbitrary shell dataflow, action internals, and cross-job provenance remain unproven, and no live attack or workflow dispatch is claimed.
 
 ### Mapping Audit (2026-10-26)
 

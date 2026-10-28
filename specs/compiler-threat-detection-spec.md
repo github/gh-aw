@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.73
+**Version**: 1.0.74
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.74` | Unreleased | Specifies bounded Actions/AW `privileged-checkout` and `artifact-execution` review warnings for privileged custom source selection and cross-run artifact execution. Preserves strict PRT enforcement, offline pin integrity, data-only consumers, and explicit analysis limits. No new threat identifier, runtime enforcement, permission grant, or lock-file schema change. |
 | `1.0.73` | Unreleased | Audit-only clarification that same-repository bot PR `edited` checkout is a runtime trust control restricted to allow-listed actors and body-only changes under Security Architecture Specification RS-05a. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.72` | Unreleased | Audit-only clarification that same-repository bot PR `labeled` events remain subject to the collaborator permission floor under Security Architecture Specification RS-05a. No new threat identifier, permission grant, or lock-file schema change. |
 | `1.0.71` | Unreleased | Adds a separate compiler-only `artipacked` exception for agent checkouts immediately followed by exact compiler-owned cleanup and credential verification. Requires current-compilation provenance, unique full-block matching, and statically proven cleanup discovery coverage; runtime authentication and standalone lint remain unchanged. |
@@ -374,6 +375,24 @@ Dry-run compilation retains the admission job, activation's forwarded admission 
 This is a compiler-generated graph/expression correctness requirement supporting lint accuracy, not a new `CTR-*` threat class or an exception to lint analysis. It MUST NOT enable admission merely to satisfy lint, suppress authored findings, or change permissions or checkout authentication. Existing lock files require regeneration to remove stale disabled-admission references; the lock-file schema is unchanged.
 
 Implementation is in `pkg/workflow/compiler_admission.go`, `awf_env.go`, `evals_steps.go`, `threat_detection_external.go`, and `notify_comment.go`. Evidence in `compiler_admission_test.go` covers repository/workflow opt-in combinations, disabled and dry-run component environment bindings, component budget selection across engines and detection paths, and lint-enabled compilation across both opt-in and dry-run states with and without detection/evals jobs. Compilation regressions require zero warnings and verify that dry-run retains admission jobs, forwarded outputs, and conclusion metadata without binding execution budgets. `notify_comment_test.go` verifies absence of admission bindings when disabled and preservation of independent guardrail/job-duration bindings, including omission of an empty step environment. These regressions do not establish live admission-service availability or runtime budget enforcement.
+
+#### 7.4.2 Privileged Custom-Code Review Diagnostics
+
+The default Actions/AW AST registry MUST include `privileged-checkout` and `artifact-execution` as warning-level review diagnostics in both strict and non-strict mode. They MUST remain distinct from mandatory compiler rejection, runtime actor authorization, immutable revision approval, and artifact provenance verification. They do not add a `CTR-*` identifier or claim complete CTR-008 or CTR-021 conformance. Disabling lint removes these diagnostics, not the independent strict `pull_request_target` policy or direct template-injection protections.
+
+`privileged-checkout` MUST inspect explicit execution steps when the declared triggers include `pull_request_target`, `workflow_run`, `issue_comment`, `repository_dispatch`, `pull_request_review`, or `pull_request_review_comment`, including mixed triggers. It MUST warn for true or dynamic `actions/checkout` `allow-unsafe-pr-checkout` values, direct PR-head/dispatch/upstream-head checkout selectors, literal `refs/pull/` refs, direct `gh pr checkout`, and supported direct Git source-selection calls. Boolean and string literal false values, including literal false expressions, MUST NOT produce an opt-out finding. Source expressions MUST be parsed rather than inferred from quoted expression text. Safe base selectors, harmless Git/gh inspection, and unrelated trusted custom actions MUST NOT be blanket-rejected. Fetch warnings identify source selection, not demonstrated execution or exploitation.
+
+`artifact-execution` MUST inspect `workflow_run` execution blocks for recognized cross-run downloads through `actions/download-artifact` with an explicit cross-run `run-id`, or `dawidd6/action-download-artifact`. Explicit current-run `github.run_id` selectors MUST be exempt; omitted built-in `run-id` MUST retain current-run semantics. Cross-run extraction into the workspace root or an unknown destination MUST produce a review warning because artifacts may overwrite executable code or configuration. Subsequent modeled direct script/interpreter calls, local action paths, and supported package/build commands inside the literal download destination in the same execution block MUST warn, with a related download location. Step, job, and workflow working-directory defaults MUST be considered. Dedicated-directory data-only consumers, earlier execution steps, and unrelated jobs MUST NOT be treated as demonstrated artifact execution. Producer success, branch filters, and repository identity MUST NOT be represented as artifact authenticity.
+
+Both rules MUST emit value-free diagnostics, preserve the input ASTs, and prefer the supplied Actions execution graph over companion AW execution steps. Analysis MUST remain offline and deterministic. Existing action-pin metadata identifies reviewed defaults, not a complete affected-version database; historical and unknown checkout SHAs MUST NOT be labeled vulnerable without authoritative affected-version evidence. Full-SHA pinning MUST remain recommended, independently of whether a selected release contains newer guards.
+
+These are bounded static checks, not whole-program safety proofs. Arbitrary environment indirection, `cd`, nested command strings, aliases, command wrappers/options, other interpreters, third-party action internals, cross-job flows, and dynamically computed paths remain outside modeled execution coverage. Malformed modeled shell syntax MUST produce an incomplete-analysis warning; unsupported shells are not analyzed. A clean result MUST NOT imply these unmodeled paths are safe, or that author-owned validation and provenance checks have been verified.
+
+| Diagnostic | Implementation | Regression evidence |
+|---|---|---|
+| `privileged-checkout` | `pkg/workflow/lint/privileged_checkout.go`; shared execution traversal, action-input booleans, Actions expression analysis, and Bash/sh AST parsing | `TestPrivilegedCheckoutInputs`, `TestPrivilegedCheckoutCommands`, `TestPrivilegedCheckoutTriggersAndPins`, `TestPrivilegedCodeTraversalAndFailures` |
+| `artifact-execution` | `pkg/workflow/lint/artifact_execution.go`; shared execution traversal and Bash/sh AST parsing | `TestArtifactExecutionSinks`, `TestArtifactDownloadBoundary`, `TestArtifactExecutionOrderingAndScopes`, `TestArtifactExecutionAWPostSteps`, `TestArticleArtifactChain` |
+| Registry, compiler wiring, and incomplete analysis | `pkg/workflow/lint/lint.go`, `pkg/workflow/compiler_lint.go` | `TestEveryBuiltInRulePositiveAndNegative`, `TestCompilerLintPrivilegedCodeDiagnostics`, `TestPrivilegedCodeMalformedShellCoverage` |
 
 ### 7.5 Proxy Startup Diagnostic Privacy Mapping
 
