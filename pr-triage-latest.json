@@ -1,34 +1,27 @@
 {
-  "run_date": "2026-10-28T00:44:01Z",
-  "run_id": "40610394429",
+  "run_date": "2026-10-28T12:26:50Z",
+  "run_id": "40687467201",
   "source": "pr-triage",
-  "eligible_total": 3,
+  "eligible_total": 2,
   "cooldown_skipped": 0,
-  "open_copilot_prs": 3,
+  "open_copilot_prs": 2,
   "category_counts": {
-    "bug": 1,
     "feature": 1,
-    "refactor": 1
+    "bug": 1
   },
   "risk_counts": {
     "high": 1,
-    "medium": 2
+    "medium": 1
   },
   "priority_counts": {
     "high": 1,
-    "medium": 2
+    "medium": 1
   },
   "action_counts": {
-    "fast_track": 2,
+    "fast_track": 1,
     "batch_review": 1
   },
-  "batches": [
-    {
-      "id": "pr-batch:agentic-quality-fixes",
-      "members": [72273, 72515, 72517],
-      "category": "quality"
-    }
-  ],
+  "batches": [],
   "selected_candidates": [
     {
       "number": 72273,
@@ -38,56 +31,43 @@
       "priority": "high",
       "action": "fast_track",
       "score": 72,
-      "score_breakdown": {"impact": 40, "urgency": 18, "quality": 14},
+      "score_breakdown": {
+        "impact": 40,
+        "urgency": 18,
+        "quality": 14
+      },
       "updated_at": "2026-10-27T15:36:43Z",
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
         "pr-priority:high",
         "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:agentic-quality-fixes"
+        "pr-agent:copilot"
       ]
     },
     {
-      "number": 72515,
-      "title": "[safeoutputs] Add concrete example to add_labels object-only tool description",
+      "number": 72632,
+      "title": "Link work queue footers to creation and completion revisions",
       "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "fast_track",
-      "score": 68,
-      "score_breakdown": {"impact": 30, "urgency": 20, "quality": 18},
-      "updated_at": "2026-10-27T21:27:20Z",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:agentic-quality-fixes"
-      ]
-    },
-    {
-      "number": 72517,
-      "title": "[duplicate-code] Refactor repeated PR transfer repository cloning",
-      "category": "refactor",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
       "score": 58,
-      "score_breakdown": {"impact": 20, "urgency": 18, "quality": 20},
-      "updated_at": "2026-10-27T22:03:11Z",
+      "score_breakdown": {
+        "impact": 25,
+        "urgency": 15,
+        "quality": 18
+      },
+      "updated_at": "2026-10-28T10:57:43Z",
       "labels": [
-        "pr-type:refactor",
+        "pr-type:bug",
         "pr-risk:medium",
         "pr-priority:medium",
         "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-quality-fixes"
+        "pr-agent:copilot"
       ]
     }
   ],
   "skipped_prs": [],
-  "notes": "Three open app/github-copilot PRs were eligible for triage; labels and recommendations were applied to each item. The set clusters into a small quality-fixes batch with one high-value feature and two improvement-oriented changes."
+  "notes": "Two open app/github-copilot PRs were eligible for triage; one high-value auth feature and one medium-risk provenance bugfix were classified and labeled. No 3+ cluster was available for batching."
 }
