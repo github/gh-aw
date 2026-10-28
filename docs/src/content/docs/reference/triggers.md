@@ -194,7 +194,7 @@ GitHub's fork-contributor workflow approval setting does not protect `pull_reque
 
 #### Fork Filtering (`forks:`)
 
-Pull request workflows block forks by default for security. Use the `forks:` field to allow specific fork patterns:
+`pull_request` workflows block forks by default for security. Use the `forks:` field to allow specific fork patterns:
 
 ```yaml wrap
 on:
@@ -206,6 +206,10 @@ on:
 Use `["owner/repo"]` for a specific repository, `["owner/*"]` for an entire org/user, or `["*"]` to allow all forks (use with caution). Omit `forks:` for the default behavior (same-repository PRs only). The compiler uses repository ID comparison so fork detection is unaffected by repository renames.
 
 Alternatively, use `forks: {author-association: [OWNER, MEMBER, COLLABORATOR]}` to allow fork PRs by the author's relationship to the base repository rather than the fork owner. Same-repository PRs remain allowed, and no association is implicitly included. See [author associations](/gh-aw/reference/fork-support/#author-associations) for trust and secret-availability considerations.
+
+`pull_request_target` also defaults to same-repository PRs only: omitting `forks:` is equivalent to `forks: []` in both strict and non-strict mode. To admit specific forks, list exact `owner/repo` entries or deliberately trusted `owner/*` patterns. Same-repository PRs remain allowed. `"*"` anywhere in a list permits all forks; strict mode warns and recommends restricting fork admission instead of rejecting compilation. `acknowledge-risk: true`, disabled checkout, and trusted checkouts do not suppress this fork warning. Actor authorization and checkout restrictions remain enforced independently; strict mode still rejects expressions and unsupported pattern forms.
+
+Fork filters and `pull_request.names` compile into job conditions, not GitHub Actions trigger properties. Bounded fork admission is defense in depth, not proof of safe PR content: a trusted actor can label an attacker-controlled PR, and disabling checkout does not prevent an agent from reading malicious content with privileged capabilities.
 
 #### Stacked PR Filtering (`max-stack:`)
 
