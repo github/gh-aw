@@ -302,6 +302,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
         - "docs/**/*.md"              # e.g. restrict to Markdown docs
       excluded-files:                 # Optional: glob patterns to strip from the patch entirely
         - "**/*.lock"
+      exclude-lock-yml: true          # Optional: drop compiled .github/workflows/*.lock.yml files from the patch (default: false)
       protected-files: request-review # Optional: "request-review" (default), "blocked", "fallback-to-issue", or "allowed"
       allowed-branches:               # Optional: glob patterns for allowed source branch names per run
         - "feature/*"

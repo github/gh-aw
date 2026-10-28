@@ -294,6 +294,7 @@ description: Safe-output reference for update, label, milestone, project, releas
         - "src/**"
       excluded-files:                 # Optional: glob patterns to strip from the patch entirely
         - "**/*.lock"
+      exclude-lock-yml: true          # Optional: drop compiled .github/workflows/*.lock.yml files from the patch (default: false)
       protected-files: request-review # Optional: "request-review" (default), "blocked", "fallback-to-issue", or "allowed"
       max-patch-size: 2048            # Optional: per-output cap on git patch size in KB (overrides global; default: 4096 KB, max: 10240)
   ```
