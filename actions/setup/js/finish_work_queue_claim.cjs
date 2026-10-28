@@ -103,21 +103,27 @@ function runtimeOptions(options) {
 }
 
 function queueFileUrl(configured, ref, line) {
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(ref) || !Number.isSafeInteger(line) || line < 1) throw new Error("work_queue_footer_location_invalid");
   const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
   if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) throw new Error("work_queue_footer_url_invalid");
   const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
-  return new URL(`${repository}/blob/${encodeURIComponent(ref)}/work-queue.jsonl${line ? `#L${line}` : ""}`, `${server.origin}/`).href;
+  return new URL(`${repository}/blob/${encodeURIComponent(ref)}/work-queue.jsonl#L${line}`, `${server.origin}/`).href;
 }
 
-function claimFooterLinks(latest, member, configured) {
+async function claimFooterLinks(latest, member, configured) {
   try {
-    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(latest.sha || "")) return;
-    const lineFor = predicate => latest.transactions.findIndex(transaction => Array.isArray(transaction.operations) && transaction.operations.some(predicate)) + 1;
-    const workLine = lineFor(operation => operation.kind === "Work" && operation.work_id === member.work_id);
-    const completionLine = lineFor(operation => operation.kind === "Completion" && operation.work_id === member.work_id && operation.claim_id === member.claim_id);
+    const origins = await store.resolveWorkQueueEventLocations({
+      githubClient: configured.queueClient || configured.githubClient,
+      owner: configured.context.repo.owner,
+      repo: configured.context.repo.repo,
+      ...(configured.branch === undefined ? {} : { branch: configured.branch }),
+      latest,
+      work_id: member.work_id,
+      claim_id: member.claim_id,
+    });
     const links = {
-      ...(workLine > 0 ? { work_created: queueFileUrl(configured, latest.sha, workLine) } : {}),
-      ...(completionLine > 0 ? { claim_finished: queueFileUrl(configured, latest.sha, completionLine) } : {}),
+      ...(origins?.work_created ? { work_created: queueFileUrl(configured, origins.work_created.sha, origins.work_created.line) } : {}),
+      ...(origins?.claim_finished ? { claim_finished: queueFileUrl(configured, origins.claim_finished.sha, origins.claim_finished.line) } : {}),
     };
     return Object.keys(links).length ? links : undefined;
   } catch {
@@ -195,7 +201,7 @@ async function authorizeWorkerClaim(options = {}) {
   let footer_links;
   if (options.requireCompletion !== false && options.includeFooterLinks !== false) {
     try {
-      footer_links = trustedClaimFooterLinks(member.handle, configured) || { queue: queueFileUrl(configured, configured.branch || "work-queue") };
+      footer_links = trustedClaimFooterLinks(member.handle, configured);
     } catch {
       log.debug("claim.footer.link.unavailable");
     }
@@ -223,7 +229,8 @@ async function reconcileWorkerClaim(options = {}) {
   for (const member of assignment.claims) {
     try {
       if (blocked.has(member.handle)) throw new Error("work_queue_finish_conflict");
-      let latest = await loadQueue(configured);
+      const eventIds = [{ work_id: member.work_id, claim_id: member.claim_id }];
+      let latest = await loadQueue({ ...configured, eventIds });
       const claim = latest.projection.claims.get(member.claim_id);
       const work = latest.projection.works.get(member.work_id);
       const intent = staged.intents.get(member.handle);
@@ -231,7 +238,7 @@ async function reconcileWorkerClaim(options = {}) {
         if (intent && (intent.outcome === "cancelled" || intent.keep_open !== (claim.keep_open === true))) throw new Error("work_queue_finish_conflict");
         const barrier = claim.keep_open ? claim.barrier : work.barrier;
         const authorized = barrier === "pending";
-        const footer_links = authorized ? claimFooterLinks(latest, member, configured) : undefined;
+        const footer_links = authorized ? await claimFooterLinks(latest, member, configured) : undefined;
         states[member.handle] = {
           claim_handle: member.handle,
           claim_id: member.claim_id,
@@ -262,12 +269,12 @@ async function reconcileWorkerClaim(options = {}) {
         request,
         core: configured.core,
       });
-      latest = await loadQueue(configured);
+      latest = await loadQueue({ ...configured, eventIds });
       const verified = latest.projection.claims.get(member.claim_id);
       if (verified?.state !== outcome || (verified.keep_open === true) !== (intent?.keep_open === true)) throw new Error("work_queue_finish_not_durable");
       log.debug("claim.finish.persisted", { completed: outcome === "completed", cancelled: outcome === "cancelled" });
       const authorized = outcome === "completed";
-      const footer_links = authorized ? claimFooterLinks(latest, member, configured) : undefined;
+      const footer_links = authorized ? await claimFooterLinks(latest, member, configured) : undefined;
       states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized, ...(footer_links ? { footer_links } : {}) };
     } catch (error) {
       log.failure("claim.finish.blocked", error);

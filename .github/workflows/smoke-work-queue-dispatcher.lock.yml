@@ -1837,6 +1837,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
+          GH_AW_CLAIM_FOOTER_LINKS: ${{ steps.work_queue_claim_reconciliation.outputs.claim_footer_links }}
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
           GH_AW_MENTIONS_GITHUB_TOKEN: ${{ github.token }}

@@ -7,6 +7,7 @@ import { authorizeWorkerClaim, finalizeWorkerResults, main, readFinishIntent, re
 import { nodeId } from "./work_queue_graph.cjs";
 import { queueFixture, noWriteClaimVerifier, REF, REPOSITORY, WORKFLOW, DISPATCHER } from "./work_queue_lifecycle.test_helpers.cjs";
 
+const workQueueStore = createRequire(import.meta.url)("./work_queue_store.cjs");
 const directories = [];
 beforeEach(() => {
   vi.stubEnv("GH_AW_PROMPTS_DIR", path.resolve(import.meta.dirname, "../md"));
@@ -40,40 +41,129 @@ afterEach(() => {
 });
 
 describe("independent trusted Claim finalization", () => {
-  it("adds a queue-file link only after Completion authorization without looking up Git history", async () => {
-    const { fixture, options } = setup(1);
-    vi.stubEnv("GITHUB_SERVER_URL", "https://github.com");
-    const footer_links = { queue: "https://github.com/owner/repo/blob/work-queue/work-queue.jsonl" };
-    const workQueueClaimLinks = vi.fn().mockResolvedValue(footer_links);
-    createRequire(import.meta.url)("./work_queue_git_transport.cjs").registerQueueLedgerClient(fixture.githubClient, { workQueueClaimLinks });
+  it("retains Work and Claim IDs when queue event locations are unavailable", async () => {
+    const { options } = setup(1);
+    const readWorkQueueLog = options.readWorkQueueLog;
+    options.readWorkQueueLog = async (...args) => ({ ...(await readWorkQueueLog(...args)), sha: "a".repeat(40), eventLocations: {} });
+    vi.stubEnv("GH_AW_CLAIM_FOOTER_LINKS", "");
     expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1" })).toMatchObject({ authorized: false });
-    expect(workQueueClaimLinks).not.toHaveBeenCalled();
     finish(options, "h1", "completed");
-    await reconcileWorkerClaim(options);
-    expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1" })).toMatchObject({ authorized: true, footer_links });
-    expect(workQueueClaimLinks).not.toHaveBeenCalled();
+    const reconciled = await reconcileWorkerClaim(options);
+    expect(reconciled.claims.h1).not.toHaveProperty("footer_links");
+    const authorization = await authorizeWorkerClaim({ ...options, claim_handle: "h1" });
+    expect(authorization).toMatchObject({ authorized: true });
+    expect(authorization).not.toHaveProperty("footer_links");
     expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1", includeFooterLinks: false })).not.toHaveProperty("footer_links");
-    expect(workQueueClaimLinks).not.toHaveBeenCalled();
   });
 
-  it("publishes immutable Work and Completion locations from the ledger already loaded while finishing", async () => {
-    const { fixture, options } = setup(1);
+  it("publishes exact physical Work and Completion locations from the ledger already loaded while finishing", async () => {
+    const { options } = setup(1);
     const revision = "a".repeat(40);
     const readWorkQueueLog = options.readWorkQueueLog;
-    options.readWorkQueueLog = async (...args) => ({ ...(await readWorkQueueLog(...args)), sha: revision });
+    const workLine = 37;
+    const completionLine = 12;
+    options.readWorkQueueLog = async (...args) => ({
+      ...(await readWorkQueueLog(...args)),
+      sha: revision,
+      eventLocations: {
+        work_created: { sha: revision, line: workLine },
+        claim_finished: { sha: revision, line: completionLine },
+      },
+    });
     finish(options, "h1", "completed");
     const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() } };
 
     const result = await main({ ...options, core });
 
-    const workLine = fixture.transactions.findIndex(transaction => transaction.operations.some(operation => operation.kind === "Work" && operation.work_id === fixture.assignment.claims[0].work_id)) + 1;
-    const completionLine = fixture.transactions.findIndex(transaction => transaction.operations.some(operation => operation.kind === "Completion" && operation.claim_id === fixture.assignment.claims[0].claim_id)) + 1;
     const output = JSON.parse(core.setOutput.mock.calls.find(([name]) => name === "claim_footer_links")[1]);
     expect(output.h1).toEqual({
       work_created: `https://github.com/owner/repo/blob/${revision}/work-queue.jsonl#L${workLine}`,
       claim_finished: `https://github.com/owner/repo/blob/${revision}/work-queue.jsonl#L${completionLine}`,
     });
     expect(result.claims.h1.footer_links).toEqual(output.h1);
+  });
+
+  it("uses physical record lines and resolves missing origins through checkpoint ancestry once", async () => {
+    const priorSHA = "b".repeat(40);
+    const headSHA = "c".repeat(40);
+    const work_id = "work-1";
+    const claim_id = "claim-1";
+    const records = [
+      { previous: "earlier", operations: [{ kind: "Completion", work_id, claim_id }] },
+      { previous: null, operations: [{ kind: "Checkpoint", prior_git_sha: priorSHA }] },
+    ];
+    const historicalContent =
+      [
+        { previous: "earlier", operations: [{ kind: "Completion", work_id, claim_id }] },
+        { previous: "earlier", operations: [{ kind: "Work", work_id }] },
+        { previous: "earlier", operations: [{ kind: "Work", work_id }] },
+      ]
+        .map(record => JSON.stringify(record))
+        .join("\n") + "\n";
+    const headContent = records.map(record => JSON.stringify(record)).join("\n") + "\n";
+    const blob = "d".repeat(40);
+    const tree = "e".repeat(40);
+    const client = {
+      rest: {
+        git: {
+          getCommit: vi.fn(async () => ({ data: { tree: { sha: tree } } })),
+          getTree: vi.fn(async () => ({ data: { truncated: false, tree: [{ path: "work-queue.jsonl", type: "blob", mode: "100644", sha: blob }] } })),
+          getBlob: vi.fn(async () => ({ data: { encoding: "base64", content: Buffer.from(historicalContent).toString("base64"), size: Buffer.byteLength(historicalContent) } })),
+        },
+      },
+    };
+    const latest = {
+      sha: headSHA,
+      eventLocations: {
+        claim_finished: { sha: headSHA, line: 1 },
+        checkpoint_prior_git_sha: priorSHA,
+      },
+    };
+
+    expect(workQueueStore.locateQueueEventLocations(headContent, [{ work_id, claim_id }], headSHA)).toEqual({
+      claim_finished: { sha: headSHA, line: 1 },
+      checkpoint_prior_git_sha: priorSHA,
+    });
+    expect(workQueueStore.locateQueueEventLocations(historicalContent, [{ work_id, claim_id }], priorSHA)).toEqual({
+      work_created: { sha: priorSHA, line: 2 },
+      claim_finished: { sha: priorSHA, line: 1 },
+    });
+    const resolve = () => workQueueStore.resolveWorkQueueEventLocations({ githubClient: client, owner: "owner", repo: "repo", latest, work_id, claim_id });
+    await expect(resolve()).resolves.toEqual({
+      work_created: { sha: priorSHA, line: 2 },
+      claim_finished: { sha: headSHA, line: 1 },
+    });
+    const calls = client.rest.git.getCommit.mock.calls.length;
+    await expect(resolve()).resolves.toMatchObject({ work_created: { sha: priorSHA, line: 2 } });
+    expect(client.rest.git.getCommit).toHaveBeenCalledTimes(calls);
+  });
+
+  it("aborts checkpoint-history lookup at its one-second deadline", async () => {
+    const controller = vi.fn();
+    const client = {
+      rest: {
+        git: {
+          getCommit: vi.fn(({ request }) => {
+            request.signal.addEventListener("abort", controller, { once: true });
+            return new Promise(() => {});
+          }),
+        },
+      },
+    };
+    const latest = { sha: "c".repeat(40), eventLocations: { checkpoint_prior_git_sha: "b".repeat(40) } };
+
+    await expect(
+      workQueueStore.resolveWorkQueueEventLocations({
+        githubClient: client,
+        owner: "owner",
+        repo: "repo",
+        latest,
+        work_id: "work-1",
+        claim_id: "claim-1",
+        timeoutMs: 1,
+      })
+    ).resolves.toBeUndefined();
+    expect(controller).toHaveBeenCalledTimes(1);
   });
 
   it("reuses only repository-scoped footer links from the reconciliation output after trusted authorization", async () => {

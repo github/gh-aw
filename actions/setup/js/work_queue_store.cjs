@@ -41,8 +41,10 @@ const DEFAULT_MAX_RETRIES = 5;
 const verifiedCheckpointHistory = new WeakMap();
 /** @type {WeakMap<object, {scope: object, repository: string, sha: string, treeSha: string, contents: string}>} */
 const verifiedQueueContents = new WeakMap();
+/** @type {WeakMap<object, Map<string, {work_created?: {sha: string, line: number}, claim_finished?: {sha: string, line: number}}>>} */
+const immutableWorkQueueOrigins = new WeakMap();
 
-/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
+/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, eventIds?: Array<{work_id: string, claim_id: string}>, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
 
 function validateBranch(branch) {
   identity(branch, "queue branch");
@@ -116,9 +118,11 @@ async function readRef(githubClient, owner, repo, branch) {
 }
 
 /** @param {QueueReadOptions} options */
-async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
+async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, eventIds, core: coreApi = undefined }) {
   log.debug("ledger.read.start");
   validateBranch(branch);
+  if (eventIds !== undefined && (!Array.isArray(eventIds) || eventIds.length > 256 || eventIds.some(member => !member || typeof member.work_id !== "string" || typeof member.claim_id !== "string")))
+    throw queueError("resource_limit", "queue event-location request is invalid or oversized");
   githubClient = queueLedgerClient(githubClient, owner, repo, branch);
   const repository = await verifyRepository(githubClient, owner, repo);
   const sha = await readRef(githubClient, owner, repo, branch);
@@ -132,10 +136,10 @@ async function readWorkQueueLog({ githubClient, owner, repo, branch = WORK_QUEUE
     log.debug("ledger.read.absent");
     return { sha: null, treeSha: null, transactions: [], state: newState(), branch, logPath: WORK_QUEUE_LOG_PATH };
   }
-  return readVerifiedQueueAtSHA({ githubClient, owner, repo, branch, repository, coreApi }, sha);
+  return readVerifiedQueueAtSHA({ githubClient, owner, repo, branch, repository, coreApi }, sha, true, true, eventIds);
 }
 
-async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = true) {
+async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = true, eventIds = undefined) {
   const { githubClient, branch, repository, coreApi } = options;
   const scope = queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient));
   const previous = verifiedQueueContents.get(githubClient);
@@ -150,21 +154,33 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = tru
     verifiedQueueContents.set(githubClient, { scope, repository: repository.full_name.toLowerCase(), sha, treeSha, contents });
   coreApi?.info(`Work queue: validated ${transactions.length} causal commits`);
   log.debug("ledger.read.complete", { bytes, transactions: transactions.length, works: state.works.size, claims: state.claims.size });
-  return { sha, treeSha, transactions, state, branch, logPath: WORK_QUEUE_LOG_PATH, ...(checkpointRecovered ? { checkpointRecovered: true } : {}) };
+  const eventLookupDeadline = eventIds?.length ? Date.now() + 1000 : undefined;
+  const eventLocations = eventLookupDeadline ? locateQueueEventLocations(contents, eventIds, sha, eventLookupDeadline) : undefined;
+  return {
+    sha,
+    treeSha,
+    transactions,
+    state,
+    branch,
+    logPath: WORK_QUEUE_LOG_PATH,
+    ...(eventLocations ? { eventLocations, eventLookupDeadline } : {}),
+    ...(checkpointRecovered ? { checkpointRecovered: true } : {}),
+  };
 }
 
-async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha) {
-  const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha });
+async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, request = undefined) {
+  const requestOptions = request ? { request } : {};
+  const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha, ...requestOptions });
   const treeSha = commit?.data?.tree?.sha;
   if (typeof treeSha !== "string" || !treeSha) throw queueError("ledger_invalid", "queue commit has no tree");
-  const response = await githubClient.rest.git.getTree({ owner, repo, tree_sha: treeSha });
+  const response = await githubClient.rest.git.getTree({ owner, repo, tree_sha: treeSha, ...requestOptions });
   if (response?.data?.truncated === true || !Array.isArray(response?.data?.tree)) throw queueError("ledger_invalid", "queue tree is missing or truncated");
   const entries = response.data.tree;
   if (entries.length > 16384) throw queueError("resource_limit", "queue tree entry limit exceeded");
   if (entries.some(entry => LEGACY_LOGS.includes(entry.path))) throw queueError("unsupported_protocol", "legacy transaction log cannot be adopted");
   const logs = entries.filter(entry => entry.path === WORK_QUEUE_LOG_PATH);
   if (logs.length !== 1 || logs[0].type !== "blob" || typeof logs[0].sha !== "string" || logs[0].mode !== "100644") throw queueError("ledger_invalid", "existing queue must contain exactly one regular canonical log");
-  const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: logs[0].sha });
+  const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: logs[0].sha, ...requestOptions });
   if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") throw queueError("ledger_invalid", "queue blob encoding is unsupported");
   const encoded = blob.data.content.replace(/\s/g, "");
   if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4) throw queueError("resource_limit", "queue blob exceeds cold parser limit");
@@ -181,6 +197,116 @@ async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha) {
     throw queueError("ledger_invalid", "queue blob contains malformed UTF-8");
   }
   return { treeSha, contents };
+}
+
+function locateQueueEventLocations(contents, eventIds, sha, deadline = Number.POSITIVE_INFINITY) {
+  const requestedWorks = new Set(eventIds.map(member => member.work_id));
+  const requestedClaims = new Set(eventIds.map(member => JSON.stringify([member.work_id, member.claim_id])));
+  const locations = {};
+  let checkpointPriorGitSHA;
+  let offset = 0;
+  let line = 0;
+  while (offset < contents.length) {
+    if (Date.now() >= deadline) break;
+    const newline = contents.indexOf("\n", offset);
+    if (newline === -1) break;
+    line++;
+    let record;
+    try {
+      record = JSON.parse(contents.slice(offset, newline));
+    } catch {
+      return {};
+    }
+    for (const operation of record.operations || []) {
+      if (operation.kind === "Work" && requestedWorks.has(operation.work_id) && !locations.work_created) locations.work_created = { sha, line };
+      if (operation.kind === "Completion" && requestedClaims.has(JSON.stringify([operation.work_id, operation.claim_id])) && !locations.claim_finished) locations.claim_finished = { sha, line };
+      if (record.previous === null && operation.kind === "Checkpoint" && !checkpointPriorGitSHA) checkpointPriorGitSHA = operation.prior_git_sha;
+    }
+    offset = newline + 1;
+    if (locations.work_created && locations.claim_finished) break;
+  }
+  return { ...locations, ...(checkpointPriorGitSHA ? { checkpoint_prior_git_sha: checkpointPriorGitSHA } : {}) };
+}
+
+/**
+ * Resolve exact physical JSONL locations, following checkpoint ancestry only when the current log omits an event.
+ * @param {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, latest: {sha?: string | null, eventLocations?: {work_created?: {sha: string, line: number}, claim_finished?: {sha: string, line: number}, checkpoint_prior_git_sha?: string}, eventLookupDeadline?: number}, work_id: string, claim_id: string, timeoutMs?: number}} options
+ */
+async function resolveWorkQueueEventLocations({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, latest, work_id, claim_id, timeoutMs = 1000 }) {
+  const key = JSON.stringify([owner.toLowerCase(), repo.toLowerCase(), branch, work_id, claim_id]);
+  let cached = immutableWorkQueueOrigins.get(githubClient);
+  if (!cached) {
+    cached = new Map();
+    immutableWorkQueueOrigins.set(githubClient, cached);
+  }
+  const previous = cached.get(key) || {};
+  const current = latest.eventLocations || {};
+  const resolved = {
+    ...(previous.work_created ? { work_created: previous.work_created } : {}),
+    ...(previous.claim_finished ? { claim_finished: previous.claim_finished } : {}),
+    ...(current.work_created ? { work_created: current.work_created } : {}),
+    ...(current.claim_finished ? { claim_finished: current.claim_finished } : {}),
+  };
+  const remember = origins => {
+    if (origins.work_created || origins.claim_finished) {
+      cached.set(key, {
+        ...(origins.work_created ? { work_created: origins.work_created } : {}),
+        ...(origins.claim_finished ? { claim_finished: origins.claim_finished } : {}),
+      });
+      while (cached.size > 256) {
+        const oldest = cached.keys().next().value;
+        if (oldest === undefined) break;
+        cached.delete(oldest);
+      }
+    }
+  };
+  if (latest.sha && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(latest.sha)) return Object.keys(resolved).length ? resolved : undefined;
+  if (!latest.sha) return Object.keys(resolved).length ? resolved : undefined;
+  if (resolved.work_created && resolved.claim_finished) {
+    remember(resolved);
+    return resolved;
+  }
+
+  const deadline = Math.min(latest.eventLookupDeadline ?? Number.POSITIVE_INFINITY, Date.now() + Math.min(Math.max(timeoutMs, 0), 1000));
+  const controller = new AbortController();
+  let timer;
+  const timedOut = new Promise(resolve => {
+    timer = setTimeout(
+      () => {
+        controller.abort();
+        resolve(undefined);
+      },
+      Math.max(0, deadline - Date.now())
+    );
+  });
+  const lookup = (async () => {
+    let priorSHA = current.checkpoint_prior_git_sha;
+    const visited = new Set([latest.sha]);
+    while (typeof priorSHA === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(priorSHA) && !visited.has(priorSHA) && Date.now() < deadline && !(resolved.work_created && resolved.claim_finished)) {
+      visited.add(priorSHA);
+      const request = { signal: controller.signal, timeout: Math.max(1, deadline - Date.now()) };
+      const { contents } = await readQueueContentsAtSHA({ githubClient, owner, repo }, priorSHA, request);
+      if (Date.now() >= deadline) break;
+      const found = locateQueueEventLocations(contents, [{ work_id, claim_id }], priorSHA, deadline);
+      if (!resolved.work_created && found.work_created) resolved.work_created = found.work_created;
+      if (!resolved.claim_finished && found.claim_finished) resolved.claim_finished = found.claim_finished;
+      priorSHA = found.checkpoint_prior_git_sha;
+    }
+    return resolved;
+  })();
+  let found;
+  try {
+    found = await Promise.race([lookup, timedOut]);
+  } catch {
+    found = undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (found) {
+    remember(found);
+    return Object.keys(found).length ? found : undefined;
+  }
+  return Object.keys(resolved).length ? { ...resolved } : undefined;
 }
 
 async function replayVerifiedQueueLog(options, sha, contents, verify = true, recover = true) {
@@ -643,6 +769,8 @@ module.exports = {
   initializeWorkQueue,
   publishWorkQueueRequest,
   readWorkQueueLog,
+  locateQueueEventLocations,
+  resolveWorkQueueEventLocations,
   replayVerifiedQueueLog,
   stableRequestResult,
   verifyRepository,

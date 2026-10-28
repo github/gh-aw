@@ -36,6 +36,7 @@ async function loadQueue(options) {
     owner: context.repo.owner,
     repo: context.repo.repo,
     ...(options.branch === undefined ? {} : { branch: options.branch }),
+    ...(options.eventIds === undefined ? {} : { eventIds: options.eventIds }),
     core: options.core,
   };
   const readBoundLog = async () => {

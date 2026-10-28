@@ -35,20 +35,12 @@ function buildWorkQueueClaimFooter() {
   const links = currentClaimFooterLinks();
   if (links?.work_created || links?.claim_finished) {
     const children = [];
-    if (links.work_created) children.push({ type: "link", url: links.work_created, children: [{ type: "text", value: "Work created" }] });
+    if (links.work_created) children.push({ type: "link", url: links.work_created, children: [{ type: "text", value: "Work created", agentTainted: false }] });
     if (links.claim_finished) {
       if (children.length) children.push({ type: "text", value: " · " });
-      children.push({ type: "link", url: links.claim_finished, children: [{ type: "text", value: "Claim finished" }] });
+      children.push({ type: "link", url: links.claim_finished, children: [{ type: "text", value: "Claim finished", agentTainted: false }] });
     }
     return [{ type: "quote_line", children }];
-  }
-  if (links?.queue) {
-    return [
-      {
-        type: "quote_line",
-        children: [{ type: "link", url: links.queue, children: [{ type: "text", value: "Work queue" }] }],
-      },
-    ];
   }
   return [
     {
