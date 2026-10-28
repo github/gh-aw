@@ -103,9 +103,9 @@ func (c *Compiler) applyPullRequestDraftFilter(data *WorkflowData, frontmatter m
 	data.If = RenderCondition(conditionTree)
 }
 
-// applyPullRequestForkFilter applies fork filter conditions for pull_request triggers
+// applyPullRequestForkFilter applies fork filter conditions for pull_request and pull_request_target triggers.
 // Supports repository patterns or an explicit author-association list.
-// Default behavior: When forks field is not specified, only same-repo PRs are allowed (forks are disallowed by default)
+// Without an explicit forks field, only pull_request defaults to same-repo PRs.
 func (c *Compiler) applyPullRequestForkFilter(data *WorkflowData, frontmatter map[string]any) {
 	filtersLog.Print("Applying pull request fork filter")
 
@@ -130,33 +130,29 @@ func (c *Compiler) applyPullRequestForkFilter(data *WorkflowData, frontmatter ma
 		return
 	}
 
-	// Check if there's a pull_request section
-	prValue, hasPR := onMap["pull_request"]
-	if !hasPR {
-		return
+	for _, eventName := range []string{"pull_request", "pull_request_target"} {
+		prMap, ok := onMap[eventName].(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasForks := prMap["forks"]; eventName == "pull_request_target" && !hasForks {
+			continue
+		}
+		c.applyPullRequestEventForkFilter(data, eventName, prMap)
 	}
+}
 
-	// Check if pull_request is an object with fork settings
-	prMap, isPRMap := prValue.(map[string]any)
-	if !isPRMap {
-		return
-	}
-
-	// Check for "forks" field (string, array, or author-association object)
+func (c *Compiler) applyPullRequestEventForkFilter(data *WorkflowData, eventName string, prMap map[string]any) {
 	forksValue, hasForks := prMap["forks"]
 
-	// Default behavior: If forks field is not specified, only allow same-repo PRs (disallow all forks by default)
 	var allowedForks []string
 	var allowedAssociations []string
 	if !hasForks {
 		filtersLog.Print("No forks field specified - applying default fork filter (disallow all forks)")
-		// Empty allowedForks array means only same-repo PRs are allowed
 		allowedForks = []string{}
 	} else {
 		filtersLog.Print("Found forks filter configuration")
 
-		// Parse repository patterns or author associations.
-		// Handle string format (e.g., forks: "*" or forks: "org/*")
 		if forksStr, isForksStr := forksValue.(string); isForksStr {
 			allowedForks = []string{forksStr}
 		} else if forksArray, isForksArray := forksValue.([]any); isForksArray {
@@ -174,16 +170,14 @@ func (c *Compiler) applyPullRequestForkFilter(data *WorkflowData, frontmatter ma
 		}
 	}
 
-	// If "*" wildcard is present, skip fork filtering (allow all forks)
 	if slices.Contains(allowedForks, "*") {
 		filtersLog.Print("Wildcard fork pattern detected, allowing all forks")
 		return // No fork filtering needed
 	}
 
-	// Build condition for allowed forks with glob support
 	notPullRequestEvent := BuildNotEquals(
 		BuildPropertyAccess("github.event_name"),
-		BuildStringLiteral("pull_request"),
+		BuildStringLiteral(eventName),
 	)
 	allowedForksCondition := BuildFromAllowedForks(allowedForks)
 	if len(allowedAssociations) > 0 {
@@ -203,7 +197,6 @@ func (c *Compiler) applyPullRequestForkFilter(data *WorkflowData, frontmatter ma
 		Right: allowedForksCondition,
 	}
 
-	// Build condition tree and render
 	existingCondition := data.If
 	conditionTree := BuildConditionTree(existingCondition, forkCondition.Render())
 	data.If = RenderCondition(conditionTree)

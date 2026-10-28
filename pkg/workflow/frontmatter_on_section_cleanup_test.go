@@ -3,9 +3,70 @@
 package workflow
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/goccy/go-yaml"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestOnSectionFiltersAfterCompilerOnlyFields(t *testing.T) {
+	for _, prefix := range []string{
+		"permissions: {}",
+		"permissions:\n    contents: read",
+		"steps:\n    - name: setup\n      run: echo setup",
+		"skip-author-associations:\n    - BOT",
+	} {
+		for _, event := range []string{"pull_request", "pull_request_target"} {
+			t.Run(prefix+"/"+event, func(t *testing.T) {
+				input := fmt.Sprintf(`on:
+  %s
+  %s:
+    forks:
+      - trusted/*
+    names:
+      - community-contribution
+    types:
+      - labeled
+    branches:
+      - main
+  workflow_dispatch:
+`, prefix, event)
+				result := NewCompiler().commentOutProcessedFieldsInOnSection(input, nil)
+				var compiled map[string]any
+				require.NoError(t, yaml.Unmarshal([]byte(result), &compiled))
+				on := compiled["on"].(map[string]any)
+				assert.Equal(t, map[string]any{
+					"types":    []any{"labeled"},
+					"branches": []any{"main"},
+				}, on[event])
+				assert.Contains(t, on, "workflow_dispatch")
+				assert.NotContains(t, on, strings.Split(prefix, ":")[0])
+			})
+		}
+	}
+}
+
+func TestOnSectionForkFilterFourSpaceIndentation(t *testing.T) {
+	for _, event := range []string{"pull_request", "pull_request_target"} {
+		t.Run(event, func(t *testing.T) {
+			input := fmt.Sprintf(`on:
+    %s:
+        forks:
+            - trusted/*
+        types:
+            - labeled
+`, event)
+			result := NewCompiler().commentOutProcessedFieldsInOnSection(input, nil)
+			var compiled map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(result), &compiled))
+			on := compiled["on"].(map[string]any)
+			assert.Equal(t, map[string]any{"types": []any{"labeled"}}, on[event])
+		})
+	}
+}
 
 func TestDedentTrailingOnCommentBlock(t *testing.T) {
 	tests := []struct {

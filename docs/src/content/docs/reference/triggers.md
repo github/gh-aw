@@ -190,7 +190,7 @@ Strict mode rejects `pull_request_target` when `on.roles` contains `all` or `rea
 
 #### Fork Filtering (`forks:`)
 
-Pull request workflows block forks by default for security. Use the `forks:` field to allow specific fork patterns:
+`pull_request` workflows block forks by default for security. Use the `forks:` field to allow specific fork patterns:
 
 ```yaml wrap
 on:
@@ -202,6 +202,8 @@ on:
 Use `["owner/repo"]` for a specific repository, `["owner/*"]` for an entire org/user, or `["*"]` to allow all forks (use with caution). Omit `forks:` for the default behavior (same-repository PRs only). The compiler uses repository ID comparison so fork detection is unaffected by repository renames.
 
 Alternatively, use `forks: {author-association: [OWNER, MEMBER, COLLABORATOR]}` to allow fork PRs by the author's relationship to the base repository rather than the fork owner. Same-repository PRs remain allowed, and no association is implicitly included. See [author associations](/gh-aw/reference/fork-support/#author-associations) for trust and secret-availability considerations.
+
+`pull_request_target` also supports explicit fork repository patterns; same-repository PRs remain allowed. Omitting `forks:` does not add a fork restriction for this event. Fork filters and `pull_request.names` compile into job conditions, not GitHub Actions trigger properties.
 
 #### Stacked PR Filtering (`max-stack:`)
 

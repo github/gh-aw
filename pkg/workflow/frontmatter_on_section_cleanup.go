@@ -20,6 +20,7 @@ func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmat
 
 	for _, line := range lines {
 		info := newOnSectionLine(line)
+		state.leaveSubsections(info)
 		if state.handleEventSectionEntry(info, &result) {
 			continue
 		}
@@ -28,7 +29,6 @@ func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmat
 			continue
 		}
 		state.enterSubsections(info)
-		state.leaveSubsections(info)
 		shouldComment, commentReason := state.determineComment(info, result, nativeLabelFilterSections)
 		result = state.appendLine(result, info, shouldComment, commentReason)
 	}
@@ -63,6 +63,7 @@ type onSectionCleanupState struct {
 	inWorkflowRun                bool
 	inWorkflowRunConclusionArray bool
 	inForksArray                 bool
+	forksIndent                  int
 	inSkipIfMatch                bool
 	inSkipIfNoMatch              bool
 	inSkipIfCheckFailing         bool
@@ -264,8 +265,9 @@ func (s *onSectionCleanupState) enterSubsections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) enterArraySections(info onSectionLine) {
-	if s.inPullRequest && strings.HasPrefix(info.trimmed, "forks:") {
+	if (s.inPullRequest || s.inPullRequestTarget) && strings.HasPrefix(info.trimmed, "forks:") {
 		s.inForksArray = true
+		s.forksIndent = info.indent
 	}
 	if !s.inEventSection() && strings.HasPrefix(info.trimmed, "skip-roles:") {
 		s.inSkipRolesArray = true
@@ -340,7 +342,7 @@ func (s *onSectionCleanupState) leaveObjectSections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) leaveArraySections(info onSectionLine) {
-	if s.inForksArray && s.inPullRequest && isLeavingArray(info, "forks:", 4) {
+	if s.inForksArray && isLeavingArray(info, "forks:", s.forksIndent) {
 		s.inForksArray = false
 	}
 	if s.inSkipRolesArray && isLeavingArray(info, "skip-roles:", 2) {
@@ -555,9 +557,9 @@ func (s *onSectionCleanupState) commentPullRequestAndTriggerField(info onSection
 		return true, " # Draft filtering applied via job conditions"
 	case (s.inPullRequest || s.inPullRequestReview) && strings.HasPrefix(info.trimmed, "max-stack:"):
 		return true, " # Stack filtering applied via job conditions"
-	case s.inPullRequest && strings.HasPrefix(info.trimmed, "forks:"):
+	case (s.inPullRequest || s.inPullRequestTarget) && strings.HasPrefix(info.trimmed, "forks:"):
 		return true, " # Fork filtering applied via job conditions"
-	case s.inForksArray && (strings.HasPrefix(info.trimmed, "-") || info.indent > 4):
+	case s.inForksArray && (strings.HasPrefix(info.trimmed, "-") || info.indent > s.forksIndent):
 		return true, " # Fork filtering applied via job conditions"
 	case s.inDeploymentStatus && strings.HasPrefix(info.trimmed, "state:"):
 		return true, " # State filtering compiled into if condition"
