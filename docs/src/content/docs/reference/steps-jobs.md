@@ -284,7 +284,21 @@ jobs:
 Generate highlights for release ${{ needs.release.outputs.version }}.
 ```
 
-Job outputs must be string values.
+Job outputs must be string values. Quote literals that YAML would otherwise
+interpret as booleans, numbers, or null, and use `''` for an empty string:
+
+```yaml
+outputs:
+  actor_trusted: 'true'
+  count: '42'
+  missing: 'null'
+  empty: ''
+```
+
+The compiler preserves these string values in the generated workflow for custom
+jobs, `pre_activation` (also spelled `pre-activation`), and custom safe-output
+jobs. Expressions such as `${{ steps.get_release.outputs.version }}` retain
+their expression syntax.
 
 ## Learn More
 
