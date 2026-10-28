@@ -370,6 +370,8 @@ Use drive memory.
 	assert.Contains(t, lockYAML, "id-token: write")
 	assert.Contains(t, lockYAML, "contents: read")
 	assert.Contains(t, lockYAML, "/tmp/gh-aw/drive-memory/")
+	assert.NotContains(t, lockYAML, updateDriveMemoryJobName+":")
+	assert.Contains(t, extractJobSection(lockYAML, "agent"), "actions/gh-drives-preview/commit@")
 }
 
 func TestCompileDriveMemoryThreatDetectionWorkflow(t *testing.T) {
@@ -405,6 +407,7 @@ Use drive memory.
 	assert.Contains(t, agentSection, "drives: read")
 	assert.NotContains(t, agentSection, "actions/gh-drives-preview/commit@")
 	assert.Contains(t, updateSection, "runs-on: ubuntu-latest")
+	assert.Contains(t, updateSection, "needs.detection.outputs.detection_success == 'true'")
 	assert.Contains(t, updateSection, "drives: write")
 	assert.Contains(t, updateSection, "Check drive-memory for concurrent updates")
 	assert.Contains(t, updateSection, "refusing to overwrite a newer version")
@@ -466,6 +469,27 @@ func TestDriveMemoryThreatDetectionJob(t *testing.T) {
 	assert.Equal(t, "runs-on: ubuntu-latest", job.RunsOn)
 	assert.Contains(t, job.Permissions, "drives: write")
 	assert.Contains(t, strings.Join(job.Steps, "\n"), "actions/gh-drives-preview/commit@")
+
+	node, err := ParseExpression(job.If)
+	require.NoError(t, err)
+	for _, agentResult := range []string{"success", "failure", "cancelled", "skipped", ""} {
+		for _, detectionResult := range []string{"success", "failure", "cancelled", "skipped", ""} {
+			for _, accepted := range []string{"true", "false", ""} {
+				values := map[string]string{
+					"needs.agent.result":                        agentResult,
+					"needs.detection.result":                    detectionResult,
+					"needs.detection.outputs.detection_success": accepted,
+				}
+				want := agentResult == "success" && detectionResult == "success" && accepted == "true"
+				assert.Equal(t, want, evaluateDetectionRedactionGate(t, node, values),
+					"agent=%q detection=%q detection_success=%q", agentResult, detectionResult, accepted)
+			}
+		}
+	}
+
+	job, err = compiler.buildUpdateDriveMemoryJob(data, false)
+	require.NoError(t, err)
+	assert.Nil(t, job, "without detection, persistence remains in the agent job")
 }
 
 func TestDriveMemoryUpdateCheckoutStepIDsAreUnique(t *testing.T) {

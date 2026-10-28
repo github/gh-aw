@@ -39,15 +39,15 @@ func TestCompiledCacheAccessBoundaries(t *testing.T) {
 					assert.NotContains(t, jobs, "update_cache_memory")
 					return
 				}
-				assert.Equal(t, "read", agent["cache-mode"])
-				assert.NotContains(t, agentSteps, "actions/cache@")
+				assert.NotContains(t, agent, "cache-mode", "dependency caches inherit trigger-scoped access so trusted runs can save")
+				assert.Contains(t, agentSteps, "actions/cache@")
 				assert.NotContains(t, agentSteps, "actions/cache/save@")
 				assert.Contains(t, agentSteps, "actions/cache/restore@")
 				publisher := jobs["update_cache_memory"].(map[string]any)
 				assert.Equal(t, "write-only", publisher["cache-mode"])
 				assert.Equal(t, map[string]any{"actions": "write", "contents": "read"}, publisher["permissions"])
 				condition := strings.Join(strings.Fields(publisher["if"].(string)), " ")
-				assert.Equal(t, "always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' && needs.agent.result == 'success'", condition)
+				assert.Equal(t, "always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' && needs.agent.result == 'success' && github.event_name != 'pull_request_target' && github.event_name != 'issue_comment' && github.event_name != 'workflow_run'", condition)
 				assert.ElementsMatch(t, []any{"activation", "agent", "detection"}, publisher["needs"])
 				publisherSteps := fmt.Sprint(publisher["steps"])
 				assert.Contains(t, publisherSteps, "actions/cache/save@")
@@ -56,9 +56,10 @@ func TestCompiledCacheAccessBoundaries(t *testing.T) {
 				require.NoError(t, err, "generated job cache modes must remain readable by native lint")
 				for _, job := range native.Jobs {
 					if string(job.ID) == "agent" {
-						assert.Equal(t, "read", job.CacheMode)
+						assert.Empty(t, job.CacheMode)
 					}
 				}
+				assertDependencyCacheTrustGates(t, agent)
 			})
 		}
 	}
@@ -74,8 +75,13 @@ func TestCompiledCacheAccessDryRunAndGHES(t *testing.T) {
 					agent := jobs["agent"].(map[string]any)
 					if ghes {
 						assert.NotContains(t, content, "cache-mode:")
-					} else {
+					} else if dryRun {
 						assert.Equal(t, "read", agent["cache-mode"])
+					} else {
+						assert.NotContains(t, agent, "cache-mode")
+					}
+					if !dryRun {
+						assertDependencyCacheTrustGates(t, agent)
 					}
 					if dryRun || restoreOnly {
 						assert.NotContains(t, jobs, "update_cache_memory")
@@ -99,6 +105,14 @@ func TestCompiledCacheAccessDryRunAndGHES(t *testing.T) {
 	}
 }
 
+func TestCacheMemoryAgentRemainsReadOnlyWithoutDependencyCaches(t *testing.T) {
+	for _, event := range []string{"push", "issue_comment"} {
+		compiled, _ := compileCacheAccessFixture(t, event, "true", false, false, false, false)
+		agent := compiled["jobs"].(map[string]any)["agent"].(map[string]any)
+		assert.Equal(t, "read", agent["cache-mode"])
+	}
+}
+
 func TestCachePublisherRequiresDetectionAcceptance(t *testing.T) {
 	data := &WorkflowData{
 		CacheMemoryConfig: &CacheMemoryConfig{Caches: []CacheMemoryEntry{{ID: "default"}}},
@@ -112,20 +126,68 @@ func TestCachePublisherRequiresDetectionAcceptance(t *testing.T) {
 	for _, agent := range []string{"success", "failure", "cancelled", "skipped", ""} {
 		for _, detection := range []string{"success", "failure", "cancelled", "skipped", ""} {
 			for _, accepted := range []string{"true", "false", ""} {
-				values := map[string]string{
-					"needs.agent.result":                        agent,
-					"needs.detection.result":                    detection,
-					"needs.detection.outputs.detection_success": accepted,
+				for _, event := range []string{"push", "workflow_dispatch", "repository_dispatch", "schedule", "pull_request_target", "issue_comment", "workflow_run"} {
+					values := map[string]string{
+						"needs.agent.result":                        agent,
+						"needs.detection.result":                    detection,
+						"needs.detection.outputs.detection_success": accepted,
+						"github.event_name":                         event,
+					}
+					trusted := event != "pull_request_target" && event != "issue_comment" && event != "workflow_run"
+					assert.Equal(t, trusted && agent == "success" && detection == "success" && accepted == "true",
+						evaluateCacheTrustGate(t, node, values),
+						"event=%s agent=%s detection=%s detection_success=%s", event, agent, detection, accepted)
 				}
-				assert.Equal(t, agent == "success" && detection == "success" && accepted == "true",
-					evaluateDetectionRedactionGate(t, node, values),
-					"agent=%s detection=%s detection_success=%s", agent, detection, accepted)
 			}
 		}
 	}
 }
 
-func compileCacheAccessFixture(t *testing.T, trigger, detection string, ghes, dryRun, restoreOnly bool) (map[string]any, string) {
+func assertDependencyCacheTrustGates(t *testing.T, agent map[string]any) {
+	t.Helper()
+	for _, event := range []string{"push", "workflow_dispatch", "repository_dispatch", "pull_request_target", "issue_comment", "workflow_run"} {
+		var activeActions []string
+		for _, rawStep := range agent["steps"].([]any) {
+			step := rawStep.(map[string]any)
+			if step["name"] != "Cache (dependencies)" {
+				continue
+			}
+			condition, err := ParseExpression(stripExpressionWrapper(step["if"].(string)))
+			require.NoError(t, err)
+			if evaluateCacheTrustGate(t, condition, map[string]string{"github.event_name": event}) {
+				activeActions = append(activeActions, step["uses"].(string))
+			}
+		}
+		require.Len(t, activeActions, 1, "event=%s", event)
+		if event == "pull_request_target" || event == "issue_comment" || event == "workflow_run" {
+			assert.Contains(t, activeActions[0], "actions/cache/restore@")
+		} else {
+			assert.Contains(t, activeActions[0], "actions/cache@", "trusted dependency caches must retain their post-action save")
+		}
+	}
+}
+
+func evaluateCacheTrustGate(t *testing.T, node ConditionNode, values map[string]string) bool {
+	t.Helper()
+	switch node := node.(type) {
+	case *AndNode:
+		return evaluateCacheTrustGate(t, node.Left, values) && evaluateCacheTrustGate(t, node.Right, values)
+	case *OrNode:
+		return evaluateCacheTrustGate(t, node.Left, values) || evaluateCacheTrustGate(t, node.Right, values)
+	case *NotNode:
+		return !evaluateCacheTrustGate(t, node.Child, values)
+	case *ExpressionNode:
+		if property, expected, found := strings.Cut(node.Expression, " != '"); found {
+			expected, quoted := strings.CutSuffix(expected, "'")
+			require.True(t, quoted)
+			require.Contains(t, values, property)
+			return values[property] != expected
+		}
+	}
+	return evaluateDetectionRedactionGate(t, node, values)
+}
+
+func compileCacheAccessFixture(t *testing.T, trigger, detection string, ghes, dryRun, restoreOnly bool, dependencyCache ...bool) (map[string]any, string) {
 	t.Helper()
 	source := fmt.Sprintf(`---
 on: %s
@@ -151,6 +213,9 @@ jobs:
 ---
 Test cache access separation.
 `, trigger, restoreOnly, detection)
+	if len(dependencyCache) > 0 && !dependencyCache[0] {
+		source = strings.Replace(source, "cache:\n  key: dependencies\n  path: node_modules\n", "", 1)
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache.md")
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))

@@ -29,8 +29,9 @@ var defaultGhAwActionlintIgnorePatterns = []string{
 	`property "workflow_(repository|sha|ref|file_path)" is not defined in object type`,
 	// GitHub is rolling out queue under concurrency before actionlint support.
 	`unexpected key "queue" for "concurrency" section`,
-	// Dry-run workflows use GitHub's workflow-level cache policy before actionlint support.
+	// Generated workflows use GitHub's workflow/job cache policies before actionlint support.
 	`^unexpected key "cache-mode" for "workflow" section(\.|$)`,
+	`^unexpected key "cache-mode" for "job" section(\.|$)`,
 	// gh-aw injects additional activation context properties in generated workflows.
 	`property "(activation|activated)" is not defined in object type`,
 	// gh-aw injects additional artifact context properties in generated workflows.

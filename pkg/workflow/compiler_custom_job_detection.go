@@ -83,8 +83,7 @@ func addCustomJobDetectionGuard(job *Job, statusOnly bool) error {
 	if statusOnly {
 		return nil
 	}
-	// Warn-mode detections can report job success while flagging tainted output.
-	guard := "needs." + detection + ".result == 'success' && needs." + detection + ".outputs.detection_success == 'true'"
+	guard := RenderCondition(buildDetectionAcceptedCondition())
 	if condition != "" {
 		guard += " && (" + condition + ")"
 	}

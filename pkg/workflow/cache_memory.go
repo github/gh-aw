@@ -559,11 +559,10 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
 		BuildStringLiteral("success"),
 	)
-	detectionAccepted := BuildAnd(buildDetectionSuccessCondition(), BuildEquals(
-		BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.detection_success", constants.DetectionJobName)),
-		BuildStringLiteral("true"),
+	jobCondition := RenderCondition(BuildAnd(
+		BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionAcceptedCondition()), agentSucceeded),
+		cacheWriteAllowedCondition(),
 	))
-	jobCondition := RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), detectionAccepted), agentSucceeded))
 
 	// Set up permissions for the cache update job.
 	// actions: write is required only when this job actually emits cache-save steps.

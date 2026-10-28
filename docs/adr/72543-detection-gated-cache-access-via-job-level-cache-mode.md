@@ -1,50 +1,38 @@
-# ADR-72543: Detection-Gated Cache Access via Job-Level `cache-mode`
+# ADR-72543: Detection-gated cache access via job-level `cache-mode`
 
-**Date**: 2026-05-14
-**Status**: Draft
-**Deciders**: pelikhan (PR author); [TODO: verify reviewers]
+## Status
 
----
+Proposed in [PR #72543](https://github.com/github/gh-aw/pull/72543).
+Adoption is pending repository maintainer review; no decider identities or human approval are asserted by this record.
 
-### Context
+## Context
 
-When threat detection is enabled, compiled workflows run the agent job before detection has judged its output, and a separate cache-memory publisher job later persists agent memory. Previously the agent job used restore-only cache *actions*, but selecting a restore-only action does not restrict the job's scoped cache token, so agent-executed code could still write to the Actions cache before detection ran. In addition, detection running in warning mode can leave the detection job successful while its verdict rejects persistence, so "detection job succeeded" was not a sufficient gate for the publisher. GitHub.com now supports a `cache-mode` field at workflow and job level that limits the cache token's capability; GHES deployments may not support it.
+An agent executes before threat detection can judge its output. Selecting a restore-only cache action does not restrict the job's scoped cache token: agent-executed code can still call the cache service directly. Preventing publication before detection therefore requires a platform-enforced token boundary, not just a different cache action.
 
-### Decision
+Cache-memory publication must remain possible after detection explicitly accepts the run. Detection in warning mode can succeed as a job while rejecting persistence, so job success alone is not an acceptance signal. Acceptance also does not establish artifact authenticity or turn low-trust inputs into trusted cache content.
 
-We will use the platform `cache-mode` field as the cache-access boundary for detection-gated workflows. On GitHub.com, the compiler emits `cache-mode: read` on the agent job whenever detection is enabled (for every trigger type, including trusted, mixed, dispatch, and expression-controlled detection), and compiles frontmatter dependency caches as restore-only. The separate cache-memory publisher gets `cache-mode: write-only` and only runs when the agent and detection jobs succeed **and** `needs.detection.outputs.detection_success == 'true'`. GHES compatibility mode omits all compiler-generated `cache-mode` fields. The Actions AST preserves job-level `cache-mode`, and the `cache-poisoning` linter warns about explicit `write`/`write-only` overrides on `pull_request_target`, `issue_comment`, and `workflow_run`, including inherited workflow-level and reusable-caller modes.
+GitHub.com supports workflow- and job-level `cache-mode` token policies. GHES compatibility mode cannot assume that support. Trusted workflows also use dependency caches, whose existing save behavior should not be lost merely because threat detection is enabled.
 
-### Alternatives Considered
+## Decision
 
-#### Alternative 1: Rely on restore-only cache actions alone
+Use job-level `cache-mode` on GitHub.com to limit agent cache access while detection is pending, except where trusted dependency-cache saves require the platform's trigger-scoped default token. Without dependency-cache saves, the detection-enabled agent uses `cache-mode: read`. With dependency caches, low-trust events use restore-only actions and inherit the platform's read-only default; trusted events retain combined restore/save actions and the platform's default write access. Runtime event conditions preserve that distinction in mixed-trigger workflows because `cache-mode` accepts literal values, not event-dependent expressions.
 
-Keep the existing approach of using restore-only cache actions in the agent job. This needs no new platform feature and works on GHES. It was rejected because the action choice doesn't constrain the job's cache token: code running in the agent job can still write cache entries directly, which leaves the cache-poisoning path open.
+A separate cache-memory publisher uses `cache-mode: write-only` and requires both successful prerequisite jobs and explicit detection acceptance (`needs.detection.outputs.detection_success == 'true'`). Missing acceptance, rejected output, or runtime-skipped detection must not authorize publication. The publisher must also be disabled at runtime for `pull_request_target`, `issue_comment`, and `workflow_run`: detection acceptance does not justify overriding their low-trust defaults or writing cache lineages restored by higher-trust runs.
 
-#### Alternative 2: Workflow-level read-only cap
+GHES compatibility mode omits compiler-generated `cache-mode` fields. The Actions AST preserves authored job-level policies, and the `cache-poisoning` linter warns about explicit `write` or `write-only` overrides on `pull_request_target`, `issue_comment`, and `workflow_run`, including inherited workflow and reusable-caller policies. The actionlint compatibility filter ignores only unsupported-key diagnostics at the supported workflow and job locations, not misplaced keys or malformed values.
 
-Set `cache-mode: read` once at workflow level for detection-enabled workflows. This is simpler and covers every job. It was rejected because it would also block the intended cache-memory publisher, which must write after detection accepts the output. The spec explicitly says the compiler MUST NOT impose a workflow-wide read cap that prevents this publication path.
+### Alternatives considered
 
-#### Alternative 3: Gate the publisher only on detection job success
+- **Restore-only actions alone:** Compatible with GHES and simpler, but insufficient because they do not restrict direct cache writes using the job token.
+- **Workflow-level read-only cap:** Restricts the agent, but also prevents the separate publisher from writing accepted memory and disables trusted dependency-cache saves. Job-level policies and trigger-scoped defaults preserve those responsibilities.
+- **Publisher gated only on detection job success:** Insufficient in warning mode, where a successful job can still reject persistence. An explicit acceptance output is required.
 
-Run the publisher whenever the detection job finishes successfully, without checking the `detection_success` output. This is simpler, but in warning mode the detection job can succeed even when its verdict rejects persistence, so rejected output could still be persisted.
+## Consequences
 
-### Consequences
+The GitHub.com agent token cannot write caches while the detection gate is active unless trusted dependency-cache compatibility requires the platform default. Publication requires an explicit acceptance signal and is disabled for the three low-trust event types above. On eligible runs the separate publisher can write without receiving cache-read access.
 
-#### Positive
-- The agent job's cache token is limited to reads on GitHub.com, so agent-executed code can't poison caches before detection runs.
-- Persistence requires an explicit detection acceptance (`detection_success == 'true'`), so warning-mode rejections, missing acceptance, and runtime-skipped detection all block publication.
-- The linter flags explicit write overrides on low-trust triggers, including inherited modes, so authors notice when they widen cache access.
+Trusted dependency-cache saves are intentionally not detection-gated. A trusted agent with those caches retains direct token write capability before detection runs; restore-only actions would not remove that capability. This is a compatibility tradeoff, not a claim that detection attests cached dependencies.
 
-#### Negative
-- The publisher's explicit `write-only` mode deliberately overrides the platform's low-trust read-only default. Its security depends on detection plus input validation, and detection acceptance is not artifact authenticity or attestation.
-- GHES deployments get no scoped-token enforcement because `cache-mode` is omitted there, so behavior differs by platform.
-- Regenerates around 307 lock files and adds compiler, AST, and linter surface that must stay in sync with platform `cache-mode` semantics.
+GHES does not receive scoped-token enforcement from these generated fields. Restore-only actions there are not an equivalent security boundary. Authored custom jobs, third-party cache writers, dependency-cache namespaces, and persistent runner caches require their own review; detection acceptance is not attestation.
 
-#### Neutral
-- Workflows without detection keep their existing same-job cache-memory behavior. Dry-run omits the publisher and stays read-only.
-- Authored custom jobs, third-party cache writers, dependency-cache namespaces, and persistent runner caches stay outside this boundary and need their own review.
-- The detector's internal no-output short-circuit still counts as acceptance.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+Compiler job policies, detection conditions, cache actions, AST validation, lint compatibility, and generated locks must remain consistent. Trusted dependency-cache save behavior must be covered by regression tests. Workflows without detection retain their existing same-job cache-memory behavior. Dry-run compilation omits the publisher and uses restore-only compiler-managed actions, with scoped-token read restrictions only outside GHES compatibility mode.

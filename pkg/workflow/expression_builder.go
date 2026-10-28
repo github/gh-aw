@@ -298,14 +298,24 @@ func buildSkipAuthorAssociationsCondition(skipAuthorAssociations map[string][]st
 	return &NotNode{Child: BuildDisjunction(false, skipTerms...)}
 }
 
-// buildDetectionSuccessCondition builds the condition to check if detection passed.
-// Detection runs in a separate detection job that only succeeds (result == 'success') when
-// the analysis worked, the output was parsed, and no threats were found. When threats are
-// detected the detection job exits with a non-zero code, giving it a 'failure' result.
+// buildDetectionSuccessCondition checks whether the detection job completed successfully.
+// Warn mode can report success even when threats were found; use
+// buildDetectionAcceptedCondition when consuming or persisting agent output.
 func buildDetectionSuccessCondition() ConditionNode {
 	return BuildEquals(
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.DetectionJobName)),
 		BuildStringLiteral("success"),
+	)
+}
+
+// buildDetectionAcceptedCondition also requires explicit acceptance of the agent output.
+func buildDetectionAcceptedCondition() ConditionNode {
+	return BuildAnd(
+		buildDetectionSuccessCondition(),
+		BuildEquals(
+			BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.detection_success", constants.DetectionJobName)),
+			BuildStringLiteral("true"),
+		),
 	)
 }
 

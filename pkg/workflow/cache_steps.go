@@ -25,12 +25,33 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 		return
 	}
 	for i, cache := range caches {
-		if data.DryRun || (!data.GHES && IsDetectionJobEnabled(data.SafeOutputs)) {
+		if data.DryRun {
 			writeCacheStepWithAction(builder, cache, i, len(caches), "actions/cache/restore")
+		} else if IsDetectionJobEnabled(data.SafeOutputs) {
+			// Match the runner's trigger-scoped cache-write boundary, including
+			// workflows that mix trusted and low-trust events.
+			trusted := cacheWriteAllowedCondition()
+			writeConditionalCacheStep(builder, cache, i, len(caches), "actions/cache", trusted)
+			writeConditionalCacheStep(builder, cache, i, len(caches), "actions/cache/restore", &NotNode{Child: trusted})
 		} else {
 			writeCacheStep(builder, cache, i, len(caches))
 		}
 	}
+}
+
+// cacheWriteAllowedCondition excludes events whose runs can carry untrusted
+// input while executing in the base repository's cache namespace.
+func cacheWriteAllowedCondition() ConditionNode {
+	var condition ConditionNode
+	for _, event := range []string{"pull_request_target", "issue_comment", "workflow_run"} {
+		allowed := BuildNotEquals(BuildPropertyAccess("github.event_name"), BuildStringLiteral(event))
+		if condition == nil {
+			condition = allowed
+		} else {
+			condition = BuildAnd(condition, allowed)
+		}
+	}
+	return condition
 }
 
 func parseCacheStepConfigs(cacheYAML string) ([]map[string]any, error) {
@@ -68,8 +89,15 @@ func writeCacheStep(builder *strings.Builder, cache map[string]any, idx int, tot
 }
 
 func writeCacheStepWithAction(builder *strings.Builder, cache map[string]any, idx int, total int, action string) {
+	writeConditionalCacheStep(builder, cache, idx, total, action, nil)
+}
+
+func writeConditionalCacheStep(builder *strings.Builder, cache map[string]any, idx, total int, action string, condition ConditionNode) {
 	stepName := resolveCacheStepName(cache, idx, total)
 	fmt.Fprintf(builder, "      - name: %s\n", stepName)
+	if condition != nil {
+		builder.WriteString("        if: ${{ " + RenderCondition(condition) + " }}\n")
+	}
 	fmt.Fprintf(builder, "        uses: %s\n", getActionPin(action))
 	builder.WriteString("        with:\n")
 	writeCacheStepValue(builder, "key", cache["key"])
