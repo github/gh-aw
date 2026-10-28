@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/workflow/aw"
+	"github.com/github/gh-aw/pkg/workflow/cachepolicy"
 )
 
 func cacheWriteOverrides(ctx context.Context, input Input, blocks []aw.ExecutionBlock) ([]Diagnostic, error) {
@@ -41,8 +42,8 @@ func cacheWriteOverrides(ctx context.Context, input Input, blocks []aw.Execution
 			reported[field] = struct{}{}
 			diagnostics = append(diagnostics, Diagnostic{
 				Path: field,
-				Message: "Explicit cache-write access overrides the read-only default for pull_request_target, issue_comment, or workflow_run; " +
-					"use cache-mode: read for untrusted execution and review any dedicated cache publisher's input validation and cache consumers",
+				Message: "Explicit cache-write access can override the read-only default outside GitHub's write-capable trigger allowlist; " +
+					"use cache-mode: read for untrusted execution and review reusable callers, publisher input validation, and cache consumers",
 			})
 		}
 	}
@@ -68,7 +69,7 @@ func cacheWriteOverrides(ctx context.Context, input Input, blocks []aw.Execution
 }
 
 func cacheLowTrustTrigger(ctx context.Context, on any) (bool, error) {
-	for _, event := range []string{"pull_request_target", "issue_comment", "workflow_run"} {
+	for _, event := range cachepolicy.ReadOnlyEvents() {
 		if _, found, err := authoredTrigger(ctx, on, event); err != nil || found {
 			return found, err
 		}

@@ -19,6 +19,10 @@ func TestCacheWriteOverrideCLI(t *testing.T) {
 		name, trigger, root, job, want string
 	}{
 		{"low trust job", "issue_comment", "", "write-only", "jobs.check.cache-mode"},
+		{"issues job", "issues", "", "write-only", "jobs.check.cache-mode"},
+		{"discussion job", "discussion", "", "write", "jobs.check.cache-mode"},
+		{"discussion comment job", "discussion_comment", "", "write-only", "jobs.check.cache-mode"},
+		{"mixed issues caller", "{push: {}, issues: {}}", "write", "", "cache-mode"},
 		{"inherited workflow", "workflow_run", "write", "", "cache-mode"},
 		{"capped job", "pull_request_target", "write", "read", ""},
 		{"dispatch default", "repository_dispatch", "", "write", ""},

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/cachepolicy"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,8 +20,15 @@ func TestCompiledCacheAccessBoundaries(t *testing.T) {
 	for _, trigger := range []string{
 		"pull_request_target",
 		"issue_comment",
+		"issues",
+		"discussion",
+		"discussion_comment",
+		"pull_request",
+		"workflow_call",
 		"{workflow_run: {workflows: [CI], branches: [main]}}",
 		"{push: {}, issue_comment: {}}",
+		"{push: {}, issues: {}}",
+		"{workflow_call: {}, discussion_comment: {}}",
 		"{repository_dispatch: {types: [refresh]}}",
 		"push",
 		"workflow_dispatch",
@@ -47,7 +55,7 @@ func TestCompiledCacheAccessBoundaries(t *testing.T) {
 				assert.Equal(t, "write-only", publisher["cache-mode"])
 				assert.Equal(t, map[string]any{"actions": "write", "contents": "read"}, publisher["permissions"])
 				condition := strings.Join(strings.Fields(publisher["if"].(string)), " ")
-				assert.Equal(t, "always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' && needs.agent.result == 'success' && github.event_name != 'pull_request_target' && github.event_name != 'issue_comment' && github.event_name != 'workflow_run'", condition)
+				assert.Equal(t, "always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' && needs.agent.result == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'delete' || github.event_name == 'registry_package' || github.event_name == 'page_build' || github.event_name == 'schedule' || github.event_name == 'pull_request')", condition)
 				assert.ElementsMatch(t, []any{"activation", "agent", "detection"}, publisher["needs"])
 				publisherSteps := fmt.Sprint(publisher["steps"])
 				assert.Contains(t, publisherSteps, "actions/cache/save@")
@@ -106,7 +114,7 @@ func TestCompiledCacheAccessDryRunAndGHES(t *testing.T) {
 }
 
 func TestCacheMemoryAgentRemainsReadOnlyWithoutDependencyCaches(t *testing.T) {
-	for _, event := range []string{"push", "issue_comment"} {
+	for _, event := range []string{"push", "issue_comment", "issues", "discussion_comment"} {
 		compiled, _ := compileCacheAccessFixture(t, event, "true", false, false, false, false)
 		agent := compiled["jobs"].(map[string]any)["agent"].(map[string]any)
 		assert.Equal(t, "read", agent["cache-mode"])
@@ -126,14 +134,14 @@ func TestCachePublisherRequiresDetectionAcceptance(t *testing.T) {
 	for _, agent := range []string{"success", "failure", "cancelled", "skipped", ""} {
 		for _, detection := range []string{"success", "failure", "cancelled", "skipped", ""} {
 			for _, accepted := range []string{"true", "false", ""} {
-				for _, event := range []string{"push", "workflow_dispatch", "repository_dispatch", "schedule", "pull_request_target", "issue_comment", "workflow_run"} {
+				for _, event := range cacheAccessTestEvents() {
 					values := map[string]string{
 						"needs.agent.result":                        agent,
 						"needs.detection.result":                    detection,
 						"needs.detection.outputs.detection_success": accepted,
 						"github.event_name":                         event,
 					}
-					trusted := event != "pull_request_target" && event != "issue_comment" && event != "workflow_run"
+					trusted := cacheAccessTestAllowsWrite(event)
 					assert.Equal(t, trusted && agent == "success" && detection == "success" && accepted == "true",
 						evaluateCacheTrustGate(t, node, values),
 						"event=%s agent=%s detection=%s detection_success=%s", event, agent, detection, accepted)
@@ -145,7 +153,7 @@ func TestCachePublisherRequiresDetectionAcceptance(t *testing.T) {
 
 func assertDependencyCacheTrustGates(t *testing.T, agent map[string]any) {
 	t.Helper()
-	for _, event := range []string{"push", "workflow_dispatch", "repository_dispatch", "pull_request_target", "issue_comment", "workflow_run"} {
+	for _, event := range cacheAccessTestEvents() {
 		var activeActions []string
 		for _, rawStep := range agent["steps"].([]any) {
 			step := rawStep.(map[string]any)
@@ -159,11 +167,37 @@ func assertDependencyCacheTrustGates(t *testing.T, agent map[string]any) {
 			}
 		}
 		require.Len(t, activeActions, 1, "event=%s", event)
-		if event == "pull_request_target" || event == "issue_comment" || event == "workflow_run" {
+		if !cacheAccessTestAllowsWrite(event) {
 			assert.Contains(t, activeActions[0], "actions/cache/restore@")
 		} else {
 			assert.Contains(t, activeActions[0], "actions/cache@", "trusted dependency caches must retain their post-action save")
 		}
+	}
+}
+
+func cacheAccessTestEvents() []string {
+	return append(append([]string{}, validGitHubEventTypes...), "", "future_untrusted_event")
+}
+
+func cacheAccessTestAllowsWrite(event string) bool {
+	switch event {
+	case "push", "workflow_dispatch", "repository_dispatch", "delete", "registry_package", "page_build", "schedule", "pull_request":
+		return true
+	default:
+		return false
+	}
+}
+
+func TestCacheWriteTriggerClassification(t *testing.T) {
+	readOnly := make(map[string]bool)
+	for _, event := range cachepolicy.ReadOnlyEvents() {
+		readOnly[event] = true
+	}
+	for _, event := range cacheAccessTestEvents() {
+		assert.Equal(t, cacheAccessTestAllowsWrite(event), cachepolicy.AllowsWrite(event), "event=%s", event)
+	}
+	for _, event := range validGitHubEventTypes {
+		assert.NotEqual(t, cachepolicy.AllowsWrite(event), readOnly[event], "each known event needs exactly one classification: %s", event)
 	}
 }
 

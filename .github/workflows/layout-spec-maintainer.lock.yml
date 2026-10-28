@@ -619,14 +619,14 @@ jobs:
           path: /tmp/gh-aw
       # Cache configuration from frontmatter processed below
       - name: Save layout spec data to cache
-        if: ${{ github.event_name != 'pull_request_target' && github.event_name != 'issue_comment' && github.event_name != 'workflow_run' }}
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch' || github.event_name == 'delete' || github.event_name == 'registry_package' || github.event_name == 'page_build' || github.event_name == 'schedule' || github.event_name == 'pull_request' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: layout-spec-cache-${{ github.run_id }}
           path: /tmp/gh-aw/agent/layout-cache
           restore-keys: layout-spec-cache-
       - name: Save layout spec data to cache
-        if: ${{ !(github.event_name != 'pull_request_target') || !(github.event_name != 'issue_comment') || !(github.event_name != 'workflow_run') }}
+        if: ${{ (!(github.event_name == 'push')) && (!(github.event_name == 'workflow_dispatch')) && (!(github.event_name == 'repository_dispatch')) && (!(github.event_name == 'delete')) && (!(github.event_name == 'registry_package')) && (!(github.event_name == 'page_build')) && (!(github.event_name == 'schedule')) && (!(github.event_name == 'pull_request')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: layout-spec-cache-${{ github.run_id }}

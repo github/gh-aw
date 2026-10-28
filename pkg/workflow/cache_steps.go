@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/cachepolicy"
 	"github.com/goccy/go-yaml"
 )
 
@@ -39,19 +40,13 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 	}
 }
 
-// cacheWriteAllowedCondition excludes events whose runs can carry untrusted
-// input while executing in the base repository's cache namespace.
+// cacheWriteAllowedCondition grants writes only for platform-write-capable events.
 func cacheWriteAllowedCondition() ConditionNode {
-	var condition ConditionNode
-	for _, event := range []string{"pull_request_target", "issue_comment", "workflow_run"} {
-		allowed := BuildNotEquals(BuildPropertyAccess("github.event_name"), BuildStringLiteral(event))
-		if condition == nil {
-			condition = allowed
-		} else {
-			condition = BuildAnd(condition, allowed)
-		}
+	var terms []ConditionNode
+	for _, event := range cachepolicy.WriteEvents() {
+		terms = append(terms, BuildEquals(BuildPropertyAccess("github.event_name"), BuildStringLiteral(event)))
 	}
-	return condition
+	return BuildDisjunction(false, terms...)
 }
 
 func parseCacheStepConfigs(cacheYAML string) ([]map[string]any, error) {

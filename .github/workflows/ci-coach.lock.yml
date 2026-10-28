@@ -3028,8 +3028,9 @@ jobs:
       - detection
     if: >
       always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' &&
-      needs.agent.result == 'success' && github.event_name != 'pull_request_target' && github.event_name != 'issue_comment' &&
-      github.event_name != 'workflow_run'
+      needs.agent.result == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' || github.event_name == 'delete' || github.event_name == 'registry_package' ||
+      github.event_name == 'page_build' || github.event_name == 'schedule' || github.event_name == 'pull_request')
     runs-on: ubuntu-slim
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:

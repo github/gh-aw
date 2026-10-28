@@ -10,13 +10,18 @@ import (
 )
 
 func TestCacheLowTrustWriteOverrides(t *testing.T) {
-	const message = "Explicit cache-write access overrides the read-only default for pull_request_target, issue_comment, or workflow_run; use cache-mode: read for untrusted execution and review any dedicated cache publisher's input validation and cache consumers"
+	const message = "Explicit cache-write access can override the read-only default outside GitHub's write-capable trigger allowlist; use cache-mode: read for untrusted execution and review reusable callers, publisher input validation, and cache consumers"
 	for _, test := range []struct {
 		name, on, mode string
 		want           bool
 	}{
 		{"target write", "pull_request_target", "write", true},
 		{"comment write only", "issue_comment", "write-only", true},
+		{"issues write", "issues", "write-only", true},
+		{"discussion write", "discussion", "write", true},
+		{"discussion comment write", "discussion_comment", "write-only", true},
+		{"mixed issues", "{push: {}, issues: {}}", "write-only", true},
+		{"reusable caller unknown", "workflow_call", "write-only", true},
 		{"workflow run write", "{workflow_run: {workflows: [CI], branches: [main]}}", "write", true},
 		{"mixed events", "[push, issue_comment]", "write", true},
 		{"mixed mapping", "{push: {}, pull_request_target: {}}", "write-only", true},
@@ -90,6 +95,23 @@ func TestCacheWriteModeInheritance(t *testing.T) {
 				assert.Equal(t, test.want, diagnostics[0].Path)
 			}
 		})
+	}
+}
+
+func TestCacheIssueReusableCallerWriteOverride(t *testing.T) {
+	for _, target := range []ASTTargets{ActionsAST, AWAST} {
+		input := ruleContractInput(t, `on: {push: {}, issues: {}, discussion_comment: {}}
+jobs:
+  call:
+    uses: ./.github/workflows/worker.yml
+    cache-mode: write-only
+`, target, false)
+		runner, err := Default().Select("cache-poisoning")
+		require.NoError(t, err)
+		diagnostics, err := runner.Run(context.Background(), input)
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 1)
+		assert.Equal(t, "jobs.call.cache-mode", diagnostics[0].Path)
 	}
 }
 
