@@ -33,6 +33,15 @@ function buildWorkQueueClaimFooter() {
   if (!handle) return [];
   const { work_id, claim_id } = claimIdentity(handle);
   const links = currentClaimFooterLinks();
+  if (links?.work_created || links?.claim_finished) {
+    const children = [];
+    if (links.work_created) children.push({ type: "link", url: links.work_created, children: [{ type: "text", value: "Work created" }] });
+    if (links.claim_finished) {
+      if (children.length) children.push({ type: "text", value: " · " });
+      children.push({ type: "link", url: links.claim_finished, children: [{ type: "text", value: "Claim finished" }] });
+    }
+    return [{ type: "quote_line", children }];
+  }
   if (links?.queue) {
     return [
       {

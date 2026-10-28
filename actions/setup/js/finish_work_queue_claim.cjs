@@ -102,6 +102,55 @@ function runtimeOptions(options) {
   return { ...options, githubClient: options.githubClient || options.github || global.github, context: options.context || global.context, core: options.core || global.core };
 }
 
+function queueFileUrl(configured, ref, line) {
+  const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
+  if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) throw new Error("work_queue_footer_url_invalid");
+  const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
+  return new URL(`${repository}/blob/${encodeURIComponent(ref)}/work-queue.jsonl${line ? `#L${line}` : ""}`, `${server.origin}/`).href;
+}
+
+function claimFooterLinks(latest, member, configured) {
+  try {
+    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(latest.sha || "")) return;
+    const lineFor = predicate => latest.transactions.findIndex(transaction => Array.isArray(transaction.operations) && transaction.operations.some(predicate)) + 1;
+    const workLine = lineFor(operation => operation.kind === "Work" && operation.work_id === member.work_id);
+    const completionLine = lineFor(operation => operation.kind === "Completion" && operation.work_id === member.work_id && operation.claim_id === member.claim_id);
+    const links = {
+      ...(workLine > 0 ? { work_created: queueFileUrl(configured, latest.sha, workLine) } : {}),
+      ...(completionLine > 0 ? { claim_finished: queueFileUrl(configured, latest.sha, completionLine) } : {}),
+    };
+    return Object.keys(links).length ? links : undefined;
+  } catch {
+    log.debug("claim.footer.link.unavailable");
+    return;
+  }
+}
+
+function trustedClaimFooterLinks(handle, configured) {
+  try {
+    const raw = process.env.GH_AW_CLAIM_FOOTER_LINKS;
+    if (!raw || Buffer.byteLength(raw, "utf8") > 64 * 1024) return;
+    const values = JSON.parse(raw);
+    if (!values || typeof values !== "object" || Array.isArray(values)) return;
+    if (!Object.hasOwn(values, handle)) return;
+    const candidate = values[handle];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return;
+    const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
+    if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) return;
+    const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
+    const expectedPath = new RegExp(`^/${repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/blob/(?:[a-f0-9]{40}|[a-f0-9]{64})/work-queue\\.jsonl$`);
+    const links = {};
+    for (const [field, value] of Object.entries({ work_created: candidate.work_created, claim_finished: candidate.claim_finished })) {
+      if (typeof value !== "string") continue;
+      const url = new URL(value);
+      if (url.origin === server.origin && !url.username && !url.password && !url.search && expectedPath.test(url.pathname) && /^#L[1-9]\d*$/.test(url.hash)) links[field] = url.href;
+    }
+    return Object.keys(links).length ? links : undefined;
+  } catch {
+    return;
+  }
+}
+
 async function authorizeWorkerClaim(options = {}) {
   log.debug("claim.authorize.start");
   const configured = runtimeOptions(options);
@@ -146,10 +195,7 @@ async function authorizeWorkerClaim(options = {}) {
   let footer_links;
   if (options.requireCompletion !== false && options.includeFooterLinks !== false) {
     try {
-      const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
-      const branch = encodeURIComponent(configured.branch || "work-queue");
-      const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
-      footer_links = { queue: new URL(`${repository}/blob/${branch}/work-queue.jsonl`, `${server.origin}/`).href };
+      footer_links = trustedClaimFooterLinks(member.handle, configured) || { queue: queueFileUrl(configured, configured.branch || "work-queue") };
     } catch {
       log.debug("claim.footer.link.unavailable");
     }
@@ -184,12 +230,15 @@ async function reconcileWorkerClaim(options = {}) {
       if (claim?.state === "completed") {
         if (intent && (intent.outcome === "cancelled" || intent.keep_open !== (claim.keep_open === true))) throw new Error("work_queue_finish_conflict");
         const barrier = claim.keep_open ? claim.barrier : work.barrier;
+        const authorized = barrier === "pending";
+        const footer_links = authorized ? claimFooterLinks(latest, member, configured) : undefined;
         states[member.handle] = {
           claim_handle: member.handle,
           claim_id: member.claim_id,
           work_id: member.work_id,
           state: barrier === "verified" ? "result" : barrier === "failed" ? "delivery_failed" : "completed",
-          authorized: barrier === "pending",
+          authorized,
+          ...(footer_links ? { footer_links } : {}),
         };
         continue;
       }
@@ -218,7 +267,8 @@ async function reconcileWorkerClaim(options = {}) {
       if (verified?.state !== outcome || (verified.keep_open === true) !== (intent?.keep_open === true)) throw new Error("work_queue_finish_not_durable");
       log.debug("claim.finish.persisted", { completed: outcome === "completed", cancelled: outcome === "cancelled" });
       const authorized = outcome === "completed";
-      states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized };
+      const footer_links = authorized ? claimFooterLinks(latest, member, configured) : undefined;
+      states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized, ...(footer_links ? { footer_links } : {}) };
     } catch (error) {
       log.failure("claim.finish.blocked", error);
       states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: "blocked", authorized: false };
@@ -483,12 +533,23 @@ async function main(options = {}) {
   try {
     const result = await reconcileWorkerClaim(options);
     coreApi.setOutput("claim_authorizations", JSON.stringify(result));
+    coreApi.setOutput(
+      "claim_footer_links",
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(result.claims || {})
+            .filter(([, claim]) => claim.authorized && claim.footer_links)
+            .map(([handle, claim]) => [handle, claim.footer_links])
+        )
+      )
+    );
     coreApi.info(`Work queue reconciliation: ${result.status}; authorization is per Claim`);
     await coreApi.summary.addRaw(renderSummary(result)).write();
     return result;
   } catch (error) {
     log.failure("claims.reconcile.failed", error);
     coreApi.setOutput("claim_authorizations", JSON.stringify({ version: 3, status: "failed", claims: {} }));
+    coreApi.setOutput("claim_footer_links", "{}");
     await coreApi.summary.addRaw(renderSummary({ claims: {} })).write();
     throw new Error("Work queue reconciliation failed; unverified Claim effects are blocked");
   }

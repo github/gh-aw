@@ -56,6 +56,39 @@ describe("independent trusted Claim finalization", () => {
     expect(workQueueClaimLinks).not.toHaveBeenCalled();
   });
 
+  it("publishes immutable Work and Completion locations from the ledger already loaded while finishing", async () => {
+    const { fixture, options } = setup(1);
+    const revision = "a".repeat(40);
+    const readWorkQueueLog = options.readWorkQueueLog;
+    options.readWorkQueueLog = async (...args) => ({ ...(await readWorkQueueLog(...args)), sha: revision });
+    finish(options, "h1", "completed");
+    const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() } };
+
+    const result = await main({ ...options, core });
+
+    const workLine = fixture.transactions.findIndex(transaction => transaction.operations.some(operation => operation.kind === "Work" && operation.work_id === fixture.assignment.claims[0].work_id)) + 1;
+    const completionLine = fixture.transactions.findIndex(transaction => transaction.operations.some(operation => operation.kind === "Completion" && operation.claim_id === fixture.assignment.claims[0].claim_id)) + 1;
+    const output = JSON.parse(core.setOutput.mock.calls.find(([name]) => name === "claim_footer_links")[1]);
+    expect(output.h1).toEqual({
+      work_created: `https://github.com/owner/repo/blob/${revision}/work-queue.jsonl#L${workLine}`,
+      claim_finished: `https://github.com/owner/repo/blob/${revision}/work-queue.jsonl#L${completionLine}`,
+    });
+    expect(result.claims.h1.footer_links).toEqual(output.h1);
+  });
+
+  it("reuses only repository-scoped footer links from the reconciliation output after trusted authorization", async () => {
+    const { options } = setup(1);
+    finish(options, "h1", "completed");
+    await reconcileWorkerClaim(options);
+    const footer_links = {
+      work_created: `https://github.com/owner/repo/blob/${"a".repeat(40)}/work-queue.jsonl#L2`,
+      claim_finished: `https://github.com/owner/repo/blob/${"b".repeat(40)}/work-queue.jsonl#L5`,
+    };
+    vi.stubEnv("GH_AW_CLAIM_FOOTER_LINKS", JSON.stringify({ h1: footer_links }));
+
+    expect(await authorizeWorkerClaim({ ...options, claim_handle: "h1" })).toMatchObject({ authorized: true, footer_links });
+  });
+
   it.each([{}, { h1: { authorized: true }, h2: { authorized: false } }])("collapses reconciliation with two empty lines before subsequent Markdown: %j", claims => {
     const summary = renderSummary({ claims });
     expect(summary).toMatch(/^<details>\n<summary>Work queue reconciliation<\/summary>\n\n### Independent Claim reconciliation\n\n/);
@@ -119,6 +152,7 @@ describe("independent trusted Claim finalization", () => {
     expect(readWorkQueueLog).not.toHaveBeenCalled();
     expect(publishWorkQueueRequest).not.toHaveBeenCalled();
     expect(core.setOutput).toHaveBeenCalledWith("claim_authorizations", JSON.stringify({ version: 3, status: "unassigned", claims: {}, errors: [] }));
+    expect(core.setOutput).toHaveBeenCalledWith("claim_footer_links", "{}");
   });
 
   it.each([1, 2])("reports independent cancellation for %i Claims with empty finish output without creating Completion or Result", async count => {
@@ -1309,7 +1343,7 @@ describe("independent trusted Claim finalization", () => {
     finish(options, undefined, "completed", "finish");
     const core = { setOutput: vi.fn(), info: vi.fn(), summary: { addRaw: vi.fn(() => ({ write: async () => {} })) } };
     await main({ ...options, core });
-    expect(core.setOutput.mock.calls.map(([name]) => name)).toEqual(["claim_authorizations"]);
+    expect(core.setOutput.mock.calls.map(([name]) => name)).toEqual(["claim_authorizations", "claim_footer_links"]);
     expect(JSON.parse(core.setOutput.mock.calls[0][1]).claims.h1.authorized).toBe(true);
   });
 
