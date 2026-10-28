@@ -19,6 +19,20 @@ To enforce self-hosted runners for every generated job, set `require_self_hosted
 
 The compiler checks all generated jobs, including framework and safe-output jobs. Each must use the `self-hosted` label or a runner group. The `GH_AW_REQUIRE_SELF_HOSTED_RUNNERS=true` compiler environment variable also enables this enforcement.
 
+## Host isolation checklist
+
+A self-hosted runner processes potentially hostile repository content even in private or internal repositories. The agent sandbox does not establish that the underlying host is clean. An ephemeral runner registration accepts one job, but re-registering on reused hardware, a reused VM disk, or persistent Kubernetes volumes can preserve an earlier job's compromise.
+
+Before admitting untrusted work:
+
+- Provision a clean, disposable VM or equivalent isolated environment for each job and destroy its writable state afterward. For ARC, include the DinD daemon's state and mounted volumes; replacing only the runner pod is insufficient when those persist.
+- Separate trusted release, publish, and deployment jobs from untrusted execution using distinct runner groups and infrastructure. Restrict group access to the intended repositories and workflows; do not share writable disks, Docker daemons, or credentials between trust domains.
+- Isolate or discard local npm/pip caches, build directories, tool caches, installed binaries, home directories, and Docker images/volumes. Audit Actions dependency-cache restores and writers separately from [cache-memory](/gh-aw/reference/cache-memory/); service-side cache restrictions do not protect persistent host caches.
+- Restrict Docker socket access to trusted runner components, never make the socket world-accessible, and prevent untrusted workloads from reaching other jobs' daemons. Limit host/internal-network and cloud metadata access independently of the agent's firewall.
+- Remove ambient Git, cloud, registry, SSH, and Kubernetes credentials from the host; grant only job-scoped credentials to the components that need them. Verify teardown after cancelled or failed jobs, not just successful runs.
+
+Runner labels, runner-group selection, and `require_self_hosted_runners` route or constrain jobs; they do not prove host ephemerality or enforce this checklist. Host provisioning, access controls, and lifecycle verification remain operator responsibilities.
+
 Self-hosted runners may require `sudo` depending on the selected engine and configuration. For the default GitHub Copilot engine, there are two distinct sudo considerations:
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.
@@ -331,7 +345,7 @@ Self-hosted runners must meet these requirements for agentic workflows to run re
 A working Docker daemon is required. The MCP gateway and sandbox run as containers.
 
 - **Unix socket**: Docker must be accessible via a Unix socket (typically `/var/run/docker.sock`). If `DOCKER_HOST` is unset, the gateway mounts `/var/run/docker.sock`. If `DOCKER_HOST` is `unix://...` or a bare absolute path, the gateway mounts that socket path. Other schemes (for example `tcp://...`) are ignored for mounts and default back to `/var/run/docker.sock`.
-- **Docker group**: The runner user must be in the `docker` group, or the socket must be world-readable.
+- **Docker group**: Grant the runner user access through the socket's owning group (typically `docker`). Do not make the socket world-accessible; Docker daemon access is a privileged host capability.
 - **ARC/Kubernetes**: Docker-in-Docker (DinD) is **required** for ARC. Set `containerMode.type="dind"` in your ARC Helm configuration. The `containerMode.type="kubernetes"` mode is not supported. The dind sidecar must share the Docker socket via an `emptyDir` volume, and the gateway retries the socket check for up to 10 seconds to handle startup race conditions. See [How to run GitHub Copilot coding agent on ARC with Docker-in-Docker](/gh-aw/reference/arc-dind-copilot-agent/) for the complete setup guide, and [ARC (Actions Runner Controller)](#arc-actions-runner-controller) below for pod security details.
 - **Split-daemon override**: On ARC or other split-daemon topologies where the socket path or group ID cannot be auto-detected, set `GH_AW_DOCKER_SOCK_PATH` and `GH_AW_DOCKER_SOCK_GID` environment variables at the runner level. See [Docker socket override for split-daemon topologies](#docker-socket-override-for-split-daemon-topologies) for details.
 
@@ -360,18 +374,18 @@ runtimes:
 
 ### Filesystem
 
-- **Use `RUNNER_TEMP` for transient state.** Put sandbox state, tool downloads, and intermediate outputs in `$RUNNER_TEMP`, which is cleaned between jobs. On shared runners, avoid writing arbitrary workflow data to `/tmp` because it can persist across jobs.
+- **Use `RUNNER_TEMP` for transient state.** Put sandbox state, tool downloads, and intermediate outputs in `$RUNNER_TEMP`. The runner attempts cleanup between jobs, but files it cannot delete can persist. On shared runners, avoid writing arbitrary workflow data to `/tmp`.
 - **No root assumption.** Tool installs, file operations, and sandbox setup should run as the unprivileged runner user. The Copilot CLI install script escalates via `sudo` for specific operations; see the sudo requirements above.
 - **No global installs.** Do not install packages to `/usr/local/`, `/opt/hostedtoolcache/`, or other system-wide paths. These may be read-only, shared across runners, or bind-mounted read-only inside the sandbox. Use job-scoped writable locations instead.
 - **No hardcoded `HOME` paths.** The runner's home directory may not be `/home/runner`. Use `$HOME` or `$RUNNER_TEMP` instead of hardcoded paths.
 
 ### Post-job cleanup
 
-Self-hosted runners persist between jobs. Agentic workflows should clean up after themselves:
+For reused self-hosted runners, post-job cleanup reduces residual state but is not recovery from a compromised host:
 
-- Files written to `$RUNNER_TEMP` are automatically cleaned.
-- Docker containers on the `awf-net` bridge are stopped and removed by the sandbox teardown.
-- If your workflow creates files outside `$RUNNER_TEMP` (e.g. in `$GITHUB_WORKSPACE`), the runner's built-in workspace cleanup handles this.
+- Check that `$RUNNER_TEMP` cleanup succeeded; permissions or interrupted teardown can leave files behind.
+- Sandbox teardown stops and removes its Docker containers; this does not establish that the daemon's other containers, images, volumes, or build caches are clean.
+- Explicitly manage files outside `$RUNNER_TEMP`, including `$GITHUB_WORKSPACE` and `$HOME`. Workspace cleanup is not a whole-host reset. Use the [host isolation checklist](#host-isolation-checklist) before switching trust domains.
 
 ### Network
 

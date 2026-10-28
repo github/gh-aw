@@ -774,7 +774,7 @@ func extractPreActivationJobOutputs(jobName string, configMap map[string]any) (m
 		if !ok {
 			return nil, fmt.Errorf("jobs.%s.outputs.%s must be a string, got %T. Example:\njobs:\n  %s:\n    outputs:\n      %s: ${{ steps.my_step.outputs.result }}", jobName, key, val, jobName, key)
 		}
-		result[key] = valStr
+		result[key] = fmt.Sprintf("%q", valStr)
 	}
 	compilerActivationJobsLog.Printf("Extracted %d custom outputs from jobs.%s", len(result), jobName)
 	return result, nil

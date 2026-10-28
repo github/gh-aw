@@ -9,6 +9,19 @@ GitHub Agentic Workflows upload several artifacts during workflow execution. Thi
 
 The `agent` and `agent-output-fallback` uploads require successful built-in secret redaction and every configured custom secret-masking step, regardless of whether the agent firewall is enabled. Failed, skipped, cancelled, or missing redaction steps block both uploads, including custom steps with `continue-on-error: true`. An engine failure alone does not block these uploads when redaction succeeds.
 
+## Cross-run artifact trust
+
+The built-in safe-output handoff consumes current-run structured outputs through configured handlers. A custom privileged `workflow_run` consumer downloading another run's artifacts crosses a separate trust boundary. Matching the repository ID, workflow name, branch, or successful conclusion does not prove that the producer ran trusted code: a base-repository workflow can process a fork PR. Redaction removes matching secrets; it does not authenticate artifact content or make it executable code.
+
+For downstream consumers:
+
+- Validate the intended producer repository, workflow, event, run ID, and immutable source SHA against the consumer's trust policy. A producer-supplied manifest alone is not independent evidence of provenance.
+- Download to an isolated staging directory, not over the checkout or a directory containing scripts/configuration used by subsequent steps. Reject unexpected paths, traversal, links, and files outside the expected layout.
+- Parse only expected data formats with schema, size, and value limits. Do not source scripts, run binaries, import modules, or execute package-install/build hooks from an untrusted artifact.
+- Keep credentials and write permissions out of jobs that must execute untrusted output. Pass only validated data into a separate narrowly scoped privileged operation.
+
+Artifact names and checksums identify selected content, not whether that content is trustworthy. These checks are consumer responsibilities; generic download-and-execute steps are not made safe by compiling the surrounding workflow.
+
 ## Quick Reference
 
 | Artifact Name | Constant | Type | Description |

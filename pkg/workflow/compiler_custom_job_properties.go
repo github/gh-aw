@@ -300,7 +300,7 @@ func extractCustomJobOutputs(job *Job, jobName string, configMap map[string]any)
 	job.Outputs = make(map[string]string)
 	for key, val := range outputsMap {
 		if valStr, ok := val.(string); ok {
-			job.Outputs[key] = valStr
+			job.Outputs[key] = fmt.Sprintf("%q", valStr)
 		} else {
 			compilerJobsLog.Printf("Warning: output '%s' in job '%s' has non-string value (type: %T), ignoring", key, jobName, val)
 		}
