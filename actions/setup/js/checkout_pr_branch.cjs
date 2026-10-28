@@ -76,6 +76,11 @@ function isCommitSha(value) {
   return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
 }
 
+/** @param {unknown} value */
+function formatShaForLog(value) {
+  return isCommitSha(value) ? value.slice(0, 12).toLowerCase() : "unknown";
+}
+
 function isOrdinaryPREvent() {
   return context.eventName === "pull_request" && !["labeled", "unlabeled"].includes(context.payload.action || "");
 }
@@ -146,7 +151,7 @@ async function resolvePRHeadSha(pullRequest, awContext) {
 async function assertCheckedOutRevision(expectedSha) {
   const actualSha = await resolveCheckedOutHeadSha();
   if (actualSha !== expectedSha) {
-    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: checked-out HEAD does not match expected commit ${expectedSha}; stop and inspect the checkout`);
+    throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: checked-out HEAD does not match expected commit ${formatShaForLog(expectedSha)}; stop and inspect the checkout`);
   }
   return actualSha;
 }
@@ -193,7 +198,7 @@ async function exportPRHeadBaseline({ branchName, baseRepo, headRepo, prNumber, 
     core.exportVariable("GH_AW_PR_HEAD_BASE_PR_NUMBER", String(prNumber));
   }
   core.exportVariable("GH_AW_PR_HEAD_BASE_REF", PR_HEAD_BASE_REF);
-  core.info(`Recorded PR head baseline for incremental patches: ${branchName}@${baseSha}`);
+  core.info(`Recorded PR head baseline for incremental patches: ${branchName}@${formatShaForLog(baseSha)}`);
 }
 
 /**
@@ -251,7 +256,7 @@ function logPRContext(eventName, pullRequest) {
   // Log head information
   if (pullRequest.head) {
     core.info(`Head ref: ${pullRequest.head.ref || "unknown"}`);
-    core.info(`Head SHA: ${pullRequest.head.sha || "unknown"}`);
+    core.info(`Head SHA prefix: ${formatShaForLog(pullRequest.head.sha)}`);
 
     if (pullRequest.head.repo) {
       core.info(`Head repo: ${pullRequest.head.repo.full_name || "unknown"}`);
@@ -264,7 +269,7 @@ function logPRContext(eventName, pullRequest) {
   // Log base information
   if (pullRequest.base) {
     core.info(`Base ref: ${pullRequest.base.ref || "unknown"}`);
-    core.info(`Base SHA: ${pullRequest.base.sha || "unknown"}`);
+    core.info(`Base SHA prefix: ${formatShaForLog(pullRequest.base.sha)}`);
 
     if (pullRequest.base.repo) {
       core.info(`Base repo: ${pullRequest.base.repo.full_name || "unknown"}`);
@@ -288,7 +293,7 @@ function logPRContext(eventName, pullRequest) {
 
   // Log current repository context
   core.info(`Current repository: ${context.repo.owner}/${context.repo.repo}`);
-  core.info(`GitHub SHA: ${context.sha}`);
+  core.info(`GitHub SHA prefix: ${formatShaForLog(context.sha)}`);
 
   core.endGroup();
 
@@ -574,7 +579,7 @@ async function main() {
 
       logCheckoutStrategy(eventName, "git fetch SHA + checkout", "same-repository pull_request event; immutable event SHA survives branch deletion");
 
-      core.info(`Fetching PR #${pullRequest.number} commit ${expectedSha} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
+      core.info(`Fetching PR #${pullRequest.number} commit ${formatShaForLog(expectedSha)} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
       const fetchArgs = await depthArgs(fetchDepth);
       core.info(fetchArgs.length > 0 ? `Fetching with ${fetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
       // Origin must permit fetching reachable unadvertised commit SHAs.
@@ -626,7 +631,7 @@ async function main() {
       }
       const fetchDepth = (commitCount || 1) + 1; // +1 to include the merge base
 
-      core.info(`Fetching PR #${prNumber} commit ${expectedSha} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
+      core.info(`Fetching PR #${prNumber} commit ${formatShaForLog(expectedSha)} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
       const prFetchArgs = await depthArgs(fetchDepth);
       core.info(prFetchArgs.length > 0 ? `Fetching with ${prFetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
       // Origin must permit fetching reachable unadvertised commit SHAs.

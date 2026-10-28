@@ -41,6 +41,33 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("records the selected PR revision in the unified session", () => {
+    const selectedSha = "ABCDEF0123456789ABCDEF0123456789ABCDEF01";
+    const outputPath = path.join(root, "usage/aw_session.jsonl");
+    const events = writeUnifiedSession({
+      rootDir: root,
+      outputPath,
+      dailyAIC: {
+        GH_AW_PR_HEAD_BASE_PR_NUMBER: "123",
+        GH_AW_PR_HEAD_BASE_SHA: selectedSha,
+      },
+    });
+    const checkout = events.find(event => event.type === "workflow.pr_checkout_revision");
+    expect(checkout?.data).toEqual({ prNumber: 123, selectedSha: selectedSha.toLowerCase() });
+    expect(checkout?.provenance).toMatchObject({ component: "workflow", phase: "agent", path: "runtime/pr-checkout" });
+    expect(fs.readFileSync(outputPath, "utf8")).toContain(JSON.stringify(checkout));
+    expect(validateSession(fs.readFileSync(outputPath, "utf8"))).toBe(events.length);
+  });
+
+  it.each([
+    ["invalid SHA", { GH_AW_PR_HEAD_BASE_PR_NUMBER: "123", GH_AW_PR_HEAD_BASE_SHA: "bad" }],
+    ["invalid PR number", { GH_AW_PR_HEAD_BASE_PR_NUMBER: "1e2", GH_AW_PR_HEAD_BASE_SHA: "a".repeat(40) }],
+    ["unsafe PR number", { GH_AW_PR_HEAD_BASE_PR_NUMBER: "9007199254740992", GH_AW_PR_HEAD_BASE_SHA: "a".repeat(40) }],
+  ])("omits checkout metadata with %s", (_description, dailyAIC) => {
+    const { events } = collectUnifiedSession({ rootDir: root, dailyAIC });
+    expect(events.some(event => event.type === "workflow.pr_checkout_revision")).toBe(false);
+  });
+
   it("collects only configured safe job outcomes and canonical execution URLs", () => {
     const { events } = collectUnifiedSession({
       rootDir: root,

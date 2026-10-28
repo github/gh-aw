@@ -353,6 +353,19 @@ function collectUnifiedSession({
       currentRunAttempt = info.run_attempt !== undefined && info.run_attempt !== null ? String(info.run_attempt) : undefined;
     }
   }
+  const selectedPrSha = dailyAIC.GH_AW_PR_HEAD_BASE_SHA;
+  const selectedPrNumberText = dailyAIC.GH_AW_PR_HEAD_BASE_PR_NUMBER;
+  if (typeof selectedPrSha === "string" && /^[0-9a-f]{40}$/i.test(selectedPrSha) && typeof selectedPrNumberText === "string" && /^[1-9]\d*$/.test(selectedPrNumberText)) {
+    const selectedPrNumber = Number(selectedPrNumberText);
+    if (Number.isSafeInteger(selectedPrNumber)) {
+      sources.push({
+        component: "workflow",
+        phase: "agent",
+        path: "runtime/pr-checkout",
+        events: [{ type: "workflow.pr_checkout_revision", data: { prNumber: selectedPrNumber, selectedSha: selectedPrSha.toLowerCase() } }],
+      });
+    }
+  }
   const skillInventory = choose(["skill_inventory.json", "activation/skill_inventory.json"]);
   if (skillInventory) {
     const inventory = records(skillInventory)[0];

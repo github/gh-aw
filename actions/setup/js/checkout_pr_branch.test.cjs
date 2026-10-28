@@ -479,7 +479,9 @@ If the pull request is still open, verify that:
 
       // Verify actual checkout commands
       // commits is undefined in mock payload, so defaults to 1; depth = 1+1 = 2
-      expect(mockCore.info).toHaveBeenCalledWith("Fetching PR #123 commit 1111111111111111111111111111111111111111 (depth: 2 for 1 PR commit(s))");
+      expect(mockCore.info).toHaveBeenCalledWith("Fetching PR #123 commit 111111111111 (depth: 2 for 1 PR commit(s))");
+      expect(mockCore.info).toHaveBeenCalledWith("Head SHA prefix: 111111111111");
+      expect(mockCore.info.mock.calls.some(([message]) => String(message).includes("1111111111111111111111111111111111111111"))).toBe(false);
       expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", ["fetch", "origin", "+1111111111111111111111111111111111111111:refs/remotes/origin/pr-head", "--depth=2"], { silent: true, ignoreReturnCode: true });
 
       expect(mockCore.info).toHaveBeenCalledWith("Checking out branch: feature-branch");
