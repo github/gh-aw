@@ -237,15 +237,19 @@ const OTELSentryEndpointSecretName = "GH_AW_OTEL_SENTRY_ENDPOINT"
 // Strict security (no sudo) is the default since AWF v0.27.32.
 const AWFDefaultCommand CommandPrefix = "awf"
 
+const awfPrivilegedEnvCommand = `sudo --preserve-env="$(compgen -e | paste -sd, -)" /usr/bin/env`
+
 // AWFPrivilegedCommand names exported variables explicitly because sudo-rs ignores
 // whole-environment preservation (-E). Only names, never credential values, enter
 // sudo's arguments. Restore PATH for host tools but execute the trusted system AWF.
-const AWFPrivilegedCommand = `sudo --preserve-env="$(compgen -e | paste -sd, -)" /usr/bin/env PATH="$PATH" /usr/local/bin/awf`
+const AWFPrivilegedCommand = awfPrivilegedEnvCommand + ` PATH="$PATH" /usr/local/bin/awf`
 
 // AWFCloudHypervisorCommand runs AWF with the host privileges required to
 // create a Cloud Hypervisor VM while preserving the runner paths it consumes.
 // sudo supplies SUDO_UID and SUDO_GID for AWF to recover the invoking identity.
-const AWFCloudHypervisorCommand = AWFPrivilegedCommand
+// Ubuntu 26.04's id symlink is rejected by AWF; expose its physical multicall
+// applet as a fallback, still subject to AWF's unchanged host-tool trust checks.
+const AWFCloudHypervisorCommand = awfPrivilegedEnvCommand + ` PATH="$PATH:/usr/lib/cargo/bin/coreutils" /usr/local/bin/awf`
 
 // AWFNVXCommand runs AWF with the host privileges required to create NVX microVMs.
 const AWFNVXCommand = AWFPrivilegedCommand

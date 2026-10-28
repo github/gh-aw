@@ -74,10 +74,34 @@ func TestBuildAWFArgsAuditDir(t *testing.T) {
 func TestPrivilegedAWFEnvironmentPreservation(t *testing.T) {
 	bash, err := exec.LookPath("bash")
 	require.NoError(t, err)
-	for _, runtime := range []AgentRuntime{AgentRuntimeCloudHypervisor, AgentRuntimeNVX, AgentRuntimeDockerSudoIptables} {
-		t.Run(string(runtime), func(t *testing.T) {
-			data := &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: runtime}}}
-			prefix := GetAWFCommandPrefix(data)
+	enclaveData := enclaveWorkflowData(true, false, 45, 0)
+	enclaveData.Enclaves[0].Runtime = "cloud-hypervisor"
+	for _, tt := range []struct {
+		name       string
+		data       *WorkflowData
+		pathSuffix string
+	}{
+		{
+			name:       "cloud-hypervisor",
+			data:       &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: AgentRuntimeCloudHypervisor}}},
+			pathSuffix: ":/usr/lib/cargo/bin/coreutils",
+		},
+		{
+			name:       "cloud-hypervisor enclave",
+			data:       enclaveData,
+			pathSuffix: ":/usr/lib/cargo/bin/coreutils",
+		},
+		{
+			name: "nvx",
+			data: &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: AgentRuntimeNVX}}},
+		},
+		{
+			name: "docker-sudo-iptables",
+			data: &WorkflowData{SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: AgentRuntimeDockerSudoIptables}}},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			prefix := GetAWFCommandPrefix(tt.data)
 			assert.Contains(t, prefix, `--preserve-env="$(compgen -e | paste -sd, -)"`)
 			assert.NotContains(t, prefix, "sudo -E")
 
@@ -88,7 +112,7 @@ set -euo pipefail
 sudo() {
   local option="$1"
   shift
-  local -a preserved=()
+  local -a preserved=(PATH=/sudo-secure-path)
   case "$option" in
     --preserve-env) ;;
     --preserve-env=*)
@@ -104,14 +128,14 @@ sudo() {
     *) return 90 ;;
   esac
   [[ "$1" == /usr/bin/env ]]
-  [[ "$2" == "PATH=$PATH" ]]
+  [[ "$2" == PATH=* ]]
   [[ "$3" == /usr/local/bin/awf ]]
   [[ "$#" == 3 ]]
-  /usr/bin/env -i "${preserved[@]}" PATH=/sudo-secure-path "$1" "$2" "$GH_AW_TEST_BASH" --noprofile --norc -c \
+  /usr/bin/env -i "${preserved[@]}" "$1" "$2" "$GH_AW_TEST_BASH" --noprofile --norc -c \
     'printf "%s\0" "${GITHUB_ACTIONS:-}" "${RUNNER_ENVIRONMENT:-}" "${ImageOS:-}" "${RUNNER_TEMP:-}" "${COPILOT_GITHUB_TOKEN:-}" "${GH_AW_TEST_CUSTOM_ENV:-}" "$PATH"'
 }
 ` + prefix
-			path := filepath.Dir(bash) + ":/usr/bin:/bin"
+			path := filepath.Join(t.TempDir(), "runner tools") + ":" + filepath.Dir(bash) + ":/usr/bin:/bin"
 			custom := "literal 'quotes' \"double quotes\"\n$(exit 99); `exit 98` *"
 			cmd := exec.Command(bash, "--noprofile", "--norc", "-c", script)
 			cmd.Env = []string{
@@ -128,7 +152,7 @@ sudo() {
 			require.NoError(t, err, "%s", output)
 			assert.Equal(t, []string{
 				"true", "github-hosted", "ubuntu24", "/runner/temp with spaces",
-				"synthetic-test-token", custom, path, "",
+				"synthetic-test-token", custom, path + tt.pathSuffix, "",
 			}, strings.Split(string(output), "\x00"))
 
 			oldScript := strings.Replace(script, prefix, `sudo --preserve-env /usr/bin/env PATH="$PATH" /usr/local/bin/awf`, 1)

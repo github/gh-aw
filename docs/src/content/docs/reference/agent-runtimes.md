@@ -93,6 +93,8 @@ Investigate this issue.
 
 The compiler verifies the host environment, downloads and checksum-verifies the Cloud Hypervisor bundle from the pinned AWF release, grants the runner user scoped access to `/dev/kvm`, and starts AWF with the preview runtime flags. The default guest size is 2 vCPUs and 4096 MiB.
 
+On Ubuntu 26.04, the compiler appends `/usr/lib/cargo/bin/coreutils` to the host AWF process's `PATH` so AWF can resolve the physical `id` applet rather than its system symlink. Existing paths retain precedence. This applies to Cloud Hypervisor primary agents and enclaves; AWF still requires root-owned, non-writable regular executables and trusted ancestor directories. Other runtime profiles and later job steps retain their original host `PATH`.
+
 Cloud Hypervisor and NVX share compiler-managed KVM permission setup: verify that `/dev/kvm` exists and is a character device, grant only the runner UID read/write access through an ACL, and verify both effective access and the scoped ACL entry. Setup fails closed with separate diagnostics for a missing device, wrong device type, ACL setup failure, or access verification failure. These device ACLs are discarded when the ephemeral GitHub-hosted runner is torn down; setup does not change device ownership or grant all users access.
 
 Cloud Hypervisor is incompatible with:
