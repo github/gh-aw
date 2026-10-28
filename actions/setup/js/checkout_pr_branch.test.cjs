@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 const { ERR_API } = require("./error_codes.cjs");
@@ -287,14 +286,60 @@ If the pull request is still open, verify that:
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it.each(["pull_request", "pull_request_target"])("rejects stale label revision evidence on %s", async eventName => {
+    it.each([
+      ["pull_request", "labeled"],
+      ["pull_request", "unlabeled"],
+      ["pull_request_target", "labeled"],
+      ["pull_request_target", "unlabeled"],
+    ])("rejects stale %s:%s revision evidence", async (eventName, action) => {
       mockContext.eventName = eventName;
-      mockContext.payload.action = "labeled";
+      mockContext.payload.action = action;
       const current = (await mockGithub.rest.pulls.get()).data;
       mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...current, head: { ...current.head, sha: newerSha } } });
       await runScript();
       expectRejectedBeforeCheckout();
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("PR head changed since the triggering revision"));
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it.each(["fork", "closed same-repository"])("accepts an ordinary %s PR event revision even when the API head moved", async checkoutPath => {
+      mockContext.payload.action = "synchronize";
+      mockContext.payload.pull_request.commits = 10;
+      if (checkoutPath === "fork") {
+        mockContext.payload.pull_request.head.repo.full_name = "fork-owner/test-repo";
+      } else {
+        mockContext.payload.pull_request.state = "closed";
+      }
+      const current = (await mockGithub.rest.pulls.get()).data;
+      mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...current, commits: 1, head: { ...current.head, sha: newerSha } } });
+      await runScript();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", ["fetch", "origin", `+${sha}:refs/remotes/origin/pr-head`, "--depth=11"], expect.anything());
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", sha);
+    });
+
+    it.each(["pull_request", "pull_request_review", "pull_request_review_comment", "workflow_dispatch", "issue_comment"])("normalizes hexadecimal SHA case for %s", async eventName => {
+      const canonicalSha = "abcdef0123456789abcdef0123456789abcdef01";
+      mockContext.eventName = eventName;
+      mockContext.payload.pull_request.head.sha = canonicalSha.toUpperCase();
+      mockContext.payload.review.commit_id = canonicalSha.toUpperCase();
+      mockContext.payload.comment.commit_id = canonicalSha.toUpperCase();
+      const current = (await mockGithub.rest.pulls.get()).data;
+      mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...current, head: { ...current.head, sha: eventName === "issue_comment" ? canonicalSha.toUpperCase() : canonicalSha } } });
+      if (eventName === "workflow_dispatch") {
+        mockContext.payload = {
+          repository: { fork: false },
+          inputs: { aw_context: JSON.stringify({ item_type: "pull_request", item_number: 123, pr_head_sha: canonicalSha.toUpperCase() }) },
+        };
+      }
+      const original = mockExec.getExecOutput.getMockImplementation();
+      mockExec.getExecOutput.mockImplementation((cmd, args, options) => (args.includes("HEAD^{commit}") ? { exitCode: 0, stdout: `${canonicalSha}\n`, stderr: "" } : original(cmd, args, options)));
+      await runScript();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockFetch).toHaveBeenCalledWith("git", ["fetch", "origin", `+${canonicalSha}:refs/remotes/origin/pr-head`, "--depth=2"], expect.anything());
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", canonicalSha);
     });
 
     it.each(["created", "edited"])("reports issue_comment:%s staleness without claiming revision approval", async action => {
@@ -2044,6 +2089,8 @@ If the pull request is still open, verify that:
   });
 
   describe("race condition - PR merged after workflow trigger", () => {
+    const missingCommit = "fatal: remote error: upload-pack: not our ref 1111111111111111111111111111111111111111";
+
     it.each([
       ["open", true, false],
       ["open", false, false],
@@ -2051,9 +2098,11 @@ If the pull request is still open, verify that:
       ["closed", false, false],
       ["open", true, true],
       ["open", false, true],
-    ])("checks out the event commit after branch deletion (payload state %s, shallow %s, head moved %s)", async (state, shallow, headMoved) => {
+      ["closed", true, true],
+      ["open", true, true, true],
+    ])("checks out the event commit after branch deletion (payload state %s, shallow %s, head moved %s, fork %s)", async (state, shallow, headMoved, fork) => {
       const actionsExec = await import("@actions/exec");
-      const root = mkdtempSync(join(tmpdir(), "checkout-pr-race-"));
+      const root = mkdtempSync(join(import.meta.dirname, ".checkout-pr-race-"));
       const upstream = join(root, "upstream");
       const workspace = join(root, "workspace");
       const env = {
@@ -2077,12 +2126,21 @@ If the pull request is still open, verify that:
         git(upstream, ["checkout", "-b", "feature-branch"]);
         writeFileSync(join(upstream, "content.txt"), "PR head\n");
         git(upstream, ["commit", "-am", "PR head"]);
+        if (headMoved) {
+          for (let i = 2; i <= 10; i++) {
+            writeFileSync(join(upstream, "content.txt"), `PR commit ${i}\n`);
+            git(upstream, ["commit", "-am", `PR commit ${i}`]);
+          }
+        }
         const headSha = git(upstream, ["rev-parse", "HEAD"]);
         if (headMoved) {
+          git(upstream, ["update-ref", "refs/pull/123/merge", headSha]);
+          git(upstream, ["checkout", "-B", "feature-branch", "main"]);
           writeFileSync(join(upstream, "content.txt"), "unapproved newer head\n");
-          git(upstream, ["commit", "-am", "advance mutable PR head"]);
+          git(upstream, ["commit", "-am", "force-push a single replacement commit"]);
         }
-        git(upstream, ["update-ref", "refs/pull/123/head", git(upstream, ["rev-parse", "HEAD"])]);
+        const currentHeadSha = git(upstream, ["rev-parse", "HEAD"]);
+        git(upstream, ["update-ref", "refs/pull/123/head", currentHeadSha]);
         git(upstream, ["checkout", "main"]);
         git(upstream, ["update-ref", "-d", "refs/heads/feature-branch"]);
         git(root, ["clone", "--branch", "main", ...(shallow ? ["--depth=1"] : []), pathToFileURL(upstream).href, workspace]);
@@ -2094,8 +2152,10 @@ If the pull request is still open, verify that:
         expect(deletedBranchFetch.stderr).toContain("couldn't find remote ref feature-branch");
         mockContext.payload.pull_request.state = state;
         mockContext.payload.pull_request.head.sha = headSha;
+        mockContext.payload.pull_request.commits = headMoved ? 10 : 1;
+        if (fork) mockContext.payload.pull_request.head.repo.full_name = "fork-owner/test-repo";
         const fullPR = (await mockGithub.rest.pulls.get()).data;
-        mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...fullPR, head: { ...fullPR.head, sha: headSha }, state: "closed", merged: true } });
+        mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...fullPR, commits: 1, head: { ...fullPR.head, sha: currentHeadSha }, state: "closed", merged: true } });
         mockExec.getExecOutput.mockImplementation((cmd, args, options) => actionsExec.getExecOutput(cmd, args, { ...options, cwd: workspace, env }));
         mockExec.exec.mockImplementation((cmd, args) => actionsExec.exec(cmd, args, { cwd: workspace, env, silent: true }));
 
@@ -2108,7 +2168,8 @@ If the pull request is still open, verify that:
         expect(git(workspace, ["branch", "--show-current"])).toBe("feature-branch");
         expect(git(workspace, ["rev-parse", "refs/remotes/origin/pr-head"])).toBe(headSha);
         expect(git(workspace, ["rev-parse", "--is-shallow-repository"])).toBe(String(shallow));
-        expect(readFileSync(join(workspace, "content.txt"), "utf8")).toBe("PR head\n");
+        expect(git(workspace, ["merge-base", "HEAD", "origin/main"])).toBe(baseSha);
+        expect(readFileSync(join(workspace, "content.txt"), "utf8")).toBe(headMoved ? "PR commit 10\n" : "PR head\n");
         expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", headSha);
         expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_BRANCH", "feature-branch");
         expect(git(upstream, ["for-each-ref", "--format=%(refname)", "refs/heads/feature-branch"])).toBe("");
@@ -2140,10 +2201,10 @@ If the pull request is still open, verify that:
       if (message) expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining(message));
       expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
     });
-    it("marks confirmed lifecycle invalidation but fails the step to stop the agent", async () => {
-      // Even the retained PR head ref is unavailable after closure.
+    it.each([missingCommit, "fatal: couldn't find remote ref 1111111111111111111111111111111111111111"])("marks confirmed lifecycle invalidation but fails the step to stop the agent: %s", async diagnostic => {
+      // The selected commit is unavailable after closure.
       mockContext.payload.pull_request.state = "open";
-      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: "fatal: couldn't find remote ref refs/pull/123/head" });
+      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: diagnostic });
       // Non-fork pull_request uses fast path (no fetchPRDetails call).
       // Only the error handler re-check calls pulls.get → returns closed.
       mockGithub.rest.pulls.get.mockResolvedValueOnce({
@@ -2167,44 +2228,63 @@ If the pull request is still open, verify that:
       expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
     });
 
-    it("uses real @actions/exec output to detect missing-ref evidence", async () => {
+    it("uses real @actions/exec output to detect missing-commit evidence", async () => {
       const actionsExec = await import("@actions/exec");
       mockGithub.rest.pulls.get.mockResolvedValue({ data: { state: "closed" } });
-      mockFetch.mockImplementation((_cmd, _args, options) => actionsExec.getExecOutput(process.execPath, ["-e", `process.stderr.write("fatal: couldn't find remote ref refs/pull/123/head\\n"); process.exit(128);`], options));
+      mockFetch.mockImplementation((_cmd, _args, options) => actionsExec.getExecOutput(process.execPath, ["-e", `process.stderr.write(${JSON.stringify(`${missingCommit}\n`)}); process.exit(128);`], options));
       await runScript();
       expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_invalidated", "true");
       expect(mockCore.setFailed).toHaveBeenCalled();
     });
 
-    it("does not classify a non-fetch error containing missing-ref text as invalidation", async () => {
+    it("does not classify a non-fetch error containing missing-commit text as invalidation", async () => {
       mockGithub.rest.pulls.get.mockResolvedValue({ data: { state: "closed" } });
-      mockExec.exec.mockRejectedValueOnce(new Error("fatal: couldn't find remote ref refs/pull/123/head"));
+      mockExec.exec.mockRejectedValueOnce(new Error(missingCommit));
       await runScript();
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("checkout_pr_invalidated", "true");
       expect(mockCore.setFailed).toHaveBeenCalled();
     });
 
-    it("does not classify a missing head ref as invalidation while the PR remains open", async () => {
-      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: "fatal: couldn't find remote ref refs/pull/123/head" });
+    it.each(["pull_request", "issue_comment"])("reports actionable SHA-fetch guidance for an unavailable commit on %s while the PR remains open", async eventName => {
+      mockContext.eventName = eventName;
+      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: missingCommit });
       await runScript();
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("checkout_pr_invalidated", "true");
-      expect(mockCore.setFailed).toHaveBeenCalled();
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("ask your administrator to verify commit availability and the upload-pack SHA fetch policy"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining(missingCommit));
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
     });
 
-    it("does not classify missing-ref text on stdout as fetch failure evidence", async () => {
+    it.each(["pull_request", "issue_comment"])("reports enterprise SHA-fetch policy restrictions without treating them as lifecycle invalidation on %s", async eventName => {
+      mockContext.eventName = eventName;
+      const current = (await mockGithub.rest.pulls.get()).data;
+      mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...current, state: "closed" } });
+      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: "error: Server does not allow request for unadvertised object 1111111111111111111111111111111111111111" });
+      await runScript();
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("checkout_pr_invalidated", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("GitHub Enterprise Server"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("do not fall back to a mutable ref"));
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+    });
+
+    it("does not classify missing-commit text on stdout as fetch failure evidence", async () => {
       mockGithub.rest.pulls.get.mockResolvedValue({ data: { state: "closed" } });
-      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "fatal: couldn't find remote ref refs/pull/123/head", stderr: "unknown git error" });
+      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: missingCommit, stderr: "unknown git error" });
       await runScript();
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("checkout_pr_invalidated", "true");
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("unknown git error"));
     });
 
-    it("keeps an intentional closed-event missing-ref failure visible", async () => {
+    it("keeps an intentional closed-event missing-commit failure visible", async () => {
       mockContext.payload.action = "closed";
       mockContext.payload.pull_request.state = "closed";
       const fullPR = (await mockGithub.rest.pulls.get()).data;
       mockGithub.rest.pulls.get.mockResolvedValue({ data: { ...fullPR, state: "closed" } });
-      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: "fatal: couldn't find remote ref refs/pull/123/head" });
+      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: missingCommit });
       await runScript();
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("checkout_pr_invalidated", "true");
       expect(mockCore.setFailed).toHaveBeenCalled();
@@ -2318,7 +2398,7 @@ If the pull request is still open, verify that:
       });
     });
 
-    it("should handle race condition for refs/pull checkout path (issue_comment event)", async () => {
+    it("handles missing-commit lifecycle invalidation for the API checkout path (issue_comment event)", async () => {
       mockContext.eventName = "issue_comment";
       mockContext.payload.pull_request.state = "open";
       // First pulls.get (fetchPRDetails): succeeds
@@ -2332,7 +2412,7 @@ If the pull request is still open, verify that:
       };
       const closedPRData = { ...fullPRData, state: "closed" };
       mockGithub.rest.pulls.get.mockResolvedValueOnce({ data: fullPRData }).mockResolvedValueOnce({ data: closedPRData });
-      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: "fatal: couldn't find remote ref refs/pull/123/head" });
+      mockFetch.mockResolvedValueOnce({ exitCode: 128, stdout: "", stderr: missingCommit });
 
       await runScript();
 

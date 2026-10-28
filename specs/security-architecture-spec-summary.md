@@ -10,6 +10,10 @@
 
 The GitHub Agentic Workflows Security Architecture Specification is a formal W3C-style document that defines the security architecture, guarantees, and implementation requirements for gh-aw. This specification enables organizations to replicate the security model in other CI/CD environments.
 
+### RS-05a Update (v1.1.7 / 2026-10-27)
+
+This summary retains its historical validation baseline above. Current [RS-05a requirements](security-architecture-spec.md#113-repository-validation) bind PR checkout to a validated immutable SHA from `origin` and verify actual `HEAD` before success or patch-baseline export. Ordinary PR events retain their recorded revision; label/review/revision-bound dispatch paths reject detected head changes. Malformed or cross-repository PR dispatch context fails explicitly. Issue-comment commands and unbound manual dispatch select the current head, not an approved revision; timestamps cannot prove which revision was reviewed. Actor trust, credential constraints, and independent safe-output lifecycle checks remain unchanged. The [validation mapping](security-architecture-spec-validation.md#7b-pr-checkout-authorization-and-revision-isolation-section-113---rs-05a) records runtime evidence, not a new formal freshness proof or live GitHub fetch test; targeted formal revalidation remains pending.
+
 ## Key Highlights
 
 ### Conformance Classes
@@ -384,7 +388,7 @@ The specification follows **semantic versioning**:
 - **Minor**: New features, backward-compatible additions
 - **Patch**: Bug fixes, clarifications, editorial changes
 
-Current version: **1.0.1** (Candidate Recommendation)
+Historical summary version: **1.0.1** (Candidate Recommendation). The RS-05a v1.1.7 update is recorded above.
 
 ## Feedback
 

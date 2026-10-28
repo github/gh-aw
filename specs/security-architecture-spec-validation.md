@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and the last completed RS-05a targeted formal revalidation, v1.1.1 on 2026-10-09. The v1.1.2 review-checkout update and v1.1.3, v1.1.5, and v1.1.6 branch-event updates have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. This document does not claim otherwise. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
+⚠️ **VALIDATION STATUS**: The specification reflected the implementation at the time of full validation on 2026-07-15 and the last completed RS-05a targeted formal revalidation, v1.1.1 on 2026-10-09. The v1.1.2 review-checkout update, v1.1.3, v1.1.5, and v1.1.6 branch-event updates, and v1.1.7 immutable-revision update have runtime evidence but have not received targeted formal revalidation (see §7b); v1.1.4 concerns transport security, not branch events. This document does not claim otherwise. These validations do not replace the full revalidation required by the policy in `security-architecture-spec.md` §11.
 
 All major security architecture claims in the specification have been verified against actual workflow implementations:
 - ✅ Job architecture (activation, agent, safe_outputs)
@@ -404,58 +404,20 @@ The rendered job condition is a runtime policy gate. It permits non-`workflow_ru
 
 ---
 
-### 7b. workflow_dispatch + aw_context PR Checkout Validation (Section 11.3 - RS-05a)
+### 7b. PR Checkout Authorization and Revision Isolation (Section 11.3 - RS-05a)
 
 **Specification Claim**:
-> **RS-05a**: For `workflow_dispatch` triggers where the `aw_context` input encodes a pull request context, the implementation MUST enforce: repository scope check, actor trust, parse resilience, and ref isolation.
+> **RS-05a**: All PR checkout paths enforce actor trust and immutable revision isolation. `workflow_dispatch` PR contexts additionally require repository scope validation and explicit failure on malformed context.
 
-**Implementation Validation** (`actions/setup/js/checkout_pr_branch.cjs`, lines 200–230):
+**Implementation mapping** (`actions/setup/js/checkout_pr_branch.cjs` and `actions/setup/js/aw_context.cjs`):
 
-```js
-// Parse aw_context from workflow_dispatch input
-if (!pullRequest && eventName === "workflow_dispatch") {
-  const awContextStr = context.payload.inputs?.aw_context;
-  if (awContextStr) {
-    try {
-      const awContext = JSON.parse(awContextStr);               // parse resilience: catch block below
-      if (awContext.item_type === "pull_request" && awContext.item_number) {
-        if (awContext.repo) {
-          const currentRepo = `${context.repo.owner}/${context.repo.repo}`;
-          if (awContext.repo !== currentRepo) {
-            core.warning(`Cross-repository workflow_dispatch is not supported: aw_context.repo ` +
-              `(${awContext.repo}) does not match current repository (${currentRepo}), skipping checkout`);
-            // pullRequest remains null — checkout skipped (repository scope check)
-          } else {
-            pullRequest = { number: awContext.item_number, state: "open" };
-          }
-        } else {
-          pullRequest = { number: awContext.item_number, state: "open" };
-        }
-      }
-    } catch (e) {
-      core.warning(`Failed to parse aw_context: ${getErrorMessage(e)}`);  // parse resilience
-    }
-  }
-}
-```
+The dispatch parser validates JSON object shape, canonical positive PR numbers, and any supplied non-empty repository identity before actor/API/git operations. Invalid supplied PR context calls `core.setFailed()` and outputs `checkout_pr_success=false`; absent context or a valid non-PR context skips PR checkout. `resolvePRHeadSha()` validates the full SHA and binds ordinary PR events to their recorded head, reviews to `commit_id`, and revision-bound dispatches to propagated `pr_head_sha`. Label/review/dispatch paths reject detected head movement, while ordinary PR events retain their event revision.
 
-Actor trust and ref isolation are provided by the shared `assertTrustedCheckoutRuntime()` call and the `exec.exec("git", [...])` array invocation that apply to all PR checkout paths. The fork-runtime rejection inside `assertTrustedCheckoutRuntime()` is itself scoped to `context.eventName === "workflow_dispatch"`, and fails closed when `context.payload.repository` is absent. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher only when GitHub also supplies `sender.type == "Bot"`; they fail closed when the command/label marker or actor is absent. Bot/app identity does not bypass the write-or-higher permission floor except for the separately verified same-repository `opened`, `synchronize`, `ready_for_review`, or `reopened` PR branch-event path, or the explicitly allow-listed same-repository `edited` path with only a body change, in RS-05a; `labeled` remains subject to that permission floor.
+Issue comments and unbound manual dispatch select the current API head, not an approved revision. `validateCommentContext()` requires valid comment and PR update timestamps and warns about newer PR updates without inferring a historical SHA. Immutable fetch uses an argument array from the current `origin`; API checkout paths recheck the selected head after fetch, and `assertCheckedOutRevision()` verifies actual `HEAD` before success or baseline export. These checks do not establish live GitHub.com or custom GitHub Enterprise Server support for fetching the selected SHA.
 
-**Trust-boundary limitation:** `github-actions[bot]` is the shared identity of repository workflows using `GITHUB_TOKEN`, not proof of one specific caller workflow. GitHub does not include an immutable caller-workflow identity in the target `workflow_dispatch` event. This validation therefore assumes that `actions: write` is granted only to trusted repository workflows; any such workflow can construct `aw_context`, so untrusted code must not receive that permission.
+Actor trust is provided by the shared `assertTrustedCheckoutRuntime()` call. Fork-runtime rejection is scoped to `workflow_dispatch` and fails closed unless `repository.fork` is boolean `false`. Centralized command and label dispatches validate the originating `aw_context.actor` instead of the `github-actions[bot]` dispatcher only when GitHub also supplies `sender.type == "Bot"`; missing markers or inconsistent identities fail closed. The same-repository bot branch-event and allow-listed comment/review exceptions remain subject to the identity, repository, action, and body-only edit constraints in RS-05a; `labeled` retains the collaborator permission floor.
 
-```js
-async function assertTrustedCheckoutRuntime() {
-  if (context.eventName === "workflow_dispatch") {
-    const repository = context.payload.repository;
-    if (!repository) {
-      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: unable to determine repository fork status for workflow_dispatch`);
-    }
-    if (repository.fork === true) {
-      throw new Error(`${ERR_PERMISSION}: Refusing PR checkout in forked repository runtime context`);
-    }
-  }
-  // ... permission-floor check below applies except for the verified same-repository bot PR branch-event path
-```
+**Trust-boundary limitation:** `github-actions[bot]` is the shared identity of repository workflows using `GITHUB_TOKEN`, not proof of one specific caller workflow. GitHub does not include an immutable caller-workflow identity in the target `workflow_dispatch` event. This validation therefore assumes that `actions: write` is granted only to trusted repository workflows; any such workflow can construct `aw_context`, so untrusted code must not receive that permission. A matching SHA proves commit identity, not that PR code is safe to execute with credentials.
 
 **Unit test coverage** (`actions/setup/js/checkout_pr_branch.test.cjs`):
 
@@ -465,11 +427,21 @@ async function assertTrustedCheckoutRuntime() {
 | non-PR `item_type` → skip | parse validation |
 | no `aw_context` input → skip | parse resilience |
 | no `inputs` at all → skip | parse resilience |
-| invalid JSON → warn + skip | parse resilience |
-| missing `item_number` → skip | item_number guard |
+| invalid JSON or a non-object context → explicit failure | parse resilience |
+| missing or invalid PR `item_number` → explicit failure | item_number guard |
 | `aw_context.repo` matches current repo → checkout | repository scope |
-| `aw_context.repo` mismatches → warn + skip | repository scope |
+| `aw_context.repo` mismatches → explicit failure | repository scope |
 | successful checkout → output `true` | ref isolation |
+| ordinary PR event fetches its recorded SHA after head movement or branch deletion | immutable event revision |
+| labels/reviews reject stale head evidence; reviews use `commit_id` | revision binding |
+| missing required dispatch SHA, malformed SHA, API failure, or head movement during fetch → failure | revision isolation (negative cases) |
+| actual checked-out `HEAD` mismatch → failure before success or baseline export | actual revision verification |
+| uppercase event, review, dispatch, or API SHA → canonical lowercase selection | hexadecimal commit identity |
+| historical fork/closed-event checkout retains its event commit count and merge base after a ten-to-one force push | event revision history depth |
+| missing-commit fetch plus confirmed live closure → lifecycle invalidation; SHA-fetch policy rejection remains an ordinary fatal error | missing-object and transport-policy distinction |
+| comment timestamps are required; newer updates warn and select the current head, not an approved revision | current-head/non-approval semantics |
+| unbound manual dispatch selects and rechecks the current API head | current-head semantics |
+| `aw_context.test.cjs` propagates event-recorded SHAs and triggering comment edit time | dispatch revision evidence |
 | same-repo PR checkout allowed when runtime repository is itself a fork (`pull_request`) | fork-runtime rejection scope |
 | `workflow_dispatch` PR replay rejected when runtime repository is a fork | fork-runtime rejection |
 | `workflow_dispatch` PR replay rejected when payload has no `repository` data (fail closed) | fork-runtime rejection (unverifiable case) |
@@ -509,10 +481,10 @@ async function assertTrustedCheckoutRuntime() {
 | `centralized_dispatch_rejects_router_self_propagation` | `unsat` | centralized dispatch cannot identify `github-actions[bot]` as the originating actor |
 | `workflow_dispatch_rejects_cross_repository_aw_context` | `unsat` | cross-repository workflow_dispatch PR replay cannot reach checkout |
 | `workflow_dispatch_rejects_noncanonical_pr_number` | `unsat` | non-canonical PR numbers cannot reach checkout |
-| `workflow_dispatch_uses_refs_pull_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without `refs/pull/N/head` isolation |
+| `workflow_dispatch_uses_api_head_checkout` | `unsat` | workflow_dispatch PR replay cannot reach checkout without the model's abstract API-head checkout path; this does not prove revision freshness |
 | `non_dispatch_pr_trigger_allows_forked_runtime_after_trust` | `sat` | the model admits non-workflow_dispatch PR triggers from structurally forked runtime repositories once actor trust holds |
 
-**Status**: **RUNTIME TESTS PASS; FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; explicitly allow-listed `edited` events bypass the permission floor only when `changes` contains a non-null object-valued `body` field and no other fields. `labeled` and edits with missing, non-body, malformed, or mixed change metadata remain subject to the collaborator permission floor on both `pull_request` and `pull_request_target`. The branch-event updates in v1.1.3, v1.1.5, and v1.1.6 have runtime evidence; v1.1.4 concerns transport security and is outside this branch-event validation. The last completed targeted formal revalidation remains v1.1.1 / 2026-10-09. The Z3 artifact's `pr_action_proves_branch_access` guard abstracts membership in the explicit PR action allowlist; it does not model webhook change fields or assert that a branch push occurred. The targeted `checkout_pr_branch.test.cjs` suite passed on 2026-10-27. The updated bounded TLA+ model and Z3 proof were not rerun because the pinned TLA+ Tools and Z3 solver are unavailable in this environment; targeted formal revalidation remains pending. Existing `workflow_dispatch`, ref-isolation, and fork-runtime evidence remains applicable; the full revalidation policy is in `security-architecture-spec.md` §11.
+**Status**: **RUNTIME EVIDENCE RECORDED; FORMAL REVALIDATION PENDING** — RS-05a runtime coverage includes the same-repository bot exceptions for `opened`, `synchronize`, `ready_for_review`, and `reopened`; explicitly allow-listed `edited` events bypass the permission floor only when `changes` contains a non-null object-valued `body` field and no other fields. `labeled` and edits with missing, non-body, malformed, or mixed change metadata retain the collaborator permission floor. The branch-event updates in v1.1.3, v1.1.5, and v1.1.6 and immutable-revision update in v1.1.7 have implementation and regression-test mappings above; v1.1.4 concerns transport security. The last completed targeted formal revalidation remains v1.1.1 / 2026-10-09. The targeted `checkout_pr_branch.test.cjs` suite passed on 2026-10-27. The updated bounded TLA+ model and Z3 proof were not rerun because the pinned TLA+ Tools and Z3 solver are unavailable in this environment. The SMT model is an authorization abstraction: `pr_action_proves_branch_access` abstracts action-allowlist membership, not webhook change fields or a branch push, and `api_head_checkout` does not model stale event evidence, fetch-time races, actual checked-out commit identity, or live GitHub fetch support. Expected solver results above are not newly executed proof evidence. The full revalidation policy is in `security-architecture-spec.md` §11.
 
 ---
 
@@ -659,7 +631,7 @@ concurrency:
 | **10.6** | Action Pinning (CS-10) | ✅ Verified | All `uses:` statements |
 | **11.1** | Timestamp Validation (RS-01, RS-02) | ✅ Verified | `activation.steps` |
 | **11.3** | workflow_run Repository Validation (RS-05) | ✅ Verified | `role_checks.go`, `TestFormalRS003_WorkflowRunRepositoryValidation` |
-| **11.3** | workflow_dispatch PR Checkout (RS-05a) | ✅ Verified | `checkout_pr_branch.cjs` lines 200–230 |
+| **11.3** | PR Checkout Authorization and Revision Isolation (RS-05a) | Runtime evidence; formal revalidation pending | `checkout_pr_branch.cjs`, `checkout_pr_branch.test.cjs`, `aw_context.test.cjs`; §7b |
 | **11.8** | Concurrency Control (RS-16 to RS-22) | ✅ Verified | `concurrency:` blocks |
 
 ---

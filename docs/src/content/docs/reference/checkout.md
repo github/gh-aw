@@ -23,6 +23,9 @@ Issue comments contain no historical PR head SHA. Comment commands therefore aut
 
 These checks preserve the existing actor permission floor and same-repository bot restrictions. A matching SHA proves commit identity, not that PR code is safe to execute with credentials. Fetching still requires credentials available to the checkout step; the helper does not persist credentials, widen sparse paths, or unshallow a repository.
 
+> [!NOTE]
+> Immutable checkout requires the current repository's `origin` to serve the selected commit by SHA, including reachable unadvertised commits, fork PR commits, and retained commits after branch deletion. Support depends on the Git server's commit availability and upload-pack SHA fetch policy; local tests do not establish compatibility with every GitHub.com or GitHub Enterprise Server configuration. If the server cannot serve that commit, checkout fails with diagnostic guidance rather than falling back to a moving PR ref.
+
 ## Custom Checkout Settings
 
 You can use `checkout:` to override default checkout settings (e.g., fetch depth, sparse checkout) without needing to define a custom job:
@@ -190,18 +193,21 @@ This is equivalent to omitting the checkout step from the agent job. Custom dev-
 
 ## PR Head Checkout and Branch Deletion
 
-PR head checkout fetches the repository's retained `refs/pull/<number>/head`
-ref, including for same-repository PRs. A queued review can therefore check out
-the PR head even if the PR merges and its source branch is deleted before the
-agent starts. The local branch keeps the PR's source branch name; checkout does
-not recreate the remote branch or fall back to the base branch.
+PR head checkout fetches the immutable commit selected by the
+[revision-binding rules](#pr-revision-binding), including for same-repository
+PRs. Source-branch deletion does not change the selected revision, but checkout
+still requires that commit to be available from `origin`. A queued review
+rejects a detected head change instead of checking out a later revision.
+The local branch keeps the PR's source branch name; checkout does not recreate
+the remote branch or fall back to the base branch.
 
 A failed PR checkout stops the agent job; it never continues on the previous
-base checkout. If an originally open PR closes and its remote ref disappears
-during checkout, the run records lifecycle invalidation separately from ordinary
-checkout errors. Authentication, permission, network, and unknown errors remain
-failures. Workflows triggered on an already closed or merged PR use the retained
-PR head ref and still require a successful checkout.
+base checkout. If an originally open PR closes and fetching the selected commit
+fails with a missing-ref or `upload-pack: not our ref <sha>` error, a live closure check records lifecycle invalidation
+separately from ordinary checkout errors. Authentication, permission, network,
+unknown errors, and unavailable state evidence remain failures. Workflows triggered
+on an already closed or merged PR still require a successful checkout of the
+selected commit.
 
 For work triggered while a PR was open, the safe-output manager checks live PR
 state before each handler, deferred retry, and buffered review submission. If the

@@ -52,8 +52,13 @@ function redactCheckoutDiagnostics(text) {
 class PRHeadFetchError extends Error {
   /** @param {number} exitCode @param {string} stderr */
   constructor(exitCode, stderr) {
-    super(`git fetch failed with exit code ${exitCode}${stderr.trim() ? `: ${redactCheckoutDiagnostics(stderr.trim())}` : ""}`);
-    this.missingRef = /could(?:n't| not) find remote ref|remote ref does not exist/i.test(stderr);
+    const missingRef = /could(?:n't| not) find remote ref|remote ref does not exist|not our ref [0-9a-f]{40}/i.test(stderr);
+    const shaFetchRejected = missingRef || /unadvertised object/i.test(stderr);
+    const guidance = shaFetchRejected
+      ? " Immutable PR checkout requires origin to allow fetching the selected commit SHA, including reachable unadvertised commits. On GitHub Enterprise Server, ask your administrator to verify commit availability and the upload-pack SHA fetch policy, then trigger a new PR event; do not fall back to a mutable ref."
+      : "";
+    super(`git fetch failed with exit code ${exitCode}${stderr.trim() ? `: ${redactCheckoutDiagnostics(stderr.trim())}` : ""}${guidance}`);
+    this.missingRef = missingRef;
   }
 }
 
@@ -126,14 +131,15 @@ async function resolvePRHeadSha(pullRequest, awContext) {
   if (expectedSha !== undefined && !isCommitSha(expectedSha)) {
     throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: invalid event PR head SHA; expected a full 40-character hexadecimal commit SHA`);
   }
+  expectedSha = expectedSha?.toLowerCase();
   const sha = expectedSha || pullRequest.head?.sha;
   if (!isCommitSha(sha)) {
     throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: missing or invalid PR head SHA; expected a full 40-character hexadecimal commit SHA`);
   }
-  if (expectedSha && !isOrdinaryPREvent() && pullRequest.head?.sha !== expectedSha) {
+  if (expectedSha && !isOrdinaryPREvent() && (!isCommitSha(pullRequest.head?.sha) || pullRequest.head.sha.toLowerCase() !== expectedSha)) {
     throw new Error(`${ERR_PERMISSION}: Refusing PR checkout: PR head changed since the triggering revision; trigger a new event for the current revision`);
   }
-  return sha;
+  return sha.toLowerCase();
 }
 
 /** @param {string} expectedSha */
@@ -571,6 +577,7 @@ async function main() {
       core.info(`Fetching PR #${pullRequest.number} commit ${expectedSha} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
       const fetchArgs = await depthArgs(fetchDepth);
       core.info(fetchArgs.length > 0 ? `Fetching with ${fetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
+      // Origin must permit fetching reachable unadvertised commit SHAs.
       await fetchPRHead([`+${expectedSha}:${PR_HEAD_BASE_REF}`, ...fetchArgs]);
 
       core.info(`Checking out branch: ${branchName}`);
@@ -593,8 +600,10 @@ async function main() {
       // Get PR details from API to determine head ref name and commit count.
       // This also gives us the full PR object for accurate fork detection
       // when the event payload only had a minimal PR (e.g. issue_comment).
-      const { commitCount, headRef, pullRequest: fullPR } = trustedPRDetails || (await fetchPRDetails(prNumber));
+      const { commitCount: currentCommitCount, headRef, pullRequest: fullPR } = trustedPRDetails || (await fetchPRDetails(prNumber));
       const expectedSha = await resolvePRHeadSha(fullPR, workflowDispatchAwContext);
+      // Ordinary PR events select the historical event SHA, not the live head.
+      const commitCount = isOrdinaryPREvent() ? pullRequest.commits : currentCommitCount;
 
       // Re-evaluate fork status with full PR data when it was unknown
       const fullPRForkDetection = detectForkPR(fullPR);
@@ -620,6 +629,7 @@ async function main() {
       core.info(`Fetching PR #${prNumber} commit ${expectedSha} (depth: ${fetchDepth} for ${commitCount} PR commit(s))`);
       const prFetchArgs = await depthArgs(fetchDepth);
       core.info(prFetchArgs.length > 0 ? `Fetching with ${prFetchArgs.join(" ")}` : "Fetching without --depth (full history preserved)");
+      // Origin must permit fetching reachable unadvertised commit SHAs.
       await fetchPRHead([`+${expectedSha}:${PR_HEAD_BASE_REF}`, ...prFetchArgs]);
       if (!isOrdinaryPREvent()) {
         const currentDetails = await fetchPRDetails(prNumber);
