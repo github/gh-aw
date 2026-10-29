@@ -157,6 +157,9 @@ Threat detection defaults to zero retries; configure its engine explicitly to ch
 
 ### Model aliases
 
+> [!NOTE]
+> The Copilot model catalog offered to a workflow can differ by organization and lag the models available to that organization's Copilot seats. Availability depends on the agentic-workflows integration, not just organization policy; a model listed by this repository's daily inventory is not necessarily offered to another workflow. An exact Copilot ID missing from the live catalog means that model is **not offered to this workflow**. Prefer aliases such as `opus` and `sonnet` over exact Copilot IDs so resolution selects an available model. To inspect the actual catalog, read `sandbox/firewall/awf-reflect.json` in the run's `agent` artifact.
+
 Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provider's live AWF `/reflect` catalog before execution:
 
 - Built-in aliases such as `opus`/`small`, workflow-defined `models:`, and their globs select the newest live match.
