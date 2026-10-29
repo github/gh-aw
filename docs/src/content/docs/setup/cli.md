@@ -321,6 +321,10 @@ Inside a checkout, `doctor` also inspects local workflows and their imports for 
 
 Secret presence does not verify its value, token type, expiry, permissions, repository access, organization approval/SSO, or Copilot availability. Dynamic credential expressions or inaccessible secret metadata are reported as unknown, not as configured. Missing or unknown credentials return a nonzero exit status; `--json` includes the checks and setup links in `agent_assignments`. Outside a checkout, or when the requested repository has no attached local checkout, workflow credential checks are skipped.
 
+For each assignment workflow, `doctor` also samples up to five completed runs created in the past seven days. It inspects the latest run attempt's assignment handler job logs for confirmed assignments, already-assigned targets, credential failures, and other assignment failures. A successful run conclusion or zero exported errors does not establish assignment success: `ignore-if-error` can suppress authentication failures. Detected assignment failures return a nonzero exit status and include run links and credential setup guidance, even when the secret exists.
+
+Run evidence is historical and does not prove that the current credential still works or is still broken. No-op, staged, skipped, and filtered operations are not counted as new assignments. Unavailable logs, unsupported log formats, incomplete metadata, and API errors are reported as unknown or inconclusive rather than success. Inspection is bounded to 40 API requests and 90 seconds across all assignment workflows. `--json` exposes the sample window, limits, per-run evidence, and coverage errors in each workflow's `recent_runs`; raw logs are never included.
+
 `doctor --repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
 
 ### Building

@@ -21,13 +21,14 @@ import (
 
 // DoctorAgentAssignmentCheck reports configuration presence, not credential validity.
 type DoctorAgentAssignmentCheck struct {
-	Workflow        string `json:"workflow"`
-	Status          string `json:"status"`
-	Secret          string `json:"secret,omitempty"`
-	SuggestedSecret string `json:"suggested_secret"`
-	Message         string `json:"message"`
-	PATURL          string `json:"pat_url"`
-	SecretsURL      string `json:"secrets_url"`
+	Workflow        string                      `json:"workflow"`
+	Status          string                      `json:"status"`
+	Secret          string                      `json:"secret,omitempty"`
+	SuggestedSecret string                      `json:"suggested_secret"`
+	Message         string                      `json:"message"`
+	PATURL          string                      `json:"pat_url"`
+	SecretsURL      string                      `json:"secrets_url"`
+	RecentRuns      *DoctorAssignmentRunHistory `json:"recent_runs,omitempty"`
 }
 
 type doctorAssignmentWorkflow struct {
@@ -68,7 +69,9 @@ func checkDoctorAgentAssignments(ctx context.Context, repo, dir string) ([]Docto
 		return nil, errors.New("cannot resolve owner/repo for assignment diagnostics")
 	}
 
-	return diagnoseDoctorAssignments(ctx, repo, host, workflows, listDoctorAssignmentSecrets), nil
+	checks := diagnoseDoctorAssignments(ctx, repo, host, workflows, listDoctorAssignmentSecrets)
+	collectDoctorAssignmentRunEvidence(ctx, repo, host, checks)
+	return checks, nil
 }
 
 func discoverDoctorAssignmentWorkflows(root string) ([]doctorAssignmentWorkflow, error) {
@@ -209,7 +212,7 @@ func diagnoseDoctorAssignments(ctx context.Context, repo, host string, workflows
 			check.Status, check.Secret, check.Message = doctorAssignmentCredential(token, secrets, lookupErr)
 		}
 		if check.Status != "configured" {
-			check.Message = fmt.Sprintf("%s Create a fine-grained PAT with Actions, Contents, Issues, and Pull requests: read and write (Metadata: read), select the resource owner and all assignment/PR target repositories, and obtain any required organization approval/SSO. Store it as the Actions secret %s in %s and reference that secret in assign-to-agent.github-token. A classic PAT needs the repo scope. GitHub App installation tokens and GITHUB_TOKEN cannot assign Copilot.", check.Message, check.SuggestedSecret, repo)
+			check.Message = fmt.Sprintf("%s %s", check.Message, doctorAssignmentRemedy(repo, check.SuggestedSecret))
 		}
 		checks = append(checks, check)
 	}
@@ -286,10 +289,14 @@ func doctorAssignmentPATURL(host, repo, secret string) string {
 	return fmt.Sprintf("%s/settings/personal-access-tokens/new?%s", host, query.Encode())
 }
 
+func doctorAssignmentRemedy(repo, secret string) string {
+	return fmt.Sprintf("Create a fine-grained PAT with Actions, Contents, Issues, and Pull requests: read and write (Metadata: read), select the resource owner and all assignment/PR target repositories, and obtain any required organization approval/SSO. Store it as the Actions secret %s in %s and reference that secret in assign-to-agent.github-token. A classic PAT needs the repo scope. GitHub App installation tokens and GITHUB_TOKEN cannot assign Copilot.", secret, repo)
+}
+
 func doctorAgentAssignmentError(checks []DoctorAgentAssignmentCheck) error {
 	for _, check := range checks {
-		if check.Status != "configured" {
-			return errors.New("assign-to-agent credential diagnostics need attention; see the reported PAT and repository secret setup links")
+		if check.Status != "configured" || doctorAssignmentRunFailure(check.RecentRuns) {
+			return errors.New("assign-to-agent diagnostics need attention; see the reported run evidence and credential setup links")
 		}
 	}
 	return nil
@@ -298,13 +305,14 @@ func doctorAgentAssignmentError(checks []DoctorAgentAssignmentCheck) error {
 func printDoctorAgentAssignments(checks []DoctorAgentAssignmentCheck) error {
 	for _, check := range checks {
 		message := check.Workflow + ": " + check.Message
-		if check.Status == "configured" {
+		if check.Status == "configured" && !doctorAssignmentRunFailure(check.RecentRuns) {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(message))
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Create PAT: "+check.PATURL))
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Add repository secret: "+check.SecretsURL))
 		}
+		printDoctorAssignmentRunHistory(check.RecentRuns)
 	}
 	return doctorAgentAssignmentError(checks)
 }

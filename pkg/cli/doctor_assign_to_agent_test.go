@@ -286,7 +286,10 @@ func TestCheckDoctorAssignmentsCheckout(t *testing.T) {
 			bin := t.TempDir()
 			script := `#!/bin/sh
 printf '%s\n' "$*" >> "$DOCTOR_CALLS"
-printf '%s' '[{"secrets":[]}]'
+case "$*" in
+  *'/runs?'*) printf '%s' '{"workflow_runs":[]}' ;;
+  *) printf '%s' '[{"secrets":[]}]' ;;
+esac
 `
 			require.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0755))
 			callsFile := filepath.Join(bin, "calls")
@@ -306,7 +309,8 @@ printf '%s' '[{"secrets":[]}]'
 			assert.Contains(t, string(calls), "--hostname "+tc.host)
 			assert.Contains(t, string(calls), "repos/octo/repo/actions/secrets?per_page=100")
 			assert.Contains(t, string(calls), "repos/octo/repo/actions/organization-secrets?per_page=100")
-			assert.Len(t, strings.Split(strings.TrimSpace(string(calls)), "\n"), 2)
+			assert.Contains(t, string(calls), "actions/workflows/assign.lock.yml/runs?")
+			assert.Len(t, strings.Split(strings.TrimSpace(string(calls)), "\n"), 3)
 		})
 	}
 }
