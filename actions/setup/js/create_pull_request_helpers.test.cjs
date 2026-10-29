@@ -620,6 +620,7 @@ describe("buildPatchPreviewBlocks", () => {
 describe("buildFallbackIssueBlocks", () => {
   it.each([
     ["manifest_protection_create_pr_fallback.md", "create-pull-request", "fallback-to-issue"],
+    ["manifest_protection_push_failed_fallback.md", "create-pull-request", "fallback-to-issue"],
     ["manifest_protection_push_to_pr_fallback.md", "push-to-pull-request-branch", "fallback-to-issue"],
     ["manifest_protection_request_review.md", "create-pull-request", "request-review"],
     ["manifest_protection_request_changes_review.md", "create-pull-request", "request-review"],
@@ -633,6 +634,10 @@ describe("buildFallbackIssueBlocks", () => {
       pr_url: "https://github.com/my-org/my-repo/pull/42",
       run_url: "https://github.com/my-org/my-repo/actions/runs/123",
       apply_instructions: "git am changes.patch",
+      branch_name: "feature",
+      title: "Protected file changes",
+      base_branch: "main",
+      repo: "my-org/my-repo",
     });
     const yaml = `safe-outputs:\n  ${safeOutput}:\n    protected-files:\n      policy: ${policy}\n      exclude:\n        - .changeset/`;
     const guidance = children.flatMap(block => (block.type === "details" ? block.children : [block]));
