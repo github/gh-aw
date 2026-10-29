@@ -1,0 +1,3 @@
+persona=docs tidy bot
+scenario=line-ending variant
+note=tiny bundle fixture
