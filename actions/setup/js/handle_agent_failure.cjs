@@ -8,6 +8,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { redactAndBoundDiagnostics } = require("./diagnostic_sanitization.cjs");
+const { redactStepSummaryContent } = require("./redact_secrets.cjs");
 const { getDetectionCautionBlocks, getFooterAgentFailureCommentBlocks } = require("./messages_footer.cjs");
 const { getPromptPath } = require("./messages_core.cjs");
 const { buildFailureReport, failureNodes: nodes } = require("./failure_report.cjs");
@@ -1859,7 +1860,7 @@ function loadReportIncompleteMessages(items) {
 
     const messages = [];
     for (const item of resolvedItems) {
-      if (item.type === "report_incomplete" && item.reason) {
+      if (item.type === "report_incomplete" && typeof item.reason === "string" && item.reason.trim()) {
         messages.push({
           reason: item.reason,
           details: item.details || null,
@@ -1892,14 +1893,21 @@ function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDi
   core.info(`Found ${messages.length} report_incomplete signal(s)`);
 
   const context = nodes.warning("Task Could Not Be Completed", [nodes.text("The workflow recorded a "), nodes.code("report_incomplete"), nodes.text(" signal: the task was not completed or completion could not be confirmed.")]);
+  context.push(
+    nodes.list(messages.map(message => [nodes.paragraph([nodes.strong([nodes.text("Reported reason (agent-declared, unverified):")]), nodes.text(" "), nodes.code(redactAndBoundDiagnostics(message.reason, { maxLength: 1000 }))])]))
+  );
   // Rebuild collector diagnostics from runtime evidence, never from message text.
   if (typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause)) {
     const outcome = buildEmptyOutputOutcome(collectorEmptyOutputCause === "invalid_safe_outputs" ? ["validation_failed"] : [], rootDir);
     if (outcome.details) context.push(...renderErrorDetails(outcome.details));
   } else {
-    context.push(...renderErrorDetails(["Completion signal: agent reported incomplete (reason and details excluded)", ...buildCompletionEvidence(rootDir)].join("\n")));
+    context.push(...renderErrorDetails(["Completion signal: agent reported incomplete", ...buildCompletionEvidence(rootDir)].join("\n")));
   }
-  context.push(nodes.paragraph([nodes.text("A comment or other safe output does not confirm that the requested task was completed. Only inferred runtime status and error codes are reported; agent text is excluded.")]));
+  context.push(
+    nodes.paragraph([
+      nodes.text("A comment or other safe output does not confirm that the requested task was completed. Reported reasons are not verified causes; runtime evidence is shown separately and agent diagnostic details are excluded."),
+    ])
+  );
 
   return context;
 }
@@ -4572,6 +4580,33 @@ async function main() {
       return;
     }
 
+    // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
+    const modelEndpointMismatchCandidate = modelEndpointMismatchSignal ? signaledModelEndpointMismatch : readModelEndpointMismatch();
+    const modelEndpointMismatch = agentConclusion === "success" && modelEndpointMismatchCandidate?.phase !== "startup" ? undefined : modelEndpointMismatchCandidate;
+    const hasModelEndpointMismatch = modelEndpointMismatchError || Boolean(modelEndpointMismatch);
+    const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
+    // A model mismatch explains generic empty output, but not a fatal final runtime signal.
+    const hasModelConfigurationError = hasModelEndpointMismatch || modelNotSupportedError;
+    const collectorFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
+    const modelConfigurationExplainsEmptyOutput = hasModelConfigurationError && !failureDiagnostics.secretRedactionFailed && !["agent_startup_failure", "driver_crash"].includes(collectorFailureCause);
+    const emptyOutputCause = modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorEmptyOutputCause;
+    const terminalOutputFailureCause = failureDiagnostics.secretRedactionFailed ? "secret_redaction_failure" : modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorFailureCause;
+    const reportItems = (Array.isArray(agentOutputResult.items) ? agentOutputResult.items : []).filter(
+      item =>
+        !(modelConfigurationExplainsEmptyOutput && collectorEmptyOutputCause && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause && typeof item.failureCause === "string") &&
+        !(isCancelledEmptyOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
+    );
+    const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
+    const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
+    if (hasReportedIncomplete) {
+      try {
+        const summary = renderSizedReport({ type: "report", title: "Incomplete result", children: reportIncompleteContext, agentTainted: false }).body;
+        await core.summary.addRaw(redactStepSummaryContent(summary)).write();
+      } catch (error) {
+        core.warning(`Failed to write incomplete-result summary: ${getErrorMessage(error)}`);
+      }
+    }
+
     // Check if failure issue reporting is disabled
     if (!reportFailureAsIssue) {
       core.info("Failure issue reporting is disabled (report-failure-as-issue: false), skipping failure issue creation");
@@ -4646,23 +4681,6 @@ async function main() {
         core.debug("Unified agent session unavailable for MCP watchdog classification");
       }
     }
-    // Only the collector-written root metadata is trusted; report_incomplete.reason is agent-controlled.
-    const modelEndpointMismatchCandidate = modelEndpointMismatchSignal ? signaledModelEndpointMismatch : readModelEndpointMismatch();
-    const modelEndpointMismatch = agentConclusion === "success" && modelEndpointMismatchCandidate?.phase !== "startup" ? undefined : modelEndpointMismatchCandidate;
-    const hasModelEndpointMismatch = modelEndpointMismatchError || Boolean(modelEndpointMismatch);
-    const modelEndpointMismatchContext = buildModelEndpointMismatchContext(modelEndpointMismatch);
-    // A model mismatch explains generic empty output, but not a fatal final runtime signal.
-    const hasModelConfigurationError = hasModelEndpointMismatch || modelNotSupportedError;
-    const collectorFailureCause = agentOutputResult.success ? agentOutputResult.collectorFailureCause : undefined;
-    const modelConfigurationExplainsEmptyOutput = hasModelConfigurationError && !failureDiagnostics.secretRedactionFailed && !["agent_startup_failure", "driver_crash"].includes(collectorFailureCause);
-    const emptyOutputCause = modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorEmptyOutputCause;
-    const terminalOutputFailureCause = failureDiagnostics.secretRedactionFailed ? "secret_redaction_failure" : modelConfigurationExplainsEmptyOutput || isCancelledEmptyOutput ? undefined : collectorFailureCause;
-    const reportItems = (Array.isArray(agentOutputResult.items) ? agentOutputResult.items : []).filter(
-      item =>
-        !(modelConfigurationExplainsEmptyOutput && collectorEmptyOutputCause && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause && typeof item.failureCause === "string") &&
-        !(isCancelledEmptyOutput && item?.type === "report_incomplete" && item.reason === collectorEmptyOutputCause)
-    );
-    const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
     const issueTitle = buildFailureIssueTitle({
       workflowName: normalizedWorkflowName,
       hasModelEndpointMismatch,
@@ -4870,8 +4888,6 @@ async function main() {
         // Build permission denied context (denied commands list + fix prompt).
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
         const permissionDeniedContext = hasToolDenialsExceeded ? "" : buildPermissionDeniedContext(agentOutputResult.items, workflowID);
-        // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
 
         // Build missing safe outputs context
         const missingSafeOutputsContext = buildMissingSafeOutputsContext(hasMissingSafeOutputs, pullRequest, hasReportedIncomplete);
@@ -5107,9 +5123,6 @@ async function main() {
         // Build missing_tool context (only when report-as-failure is enabled for this signal type).
         // Suppress when tool-denials-exceeded is present: excessive tool denials take precedence.
         const missingToolContext = missingToolReportAsFailure && !hasToolDenialsExceeded ? buildMissingToolContext(agentOutputResult.items) : "";
-
-        // Build report_incomplete context
-        const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
 
         // Build permission denied context (denied commands list + fix prompt).
         // Suppress when tool-denials-exceeded is present: that context already covers the denied errors.
