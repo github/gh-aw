@@ -1,120 +1,124 @@
 {
-  "queries": [
-    {
-      "q": "topic:agentic-workflows",
-      "last_run": "2026-09-29"
-    },
-    {
-      "q": "topic:gh-aw",
-      "last_run": "2026-09-29"
-    },
-    {
-      "q": "topic:github-agentic-workflows",
-      "last_run": "2026-09-29"
-    },
-    {
-      "q": "gh-aw extension agentic workflows in:description",
-      "last_run": "2026-09-29"
-    },
-    {
-      "q": "gh-aw shared workflows agentic",
-      "last_run": "2026-10-04"
-    },
-    {
-      "q": "gh-aw in:readme agentic workflows",
-      "last_run": "2026-10-04"
-    },
-    {
-      "q": "\"agentic workflows\" gh in:description fork:false archived:false",
-      "last_run": "2026-10-05"
-    },
-    {
-      "q": "agentic workflows gh-aw fork:false archived:false pushed:>2026-09-01",
-      "last_run": "2026-10-07"
-    },
-    {
-      "q": "gh-aw agent workflows fork:false archived:false pushed:>2026-09-15",
-      "last_run": "2026-10-09"
-    },
-    {
-      "q": "gh-aw (plain search)",
-      "last_run": "2026-10-10"
-    },
-    {
-      "q": "\"safe-outputs\" agentic workflow in:readme fork:false archived:false pushed:>2026-09-20",
-      "last_run": "2026-10-11"
-    },
-    {
-      "q": "gh-aw workflows in:description fork:false archived:false pushed:>2026-10-05",
-      "last_run": "2026-10-12"
-    },
-    {
-      "q": "agentic workflow shared components gh-aw in:readme fork:false archived:false pushed:>2026-10-01",
-      "last_run": "2026-10-12"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-08",
-      "last_run": "2026-10-13"
-    },
-    {
-      "q": "gh-aw agentic workflows fork:false archived:false pushed:>2026-10-12",
-      "last_run": "2026-10-15"
-    },
-    {
-      "q": "topic:gh-aw fork:false archived:false pushed:>2026-10-10",
-      "last_run": "2026-10-16"
-    },
-    {
-      "q": "agentic workflows in:readme gh aw extension fork:false archived:false pushed:>2026-10-01",
-      "last_run": "2026-10-16"
-    },
-    {
-      "q": "gh-aw workflows fork:false archived:false pushed:>2026-10-14",
-      "last_run": "2026-10-17"
-    },
-    {
-      "q": "topic:agentic-workflows fork:false archived:false pushed:>2026-10-10",
-      "last_run": "2026-10-18"
-    },
-    {
-      "q": "topic:github-agentic-workflows fork:false archived:false pushed:>2026-10-10",
-      "last_run": "2026-10-19"
-    },
-    {
-      "q": "gh-aw MCP server fork:false archived:false pushed:>2026-10-15",
-      "last_run": "2026-10-20"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-17",
-      "last_run": "2026-10-21"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-19",
-      "last_run": "2026-10-22"
-    },
-    {
-      "q": "topic:gh-aw fork:false archived:false pushed:>2026-10-10",
-      "last_run": "2026-10-23"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-21",
-      "last_run": "2026-10-24"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-23",
-      "last_run": "2026-10-25"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-24",
-      "last_run": "2026-10-26"
-    },
-    {
-      "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-25",
-      "last_run": "2026-10-27"
-    },
-    {
-      "q": "topic:agentic-workflows pushed:>2026-10-01 fork:false archived:false",
-      "last_run": "2026-10-28"
-    }
-  ]
+ "queries": [
+  {
+   "q": "topic:agentic-workflows",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "topic:gh-aw",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "topic:github-agentic-workflows",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "gh-aw extension agentic workflows in:description",
+   "last_run": "2026-09-29"
+  },
+  {
+   "q": "gh-aw shared workflows agentic",
+   "last_run": "2026-10-04"
+  },
+  {
+   "q": "gh-aw in:readme agentic workflows",
+   "last_run": "2026-10-04"
+  },
+  {
+   "q": "\"agentic workflows\" gh in:description fork:false archived:false",
+   "last_run": "2026-10-05"
+  },
+  {
+   "q": "agentic workflows gh-aw fork:false archived:false pushed:>2026-09-01",
+   "last_run": "2026-10-07"
+  },
+  {
+   "q": "gh-aw agent workflows fork:false archived:false pushed:>2026-09-15",
+   "last_run": "2026-10-09"
+  },
+  {
+   "q": "gh-aw (plain search)",
+   "last_run": "2026-10-10"
+  },
+  {
+   "q": "\"safe-outputs\" agentic workflow in:readme fork:false archived:false pushed:>2026-09-20",
+   "last_run": "2026-10-11"
+  },
+  {
+   "q": "gh-aw workflows in:description fork:false archived:false pushed:>2026-10-05",
+   "last_run": "2026-10-12"
+  },
+  {
+   "q": "agentic workflow shared components gh-aw in:readme fork:false archived:false pushed:>2026-10-01",
+   "last_run": "2026-10-12"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-08",
+   "last_run": "2026-10-13"
+  },
+  {
+   "q": "gh-aw agentic workflows fork:false archived:false pushed:>2026-10-12",
+   "last_run": "2026-10-15"
+  },
+  {
+   "q": "topic:gh-aw fork:false archived:false pushed:>2026-10-10",
+   "last_run": "2026-10-16"
+  },
+  {
+   "q": "agentic workflows in:readme gh aw extension fork:false archived:false pushed:>2026-10-01",
+   "last_run": "2026-10-16"
+  },
+  {
+   "q": "gh-aw workflows fork:false archived:false pushed:>2026-10-14",
+   "last_run": "2026-10-17"
+  },
+  {
+   "q": "topic:agentic-workflows fork:false archived:false pushed:>2026-10-10",
+   "last_run": "2026-10-18"
+  },
+  {
+   "q": "topic:github-agentic-workflows fork:false archived:false pushed:>2026-10-10",
+   "last_run": "2026-10-19"
+  },
+  {
+   "q": "gh-aw MCP server fork:false archived:false pushed:>2026-10-15",
+   "last_run": "2026-10-20"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-17",
+   "last_run": "2026-10-21"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-19",
+   "last_run": "2026-10-22"
+  },
+  {
+   "q": "topic:gh-aw fork:false archived:false pushed:>2026-10-10",
+   "last_run": "2026-10-23"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-21",
+   "last_run": "2026-10-24"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-23",
+   "last_run": "2026-10-25"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-24",
+   "last_run": "2026-10-26"
+  },
+  {
+   "q": "gh-aw agentic fork:false archived:false pushed:>2026-10-25",
+   "last_run": "2026-10-27"
+  },
+  {
+   "q": "topic:agentic-workflows pushed:>2026-10-01 fork:false archived:false",
+   "last_run": "2026-10-28"
+  },
+  {
+   "q": "topic:gh-aw fork:false archived:false pushed:>2026-10-20",
+   "last_run": "2026-10-29"
+  }
+ ]
 }
