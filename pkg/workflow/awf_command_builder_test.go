@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,79 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildAWFConfigFileSetupMaxAICredits(t *testing.T) {
+	for _, engine := range []string{"claude", "copilot", "codex"} {
+		for _, tc := range []struct {
+			name      string
+			credits   int64
+			result    string
+			allowance string
+			expected  int64
+			invalid   bool
+			detection bool
+			evals     bool
+		}{
+			{name: "disabled", credits: -1},
+			{name: "other negative", credits: -5},
+			{name: "disabled detection", credits: -1, detection: true},
+			{name: "disabled evals", credits: -1, evals: true},
+			{name: "positive", credits: 123, expected: 123},
+			{name: "default", expected: constants.DefaultMaxAICredits},
+			{name: "admission overrides disabled", credits: -1, result: "admitted", allowance: "111", expected: 111},
+			{name: "ignored admission retains disabled", credits: -1, result: "ignored", allowance: "111"},
+			{name: "missing admission allowance blocks", credits: -1, result: "admitted", invalid: true},
+			{name: "invalid admission allowance blocks", credits: -1, result: "admitted", allowance: "-1", invalid: true},
+		} {
+			t.Run(engine+"/"+tc.name, func(t *testing.T) {
+				config := AWFCommandConfig{
+					EngineName: engine,
+					WorkflowData: &WorkflowData{
+						EngineConfig:   &EngineConfig{ID: engine, MaxAICredits: tc.credits},
+						IsDetectionRun: tc.detection,
+						IsEvalsRun:     tc.evals,
+					},
+				}
+				configJSON, err := BuildAWFConfigJSON(config)
+				require.NoError(t, err)
+				dir := t.TempDir()
+				require.NoError(t, os.MkdirAll(filepath.Join(dir, "gh-aw"), 0o700))
+				script := buildAWFConfigFileSetup(config, configJSON)
+				script = strings.ReplaceAll(script, string(constants.AWFConfigFilePath), filepath.Join(dir, "copied-config.json"))
+				cmd := exec.Command("bash", "-c", "set -euo pipefail\n"+script)
+				cmd.Env = append(os.Environ(),
+					"RUNNER_TEMP="+dir,
+					"GH_AW_MAX_AI_CREDITS=",
+					"GH_AW_ADMISSION_RESULT="+tc.result,
+					"GH_AW_ADMISSION_MAX_AI_CREDITS="+tc.allowance,
+				)
+				output, err := cmd.CombinedOutput()
+				if tc.invalid {
+					require.Error(t, err)
+					assert.Contains(t, string(output), "ERR_ADMISSION")
+					return
+				}
+				require.NoError(t, err, "%s", output)
+				content, err := os.ReadFile(filepath.Join(dir, "gh-aw", "awf-config.json"))
+				require.NoError(t, err)
+				var parsed struct {
+					APIProxy struct {
+						MaxAICredits        *int64 `json:"maxAiCredits"`
+						EnableTokenSteering *bool  `json:"enableTokenSteering"`
+					} `json:"apiProxy"`
+				}
+				require.NoError(t, json.Unmarshal(content, &parsed))
+				if tc.expected == 0 {
+					assert.Nil(t, parsed.APIProxy.MaxAICredits)
+					assert.Nil(t, parsed.APIProxy.EnableTokenSteering)
+				} else {
+					require.NotNil(t, parsed.APIProxy.MaxAICredits)
+					assert.Equal(t, tc.expected, *parsed.APIProxy.MaxAICredits)
+				}
+			})
+		}
+	}
+}
 
 func TestBuildAWFArgsAuditDir(t *testing.T) {
 	t.Run("non-arc-dind omits audit-dir and proxy-logs-dir from CLI flags", func(t *testing.T) {

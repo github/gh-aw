@@ -258,6 +258,12 @@ func buildAWFConfigFileSetup(config AWFCommandConfig, awfConfigJSON string) stri
 	maxAICreditsExportLine, updatedAWFConfigJSON := buildMaxAICreditsExport(config, awfConfigJSON)
 	printfArg := buildAWFConfigPrintfArg(updatedAWFConfigJSON, maxAICreditsExportLine != "")
 	configFileSetup := buildConfigFilePrintfLine(printfArg)
+	if config.WorkflowData != nil && config.WorkflowData.EngineConfig != nil && config.WorkflowData.EngineConfig.MaxAICredits < 0 {
+		// Omit disabled budgets unless runtime admission supplied a positive allowance.
+		disabledPrintfArg := buildAWFConfigPrintfArg(awfConfigJSON, false)
+		configFileSetup = fmt.Sprintf("if [[ \"$%s\" == -* ]]; then\n%s\nelse\n%s\nfi",
+			awfMaxAICreditsVarName, buildConfigFilePrintfLine(disabledPrintfArg), configFileSetup)
+	}
 	if maxAICreditsExportLine != "" {
 		configFileSetup = maxAICreditsExportLine + "\n" + configFileSetup
 	}
