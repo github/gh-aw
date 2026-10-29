@@ -312,10 +312,6 @@ func diagnoseDoctorAssignmentsWithEnvironment(ctx context.Context, repo, host st
 	return checks
 }
 
-func doctorAssignmentCredential(token string, secrets map[string]struct{}, lookupErr error) (string, string, string) {
-	return doctorAssignmentCredentialWithEnvironment(token, secrets, lookupErr, nil, nil)
-}
-
 func doctorAssignmentCredentialWithEnvironment(token string, secrets map[string]struct{}, lookupErr error, environmentSecrets map[string]struct{}, environmentErr error) (string, string, string) {
 	names, ok := doctorAssignmentSecretNames(strings.TrimSpace(token))
 	if !ok {
