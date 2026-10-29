@@ -1,8 +1,8 @@
 # ADR-73046: Topology-Aware LLM Gateway URL for Detection and Evals Jobs
 
-**Date**: 2026-05-12
-**Status**: Draft
-**Deciders**: Unknown (not recorded in PR #73046)
+**Date**: 2026-10-29
+**Status**: Proposed
+**Deciders**: gh-aw maintainers
 
 ---
 
@@ -12,7 +12,7 @@ The compiler decides the LLM gateway host that it gives agent engines. `llmGatew
 
 ### Decision
 
-We will add a separate predicate, `isAWFAgentOnNetworkIsolationTopology` in `pkg/workflow/firewall.go`. It answers only whether AWF places the agent on the network-isolation topology, so it depends only on the sandbox runtime profile. Like `isAWFNetworkIsolationEnabled`, it handles a disabled sandbox, NVX, and `SupportsHostAccess`. Unlike `isAWFNetworkIsolationEnabled`, it does not exempt detection and evals runs. `llmGatewayBaseURL` is the only call site that switches to the new predicate. `isAWFNetworkIsolationEnabled` and its other call sites (MCP gateway host, DIFC/CLI proxy host, and the `network` section of `awf-config.json`) stay unchanged. Splitting the predicate fixes gateway addressing without changing sidecar behavior for detection and evals.
+We will add a separate predicate, `isAWFAgentOnNetworkIsolationTopology` in `pkg/workflow/firewall.go`. It answers only whether AWF places the agent on the network-isolation topology, so it depends only on the sandbox configuration: it returns false for a missing or disabled agent sandbox, true for NVX, and otherwise `NetworkIsolation && !SupportsHostAccess` from the runtime profile. It does not exempt detection and evals runs. `isAWFNetworkIsolationEnabled` is rewritten in terms of it: it returns true for NVX, returns false for detection and evals runs, and otherwise returns `isAWFAgentOnNetworkIsolationTopology`. The disabled-sandbox, NVX, and profile logic therefore exists in one place, and the results of `isAWFNetworkIsolationEnabled` are unchanged for every input. `llmGatewayBaseURL` is the only call site that switches to the new predicate. The other call sites of `isAWFNetworkIsolationEnabled` (MCP gateway host, DIFC/CLI proxy host, and the `network` section of `awf-config.json`) stay unchanged. Splitting the predicate fixes gateway addressing without changing sidecar behavior for detection and evals.
 
 ### Alternatives Considered
 
@@ -22,7 +22,7 @@ This would make one predicate follow the actual topology everywhere. It would al
 
 #### Alternative 2: Special-case detection/evals inside `llmGatewayBaseURL`
 
-`llmGatewayBaseURL` could check `IsDetectionRun`/`IsEvalsRun` directly and force `api-proxy`. This would add job-type knowledge to URL construction and could break runtimes with host access, such as `docker-sudo-iptables`, which must keep `host.docker.internal`. A named, profile-based topology predicate keeps that logic in one place, next to the existing isolation logic.
+`llmGatewayBaseURL` could check `IsDetectionRun`/`IsEvalsRun` directly and force `api-proxy`. This would add job-type knowledge to URL construction and could break runtimes with host access, such as `docker-sudo-iptables`, which must keep `host.docker.internal`. A named, profile-based topology predicate keeps that logic in one place and lets `isAWFNetworkIsolationEnabled` reuse it.
 
 ### Consequences
 
@@ -32,8 +32,8 @@ This would make one predicate follow the actual topology everywhere. It would al
 - Runtimes with host access still get `host.docker.internal`.
 
 #### Negative
-- Two similar predicates now exist (`isAWFNetworkIsolationEnabled` and `isAWFAgentOnNetworkIsolationTopology`) with partly duplicated logic. Future call sites must choose the right one, and the two can drift apart.
-- Several compiled lock files change (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `GITHUB_COPILOT_BASE_URL`, `GEMINI_API_BASE_URL` in detection and evals jobs). The end-to-end fix can be confirmed only by a live run after merge.
+- Two related predicates now exist (`isAWFNetworkIsolationEnabled` and `isAWFAgentOnNetworkIsolationTopology`). Future call sites must choose the right one: use the topology predicate for addresses the agent must reach, and the isolation predicate for sidecar attachment. Because `isAWFNetworkIsolationEnabled` delegates to the topology predicate, the runtime-profile logic cannot drift between them.
+- Six compiled lock files change (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `GITHUB_COPILOT_BASE_URL`, `GEMINI_API_BASE_URL` in detection and evals jobs move from `host.docker.internal` to `api-proxy`). The end-to-end fix can be confirmed only by a live run after merge.
 
 #### Neutral
 - The existing detection/evals exemption in `isAWFNetworkIsolationEnabled` now applies only to sidecar attachment, which its comment already describes.
@@ -41,4 +41,4 @@ This would make one predicate follow the actual topology everywhere. It would al
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+This record completes the Design Decision Gate draft for PR #73046. Its proposed status does not assert maintainer approval. Tests: `TestLLMProviderGatewayBaseURLFollowsNetworkTopology` pins the gateway URL per topology, and `TestDetectionAndEvalsSidecarOutputUnchanged` pins the unchanged MCP gateway and DIFC proxy output for detection and evals runs.

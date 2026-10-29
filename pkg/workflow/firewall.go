@@ -149,11 +149,7 @@ func declaresIgnoredFilesystemAllowWrite(workflowData *WorkflowData) bool {
 }
 
 func isAWFNetworkIsolationEnabled(workflowData *WorkflowData) bool {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || agentConfig.Disabled {
-		return false
-	}
-	if agentConfig.Runtime == AgentRuntimeNVX {
+	if isNVXRuntime(workflowData) {
 		return true
 	}
 	// Inline threat detection and evals run a standalone AWF with no MCP sidecars, so
@@ -161,8 +157,7 @@ func isAWFNetworkIsolationEnabled(workflowData *WorkflowData) bool {
 	if workflowData != nil && (workflowData.IsDetectionRun || workflowData.IsEvalsRun) {
 		return false
 	}
-	profile := resolveSandboxRuntimeProfile(agentConfig)
-	return profile.NetworkIsolation && !profile.SupportsHostAccess
+	return isAWFAgentOnNetworkIsolationTopology(workflowData)
 }
 
 // isAWFAgentOnNetworkIsolationTopology reports whether AWF places the agent on its
