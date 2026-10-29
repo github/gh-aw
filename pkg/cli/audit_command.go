@@ -49,6 +49,7 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -o ./audit-reports # Custom output directory
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -v                 # Verbose output
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --parse            # Parse agent logs and firewall logs, generating log.md and firewall.md
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo --models  # Report same-run model catalog and routing
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo  # Audit run from a specific repository
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
@@ -74,6 +75,7 @@ type auditCommandOptions struct {
 	timeout          time.Duration
 	search           string
 	searchLimit      int
+	models           bool
 }
 
 // NewAuditCommand creates the audit command
@@ -108,6 +110,7 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().Duration("timeout", 0, "Maximum audit duration (e.g., 50s or 5m; 0 means no additional deadline). JSON single-run audits return explicitly incomplete results on timeout")
 	cmd.Flags().String("search", "", "Retrieve relevant evidence from the unified session using local BM25 search (single-run only)")
 	cmd.Flags().Int("search-limit", defaultAuditSearchLimit, "Maximum evidence groups returned by --search (1-20)")
+	cmd.Flags().Bool("models", false, "Include the run's model catalog, discovery status, and supported endpoints (single-run only)")
 	RegisterDirFlagCompletion(cmd, "output")
 }
 
@@ -122,6 +125,9 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 	}
 	if opts.search != "" && (len(args) != 1 || opts.group) {
 		return errors.New("--search requires a single run without --group")
+	}
+	if opts.models && (len(args) != 1 || opts.group) {
+		return errors.New("--models requires a single run without --group")
 	}
 	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
 	ctx := cmd.Context()
@@ -164,6 +170,7 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.timeout, _ = cmd.Flags().GetDuration("timeout")
 	opts.search, _ = cmd.Flags().GetString("search")
 	opts.searchLimit, _ = cmd.Flags().GetInt("search-limit")
+	opts.models, _ = cmd.Flags().GetBool("models")
 	if cmd.Flags().Changed("search") || cmd.Flags().Changed("search-limit") {
 		if err := validateAuditSearch(opts.search, opts.searchLimit); err != nil {
 			return auditCommandOptions{}, err
@@ -234,6 +241,9 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	if opts.search != "" && components.JobID > 0 {
 		return errors.New("--search is not supported with job or step URLs; provide a run ID or run URL")
 	}
+	if opts.models && components.JobID > 0 {
+		return errors.New("--models is not supported with job or step URLs; provide a run ID or run URL")
+	}
 	auditCommandLog.Printf("Running single-run audit: run=%d, owner=%s, repo=%s, job_id=%d", components.Number, components.Owner, components.Repo, components.JobID)
 	_, err = AuditWorkflowRun(ctx, components.Number, AuditOptions{
 		Owner:            components.Owner,
@@ -254,6 +264,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		NoBaseline:       opts.noBaseline,
 		Search:           opts.search,
 		SearchLimit:      opts.searchLimit,
+		Models:           opts.models,
 	})
 	return err
 }

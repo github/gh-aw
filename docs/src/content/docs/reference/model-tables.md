@@ -7,7 +7,7 @@ sidebar:
 
 This page lists the built-in model aliases used by GitHub Agentic Workflows.
 
-Copilot catalogs can differ by organization and lag Copilot seats; an exact ID missing from the live catalog is not offered to this workflow, so prefer `opus` or `sonnet` aliases and see [workflow-specific catalog availability](/gh-aw/reference/engines/#model-aliases) for the actual catalog artifact.
+Copilot catalogs can differ by organization and lag Copilot seats; an exact ID missing from a complete live catalog is not offered to this workflow, so prefer `opus` or `sonnet` aliases. Run `gh aw audit <run-url> --models` for detailed model information from that run; see [workflow-specific catalog availability](/gh-aw/reference/engines/#model-aliases).
 
 ## Model Aliases
 
