@@ -77,6 +77,7 @@ gh aw compile --fail-fast         # Stop at first error
 gh aw compile --purge             # Remove orphaned .lock.yml files
 gh aw compile --approve           # Approve new secrets / action changes
 gh aw compile --no-lint           # Disable default built-in AST lint (rejected with --dry-run)
+gh aw compile --actions-lock      # Run `gh actions-lock --no-narrow` after a successful compile (rejected with --dry-run)
 ```
 
 **MCP equivalent**: `compile` tool

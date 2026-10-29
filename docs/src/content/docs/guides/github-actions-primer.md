@@ -11,7 +11,7 @@ sidebar:
 
 ### YAML Workflows
 
-A **YAML workflow** is an automated process defined in `.github/workflows/`. Each workflow consists of jobs that execute when triggered by events. Workflows must be stored on the **main** or default branch to be active and are versioned alongside your code.
+A **YAML workflow** is an automated process defined in `.github/workflows/`. Each workflow consists of jobs that execute when triggered by events. Workflows are versioned alongside your code and must be on the default branch to be active.
 
 **Example** (`.github/workflows/ci.yml`):
 
@@ -41,14 +41,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
       - run: npm run build
-
   test:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
       - run: npm test
 ```
 
@@ -58,54 +55,26 @@ jobs:
 
 ```yaml
 steps:
-  # Action step - uses a pre-built action
-  - uses: actions/checkout@v7
-
-  # Run step - executes a shell command
-  - name: Install dependencies
-    run: npm install
-
-  # Action with inputs
-  - uses: actions/setup-node@v4
+  - uses: actions/setup-node@v7   # action step
     with:
       node-version: '24'
+  - run: npm install              # run step
 ```
 
 ## Security Model
 
 ### Workflow Storage and Execution
 
-Workflows must be stored in `.github/workflows/` on the **default branch** to be active and trusted. This gives workflow changes normal code review, preserves an audit trail, and keeps the default branch as the trust boundary.
-
-```yaml
-# Workflows on main branch can access secrets
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - run: echo "Has access to production secrets"
-```
+Workflows on the **default branch** are active and trusted, so changes get normal code review and an audit trail.
 
 ### Permission Model
 
-GitHub Actions follows the **principle of least privilege** with explicit permission declarations. Fork pull requests are read-only by default, and required permissions should be declared explicitly.
+GitHub Actions follows the **principle of least privilege** with explicit permission declarations. Fork pull requests are read-only by default, and required permissions should be declared explicitly:
 
 ```yaml
 permissions:
-  contents: read       # Read repository contents
-  issues: write        # Create/modify issues
-  pull-requests: write # Create/modify PRs
-
-jobs:
-  example:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Job has specified permissions only"
+  contents: read
+  issues: write
 ```
 
 With GitHub Agentic Workflows, **write permissions are not used directly**. Instead, workflows declare **safe outputs**, which validate, constrain, and sanitize GitHub write operations.
@@ -115,21 +84,15 @@ With GitHub Agentic Workflows, **write permissions are not used directly**. Inst
 **Secrets** are encrypted environment variables stored at the repository, organization, or environment level. They are masked in logs, available only where GitHub permits them, and can be further scoped by environment.
 
 ```yaml
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to production
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-        run: ./deploy.sh
+env:
+  API_KEY: ${{ secrets.API_KEY }}
 ```
 
 ## Testing and Debugging Workflows
 
 ### Testing from Branches with workflow_dispatch
 
-The **`workflow_dispatch`** trigger allows manual workflow execution from a selected branch, which is especially useful for development and testing:
+**`workflow_dispatch`** runs a workflow manually from a selected branch:
 
 ```yaml
 name: Test Workflow
@@ -144,17 +107,12 @@ on:
         options:
           - staging
           - production
-      debug:
-        description: 'Enable debug logging'
-        required: false
-        type: boolean
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Testing in ${{ inputs.environment }}"
-      - run: echo "Debug mode: ${{ inputs.debug }}"
 ```
 
 To run it, open the **Actions** tab, select the workflow, click **Run workflow**, then choose a branch and provide inputs.
@@ -176,12 +134,6 @@ steps:
       echo "::notice::This is a notice"
       echo "::warning::This is a warning"
       echo "::error::This is an error"
-
-  - name: Debug environment
-    run: |
-      echo "GitHub event: ${{ github.event_name }}"
-      echo "Actor: ${{ github.actor }}"
-      printenv | sort
 ```
 
 ## Agentic Workflows vs Traditional GitHub Actions

@@ -23770,6 +23770,14 @@ checkout:
   # (optional)
   pull-request: true
 
+  # Explicitly allow the compiler-generated PR checkout to select the current API
+  # head instead of the triggering event or review revision. Applies workflow-wide
+  # if enabled in any checkout entry. The selected SHA is still fetched, rechecked,
+  # and verified; this is current-head execution, not revision approval. Does not
+  # enable a disabled PR checkout. Requires a literal boolean.
+  # (optional)
+  pull-request-floating-head: true
+
   # Repository to checkout in owner/repo format, or a newline-separated list when
   # multi: true is set. Without multi, expressions must resolve to exactly one
   # repository and need no allowlist or path prefix. Wildcards are not supported.

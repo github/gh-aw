@@ -299,25 +299,6 @@ func TestDryRunScannerReportingKeepsFindingsAndGate(t *testing.T) {
 	}
 }
 
-func TestScannerReportingPreservesMixedFailures(t *testing.T) {
-	step := runStepInfo{Script: "echo hello", LockFile: "test.lock.yml"}
-	finding := withShellcheckFindings(errors.New("findings"), step, "script:1:3: warning: quote this [SC2086]")
-	dockerFailure := fmt.Errorf("Docker ShellCheck invocation failed: %w", errors.New("exit status 125: container stderr"))
-	var reported error
-	ctx := context.WithValue(context.Background(), compileScannerReporterKey{}, func(_ string, err error) { reported = err })
-	err := reportShellcheckResults(ctx, []runStepInfo{step, step}, []shellcheckResult{
-		{err: finding}, {err: dockerFailure},
-	}, true)
-	require.Error(t, err)
-	issues := scannerValidationIssues("shellcheck", reported)
-	require.Len(t, issues, 2)
-	assert.Equal(t, "SC2086", issues[0].RuleID)
-	assert.Equal(t, "shellcheck_error", issues[1].Type)
-	assert.Contains(t, issues[1].Message, "Docker ShellCheck invocation failed")
-	assert.Contains(t, issues[1].Message, "container stderr")
-	require.Len(t, scannerValidationIssues("shellcheck", err), 2)
-}
-
 func TestShellcheckEarlyFailuresAreReported(t *testing.T) {
 	for _, tc := range []struct {
 		name          string

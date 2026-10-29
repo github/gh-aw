@@ -108,10 +108,10 @@
       "version": "v0.24.3",
       "sha": "66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c"
     },
-    "astral-sh/setup-uv@v10.3.2": {
+    "astral-sh/setup-uv@v10.3.3": {
       "repo": "astral-sh/setup-uv",
-      "version": "v10.3.2",
-      "sha": "07a047e608db84b3d8c06cd9a7c7dcc9c355c18e"
+      "version": "v10.3.3",
+      "sha": "68559e99cc807c1eb7e9238fd43a15bba460eec2"
     },
     "denoland/setup-deno@v2.0.5": {
       "repo": "denoland/setup-deno",
