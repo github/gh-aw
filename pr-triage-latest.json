@@ -1,26 +1,44 @@
 {
-  "run_date": "2026-10-29T00:43:51Z",
-  "run_id": "40795680537",
+  "run_date": "2026-10-29T06:29:43Z",
+  "run_id": "40829281558",
   "source": "pr-triage",
-  "eligible_total": 2,
-  "cooldown_skipped": 7,
-  "open_copilot_prs": 9,
+  "eligible_total": 7,
+  "cooldown_skipped": 0,
+  "open_copilot_prs": 7,
   "category_counts": {
     "feature": 1,
-    "bug": 1
+    "bug": 1,
+    "refactor": 1,
+    "test": 1,
+    "docs": 2,
+    "chore": 1
   },
   "risk_counts": {
     "high": 1,
-    "medium": 1
+    "medium": 2,
+    "low": 4
   },
   "priority_counts": {
     "high": 1,
-    "medium": 1
+    "medium": 2,
+    "low": 4
   },
   "action_counts": {
-    "fast_track": 2
+    "fast_track": 2,
+    "auto_merge": 3,
+    "batch_review": 1,
+    "defer": 1
   },
-  "batches": [],
+  "batches": [
+    {
+      "id": "agentic-quality-fixes",
+      "prs": [
+        72515,
+        72757,
+        72711
+      ]
+    }
+  ],
   "selected_candidates": [
     {
       "number": 72273,
@@ -63,18 +81,123 @@
         "pr-risk:medium",
         "pr-priority:medium",
         "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:agentic-quality-fixes"
+      ]
+    },
+    {
+      "number": 72757,
+      "title": "[duplicate-code] refactor: reuse bounded work-queue content reader",
+      "category": "refactor",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 61,
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 15,
+        "quality": 14
+      },
+      "updated_at": "2026-10-29T00:28:28Z",
+      "labels": [
+        "pr-type:refactor",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agentic-quality-fixes"
+      ]
+    },
+    {
+      "number": 72728,
+      "title": "[aider] Add test stubs for uncovered packages",
+      "category": "test",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 42,
+      "score_breakdown": {
+        "impact": 18,
+        "urgency": 10,
+        "quality": 14
+      },
+      "updated_at": "2026-10-28T16:40:39Z",
+      "labels": [
+        "pr-type:test",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:auto_merge",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 72711,
+      "title": "[dead-code] chore: remove dead functions \u2014 4 functions removed",
+      "category": "chore",
+      "risk": "low",
+      "priority": "low",
+      "action": "defer",
+      "score": 34,
+      "score_breakdown": {
+        "impact": 12,
+        "urgency": 8,
+        "quality": 14
+      },
+      "updated_at": "2026-10-28T14:43:11Z",
+      "labels": [
+        "pr-type:chore",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:defer",
+        "pr-agent:copilot",
+        "pr-batch:agentic-quality-fixes"
+      ]
+    },
+    {
+      "number": 72826,
+      "title": "[docs] docs: unbloat github-actions-primer.md",
+      "category": "docs",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 30,
+      "score_breakdown": {
+        "impact": 10,
+        "urgency": 6,
+        "quality": 14
+      },
+      "updated_at": "2026-10-29T00:54:39Z",
+      "labels": [
+        "pr-type:docs",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:auto_merge",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 72842,
+      "title": "[docs] Update Astro dependencies - 2026-10-29",
+      "category": "docs",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 28,
+      "score_breakdown": {
+        "impact": 10,
+        "urgency": 4,
+        "quality": 14
+      },
+      "updated_at": "2026-10-29T03:05:15Z",
+      "labels": [
+        "pr-type:docs",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:auto_merge",
         "pr-agent:copilot"
       ]
     }
   ],
-  "skipped_prs": [
-    72817,
-    72806,
-    72804,
-    72757,
-    72728,
-    72711,
-    72710
-  ],
-  "notes": "Two agent-authored PRs were eligible after applying the 1-hour cooldown; the remaining open agent PRs were still in their stabilization window."
+  "skipped_prs": [],
+  "notes": "Seven app/github-copilot PRs were eligible after the 1-hour stabilization window; the feature work is highest priority, while the docs/test automation PRs are low-risk and ready to merge or batch at low urgency."
 }
