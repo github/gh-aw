@@ -56,6 +56,7 @@ func loadCachedAuditData(runOutputDir string, run WorkflowRun, source auditCache
 
 func writeAuditData(runOutputDir string, auditData AuditData) error {
 	auditData.EvidenceSearch = nil
+	auditData.ModelCatalog = nil
 	auditData.SchemaVersion = auditSchemaVersion
 	data, err := json.MarshalIndent(auditData, "", "  ")
 	if err != nil {
