@@ -1,35 +1,35 @@
 ### 📊 Performance Summary
 
-**Date:** 2026-10-22  
-**Analysis:** 1 regression(s), 4 warning(s); likely environment noise: false
+**Date:** 2026-10-29  
+**Analysis:** 8 regressions, 0 warnings; likely environment noise: true
 
 ### 🎯 Key Metrics
 
-- **Benchmarks:** 9 total; 3 stable, 4 warnings, 1 regression(s), 1 improvement(s)
-- **Regression:** `CompileComplexWorkflow` at 12.13 ms/op, 15.9% slower than its 10.47 ms/op historical median (13 data points).
-- **Warnings:** `CompileSimpleWorkflow` (+7.6%), `CompileMCPWorkflow` (+7.9%), `CompileMemoryUsage` (+5.6%), and `YAMLGeneration` (+7.5%).
-- **Improvement:** `FindIncludesInContent` is 8.6% faster. Parsing, validation, and workflow-name extraction are stable.
+- **Benchmarks:** 10 total; 1 stable, 0 warnings, 8 regressions, 1 improvement(s).
+- **Noise signal:** slowdowns span compilation, parsing, validation, YAML generation, and a helper benchmark, while `ExtractWorkflowNameFromFile` improved by 40.7%; the configured noise heuristic is true.
+- **Decision:** no focused regression fix or PR is supported by this run; rerun benchmarks before attributing these broad changes to code.
 
 <details>
 <summary><b>📈 Detailed benchmark results</b></summary>
 
 | Benchmark | Current | Historical median | Change | Memory | Allocations | Status |
 |---|---:|---:|---:|---:|---:|---|
-| `CompileComplexWorkflow` | 12.13 ms | 10.47 ms | +15.9% | 6145611 B/op | 39549 | regression |
-| `CompileMCPWorkflow` | 8.08 ms | 7.49 ms | +7.9% | 4275490 B/op | 31094 | warning |
-| `CompileMemoryUsage` | 10.60 ms | 10.04 ms | +5.5% | 5796813 B/op | 36562 | warning |
-| `CompileSimpleWorkflow` | 7.73 ms | 7.19 ms | +7.6% | 4185058 B/op | 27953 | warning |
-| `ExtractWorkflowNameFromFile` | 2.32 µs | 2.31 µs | +0.7% | 216 B/op | 4 | stable |
-| `FindIncludesInContent` | 98 ns | 107 ns | -8.6% | 64 B/op | 1 | improvement |
-| `ParseWorkflow` | 991.92 µs | 1.03 ms | -3.7% | 723324 B/op | 13608 | stable |
-| `Validation` | 155.43 µs | 156.14 µs | -0.5% | 231497 B/op | 661 | stable |
-| `YAMLGeneration` | 7.59 ms | 7.07 ms | +7.5% | 4145088 B/op | 27115 | warning |
+| `CompileComplexWorkflow` | 14.65 ms | 12.44 ms | +17.8% | 6841950 B/op | 48932 | regression |
+| `CompileMCPWorkflow` | 10.79 ms | 8.81 ms | +22.6% | 5071526 B/op | 39338 | regression |
+| `CompileMemoryUsage` | 14.54 ms | 11.96 ms | +21.6% | 6441416 B/op | 45336 | regression |
+| `CompileSimpleWorkflow` | 10.25 ms | 8.51 ms | +20.5% | 4964192 B/op | 36483 | regression |
+| `ExtractWorkflowNameFromFile` | 3.15 µs | 5.32 µs | -40.7% | 216 B/op | 4 | improvement |
+| `FastParseTitleFromReader` | 126.7 ns | 129.0 ns | -1.8% | 32 B/op | 1 | stable |
+| `FindIncludesInContent` | 156.6 ns | 122.0 ns | +28.1% | 64 B/op | 1 | regression |
+| `ParseWorkflow` | 1.28 ms | 1.10 ms | +16.3% | 728994 B/op | 13666 | regression |
+| `Validation` | 206.80 µs | 171.43 µs | +20.6% | 247924 B/op | 871 | regression |
+| `YAMLGeneration` | 10.36 ms | 8.41 ms | +23.2% | 4861110 B/op | 34865 | regression |
 
 </details>
 
 ### 💡 Recommendations
 
-- Review recent compilation pipeline changes and profile `CompileComplexWorkflow` if the regression persists.
-- Monitor the four warning results on the next benchmark run.
+- Rerun the benchmark suite under a comparable runner before investigating individual compiler changes.
+- No implementation PR was created because the run met the configured likely environment noise rule.
 
-**References:** [Run 39799490862](https://github.com/github/gh-aw/actions/runs/39799490862)
+**References:** [Run 40895439494](https://github.com/github/gh-aw/actions/runs/40895439494)
