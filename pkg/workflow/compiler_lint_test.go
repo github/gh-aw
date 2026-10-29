@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -379,6 +380,77 @@ func TestCompilerLintAllowsOnlyWellFormedMutableActionRefs(t *testing.T) {
 			}
 			require.ErrorContains(t, compiler.lintCompiledWorkflow(data,
 				"on: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: example/action\n", "test.md"), "Malformed action")
+		})
+	}
+}
+
+func TestCompilerLintGeneratedActionFallback(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []ActionMode{ActionModeAction, ActionModeRelease} {
+		t.Run(mode.String(), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "triage.md")
+			source := `---
+on: issues
+permissions:
+  contents: read
+  issues: read
+tools:
+  github:
+    toolsets: [issues]
+safe-outputs:
+  add-labels:
+    allowed: [bug]
+---
+Triage new issues.
+`
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithVersion("v0.93.5"), WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetActionMode(mode)
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			_, resolver := compiler.ensureSharedActionCacheAndResolver()
+			repo := GitHubActionsOrgRepo + "/setup"
+			if mode == ActionModeRelease {
+				repo = GitHubOrgRepo + "/actions/setup"
+			}
+			resolver.failedResolutions[repo+"@v0.93.5"] = struct{}{}
+			baseRepo := GitHubActionsOrgRepo
+			if mode == ActionModeRelease {
+				baseRepo = GitHubOrgRepo
+			}
+			resolver.failedResolutions[baseRepo+"@v0.93.5"] = struct{}{}
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Positive(t, compiler.GetWarningCount(), "unresolved generated refs must remain visible")
+			lock, err := os.ReadFile(filepath.Join(dir, "triage.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), "uses: "+repo+"@v0.93.5")
+
+			artifactSource := strings.Replace(source, "safe-outputs:\n", "safe-outputs:\n  upload-artifact:\n", 1)
+			require.NoError(t, os.WriteFile(path, []byte(artifactSource), 0o600))
+			require.NoError(t, compiler.CompileWorkflow(path), "rendering copies must preserve generated references")
+
+			// The same reference authored by the user must still be pinned.
+			authored := "pre-steps:\n  - uses: " + repo + "@v0.93.5\n"
+			authoredSource := strings.Replace(source, "on: issues\n", "on: issues\n"+authored, 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			authoredSource = strings.Replace(source, "  add-labels:\n    allowed: [bug]\n",
+				"  actions:\n    setup:\n      uses: "+repo+"@v0.93.5\n      inputs: {}\n", 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			authoredSource = strings.Replace(authoredSource, "safe-outputs:\n", "safe-outputs:\n  upload-artifact:\n", 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			authored = "jobs:\n  pre_activation:\n    steps:\n      - uses: " + repo + "@v0.93.5\n"
+			authoredSource = strings.Replace(source, "on: issues\n", "on: issues\n"+authored, 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
 		})
 	}
 }

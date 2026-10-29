@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -68,7 +69,7 @@ func resolveSetupActionModeRef(ctx context.Context, actionTag string, version st
 	if !ok {
 		return localPath
 	}
-	actionRepo := actionsOrgRepo + "/setup"
+	actionRepo := path.Join(actionsOrgRepo, "setup")
 	remoteRef := fmt.Sprintf("%s@%s", actionRepo, tag)
 	ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Action mode")
 	if ref != "" {
@@ -129,7 +130,16 @@ func tryResolveSetupSHA(ctx context.Context, resolver SHAResolver, actionRepo, t
 // For dev mode: returns the local path as-is (e.g., "./actions/create-issue")
 // For release mode: converts to SHA-pinned remote reference (e.g., "github/gh-aw/actions/create-issue@SHA # tag")
 // For action mode: converts to SHA-pinned reference in external repo if possible (e.g., "github/gh-aw-actions/create-issue@SHA # version")
-func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) string {
+func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) (reference string) {
+	defer func() {
+		if data != nil && reference != "" {
+			if data.generatedActionRefs == nil {
+				data.generatedActionRefs = make(map[string]struct{})
+			}
+			ref, _, _ := strings.Cut(reference, " # ")
+			data.generatedActionRefs[ref] = struct{}{}
+		}
+	}()
 	hasActionTag, frontmatterActionTag := getFrontmatterActionTag(data)
 
 	// For ./actions/setup, check for compiler-level actionTag override first

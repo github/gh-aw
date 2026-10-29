@@ -3,10 +3,12 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
@@ -24,8 +26,9 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	}
 	diagnostics, err := workflowlint.Default().Run(c.ctx, workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), SourcePath: sourcePath,
-		AllowActionRefs: c.allowActionRefs,
-		SafeOutputJobs:  safeOutputLintJobs(data),
+		AllowActionRefs:     c.allowActionRefs,
+		SafeOutputJobs:      safeOutputLintJobs(data),
+		GeneratedActionRefs: compilerGeneratedActionRefs(data),
 	})
 	var failures []error
 	if err != nil {
@@ -68,6 +71,37 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		return formatCompilerError(sourcePath, "error", err.Error(), err)
 	}
 	return nil
+}
+
+func compilerGeneratedActionRefs(data *WorkflowData) map[string]struct{} {
+	generated := maps.Clone(data.generatedActionRefs)
+	// Authored pin failures must not inherit a matching compiler-generated fallback.
+	for _, failure := range data.ActionResolutionFailures {
+		for reference := range generated {
+			if gitutil.ExtractBaseRepo(extractActionRepo(reference)) == gitutil.ExtractBaseRepo(failure.Repo) &&
+				extractActionVersion(reference) == failure.Ref {
+				delete(generated, reference)
+			}
+		}
+	}
+	removeAuthoredActionRefs(generated, data.Jobs)
+	return generated
+}
+
+func removeAuthoredActionRefs(generated map[string]struct{}, value any) {
+	switch value := value.(type) {
+	case map[string]any:
+		if uses, ok := value["uses"].(string); ok {
+			delete(generated, uses)
+		}
+		for _, child := range value {
+			removeAuthoredActionRefs(generated, child)
+		}
+	case []any:
+		for _, child := range value {
+			removeAuthoredActionRefs(generated, child)
+		}
+	}
 }
 
 func (c *Compiler) lintPolicyDocument(data *WorkflowData) *aw.Document {
