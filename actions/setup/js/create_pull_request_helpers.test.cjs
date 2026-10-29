@@ -618,6 +618,33 @@ describe("buildPatchPreviewBlocks", () => {
 // buildFallbackIssueBlocks
 // ---------------------------------------------------------------------------
 describe("buildFallbackIssueBlocks", () => {
+  it.each([
+    ["manifest_protection_create_pr_fallback.md", "create-pull-request", "fallback-to-issue"],
+    ["manifest_protection_push_to_pr_fallback.md", "push-to-pull-request-branch", "fallback-to-issue"],
+    ["manifest_protection_request_review.md", "create-pull-request", "request-review"],
+    ["manifest_protection_request_changes_review.md", "create-pull-request", "request-review"],
+  ])("includes scoped exclusion guidance in %s", (template, safeOutput, policy) => {
+    const children = buildFallbackIssueBlocks(require.resolve(`../md/${template}`), {
+      files: { type: "inline_slot", children: [{ type: "code", value: ".changeset/release.md", agentTainted: true }] },
+      main_body: [],
+      footer: [],
+      create_pr_url: "https://github.com/my-org/my-repo/compare/main...feature?expand=1",
+      pull_number: "42",
+      pr_url: "https://github.com/my-org/my-repo/pull/42",
+      run_url: "https://github.com/my-org/my-repo/actions/runs/123",
+      apply_instructions: "git am changes.patch",
+    });
+    const yaml = `safe-outputs:\n  ${safeOutput}:\n    protected-files:\n      policy: ${policy}\n      exclude:\n        - .changeset/`;
+    const guidance = children.flatMap(block => (block.type === "details" ? block.children : [block]));
+    expect(guidance).toContainEqual({ type: "code_block", language: "yaml", value: yaml, agentTainted: false });
+    const { body } = renderReport({ type: "report", title: "Protected files", children });
+    expect(body).toContain("`.changeset/*`");
+    expect(body).toContain("not glob patterns");
+    expect(body).toContain("`allowed-files`");
+    expect(body).toContain("`gh aw compile`");
+    expect(body).not.toContain("protected-files: allowed");
+  });
+
   it("composes protected-files fallback content as typed blocks with a compare link", () => {
     const mainBody = { type: "paragraph", children: [{ type: "text", value: "Original PR description", agentTainted: true }], agentTainted: true };
     const footer = { type: "paragraph", children: [{ type: "text", value: "Workflow footer", agentTainted: false }], agentTainted: false };

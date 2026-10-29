@@ -3440,6 +3440,13 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("🛡️ Protected Files");
       expect(result).toContain("package.json");
       expect(result).toContain("protected-files: fallback-to-issue");
+      expect(result).toContain("Allow intentional protected-file changes");
+      expect(result).toContain("`.changeset/*`");
+      expect(result).toContain("policy: blocked");
+      expect(result).toContain("exclude:\n        - .changeset/");
+      expect(result).toContain("not glob patterns");
+      expect(result).toContain("`allowed-files`");
+      expect(result).toContain("`gh aw compile`");
       // Should NOT contain generic "Code Push Failed" for pure manifest errors
       expect(result).not.toContain("Code Push Failed");
     });
@@ -3554,6 +3561,7 @@ describe("handle_agent_failure", () => {
       const result = buildCodePushFailureContext(errors);
       expect(result).toContain("push-to-pull-request-branch:");
       expect(result).toContain("protected-files: fallback-to-issue");
+      expect(result).toContain("push-to-pull-request-branch:\n    protected-files:\n      policy: blocked\n      exclude:\n        - .changeset/");
       expect(result).not.toContain("create-pull-request:");
     });
 
