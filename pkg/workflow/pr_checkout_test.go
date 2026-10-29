@@ -16,9 +16,9 @@ import (
 func TestCompilePRFloatingHead(t *testing.T) {
 	for _, list := range []bool{false, true} {
 		t.Run(fmt.Sprint(list), func(t *testing.T) {
-			checkout := "  allow-pull-request-floating-head: true"
+			checkout := "  pull-request-floating-head: true"
 			if list {
-				checkout = "  - allow-pull-request-floating-head: true"
+				checkout = "  - pull-request-floating-head: true"
 			}
 			content := "---\non:\n  pull_request:\n    types: [opened]\npermissions:\n  contents: read\nengine: copilot\ncheckout:\n" + checkout + "\n---\nReview the PR.\n"
 			file := filepath.Join(t.TempDir(), "floating-head.md")
@@ -26,8 +26,8 @@ func TestCompilePRFloatingHead(t *testing.T) {
 			require.NoError(t, NewCompiler().CompileWorkflow(file))
 			compiled, err := os.ReadFile(strings.TrimSuffix(file, ".md") + ".lock.yml")
 			require.NoError(t, err)
-			require.Contains(t, string(compiled), `GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD: "true"`)
-			require.Equal(t, 1, strings.Count(string(compiled), "GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD"))
+			require.Contains(t, string(compiled), `GH_AW_PULL_REQUEST_FLOATING_HEAD: "true"`)
+			require.Equal(t, 1, strings.Count(string(compiled), "GH_AW_PULL_REQUEST_FLOATING_HEAD"))
 		})
 	}
 }

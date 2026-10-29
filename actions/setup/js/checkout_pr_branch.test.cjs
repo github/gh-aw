@@ -133,7 +133,7 @@ describe("checkout_pr_branch.cjs", () => {
     process.env.GITHUB_TOKEN = "test-token";
     process.env.GITHUB_SERVER_URL = "https://github.com";
     delete process.env.GH_AW_ALLOWED_BOTS;
-    delete process.env.GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD;
+    delete process.env.GH_AW_PULL_REQUEST_FLOATING_HEAD;
   });
 
   afterEach(() => {
@@ -144,7 +144,7 @@ describe("checkout_pr_branch.cjs", () => {
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_SERVER_URL;
     delete process.env.GH_AW_ALLOWED_BOTS;
-    delete process.env.GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD;
+    delete process.env.GH_AW_PULL_REQUEST_FLOATING_HEAD;
     vi.clearAllMocks();
   });
 
@@ -281,7 +281,7 @@ If the pull request is still open, verify that:
 
     describe("explicit floating-head checkout", () => {
       beforeEach(() => {
-        process.env.GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD = "true";
+        process.env.GH_AW_PULL_REQUEST_FLOATING_HEAD = "true";
       });
 
       it.each(["same-repository", "fork", "closed"])("selects the current API head and depth for a delayed %s PR event", async checkoutPath => {
@@ -294,7 +294,7 @@ If the pull request is still open, verify that:
         expect(mockCore.setFailed).not.toHaveBeenCalled();
         expect(mockFetch).toHaveBeenCalledWith("git", ["fetch", "origin", `+${sha}:refs/remotes/origin/pr-head`, "--depth=2"], expect.anything());
         expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", sha);
-        expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("checkout.allow-pull-request-floating-head is enabled"));
+        expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("checkout.pull-request-floating-head is enabled"));
       });
 
       it.each(["pull_request_review", "pull_request_review_comment", "pull_request", "issue_comment", "workflow_dispatch"])("does not require revision/freshness evidence for %s", async eventName => {
@@ -384,7 +384,7 @@ If the pull request is still open, verify that:
       });
 
       it.each(["false", "TRUE", "1"])("does not enable floating checkout with environment value %s", async value => {
-        process.env.GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD = value;
+        process.env.GH_AW_PULL_REQUEST_FLOATING_HEAD = value;
         mockContext.eventName = "pull_request_review";
         mockContext.payload.review.commit_id = newerSha;
         await runScript();

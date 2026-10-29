@@ -206,8 +206,8 @@ func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowDa
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: " + resolvedToken + "\n")
 	for _, checkout := range data.CheckoutConfigs {
-		if checkout != nil && checkout.AllowPullRequestFloatingHead {
-			yaml.WriteString("          GH_AW_ALLOW_PULL_REQUEST_FLOATING_HEAD: \"true\"\n")
+		if checkout != nil && checkout.PullRequestFloatingHead {
+			yaml.WriteString("          GH_AW_PULL_REQUEST_FLOATING_HEAD: \"true\"\n")
 			break
 		}
 	}

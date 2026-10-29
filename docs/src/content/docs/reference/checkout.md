@@ -7,7 +7,7 @@ sidebar:
 
 The `checkout:` frontmatter field controls how `actions/checkout` is invoked in the agent job. Configure custom checkout settings, check out multiple repositories, or disable checkout entirely.
 
-By default, the agent checks out the repository where the workflow is running with a shallow fetch (`fetch-depth: 1`). If triggered by a `pull_request` event, it also checks out the PR's selected immutable commit, as described in [PR Revision Binding](#pr-revision-binding). For `pull_request_target` events, automatic PR checkout is **disabled by default**; `allow-pull-request-floating-head` does not enable it. For most workflows, this default checkout is sufficient and no `checkout:` configuration is necessary.
+By default, the agent checks out the repository where the workflow is running with a shallow fetch (`fetch-depth: 1`). If triggered by a `pull_request` event, it also checks out the PR's selected immutable commit, as described in [PR Revision Binding](#pr-revision-binding). For `pull_request_target` events, automatic PR checkout is **disabled by default**; `pull-request-floating-head` does not enable it. For most workflows, this default checkout is sufficient and no `checkout:` configuration is necessary.
 
 Before the agent job, activation separately checks out workflow configuration to load runtime imports and skills. On `pull_request`, `pull_request_review`, and `pull_request_review_comment` events, this sparse checkout uses the PR **base SHA**, not the PR head; on other events it retains the normal activation ref. For reusable `workflow_call` workflows, it uses the resolved callee SHA when there is no active PR event, and skips cross-repository checkout if authentication may fall back to the caller's repository-scoped `GITHUB_TOKEN`. The `checkout:` options below describe the agent job and do not override this activation checkout.
 
@@ -44,7 +44,7 @@ To select the current PR head at execution time instead of the triggering event 
 
 ```aw wrap
 checkout:
-  allow-pull-request-floating-head: true
+  pull-request-floating-head: true
 ```
 
 The default is `false`. The value must be a literal boolean; strings such as `"true"` and expressions are rejected. With `true`, checkout ignores event/review SHA and comment freshness evidence, resolves the current head through the PR API, and uses the current commit count for fetch depth. It still fetches that specific SHA, rechecks the head after fetch, and verifies actual `HEAD`. A head change during fetch fails; this option does not restore mutable-ref fetching or bypass the server's SHA-fetch requirements.
@@ -90,7 +90,7 @@ checkout:
 | Field | Type | Description |
 |-------|------|-------------|
 | `pull-request` | boolean | Set `false` to disable automatic PR checkout and its paired base-config snapshot/restore steps. The normal repository checkout remains enabled. |
-| `allow-pull-request-floating-head` | boolean | Select the current API head instead of event/review revision evidence. Defaults to `false`; literal boolean only. Applies workflow-wide if any checkout entry enables it. See [Allow Floating Head](#allow-floating-head). |
+| `pull-request-floating-head` | boolean | Select the current API head instead of event/review revision evidence. Defaults to `false`; literal boolean only. Applies workflow-wide if any checkout entry enables it. See [Allow Floating Head](#allow-floating-head). |
 | `repository` | string | Explicit repository in `owner/repo` format, or a newline-separated list with `multi: true`. Without `multi`, expressions must resolve to exactly one repository and need no allowlist. Does not support wildcards. Defaults to the current repository. |
 | `repo` | string | Alias for `repository`; specify only one. Does not support wildcards. |
 | `multi` | boolean | Explicitly enables runtime repository-list expansion and its restrictions. Defaults to `false`; must be a literal boolean. |

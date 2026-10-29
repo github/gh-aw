@@ -23776,7 +23776,7 @@ checkout:
   # and verified; this is current-head execution, not revision approval. Does not
   # enable a disabled PR checkout. Requires a literal boolean.
   # (optional)
-  allow-pull-request-floating-head: true
+  pull-request-floating-head: true
 
   # Repository to checkout in owner/repo format, or a newline-separated list when
   # multi: true is set. Without multi, expressions must resolve to exactly one

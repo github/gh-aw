@@ -4,7 +4,7 @@ package parser
 
 import "testing"
 
-func TestMainWorkflowSchema_AllowPullRequestFloatingHead(t *testing.T) {
+func TestMainWorkflowSchema_PullRequestFloatingHead(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		value any
@@ -19,7 +19,7 @@ func TestMainWorkflowSchema_AllowPullRequestFloatingHead(t *testing.T) {
 	} {
 		for _, list := range []bool{false, true} {
 			t.Run(tc.name, func(t *testing.T) {
-				var checkout any = map[string]any{"allow-pull-request-floating-head": tc.value}
+				var checkout any = map[string]any{"pull-request-floating-head": tc.value}
 				if list {
 					checkout = []any{checkout}
 				}
