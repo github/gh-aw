@@ -558,12 +558,13 @@ For an already registered workflow, compile and push the candidate source, lock 
 
 ```bash
 gh aw compile workflow --validate --strict
+gh aw run workflow --dry-run --ref feature/my-change  # Preview the dispatch
 gh aw run workflow --ref feature/my-change
 # From another checkout:
 gh aw run workflow --repo owner/repo --ref feature/my-change
 ```
 
-Compilation alone does not publish files. Local uncommitted changes are not executed. `gh aw run --dry-run` only validates/previews the command; it does not dispatch or make the compiled workflow safe to execute. For a live test with compiler-managed mutations suppressed, compile with `gh aw compile workflow --dry-run`, review and publish that source/lock revision, then dispatch it. This does not suppress arbitrary script effects or credential use.
+Compilation alone does not publish files. Local uncommitted changes are not executed. Use `gh aw run --dry-run` to preview the dispatch command before a live test; it does not dispatch, execute the candidate, or make the compiled workflow safe to execute. For a live test with compiler-managed mutations suppressed, compile with `gh aw compile workflow --dry-run`, review and publish that source/lock revision, then dispatch it. This does not suppress arbitrary script effects or credential use.
 
 For a **new workflow**, a maintainer can first merge a reviewed, inert registration file at the **exact same lock-file path** the candidate will use. For example, this is a plain GitHub Actions bootstrap file, not compiler output:
 
