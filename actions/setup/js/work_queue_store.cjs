@@ -180,8 +180,13 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = tru
  * @param {string} sha
  * @param {Record<string, unknown> | undefined} [request]
  * @param {(code: string, message: string) => Error} [onInvalid]
+ * @throws {Error} If queue contents are invalid, using onInvalid when provided.
  */
 async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, request = undefined, onInvalid = undefined) {
+  /**
+   * @type {(code: string, message: string) => never}
+   * @throws {Error} Always throws the error from onInvalid or queueError.
+   */
   const fail = (code, message) => {
     throw onInvalid ? onInvalid(code, message) : queueError(code, message);
   };
@@ -202,8 +207,7 @@ async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, reques
   if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4) fail("resource_limit", "queue blob exceeds cold parser limit");
   const paddingAt = encoded.indexOf("=");
   // A repeated quartet regexp over multi-MiB ledgers overflows V8's regexp stack.
-  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded) || (paddingAt !== -1 && (paddingAt < encoded.length - 2 || !["=", "=="].includes(encoded.slice(paddingAt)))))
-    fail("ledger_invalid", "malformed queue blob base64");
+  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded) || (paddingAt !== -1 && (paddingAt < encoded.length - 2 || !["=", "=="].includes(encoded.slice(paddingAt))))) fail("ledger_invalid", "malformed queue blob base64");
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.toString("base64") !== encoded) fail("ledger_invalid", "malformed queue blob base64");
   if (bytes.length > 80 * 1024 * 1024 || (typeof blob.data.size === "number" && blob.data.size !== bytes.length)) fail("ledger_invalid", "queue blob is oversized or truncated");
@@ -468,12 +472,7 @@ async function validateCompactionExtension(previous, current, { githubClient, ow
     ancestor = parent.data.parents[0].sha;
   }
   if (ancestor !== checkpoint.prior_git_sha) throw queueError("ledger_invalid", message);
-  const { contents } = await readQueueContentsAtSHA(
-    { githubClient, owner, repo },
-    checkpoint.prior_git_sha,
-    undefined,
-    () => queueError("ledger_invalid", message)
-  );
+  const { contents } = await readQueueContentsAtSHA({ githubClient, owner, repo }, checkpoint.prior_git_sha, undefined, () => queueError("ledger_invalid", message));
   const source = replayTransactionLog(contents);
   if (
     source.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase() ||
