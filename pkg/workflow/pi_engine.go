@@ -447,6 +447,9 @@ func (e *PiEngine) buildPiModelsJSONSetup(workflowData *WorkflowData, profile un
 		if modelID != "" {
 			modelIDAssignment = "export GH_AW_PI_MODEL_ID=" + shellEscapeArg(modelID) + " && "
 		}
+		if piModelIsAlias(workflowData) {
+			modelIDAssignment += "export GH_AW_PI_MODEL_FILE=" + shellEscapeArg(piResolvedModelFile) + " && "
+		}
 		setup := fmt.Sprintf(
 			`%sexport GH_AW_PI_GATEWAY_SECRET_ENV=%s GH_AW_PI_GATEWAY_FALLBACK_PORT=%d GH_AW_LLM_PROVIDER=%s%s && ( %s "%s/pi_models_json.cjs" ) && `,
 			modelIDAssignment, shellEscapeArg(gatewaySecretEnvVar), profile.gatewayPort, shellEscapeArg(reflectProvider),

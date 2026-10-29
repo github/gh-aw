@@ -4,6 +4,8 @@ package workflow
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -656,6 +658,7 @@ func TestPiEngine_GetExecutionSteps_AliasModelResolvedAtRuntime(t *testing.T) {
 		model     string
 		wantAlias bool
 	}{
+		{model: "opus", wantAlias: true},
 		{model: "copilot/opus", wantAlias: true},
 		{model: "copilot/claude-opus-5.5"},
 		{model: "copilot/auto"},
@@ -674,12 +677,43 @@ func TestPiEngine_GetExecutionSteps_AliasModelResolvedAtRuntime(t *testing.T) {
 			stepText := strings.Join(steps[0], "\n")
 			modelID := strings.TrimPrefix(tt.model, "copilot/")
 			if tt.wantAlias {
+				assert.Contains(t, stepText, "export GH_AW_PI_MODEL_FILE=/tmp/gh-aw/pi-model")
 				assert.Contains(t, stepText, `--model "aw-gateway/$(cat /tmp/gh-aw/pi-model)"`)
 				assert.NotContains(t, stepText, "--model aw-gateway/"+modelID)
 			} else {
 				assert.Contains(t, stepText, "--model aw-gateway/"+modelID)
 				assert.NotContains(t, stepText, "/tmp/gh-aw/pi-model")
 			}
+		})
+	}
+}
+
+func TestCompilePiAliasModelFileArcDind(t *testing.T) {
+	for _, model := range []string{"opus", "copilot/opus"} {
+		t.Run(model, func(t *testing.T) {
+			source := filepath.Join(t.TempDir(), "pi-alias.md")
+			markdown := fmt.Sprintf(`---
+on: workflow_dispatch
+permissions:
+  contents: read
+strict: false
+runner:
+  topology: arc-dind
+engine:
+  id: pi
+  model: %s
+---
+Report status.
+`, model)
+			require.NoError(t, os.WriteFile(source, []byte(markdown), 0o600))
+			require.NoError(t, NewCompiler(WithVersion("dev")).CompileWorkflow(source))
+			lockBytes, err := os.ReadFile(filepath.Join(filepath.Dir(source), "pi-alias.lock.yml"))
+			require.NoError(t, err)
+			execution := extractWorkflowStepByName(t, string(lockBytes), "Execute Pi CLI")
+			modelFile := "${RUNNER_TEMP}/gh-aw/pi-model"
+			assert.Contains(t, execution, "export GH_AW_PI_MODEL_FILE="+modelFile)
+			assert.Contains(t, execution, `--model "aw-gateway/$(cat `+modelFile+`)"`)
+			assert.NotContains(t, execution, "/tmp/gh-aw/pi-model")
 		})
 	}
 }
