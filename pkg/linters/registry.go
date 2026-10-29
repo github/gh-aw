@@ -59,6 +59,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/regexpdynamicpattern"
 	"github.com/github/gh-aw/pkg/linters/seenmapbool"
 	"github.com/github/gh-aw/pkg/linters/slicemakezerolength"
+	"github.com/github/gh-aw/pkg/linters/sortbasic"
 	"github.com/github/gh-aw/pkg/linters/sortslice"
 	"github.com/github/gh-aw/pkg/linters/sprintfbool"
 	"github.com/github/gh-aw/pkg/linters/sprintferrdot"
@@ -154,6 +155,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	ssljson.Analyzer,
 	seenmapbool.Analyzer,
 	slicemakezerolength.Analyzer,
+	sortbasic.Analyzer,
 	sortslice.Analyzer,
 	sprintferrdot.Analyzer,
 	sprintferrorsnew.Analyzer,

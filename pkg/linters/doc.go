@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 85 active analyzers:
+// All 86 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -58,6 +58,7 @@
 //   - regexpdynamicpattern — flags regexp compile calls whose pattern is not a compile-time constant
 //   - seenmapbool — flags map[string]bool used as a set that should use map[string]struct{}
 //   - slicemakezerolength — flags zero-length slice allocations before known-size range loops that append one element per iteration
+//   - sortbasic — flags sort.Strings / sort.Ints / sort.Float64s calls that should use slices.Sort
 //   - sortslice — flags sort.Slice / sort.SliceStable calls that should use slices.SortFunc / slices.SortStableFunc
 //   - sprintferrdot — flags redundant .Error() calls on error values passed to fmt format functions
 //   - sprintferrorsnew — flags errors.New(fmt.Sprintf(...)) calls that should use fmt.Errorf instead

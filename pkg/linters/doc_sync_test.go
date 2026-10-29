@@ -25,6 +25,7 @@ var (
 
 var notYetEnforced = map[string]string{
 	"blankassigncomma":            "existing production violations need remediation before enforcement; nolint suppression already works",
+	"sortbasic":                   "existing production sort.Strings/Ints calls need remediation before enforcement; nolint suppression already works",
 	"bufferresetbeforereuse":      "new correctness analyzer needs an enforcement-readiness audit before native CI enables it",
 	"bufioscannererunchecked":     "existing scanner loops need Err handling before native CI enables it",
 	"closeerrorunchecked":         "existing production violations need remediation before enforcement; nolint suppression already works",
