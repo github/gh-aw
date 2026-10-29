@@ -1246,6 +1246,8 @@ function isCopilotToolSearchOnlyCompletion(events) {
   );
 }
 
+const copilotAssistantResponseLineFilter = line => /"type"\s*:\s*"assistant\.(?:message|refusal)"/.test(line);
+
 /**
  * Native CLI stdout is plain text; inspect only this invocation's exact session.
  * Never select another session by recency in a shared HOME.
@@ -1257,14 +1259,14 @@ function hasCopilotToolSearchOnlyCompletion(output, sessionId) {
   if (sessionId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(sessionId)) {
     for (const directory of copilotSessionStateDirectories()) {
       try {
-        return isCopilotToolSearchOnlyCompletion(readJsonlFile(path.join(directory, sessionId, "events.jsonl"), { strict: true }));
+        return isCopilotToolSearchOnlyCompletion(readJsonlFile(path.join(directory, sessionId, "events.jsonl"), { strict: true, lineFilter: copilotAssistantResponseLineFilter }));
       } catch (error) {
         const missing = error !== null && typeof error === "object" && "code" in error && error.code === "ENOENT";
         if (!missing) log("Could not inspect Copilot completion events; leaving missing-output validation to the collector");
       }
     }
   }
-  return isCopilotToolSearchOnlyCompletion(iterateJsonl(output));
+  return isCopilotToolSearchOnlyCompletion(iterateJsonl(output, { lineFilter: copilotAssistantResponseLineFilter }));
 }
 
 /**

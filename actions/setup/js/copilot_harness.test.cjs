@@ -168,11 +168,11 @@ describe("Copilot tool-search-only completion", () => {
     const sessionId = "aabbccdd-1122-3344-5566-778899aabbcc";
     const dir = path.join(root, "session-state", sessionId);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "events.jsonl"), JSON.stringify(search) + "\n");
+    fs.writeFileSync(path.join(dir, "events.jsonl"), [{ type: "session.start" }, search, { type: "session.shutdown" }].map(event => JSON.stringify(event)).join("\n") + "\n");
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", sessionId)).toBe(true);
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", "11223344-1122-3344-5566-778899aabbcc")).toBe(false);
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", "../other")).toBe(false);
-    expect(hasCopilotToolSearchOnlyCompletion(JSON.stringify(search), undefined)).toBe(true);
+    expect(hasCopilotToolSearchOnlyCompletion(`${JSON.stringify({ type: "session.start" })}\n${JSON.stringify(search)}`, undefined)).toBe(true);
     fs.appendFileSync(path.join(dir, "events.jsonl"), '{"type":"assistant.message"');
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", sessionId)).toBe(false);
   });
