@@ -60,7 +60,12 @@ const initialMermaid = initial.ok ? workflowGraphToMermaid(initial.graph) : '';
     if (!(errorBox instanceof HTMLElement)) throw new Error('Error container not found');
     if (!(mermaidSource instanceof HTMLElement)) throw new Error('Mermaid source container not found');
 
-    mermaid.initialize({ startOnLoad: false });
+    mermaid.initialize({
+      startOnLoad: false,
+      layout: 'dagre',
+      theme: 'default',
+      look: 'classic',
+    });
 
     async function renderMermaid(mermaidText) {
       mermaidSource.textContent = mermaidText;

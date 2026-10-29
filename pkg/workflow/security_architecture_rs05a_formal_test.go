@@ -63,7 +63,7 @@ func TestFormalRS05a_CheckoutGateConjunctionAllPass(t *testing.T) {
 
 	assert.Contains(t, result.Info, "Detected workflow_dispatch event for PR #123 via aw_context, will fetch PR ref")
 	assertRS05aCheckoutSucceeded(t, result)
-	assertRS05aFetchedPullHeadRef(t, result, 123)
+	assertRS05aFetchedHeadSha(t, result, 123)
 	assert.Len(t, result.PermissionCalls, 1, "RS-05a actor trust gate must run before checkout")
 	assert.Empty(t, result.Warnings, "RS-05a all-pass case must not emit warnings")
 }
@@ -75,10 +75,9 @@ func TestFormalRS05a_RepoScopeMismatchBlocksCheckout(t *testing.T) {
 		"repo":        "other-owner/other-repo",
 	}))
 
-	assertRS05aCheckoutSkipped(t, result)
+	assertRS05aCheckoutRejected(t, result)
 	assert.Empty(t, result.PermissionCalls, "RS-05a repository scope mismatch must block before actor trust")
-	assertRS05aWarningContains(t, result, "Cross-repository workflow_dispatch is not supported")
-	assertRS05aWarningContains(t, result, "other-owner/other-repo")
+	assertRS05aFailedContains(t, result, "Cross-repository workflow_dispatch is not supported")
 }
 
 func TestFormalRS05a_RepoScopeAbsentAllowsCheckoutContinuation(t *testing.T) {
@@ -88,7 +87,7 @@ func TestFormalRS05a_RepoScopeAbsentAllowsCheckoutContinuation(t *testing.T) {
 	}))
 
 	assertRS05aCheckoutSucceeded(t, result)
-	assertRS05aFetchedPullHeadRef(t, result, 123)
+	assertRS05aFetchedHeadSha(t, result, 123)
 	assert.Len(t, result.PermissionCalls, 1, "RS-05a absent repo field must fall through to actor trust")
 }
 
@@ -157,7 +156,7 @@ func TestFormalRS05a_ActorTrustVerifiedBotAllowed(t *testing.T) {
 	result := runRS05aBridge(t, scenario)
 
 	assertRS05aCheckoutSucceeded(t, result)
-	assertRS05aFetchedPullHeadRef(t, result, 123)
+	assertRS05aFetchedHeadSha(t, result, 123)
 	assert.Len(t, result.PermissionCalls, 1, "RS-05a verified bot/app actor must satisfy the repository permission floor")
 	assert.Contains(t, result.Info, "Runtime safety check passed for actor 'copilot-swe-agent[bot]' with 'write' permission")
 }
@@ -194,7 +193,7 @@ func TestFormalRS05a_CentralizedDispatchValidatesOriginatingActor(t *testing.T) 
 	result := runRS05aBridge(t, scenario)
 
 	assertRS05aCheckoutSucceeded(t, result)
-	assertRS05aFetchedPullHeadRef(t, result, 123)
+	assertRS05aFetchedHeadSha(t, result, 123)
 	require.Len(t, result.PermissionCalls, 1)
 	assert.Equal(t, "trusted-maintainer", result.PermissionCalls[0]["username"], "centralized dispatch must validate the originating actor, not the dispatcher bot")
 	assert.Contains(t, result.Info, "Validating centralized workflow_dispatch against originating actor 'trusted-maintainer'")
@@ -275,18 +274,18 @@ func TestFormalRS05a_CentralizedDispatchWithoutRouterMarkersRejected(t *testing.
 	assertRS05aOutput(t, result, "checkout_pr_success", "false")
 }
 
-func TestFormalRS05a_MalformedJSONSkipsCheckoutWithoutPanic(t *testing.T) {
+func TestFormalRS05a_MalformedJSONRejectsCheckoutWithoutPanic(t *testing.T) {
 	scenario := rs05aDefaultBridgeScenario(t, nil)
 	scenario.AwContextRaw = "{not-valid-json"
 
 	result := runRS05aBridge(t, scenario)
 
-	assertRS05aCheckoutSkipped(t, result)
+	assertRS05aCheckoutRejected(t, result)
 	assert.Empty(t, result.Thrown, "RS-05a malformed aw_context JSON must be caught by the implementation")
-	assertRS05aWarningContains(t, result, "Failed to parse aw_context:")
+	assertRS05aFailedContains(t, result, "invalid aw_context")
 }
 
-func TestFormalRS05a_RefIsolationUsesPullHeadRef(t *testing.T) {
+func TestFormalRS05a_RefIsolationUsesHeadSha(t *testing.T) {
 	result := runRS05aBridge(t, rs05aDefaultBridgeScenario(t, map[string]any{
 		"item_type":   "pull_request",
 		"item_number": 456,
@@ -294,9 +293,9 @@ func TestFormalRS05a_RefIsolationUsesPullHeadRef(t *testing.T) {
 	}))
 
 	assertRS05aCheckoutSucceeded(t, result)
-	assertRS05aFetchedPullHeadRef(t, result, 456)
+	assertRS05aFetchedHeadSha(t, result, 456)
 	assert.NotContains(t, strings.Join(rs05aAllExecArgs(result), " "), "fork-owner",
-		"RS-05a ref isolation must fetch the pull head ref from the current repository origin, not a caller-supplied remote")
+		"RS-05a ref isolation must fetch the head SHA from the current repository origin, not a caller-supplied remote")
 }
 
 func TestFormalRS05a_RefIsolationRejectsShellInterpolation(t *testing.T) {
@@ -310,7 +309,7 @@ func TestFormalRS05a_RefIsolationRejectsShellInterpolation(t *testing.T) {
 	require.NotNil(t, fetch, "RS-05a checkout must fetch the PR head")
 	assert.True(t, fetch.ArgsIsArray, "RS-05a fetch must use array-based exec arguments")
 	assert.Equal(t, "git", fetch.Command)
-	assert.Contains(t, fetch.Args, "+refs/pull/789/head:refs/remotes/origin/pr-head")
+	assert.Contains(t, fetch.Args, "+1111111111111111111111111111111111111111:refs/remotes/origin/pr-head")
 	assert.NotContains(t, strings.Join(fetch.Args, " "), "$(")
 	assert.NotContains(t, strings.Join(fetch.Args, " "), "${")
 	assert.NotContains(t, strings.Join(fetch.Args, " "), ";")
@@ -322,7 +321,7 @@ func TestFormalRS05a_MissingItemNumberBlocksCheckout(t *testing.T) {
 		"repo":      "test-owner/test-repo",
 	}))
 
-	assertRS05aCheckoutSkipped(t, result)
+	assertRS05aCheckoutRejected(t, result)
 	assert.Empty(t, result.PermissionCalls, "RS-05a missing item_number must block before actor trust")
 }
 
@@ -335,7 +334,7 @@ func TestFormalRS05a_ZeroItemNumberTreatedAsFalsy(t *testing.T) {
 				"repo":        "test-owner/test-repo",
 			}))
 
-			assertRS05aCheckoutSkipped(t, result)
+			assertRS05aCheckoutRejected(t, result)
 			assert.Empty(t, result.PermissionCalls, "RS-05a falsy item_number must block before actor trust")
 		})
 	}
@@ -350,7 +349,7 @@ func TestFormalRS05a_AdversarialItemNumbersBlockedBeforeTrustGate(t *testing.T) 
 				"repo":        "test-owner/test-repo",
 			}))
 
-			assertRS05aCheckoutSkipped(t, result)
+			assertRS05aCheckoutRejected(t, result)
 			assert.Empty(t, result.PermissionCalls, "non-canonical item_number must block before actor trust")
 			assert.Empty(t, result.PullCalls, "non-canonical item_number must block before pull request API access")
 		})
@@ -386,6 +385,7 @@ func rs05aDefaultBridgeScenario(t *testing.T, awContext map[string]any) rs05aBri
 		CommitCount:       1,
 	}
 	if awContext != nil {
+		awContext["pr_head_sha"] = "1111111111111111111111111111111111111111"
 		raw, err := json.Marshal(awContext)
 		require.NoError(t, err)
 		scenario.AwContextRaw = string(raw)
@@ -468,7 +468,7 @@ global.exec = {
       args: Array.isArray(args) ? args.map(String) : [String(args)],
       argsIsArray: Array.isArray(args),
     });
-    return { stdout: "true\n", stderr: "", exitCode: 0 };
+    return { stdout: args.includes("HEAD^{commit}") ? "1111111111111111111111111111111111111111\n" : "true\n", stderr: "", exitCode: 0 };
   },
 };
 
@@ -512,6 +512,7 @@ global.github = {
             state: "open",
             commits: Number(scenario.commitCount || 1),
             head: {
+              sha: "1111111111111111111111111111111111111111",
               ref: scenario.headRef || "feature-branch",
               repo: { full_name: scenario.headRepoFullName || "test-owner/test-repo", owner: { login: "test-owner" } },
             },
@@ -550,26 +551,25 @@ func assertRS05aCheckoutSkipped(t *testing.T, result rs05aBridgeResult) {
 	assert.Empty(t, result.SetFailed, "RS-05a skipped checkout must be fail-secure without failing the step")
 }
 
-func assertRS05aFetchedPullHeadRef(t *testing.T, result rs05aBridgeResult, prNumber int) {
+func assertRS05aCheckoutRejected(t *testing.T, result rs05aBridgeResult) {
+	t.Helper()
+	assertRS05aNoFetch(t, result)
+	assertRS05aOutput(t, result, "checkout_pr_success", "false")
+	assert.NotEmpty(t, result.SetFailed, "RS-05a invalid checkout context must fail the step")
+}
+
+func assertRS05aFetchedHeadSha(t *testing.T, result rs05aBridgeResult, prNumber int) {
 	t.Helper()
 	fetch := rs05aFindGitSubcommand(result, "fetch")
 	require.NotNil(t, fetch, "RS-05a checkout must fetch the PR head")
-	assert.Equal(t, []string{"fetch", "origin", fmt.Sprintf("+refs/pull/%d/head:refs/remotes/origin/pr-head", prNumber), "--depth=2"}, fetch.Args)
+	assert.Equal(t, []string{"fetch", "origin", "+1111111111111111111111111111111111111111:refs/remotes/origin/pr-head", "--depth=2"}, fetch.Args)
+	require.NotEmpty(t, result.PullCalls)
+	assert.InDelta(t, prNumber, result.PullCalls[0]["pull_number"], 0)
 }
 
 func assertRS05aNoFetch(t *testing.T, result rs05aBridgeResult) {
 	t.Helper()
 	assert.Nil(t, rs05aFindGitSubcommand(result, "fetch"), "RS-05a blocked checkout must not fetch any PR ref")
-}
-
-func assertRS05aWarningContains(t *testing.T, result rs05aBridgeResult, want string) {
-	t.Helper()
-	for _, warning := range result.Warnings {
-		if strings.Contains(warning, want) {
-			return
-		}
-	}
-	assert.Failf(t, "missing warning", "expected warning containing %q in %#v", want, result.Warnings)
 }
 
 func assertRS05aFailedContains(t *testing.T, result rs05aBridgeResult, want string) {
