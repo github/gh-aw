@@ -5887,6 +5887,88 @@
             "matches"
           ],
           "additionalProperties": false
+        },
+        "model_catalog": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "models_fetch_complete": {
+              "type": "boolean"
+            },
+            "endpoints": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "configured": {
+                    "type": "boolean"
+                  },
+                  "models": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "supported_endpoints": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "warning": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "configured",
+                  "models"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "warnings": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "source",
+            "models_fetch_complete",
+            "endpoints"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
