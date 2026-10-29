@@ -1110,11 +1110,39 @@ function buildCodePushFailureContext(codePushFailureErrors, pullRequest = null, 
     };
     const blockedTypes = [...new Set(manifestErrors.map(e => e.type))];
     let yamlSnippet = "safe-outputs:\n";
+    let excludeSnippet = "safe-outputs:\n";
     for (const type of blockedTypes) {
       const yamlKey = typeToYamlKey[type] || type.replace(/_/g, "-");
       yamlSnippet += `  ${yamlKey}:\n    protected-files: fallback-to-issue\n`;
+      excludeSnippet += `  ${yamlKey}:\n    protected-files:\n      policy: blocked\n      exclude:\n        - .changeset/\n`;
     }
     context.push(nodes.details([nodes.text("⚙️ Configure "), nodes.code("protected-files: fallback-to-issue")], [nodes.codeBlock(yamlSnippet.trimEnd(), "yaml")]));
+    context.push(
+      nodes.details(
+        [nodes.text("Allow intentional protected-file changes")],
+        [
+          nodes.paragraph([
+            nodes.text("If this workflow is intended to modify these files, add specific filenames or folder prefixes to "),
+            nodes.code("protected-files.exclude"),
+            nodes.text(" under the affected safe output in the workflow Markdown frontmatter. For example, to allow "),
+            nodes.code(".changeset/*"),
+            nodes.text(", exclude the folder using "),
+            nodes.code(".changeset/"),
+            nodes.text(":"),
+          ]),
+          nodes.codeBlock(excludeSnippet.trimEnd(), "yaml"),
+          nodes.paragraph([
+            nodes.text(
+              "Keep your existing policy and exclusions. Folder exclusions use path prefixes, not glob patterns, and allow all files beneath that folder, including subfolders. Other protected files still follow the configured policy. If "
+            ),
+            nodes.code("allowed-files"),
+            nodes.text(" is configured, these paths must also match it. Run "),
+            nodes.code("gh aw compile"),
+            nodes.text(" after updating the workflow."),
+          ]),
+        ]
+      )
+    );
   }
 
   // Patch size exceeded section
