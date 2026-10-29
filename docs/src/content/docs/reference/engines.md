@@ -159,6 +159,8 @@ Threat detection defaults to zero retries; configure its engine explicitly to ch
 
 > [!NOTE]
 > The Copilot model catalog offered to a workflow can differ by organization and lag the models available to that organization's Copilot seats. Availability depends on the agentic-workflows integration, not just organization policy; a model listed by this repository's daily inventory is not necessarily offered to another workflow. An exact Copilot ID missing from a complete live catalog means that model is **not offered to this workflow**. Prefer aliases such as `opus` and `sonnet` over exact Copilot IDs so resolution selects an available model. Run `gh aw audit <run-url> --models` for a detailed report of that run's model information, including its catalog, discovery status, supported endpoints, and recorded routing and usage. Missing or incomplete discovery does not confirm model absence.
+>
+> If a model is available but lacks a pricing entry, define per-model pricing with `models.providers` in frontmatter or an imported shared workflow; see [custom model pricing](/gh-aw/reference/faq/#how-do-i-supply-pricing-for-a-custom-or-private-model). Pricing configuration does not make an unavailable model available.
 
 Copilot, Claude, Codex, Pi, and Agy resolve aliases against the configured provider's live AWF `/reflect` catalog before execution:
 
