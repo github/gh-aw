@@ -317,6 +317,10 @@ gh aw doctor --repo github/gh-aw --dir ./gh-aw --require-owner-type org
 
 Use `--repo` to verify a specific repository exists and inspect the local checkout that should correspond to it. `--require-owner-type` accepts `any`, `user`, or `org` and defaults to `any`; `--dir` and `--require-owner-type` require `--repo`.
 
+Inside a checkout, `doctor` also inspects local workflows and their imports for `safe-outputs.assign-to-agent`. It checks repository secrets and organization secrets available to the repository for the configured assignment token, or `GH_AW_AGENT_TOKEN` / `GH_AW_GITHUB_TOKEN` by default. Missing credentials produce a prefilled PAT creation link and a repository secret setup link. GitHub App installation tokens and the default `GITHUB_TOKEN` cannot perform Copilot assignment; creating an App does not resolve this requirement.
+
+Secret presence does not verify its value, token type, expiry, permissions, repository access, organization approval/SSO, or Copilot availability. Dynamic credential expressions or inaccessible secret metadata are reported as unknown, not as configured. Missing or unknown credentials return a nonzero exit status; `--json` includes the checks and setup links in `agent_assignments`. Outside a checkout, or when the requested repository has no attached local checkout, workflow credential checks are skipped.
+
 `doctor --repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
 
 ### Building
