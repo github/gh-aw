@@ -611,5 +611,100 @@ describe("schema-validation.cjs", () => {
       expect(message).toContain("Required fields: name, rationale, confidence");
       expect(message).toContain('Received: \"bug\"');
     });
+
+    it("derives add_labels object-shape guidance from a workflow-configured item schema", async () => {
+      const { formatSchemaValidationError } = await import("./schema-validation.cjs");
+      const inputSchema = {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["name", "confidence"],
+              properties: {
+                name: { type: "string" },
+                confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+              },
+            },
+          },
+        },
+      };
+      const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
+      expect(message).toContain("Invalid arguments for add_labels:");
+      expect(message).toContain("labels[0] must be an object (string shorthand is not supported).");
+      expect(message).toContain("Required fields: name, confidence");
+      expect(message).not.toContain("rationale");
+      expect(message).toContain('Expected: {"name":"bug","confidence":"HIGH"}');
+      expect(message).toContain('Received: \"bug\"');
+    });
+
+    it("uses a boolean example for the required suggest field", async () => {
+      const { formatSchemaValidationError } = await import("./schema-validation.cjs");
+      const inputSchema = {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["name", "suggest"],
+              properties: {
+                name: { type: "string" },
+                suggest: { type: "boolean" },
+              },
+            },
+          },
+        },
+      };
+      const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
+      expect(message).toContain('Expected: {"name":"bug","suggest":true}');
+      expect(message).toContain("Required fields: name, suggest");
+    });
+
+    it("does not report optional fields as required or suggest an invalid example", async () => {
+      const { formatSchemaValidationError } = await import("./schema-validation.cjs");
+      const inputSchema = {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                slug: { type: "string", pattern: "^[A-Z]{3}$" },
+              },
+            },
+          },
+        },
+      };
+      const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
+      expect(message).toContain("No required fields are declared by the configured item schema.");
+      expect(message).toContain("Available fields: slug");
+      expect(message).not.toContain("Required fields:");
+      expect(message).not.toContain("Expected:");
+    });
+
+    it("omits an example when a constrained required value cannot be inferred", async () => {
+      const { formatSchemaValidationError } = await import("./schema-validation.cjs");
+      const inputSchema = {
+        type: "object",
+        properties: {
+          labels: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["slug"],
+              properties: {
+                slug: { type: "string", pattern: "^[A-Z]{3}$" },
+              },
+            },
+          },
+        },
+      };
+      const message = formatSchemaValidationError("add_labels", { labels: ["bug"] }, { path: "labels[0]", message: "must be a object" }, inputSchema);
+      expect(message).toContain("Required fields: slug");
+      expect(message).not.toContain("Expected:");
+    });
   });
 });
