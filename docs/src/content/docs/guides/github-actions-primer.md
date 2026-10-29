@@ -55,7 +55,7 @@ jobs:
 
 ```yaml
 steps:
-  - uses: actions/setup-node@v4   # action step
+  - uses: actions/setup-node@v7   # action step
     with:
       node-version: '24'
   - run: npm install              # run step
