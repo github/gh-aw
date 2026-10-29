@@ -45,7 +45,7 @@ Find the likely cause of issue #${{ github.event.issue.number }} and comment wit
 
 This configuration is a good starting point for most workflows. `goal: cost` prefers the cheapest choice that is likely to succeed, and `mode: auto` lets the router judge how demanding each task is. Because the workflow doesn't restrict models, the router can choose any model it supports that your organization's Copilot plan offers. [Choose which models the router can use](#choose-which-models-the-router-can-use) shows how to narrow that.
 
-Routing currently works only with models served through GitHub Copilot, so the workflow needs Copilot authentication, here through the [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) permission. Workflows that call model providers such as Anthropic or OpenAI directly, with their own API keys, can't use routing yet; see [GitHub Copilot models only](#github-copilot-models-only). Routing also needs the AWF firewall, which is enabled by default. The Copilot and pi engines need nothing else. Claude and Codex need one more setting; see [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi).
+This example routes models served through GitHub Copilot, so the workflow needs Copilot authentication, here through the [`copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) permission. Claude and Codex can instead route on their own provider, Anthropic or OpenAI, with the same API key they use without routing; see [Use routing with Claude, Codex, or pi](#use-routing-with-claude-codex-or-pi). Routing also needs the AWF firewall, which is enabled by default.
 
 Compile and run the workflow as usual. To see which model a run used, see [Check which model was used](#check-which-model-was-used).
 
@@ -149,9 +149,9 @@ engine:
     allowed-models: [small, sonnet]
 ```
 
-The compiler expands each alias into the GitHub Copilot model patterns it stands for, here `github-copilot/*haiku*`, `github-copilot/gpt-5*mini*`, `github-copilot/gpt-5*nano*`, `github-copilot/gemini-*flash*lite*`, and `github-copilot/*sonnet*`, and the router chooses among the available models that match. Routing always uses GitHub Copilot inference, so only an alias's `copilot/` patterns are used, whichever engine runs the workflow. Exact names stay exact, and you can mix them with aliases, as in `[gpt-5.6-luna, small]`.
+The compiler expands each alias into the model patterns it stands for on the routing provider, here the GitHub Copilot patterns `github-copilot/*haiku*`, `github-copilot/gpt-5*mini*`, `github-copilot/gpt-5*nano*`, `github-copilot/gemini-*flash*lite*`, and `github-copilot/*sonnet*`, and the router chooses among the available models that match. Only an alias's patterns for the routing provider are used: its `copilot/` patterns for GitHub Copilot routing, and its `anthropic/` or `openai/` patterns for [native routing](#native-anthropic-and-openai-routing). Exact names stay exact, and you can mix them with aliases, as in `[gpt-5.6-luna, small]`.
 
-Some names are both an alias and a GitHub Copilot model id, such as `gpt-5.4` and `gpt-5-mini`. When a name is a GitHub Copilot model id in gh-aw's bundled model catalogue, it stays exact, just as `engine.model` uses a model id over an alias with the same name. A `github-copilot/` or `copilot/` prefix, as in `github-copilot/gemini-3.8-flash`, always makes an entry exact. To route over an alias's models instead, list another alias that covers them, or define an alias with a different name under `models`.
+Some names are both an alias and a model id, such as `gpt-5.4` and `gpt-5-mini`. When a name is a model id of the routing provider in gh-aw's bundled model catalogue, it stays exact, just as `engine.model` uses a model id over an alias with the same name. A provider prefix for the routing provider, such as `github-copilot/` or `copilot/` in `github-copilot/gemini-3.8-flash`, or `anthropic/` with native Claude routing, always makes an entry exact. A prefix for another provider fails to compile rather than being moved to the routing provider. To route over an alias's models instead, list another alias that covers them, or define an alias with a different name under `models`.
 
 An entry that is neither an alias nor an exact model name, such as the typo `smal`, fails to compile, and the error lists the valid aliases. Exact names aren't checked against the models currently available.
 
@@ -172,7 +172,7 @@ engine:
 
 Here the router chooses `gpt-5.4-mini` or `gpt-5.6-sol`, and the compiler warns that `claude-sonnet-5` won't be selected. If the policy excludes every entry, compilation fails and the error names the excluded entries.
 
-An alias is narrowed by the policy in the same way. A pattern that a `models.blocked` rule fully covers is dropped, and a pattern outside `models.allowed` is narrowed to the `models.allowed` entries it includes: with `models.allowed: [claude-haiku-4.5, gpt-5.4-mini]`, `allowed-models: [small]` becomes `claude-haiku-4.5` and `gpt-5.4-mini`. When a block or allow pattern only partly overlaps an alias pattern, such as `models.blocked: [claude-sonnet-4.5]` with `sonnet`, the alias pattern stays in the shortlist and the firewall applies the policy to each available model, so the router never selects a blocked model. The compiler warns about aliases that the policy excludes entirely. As in the firewall, policy rules match model names case-insensitively, and the `copilot/`, `github-copilot/`, and `github/` providers all match GitHub Copilot models.
+An alias is narrowed by the policy in the same way. A pattern that a `models.blocked` rule fully covers is dropped, and a pattern outside `models.allowed` is narrowed to the `models.allowed` entries it includes: with `models.allowed: [claude-haiku-4.5, gpt-5.4-mini]`, `allowed-models: [small]` becomes `claude-haiku-4.5` and `gpt-5.4-mini`. When a block or allow pattern only partly overlaps an alias pattern, such as `models.blocked: [claude-sonnet-4.5]` with `sonnet`, the alias pattern stays in the shortlist and the firewall applies the policy to each available model, so the router never selects a blocked model. The compiler warns about aliases that the policy excludes entirely. As in the firewall, policy rules match model names case-insensitively, and the `copilot/`, `github-copilot/`, and `github/` providers all match GitHub Copilot models. With native routing, bare rules and rules for the native provider, such as `anthropic/claude-sonnet-*`, apply; a `github-copilot/claude-*` rule doesn't allow or block Anthropic models.
 
 `allowed-models` entries can be GitHub Actions expressions, such as `${{ vars.ROUTING_MODEL }}`, but only when the workflow sets neither `models.allowed` nor `models.blocked`, because the compiler can't check an expression against the policy.
 
@@ -210,7 +210,7 @@ The importing workflow must either omit `engine` or use its object form, such as
 
 ### Keeping up with new models
 
-The router chooses only among models it has benchmark data for. That data is part of the AWF release that gh-aw pins when it compiles the workflow. When gh-aw updates AWF with data for new models, run [`gh aw upgrade`](/gh-aw/setup/working-with-workflows/#upgrading-workflows) to recompile your workflows, and the new models become candidates if your settings allow them. Models that have been retired, or that your organization's Copilot plan doesn't offer, are skipped at run time.
+The router chooses only among models it has benchmark data for. That data is part of the AWF release that gh-aw pins when it compiles the workflow. When gh-aw updates AWF with data for new models, run [`gh aw upgrade`](/gh-aw/setup/working-with-workflows/#upgrading-workflows) to recompile your workflows, and the new models become candidates if your settings allow them. Models that have been retired, or that your organization's Copilot plan or your provider account doesn't offer, are skipped at run time.
 
 To get the most from this, describe models with patterns in the model policy, or don't restrict them, rather than listing exact names in `allowed-models`.
 
@@ -256,16 +256,18 @@ Reply with the single best label for the issue you are given.
 
 ## Use routing with Claude, Codex, or pi
 
-Routing works with the `copilot`, `claude`, `codex`, and `pi` engines, as long as they use models served through GitHub Copilot. Claude and Codex call the Anthropic and OpenAI APIs by default, so they need `model-provider: github` to use Copilot instead, and they can only use models from their own family:
+Routing works with the `copilot`, `claude`, `codex`, and `pi` engines. The Copilot and pi engines route models served through GitHub Copilot. Claude and Codex route either on their native provider, Anthropic or OpenAI, with their own API key, or on GitHub Copilot with `model-provider: github`. Either way, they can only use models from their own family:
 
-| Engine | Required setting | Candidate models |
-|---|---|---|
-| `copilot` | None | Any |
-| `pi` | None | Any |
-| `claude` | `model-provider: github` | `claude-*` only |
-| `codex` | `model-provider: github` | `gpt-*` only |
+| Engine | Provider | Setting | Candidate models |
+|---|---|---|---|
+| `copilot` | GitHub Copilot | None | Any |
+| `pi` | GitHub Copilot | None | Any |
+| `claude` | Anthropic (`ANTHROPIC_API_KEY`) | None, or `model-provider: anthropic` | `claude-*` only |
+| `claude` | GitHub Copilot | `model-provider: github` | `claude-*` only |
+| `codex` | OpenAI (`CODEX_API_KEY` or `OPENAI_API_KEY`) | None, or `model-provider: openai` | `gpt-*` only |
+| `codex` | GitHub Copilot | `model-provider: github` | `gpt-*` only |
 
-For example, to route a Claude workflow between two Claude models:
+For example, to route a Claude workflow between two Claude models on GitHub Copilot:
 
 ```aw wrap
 engine:
@@ -279,7 +281,30 @@ engine:
 
 Without `allowed-models`, Claude and Codex choose from every model in their family that the policy allows. The compiler rejects other engines and providers, and `allowed-models` entries from another family.
 
-Aliases are limited to the engine's family as well. With Claude, `allowed-models: [small]` keeps only the alias's Claude models (`claude-*haiku*`), and with Codex, only its GPT models (`gpt-5*mini*` and `gpt-5*nano*`). An alias pattern that doesn't start with the family name is narrowed to the family only when the alias also lists the engine's own provider, as `sonnet` lists `anthropic/*sonnet*`, and the narrowed pattern matches a GitHub Copilot model in gh-aw's bundled catalogue. An alias with no models in the engine's family, such as `sonnet` or `grok` with Codex, fails to compile.
+Aliases are limited to the engine's family as well. With Claude, `allowed-models: [small]` keeps only the alias's Claude models (`claude-*haiku*`), and with Codex, only its GPT models (`gpt-5*mini*` and `gpt-5*nano*`). An alias pattern that doesn't start with the family name is narrowed to the family only when the alias also lists the engine's own provider, as `sonnet` lists `anthropic/*sonnet*`, and the narrowed pattern matches a model of the routing provider in gh-aw's bundled catalogue. An alias with no models in the engine's family, such as `sonnet` or `grok` with Codex, fails to compile.
+
+### Native Anthropic and OpenAI routing
+
+Claude routes on Anthropic, and Codex on OpenAI, when the workflow doesn't set `model-provider` or sets the engine's own provider. Inference keeps using the workflow's provider API key, which stays in the firewall's API proxy, and is billed by that provider, not to your Copilot plan. AWF still counts [AI Credits](/gh-aw/reference/cost-management/) for the run, but that is the firewall's own accounting and budget, not a Copilot charge.
+
+```aw wrap
+engine:
+  id: claude
+  model-routing:
+    goal: cost
+    mode: economy
+    allowed-models: [claude-sonnet-5]
+```
+
+Native candidates use the provider's own model names. Anthropic names use dashes, as in `claude-sonnet-5-5`, where GitHub Copilot uses `claude-sonnet-5.5`. Without `allowed-models`, the candidates are `claude-*` or `gpt-*`, and an alias such as `sonnet` becomes the native pattern `claude-*sonnet*`.
+
+The router chooses a native model only when all of these hold at run time:
+
+- The provider's model list, which AWF fetches with the workflow's key, includes it.
+- The firewall has routing metadata for it: its API and the reasoning efforts it accepts. Models without that metadata, such as the Haiku models, `o3`, `gpt-5-nano`, and `gpt-5.4-mini` today, are skipped, so a shortlist of only those fails.
+- The router has benchmark data for it, and the model policy and shortlist allow it.
+
+Native routing runs only on the provider's own HTTPS endpoint, `https://api.anthropic.com` or `https://api.openai.com`. It never switches credentials or providers: Claude doesn't route on OpenAI, Codex doesn't route on Anthropic, and the run fails rather than falling back to another provider that offers the same model. The compiler rejects native routing with a custom `engine.api-target`, a custom `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` in `engine.env`, a `sandbox.agent.targets` gateway for the provider, or `engine.auth` for another cloud such as Azure OpenAI. Remove the custom target, use GitHub Copilot inference with `model-provider: github`, or remove `model-routing`.
 
 Routing also has these requirements:
 
@@ -292,7 +317,7 @@ Routing also has these requirements:
 
 Routing happens once per run, before the agent starts:
 
-1. A small model classifies the task by type (such as fix, refactor, or explain), scope, and complexity. It reads the workflow's prompt, including interpolated content such as the triggering issue's text, and treats that text as data, not instructions.
+1. A small model from the candidates, on the same provider, classifies the task by type (such as fix, refactor, or explain), scope, and complexity. It reads the workflow's prompt, including interpolated content such as the triggering issue's text, and treats that text as data, not instructions.
 2. The [router](https://github.com/github/gh-aw-firewall/tree/main/containers/router) ranks the candidate models and efforts for that kind of task, using benchmark results, and chooses one according to the workflow's `goal` and `mode`.
 3. The main agent runs the whole task with the chosen model and effort.
 
@@ -310,9 +335,9 @@ inference routing: mode=awf-routed model=gpt-5.6-sol effort=high
 
 ## Known limitations
 
-### GitHub Copilot models only
+### Supported providers and engines
 
-The router currently chooses only among models served through GitHub Copilot, because its benchmark data and model availability checks cover Copilot's models. The compiler rejects routing in workflows that use another provider, such as Claude or Codex with their own Anthropic or OpenAI API keys, and in workflows on engines other than `copilot`, `claude`, `codex`, and `pi`. This limitation is temporary, and support for more providers and engines is planned.
+Routing runs on GitHub Copilot, or natively on Anthropic for Claude and on OpenAI for Codex. The compiler rejects routing on other providers, such as Claude on OpenAI, Codex on Anthropic, or the Copilot and pi engines on a provider other than GitHub Copilot; on custom targets, BYOK gateways, or Azure OpenAI; and on engines other than `copilot`, `claude`, `codex`, and `pi`. See [Native Anthropic and OpenAI routing](#native-anthropic-and-openai-routing).
 
 ### Selection varies between runs
 
@@ -334,7 +359,9 @@ Sub-agents from a different model family than the selected main model fail. See 
 
 | Symptom | Cause and fix |
 |---|---|
-| Compilation fails because routing requires GitHub Copilot inference | A Claude or Codex workflow uses its default provider. Set `engine.model-provider: github`. See [GitHub Copilot models only](#github-copilot-models-only). |
+| Compilation fails because routing requires GitHub Copilot inference | A Copilot or pi workflow sets a provider other than `github`. Remove `engine.model-provider`. See [Supported providers and engines](#supported-providers-and-engines). |
+| Compilation fails because native routing does not cross providers | A Claude workflow sets `model-provider: openai`, or a Codex workflow sets `anthropic`. Use the engine's own provider (or omit `model-provider`), or use `github`. |
+| Compilation fails because routing on the native provider requires its native HTTPS endpoint | Native routing is combined with a custom `api-target`, base URL, gateway, or Azure OpenAI. Remove the custom target, set `model-provider: github`, or remove `model-routing`. See [Native Anthropic and OpenAI routing](#native-anthropic-and-openai-routing). |
 | Compilation fails when `allowed-models` contains a pattern such as `gpt-*` | `allowed-models` takes exact names and aliases. Put the pattern in `models.allowed` instead. See [Only one model family](#only-one-model-family). |
 | Compilation fails because an `allowed-models` entry is neither a gh-aw model alias nor an exact model id | The entry is misspelt, such as `smal`. Use an alias from the list in the error or an exact model name. See [A shortlist of model aliases](#a-shortlist-of-model-aliases). |
 | Compilation fails because all `allowed-models` are excluded by `models.allowed` or `models.blocked` | The policy excludes every candidate or, for Claude or Codex without `allowed-models`, the engine's whole family. Change either setting. |

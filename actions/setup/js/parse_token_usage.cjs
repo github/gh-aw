@@ -8,7 +8,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { mapAWFRoutingEffort, resolveAWFModelRoutingSelection, getAWFModelRoutingPolicy, resolveAWFRoutingProvider } = require("./awf_model_routing.cjs");
+const { mapAWFRoutingEffort, resolveAWFModelRoutingSelection, getAWFModelRoutingPolicy, resolveAWFRoutingProvider, routingEndpointPaths } = require("./awf_model_routing.cjs");
 const { recordModelRouting, resolveEffectiveModel, validateModelIdentifier } = require("./model_attribution.cjs");
 const { persistCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { persistModelConfigBaseline } = require("./routing_analytics.cjs");
@@ -103,9 +103,11 @@ function getModelRoutingRequestModel(record) {
   return "";
 }
 
-function hasCorroboratedModelRoutingRequests(requestRecords, wireModel, endpoint) {
+function hasCorroboratedModelRoutingRequests(requestRecords, wireModel, endpoint, routingProvider = "github") {
   const requests = requestRecords.filter(record => getModelRoutingRequestModel(record) === wireModel);
-  return requests.length > 0 && requests.every(record => record.routed === "as_selected" && record.upstream_endpoint === endpoint && Array.isArray(record.deviations) && record.deviations.every(deviation => deviation === "endpoint"));
+  // Native OpenAI forwards /responses upstream as /v1/responses; Copilot paths are compared exactly.
+  const upstream = record => (routingProvider === "github" ? record.upstream_endpoint : routingEndpointPaths([record.upstream_endpoint])[0]);
+  return requests.length > 0 && requests.every(record => record.routed === "as_selected" && upstream(record) === endpoint && Array.isArray(record.deviations) && record.deviations.every(deviation => deviation === "endpoint"));
 }
 
 function getModelRoutingSelectionFailureCode(error) {
@@ -165,7 +167,7 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
         const selectedModelMatches = !selectedAdvisory || advisory.wire_model === wireModel;
         const selectedEndpointMatches = !selectedAdvisory || advisory.selected_endpoint === routing.endpoint;
         const endpointMatches = policy.endpoints.includes(effectiveEndpoint) && checked.selection.endpoint === effectiveEndpoint;
-        const requestsCorroborate = hasCorroboratedModelRoutingRequests(requestRecords, wireModel, effectiveEndpoint);
+        const requestsCorroborate = hasCorroboratedModelRoutingRequests(requestRecords, wireModel, effectiveEndpoint, routingProvider);
         if (!selectedModelMatches || !selectedEndpointMatches || !endpointMatches || !requestsCorroborate) {
           routing = {
             ...routing,

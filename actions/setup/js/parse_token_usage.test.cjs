@@ -304,6 +304,123 @@ describe("parse_token_usage", () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("model", "");
     });
 
+    // Native routing: the selection and request records carry the native provider,
+    // and /reflect metadata comes from that provider's endpoint (protocol names).
+    function setupNativeRoutingFixture({ engine, provider, wireModel, selectedEndpoint, upstreamEndpoint, supportedEndpoints, efforts, effort, reflectProvider = provider, outcomeEndpoint = selectedEndpoint }) {
+      process.env.GH_AW_TMP_DIR = tmpDir;
+      process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";
+      process.env.GH_AW_ENGINE_ID = engine;
+      process.env.GH_AW_ENGINE_MODEL = "agent";
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify({ model: "agent" }));
+      const agentDir = path.join(tmpDir, "agent");
+      fs.mkdirSync(agentDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(agentDir, "awf-reflect.json"),
+        JSON.stringify({
+          endpoints: [
+            {
+              provider: reflectProvider,
+              configured: true,
+              models: [wireModel],
+              routing_models: [{ model_id: wireModel, source: "maintained", supported_endpoints: supportedEndpoints, supported_reasoning_efforts: efforts, context_window_tokens: 1000000, candidate_metadata_complete: true }],
+            },
+          ],
+        })
+      );
+      fs.writeFileSync(path.join(agentDir, "awf-routing-outcome.json"), JSON.stringify({ status: "selected", wire_model: wireModel, endpoint: outcomeEndpoint, selected_endpoint: selectedEndpoint, effort, applied_effort: effort }));
+      const routingPath = path.join(tmpDir, "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl");
+      fs.mkdirSync(path.dirname(routingPath), { recursive: true });
+      const records = [
+        {
+          _schema: "model-routing/v0.28.62",
+          event: "model_routing",
+          stage: "selection",
+          provider,
+          selected_provider: provider,
+          selected_model: `${provider}/${wireModel}`,
+          wire_model: wireModel,
+          selected_effort: effort,
+          endpoint: selectedEndpoint,
+          mode: "economy",
+        },
+        {
+          _schema: "model-routing/v0.28.62",
+          event: "model_routing",
+          stage: "request",
+          provider,
+          selected_provider: provider,
+          requested_model: wireModel,
+          requested_effort: effort,
+          routed: "as_selected",
+          deviations: outcomeEndpoint === selectedEndpoint ? [] : ["endpoint"],
+          upstream_endpoint: upstreamEndpoint,
+        },
+      ];
+      fs.writeFileSync(routingPath, records.map(record => JSON.stringify(record)).join("\n") + "\n");
+    }
+
+    test("records a native Anthropic selection checked against the Anthropic endpoint", async () => {
+      setupNativeRoutingFixture({
+        engine: "claude",
+        provider: "anthropic",
+        wireModel: "claude-sonnet-5-5",
+        selectedEndpoint: "/v1/messages",
+        upstreamEndpoint: "/v1/messages",
+        supportedEndpoints: ["messages"],
+        efforts: ["low", "medium", "high", "max"],
+        effort: "high",
+      });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"))).toMatchObject({
+        model: "claude-sonnet-5-5",
+        model_routing: { status: "selected", provider: "anthropic", wire_model: "claude-sonnet-5-5", effort: "high", endpoint: "/v1/messages" },
+      });
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
+    });
+
+    test("rejects a native selection when only another provider's endpoint lists the model", async () => {
+      setupNativeRoutingFixture({
+        engine: "claude",
+        provider: "anthropic",
+        wireModel: "claude-sonnet-5",
+        selectedEndpoint: "/v1/messages",
+        upstreamEndpoint: "/v1/messages",
+        supportedEndpoints: ["/v1/messages"],
+        efforts: ["low", "medium", "high", "max"],
+        effort: "high",
+        reflectProvider: "copilot",
+      });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({ status: "rejected", failure_code: "invalid_selection" });
+    });
+
+    test("corroborates a native OpenAI endpoint override forwarded upstream as /v1/responses", async () => {
+      setupNativeRoutingFixture({
+        engine: "codex",
+        provider: "openai",
+        wireModel: "gpt-5.4",
+        selectedEndpoint: "/chat/completions",
+        outcomeEndpoint: "/responses",
+        upstreamEndpoint: "/v1/responses",
+        supportedEndpoints: ["chat_completions", "responses"],
+        efforts: ["none", "low", "medium", "high", "xhigh"],
+        effort: "high",
+      });
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({
+        status: "selected",
+        provider: "openai",
+        endpoint: "/responses",
+        selected_endpoint: "/chat/completions",
+      });
+    });
+
     test("records selected AWF model and mapped effort in aw_info and step outputs", async () => {
       process.env.GH_AW_TMP_DIR = tmpDir;
       process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";
