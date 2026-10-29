@@ -330,8 +330,6 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
     const finalDiagnosticWindow = safeStdio.slice(-8000).split(/\r?\n/).slice(-20).join("\n");
     const evidence = collectAgentErrorEvidence(finalDiagnosticWindow, events, rawSourceEngine);
     for (const line of evidence.diagnostics.slice().reverse()) {
-      // Process bookkeeping is not engine stderr and must not hide a preceding exception.
-      if (/^\[(?:copilot|claude|codex)-harness\].*\bprocess (?:closed|exit event)\b/.test(line)) continue;
       let summary = agentErrorSummaryText(line, [], rawSourceEngine);
       const category = classifyDriverStderr(line);
       const crashed = ["dependency_loading", "syntax_error", "runtime_exception", "out_of_memory", "process_startup"].includes(category);

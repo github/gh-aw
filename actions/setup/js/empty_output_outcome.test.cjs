@@ -402,6 +402,15 @@ describe("empty output outcome", () => {
     expect(outcome.details).not.toContain("private-recovered-error");
   });
 
+  it("preserves a final timeout over a recovered runtime exception", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "143");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: private-recovered-error\n[copilot-harness] attempt 2: process closed exitCode=143 signal=SIGTERM watchdogFired=false\n");
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe("engine_outage");
+    expect(outcome.details).toContain("Last driver stderr summary: Engine error: Engine timed out");
+    expect(outcome.details).not.toContain("private-recovered-error");
+  });
+
   it("does not classify a stale diagnostic beyond the final tail", () => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: old failure\n" + "noise\n".repeat(21));

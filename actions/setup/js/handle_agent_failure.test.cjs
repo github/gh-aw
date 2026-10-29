@@ -1589,7 +1589,7 @@ describe("handle_agent_failure", () => {
     });
 
     it.each([
-      ["crash", "TypeError: private-driver-payload\n", "process.kill(process.pid, 'SIGKILL')", 137, "driver_crash", "engine driver crashed"],
+      ["crash", "TypeError: private-driver-payload\n", "process.exit(139)", 139, "driver_crash", "engine driver crashed"],
       ["outage", "CAPIError: 503 Service Unavailable\n", "process.exit(1)", 1, "engine_outage", "experienced an engine outage"],
     ])("publishes exit details and final error summaries for a simulated driver %s", async (_kind, finalError, termination, exitCode, failureCause, titleSuffix) => {
       syncRuntimePromptTemplates(import.meta.url);
@@ -1644,8 +1644,8 @@ describe("handle_agent_failure", () => {
         expect(body).toContain("Last engine error lines (summarized");
         expect(body).toContain("Provider server error after retries");
         if (failureCause === "driver_crash") {
-          expect(body).toContain("Driver exit signal (inferred from exit code): SIGKILL");
-          expect(body).toContain("Driver exit meaning: Terminated by SIGKILL");
+          expect(body).toContain("Driver exit signal (inferred from exit code): SIGSEGV");
+          expect(body).toContain("Driver exit meaning: Terminated by SIGSEGV");
           expect(body).toContain("Driver execution failed (unhandled JavaScript exception)");
         } else {
           expect(body).not.toContain("Failure classification: driver_crash");
