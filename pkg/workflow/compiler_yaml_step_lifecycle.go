@@ -8,6 +8,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow/compilerenv"
+	"github.com/goccy/go-yaml"
 )
 
 var compilerYamlStepLifecycleLog = logger.New("workflow:compiler_yaml:steps")
@@ -23,7 +24,45 @@ func (c *Compiler) generatePreSteps(yaml *strings.Builder, data *WorkflowData) {
 }
 
 func (c *Compiler) generatePostSteps(yaml *strings.Builder, data *WorkflowData) {
-	writeStepsSection(yaml, data.PostSteps)
+	_, late := splitSafeOutputsPostSteps(data.PostSteps)
+	writeStepsSection(yaml, late)
+}
+
+// Only move a self-contained prefix: ordinary post-steps retain their ordering
+// and artifact uploads remain after secret redaction.
+func splitSafeOutputsPostSteps(source string) (early, late string) {
+	var section struct {
+		Steps []map[string]any `yaml:"post-steps"`
+	}
+	if err := yaml.Unmarshal([]byte(source), &section); err != nil {
+		return "", source
+	}
+	count := 0
+	for _, step := range section.Steps {
+		if !IsLiteralSafeOutputsToolStep(step) {
+			break
+		}
+		count++
+	}
+	if count == 0 {
+		return "", source
+	}
+	encode := func(steps []map[string]any) (string, error) {
+		if len(steps) == 0 {
+			return "", nil
+		}
+		encoded, err := yaml.Marshal(map[string]any{"post-steps": steps})
+		return string(encoded), err
+	}
+	early, err := encode(section.Steps[:count])
+	if err != nil {
+		return "", source
+	}
+	late, err = encode(section.Steps[count:])
+	if err != nil {
+		return "", source
+	}
+	return early, late
 }
 
 func (c *Compiler) generatePreAgentSteps(yaml *strings.Builder, data *WorkflowData) {

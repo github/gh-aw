@@ -98,6 +98,8 @@ Useful for artifact uploads, summaries, cleanup, or triggering downstream workfl
 Post-steps must not create issues directly, read safe-output files, or expose secrets through a step-level `env` section. Avoid uploading the entire `/tmp/gh-aw/` directory, which can contain protected safe-output files.
 Use [`safe-outputs.create-issue`](/gh-aw/reference/safe-outputs/) to publish agent-generated issues instead.
 
+A leading sequence of standalone `safeoutputs <tool> '<JSON>'` post-steps runs before MCP gateway shutdown, secret redaction, and output collection. This allows deterministic tool calls to use the configured safe-output validation and processing pipeline. These steps support only `name`, `run`, `shell` (`bash` or `sh`), and `if` set to `success()`, `failure()`, or `always()`. JSON must be a literal single-quoted object without Actions expressions. Ordinary post-steps retain their later execution order; tool calls after an ordinary post-step are not moved before teardown. [`gh aw fix`](/gh-aw/setup/cli/#fix) migrates a narrow subset of direct file appends to this form.
+
 ## Custom Jobs (`jobs:`)
 
 Define custom jobs that run before agentic execution. The agentic execution job waits for all custom jobs to complete. Custom jobs can share data with the agent through artifacts or job outputs.

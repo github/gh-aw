@@ -761,6 +761,11 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 		}
 	}
 
+	// Literal safe-output calls need the live gateway, and their output must be
+	// included in the subsequent redaction and collection passes.
+	earlyPostSteps, _ := splitSafeOutputsPostSteps(data.PostSteps)
+	writeStepsSection(yaml, earlyPostSteps)
+
 	// Stop MCP gateway after agent execution and before secret redaction
 	// This ensures the gateway process is properly cleaned up
 	// The MCP gateway is always enabled, even when agent sandbox is disabled

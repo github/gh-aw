@@ -143,6 +143,7 @@ func TestGetAllCodemods_ContainsExpectedCodemods(t *testing.T) {
 		"mentions-allow-team-members-to-allowed-collaborators",
 		"engine-copilot-sdk-driver-to-driver",
 		"request-review-policy-normalization",
+		"post-steps-safe-outputs-append",
 		"post-steps-safe-outputs-guided-error",
 		"pull-request-target-guided-error",
 	}
@@ -278,6 +279,7 @@ func expectedCodemodOrder() []string {
 		"mentions-allow-team-members-to-allowed-collaborators",
 		"engine-copilot-sdk-driver-to-driver",
 		"request-review-policy-normalization",
+		"post-steps-safe-outputs-append",
 		"post-steps-safe-outputs-guided-error",
 		"pull-request-target-guided-error",
 	}
