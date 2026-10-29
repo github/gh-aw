@@ -79,3 +79,6 @@ metrics/latest.json (2026-10-26) partial but usable: 443 runs/123 workflows, 85.
 
 ## Run 2026-10-27T13:00Z
 latest.json (2026-10-27, partial): 405 runs, 84.4% success. ai-moderator 3/22 ok; smoke-gemini/pi 0/2; DDG 87%; Pocock 94% (718k tokens, redesign candidate); impeccable 0 runs. Discussion posted; no issues.
+
+## Run 2026-10-29T12:47Z
+metrics/latest.json now dated 2026-10-29 but collection_status=partial; workflow_runs data unavailable (zero placeholders), 1.5h coverage. Ranking deferred; no discussion/issue filed.
