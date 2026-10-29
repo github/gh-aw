@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-08",
-    "workflow_name": "PR Sous Chef",
-    "workflow_file": "pr-sous-chef",
-    "total_aic_analyzed": 223.02,
-    "runs_audited": 11,
-    "recommendations_count": 3,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 18
-  },
-  {
     "date": "2026-09-09",
     "workflow_name": "CI Optimization Coach",
     "workflow_file": "ci-coach",
@@ -292,6 +282,16 @@
     "workflow_file": "claude-code-user-docs-review",
     "total_aic_analyzed": 82.37,
     "runs_audited": 1,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 20
+  },
+  {
+    "date": "2026-10-29",
+    "workflow_name": "Matt Pocock Skills Reviewer",
+    "workflow_file": "mattpocock-skills-reviewer",
+    "total_aic_analyzed": 305.69,
+    "runs_audited": 3,
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 20
