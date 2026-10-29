@@ -1,10 +1,11 @@
 ---
 private: true
 emoji: "🧪"
-description: Daily scan of Go packages for missing test coverage and automatic addition of test stubs using Aider
+description: Weekly assertion-based Go tests that must measurably improve production coverage before opening a PR
 on:
-  schedule: daily
+  schedule: weekly
   workflow_dispatch:
+  skip-if-match: 'is:pr is:open in:body "gh-aw-tracker-id: daily-go-test-stubs-aider"'
 permissions:
   copilot-requests: write
   contents: read
@@ -28,9 +29,10 @@ tools:
   bash:
     - "*"
 safe-outputs:
-  steer: true
   create-pull-request:
-    expires: 2d
+    max: 1
+    allowed-files:
+      - "pkg/**/aider_coverage_test.go"
     title-prefix: "[aider] "
     labels: [automation, testing]
     draft: false
@@ -46,51 +48,66 @@ features:
 
 # Daily Go Test Stubs — Aider
 
-You are an automated coding agent that improves Go test coverage by finding untested packages and adding
-minimal test stubs. Aider has no MCP client; invoke safe-output tools through
-the `safeoutputs` MCP CLI. Follow the Aider execution constraints above: one shell command per line, and
-no heredocs. Use the supplied command to generate stubs, not model-authored edits.
+Improve real Go behavior coverage, not the number of test files. The legacy workflow
+name/path is retained for continuity. Aider has no MCP client; use the `safeoutputs`
+MCP CLI. Use one shell command per line, no heredocs, and SEARCH/REPLACE blocks for edits.
+Never create skipped tests, placeholders, empty tests, or tests that merely call code
+without checking its result. A quiet run is better than a low-value PR.
 
-## Step 1 — Generate stubs for packages with no test files
+## Step 1 — Measure a bounded coverage gap
 
-No source files need to be attached before starting. Your first reply must put
-this exact command in a fenced `bash` block. It discovers packages and creates
-stubs for at most three of them using their actual Go package names.
+No files need to be attached. Your first reply must run this exact command.
+It inspects at most three small, non-generated library packages, prefers recent
+changes, records a fresh baseline, and prints the selected production source,
+coverage by function, and existing tests. It does not generate tests.
+An existing open PR from this workflow suppresses further work until reviewed.
 
 ```bash
-workspace="$(pwd -P)" && go list -f '{{if and (not .TestGoFiles) (not .XTestGoFiles)}}{{.Dir}} {{.Name}}{{end}}' ./... > /tmp/gh-aw/agent/aider-untested-packages && count=0 && while IFS= read -r row; do if [ -n "$row" ]; then directory="${row% *}"; package="${row##* }"; resolved="$(realpath -- "$directory")" || exit 1; case "$resolved" in "$workspace"|"$workspace"/*) ;; *) printf 'Refusing to write outside workspace: %s\n' "$resolved" >&2; exit 1 ;; esac; (set -C; printf 'package %s\n\nimport "testing"\n\nfunc TestPlaceholder_TODO(t *testing.T) {\n\tt.Skip("not yet implemented")\n}\n' "$package" > "$resolved/${package}_test.go") || exit 1; printf '%s %s\n' "$resolved" "$package"; count=$((count + 1)); if [ "$count" -eq 3 ]; then break; fi; fi; done < /tmp/gh-aw/agent/aider-untested-packages
+python3 scripts/aider_go_test_coverage.py discover
 ```
 
-The command prints one directory and package name for each created stub. It
-excludes packages with internal or external tests, testdata, hidden directories,
-and nested modules. Existing files are never overwritten. If the command fails,
-report incomplete; an error is not evidence that all packages have tests.
+Consume its output before editing. A discovery/test/tool failure is incomplete,
+not evidence that coverage is complete. Do not retry with insecure TLS settings.
 
-## Step 2 — Inspect the generation result
+## Step 2 — Add one useful test file
 
-Read the returned command output and exit status on the next reflection.
-The generated `<package>_test.go` files already declare the correct package,
-import `"testing"`, and contain `TestPlaceholder_TODO` with
-`t.Skip("not yet implemented")`. For example, a command package in a hyphenated
-directory declares `package main`, not a name derived from that directory.
-Do not rewrite the generated declarations or repeat generation.
+Choose an uncovered function whose behavior is clear from the printed source.
+Prefer a branch returning a literal string, boolean, or integer: the publication
+gate must prove the new tests detect an incorrect return value.
+In exactly the printed `TARGET` file, write real tests with explicit expected
+results, including a normal case and an error/boundary case where applicable.
+Use the actual package declaration and existing assertion style. Tests should
+catch an incorrect return value or branch condition, not just execute a function.
+Do not change production code, existing tests, modules, workflow files, skills,
+or the helper. Do not rerun discovery or modify its baseline.
 
-## Step 3 — Commit and create the pull request
+## Step 3 — Verify the improvement and publish only that file
 
-If any stubs were created, run these commands (one per line):
+After adding tests, run this command. It formats only the target file, runs the
+whole selected package's tests without the test cache, and requires strictly
+more covered production statements with no lost baseline coverage. It rejects
+skips, placeholders, missing assertions, existing-file edits, and unrelated
+files. It also checks up to three mutations of newly covered literal returns
+using temporary Go compiler overlays. At least one mutation must fail an assertion
+in the new tests alone, not just an existing test or compilation. Production files
+are never edited by these probes. Coverage without this behavioral witness is
+insufficient. Only the verified new test file is staged, never Aider history or skills.
+The PR includes measured before/after coverage; no speculative coverage claims.
 
 ```bash
-make fmt-go && go test ./... -run '^TestPlaceholder_TODO$' && git checkout -b add-test-stubs-$GITHUB_RUN_ID && git add -A && git commit -m "Add test stubs for uncovered packages" && safeoutputs create_pull_request --title "Add test stubs for uncovered packages" --body "Automatically generated test stubs for packages with zero test coverage. Stubs use t.Skip and are ready to be filled in." --branch "add-test-stubs-$GITHUB_RUN_ID" || safeoutputs report_incomplete --reason "Could not format, test, commit, or submit the generated test stubs — no pull request confirmed."
+python3 scripts/aider_go_test_coverage.py publish || safeoutputs report_incomplete --reason "Could not verify a real coverage gain or publish the focused test improvement; no pull request confirmed."
 ```
 
-If no packages needed stubs (all packages already had tests), run instead:
+Only if discovery succeeded with `NO_CANDIDATE`, or source inspection establishes
+no useful bounded assertion-based test, run instead (do not claim every package
+is covered):
 
 ```bash
-safeoutputs noop --message "All Go packages already have test files — no stubs needed."
+safeoutputs noop --message "No useful bounded coverage improvement found; no placeholder PR created."
 ```
 
 ## Step 4 — Exit rule
 
 **Always** invoke exactly one `safeoutputs` CLI command before finishing.
-Use `report_incomplete` for failed or unfinished work; `noop` is only for a confirmed
-absence of packages needing stubs.
+Use `report_incomplete` for failed discovery, failed tests, unchanged coverage,
+or unfinished work. Never publish a partial improvement or fix a gate by weakening it.
