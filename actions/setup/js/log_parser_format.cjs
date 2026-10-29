@@ -788,7 +788,7 @@ function createLogParserFormatters(deps) {
       appendStatistics(statistics, entries, collectToolUsePairs(entries), true);
       const visibleStats = boundSummaryLines(statistics, 16 * 1024, maxLineBytes);
       const statsFence = buildSafeOuterCodeFence(visibleStats);
-      preamble = `### Agent session\n\n${statsFence}\n${visibleStats.join("\n")}\n${statsFence}\n\n<details><summary>Trace details</summary>\n\n`;
+      preamble = buildStepSummaryDetailsSection("Agent session", `${statsFence}\n${visibleStats.join("\n")}\n${statsFence}`) + "<details><summary>Trace details</summary>\n\n";
     }
     const tail = standard ? "\n\n</details>" : "";
     const budget = MAX_STEP_SUMMARY_SIZE - Buffer.byteLength(preamble + tail, "utf8") - 2 * (maxLineBytes + 1) - 3;

@@ -271,9 +271,15 @@ describe("standard agent trace rendering", () => {
 
   it("uses progressive disclosure with outcomes before the detailed trace", () => {
     const output = generateCopilotCliStyleSummary(trace);
-    expect(output.startsWith("### Agent session\n")).toBe(true);
-    expect(output.indexOf("Tools: 1/4 succeeded")).toBeLessThan(output.indexOf("<details><summary>Trace details</summary>"));
-    expect(output).toContain("\n</details>");
+    expect(output.startsWith("<details>\n<summary>Agent session</summary>\n\n```\n")).toBe(true);
+    const statsEnd = output.indexOf("\n</details>");
+    expect(output.indexOf("Tools: 1/4 succeeded")).toBeLessThan(statsEnd);
+    expect(output.indexOf("Cache Read Tokens: 0")).toBeLessThan(statsEnd);
+    expect(statsEnd).toBeLessThan(output.indexOf("<details><summary>Trace details</summary>"));
+    expect(output.match(/^<details>/gm)).toHaveLength(2);
+    expect(output.match(/^<\/details>$/gm)).toHaveLength(2);
+    expect(output.endsWith("\n\n</details>")).toBe(true);
+    expect(output).not.toContain("### Agent session");
     expect(output).not.toContain("<details open>");
   });
 
