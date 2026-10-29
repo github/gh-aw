@@ -30,6 +30,10 @@ AGENT_FILES="AGENTS.md CLAUDE.md GEMINI.md"
 
 REAL_DEST="/tmp/gh-aw/base"
 
+extract_snapshot() {
+  tar -xf "${REAL_DEST}/snapshot.tar" -C "${REAL_DEST}"
+}
+
 cleanup() {
   rm -rf "${TEST_WORKSPACE:-}" "${REAL_DEST}"
 }
@@ -57,6 +61,7 @@ rm -rf "${REAL_DEST}"
 GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
   GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${SAVE_SCRIPT}" >/dev/null 2>&1
 
+extract_snapshot
 assert "saves .github" "[ -d '${REAL_DEST}/.github' ]"
 assert "saves SKILL.md" "[ -f '${REAL_DEST}/.github/skills/SKILL.md' ]"
 assert "saves .agents" "[ -d '${REAL_DEST}/.agents' ]"
@@ -79,6 +84,7 @@ GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
   GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${SAVE_SCRIPT}" >/dev/null 2>&1
 EXIT_CODE=$?
 
+extract_snapshot
 assert "exits 0" "[ ${EXIT_CODE} -eq 0 ]"
 assert "saves .github" "[ -d '${REAL_DEST}/.github' ]"
 assert ".agents not created when absent" "[ ! -d '${REAL_DEST}/.agents' ]"
@@ -110,10 +116,13 @@ echo "new content" >"${TEST_WORKSPACE}/.github/new.md"
 # Pre-create a stale snapshot with different content
 mkdir -p "${REAL_DEST}/.github"
 echo "stale content" >"${REAL_DEST}/.github/stale.md"
+tar -cf "${REAL_DEST}/snapshot.tar" -C "${REAL_DEST}" .github
+rm -rf "${REAL_DEST}/.github"
 
 GH_AW_AGENT_FOLDERS="${AGENT_FOLDERS}" GH_AW_AGENT_FILES="${AGENT_FILES}" \
   GITHUB_WORKSPACE="${TEST_WORKSPACE}" bash "${SAVE_SCRIPT}" >/dev/null 2>&1
 
+extract_snapshot
 assert "new file present after re-run" "[ -f '${REAL_DEST}/.github/new.md' ]"
 assert "stale file removed on re-run" "[ ! -f '${REAL_DEST}/.github/stale.md' ]"
 rm -rf "${TEST_WORKSPACE}" "${REAL_DEST}"

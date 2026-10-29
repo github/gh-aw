@@ -674,6 +674,7 @@ async function main() {
     }
 
     // Set output to indicate successful checkout
+    core.setOutput("checked_out", "true");
     core.setOutput("checkout_pr_success", "true");
   } catch (error) {
     const errorMsg = redactCheckoutDiagnostics(getErrorMessage(error));
