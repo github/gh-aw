@@ -58,7 +58,7 @@ var permissionsCompilerLog = logger.New("workflow:permissions_compiler_validator
 // permissions, GitHub App-only constraints, MCP app write restrictions, workflow_run
 // branch security, GitHub MCP toolset permissions, and the id-token write reminder.
 // It returns the parsed *Permissions for reuse in subsequent validation steps.
-func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath string) (*Permissions, error) {
+func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath string) (*Permissions, error) { //nolint:largefunc // Orchestrates the ordered permission validation pipeline.
 	// Use the cached *Permissions object when available to avoid repeated YAML parsing.
 	// CachedPermissions is populated by applyDefaults after all permission mutations are applied.
 	// Fall back to parsing from the raw string for code paths that bypass applyDefaults
@@ -195,15 +195,12 @@ OIDC tokens can authenticate to cloud providers (AWS, Azure, GCP).
 Ensure proper audience validation and trust policies are configured.`
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "info", infoMsg))
 	}
-	if !c.quiet && shouldEmitCopilotRequestsEnableTip(workflowData, workflowPermissions) && !c.repositoryOwnerIsIndividualUser() {
-		if !c.copilotRequestsTipShown[markdownPath] {
-			if c.batchMode {
-				c.copilotTipNeeded = true
-			} else {
-				tipMsg := `Tip: set permissions.copilot-requests: write to use GitHub Actions token-based inference with the Copilot engine instead of a personal access token (COPILOT_GITHUB_TOKEN). This option requires that your organization has centralized Copilot billing enabled and may not be available in all organizations. To suppress this tip when using a PAT, set permissions.copilot-requests: none — see https://github.github.com/gh-aw/reference/billing/ for details.`
-				fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "info", tipMsg))
-			}
-			c.copilotRequestsTipShown[markdownPath] = true
+	if (!c.quiet || c.batchMode) && shouldEmitCopilotRequestsEnableTip(workflowData, workflowPermissions) && !c.repositoryOwnerIsIndividualUser() {
+		if c.batchMode {
+			c.copilotTipNeeded = true
+		} else {
+			tipMsg := `Tip: set permissions.copilot-requests: write to use GitHub Actions token-based inference with the Copilot engine instead of a personal access token (COPILOT_GITHUB_TOKEN). This option requires that your organization has centralized Copilot billing enabled and may not be available in all organizations. To suppress this tip when using a PAT, set permissions.copilot-requests: none — see https://github.github.com/gh-aw/reference/billing/ for details.`
+			c.emitTipOnce(markdownPath, tipMsg)
 		}
 	}
 

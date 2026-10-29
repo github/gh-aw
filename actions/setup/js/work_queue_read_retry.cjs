@@ -3,6 +3,15 @@
 
 const TRANSIENT_CODES = new Set(["ETIMEDOUT", "ECONNRESET", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT"]);
 
+async function metadataRequest(read) {
+  // Octokit's fetch transport uses AbortSignal, not the legacy timeout option.
+  const request = { retries: 0, retryCount: 0, signal: AbortSignal.timeout(15000) };
+  const response = await read(request);
+  // Octokit can swallow a body-read abort and return an empty successful payload.
+  if (request.signal.aborted) throw Object.assign(new Error("work queue metadata request timed out", { cause: request.signal.reason }), { code: "ETIMEDOUT" });
+  return response;
+}
+
 function isTransientQueueReadError(error) {
   let transient = false;
   for (let depth = 0; depth < 5 && error && typeof error === "object"; depth++, error = error.cause) {
@@ -32,4 +41,4 @@ async function readQueueMetadata(read, log, event, sleepFn = delay => new Promis
   }
 }
 
-module.exports = { isTransientQueueReadError, readQueueMetadata };
+module.exports = { isTransientQueueReadError, readQueueMetadata, metadataRequest };

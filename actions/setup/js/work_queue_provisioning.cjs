@@ -5,22 +5,13 @@ const { TextDecoder } = require("node:util");
 const { posix } = require("node:path");
 const { queueError } = require("./work_queue_codec.cjs");
 const { validatePolicy, validateProfile } = require("./work_queue_policy.cjs");
-const { readQueueMetadata } = require("./work_queue_read_retry.cjs");
+const { readQueueMetadata, metadataRequest } = require("./work_queue_read_retry.cjs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("provisioning");
 
 const MAX_WORKFLOW_BYTES = 1024 * 1024;
 
 /** @typedef {{rest: {repos: {getContent(options: {owner: string, repo: string, path: string, ref: string, request: object}): Promise<{data: unknown}>}, actions: {getWorkflow(options: {owner: string, repo: string, workflow_id: string, request: object}): Promise<{data: unknown}>}}}} RouteClient */
 /** @typedef {ReturnType<typeof import("./work_queue_policy.cjs").defaultPolicy>["pools"]["default"]["profiles"]["default"]} WorkerProfile */
-
-async function metadataRequest(read) {
-  // Octokit's fetch transport uses AbortSignal, not the legacy timeout option.
-  const request = { retries: 0, retryCount: 0, signal: AbortSignal.timeout(15000) };
-  const response = await read(request);
-  // Octokit can swallow a body-read abort and return an empty successful payload.
-  if (request.signal.aborted) throw Object.assign(new Error("work queue metadata request timed out", { cause: request.signal.reason }), { code: "ETIMEDOUT" });
-  return response;
-}
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function isRecord(value) {

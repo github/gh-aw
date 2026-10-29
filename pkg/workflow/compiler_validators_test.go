@@ -649,7 +649,7 @@ func TestValidatePermissions_UsesCachedPermissionScopeValidation(t *testing.T) {
 	require.ErrorContains(t, err, cachedErr.Error())
 }
 
-func TestValidatePermissions_EmitsCopilotRequestsTipOncePerMarkdownPath(t *testing.T) {
+func TestValidatePermissions_EmitsCopilotRequestsTipOncePerCompiler(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "perms-tip-once-test")
 	markdownPath := filepath.Join(tmpDir, "test.md")
 
@@ -669,11 +669,41 @@ func TestValidatePermissions_EmitsCopilotRequestsTipOncePerMarkdownPath(t *testi
 		require.NoError(t, err)
 		_, err = compiler.validatePermissions(workflowData, markdownPath)
 		require.NoError(t, err)
+		compiler.ResetWarningCount()
+		_, err = compiler.validatePermissions(workflowData, filepath.Join(tmpDir, "another.md"))
+		require.NoError(t, err)
 	})
 
 	const tipText = "Tip: set permissions.copilot-requests: write to use GitHub Actions token-based inference"
-	assert.Equal(t, 1, strings.Count(stderr, tipText), "copilot-requests tip should be emitted only once per markdown path")
+	assert.Equal(t, 1, strings.Count(stderr, tipText), "copilot-requests tip should be emitted only once across workflows")
 	assert.Contains(t, stderr, "To suppress this tip when using a PAT, set permissions.copilot-requests: none")
+
+	stderr = testutil.CaptureStderr(t, func() {
+		_, err := NewCompiler().validatePermissions(workflowData, markdownPath)
+		require.NoError(t, err)
+	})
+	assert.Equal(t, 1, strings.Count(stderr, tipText), "a new compiler should emit the tip again")
+}
+
+func TestValidatePermissions_BatchCollectsCopilotRequestsTip(t *testing.T) {
+	workflowData := &WorkflowData{
+		AI:           "copilot",
+		Permissions:  "permissions:\n  contents: read\n",
+		EngineConfig: &EngineConfig{ID: "copilot"},
+	}
+	compiler := NewCompiler()
+	compiler.SetBatchMode(true)
+	compiler.SetQuiet(true)
+
+	stderr := testutil.CaptureStderr(t, func() {
+		for _, path := range []string{"first.md", "second.md"} {
+			_, err := compiler.validatePermissions(workflowData, path)
+			require.NoError(t, err)
+		}
+	})
+
+	assert.Empty(t, stderr)
+	assert.True(t, compiler.CopilotRequestsTipNeeded())
 }
 
 func TestValidatePermissions_QuietSuppressesCopilotRequestsTip(t *testing.T) {

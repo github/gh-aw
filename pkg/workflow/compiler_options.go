@@ -76,24 +76,24 @@ func NewCompiler(opts ...CompilerOption) *Compiler {
 
 	// Create compiler with defaults
 	c := &Compiler{
-		ctx:                     context.Background(), // Default context; override with SetContext
-		verbose:                 false,
-		engineOverride:          "",
-		version:                 version,
-		skipValidation:          true, // Skip validation by default for now since existing workflows don't fully comply
-		jobManager:              NewJobManager(),
-		engineRegistry:          engineRegistry,
-		engineCatalog:           NewEngineCatalog(engineRegistry),
-		stepOrderTracker:        NewStepOrderTracker(),
-		artifactManager:         NewArtifactManager(),
-		actionPinWarnings:       make(map[string]bool), // Initialize warning cache
-		priorManifests:          make(map[string]*GHAWManifest),
-		ownerTypeCache:          make(map[string]string),        // Initialize owner-type cache (keyed by owner login)
-		copilotRequestsTipShown: make(map[string]bool),          // Initialize one-time tip tracking (keyed by markdown path)
-		featureUsage:            make(map[string]int),           // Initialize batch feature usage counts
-		permissionWarningShown:  make(map[string]string),        // Initialize one-time permission warning tracking (keyed by markdown path)
-		allowedDomainsCache:     make(map[string]allowedDomain), // Initialize allowed-domains cache (keyed by markdown path)
-		gitRoot:                 gitRoot,                        // Auto-detected git root
+		ctx:                    context.Background(), // Default context; override with SetContext
+		verbose:                false,
+		engineOverride:         "",
+		version:                version,
+		skipValidation:         true, // Skip validation by default for now since existing workflows don't fully comply
+		jobManager:             NewJobManager(),
+		engineRegistry:         engineRegistry,
+		engineCatalog:          NewEngineCatalog(engineRegistry),
+		stepOrderTracker:       NewStepOrderTracker(),
+		artifactManager:        NewArtifactManager(),
+		actionPinWarnings:      make(map[string]bool), // Initialize warning cache
+		priorManifests:         make(map[string]*GHAWManifest),
+		ownerTypeCache:         make(map[string]string),        // Initialize owner-type cache (keyed by owner login)
+		tipsShown:              make(map[string]bool),          // Initialize one-time tip tracking (keyed by message)
+		featureUsage:           make(map[string]int),           // Initialize batch feature usage counts
+		permissionWarningShown: make(map[string]string),        // Initialize one-time permission warning tracking (keyed by markdown path)
+		allowedDomainsCache:    make(map[string]allowedDomain), // Initialize allowed-domains cache (keyed by markdown path)
+		gitRoot:                gitRoot,                        // Auto-detected git root
 	}
 
 	// Apply functional options

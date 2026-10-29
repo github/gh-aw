@@ -77,6 +77,7 @@ type AuditData struct {
 	WorkQueue                  *WorkQueueReport         `json:"work_queue,omitempty"`
 	Friction                   *FrictionCostSummary     `json:"friction,omitempty"`
 	EvidenceSearch             *AuditEvidenceSearch     `json:"evidence_search,omitempty"`
+	ModelCatalog               *AuditModelCatalog       `json:"model_catalog,omitempty"`
 }
 
 // AuditFinding represents a key insight discovered during audit
