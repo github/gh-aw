@@ -128,7 +128,8 @@ describe("authenticated native queue runs", () => {
     ).resolves.toMatchObject({ authenticated: true, run_id: run.id, principal: "11", ref });
     expect(githubClient.rest.repos.get).toHaveBeenCalledTimes(1);
     expect(read).toHaveBeenCalledTimes(3);
-    for (const [parameters] of read.mock.calls) expect(parameters).toEqual(read.mock.calls[0][0]);
+    for (const [parameters] of read.mock.calls) expect(parameters).toMatchObject({ ...read.mock.calls[0][0], request: { ...read.mock.calls[0][0].request, signal: expect.any(AbortSignal) } });
+    expect(new Set(read.mock.calls.map(([parameters]) => parameters.request.signal)).size).toBe(3);
     expect(read.mock.calls[0][0]).toMatchObject({ run_id: run.id, request: { retries: 0, retryCount: 0, timeout: 15000 } });
     expect(sleepFn.mock.calls).toEqual([[1000], [1000]]);
   });
@@ -206,7 +207,9 @@ describe("authenticated native queue runs", () => {
     const githubClient = nativeClient({ getWorkflowRun, getWorkflowRunAttempt });
     expect(validateNativeRun(await fetchNativeRunAttempt(githubClient, expected.repository, run.id, 1), { ...expected, run_id: run.id })).toMatchObject({ run_id: run.id, run_attempt: 1 });
     expect(getWorkflowRun).not.toHaveBeenCalled();
-    expect(getWorkflowRunAttempt).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ run_id: run.id, attempt_number: 1, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0, timeout: 15000 } }));
+    expect(getWorkflowRunAttempt).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ run_id: run.id, attempt_number: 1, headers: { "X-GitHub-Api-Version": API_VERSION }, request: { retries: 0, retryCount: 0, timeout: 15000, signal: expect.any(AbortSignal) } })
+    );
   });
 
   it("classifies only the retryable native verification failures as transient", () => {
