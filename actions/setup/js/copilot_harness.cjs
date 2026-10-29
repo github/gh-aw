@@ -49,7 +49,7 @@
 
 "use strict";
 
-const { iterateJsonl } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, readJsonlFile } = require("./jsonl_helpers.cjs");
 require("./shim.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -105,7 +105,7 @@ const COPILOT_ROUTING_POLICY = getAWFModelRoutingPolicy("copilot");
 const { loadModelsJson } = require("./model_costs.cjs");
 const { applyCopilotWireAPI: configureCopilotWireAPI, warnCopilotSubagentEndpoints, recordModelEndpointMismatch, getSupportedEndpoints, MODEL_ENDPOINT_FIX } = require("./copilot_wire_api.cjs");
 const { loadModelAliasMap, resolveEngineModel, normalizeForCopilotCLI, ModelAliasResolutionError, recordModelResolution, splitModelIdentifier } = require("./resolve_model_alias.cjs");
-const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
+const { COPILOT_MODEL_VERIFICATION_EXIT_CODE, copilotSessionStateDirectories, createCopilotModelObserver, readCopilotModelSubstitution, recordCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { getEngineSubAgentTarget } = require("./extract_inline_sub_agents.cjs");
 const { inlineArtifactTarget } = require("./inline_artifact_target.cjs");
 const MODEL_NOT_SUPPORTED_PATTERN = /The requested model is not supported|No model available\b[^\n]*policy enablement/i;
@@ -1224,6 +1224,49 @@ function isCopilotContentFilterError(output) {
   return false;
 }
 
+/** @param {Iterable<any>} events @returns {boolean} */
+function isCopilotToolSearchOnlyCompletion(events) {
+  let message;
+  for (const event of events) {
+    const context = copilotSessionContext(event);
+    if (context.agentId !== undefined || context.parentToolUseId) continue;
+    if (event?.type === "assistant.message") message = event.data;
+    if (event?.type === "assistant.refusal") message = undefined;
+  }
+  return (
+    !!message &&
+    (message.content === "" || message.content === null) &&
+    Array.isArray(message.toolRequests) &&
+    message.toolRequests.length === 0 &&
+    !getCopilotMessageRefusal(message) &&
+    message.serverTools?.provider === "openai-responses" &&
+    Array.isArray(message.serverTools.items) &&
+    message.serverTools.items.length > 0 &&
+    message.serverTools.items.every(item => item?.type === "tool_search_call" && item.execution === "server" && item.status === "completed")
+  );
+}
+
+/**
+ * Native CLI stdout is plain text; inspect only this invocation's exact session.
+ * Never select another session by recency in a shared HOME.
+ * @param {string} output
+ * @param {string | undefined} sessionId
+ * @returns {boolean}
+ */
+function hasCopilotToolSearchOnlyCompletion(output, sessionId) {
+  if (sessionId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(sessionId)) {
+    for (const directory of copilotSessionStateDirectories()) {
+      try {
+        return isCopilotToolSearchOnlyCompletion(readJsonlFile(path.join(directory, sessionId, "events.jsonl"), { strict: true }));
+      } catch (error) {
+        const missing = error !== null && typeof error === "object" && "code" in error && error.code === "ENOENT";
+        if (!missing) log("Could not inspect Copilot completion events; leaving missing-output validation to the collector");
+      }
+    }
+  }
+  return isCopilotToolSearchOnlyCompletion(iterateJsonl(output));
+}
+
 /**
  * Classify a failed Copilot attempt into a short, named failure class.
  * @param {{
@@ -2108,6 +2151,13 @@ async function main() {
             result.runtimeGuardReason = "copilot_model_verification";
             if (modelSubstitution) result.output += `\n${modelSubstitution}`;
           }
+          if (result.exitCode === 0 && (!safeOutputsPath || !hasTerminalSafeOutput(safeOutputsPath)) && hasCopilotToolSearchOnlyCompletion(result.output, sessionId)) {
+            result.exitCode = 1;
+            result.runtimeGuardReason = "copilot_tool_search_only_completion";
+            log(
+              "Copilot stopped after server-side tool discovery without text, a local tool request, or a terminal safe output. Continuation belongs to Copilot CLI/upstream Responses handling; task completion is unverified. Not retrying to avoid duplicate side effects."
+            );
+          }
           lastHasOutput = result.hasOutput;
           const attemptDetections = detectCopilotErrors(result.output);
           detectedCopilotErrors.inferenceAccessError ||= attemptDetections.inferenceAccessError;
@@ -2118,6 +2168,10 @@ async function main() {
           return result;
         },
         handleFailure: async ({ attempt, result }) => {
+          if (result.runtimeGuardReason === "copilot_tool_search_only_completion") {
+            result.failureClasses = ["copilot_tool_search_only_completion"];
+            return { action: "stop" };
+          }
           if (result.runtimeGuardReason === "copilot_model_verification") {
             result.failureClasses = ["copilot_model_verification"];
             return { action: "stop" };
@@ -2566,6 +2620,8 @@ if (typeof module !== "undefined" && module.exports) {
     detectCopilotErrors,
     classifyCopilotFailure,
     isCopilotContentFilterError,
+    isCopilotToolSearchOnlyCompletion,
+    hasCopilotToolSearchOnlyCompletion,
     extractTokenCountFromOutput,
     shouldRetryFailedExecution,
     shouldContinueCopilotSessionAfterFailure,

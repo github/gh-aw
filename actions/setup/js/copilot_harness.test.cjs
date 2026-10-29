@@ -15,6 +15,8 @@ const {
   buildMissingToolPermissionIssuePayload,
   classifyCopilotFailure,
   isCopilotContentFilterError,
+  isCopilotToolSearchOnlyCompletion,
+  hasCopilotToolSearchOnlyCompletion,
   extractTokenCountFromOutput,
   buildMissingToolAlternatives,
   buildInfrastructureIncompletePayload,
@@ -114,6 +116,115 @@ describe("native invocation model and session selection", () => {
   });
   it.each([["--continue"], ["--resume", "named-session"], ["--resume=prefix"], ["--connect"], ["--session-id", "../other"]])("rejects ambiguous session selection instead of observing shared telemetry (%j)", (...args) => {
     expect(() => prepareCopilotModelSession(args, undefined)).toThrow("Copilot model verification requires");
+  });
+});
+
+describe("Copilot tool-search-only completion", () => {
+  // Shape observed in dotnet/android run 40700757014; no opaque IDs or prompt payloads.
+  const search = {
+    type: "assistant.message",
+    data: {
+      content: "",
+      toolRequests: [],
+      serverTools: { provider: "openai-responses", items: [{ type: "tool_search_call", execution: "server", status: "completed" }] },
+    },
+  };
+  const tempDirs = [];
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it.each(["", null])("recognizes an empty final main response (%j)", content => {
+    expect(isCopilotToolSearchOnlyCompletion([{ ...search, data: { ...search.data, content } }, { type: "session.shutdown" }])).toBe(true);
+  });
+
+  it.each([
+    { content: "Review complete." },
+    { toolRequests: [{ name: "github.pull_request_read" }] },
+    { refusal: "Cannot comply." },
+    { serverTools: { provider: "openai-responses" } },
+    { serverTools: { provider: "openai-responses", items: [{ type: "tool_search_call", execution: "server", status: "in_progress" }] } },
+    { serverTools: { provider: "openai-responses", items: [{ type: "web_search_call", execution: "server", status: "completed" }] } },
+  ])("does not mistake another response for discovery-only completion (%j)", overrides => {
+    expect(isCopilotToolSearchOnlyCompletion([{ ...search, data: { ...search.data, ...overrides } }])).toBe(false);
+  });
+
+  it("uses the last main assistant message and ignores subagents", () => {
+    const done = { type: "assistant.message", data: { content: "Done." } };
+    expect(isCopilotToolSearchOnlyCompletion([search, done])).toBe(false);
+    expect(isCopilotToolSearchOnlyCompletion([done, { ...search, agentId: "child" }])).toBe(false);
+    expect(isCopilotToolSearchOnlyCompletion([done, { ...search, data: { ...search.data, parentToolCallId: "child-call" } }])).toBe(false);
+    expect(isCopilotToolSearchOnlyCompletion([search, { ...done, agentId: "child" }])).toBe(true);
+    expect(isCopilotToolSearchOnlyCompletion([search, { type: "assistant.refusal", data: { reason: "refusal" } }])).toBe(false);
+    expect(isCopilotToolSearchOnlyCompletion([])).toBe(false);
+  });
+
+  it("reads only the exact native session, never another session in shared HOME", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-search-session-"));
+    tempDirs.push(root);
+    vi.stubEnv("COPILOT_HOME", root);
+    vi.stubEnv("GH_AW_TMP_DIR", root);
+    const sessionId = "aabbccdd-1122-3344-5566-778899aabbcc";
+    const dir = path.join(root, "session-state", sessionId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "events.jsonl"), JSON.stringify(search) + "\n");
+    expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", sessionId)).toBe(true);
+    expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", "11223344-1122-3344-5566-778899aabbcc")).toBe(false);
+    expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", "../other")).toBe(false);
+    expect(hasCopilotToolSearchOnlyCompletion(JSON.stringify(search), undefined)).toBe(true);
+    fs.appendFileSync(path.join(dir, "events.jsonl"), '{"type":"assistant.message"');
+    expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", sessionId)).toBe(false);
+  });
+
+  it.each([false, true])("native zero exit is rejected only without a terminal safe output (terminal=%s)", terminal => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-search-exit-"));
+    tempDirs.push(root);
+    const stub = path.join(root, "stub.cjs");
+    const safeOutputs = path.join(root, "safe-outputs.jsonl");
+    const configPath = path.join(root, "awf-config.json");
+    fs.writeFileSync(configPath, "{}");
+    fs.writeFileSync(safeOutputs, terminal ? '{"type":"submit_pull_request_review"}\n' : "");
+    fs.writeFileSync(
+      stub,
+      `const fs = require("fs"), path = require("path");
+const args = process.argv.slice(2);
+const id = args[args.indexOf("--session-id") + 1];
+const dir = path.join(process.env.COPILOT_HOME, "session-state", id);
+fs.mkdirSync(dir, { recursive: true });
+fs.writeFileSync(path.join(dir, "events.jsonl"), JSON.stringify(${JSON.stringify({ ...search, data: { ...search.data, model: "gpt-6.1-sol" } })}) + "\\n");
+process.stdout.write("Skill loaded successfully.\\n");`
+    );
+    const result = spawnSync(process.execPath, [require.resolve("./copilot_harness.cjs"), process.execPath, stub], {
+      cwd: root,
+      env: {
+        PATH: process.env.PATH,
+        HOME: root,
+        TMPDIR: root,
+        GITHUB_WORKSPACE: root,
+        GH_AW_ENGINE_CWD: root,
+        GH_AW_AWF_CONFIG_PATH: configPath,
+        GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
+        GH_AW_HARNESS_MAX_DELAY_MS: "1",
+        COPILOT_HOME: root,
+        COPILOT_MODEL: "gpt-6.1-sol",
+        GH_AW_PHASE: "agent",
+        GH_AW_TMP_DIR: root,
+        GH_AW_SAFE_OUTPUTS: safeOutputs,
+        GH_AW_MODEL_ROUTING: "0",
+        AWF_REFLECT_ENABLED: "0",
+      },
+      encoding: "utf8",
+      timeout: 10000,
+    });
+    expect(result.status, result.stderr).toBe(terminal ? 0 : 1);
+    expect(result.stderr).toContain(terminal ? "success on attempt 1" : "Copilot stopped after server-side tool discovery");
+    expect(result.stderr).not.toContain("retry 1/");
+    expect(fs.readFileSync(safeOutputs, "utf8")).toBe(terminal ? '{"type":"submit_pull_request_review"}\n' : "");
+    if (!terminal) {
+      const retry = JSON.parse(fs.readFileSync(path.join(root, "agent/harness_retry.json"), "utf8"));
+      expect(retry.attempt_results[0].failure_classes).toEqual(["copilot_tool_search_only_completion"]);
+    }
   });
 });
 
