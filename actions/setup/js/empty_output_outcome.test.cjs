@@ -381,6 +381,27 @@ describe("empty output outcome", () => {
     expect(outcome.details).not.toContain("private-final-failure");
   });
 
+  it("bounds final error summaries and preserves their order without publishing payloads", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), ["Error: Authentication failed", ...Array(4).fill("CAPIError: 503 Service Unavailable"), "TypeError: private-final-failure", "[ERROR] private-unclassified-error"].join("\n"));
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    const tail = outcome.details.split("Last engine error lines (summarized, oldest first; full text in agent-stdio.log):\n")[1];
+    expect(tail).toBeDefined();
+    expect(tail.split("\n").slice(0, 5)).toEqual([...Array(4).fill("Engine error: Provider server error after retries (capi_server_error)"), "Driver execution failed (unhandled JavaScript exception)"]);
+    expect(tail.split("\n")[5]).toBe("Last tool call status: not recorded");
+    expect(outcome.details).not.toContain("private-");
+  });
+
+  it("does not classify a recovered runtime exception as the final failure", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: private-recovered-error\nCAPIError: 503 Service Unavailable\n");
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe("engine_outage");
+    expect(outcome.details).toContain("Last driver stderr summary: Engine error: Provider server error after retries");
+    expect(outcome.details).toContain("Driver execution failed (unhandled JavaScript exception)\nEngine error: Provider server error after retries");
+    expect(outcome.details).not.toContain("private-recovered-error");
+  });
+
   it("does not classify a stale diagnostic beyond the final tail", () => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: old failure\n" + "noise\n".repeat(21));

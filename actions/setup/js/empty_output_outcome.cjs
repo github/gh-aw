@@ -323,26 +323,32 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   if (engineSummary) diagnostics.add(engineSummary);
   const driverExitSignal = crashSignalNameForExitCode(driverExitCode) ?? ({ 130: "SIGINT", 137: "SIGKILL", 143: "SIGTERM" }[driverExitCode] || undefined);
   let driverStderrSummary = "";
-  let capturedStderrSummary = "";
+  const lastEngineErrors = [];
   let unhandledDriverError = false;
   let finalDriverCrash = false;
   if (!agentNotStarted && driverExitCode > 0) {
     const finalDiagnosticWindow = safeStdio.slice(-8000).split(/\r?\n/).slice(-20).join("\n");
     const evidence = collectAgentErrorEvidence(finalDiagnosticWindow, events, rawSourceEngine);
     for (const line of evidence.diagnostics.slice().reverse()) {
-      driverStderrSummary = agentErrorSummaryText(line, [], rawSourceEngine);
+      // Process bookkeeping is not engine stderr and must not hide a preceding exception.
+      if (/^\[(?:copilot|claude|codex)-harness\].*\bprocess (?:closed|exit event)\b/.test(line)) continue;
+      let summary = agentErrorSummaryText(line, [], rawSourceEngine);
       const category = classifyDriverStderr(line);
-      if (["dependency_loading", "syntax_error", "runtime_exception", "out_of_memory", "process_startup"].includes(category)) {
-        finalDriverCrash = true;
-        driverStderrSummary = DRIVER_STDERR_SUMMARIES[category];
+      const crashed = ["dependency_loading", "syntax_error", "runtime_exception", "out_of_memory", "process_startup"].includes(category);
+      if (crashed) summary = DRIVER_STDERR_SUMMARIES[category];
+      if (!summary && /^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) {
+        summary = "SDK driver reported an error";
       }
-      if (!driverStderrSummary && /^\[(?:copilot-sdk-driver|sdk-driver)\]\s+(?:\[sdk-driver\]\s+)?(?:error|unhandled error):/i.test(line)) {
-        driverStderrSummary = "SDK driver reported an error";
-        // Session errors use "error:" too; only the outer driver's unhandled
-        // exception establishes a crash rather than a handled provider failure.
+      if (!summary) continue;
+      // Publish only fixed summaries, not stderr payloads or quoted agent text.
+      lastEngineErrors.unshift(summary);
+      if (!driverStderrSummary) {
+        driverStderrSummary = summary;
+        finalDriverCrash = crashed;
+        // A handled SDK session error is not an unhandled driver exception.
         unhandledDriverError = /^\[copilot-sdk-driver\]\s+unhandled error:/i.test(line);
       }
-      if (driverStderrSummary) break;
+      if (lastEngineErrors.length === 5) break;
     }
   }
   const engineErrorType = engineSummary.match(/\(([a-z][a-z0-9_]*)\)/)?.[1] || "";
@@ -411,9 +417,8 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
           ...(driverExitCode > 0
             ? [
                 `Driver exit meaning: ${driverExitMeaning}`,
-                `Last driver stderr summary: ${
-                  capturedStderrSummary || driverStderrSummary || (stdioRead ? (stdio.trim() ? "not recorded (no classified stderr diagnostic)" : "no output captured") : "not recorded (diagnostic log unavailable)")
-                }`,
+                `Last driver stderr summary: ${driverStderrSummary || (stdioRead ? (stdio.trim() ? "not recorded (no classified stderr diagnostic)" : "no output captured") : "not recorded (diagnostic log unavailable)")}`,
+                ...(lastEngineErrors.length ? [`Last engine error lines (summarized, oldest first; full text in agent-stdio.log):\n${lastEngineErrors.join("\n")}`] : []),
               ]
             : []),
           `Last tool call status: ${lastToolCallStatus}`,

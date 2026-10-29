@@ -267,7 +267,9 @@ function agentErrorSummaryText(content, eventsOrSourceEngine = [], rawSourceEngi
   const events = Array.isArray(eventsOrSourceEngine) ? eventsOrSourceEngine : [];
   const sourceEngine = typeof eventsOrSourceEngine === "string" ? eventsOrSourceEngine : rawSourceEngine;
   const execution = collectAgentExecution({ content, events, rawSourceEngine: sourceEngine });
-  return (execution?.data.categories || [])
+  const categories = new Set(execution?.data.categories || []);
+  if (execution?.data.errorCodes.some(code => typeof code === "number" && code >= 500 && code <= 599)) categories.add("capi_server_error");
+  return [...categories]
     .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
     .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
     .join("\n");
