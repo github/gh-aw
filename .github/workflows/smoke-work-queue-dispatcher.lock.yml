@@ -691,9 +691,8 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"smoke-work-queue-worker\"],\"github-token\":\"${GH_AW_SECRET_GITHUB_TOKEN}\",\"max\":1,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${GH_AW_SECRET_GH_AW_GITHUB_TOKEN}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"smoke-work-queue-worker\"],\"workflow_files\":{\"smoke-work-queue-worker\":\".lock.yml\"},\"workflows\":[\"smoke-work-queue-worker\"]},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"smoke-work-queue-worker\"],\"max\":1,\"target-ref\":\"${{ github.event.repository.default_branch }}\",\"work_queue_dispatch_credential\":{\"kind\":\"${GH_AW_SECRET_GH_AW_GITHUB_TOKEN}\"},\"work_queue_enabled\":true,\"work_queue_workflows\":[\"smoke-work-queue-worker\"],\"workflow_files\":{\"smoke-work-queue-worker\":\".lock.yml\"},\"workflows\":[\"smoke-work-queue-worker\"]},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'authenticated' || 'github_token' }}
-          GH_AW_SECRET_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           script: |
             const path = require('path');
