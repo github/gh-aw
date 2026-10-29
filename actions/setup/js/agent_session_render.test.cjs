@@ -275,10 +275,10 @@ describe("standard agent trace rendering", () => {
     const statsEnd = output.indexOf("\n</details>");
     expect(output.indexOf("Tools: 1/4 succeeded")).toBeLessThan(statsEnd);
     expect(output.indexOf("Cache Read Tokens: 0")).toBeLessThan(statsEnd);
-    expect(statsEnd).toBeLessThan(output.indexOf("<details><summary>Trace details</summary>"));
+    expect(statsEnd).toBeLessThan(output.indexOf("<details>\n<summary>Trace details</summary>"));
     expect(output.match(/^<details>/gm)).toHaveLength(2);
     expect(output.match(/^<\/details>$/gm)).toHaveLength(2);
-    expect(output.endsWith("\n\n</details>")).toBe(true);
+    expect(output.endsWith("\n\n</details>\n")).toBe(true);
     expect(output).not.toContain("### Agent session");
     expect(output).not.toContain("<details open>");
   });
@@ -293,6 +293,14 @@ describe("standard agent trace rendering", () => {
     expect(generateCopilotCliStyleSummary(events)).toContain(expected);
     expect(generateConversationMarkdown(events, { ...options, formatToolCallback: (call, result) => formatToolUse(call, result, { includeDetailedParameters: true }) }).markdown).toContain(expected);
     expect(events[0].data.input).toEqual(value);
+  });
+
+  it("keeps agent-supplied fences and disclosure tags inside the structured trace code block", () => {
+    const output = generateCopilotCliStyleSummary([{ type: "assistant.message", data: { content: "````````\n</details>\n<details open>\nraw output" } }]);
+    const traceSection = output.slice(output.indexOf("<details>\n<summary>Trace details</summary>"));
+    expect(traceSection).toContain("<summary>Trace details</summary>\n\n`````````\n");
+    expect(traceSection).toContain("````````\n  </details>\n  <details open>\n  raw output");
+    expect(traceSection.endsWith("\n`````````\n\n</details>\n")).toBe(true);
   });
 
   it("renders MCP text-block output as readable text without changing the structured trace", () => {

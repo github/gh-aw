@@ -1,6 +1,7 @@
 // @ts-check
 
 const { buildStepSummaryDetailsSection } = require("./log_parser_step_summary_builder.cjs");
+const { renderReport } = require("./report_ast.cjs");
 const { normalizeSessionUsage, sessionTokenTotal, sessionOutputText, observedSessionModel, projectSessionResult, isNestedSessionEvent, isSingleNestedSession } = require("./agent_session.cjs");
 const { collapseStreamedMessages, escapeSummaryText, renderInitializationLines, toolOutcome, boundSummaryLines } = require("./agent_session_render.cjs");
 const { isUnifiedSessionTrace, publicationAgentSessions, renderUnifiedSession } = require("./unified_session_render.cjs");
@@ -775,31 +776,31 @@ function createLogParserFormatters(deps) {
    */
   function generateCopilotCliStyleSummary(logEntries, options = {}) {
     if (isUnifiedSessionTrace(logEntries)) return unifiedSummary(logEntries, true, options.maxBytes);
-    const lines = [];
     const standard = isCopilotEventLogEntries(logEntries);
     const model = options.model ?? observedSessionModel(logEntries);
     const initialization = isCopilotEventLogEntries(logEntries) ? renderInitializationLines(normalizeEntriesForRendering(logEntries).find(entry => entry.type === "system" && entry.subtype === "init")) : [];
     const fullBody = [...(model ? [`Model: ${model}`, ""] : []), ...initialization, "Conversation:", "", ...generateSummaryLines(logEntries)];
     const maxLineBytes = 4 * MAX_AGENT_TEXT_LENGTH + 128;
-    let preamble = "";
+    /** @type {import("./report_ast.cjs").ReportBlock & {type: "code_block"}} */
+    const traceBlock = { type: "code_block", language: "", value: "", sizeProtected: true, agentTainted: true };
+    /** @type {import("./report_ast.cjs").Report} */
+    const report = { type: "report", title: "Agent session", agentTainted: false, children: [] };
     if (standard) {
       const entries = normalizeEntriesForRendering(logEntries);
       const statistics = [];
       appendStatistics(statistics, entries, collectToolUsePairs(entries), true);
       const visibleStats = boundSummaryLines(statistics, 16 * 1024, maxLineBytes);
-      const statsFence = buildSafeOuterCodeFence(visibleStats);
-      preamble = buildStepSummaryDetailsSection("Agent session", `${statsFence}\n${visibleStats.join("\n")}\n${statsFence}`) + "<details><summary>Trace details</summary>\n\n";
+      report.children.push(
+        { type: "details", summary: "Agent session", agentTainted: false, children: [{ type: "code_block", language: "", value: visibleStats.join("\n"), agentTainted: false }] },
+        { type: "details", summary: "Trace details", agentTainted: false, children: [traceBlock] }
+      );
+    } else {
+      report.children.push(traceBlock);
     }
-    const tail = standard ? "\n\n</details>" : "";
-    const budget = MAX_STEP_SUMMARY_SIZE - Buffer.byteLength(preamble + tail, "utf8") - 2 * (maxLineBytes + 1) - 3;
-    const bodyLines = boundSummaryLines(fullBody, budget, maxLineBytes);
-    const fence = buildSafeOuterCodeFence(bodyLines);
-
-    lines.push(fence);
-    lines.push(...bodyLines);
-    lines.push(fence);
-
-    return preamble + lines.join("\n") + tail;
+    const overhead = Buffer.byteLength(renderReport(report).body, "utf8");
+    const budget = MAX_STEP_SUMMARY_SIZE - overhead - 2 * (maxLineBytes + 1);
+    traceBlock.value = boundSummaryLines(fullBody, budget, maxLineBytes).join("\n");
+    return renderReport(report).body;
   }
 
   /** @param {Array<any>} events @param {boolean} markdown @param {number} [maxBytes] @returns {string} */
