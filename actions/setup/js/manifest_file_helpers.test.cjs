@@ -29,6 +29,17 @@ describe("manifest_file_helpers", () => {
       expect(check([".changeset/fix.md", "package.json"], { protected_files_policy: "fallback-to-issue" }).action).toBe("fallback");
       expect(check([".changeset/fix.md", "package.json"], { protected_files_policy: "request-review" }).action).toBe("request_review");
     });
+
+    it("treats placeholder-like exclusions literally without exempting other protected paths", () => {
+      const overrides = {
+        protected_files: [...config.protected_files, "<!DOUBLESTAR>"],
+        protected_files_path_exclude: ["<!DOUBLESTAR>"],
+      };
+      expect(check(["<!DOUBLESTAR>"], overrides).action).toBe("allow");
+      for (const path of ["README.md", "package.json", ".github/workflows/ci.yml", ".cursor/settings.json"]) {
+        expect(check([path], overrides).action, path).toBe("deny");
+      }
+    });
   });
 
   describe("extractFilenamesFromPatch", () => {

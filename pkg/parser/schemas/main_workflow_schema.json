@@ -8254,15 +8254,15 @@
                 },
                 "protected-files": {
                   "type": "object",
-                  "description": "Protected files prevent workflow run approval when modified by the associated pull request. Use exclude to remove filenames or path prefixes from the default protected set, or a leading / for an exact repository path.",
+                  "description": "Protected files prevent workflow run approval when modified by the associated pull request. Use exclude to remove filenames or path prefixes from the default protected set, or a leading / for a repository-root path glob.",
                   "properties": {
                     "exclude": {
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "pattern": "[^*/\\s]"
+                        "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$"
                       },
-                      "description": "Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection everywhere they match. A leading / excludes only the exact repository path (e.g. /pyproject.toml), leaving same-named nested files protected."
+                      "description": "Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection everywhere they match. A leading / matches a repository-root path glob: * does not match /, while ** does. Without wildcards, /pyproject.toml excludes only that root file. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace."
                     }
                   },
                   "additionalProperties": false
@@ -9083,9 +9083,9 @@
                           "type": "array",
                           "items": {
                             "type": "string",
-                            "pattern": "[^*/\\s]"
+                            "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$"
                           },
-                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
+                          "description": "List of basenames (e.g. AGENTS.md) or path prefixes (e.g. .agents/) to remove from the default protected-file set. A leading / matches a repository-root path glob: * does not match /, while ** does. Without wildcards, /pyproject.toml excludes only that root file. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace.",
                           "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
                         }
                       },
@@ -11402,9 +11402,9 @@
                           "type": "array",
                           "items": {
                             "type": "string",
-                            "pattern": "[^*/\\s]"
+                            "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$"
                           },
-                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
+                          "description": "List of basenames (e.g. AGENTS.md) or path prefixes (e.g. .agents/) to remove from the default protected-file set. A leading / matches a repository-root path glob: * does not match /, while ** does. Without wildcards, /pyproject.toml excludes only that root file. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace.",
                           "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
                         }
                       },

@@ -2605,18 +2605,10 @@ func TestValidateWithSchema_YAMLTypedSlice(t *testing.T) {
 	}
 }
 
-// TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_ProtectedFilesObjectForm
-// verifies that the protected-files field on create-pull-request and
-// push-to-pull-request-branch accepts the documented object form
-// {policy, exclude} in addition to the plain string enum.
-//
-// This is a regression test for the bug where the schema only accepted
-// "string or null" for protected-files, rejecting object-form configurations
-// with "expected string or null, got object".
 func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
 	t.Parallel()
 	for _, handler := range []string{"create-pull-request", "push-to-pull-request-branch", "approve-workflow-run"} {
-		for _, pattern := range []string{"*", "**", "**/*", "*/**/*", "/**", "/**/*", " ", "AGENTS.md", ".agents/", "/.changeset/*.md", "/docs/**"} {
+		for _, pattern := range []string{"", "*", "**", "**/*", "*/**/*", "/**", "/**/*", "**.*", "/**.*", ".*/**", "/.*/**", ".", "/", " ", " docs/**", "docs/** ", "docs/a b.md", "docs/\tfile.md", "docs/\nfile.md", "AGENTS.md", ".agents/", "/pyproject.toml", "/.changeset/*.md", "/docs/**", "/**/*.md", "/_/**", "/-/**", "/1/**"} {
 			t.Run(handler+"/"+pattern, func(t *testing.T) {
 				config := map[string]any{
 					"protected-files": map[string]any{"exclude": []any{pattern}},
@@ -2631,7 +2623,7 @@ func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
 				}
 				err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "test.md")
 				switch pattern {
-				case "AGENTS.md", ".agents/", "/.changeset/*.md", "/docs/**":
+				case "AGENTS.md", ".agents/", "/pyproject.toml", "/.changeset/*.md", "/docs/**", "/**/*.md", "/_/**", "/-/**", "/1/**":
 					if err != nil {
 						t.Fatalf("scoped exclusion %q rejected: %v", pattern, err)
 					}
@@ -2645,6 +2637,14 @@ func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
 	}
 }
 
+// TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_ProtectedFilesObjectForm
+// verifies that the protected-files field on create-pull-request and
+// push-to-pull-request-branch accepts the documented object form
+// {policy, exclude} in addition to the plain string enum.
+//
+// This is a regression test for the bug where the schema only accepted
+// "string or null" for protected-files, rejecting object-form configurations
+// with "expected string or null, got object".
 func TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_ProtectedFilesObjectForm(t *testing.T) {
 	t.Parallel()
 

@@ -23,9 +23,13 @@
       "additionalProperties": false,
       "properties": {
         "exclude": {
-          "description": "Repository-root path globs exempt from protected-file checks, combined with per-workflow exclusions. Supports * (not /) and ** (including /). Each pattern must include a literal filename, directory, or extension; wildcard-only catch-all patterns are not allowed.",
+          "description": "Repository-root path globs exempt from protected-file checks, combined with per-workflow exclusions. Supports * (not /) and ** (including /). Each pattern must contain a letter, digit, underscore, or hyphen, with no leading / or whitespace; catch-all patterns are not allowed.",
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "pattern": "[^*/\\s]" },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [{ "pattern": "^[^/\\s][^\\s]*$" }, { "pattern": "[A-Za-z0-9_-]" }]
+          },
           "examples": [[".changeset/*.md"]]
         }
       }
