@@ -328,8 +328,23 @@
         "provenance 75.0% bot-driven (3/4, n=4 low confidence); true-agentic 1/1=100% (Addressing comment on PR #72403)",
         "conv/event logs empty again (0/50) after the 10-21/10-26/10-27 partial-recovery streak; orphan 0/13 open PRs -> NORMAL, 56th consecutive healthy day"
       ]
+    },
+    {
+      "date": "2026-10-29",
+      "sessions_analyzed": 50,
+      "completion_rate": 30.0,
+      "average_duration_minutes": 90.285,
+      "median_duration_minutes": 36.617,
+      "orphaned_rate": 0.0,
+      "orphan_candidates": 0,
+      "experimental_strategy": "temporal_analysis_confound_controlled",
+      "key_insights": [
+        "30.0% completion (15/50), +22pts vs 10-28 (8.0%), ~57-day mean; 0/50 conversation logs (pipeline failure persists)",
+        "100% single-branch day (copilot/improve-claim-footer-rendering, 6.5h span); confound-controlled hourly analysis found a real 13:00 UTC failure cluster (1/10 non-gate workflows succeeded) vs ~60% in adjacent hours",
+        "100% bot-driven successes (15/15); true-agentic 0/17 resolved (action_required); orphan 0/12 NORMAL, 57th healthy day"
+      ]
     }
   ],
-  "last_updated": "2026-10-28",
+  "last_updated": "2026-10-29",
   "version": "1.11"
 }
