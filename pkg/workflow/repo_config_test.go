@@ -19,6 +19,38 @@ func TestLoadRepoConfig_FileNotFound(t *testing.T) {
 	assert.Nil(t, cfg.Maintenance, "maintenance config should be nil when file is absent")
 }
 
+func TestLoadRepoConfig_ProtectedFiles(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		content string
+		want    []string
+		invalid bool
+	}{
+		{name: "omitted", content: `{}`},
+		{name: "empty object", content: `{"protected_files":{}}`},
+		{name: "empty list", content: `{"protected_files":{"exclude":[]}}`, want: []string{}},
+		{name: "path globs", content: `{"protected_files":{"exclude":[".changeset/*.md","docs/**","README.md"]}}`, want: []string{".changeset/*.md", "docs/**", "README.md"}},
+		{name: "not an object", content: `{"protected_files":true}`, invalid: true},
+		{name: "unknown policy", content: `{"protected_files":{"policy":"allowed"}}`, invalid: true},
+		{name: "not a list", content: `{"protected_files":{"exclude":".changeset/*.md"}}`, invalid: true},
+		{name: "non-string entry", content: `{"protected_files":{"exclude":[1]}}`, invalid: true},
+		{name: "empty entry", content: `{"protected_files":{"exclude":[""]}}`, invalid: true},
+		{name: "blank entry", content: `{"protected_files":{"exclude":[" "]}}`, invalid: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeAWJSON(t, dir, tt.content)
+			cfg, err := LoadRepoConfig(dir)
+			if tt.invalid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, cfg.ProtectedFiles.Exclude)
+		})
+	}
+}
+
 func TestLoadRepoConfig_MaintenanceFalse(t *testing.T) {
 	dir := t.TempDir()
 	writeAWJSON(t, dir, `{"maintenance": false}`)

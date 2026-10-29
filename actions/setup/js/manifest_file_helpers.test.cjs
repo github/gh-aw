@@ -3,9 +3,34 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { extractFilenamesFromPatch, checkForManifestFiles, checkAllowedFiles, checkExcludedFiles, checkFileProtection, checkForTopLevelDotFolders } = require("./manifest_file_helpers.cjs");
+const { extractFilenamesFromPatch, checkForManifestFiles, checkAllowedFiles, checkExcludedFiles, checkFileProtection, checkFileProtectionPostApply, checkForTopLevelDotFolders } = require("./manifest_file_helpers.cjs");
 
 describe("manifest_file_helpers", () => {
+  describe.each(["patch", "post-apply"])("repository protected-file exclusions (%s)", mode => {
+    const config = {
+      protected_files: ["README.md", "package.json"],
+      protected_path_prefixes: [".github/"],
+      protect_top_level_dot_folders: true,
+      protected_files_path_exclude: [".changeset/*.md", ".github/reports/**", "README.md"],
+    };
+    const check = (paths, overrides = {}) =>
+      mode === "patch" ? checkFileProtection(paths.map(path => `diff --git a/${path} b/${path}\nindex abc..def 100644\n`).join("\n"), { ...config, ...overrides }) : checkFileProtectionPostApply(paths, { ...config, ...overrides });
+
+    it("allows only matching paths, including dot-folder and protected-prefix exceptions", () => {
+      expect(check([".changeset/fix.md", ".changeset/README.md", ".github/reports/nested/report.md", "README.md"]).action).toBe("allow");
+      for (const path of [".changeset/config.json", ".changeset/nested/fix.md", ".changesets/fix.md", "nested/.changeset/README.md", "docs/README.md", ".github/workflows/ci.yml", "package.json"]) {
+        expect(check([path]).action, path).toBe("deny");
+      }
+    });
+
+    it("preserves allowlists and policies for other protected files", () => {
+      expect(check([".changeset/fix.md"], { allowed_files: ["src/**"] }).action).toBe("deny");
+      expect(check([".changeset/fix.md", ".changeset/config.json"]).action).toBe("deny");
+      expect(check([".changeset/fix.md", "package.json"], { protected_files_policy: "fallback-to-issue" }).action).toBe("fallback");
+      expect(check([".changeset/fix.md", "package.json"], { protected_files_policy: "request-review" }).action).toBe("request_review");
+    });
+  });
+
   describe("extractFilenamesFromPatch", () => {
     it("should return empty array for empty patch", () => {
       expect(extractFilenamesFromPatch("")).toEqual([]);

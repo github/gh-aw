@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,6 +15,65 @@ import (
 // ========================================
 // Protected Files and Checkout Mapping Tests
 // ========================================
+
+func TestRepositoryProtectedFilesExclusions(t *testing.T) {
+	gitRoot := t.TempDir()
+	writeAWJSON(t, gitRoot, `{"protected_files":{"exclude":[".changeset/*.md","README.md"]}}`)
+	compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+	compiler.gitRoot = gitRoot
+	data, err := compiler.ParseWorkflowString(`---
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  create-pull-request:
+    protected-files:
+      exclude: [AGENTS.md, /pyproject.toml]
+  push-to-pull-request-branch:
+    protected-files:
+      exclude: [AGENTS.md, /pyproject.toml]
+  approve-workflow-run:
+    github-token: ${{ secrets.APPROVE_WORKFLOW_RUN_TOKEN }}
+    allowed-workflows: [ci.yml]
+    protected-files:
+      exclude: [AGENTS.md, /pyproject.toml]
+---
+Update changesets.
+`, "workflow.md")
+	require.NoError(t, err)
+	compiled, err := compiler.CompileToYAML(data, "workflow.md")
+	require.NoError(t, err)
+	assert.Contains(t, compiled, `\"protected_files_path_exclude\":[\"pyproject.toml\",\".changeset/*.md\",\"README.md\"]`)
+	require.Equal(t, []string{".changeset/*.md", "README.md"}, data.RepoProtectedFilesExclude)
+
+	generated, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err)
+	var mcpConfig map[string]map[string]any
+	require.NoError(t, json.Unmarshal([]byte(generated), &mcpConfig))
+
+	var steps []string
+	compiler.addHandlerManagerConfigEnvVar(&steps, data)
+	require.Len(t, steps, 1)
+	_, quoted, ok := strings.Cut(steps[0], "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ")
+	require.True(t, ok)
+	handlerJSON, err := strconv.Unquote(strings.TrimSpace(quoted))
+	require.NoError(t, err)
+	var runtimeConfig map[string]map[string]any
+	require.NoError(t, json.Unmarshal([]byte(handlerJSON), &runtimeConfig))
+	for _, name := range []string{"create_pull_request", "push_to_pull_request_branch", "approve_workflow_run"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := mcpConfig[name]
+			require.NotNil(t, cfg)
+			assert.Equal(t, cfg["protected_files"], runtimeConfig[name]["protected_files"])
+			assert.Equal(t, cfg["protected_files_path_exclude"], runtimeConfig[name]["protected_files_path_exclude"])
+			assert.Equal(t, []string{"pyproject.toml", ".changeset/*.md", "README.md"}, ParseStringArrayFromConfig(cfg, "protected_files_path_exclude", nil))
+			assert.NotContains(t, ParseStringArrayFromConfig(cfg, "protected_files", nil), "AGENTS.md")
+			assert.Contains(t, ParseStringArrayFromConfig(cfg, "protected_files", nil), "README.md", "repo paths must not remove matching basenames globally")
+			assert.Contains(t, ParseStringArrayFromConfig(cfg, "protected_files", nil), "package.json")
+			assert.Equal(t, true, cfg["protect_top_level_dot_folders"])
+			assert.NotContains(t, cfg, "_protected_files_exclude")
+		})
+	}
+}
 
 // TestProtectedFilesExclude verifies that the _protected_files_exclude sentinel key is
 // used at compile time to filter manifest files and is NOT forwarded to the runtime config.

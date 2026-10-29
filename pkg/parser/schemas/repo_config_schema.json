@@ -17,6 +17,19 @@
     }
   },
   "properties": {
+    "protected_files": {
+      "description": "Repository-wide exceptions to safe-output protected-file checks. Does not bypass allowed-files restrictions or change the protected-files policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exclude": {
+          "description": "Repository-root path globs exempt from protected-file checks, combined with per-workflow exclusions. Supports * (not /) and ** (including /).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "examples": [[".changeset/*.md"]]
+        }
+      }
+    },
     "admission": {
       "type": "boolean",
       "default": false,
