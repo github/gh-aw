@@ -18,10 +18,12 @@ env:
   GH_AW_HARNESS_MAX_RETRIES: "4"
 tracker-id: avenger-ci
 max-turns: 50
-model: copilot/gpt-6-astra
 engine:
   id: copilot
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 network:
   allowed:
     - defaults
