@@ -79,7 +79,7 @@ type Compiler struct {
 	ghesArtifactCompat      bool                     // If true, emit GHES-compatible v3 pins for artifact actions
 	ghesCompatConfigured    bool                     // True once GHES compatibility has been resolved from CLI/config
 	ownerTypeCache          map[string]string        // Cached GitHub owner type ("User"/"Organization"/"") keyed by owner login; not goroutine-safe (Compiler is used sequentially)
-	copilotRequestsTipShown map[string]bool          // Tracks markdown paths that already emitted the copilot-requests enable tip in this compiler instance
+	tipsShown               map[string]bool          // Tracks tip messages already emitted across workflows in this compiler instance
 	copilotTipNeeded        bool                     // Tracks whether batch output should include the copilot-requests enable tip
 	featureUsage            map[string]int           // Counts experimental feature usage across workflows in batch mode
 	permissionWarningShown  map[string]string        // Tracks markdown paths and last warning fingerprint (frontmatter hash when available, otherwise formatted warning text)
