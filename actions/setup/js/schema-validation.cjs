@@ -7,6 +7,8 @@
  * and JSON-schema consumers.
  */
 
+const { buildAddLabelsObjectShape } = require("./add_labels_schema.cjs");
+
 /**
  * Maximum allowed byte length for any single string-typed input parameter (SM-IS-01).
  * 10 KB = 10 * 1024 bytes.
@@ -284,18 +286,44 @@ function validateValueAgainstSchema(value, schema, options = {}) {
   return validateSchemaNode(value, schema, "", { ...options, skipRequiredAtRoot: false });
 }
 
-function formatSchemaValidationError(toolName, args, error) {
+/**
+ * Derive the add_labels object-shape guidance (required fields + example) from the tool's
+ * actual configured labels item schema, falling back to the historical default
+ * (name, rationale, confidence) only when the schema isn't available.
+ * This keeps the error message in sync with workflows that configure a custom item-schema.
+ * @param {unknown} inputSchema
+ */
+function describeAddLabelsObjectShape(inputSchema) {
+  const DEFAULT_REQUIRED = ["name", "rationale", "confidence"];
+  const DEFAULT_EXAMPLE = '{"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}';
+  /** @type {any} */
+  const schema = inputSchema;
+  const itemSchema = schema?.properties?.labels?.items;
+  const shape = buildAddLabelsObjectShape(itemSchema);
+  if (!shape) {
+    return { required: DEFAULT_REQUIRED, fields: [], example: DEFAULT_EXAMPLE, configured: false };
+  }
+  return { ...shape, configured: true };
+}
+
+function formatSchemaValidationError(toolName, args, error, inputSchema) {
   if (toolName === "add_labels" && typeof error?.path === "string" && /^labels\[\d+\]$/.test(error.path) && Array.isArray(args?.labels)) {
     const index = Number(error.path.match(/^labels\[(\d+)\]$/)?.[1] || -1);
     const receivedLabel = index >= 0 ? args.labels[index] : undefined;
     if (typeof receivedLabel === "string") {
-      return [
-        "Invalid arguments for add_labels:",
-        `  ${error.path} must be an object (string shorthand is not supported).`,
-        '  Expected: {"name":"bug","rationale":"Why this label applies","confidence":"HIGH"}',
-        "  Required fields: name, rationale, confidence",
-        `  Received: ${JSON.stringify(receivedLabel)}`,
-      ].join("\n");
+      const shape = describeAddLabelsObjectShape(inputSchema);
+      const details = ["Invalid arguments for add_labels:", `  ${error.path} must be an object (string shorthand is not supported).`];
+      if (shape.example) details.push(`  Expected: ${shape.example}`);
+      if (shape.required.length > 0) {
+        details.push(`  Required fields: ${shape.required.join(", ")}`);
+      } else if (shape.configured) {
+        details.push("  No required fields are declared by the configured item schema.");
+        if (shape.fields.length > 0) details.push(`  Available fields: ${shape.fields.join(", ")}`);
+      } else {
+        details.push(`  Required fields: ${shape.required.join(", ")}`);
+      }
+      details.push(`  Received: ${JSON.stringify(receivedLabel)}`);
+      return details.join("\n");
     }
   }
 

@@ -790,6 +790,64 @@ describe("native creation Claim delivery", () => {
     });
   });
 
+  it.each([
+    { method: "createRef", ref: "refs/heads/approved", sha: BASE },
+    { method: "updateRef", ref: "heads/approved", sha: COMMIT },
+  ])("settles the signed PR branch $method effect without replaying writes", async ({ method, ref, sha }) => {
+    const f = fixture("create_pull_request");
+    f.client.rest.git[method] = vi.fn(async () => ({ data: { ref: "refs/heads/approved", object: { type: "commit", sha } } }));
+    await f.execute(async () => {
+      const wrapped = wrapClaimEffectClient(f.client, { claim_handle: f.member.handle, authorize: f.authorize, context: f.context });
+      await wrapped.rest.git[method]({ owner: "owner", repo: "repo", ref, sha });
+      expect(f.effects[0]).toMatchObject({ kind: "git_ref", id: sha, expected: { ref: "refs/heads/approved", sha }, outcome: "succeeded" });
+      f.client.graphql.mockResolvedValue({ createCommitOnBranch: { commit: { oid: COMMIT } } });
+      await wrapped.graphql("mutation NativeCommit($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }", {
+        input: { branch: { repositoryNameWithOwner: REPOSITORY, branchName: "approved" }, expectedHeadOid: BASE, message: { headline: "Prepared change" }, fileChanges: {} },
+      });
+      await f.capture();
+      expect(closeClaimEffectChannel()).toBeDefined();
+      const delivery = await f.settle();
+      expect(delivery.verification, delivery.reason).toBe("verified");
+      expect(f.client.rest.repos.compareCommits).toHaveBeenCalledWith(expect.objectContaining({ base: BASE, head: COMMIT }));
+    });
+    expect((await f.finalize()).claims.h1.state).toBe("result");
+    expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("verified");
+    expect(f.client.rest.git[method]).toHaveBeenCalledTimes(1);
+    expect(f.client.graphql.mock.calls.filter(([query]) => /\bmutation\b/.test(query))).toHaveLength(1);
+    expect(f.client.rest.pulls.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["missing_selector", "foreign_ref", "foreign_repository", "foreign_claim", "unknown", "invalid_commit", "response_mismatch", "unrelated_commit", "moved_ref", "unavailable"])(
+    "keeps a signed PR branch effect unverified for %s",
+    async mismatch => {
+      const f = fixture("create_pull_request");
+      await f.execute(async () => {
+        await f.capture();
+        const effect = recordClaimEffect({ repository: REPOSITORY, kind: "git_ref", id: BASE, expected: { ref: "refs/heads/approved", sha: BASE }, outcome: "succeeded" });
+        if (mismatch === "missing_selector") delete effect.expected.ref;
+        if (mismatch === "foreign_ref") effect.expected.ref = "refs/heads/other";
+        if (mismatch === "foreign_repository") effect.repository = "other/repo";
+        if (mismatch === "foreign_claim") effect.claim_id = "other-claim";
+        if (mismatch === "unknown") effect.outcome = "unknown";
+        if (mismatch === "invalid_commit") effect.id = effect.expected.sha = "not-a-commit";
+        if (mismatch === "response_mismatch") effect.expected.sha = COMMIT;
+        if (mismatch === "unrelated_commit") {
+          effect.id = effect.expected.sha = REF;
+          f.client.rest.repos.compareCommits.mockImplementation(async ({ base }) => ({
+            data: { base_commit: { sha: base }, merge_base_commit: { sha: BASE }, status: base === REF ? "diverged" : "ahead", ahead_by: 1, behind_by: base === REF ? 1 : 0 },
+          }));
+        }
+        if (mismatch === "moved_ref") f.client.rest.git.getRef.mockResolvedValue({ data: { ref: "refs/heads/approved", object: { type: "commit", sha: REF } } });
+        if (mismatch === "unavailable") f.client.rest.repos.compareCommits.mockRejectedValue(new Error("Unavailable"));
+        const delivery = await f.settle();
+        expect(delivery.verification).toBe("unknown");
+        expect(delivery.disposition).not.toBe("none");
+      });
+      expect(f.queue.state.works.get(f.member.work_id).barrier).toBe("pending");
+      expect(f.queue.transactions.flatMap(commit => commit.operations).some(operation => operation.kind === "Result")).toBe(false);
+    }
+  );
+
   it.each([false, true])("covers only native PR-label updates with an independently matching parent=%s", async foreign => {
     const f = fixture("create_pull_request");
     await f.execute(async () => {

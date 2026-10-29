@@ -4,11 +4,39 @@ package workflow
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestEmitTipOnce(t *testing.T) {
+	compiler := NewCompiler()
+	const firstTip = "Tip: first suggestion"
+	const secondTip = "Tip: second suggestion"
+
+	compiler.SetQuiet(true)
+	stderr := testutil.CaptureStderr(t, func() {
+		compiler.emitTipOnce("quiet.md", firstTip)
+	})
+	assert.Empty(t, stderr)
+
+	compiler.SetQuiet(false)
+	stderr = testutil.CaptureStderr(t, func() {
+		compiler.emitTipOnce("first.md", firstTip)
+		compiler.emitTipOnce("first.md", firstTip)
+		compiler.ResetWarningCount()
+		compiler.emitTipOnce("second.md", firstTip)
+		compiler.emitTipOnce("second.md", secondTip)
+	})
+
+	assert.Equal(t, 1, strings.Count(stderr, firstTip))
+	assert.Equal(t, 1, strings.Count(stderr, secondTip))
+	assert.Contains(t, stderr, "first.md")
+	assert.Zero(t, compiler.GetWarningCount(), "tips should not count as warnings")
+}
 
 // TestIsFormattedCompilerError verifies that the helper correctly identifies
 // errors produced by formatCompilerError / formatCompilerErrorWithPosition and

@@ -274,6 +274,17 @@ async function verifyPullRequest(options, receipt) {
   const effects = [];
   for (const effect of options.effects || []) {
     if (!receiptMatchesClaim(effect, claim) || effect.outcome !== "succeeded") continue;
+    if (effect.repository === receipt.headRepository && effect.kind === "git_ref") {
+      if (
+        typeof effect.expected?.ref !== "string" ||
+        effect.expected.ref.replace(/^refs\//, "") !== `heads/${receipt.branch}` ||
+        !REVISION.test(effect.id) ||
+        effect.expected.sha !== effect.id ||
+        (effect.id !== receipt.commit && !(await readAncestry(github, receipt.headRepository, effect.id, receipt.commit)))
+      )
+        return { verified: false };
+      effects.push({ kind: "git_ref", repository: receipt.headRepository, id: effect.id });
+    }
     if (effect.repository === receipt.headRepository && effect.kind === "graphql" && effect.commit) {
       if (!REVISION.test(effect.commit) || (effect.commit !== receipt.commit && !(await readAncestry(github, receipt.headRepository, effect.commit, receipt.commit)))) return { verified: false };
       effects.push({ kind: "graphql", repository: receipt.headRepository, id: effect.id });

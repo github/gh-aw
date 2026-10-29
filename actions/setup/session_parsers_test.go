@@ -77,3 +77,24 @@ func TestSessionParserSourcesLoadLogParserBootstrap(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 }
+
+func TestSessionParserSourcesLoadSchemaValidation(t *testing.T) {
+	t.Parallel()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is required to load embedded JavaScript sources")
+	}
+
+	bundleDir := t.TempDir()
+	require.NoError(t, os.CopyFS(bundleDir, SessionParserSources))
+
+	cmd := exec.Command(node, "-e", `
+		const assert = require("node:assert/strict");
+		const { validateValueAgainstSchema } = require("./js/schema-validation.cjs");
+		assert.equal(validateValueAgainstSchema(1, { type: "integer" }), null);
+		assert.notEqual(validateValueAgainstSchema("1", { type: "integer" }), null);
+	`)
+	cmd.Dir = bundleDir
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
