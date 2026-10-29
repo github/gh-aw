@@ -4,7 +4,7 @@
 const { extractDiffGitHeaderEntries } = require("./patch_path_helpers.cjs");
 
 function normalizeDotFolderExcludes(excludes) {
-  return new Set((Array.isArray(excludes) ? excludes : []).map(exclude => String(exclude || "").replace(/\/+$/, "")).filter(Boolean));
+  return new Set([".changeset", ...(Array.isArray(excludes) ? excludes : []).map(exclude => String(exclude || "").replace(/\/+$/, "")).filter(Boolean)]);
 }
 
 function formatHeaderLineForError(headerLine) {
@@ -183,7 +183,8 @@ function checkExcludedFiles(patchContent, excludedFilePatterns) {
  * Root-level dot-files (e.g. `.env`) are NOT matched — only paths that have at
  * least two components (i.e. the file is *inside* a dot-directory) are flagged.
  *
- * Specific dot-folder prefixes can be opted out via the `excludes` parameter
+ * The top-level `.changeset/` release-notes directory is excluded by default.
+ * Other dot-folder prefixes can be opted out via the `excludes` parameter
  * (e.g. `[".agents/"]` to allow an agent to write its own instruction files).
  *
  * @param {string} patchContent - The git patch content

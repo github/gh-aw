@@ -731,6 +731,33 @@ index abc..def 100644
   describe("checkFileProtectionPostApply", () => {
     const { checkFileProtectionPostApply } = require("./manifest_file_helpers.cjs");
 
+    it.each([undefined, [], [".agents/"]])("should allow release notes with dot-folder excludes %j without weakening other protection", excludes => {
+      const config = {
+        protected_files: ["package.json", "README.md"],
+        protect_top_level_dot_folders: true,
+        protected_dot_folder_excludes: excludes,
+        protected_files_policy: "request-review",
+      };
+      for (const files of [[".changeset/patch-cli-version-updates-2026-10-29.md"], [".changeset/nested/fix.md"]]) {
+        const patch = files.map(file => `diff --git a/${file} b/${file}\n`).join("");
+        expect(checkFileProtection(patch, config)).toEqual({ action: "allow" });
+        expect(checkFileProtectionPostApply(files, config)).toEqual({ action: "allow" });
+        expect(checkFileProtection(patch, { ...config, allowed_files: ["src/**"] }).action).toBe("deny");
+        expect(checkFileProtectionPostApply(files, { ...config, allowed_files: ["src/**"] }).action).toBe("deny");
+      }
+      for (const file of [".github/workflows/ci.yml", ".cursor/rules.md", ".changeset-other/fix.md", ".changeset/package.json", ".changeset/README.md"]) {
+        const patch = `diff --git a/${file} b/${file}\n`;
+        expect(checkFileProtection(patch, config).action).toBe("request_review");
+        expect(checkFileProtectionPostApply([file], config).action).toBe("request_review");
+      }
+      const renamePatch = "diff --git a/.github/workflows/ci.yml b/.changeset/fix.md\n";
+      expect(checkFileProtection(renamePatch, config).action).toBe("request_review");
+      if (excludes?.includes(".agents/")) {
+        expect(checkFileProtection("diff --git a/.agents/task.md b/.agents/task.md\n", config)).toEqual({ action: "allow" });
+        expect(checkFileProtectionPostApply([".agents/task.md"], config)).toEqual({ action: "allow" });
+      }
+    });
+
     it("should exempt only the exact path, while protecting nested manifests", () => {
       const config = {
         allowed_files: ["pyproject.toml", "lib/**", "tests/**"],
