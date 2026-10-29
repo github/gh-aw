@@ -167,6 +167,7 @@ Compile each work-queue workflow phase.
 	gate := "steps.work_queue_claim_reconciliation.outputs.authorized == 'true'"
 	require.NotContains(t, safeOutputs, gate)
 	require.Contains(t, safeOutputs, "GH_AW_WORK_QUEUE_ENABLED")
+	require.Contains(t, safeOutputs, "GH_AW_CLAIM_FOOTER_LINKS: ${{ steps.work_queue_claim_reconciliation.outputs.claim_footer_links }}")
 	require.Contains(t, compiled, "work_queue_scoped")
 	require.Contains(t, safeOutputs, "id: process_safe_outputs")
 	require.Less(t,

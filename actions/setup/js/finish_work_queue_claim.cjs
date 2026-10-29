@@ -102,6 +102,61 @@ function runtimeOptions(options) {
   return { ...options, githubClient: options.githubClient || options.github || global.github, context: options.context || global.context, core: options.core || global.core };
 }
 
+function queueFileUrl(configured, ref, line) {
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(ref) || !Number.isSafeInteger(line) || line < 1) throw new Error("work_queue_footer_location_invalid");
+  const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
+  if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) throw new Error("work_queue_footer_url_invalid");
+  const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
+  return new URL(`${repository}/blob/${encodeURIComponent(ref)}/work-queue.jsonl#L${line}`, `${server.origin}/`).href;
+}
+
+async function claimFooterLinks(latest, member, configured) {
+  try {
+    const origins = await store.resolveWorkQueueEventLocations({
+      githubClient: configured.queueClient || configured.githubClient,
+      owner: configured.context.repo.owner,
+      repo: configured.context.repo.repo,
+      ...(configured.branch === undefined ? {} : { branch: configured.branch }),
+      latest,
+      work_id: member.work_id,
+      claim_id: member.claim_id,
+    });
+    const links = {
+      ...(origins?.work_created ? { work_created: queueFileUrl(configured, origins.work_created.sha, origins.work_created.line) } : {}),
+      ...(origins?.claim_finished ? { claim_finished: queueFileUrl(configured, origins.claim_finished.sha, origins.claim_finished.line) } : {}),
+    };
+    return Object.keys(links).length ? links : undefined;
+  } catch {
+    log.debug("claim.footer.link.unavailable");
+    return;
+  }
+}
+
+function trustedClaimFooterLinks(handle, configured) {
+  try {
+    const raw = process.env.GH_AW_CLAIM_FOOTER_LINKS;
+    if (!raw || Buffer.byteLength(raw, "utf8") > 64 * 1024) return;
+    const values = JSON.parse(raw);
+    if (!values || typeof values !== "object" || Array.isArray(values)) return;
+    if (!Object.hasOwn(values, handle)) return;
+    const candidate = values[handle];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return;
+    const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
+    if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) return;
+    const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
+    const expectedPath = new RegExp(`^/${repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/blob/(?:[a-f0-9]{40}|[a-f0-9]{64})/work-queue\\.jsonl$`);
+    const links = {};
+    for (const [field, value] of Object.entries({ work_created: candidate.work_created, claim_finished: candidate.claim_finished })) {
+      if (typeof value !== "string") continue;
+      const url = new URL(value);
+      if (url.origin === server.origin && !url.username && !url.password && !url.search && expectedPath.test(url.pathname) && /^#L[1-9]\d*$/.test(url.hash)) links[field] = url.href;
+    }
+    return Object.keys(links).length ? links : undefined;
+  } catch {
+    return;
+  }
+}
+
 async function authorizeWorkerClaim(options = {}) {
   log.debug("claim.authorize.start");
   const configured = runtimeOptions(options);
@@ -143,7 +198,15 @@ async function authorizeWorkerClaim(options = {}) {
     ...(resource === undefined ? {} : { resource }),
   });
   log.debug("claim.authorize.complete", { require_completion: options.requireCompletion !== false });
-  return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed" };
+  let footer_links;
+  if (options.requireCompletion !== false && options.includeFooterLinks !== false) {
+    try {
+      footer_links = trustedClaimFooterLinks(member.handle, configured);
+    } catch {
+      log.debug("claim.footer.link.unavailable");
+    }
+  }
+  return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed", ...(footer_links ? { footer_links } : {}) };
 }
 
 async function reconcileWorkerClaim(options = {}) {
@@ -166,19 +229,23 @@ async function reconcileWorkerClaim(options = {}) {
   for (const member of assignment.claims) {
     try {
       if (blocked.has(member.handle)) throw new Error("work_queue_finish_conflict");
-      let latest = await loadQueue(configured);
+      const eventIds = [{ work_id: member.work_id, claim_id: member.claim_id }];
+      let latest = await loadQueue({ ...configured, eventIds });
       const claim = latest.projection.claims.get(member.claim_id);
       const work = latest.projection.works.get(member.work_id);
       const intent = staged.intents.get(member.handle);
       if (claim?.state === "completed") {
         if (intent && (intent.outcome === "cancelled" || intent.keep_open !== (claim.keep_open === true))) throw new Error("work_queue_finish_conflict");
         const barrier = claim.keep_open ? claim.barrier : work.barrier;
+        const authorized = barrier === "pending";
+        const footer_links = authorized ? await claimFooterLinks(latest, member, configured) : undefined;
         states[member.handle] = {
           claim_handle: member.handle,
           claim_id: member.claim_id,
           work_id: member.work_id,
           state: barrier === "verified" ? "result" : barrier === "failed" ? "delivery_failed" : "completed",
-          authorized: barrier === "pending",
+          authorized,
+          ...(footer_links ? { footer_links } : {}),
         };
         continue;
       }
@@ -202,12 +269,13 @@ async function reconcileWorkerClaim(options = {}) {
         request,
         core: configured.core,
       });
-      latest = await loadQueue(configured);
+      latest = await loadQueue({ ...configured, eventIds });
       const verified = latest.projection.claims.get(member.claim_id);
       if (verified?.state !== outcome || (verified.keep_open === true) !== (intent?.keep_open === true)) throw new Error("work_queue_finish_not_durable");
       log.debug("claim.finish.persisted", { completed: outcome === "completed", cancelled: outcome === "cancelled" });
       const authorized = outcome === "completed";
-      states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized };
+      const footer_links = authorized ? await claimFooterLinks(latest, member, configured) : undefined;
+      states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized, ...(footer_links ? { footer_links } : {}) };
     } catch (error) {
       log.failure("claim.finish.blocked", error);
       states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: "blocked", authorized: false };
@@ -472,12 +540,23 @@ async function main(options = {}) {
   try {
     const result = await reconcileWorkerClaim(options);
     coreApi.setOutput("claim_authorizations", JSON.stringify(result));
+    coreApi.setOutput(
+      "claim_footer_links",
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(result.claims || {})
+            .filter(([, claim]) => claim.authorized && claim.footer_links)
+            .map(([handle, claim]) => [handle, claim.footer_links])
+        )
+      )
+    );
     coreApi.info(`Work queue reconciliation: ${result.status}; authorization is per Claim`);
     await coreApi.summary.addRaw(renderSummary(result)).write();
     return result;
   } catch (error) {
     log.failure("claims.reconcile.failed", error);
     coreApi.setOutput("claim_authorizations", JSON.stringify({ version: 3, status: "failed", claims: {} }));
+    coreApi.setOutput("claim_footer_links", "{}");
     await coreApi.summary.addRaw(renderSummary({ claims: {} })).write();
     throw new Error("Work queue reconciliation failed; unverified Claim effects are blocked");
   }

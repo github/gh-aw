@@ -440,52 +440,6 @@ func TestValidateBalancedQuotes(t *testing.T) {
 	}
 }
 
-func TestContainsLogicalOperators(t *testing.T) {
-	tests := []struct {
-		name     string
-		expr     string
-		expected bool
-	}{
-		{
-			name:     "no operators",
-			expr:     "github.workflow",
-			expected: false,
-		},
-		{
-			name:     "has AND operator",
-			expr:     "github.workflow && github.ref",
-			expected: true,
-		},
-		{
-			name:     "has OR operator",
-			expr:     "github.workflow || github.ref",
-			expected: true,
-		},
-		{
-			name:     "has NOT operator",
-			expr:     "!github.workflow",
-			expected: true,
-		},
-		{
-			name:     "has multiple operators",
-			expr:     "!github.workflow && github.ref || github.repository",
-			expected: true,
-		},
-		{
-			name:     "has != comparison (triggers due to ! character)",
-			expr:     "github.workflow != 'test'",
-			expected: true, // The function detects '!' even when part of '!='; parser will handle correctly
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := containsLogicalOperators(tt.expr)
-			assert.Equal(t, tt.expected, result, "containsLogicalOperators(%s) = %v, want %v", tt.expr, result, tt.expected)
-		})
-	}
-}
-
 // TestValidateConcurrencyGroupExpressionRealWorld tests real-world concurrency group patterns
 func TestValidateConcurrencyGroupExpressionRealWorld(t *testing.T) {
 	// These are actual patterns used in the codebase

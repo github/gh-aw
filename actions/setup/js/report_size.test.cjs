@@ -345,6 +345,14 @@ describe("automatic report size redaction", () => {
     expect(fitMarkdownBody("x".repeat(100), { maxLength: SIZE_NOTICE.length })).toBe(SIZE_NOTICE);
   });
 
+  it("fits typed reports and rejects string-only options", () => {
+    const input = report([paragraph("x".repeat(1000))]);
+    expect(fitMarkdownBody(input, { maxLength: 100 })).toBe(renderSizedReport(input, 100).body);
+    expect(() => fitMarkdownBody(input, { prefix: "prefix" })).toThrow("require Markdown string input");
+    expect(() => fitMarkdownBody(input, { suffix: "footer" })).toThrow("require Markdown string input");
+    expect(() => fitMarkdownBody(input, { allowedMentions: ["@someone"] })).toThrow("require Markdown string input");
+  });
+
   it.each([0, -1, 1.5, NaN, Infinity])("rejects invalid size budgets %s", maxLength => {
     expect(() => renderSizedReport(report([paragraph("Body")]), maxLength)).toThrow("positive integer");
   });

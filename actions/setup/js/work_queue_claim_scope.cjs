@@ -210,6 +210,7 @@ async function assertClaimAuthorized(message, options = {}) {
     message: normalized,
     ...(options.resource === undefined ? {} : { resource: options.resource }),
     requireCompletion: options.requireCompletion !== false,
+    includeFooterLinks: !execution?.footer_links_requested,
   });
   if (proof?.suppressed !== undefined && typeof proof.suppressed !== "boolean") throw scopeError("trusted per-Claim proof has an invalid suppression flag");
   if (proof?.suppressed === true && !["cancelled", "result"].includes(proof.state)) throw scopeError("trusted per-Claim proof cannot suppress a nonterminal authorization failure");
@@ -229,6 +230,10 @@ async function assertClaimAuthorized(message, options = {}) {
     );
   }
   if (!proof || proof.authorized !== true || proof.claim_handle !== normalized.claim_handle) throw scopeError("same-Claim ownership, Completion, run binding, or resource scope is not authorized");
+  if (execution && options.requireCompletion !== false) {
+    execution.footer_links_requested = true;
+    if (proof.footer_links) execution.footer_links = Object.freeze({ ...proof.footer_links });
+  }
   return normalized;
 }
 
@@ -297,6 +302,10 @@ function currentClaimHandle() {
 
 function currentClaimAssignment() {
   return claimExecution.getStore()?.assignment;
+}
+
+function currentClaimFooterLinks() {
+  return claimExecution.getStore()?.footer_links;
 }
 
 /**
@@ -431,6 +440,7 @@ module.exports = {
   assertClaimArtifactFile,
   currentClaimHandle,
   currentClaimAssignment,
+  currentClaimFooterLinks,
   withClaimResourceEffects,
   createClaimResourceVerification,
   withClaimResourceVerification,

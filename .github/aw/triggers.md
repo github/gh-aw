@@ -152,6 +152,8 @@ on:
     forks: ["trusted-org/*", "trusted-user/repo"]
 ```
 
+`pull_request_target` supports the same `forks:` field and defaults to same-repository PRs only (omitting `forks:` is equivalent to `forks: []`). List exact `owner/repo` or `owner/*` entries to admit specific forks; `"*"` anywhere in the list allows all forks and triggers a strict-mode warning recommending a narrower pattern. `acknowledge-risk: true` and disabled/trusted checkout do not suppress this warning — prefer `pull_request` and avoid `pull_request_target` fork admission unless base-repository context is required.
+
 ### Command Triggers (/mentions)
 
 ```yaml
