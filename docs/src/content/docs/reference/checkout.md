@@ -7,7 +7,7 @@ sidebar:
 
 The `checkout:` frontmatter field controls how `actions/checkout` is invoked in the agent job. Configure custom checkout settings, check out multiple repositories, or disable checkout entirely.
 
-By default, the agent checks out the repository where the workflow is running with a shallow fetch (`fetch-depth: 1`). If triggered by a `pull_request` event, it also checks out the PR head ref. For `pull_request_target` events, checkout of the PR head branch is **disabled by default** — the head branch may be deleted (merged/closed PRs) or inaccessible (fork PRs), causing the step to hard-fail. For most workflows, this default checkout is sufficient and no `checkout:` configuration is necessary.
+By default, the agent checks out the repository where the workflow is running with a shallow fetch (`fetch-depth: 1`). If triggered by a `pull_request` event, it also checks out the PR's selected immutable commit, as described in [PR Revision Binding](#pr-revision-binding). For `pull_request_target` events, automatic PR checkout is **disabled by default**; `allow-pull-request-floating-head` does not enable it. For most workflows, this default checkout is sufficient and no `checkout:` configuration is necessary.
 
 Before the agent job, activation separately checks out workflow configuration to load runtime imports and skills. On `pull_request`, `pull_request_review`, and `pull_request_review_comment` events, this sparse checkout uses the PR **base SHA**, not the PR head; on other events it retains the normal activation ref. For reusable `workflow_call` workflows, it uses the resolved callee SHA when there is no active PR event, and skips cross-repository checkout if authentication may fall back to the caller's repository-scoped `GITHUB_TOKEN`. The `checkout:` options below describe the agent job and do not override this activation checkout.
 
@@ -15,13 +15,25 @@ Use `checkout:` when you need to check out additional branches, check out multip
 
 ## PR Revision Binding
 
-By default, the compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch. Ordinary `pull_request` events use the event's head SHA, even if the branch subsequently moves or is deleted. Review and review-comment events use their `commit_id`; label events use their recorded PR head SHA. These paths reject a detected head change, except ordinary `pull_request` events, which retain the event revision.
+By default, the compiler-generated "Checkout PR branch" step fetches a specific commit SHA from the current repository's `origin`, then verifies the checked-out `HEAD` before reporting success or recording a patch baseline. It does not resolve a moving `refs/pull/N/head` during fetch.
+
+| Trigger | Selected revision by default | Head movement |
+|---------|------------------------------|---------------|
+| `pull_request`, except `labeled` and `unlabeled` | Event-recorded PR head SHA | Retains the event revision, even if the branch moves or is deleted. |
+| `pull_request` label events | Event-recorded PR head SHA | Must match the live head before and after fetch. |
+| `pull_request_review` / `pull_request_review_comment` | Review or review-comment `commit_id` | Must match the live head before and after fetch. |
+| Revision-bound `workflow_dispatch` | Supplied `aw_context.pr_head_sha` | Must match the live head before and after fetch. |
+| `issue_comment`, routed comment commands, or manual PR dispatch without revision evidence | Current API head SHA | Pins the selected head and rejects a detected change during fetch; does not establish revision approval. |
+
+These rules apply only when the compiler generates automatic PR checkout. The [floating-head opt-in](#allow-floating-head) replaces event/review revision selection with current-head selection.
 
 Centralized command/label dispatch propagates event-recorded revision evidence in `aw_context.pr_head_sha`. A revision-bound dispatch must provide a full 40-character commit SHA matching the current PR head. Missing required evidence, malformed PR context, API failures, and detected head changes stop checkout rather than continuing on the previous workspace.
 
 Issue comments contain no historical PR head SHA. Comment commands therefore authorize **current-head execution**, not approval of a particular revision. They require valid comment creation/edit and PR update timestamps and warn when the PR was updated after the triggering comment; the resolved head is pinned and checked again after fetch. Timestamps cannot prove which revision was reviewed: unrelated activity, including the router's status comment, also updates the PR. Manual PR dispatch without command/label markers or a supplied revision also selects the current head; it is not revision approval. Workflows requiring revision approval should use a revision-bearing PR/review event or disable automatic PR checkout with `checkout: { pull-request: false }`. A comment command alone is not suitable for approving privileged execution of PR code.
 
 These checks preserve the existing actor permission floor and same-repository bot restrictions. A matching SHA proves commit identity, not that PR code is safe to execute with credentials. Fetching still requires credentials available to the checkout step; the helper does not persist credentials, widen sparse paths, or unshallow a repository.
+
+After successful checkout, the unified session records a `workflow.pr_checkout_revision` event from `runtime/pr-checkout` with `prNumber` and the full, lowercase `selectedSha`. This records commit identity without adding repository content or credentials; checkout log messages use 12-character SHA prefixes.
 
 > [!NOTE]
 > Immutable checkout requires the current repository's `origin` to serve the selected commit by SHA, including reachable unadvertised commits, fork PR commits, and retained commits after branch deletion. Support depends on the Git server's commit availability and upload-pack SHA fetch policy; local tests do not establish compatibility with every GitHub.com or GitHub Enterprise Server configuration. If the server cannot serve that commit, checkout fails with diagnostic guidance rather than falling back to a moving PR ref.
@@ -35,7 +47,7 @@ checkout:
   allow-pull-request-floating-head: true
 ```
 
-The default is `false`. With `true`, checkout ignores event/review SHA and comment freshness evidence, resolves the current head through the PR API, and uses the current commit count for fetch depth. It still fetches that specific SHA, rechecks the head after fetch, and verifies actual `HEAD`. A head change during fetch fails; this option does not restore mutable-ref fetching or bypass the server's SHA-fetch requirements.
+The default is `false`. The value must be a literal boolean; strings such as `"true"` and expressions are rejected. With `true`, checkout ignores event/review SHA and comment freshness evidence, resolves the current head through the PR API, and uses the current commit count for fetch depth. It still fetches that specific SHA, rechecks the head after fetch, and verifies actual `HEAD`. A head change during fetch fails; this option does not restore mutable-ref fetching or bypass the server's SHA-fetch requirements.
 
 > [!WARNING]
 > Floating-head checkout can execute commits pushed after a label, review, or command. It authorizes current-head execution, not approval of those commits. Do not enable it when the triggering event is intended to approve privileged execution of a specific revision.

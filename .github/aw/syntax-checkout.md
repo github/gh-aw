@@ -70,6 +70,14 @@ checkout:
 - `allow-pull-request-floating-head:` - Literal boolean, default `false`. Set `true` to select the current API PR head rather than the event/review revision; applies workflow-wide if enabled in any checkout entry. Still fetches and verifies a specific SHA and rejects fetch-time head changes. This is current-head execution, not revision approval; actor and fork restrictions remain enforced.
 - `force-clean-git-credentials:` - Persist credentials during checkout, then run a post-checkout cleanup step that removes them from root and submodule git configs
 
+## Automatic PR revision selection
+
+When automatic PR checkout is generated, it fetches an immutable SHA from `origin` and verifies actual `HEAD` before recording the patch baseline. By default, ordinary `pull_request` events retain their event-recorded head even if the branch moves or is deleted. Label events and review events bind to the recorded head or review `commit_id` and reject detected live-head changes. Centralized dispatch propagates revision evidence in `aw_context.pr_head_sha`.
+
+Issue comments and manual PR dispatch without revision evidence select the current API head, not an approved historical revision. `allow-pull-request-floating-head: true` explicitly selects that current-head policy for other PR events too, ignoring event/review SHA and comment freshness evidence. All current-head selections still reject detected fetch-time head changes. The option does not enable a PR checkout disabled by `checkout: false`, `pull-request: false`, or the compiler's PR-target policy.
+
+The server must serve the selected commit by SHA; checkout fails rather than falling back to a moving PR ref. Revision binding does not make PR code trusted or replace safe-output lifecycle checks.
+
 ## Multi-repository checkout (`multi: true`)
 
 Runtime-expanded repository lists (e.g. a newline-separated `repository:`/`repo:` value, or a dynamic expression) require explicit opt-in — without `multi: true`, `repository`/`repo` must resolve to exactly one `owner/repo` slug and ordinary single-checkout behavior applies.
