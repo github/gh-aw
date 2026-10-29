@@ -72,7 +72,7 @@ func TestDoctorAssignmentCredentialFlattenedFallbacks(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			status, secret, _ := doctorAssignmentCredential(tc.token, tc.secrets, tc.lookupErr)
+			status, secret, _ := doctorAssignmentCredentialWithEnvironment(tc.token, tc.secrets, tc.lookupErr, nil, nil)
 			assert.Equal(t, tc.status, status)
 			assert.Equal(t, tc.secret, secret)
 		})
