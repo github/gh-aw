@@ -165,6 +165,24 @@ func isAWFNetworkIsolationEnabled(workflowData *WorkflowData) bool {
 	return profile.NetworkIsolation && !profile.SupportsHostAccess
 }
 
+// isAWFAgentOnNetworkIsolationTopology reports whether AWF places the agent on its
+// network-isolation topology, which depends only on the sandbox runtime profile.
+// Unlike isAWFNetworkIsolationEnabled it does not exempt inline threat detection
+// and evals: those runs attach no sidecars, but AWF still runs the agent on the
+// isolated topology, so addresses the agent must reach (such as the LLM gateway on
+// the api-proxy container) must follow it.
+func isAWFAgentOnNetworkIsolationTopology(workflowData *WorkflowData) bool {
+	agentConfig := getAgentConfig(workflowData)
+	if agentConfig == nil || agentConfig.Disabled {
+		return false
+	}
+	if agentConfig.Runtime == AgentRuntimeNVX {
+		return true
+	}
+	profile := resolveSandboxRuntimeProfile(agentConfig)
+	return profile.NetworkIsolation && !profile.SupportsHostAccess
+}
+
 // enableFirewallByDefaultForCopilot enables firewall by default for copilot and codex engines
 // when network restrictions are present but no explicit firewall configuration exists
 // and no SRT sandbox is configured (SRT and AWF are mutually exclusive)
