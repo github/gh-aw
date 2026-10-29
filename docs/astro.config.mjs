@@ -276,7 +276,12 @@ export default defineConfig({
       },
     },
     sitemap(),
-    mermaid(),
+    mermaid({
+      mermaidConfig: {
+        layout: "dagre",
+        look: "classic",
+      },
+    }),
     starlight({
       title: "GitHub Agentic Workflows",
       description: "Intelligent automation for GitHub with Copilot, Claude, Codex or Gemini. Agents triage, investigate and open pull requests with guardrails and cost controls.",
