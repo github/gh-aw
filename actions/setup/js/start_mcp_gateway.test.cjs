@@ -35,10 +35,47 @@ import {
   validateGatewayAgentIdentifiers,
   waitForSafeOutputsReadiness,
   retryGatewayStartup,
+  startGatewayWithRetry,
   httpGet,
 } from "./start_mcp_gateway.cjs";
 import { writeMcpConfiguration } from "./mcp_configuration.cjs";
 import { applyGatewayRuntimeTimeouts } from "./tool_timeouts.cjs";
+
+describe("MCP gateway container startup retry", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not restart a successful gateway", async () => {
+    const start = vi.fn().mockResolvedValue({ gatewayPid: 123 });
+    await expect(startGatewayWithRetry(start)).resolves.toEqual({ gatewayPid: 123 });
+    expect(start).toHaveBeenCalledOnce();
+  });
+
+  it("recovers on the single retry", async () => {
+    vi.useFakeTimers();
+    const start = vi.fn().mockRejectedValueOnce(new Error("ERR_SYSTEM: container exited")).mockResolvedValue({ gatewayPid: 456 });
+    const result = startGatewayWithRetry(start);
+    await vi.runAllTimersAsync();
+    await expect(result).resolves.toEqual({ gatewayPid: 456 });
+    expect(start).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports the pre-agent step after exactly two failed attempts", async () => {
+    vi.useFakeTimers();
+    const start = vi.fn().mockRejectedValue(new Error("ERR_SYSTEM: Gateway failed to become ready"));
+    const result = expect(startGatewayWithRetry(start)).rejects.toThrow('Pre-agent failure in step "Start MCP Gateway" after 2 startup attempts: ERR_SYSTEM: Gateway failed to become ready');
+    await vi.runAllTimersAsync();
+    await result;
+    expect(start).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry invalid configuration", async () => {
+    const start = vi.fn().mockRejectedValue(new Error("ERR_CONFIG: invalid agent ID"));
+    await expect(startGatewayWithRetry(start)).rejects.toThrow("ERR_CONFIG: invalid agent ID");
+    expect(start).toHaveBeenCalledOnce();
+  });
+});
 
 describe("MCP gateway runner proxy environment", () => {
   it.each([
@@ -121,7 +158,7 @@ describe("MCP gateway runner proxy environment", () => {
 
   it("adds runner proxy flags before launching the gateway", () => {
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-    expect(source.indexOf("args = injectProxyEnvArgs(args, gatewayEnv)")).toBeLessThan(source.indexOf("const child = spawn(cmd, args"));
+    expect(source.indexOf("args = injectProxyEnvArgs(args, gatewayEnv)")).toBeLessThan(source.indexOf("child = spawn(cmd, args"));
   });
 
   it.each(["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"])("redacts %s values in gateway diagnostics", name => {
@@ -137,7 +174,7 @@ describe("MCP gateway CA launcher arguments", () => {
     const require = createRequire(import.meta.url);
     const spawn = vi.fn(() => ({
       on: vi.fn(),
-      stdin: { write: vi.fn(), end: vi.fn() },
+      stdin: { write: vi.fn(), end: vi.fn(), on: vi.fn() },
       unref: vi.fn(),
       // Stop before health polling; this test covers the launch boundary.
       pid: undefined,
@@ -164,6 +201,7 @@ describe("MCP gateway CA launcher arguments", () => {
         chmodSync: vi.fn(),
         rmSync: vi.fn(),
         openSync: vi.fn(() => 42),
+        closeSync: vi.fn(),
         mkdtempSync: vi.fn(() => directory),
       },
       os: { tmpdir: () => directory },
@@ -179,14 +217,16 @@ describe("MCP gateway CA launcher arguments", () => {
     try {
       fs.writeFileSync(caPath, "certificate validated by gateway", { mode: 0o600 });
       const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-      await vm.runInNewContext(`${source}\nmain();`, {
+      await vm.runInNewContext(`${source}\nsleep = async () => {}; main().catch(err => core.setFailed(err.message));`, {
         require: id => mocks[id] || require(id),
         module: { exports: {} },
         process: { env, umask: vi.fn(), on: vi.fn() },
         core,
       });
 
-      expect(spawn).toHaveBeenCalledOnce();
+      expect(spawn).toHaveBeenCalledTimes(2);
+      expect(mocks.fs.closeSync).toHaveBeenCalledTimes(4);
+      expect(mocks.child_process.execSync).toHaveBeenCalledTimes(2);
       const [command, args, options] = spawn.mock.calls[0];
       const launchedConfig = JSON.parse(spawn.mock.results[0].value.stdin.write.mock.calls[0][0]);
       const target = launchedConfig.mcpServers.private.caCertFile;
@@ -208,7 +248,7 @@ describe("MCP gateway CA launcher arguments", () => {
       ]);
       expect(options.env.NO_PROXY).toBe(inheritedProxy ? "host.docker.internal,awf-enclave-mcp" : undefined);
       expect(launchedConfig.mcpServers.public).not.toHaveProperty("caCertFile");
-      expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("ERR_SYSTEM: Failed to start gateway container");
+      expect(core.setFailed).toHaveBeenCalledExactlyOnceWith('ERR_SYSTEM: Pre-agent failure in step "Start MCP Gateway" after 2 startup attempts: ERR_SYSTEM: Failed to start gateway container');
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
@@ -335,8 +375,8 @@ describe("start_mcp_gateway logging", () => {
 
   it.each([false, true])("times health and safe-output readiness separately when readiness fails: %s", async fails => {
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-    const start = source.indexOf("  if (succeeded) {");
-    const end = source.indexOf("\n  } else {", start);
+    const start = source.indexOf("    if (succeeded) {");
+    const end = source.indexOf("\n    } else {", start);
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     const runSuccessBlock = new AsyncFunction(
       "{ nowMs, printTiming, waitForSafeOutputsReadiness, core, writeGatewayStartupMarker }",

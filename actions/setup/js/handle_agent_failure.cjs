@@ -1951,7 +1951,7 @@ async function getSecretRedactionError(jobId, step) {
 /**
  * Find the failed agent step using Actions metadata only, never agent-generated log text.
  * @param {{startupFailure?: boolean}} [options] - Select the first failed step only for a validated collector startup failure.
- * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean}>}
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean, preAgentFailure?: boolean, checkoutRef?: string}>}
  */
 async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   let jobs;
@@ -2012,11 +2012,22 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (agentConclusion !== "failure" && agentConclusion !== "timed_out" && !isCancelledTimeout) {
     return { failingStep: "", agentConclusion };
   }
-  const steps = agentJob.steps?.slice();
+  const steps = agentJob.steps?.slice() || [];
+  const setupBoundary = steps.findIndex(step => step.name === "Start MCP Gateway" || (typeof step.name === "string" && step.name.startsWith("Execute ")));
+  const setupFailure =
+    setupBoundary >= 0 &&
+    ["skipped", "failure", "timed_out"].includes(steps[setupBoundary].conclusion) &&
+    (startupFailure || steps[setupBoundary].conclusion === "skipped" || steps.some(step => typeof step.name === "string" && step.name.startsWith("Execute ") && step.conclusion === "skipped")) &&
+    !steps.some(step => typeof step.name === "string" && step.name.startsWith("Execute ") && step.conclusion !== "skipped")
+      ? steps
+          .slice(0, setupBoundary + (steps[setupBoundary].name === "Start MCP Gateway" ? 1 : 0))
+          .find(step => ["failure", "timed_out"].includes(step.conclusion) && (step.name === "Start MCP Gateway" || (typeof step.name === "string" && step.name.startsWith("Checkout "))))
+      : undefined;
   if (!startupFailure) steps?.reverse();
   const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && ["failure", "timed_out"].includes(step.conclusion));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
-  const failedStep = (!startupFailure && redactionStep) || steps?.find(step => (["failure", "timed_out"].includes(step.conclusion) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const failedStep =
+    (!startupFailure && redactionStep) || setupFailure || steps?.find(step => (["failure", "timed_out"].includes(step.conclusion) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
   if (!failedStep) {
     return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }
@@ -2028,6 +2039,10 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   return {
     failingStep,
     agentConclusion,
+    ...(failedStep === setupFailure ? { preAgentFailure: true } : {}),
+    ...(failedStep === setupFailure && failedStep.name === "Checkout repository (gh-aw default)" && process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF === "true" && /^refs\/pull\/[1-9]\d*\/merge$/.test(context.ref || "")
+      ? { checkoutRef: context.ref }
+      : {}),
     ...(isCancelledTimeout ? { isTimedOut: true } : {}),
     ...(failedStep === redactionStep ? { secretRedactionFailed: true, stepError: await getSecretRedactionError(agentJob.id, redactionStep) } : {}),
   };
@@ -2035,10 +2050,21 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>, preAgentFailure?: boolean, checkoutRef?: string}} options
  * @returns {ReportBlock[]}
  */
-function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", attributionUnavailable = "", stepError = "", engineFailureContext, checkoutError = "", items = [] }) {
+function buildFailureDiagnosticsContext({
+  failureCategories,
+  failingStep,
+  agentConclusion = "",
+  attributionUnavailable = "",
+  stepError = "",
+  engineFailureContext,
+  checkoutError = "",
+  items = [],
+  preAgentFailure = false,
+  checkoutRef = "",
+}) {
   const checkoutContext = checkoutError
     ? [
         nodes.heading("Runtime Checkout Rejected"),
@@ -2051,7 +2077,8 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
       ]
     : [];
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-  const isGenericFailure = Boolean(stepError) || failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || failureCategories.includes("agent_startup_failure") || infrastructureMessages.length > 0;
+  const isGenericFailure =
+    preAgentFailure || Boolean(stepError) || failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || failureCategories.includes("agent_startup_failure") || infrastructureMessages.length > 0;
   const hasModelEndpointMismatch = failureCategories.includes("model_endpoint_mismatch");
   if (!isGenericFailure && !hasModelEndpointMismatch) {
     return checkoutContext;
@@ -2074,6 +2101,14 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
     metadata.push(nodes.strong([nodes.text("Failing step:")]), nodes.text(" Unavailable"));
   }
   context.push(nodes.paragraph(metadata));
+  if (preAgentFailure) {
+    context.push(nodes.paragraph([nodes.strong([nodes.text("Pre-agent setup failure:")]), nodes.text(" The agent did not start. Inspect the failing setup step in the linked run.")]));
+    if (checkoutRef) {
+      context.push(
+        nodes.paragraph([nodes.text("Requested pull-request merge ref: "), nodes.code(checkoutRef), nodes.text(". Verify that this ref is still available and the pull request is mergeable; checkout did not fall back to the head branch.")])
+      );
+    }
+  }
   if (stepError) {
     context.push(...renderErrorDetails(stepError));
   } else if (engineFailureContext.length) {
