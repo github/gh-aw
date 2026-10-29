@@ -64,23 +64,45 @@ func TestDoctorAssignmentCredential(t *testing.T) {
 func TestDiscoverDoctorAssignmentWorkflows(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		files   map[string]string
-		want    int
-		token   string
-		wantErr string
+		name        string
+		files       map[string]string
+		want        int
+		token       string
+		environment string
+		wantErr     string
 	}{
 		{name: "no workflow directory"},
 		{name: "unrelated workflow", files: map[string]string{"normal.md": "---\non: push\nsafe-outputs:\n  add-comment:\n---\nPrompt"}, want: 0},
+		{name: "unrelated workflow environment is not diagnosed", files: map[string]string{"normal.md": "---\non: push\nenvironment: null\n---\nPrompt"}, want: 0},
 		{name: "null shorthand", files: map[string]string{"assign.md": "---\non: issues\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 1},
 		{name: "boolean shorthand", files: map[string]string{"assign.md": "---\non: issues\nsafe-outputs:\n  assign-to-agent: true\n---\nPrompt"}, want: 1},
 		{name: "custom token", files: map[string]string{"assign.md": "---\non: issues\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.CUSTOM_PAT }}\n---\nPrompt"}, want: 1, token: "${{ secrets.CUSTOM_PAT }}"},
 		{name: "unused shared fragment", files: map[string]string{"shared.md": "---\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 0},
+		{name: "unused import-safe on fragment", files: map[string]string{"shared.md": "---\non:\n  skip-bots: true\n  github-token: ${{ secrets.UNUSED_PAT }}\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 0},
+		{name: "overridden import-safe on fragment", files: map[string]string{"assign.md": "---\non: issues\nimports:\n  - shared.md\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.LOCAL_PAT }}\n---\nPrompt", "shared.md": "---\non:\n  skip-bots: true\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.UNUSED_PAT }}\n---\nPrompt"}, want: 1, token: "${{ secrets.LOCAL_PAT }}"},
 		{name: "imported assignment", files: map[string]string{"assign.md": "---\non: issues\nimports:\n  - shared/assign.md\n---\nPrompt", "shared/assign.md": "---\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.IMPORTED_PAT }}\n---\nPrompt"}, want: 1, token: "${{ secrets.IMPORTED_PAT }}"},
+		{name: "included assignment", files: map[string]string{"assign.md": "---\non: issues\n---\n@include shared/assign.md", "shared/assign.md": "---\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.INCLUDED_PAT }}\n---\nPrompt"}, want: 1, token: "${{ secrets.INCLUDED_PAT }}"},
+		{name: "local overrides included assignment", files: map[string]string{"assign.md": "---\non: issues\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.LOCAL_PAT }}\n---\n@include shared/assign.md", "shared/assign.md": "---\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.INCLUDED_PAT }}\n---\nPrompt"}, want: 1, token: "${{ secrets.LOCAL_PAT }}"},
+		{name: "top-level environment", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "production"},
+		{name: "top-level environment object", files: map[string]string{"assign.md": "---\non: issues\nenvironment:\n  name: production\n  url: https://example.com\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "production"},
+		{name: "safe outputs environment overrides top level", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nsafe-outputs:\n  environment: staging\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "staging"},
+		{name: "safe outputs only environment", files: map[string]string{"assign.md": "---\non: issues\nsafe-outputs:\n  environment: staging\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "staging"},
+		{name: "safe outputs environment object", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nsafe-outputs:\n  environment:\n    name: staging\n    url: https://example.com\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "staging"},
+		{name: "included environment follows compiler merge", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\n---\n@include shared/assign.md", "shared/assign.md": "---\nsafe-outputs:\n  environment: staging\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "production"},
+		{name: "imported environment follows compiler merge", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nimports:\n  - shared/assign.md\n---\nPrompt", "shared/assign.md": "---\nsafe-outputs:\n  environment: staging\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "production"},
+		{name: "dynamic environment", files: map[string]string{"assign.md": "---\non: issues\nenvironment: ${{ inputs.environment }}\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 1, environment: "${{ inputs.environment }}"},
+		{name: "unsupported environment scalar", files: map[string]string{"assign.md": "---\non: issues\nenvironment: 123\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, wantErr: "environment must be a non-empty environment name"},
+		{name: "unsupported environment sequence", files: map[string]string{"assign.md": "---\non: issues\nenvironment: [production]\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, wantErr: "environment must be a non-empty environment name"},
+		{name: "environment object without name", files: map[string]string{"assign.md": "---\non: issues\nenvironment:\n  url: https://example.com\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, wantErr: "environment must be a non-empty environment name"},
+		{name: "environment object with unsupported name", files: map[string]string{"assign.md": "---\non: issues\nenvironment:\n  name: 123\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, wantErr: "environment must be a non-empty environment name"},
+		{name: "empty environment override does not restore top level", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nsafe-outputs:\n  environment: ''\n  assign-to-agent:\n---\nPrompt"}, wantErr: "safe-outputs.environment must be a non-empty environment name"},
+		{name: "null environment override does not restore top level", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nsafe-outputs:\n  environment:\n  assign-to-agent:\n---\nPrompt"}, wantErr: "safe-outputs.environment must be a non-empty environment name"},
+		{name: "empty environment object name does not restore top level", files: map[string]string{"assign.md": "---\non: issues\nenvironment: production\nsafe-outputs:\n  environment:\n    name: ''\n  assign-to-agent:\n---\nPrompt"}, wantErr: "safe-outputs.environment must be a non-empty environment name"},
 		{name: "local override", files: map[string]string{"assign.md": "---\non: issues\nimports:\n  - shared/assign.md\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.LOCAL_PAT }}\n---\nPrompt", "shared/assign.md": "---\nsafe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.IMPORTED_PAT }}\n---\nPrompt"}, want: 1, token: "${{ secrets.LOCAL_PAT }}"},
 		{name: "README ignored", files: map[string]string{"README.md": "---\non: issues\nsafe-outputs:\n  assign-to-agent:\n---\nPrompt"}, want: 0},
 		{name: "invalid YAML", files: map[string]string{"broken.md": "---\non: [\n---\nPrompt"}, wantErr: "failed to parse"},
 		{name: "missing import", files: map[string]string{"assign.md": "---\non: issues\nimports:\n  - shared/missing.md\n---\nPrompt"}, wantErr: "failed to resolve imports"},
+		{name: "missing include", files: map[string]string{"assign.md": "---\non: issues\n---\n@include shared/missing.md"}, wantErr: "failed to expand includes"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -101,6 +123,7 @@ func TestDiscoverDoctorAssignmentWorkflows(t *testing.T) {
 			if tc.want > 0 {
 				assert.Equal(t, ".github/workflows/assign.md", checks[0].path)
 				assert.Equal(t, tc.token, checks[0].config.AssignToAgent.GitHubToken)
+				assert.Equal(t, tc.environment, checks[0].environment)
 			}
 		})
 	}
@@ -164,6 +187,7 @@ func TestDiagnoseDoctorAssignments(t *testing.T) {
 func TestListDoctorAssignmentSecrets(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
+		ownerType    string
 		repoResponse string
 		orgResponse  string
 		orgFailure   bool
@@ -171,6 +195,8 @@ func TestListDoctorAssignmentSecrets(t *testing.T) {
 	}{
 		{name: "repository and inherited secrets", repoResponse: `[{"secrets":[{"name":"REPO_PAT"}]},{"secrets":[{"name":"SECOND_PAT"}]}]`, orgResponse: `[{"secrets":[{"name":"ORG_PAT"}]}]`},
 		{name: "empty", repoResponse: `[{"secrets":[]}]`, orgResponse: `[{"secrets":[]}]`},
+		{name: "personal repository", ownerType: "User", repoResponse: `[{"secrets":[{"name":"REPO_PAT"}]}]`, orgFailure: true},
+		{name: "personal repository missing secret", ownerType: "User", repoResponse: `[{"secrets":[]}]`, orgFailure: true},
 		{name: "permission denied preserves repository names", repoResponse: `[{"secrets":[{"name":"REPO_PAT"}]}]`, orgFailure: true, wantErr: "cannot inspect Actions organization-secrets"},
 		{name: "malformed response", repoResponse: `not JSON`, wantErr: "failed to parse"},
 		{name: "missing secrets array", repoResponse: `[{}]`, wantErr: "missing the secrets array"},
@@ -180,6 +206,7 @@ func TestListDoctorAssignmentSecrets(t *testing.T) {
 			dir := t.TempDir()
 			script := `#!/bin/sh
 case "$*" in
+  *'repos/octo/repo --jq .owner.type') printf '%s' "$DOCTOR_OWNER_TYPE" ;;
   *'--hostname ghe.example.com'*'--paginate --slurp repos/octo/repo/actions/organization-secrets?per_page=100'*)
     if [ "$DOCTOR_ORG_FAILURE" = "true" ]; then exit 1; fi
     printf '%s' "$DOCTOR_ORG_RESPONSE" ;;
@@ -193,6 +220,10 @@ esac
 			t.Setenv("DOCTOR_REPO_RESPONSE", tc.repoResponse)
 			t.Setenv("DOCTOR_ORG_RESPONSE", tc.orgResponse)
 			t.Setenv("DOCTOR_ORG_FAILURE", "false")
+			t.Setenv("DOCTOR_OWNER_TYPE", "Organization")
+			if tc.ownerType != "" {
+				t.Setenv("DOCTOR_OWNER_TYPE", tc.ownerType)
+			}
 			if tc.orgFailure {
 				t.Setenv("DOCTOR_ORG_FAILURE", "true")
 			}
@@ -204,11 +235,126 @@ esac
 			}
 			if strings.Contains(tc.repoResponse, "REPO_PAT") {
 				assert.Contains(t, secrets, "REPO_PAT")
+				config := &workflow.SafeOutputsConfig{AssignToAgent: &workflow.AssignToAgentConfig{
+					BaseSafeOutputConfig: workflow.BaseSafeOutputConfig{GitHubToken: "${{ secrets.REPO_PAT }}"},
+				}}
+				checks := diagnoseDoctorAssignments(context.Background(), "octo/repo", "https://ghe.example.com",
+					[]doctorAssignmentWorkflow{{path: "assign.md", config: config}},
+					listDoctorAssignmentSecrets)
+				require.Len(t, checks, 1)
+				assert.Equal(t, "configured", checks[0].Status)
+				assert.Equal(t, "REPO_PAT", checks[0].Secret)
+				config.AssignToAgent.GitHubToken = "${{ secrets.UNKNOWN_FIRST || secrets.REPO_PAT }}"
+				checks = diagnoseDoctorAssignments(context.Background(), "octo/repo", "https://ghe.example.com",
+					[]doctorAssignmentWorkflow{{path: "assign.md", config: config}},
+					listDoctorAssignmentSecrets)
+				if tc.wantErr != "" {
+					assert.Equal(t, "unknown", checks[0].Status, "an unknown higher-priority secret must not be hidden")
+				} else {
+					assert.Equal(t, "configured", checks[0].Status)
+				}
+			}
+			if tc.name == "personal repository missing secret" {
+				status, _, _ := doctorAssignmentCredential("${{ secrets.REPO_PAT }}", secrets, err)
+				assert.Equal(t, "missing", status)
 			}
 			if tc.name == "repository and inherited secrets" {
 				assert.Contains(t, secrets, "SECOND_PAT")
 				assert.Contains(t, secrets, "ORG_PAT")
 			}
+		})
+	}
+}
+
+func TestDiagnoseDoctorAssignmentEnvironments(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name           string
+		token          string
+		repository     map[string]struct{}
+		repositoryErr  error
+		environment    map[string]struct{}
+		environmentErr error
+		status         string
+		secret         string
+	}{
+		{name: "environment-only PAT", environment: map[string]struct{}{"FIRST": {}}, status: "configured", secret: "FIRST"},
+		{name: "environment-only PAT despite inaccessible repository", repositoryErr: errors.New("repository denied"), environment: map[string]struct{}{"FIRST": {}}, status: "configured", secret: "FIRST"},
+		{name: "environment overrides repository", repository: map[string]struct{}{"FIRST": {}}, environment: map[string]struct{}{"FIRST": {}}, status: "configured", secret: "FIRST"},
+		{name: "repository fallback", repository: map[string]struct{}{"SECOND": {}}, status: "configured", secret: "SECOND"},
+		{name: "unknown repository priority", repositoryErr: errors.New("organization denied"), environment: map[string]struct{}{"SECOND": {}}, status: "unknown"},
+		{name: "unknown environment overrides known repository", repository: map[string]struct{}{"FIRST": {}}, environmentErr: errors.New("environment denied"), status: "unknown"},
+		{name: "unknown environment blocks repository fallback", repository: map[string]struct{}{"SECOND": {}}, environmentErr: errors.New("environment denied"), status: "unknown"},
+		{name: "missing in every scope", status: "missing"},
+		{name: "automatic token cannot be overridden", token: "${{ secrets.GITHUB_TOKEN }}", environment: map[string]struct{}{"GITHUB_TOKEN": {}}, status: "missing"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			token := tc.token
+			if token == "" {
+				token = "${{ secrets.FIRST || secrets.SECOND || secrets.GITHUB_TOKEN }}"
+			}
+			config := &workflow.SafeOutputsConfig{AssignToAgent: &workflow.AssignToAgentConfig{
+				BaseSafeOutputConfig: workflow.BaseSafeOutputConfig{GitHubToken: token},
+			}}
+			calls := 0
+			checks := diagnoseDoctorAssignmentsWithEnvironment(context.Background(), "octo/repo", "https://ghe.example.com",
+				[]doctorAssignmentWorkflow{{path: "assign.md", config: config, environment: "production"}, {path: "other.md", config: config, environment: "production"}},
+				func(context.Context, string, string) (map[string]struct{}, error) {
+					return tc.repository, tc.repositoryErr
+				},
+				func(_ context.Context, repo, host, environment string) (map[string]struct{}, error) {
+					calls++
+					assert.Equal(t, "octo/repo", repo)
+					assert.Equal(t, "https://ghe.example.com", host)
+					assert.Equal(t, "production", environment)
+					return tc.environment, tc.environmentErr
+				})
+			assert.Equal(t, 1, calls, "shared environment metadata is fetched once")
+			require.Len(t, checks, 2)
+			assert.Equal(t, tc.status, checks[0].Status)
+			assert.Equal(t, tc.secret, checks[0].Secret)
+			if tc.name == "environment overrides repository" {
+				assert.Contains(t, checks[0].Message, "workflow environment")
+			}
+		})
+	}
+}
+
+func TestListDoctorAssignmentEnvironmentSecrets(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		environment string
+		failure     bool
+		wantErr     string
+	}{
+		{name: "escaped environment", environment: "release/production west"},
+		{name: "inaccessible environment", environment: "release/production west", failure: true, wantErr: "cannot inspect Actions environment secrets"},
+		{name: "dynamic environment", environment: "${{ inputs.environment }}", wantErr: "environment is dynamic"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			script := `#!/bin/sh
+case "$*" in
+  *'--hostname ghe.example.com'*'--paginate --slurp repos/octo/repo/environments/release%2Fproduction%20west/secrets?per_page=100'*)
+    if [ "$DOCTOR_ENV_FAILURE" = "true" ]; then exit 1; fi
+    printf '%s' '[{"secrets":[{"name":"ENV_PAT"}]}]' ;;
+  *) echo "unexpected gh arguments" >&2; exit 2 ;;
+esac
+`
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0755))
+			t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("DOCTOR_ENV_FAILURE", "false")
+			if tc.failure {
+				t.Setenv("DOCTOR_ENV_FAILURE", "true")
+			}
+			names, err := listDoctorAssignmentEnvironmentSecrets(context.Background(), "octo/repo", "https://ghe.example.com", tc.environment)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Contains(t, names, "ENV_PAT")
 		})
 	}
 }
@@ -274,6 +420,7 @@ func TestCheckDoctorAssignmentsCheckout(t *testing.T) {
 		{name: "HTTPS", remote: "https://github.com/octo/repo.git", host: "github.com"},
 		{name: "SSH", remote: "git@github.com:octo/repo.git", host: "github.com"},
 		{name: "enterprise HTTPS", remote: "https://ghe.example.com/octo/repo.git", host: "ghe.example.com"},
+		{name: "enterprise HTTPS with hostname in userinfo", remote: "https://alice%40ghe.example.com@ghe.example.com/octo/repo.git", host: "ghe.example.com"},
 		{name: "enterprise SSH", remote: "ssh://git@ghe.example.com/octo/repo.git", host: "ghe.example.com"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -288,6 +435,7 @@ func TestCheckDoctorAssignmentsCheckout(t *testing.T) {
 printf '%s\n' "$*" >> "$DOCTOR_CALLS"
 case "$*" in
   *'/runs?'*) printf '%s' '{"workflow_runs":[]}' ;;
+  *'--jq .owner.type') printf '%s' 'Organization' ;;
   *) printf '%s' '[{"secrets":[]}]' ;;
 esac
 `
@@ -310,7 +458,7 @@ esac
 			assert.Contains(t, string(calls), "repos/octo/repo/actions/secrets?per_page=100")
 			assert.Contains(t, string(calls), "repos/octo/repo/actions/organization-secrets?per_page=100")
 			assert.Contains(t, string(calls), "actions/workflows/assign.lock.yml/runs?")
-			assert.Len(t, strings.Split(strings.TrimSpace(string(calls)), "\n"), 3)
+			assert.Len(t, strings.Split(strings.TrimSpace(string(calls)), "\n"), 4)
 		})
 	}
 }

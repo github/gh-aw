@@ -1,49 +1,63 @@
-# ADR-72942: Diagnose assign-to-agent Credentials in `gh aw doctor` via Secret Metadata
+# ADR-72942: Diagnose assignment credentials through metadata and recent-run evidence
 
 **Date**: 2026-10-29
-**Status**: Draft
-**Deciders**: pelikhan [TODO: verify additional deciders]
+**Status**: Proposed (pending PR acceptance)
+**Deciders**: @pelikhan (requested credential diagnostics and recent-run inspection)
 
 ---
 
 ### Context
 
-Workflows that use `safe-outputs.assign-to-agent` can look correctly configured while, at runtime, the assignment step falls back through the default chain `secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN` to a credential that cannot assign Copilot (for example `GITHUB_TOKEN` or a GitHub App installation token). Users only discover the problem when a workflow run fails. `gh aw doctor` already checks authentication and repository setup, so it is the natural place for a pre-flight check. The CLI cannot read secret values. It can only list secret names through the repository `actions/secrets` and `actions/organization-secrets` endpoints. Assignment configuration can also come from imported workflow files.
+Workflows using `safe-outputs.assign-to-agent` can appear configured while falling back through `secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN` to an unsuitable credential. Neither `GITHUB_TOKEN` nor GitHub App installation tokens can assign Copilot. The CLI cannot retrieve stored Actions secret values, and a secret name alone does not establish token validity or permissions.
+
+Workflow success is also insufficient evidence: `ignore-if-error` can suppress authentication failures and leave a successful conclusion with zero exported assignment errors. An observed `issue-monster` run, [40859170777](https://github.com/github/gh-aw/actions/runs/40859170777), exhibited that behavior despite HTTP 401 errors. `gh aw doctor` already checks authentication and repository setup, making it a suitable place to combine configuration diagnostics with bounded historical evidence without dispatching a new workflow.
+
+Assignment configuration may come from frontmatter imports or Markdown includes. Shared fragments are not standalone workflows, and consumer overrides must be respected. Effective credentials can use repository, inherited organization, and safe-output environment secret scopes, whose metadata may require permissions unavailable to the caller.
 
 ### Decision
 
-We will add an assign-to-agent credential check to `gh aw doctor`. It discovers local workflows, including imported safe-output configuration, that enable `assign-to-agent`. It then uses the `actionslanguageservice` expression parser to resolve the configured `github-token` (or the default fallback chain) into an ordered list of secret references. Finally, it checks those names against the repository and inherited organization Actions secret **metadata**. Each workflow gets a status of `configured`, `missing`, or `unknown`. `GITHUB_TOKEN` and `github-app` configurations are treated as `missing`. Dynamic expressions and failed secret lookups are reported as `unknown`, not `configured`. Any non-`configured` result makes doctor exit nonzero and print prefilled PAT-creation and repository-secret setup links. The results are also exposed as `agent_assignments` in `--json`. The main driver is to catch misconfiguration early without ever handling secret values.
+Add assignment diagnostics to `gh aw doctor`, keeping configuration presence separate from historical execution:
+
+1. Discover standalone local workflows and merge their imported and Markdown-included safe-output configuration using compiler/parser semantics. Exclude import-safe shared fragments as independent workflows.
+2. Resolve static secret references with the shared `actionslanguageservice` expression parser, preserving every fallback operand and its order. Check available secret metadata in the applicable scopes. Uninspectable scopes and dynamic expressions remain unknown; a known lower-priority secret must not hide an unknown higher-priority fallback.
+3. Report configuration as `configured`, `missing`, or `unknown`. `configured` means the selected secret name is available, not that its value is a usable PAT. Per-handler App tokens and automatic tokens are unsuitable for assignment. Non-configured results return a nonzero exit status with host-aware PAT and repository-secret setup links.
+4. Sample at most five completed runs created in the past seven days per assignment workflow. Inspect the latest run attempt's assignment-handler job logs, bounded to 40 API requests and 90 seconds across workflows. Recognize actual handler confirmations and failure markers rather than run conclusions or exported error counts.
+5. Preserve successful assignments, already-assigned targets, credential failures, other assignment failures, and inconclusive evidence as distinct historical outcomes. Detected assignment failures return nonzero even when secret metadata is configured. Unavailable logs and absent evidence do not imply success or prove current credentials are invalid.
+
+Expose configuration and run evidence in `agent_assignments` through `--json`, including the sample window and run links. Do not print or persist raw logs or secret values in diagnostic results. The command performs read-only inspection; it does not dispatch workflows, assign agents, create PATs, or change secrets.
 
 ### Alternatives Considered
 
 #### Alternative 1: Validate the token itself (call the Copilot assignment API or introspect the PAT)
 
-This would detect expired, under-scoped, or SSO-unapproved tokens, which a presence check misses. It was rejected because the CLI cannot read stored Actions secret values, and asking users to paste tokens locally would add credential-handling risk. Presence and validity are therefore reported as separate concerns, and the documentation explains the limits.
+Direct validation could detect expired, under-scoped, or SSO-unapproved tokens, but the CLI cannot read stored Actions secret values. Asking users to paste those tokens would add credential-handling risk; attempting assignment would also mutate the repository. Metadata and historical outcomes therefore remain separate evidence, with explicit limitations.
 
-#### Alternative 2: Runtime-only detection (fail or warn inside the workflow's assignment step)
+#### Alternative 2: Rely only on runtime handling or workflow conclusions
 
-This is accurate because it uses the real token, but feedback comes only after a run and costs a workflow execution. It does not give the "fix before you run" experience or the direct setup links that `doctor` can provide.
+Runtime handlers use the real credential, but users must locate their logs and successful conclusions can conceal suppressed failures. Retain runtime handling and mine its existing evidence in doctor instead of dispatching a diagnostic workflow or treating a green run as proof of assignment.
 
 #### Alternative 3: Compile-time validation in `gh aw compile`
 
-This would surface issues during authoring, but it would make compilation depend on network access and API permissions for secret listing, which compilation intentionally avoids. Keeping the check in `doctor` leaves compile hermetic.
+This would surface issues during authoring, but would add repository-secret metadata permissions and historical-run inspection to compilation. Keep these operational checks in doctor rather than adding them to every compile.
 
 ### Consequences
 
 #### Positive
 - Missing assignment credentials are found before a workflow runs, along with actionable PAT and secret setup links, including enterprise hosts.
-- No secret values are handled. Only names from secret metadata are used, and fallback precedence (for example an unreachable fallback after `GITHUB_TOKEN`) is modelled correctly through expression parsing.
+- Secret values are not retrieved. Static secret names and ordered fallbacks are checked without evaluating arbitrary expressions.
+- Historical authentication failures remain visible even when workflow success and error counters conceal them.
 - Machine-readable `agent_assignments` output and a nonzero exit status let doctor be used as a CI or automation gate.
 
 #### Negative
-- A `configured` status only means the secret exists. Doctor cannot verify a wrong value, expiry, permissions, repository access, or Copilot availability, so false confidence is possible.
-- `doctor` now depends on the secret-listing API. Callers without permission get `unknown` and a nonzero exit, which may be noisy for users without admin access.
-- `doctor` now has new coupling to workflow compilation and import parsing (`workflow.Compiler`, `parser.ImportCache`) and to the default token fallback chain, which must be kept in sync if that chain changes.
+- Configuration presence and historical success cannot establish current validity, expiry, permissions, repository access, or Copilot availability. Historical failures can also outlive a credential repair.
+- API permissions, dynamic environment names, unavailable logs, and bounded samples can leave coverage incomplete. Unknown configuration returns nonzero; unknown history is reported without declaring the current credential broken.
+- Discovery, secret-scope precedence, the default token chain, and recognized handler log formats must remain aligned with compiler and runtime behavior.
+- Recent-run inspection adds API traffic and latency, controlled by explicit sample, request, and time limits.
 
 #### Neutral
 - The checks are skipped outside a checkout, or when the requested repository has no attached local checkout. Authentication-only diagnostics stay available there.
-- `setup_repository.go` was refactored (`checkSetupRepositoryCheckout`, `renderSetupRepositoryCheckResult`) so these checks fit into the existing doctor flow.
+- Personal-account repositories do not have inherited organization secrets. Organization lookup failures must not erase known repository credentials or be mistaken for proof that an inaccessible scope is empty.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*This record documents the proposed implementation and does not imply reviewer approval.*
