@@ -420,7 +420,7 @@ A repository secret name used to authenticate Copilot inference with a specific 
 
 ### Copilot Org Billing Opt-Out (`copilot-requests: none`)
 
-A frontmatter setting, `permissions: copilot-requests: none`, that explicitly declines centralized organization billing for the Copilot engine. Without it, `gh aw compile` emits an informational tip on every compilation suggesting `copilot-requests: write` when the conditions for org billing are otherwise met; setting `none` silences that tip for workflows intentionally using individual/seat billing via `COPILOT_GITHUB_TOKEN`. See [Billing Reference](/gh-aw/reference/billing/).
+A frontmatter setting, `permissions: copilot-requests: none`, that explicitly declines centralized organization billing for the Copilot engine. Without it, `gh aw compile` emits an informational tip once per compile run, even when compiling multiple workflows, suggesting `copilot-requests: write` when the conditions for org billing are otherwise met; setting `none` silences that tip for workflows intentionally using individual/seat billing via `COPILOT_GITHUB_TOKEN`. See [Billing Reference](/gh-aw/reference/billing/).
 
 ### Copilot Org Billing Error (`copilot_org_billing_error`)
 

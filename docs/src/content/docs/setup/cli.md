@@ -317,6 +317,14 @@ gh aw doctor --repo github/gh-aw --dir ./gh-aw --require-owner-type org
 
 Use `--repo` to verify a specific repository exists and inspect the local checkout that should correspond to it. `--require-owner-type` accepts `any`, `user`, or `org` and defaults to `any`; `--dir` and `--require-owner-type` require `--repo`.
 
+Inside a checkout, `doctor` also inspects local workflows, their imports, and Markdown `@include` directives for `safe-outputs.assign-to-agent`. It checks repository secrets and organization secrets available to organization-owned repositories; the organization-secret lookup is skipped for personal-account repositories. It also checks secrets in the workflow's effective environment (`safe-outputs.environment`, or top-level `environment` when no override is set). The configured assignment token is checked, or `GH_AW_AGENT_TOKEN` / `GH_AW_GITHUB_TOKEN` by default. Missing credentials produce a prefilled PAT creation link and a repository secret setup link. GitHub App installation tokens and the default `GITHUB_TOKEN` cannot perform Copilot assignment; creating an App does not resolve this requirement.
+
+Secret presence does not verify its value, token type, expiry, permissions, repository access, organization approval/SSO, or Copilot availability. Known repository secrets remain usable when organization metadata is inaccessible, unless an earlier fallback secret has unknown availability. Dynamic credential expressions, dynamic environments, and inaccessible environment secret metadata are reported as unknown, not as configured: environment secrets can override repository and organization secrets. Missing or unknown credentials return a nonzero exit status; `--json` includes the checks and setup links in `agent_assignments`. Outside a checkout, or when the requested repository has no attached local checkout, workflow credential checks are skipped.
+
+For each assignment workflow, `doctor` also samples up to five completed runs created in the past seven days. It inspects the latest run attempt's assignment handler job logs for confirmed assignments, already-assigned targets, credential failures, and other assignment failures. A successful run conclusion or zero exported errors does not establish assignment success: `ignore-if-error` can suppress authentication failures. Detected assignment failures return a nonzero exit status and include run links and credential setup guidance, even when the secret exists.
+
+Run evidence is historical and does not prove that the current credential still works or is still broken. No-op, staged, skipped, and filtered operations are not counted as new assignments. Unavailable logs, unsupported log formats, incomplete metadata, and API errors are reported as unknown or inconclusive rather than success. Inspection is bounded to 40 API requests and 90 seconds across all assignment workflows. `--json` exposes the sample window, limits, per-run evidence, and coverage errors in each workflow's `recent_runs`; raw logs are never included.
+
 `doctor --repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
 
 ### Building
@@ -788,6 +796,7 @@ gh aw audit https://github.com/owner/repo/actions/runs/123/job/456 # By job URL 
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456#step:7:1 # By step URL (extracts specific step)
 gh aw audit 12345678 --parse                              # Parse logs to markdown
 gh aw audit 12345678 --repo owner/repo                    # Specify repository for bare run ID
+gh aw audit 12345678 --repo owner/repo --models           # Detailed same-run model information
 ```
 
 **`--stdin` flag:** Reads run IDs or URLs from stdin (one per line) instead of positional arguments (mutually exclusive). Blank and `#`-prefixed lines are ignored. Bare numeric IDs require `--repo owner/repo`; full URLs carry their own repo context.
@@ -798,7 +807,9 @@ cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
 ```
 
-**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+
+`--models` adds the run's advertised model catalog, discovery completeness, and supported API endpoints alongside the recorded model selection, routing, and usage. With `--json`, the catalog is in `model_catalog`. Missing, invalid, or incomplete inventory is reported explicitly and does not establish model absence. The flag automatically includes the `agent`, `usage`, and `info` artifact sets when `--artifacts` is narrowed. It requires a single run and cannot be combined with `--group` or job/step URLs.
 
 `--search "query"` retrieves evidence from the run's redacted unified session using local BM25 ranking, without changing audit findings. `--search-limit` bounds returned evidence groups (default: `5`, range: `1–20`). Search requires a single run and cannot be combined with `--group` or job/step URLs. See [Searching session evidence](/gh-aw/reference/audit/#searching-session-evidence) for input limits and automatic repetition grouping.
 

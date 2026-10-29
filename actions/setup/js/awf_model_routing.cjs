@@ -45,8 +45,8 @@ function mapAWFRoutingEffort(engine, effort) {
   if (engine === "copilot") return { effort, error: null };
   const supported = {
     claude: new Set(["low", "medium", "high", "xhigh", "max"]),
-    // Reviewed for the pinned Codex 0.164.0 (DefaultCodexVersion): its ReasoningEffort accepts every
-    // routing-contract value unchanged (openai/codex rust-v0.164.0 codex-rs/protocol/src/openai_models.rs).
+    // Reviewed for the pinned Codex 0.165.0 (DefaultCodexVersion): its ReasoningEffort accepts every
+    // routing-contract value unchanged (openai/codex rust-v0.165.0 codex-rs/protocol/src/openai_models.rs).
     // Per-model eligibility is AWF's candidate catalogue, not this client-capability list.
     // Re-review on every Codex pin bump (see awf_model_routing.test.cjs).
     codex: new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]),
