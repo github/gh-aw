@@ -167,7 +167,7 @@ gh aw init --create-pull-request        # Initialize and open a pull request
 gh aw init --pr --auto-merge            # Initialize, open a PR, and enable auto-merge
 ```
 
-**Options:** `--engine/-e`, `--no-mcp`, `--no-skill`, `--no-agent`, `--codespaces`, `--completions`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge))
+**Options:** `--engine/-e`, `--no-mcp`, `--no-skill`, `--no-agent`, `--codespaces`, `--completions`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge))
 
 ##### Initializing for non-Copilot engines
 
@@ -200,7 +200,7 @@ gh aw add-wizard githubnext/agentics/ci-doctor --no-secret  # Skip secret prompt
 gh aw add-wizard githubnext/agentics/ci-doctor --pr --auto-merge  # Force PR delivery and enable auto-merge
 ```
 
-**Options:** `--no-secret`, `--dir/-d`, `--engine/-e`, `--gh-aw-ref`, `--no-gitattributes`, `--no-stop-after`, `--stop-after`, `--append`, `--no-security-scanner`, `--no-config`, `--create-pull-request` / `--pr` (force PR delivery), `--auto-merge` (requires explicit PR flag; see [auto-merge requirements](#pull-request-auto-merge))
+**Options:** `--no-secret`, `--dir/-d`, `--engine/-e`, `--gh-aw-ref`, `--no-gitattributes`, `--no-stop-after`, `--stop-after`, `--append`, `--no-security-scanner`, `--no-config`, `--create-pull-request` / `--pr` (force PR delivery), `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires explicit PR flag; see [auto-merge requirements](#pull-request-auto-merge))
 
 When the Copilot engine is selected, the wizard prompts the user to choose an authentication method: organization billing via [`permissions.copilot-requests: write`](/gh-aw/reference/auth/#copilot-requests-write-permission) (no PAT required), or a [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token) personal access token (a separate token from the default `GITHUB_TOKEN`, because the agent needs elevated Copilot API access that the ephemeral workflow token does not carry). When `COPILOT_GITHUB_TOKEN` already exists, using it is the default; because GitHub does not expose stored secret values, the user asserts that it is a suitable fine-grained PAT with Copilot Requests permission. The alternative replacement path opens a preconfigured fine-grained PAT creation page, validates the pasted token, and updates the repository secret.
 
@@ -222,7 +222,7 @@ gh aw add https://example.com/workflows/my-workflow.md               # Arbitrary
 gh aw add https://example.com/workflows/my-workflow.json             # Arbitrary HTTPS URL (JSON workflow definition)
 ```
 
-**Options:** `--dir/-d`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--no-gitattributes`, `--append`, `--no-security-scanner`, `--engine/-e`, `--force/-f`, `--gh-aw-ref`, `--name/-n`, `--no-stop-after`, `--stop-after`
+**Options:** `--dir/-d`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--no-gitattributes`, `--append`, `--no-security-scanner`, `--engine/-e`, `--force/-f`, `--gh-aw-ref`, `--name/-n`, `--no-stop-after`, `--stop-after`
 
 Repository-level packages can declare an [`aw.yml` manifest](/gh-aw/reference/aw-yml-package-manifest/) at the repository root or in a nested package folder to define installable files, package `README.md`, schema compatibility, and minimum supported CLI versions.
 
@@ -317,6 +317,14 @@ gh aw doctor --repo github/gh-aw --dir ./gh-aw --require-owner-type org
 
 Use `--repo` to verify a specific repository exists and inspect the local checkout that should correspond to it. `--require-owner-type` accepts `any`, `user`, or `org` and defaults to `any`; `--dir` and `--require-owner-type` require `--repo`.
 
+Inside a checkout, `doctor` also inspects local workflows, their imports, and Markdown `@include` directives for `safe-outputs.assign-to-agent`. It checks repository secrets and organization secrets available to organization-owned repositories; the organization-secret lookup is skipped for personal-account repositories. It also checks secrets in the workflow's effective environment (`safe-outputs.environment`, or top-level `environment` when no override is set). The configured assignment token is checked, or `GH_AW_AGENT_TOKEN` / `GH_AW_GITHUB_TOKEN` by default. Missing credentials produce a prefilled PAT creation link and a repository secret setup link. GitHub App installation tokens and the default `GITHUB_TOKEN` cannot perform Copilot assignment; creating an App does not resolve this requirement.
+
+Secret presence does not verify its value, token type, expiry, permissions, repository access, organization approval/SSO, or Copilot availability. Known repository secrets remain usable when organization metadata is inaccessible, unless an earlier fallback secret has unknown availability. Dynamic credential expressions, dynamic environments, and inaccessible environment secret metadata are reported as unknown, not as configured: environment secrets can override repository and organization secrets. Missing or unknown credentials return a nonzero exit status; `--json` includes the checks and setup links in `agent_assignments`. Outside a checkout, or when the requested repository has no attached local checkout, workflow credential checks are skipped.
+
+For each assignment workflow, `doctor` also samples up to five completed runs created in the past seven days. It inspects the latest run attempt's assignment handler job logs for confirmed assignments, already-assigned targets, credential failures, and other assignment failures. A successful run conclusion or zero exported errors does not establish assignment success: `ignore-if-error` can suppress authentication failures. Detected assignment failures return a nonzero exit status and include run links and credential setup guidance, even when the secret exists.
+
+Run evidence is historical and does not prove that the current credential still works or is still broken. No-op, staged, skipped, and filtered operations are not counted as new assignments. Unavailable logs, unsupported log formats, incomplete metadata, and API errors are reported as unknown or inconclusive rather than success. Inspection is bounded to 40 API requests and 90 seconds across all assignment workflows. `--json` exposes the sample window, limits, per-run evidence, and coverage errors in each workflow's `recent_runs`; raw logs are never included.
+
 `doctor --repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
 
 ### Building
@@ -407,7 +415,7 @@ Unlike `gh aw upgrade`, `gh aw compile` does not run codemods unless you pass `-
 
 **Options:** `--action-mode`, `--action-tag`, `--actionlint`, `--actions-lock`, `--actions-repo`, `--allow-action-refs`, `--allow-experimental`, `--approve`, `--dependabot`, `--dry-run`, `--dir/-d`, `--engine/-e`, `--environment`, `--fail-fast`, `--fix`, `--force/-f`, `--force-refresh-action-pins`, `--force-refresh-container-pins`, `--gh-aw-ref`, `--ghes`, `--grant`, `--grype`, `--json/-j`, `--logical-repo/-l`, `--models`, `--no-check-update`, `--no-emit`, `--no-lint`, `--no-logo`, `--poutine`, `--purge`, `--refresh-stop-time`, `--require-self-hosted-runners`, `--runner-guard`, `--schedule-seed`, `--shellcheck`, `--show-all`, `--staged`, `--stats`, `--strict`, `--syft`, `--trial`, `--validate`, `--validate-images`, `--watch/-w`, `--yamllint`, `--zizmor`
 
-**`--actions-lock` flag:** After successful compilation and companion workflow generation, run `gh actions-lock --no-narrow` from the repository root to update `.github/workflows/actions.lock`. The extension scans all workflows in its default directory, even when compiling specific files or using `--dir`. `--no-narrow` preserves SHA-pinned action references. Install the extension separately with `gh extension install github/gh-actions-lock`; compilation never installs it. Extension failures fail the command without rolling back compiled files. Extension output goes to stderr, preserving `--json` output on stdout. Cannot be combined with `--no-emit`, `--read-only`, `--watch`, or `--dry-run`: the extension performs repository-wide post-processing beyond emitted compiler files. This integration does not replace `.github/aw/actions-lock.json` or change existing pin resolution.
+**`--actions-lock` flag:** After successful compilation and companion workflow generation, run `gh actions-lock --no-narrow` from the repository root to update `.github/workflows/actions.lock`. The extension scans all workflows in its default directory, even when compiling specific files or using `--dir`. `--no-narrow` preserves SHA-pinned action references. Install the extension separately with `gh extension install github/gh-actions-lock`; compilation never installs it. Extension failures fail the command without rolling back compiled files. Extension output goes to stderr, preserving `--json` output on stdout. Cannot be combined with `--no-emit`, `--read-only` (a supported flag hidden from help), `--watch`, or `--dry-run`: the extension performs repository-wide post-processing beyond emitted compiler files. This integration does not replace `.github/aw/actions-lock.json` or change existing pin resolution.
 
 The extension inherits the environment through the standard GitHub CLI helper, including `GH_HOST`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`, `GH_ACTIONS_LOCK_GITHUB_COM_TOKEN`, `GH_CONFIG_DIR`, and certificate settings. When `GH_HOST` is unset, the host detected from the origin remote is forwarded. Existing `GH_TOKEN` precedence and `GITHUB_TOKEN` fallback are preserved. Host support depends on the installed extension.
 
@@ -788,6 +796,7 @@ gh aw audit https://github.com/owner/repo/actions/runs/123/job/456 # By job URL 
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456#step:7:1 # By step URL (extracts specific step)
 gh aw audit 12345678 --parse                              # Parse logs to markdown
 gh aw audit 12345678 --repo owner/repo                    # Specify repository for bare run ID
+gh aw audit 12345678 --repo owner/repo --models           # Detailed same-run model information
 ```
 
 **`--stdin` flag:** Reads run IDs or URLs from stdin (one per line) instead of positional arguments (mutually exclusive). Blank and `#`-prefixed lines are ignored. Bare numeric IDs require `--repo owner/repo`; full URLs carry their own repo context.
@@ -798,7 +807,9 @@ cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
 ```
 
-**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+
+`--models` adds the run's advertised model catalog, discovery completeness, and supported API endpoints alongside the recorded model selection, routing, and usage. With `--json`, the catalog is in `model_catalog`. Missing, invalid, or incomplete inventory is reported explicitly and does not establish model absence. The flag automatically includes the `agent`, `usage`, and `info` artifact sets when `--artifacts` is narrowed. It requires a single run and cannot be combined with `--group` or job/step URLs.
 
 `--search "query"` retrieves evidence from the run's redacted unified session using local BM25 ranking, without changing audit findings. `--search-limit` bounds returned evidence groups (default: `5`, range: `1–20`). Search requires a single run and cannot be combined with `--group` or job/step URLs. See [Searching session evidence](/gh-aw/reference/audit/#searching-session-evidence) for input limits and automatic repetition grouping.
 
@@ -1119,7 +1130,7 @@ gh aw update --org my-org --pr --auto-merge --yes  # Enable auto-merge per repos
 gh aw update --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
+**Options:** `--dir/-d`, `--no-merge`, `--major`, `--force/-f`, `--engine/-e`, `--no-stop-after`, `--stop-after`, `--no-release-bump`, `--no-security-scanner`, `--approve`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--no-compile`, `--no-redirect`, `--cool-down`, `--repo/-r`
 
 Org mode (`--org`) previews or creates workflow update pull requests across every repository in an organization. Use `--repos` to limit matches, `--create-issue` to open an issue in each repository with pending updates, and `--yes/-y` to auto-accept per-repository confirmations in CI.
 
@@ -1160,7 +1171,7 @@ gh aw deploy githubnext/agentics/ci-doctor --org my-org --repos '*-service' --ye
 gh aw deploy ./my-workflow.md --org my-org --pr --auto-merge --yes  # Enable auto-merge per repository
 ```
 
-**Options:** `--repo/-r` (required unless `--org`), `--name/-n`, `--engine/-e`, `--force/-f`, `--append`, `--no-gitattributes`, `--dir/-d`, `--no-stop-after`, `--stop-after`, `--no-security-scanner`, `--cool-down`, `--org`, `--repos`, `--yes/-y`, `--create-pull-request` / `--pr` (compatibility flags; PR creation is always enabled), `--auto-merge` (requires explicit PR flag; see [auto-merge requirements](#pull-request-auto-merge))
+**Options:** `--repo/-r` (required unless `--org`), `--name/-n`, `--engine/-e`, `--force/-f`, `--append`, `--no-gitattributes`, `--dir/-d`, `--no-stop-after`, `--stop-after`, `--no-security-scanner`, `--cool-down`, `--org`, `--repos`, `--yes/-y`, `--create-pull-request` / `--pr` (compatibility flags; PR creation is always enabled), `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires explicit PR flag; see [auto-merge requirements](#pull-request-auto-merge))
 
 Org mode (`--org`) deploys workflows across every repository in an organization instead of a single `--repo` target. Use `--repos` to limit org mode to repositories matching one or more glob patterns, and `--yes/-y` to auto-accept org-mode deploy confirmations (required in CI).
 
@@ -1183,7 +1194,7 @@ gh aw upgrade --audit --json               # Dependency audit in JSON format
 gh aw upgrade --org my-org --create-issue --yes  # Auto-accept per-repo confirmations (required in CI)
 ```
 
-**Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request` / `--pr`, `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--audit`, `--json/-j`, `--approve`, `--pre-releases`
+**Options:** `--dir/-d`, `--engine/-e`, `--repo/-r`, `--no-fix`, `--no-actions`, `--no-compile`, `--no-agent`, `--no-mcp`, `--no-skill`, `--disable-codemod`, `--create-pull-request` / `--pr`, `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires PR creation; see [auto-merge requirements](#pull-request-auto-merge)), `--create-issue`, `--org`, `--enterprise`, `--repos`, `--interactive`, `--dry-run`, `--concurrency`, `--replace-existing`, `--yes/-y`, `--audit`, `--json/-j`, `--approve`, `--pre-releases`
 
 The dispatcher skill is updated by default. The Copilot custom agent and setup-steps workflow are created only when a workflow uses Copilot (including when the engine is omitted), or updated if the respective file already exists. An explicit `--engine` overrides workflow engine detection. Use `--no-agent`, `--no-mcp`, or `--no-skill` to skip the corresponding files, even when they already exist.
 
@@ -1276,7 +1287,7 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo
 gh aw pr transfer <pr-url> --repo target-owner/target-repo --pr --auto-merge
 ```
 
-**Options:** `--repo/-r`, `--create-pull-request` / `--pr` (compatibility flags; PR creation is always enabled), `--auto-merge` (requires explicit PR flag; see [auto-merge requirements](#pull-request-auto-merge))
+**Options:** `--repo/-r`, `--create-pull-request` / `--pr` (compatibility flags; PR creation is always enabled), `--pr-message` (see [pull request descriptions](#pull-request-descriptions)), `--auto-merge` (requires explicit PR flag; see [auto-merge requirements](#pull-request-auto-merge))
 
 #### `mcp-server`
 

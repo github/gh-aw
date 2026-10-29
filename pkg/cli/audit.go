@@ -31,6 +31,7 @@ type AuditOptions struct {
 	NoBaseline       bool
 	Search           string
 	SearchLimit      int
+	Models           bool
 }
 
 type auditRunConfig struct {
@@ -54,6 +55,7 @@ type auditRunConfig struct {
 	noBaseline       bool
 	search           string
 	searchLimit      int
+	models           bool
 	// evalsArtifactRequested is true when evals were requested via --evals or
 	// explicit --artifacts evals, and is used to trigger legacy dedicated-evals
 	// fallback behavior for older runs.
