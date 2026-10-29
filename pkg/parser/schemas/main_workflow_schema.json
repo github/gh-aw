@@ -8259,7 +8259,8 @@
                     "exclude": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "[^*/\\s]"
                       },
                       "description": "Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection everywhere they match. A leading / excludes only the exact repository path (e.g. /pyproject.toml), leaving same-named nested files protected."
                     }
@@ -9081,7 +9082,8 @@
                         "exclude": {
                           "type": "array",
                           "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[^*/\\s]"
                           },
                           "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
                           "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
@@ -11399,7 +11401,8 @@
                         "exclude": {
                           "type": "array",
                           "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[^*/\\s]"
                           },
                           "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
                           "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
