@@ -239,6 +239,8 @@ type WorkflowData struct {
 	Evals                          *EvalsConfig                    // BinEval evaluation configuration parsed from frontmatter evals field
 	Graders                        *GradersConfig                  // Deterministic graders configuration parsed from frontmatter graders field
 	ExcludedEnv                    []string                        // additional env var names to exclude from agent container via AWF --exclude-env (from frontmatter excluded-env field)
+
+	engineInstallationDependencies []EngineInstallationDefinition // Snapshot before the per-workflow engine catalog is reset
 }
 
 // PinContext returns an actionpins.PinContext backed by this WorkflowData.

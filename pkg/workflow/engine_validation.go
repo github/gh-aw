@@ -42,6 +42,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -51,6 +52,44 @@ import (
 )
 
 var engineValidationLog = logger.New("workflow:engine_validation")
+
+var blockedClaudeVersionPattern = regexp.MustCompile(`^0*2\.0*1\.0*313(?:\+.*)?$`)
+
+func (c *Compiler) validateBlockedEngineVersions(data *WorkflowData) error {
+	if data == nil {
+		return nil
+	}
+	if err := validateBlockedClaudeVersion(data.EngineConfig, ResolveEngineID(data), "engine.version"); err != nil {
+		return err
+	}
+	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil {
+		config := data.SafeOutputs.ThreatDetection.EngineConfig
+		if err := validateBlockedClaudeVersion(config, c.getThreatDetectionEngineID(data), "safe-outputs.threat-detection.engine.version"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateBlockedClaudeVersion(config *EngineConfig, engineID, field string) error {
+	if engineID != "claude" {
+		return nil
+	}
+	version := string(constants.DefaultClaudeCodeVersion)
+	if config != nil && config.Version != "" {
+		version = config.Version
+	}
+	configuredVersion := version
+	version = strings.TrimSpace(version)
+	version = strings.TrimSpace(strings.TrimPrefix(version, "="))
+	version = strings.TrimPrefix(version, "v")
+	if blockedClaudeVersionPattern.MatchString(version) {
+		return NewValidationError(field, configuredVersion,
+			"Claude Code 2.1.313 is blocked for security reasons",
+			fmt.Sprintf("Remove the version override to use the compiler-pinned version (%s), or pin an unaffected release, then recompile the workflow.", constants.DefaultClaudeCodeVersion))
+	}
+	return nil
+}
 
 // validateEngineVersion warns when the workflow explicitly pins the engine CLI
 // to "latest". Unpinned "latest" versions change unpredictably and undermine

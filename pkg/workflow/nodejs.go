@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -363,16 +364,26 @@ func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandNam
 	}
 
 	var installStep GitHubActionStep
-	if ExpressionPattern.MatchString(version) {
+	guardClaudeVersion := needsClaudeNpmVersionGuard(packageName, version)
+	if ExpressionPattern.MatchString(version) || guardClaudeVersion {
+		envVersion := version
+		if !ExpressionPattern.MatchString(version) {
+			envVersion = strconv.Quote(version)
+		}
 		installStep = GitHubActionStep{
 			"      - name: " + stepName,
 			"        run: |",
+		}
+		if guardClaudeVersion {
+			installStep = append(installStep, claudeNpmVersionGuard)
+		}
+		installStep = append(installStep,
 			"          mkdir -p \"${RUNNER_TEMP}/gh-aw/engine-cli/bin\"",
 			fmt.Sprintf(`          npm install %s--prefix "${RUNNER_TEMP}/gh-aw/engine-cli" %s@"${ENGINE_VERSION}"`, ignoreScriptsFlag, packageName),
 			fmt.Sprintf(`          ln -sf "../node_modules/.bin/%s" "${RUNNER_TEMP}/gh-aw/engine-cli/bin/%s"`, commandName, commandName),
 			"        env:",
-			"          ENGINE_VERSION: " + version,
-		}
+			"          ENGINE_VERSION: "+envVersion,
+		)
 		if cooldownEnabled {
 			installStep = append(installStep, fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
 		}
@@ -404,6 +415,26 @@ func GetMicroVMNpmCLIPathSetup(workflowData *WorkflowData) string {
 	return `export PATH="${RUNNER_TEMP}/gh-aw/engine-cli/bin:$PATH"`
 }
 
+func generateNpmVersionInstallStep(version, stepName, installCmd string, guardClaudeVersion bool) GitHubActionStep {
+	envVersion := version
+	if !ExpressionPattern.MatchString(version) {
+		envVersion = strconv.Quote(version)
+	}
+	step := GitHubActionStep{
+		"      - name: " + stepName,
+		"        run: " + installCmd,
+	}
+	if guardClaudeVersion {
+		step = GitHubActionStep{
+			"      - name: " + stepName,
+			"        run: |",
+			claudeNpmVersionGuard,
+			"          " + installCmd,
+		}
+	}
+	return append(step, "        env:", "          ENGINE_VERSION: "+envVersion)
+}
+
 // GenerateNpmInstallStepsWithScope generates npm installation steps with control over global vs local installation.
 // By default, --ignore-scripts is added to the install command to prevent pre/post install
 // scripts from executing (supply chain security). Pass options.RunInstallScripts=true to allow scripts.
@@ -432,19 +463,15 @@ func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPr
 	}
 
 	var installStep GitHubActionStep
-	if ExpressionPattern.MatchString(version) {
-		// Version is a GitHub Actions expression (e.g. ${{ inputs.engine-version }}).
+	guardClaudeVersion := needsClaudeNpmVersionGuard(packageName, version)
+	if ExpressionPattern.MatchString(version) || guardClaudeVersion {
+		// Version is a GitHub Actions expression or a guarded Claude selector.
 		// Pass it via an env var instead of direct shell interpolation to prevent injection:
 		// if the expression evaluates to a malicious string, it would otherwise be
 		// substituted verbatim into the shell command before the shell parses it.
-		nodejsLog.Printf("Version contains GitHub Actions expression, using env var for injection safety: %s", version)
+		nodejsLog.Printf("Using env var for npm version injection safety: %s", version)
 		installCmd := fmt.Sprintf(`npm install %s%s%s@"${ENGINE_VERSION}"`, ignoreScriptsFlag, globalFlag, packageName)
-		installStep = GitHubActionStep{
-			"      - name: " + stepName,
-			"        run: " + installCmd,
-			"        env:",
-			"          ENGINE_VERSION: " + version,
-		}
+		installStep = generateNpmVersionInstallStep(version, stepName, installCmd, guardClaudeVersion)
 		if options.CooldownEnabled {
 			installStep = append(installStep, fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
 		}

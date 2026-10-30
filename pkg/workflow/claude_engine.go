@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,6 +17,18 @@ import (
 var claudeLog = logger.New("workflow:claude_engine")
 
 const claudeDebugLogFile = constants.TmpGhAwDir + "/claude-debug.log"
+
+var claudePinnedVersionPattern = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+// Resolve selectors before installation so a tag, range, or expression cannot
+// install a blocked release or execute its lifecycle scripts.
+const claudeNpmVersionGuard = `          CLAUDE_VERSION_JSON="$(npm view "@anthropic-ai/claude-code@${ENGINE_VERSION}" version --json)"
+          ENGINE_VERSION="$(printf '%s' "$CLAUDE_VERSION_JSON" | node -e 'let input = ""; process.stdin.on("data", chunk => input += chunk); process.stdin.on("end", () => { const versions = JSON.parse(input); const version = Array.isArray(versions) ? versions.at(-1) : versions; if (typeof version !== "string" || !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version) || version.split("+")[0] === "2.1.313") { console.error("Claude Code version is invalid or blocked for security reasons. Pin an unaffected release and recompile."); process.exit(1); } process.stdout.write(version); });')"`
+
+func needsClaudeNpmVersionGuard(packageName, version string) bool {
+	return packageName == "@anthropic-ai/claude-code" &&
+		(!claudePinnedVersionPattern.MatchString(version) || strings.TrimPrefix(version, "v") == "2.1.313")
+}
 
 // ClaudeEngine represents the Claude Code agentic engine
 type ClaudeEngine struct {

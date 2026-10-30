@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/setutil"
 	"github.com/github/gh-aw/pkg/testutil"
 
@@ -90,6 +91,7 @@ func TestCollectNpmDependencies(t *testing.T) {
 				},
 			},
 			expectedDeps: []NpmDependency{
+				{Name: "@github/copilot", Version: string(constants.DefaultCopilotVersion)},
 				{Name: "@playwright/mcp", Version: "latest"},
 			},
 		},
@@ -104,6 +106,7 @@ func TestCollectNpmDependencies(t *testing.T) {
 				},
 			},
 			expectedDeps: []NpmDependency{
+				{Name: "@github/copilot", Version: string(constants.DefaultCopilotVersion)},
 				{Name: "@playwright/mcp", Version: "latest"},
 				{Name: "typescript", Version: "5.0.0"},
 			},
@@ -119,6 +122,7 @@ func TestCollectNpmDependencies(t *testing.T) {
 				},
 			},
 			expectedDeps: []NpmDependency{
+				{Name: "@github/copilot", Version: string(constants.DefaultCopilotVersion)},
 				{Name: "typescript", Version: "5.0.0"},
 			},
 		},
@@ -129,6 +133,7 @@ func TestCollectNpmDependencies(t *testing.T) {
 				{CustomSteps: "npx @scope/alpha"},
 			},
 			expectedDeps: []NpmDependency{
+				{Name: "@github/copilot", Version: string(constants.DefaultCopilotVersion)},
 				{Name: "@scope/alpha", Version: "latest"},
 				{Name: "zod", Version: "2.0.0"},
 			},
@@ -629,10 +634,11 @@ func TestGenerateDependabotManifests_NoDependencies(t *testing.T) {
 	compiler := NewCompiler()
 	tempDir := testutil.TempDir(t, "test-*")
 
-	// Workflow with no npm dependencies
+	// A custom executable skips the default engine installation.
 	workflows := []*WorkflowData{
 		{
-			CustomSteps: "echo 'hello world'",
+			CustomSteps:  "echo 'hello world'",
+			EngineConfig: &EngineConfig{ID: "copilot", Command: "local-copilot"},
 		},
 	}
 
@@ -703,8 +709,8 @@ func TestGenerateDependabotManifests_WithDependencies(t *testing.T) {
 		t.Fatalf("failed to unmarshal package.json: %v", err)
 	}
 
-	if len(pkgJSON.Dependencies) != 1 {
-		t.Errorf("expected 1 dependency, got %d", len(pkgJSON.Dependencies))
+	if len(pkgJSON.Dependencies) != 2 {
+		t.Errorf("expected engine and MCP dependencies, got %d", len(pkgJSON.Dependencies))
 	}
 	if pkgJSON.Dependencies["@playwright/mcp"] != "latest" {
 		t.Error("@playwright/mcp dependency should be present")
@@ -1167,7 +1173,7 @@ func TestCollectDependenciesEmpty(t *testing.T) {
 	}{
 		{name: "nil workflows"},
 		{name: "empty workflows", workflows: []*WorkflowData{}},
-		{name: "no packages", workflows: []*WorkflowData{{CustomSteps: "echo hello"}}},
+		{name: "no packages", workflows: []*WorkflowData{{CustomSteps: "echo hello", EngineConfig: &EngineConfig{ID: "copilot", Command: "local-copilot"}}}},
 	}
 
 	for _, tt := range tests {

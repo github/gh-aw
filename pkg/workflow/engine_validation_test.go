@@ -6,9 +6,52 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestValidateBlockedEngineVersions(t *testing.T) {
+	assert.NotEqual(t, "2.1.313", string(constants.DefaultClaudeCodeVersion))
+	for _, strict := range []bool{false, true} {
+		for _, version := range []string{"2.1.313", "v2.1.313", "=2.1.313", " = v2.1.313 ", "02.01.0313", "2.1.313+build"} {
+			t.Run(version+map[bool]string{false: "/non-strict", true: "/strict"}[strict], func(t *testing.T) {
+				c := NewCompiler()
+				c.SetStrictMode(strict)
+				data := &WorkflowData{EngineConfig: &EngineConfig{ID: "claude", Version: version}}
+				err := c.validateBlockedEngineVersions(data)
+				require.ErrorContains(t, err, "Claude Code 2.1.313 is blocked")
+				assert.Contains(t, err.Error(), "engine.version")
+				assert.Contains(t, err.Error(), string(constants.DefaultClaudeCodeVersion))
+			})
+		}
+	}
+	for _, version := range []string{"", string(constants.DefaultClaudeCodeVersion), "2.1.314", "2.1.313-beta.1"} {
+		require.NoError(t, NewCompiler().validateBlockedEngineVersions(&WorkflowData{
+			EngineConfig: &EngineConfig{ID: "claude", Version: version},
+		}))
+	}
+	require.NoError(t, NewCompiler().validateBlockedEngineVersions(nil))
+	require.NoError(t, NewCompiler().validateBlockedEngineVersions(&WorkflowData{}))
+	require.NoError(t, NewCompiler().validateBlockedEngineVersions(&WorkflowData{
+		EngineConfig: &EngineConfig{ID: "codex", Version: "2.1.313"},
+	}))
+	t.Run("legacy engine identity", func(t *testing.T) {
+		require.ErrorContains(t, NewCompiler().validateBlockedEngineVersions(&WorkflowData{
+			AI: "claude", EngineConfig: &EngineConfig{Version: "2.1.313"},
+		}), "Claude Code 2.1.313 is blocked")
+	})
+	t.Run("threat detection override", func(t *testing.T) {
+		data := &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "copilot"},
+			SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
+				EngineConfig: &EngineConfig{ID: "claude", Version: "2.1.313"},
+			}},
+		}
+		err := NewCompiler().validateBlockedEngineVersions(data)
+		require.ErrorContains(t, err, "safe-outputs.threat-detection.engine.version")
+	})
+}
 
 // TestValidateSingleEngineSpecification tests the validateSingleEngineSpecification function
 func TestValidateSingleEngineSpecification(t *testing.T) {

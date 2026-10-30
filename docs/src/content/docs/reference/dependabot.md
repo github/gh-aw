@@ -5,7 +5,11 @@ sidebar:
   order: 750
 ---
 
-The `gh aw compile --dependabot` command scans workflows for runtime tools (`npx`, `pip install`, `go install`), generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`), and configures Dependabot to monitor for updates
+The `gh aw compile --dependabot` command scans workflows for runtime tools (`npx`, `pip install`, `go install`) and agentic engine packages, generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`), and configures Dependabot to monitor for updates.
+
+Engine dependencies use the effective CLI version: the compiler-pinned default or an explicit `engine.version` override. Imported engine definitions with npm, pip, uv, or Go installation metadata are included, as are separately installed threat-detection engines. Multiple versions of the same npm engine package are preserved through npm aliases. Runtime version expressions and custom executable overrides cannot be represented as static package dependencies and are omitted.
+
+Python and Go manifests retain one version per package; when workflows specify different versions, the last collected version takes precedence. Unlike npm, these manifest formats do not support package aliases for independently tracking conflicting versions.
 
 ## Usage
 
@@ -49,6 +53,8 @@ All ecosystems update `.github/dependabot.yml` with weekly update schedules. Exi
 > **Never merge Dependabot PRs that only modify manifest files.** These changes are overwritten on next compilation.
 
 **Correct workflow**: Update source `.md` files, then recompile to regenerate manifests.
+
+For engine dependencies, update `engine.version` in the workflow or the imported engine definition. If the workflow uses a compiler-pinned default, upgrade the compiler or explicitly pin an unaffected engine release, then regenerate the manifests. Changing a generated manifest does not change the engine installed by the workflow.
 
 ```bash
 # Find affected workflows

@@ -73,6 +73,8 @@ Engine-specific options such as `agent`, `copilot-sdk`, `driver`, `dynamic-workf
 
 ### Pinning a Specific Engine Version
 
+Claude Code `2.1.313` is blocked for security reasons, including in threat-detection engine overrides. Remove that override to use the compiler-pinned version, or select an unaffected release, then recompile existing workflows.
+
 The compiler pins a CLI release. Override it with `engine.version`, then recompile:
 
 ```yaml
@@ -84,6 +86,8 @@ engine:
 <span id="parameterized-versions"></span>
 
 Versions can use GitHub Actions expressions; the runtime passes them through environment variables rather than shell interpolation. Copilot expression values must resolve to trusted cached releases or built-in manifest pins. Other Copilot releases require a literal version and [checksum pin](/gh-aw/reference/engines/copilot/#copilot-release-checksum-pins). Agy accepts only its verified releases.
+
+Claude version selectors are resolved before installation and rejected if they select the blocked release, before any package lifecycle scripts run.
 
 ### Engine Environment Variables
 

@@ -86,7 +86,9 @@ func TestGenerateNpmInstallSteps_IgnoreScriptsByDefault(t *testing.T) {
 	installStep := strings.Join(steps[0], "\n")
 
 	assert.Contains(t, installStep, "--ignore-scripts", "Expected --ignore-scripts flag by default")
-	assert.Contains(t, installStep, "npm install --ignore-scripts -g @anthropic-ai/claude-code@latest")
+	assert.Contains(t, installStep, `npm install --ignore-scripts -g @anthropic-ai/claude-code@"${ENGINE_VERSION}"`)
+	assert.Contains(t, installStep, `ENGINE_VERSION: "latest"`)
+	assert.Contains(t, installStep, claudeNpmVersionGuard)
 	assert.Contains(t, installStep, "NPM_CONFIG_MIN_RELEASE_AGE: '3'")
 }
 
@@ -107,7 +109,9 @@ func TestGenerateNpmInstallSteps_RunInstallScriptsEnabled(t *testing.T) {
 	installStep := strings.Join(steps[0], "\n")
 
 	assert.NotContains(t, installStep, "--ignore-scripts", "Expected no --ignore-scripts flag when runInstallScripts=true")
-	assert.Contains(t, installStep, "npm install -g @anthropic-ai/claude-code@latest")
+	assert.Contains(t, installStep, `npm install -g @anthropic-ai/claude-code@"${ENGINE_VERSION}"`)
+	assert.Contains(t, installStep, `ENGINE_VERSION: "latest"`)
+	assert.Contains(t, installStep, claudeNpmVersionGuard)
 	assert.Contains(t, installStep, "NPM_CONFIG_MIN_RELEASE_AGE: '3'")
 }
 

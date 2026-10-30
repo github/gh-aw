@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/testutil"
 
 	"github.com/github/gh-aw/pkg/workflow"
@@ -157,13 +158,21 @@ This workflow uses npx to run Playwright MCP.
 	}
 }
 
-func TestCompileDependabotNoDependencies(t *testing.T) {
+func TestCompileDependabotEngineDependencies(t *testing.T) {
 	// Create temp directory for test
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
 	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
 		t.Fatalf("failed to create workflows directory: %v", err)
 	}
+	binDir := filepath.Join(tempDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(binDir, "npm"), []byte("#!/bin/sh\nprintf '{\"lockfileVersion\":3}\\n' > package-lock.json\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	// Change to temp directory
 	origDir, _ := os.Getwd()
@@ -173,7 +182,7 @@ func TestCompileDependabotNoDependencies(t *testing.T) {
 	// Initialize git repo
 	initGitRepo(t, tempDir)
 
-	// Create a test workflow WITHOUT npm dependencies
+	// No authored npm dependencies: the default agent still installs its CLI.
 	workflowContent := `---
 on: push
 permissions:
@@ -184,7 +193,7 @@ permissions:
 
 # Test Workflow
 
-This workflow does not use npm.
+This workflow only uses the default engine package.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
 	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
@@ -207,16 +216,22 @@ This workflow does not use npm.
 		t.Fatalf("compilation failed: %v", err)
 	}
 
-	// Verify package.json was NOT created (no dependencies)
 	packageJSONPath := filepath.Join(workflowsDir, "package.json")
-	if _, err := os.Stat(packageJSONPath); !os.IsNotExist(err) {
-		t.Error("package.json should not be created when there are no npm dependencies")
+	packageData, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest workflow.PackageJSON
+	if err := json.Unmarshal(packageData, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Dependencies["@github/copilot"] != string(constants.DefaultCopilotVersion) {
+		t.Errorf("default engine dependency missing or incorrect: %v", manifest.Dependencies)
 	}
 
-	// Verify dependabot.yml was NOT created (no dependencies)
 	dependabotPath := filepath.Join(tempDir, ".github", "dependabot.yml")
-	if _, err := os.Stat(dependabotPath); !os.IsNotExist(err) {
-		t.Error("dependabot.yml should not be created when there are no npm dependencies")
+	if _, err := os.Stat(dependabotPath); err != nil {
+		t.Errorf("engine dependencies should enable Dependabot: %v", err)
 	}
 }
 

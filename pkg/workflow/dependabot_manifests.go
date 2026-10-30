@@ -115,6 +115,7 @@ func (c *Compiler) collectNpmDependencies(workflowDataList []*WorkflowData) []Np
 	deps := collectDependencies(workflowDataList, extractNpxPackages, parseNpmPackage, func(dep NpmDependency) string {
 		return dep.Name
 	})
+	deps = c.mergeNpmEngineDependencies(deps, workflowDataList)
 
 	dependabotLog.Printf("Collected %d unique dependencies", len(deps))
 	return deps
@@ -122,39 +123,15 @@ func (c *Compiler) collectNpmDependencies(workflowDataList []*WorkflowData) []Np
 
 // parseNpmPackage parses a package string like "@playwright/mcp@latest" into name and version
 func parseNpmPackage(pkg string) NpmDependency {
-	// Handle scoped packages (@org/package@version)
-	if strings.HasPrefix(pkg, "@") {
-		// Find the second @ for version separator
-		parts := strings.Split(pkg, "@")
-		if len(parts) >= 3 {
-			// @org/package@version
-			return NpmDependency{
-				Name:    "@" + parts[1],
-				Version: parts[2],
-			}
-		} else if len(parts) == 2 {
-			// @org/package (no version)
-			return NpmDependency{
-				Name:    pkg,
-				Version: "latest",
-			}
-		}
+	name, version, hasVersion := strings.Cut(pkg, "@")
+	if unscoped, scoped := strings.CutPrefix(pkg, "@"); scoped {
+		name, version, hasVersion = strings.Cut(unscoped, "@")
+		name = "@" + name
 	}
-
-	// Handle non-scoped packages (package@version)
-	parts := strings.SplitN(pkg, "@", 2)
-	if len(parts) == 2 {
-		return NpmDependency{
-			Name:    parts[0],
-			Version: parts[1],
-		}
+	if !hasVersion {
+		version = "latest"
 	}
-
-	// No version specified
-	return NpmDependency{
-		Name:    pkg,
-		Version: "latest",
-	}
+	return NpmDependency{Name: name, Version: version}
 }
 
 // loadOrInitPackageJSON reads and parses an existing package.json at path, or returns a
@@ -328,7 +305,9 @@ func runNpmInstallPackageLockOnly(ctx context.Context, npmPath, workflowDir stri
 func (c *Compiler) collectPipDependencies(workflowDataList []*WorkflowData) []PipDependency {
 	dependabotLog.Print("Collecting pip dependencies from workflows")
 
-	deps := collectDependencies(workflowDataList, extractPipPackages, parsePipPackage, func(dep PipDependency) string {
+	deps := collectDependencies(workflowDataList, func(data *WorkflowData) []string {
+		return append(extractPipPackages(data), c.enginePackages(data, "pip")...)
+	}, parsePipPackage, func(dep PipDependency) string {
 		return dep.Name
 	})
 
@@ -444,7 +423,9 @@ func (c *Compiler) generateRequirementsTxt(path string, deps []PipDependency, fo
 func (c *Compiler) collectGoDependencies(workflowDataList []*WorkflowData) []GoDependency {
 	dependabotLog.Print("Collecting Go dependencies from workflows")
 
-	deps := collectDependencies(workflowDataList, extractGoPackages, parseGoPackage, func(dep GoDependency) string {
+	deps := collectDependencies(workflowDataList, func(data *WorkflowData) []string {
+		return append(extractGoPackages(data), c.enginePackages(data, "go")...)
+	}, parseGoPackage, func(dep GoDependency) string {
 		return dep.Path
 	})
 

@@ -62,6 +62,7 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 	if err := c.populateWorkflowBuildContext(ctx); err != nil {
 		return nil, err
 	}
+	ctx.workflowData.engineInstallationDependencies = c.engineInstallations(ctx.workflowData)
 	orchestratorWorkflowLog.Printf("Workflow file parsing completed successfully: %s", markdownPath)
 	return ctx.workflowData, nil
 }

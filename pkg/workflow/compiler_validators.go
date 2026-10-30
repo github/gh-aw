@@ -184,6 +184,9 @@ func (c *Compiler) validateFeatureConfig(workflowData *WorkflowData, markdownPat
 // permission requirement, and dispatch/call-workflow configurations.
 // workflowPermissions is the *Permissions value returned by validatePermissions.
 func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdownPath string, workflowPermissions *Permissions) error {
+	if err := c.validateBlockedEngineVersions(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	workflowLog.Printf("Validating release checksum pins")
 	if err := c.validateReleaseIntegrityPins(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
