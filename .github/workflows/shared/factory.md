@@ -81,7 +81,7 @@ engine:
       const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
       const { join } = require("path");
       const { spawnSync } = require("child_process");
-      const { fetchAWFReflect, resolveProviderEndpointFromReflect, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
+      const { fetchAWFReflect, resolveProviderEndpointFromReflect, deriveBaseUrlFromModelsURL, inferWireApiForModel, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
       const log = message => process.stderr.write(`[factory-harness] ${message}\n`);
@@ -109,15 +109,28 @@ engine:
         if (!endpoint || !REFLECT_PROVIDER_ALIASES[provider].has(normalizeReflectProviderName(endpoint.endpointProvider))) {
           throw new Error(`No configured /reflect endpoint found for provider ${provider}`);
         }
+        const reflectedEndpoint = reflected.reflectData.endpoints?.find(
+          entry => entry?.configured === true &&
+            normalizeReflectProviderName(entry.provider) === normalizeReflectProviderName(endpoint.endpointProvider)
+        );
+        if (typeof reflectedEndpoint?.models_url !== "string") {
+          throw new Error(`No configured /reflect models endpoint found for provider ${provider}`);
+        }
+        const baseUrl = deriveBaseUrlFromModelsURL(reflectedEndpoint.models_url);
         const isAnthropic = provider === "anthropic";
+        const providerType = isAnthropic
+          ? "anthropic"
+          : provider === "openai" || (provider === "github" && inferWireApiForModel("openai", model) === "responses")
+            ? "openai"
+            : "generic-chat-completion-api";
         const settings = {
           cloudSessionSync: false,
           blockOnMcpLoad: true,
           customModels: [{
             displayName: "gh-aw",
             model,
-            provider: isAnthropic ? "anthropic" : provider === "openai" ? "openai" : "generic-chat-completion-api",
-            baseUrl: isAnthropic ? endpoint.baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "") : endpoint.baseUrl,
+            provider: providerType,
+            baseUrl: isAnthropic ? baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "") : baseUrl,
             apiKey: "awf-proxy",
           }],
         };
@@ -136,7 +149,7 @@ engine:
             delete childEnv[name];
           }
           const result = spawnSync(command, [...args, "--settings", settingsPath, "--model", "custom:gh-aw-0", "--file", promptPath], {
-            cwd: process.env.GITHUB_WORKSPACE,
+            cwd: process.env.GH_AW_ENGINE_CWD || process.env.GITHUB_WORKSPACE,
             env: childEnv,
             stdio: "inherit",
           });

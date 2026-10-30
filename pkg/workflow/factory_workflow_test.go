@@ -120,9 +120,9 @@ func TestFactoryHarness(t *testing.T) {
 	excludedEnvJSON, err := json.Marshal(factoryExcludedEnv)
 	require.NoError(t, err)
 	for _, scenario := range []string{
-		"success", "anthropic", "openai", "codex", "whitespace-model", "missing-model", "wrong-provider",
+		"success", "copilot-chat-completions", "copilot-responses", "anthropic", "openai", "codex", "whitespace-model", "working-directory", "missing-model", "wrong-provider",
 		"empty-model", "missing-prompt", "empty-prompt", "unreadable-prompt",
-		"execution-failure", "signal", "spawn-error", "no-awf", "reflect-failure", "missing-endpoint", "wrong-endpoint",
+		"execution-failure", "signal", "spawn-error", "no-awf", "reflect-failure", "missing-endpoint", "missing-models-url", "wrong-endpoint",
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -140,6 +140,7 @@ const factoryHarnessTestDriver = `
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
+const awfReflect = require("../../actions/setup/js/awf_reflect.cjs");
 const [scriptPath, scenario, excludedEnvJSON] = process.argv.slice(1);
 const excludedEnv = JSON.parse(excludedEnvJSON);
 const calls = [];
@@ -154,6 +155,9 @@ if (["anthropic", "openai", "codex"].includes(scenario)) {
   env.GH_AW_LLM_PROVIDER = scenario === "codex" ? "openai" : scenario;
   env.FACTORY_MODEL = scenario + "/fixture-model";
 }
+if (scenario === "copilot-chat-completions") env.FACTORY_MODEL = "copilot/claude-haiku-5.5";
+if (scenario === "copilot-responses") env.FACTORY_MODEL = "copilot/gpt-5.3-codex";
+if (scenario === "working-directory") env.GH_AW_ENGINE_CWD = "/workspace/subdir";
 if (scenario === "missing-model") delete env.FACTORY_MODEL;
 if (scenario === "wrong-provider") env.GH_AW_LLM_PROVIDER = "factory";
 if (scenario === "empty-model") env.FACTORY_MODEL = "copilot/ ";
@@ -188,16 +192,18 @@ await vm.runInNewContext(fs.readFileSync(scriptPath, "utf8"), {
       },
     };
     if (name === "./awf_reflect.cjs") return {
-      fetchAWFReflect: async () => ({ok: scenario !== "reflect-failure", reflectData: {endpoints: []}}),
-      normalizeReflectProviderName: value => value,
-      REFLECT_PROVIDER_ALIASES: {github: new Set(["github"]), anthropic: new Set(["anthropic"]), openai: new Set(["openai"])},
-      resolveProviderEndpointFromReflect: options => {
-        assert.equal(options.provider, env.GH_AW_LLM_PROVIDER);
-        return scenario === "missing-endpoint" ? null : {
-          baseUrl: "http://api-proxy:10001/v1",
-          endpointProvider: scenario === "wrong-endpoint" ? "anthropic" : env.GH_AW_LLM_PROVIDER,
-        };
-      },
+      ...awfReflect,
+      fetchAWFReflect: async () => ({
+        ok: scenario !== "reflect-failure",
+        reflectData: {
+          endpoints: scenario === "missing-endpoint" ? [] : [{
+            configured: true,
+            provider: scenario === "wrong-endpoint" ? "anthropic" : env.GH_AW_LLM_PROVIDER,
+            models_url: scenario === "missing-models-url" ? null : "http://api-proxy:10001/v1/models",
+            port: 10001,
+          }],
+        },
+      }),
     };
     if (name === "child_process") return {spawnSync: (command, childArgs, options) => {
       calls.push({command, args: Array.from(childArgs), options});
@@ -229,6 +235,7 @@ const failures = {
   "no-awf": "Factory requires the AWF API proxy",
   "reflect-failure": "Unable to discover the Factory LLM endpoint",
   "missing-endpoint": "No configured /reflect endpoint found",
+  "missing-models-url": "No configured /reflect models endpoint found",
   "wrong-endpoint": "No configured /reflect endpoint found",
 };
 if (failures[scenario]) {
@@ -237,14 +244,14 @@ if (failures[scenario]) {
 } else {
   assert.equal(mockProcess.exitCode || 0, 0);
 }
-const ran = ["success", "anthropic", "openai", "codex", "whitespace-model", "execution-failure", "signal", "spawn-error"].includes(scenario);
+const ran = ["success", "copilot-chat-completions", "copilot-responses", "anthropic", "openai", "codex", "whitespace-model", "working-directory", "execution-failure", "signal", "spawn-error"].includes(scenario);
 assert.equal(calls.length, ran ? 1 : 0);
 assert.equal(cleaned, ran);
 if (ran) {
   assert.equal(calls[0].command, "droid");
   assert.deepEqual(calls[0].args, [...args, "--settings", "/tmp/gh-aw/agent/factory-fixture/settings.json",
     "--model", "custom:gh-aw-0", "--file", env.GH_AW_PROMPT]);
-  assert.equal(calls[0].options.cwd, "/workspace");
+  assert.equal(calls[0].options.cwd, scenario === "working-directory" ? "/workspace/subdir" : "/workspace");
   assert.equal(calls[0].options.shell, undefined);
   assert.equal(calls[0].options.stdio, "inherit");
   assert.notEqual(calls[0].options.env, env);
@@ -259,8 +266,11 @@ if (ran) {
   assert.equal(settings.customModels.length, 1);
   const model = settings.customModels[0];
   assert.equal(model.apiKey, "awf-proxy");
-  assert.equal(model.model, scenario === "anthropic" || scenario === "openai" || scenario === "codex" ? "fixture-model" : "gpt-5.2");
-  assert.equal(model.provider, scenario === "anthropic" ? "anthropic" : ["openai", "codex"].includes(scenario) ? "openai" : "generic-chat-completion-api");
+  assert.equal(model.model, scenario === "anthropic" || scenario === "openai" || scenario === "codex" ? "fixture-model" :
+    scenario === "copilot-chat-completions" ? "claude-haiku-5.5" :
+    scenario === "copilot-responses" ? "gpt-5.3-codex" : "gpt-5.2");
+  assert.equal(model.provider, scenario === "anthropic" ? "anthropic" :
+    scenario === "copilot-chat-completions" ? "generic-chat-completion-api" : "openai");
   assert.equal(model.baseUrl, scenario === "anthropic" ? "http://api-proxy:10001" : "http://api-proxy:10001/v1");
 }
 })().catch(error => { console.error(error); process.exitCode = 1; });
