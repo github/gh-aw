@@ -159,7 +159,7 @@ async function addIssueComment(github, owner, repo, issueNumber, message) {
  * @param {string} stateReason - The reason for closing: "COMPLETED", "NOT_PLANNED", or "DUPLICATE"
  * @returns {Promise<{number: number, html_url: string, title: string, node_id: string}>} Issue details
  */
-async function closeIssue(github, owner, repo, issueNumber, stateReason, intentMetadata, useIssueIntent) {
+async function closeIssue(github, owner, repo, issueNumber, stateReason, intentMetadata, useIssueIntent, canonicalIssue) {
   const baseParams = {
     owner,
     repo,
@@ -170,6 +170,19 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
 
   const hasIntentMetadata = Boolean(intentMetadata && Object.keys(intentMetadata).length > 0);
   if (useIssueIntent && hasIntentMetadata) {
+    let duplicateIssueId;
+    if (canonicalIssue) {
+      const { data } = await github.rest.issues.get({
+        owner: canonicalIssue.owner,
+        repo: canonicalIssue.repo,
+        issue_number: canonicalIssue.issueNumber,
+      });
+      duplicateIssueId = data.id;
+      if (!duplicateIssueId) {
+        throw new Error(`${ERR_NOT_FOUND}: id missing for canonical issue ${canonicalIssue.owner}/${canonicalIssue.repo}#${canonicalIssue.issueNumber}`);
+      }
+    }
+
     try {
       core.debug("Attempting issue-intent close request");
       const { data: issue } = await github.request("PATCH /repos/{owner}/{repo}/issues/{issue_number}", {
@@ -178,6 +191,7 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
         issue_number: issueNumber,
         state: { value: "closed", ...intentMetadata },
         state_reason: baseParams.state_reason,
+        ...(duplicateIssueId !== undefined ? { duplicate_issue_id: duplicateIssueId } : {}),
       });
       core.debug("Issue-intent close request succeeded");
       return issue;
@@ -351,15 +365,16 @@ async function main(config = {}) {
         const intentMetadata = issueIntentEnabled ? normalizeIssueIntentMetadata(item) : {};
         core.info(`Closing issue #${entityNumber} with state_reason=${stateReason}`);
 
-        const closePromise = closeIssue(github, owner, repo, entityNumber, stateReason, intentMetadata, issueIntentEnabled);
+        const stateReasonUpper = stateReason.toUpperCase();
+        const parsed = stateReasonUpper === "DUPLICATE" ? parseDuplicateOf(item.duplicate_of, owner, repo) : null;
+        const canonicalIssue = parsed && validateRepo(`${parsed.owner}/${parsed.repo}`, defaultTargetRepo, allowedRepos).valid && !(parsed.owner === owner && parsed.repo === repo && parsed.issueNumber === entityNumber) ? parsed : undefined;
+        const closePromise = closeIssue(github, owner, repo, entityNumber, stateReason, intentMetadata, issueIntentEnabled, canonicalIssue);
 
         // When duplicate_of is provided and state_reason is DUPLICATE, create the native duplicate relationship
-        const stateReasonUpper = stateReason.toUpperCase();
         if (item.duplicate_of !== undefined && item.duplicate_of !== null && stateReasonUpper !== "DUPLICATE") {
           core.warning(`duplicate_of is set but state_reason is ${stateReason} (not DUPLICATE); native duplicate marking will be skipped`);
         }
         if (item.duplicate_of !== undefined && item.duplicate_of !== null && stateReasonUpper === "DUPLICATE") {
-          const parsed = parseDuplicateOf(item.duplicate_of, owner, repo);
           if (parsed) {
             // Validate canonical repo against the same allowedRepos policy
             const canonicalRepoSlug = `${parsed.owner}/${parsed.repo}`;
