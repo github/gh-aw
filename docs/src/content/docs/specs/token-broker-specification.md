@@ -8,7 +8,7 @@ sidebar:
 # Token Broker Specification
 
 **Version**: 1.0.0<br />
-**Status**: Draft<br />
+**Status**: Experimental draft<br />
 **Date**: 2026-10-30<br />
 **Editors**: GitHub Agentic Workflows maintainers<br />
 **Latest version**: [Token Broker Specification](/gh-aw/specs/token-broker-specification/)
@@ -18,6 +18,8 @@ sidebar:
 This specification defines a deployment-owned HTTPS service that exchanges a verified GitHub Actions OpenID Connect (OIDC) identity token for a short-lived credential. Two independent capabilities authorize GitHub Copilot inference requests and Copilot coding-agent task operations. The specification defines the wire contract, issuer verification, tenant and workflow authorization, credential issuance, renewal, failure handling, and compliance tests. It does not define a public GitHub credential-minting API or supply a server implementation.
 
 ## Status of This Document
+
+Token broker authentication is experimental. The protocol, configuration, and behavior may change without deprecation. Compiling a workflow that enables either broker capability emits an experimental-feature warning.
 
 This is a project specification following W3C-style conventions, not a W3C Recommendation. Repository maintainers govern changes through the normal contribution and review process. Version numbers follow semantic versioning: incompatible contract changes increment the major version, backward-compatible features increment the minor version, and clarifications increment the patch version.
 

@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -11,6 +12,50 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestTokenBrokerExperimentalWarning(t *testing.T) {
+	const warning = "Using experimental feature: token-broker"
+	for _, tc := range []struct {
+		name    string
+		request bool
+		task    bool
+	}{
+		{name: "disabled"},
+		{name: "request-only", request: true},
+		{name: "task-only", task: true},
+		{name: "both", request: true, task: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, batchMode := range []bool{false, true} {
+				t.Run(map[bool]string{false: "single", true: "batch"}[batchMode], func(t *testing.T) {
+					enabled := tc.request || tc.task
+					compiler := NewCompiler()
+					compiler.SetBatchMode(batchMode)
+					var output bytes.Buffer
+					compiler.emitExperimentalFeatureWarningsTo(&WorkflowData{
+						TokenBrokerEnabled:        enabled,
+						TokenBrokerCopilotRequest: tc.request,
+						TokenBrokerCopilotTask:    tc.task,
+					}, &output)
+
+					if enabled {
+						assert.Equal(t, 1, compiler.GetWarningCount())
+						if batchMode {
+							assert.Empty(t, output.String())
+							assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()[warning])
+						} else {
+							assert.Contains(t, output.String(), warning)
+						}
+					} else {
+						assert.Empty(t, output.String())
+						assert.Zero(t, compiler.GetWarningCount())
+						assert.Zero(t, compiler.GetExperimentalFeatureUsage()[warning])
+					}
+				})
+			}
+		})
+	}
+}
 
 func TestTokenBrokerCompileOptIn(t *testing.T) {
 	t.Setenv(tokenBrokerURLEnv, "https://compile-time.invalid/never")

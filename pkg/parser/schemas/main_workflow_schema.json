@@ -8,7 +8,7 @@
   "required": ["on"],
   "properties": {
     "token-broker": {
-      "description": "Select independent Copilot capabilities to authenticate through the OIDC token broker.",
+      "description": "Experimental. Select independent Copilot capabilities to authenticate through the OIDC token broker. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation.",
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,

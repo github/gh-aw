@@ -92,6 +92,9 @@ if: github.event_name == 'push'
 
 ### Token Broker (`token-broker:`)
 
+> [!WARNING]
+> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables either capability emits a warning.
+
 An optional object that independently enables OIDC-authenticated Copilot credential exchange.
 
 ```aw

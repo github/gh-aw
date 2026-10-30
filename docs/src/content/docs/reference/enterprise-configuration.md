@@ -75,6 +75,9 @@ The same configuration enables an isolated conclusion-admission job to post to `
 ## OIDC Token Broker
 
 > [!WARNING]
+> Token broker authentication is experimental. Configuration and behavior may change without deprecation. Compiling a workflow that enables either capability emits a warning.
+
+> [!WARNING]
 > Brokered Copilot inference is supported in threat-detection and evals jobs. Main-agent inference remains blocked pending a renewable credential provider in AWF. Enable task and request capabilities independently; task-only adoption does not change the workflow's inference authentication.
 
 Enterprise administrators can distribute a broker endpoint through an organization Actions variable named `GH_AW_TOKEN_BROKER_URL`, with access limited to enrolled repositories. A repository Actions variable can override the organization value. An Actions secret with the same name is also supported; a nonempty variable takes precedence over the secret. For enterprise-wide deployment, provision the setting in each organization rather than assuming an enterprise Actions-variable scope.
