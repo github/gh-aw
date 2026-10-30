@@ -259,6 +259,10 @@ export interface SessionProvenance {
   index: SessionCount;
   /** Ordering key only; numeric native timestamp units are schema-dependent. */
   timestampMs?: number;
+  /** Retry attempt correlation, assigned only when the source evidence is unambiguous. @pattern ^(harness:[1-9][0-9]{0,2}|startup:[1-9][0-9]{0,2}(:harness:[1-9][0-9]{0,2})?)$ */
+  attemptId?: string;
+  /** Optional startup scope for an unambiguous nested harness correlation. @pattern ^startup:[1-9][0-9]{0,2}$ */
+  startupAttemptId?: string;
   /** Preserves a source event's preexisting provenance field. */
   native?: unknown;
 }

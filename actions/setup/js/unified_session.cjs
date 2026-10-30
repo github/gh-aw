@@ -16,6 +16,7 @@ const { normalizeOtelEvents } = require("./unified_session_otel.cjs");
 const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { estimateBaseline, projectModelConfig } = require("./routing_analytics.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
+const { parseHarnessAttempts, correlateHarnessAttempts } = require("./harness_retry_session.cjs");
 
 const SESSION_FILE_FORMAT_VERSION = 1;
 
@@ -53,7 +54,7 @@ function isModelResolutionData(data) {
 }
 
 /** @typedef {import("./types/agent_session").SessionEvent} SessionEvent */
-/** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], indices?: number[], timestampUnit?: import("./unified_session_order.cjs").TimestampUnit}} SessionSource */
+/** @typedef {{component: string, phase: string, path: string, events: SessionEvent[], attemptId?: string, startupAttemptId?: string, indices?: number[], timestampUnit?: import("./unified_session_order.cjs").TimestampUnit}} SessionSource */
 
 /** @param {unknown} value @returns {boolean} */
 const isNativePath = value => typeof value === "string" && /^sandbox\/agent\/logs\/copilot-session-state\/[A-Za-z0-9_-]+\/events\.jsonl$/.test(value);
@@ -96,6 +97,8 @@ function mergeSessionSources(sources) {
             phase: source.phase,
             path: source.path,
             index: sourceIndex,
+            ...(source.attemptId ? { attemptId: source.attemptId } : {}),
+            ...(source.startupAttemptId ? { startupAttemptId: source.startupAttemptId } : {}),
             ...(timestampMs !== undefined ? { timestampMs } : {}),
             ...(Object.hasOwn(event, "provenance") ? { native: structuredClone(event.provenance) } : {}),
           },
@@ -530,12 +533,49 @@ function collectUnifiedSession({
     ["", "agent"],
     ["threat-detection/", "detection"],
   ]) {
-    const retryFile = path.join(rootDir, prefix, prefix ? "detection_harness_retry.json" : "agent/harness_retry.json");
-    if (exists(retryFile)) {
+    const retryFile = choose(prefix ? ["threat-detection/detection_harness_retry.json", "usage/detection/harness_retry.json"] : ["agent/harness_retry.json", "usage/agent/harness_retry.json"]);
+    if (retryFile) {
       const record = records(retryFile)[0];
       const data = normalizeHarnessRetryRecord(record);
       if (data) {
-        sources.push({ component: "harness", phase, path: path.relative(rootDir, retryFile), events: [{ type: "harness.retry", data }] });
+        /** @type {SessionEvent[]} */
+        const retryEvents = [{ type: "harness.retry", data }];
+        /** @type {Array<["startup" | "harness", import("./types/unified_session").HarnessRetryAttemptData[]]>} */
+        const layers = [
+          ["startup", data.startupAttemptResults ?? []],
+          ["harness", data.attemptResults],
+        ];
+        for (const [layer, attempts] of layers) {
+          for (const attempt of attempts) {
+            retryEvents.push({
+              type: "harness.attempt",
+              data: { ...attempt, attemptId: attempt.attemptId ?? `${layer}:${attempt.attempt}`, layer },
+              ...(attempt.startedAt !== undefined ? { timestamp: attempt.startedAt } : {}),
+            });
+          }
+        }
+        sources.push({ component: "harness", phase, path: path.relative(rootDir, retryFile), events: retryEvents });
+        if (phase === "agent" && !protectedSessionCapture && engine) {
+          const segments = parseHarnessAttempts(stdioContent, engine, data.attemptResults, parseEngineSession);
+          if (segments) {
+            for (let index = sources.length - 1; index >= 0; index--) {
+              if (sources[index].component === "agent" && sources[index].phase === "agent") sources.splice(index, 1);
+            }
+            let sourceIndex = 0;
+            for (const segment of segments) {
+              const indices = segment.events.map(() => sourceIndex++);
+              sources.push({
+                component: "agent",
+                phase,
+                path: "agent-stdio.log",
+                events: segment.events,
+                indices,
+                attemptId: segment.attempt.attemptId ?? `harness:${segment.attempt.attempt}`,
+                startupAttemptId: segment.attempt.startupAttemptId,
+              });
+            }
+          }
+        }
       } else {
         report(retryFile, "invalid_harness_retry", undefined);
       }
@@ -848,7 +888,7 @@ function collectUnifiedSession({
   /** @type {import("./types/agent_session").SessionFileFormatEvent} */
   const format = { type: "session.format", data: { version: SESSION_FILE_FORMAT_VERSION } };
   sources.push({ component: "collector", phase: "conclusion", path: "usage/aw_session.jsonl", events: [format, ...warnings, ...routingEstimates, summary] });
-  const events = mergeSessionSources(sources);
+  const events = correlateHarnessAttempts(mergeSessionSources(sources));
   const formatIndex = events.findIndex(event => event.type === "session.format" && event.provenance.component === "collector" && event.provenance.index === 0);
   // File metadata leads the stream without inventing a timestamp for it.
   const [header] = events.splice(formatIndex, 1);
