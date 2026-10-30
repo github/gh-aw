@@ -1934,7 +1934,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 10
         env:
-          ANTHROPIC_BASE_URL: http://host.docker.internal:10002
+          ANTHROPIC_BASE_URL: http://api-proxy:10002
           ANTHROPIC_MODEL: claude-haiku-4.5
           BASH_DEFAULT_TIMEOUT_MS: 60000
           BASH_MAX_TIMEOUT_MS: 60000

@@ -61,6 +61,19 @@ Creates `.github/skills/agentic-workflows/SKILL.md`. With the Copilot engine (de
 **MCP equivalent**: Not available — run from a local terminal or use the `upgrade` tool for updates.
 
 ---
+### `gh aw doctor`
+
+Diagnose CLI authentication and repository setup.
+
+```bash
+gh aw doctor [--repo owner/repo]  # Check gh CLI auth; with --repo also verify repo access and checkout state
+```
+
+In a local checkout, also inspects workflows using `safe-outputs.assign-to-agent` for an available PAT secret and samples recent runs for credential-failure evidence. Does not verify stored secret values, expiry, or permissions.
+
+**MCP equivalent**: Not available — run from a local terminal.
+
+---
 ### `gh aw compile`
 
 Compile workflow `.md` files into GitHub Actions `.lock.yml` files.
@@ -156,17 +169,12 @@ gh aw audit <id1> <id2> --group     # Grouped findings: one entry per [run, code
 gh aw audit <id1> <id2> <id3> --group --json  # Per-run finding codes for recurrence checks
 gh aw audit <run-id> --search "ERR_AUTH_401 api.example.com" --json  # BM25 evidence with automatic repetition grouping
 gh aw audit <run-id> --search "github.issue_read timeout" --search-limit 3
+gh aw audit <run-id> --models        # Report the run's model catalog, discovery status, and supported endpoints
 ```
 
-For audit triage methodology, see [analyzing-runs.md](analyzing-runs.md#audit).
-`--search` is single-run CLI retrieval over the redacted unified session, not
-finding generation. Results include bounded excerpts, source references,
-neighboring events, and occurrence counts. Drain3 activates automatically only
-when repetitive top matches crowd the limit and grouping saves excerpt text;
-no configuration is needed. It never changes BM25 ranking, and groups keep
-structured success/failure outcomes separate. Cluster/template/anomaly fields
-are omitted for ungrouped results. Do not compare cluster IDs across runs or treat
-zero matches as safety evidence. It cannot be combined with `--group` or job/step URLs.
+For audit triage methodology, including `--search` BM25/Drain3 grouping semantics,
+see [analyzing-runs.md](analyzing-runs.md#audit). `--models` and `--search` are both
+single-run only: neither combines with `--group` or job/step URLs.
 
 **MCP equivalent**: `audit` tool (single run) / `audit-diff` tool (multi-run comparison)
 for ordinary audits; BM25 `--search` is CLI-only.
@@ -388,4 +396,5 @@ gh aw json-schema logs-jsonl
 | `gh aw deploy` | *(local only)* |
 | `gh aw env` | *(local only)* |
 | `gh aw init` | *(local only)* |
+| `gh aw doctor` | *(local only)* |
 | `gh aw json-schema` | *(local only)* |

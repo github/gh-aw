@@ -149,17 +149,30 @@ func declaresIgnoredFilesystemAllowWrite(workflowData *WorkflowData) bool {
 }
 
 func isAWFNetworkIsolationEnabled(workflowData *WorkflowData) bool {
-	agentConfig := getAgentConfig(workflowData)
-	if agentConfig == nil || agentConfig.Disabled {
-		return false
-	}
-	if agentConfig.Runtime == AgentRuntimeNVX {
+	if isNVXRuntime(workflowData) {
 		return true
 	}
 	// Inline threat detection and evals run a standalone AWF with no MCP sidecars, so
 	// there is nothing to attach to the isolated topology.
 	if workflowData != nil && (workflowData.IsDetectionRun || workflowData.IsEvalsRun) {
 		return false
+	}
+	return isAWFAgentOnNetworkIsolationTopology(workflowData)
+}
+
+// isAWFAgentOnNetworkIsolationTopology reports whether AWF places the agent on its
+// network-isolation topology, which depends only on the sandbox runtime profile.
+// Unlike isAWFNetworkIsolationEnabled it does not exempt inline threat detection
+// and evals: those runs attach no sidecars, but AWF still runs the agent on the
+// isolated topology, so addresses the agent must reach (such as the LLM gateway on
+// the api-proxy container) must follow it.
+func isAWFAgentOnNetworkIsolationTopology(workflowData *WorkflowData) bool {
+	agentConfig := getAgentConfig(workflowData)
+	if agentConfig == nil || agentConfig.Disabled {
+		return false
+	}
+	if agentConfig.Runtime == AgentRuntimeNVX {
+		return true
 	}
 	profile := resolveSandboxRuntimeProfile(agentConfig)
 	return profile.NetworkIsolation && !profile.SupportsHostAccess

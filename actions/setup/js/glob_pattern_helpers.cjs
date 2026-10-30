@@ -55,10 +55,7 @@ function globPatternToRegex(pattern, options) {
 
   if (pathMode) {
     // Path mode: handle ** and * differently
-    regexPattern = regexPattern
-      .replace(/\*\*/g, "<!DOUBLESTAR>") // Temporarily replace **
-      .replace(/\*/g, "[^/]*") // Single * matches non-slash chars
-      .replace(/<!DOUBLESTAR>/g, ".*"); // ** matches everything including /
+    regexPattern = regexPattern.replace(/\*\*|\*/g, wildcard => (wildcard === "**" ? ".*" : "[^/]*"));
   } else {
     // Simple mode: * matches any character
     regexPattern = regexPattern.replace(/\*/g, ".*");
