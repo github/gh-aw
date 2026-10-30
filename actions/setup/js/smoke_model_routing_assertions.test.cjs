@@ -10,6 +10,8 @@ import {
   detectionMain,
   evaluateDetectionEvidence,
   evaluateRequestedEffort,
+  evaluateSessionContract,
+  supportedEndpoints,
   main,
   normalizeEndpoint,
   servedModel,
@@ -529,6 +531,218 @@ describe("smoke_model_routing_assertions", () => {
       awInfo.model_routing = { status: "rejected", failure_code: "unsupported_endpoint", detail: "AWF model routing endpoint /chat/completions is not supported by this engine" };
       claudeFixture({ awInfo });
       expect(claudeCheck().failures).toEqual(["FAIL R1 routing not selected: runner-written routing status is rejected, expected selected; ignored agent-written model_routing.outcome (status=selected)"]);
+    });
+  });
+
+  // Native provider routing. No native routed run has been captured yet, so the
+  // records are derived from captured Copilot runs by changing only the provider
+  // and model identity fields AWF writes for a native route (provider-scoped
+  // selection/request records, bare wire_model, `<provider>/<wire_model>` selected
+  // model) and the effort; /reflect native endpoints use AWF's
+  // buildRoutingModelMetadata shape, whose supported_endpoints are protocol names.
+  describe("native provider routing (derived record shapes)", () => {
+    const ROUTING = "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl";
+    const sonnet = { model_id: "claude-sonnet-5", source: "maintained", supported_endpoints: ["messages"], supported_reasoning_efforts: ["low", "medium", "high", "max"], context_window_tokens: 1000000, candidate_metadata_complete: true };
+    const gpt54 = {
+      model_id: "gpt-5.4",
+      source: "maintained",
+      supported_endpoints: ["chat_completions", "responses"],
+      supported_reasoning_efforts: ["none", "low", "medium", "high", "xhigh"],
+      context_window_tokens: 1050000,
+      candidate_metadata_complete: true,
+    };
+    const nativeReflect = ({ anthropic = {}, openai = {} } = {}) => ({
+      endpoints: [
+        { provider: "openai", port: 10000, base_url: "http://api-proxy:10000", configured: false, models: null, routing_models: null, ...openai },
+        { provider: "anthropic", port: 10001, base_url: "http://api-proxy:10001", configured: true, models: ["claude-haiku-4-5", "claude-sonnet-5"], routing_models: [sonnet], ...anthropic },
+        // A Copilot listener advertising the same model must not satisfy native checks.
+        { provider: "copilot", port: 10002, base_url: "http://api-proxy:10002", configured: false, models: ["claude-sonnet-5"], routing_models: [{ model_id: "claude-sonnet-5", supported_endpoints: ["/chat/completions"] }] },
+      ],
+    });
+    const openaiReflect = () =>
+      nativeReflect({
+        openai: { configured: true, models: ["gpt-5.4", "gpt-5.4-mini"], routing_models: [gpt54] },
+        anthropic: { configured: false, models: null, routing_models: null },
+      });
+    const claudeGoldenDir = fileURLToPath(new URL("../../../pkg/cli/testdata/model_routing_golden/claude-awf-selected-messages/", import.meta.url));
+    const claudeGolden = file => fs.readFileSync(path.join(claudeGoldenDir, file), "utf8");
+    // claude-awf-selected-messages moved to Anthropic: the selection is on native Messages
+    // (no Copilot endpoint override) at the economy mode the smoke requests.
+    const toAnthropic = text =>
+      text
+        .replaceAll('"provider":"copilot"', '"provider":"anthropic"')
+        .replaceAll('"selected_provider":"copilot"', '"selected_provider":"anthropic"')
+        .replaceAll("github-copilot/claude-opus-5", "anthropic/claude-sonnet-5")
+        .replaceAll("github-copilot/claude-sonnet-5", "anthropic/claude-sonnet-5")
+        .replaceAll('"model":"claude-opus-5","path":"/chat/completions"', '"model":"claude-sonnet-5","path":"/v1/messages"')
+        .replaceAll('"endpoint":"/chat/completions"', '"endpoint":"/v1/messages"')
+        .replaceAll('"deviations":["endpoint"]', '"deviations":[]')
+        .replaceAll('"mode":"auto"', '"mode":"economy"');
+    const anthropicAwInfo = () => {
+      const awInfo = JSON.parse(claudeGolden("aw_info.json"));
+      awInfo.model_routing = { ...awInfo.model_routing, provider: "anthropic", model: "anthropic/claude-sonnet-5", endpoint: "/v1/messages" };
+      delete awInfo.model_routing.selected_endpoint;
+      return awInfo;
+    };
+
+    function anthropicFixture({ routing = toAnthropic(claudeGolden(ROUTING)), tokenUsage = toAnthropic(claudeGolden(TOKEN_USAGE)), reflectData = nativeReflect() } = {}) {
+      write("aw_info.json", anthropicAwInfo());
+      write(
+        ROUTING,
+        routing
+          .split("\n")
+          .filter(Boolean)
+          .map(line => ({ event: "model_routing", ...JSON.parse(line) }))
+      );
+      write(TOKEN_USAGE, tokenUsage);
+      write("agent/awf-routing-outcome.json", { status: "selected", wire_model: "claude-sonnet-5", endpoint: "/v1/messages", effort: "medium", applied_effort: "medium" });
+      write("sandbox/firewall/awf-reflect.json", reflectData);
+    }
+    const anthropicExpectations = {
+      engine: "claude",
+      executionOutcome: "success",
+      allowedModels: ["claude-sonnet-5"],
+      mainEndpoint: "/v1/messages",
+      routingMode: "economy",
+      nativeProvider: "anthropic",
+      expectRequestedEffortMatchesSelection: true,
+    };
+    const anthropicCheck = (extra = {}) => checkModelRoutingEvidence({ rootDir: root, ...anthropicExpectations, ...extra });
+
+    const copilotFixtureDir = fileURLToPath(new URL("./fixtures/copilot-routed-run-39147795806/", import.meta.url));
+    const copilotFixture = file => fs.readFileSync(path.join(copilotFixtureDir, file), "utf8");
+    // copilot-routed-run-39147795806 moved to OpenAI: gpt-5.4 at its maintained high effort.
+    const toOpenAI = text =>
+      text
+        .replaceAll('"provider":"copilot"', '"provider":"openai"')
+        .replaceAll('"selected_provider":"copilot"', '"selected_provider":"openai"')
+        .replaceAll("github-copilot/gpt-5.6-luna", "openai/gpt-5.4")
+        .replaceAll('"gpt-5.6-luna"', '"gpt-5.4"')
+        .replaceAll('"selected_effort":"max"', '"selected_effort":"high"')
+        .replaceAll('"requested_effort":"max"', '"requested_effort":"high"');
+    function openaiFixture({ tokenUsage = toOpenAI(copilotFixture("token-usage.jsonl")) } = {}) {
+      const awInfo = JSON.parse(copilotFixture("aw_info.json"));
+      Object.assign(awInfo, {
+        engine_id: "codex",
+        model: "gpt-5.4",
+        requested_model: "agent",
+        routed_model: "gpt-5.4",
+        model_routing: { status: "selected", source: "awf-routing", provider: "openai", wire_model: "gpt-5.4", model: "openai/gpt-5.4", effort: "high", endpoint: "/responses", mode: "economy" },
+      });
+      write("aw_info.json", awInfo);
+      write(ROUTING, toOpenAI(copilotFixture("model-routing.jsonl")));
+      write(TOKEN_USAGE, tokenUsage);
+      write("agent/awf-routing-outcome.json", { status: "selected", wire_model: "gpt-5.4", endpoint: "/responses", selected_endpoint: "/responses", effort: "high", applied_effort: "high" });
+      write("sandbox/firewall/awf-reflect.json", openaiReflect());
+    }
+    const openaiCheck = () =>
+      checkModelRoutingEvidence({
+        rootDir: root,
+        engine: "codex",
+        executionOutcome: "success",
+        allowedModels: ["gpt-5.4"],
+        mainEndpoint: "/responses",
+        routingMode: "economy",
+        nativeProvider: "openai",
+        expectRequestedEffortMatchesSelection: true,
+      });
+
+    it("maps native protocol names to request paths only for the native provider", () => {
+      expect([...supportedEndpoints("claude-sonnet-5", null, nativeReflect(), "anthropic")]).toEqual(["/v1/messages"]);
+      expect([...supportedEndpoints("gpt-5.4", null, openaiReflect(), "openai")]).toEqual(["/chat/completions", "/v1/chat/completions", "/responses", "/v1/responses"]);
+      expect([...supportedEndpoints("claude-sonnet-5", null, nativeReflect())]).toEqual(["/v1/messages", "/chat/completions"]);
+    });
+
+    it("passes every check for a native Anthropic route on Messages", () => {
+      anthropicFixture();
+      const results = anthropicCheck();
+      expect(results.failures).toEqual([]);
+      expect(results.passes).toEqual([
+        "PASS E2 evidence: unified session and api-proxy token usage present",
+        "PASS E1 agent execution outcome is success",
+        "PASS R1 routing selected claude-sonnet-5 (runner status=selected, endpoint=/v1/messages)",
+        "PASS R2 one routing_classification request: claude-sonnet-5 /v1/messages 200",
+        "PASS R3 main-agent request on selected model: claude-sonnet-5 /v1/messages 200",
+        "PASS R4 all 3 main-agent request(s) used allowed models",
+        "PASS M1 all 3 main-agent request(s) used /v1/messages",
+        "PASS P1 requested mode economy; recommended profile economy and selected effort medium are valid for claude-sonnet-5",
+        "PASS N1 native anthropic selection anthropic/claude-sonnet-5 (wire_model=claude-sonnet-5, effort=medium)",
+        "PASS N2 all 3 main-agent request(s) and 3 request event(s) used anthropic claude-sonnet-5",
+        "PASS N3 anthropic endpoint http://api-proxy:10001 lists claude-sonnet-5 with complete routing metadata",
+        "PASS H3 all 3 main-agent request(s) requested the selected effort medium",
+      ]);
+    });
+
+    it("fails N1 and N2 for the captured Copilot route even though the provider-blind checks pass", () => {
+      const routing = claudeGolden(ROUTING).replaceAll('"mode":"auto"', '"mode":"economy"');
+      anthropicFixture({ routing, tokenUsage: claudeGolden(TOKEN_USAGE) });
+      const { passes, failures } = anthropicCheck();
+      expect(checkIds(passes)).toEqual(expect.arrayContaining(["R1", "R3", "R4", "M1", "N3", "H3"]));
+      expect(failures).toEqual([
+        "FAIL N1 native anthropic selection: selection provider is copilot, expected anthropic; selected_provider is copilot, expected anthropic; selected_model is github-copilot/claude-sonnet-5, expected anthropic/claude-sonnet-5",
+        "FAIL N2 token-usage record(s) not on anthropic claude-sonnet-5: copilot claude-sonnet-5, copilot claude-sonnet-5, copilot claude-sonnet-5; request event(s) not on anthropic claude-sonnet-5: copilot claude-sonnet-5, copilot claude-sonnet-5, copilot claude-sonnet-5",
+      ]);
+    });
+
+    it("compares exact native wire IDs instead of Copilot-normalized names", () => {
+      const toDash = text => toAnthropic(text).replaceAll("claude-sonnet-5", "claude-sonnet-5-5");
+      anthropicFixture({
+        routing: toDash(claudeGolden(ROUTING)),
+        tokenUsage: toDash(claudeGolden(TOKEN_USAGE)),
+        reflectData: nativeReflect({ anthropic: { models: ["claude-sonnet-5-5"], routing_models: [{ ...sonnet, model_id: "claude-sonnet-5-5" }] } }),
+      });
+      // allowed-models in Copilot dot form must not authorize the native dash-form wire ID.
+      const { failures } = anthropicCheck({ allowedModels: ["claude-sonnet-5.5"] });
+      expect(failures).toEqual(["FAIL N1 native anthropic selection: wire_model claude-sonnet-5-5 is not exactly one of allowed-models [claude-sonnet-5.5]"]);
+      expect(anthropicCheck({ allowedModels: ["claude-sonnet-5-5"] }).failures).toEqual([]);
+    });
+
+    it("fails N3 and the metadata-based checks when the native endpoint is not configured", () => {
+      anthropicFixture({ reflectData: nativeReflect({ anthropic: { configured: false } }) });
+      const { failures } = anthropicCheck();
+      expect(failures).toEqual(["FAIL N3 /reflect has no configured anthropic endpoint (observed: configured=false)"]);
+    });
+
+    it("does not read native metadata from another provider's endpoint", () => {
+      anthropicFixture({ reflectData: nativeReflect({ anthropic: { routing_models: [] } }) });
+      const { failures } = anthropicCheck();
+      // R3 falls back to the selection's endpoint when /reflect has no metadata.
+      expect(checkIds(failures)).toEqual(["P1", "N3"]);
+      expect(failures[0]).toBe("FAIL P1 no /reflect supported_reasoning_efforts for claude-sonnet-5 to check selected effort medium against");
+    });
+
+    it("fails N1 and H3 when the native selection or request carries no effort", () => {
+      anthropicFixture({ routing: toAnthropic(claudeGolden(ROUTING)).replaceAll('"selected_effort":"medium"', '"selected_effort":null').replace('"requested_effort":"medium"', '"requested_effort":"low"') });
+      const { failures } = anthropicCheck();
+      expect(failures).toEqual(expect.arrayContaining(["FAIL N1 native anthropic selection: selected effort is null; native routing metadata advertises efforts for every allowed model"]));
+      expect(checkIds(failures)).toEqual(expect.arrayContaining(["N1", "P1", "H3"]));
+    });
+
+    it("passes every check for a native OpenAI route on Responses", () => {
+      openaiFixture();
+      const results = openaiCheck();
+      expect(results.failures).toEqual([]);
+      expect(checkIds(results.passes)).toEqual(["E2", "E1", "R1", "R2", "R3", "R4", "M1", "P1", "N1", "N2", "N3", "H3"]);
+      expect(results.passes).toContain("PASS N1 native openai selection openai/gpt-5.4 (wire_model=gpt-5.4, effort=high)");
+      expect(results.passes).toContain("PASS H3 all 4 main-agent request(s) requested the selected effort high");
+    });
+
+    it("fails N2 when a main-agent request reached Copilot instead of OpenAI", () => {
+      const lines = toOpenAI(copilotFixture("token-usage.jsonl")).split("\n").filter(Boolean);
+      lines[1] = lines[1].replace('"provider":"openai"', '"provider":"copilot"');
+      openaiFixture({ tokenUsage: lines.join("\n") + "\n" });
+      const { failures } = openaiCheck();
+      expect(failures).toEqual(["FAIL N2 token-usage record(s) not on openai gpt-5.4: copilot gpt-5.4"]);
+    });
+
+    it("requires native-provider inventory for U2", () => {
+      const inventory = endpoints => ({ type: "model.inventory", data: { endpoints }, provenance: { component: "firewall", phase: "agent", path: "sandbox/firewall/awf-reflect.json", index: 0 } });
+      const expectations = { expectModelInventory: true, nativeProvider: "openai", resolutionRoles: [] };
+      const copilotOnly = evaluateSessionContract({ events: [inventory([{ provider: "copilot", configured: true, models: ["gpt-5.4"] }])], expectations });
+      expect(copilotOnly.failures).toEqual(["FAIL U2 agent-phase model.inventory from sandbox/firewall/awf-reflect.json has no configured openai endpoint with models; observed endpoints: copilot configured=true models=1"]);
+      const native = evaluateSessionContract({ events: [inventory([{ provider: "openai", configured: true, models: ["gpt-5.4", "gpt-5.4-mini"] }])], expectations });
+      expect(native.failures).toEqual([]);
+      expect(native.passes).toContain("PASS U2 one agent-phase model.inventory from sandbox/firewall/awf-reflect.json; openai endpoint configured with 2 model(s)");
     });
   });
 

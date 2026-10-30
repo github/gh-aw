@@ -5,7 +5,7 @@ import os from "os";
 import path from "path";
 
 const require = createRequire(import.meta.url);
-const { ROUTING_REASONING_EFFORTS, getAWFModelRoutingFailureCode, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, resolveAWFModelRoutingSelection } = require("./awf_model_routing.cjs");
+const { ROUTING_REASONING_EFFORTS, getAWFModelRoutingFailureCode, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, resolveAWFModelRoutingSelection, resolveAWFRoutingProvider, routingEndpointPaths } = require("./awf_model_routing.cjs");
 const reflectFixtures = require("./fixtures/model_resolution_reflect.cjs");
 
 const reflectData = {
@@ -17,6 +17,30 @@ const reflectData = {
 };
 
 describe("awf_model_routing.cjs", () => {
+  it("resolves the routing provider from the engine and its resolved LLM provider", () => {
+    expect(resolveAWFRoutingProvider("claude", undefined)).toBe("anthropic");
+    expect(resolveAWFRoutingProvider("claude", "anthropic")).toBe("anthropic");
+    expect(resolveAWFRoutingProvider("claude", "github")).toBe("github");
+    expect(resolveAWFRoutingProvider("claude", "openai")).toBe("");
+    expect(resolveAWFRoutingProvider("codex", "")).toBe("openai");
+    expect(resolveAWFRoutingProvider("codex", "copilot")).toBe("github");
+    expect(resolveAWFRoutingProvider("codex", "anthropic")).toBe("");
+    expect(resolveAWFRoutingProvider("copilot", undefined)).toBe("github");
+    expect(resolveAWFRoutingProvider("pi", "anthropic")).toBe("");
+  });
+
+  it("maps native protocol names and paths to routing endpoints", () => {
+    expect(routingEndpointPaths(["messages"])).toEqual(["/v1/messages"]);
+    expect(routingEndpointPaths(["chat_completions", "responses"])).toEqual(["/chat/completions", "/responses"]);
+    expect(routingEndpointPaths(["/v1/responses", "/chat/completions", "/v1/messages", "embeddings", 7])).toEqual(["/responses", "/chat/completions", "/v1/messages"]);
+  });
+
+  it("keeps Copilot selections on the default GitHub provider", () => {
+    const anthropic = { ...reflectData, endpoints: [{ provider: "anthropic", configured: true, models: ["claude-opus-5"] }] };
+    expect(resolveAWFModelRoutingSelection(anthropic, true, ["/v1/messages"], true).error).toContain("unavailable Copilot wire model");
+    expect(resolveAWFModelRoutingSelection(reflectData, true, ["/v1/messages"], true, "anthropic").error).toContain("native routing does not cross providers");
+  });
+
   it("accepts the AWF effort set and validates endpoint compatibility", () => {
     expect(ROUTING_REASONING_EFFORTS).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
     expect(resolveAWFModelRoutingSelection(reflectData, true, ["/v1/messages"]).selection).toMatchObject({

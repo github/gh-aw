@@ -724,7 +724,7 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
@@ -749,11 +749,20 @@ and multi-workflow selection still apply.
 gh aw logs --harbor --output ./harbor-eval
 ```
 
-The export preserves recorded metadata and grading evidence; it does not rerun
-agents, execute graders, infer task success from GitHub conclusions, or create
-missing rewards. Keep exports private: trajectories and source sessions can
+The export preserves recorded metadata and grading evidence; by default it does
+not execute graders. It never reruns agents, infers task success from GitHub
+conclusions, or creates missing rewards. Keep exports private: trajectories and source sessions can
 contain prompts, reasoning, and tool payloads. Compatibility is tested against
 Harbor **0.25.0** using its native models, CLI, and viewer.
+
+`--additional-grader WORKFLOW:GRADER` selects an enabled built-in or isolated
+JavaScript grader from a local workflow. Repeat the flag or separate selectors
+with commas. With `--harbor`, additional graders run over the downloaded unified
+sessions before serialization. Original scores retain `gh-aw.<id>` reward keys;
+additional numeric pass/fail results use `gh-aw.regraded.<id>`. Conflicting keys
+are rejected, not overwritten. Each trial's `gh-aw/regrading.json` retains
+additional results, failure states, and provenance separately from the original
+evidence. Missing evidence never becomes a zero or a successful reward.
 
 The `graders` artifact set includes conclusion's built-in results in `usage`
 and the optional combined `graders` artifact from the separate custom-grader job,
@@ -979,7 +988,22 @@ cat aw_session.jsonl | gh aw graders run weekly-research loops
 cat aw_session.jsonl | gh aw graders run weekly-research operational-value
 ```
 
-**Options:** `--repo/-r`
+Regrade a downloaded logs collection without network access:
+
+```bash wrap
+gh aw graders run weekly-research loops --logs-dir ./my-logs
+gh aw graders run --logs-dir ./my-logs --additional-grader weekly-research:loops,weekly-research:goal-directness
+```
+
+Collection mode emits a JSON report, preserves original grader artifacts without
+rewriting them, and records the selected definitions, implementation identities,
+and session digests separately from historical scores. It uses only GH-AW logs
+and unified sessions, never Harbor bundles. Missing sessions and grader errors
+are explicit per-run results. Collection mode and `logs --harbor` additional
+grading support only in-memory built-ins and isolated JavaScript, not Bash.
+The existing single-session Bash replay behavior is unchanged.
+
+**Options:** `--additional-grader`, `--logs-dir`, `--repo/-r`
 
 #### `logs --outcomes`
 

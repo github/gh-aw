@@ -1,6 +1,7 @@
 // This file resolves engine.model-routing.allowed-models into the router's
-// candidate pool: gh-aw aliases are expanded to GitHub Copilot model patterns and
-// the result is narrowed by models.allowed and models.blocked.
+// candidate pool: gh-aw aliases are expanded to model patterns in the routing
+// namespace (GitHub Copilot, or the engine's native Anthropic or OpenAI provider)
+// and the result is narrowed by models.allowed and models.blocked.
 
 package workflow
 
@@ -19,10 +20,13 @@ import (
 
 var modelRoutingCandidatesLog = logger.New("workflow:model_routing_candidates")
 
+// copilotRoutingNamespace is the provider namespace of GitHub Copilot routing candidates.
+const copilotRoutingNamespace = "github-copilot"
+
 // modelRoutingCandidateGroup is one authored allowed-models entry and the
-// github-copilot/ candidates it resolves to.
+// candidates in the routing namespace it resolves to.
 type modelRoutingCandidateGroup struct {
-	// Name is the authored entry without a github-copilot/ or copilot/ prefix.
+	// Name is the authored entry without its routing-namespace provider prefix.
 	Name string
 	// Alias reports that Name is a gh-aw model alias.
 	Alias bool
@@ -44,32 +48,44 @@ func modelRoutingAliasMap(data *WorkflowData) map[string][]string {
 	return getBuiltinOnlyAliasMap()
 }
 
-// bundledCopilotModelIDs returns the lower-cased github-copilot model ids of gh-aw's
+// bundledProviderModelIDs returns the lower-cased model ids of each provider in gh-aw's
 // bundled model catalogue (pkg/cli/data/models.json).
-var bundledCopilotModelIDs = sync.OnceValue(func() map[string]struct{} {
+var bundledProviderModelIDs = sync.OnceValue(func() map[string]map[string]struct{} {
 	var catalog struct {
 		Providers map[string]struct {
 			Models map[string]json.RawMessage `json:"models"`
 		} `json:"providers"`
 	}
-	ids := make(map[string]struct{})
+	ids := make(map[string]map[string]struct{})
 	if err := json.Unmarshal(clidata.ModelsJSON, &catalog); err != nil {
 		return ids
 	}
-	for id := range catalog.Providers["github-copilot"].Models {
-		ids[strings.ToLower(id)] = struct{}{}
+	for provider, entry := range catalog.Providers {
+		ids[provider] = make(map[string]struct{}, len(entry.Models))
+		for id := range entry.Models {
+			ids[provider][strings.ToLower(id)] = struct{}{}
+		}
 	}
 	return ids
 })
 
+// bundledCopilotModelIDs returns the lower-cased github-copilot model ids of the bundled catalogue.
+func bundledCopilotModelIDs() map[string]struct{} {
+	return bundledProviderModelIDs()[copilotRoutingNamespace]
+}
+
 func isBundledCopilotModelID(model string) bool {
-	_, ok := bundledCopilotModelIDs()[strings.ToLower(model)]
+	return isBundledProviderModelID(copilotRoutingNamespace, model)
+}
+
+func isBundledProviderModelID(provider, model string) bool {
+	_, ok := bundledProviderModelIDs()[provider][strings.ToLower(model)]
 	return ok
 }
 
-func bundledCopilotModelMatches(pattern string) bool {
+func bundledProviderModelMatches(provider, pattern string) bool {
 	pattern = strings.ToLower(pattern)
-	for id := range bundledCopilotModelIDs() {
+	for id := range bundledProviderModelIDs()[provider] {
 		if matched, err := path.Match(pattern, id); err == nil && matched {
 			return true
 		}
@@ -78,11 +94,14 @@ func bundledCopilotModelMatches(pattern string) bool {
 }
 
 // resolveModelRoutingCandidateGroups resolves each engine.model-routing.allowed-models
-// entry. An entry with a github-copilot/ or copilot/ prefix, or a GitHub Copilot model
-// id in the bundled catalogue, is exact, even when an alias has the same name; this
-// matches resolveConfiguredModel, where a live model id wins over an alias. Other
-// aliases expand through the workflow's alias map to GitHub Copilot patterns, limited
-// to the engine's model family for Claude and Codex. Remaining entries must be GitHub
+// entry in the routing namespace: github-copilot, or the engine's native provider
+// (anthropic for Claude, openai for Codex). An entry with the namespace's provider
+// prefix (github-copilot/ or copilot/ for Copilot), or a model id of the namespace in
+// the bundled catalogue, is exact, even when an alias has the same name; this matches
+// resolveConfiguredModel, where a live model id wins over an alias. A native entry
+// with another provider's prefix is rejected rather than retargeted. Other aliases
+// expand through the workflow's alias map to patterns in the namespace, limited to
+// the engine's model family for Claude and Codex. Remaining entries must be GitHub
 // Actions expressions or plausible exact model ids; they are not checked against a
 // live catalogue.
 func resolveModelRoutingCandidateGroups(data *WorkflowData, engineName string) ([]modelRoutingCandidateGroup, error) {
@@ -93,23 +112,29 @@ func resolveModelRoutingCandidateGroups(data *WorkflowData, engineName string) (
 	if routing.AllowedModels == nil {
 		return nil, nil
 	}
-	if len(routing.AllowedModels) == 0 {
-		return nil, errors.New("engine.model-routing.allowed-models must contain at least one Copilot model")
+	namespace := modelRoutingNamespace(data, engineName)
+	modelLabel := "Copilot model"
+	if namespace != copilotRoutingNamespace {
+		modelLabel = namespace + " model"
 	}
-	modelRoutingCandidatesLog.Printf("Resolving %d allowed-models entries for engine=%s", len(routing.AllowedModels), engineName)
+	if len(routing.AllowedModels) == 0 {
+		return nil, fmt.Errorf("engine.model-routing.allowed-models must contain at least one %s", modelLabel)
+	}
+	modelRoutingCandidatesLog.Printf("Resolving %d allowed-models entries for engine=%s namespace=%s", len(routing.AllowedModels), engineName, namespace)
 	aliases := modelRoutingAliasMap(data)
 	groups := make([]modelRoutingCandidateGroup, 0, len(routing.AllowedModels))
 	seen := make(map[string]struct{}, len(routing.AllowedModels))
 	for _, model := range routing.AllowedModels {
 		model = strings.TrimSpace(model)
-		unprefixed := strings.TrimPrefix(model, "github-copilot/")
-		unprefixed = strings.TrimPrefix(unprefixed, "copilot/")
-		prefixed := unprefixed != model
+		unprefixed, prefixed, err := stripModelRoutingNamespacePrefix(model, namespace)
+		if err != nil {
+			return nil, err
+		}
 		model = unprefixed
 		if !validModelRoutingCandidate(model) {
-			return nil, fmt.Errorf("engine.model-routing.allowed-models contains invalid Copilot model %q", model)
+			return nil, fmt.Errorf("engine.model-routing.allowed-models contains invalid %s %q", modelLabel, model)
 		}
-		exact := prefixed || containsExpression(model) || isBundledCopilotModelID(model)
+		exact := prefixed || containsExpression(model) || isBundledProviderModelID(namespace, model)
 		key := model
 		if !exact && aliases[model] != nil {
 			key = "alias:" + model
@@ -121,27 +146,70 @@ func resolveModelRoutingCandidateGroups(data *WorkflowData, engineName string) (
 		group := modelRoutingCandidateGroup{Name: model}
 		switch {
 		case exact:
-			group.Patterns = []string{"github-copilot/" + model}
+			group.Patterns = []string{qualifiedModelID(namespace, model)}
 		case aliases[model] != nil:
-			patterns, err := expandModelRoutingAlias(model, aliases, engineName)
+			patterns, err := expandModelRoutingAliasInNamespace(model, aliases, engineName, namespace)
 			if err != nil {
 				return nil, err
 			}
 			group.Alias = true
 			group.Patterns = patterns
 		case plausibleConcreteModelID(model):
-			group.Patterns = []string{"github-copilot/" + model}
+			group.Patterns = []string{qualifiedModelID(namespace, model)}
 		default:
-			names := make([]string, 0, len(aliases))
-			for name := range aliases {
-				names = append(names, name)
-			}
-			slices.Sort(names)
-			return nil, fmt.Errorf("engine.model-routing.allowed-models contains %q, which is neither a gh-aw model alias nor an exact model id. Use an exact Copilot model id such as gpt-5.6-luna, or one of the aliases: %s", model, strings.Join(names, ", "))
+			return nil, unknownModelRoutingEntryError(model, namespace, aliases)
 		}
 		groups = append(groups, group)
 	}
 	return groups, nil
+}
+
+// unknownModelRoutingEntryError reports an allowed-models entry that is neither an
+// alias nor a plausible exact model id, with an example for the routing namespace.
+func unknownModelRoutingEntryError(model, namespace string, aliases map[string][]string) error {
+	names := make([]string, 0, len(aliases))
+	for name := range aliases {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	example := "an exact Copilot model id such as gpt-5.6-luna"
+	switch namespace {
+	case string(LLMProviderAnthropic):
+		example = "an exact Anthropic model id such as claude-sonnet-5"
+	case string(LLMProviderOpenAI):
+		example = "an exact OpenAI model id such as gpt-5.4"
+	}
+	return fmt.Errorf("engine.model-routing.allowed-models contains %q, which is neither a gh-aw model alias nor an exact model id. Use %s, or one of the aliases: %s", model, example, strings.Join(names, ", "))
+}
+
+// stripModelRoutingNamespacePrefix removes the routing namespace's provider prefix from
+// an allowed-models entry and reports whether it had one. Copilot routing accepts the
+// github-copilot/ and copilot/ prefixes. Native routing accepts its own provider prefix
+// and rejects any other provider, so a mismatched entry is never silently retargeted.
+// A literal provider prefix before a GitHub Actions expression (for example
+// anthropic/${{ vars.MODEL }}) is handled the same way; slashes inside expressions are
+// ignored, and an entry whose provider is itself an expression is left unchanged.
+func stripModelRoutingNamespacePrefix(model, namespace string) (string, bool, error) {
+	if namespace == copilotRoutingNamespace {
+		unprefixed := strings.TrimPrefix(model, "github-copilot/")
+		unprefixed = strings.TrimPrefix(unprefixed, "copilot/")
+		return unprefixed, unprefixed != model, nil
+	}
+	masked := ExpressionPattern.ReplaceAllStringFunc(model, func(expression string) string {
+		return strings.Repeat("x", len(expression))
+	})
+	slash := strings.IndexByte(masked, '/')
+	if slash < 0 {
+		return model, false, nil
+	}
+	provider, name := model[:slash], model[slash+1:]
+	if containsExpression(provider) {
+		return model, false, nil
+	}
+	if strings.EqualFold(provider, namespace) {
+		return name, true, nil
+	}
+	return "", false, fmt.Errorf("engine.model-routing.allowed-models contains %q, whose provider %q differs from the native %q provider that this workflow routes on; AWF native routing does not cross providers. Use a bare model id or the %s/ prefix", model, provider, namespace, namespace)
 }
 
 // plausibleConcreteModelID reports whether model looks like an exact model id rather than
@@ -150,21 +218,28 @@ func plausibleConcreteModelID(model string) bool {
 	return routingModelNamePattern.MatchString(model) && strings.ContainsAny(model, "0123456789-")
 }
 
-// expandModelRoutingAlias returns the github-copilot/ patterns of alias. Routing always
-// uses GitHub Copilot inference, so other providers' patterns are dropped. For Claude
-// and Codex, only patterns in the engine's model family are kept. A pattern that does
-// not start with the family, from an alias that also lists the engine's native
-// provider, is intersected with the family (for example *sonnet* becomes
-// claude-*sonnet*, and *claude-sonnet* becomes claude-sonnet*); an intersection that
-// matches no GitHub Copilot model in the bundled catalogue is dropped rather than
-// emitted as a pattern that only fails at run time.
+// expandModelRoutingAlias returns the github-copilot/ patterns of alias for GitHub
+// Copilot routing.
 func expandModelRoutingAlias(alias string, aliases map[string][]string, engineName string) ([]string, error) {
+	return expandModelRoutingAliasInNamespace(alias, aliases, engineName, copilotRoutingNamespace)
+}
+
+// expandModelRoutingAliasInNamespace returns the patterns of alias in the routing
+// namespace (github-copilot, anthropic or openai). Routing never crosses providers, so
+// other providers' patterns are dropped. For Claude and Codex, only patterns in the
+// engine's model family are kept. A pattern that does not start with the family, from
+// an alias that also lists the engine's native provider, is intersected with the
+// family (for example *sonnet* becomes claude-*sonnet*, and *claude-sonnet* becomes
+// claude-sonnet*); an intersection that matches no model of the namespace in the
+// bundled catalogue is dropped rather than emitted as a pattern that only fails at
+// run time.
+func expandModelRoutingAliasInNamespace(alias string, aliases map[string][]string, engineName, namespace string) ([]string, error) {
 	engineName = strings.ToLower(engineName)
 	familyPrefix, familyLimited := modelRoutingEngineFamilyPrefixes[engineName]
 	nativeProvider := modelRoutingEngineNativeProviders[engineName]
 	var patterns []string
-	walkModelPatterns(alias, aliases, "github-copilot", func(pattern, source string) {
-		name, ok := strings.CutPrefix(pattern, "github-copilot/")
+	walkModelPatterns(alias, aliases, namespace, func(pattern, source string) {
+		name, ok := strings.CutPrefix(pattern, namespace+"/")
 		if !ok || name == "" {
 			return
 		}
@@ -176,11 +251,11 @@ func expandModelRoutingAlias(alias string, aliases map[string][]string, engineNa
 				return
 			}
 			names = slices.DeleteFunc(intersectModelPatternWithFamily(name, familyPrefix), func(narrowed string) bool {
-				return !bundledCopilotModelMatches(narrowed)
+				return !bundledProviderModelMatches(namespace, narrowed)
 			})
 		}
 		for _, name := range names {
-			patterns = appendUnique(patterns, "github-copilot/"+name)
+			patterns = appendUnique(patterns, qualifiedModelID(namespace, name))
 		}
 	})
 	if len(patterns) > 0 {
@@ -281,10 +356,11 @@ func narrowModelRoutingCandidate(candidate string, allowed, blocked []string, ex
 	if len(allowed) == 0 || modelPolicyRulesCover(allowed, candidate) {
 		return []string{candidate}
 	}
+	namespace := modelRoutingCandidateNamespace(candidate)
 	var narrowed []string
 	partial := false
 	for _, rule := range allowed {
-		qualified, ok := copilotQualifiedModelPolicyRule(rule)
+		qualified, ok := qualifiedModelPolicyRule(rule, namespace)
 		if !ok {
 			continue
 		}
@@ -306,24 +382,46 @@ func narrowModelRoutingCandidate(candidate string, allowed, blocked []string, ex
 // Copilot models (getProviderAliases in gh-aw-firewall).
 var copilotModelPolicyProviders = []string{"copilot", "github-copilot", "github"}
 
-// copilotQualifiedModelPolicyRule returns rule qualified with github-copilot/, or false
-// when its provider cannot match GitHub Copilot models. Like AWF, the provider may be
-// any GitHub Copilot provider name, compared case-insensitively.
-func copilotQualifiedModelPolicyRule(rule string) (string, bool) {
+// qualifiedModelID returns model qualified with the routing namespace (provider).
+func qualifiedModelID(namespace, model string) string {
+	return namespace + "/" + model //nolint:manualpathconcat // provider-qualified model IDs are not filesystem paths
+}
+
+// qualifiedModelPolicyRule returns rule qualified with the routing namespace, or false
+// when its provider cannot match models of that namespace. A bare rule applies to every
+// provider, as in AWF. For github-copilot the provider may be any GitHub Copilot
+// provider name; a native namespace (anthropic or openai) matches only its own name, so
+// a github-copilot/ rule never authorizes a native model and vice versa.
+func qualifiedModelPolicyRule(rule, namespace string) (string, bool) {
 	provider, model := splitModelPolicyRule(rule)
-	if provider != "" && !slices.ContainsFunc(copilotModelPolicyProviders, func(name string) bool {
+	names := []string{strings.ToLower(namespace)}
+	if namespace == copilotRoutingNamespace {
+		names = copilotModelPolicyProviders
+	}
+	if provider != "" && !slices.ContainsFunc(names, func(name string) bool {
 		matched, err := path.Match(strings.ToLower(provider), name)
 		return err == nil && matched
 	}) {
 		return "", false
 	}
-	return "github-copilot/" + model, true
+	return qualifiedModelID(namespace, model), true
 }
 
-// modelPolicyRulesCover reports whether some rule matches every model that candidate matches.
+// modelRoutingCandidateNamespace returns the provider namespace of a provider-qualified
+// candidate pattern, defaulting to github-copilot.
+func modelRoutingCandidateNamespace(candidate string) string {
+	if provider, _, ok := strings.Cut(candidate, "/"); ok && provider != "" {
+		return provider
+	}
+	return copilotRoutingNamespace
+}
+
+// modelPolicyRulesCover reports whether some rule matches every model that candidate
+// matches. Rules are qualified with the candidate's provider namespace.
 func modelPolicyRulesCover(rules []string, candidate string) bool {
+	namespace := modelRoutingCandidateNamespace(candidate)
 	for _, rule := range rules {
-		if qualified, ok := copilotQualifiedModelPolicyRule(rule); ok && modelPatternCovers(qualified, candidate) {
+		if qualified, ok := qualifiedModelPolicyRule(rule, namespace); ok && modelPatternCovers(qualified, candidate) {
 			return true
 		}
 	}
@@ -393,13 +491,17 @@ func modelPatternsMayOverlap(a, b string) bool {
 
 // modelRoutingAWFCandidates returns the router's candidate pool emitted to AWF: the
 // policy-narrowed routing.candidateModels (or the Claude/Codex family default), or, for
-// AWF without routing.candidateModels, the list that replaces models.allowed.
+// AWF without routing.candidateModels, the list that replaces models.allowed. Copilot
+// candidates keep their github-copilot/ prefix; native routing.candidateModels are bare
+// model ids or patterns of the routing provider named by apiProxy.routing.provider, while
+// native candidates on the legacy allowlist keep their provider prefix.
 func modelRoutingAWFCandidates(data *WorkflowData, engineName string, allowed, blocked []string) ([]string, error) {
 	modelRoutingCandidatesLog.Printf("Resolving model-routing AWF candidates for engine=%s", engineName)
 	groups, err := resolveModelRoutingCandidateGroups(data, engineName)
 	if err != nil {
 		return nil, NewValidationError("engine.model-routing.allowed-models", "", "invalid model-routing candidates", err.Error())
 	}
+	namespace := modelRoutingNamespace(data, engineName)
 	supportsCandidates := apiProxySupportsRoutingCandidateModels(data)
 	var candidates []string
 	if len(groups) > 0 {
@@ -409,10 +511,18 @@ func modelRoutingAWFCandidates(data *WorkflowData, engineName string, allowed, b
 		}
 	}
 	if supportsCandidates && len(candidates) == 0 {
-		if err := modelRoutingDefaultCandidatesPolicyError(engineName, allowed, blocked); err != nil {
+		if err := modelRoutingDefaultCandidatesPolicyError(engineName, namespace, allowed, blocked); err != nil {
 			return nil, NewValidationError("engine.model-routing.allowed-models", "", "model-routing candidates violate model policy", err.Error())
 		}
-		candidates = modelRoutingDefaultCandidates(engineName)
+		candidates = modelRoutingDefaultCandidates(engineName, namespace)
+	}
+	// Native candidates lose their provider prefix only in routing.candidateModels. Without
+	// it, the candidates replace the request-wide apiProxy.allowedModels and keep their
+	// provider prefix, so a bare id never also authorizes the model on another provider.
+	if namespace != copilotRoutingNamespace && supportsCandidates {
+		for i, candidate := range candidates {
+			candidates[i] = strings.TrimPrefix(candidate, namespace+"/")
+		}
 	}
 	modelRoutingCandidatesLog.Printf("Resolved %d model-routing candidate(s) for engine=%s", len(candidates), engineName)
 	return candidates, nil

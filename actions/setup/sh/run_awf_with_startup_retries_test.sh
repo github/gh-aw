@@ -10,13 +10,15 @@ fail() {
   exit 1
 }
 
-WORKDIR="$(mktemp -d)"
+WORKDIR="${PWD}/.startup-retry-test-$$"
+mkdir -p "$WORKDIR"
 cleanup() {
   rm -rf "$WORKDIR"
 }
 trap cleanup EXIT
 
 export RUNNER_TEMP="$WORKDIR/runner-temp"
+export GH_AW_HARNESS_TELEMETRY_DIR="$WORKDIR/telemetry"
 mkdir -p "$RUNNER_TEMP"
 
 run_with_env() {
@@ -51,6 +53,20 @@ fi
 grep -Fq "[codex-awf-retry] AWF startup failed before codex harness; retrying fresh" "$OUTPUT" || fail "expected retry diagnostic"
 grep -Fq "Fatal error: Refusing to use symlink as bind mountpoint" "$WORKDIR/agent.log" || fail "expected first attempt in agent log"
 grep -Fq "[codex-harness] started" "$WORKDIR/agent.log" || fail "expected successful attempt in agent log"
+node - "$GH_AW_HARNESS_TELEMETRY_DIR/harness_retry.json" <<'NODE'
+const assert = require("node:assert/strict");
+const telemetry = require(process.argv[2]);
+assert.equal(telemetry.startup_attempt_results.length, 2);
+for (const [index, attempt] of telemetry.startup_attempt_results.entries()) {
+  assert.equal(attempt.attempt_id, `startup:${index + 1}`);
+  assert.equal(attempt.strategy, "restart");
+  assert.equal(attempt.outcome, index === 0 ? "failure" : "success");
+  assert.equal(attempt.exit_code, index === 0 ? 1 : 0);
+  assert.equal(attempt.backoff_ms, 0);
+  assert.ok(attempt.finished_at >= attempt.started_at);
+}
+assert.deepEqual(telemetry.startup_attempt_results[0].failure_classes, ["startup_error"]);
+NODE
 
 ATTEMPT_FILE="$WORKDIR/attempts-with-marker"
 OUTPUT="$WORKDIR/no-retry-output.log"

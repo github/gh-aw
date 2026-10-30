@@ -56,7 +56,11 @@ func subAgentModelPolicyWarnings(data *WorkflowData, allowed, blocked []string) 
 }
 
 func subAgentModelAllowedByPolicy(request string, data *WorkflowData, allowed, blocked []string) bool {
-	for _, pattern := range expandSubagentModelPatterns(request, data, "github-copilot") {
+	namespace := copilotRoutingNamespace
+	if data != nil && data.EngineConfig != nil {
+		namespace = modelRoutingNamespace(data, data.EngineConfig.ID)
+	}
+	for _, pattern := range expandSubagentModelPatterns(request, data, namespace) {
 		if len(allowed) > 0 && strings.ContainsAny(pattern, "*[") {
 			for _, rule := range allowed {
 				if strings.ContainsAny(rule, "*[") {
@@ -64,14 +68,14 @@ func subAgentModelAllowedByPolicy(request string, data *WorkflowData, allowed, b
 				}
 				qualified := rule
 				if !strings.Contains(rule, "/") {
-					qualified = "github-copilot/" + rule
+					qualified = qualifiedModelID(namespace, rule)
 				}
 				if matched, _ := path.Match(pattern, qualified); matched && !matchesModelPolicy(rule, qualified, blocked) {
 					return true
 				}
 			}
 		}
-		model := strings.TrimPrefix(pattern, "github-copilot/")
+		model := strings.TrimPrefix(pattern, namespace+"/")
 		if len(allowed) > 0 && !matchesModelPolicy(model, pattern, allowed) {
 			continue
 		}
@@ -144,8 +148,9 @@ func (c *Compiler) warnRoutedSubAgentModels(data *WorkflowData) {
 	if len(data.SubAgentModels) == 0 {
 		return
 	}
+	namespace := modelRoutingNamespace(data, data.EngineConfig.ID)
 	for _, agent := range data.SubAgentModels {
-		for _, model := range expandSubagentModelPatterns(agent.Model, data, "github-copilot") {
+		for _, model := range expandSubagentModelPatterns(agent.Model, data, namespace) {
 			if !modelRoutingEngineSupportsModel(data.EngineConfig.ID, model) {
 				warning := fmt.Sprintf("sub-agent %q model %q may be incompatible with the %s engine's model-routing API", agent.Name, agent.Model, data.EngineConfig.ID)
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning))
@@ -247,24 +252,25 @@ var modelRoutingEngineFamilyPrefixes = map[string]string{
 
 // modelRoutingDefaultCandidates returns the router candidates used when
 // engine.model-routing.allowed-models is omitted: the engine's model family for
-// Claude and Codex, and none (the policy-filtered catalogue) for Copilot and pi.
-func modelRoutingDefaultCandidates(engineName string) []string {
+// Claude and Codex, qualified with the routing namespace (github-copilot, or the
+// engine's native provider), and none (the policy-filtered catalogue) for Copilot and pi.
+func modelRoutingDefaultCandidates(engineName, namespace string) []string {
 	if prefix, ok := modelRoutingEngineFamilyPrefixes[strings.ToLower(engineName)]; ok {
-		return []string{"github-copilot/" + prefix + "*"}
+		return []string{qualifiedModelID(namespace, prefix+"*")}
 	}
 	return nil
 }
 
 // modelRoutingDefaultCandidatesPolicyError reports when models.allowed or models.blocked leaves
 // no model in the Claude or Codex family that the router uses when allowed-models is omitted.
-func modelRoutingDefaultCandidatesPolicyError(engineName string, allowed, blocked []string) error {
+func modelRoutingDefaultCandidatesPolicyError(engineName, namespace string, allowed, blocked []string) error {
 	prefix, ok := modelRoutingEngineFamilyPrefixes[strings.ToLower(engineName)]
 	if !ok {
 		return nil
 	}
 	err := fmt.Errorf("all engine.model-routing.allowed-models are excluded by models.allowed or models.blocked policy (allowed-models is omitted, so the %s engine uses its model family, %s*)", strings.ToLower(engineName), prefix)
 	for _, rule := range blocked {
-		if modelPolicyRuleCoversFamily(rule, prefix) {
+		if modelPolicyRuleCoversFamily(rule, prefix, namespace) {
 			return err
 		}
 	}
@@ -272,11 +278,11 @@ func modelRoutingDefaultCandidatesPolicyError(engineName string, allowed, blocke
 		return nil
 	}
 	for _, rule := range allowed {
-		if !modelPolicyRuleMayMatchFamily(rule, prefix) {
+		if !modelPolicyRuleMayMatchFamily(rule, prefix, namespace) {
 			continue
 		}
 		if !strings.ContainsAny(rule, "*?[\\") {
-			if qualified, _ := copilotQualifiedModelPolicyRule(rule); modelPolicyRulesCover(blocked, qualified) {
+			if qualified, _ := qualifiedModelPolicyRule(rule, namespace); modelPolicyRulesCover(blocked, qualified) {
 				continue
 			}
 		}
@@ -292,9 +298,9 @@ func splitModelPolicyRule(rule string) (string, string) {
 	return "", rule
 }
 
-// modelPolicyRuleMayMatchFamily reports whether rule can match a model whose name starts with prefix.
-func modelPolicyRuleMayMatchFamily(rule, prefix string) bool {
-	qualified, ok := copilotQualifiedModelPolicyRule(rule)
+// modelPolicyRuleMayMatchFamily reports whether rule can match a model in namespace whose name starts with prefix.
+func modelPolicyRuleMayMatchFamily(rule, prefix, namespace string) bool {
+	qualified, ok := qualifiedModelPolicyRule(rule, namespace)
 	if !ok {
 		return false
 	}
@@ -307,9 +313,38 @@ func modelPolicyRuleMayMatchFamily(rule, prefix string) bool {
 	return strings.HasPrefix(model, prefix)
 }
 
-// modelPolicyRuleCoversFamily reports whether rule matches every model whose name starts with prefix.
-func modelPolicyRuleCoversFamily(rule, prefix string) bool {
-	return modelPolicyRulesCover([]string{rule}, "github-copilot/"+prefix+"*")
+// modelPolicyRuleCoversFamily reports whether rule matches every model in namespace whose name starts with prefix.
+func modelPolicyRuleCoversFamily(rule, prefix, namespace string) bool {
+	return modelPolicyRulesCover([]string{rule}, qualifiedModelID(namespace, prefix+"*"))
+}
+
+// modelRoutingNativeLLMProviders maps the engines that can route on their own
+// provider's API to that provider. AWF routes natively only on the matching
+// configured provider (apiProxy.routing.provider) and never crosses providers.
+var modelRoutingNativeLLMProviders = map[string]LLMProvider{
+	"claude": LLMProviderAnthropic,
+	"codex":  LLMProviderOpenAI,
+}
+
+// modelRoutingNativeProvider returns the AWF routing provider (anthropic or openai)
+// when engine.model-routing runs on the engine's native provider, or "" when it runs
+// on GitHub Copilot (or is not supported).
+func modelRoutingNativeProvider(engineName string, data *WorkflowData) string {
+	engineName = strings.ToLower(engineName)
+	native, ok := modelRoutingNativeLLMProviders[engineName]
+	if !ok || modelRoutingProvider(engineName, data) != native {
+		return ""
+	}
+	return string(native)
+}
+
+// modelRoutingNamespace returns the provider namespace of the router's candidates:
+// the native provider for native routing, otherwise github-copilot.
+func modelRoutingNamespace(data *WorkflowData, engineName string) string {
+	if provider := modelRoutingNativeProvider(engineName, data); provider != "" {
+		return provider
+	}
+	return copilotRoutingNamespace
 }
 
 func modelRoutingProvider(engineName string, data *WorkflowData) LLMProvider {
@@ -379,10 +414,8 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 	if !isFirewallEnabled(workflowData) {
 		return NewValidationError("engine.model-routing", "", "task-level model routing requires the AWF firewall", "Enable the AWF firewall for this workflow.")
 	}
-	if provider := modelRoutingProvider(engineName, workflowData); provider != LLMProviderGitHub {
-		return NewValidationError("engine.model-provider", string(provider),
-			fmt.Sprintf("task-level model routing requires GitHub Copilot inference, but the %s engine resolves to the %q provider", engineName, provider),
-			"Set engine.model-provider: github, or remove engine.model-routing.")
+	if err := validateModelRoutingProviderTarget(workflowData, engineName); err != nil {
+		return err
 	}
 	if routing.Goal != "cost" && routing.Goal != "cost-speed" {
 		return NewValidationError("engine.model-routing.goal", routing.Goal, "unsupported model-routing goal", "Use cost or cost-speed.")
@@ -418,7 +451,7 @@ func validateModelRouting(workflowData *WorkflowData, engineName string) error {
 		if _, _, err := intersectModelRoutingPolicy(groups, allowed, blocked, !apiProxySupportsRoutingCandidateModels(workflowData)); err != nil {
 			return NewValidationError("engine.model-routing.allowed-models", strings.Join(routing.AllowedModels, ", "), "model-routing candidates violate model policy", err.Error())
 		}
-	} else if err := modelRoutingDefaultCandidatesPolicyError(engineName, allowed, blocked); err != nil {
+	} else if err := modelRoutingDefaultCandidatesPolicyError(engineName, modelRoutingNamespace(workflowData, engineName), allowed, blocked); err != nil {
 		return NewValidationError("engine.model-routing.allowed-models", "", "model-routing candidates violate model policy", err.Error())
 	}
 	firewallConfig := getFirewallConfig(workflowData)

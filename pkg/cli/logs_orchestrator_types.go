@@ -30,6 +30,7 @@ type LogsDownloadOptions struct {
 	Episodes           bool
 	Outcomes           bool
 	Harbor             bool
+	AdditionalGraders  []string
 	OutcomesDir        string
 	TimeoutMinutes     int
 	TimeoutSeconds     int
@@ -118,6 +119,7 @@ type StdinLogsOptions struct {
 	Episodes          bool
 	Outcomes          bool
 	Harbor            bool
+	AdditionalGraders []string
 	OutcomesDir       string
 	Timeout           int
 	MaxStorageMB      int

@@ -73,6 +73,7 @@ fi
 
 gh_aw_awf_delay_s=$(((gh_aw_awf_initial_delay_ms + 999) / 1000))
 gh_aw_awf_attempt=0
+gh_aw_awf_backoff_ms=0
 gh_aw_awf_attempt_log_name="${GH_AW_AWF_ATTEMPT_LOG_NAME:-agent}"
 
 # The harness marker is emitted before the engine process is spawned, so its
@@ -103,9 +104,11 @@ gh_aw_awf_record_execution_not_started() {
 
 while true; do
   gh_aw_awf_attempt_log="$(mktemp "${RUNNER_TEMP:-/tmp}/gh-aw-awf-${gh_aw_awf_attempt_log_name}.XXXXXX")"
+  node "$gh_aw_preflight_script" --startup-attempt start "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_backoff_ms" || true
   "$@" 2>&1 | tee -a "$GH_AW_AWF_LOG_FILE" "$gh_aw_awf_attempt_log"
   gh_aw_awf_status=${PIPESTATUS[0]}
   if [ "$gh_aw_awf_status" -eq 0 ]; then
+    node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_status" || true
     rm -f "$gh_aw_awf_attempt_log"
     exit 0
   fi
@@ -116,12 +119,15 @@ while true; do
     ! grep -Fq "$GH_AW_AWF_HARNESS_MARKER" "$gh_aw_awf_attempt_log" &&
     grep -Eqi '(Fatal error:|Process exiting with code:|Refusing to use symlink as bind mountpoint|mcp gateway[^[:cntrl:]]{0,80}(startup failed|failed to start|startup error))' "$gh_aw_awf_attempt_log" &&
     [ "$gh_aw_awf_attempt" -lt "$gh_aw_awf_startup_retries" ]; then
+    node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_status" startup_error || true
     gh_aw_awf_attempt=$((gh_aw_awf_attempt + 1))
     echo "[${GH_AW_AWF_ENGINE_NAME}-awf-retry] AWF startup failed before ${GH_AW_AWF_ENGINE_NAME} harness; retrying fresh (startup retry ${gh_aw_awf_attempt}/${gh_aw_awf_startup_retries})"
     rm -f "$gh_aw_awf_attempt_log"
     sleep "$gh_aw_awf_delay_s"
+    gh_aw_awf_backoff_ms=$((gh_aw_awf_delay_s * 1000))
     continue
   fi
+  node "$gh_aw_preflight_script" --startup-attempt finish "$((gh_aw_awf_attempt + 1))" "$gh_aw_awf_status" || true
   if ! grep -Fq "$GH_AW_AWF_HARNESS_MARKER" "$gh_aw_awf_attempt_log"; then
     gh_aw_awf_record_execution_not_started
   fi
