@@ -227,6 +227,9 @@ type AWFAPIProxyConfig struct {
 }
 
 type AWFModelRoutingConfig struct {
+	// Provider is the native routing provider ("anthropic" or "openai"). It is
+	// omitted for GitHub Copilot routing, which is AWF's default provider.
+	Provider        string                   `json:"provider,omitempty"`
 	Objective       AWFModelRoutingObjective `json:"objective"`
 	Task            AWFModelRoutingTask      `json:"task"`
 	CandidateModels []string                 `json:"candidateModels,omitempty"`

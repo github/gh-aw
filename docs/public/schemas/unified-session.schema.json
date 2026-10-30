@@ -859,11 +859,12 @@
             "enabled": { "type": "boolean" },
             "goal": { "type": "string" },
             "mode": { "type": "string" },
+            "provider": { "type": "string", "enum": ["anthropic", "openai"], "description": "Native routing provider (`anthropic` or `openai`) sent to AWF as `apiProxy.routing.provider`; absent for GitHub Copilot routing." },
             "allowedModels": { "type": "array", "items": { "type": "string" }, "description": "Configured routing candidates as authored (exact ids or gh-aw aliases) without provider prefix; absent means the router default or unknown." },
             "candidateModels": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "Effective router pool sent to AWF as provider-qualified ids or patterns: aliases expanded, narrowed by the model policy; absent when unknown or expression-valued."
+              "description": "Effective router pool sent to AWF: `github-copilot/` ids or patterns for Copilot routing, or bare ids or patterns of the native `provider`; aliases expanded, narrowed by the model policy; absent when unknown or expression-valued."
             }
           },
           "required": ["enabled"],

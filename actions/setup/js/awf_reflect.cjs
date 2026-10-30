@@ -353,9 +353,11 @@ async function enrichReflectModels(reflectData, timeoutMs, logger) {
 /**
  * Fetch the AWF API proxy /reflect endpoint and persist the response to disk.
  *
- * The /reflect endpoint is exposed by the api-proxy sidecar on each started provider port.
- * The active provider's gateway port should be used rather than a hardcoded port, since
- * port 10000 (the OpenAI sidecar) is only started when OpenAI credentials are configured.
+ * The /reflect endpoint is exposed by the api-proxy sidecar on every provider listener.
+ * AWF binds each provider listener (including port 10000, the OpenAI listener) even when
+ * that provider has no inference credentials, and every listener serves the same aggregate
+ * reflection before rejecting unconfigured inference, so the default port 10000 works for
+ * any configured provider without an OpenAI key.
  * This information is saved to AWF_REFLECT_OUTPUT_PATH so the post-run GitHub Actions step
  * (awf_reflect_summary.cjs) can include it in the step summary without requiring the
  * containers to still be running.
