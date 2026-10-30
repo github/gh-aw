@@ -1193,15 +1193,17 @@ describe("close_issue", () => {
       const handler = await main({ allowed_repos: ["other-org/other-repo"] });
       const getCalls = [];
       const requestCalls = [];
+      const graphqlCalls = [];
       mockGithub.rest.issues.get = async params => {
         getCalls.push(params);
-        return { data: { id: 100000 + params.issue_number, number: params.issue_number, title: "Test Issue", labels: [], state: "open" } };
+        return { data: { id: 100000 + params.issue_number, node_id: `node_${params.issue_number}`, number: params.issue_number, title: "Test Issue", labels: [], state: "open" } };
       };
       mockGithub.request = async (route, params) => {
         expect(getCalls).toHaveLength(2);
         requestCalls.push({ route, params });
-        return { data: { number: params.issue_number, title: "Test Issue", state: "open" } };
+        return { data: { number: params.issue_number, node_id: `node_${params.issue_number}`, title: "Test Issue", state: "open" } };
       };
+      mockGithub.graphql = async (mutation, variables) => graphqlCalls.push(variables);
 
       const result = await handler({ issue_number: 100, body: "Duplicate", state_reason: "duplicate", duplicate_of: duplicateOf, suggest: true, rationale: "Same defect", confidence: "high" }, {});
 
@@ -1224,6 +1226,9 @@ describe("close_issue", () => {
           },
         },
       ]);
+      expect(getCalls).toHaveLength(2);
+      expect(graphqlCalls).toHaveLength(1);
+      expect(graphqlCalls[0].canonicalId).toBe("node_50");
     });
 
     it.each([403, 404, "missing ID"])("should fail closed when canonical issue lookup fails with %s", async failure => {
@@ -1246,29 +1251,44 @@ describe("close_issue", () => {
       expect(mutations).toEqual([]);
     });
 
-    it.each([{ duplicate_of: "invalid" }, { duplicate_of: 100 }, { duplicate_of: "other-org/other-repo#50" }, { duplicate_of: 50, state_reason: "completed" }])(
-      "should not resolve a canonical ID for an ineligible duplicate reference: %j",
-      async fields => {
-        const handler = await main();
-        const getCalls = [];
-        const requestCalls = [];
-        mockGithub.rest.issues.get = async params => {
-          getCalls.push(params);
-          return { data: { number: params.issue_number, title: "Test Issue", labels: [], state: "open" } };
-        };
-        mockGithub.request = async (route, params) => {
-          requestCalls.push(params);
-          return { data: { number: params.issue_number, title: "Test Issue" } };
-        };
+    it.each([
+      { fields: { duplicate_of: "invalid" }, rejected: true },
+      { fields: { duplicate_of: 100 }, rejected: true },
+      { fields: { duplicate_of: "Test-Owner/Test-Repo#100" }, rejected: true },
+      { fields: { duplicate_of: "other-org/other-repo#50" }, rejected: true },
+      { fields: { duplicate_of: 50, state_reason: "completed" }, rejected: false },
+    ])("should handle an ineligible duplicate reference safely: %j", async ({ fields, rejected }) => {
+      const handler = await main();
+      const getCalls = [];
+      const requestCalls = [];
+      const updateCalls = [];
+      mockGithub.rest.issues.get = async params => {
+        getCalls.push(params);
+        return { data: { number: params.issue_number, title: "Test Issue", labels: [], state: "open" } };
+      };
+      mockGithub.request = async (route, params) => {
+        requestCalls.push(params);
+        return { data: { number: params.issue_number, title: "Test Issue" } };
+      };
+      mockGithub.rest.issues.update = async params => {
+        updateCalls.push(params);
+        return { data: { number: params.issue_number, title: "Test Issue" } };
+      };
 
-        const result = await handler({ issue_number: 100, body: "Close", state_reason: "duplicate", suggest: true, ...fields }, {});
+      const result = await handler({ issue_number: 100, body: "Close", state_reason: "duplicate", suggest: true, ...fields }, {});
 
+      expect(getCalls).toHaveLength(1);
+      if (rejected) {
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("duplicate close intent requires a valid");
+        expect(requestCalls).toHaveLength(0);
+        expect(updateCalls).toHaveLength(0);
+      } else {
         expect(result.success).toBe(true);
-        expect(getCalls).toHaveLength(1);
         expect(requestCalls).toHaveLength(1);
         expect(requestCalls[0].duplicate_issue_id).toBeUndefined();
       }
-    );
+    });
 
     it("should call markAsDuplicate mutation when duplicate_of and state_reason DUPLICATE are set", async () => {
       const handler = await main({ max: 10, state_reason: "DUPLICATE" });

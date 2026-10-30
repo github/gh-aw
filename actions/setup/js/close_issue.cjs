@@ -67,22 +67,26 @@ function parseDuplicateOf(value, defaultOwner, defaultRepo) {
  * This creates a native "marked this as a duplicate of #X" timeline event.
  *
  * @param {any} github - Authenticated GitHub client (must support graphql)
- * @param {string} duplicateNodeId - GraphQL node ID of the issue being marked as a duplicate
+ * @param {string|undefined} duplicateNodeId - GraphQL node ID of the issue being marked as a duplicate
  * @param {string} canonicalOwner - Owner of the canonical issue's repo
  * @param {string} canonicalRepo - Repo of the canonical issue
  * @param {number} canonicalNumber - Issue number that is the canonical original
  * @returns {Promise<void>}
  */
-async function markIssueAsDuplicate(github, duplicateNodeId, canonicalOwner, canonicalRepo, canonicalNumber) {
+async function markIssueAsDuplicate(github, duplicateNodeId, canonicalOwner, canonicalRepo, canonicalNumber, canonicalIssueData) {
   if (!duplicateNodeId) {
     throw new Error(`${ERR_NOT_FOUND}: node_id missing for duplicate issue`);
   }
 
-  const { data: canonicalData } = await github.rest.issues.get({
-    owner: canonicalOwner,
-    repo: canonicalRepo,
-    issue_number: canonicalNumber,
-  });
+  let canonicalData = canonicalIssueData;
+  if (!canonicalData) {
+    const response = await github.rest.issues.get({
+      owner: canonicalOwner,
+      repo: canonicalRepo,
+      issue_number: canonicalNumber,
+    });
+    canonicalData = response.data;
+  }
 
   const canonicalNodeId = canonicalData.node_id;
   if (!canonicalNodeId) {
@@ -106,6 +110,23 @@ async function markIssueAsDuplicate(github, duplicateNodeId, canonicalOwner, can
     }`,
     { duplicateId: duplicateNodeId, canonicalId: canonicalNodeId }
   );
+}
+
+function resolveEligibleCanonicalIssue(parsed, owner, repo, issueNumber, defaultTargetRepo, allowedRepos) {
+  if (!parsed) {
+    return { canonicalIssue: undefined, reason: "duplicate_of value could not be parsed" };
+  }
+
+  const canonicalRepoSlug = `${parsed.owner}/${parsed.repo}`;
+  if (!validateRepo(canonicalRepoSlug, defaultTargetRepo, allowedRepos).valid) {
+    return { canonicalIssue: undefined, reason: `canonical repo "${canonicalRepoSlug}" is not in the allowed-repos list` };
+  }
+
+  if (parsed.owner.toLowerCase() === owner.toLowerCase() && parsed.repo.toLowerCase() === repo.toLowerCase() && parsed.issueNumber === issueNumber) {
+    return { canonicalIssue: undefined, reason: `issue #${issueNumber} cannot be a duplicate of itself` };
+  }
+
+  return { canonicalIssue: parsed, reason: undefined };
 }
 
 /**
@@ -157,7 +178,7 @@ async function addIssueComment(github, owner, repo, issueNumber, message) {
  * @param {string} repo - Repository name
  * @param {number} issueNumber - Issue number
  * @param {string} stateReason - The reason for closing: "COMPLETED", "NOT_PLANNED", or "DUPLICATE"
- * @returns {Promise<{number: number, html_url: string, title: string, node_id: string}>} Issue details
+ * @returns {Promise<{issue: {number: number, html_url: string, title: string, node_id?: string}, canonicalIssueData?: {id?: number, node_id?: string}}>} Close result and fetched canonical issue details
  */
 async function closeIssue(github, owner, repo, issueNumber, stateReason, intentMetadata, useIssueIntent, canonicalIssue) {
   const baseParams = {
@@ -169,14 +190,19 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
   };
 
   const hasIntentMetadata = Boolean(intentMetadata && Object.keys(intentMetadata).length > 0);
+  let canonicalIssueData;
   if (useIssueIntent && hasIntentMetadata) {
     let duplicateIssueId;
+    if (baseParams.state_reason === "duplicate" && !canonicalIssue) {
+      throw new Error(`${ERR_VALIDATION}: duplicate close intent requires a valid, allowed, non-self duplicate_of reference`);
+    }
     if (canonicalIssue) {
       const { data } = await github.rest.issues.get({
         owner: canonicalIssue.owner,
         repo: canonicalIssue.repo,
         issue_number: canonicalIssue.issueNumber,
       });
+      canonicalIssueData = data;
       duplicateIssueId = data.id;
       if (!duplicateIssueId) {
         throw new Error(`${ERR_NOT_FOUND}: id missing for canonical issue ${canonicalIssue.owner}/${canonicalIssue.repo}#${canonicalIssue.issueNumber}`);
@@ -194,7 +220,7 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
         ...(duplicateIssueId !== undefined ? { duplicate_issue_id: duplicateIssueId } : {}),
       });
       core.debug("Issue-intent close request succeeded");
-      return issue;
+      return { issue, canonicalIssueData };
     } catch (error) {
       const errorRecord = error && typeof error === "object" ? /** @type {Record<string, unknown>} */ error : undefined;
       const response = errorRecord?.response;
@@ -210,7 +236,7 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
 
   const { data: issue } = await github.rest.issues.update(baseParams);
 
-  return issue;
+  return { issue, canonicalIssueData: undefined };
 }
 
 /**
@@ -367,7 +393,8 @@ async function main(config = {}) {
 
         const stateReasonUpper = stateReason.toUpperCase();
         const parsed = stateReasonUpper === "DUPLICATE" ? parseDuplicateOf(item.duplicate_of, owner, repo) : null;
-        const canonicalIssue = parsed && validateRepo(`${parsed.owner}/${parsed.repo}`, defaultTargetRepo, allowedRepos).valid && !(parsed.owner === owner && parsed.repo === repo && parsed.issueNumber === entityNumber) ? parsed : undefined;
+        const canonicalIssueResolution = resolveEligibleCanonicalIssue(parsed, owner, repo, entityNumber, defaultTargetRepo, allowedRepos);
+        const canonicalIssue = canonicalIssueResolution.canonicalIssue;
         const closePromise = closeIssue(github, owner, repo, entityNumber, stateReason, intentMetadata, issueIntentEnabled, canonicalIssue);
 
         // When duplicate_of is provided and state_reason is DUPLICATE, create the native duplicate relationship
@@ -375,37 +402,24 @@ async function main(config = {}) {
           core.warning(`duplicate_of is set but state_reason is ${stateReason} (not DUPLICATE); native duplicate marking will be skipped`);
         }
         if (item.duplicate_of !== undefined && item.duplicate_of !== null && stateReasonUpper === "DUPLICATE") {
-          if (parsed) {
-            // Validate canonical repo against the same allowedRepos policy
-            const canonicalRepoSlug = `${parsed.owner}/${parsed.repo}`;
-            const repoValidation = validateRepo(canonicalRepoSlug, defaultTargetRepo, allowedRepos);
-            if (!repoValidation.valid) {
-              core.warning(`Skipping native duplicate marking: canonical repo "${canonicalRepoSlug}" is not in the allowed-repos list`);
-              return closePromise;
-            }
-
-            // Guard against marking an issue as a duplicate of itself
-            if (parsed.owner === owner && parsed.repo === repo && parsed.issueNumber === entityNumber) {
-              core.warning(`Skipping native duplicate marking: issue #${entityNumber} cannot be a duplicate of itself`);
-              return closePromise;
-            }
-
-            core.info(`Marking issue #${entityNumber} as duplicate of ${parsed.owner}/${parsed.repo}#${parsed.issueNumber}`);
-            return closePromise.then(async closedEntity => {
-              try {
-                await markIssueAsDuplicate(github, closedEntity.node_id, parsed.owner, parsed.repo, parsed.issueNumber);
-                core.info(`✓ Marked issue #${entityNumber} as duplicate of ${parsed.owner}/${parsed.repo}#${parsed.issueNumber}`);
-              } catch (dupError) {
-                core.warning(`Failed to mark native duplicate relationship for #${entityNumber}: ${getErrorMessage(dupError)}`);
-              }
-              return closedEntity;
-            });
+          if (!canonicalIssue) {
+            core.warning(`Skipping native duplicate marking: ${canonicalIssueResolution.reason}`);
           } else {
-            core.warning(`duplicate_of value "${item.duplicate_of}" could not be parsed; skipping native duplicate marking`);
+            core.info(`Marking issue #${entityNumber} as duplicate of ${canonicalIssue.owner}/${canonicalIssue.repo}#${canonicalIssue.issueNumber}`);
           }
         }
 
-        return closePromise;
+        return closePromise.then(async ({ issue: closedEntity, canonicalIssueData }) => {
+          if (canonicalIssue) {
+            try {
+              await markIssueAsDuplicate(github, closedEntity.node_id, canonicalIssue.owner, canonicalIssue.repo, canonicalIssue.issueNumber, canonicalIssueData);
+              core.info(`✓ Marked issue #${entityNumber} as duplicate of ${canonicalIssue.owner}/${canonicalIssue.repo}#${canonicalIssue.issueNumber}`);
+            } catch (dupError) {
+              core.warning(`Failed to mark native duplicate relationship for #${entityNumber}: ${getErrorMessage(dupError)}`);
+            }
+          }
+          return closedEntity;
+        });
       },
 
       continueOnCommentError: false,
