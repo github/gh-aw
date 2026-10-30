@@ -981,6 +981,7 @@ func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string
 		}
 		steps = append(steps, buildSafeOutputItemsManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts, data)...)
 	}
+	steps = append(steps, c.buildTokenBrokerInvalidationStep(data)...)
 	if c.actionMode.IsDev() && usesPatchesAndCheckouts(data.SafeOutputs) {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 		consolidatedSafeOutputsJobLog.Print("Added restore actions folder step to safe_outputs job (dev mode with checkout)")

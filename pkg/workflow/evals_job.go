@@ -105,6 +105,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
 	permissions := perms.RenderToYAML()
+	steps = append(steps, c.buildTokenBrokerInvalidationStep(&evalsAuthData)...)
 
 	job := &Job{
 		Name:        string(constants.EvalsJobName),

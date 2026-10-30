@@ -147,16 +147,20 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 				Jobs map[string]struct {
 					Permissions map[string]string `yaml:"permissions"`
 					Steps       []struct {
-						ID  string            `yaml:"id"`
-						Env map[string]string `yaml:"env"`
+						ID   string            `yaml:"id"`
+						Name string            `yaml:"name"`
+						If   string            `yaml:"if"`
+						Env  map[string]string `yaml:"env"`
 					} `yaml:"steps"`
 				} `yaml:"jobs"`
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(output), &compiled))
 			consumers := 0
+			invalidations := 0
 			for name, job := range compiled.Jobs {
 				for _, step := range job.Steps {
-					if _, exists := step.Env[tokenBrokerURLEnv]; exists {
+					if step.ID == "process_safe_outputs" {
+						assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
 						assert.Equal(t, "process_safe_outputs", step.ID)
 						assert.Equal(t, "write", job.Permissions["id-token"])
 						var config map[string]any
@@ -164,12 +168,19 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 						assert.Equal(t, map[string]any{"copilot-task": true}, config["_token_broker"])
 						consumers++
 					}
+					if step.Name == "Invalidate brokered Copilot credentials" {
+						assert.Equal(t, "always()", step.If)
+						assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
+						assert.Equal(t, "write", job.Permissions["id-token"])
+						invalidations++
+					}
 				}
 				if name != "safe_outputs" && name != "admission" && name != "conclusion_admission" {
 					assert.NotContains(t, job.Permissions, "id-token", name)
 				}
 			}
 			assert.Equal(t, 1, consumers)
+			assert.Equal(t, 1, invalidations)
 		})
 	}
 }
@@ -286,7 +297,9 @@ func TestTokenBrokerSupportsDetectionInference(t *testing.T) {
 	assert.Contains(t, output, "name: detection")
 	assert.Contains(t, output, "id-token: write")
 	assert.Contains(t, output, "id: token_broker_copilot_request")
+	assert.Contains(t, output, "getBrokerToken('copilot-request', { mask: token => core.setSecret(token) }, 'github')")
 	assert.Contains(t, output, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
+	assert.Contains(t, output, "name: Invalidate brokered Copilot credentials\n        if: always()")
 	assert.NotContains(t, output, "copilot-requests: write")
 }
 
@@ -307,6 +320,7 @@ func TestTokenBrokerSupportsEvalsInference(t *testing.T) {
 	steps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
 	assert.Contains(t, steps, "id: token_broker_copilot_request")
 	assert.Contains(t, steps, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
+	assert.Contains(t, strings.Join(job.Steps, ""), "name: Invalidate brokered Copilot credentials\n        if: always()")
 }
 
 func TestTokenBrokerGitHubProviderInAgentRemainsUnsupported(t *testing.T) {

@@ -95,11 +95,11 @@ describe("token broker", () => {
     const [brokerUrl, brokerInit] = fixture.fetchImpl.mock.calls[1];
     expect(brokerUrl).toBe(fixture.env.GH_AW_TOKEN_BROKER_URL);
     expect(brokerInit).toMatchObject({ method: "POST", redirect: "manual", headers: { "content-type": "application/json" } });
-    expect(JSON.parse(brokerInit.body)).toEqual({ token_type: tokenType, oidc_token: OIDC });
+    expect(JSON.parse(brokerInit.body)).toEqual(tokenType === "copilot-request" ? { token_type: tokenType, provider: "github", oidc_token: OIDC } : { token_type: tokenType, oidc_token: OIDC });
     expect(fixture.mask.mock.calls).toEqual([[OIDC], ["synthetic-credential"]]);
     expect(log).not.toHaveBeenCalled();
     expect(fixture.env).toEqual(before);
-    expect(Object.keys(fixture.client)).toEqual(["getToken"]);
+    expect(Object.keys(fixture.client)).toEqual(["getToken", "invalidateTokens"]);
   });
 
   it("deduplicates concurrent requests, caches per capability, and renews at the skew boundary", async () => {
@@ -116,6 +116,47 @@ describe("token broker", () => {
     fixture.fetchImpl.mockImplementation(async (_url, init) => (init.method === "POST" ? success("synthetic-renewed", "2026-10-30T12:10:00Z") : json({ value: jwt(time / 1000 + 300) })));
     expect(await fixture.client.getToken("copilot-request")).toBe("synthetic-renewed");
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
+  });
+
+  it("isolates Copilot request credentials by inference provider", async () => {
+    const fixture = setup();
+    await fixture.client.getToken("copilot-request", "github");
+    await fixture.client.getToken("copilot-request", "openai");
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(4);
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "copilot-request", provider: "github", oidc_token: OIDC });
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ token_type: "copilot-request", provider: "openai", oidc_token: OIDC });
+  });
+
+  it("invalidates job-scoped broker credentials using a fresh OIDC identity", async () => {
+    const fixture = setup({
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? (JSON.parse(init.body).operation === "invalidate" ? new Response(null, { status: 204 }) : success()) : json({ value: OIDC }))),
+    });
+    await fixture.client.getToken("copilot-task");
+    await fixture.client.invalidateTokens();
+    await fixture.client.getToken("copilot-task");
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body)).toEqual({ operation: "invalidate", oidc_token: OIDC });
+    expect(fixture.fetchImpl.mock.calls[3][1]).toMatchObject({ method: "POST", redirect: "manual", headers: { "cache-control": "no-store" } });
+    expect(fixture.mask.mock.calls).toEqual([[OIDC], ["synthetic-credential"], [OIDC], [OIDC], ["synthetic-credential"]]);
+  });
+
+  it("fails closed when broker invalidation is denied", async () => {
+    const fixture = setup({
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? new Response("sensitive-detail", { status: 403 }) : json({ value: OIDC }))),
+    });
+    await fails(fixture.client.invalidateTokens(), "UNAUTHORIZED");
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds and aborts broker invalidation", async () => {
+    vi.useFakeTimers();
+    const fixture = setup({
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? new Promise(() => {}) : json({ value: OIDC }))),
+    });
+    const result = fails(fixture.client.invalidateTokens(), "UNAVAILABLE");
+    await vi.advanceTimersByTimeAsync(10000);
+    await result;
+    expect(fixture.fetchImpl.mock.calls[1][1].signal.aborted).toBe(true);
   });
 
   it.each(["GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB", "GITHUB_REPOSITORY", "GH_AW_TOKEN_BROKER_URL"])("isolates cache and pending requests by %s", async key => {
@@ -135,8 +176,10 @@ describe("token broker", () => {
     await getBrokerToken("copilot-request", fixture.options);
     await getBrokerToken("copilot-request", fixture.options);
     expect(fixture.fetchImpl).toHaveBeenCalledTimes(2);
+    await getBrokerToken("copilot-request", fixture.options, "openai");
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[3][1].body).provider).toBe("openai");
     await fixture.client.getToken("copilot-request");
-    expect(fixture.fetchImpl).toHaveBeenCalledTimes(4);
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
   });
 
   it("uses a context-keyed default singleton and live Actions masking", async () => {
@@ -312,6 +355,7 @@ describe("token broker", () => {
   it("rejects invalid capabilities before network access", async () => {
     const fixture = setup();
     for (const type of ["", "a b", "copilot-request\r\n", "github", "copilot", "admission-oidc", "COPILOT_CONNECTION_TOKEN", null]) await fails(fixture.client.getToken(type), "UNSUPPORTED");
+    for (const provider of ["", "OpenAI", "provider with spaces", null]) await fails(fixture.client.getToken("copilot-request", provider), "UNSUPPORTED");
     expect(fixture.fetchImpl).not.toHaveBeenCalled();
   });
 });

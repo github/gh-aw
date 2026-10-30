@@ -98,7 +98,17 @@ Admission success, admission absence, and admission's `ignore` outage policy MUS
 
 The configured URL is the complete exchange endpoint; no route suffix or discovery request is appended. The client MUST acquire a GitHub Actions OIDC JWT with that exact audience and send one HTTPS POST with `Content-Type: application/json` and `Accept: application/json`. Redirects MUST NOT be followed during OIDC acquisition or exchange. The broker MUST serve the configured endpoint directly without redirects.
 
-The request MUST be a UTF-8 JSON object containing exactly two unique string members, in either order:
+An exchange request MUST be a UTF-8 JSON object containing exactly two unique string members, in either order, for `copilot-task`; a `copilot-request` exchange MUST contain exactly three:
+
+```json
+{
+  "token_type": "copilot-request",
+  "provider": "github",
+  "oidc_token": "<github-actions-oidc-jwt>"
+}
+```
+
+For `copilot-task`, the `provider` member is omitted:
 
 ```json
 {
@@ -110,9 +120,10 @@ The request MUST be a UTF-8 JSON object containing exactly two unique string mem
 | Member | Contract |
 | --- | --- |
 | `token_type` | Exactly `copilot-request` or `copilot-task`, case-sensitive. |
+| `provider` | Required only for `copilot-request`. A nonempty inference-provider identifier matching gh-aw's provider IDs (for example, `github`). It MUST NOT be a provider endpoint or URL. |
 | `oidc_token` | Nonempty, signed compact JWT issued by the configured trusted GitHub Actions issuer. |
 
-The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
+For `copilot-task`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
 
 ### 4.2. Independent capabilities
 
@@ -158,6 +169,23 @@ The broker MUST use 401 for identity-verification failure and 403 for policy den
 Failure responses MUST carry `Cache-Control: no-store` and MUST NOT contain credentials, raw claims, upstream responses, stack traces, or sensitive configuration. Empty bodies are RECOMMENDED; any diagnostic body MUST use fixed, sanitized messages. Clients do not rely on an error-body schema and MUST NOT surface raw bodies or underlying exceptions. The 400 classification is existing client behavior, not evidence that the broker lacks a capability.
 
 The client exchange deadline MUST be 10 seconds total, including OIDC acquisition, both response reads, and broker exchange. Each OIDC and broker response read MUST be bounded to 65,536 bytes. The client MUST cancel timed-out work and MUST NOT automatically retry or follow redirects. Servers SHOULD complete well within that deadline; server and upstream timeouts MUST be finite.
+
+### 4.5. Credential invalidation
+
+The client MUST issue an invalidation request to the configured endpoint after each job that can exchange a broker credential. This MUST be a separate POST step with the GitHub Actions `always()` condition, so it runs after success, failure, or cancellation of earlier steps. It MUST request a fresh OIDC identity with the configured audience; it MUST NOT include an exchanged credential in the invalidation request.
+
+The UTF-8 JSON request MUST contain exactly these two unique string members:
+
+```json
+{
+  "operation": "invalidate",
+  "oidc_token": "<github-actions-oidc-jwt>"
+}
+```
+
+The broker MUST verify the identity and revoke all credentials it issued to that exact authorized execution context, including credentials for any provider or capability issued in that job. The operation MUST be idempotent and MUST NOT revoke credentials belonging to another job, run, attempt, repository, or tenant. A successful invalidation MUST return HTTP 204 with an empty body and `Cache-Control: no-store`. The client MUST fail the invalidation step on any other status, without exposing response bodies or transport diagnostics. The server MUST reject malformed requests and MUST NOT disclose whether credentials exist for an unauthorized context.
+
+The invalidation step is cleanup, not a fallback or substitute for short credential lifetimes. If the job is force-terminated before the step can run, short server-enforced lifetimes remain the bound on credential exposure.
 
 ## 5. Identity Verification and Authorization
 
@@ -241,7 +269,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-004 | Server | Missing/non-numeric/expired `exp`, future `nbf`/`iat`, invalid ordering, and excessive age/lifetime return 401 under the configured time policy; test exact boundaries. |
 | T-TBR-005 | Server | Wrong tenant/owner/repository IDs, transfer, workflow revision/ref, environment, fork policy, run/attempt, or job evidence returns 403. Missing required evidence also denies. |
 | T-TBR-006 | Server | Valid identity denied a supported capability returns 403, not unsupported. An unsupported known type with invalid identity returns 401. Neither path invokes issuance. |
-| T-TBR-007 | Server | Extra/duplicate/missing fields, malformed UTF-8/JSON, arrays, and wrong types return 400; unknown string type returns 422; oversize/media-type failures return 413/415. |
+| T-TBR-007 | Server | Extra/duplicate/missing fields, malformed UTF-8/JSON, arrays, wrong types, or a missing/extra provider field return 400; unknown string type returns 422; oversize/media-type failures return 413/415. |
 | T-TBR-008 | Both | Success is 200 with exactly two fields, safe nonempty ASCII token, no-store, bounded body, and valid expiration. Client accepts lowercase `t`/`z`, fractional seconds, and numeric offsets through `23:59`; rejects extra/duplicate fields, invalid calendar dates, leap seconds, out-of-range time/offset components, and expiry at/below 30 seconds. |
 | T-TBR-009 | Server | Concurrent use of one valid JWT for both authorized capabilities succeeds. Replay across policy boundaries cannot broaden issuance. Test per-context replay rules, rate limits (429), and bounded cache retention. |
 | T-TBR-010 | Client | Same-key requests coalesce; changed capability/repository/job/run/attempt/endpoint cannot inherit a token. Refresh occurs at the 30-second boundary; failure never reuses a stale token. |
@@ -250,6 +278,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | T-TBR-013 | Server | Backend returns wrong capability/scope, unsafe token, excessive/unknown expiration, or incompatible credential. No successful response is emitted. SSRF and cross-tenant backend selection are rejected. |
 | T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. Broker exchange alone is insufficient. |
 | T-TBR-015 | Server | Rotate trusted signing keys; cached valid keys remain usable within policy, unknown keys trigger bounded refresh, and untrusted/unavailable keys fail closed. |
+| T-TBR-016 | Both | An unconditional job post-step obtains a fresh OIDC identity and invalidates only credentials for its verified execution context; repeat invalidation succeeds, unauthorized scopes do not revoke credentials, and non-204 responses fail safely. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 
@@ -333,3 +362,4 @@ These choices do not permit extra wire fields, weakened identity verification, o
 - Specified issuer verification, tenant/workflow/job authorization, deployment-owned issuance, lifecycle, replay, and privacy controls.
 - Recorded existing client behavior, compliance scenarios, and the unresolved renewable inference integration.
 - Clarified the existing handler-config opt-in marker, marker-independent low-level API, and restricted timestamp profile.
+- Included the inference provider ID in `copilot-request` exchanges and specified unconditional job-scoped credential invalidation.

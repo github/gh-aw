@@ -88,7 +88,24 @@ func (c *Compiler) buildTokenBrokerRequestStep(data *WorkflowData, condition str
 		"        with:\n",
 		"          script: |\n",
 		"            const { getBrokerToken } = require('"+SetupActionDestination+"/setup/js/token_broker.cjs');\n",
-		"            core.setOutput('token', await getBrokerToken('copilot-request', { mask: token => core.setSecret(token) }));\n",
+		"            core.setOutput('token', await getBrokerToken('copilot-request', { mask: token => core.setSecret(token) }, 'github'));\n",
 	)
 	return step
+}
+
+func (c *Compiler) buildTokenBrokerInvalidationStep(data *WorkflowData) []string {
+	if !usesTokenBrokerInference(data) && !usesTokenBrokerTasks(data) {
+		return nil
+	}
+	return []string{
+		"      - name: Invalidate brokered Copilot credentials\n",
+		"        if: always()\n",
+		"        uses: " + getCachedActionPin("actions/github-script", data) + "\n",
+		"        env:\n",
+		"          " + tokenBrokerURLEnv + ": " + tokenBrokerURLExpression + "\n",
+		"        with:\n",
+		"          script: |\n",
+		"            const { invalidateBrokerTokens } = require('" + SetupActionDestination + "/setup/js/token_broker.cjs');\n",
+		"            await invalidateBrokerTokens({ mask: token => core.setSecret(token) });\n",
+	}
 }

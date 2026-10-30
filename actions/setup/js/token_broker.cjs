@@ -81,8 +81,8 @@ function expiration(value) {
 /** @typedef {{env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, now?: () => number, mask?: (token: string) => void | Promise<void>}} BrokerOptions */
 
 /**
- * Tokens exist only in this client's memory. Only inference and task capabilities are supported;
- * HTTP 400, 404, 422 and 501 mean unsupported, with no fallback or retry.
+ * The client cache is memory-only. HTTP 400, 404, 422 and 501 mean unsupported,
+ * with no fallback or retry.
  * @param {BrokerOptions} [options]
  */
 function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = Date.now, mask = async token => (await import("@actions/core")).setSecret(token) } = {}) {
@@ -90,15 +90,18 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
   const cache = new Map();
   /** @type {Map<string, Promise<string>>} */
   const pending = new Map();
+  let credentialGeneration = 0;
 
-  /** @param {string} tokenType @returns {Promise<string>} */
-  async function getToken(tokenType) {
+  /** @param {string} tokenType @param {string} [provider] @returns {Promise<string>} */
+  async function getToken(tokenType, provider = "github") {
     if (tokenType !== "copilot-request" && tokenType !== "copilot-task") throw failure("UNSUPPORTED");
+    if (tokenType === "copilot-request" && (typeof provider !== "string" || !/^[a-z][a-z0-9_-]{0,63}$/.test(provider))) throw failure("UNSUPPORTED");
     if (!Object.hasOwn(env, "GH_AW_TOKEN_BROKER_URL")) throw failure("CONFIGURATION");
     const snapshot = { ...env };
     const endpoint = snapshot.GH_AW_TOKEN_BROKER_URL || "";
     httpsUrl(endpoint, "CONFIGURATION");
-    const key = JSON.stringify([snapshot.GITHUB_RUN_ID, snapshot.GITHUB_RUN_ATTEMPT, snapshot.GITHUB_JOB, snapshot.GITHUB_REPOSITORY, endpoint, tokenType]);
+    const generation = credentialGeneration;
+    const key = JSON.stringify([snapshot.GITHUB_RUN_ID, snapshot.GITHUB_RUN_ATTEMPT, snapshot.GITHUB_JOB, snapshot.GITHUB_REPOSITORY, endpoint, tokenType, tokenType === "copilot-request" ? provider : null, generation]);
     const cached = cache.get(key);
     if (cached && cached.expiresAt > now() + SKEW_MS) return cached.token;
     cache.delete(key);
@@ -117,35 +120,14 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
     });
 
     const exchange = async () => {
-      const oidcUrl = httpsUrl(snapshot.ACTIONS_ID_TOKEN_REQUEST_URL, "OIDC");
-      const bootstrap = snapshot.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
-      if (!isCredential(bootstrap)) throw failure("OIDC");
-      oidcUrl.searchParams.set("audience", endpoint || "");
-      /** @type {string} */
-      let oidcToken;
-      try {
-        const response = await fetchImpl(oidcUrl, { headers: { authorization: `bearer ${bootstrap}`, accept: "application/json" }, redirect: "manual", signal: controller.signal });
-        if (response.status !== 200 || response.redirected) {
-          discard(response);
-          throw failure("OIDC");
-        }
-        const result = JSON.parse(await readBoundedBody(response, 65536));
-        if (typeof result?.value !== "string") throw failure("OIDC");
-        await mask(result.value);
-        if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(result.value)) throw failure("OIDC");
-        const payload = JSON.parse(Buffer.from(result.value.split(".")[1], "base64url").toString("utf8"));
-        if (typeof payload?.exp !== "number" || !Number.isFinite(payload.exp) || payload.exp * 1000 <= now()) throw failure("OIDC");
-        oidcToken = result.value;
-      } catch {
-        throw failure("OIDC");
-      }
+      const oidcToken = await acquireOIDCToken(snapshot, endpoint, fetchImpl, now, mask, controller.signal);
       if (controller.signal.aborted) throw failure("UNAVAILABLE");
       let response;
       try {
         response = await fetchImpl(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
-          body: JSON.stringify({ token_type: tokenType, oidc_token: oidcToken }),
+          body: JSON.stringify(tokenType === "copilot-request" ? { token_type: tokenType, provider, oidc_token: oidcToken } : { token_type: tokenType, oidc_token: oidcToken }),
           redirect: "manual",
           signal: controller.signal,
         });
@@ -169,7 +151,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
           throw failure("MALFORMED_RESPONSE");
         const expiresAt = expiration(result.expires_at);
         if (expiresAt <= now() + SKEW_MS) throw failure("MALFORMED_RESPONSE");
-        if (controller.signal.aborted) throw failure("UNAVAILABLE");
+        if (controller.signal.aborted || generation !== credentialGeneration) throw failure("UNAVAILABLE");
         cache.set(key, { token: result.token, expiresAt });
         return result.token;
       } catch {
@@ -183,7 +165,84 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
     pending.set(key, request);
     return request;
   }
-  return { getToken };
+
+  async function invalidateTokens() {
+    credentialGeneration++;
+    cache.clear();
+    pending.clear();
+    if (!Object.hasOwn(env, "GH_AW_TOKEN_BROKER_URL")) throw failure("CONFIGURATION");
+    const snapshot = { ...env };
+    const endpoint = snapshot.GH_AW_TOKEN_BROKER_URL || "";
+    httpsUrl(endpoint, "CONFIGURATION");
+    const controller = new AbortController();
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer;
+    /** @type {Promise<never>} */
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(failure("UNAVAILABLE"));
+        controller.abort();
+      }, TIMEOUT_MS);
+    });
+    const invalidate = async () => {
+      const oidcToken = await acquireOIDCToken(snapshot, endpoint, fetchImpl, now, mask, controller.signal);
+      if (controller.signal.aborted) throw failure("UNAVAILABLE");
+      let response;
+      try {
+        response = await fetchImpl(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
+          body: JSON.stringify({ operation: "invalidate", oidc_token: oidcToken }),
+          redirect: "manual",
+          signal: controller.signal,
+        });
+      } catch {
+        throw failure("UNAVAILABLE");
+      }
+      if (response.status !== 204 || response.redirected) {
+        discard(response);
+        if (response.status === 401 || response.status === 403) throw failure("UNAUTHORIZED");
+        if ([400, 404, 422, 501].includes(response.status)) throw failure("UNSUPPORTED");
+        throw failure("UNAVAILABLE");
+      }
+      discard(response);
+    };
+    return Promise.race([invalidate(), timeout]).finally(() => clearTimeout(timer));
+  }
+
+  return { getToken, invalidateTokens };
+}
+
+/**
+ * @param {NodeJS.ProcessEnv} snapshot
+ * @param {string} endpoint
+ * @param {typeof fetch} fetchImpl
+ * @param {() => number} now
+ * @param {(token: string) => void | Promise<void>} mask
+ * @param {AbortSignal} signal
+ * @returns {Promise<string>}
+ */
+async function acquireOIDCToken(snapshot, endpoint, fetchImpl, now, mask, signal) {
+  const oidcUrl = httpsUrl(snapshot.ACTIONS_ID_TOKEN_REQUEST_URL, "OIDC");
+  const bootstrap = snapshot.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  if (!isCredential(bootstrap)) throw failure("OIDC");
+  oidcUrl.searchParams.set("audience", endpoint);
+  try {
+    const response = await fetchImpl(oidcUrl, { headers: { authorization: `bearer ${bootstrap}`, accept: "application/json" }, redirect: "manual", signal });
+    if (response.status !== 200 || response.redirected) {
+      discard(response);
+      throw failure("OIDC");
+    }
+    const result = JSON.parse(await readBoundedBody(response, 65536));
+    if (typeof result?.value !== "string") throw failure("OIDC");
+    await mask(result.value);
+    if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(result.value)) throw failure("OIDC");
+    const payload = JSON.parse(Buffer.from(result.value.split(".")[1], "base64url").toString("utf8"));
+    if (typeof payload?.exp !== "number" || !Number.isFinite(payload.exp) || payload.exp * 1000 <= now()) throw failure("OIDC");
+    return result.value;
+  } catch {
+    throw failure("OIDC");
+  }
 }
 
 /** @type {ReturnType<typeof createTokenBrokerClient> | undefined} */
@@ -191,18 +250,32 @@ let defaultClient;
 /** @type {WeakMap<BrokerOptions, ReturnType<typeof createTokenBrokerClient>>} */
 const optionClients = new WeakMap();
 
-/** @param {string} tokenType @param {BrokerOptions} [options] @returns {Promise<string>} */
-function getBrokerToken(tokenType, options) {
+/** @param {string} tokenType @param {BrokerOptions} [options] @param {string} [provider] @returns {Promise<string>} */
+function getBrokerToken(tokenType, options, provider = "github") {
   if (!options) {
     defaultClient ||= createTokenBrokerClient();
-    return defaultClient.getToken(tokenType);
+    return defaultClient.getToken(tokenType, provider);
   }
   let client = optionClients.get(options);
   if (!client) {
     client = createTokenBrokerClient(options);
     optionClients.set(options, client);
   }
-  return client.getToken(tokenType);
+  return client.getToken(tokenType, provider);
 }
 
-module.exports = { createTokenBrokerClient, getBrokerToken, isTokenBrokerEnabled };
+/** @param {BrokerOptions} [options] @returns {Promise<void>} */
+function invalidateBrokerTokens(options) {
+  if (!options) {
+    defaultClient ||= createTokenBrokerClient();
+    return defaultClient.invalidateTokens();
+  }
+  let client = optionClients.get(options);
+  if (!client) {
+    client = createTokenBrokerClient(options);
+    optionClients.set(options, client);
+  }
+  return client.invalidateTokens();
+}
+
+module.exports = { createTokenBrokerClient, getBrokerToken, invalidateBrokerTokens, isTokenBrokerEnabled };

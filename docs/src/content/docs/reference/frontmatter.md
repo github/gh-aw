@@ -99,7 +99,7 @@ token-broker:
   copilot-task: true
 ```
 
-Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
+Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. Request exchanges include the selected LLM inference provider ID. Jobs using brokered credentials run an unconditional post-step to invalidate credentials for that job. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
 
 ### Imports (`imports:`)
 

@@ -208,6 +208,7 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 		detectionAuthData.Model = model
 	}
 	brokeredInference := usesTokenBrokerInference(detectionAuthData)
+	steps = append(steps, c.buildTokenBrokerInvalidationStep(detectionAuthData)...)
 	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data) && !brokeredInference
 	perms := NewPermissionsContentsRead()
 	if copilotRequestsEnabled {
