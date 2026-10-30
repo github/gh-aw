@@ -2094,4 +2094,4 @@ jobs:
             /tmp/gh-aw/claims/*/safe-output-errors.json
             /tmp/gh-aw/claims/*/claim-delivery-errors.json
           if-no-files-found: ignore
-          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || (job.status == 'failure' && 7 || 1) }}
+          retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}

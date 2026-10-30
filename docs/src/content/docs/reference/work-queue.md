@@ -329,6 +329,8 @@ Idle refresh is every 10 seconds; search and action review pause it. Failed read
 
 Events go to stderr with elapsed timing and sanitized counts, flags, statuses, and error categories, not payloads, identities, or credentials. Blocked controls and exhausted delivery verification also emit always-visible diagnostics.
 
+Non-staged workers upload Claim-scoped output manifests, execution outcomes, temporary ID maps, and handler/delivery errors in `safe-outputs-items` only after successful secret redaction. These diagnostics default to 30 days of retention regardless of job success, failure, or cancellation, because native job success does not establish verified delivery. Repository `artifact_retention_days` or `GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS` overrides still apply. Private delivery receipts are not included. Retention does not guarantee upload after forced termination, recover expired artifacts, or authorize replaying effects.
+
 Routing diagnostics distinguish installed Policy gaps from compiler approval failures:
 
 | Code | Meaning and recovery |

@@ -1892,7 +1892,8 @@ func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.
 				require.Contains(t, content, "id: redact_secrets")
 				require.Contains(t, content, "steps.redact_secrets.outcome == 'success'")
 				require.Contains(t, content, "SECRET_PRIVATE_TOKEN: ${{ secrets.PRIVATE_TOKEN }}")
-				require.Contains(t, content, "retention-days: ${{ job.status == 'failure' && 7 || 1 }}")
+				require.Contains(t, content, "retention-days: 30\n")
+				require.NotContains(t, content, "job.status")
 				require.Less(t, strings.Index(content, "id: redact_secrets"), strings.Index(content, "Upload Safe Outputs Items"))
 			} else {
 				require.NotContains(t, content, "/claims/")
@@ -1909,8 +1910,9 @@ func TestClaimDiagnosticRetentionPreservesRepositoryOverrides(t *testing.T) {
 		config *RepoConfig
 		want   any
 	}{
-		{name: "default", want: "${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || (job.status == 'failure' && 7 || 1) }}"},
+		{name: "default", want: "${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '30' }}"},
 		{name: "repository", config: &RepoConfig{ArtifactRetentionDays: new(TemplatableInt32("14"))}, want: 14},
+		{name: "repository-expression", config: &RepoConfig{ArtifactRetentionDays: new(TemplatableInt32("${{ vars.CLAIM_RETENTION || '14' }}"))}, want: "${{ vars.CLAIM_RETENTION || '14' }}"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string {
@@ -1921,8 +1923,10 @@ func TestClaimDiagnosticRetentionPreservesRepositoryOverrides(t *testing.T) {
 			uploads := retentionTestSteps(t, output)
 			require.Len(t, uploads, 1)
 			assert.EqualValues(t, test.want, uploads[0]["with"].(map[string]any)["retention-days"])
+			assert.NotContains(t, output, "job.status")
 			assert.Contains(t, output, "steps.redact_secrets.outcome == 'success'")
 			assert.Contains(t, output, "/tmp/gh-aw/claims/*/claim-delivery-errors.json")
+			assert.NotContains(t, output, "/tmp/gh-aw/claims/*/delivery-receipt.json")
 		})
 	}
 }

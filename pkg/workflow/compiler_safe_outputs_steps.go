@@ -310,7 +310,7 @@ func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string
 	}
 	steps = append(steps, "          if-no-files-found: ignore\n")
 	if claimArtifacts {
-		steps = append(steps, "          retention-days: ${{ job.status == 'failure' && 7 || 1 }}\n")
+		steps = append(steps, "          retention-days: 30\n")
 	}
 	return steps
 }
