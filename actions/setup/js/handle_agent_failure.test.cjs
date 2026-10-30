@@ -1588,6 +1588,74 @@ describe("handle_agent_failure", () => {
       }
     });
 
+    it.each([
+      ["crash", "TypeError: private-driver-payload\n", "process.exit(139)", 139, "driver_crash", "engine driver crashed"],
+      ["outage", "CAPIError: 503 Service Unavailable\n", "process.exit(1)", 1, "engine_outage", "experienced an engine outage"],
+    ])("publishes exit details and final error summaries for a simulated driver %s", async (_kind, finalError, termination, exitCode, failureCause, titleSuffix) => {
+      syncRuntimePromptTemplates(import.meta.url);
+      const { runProcess } = require("./process_runner.cjs");
+      const { buildEmptyOutputOutcome } = require("./empty_output_outcome.cjs");
+      const lines = [];
+      const result = await runProcess({
+        command: process.execPath,
+        args: ["-e", `process.stderr.write(${JSON.stringify(`CAPIError: 502 Bad Gateway\n${finalError}`)}, () => { ${termination}; })`],
+        logArgs: ["<test-driver>"],
+        attempt: 0,
+        log: message => lines.push(`[copilot-harness] ${message}`),
+        onStderrLine: line => lines.push(line),
+      });
+      expect(result.exitCode).toBe(exitCode);
+      fs.writeFileSync(path.join(tmpDir, "agent_execution_exit_code.txt"), String(result.exitCode));
+      fs.writeFileSync(path.join(tmpDir, "agent-stdio.log"), lines.join("\n"));
+      const outcome = buildEmptyOutputOutcome([], tmpDir);
+      expect(outcome.failureCause).toBe(failureCause);
+      const output = path.join(tmpDir, "output.json");
+      fs.writeFileSync(
+        output,
+        JSON.stringify({
+          items: [outcome],
+          collectorEmptyOutputCause: outcome.reason,
+          collectorFailureCause: outcome.failureCause,
+          collectorDriverExitCode: outcome.driverExitCode,
+        })
+      );
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", output);
+      vi.stubEnv("GH_AW_AGENT_CONCLUSION", "failure");
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "true");
+      fs.writeFileSync(path.join(promptsDir, "agent_failure_issue.md"), fs.readFileSync(new URL("../md/agent_failure_issue.md", import.meta.url), "utf8"));
+      const create = vi.fn().mockResolvedValue({ data: { number: 101, html_url: "https://github.com/owner/repo/issues/101", node_id: "I_101" } });
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create, createComment: vi.fn() },
+          pulls: { get: vi.fn() },
+          actions: { listJobsForWorkflowRun: vi.fn() },
+        },
+        paginate: vi.fn(async () => [{ name: "agent", conclusion: "failure", steps: [{ name: "Run agent", conclusion: "failure" }] }]),
+        graphql: vi.fn(),
+      };
+      try {
+        await main();
+        expect(create).toHaveBeenCalledOnce();
+        const { title, body } = create.mock.calls[0][0];
+        expect(title).toBe(`[aw] Test Workflow: ${titleSuffix}`);
+        expect(body).toContain(`Failure classification: ${failureCause}`);
+        expect(body).toContain(`Driver exit code: ${exitCode}`);
+        expect(body).toContain("Last engine error lines (summarized");
+        expect(body).toContain("Provider server error (HTTP 5xx)");
+        if (failureCause === "driver_crash") {
+          expect(body).toContain("Driver exit signal (inferred from exit code): SIGSEGV");
+          expect(body).toContain("Driver exit meaning: Terminated by SIGSEGV");
+          expect(body).toContain("Driver execution failed (unhandled JavaScript exception)");
+        } else {
+          expect(body).not.toContain("Failure classification: driver_crash");
+        }
+        expect(body).not.toContain("private-driver-payload");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it.each(["GH_AW_MODEL_ENDPOINT_MISMATCH_ERROR", "GH_AW_MODEL_NOT_SUPPORTED_ERROR", "GH_AW_HTTP_400_RESPONSE_ERROR", "GH_AW_AGENTIC_ENGINE_TIMEOUT"])(
       "keeps final driver crash title, cause and details despite historical %s",
       async historicalSignal => {
