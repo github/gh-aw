@@ -10,6 +10,8 @@ pkg/workflow/sh/*.sh linguist-generated=true
 actions/*/index.js linguist-generated=true
 actions/setup-cli/install.sh linguist-generated=true
 actions/setup-cli/install.ps1 linguist-generated=true
+# Rendered snapshots preserve Markdown hard breaks and template whitespace.
+actions/setup/js/testdata/messages_preview.md whitespace=-blank-at-eol
 specs/artifacts.md linguist-generated=true merge=ours
 docs/adr/*.md merge=theirs
 # Use bd merge for beads JSONL files

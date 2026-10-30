@@ -73,6 +73,9 @@ Validate YAML syntax (especially indentation and `key: value` spacing), confirm 
 
 If no lock file is generated, fix the reported errors, confirm `.github/workflows/` is writable, and remove stale `.lock.yml` files with `gh aw compile --purge` after deleting a workflow `.md`.
 
+> [!TIP]
+> After upgrading, Copilot web-tool errors or a missing `tools.bash` setting with `tools.github.min-integrity: none` can be fixed with `gh aw fix --write`, followed by `gh aw compile`. Review the [common compatibility fixes](/gh-aw/reference/releases/#common-compatibility-fixes-after-upgrading) for tool alternatives and explicit shell-access choices.
+
 ## Import and Include Issues
 
 Import paths are relative to the repository root, for example `.github/workflows/shared/tools.md`; verify the expected files with `git status`. A workflow can import only one file from `.github/agents/`. If compilation hangs, check for circular imports and remove the cycle.

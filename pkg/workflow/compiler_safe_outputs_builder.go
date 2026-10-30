@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"sync/atomic"
 
 	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var safeOutputsBuilderLog = logger.New("workflow:safe_outputs_builder")
@@ -62,8 +62,9 @@ func (e templatableJSONExpression) MarshalJSON() ([]byte, error) {
 // Callers must only pass expressions that satisfy isExpression (i.e. the whole string is
 // wrapped in a well-formed "${{ ... }}"); AddTemplatableJSONSlice enforces this.
 func wrapExpressionWithToJSON(expr string) string {
-	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(expr), "${{"), "}}"))
-	if strings.HasPrefix(inner, "toJSON(") {
+	inner := stripExpressionWrapper(expr)
+	expression, ok := actionslanguageservice.WrappedExpression(expr)
+	if ok && expression.Kind == "call" && strings.EqualFold(expression.Token.Text, "toJSON") {
 		return expr
 	}
 	return "${{ toJSON(" + inner + ") }}"
@@ -166,11 +167,6 @@ func marshalSafeOutputsConfig(config map[string]any) ([]byte, error) {
 	return result, nil
 }
 
-var (
-	needsDotReferencePattern     = regexp.MustCompile(`needs\s*\.\s*([^\s.]+)\s*\.`)
-	needsBracketReferencePattern = regexp.MustCompile(`needs\s*\[\s*['"]([^'"]+)['"]\s*\]\s*\.`)
-)
-
 // sanitizeAgentSafeOutputsConfig walks a safe-outputs config map (as produced for the agent
 // job's copy of config.json) and neutralizes any templated field whose expression references
 // needs.<job> for a job in unresolvableJobs. These jobs are only ever added as dependencies of
@@ -183,13 +179,8 @@ func sanitizeAgentSafeOutputsConfig(config map[string]any, unresolvableJobs []st
 		return
 	}
 	referencesUnresolvableJob := func(expr string) bool {
-		for _, reference := range needsDotReferencePattern.FindAllStringSubmatch(expr, -1) {
-			if slices.Contains(unresolvableJobs, reference[1]) {
-				return true
-			}
-		}
-		for _, reference := range needsBracketReferencePattern.FindAllStringSubmatch(expr, -1) {
-			if slices.Contains(unresolvableJobs, reference[1]) {
+		for _, path := range interpolationReferences(expr) {
+			if len(path) >= 3 && strings.EqualFold(path[0], "needs") && slices.Contains(unresolvableJobs, path[1]) {
 				return true
 			}
 		}

@@ -1,8 +1,20 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { generateFooterWithMessages, getDetectionCautionAlert, generateXMLMarker } = require("./messages_footer.cjs");
+const { generateFooterWithMessages, buildGeneratedFooterParts, buildFooterBlocks, getDetectionCautionAlert, getDetectionCautionBlocks, generateXMLMarker } = require("./messages_footer.cjs");
 const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+
+/**
+ * Import footer templates while retaining Claim and diagnostic subtrees as nodes.
+ * @param {Parameters<typeof buildGeneratedFooter>[0]} params
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function buildGeneratedFooterBlocks(params) {
+  const { workflowName, runUrl, workflowSource = "", workflowSourceURL = "", triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber, historyUrl } = params;
+  const parts = buildGeneratedFooterParts(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber, historyUrl, { skipDetectionCaution: true });
+  return buildFooterBlocks(parts);
+}
 
 /**
  * Build the shared generated footer body.
@@ -65,7 +77,27 @@ function assembleMarkdownBodyParts(params) {
   return { detectionCaution, footer, noFooterMarker };
 }
 
+/**
+ * Tree-first counterpart for issue and comment publishers.
+ * @param {Parameters<typeof assembleMarkdownBodyParts>[0]} params
+ */
+function assembleReportBodyParts(params) {
+  const { includeFooter, workflowName, runUrl, workflowId = "", markerWhenFooterDisabled = "none" } = params;
+  const detectionCaution = getDetectionCautionBlocks(workflowName, runUrl);
+  const footer = includeFooter ? buildGeneratedFooterBlocks(params) : [];
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const noFooterMarker = [];
+  if (!includeFooter && markerWhenFooterDisabled === "workflow-id" && workflowId) {
+    noFooterMarker.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: workflowId, agentTainted: false });
+  } else if (!includeFooter && markerWhenFooterDisabled === "xml") {
+    noFooterMarker.push(...parseReportMarkdown(generateXMLMarker(workflowName, runUrl), { allowMetadata: true, agentTainted: false }));
+  }
+  return { detectionCaution, footer, noFooterMarker };
+}
+
 module.exports = {
   buildGeneratedFooter,
+  buildGeneratedFooterBlocks,
   assembleMarkdownBodyParts,
+  assembleReportBodyParts,
 };

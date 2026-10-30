@@ -2,14 +2,14 @@ package aw
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/rhysd/actionlint"
 )
 
-var statusOnlyExpressionPattern = regexp.MustCompile(`(?s)\$\{\{.*?\}\}`)
+var statusOnlyExpressionPattern = actionslanguageservice.Pattern{}
 
 // StatusOnlyViolation describes one rejected status-only job reference.
 type StatusOnlyViolation struct {

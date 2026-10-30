@@ -320,8 +320,8 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 		for key, value := range section.EnvVars {
 			// Extract the GitHub expression from the value (e.g., "${{ github.repository }}" -> "github.repository")
 			// This is needed for the substitution step
-			if strings.HasPrefix(value, "${{ ") && strings.HasSuffix(value, " }}") {
-				content := strings.TrimSpace(value[4 : len(value)-3])
+			if isExpression(value) {
+				content := stripExpressionWrapper(value)
 				// Add to both allEnvVars (for prompt creation step) and expressionMappingsMap (for substitution step)
 				allEnvVars[key] = value
 				// Only add if not already present (user prompt expressions take precedence)

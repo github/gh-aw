@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 const gatewayProvenanceJobName = "gateway_provenance"
@@ -98,29 +100,7 @@ func (c *Compiler) guardGatewayProvenanceJobs(data *WorkflowData) error {
 }
 
 // Interpolation could turn a false condition into a nonempty, truthy string.
-// GitHub expression literals use single quotes, with doubled quotes for escapes.
 func isGatewayProvenanceCondition(condition string) bool {
-	if strings.TrimSpace(condition) == "" {
-		return false
-	}
-	quoted := false
-	depth := 0
-	for i, char := range condition {
-		if char == '\'' {
-			quoted = !quoted
-		} else if !quoted {
-			switch {
-			case strings.HasPrefix(condition[i:], "${{"), strings.HasPrefix(condition[i:], "}}"):
-				return false
-			case char == '(':
-				depth++
-			case char == ')':
-				if depth == 0 {
-					return false
-				}
-				depth--
-			}
-		}
-	}
-	return !quoted && depth == 0
+	expression, err := actionslanguageservice.ParseSyntax(condition)
+	return err == nil && expression != nil
 }

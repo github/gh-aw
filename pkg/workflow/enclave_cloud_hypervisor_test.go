@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +47,7 @@ func TestEnclaveCloudHypervisorAWFConfig(t *testing.T) {
 	assert.NotContains(t, args, "--container-runtime cloud-hypervisor")
 	assert.Contains(t, args, "--tty")
 	assert.Contains(t, args, "--mount")
-	assert.Equal(t, "sudo --preserve-env awf", GetAWFCommandPrefix(data))
+	assert.Equal(t, constants.AWFCloudHypervisorCommand, GetAWFCommandPrefix(data))
 	assert.NotContains(t, strings.Join(generateAWFInstallationStepForWorkflow("v0.28.47", data), "\n"), "--rootless")
 	assert.NotContains(t, strings.Join(generateFirewallLogParsingStep("enclave", data), "\n"), "--rootless")
 	assert.NotContains(t, args, "--legacy-security")
@@ -141,7 +142,7 @@ Run exactly one enclave script to build and test the repository.
 			assert.Contains(t, lock, `\"mountPolicy\":\"workspace-only\"`)
 			assert.Contains(t, lock, `\"runtime\":\"cloud-hypervisor\"`)
 			assert.Contains(t, lock, `"awf-enclave"`)
-			assert.Contains(t, lock, "sudo --preserve-env awf --config")
+			assert.Contains(t, lock, constants.AWFCloudHypervisorCommand+" --config")
 			assert.NotContains(t, lock, `install_awf_binary.sh" v0.28.47 --rootless`)
 			assert.Contains(t, lock, "--exclude-env AWF_CLOUD_HYPERVISOR_ENCLAVE_SCRIPT_ROOTFS")
 			assert.NotContains(t, lock, "--container-runtime cloud-hypervisor")

@@ -13,6 +13,7 @@ const { getCurrentBranch } = require("./get_current_branch.cjs");
 const { getBaseBranch } = require("./get_base_branch.cjs");
 const { lookupCheckout } = require("./checkout_manifest.cjs");
 const { generateGitPatch } = require("./generate_git_patch.cjs");
+const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { generateGitBundle } = require("./generate_git_bundle.cjs");
 const { hasMergeCommitsInRange, execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
 const { enforceCommentLimits, MAX_COMMENT_INPUT_LENGTH } = require("./comment_limit_helpers.cjs");
@@ -22,7 +23,7 @@ const { findRepoCheckout } = require("./find_repo_checkout.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo, isSideRepoTarget, patchWorkspaceTargetsRepo } = require("./repo_helpers.cjs");
 const { generateTemporaryId, getOrGenerateTemporaryId } = require("./temporary_id.cjs");
 const { parseAllowedExtensionsEnv } = require("./allowed_extensions_helpers.cjs");
-const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
+const { buildExcludePathspecs, getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
 const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
@@ -1130,9 +1131,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       patchOptions.workspacePath = patchWorkspacePath;
     }
     // Pass excluded_files so git excludes them via :(exclude) pathspecs at generation time.
-    if (Array.isArray(prConfig.excluded_files) && prConfig.excluded_files.length > 0) {
-      patchOptions.excludedFiles = prConfig.excluded_files;
-    }
+    patchOptions.excludedFiles = getExcludedFiles(prConfig);
     // Pass pinnedSha so patch generation uses the pinned commit, not a potentially-flipped ref
     if (pinnedSha) {
       patchOptions.pinnedSha = pinnedSha;
@@ -1174,13 +1173,14 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (patchResult.baseCommit) {
       entry.base_commit = patchResult.baseCommit;
     }
+    if (patchResult.excludedWorkflowFiles?.length > 0) {
+      entry.body = `${WORKFLOW_COMPILATION_NOTICE}\n\n${entry.body || ""}`;
+    }
 
     if (useBundle) {
       // Bundle transport: preserves merge commits and per-commit metadata
       server.debug(`Generating bundle for create_pull_request with branch: ${entry.branch}${repoCwd ? ` in ${repoCwd} baseBranch: ${baseBranch}` : ""}`);
-      if (Array.isArray(prConfig.excluded_files) && prConfig.excluded_files.length > 0) {
-        transportOptions.excludedFiles = prConfig.excluded_files;
-      }
+      transportOptions.excludedFiles = getExcludedFiles(prConfig);
       const bundleResult = await generateGitBundle(entry.branch, baseBranch, transportOptions);
 
       if (!bundleResult.success) {
@@ -1620,7 +1620,10 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         if (!pushPinnedSha) {
           server.debug("Incremental allowed-files check skipped: branch SHA not pinned (non-bundle path)");
         } else {
-          const agentFiles = execGitSync(["log", "--ancestry-path", "--name-only", "--pretty=format:", `${incrementalBaseRef}..${pushPinnedSha}`, "--"], { cwd: pushGitCwd })
+          // Use the transport's Git pathspecs so only files actually retained in
+          // the generated changeset are subject to the allowlist.
+          const excludedPathspecs = buildExcludePathspecs(getExcludedFiles(pushConfig));
+          const agentFiles = execGitSync(["log", "--ancestry-path", "--name-only", "--pretty=format:", `${incrementalBaseRef}..${pushPinnedSha}`, "--", ...excludedPathspecs.slice(1)], { cwd: pushGitCwd })
             .toString()
             .split("\n")
             .map(s => s.trim())
@@ -1628,12 +1631,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
 
           if (agentFiles.length > 0) {
             const allowedPatterns = pushConfig.allowed_files.map(p => globPatternToRegex(p));
-            // Files matching excluded_files are intentionally exempt: they will be stripped
-            // from the patch at generation time via :(exclude) pathspecs, so they won't be
-            // present in the final changeset applied to the branch.
-            const excludedPatterns = Array.isArray(pushConfig.excluded_files) ? pushConfig.excluded_files.map(p => globPatternToRegex(p)) : [];
             const uniqueFiles = [...new Set(agentFiles)];
-            const disallowedFiles = uniqueFiles.filter(f => !allowedPatterns.some(re => re.test(f)) && !excludedPatterns.some(re => re.test(f)));
+            const disallowedFiles = uniqueFiles.filter(f => !allowedPatterns.some(re => re.test(f)));
 
             if (disallowedFiles.length > 0) {
               const sample = disallowedFiles.slice(0, 5);
@@ -1674,9 +1673,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       pushPatchOptions.workspacePath = pushPatchWorkspacePath;
     }
     // Pass excluded_files so git excludes them via :(exclude) pathspecs at generation time.
-    if (Array.isArray(pushConfig.excluded_files) && pushConfig.excluded_files.length > 0) {
-      pushPatchOptions.excludedFiles = pushConfig.excluded_files;
-    }
+    pushPatchOptions.excludedFiles = getExcludedFiles(pushConfig);
     // Pass pinnedSha so patch generation uses the pinned commit, not a potentially-flipped ref
     if (pushPinnedSha) {
       pushPatchOptions.pinnedSha = pushPinnedSha;
@@ -1716,6 +1713,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (patchResult.baseCommit) {
       entry.base_commit = patchResult.baseCommit;
     }
+    if (patchResult.excludedWorkflowFiles?.length > 0) {
+      entry.message = `${WORKFLOW_COMPILATION_NOTICE}\n\n${entry.message || ""}`;
+    }
 
     // Store the incremental net diff size so push_to_pull_request_branch can
     // validate `max_patch_size` against the actual incremental change relative
@@ -1730,9 +1730,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (useBundle) {
       // Bundle transport: preserves merge commits and per-commit metadata
       server.debug(`Generating incremental bundle for push_to_pull_request_branch with branch: ${entry.branch}, baseBranch: ${baseBranch}`);
-      if (Array.isArray(pushConfig.excluded_files) && pushConfig.excluded_files.length > 0) {
-        pushTransportOptions.excludedFiles = pushConfig.excluded_files;
-      }
+      pushTransportOptions.excludedFiles = getExcludedFiles(pushConfig);
       const bundleResult = await generateGitBundle(entry.branch, baseBranch, pushTransportOptions);
 
       if (!bundleResult.success) {

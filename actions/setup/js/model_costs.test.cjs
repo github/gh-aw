@@ -25,6 +25,33 @@ function writeModelsFixture(providers) {
 }
 
 describe("model_costs.cjs", () => {
+  it.each([
+    ["github-copilot", "gpt-5.6-luna-utility", [2e-7, 1.2e-6, 2e-8, 2.5e-7], 0.03805],
+    ["github-copilot", "gpt-6.1-terra", [1e-6, 5e-6, 5e-8, 1.25e-6], 0.16825],
+    ["openai", "gpt-6.1-terra", [1e-6, 5e-6, 5e-8, 1.25e-6], 0.16825],
+  ])("prices bundled %s/%s with explicit pricing and routing metadata", async (provider, model, rates, expectedAIC) => {
+    const catalog = JSON.parse(fs.readFileSync(new URL("./models.json", import.meta.url), "utf8"));
+    const entry = catalog.providers[provider].models[model];
+    expect(entry).toBeDefined();
+    expect(entry.provider_type).toBe("openai");
+    expect(entry.wire_api).toBe("responses");
+    expect(["input", "output", "cache_read", "cache_write"].map(key => Number(entry.cost[key]))).toEqual(rates);
+
+    const { computeInferenceAIC } = await import("./model_costs.cjs");
+    for (const pricingProvider of provider === "github-copilot" ? [provider, "copilot", "github_models"] : [provider]) {
+      expect(
+        computeInferenceAIC({
+          provider: pricingProvider,
+          model,
+          inputTokens: 1000,
+          outputTokens: 200,
+          cacheReadTokens: 400,
+          cacheWriteTokens: 50,
+        })
+      ).toBeCloseTo(expectedAIC, 10);
+    }
+  });
+
   it("computes inference AIC using provider-specific pricing", async () => {
     writeModelsFixture({
       anthropic: {

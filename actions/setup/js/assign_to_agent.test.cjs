@@ -487,7 +487,7 @@ describe("assign_to_agent", () => {
       expect(mockGithub.rest.issues.createComment).toHaveBeenCalledTimes(1);
       expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.stringContaining("credential source: GITHUB_TOKEN."),
+          body: expect.stringContaining("credential source: GITHUB\\_TOKEN."),
         })
       );
     });

@@ -55,6 +55,7 @@ type Job struct {
 	HasWorkflowRunSafetyChecks bool // If true, the job's if condition includes workflow_run safety checks
 	PermissionsComment         string
 	Permissions                string
+	CacheMode                  string
 	TimeoutMinutes             int
 	TimeoutMinutesExpression   string
 	Concurrency                string            // Job-level concurrency configuration
@@ -65,8 +66,8 @@ type Job struct {
 	Env                        map[string]string // Job-level environment variables
 	ContinueOnError            *bool             // continue-on-error flag for the job (nil means unset)
 	Steps                      []string
-	Needs                      []string // Job dependencies (needs clause)
-	Outputs                    map[string]string
+	Needs                      []string          // Job dependencies (needs clause)
+	Outputs                    map[string]string // YAML-ready scalar snippets, emitted verbatim by WriteJobsYAML
 	actionsCondition           bool
 	// Actions contributes typed steps after Steps, and typed conditions,
 	// environment values, and output bindings. It is lowered after all job
@@ -230,17 +231,17 @@ func (jm *JobManager) WriteJobsYAML(b *strings.Builder) {
 func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 	jobLog.Printf("Rendering job: %s (steps=%d, needs=%d, reusable=%t)", job.Name, len(job.Steps), len(job.Needs), job.Uses != "")
 
-	fmt.Fprintf(b, "  %s:\n", job.Name)
+	fmt.Fprintf(b, "  %s:\n", job.Name) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 
 	// Add display name if present
 	if job.DisplayName != "" {
-		fmt.Fprintf(b, "    name: %s\n", job.DisplayName)
+		fmt.Fprintf(b, "    name: %s\n", job.DisplayName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add needs clause if there are dependencies
 	if len(job.Needs) > 0 {
 		if len(job.Needs) == 1 {
-			fmt.Fprintf(b, "    needs: %s\n", job.Needs[0])
+			fmt.Fprintf(b, "    needs: %s\n", job.Needs[0]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		} else {
 			b.WriteString("    needs:\n")
 			// Sort needs for consistent output
@@ -248,7 +249,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 			copy(sortedNeeds, job.Needs)
 			sort.Strings(sortedNeeds)
 			for _, dep := range sortedNeeds {
-				fmt.Fprintf(b, "      - %s\n", dep)
+				fmt.Fprintf(b, "      - %s\n", dep) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 			}
 		}
 	}
@@ -269,7 +270,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 			// (e.g. startsWith(body, '/command\n') for matching bot comments with attribution metadata).
 			// Use a YAML double-quoted scalar so the \n escape is preserved as a real newline after
 			// YAML parsing, which GitHub Actions then evaluates correctly.
-			fmt.Fprintf(b, "    if: \"%s\"\n", escapeForYAMLDoubleQuoted(job.If))
+			fmt.Fprintf(b, "    if: \"%s\"\n", escapeForYAMLDoubleQuoted(job.If)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		} else if strings.Contains(job.If, "\n") || len(job.If) > int(constants.MaxExpressionLineLength) {
 			// Use YAML folded style for multiline expressions or long expressions
 			b.WriteString("    if: >\n")
@@ -279,73 +280,76 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 				lines := strings.SplitSeq(job.If, "\n")
 				for line := range lines {
 					if strings.TrimSpace(line) != "" {
-						fmt.Fprintf(b, "      %s\n", strings.TrimSpace(line))
+						fmt.Fprintf(b, "      %s\n", strings.TrimSpace(line)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 					}
 				}
 			} else {
 				// Long single-line expression, break it into logical lines
 				lines := BreakLongExpression(job.If)
 				for _, line := range lines {
-					fmt.Fprintf(b, "      %s\n", strings.TrimSpace(line))
+					fmt.Fprintf(b, "      %s\n", strings.TrimSpace(line)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 				}
 			}
 		} else {
 			// Single line expression that's not too long
-			fmt.Fprintf(b, "    if: %s\n", job.If)
+			fmt.Fprintf(b, "    if: %s\n", job.If) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 	}
 
 	// Add runs-on
 	if job.RunsOn != "" {
-		fmt.Fprintf(b, "    %s\n", job.RunsOn)
+		fmt.Fprintf(b, "    %s\n", job.RunsOn) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add strategy section
 	if job.Strategy != "" {
-		fmt.Fprintf(b, "    %s\n", strings.TrimRight(job.Strategy, "\n"))
+		fmt.Fprintf(b, "    %s\n", strings.TrimRight(job.Strategy, "\n")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add environment section
 	if job.Environment != "" {
-		fmt.Fprintf(b, "    %s\n", job.Environment)
+		fmt.Fprintf(b, "    %s\n", job.Environment) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add container section
 	if job.Container != "" {
-		fmt.Fprintf(b, "    %s\n", job.Container)
+		fmt.Fprintf(b, "    %s\n", job.Container) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add services section
 	if job.Services != "" {
-		fmt.Fprintf(b, "    %s\n", job.Services)
+		fmt.Fprintf(b, "    %s\n", job.Services) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add permissions section
 	if job.PermissionsComment != "" {
 		for line := range strings.SplitSeq(strings.TrimRight(job.PermissionsComment, "\n"), "\n") {
-			fmt.Fprintf(b, "    %s\n", line)
+			fmt.Fprintf(b, "    %s\n", line) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 	}
 	if job.Permissions != "" {
-		fmt.Fprintf(b, "    %s\n", job.Permissions)
+		fmt.Fprintf(b, "    %s\n", job.Permissions) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	}
+	if job.CacheMode != "" {
+		b.WriteString("    cache-mode: " + job.CacheMode + "\n")
 	}
 
 	// Add concurrency section
 	if job.Concurrency != "" {
-		fmt.Fprintf(b, "    %s\n", job.Concurrency)
+		fmt.Fprintf(b, "    %s\n", job.Concurrency) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add timeout-minutes if specified
 	if job.TimeoutMinutesExpression != "" {
 		// TimeoutMinutesExpression is validated when parsed from frontmatter in compiler_jobs.go.
-		fmt.Fprintf(b, "    timeout-minutes: %s\n", job.TimeoutMinutesExpression)
+		fmt.Fprintf(b, "    timeout-minutes: %s\n", job.TimeoutMinutesExpression) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	} else if job.TimeoutMinutes > 0 {
-		fmt.Fprintf(b, "    timeout-minutes: %d\n", job.TimeoutMinutes)
+		fmt.Fprintf(b, "    timeout-minutes: %d\n", job.TimeoutMinutes) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add continue-on-error only when explicitly set
 	if job.ContinueOnError != nil {
-		fmt.Fprintf(b, "    continue-on-error: %t\n", *job.ContinueOnError)
+		fmt.Fprintf(b, "    continue-on-error: %t\n", *job.ContinueOnError) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 
 	// Add environment variables section
@@ -356,7 +360,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 		envKeys := sliceutil.SortedKeys(env)
 
 		for _, key := range envKeys {
-			fmt.Fprintf(b, "      %s: %s\n", key, env[key])
+			fmt.Fprintf(b, "      %s: %s\n", key, env[key]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 	}
 
@@ -367,7 +371,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 		outputKeys := sliceutil.SortedKeys(job.Outputs)
 
 		for _, key := range outputKeys {
-			fmt.Fprintf(b, "      %s: %s\n", key, job.Outputs[key])
+			fmt.Fprintf(b, "      %s: %s\n", key, job.Outputs[key]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 	}
 
@@ -375,7 +379,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 	if job.Uses != "" {
 		jobLog.Printf("Rendering reusable workflow call: %s uses=%s with=%d secrets=%d", job.Name, job.Uses, len(job.With), len(job.Secrets))
 		// Add uses directive for reusable workflow
-		fmt.Fprintf(b, "    uses: %s\n", job.Uses)
+		fmt.Fprintf(b, "    uses: %s\n", job.Uses) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 
 		// Add with parameters if present
 		if len(job.With) > 0 {
@@ -388,13 +392,13 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 				// Format the value based on its type
 				switch v := value.(type) {
 				case string:
-					fmt.Fprintf(b, "      %s: %s\n", key, v)
+					fmt.Fprintf(b, "      %s: %s\n", key, v) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 				case int, int64, float64:
-					fmt.Fprintf(b, "      %s: %v\n", key, v)
+					fmt.Fprintf(b, "      %s: %v\n", key, v) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 				case bool:
-					fmt.Fprintf(b, "      %s: %t\n", key, v)
+					fmt.Fprintf(b, "      %s: %t\n", key, v) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 				default:
-					fmt.Fprintf(b, "      %s: %v\n", key, v)
+					fmt.Fprintf(b, "      %s: %v\n", key, v) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 				}
 			}
 		}
@@ -408,7 +412,7 @@ func (jm *JobManager) renderJobTo(b *strings.Builder, job *Job) {
 			secretKeys := sliceutil.SortedKeys(job.Secrets)
 
 			for _, key := range secretKeys {
-				fmt.Fprintf(b, "      %s: %s\n", key, job.Secrets[key])
+				fmt.Fprintf(b, "      %s: %s\n", key, job.Secrets[key]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 			}
 		}
 	} else {

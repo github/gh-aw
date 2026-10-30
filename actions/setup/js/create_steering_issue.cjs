@@ -2,9 +2,10 @@
 /// <reference types="@actions/github-script" />
 
 const { createReportIssue } = require("./issue_report.cjs");
-
-const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
-const { buildGeneratedFooter } = require("./markdown_body_helpers.cjs");
+const fs = require("node:fs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
+const { buildGeneratedFooterBlocks } = require("./markdown_body_helpers.cjs");
 const { sanitizeTitle } = require("./sanitize_title.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 
@@ -17,11 +18,15 @@ async function main() {
   const runUrl = buildWorkflowRunUrl(context, context.repo);
   const coreTitle = sanitizeTitle(`${workflowName}: work in progress`, "", MAX_STEERING_TITLE_BODY_LENGTH);
   const title = `${WIP_TITLE_MARKER}${coreTitle}`;
-  const steeringBody = renderTemplateFromFile(getPromptPath("steering_issue_body.md"), {
-    run_url: runUrl,
-    workflow_name: workflowName,
-  }).trimEnd();
-  const footer = buildGeneratedFooter({
+  const steeringBody = parseReportMarkdown(fs.readFileSync(getPromptPath("steering_issue_body.md"), "utf8"), {
+    context: {
+      run_url: runUrl,
+      workflow_name: workflowName,
+    },
+    minimumHeadingLevel: 2,
+    agentTainted: false,
+  });
+  const footer = buildGeneratedFooterBlocks({
     workflowName,
     runUrl,
     workflowSource: process.env.GH_AW_WORKFLOW_SOURCE || "",
@@ -30,14 +35,15 @@ async function main() {
     triggeringPRNumber: context.payload?.pull_request?.number,
     triggeringDiscussionNumber: context.payload?.discussion?.number,
   });
-  const body = `${steeringBody}\n\n${footer}`;
-
-  const { data: issue } = await createReportIssue(github, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    title,
-    body,
-  });
+  const { data: issue } = await createReportIssue(
+    github,
+    {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      title,
+    },
+    { type: "report", title, children: [...steeringBody, ...footer], agentTainted: false }
+  );
 
   core.setOutput("issue_number", issue.number);
   core.setOutput("issue_url", issue.html_url);

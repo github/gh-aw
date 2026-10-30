@@ -36,13 +36,12 @@ function getDefaultDisclosureHeader() {
  * @returns {string} The rendered header text, or empty string if not configured
  */
 function getBodyHeader(ctx) {
-  const messages = getMessages();
-  if (!messages?.bodyHeader) {
-    return "";
-  }
+  return renderTemplate(getBodyHeaderTemplate(), toSnakeCase(ctx));
+}
 
-  const templateContext = toSnakeCase(ctx);
-  return renderTemplate(messages.bodyHeader, templateContext);
+/** @returns {string} */
+function getBodyHeaderTemplate() {
+  return getMessages()?.bodyHeader || "";
 }
 
 /**
@@ -54,6 +53,11 @@ function getBodyHeader(ctx) {
  * @returns {string} The rendered disclosure header text, or empty string if not configured
  */
 function getDisclosureHeader(ctx) {
+  return renderTemplate(getDisclosureHeaderTemplate(), toSnakeCase(ctx));
+}
+
+/** @returns {string} */
+function getDisclosureHeaderTemplate() {
   const messages = getMessages();
   const disclosureHeader = messages?.disclosureHeader;
   if (!disclosureHeader) {
@@ -69,13 +73,14 @@ function getDisclosureHeader(ctx) {
     return "";
   }
 
-  const templateContext = toSnakeCase(ctx);
-  return renderTemplate(template, templateContext);
+  return template;
 }
 
 module.exports = {
   getBodyHeader,
   getDisclosureHeader,
+  getBodyHeaderTemplate,
+  getDisclosureHeaderTemplate,
   get DEFAULT_DISCLOSURE_HEADER() {
     return getDefaultDisclosureHeader();
   },

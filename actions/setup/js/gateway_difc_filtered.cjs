@@ -1,7 +1,9 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { iterateJsonl, iterateLines, readLines } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, readLines } = require("./jsonl_helpers.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderReport } = require("./report_ast.cjs");
 /**
  * Gateway DIFC Filtered Module
  *
@@ -67,8 +69,17 @@ function getDifcFilteredEvents(gatewayJsonlPath, rpcMessagesPath) {
  * @returns {string} GitHub note alert with details section, or empty string if no filtered events
  */
 function generateDifcFilteredSection(filteredEvents) {
+  const children = generateDifcFilteredReportSection(filteredEvents);
+  return children.length ? "\n\n" + renderReport({ type: "report", title: "Integrity filtering", children }).body : "";
+}
+
+/**
+ * @param {Array<Object>} filteredEvents
+ * @returns {import("./report_ast.cjs").ReportBlock[]}
+ */
+function generateDifcFilteredReportSection(filteredEvents) {
   if (!filteredEvents || filteredEvents.length === 0) {
-    return "";
+    return [];
   }
 
   // Deduplicate events by their significant fields
@@ -85,37 +96,41 @@ function generateDifcFilteredSection(filteredEvents) {
   const verb = count === 1 ? "was" : "were";
   const subjectNegationPhrase = count === 1 ? "it doesn't" : "they don't";
 
-  let section = "\n\n> [!NOTE]\n";
-  section += `> <details>\n`;
-  section += `> <summary>🔒 Integrity filter blocked ${count} ${itemWord}</summary>\n`;
-  section += `>\n`;
-  section += `> The following ${itemWord} ${verb} blocked because ${subjectNegationPhrase} meet the GitHub integrity level.\n`;
-  section += `>\n`;
-
   const maxItems = 16;
   const visibleEvents = uniqueEvents.slice(0, maxItems);
   const remainingCount = uniqueEvents.length - visibleEvents.length;
 
-  for (const event of visibleEvents) {
+  /** @type {import("./report_ast.cjs").ReportBlock[][]} */
+  const items = visibleEvents.map(event => {
+    /** @type {import("./report_ast.cjs").ReportInline[]} */
     let reference;
     if (event.html_url) {
-      const label = event.number ? `#${event.number}` : event.html_url;
-      reference = `[${label}](${event.html_url})`;
+      /** @type {string | import("./report_markdown.cjs").ReportInlineSlot} */
+      const label = /^[1-9]\d*$/.test(String(event.number)) ? { type: "inline_slot", children: [{ type: "issue_reference", number: String(event.number), agentTainted: false }] } : event.html_url;
+      const link = parseReportMarkdown("[{label}]({url})", { context: { label, url: event.html_url }, agentTainted: true })[0];
+      if (link.type !== "paragraph") throw new TypeError("Integrity reference must be an inline link");
+      reference = link.children;
     } else {
       const desc = event.description ? event.description.replace(/^[a-z-]+:(?!\/\/)/i, "") : null;
       const validDesc = desc && desc !== "#unknown" ? desc : null;
-      reference = validDesc || (event.tool_name ? `\`${event.tool_name}\`` : "-");
+      reference = validDesc
+        ? [{ type: /^[\w.-]+\/[\w.-]+#[1-9]\d*$/.test(validDesc) ? "code" : "text", value: validDesc, agentTainted: true }]
+        : [{ type: event.tool_name ? "code" : "text", value: event.tool_name || "-", agentTainted: true }];
     }
-    const tool = event.tool_name ? `\`${event.tool_name}\`` : "-";
     const reason = (event.reason || "-").replace(/^Resource '[^']*' /, "").replace(/\n/g, " ");
-    section += `> - ${reference} ${tool}: ${reason}\n`;
-  }
+    return [
+      {
+        type: "paragraph",
+        agentTainted: false,
+        children: [...reference, { type: "text", value: " ", agentTainted: false }, { type: event.tool_name ? "code" : "text", value: event.tool_name || "-", agentTainted: true }, { type: "text", value: `: ${reason}`, agentTainted: true }],
+      },
+    ];
+  });
 
   if (remainingCount > 0) {
-    section += `> - ... and ${remainingCount} more ${remainingCount === 1 ? "item" : "items"}\n`;
+    items.push([{ type: "paragraph", agentTainted: false, children: [{ type: "text", value: `... and ${remainingCount} more ${remainingCount === 1 ? "item" : "items"}`, agentTainted: false }] }]);
   }
 
-  section += `>\n`;
   const promptsDir = process.env.GH_AW_PROMPTS_DIR || `${process.env.RUNNER_TEMP}/gh-aw/prompts`;
   const remediationPath = `${promptsDir}/integrity_filter_remediation.md`;
   let remediationText;
@@ -124,17 +139,30 @@ function generateDifcFilteredSection(filteredEvents) {
   } catch (err) {
     throw new Error(`Failed to read file ${remediationPath}: ${String(err)}`, { cause: err });
   }
-  for (const line of iterateLines(remediationText.trimEnd())) {
-    section += line ? `> ${line}\n` : `>\n`;
-  }
-  section += `>\n`;
-  section += `> </details>\n`;
-
-  return section;
+  return [
+    {
+      type: "alert",
+      kind: "NOTE",
+      agentTainted: false,
+      children: [
+        {
+          type: "details",
+          summary: `🔒 Integrity filter blocked ${count} ${itemWord}`,
+          agentTainted: false,
+          children: [
+            { type: "paragraph", agentTainted: false, children: [{ type: "text", value: `The following ${itemWord} ${verb} blocked because ${subjectNegationPhrase} meet the GitHub integrity level.`, agentTainted: false }] },
+            { type: "list", ordered: false, items, agentTainted: false },
+            ...parseReportMarkdown(remediationText, { agentTainted: false }),
+          ],
+        },
+      ],
+    },
+  ];
 }
 
 module.exports = {
   parseDifcFilteredEvents,
   getDifcFilteredEvents,
   generateDifcFilteredSection,
+  generateDifcFilteredReportSection,
 };

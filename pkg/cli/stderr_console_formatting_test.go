@@ -38,6 +38,16 @@ func TestRenderOrgActionSummaryUsesConsoleFormatListItemStderr(t *testing.T) {
 	assert.Equal(t, console.FormatListItemStderr("repo-assist: v1.0.0 -> v1.1.0"), lines[4])
 }
 
+func TestRenderOrgActionSummaryShowsUncompiledOnlyVersion(t *testing.T) {
+	_, stderr := captureOutput(t, func() error {
+		renderOrgActionSummary(orgRepoPreview{
+			Repo: "octo/repo", TotalWorkflows: 1, MissingWorkflowLocks: 1,
+		}, "upgrade")
+		return nil
+	})
+	assert.Contains(t, stderr, "Compiler versions: uncompiled (1 workflow(s)) ->")
+}
+
 func TestFindWorkflowsWithMCPServerUsesConsoleFormatInfoMessageStderr(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())

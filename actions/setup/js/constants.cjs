@@ -204,6 +204,12 @@ const SCAN_WINDOW_MS = 24 * 60 * 60 * 1000;
  */
 const PROXY_ENV_NAMES = Object.freeze(["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"]);
 
+/**
+ * GitHub Actions step name for starting the MCP gateway.
+ * @type {string}
+ */
+const STEP_NAME_START_MCP_GATEWAY = "Start MCP Gateway";
+
 module.exports = {
   AGENT_OUTPUT_FILENAME,
   TMP_GH_AW_PATH,
@@ -231,4 +237,5 @@ module.exports = {
   MAX_RESTORE_PAGES,
   SCAN_WINDOW_MS,
   PROXY_ENV_NAMES,
+  STEP_NAME_START_MCP_GATEWAY,
 };

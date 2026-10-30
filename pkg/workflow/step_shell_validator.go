@@ -40,7 +40,7 @@ var stepShellValidatorLog = logger.New("workflow:step_shell_validator")
 // by this pattern, which is acceptable for this crude validator.
 var ghCLIPattern = regexp.MustCompile(`(?m)(?:^|&&|\|\||;|\|)\s*gh(?:\s|$)`)
 
-var runnerToolCacheInRunPattern = regexp.MustCompile(`\$\{\{\s*runner\.tool_cache\s*\}\}`)
+var runnerToolCacheInRunPattern = expressionReferenceAccessPattern([]string{"runner", "tool_cache"})
 
 // validateStepShellScripts checks the "pre-steps", "steps", "pre-agent-steps",
 // and "post-steps" frontmatter sections for common shell script mistakes.

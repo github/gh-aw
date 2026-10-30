@@ -27,7 +27,7 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 	// match (so FindStringSubmatch reliably extracts capture group 1 = the expression).
 	// prefix is the canonical opening tag text without the expression
 	// (e.g. "{{#if " or "{{#elseif "), used to rebuild the output tag.
-	wrapTagExpr := func(re *regexp.Regexp, match, prefix string) string {
+	wrapTagExpr := func(re conditionalPattern, match, prefix string) string {
 		submatches := re.FindStringSubmatch(match)
 		if len(submatches) < 2 {
 			return match
@@ -64,17 +64,19 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 	}
 
 	// Process {{#if ...}} tags
-	result := TemplateIfPattern.ReplaceAllStringFunc(markdown, func(match string) string {
-		return wrapTagExpr(TemplateIfPattern, match, "{{#if ")
+	ifPattern := conditionalPattern{TemplateIfPattern}
+	elseIfPattern := conditionalPattern{TemplateElseIfPattern}
+	result := ifPattern.ReplaceAllStringFunc(markdown, func(match string) string {
+		return wrapTagExpr(ifPattern, match, "{{#if ")
 	})
 
 	// Process all elseif variant tags — normalise to canonical {{#elseif ...}} form after wrapping
-	result = TemplateElseIfPattern.ReplaceAllStringFunc(result, func(match string) string {
-		submatches := TemplateElseIfPattern.FindStringSubmatch(match)
+	result = elseIfPattern.ReplaceAllStringFunc(result, func(match string) string {
+		submatches := elseIfPattern.FindStringSubmatch(match)
 		if len(submatches) < 2 {
 			return match
 		}
-		wrapped := wrapTagExpr(TemplateElseIfPattern, match, "{{#elseif ")
+		wrapped := wrapTagExpr(elseIfPattern, match, "{{#elseif ")
 		// If the original tag used a non-canonical form (else-if / else_if / without #),
 		// the prefix replacement above already normalises it to {{#elseif ...}}.
 		return wrapped

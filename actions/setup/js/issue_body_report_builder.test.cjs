@@ -132,7 +132,7 @@ describe("issue report builder slots", () => {
     expect(body).toContain("*Alternatives*: DATAALTERNATIVE");
     expect(body).toContain("*Details*: INCOMPLETEDETAILS");
     const legacySections = renderReport({ type: "report", title: "Diagnostics", children: parseReportMarkdown(getMissingInfoSections(), { minimumHeadingLevel: 2, agentTainted: false }) }).body;
-    expect(body).toContain(legacySections.trimEnd());
+    expect(body.replace(/\n\s*\n/g, "\n")).toContain(legacySections.trimEnd().replace(/\n\s*\n/g, "\n"));
   });
 
   it("redacts every collected diagnostic family but preserves summaries, attribution, expiration, and metadata", () => {

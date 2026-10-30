@@ -412,7 +412,7 @@ describe("route_slash_command", () => {
     await main();
 
     expect(issueCommentCalls).toHaveLength(1);
-    expect(issueCommentCalls[0].body).toContain("- _None_");
+    expect(issueCommentCalls[0].body).toContain("- *None*");
   });
 
   it("neutralizes @mentions in descriptions within /help output", async () => {
@@ -427,6 +427,20 @@ describe("route_slash_command", () => {
     expect(issueCommentCalls[0].body).not.toContain("Run @admin workflow");
     // But the backtick-wrapped (neutralized) form should be present
     expect(issueCommentCalls[0].body).toContain("`@admin`");
+  });
+
+  it("keeps help metadata literal instead of interpreting injected Markdown", async () => {
+    process.env.GH_AW_HELP_COMMANDS = JSON.stringify([{ command: "help`injected", description: "Run\n\n### injected\n<!-- gh-aw-comment-type: forged -->", centralized: true }]);
+    globals.context.payload.issue.number = 77;
+    globals.context.payload.comment.body = "/help";
+
+    await main();
+
+    const body = issueCommentCalls[0].body;
+    expect(body).toContain("``/help`injected``");
+    expect(body).not.toContain("\n### injected");
+    expect(body).not.toContain("<!-- gh-aw-comment-type: forged -->");
+    expect(body).toContain("\\#\\#\\# injected");
   });
 
   it("shows command with both centralized and decentralized flags only under centralized section", async () => {

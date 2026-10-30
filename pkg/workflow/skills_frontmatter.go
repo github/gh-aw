@@ -23,7 +23,7 @@ var skillRepoPathRegexp = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?
 var skillRefCharsRegexp = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_./-]*$`)
 
 var localSkillPathRegexp = regexp.MustCompile(`^(?:\./)?(?:\.[A-Za-z0-9_-][A-Za-z0-9_.-]*|[A-Za-z0-9_-][A-Za-z0-9_.-]*)(?:/(?:\.[A-Za-z0-9_-][A-Za-z0-9_.-]*|[A-Za-z0-9_-][A-Za-z0-9_.-]*))*$`)
-var skillsGitHubTokenExpressionRegexp = regexp.MustCompile(`^\$\{\{\s*(secrets\.[A-Za-z_][A-Za-z0-9_]*(\s*\|\|\s*secrets\.[A-Za-z_][A-Za-z0-9_]*)*|needs\.[A-Za-z_][A-Za-z0-9_]*\.outputs\.[A-Za-z_][A-Za-z0-9_]*)\s*\}\}$`)
+var skillsGitHubTokenExpressionRegexp = credentialExpressionPattern(true, false, false)
 
 // looksLikeAmbiguousSHA reports whether ref is composed entirely of hex characters
 // with a length between 7 and 40 (inclusive) but is not itself a valid, canonical

@@ -338,50 +338,67 @@ async function mainNotifyIssue() {
 
   // Build and create the new upgrade notification issue
   const issueTitle = "[aw] Upgrade available";
-  const fileList = changedFiles.map(f => `- \`${f}\``).join("\n");
-  const issueBody = `## Agentic Workflow Upgrade Available
-
-A new version of the agentic workflow tooling is available. Run \`gh aw upgrade\` to apply it.
-
-**Files that will be updated:**
-
-${fileList}
-
-### How to apply
-
-- **Via @copilot**: Add a comment \`@copilot upgrade agentic workflows\` on this issue
-- **Via CLI**: Run \`gh aw upgrade\` in your local checkout
-
-${AUTO_UPGRADE_ISSUE_MARKER}
-`;
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportInline} */
+  const text = value => ({ type: "text", value, agentTainted: false });
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportInline} */
+  const code = value => ({ type: "code", value, agentTainted: false });
+  /** @type {import("./report_ast.cjs").Report} */
+  const report = {
+    type: "report",
+    title: issueTitle,
+    agentTainted: false,
+    children: [
+      { type: "heading", level: 2, children: [text("Agentic Workflow Upgrade Available")] },
+      { type: "paragraph", children: [text("A new version of the agentic workflow tooling is available. Run "), code("gh aw upgrade"), text(" to apply it.")] },
+      { type: "paragraph", children: [{ type: "strong", children: [text("Files that will be updated:")] }] },
+      { type: "list", ordered: false, items: changedFiles.map(file => [{ type: "paragraph", children: [code(file)] }]) },
+      { type: "heading", level: 3, children: [text("How to apply")] },
+      {
+        type: "list",
+        ordered: false,
+        items: [
+          [{ type: "paragraph", children: [{ type: "strong", children: [text("Via @copilot")] }, text(": Add a comment "), code("@copilot upgrade agentic workflows"), text(" on this issue")] }],
+          [{ type: "paragraph", children: [{ type: "strong", children: [text("Via CLI")] }, text(": Run "), code("gh aw upgrade"), text(" in your local checkout")] }],
+        ],
+      },
+      { type: "xml_marker", name: "gh-aw-workflow-id", value: AUTO_UPGRADE_WORKFLOW_ID, agentTainted: false },
+    ],
+  };
 
   core.info(`Creating upgrade notification issue: "${issueTitle}"`);
   let createdIssue;
   try {
-    createdIssue = await createReportIssue(github, {
-      owner,
-      repo,
-      title: issueTitle,
-      body: issueBody,
-      labels: ["agentic-workflows"],
-    });
+    createdIssue = await createReportIssue(
+      github,
+      {
+        owner,
+        repo,
+        title: issueTitle,
+        labels: ["agentic-workflows"],
+      },
+      report
+    );
   } catch (error) {
     // Label may not exist when auto-upgrade is used without maintenance label creation.
     const errorAny = /** @type {any} */ error;
     if (errorAny?.status === 422) {
       core.warning("Failed to create issue with label 'agentic-workflows'; retrying without labels");
-      createdIssue = await createReportIssue(github, {
-        owner,
-        repo,
-        title: issueTitle,
-        body: issueBody,
-      });
+      createdIssue = await createReportIssue(
+        github,
+        {
+          owner,
+          repo,
+          title: issueTitle,
+        },
+        report
+      );
     } else {
       throw error;
     }
   }
 
   const issueUrl = createdIssue.data.html_url;
+  const fileList = changedFiles.map(f => `- \`${f}\``).join("\n");
   core.info(`✓ Created issue: ${issueUrl}`);
   core.notice(`Created upgrade notification issue: ${issueUrl}`);
 

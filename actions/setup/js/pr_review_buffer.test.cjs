@@ -595,7 +595,7 @@ describe("pr_review_buffer (factory pattern)", () => {
 
       const callArgs = mockGithub.rest.pulls.createReview.mock.calls[0][0];
       expect(callArgs.event).toBe("APPROVE");
-      expect(callArgs.body).toContain("LGTM! Approving this change.");
+      expect(callArgs.body).toContain("LGTM\\! Approving this change.");
       // No comments array when empty
       expect(callArgs.comments).toBeUndefined();
     });
@@ -830,7 +830,8 @@ describe("pr_review_buffer (factory pattern)", () => {
         const body = mockGithub.rest.pulls.createReview.mock.calls[1][0].body;
         expect(body.length).toBeLessThanOrEqual(65000);
         expect(body).toContain("Content redacted to fit size limit.");
-        expect(body).not.toContain("agent-comment-");
+        expect(body).toContain("agent-comment-" + "x".repeat(486) + "...");
+        expect(body).not.toContain("x".repeat(1000));
         expect(body).toContain(policy);
         expect(body).toContain(commentFooter);
         expect(body).toContain('[gh-aw-workflow-call-id]: # "owner%2Frepo%2FCallerA"');
@@ -845,7 +846,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       buffer.setReviewMetadata("Normal summary", "COMMENT");
       buffer.setReviewContext({ repo: "owner/repo", repoParts: { owner: "owner", repo: "repo" }, pullRequestNumber: 42, pullRequest: { head: { sha: "abc123" } } });
       buffer.setFooterContext({ workflowName: "test-workflow", runUrl: "https://github.com/owner/repo/actions/runs/123", bodyFooter: "f".repeat(65000) });
-      await expect(buffer.submitReview()).rejects.toThrow("Protected markers and footers");
+      await expect(buffer.submitReview()).rejects.toThrow("protected markers, footers, and framework content");
       expect(mockGithub.rest.pulls.createReview).not.toHaveBeenCalled();
     });
 
@@ -1636,11 +1637,11 @@ describe("pr_review_buffer (factory pattern)", () => {
       const retryArgs = mockGithub.rest.pulls.createReview.mock.calls[1][0];
       expect(retryArgs.comments).toBeUndefined();
       expect(retryArgs.body).toContain("### Comments that could not be inline-anchored");
-      expect(retryArgs.body).toContain("<details><summary>.changeset/some-file.md:1</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>.changeset/some-file.md:1</summary>");
       expect(retryArgs.body).toContain("Review comment on line 1");
-      expect(retryArgs.body).toContain("<details><summary>.github/workflows/ace-editor.lock.yml:1</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>.github/workflows/ace-editor.lock.yml:1</summary>");
       expect(retryArgs.body).toContain("Another review comment");
-      expect(retryArgs.body).toContain("<details><summary>src/new_file.js:42</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>src/new_file.js:42</summary>");
       expect(retryArgs.body).toContain("A third inline comment that should be preserved in the fallback body");
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Line could not be resolved"));
     });
@@ -1683,7 +1684,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(retryArgs.comments).toHaveLength(2);
       expect(retryArgs.comments.map(comment => comment.path)).toEqual(["src/valid-one.js", "src/valid-two.js"]);
       expect(retryArgs.body).toContain("### Comments that could not be inline-anchored");
-      expect(retryArgs.body).toContain("<details><summary>src/unresolved.js:99</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>src/unresolved.js:99</summary>");
       expect(retryArgs.body).toContain("This one cannot be anchored");
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Retrying with 2 resolvable inline comment(s)"));
     });
@@ -1721,7 +1722,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(retryArgs.comments).toHaveLength(2);
       expect(retryArgs.comments.map(comment => comment.path)).toEqual(["src/valid-one.js", "src/valid-two.js"]);
       expect(retryArgs.body).toContain("### Comments that could not be inline-anchored");
-      expect(retryArgs.body).toContain("<details><summary>src/missing.js:99</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>src/missing.js:99</summary>");
       expect(retryArgs.body).toContain("This path is not in the diff");
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Retrying with 2 resolvable inline comment(s)"));
     });
@@ -1800,9 +1801,9 @@ describe("pr_review_buffer (factory pattern)", () => {
       const retryArgs = mockGithub.rest.pulls.createReview.mock.calls[1][0];
       expect(retryArgs.comments).toBeUndefined();
       expect(retryArgs.body).toContain("### Comments that could not be inline-anchored");
-      expect(retryArgs.body).toContain("<details><summary>.changeset/some-file.md:1</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>.changeset/some-file.md:1</summary>");
       expect(retryArgs.body).toContain("Review comment on line 1");
-      expect(retryArgs.body).toContain("<details><summary>src/new_file.js:42</summary>");
+      expect(retryArgs.body).toContain("<details>\n<summary>src/new_file.js:42</summary>");
       expect(retryArgs.body).toContain("A second inline comment");
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Path could not be resolved"));
     });
@@ -1924,13 +1925,13 @@ describe("pr_review_buffer (factory pattern)", () => {
 
       expect(result.success).toBe(true);
       const retryArgs = mockGithub.rest.pulls.createReview.mock.calls[1][0];
-      expect(retryArgs.body).toContain("src/&lt;unsafe&gt;&amp;&quot;&#39;.js:9");
+      expect(retryArgs.body).toContain("src/&lt;unsafe&gt;&amp;\"'.js:9");
       expect(retryArgs.body).toContain("&lt;b&gt;tag&lt;/b&gt;");
-      expect(retryArgs.body).toContain("&amp; &quot;quote&quot; &#39;single&#39;");
+      expect(retryArgs.body).toContain("&amp; \"quote\" 'single'");
       expect(retryArgs.body).not.toContain("</summary><b>tag</b>");
     });
 
-    it("should avoid appending large inline bodies when fallback has no excerpt budget", async () => {
+    it("bounds inline excerpts and fits the complete fallback when the review consumes the budget", async () => {
       for (let i = 0; i < 8; i++) {
         buffer.addComment({ path: `src/file-${i}.js`, line: i + 1, body: `comment-${i}-` + "z".repeat(600) });
       }
@@ -1954,7 +1955,8 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(result.success).toBe(true);
       const retryArgs = mockGithub.rest.pulls.createReview.mock.calls[1][0];
       expect(retryArgs.body.length).toBeLessThanOrEqual(65000);
-      expect(retryArgs.body).not.toContain("comment-0-");
+      expect(retryArgs.body).toContain("comment-0-");
+      expect(retryArgs.body).not.toContain("z".repeat(501));
       expect(retryArgs.body).toContain("Content redacted to fit size limit.");
     });
 
@@ -2477,9 +2479,7 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(result.success).toBe(true);
       const callArgs = mockGithub.rest.pulls.createReview.mock.calls[0][0];
       // Footer should NOT be included because body is whitespace-only (trimmed length is 0)
-      // Original whitespace body is preserved in the API call
-      expect(callArgs.body).toBe("   \n  ");
-      expect(callArgs.body).not.toContain("test-workflow");
+      expect(callArgs.body).toBeUndefined();
     });
 
     it("should normalize boolean false to 'none' mode", async () => {

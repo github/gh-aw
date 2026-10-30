@@ -2,13 +2,11 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
-)
 
-var otlpMetadataReferencePattern = regexp.MustCompile(`^\s*\$\{\{\s*github\.aw\.metadata\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}\s*$`)
-var otlpMetadataAccessPattern = regexp.MustCompile(`^github\s*\.\s*aw\s*(?:\.\s*metadata\b|\[\s*'metadata'\s*\]|\[\s*"metadata"\s*\])`)
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
+)
 
 // resolveOTLPMetadataReferences replaces whole-value references in custom OTLP
 // attribute maps with strings from the root workflow's metadata.
@@ -62,17 +60,12 @@ func resolveOTLPMetadataReferences(workflowData *WorkflowData) error {
 }
 
 func resolveOTLPMetadataValue(text string, metadata map[string]any, scope string) (string, error) {
-	match := otlpMetadataReferencePattern.FindStringSubmatch(text)
-	if len(match) < 2 {
+	expression, ok := actionslanguageservice.WrappedExpression(text)
+	path, reference := actionslanguageservice.Reference(expression)
+	if !ok || !reference || len(path) != 4 || !referenceHasPrefix(path, []string{"github", "aw", "metadata"}) {
 		return "", fmt.Errorf("%s must be a whole-value reference in the form ${{ github.aw.metadata.<key> }}", scope)
 	}
-	key := ""
-	for index, capture := range match {
-		if index == 1 {
-			key = capture
-			break
-		}
-	}
+	key := path[3]
 	if metadata == nil {
 		return "", fmt.Errorf("%s references metadata key %q, but the root workflow has no metadata map", scope, key)
 	}
@@ -91,80 +84,12 @@ func resolveOTLPMetadataValue(text string, metadata map[string]any, scope string
 }
 
 func containsOTLPMetadataAccess(value string) bool {
-	searchFrom := 0
-	for {
-		open := strings.Index(value[searchFrom:], "${{")
-		if open == -1 {
-			return false
-		}
-		expressionStart := searchFrom + open + len("${{")
-		closed := false
-		for index := expressionStart; index < len(value); {
-			current, ok := otlpStringByteAt(value, index)
-			if !ok {
-				break
-			}
-			switch current {
-			case '\'', '"':
-				index = skipOTLPExpressionString(value, index)
-				continue
-			case '}':
-				next, ok := otlpStringByteAt(value, index+1)
-				if ok && next == '}' {
-					searchFrom = index + 2
-					closed = true
-				}
-			}
-			if closed {
-				break
-			}
-			previous, hasPrevious := otlpStringByteAt(value, index-1)
-			if current == 'g' && (!hasPrevious || index == expressionStart || !isOTLPIdentifierCharacter(previous)) && otlpMetadataAccessPattern.MatchString(value[index:]) {
-				return true
-			}
-			index++
-		}
-		if !closed {
-			return false
+	for _, path := range interpolationReferences(value) {
+		if referenceHasPrefix(path, []string{"github", "aw", "metadata"}) {
+			return true
 		}
 	}
-}
-
-func skipOTLPExpressionString(value string, start int) int {
-	quote, ok := otlpStringByteAt(value, start)
-	if !ok {
-		return len(value)
-	}
-	for index := start + 1; index < len(value); index++ {
-		current, ok := otlpStringByteAt(value, index)
-		if !ok {
-			return len(value)
-		}
-		if current == '\\' {
-			index++
-			continue
-		}
-		if current == quote {
-			next, ok := otlpStringByteAt(value, index+1)
-			if ok && next == quote {
-				index++
-				continue
-			}
-			return index + 1
-		}
-	}
-	return len(value)
-}
-
-func otlpStringByteAt(value string, index int) (byte, bool) {
-	if index < 0 || index >= len(value) {
-		return 0, false
-	}
-	return value[index], true
-}
-
-func isOTLPIdentifierCharacter(char byte) bool {
-	return char == '_' || char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9'
+	return false
 }
 
 func normalizeOTLPAttributeMap(otlp map[string]any, field string) map[string]any {

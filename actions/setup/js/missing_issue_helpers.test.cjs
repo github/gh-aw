@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 // Create a temporary template file used by "new issue" tests
 const tmpDir = os.tmpdir();
 const testTemplatePath = path.join(tmpDir, "test_missing_issue_template.md");
-fs.writeFileSync(testTemplatePath, "# Missing Items\n\n{{test_list}}\n");
+fs.writeFileSync(testTemplatePath, "# Missing Items\n\n{test_list}\n");
 
 // Mock globals before importing the module
 const mockCore = {
@@ -354,7 +354,7 @@ describe("missing_issue_helpers.cjs - buildMissingIssueHandler", () => {
       await handler(defaultMessage);
 
       const commentBody = mockGithub.rest.issues.createComment.mock.calls[0][0].body;
-      expect(commentBody).toContain("### 1. item-one");
+      expect(commentBody).toContain("### 1\\. item-one");
       expect(commentBody).toContain("**Reason:** not found");
     });
   });

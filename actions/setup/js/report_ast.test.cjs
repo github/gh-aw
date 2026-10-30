@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createRequire } from "module";
+import { execFileSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const { normalizeReport, normalizeReportTitle, redactReportForRendering, assertRedactedReport, renderReport } = require("./report_ast.cjs");
@@ -15,6 +16,97 @@ beforeEach(() => vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "github.com,example.com,exa
 afterEach(() => vi.unstubAllEnvs());
 
 describe("report AST", () => {
+  it.each(["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"])("parses and renders %s as a structured GitHub alert", kind => {
+    const source = `> [!${kind}]\n> **Guidance:** safe text.`;
+    const children = parseReportMarkdown(source, { agentTainted: false });
+    expect(children).toMatchObject([{ type: "alert", kind, agentTainted: false, children: [{ type: "paragraph", children: [{ type: "strong" }, { type: "text" }] }] }]);
+    const body = renderReport(report(children)).body;
+    expect(body).toBe(source + "\n");
+    expect(parseReportMarkdown(body, { agentTainted: false })).toEqual(children);
+  });
+
+  it("preserves compact marker identities and substitutes metadata scalars without parsing their contents", () => {
+    const children = parseReportMarkdown("<!-- gh-aw-work-issue:{work_id} -->", { context: { work_id: "work_123" }, allowMetadata: true, agentTainted: false });
+    expect(children).toEqual([{ type: "xml_marker", name: "gh-aw-work-issue", value: "work_123", compact: true, agentTainted: false }]);
+    expect(renderReport(report(children)).body).toBe("<!-- gh-aw-work-issue:work_123 -->\n");
+  });
+
+  it("imports a durable review marker as its own block and retains its encoded identity", () => {
+    const source = 'Review summary\n[gh-aw-workflow-call-id]: # "owner%2Frepo%2FWorkflow%20name"';
+    const children = parseReportMarkdown(source, { allowMetadata: true, agentTainted: false });
+    expect(children[1]).toEqual({ type: "review_marker", workflowCallId: "owner/repo/Workflow name", agentTainted: false });
+    expect(renderReport(report(children)).body).toBe(source.replace("\n[", "\n\n[") + "\n");
+  });
+
+  it.each(["%", "%FF", "%E0%A4"])("keeps malformed review metadata %s literal instead of failing publication", encoded => {
+    const children = parseReportMarkdown(`[gh-aw-workflow-call-id]: # "${encoded}"`, { allowMetadata: true, agentTainted: true });
+    expect(children).toHaveLength(1);
+    expect(children[0].type).toBe("paragraph");
+    expect(renderReport(report(children)).body).not.toContain("[gh-aw-workflow-call-id]:");
+  });
+
+  it("keeps emphasis and subscript structure when templates use underscored scalar names", () => {
+    const children = parseReportMarkdown("<sub><em>{workflow_name}</em></sub>\n\n*{workflow_name}*", { context: { workflow_name: "Worker" }, agentTainted: false });
+    expect(renderReport(report(children)).body).toBe("<sub><em>Worker</em></sub>\n\n*Worker*\n");
+  });
+
+  it.each(["<details><summary>", "<details>\n<summary>"])("preserves subscript summaries imported from %s", opening => {
+    const children = parseReportMarkdown(`${opening}<sub>{label}</sub></summary>\n\nInstructions\n\n</details>`, {
+      context: { label: "Add this agentic workflow to your repo" },
+      agentTainted: false,
+    });
+    expect(children[0]).toMatchObject({
+      type: "details",
+      summary: [{ type: "subscript", agentTainted: false, children: [{ type: "text", value: "Add this agentic workflow to your repo", agentTainted: false }] }],
+    });
+    const body = renderReport(report(children)).body;
+    expect(body).toContain("<summary><sub>Add this agentic workflow to your repo</sub></summary>");
+    expect(renderReport(report(parseReportMarkdown(body, { agentTainted: false }))).body).toBe(body);
+  });
+
+  it("parses long unmatched emphasis with placeholder-like text without exponential backtracking", () => {
+    const output = execFileSync(
+      process.execPath,
+      ["-e", 'const { parseReportMarkdown } = require("./report_markdown.cjs"); const source = "*" + "{a}".repeat(5000); const nodes = parseReportMarkdown(source); process.stdout.write(JSON.stringify(nodes));'],
+      { cwd: import.meta.dirname, timeout: 5000 }
+    );
+    expect(JSON.parse(output.toString())).toEqual([paragraph("*" + "{a}".repeat(5000))]);
+  });
+
+  it("does not turn multiline literal data into lists or separators", () => {
+    const children = parseReportMarkdown("Value: {value}", { context: { value: "first\n- item\n+ another\n1. numbered\n2) alternate\n---" }, agentTainted: true });
+    expect(children).toHaveLength(1);
+    expect(renderReport(report(children)).body).toBe("Value: first - item + another 1. numbered 2) alternate ---\n");
+    expect(renderReport(report([paragraph("Value: first\n- item\n+ another\n1. numbered\n2) alternate\n---")])).body).toBe("Value: first - item + another 1. numbered 2) alternate ---\n");
+  });
+
+  it("roundtrips tagged code blocks with a minimum fence longer than embedded backticks", () => {
+    const value = "text\n````````\n<!-- gh-aw-execution: literal example -->";
+    const body = renderReport(report([{ type: "code_block", language: "gh-aw-comment-memory:notes", fenceLength: 6, value, agentTainted: true }])).body;
+    expect(body).toBe("`````````gh-aw-comment-memory:notes\n" + value + "\n`````````\n");
+    const imported = parseReportMarkdown(body, { allowMetadata: true, agentTainted: true });
+    expect(imported).toEqual([{ type: "code_block", language: "gh-aw-comment-memory:notes", fenceLength: 9, value, agentTainted: true }]);
+    expect(renderReport(report(imported)).body).toBe(body);
+  });
+
+  it.each([2, 3.5, 129])("rejects invalid minimum fence length %s", fenceLength => {
+    expect(() => renderReport(report([{ type: "code_block", language: "text", value: "example", fenceLength }]))).toThrow(TypeError);
+  });
+
+  it("preserves protected empty code fences and their wrappers without retaining ordinary empty blocks", () => {
+    /** @type {import("./report_ast.cjs").ReportBlock} */
+    const memory = { type: "code_block", language: "gh-aw-comment-memory:notes", fenceLength: 6, value: "", agentTainted: true, sizeProtected: true };
+    const input = report([
+      { type: "details", summary: "Saved memory", children: [memory] },
+      { type: "details", summary: "Empty diagnostic", children: [{ type: "code_block", language: "text", value: " \n " }] },
+    ]);
+    const normalized = normalizeReport(input);
+
+    expect(normalized.children).toEqual([{ type: "details", summary: "Saved memory", children: [memory] }]);
+    expect(normalizeReport(normalized)).toEqual(normalized);
+    expect(renderReport(input).body).toBe("<details>\n<summary>Saved memory</summary>\n\n``````gh-aw-comment-memory:notes\n\n``````\n\n</details>\n");
+  });
+
   it("requires a non-forgeable redaction pass before a tree can be concretized", () => {
     const input = { ...report([paragraph("Safe agent text")]), agentTainted: false };
     expect(() => assertRedactedReport(input)).toThrow("must pass redaction");

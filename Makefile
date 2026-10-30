@@ -118,6 +118,10 @@ update-golden:
 	go test -v ./pkg/console -run='^TestGolden_' -update
 
 # Wasm golden tests — compare wasm (string API) compiler output against golden files
+.PHONY: test-actions-parser-conformance
+test-actions-parser-conformance:
+	npm test --prefix pkg/workflow/actionslanguageservice/conformance
+
 .PHONY: test-wasm-golden
 test-wasm-golden:
 	@echo "Running wasm golden tests (Go string API path)..."
@@ -165,6 +169,10 @@ test-integration-mcp-other:
 .PHONY: test-integration-logs
 test-integration-logs:
 	go test -v -timeout=3m -tags 'integration' -run 'TestLogs|TestFirewall|TestNoStopTime|TestLocalWorkflow' -skip 'TestLogsMultiTarget' ./pkg/cli
+
+.PHONY: test-harbor-conformance
+test-harbor-conformance:
+	go test -v -timeout=3m -tags 'integration harbor' -run '^TestHarborConformance$$' -count=1 ./pkg/cli
 
 .PHONY: test-integration-logs-multi-target-count
 test-integration-logs-multi-target-count:

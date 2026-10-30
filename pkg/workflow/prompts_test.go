@@ -360,36 +360,41 @@ func TestDailyFormalSpecVerifierDefinesConfiguredSafeOutputContract(t *testing.T
 	}
 
 	workflow := string(content)
-	requiredContract := "Draft the title and body locally first if needed, but emit exactly one final `create_issue` safe output only after the full payload is complete."
+	requiredContract := "Draft the title and body locally first if needed, but emit exactly one final `create_pull_request` only after implementation and validation are complete."
 	if !strings.Contains(workflow, requiredContract) {
-		t.Fatal("Expected daily-formal-spec-verifier workflow to require a single final create_issue safe output")
+		t.Fatal("Expected daily-formal-spec-verifier workflow to require a single final create_pull_request after validation")
 	}
 
 	for _, expected := range []string{
 		"cli-proxy: true",
-		"direct safe-output MCP tools are not exposed",
-		"safeoutputs create_issue '<JSON>'",
-		"Stdin is also supported with `safeoutputs create_issue .`",
-		"prefer inline JSON without auxiliary tools, pipelines, temporary files, or shell expansion",
+		"safeoutputs create_pull_request '<JSON>'",
+		"complete JSON object containing `title`, `body`, and `branch`",
+		"If a direct safe-output tool is exposed instead, call it with the same arguments.",
+		"Do **not** use `python3`, `node`, `jq`, or any other scripting runtime to construct or validate the pull request payload",
+		"Never retry `create_pull_request` with empty, placeholder, or partial arguments.",
 		`safeoutputs report_incomplete '{"reason":"<concrete blocker>"}'`,
 		"Do not redirect it to a file.",
+		"The generated test file is formatted and its focused Go tests passed against real implementation APIs.",
 	} {
 		if !strings.Contains(workflow, expected) {
-			t.Fatalf("Expected daily-formal-spec-verifier workflow to support configured CLI transport with %q", expected)
+			t.Fatalf("Expected daily-formal-spec-verifier workflow to enforce its validated pull request contract with %q", expected)
 		}
 	}
 	if strings.Contains(workflow, "Do **not** use `bash`, `cli-proxy`, or the `safeoutputs` CLI") {
 		t.Fatal("Workflow must not forbid its configured safe-output transport")
 	}
 
-	reportIncompleteGuidance := "If the quality checks below cannot be met, emit `report_incomplete` through the same transport instead of `create_issue`."
+	reportIncompleteGuidance := "If the quality checks below cannot be met, emit `report_incomplete` through the same transport."
 	if !strings.Contains(workflow, reportIncompleteGuidance) {
 		t.Fatal("Expected daily-formal-spec-verifier workflow to require report_incomplete fallback through the configured transport")
 	}
 
-	terminalSafeOutputGuidance := "**Before finishing, confirm you called exactly one terminal safe output:** `create_issue`, `report_incomplete`, or `noop`."
+	terminalSafeOutputGuidance := "**Before finishing, confirm you called exactly one terminal safe output:** `create_pull_request`, `report_incomplete`, or `noop`."
 	if !strings.Contains(workflow, terminalSafeOutputGuidance) {
 		t.Fatal("Expected daily-formal-spec-verifier workflow to require exactly one terminal safe output before finishing")
+	}
+	if strings.Contains(workflow, "create_issue") {
+		t.Fatal("Workflow must not request the unconfigured create_issue safe output")
 	}
 }
 
@@ -427,11 +432,13 @@ func TestDailyFormalSpecVerifierHasToolBudgetAwareness(t *testing.T) {
 	}
 
 	workflow := string(content)
-	if !strings.Contains(workflow, "If you are approaching the tool call limit, emit a partial result immediately rather than continuing to gather more data.") {
-		t.Fatal("Expected daily-formal-spec-verifier workflow to contain tool budget awareness instruction")
-	}
-	if !strings.Contains(workflow, "report_incomplete") {
-		t.Fatal("Expected daily-formal-spec-verifier workflow to mention report_incomplete as budget-exhaustion fallback")
+	for _, expected := range []string{
+		"**Tool budget awareness**: Reserve time for focused validation and delivery.",
+		"If the quality bar or validation cannot be completed, emit `report_incomplete`; never publish a partial or unvalidated test suite.",
+	} {
+		if !strings.Contains(workflow, expected) {
+			t.Fatalf("Expected daily-formal-spec-verifier workflow to enforce tool-budget validation and fallback with %q", expected)
+		}
 	}
 }
 

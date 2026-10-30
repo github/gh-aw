@@ -7,13 +7,14 @@
  * @module update_pr_description_helpers
  */
 
-const { assembleMarkdownBodyParts, buildGeneratedFooter } = require("./markdown_body_helpers.cjs");
-const { getBodyFooterMessage } = require("./messages_footer.cjs");
-const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
+const { assembleReportBodyParts, buildGeneratedFooter, buildGeneratedFooterBlocks } = require("./markdown_body_helpers.cjs");
+const { getBodyFooterBlocks } = require("./messages_footer.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
-const { appendExecutionProvenance } = require("./execution_provenance.cjs");
+const { appendReportExecutionProvenance, stripExecutionProvenance } = require("./execution_provenance.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 /**
  * Build the AI footer with workflow attribution
@@ -66,20 +67,22 @@ function buildIslandEndMarker(workflowId) {
  * @returns {{found: boolean, startIndex: number, endIndex: number}} Island location info
  */
 function findIsland(body, workflowId) {
-  const startMarker = buildIslandStartMarker(workflowId);
-  const endMarker = buildIslandEndMarker(workflowId);
-
-  const startIndex = body.indexOf(startMarker);
-  if (startIndex === -1) {
+  const starts = [buildIslandStartMarker(workflowId), `<!-- gh-aw-island-start: ${workflowId} -->`];
+  const ends = [buildIslandEndMarker(workflowId), `<!-- gh-aw-island-end: ${workflowId} -->`];
+  const startIndex = Math.min(...starts.map(marker => body.indexOf(marker)).filter(index => index >= 0));
+  if (!Number.isFinite(startIndex)) {
     return { found: false, startIndex: -1, endIndex: -1 };
   }
 
-  const endIndex = body.indexOf(endMarker, startIndex);
-  if (endIndex === -1) {
+  const endPositions = ends
+    .map(marker => ({ index: body.indexOf(marker, startIndex), length: marker.length }))
+    .filter(position => position.index >= 0)
+    .sort((a, b) => a.index - b.index);
+  if (!endPositions.length) {
     return { found: false, startIndex: -1, endIndex: -1 };
   }
 
-  return { found: true, startIndex, endIndex: endIndex + endMarker.length };
+  return { found: true, startIndex, endIndex: endPositions[0].index + endPositions[0].length };
 }
 
 /**
@@ -98,63 +101,81 @@ function findIsland(body, workflowId) {
  * @returns {string} Updated body content
  */
 function updateBody(params) {
+  return renderSizedReport(buildUpdatedBodyReport(params)).body;
+}
+
+/**
+ * @param {Parameters<typeof updateBody>[0]} params
+ * @returns {import("./report_ast.cjs").Report}
+ */
+function buildUpdatedBodyReport(params) {
   const { currentBody, newContent, operation, workflowName, runUrl, workflowId, includeFooter = true, bodyFooter, historyUrl } = params;
-  // When footer is enabled use the full footer (includes install instructions, XML marker, etc.)
-  // When footer is disabled still add standalone workflow-id marker for searchability
-  const aiFooter = includeFooter ? buildAIFooter(workflowName, runUrl, historyUrl) : "";
-  const footerSection = aiFooter ? `\n\n${aiFooter}` : "";
-  const renderedBodyFooter = getBodyFooterMessage(bodyFooter, { workflowName, runUrl });
-  const bodyFooterSection = renderedBodyFooter ? `\n\n${renderedBodyFooter.trimEnd()}` : "";
-  const workflowIdMarker = !includeFooter && workflowId ? `\n\n${generateWorkflowIdMarker(workflowId)}` : "";
-
-  // Sanitize new content to prevent injection attacks
   const sanitizedNewContent = sanitizeContent(newContent);
-
-  // Inject CAUTION at top of new content if threat detection warning was raised
-  const { detectionCaution } = assembleMarkdownBodyParts({
+  const ctx = typeof context !== "undefined" ? context : null;
+  const { detectionCaution } = assembleReportBodyParts({
     includeFooter: false,
     workflowName,
     runUrl,
   });
-  const contentWithCaution = detectionCaution ? `${detectionCaution}\n\n${sanitizedNewContent}` : sanitizedNewContent;
+  const content = [...detectionCaution, ...parseReportMarkdown(stripExecutionProvenance(sanitizedNewContent), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true })];
+  if (includeFooter)
+    content.push(
+      ...buildGeneratedFooterBlocks({
+        workflowName,
+        runUrl,
+        historyUrl,
+        workflowSource: process.env.GH_AW_WORKFLOW_SOURCE ?? "",
+        workflowSourceURL: process.env.GH_AW_WORKFLOW_SOURCE_URL ?? "",
+        triggeringIssueNumber: ctx?.payload?.issue?.number,
+        triggeringPRNumber: ctx?.payload?.pull_request?.number,
+        triggeringDiscussionNumber: ctx?.payload?.discussion?.number,
+      })
+    );
+  content.push(...getBodyFooterBlocks(bodyFooter, { workflowName, runUrl }));
+  if (!includeFooter && workflowId) content.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: workflowId, agentTainted: false });
+  /** @param {string} source */
+  const existing = source => parseReportMarkdown(stripExecutionProvenance(source), { minimumHeadingLevel: 2, allowMetadata: true, agentTainted: true });
+  /** @param {import("./report_ast.cjs").ReportBlock[]} children @returns {import("./report_ast.cjs").Report} */
+  const report = children => ({ type: "report", title: "Updated body", children });
 
   if (operation === "replace") {
     // Replace: use new content with optional AI footer
     core.info("Operation: replace (full body replacement)");
-    return contentWithCaution + footerSection + bodyFooterSection + workflowIdMarker;
+    return report(content);
   }
 
   if (operation === "replace-island") {
     // Try to find existing island for this workflow ID
     const island = findIsland(currentBody, workflowId);
-    const startMarker = buildIslandStartMarker(workflowId);
-    const endMarker = buildIslandEndMarker(workflowId);
-    const islandContent = `${startMarker}\n${contentWithCaution}${footerSection}${bodyFooterSection}${workflowIdMarker}\n${endMarker}`;
+    /** @type {import("./report_ast.cjs").ReportBlock[]} */
+    const islandContent = [
+      { type: "xml_marker", name: "gh-aw-island-start", value: workflowId, compact: true, agentTainted: false },
+      ...content,
+      { type: "xml_marker", name: "gh-aw-island-end", value: workflowId, compact: true, agentTainted: false },
+    ];
 
     if (island.found) {
       // Replace the island content
       core.info(`Operation: replace-island (updating existing island for workflow ${workflowId})`);
       const before = currentBody.substring(0, island.startIndex);
       const after = currentBody.substring(island.endIndex);
-      return before + islandContent + after;
+      return report([...existing(before), ...islandContent, ...existing(after)]);
     } else {
       // Island not found, fall back to append mode
       core.info(`Operation: replace-island (island not found for workflow ${workflowId}, falling back to append)`);
-      return currentBody + `\n\n---\n\n${islandContent}`;
+      return report([...existing(currentBody), { type: "separator", agentTainted: false }, ...islandContent]);
     }
   }
 
   if (operation === "prepend") {
     // Prepend: add content, AI footer (if enabled), and horizontal line at the start
     core.info("Operation: prepend (add to start with separator)");
-    const prependSection = `${contentWithCaution}${footerSection}${bodyFooterSection}${workflowIdMarker}\n\n---\n\n`;
-    return prependSection + currentBody;
+    return report([...content, { type: "separator", agentTainted: false }, ...existing(currentBody)]);
   }
 
   // Default to append
   core.info("Operation: append (add to end with separator)");
-  const appendSection = `\n\n---\n\n${contentWithCaution}${footerSection}${bodyFooterSection}${workflowIdMarker}`;
-  return currentBody + appendSection;
+  return report([...existing(currentBody), { type: "separator", agentTainted: false }, ...content]);
 }
 
 /**
@@ -185,7 +206,7 @@ function buildUpdatedBody({ context, currentBody, newContent, operation, include
       serverUrl: context.serverUrl,
     }) || undefined;
 
-  const body = updateBody({
+  const report = buildUpdatedBodyReport({
     currentBody,
     newContent,
     operation,
@@ -196,7 +217,7 @@ function buildUpdatedBody({ context, currentBody, newContent, operation, include
     bodyFooter,
     historyUrl,
   });
-  return appendExecutionProvenance(body, workflowName, runUrl);
+  return renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
 }
 
 module.exports = {

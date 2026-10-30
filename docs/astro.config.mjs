@@ -276,7 +276,12 @@ export default defineConfig({
       },
     },
     sitemap(),
-    mermaid(),
+    mermaid({
+      mermaidConfig: {
+        layout: "dagre",
+        look: "classic",
+      },
+    }),
     starlight({
       title: "GitHub Agentic Workflows",
       description: "Intelligent automation for GitHub with Copilot, Claude, Codex or Gemini. Agents triage, investigate and open pull requests with guardrails and cost controls.",
@@ -448,7 +453,11 @@ export default defineConfig({
             { label: "Safe Rollout in Organizations", link: "/guides/safe-rollout/" },
             { label: "Sharing Workflows in Organizations", link: "/guides/sharing-workflows/" },
             { label: "Measuring Impact", link: "/guides/measuring-impact/" },
-            { label: "Agentic Automation Workshop", link: "https://githubnext.github.io/gh-aw-workshop/", attrs: { class: "sidebar-external", target: "_blank", rel: "noopener", "aria-label": "Agentic Automation Workshop (opens in a new tab)" } },
+            {
+              label: "Agentic Automation Workshop",
+              link: "https://githubnext.github.io/gh-aw-workshop/",
+              attrs: { class: "sidebar-external", target: "_blank", rel: "noopener", "aria-label": "Agentic Automation Workshop (opens in a new tab)" },
+            },
           ],
         },
         {

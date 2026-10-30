@@ -443,6 +443,13 @@ func formatWorkflowRunError(err error) error {
 		fmt.Fprint(os.Stderr, getCodespacePermissionErrorMessage())
 		return errors.New("failed to run workflow on GitHub Actions: permission denied (403)")
 	}
+	lowerErrorMsg := strings.ToLower(errorMsg)
+	if strings.Contains(lowerErrorMsg, "not found on the default branch") {
+		return fmt.Errorf("failed to run workflow on GitHub Actions: %w\n%s", err, workflowDispatchRegistrationHint)
+	}
+	if strings.Contains(lowerErrorMsg, "does not have 'workflow_dispatch' trigger") {
+		return fmt.Errorf("failed to run workflow on GitHub Actions: %w\nThe workflow at the selected ref must declare on.workflow_dispatch. Add the trigger, recompile, and push the source and .lock.yml to that ref. Manual dispatch does not reproduce a pull_request_target event. See https://github.github.com/gh-aw/setup/cli/#run-from-a-feature-branch", err)
+	}
 	return fmt.Errorf("failed to run workflow on GitHub Actions: %w", err)
 }
 

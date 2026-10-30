@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "path";
 import { fileURLToPath } from "url";
+import { renderReport } from "./report_ast.cjs";
 
 let buildAICreditsRateLimitErrorContext;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,7 +12,10 @@ describe("handle_agent_failure AI Credits rate-limit context", () => {
     process.env.GH_AW_PROMPTS_DIR = path.join(__dirname, "../md");
     const mod = await import("./handle_agent_failure.cjs");
     const exports = mod.default || mod;
-    buildAICreditsRateLimitErrorContext = exports.buildAICreditsRateLimitErrorContext;
+    buildAICreditsRateLimitErrorContext = (...args) => {
+      const children = exports.buildAICreditsRateLimitErrorContext(...args);
+      return children.length ? renderReport({ type: "report", title: "Workflow failure", children }).body : "";
+    };
   });
 
   afterEach(() => {

@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -116,6 +118,18 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "VALUE: fallback'literal",
 		},
 		{
+			name:     "multiple escaped quote pairs in literal fallback resolve",
+			content:  `VALUE: ${{ github.aw.import-inputs.missing || 'it''s ''ready''' }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: it's 'ready'",
+		},
+		{
+			name:     "consecutive escaped quote pairs in grouped fallback resolve",
+			content:  `VALUE: ${{ github.aw.import-inputs.missing || ('a''''b') }}`,
+			inputs:   map[string]any{},
+			expected: "VALUE: a''b",
+		},
+		{
 			name:     "legacy input participates in fallback chains",
 			content:  `VALUE: ${{ github.aw.inputs.campaign || github.aw.import-inputs.package || 'fallback-literal' }}`,
 			inputs:   map[string]any{"package": "repo-assist"},
@@ -221,11 +235,10 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 			expected: "A: eslint-rules\nB: b-default",
 		},
 		{
-			name:     "multiline expression is left untouched",
+			name:     "multiline expression uses Actions syntax",
 			content:  "VALUE: ${{ github.aw.import-inputs.campaign ||\n'fallback-literal' }}",
 			inputs:   map[string]any{},
-			expected: "VALUE: ${{ github.aw.import-inputs.campaign ||\n'fallback-literal' }}",
-			contains: true,
+			expected: "VALUE: fallback-literal",
 		},
 		{
 			name:     "literal-only fallback without input reference is left untouched",
@@ -273,105 +286,35 @@ func TestSubstituteImportInputsInContent_Fallback(t *testing.T) {
 	}
 }
 
-func TestSplitFallbackOperands(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected []string
-	}{
-		{
-			name:     "two simple operands",
-			input:    "github.aw.import-inputs.campaign || 'fallback'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'fallback'"},
-		},
-		{
-			name:     "three operands",
-			input:    "a || b || c",
-			expected: []string{"a ", " b ", " c"},
-		},
-		{
-			name:     "pipe characters inside single-quoted string are not split",
-			input:    "github.aw.import-inputs.campaign || 'a||b'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'a||b'"},
-		},
-		{
-			name:     "escaped single quote inside string is not treated as string terminator",
-			input:    "github.aw.import-inputs.campaign || 'it''s here'",
-			expected: []string{"github.aw.import-inputs.campaign ", " 'it''s here'"},
-		},
-		{
-			name:     "no fallback operator returns single operand",
-			input:    "github.aw.import-inputs.campaign",
-			expected: []string{"github.aw.import-inputs.campaign"},
-		},
+func TestImportInputParserDiagnosticsDoNotLogSource(t *testing.T) {
+	const marker = "sensitive-import-expression-marker"
+	if os.Getenv("GH_AW_TEST_IMPORT_LOG_REDACTION") == "1" {
+		content := "${{ format('" + marker + "', ) }}"
+		if got := substituteImportInputsInContent(content, nil); got != content {
+			t.Fatalf("malformed expression changed: %q", got)
+		}
+		return
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := splitFallbackOperands(tc.input)
-			if len(got) != len(tc.expected) {
-				t.Fatalf("splitFallbackOperands(%q) = %#v, want %#v", tc.input, got, tc.expected)
-			}
-			for i := range got {
-				if got[i] != tc.expected[i] {
-					t.Errorf("splitFallbackOperands(%q)[%d] = %q, want %q", tc.input, i, got[i], tc.expected[i])
-				}
-			}
-		})
+	cmd := exec.Command(os.Args[0], "-test.run=^TestImportInputParserDiagnosticsDoNotLogSource$")
+	env := make([]string, 0, len(os.Environ())+3)
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if key != "GH_AW_TEST_IMPORT_LOG_REDACTION" && key != "DEBUG" && key != "DEBUG_COLORS" {
+			env = append(env, entry)
+		}
 	}
-}
-
-func TestResolveFallbackOperand(t *testing.T) {
-	inputs := map[string]any{
-		"campaign": "eslint-rules",
-		"empty":    "",
-		"nested":   map[string]any{"name": "nested-value"},
+	cmd.Env = append(env,
+		"GH_AW_TEST_IMPORT_LOG_REDACTION=1",
+		"DEBUG=parser:import_processor",
+		"DEBUG_COLORS=0",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("debug-log subprocess failed: %v\n%s", err, output)
 	}
-
-	tests := []struct {
-		name             string
-		operand          string
-		wantOK           bool
-		wantValue        any
-		wantFormatted    string
-		wantInputRef     bool
-		checkValue       bool
-		checkFormattedEq bool
-	}{
-		{name: "import-inputs reference resolves", operand: "github.aw.import-inputs.campaign", wantOK: true, wantValue: "eslint-rules", wantFormatted: "eslint-rules", wantInputRef: true, checkValue: true, checkFormattedEq: true},
-		{name: "legacy inputs reference resolves", operand: "github.aw.inputs.campaign", wantOK: true, wantValue: "eslint-rules", wantFormatted: "eslint-rules", wantInputRef: true, checkValue: true, checkFormattedEq: true},
-		{name: "missing input reference resolves ok with empty formatted", operand: "github.aw.import-inputs.missing", wantOK: true, wantInputRef: true, checkFormattedEq: true, wantFormatted: ""},
-		{name: "nested subkey resolves", operand: "github.aw.import-inputs.nested.name", wantOK: true, wantValue: "nested-value", wantFormatted: "nested-value", wantInputRef: true, checkValue: true, checkFormattedEq: true},
-		{name: "true literal resolves", operand: "true", wantOK: true, wantValue: true, wantFormatted: "true", checkValue: true, checkFormattedEq: true},
-		{name: "false literal resolves", operand: "false", wantOK: true, wantValue: false, wantFormatted: "false", checkValue: true, checkFormattedEq: true},
-		{name: "null literal resolves to ok with nil value", operand: "null", wantOK: true, checkFormattedEq: true, wantFormatted: ""},
-		{name: "quoted string literal resolves", operand: "'hello'", wantOK: true, wantValue: "hello", wantFormatted: "hello", checkValue: true, checkFormattedEq: true},
-		{name: "integer literal resolves", operand: "42", wantOK: true, wantValue: int64(42), wantFormatted: "42", checkValue: true, checkFormattedEq: true},
-		{name: "negative integer literal resolves", operand: "-42", wantOK: true, wantValue: int64(-42), wantFormatted: "-42", checkValue: true, checkFormattedEq: true},
-		{name: "float literal resolves", operand: "1.5", wantOK: true, wantValue: 1.5, wantFormatted: "1.5", checkValue: true, checkFormattedEq: true},
-		{name: "unsupported bare identifier does not resolve", operand: "github.event.inputs.campaign", wantOK: false},
-		{name: "unquoted bare word does not resolve", operand: "notaliteral", wantOK: false},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := resolveFallbackOperand(tc.operand, inputs)
-			if got.ok != tc.wantOK {
-				t.Fatalf("resolveFallbackOperand(%q).ok = %v, want %v", tc.operand, got.ok, tc.wantOK)
-			}
-			if !got.ok {
-				return
-			}
-			if got.isInputReference != tc.wantInputRef {
-				t.Errorf("resolveFallbackOperand(%q).isInputReference = %v, want %v", tc.operand, got.isInputReference, tc.wantInputRef)
-			}
-			if tc.checkValue && got.value != tc.wantValue {
-				t.Errorf("resolveFallbackOperand(%q).value = %#v, want %#v", tc.operand, got.value, tc.wantValue)
-			}
-			if tc.checkFormattedEq && got.formatted != tc.wantFormatted {
-				t.Errorf("resolveFallbackOperand(%q).formatted = %q, want %q", tc.operand, got.formatted, tc.wantFormatted)
-			}
-		})
+	if strings.Contains(string(output), marker) {
+		t.Fatalf("parser source was written to debug logs: %s", output)
 	}
 }
 

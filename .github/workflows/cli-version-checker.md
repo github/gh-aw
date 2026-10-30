@@ -19,6 +19,7 @@ engine:
 network: 
    allowed: [defaults, node, go, "api.github.com", containers]
 imports:
+  - shared/lock-safe-pull-request.md
   - ../skills/jqschema/SKILL.md
   - shared/reporting.md
   - shared/otlp.md
@@ -34,11 +35,12 @@ tools:
     - "*"
   edit:
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     expires: 2d
     title-prefix: "[ca] "
     labels: [automation, dependencies, cookie]
-    close-older-issues: true
+    close-older-pull-requests: true
 timeout-minutes: 45
 features:
   gh-aw-detection: true
@@ -65,7 +67,7 @@ Monitor and update agentic CLI tools: Claude Code, GitHub Copilot CLI, OpenAI Co
 2. If cached versions exist and are recent (< 24h), verify if updates are needed before proceeding
 3. If no CLI version, Docker image version, or Docker image digest changes are detected, call `noop` as the terminal safe output and exit successfully
 
-**CRITICAL**: If ANY version or digest changes are detected, you MUST create an issue using safe-outputs.create-issue. Do not skip issue creation even for minor updates.
+**CRITICAL**: If version or digest changes are detected, implement and validate them and create a pull request using `create_pull_request`, including minor updates. Report concrete blockers with `report_incomplete`.
 
 For each CLI/MCP server and threat-detect:
 1. Fetch latest version from NPM registry or GitHub releases (use npm view commands for package metadata)
@@ -164,9 +166,9 @@ For each CLI tool update, install (`npm install -g <package>@<version>`), run `-
 3. Run `make fmt` after editing any Go files
 4. **REQUIRED**: Run `make recompile` in the **foreground** — do NOT background it with `&` or follow it with `sleep`. Wait for it to finish completely before proceeding. Example: `make recompile && echo "done"`.
 5. Verify changes with `git status`
-6. **REQUIRED**: Create issue via safe-outputs with detailed analysis (do NOT skip this step)
+6. **REQUIRED**: Validate the updated pins, commit the intended changes locally, and call `create_pull_request` with detailed analysis and the local branch. Compiled workflow locks are excluded from delivery automatically.
 
-## Issue Format
+## Pull Request Format
 
 **Follow the Report Structure Pattern defined in `shared/reporting.md`.**
 

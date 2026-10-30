@@ -472,6 +472,7 @@ jobs:
       contents: read
       copilot-requests: write
       issues: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-pi-${{ github.workflow }}"
       queue: max
@@ -1327,6 +1328,7 @@ jobs:
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
+      checks: read
       issues: write
       pull-requests: write
     concurrency:

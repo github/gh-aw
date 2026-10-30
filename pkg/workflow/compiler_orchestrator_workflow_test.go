@@ -1023,7 +1023,8 @@ func TestMergeJobsFromYAMLImports_NoImportedJobs(t *testing.T) {
 		},
 	}
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, "")
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, "")
+	require.NoError(t, err)
 
 	assert.Equal(t, mainJobs, result)
 	assert.Len(t, result, 1)
@@ -1037,7 +1038,8 @@ func TestMergeJobsFromYAMLImports_EmptyJSON(t *testing.T) {
 		"test": map[string]any{"runs-on": "ubuntu-latest"},
 	}
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, "{}")
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, "{}")
+	require.NoError(t, err)
 
 	assert.Equal(t, mainJobs, result)
 	assert.Len(t, result, 1)
@@ -1050,7 +1052,8 @@ func TestMergeJobsFromYAMLImports_ImportedJobsOnly(t *testing.T) {
 	mainJobs := map[string]any{}
 	importedJobsJSON := `{"imported-job": {"runs-on": "ubuntu-latest", "steps": [{"run": "echo imported"}]}}`
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 1)
 	assert.Contains(t, result, "imported-job")
@@ -1072,7 +1075,8 @@ func TestMergeJobsFromYAMLImports_MainJobTakesPrecedence(t *testing.T) {
 	// Imported job with same name "test"
 	importedJobsJSON := `{"test": {"runs-on": "macos-latest", "steps": [{"run": "echo imported"}]}}`
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 1)
 	assert.Contains(t, result, "test")
@@ -1100,7 +1104,8 @@ func TestMergeJobsFromYAMLImports_MergesPreStepsOnConflict(t *testing.T) {
 	}
 
 	importedJobsJSON := `{"test": {"runs-on": "macos-latest", "pre-steps": [{"name": "import pre", "run": "echo import"}], "steps": [{"run": "echo imported job"}]}}`
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 1)
 	testJob := result["test"].(map[string]any)
@@ -1136,7 +1141,8 @@ func TestMergeJobsFromYAMLImports_MergesSetupStepsOnConflict(t *testing.T) {
 	}
 
 	importedJobsJSON := `{"test": {"runs-on": "macos-latest", "setup-steps": [{"name": "import setup", "run": "echo import"}], "steps": [{"run": "echo imported job"}]}}`
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 1)
 	testJob := result["test"].(map[string]any)
@@ -1173,7 +1179,8 @@ func TestMergeJobsFromYAMLImports_MergesSetupAndPreStepsIndependentlyOnConflict(
 	}
 
 	importedJobsJSON := `{"test": {"runs-on": "macos-latest", "setup-steps": [{"name": "import setup", "run": "echo import setup"}], "pre-steps": [{"name": "import pre", "run": "echo import pre"}], "steps": [{"run": "echo imported job"}]}}`
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 1)
 	testJob := result["test"].(map[string]any)
@@ -1209,7 +1216,8 @@ func TestMergeJobsFromYAMLImports_MergesActivationStepsOnConflict(t *testing.T) 
 	}
 
 	importedJobsJSON := `{"activation": {"steps": [{"name": "import activation", "run": "echo import"}]}}`
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 1)
 	activationJob := result["activation"].(map[string]any)
@@ -1237,7 +1245,8 @@ func TestMergeJobsFromYAMLImports_DoesNotMergeRegularStepsForCustomJobConflict(t
 	}
 
 	importedJobsJSON := `{"test": {"runs-on": "macos-latest", "steps": [{"name": "import", "run": "echo import"}]}}`
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	testJob := result["test"].(map[string]any)
 	steps, ok := testJob["steps"].([]any)
@@ -1258,7 +1267,8 @@ func TestMergeJobsFromYAMLImports_MultipleImportedJobs(t *testing.T) {
 	importedJobsJSON := `{"imported-1": {"runs-on": "ubuntu-latest"}}
 {"imported-2": {"runs-on": "macos-latest"}}`
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 3)
 	assert.Contains(t, result, "main-job")
@@ -1277,7 +1287,8 @@ func TestMergeJobsFromYAMLImports_MalformedJSON(t *testing.T) {
 	// Malformed JSON should be skipped
 	importedJobsJSON := `{"malformed": "unclosed`
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	// Should return only main jobs, skipping malformed
 	assert.Len(t, result, 1)
@@ -1300,7 +1311,8 @@ func TestMergeJobsFromYAMLImports_EmptyLines(t *testing.T) {
 {"job-2": {"runs-on": "macos-latest"}}
 `
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 2)
 	assert.Contains(t, result, "job-1")
@@ -1959,7 +1971,8 @@ func TestMergeJobsFromYAMLImports_PreservesJobOrder(t *testing.T) {
 	importedJobsJSON := `{"job-c": {"runs-on": "ubuntu-latest"}}
 {"job-d": {"runs-on": "macos-latest"}}`
 
-	result := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	result, err := compiler.mergeJobsFromYAMLImports(mainJobs, importedJobsJSON)
+	require.NoError(t, err)
 
 	assert.Len(t, result, 4)
 	// Verify all jobs present

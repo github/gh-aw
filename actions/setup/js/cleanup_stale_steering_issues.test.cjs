@@ -8,6 +8,12 @@ const mockContext = {
 };
 
 describe("cleanup_stale_steering_issues", () => {
+  it("preserves the compact cleanup marker identity after tree rendering", async () => {
+    const { CLEANUP_COMMENT, CLEANUP_COMMENT_MARKER } = await import("./cleanup_stale_steering_issues.cjs");
+    expect(CLEANUP_COMMENT_MARKER).toBe("<!-- gh-aw:stale-steering-issue-cleanup -->");
+    expect(CLEANUP_COMMENT).toBe("This steering issue was left open after its linked workflow run completed successfully. Closing it during scheduled agentic maintenance.\n\n<!-- gh-aw:stale-steering-issue-cleanup -->");
+  });
+
   let mockGithub;
   const oldCreatedAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
   const makeIssue = (overrides = {}) => ({

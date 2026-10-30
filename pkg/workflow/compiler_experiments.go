@@ -12,6 +12,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var experimentsLog = logger.New("workflow:compiler_experiments")
@@ -786,12 +787,7 @@ func sortedExperimentNames(experiments map[string][]string) []string {
 	return names
 }
 
-// experimentsFieldReferenceRegex matches `experiments.<name>` tokens (simple identifier)
-// appearing anywhere inside a raw configuration string, such as an `engine.model` value.
-// Unlike experimentNameRegex/experimentComparisonRegex in expression_extraction.go, this
-// pattern is not anchored, so it can rewrite the reference wherever it appears inside a
-// larger ${{ ... }} expression (e.g. "${{ experiments.model }}").
-var experimentsFieldReferenceRegex = regexp.MustCompile(`\bexperiments\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
+var experimentReferencePrefix = []string{"experiments"}
 
 // activationOutputsPrefix and pickExperimentOutputsPrefix are the two forms an experiment
 // variant reference can take once rewritten out of the `experiments.<name>` placeholder:
@@ -804,173 +800,44 @@ const (
 	pickExperimentOutputsPrefix = "steps.pick-experiment.outputs."
 )
 
-// activationOutputsReferenceRegex matches `needs.activation.outputs.<name>` tokens (simple
-// identifier), with a trailing word boundary so that a name which is a prefix of another
-// declared name (e.g. "model" vs. "model_variant") is never partially matched.
-var activationOutputsReferenceRegex = regexp.MustCompile(`\bneeds\.activation\.outputs\.([a-zA-Z_][a-zA-Z0-9_]*)\b`)
+var activationOutputReferencePrefix = []string{"needs", "activation", "outputs"}
 
-// byteSpan is a half-open [start, end) byte range within a string.
-type byteSpan struct {
-	start int
-	end   int
-}
-
-// expressionBodySpans returns the spans of the bodies of the `${{ ... }}` expressions in s.
-// GitHub Actions does not support nested interpolation, so the first `}}` terminates a body.
-// Text outside these spans is plain literal text and must never be rewritten.
-func expressionBodySpans(s string) []byteSpan {
-	var spans []byteSpan
-	for i := 0; i < len(s); {
-		open := strings.Index(s[i:], "${{")
-		if open < 0 {
-			break
-		}
-		start := i + open + len("${{")
-		closeOffset := strings.Index(s[start:], "}}")
-		if closeOffset < 0 {
-			break
-		}
-		end := start + closeOffset
-		spans = append(spans, byteSpan{start: start, end: end})
-		i = end + len("}}")
-	}
-	return spans
-}
-
-// unquotedSpans splits an expression body span into the sub-spans that lie outside string
-// literals. GitHub Actions expressions quote string literals with single quotes and escape an
-// embedded quote by doubling it, so both forms are skipped: text inside a literal (e.g.
-// the format string in `format('experiments.model-{0}', inputs.suffix)`) is data, not an
-// expression reference, and must be preserved verbatim.
-func unquotedSpans(s string, span byteSpan) []byteSpan {
-	if span.start < 0 || span.end > len(s) || span.start > span.end {
-		return nil
-	}
-	var spans []byteSpan
-	segStart := span.start
-	i := span.start
-	for i < span.end {
-		quoteOffset := strings.IndexByte(s[i:span.end], '\'')
-		if quoteOffset < 0 {
-			break
-		}
-		quote := i + quoteOffset
-		if segStart < quote {
-			spans = append(spans, byteSpan{start: segStart, end: quote})
-		}
-		i = quote + 1
-		for i < span.end {
-			quoteOffset = strings.IndexByte(s[i:span.end], '\'')
-			if quoteOffset < 0 {
-				i = span.end
-				break
-			}
-			quote = i + quoteOffset
-			if strings.HasPrefix(s[quote:span.end], "''") {
-				i = quote + 2
-				continue
-			}
-			i = quote + 1
-			break
-		}
-		segStart = i
-	}
-	if segStart < span.end {
-		spans = append(spans, byteSpan{start: segStart, end: span.end})
-	}
-	return spans
-}
-
-func regexpSubmatchSpans(match []int) (byteSpan, byteSpan, bool) {
-	if len(match) >= 4 {
-		var fullMatch, capture byteSpan
-		for index, offset := range match {
-			switch index {
-			case 0:
-				fullMatch.start = offset
-			case 1:
-				fullMatch.end = offset
-			case 2:
-				capture.start = offset
-			case 3:
-				capture.end = offset
-				return fullMatch, capture, true
-			}
-		}
-	}
-	return byteSpan{}, byteSpan{}, false
-}
-
-// rewriteDeclaredExperimentNames replaces every match of re whose first captured group (the
-// experiment name) is a key of experiments with replacementPrefix followed by that name.
-// Matches for undeclared names are left untouched. re must have exactly one capturing group,
-// which captures the experiment name.
-//
-// Rewriting is deliberately narrow because `engine.model` accepts arbitrary composite
-// expressions:
-//   - only the bodies of `${{ ... }}` expressions are considered, so plain text is untouched;
-//   - string literals inside those bodies are skipped, so `format('experiments.model-{0}', x)`
-//     keeps its literal intact;
-//   - a match adjacent to a `.` on either side is skipped, since `fromJSON(x).experiments.model`
-//     and `experiments.model.foo` are property chains, not experiment placeholders.
-//
-// The regex-based, word-boundary-anchored matching (rather than sequential strings.ReplaceAll
-// per name) additionally avoids one declared name corrupting the occurrence of another name it
-// happens to be a prefix of.
-func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, re *regexp.Regexp, replacementPrefix string) string {
+func rewriteDeclaredExperimentNames(s string, experiments map[string][]string, prefix []string, replacementPrefix string) string {
 	if len(experiments) == 0 {
 		return s
 	}
-	return rewriteExpressionReferences(s, re, func(name string) (string, bool) {
+	return rewriteExpressionReferences(s, prefix, func(name string) (string, bool) {
 		_, declared := experiments[name]
 		return replacementPrefix + name, declared
 	})
 }
 
-func rewriteExpressionReferences(s string, re *regexp.Regexp, replace func(string) (string, bool)) string {
-	if !strings.Contains(s, "${{") {
-		return s
-	}
+// Only complete access paths are rewritten; string literals and properties of
+// another value are not compiler placeholders.
+func rewriteExpressionReferences(s string, prefix []string, replace func(string) (string, bool)) string {
 	var b strings.Builder
 	last := 0
-	rewritten := false
-	for _, body := range expressionBodySpans(s) {
-		for _, seg := range unquotedSpans(s, body) {
-			for _, match := range re.FindAllStringSubmatchIndex(s[seg.start:seg.end], -1) {
-				fullMatch, capture, ok := regexpSubmatchSpans(match)
-				if !ok {
-					continue
-				}
-				if fullMatch.start < 0 || fullMatch.end < fullMatch.start || fullMatch.end > seg.end-seg.start ||
-					capture.start < 0 || capture.end < capture.start || capture.end > seg.end-seg.start {
-					continue
-				}
-				start, end := seg.start+fullMatch.start, seg.start+fullMatch.end
-				nameStart, nameEnd := seg.start+capture.start, seg.start+capture.end
-				if start < 0 || end > len(s) || start > end ||
-					nameStart < 0 || nameEnd > len(s) || nameStart > nameEnd {
-					continue
-				}
-				name := s[nameStart:nameEnd]
-				replacement, ok := replace(name)
-				if !ok {
-					continue
-				}
-				if start > 0 && strings.HasSuffix(s[:start], ".") {
-					continue // property of another value, e.g. fromJSON(x).experiments.model
-				}
-				if end < len(s) && strings.HasPrefix(s[end:], ".") {
-					continue // property of the variant value, e.g. experiments.model.foo
-				}
-				b.WriteString(s[last:start])
-				b.WriteString(replacement)
-				last = end
-				rewritten = true
-			}
+	spans, _ := actionslanguageservice.ExtractExpressions(s)
+	for _, span := range spans {
+		expression, err := actionslanguageservice.ParseSyntax(span.Content)
+		if err != nil {
+			continue
 		}
-	}
-	if !rewritten {
-		return s
+		actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+			path, ok := actionslanguageservice.Reference(node)
+			if !ok {
+				return true
+			}
+			if len(path) == len(prefix)+1 && referenceHasPrefix(path, prefix) {
+				if replacement, changed := replace(path[len(prefix)]); changed {
+					start, end := span.Start+3+node.Start, span.Start+3+node.End
+					b.WriteString(s[last:start])
+					b.WriteString(replacement)
+					last = end
+				}
+			}
+			return false
+		})
 	}
 	b.WriteString(s[last:])
 	return b.String()
@@ -982,7 +849,7 @@ func rewriteExpressionReferences(s string, re *regexp.Regexp, replace func(strin
 // safe-outputs, etc.), where the experiment variant is exposed via the activation job's
 // outputs (see buildActivationJob).
 func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[string][]string) string {
-	return rewriteDeclaredExperimentNames(s, experiments, experimentsFieldReferenceRegex, activationOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, experimentReferencePrefix, activationOutputsPrefix)
 }
 
 // RewriteActivationOutputsToLocalStepOutputs converts `needs.activation.outputs.<name>`
@@ -993,7 +860,7 @@ func RewriteExperimentsReferenceForDownstreamJobs(s string, experiments map[stri
 // names are rewritten, so an unrelated `needs.activation.outputs.*` reference (not produced by
 // the experiments rewrite) is left untouched.
 func RewriteActivationOutputsToLocalStepOutputs(s string, experiments map[string][]string) string {
-	return rewriteDeclaredExperimentNames(s, experiments, activationOutputsReferenceRegex, pickExperimentOutputsPrefix)
+	return rewriteDeclaredExperimentNames(s, experiments, activationOutputReferencePrefix, pickExperimentOutputsPrefix)
 }
 
 // experimentArtifactUploadName returns the artifact name used when uploading the experiment

@@ -101,7 +101,11 @@ describe("create_project_status_update", () => {
     expect(mockCore.error).toHaveBeenCalled();
   });
 
-  it("should preserve allowlisted mentions and neutralize non-allowlisted mentions", async () => {
+  it.each([
+    { bodyFooter: undefined, allowedMentionAliases: undefined },
+    { bodyFooter: "Policy footer", allowedMentionAliases: undefined },
+    { bodyFooter: "Policy footer", allowedMentionAliases: ["copilot-swe-agent", "another-allowed"] },
+  ])("should preserve mention policy with footer $bodyFooter and resolved aliases $allowedMentionAliases", async ({ bodyFooter, allowedMentionAliases }) => {
     mockGithub.graphql
       .mockResolvedValueOnce({
         organization: {
@@ -129,13 +133,15 @@ describe("create_project_status_update", () => {
 
     const handler = await main({
       max: 10,
-      mentions: { allowTeamMembers: false, allowContext: false, allowed: ["copilot"] },
+      mentions: { allowTeamMembers: false, allowContext: false, allowed: ["copilot", "another-allowed"], max: 1 },
+      body_footer: bodyFooter,
+      allowedMentionAliases,
     });
 
     const result = await handler(
       {
         project: "https://github.com/orgs/test-org/projects/42",
-        body: "Please ask @copilot and @someone-else to review this.",
+        body: "Please ask @copilot, @another-allowed and @someone-else to review this.",
       },
       {}
     );
@@ -144,7 +150,9 @@ describe("create_project_status_update", () => {
     const mutationCall = mockGithub.graphql.mock.calls[1];
     expect(mutationCall?.[1]?.body).toContain("@copilot");
     expect(mutationCall?.[1]?.body).not.toContain("`@copilot`");
+    expect(mutationCall?.[1]?.body).toContain("`@another-allowed`");
     expect(mutationCall?.[1]?.body).toContain("`@someone-else`");
+    if (bodyFooter) expect(mutationCall?.[1]?.body).toContain("\n\nPolicy footer");
   });
 
   it("should handle missing body field", async () => {

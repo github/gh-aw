@@ -31,7 +31,7 @@ const main = buildMissingIssueHandler({
     },
   ],
   templatePath: getPromptPath("missing_tool_issue.md"),
-  templateListKey: "incomplete_signals_list",
+  templateListKey: "missing_tools_list",
   buildCommentHeader: runUrl => [`## Incomplete Run Reported`, ``, `The agent reported that the task could not be completed during [workflow run](${runUrl}):`, ``],
   renderCommentItem: (_item, index) => [`### ${index + 1}. Incomplete signal`, "**Task completion:** unconfirmed", ""],
   renderIssueItem: (_item, index) => [`#### ${index + 1}. Incomplete signal`, "**Task completion:** unconfirmed", ""],

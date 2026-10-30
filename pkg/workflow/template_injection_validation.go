@@ -52,6 +52,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var templateInjectionValidationLog = logger.New("workflow:template_injection_validation")
@@ -71,14 +72,74 @@ type runContentExpressionScan struct {
 	hasDisallowed bool
 }
 
-// mayContainInlineExpression is a cheap zero-false-negative precheck for
-// GitHub Actions inline expressions. It intentionally allows false positives,
-// for example when `${{` and a later `}}` appear in unrelated text without
-// forming a valid expression. Callers still apply InlineExpressionPattern
-// before classifying expressions.
+// Include incomplete wrappers so malformed executable expressions fail closed.
 func mayContainInlineExpression(s string) bool {
-	_, remainder, found := strings.Cut(s, "${{")
-	return found && strings.Contains(remainder, "}}")
+	return strings.Contains(s, "${{")
+}
+
+func runScriptExpressions(source string) []string {
+	spans, err := actionslanguageservice.ExtractExpressions(source)
+	var expressions []string
+	last := 0
+	for _, span := range spans {
+		expressions = append(expressions, source[span.Start:span.End])
+		last = span.End
+	}
+	if err != nil {
+		if start := strings.Index(source[last:], "${{"); start >= 0 {
+			expressions = append(expressions, source[last+start:])
+		}
+	}
+	return expressions
+}
+
+// Unknown computed selectors are wildcards for this deny policy, not trusted
+// static references. In particular, steps[vars.step].outputs.* is user data.
+func runScriptAccessPath(expression *actionslanguageservice.Expression) []string {
+	switch expression.Kind {
+	case "group":
+		return runScriptAccessPath(expression.Child(0))
+	case "context":
+		return []string{expression.Token.Text}
+	case "index":
+		path := runScriptAccessPath(expression.Child(0))
+		if path == nil {
+			return nil
+		}
+		index := expression.Child(1)
+		if index.Kind == "literal" && (index.Token.Kind == "identifier" || index.Token.Kind == "string") {
+			if value, ok := index.Token.Value.(string); ok {
+				return append(path, value)
+			}
+		}
+		return append(path, "*")
+	default:
+		return nil
+	}
+}
+
+func unsafeRunScriptExpressionContext(source string) string {
+	expression, ok := actionslanguageservice.WrappedExpression(source)
+	if !ok {
+		return "invalid expression"
+	}
+	context := ""
+	actionslanguageservice.Walk(expression, func(node *actionslanguageservice.Expression) bool {
+		if context != "" {
+			return false
+		}
+		path := runScriptAccessPath(node)
+		switch {
+		case len(path) >= 1 && strings.EqualFold(path[0], "inputs"):
+			context = "workflow inputs"
+		case len(path) >= 2 && strings.EqualFold(path[0], "github") && (strings.EqualFold(path[1], "event") || path[1] == "*"):
+			context = "github.event"
+		case len(path) >= 4 && strings.EqualFold(path[0], "steps") && (strings.EqualFold(path[2], "outputs") || path[2] == "*"):
+			context = "steps.*.outputs"
+		}
+		return context == ""
+	})
+	return context
 }
 
 func findRunValue(keyPart string) (string, bool) {
@@ -269,11 +330,12 @@ func scanRunContentExpressions(yamlContent string) runContentExpressionScan {
 			return false
 		}
 
-		for _, expr := range InlineExpressionPattern.FindAllString(line, -1) {
-			if !scan.hasUnsafe && UnsafeContextPattern.MatchString(expr) {
+		for _, expr := range runScriptExpressions(line) {
+			context := unsafeRunScriptExpressionContext(expr)
+			if !scan.hasUnsafe && context != "" {
 				scan.hasUnsafe = true
 			}
-			if !scan.hasDisallowed && !allowedRunScriptExpressionRegex.MatchString(expr) {
+			if !scan.hasDisallowed && (context == "invalid expression" || !allowedRunScriptExpressionRegex.MatchString(expr)) {
 				scan.hasDisallowed = true
 			}
 			if scan.hasUnsafe && scan.hasDisallowed {
@@ -298,7 +360,7 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 
 	for _, runContent := range runBlocks {
 		// Check if this run block contains inline expressions
-		if !InlineExpressionPattern.MatchString(runContent) {
+		if !mayContainInlineExpression(runContent) {
 			continue
 		}
 
@@ -308,17 +370,17 @@ func validateNoTemplateInjectionFromParsed(workflow map[string]any) error {
 		contentWithoutHeredocs := stripShellLineComments(removeHeredocContent(runContent))
 
 		// Extract all inline expressions from this run block (excluding heredocs)
-		expressions := InlineExpressionPattern.FindAllString(contentWithoutHeredocs, -1)
+		expressions := runScriptExpressions(contentWithoutHeredocs)
 
 		// Check each expression for unsafe contexts
 		for _, expr := range expressions {
-			if UnsafeContextPattern.MatchString(expr) {
+			if context := unsafeRunScriptExpressionContext(expr); context != "" {
 				// Found an unsafe pattern - extract a snippet for context
 				snippet := extractRunSnippet(contentWithoutHeredocs, expr)
 				violations = append(violations, TemplateInjectionViolation{
 					Expression: expr,
 					Snippet:    snippet,
-					Context:    detectExpressionContext(expr),
+					Context:    context,
 				})
 
 				templateInjectionValidationLog.Printf("Found template injection risk: %s in run block", expr)
@@ -357,9 +419,9 @@ func validateNoGitHubExpressionsInRunScriptsFromParsed(workflow map[string]any) 
 		// Align with template-injection validation by excluding non-executable regions:
 		// heredoc bodies and bash # comments.
 		contentWithoutHeredocs := stripShellLineComments(removeHeredocContent(runContent))
-		expressions := InlineExpressionPattern.FindAllString(contentWithoutHeredocs, -1)
+		expressions := runScriptExpressions(contentWithoutHeredocs)
 		for _, expr := range expressions {
-			if allowedRunScriptExpressionRegex.MatchString(expr) {
+			if _, valid := actionslanguageservice.WrappedExpression(expr); valid && allowedRunScriptExpressionRegex.MatchString(expr) {
 				continue
 			}
 			snippet := extractRunSnippet(contentWithoutHeredocs, expr)

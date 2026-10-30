@@ -252,10 +252,26 @@ function isPermissionsError(errorMessage) {
 async function handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, contextMessage) {
   try {
     // Prepare issue message with a note about the fallback
-    const fallbackNote = `\n\n---\n\n> [!WARNING]\n> This was intended to be a discussion, but discussions could not be created due to permissions issues. This issue was created as a fallback.\n> To enable discussions, ensure the repository has an Announcements category (announcement-capable) configured.\n`;
+    const { ISSUE_BODY_SUFFIX } = require("./issue_body.cjs");
     const issueMessage = {
       ...item,
-      body: (item.body || "") + fallbackNote,
+      body: item.body || "",
+      [ISSUE_BODY_SUFFIX]: [
+        { type: "separator", agentTainted: false },
+        {
+          type: "alert",
+          kind: "WARNING",
+          agentTainted: false,
+          children: [
+            {
+              type: "paragraph",
+              agentTainted: false,
+              children: [{ type: "text", value: "This was intended to be a discussion, but discussions could not be created due to permissions issues. This issue was created as a fallback.", agentTainted: false }],
+            },
+            { type: "paragraph", agentTainted: false, children: [{ type: "text", value: "To enable discussions, ensure the repository has an Announcements category (announcement-capable) configured.", agentTainted: false }] },
+          ],
+        },
+      ],
       repo: qualifiedItemRepo,
     };
 

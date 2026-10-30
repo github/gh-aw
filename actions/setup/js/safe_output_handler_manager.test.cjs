@@ -29,6 +29,16 @@ import {
 } from "./safe_output_handler_manager.cjs";
 
 const require = createRequire(import.meta.url);
+const { COMMENT_PREAMBLE } = require("./issue_body.cjs");
+const { renderReport } = require("./report_ast.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+
+function renderedCommentMessage(message) {
+  return {
+    ...message,
+    body: renderReport({ type: "report", title: "Comment", children: [...(message[COMMENT_PREAMBLE] || []), ...parseReportMarkdown(message.body, { agentTainted: true })] }).body.trimEnd(),
+  };
+}
 
 describe("Safe Output Handler Manager", () => {
   beforeEach(() => {
@@ -2319,7 +2329,7 @@ describe("Safe Output Handler Manager", () => {
       // add_comment is NOT cancelled — it should be called with a failure note prepended
       expect(result.results[1].cancelled).toBeUndefined();
       expect(commentHandler).toHaveBeenCalledTimes(1);
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toContain("push_to_pull_request_branch");
       expect(calledMessage.body).toContain("Branch not found");
       // non-code-push message should continue to execute
@@ -2348,10 +2358,10 @@ describe("Safe Output Handler Manager", () => {
       // add_comment is NOT cancelled — handler is called with failure note
       expect(result.results[1].cancelled).toBeUndefined();
       expect(commentHandler).toHaveBeenCalledTimes(1);
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toContain("create_pull_request");
       expect(calledMessage.body).toContain("API error");
-      expect(calledMessage.body).toContain("PR created!");
+      expect(calledMessage.body).toContain("PR created\\!");
     });
 
     it("should NOT cancel subsequent code-push messages after a code-push failure", async () => {
@@ -2486,7 +2496,7 @@ describe("Safe Output Handler Manager", () => {
 
       // The add_comment handler must have been called with the modified body
       expect(commentHandler).toHaveBeenCalledTimes(1);
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toContain("A fix PR has been created. Please review and merge.");
       expect(calledMessage.body).toContain("pull request was not created");
       expect(calledMessage.body).toContain("#42");
@@ -2518,7 +2528,7 @@ describe("Safe Output Handler Manager", () => {
 
       await processMessages(handlers, messages);
 
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toContain("pull request was not created");
       expect(calledMessage.body).toContain("#7");
     });
@@ -2545,7 +2555,7 @@ describe("Safe Output Handler Manager", () => {
 
       await processMessages(handlers, messages);
 
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toContain("Direct push to the original pull request branch was not possible");
       expect(calledMessage.body).toContain("#71");
       expect(calledMessage.body).toContain("https://github.com/owner/repo/pull/71");
@@ -2572,7 +2582,7 @@ describe("Safe Output Handler Manager", () => {
 
       await processMessages(handlers, messages);
 
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toBe("A fix PR has been created.");
       expect(calledMessage.body).not.toContain("pull request was not created");
     });
@@ -2595,7 +2605,7 @@ describe("Safe Output Handler Manager", () => {
 
       // add_comment handler must have been called (not cancelled)
       expect(commentHandler).toHaveBeenCalledTimes(1);
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       // Failure note should be prepended
       expect(calledMessage.body).toContain("create_pull_request");
       expect(calledMessage.body).toContain("Failed to apply patch");
@@ -2623,7 +2633,7 @@ describe("Safe Output Handler Manager", () => {
       await processMessages(handlers, messages);
 
       expect(commentHandler).toHaveBeenCalledTimes(1);
-      const calledMessage = commentHandler.mock.calls[0][0];
+      const calledMessage = renderedCommentMessage(commentHandler.mock.calls[0][0]);
       expect(calledMessage.body).toContain("push_to_pull_request_branch");
       expect(calledMessage.body).toContain("Branch not found");
       expect(calledMessage.body).toContain("Changes have been pushed.");

@@ -1907,7 +1907,7 @@ describe("log_parser_shared.cjs", () => {
 
       // Check that output is wrapped in code block
       expect(result).toMatch(/^```\n/);
-      expect(result).toMatch(/\n```$/);
+      expect(result).toMatch(/\n```\n$/);
 
       // Check for Conversation section
       expect(result).toContain("Conversation:");
@@ -1944,7 +1944,7 @@ describe("log_parser_shared.cjs", () => {
       const result = generateCopilotCliStyleSummary(logEntries, { parserName: "Agent" });
 
       expect(result).toMatch(/^````\n/);
-      expect(result).toMatch(/\n````$/);
+      expect(result).toMatch(/\n````\n$/);
       expect(result).toContain("```js");
       expect(result).toContain("console.log('hi')");
     });

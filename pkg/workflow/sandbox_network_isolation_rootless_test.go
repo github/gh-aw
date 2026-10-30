@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // TestNetworkIsolationRootless verifies that the default docker runtime profile
@@ -192,7 +194,7 @@ This workflow verifies that docker-sudo-iptables installs awf without --rootless
 	}
 
 	// AWF invocation must restore the runner PATH after sudo applies secure_path.
-	if !strings.Contains(lockStr, `sudo -E /usr/bin/env PATH="$PATH" /usr/local/bin/awf`) {
+	if !strings.Contains(lockStr, constants.AWFLegacySecurityCommand) {
 		t.Error("Expected PATH-preserving sudo invocation in lock file for runtime: docker-sudo-iptables")
 	}
 }

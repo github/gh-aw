@@ -495,6 +495,7 @@ jobs:
       copilot-requests: write
       issues: read
       pull-requests: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-pi-${{ github.workflow }}"
       queue: max
@@ -699,10 +700,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"github-token\":\"${GH_AW_SECRET_AWI_MAINTENANCE_TOKEN}\",\"max\":5,\"target\":\"*\"},\"approve_workflow_run\":{\"allowed_pull_requests\":${{ toJSON(needs.prefilter.outputs.eligible_pull_request_numbers) }},\"allowed_workflows\":[\"cjs.yml\",\"cgo.yml\",\"CWI.yml\"],\"comment\":true,\"github-token\":\"${GH_AW_SECRET_AWI_MAINTENANCE_TOKEN}\",\"max\":8,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CHANGELOG.md\",\"PI.md\",\"AGENTS.md\",\"AGENTS.override.md\",\"AGENTS.MD\",\"CLAUDE.md\",\"CLAUDE.MD\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":72,\"group_by_day\":true,\"labels\":[\"automation\"],\"max\":1,\"title_prefix\":\"[pr-sous-chef] \"},\"create_report_incomplete_issue\":{},\"dismiss_pull_request_review\":{\"max\":20,\"target\":\"*\"},\"mentions\":{\"allowed\":[\"copilot\"]},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
-          GH_AW_SECRET_AWI_MAINTENANCE_TOKEN: ${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          GH_AW_SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          GH_AW_SECRET_GITHUB_TOKEN: ${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":5,\"target\":\"*\"},\"approve_workflow_run\":{\"allowed_pull_requests\":${{ toJSON(needs.prefilter.outputs.eligible_pull_request_numbers) }},\"allowed_workflows\":[\"cjs.yml\",\"cgo.yml\",\"CWI.yml\"],\"comment\":true,\"max\":8,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CHANGELOG.md\",\"PI.md\",\"AGENTS.md\",\"AGENTS.override.md\",\"AGENTS.MD\",\"CLAUDE.md\",\"CLAUDE.MD\"],\"protected_files_path_exclude\":[\".changeset/*.md\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":72,\"group_by_day\":true,\"labels\":[\"automation\"],\"max\":1,\"title_prefix\":\"[pr-sous-chef] \"},\"create_report_incomplete_issue\":{},\"dismiss_pull_request_review\":{\"max\":20,\"target\":\"*\"},\"mentions\":{\"allowed\":[\"copilot\"]},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -2871,8 +2869,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
         env:
-          GH_AW_SECRET_NAMES: 'AWI_MAINTENANCE_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
-          SECRET_AWI_MAINTENANCE_TOKEN: ${{ secrets.AWI_MAINTENANCE_TOKEN }}
+          GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -3064,6 +3061,7 @@ jobs:
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: write
+      checks: read
       issues: write
       pull-requests: write
     concurrency:
@@ -4254,9 +4252,9 @@ jobs:
       issues: read
       pull-requests: read
     outputs:
-      eligible_count: ${{ steps.fetch-prs.outputs.eligible_count }}
-      eligible_pull_request_numbers: ${{ steps.fetch-prs.outputs.eligible_pull_request_numbers }}
-      rate_limit_low: ${{ steps.fetch-prs.outputs.rate_limit_low }}
+      eligible_count: "${{ steps.fetch-prs.outputs.eligible_count }}"
+      eligible_pull_request_numbers: "${{ steps.fetch-prs.outputs.eligible_pull_request_numbers }}"
+      rate_limit_low: "${{ steps.fetch-prs.outputs.rate_limit_low }}"
     steps:
       - name: Configure GH_HOST for enterprise compatibility
         id: ghes-host-config
@@ -4490,7 +4488,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "*.grafana.net,*.sentry.io,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"github-token\":\"${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":5,\"target\":\"*\"},\"approve_workflow_run\":{\"allowed_pull_requests\":${{ toJSON(needs.prefilter.outputs.eligible_pull_request_numbers) }},\"allowed_workflows\":[\"cjs.yml\",\"cgo.yml\",\"CWI.yml\"],\"comment\":true,\"github-token\":\"${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":8,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CHANGELOG.md\",\"PI.md\",\"AGENTS.md\",\"AGENTS.override.md\",\"AGENTS.MD\",\"CLAUDE.md\",\"CLAUDE.MD\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":72,\"group_by_day\":true,\"labels\":[\"automation\"],\"max\":1,\"title_prefix\":\"[pr-sous-chef] \"},\"create_report_incomplete_issue\":{},\"dismiss_pull_request_review\":{\"max\":20,\"target\":\"*\"},\"mentions\":{\"allowed\":[\"copilot\"]},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"github-token\":\"${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":5,\"target\":\"*\"},\"approve_workflow_run\":{\"allowed_pull_requests\":${{ toJSON(needs.prefilter.outputs.eligible_pull_request_numbers) }},\"allowed_workflows\":[\"cjs.yml\",\"cgo.yml\",\"CWI.yml\"],\"comment\":true,\"github-token\":\"${{ secrets.AWI_MAINTENANCE_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":8,\"protect_top_level_dot_folders\":true,\"protected_files\":[\"package.json\",\"bun.lockb\",\"bunfig.toml\",\"deno.json\",\"deno.jsonc\",\"deno.lock\",\"global.json\",\"NuGet.Config\",\"Directory.Packages.props\",\"mix.exs\",\"mix.lock\",\"go.mod\",\"go.sum\",\"stack.yaml\",\"stack.yaml.lock\",\"pom.xml\",\"build.gradle\",\"build.gradle.kts\",\"settings.gradle\",\"settings.gradle.kts\",\"gradle.properties\",\"package-lock.json\",\"yarn.lock\",\"pnpm-lock.yaml\",\"npm-shrinkwrap.json\",\"requirements.txt\",\"Pipfile\",\"Pipfile.lock\",\"pyproject.toml\",\"setup.py\",\"setup.cfg\",\"Gemfile\",\"Gemfile.lock\",\"uv.lock\",\"CODEOWNERS\",\"DESIGN.md\",\"README.md\",\"CONTRIBUTING.md\",\"SECURITY.md\",\"CODE_OF_CONDUCT.md\",\"CHANGELOG.md\",\"PI.md\",\"AGENTS.md\",\"AGENTS.override.md\",\"AGENTS.MD\",\"CLAUDE.md\",\"CLAUDE.MD\"],\"protected_files_path_exclude\":[\".changeset/*.md\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":72,\"group_by_day\":true,\"labels\":[\"automation\"],\"max\":1,\"title_prefix\":\"[pr-sous-chef] \"},\"create_report_incomplete_issue\":{},\"dismiss_pull_request_review\":{\"max\":20,\"target\":\"*\"},\"mentions\":{\"allowed\":[\"copilot\"]},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

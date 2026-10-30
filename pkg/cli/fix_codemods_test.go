@@ -93,6 +93,7 @@ func TestGetAllCodemods_ContainsExpectedCodemods(t *testing.T) {
 		"bash-anonymous-removal",
 		"activation-outputs-to-sanitized-step",
 		"roles-to-on-roles",
+		"pull-request-target-restrict-roles",
 		"bots-to-on-bots",
 		"engine-steps-to-top-level",
 		"assign-to-agent-default-agent-to-name",
@@ -143,6 +144,7 @@ func TestGetAllCodemods_ContainsExpectedCodemods(t *testing.T) {
 		"engine-copilot-sdk-driver-to-driver",
 		"request-review-policy-normalization",
 		"post-steps-safe-outputs-guided-error",
+		"pull-request-target-guided-error",
 	}
 
 	for _, expectedID := range expectedIDs {
@@ -227,6 +229,7 @@ func expectedCodemodOrder() []string {
 		"bash-allowlist-unsupported-engine-guided-error",
 		"activation-outputs-to-sanitized-step",
 		"roles-to-on-roles",
+		"pull-request-target-restrict-roles",
 		"bots-to-on-bots",
 		"engine-steps-to-top-level",
 		"engine-max-runs-to-top-level",
@@ -276,5 +279,6 @@ func expectedCodemodOrder() []string {
 		"engine-copilot-sdk-driver-to-driver",
 		"request-review-policy-normalization",
 		"post-steps-safe-outputs-guided-error",
+		"pull-request-target-guided-error",
 	}
 }

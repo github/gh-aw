@@ -316,12 +316,16 @@ This command accepts one or more workflow IDs.
 The workflows must have been compiled into GitHub Actions YAML files.
 
 This command only works with workflows that have workflow_dispatch triggers.
+Use --ref to execute the workflow content from a branch or tag before merging.
+GitHub still requires the workflow file to exist on the default branch; --ref
+does not register new workflows or reproduce pull_request_target events.
+See https://github.github.com/gh-aw/setup/cli/#run-from-a-feature-branch
 
 ` + cli.WorkflowIDExplanation,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` run                          # Interactive mode
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver.md   # Alternative format
-  ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --ref main  # Run on specific branch
+  ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --ref feature/my-change  # Run branch workflow content
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --repeat 3  # Run 4 times total (1 initial + 3 repeats)
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --enable-if-needed  # Enable if disabled, run, then restore state
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --auto-merge-prs  # Auto-merge any PRs created during execution
@@ -428,6 +432,7 @@ type compileCmdOptions struct {
 	noLogo                    bool
 	trial                     bool
 	dependabot                bool
+	actionsLock               bool
 	forceOverwrite            bool
 	refreshStopTime           bool
 	forceRefreshActionPins    bool
@@ -478,7 +483,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 	requireSelfHostedRunners, _ := cmd.Flags().GetBool("require-self-hosted-runners")
 	trial, _ := cmd.Flags().GetBool("trial")
 	logicalRepo, _ := cmd.Flags().GetString("logical-repo")
-	dependabot, _ := cmd.Flags().GetBool("dependabot")
+	dependabot, actionsLock := getCompileDependencyOptions(cmd)
 	forceOverwrite, _ := cmd.Flags().GetBool("force")
 	refreshStopTime, _ := cmd.Flags().GetBool("refresh-stop-time")
 	forceRefreshActionPins, _ := cmd.Flags().GetBool("force-refresh-action-pins")
@@ -514,7 +519,7 @@ func getCompileCmdOptions(cmd *cobra.Command) compileCmdOptions {
 		dir: dir, workflowsDir: workflowsDir, logicalRepo: logicalRepo, scheduleSeed: scheduleSeed, priorManifestFile: priorManifestFile, mcpProgressFile: mcpProgressFile,
 		environment: environment, dryRun: dryRun, allowExperimental: allowExperimental,
 		validate: validate, watch: watch, noEmit: noEmit, readOnly: readOnly, noLogo: noLogo, purge: purge, strict: strict, requireSelfHostedRunners: requireSelfHostedRunners, trial: trial, dependabot: dependabot,
-		forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
+		actionsLock: actionsLock, forceOverwrite: forceOverwrite, refreshStopTime: refreshStopTime, forceRefreshActionPins: forceRefreshActionPins, forceRefreshContainerPins: forceRefreshContainerPins, allowActionRefs: allowActionRefs,
 		zizmor: zizmor, poutine: poutine, actionlint: actionlint, skipLint: skipLint, runnerGuard: runnerGuard, syft: syft, grype: grype, grant: grant, yamllint: yamllint, shellcheck: shellcheck,
 		jsonOutput: jsonOutput, showAllErrors: showAllErrors, fix: fix, stats: stats, models: models, failFast: failFast, noCheckUpdate: noCheckUpdate,
 		staged: staged, approve: approve, validateImages: validateImages, ghes: ghes, verbose: verbose, useSamples: useSamples,
@@ -525,6 +530,12 @@ func getCompileInternalFileOptions(cmd *cobra.Command) (priorManifestFile, mcpPr
 	priorManifestFile, _ = cmd.Flags().GetString("prior-manifest-file")
 	mcpProgressFile, _ = cmd.Flags().GetString("mcp-progress-file")
 	return priorManifestFile, mcpProgressFile
+}
+
+func getCompileDependencyOptions(cmd *cobra.Command) (dependabot, actionsLock bool) {
+	dependabot, _ = cmd.Flags().GetBool("dependabot")
+	actionsLock, _ = cmd.Flags().GetBool("actions-lock")
+	return dependabot, actionsLock
 }
 
 func getCompileReadOnlyOptions(cmd *cobra.Command) (noEmit, readOnly, noCheckUpdate bool) {
@@ -572,7 +583,7 @@ func (o *compileCmdOptions) toCompileConfig(args []string) cli.CompileConfig {
 		NoEmit: o.noEmit, ReadOnly: o.readOnly, NoLogo: o.noLogo, Purge: o.purge, TrialMode: o.trial, TrialLogicalRepoSlug: o.logicalRepo, Strict: o.strict,
 		RequireSelfHostedRunners: o.requireSelfHostedRunners,
 		EnvironmentOverride:      o.environment, DryRun: o.dryRun, AllowExperimental: o.allowExperimental,
-		Dependabot: o.dependabot, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
+		Dependabot: o.dependabot, ActionsLock: o.actionsLock, ForceOverwrite: o.forceOverwrite, RefreshStopTime: o.refreshStopTime, ForceRefreshActionPins: o.forceRefreshActionPins, ForceRefreshContainerPins: o.forceRefreshContainerPins,
 		AllowActionRefs: o.allowActionRefs, Zizmor: o.zizmor, Poutine: o.poutine, Actionlint: o.actionlint, SkipLint: o.skipLint, RunnerGuard: o.runnerGuard,
 		Syft: o.syft, Grype: o.grype, Grant: o.grant, Yamllint: o.yamllint, Shellcheck: o.shellcheck, JSONOutput: o.jsonOutput, ShowAllErrors: o.showAllErrors,
 		Stats: o.stats, Models: o.models, FailFast: o.failFast, ScheduleSeed: o.scheduleSeed, Staged: o.staged, Approve: o.approve,
@@ -841,6 +852,7 @@ func configureCompileBuildFlags() {
 }
 
 func configureCompileToolFlags() {
+	compileCmd.Flags().Bool("actions-lock", false, "Run gh actions-lock --no-narrow after successful compilation (requires the separately installed github/gh-actions-lock extension)")
 	compileCmd.Flags().Bool("dependabot", false, "Generate dependency manifests (package.json, requirements.txt, go.mod) and Dependabot config when dependencies are detected")
 	compileCmd.Flags().BoolP("force", "f", false, "Force overwrite of existing dependency files (only applies when --dependabot is set; e.g., dependabot.yml)")
 	compileCmd.Flags().Bool("refresh-stop-time", false, "Force regeneration of stop-after times instead of preserving existing values from lock files")
@@ -907,7 +919,7 @@ func configureOtherCommandFlags() {
 	runCmd.Flags().Bool("enable-if-needed", false, "Enable the workflow before running if needed, and restore state afterward")
 	runCmd.Flags().StringP("engine", "e", "", cli.EngineFlagOverrideUsage)
 	runCmd.Flags().StringP("repo", "r", "", "Target repository ([HOST/]owner/repo format). Defaults to current repository")
-	runCmd.Flags().String("ref", "", "Branch or tag name to run the workflow on (default: current branch)")
+	runCmd.Flags().String("ref", "", "Branch or tag whose workflow content to run (requires default-branch registration; default: current branch, or repository default with --repo)")
 	runCmd.Flags().Bool("auto-merge-prs", false, "Auto-merge any pull requests created during the workflow execution")
 	runCmd.Flags().StringArrayP("raw-field", "F", []string{}, "Pass a workflow dispatch input in key=value format (can be specified multiple times)")
 	_ = runCmd.Flags().MarkShorthandDeprecated("raw-field", "use the long form --raw-field instead")

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
@@ -16,7 +17,7 @@ func TestWorkQueueParsedWorkerStampMatchesCompleteRegistrySource(t *testing.T) {
 		FrontmatterYAML: frontmatter,
 		RawMarkdown:     body,
 	}
-	expected, err := workQueueLogicalContractFromContent(path, "---\n"+frontmatter+"\n---\n"+body)
+	expected, err := workQueueLogicalContractFromContentWithCache(path, "---\n"+frontmatter+"\n---\n"+body, parser.NewImportCache(filepath.Dir(path)))
 	if err != nil {
 		t.Fatal(err)
 	}

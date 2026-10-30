@@ -23,11 +23,37 @@ tools:
     key: arxiv-paper-dedup
     retention-days: 90
     allowed-extensions: [".json"]
-  repo-memory:
-    branch-name: memory/arxiv-paper-ledger
-    allowed-extensions: [".json", ".md"]
-    max-patch-size: 51200
-    format-json: true
+  ledger:
+    arxiv-papers:
+      type: table
+      key: id
+      schema:
+        type: object
+        required: [id, title, url, published, categories, relevant, analyzed_at]
+        properties:
+          id:
+            type: string
+          title:
+            type: string
+          url:
+            type: string
+          published:
+            type: string
+          categories:
+            type: array
+            items:
+              type: string
+          relevant:
+            type: boolean
+          analyzed_at:
+            type: string
+          opportunity:
+            type: string
+          area:
+            type: string
+        additionalProperties: false
+      max-record-kb: 4
+      max-patch-kb: 50
   bash:
     - "*"
 
@@ -167,6 +193,23 @@ If `new_count` is 0, call `noop` with message:
 "No new arXiv papers today — all N previously processed."
 Then stop immediately.
 
+Before investigating PDFs, query the built-in table's `state` at
+`/tmp/gh-aw/ledgers/arxiv-papers/ledger.db` using Python's `sqlite3` with
+`mode=ro`. Match candidate paper IDs against `state.key` with parameterized
+queries and remove already-recorded papers from this run's working list.
+This durable check prevents reprocessing when the dedup cache expires.
+Add only these already-persisted IDs to
+`/tmp/gh-aw/cache-memory/seen-paper-ids.json`, preserving existing IDs.
+Never cache a paper merely because its ledger write was queued.
+If no candidates remain, call `noop` with "No new arXiv papers today — all
+previously processed." and stop. If the projection cannot be read, call
+native `report_incomplete` with the error and stop without claiming a
+successful scan.
+
+The existing cache remains a fast filter and preserves deduplication during
+the transition. The old `memory/arxiv-paper-ledger` branch is historical
+only; do not rewrite or migrate its Markdown/JSON files during a scan.
+
 ## Step 1b: Investigate Paper PDFs
 
 For each paper in `papers`, invoke the `preliminary-investigator` sub-agent with its full paper object. Merge the returned `pdf_fetched` and `preliminary_note` fields into that paper object.
@@ -182,7 +225,7 @@ For each paper in `papers`, invoke the `paper-screener` sub-agent with input:
 
 Collect only papers where the screener returns `{"relevant": true, ...}`.
 
-If no papers are relevant, proceed to Step 4 to update the ledger, then call `noop`:
+If no papers are relevant, proceed to Step 4 to queue the ledger updates, then call `noop`:
 "N papers screened, none relevant to gh-aw today."
 Stop after the ledger update.
 
@@ -203,39 +246,36 @@ Collect the returned opportunity objects.
 
 ## Step 4: Update the Paper Ledger
 
-Use `python3 -c` to update the ledger, index and dedup cache as one standalone shell command. Read paper data from `new-papers.json` as data, not as shell commands; do not chain shell commands or create a separate script.
+For every paper processed in Step 2 (all screened papers regardless of
+relevance), submit one `ledger_append` safe-output call:
 
-Load `/tmp/gh-aw/repo-memory/default/paper-ledger.md` if it exists; otherwise start with:
-```markdown
-# arXiv Paper Ledger
-
-Papers investigated for GitHub Agentic Workflows improvement opportunities.
+```json
+{
+  "ledger": "arxiv-papers",
+  "operation": "upsert",
+  "value": {
+    "id": "arxiv_id",
+    "title": "Paper title",
+    "url": "https://arxiv.org/abs/arxiv_id",
+    "published": "YYYY-MM-DD",
+    "categories": ["cs.AI"],
+    "relevant": false,
+    "analyzed_at": "YYYY-MM-DDTHH:MM:SSZ"
+  }
+}
 ```
 
-Load `/tmp/gh-aw/repo-memory/default/paper-index.json` if it exists; otherwise use `{"papers": []}`.
+Use the paper's actual metadata and screening result. For papers with an
+extracted opportunity, also include `opportunity` and `area` in `value`.
+The primary key is `value.id`; do not send a top-level `key`.
+Do not write a Markdown ledger, JSON index, SQLite database, or ledger
+shards directly.
 
-For every paper processed in Step 2 (all new papers regardless of relevance), append to the ledger:
-
-```markdown
-### [TITLE](URL)
-- **ID**: arxiv_id
-- **Published**: YYYY-MM-DD
-- **Categories**: cat1, cat2
-- **Relevant**: Yes / No
-- **Opportunity**: (if relevant) concise opportunity text; omit line if not relevant
-- **Area**: (if relevant) area; omit line if not relevant
-```
-
-Append to the index JSON array:
-`{"id": "...", "title": "...", "published": "...", "relevant": true/false, "analyzed_at": "YYYY-MM-DD-HH-MM-SS"}`
-
-Write the updated ledger to `/tmp/gh-aw/repo-memory/default/paper-ledger.md`.
-Write the updated index to `/tmp/gh-aw/repo-memory/default/paper-index.json`.
-
-Update the dedup cache at `/tmp/gh-aw/cache-memory/seen-paper-ids.json`:
-Load existing `{"ids": [...]}` or start with `{"ids": []}`.
-Append all paper IDs from `new-papers.json` (whether relevant or not).
-Write back — no colons in filenames.
+Submit each paper at most once per run. Writes are queued safe outputs,
+not immediately visible in this run's read-only projection; they become
+durable only after `push_ledger_changes` succeeds. If a submission fails,
+call native `report_incomplete` with the error and stop. Do not mark that
+paper seen or claim its ledger update succeeded.
 
 ## Step 5: Create Discussion or Noop
 
@@ -244,14 +284,16 @@ Write back — no colons in filenames.
 
 Use the `discussion-template` skill to format the discussion body.
 
-**If no actionable opportunities were found** (but papers were processed and ledger updated):
+**If no actionable opportunities were found** (but papers were processed and ledger updates queued):
 call `noop` with message: "Processed N papers (M relevant), no actionable gh-aw improvements identified today."
 
 ## Completion Requirement
 
-You MUST call exactly one safe-output tool before finishing:
+After any required `ledger_append` calls, you MUST call exactly one terminal
+safe-output tool before finishing:
 - `create_discussion` when actionable opportunities are found.
 - `noop` when no actionable opportunities are found, when `new_count` is 0, or when analysis cannot produce actionable output.
+- Native `report_incomplete` if the ledger projection cannot be read or a ledger submission fails; never emit a clean `noop` for these failures.
 
 Do not end with a plain-text summary only. The final action in the run must be one safe-output call.
 

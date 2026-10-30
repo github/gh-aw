@@ -124,7 +124,7 @@ func TestCloudHypervisorAWFCommandOmitsUnsupportedMountsAndTTY(t *testing.T) {
 	}
 
 	command := BuildAWFCommand(config)
-	assert.Contains(t, command, "sudo --preserve-env awf")
+	assert.Contains(t, command, constants.AWFCloudHypervisorCommand)
 	assert.Contains(t, command, `--cloud-hypervisor-artifact-manifest "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST}"`)
 	assert.Contains(t, command, `--cloud-hypervisor-artifact-manifest-bundle "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_MANIFEST_BUNDLE}"`)
 	assert.Contains(t, command, `--cloud-hypervisor-artifact-release-tag "${GH_AW_CLOUD_HYPERVISOR_ARTIFACT_RELEASE_TAG}"`)
@@ -493,7 +493,7 @@ sandbox:
 	assert.Contains(t, lockStr, "Check host eligibility for cloud-hypervisor")
 	assert.Contains(t, lockStr, "Download and verify cloud-hypervisor bundle")
 	assert.Contains(t, lockStr, "GH_AW_AWF_VERSION: v0.28.11")
-	assert.Contains(t, lockStr, "sudo --preserve-env awf")
+	assert.Contains(t, lockStr, constants.AWFCloudHypervisorCommand)
 	assert.NotContains(t, lockStr, `install_awf_binary.sh" v0.28.1 --rootless`)
 	assert.NotContains(t, lockStr, `print_firewall_logs.sh" --rootless`)
 	assert.Contains(t, lockStr, "--container-runtime cloud-hypervisor")
@@ -546,7 +546,7 @@ sandbox:
 	homeMkdirIdx := strings.Index(lockStr, `mkdir -p "${GITHUB_WORKSPACE}/.awf-home"`)
 	homeExcludeIdx := strings.Index(lockStr, `printf '\n%s\n' '/.awf-home/'`)
 	createDirIdx := strings.Index(lockStr, "Create cache-memory directory")
-	awfIdx := strings.Index(lockStr, "sudo --preserve-env awf")
+	awfIdx := strings.Index(lockStr, constants.AWFCloudHypervisorCommand)
 	require.NotEqual(t, -1, homeExcludeIdx)
 	require.NotEqual(t, -1, createDirIdx)
 	require.NotEqual(t, -1, awfIdx)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/stretchr/testify/assert"
@@ -213,7 +214,7 @@ Test workflow with legacy security.`
 	lockStr := string(lockContent)
 
 	// Legacy mode should preserve the runner PATH across sudo's secure_path.
-	assert.Contains(t, lockStr, `sudo -E /usr/bin/env PATH="$PATH" /usr/local/bin/awf`, "Legacy security mode should preserve PATH across sudo")
+	assert.Contains(t, lockStr, constants.AWFLegacySecurityCommand, "Legacy security mode should preserve PATH across sudo")
 
 	// Should emit --legacy-security flag
 	assert.Contains(t, lockStr, "--legacy-security", "Legacy security mode should emit --legacy-security flag")

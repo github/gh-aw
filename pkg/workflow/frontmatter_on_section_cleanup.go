@@ -20,6 +20,7 @@ func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmat
 
 	for _, line := range lines {
 		info := newOnSectionLine(line)
+		state.leaveSubsections(info)
 		if state.handleEventSectionEntry(info, &result) {
 			continue
 		}
@@ -28,7 +29,6 @@ func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmat
 			continue
 		}
 		state.enterSubsections(info)
-		state.leaveSubsections(info)
 		shouldComment, commentReason := state.determineComment(info, result, nativeLabelFilterSections)
 		result = state.appendLine(result, info, shouldComment, commentReason)
 	}
@@ -63,10 +63,12 @@ type onSectionCleanupState struct {
 	inWorkflowRun                bool
 	inWorkflowRunConclusionArray bool
 	inForksArray                 bool
+	forksIndent                  int
 	inSkipIfMatch                bool
 	inSkipIfNoMatch              bool
 	inSkipIfCheckFailing         bool
 	inSkipAuthorAssociations     bool
+	skipAuthorAssociationsIndent int
 	inSkipRolesArray             bool
 	inSkipBotsArray              bool
 	inRolesArray                 bool
@@ -77,7 +79,9 @@ type onSectionCleanupState struct {
 	allowedCheckoutsIndent       int
 	inGitHubApp                  bool
 	inOnSteps                    bool
+	onStepsIndent                int
 	inOnPermissions              bool
+	onPermissionsIndent          int
 	commentBlockIndent           string
 	inCommentBlock               bool
 	currentSection               string
@@ -264,8 +268,9 @@ func (s *onSectionCleanupState) enterSubsections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) enterArraySections(info onSectionLine) {
-	if s.inPullRequest && strings.HasPrefix(info.trimmed, "forks:") {
+	if (s.inPullRequest || s.inPullRequestTarget) && strings.HasPrefix(info.trimmed, "forks:") {
 		s.inForksArray = true
+		s.forksIndent = info.indent
 	}
 	if !s.inEventSection() && strings.HasPrefix(info.trimmed, "skip-roles:") {
 		s.inSkipRolesArray = true
@@ -287,9 +292,11 @@ func (s *onSectionCleanupState) enterArraySections(info onSectionLine) {
 	}
 	if !s.inEventSection() && strings.HasPrefix(info.trimmed, "steps:") {
 		s.inOnSteps = true
+		s.onStepsIndent = info.indent
 	}
 	if !s.inEventSection() && !s.inOnPermissions && strings.HasPrefix(info.trimmed, "permissions:") {
 		s.inOnPermissions = true
+		s.onPermissionsIndent = info.indent
 	}
 }
 
@@ -308,6 +315,7 @@ func (s *onSectionCleanupState) enterObjectSections(info onSectionLine) {
 	}
 	if !s.inEventSection() && !s.inSkipAuthorAssociations && strings.HasPrefix(info.trimmed, "skip-author-associations:") && info.trimmed == "skip-author-associations:" {
 		s.inSkipAuthorAssociations = true
+		s.skipAuthorAssociationsIndent = info.indent
 	}
 	if !s.inEventSection() && !s.inGitHubApp && ((strings.HasPrefix(info.trimmed, "github-app:") && info.trimmed == "github-app:") ||
 		(strings.HasPrefix(info.trimmed, "# github-app:") && strings.Contains(info.trimmed, "pre-activation job"))) {
@@ -322,25 +330,25 @@ func (s *onSectionCleanupState) leaveSubsections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) leaveObjectSections(info onSectionLine) {
-	if s.inSkipIfMatch && isLeavingTopLevelObject(info, "skip-if-match:", "# skip-if-match:") {
+	if s.inSkipIfMatch && isLeavingTopLevelObject(info, "skip-if-match:", "# skip-if-match:", 2) {
 		s.inSkipIfMatch = false
 	}
-	if s.inSkipIfNoMatch && isLeavingTopLevelObject(info, "skip-if-no-match:", "# skip-if-no-match:") {
+	if s.inSkipIfNoMatch && isLeavingTopLevelObject(info, "skip-if-no-match:", "# skip-if-no-match:", 2) {
 		s.inSkipIfNoMatch = false
 	}
-	if s.inSkipIfCheckFailing && isLeavingTopLevelObject(info, "skip-if-check-failing:", "# skip-if-check-failing:") {
+	if s.inSkipIfCheckFailing && isLeavingTopLevelObject(info, "skip-if-check-failing:", "# skip-if-check-failing:", 2) {
 		s.inSkipIfCheckFailing = false
 	}
-	if s.inSkipAuthorAssociations && isLeavingTopLevelObject(info, "skip-author-associations:", "# skip-author-associations:") {
+	if s.inSkipAuthorAssociations && isLeavingTopLevelObject(info, "skip-author-associations:", "# skip-author-associations:", s.skipAuthorAssociationsIndent) {
 		s.inSkipAuthorAssociations = false
 	}
-	if s.inGitHubApp && isLeavingTopLevelObject(info, "github-app:", "# github-app:") {
+	if s.inGitHubApp && isLeavingTopLevelObject(info, "github-app:", "# github-app:", 2) {
 		s.inGitHubApp = false
 	}
 }
 
 func (s *onSectionCleanupState) leaveArraySections(info onSectionLine) {
-	if s.inForksArray && s.inPullRequest && isLeavingArray(info, "forks:", 4) {
+	if s.inForksArray && isLeavingArray(info, "forks:", s.forksIndent) {
 		s.inForksArray = false
 	}
 	if s.inSkipRolesArray && isLeavingArray(info, "skip-roles:", 2) {
@@ -364,19 +372,19 @@ func (s *onSectionCleanupState) leaveArraySections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) leaveStepsAndPermissions(info onSectionLine) {
-	if s.inOnSteps && isLeavingArray(info, "steps:", 2) {
+	if s.inOnSteps && isLeavingArray(info, "steps:", s.onStepsIndent) {
 		s.inOnSteps = false
 	}
-	if s.inOnPermissions && isLeavingTopLevelObject(info, "permissions:", "# permissions:") {
+	if s.inOnPermissions && isLeavingTopLevelObject(info, "permissions:", "# permissions:", s.onPermissionsIndent) {
 		s.inOnPermissions = false
 	}
 }
 
-func isLeavingTopLevelObject(info onSectionLine, key, commentedKey string) bool {
+func isLeavingTopLevelObject(info onSectionLine, key, commentedKey string, indent int) bool {
 	return info.trimmed != "" &&
 		!strings.HasPrefix(info.trimmed, key) &&
 		!strings.HasPrefix(info.trimmed, commentedKey) &&
-		info.indent == 2 &&
+		info.indent == indent &&
 		!strings.HasPrefix(info.trimmed, "#")
 }
 
@@ -555,9 +563,9 @@ func (s *onSectionCleanupState) commentPullRequestAndTriggerField(info onSection
 		return true, " # Draft filtering applied via job conditions"
 	case (s.inPullRequest || s.inPullRequestReview) && strings.HasPrefix(info.trimmed, "max-stack:"):
 		return true, " # Stack filtering applied via job conditions"
-	case s.inPullRequest && strings.HasPrefix(info.trimmed, "forks:"):
+	case (s.inPullRequest || s.inPullRequestTarget) && strings.HasPrefix(info.trimmed, "forks:"):
 		return true, " # Fork filtering applied via job conditions"
-	case s.inForksArray && (strings.HasPrefix(info.trimmed, "-") || info.indent > 4):
+	case s.inForksArray && (strings.HasPrefix(info.trimmed, "-") || info.indent > s.forksIndent):
 		return true, " # Fork filtering applied via job conditions"
 	case s.inDeploymentStatus && strings.HasPrefix(info.trimmed, "state:"):
 		return true, " # State filtering compiled into if condition"

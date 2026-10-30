@@ -44,6 +44,23 @@ function execGitCommand(args, options = {}) {
 function stripLeadingErrorCode(msg) {
   return msg.replace(ERROR_CODE_PREFIX_RE, "");
 }
+
+/**
+ * @param {string} output
+ * @returns {string}
+ */
+function getWorkflowPermissionHint(output) {
+  if (!/refusing to allow\b[^\r\n]*\bworkflow\b[^\r\n]*\.github\/workflows\/[^\r\n]*\.ya?ml\b[^\r\n]*\bwithout\b[^\r\n]*\b(?:permission|scope)\b/i.test(output)) {
+    return "";
+  }
+  return (
+    "\nGitHub refused to update workflow YAML because the push credentials lack workflow-write permission. " +
+    "If these changes are generated workflow locks, set `exclude-lock-yml: true` on the relevant `safe-outputs` entry " +
+    "(for example, `safe-outputs.create-pull-request` or `safe-outputs.push-to-pull-request-branch`) and recompile the workflow. " +
+    "Other workflow YAML changes still require credentials permitted to update workflows. " +
+    "Regenerate and commit excluded locks with authorized credentials before merging."
+  );
+}
 const OID_PATTERN = /^[0-9a-f]{40}$/i;
 
 /**
@@ -314,7 +331,7 @@ async function pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl
       const detail = redactBuiltInPatterns(redactSecrets(output, secrets).content)
         .content.replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
         .replace(/(authorization:\s*(?:bearer|basic)\s+)\S+/gi, "$1[REDACTED]");
-      throw new Error(`${ERR_SYSTEM}: git push failed (exit code ${result.exitCode}): ${detail}`);
+      throw new Error(`${ERR_SYSTEM}: git push failed (exit code ${result.exitCode}): ${detail}${getWorkflowPermissionHint(detail)}`);
     }
     return resolveLocalHeadSha(cwd);
   };
@@ -925,7 +942,8 @@ async function pushSignedCommits({
       throw new Error(`${ERR_VALIDATION}: pushSignedCommits: refusing unsigned push for branch '${branch}': ${stripLeadingErrorCode(getErrorMessage(err))}`, { cause: err });
     }
     if (allowGitPushFallback === false) {
-      throw new Error(`${ERR_API}: pushSignedCommits: signed commit push failed for branch '${branch}' and git push fallback is disabled: ${getErrorMessage(err)}`, { cause: err });
+      const detail = getErrorMessage(err);
+      throw new Error(`${ERR_API}: pushSignedCommits: signed commit push failed for branch '${branch}' and git push fallback is disabled: ${detail}${getWorkflowPermissionHint(detail)}`, { cause: err });
     }
     core.warning(`pushSignedCommits: GraphQL signed push failed, falling back to git push: ${getErrorMessage(err)}`);
     const fallbackSha = await pushBranchAndResolveHead({ branch, cwd, gitAuthEnv, pushRemoteUrl, pushToken, assertTransportUnchanged, requireExistingBranch });

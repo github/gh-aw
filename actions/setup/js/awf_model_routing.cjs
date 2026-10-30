@@ -15,6 +15,49 @@ const AWF_MODEL_ROUTING_POLICIES = Object.freeze({
   pi: Object.freeze({ endpoints: ROUTING_ENDPOINTS, allowEndpointOverride: true }),
 });
 const EMPTY_MODEL_ROUTING_POLICY = Object.freeze({ endpoints: Object.freeze([]), allowEndpointOverride: false });
+// Engines that can route on their own provider's API (AWF apiProxy.routing.provider).
+// AWF native routing never crosses providers; Copilot and pi route only on GitHub Copilot.
+const AWF_NATIVE_ROUTING_PROVIDERS = Object.freeze({ claude: "anthropic", codex: "openai" });
+// AWF reports native model endpoints as protocol names ("messages", "responses",
+// "chat_completions") or as paths; map both to the routing endpoint paths.
+const ROUTING_PROTOCOL_ENDPOINTS = Object.freeze({
+  messages: "/v1/messages",
+  responses: "/responses",
+  chat_completions: "/chat/completions",
+  "chat-completions": "/chat/completions",
+});
+
+/**
+ * Resolve the routing provider ("github", "anthropic" or "openai") for an engine and
+ * its resolved LLM provider (GH_AW_LLM_PROVIDER). Returns "" when the engine cannot
+ * route on that provider.
+ * @param {string} engine
+ * @param {string|undefined} llmProvider
+ * @returns {string}
+ */
+function resolveAWFRoutingProvider(engine, llmProvider) {
+  const engineName = String(engine || "").toLowerCase();
+  const nativeProvider = AWF_NATIVE_ROUTING_PROVIDERS[engineName] || "";
+  const provider = normalizeReflectProviderName(llmProvider, nativeProvider || "github");
+  if (REFLECT_PROVIDER_ALIASES.github.has(provider)) return "github";
+  return nativeProvider && provider === nativeProvider ? nativeProvider : "";
+}
+
+/**
+ * Map a model's advertised endpoints (protocol names or paths) to routing endpoint paths.
+ * @param {unknown[]} supportedEndpoints
+ * @returns {string[]}
+ */
+function routingEndpointPaths(supportedEndpoints) {
+  const paths = [];
+  for (const value of supportedEndpoints) {
+    if (typeof value !== "string") continue;
+    const endpoint = value.trim().toLowerCase();
+    const mapped = ROUTING_PROTOCOL_ENDPOINTS[endpoint] || (/\/messages$/.test(endpoint) ? "/v1/messages" : /\/responses$/.test(endpoint) ? "/responses" : /\/chat\/completions$/.test(endpoint) ? "/chat/completions" : "");
+    if (mapped && !paths.includes(mapped)) paths.push(mapped);
+  }
+  return paths;
+}
 
 /**
  * @param {string} engine
@@ -45,8 +88,8 @@ function mapAWFRoutingEffort(engine, effort) {
   if (engine === "copilot") return { effort, error: null };
   const supported = {
     claude: new Set(["low", "medium", "high", "xhigh", "max"]),
-    // Reviewed for the pinned Codex 0.164.0 (DefaultCodexVersion): its ReasoningEffort accepts every
-    // routing-contract value unchanged (openai/codex rust-v0.164.0 codex-rs/protocol/src/openai_models.rs).
+    // Reviewed for the pinned Codex 0.165.0 (DefaultCodexVersion): its ReasoningEffort accepts every
+    // routing-contract value unchanged (openai/codex rust-v0.165.0 codex-rs/protocol/src/openai_models.rs).
     // Per-model eligibility is AWF's candidate catalogue, not this client-capability list.
     // Re-review on every Codex pin bump (see awf_model_routing.test.cjs).
     codex: new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]),
@@ -69,13 +112,18 @@ function getAWFModelRoutingFailureCode(error) {
 
 /**
  * Resolve the task-level AWF model selection when routing is enabled.
+ * expectedProvider is the engine's routing provider: "github" (GitHub Copilot, the
+ * default) or a native provider ("anthropic" for Claude, "openai" for Codex). A native
+ * selection must come from that provider and be backed by its configured /reflect
+ * endpoint; it never falls back to another provider that lists the same model.
  * @param {any} reflectData
  * @param {boolean} routingRequired
  * @param {string[]|null} [allowedEndpoints]
  * @param {boolean} [allowEndpointOverride]
+ * @param {string} [expectedProvider]
  * @returns {{selection: {provider: string, model: string, wire_model: string, effort: string|null, endpoint: string, selected_endpoint: string}|null, error: string|null}}
  */
-function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, allowedEndpoints = null, allowEndpointOverride = false) {
+function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, allowedEndpoints = null, allowEndpointOverride = false, expectedProvider = "github") {
   const routing = reflectData && typeof reflectData === "object" ? reflectData.routing : null;
   if (routing == null) {
     return routingRequired ? { selection: null, error: "AWF /reflect did not return the required model-routing selection" } : { selection: null, error: null };
@@ -92,6 +140,10 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   const wireModel = typeof selection.wire_model === "string" ? selection.wire_model.trim() : "";
   const endpoint = typeof selection.endpoint === "string" ? selection.endpoint.trim() : "";
   const selectedEndpoint = typeof selection.selected_endpoint === "string" ? selection.selected_endpoint.trim() : endpoint;
+  const routingProvider = normalizeReflectProviderName(expectedProvider, "github");
+  if (routingProvider !== "github") {
+    return resolveNativeAWFModelRoutingSelection(reflectData, selection, routingProvider, allowedEndpoints, allowEndpointOverride);
+  }
   if (!["copilot", "github-copilot", "github"].includes(provider) || !wireModel || !endpoint) {
     return { selection: null, error: "AWF /reflect returned an incomplete or unsupported Copilot routing selection" };
   }
@@ -134,6 +186,86 @@ function resolveAWFModelRoutingSelection(reflectData, routingRequired = false, a
   const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
   if (effort && !isRoutingReasoningEffort(effort)) {
     return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
+  }
+  return {
+    selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint: effectiveEndpoint, selected_endpoint: endpoint },
+    error: null,
+  };
+}
+
+/**
+ * Validate a native (Anthropic or OpenAI) AWF routing selection against the
+ * provider-scoped /reflect endpoint: the selected provider must equal the engine's
+ * provider, that provider must have exactly one configured endpoint listing the wire
+ * model with complete routing metadata, the endpoint must be one the model advertises
+ * (or an engine endpoint it advertises, when overrides are allowed), and a selected
+ * effort must be one the model advertises.
+ * @param {any} reflectData
+ * @param {any} selection
+ * @param {string} expectedProvider
+ * @param {string[]|null} allowedEndpoints
+ * @param {boolean} allowEndpointOverride
+ * @returns {{selection: {provider: string, model: string, wire_model: string, effort: string|null, endpoint: string, selected_endpoint: string}|null, error: string|null}}
+ */
+function resolveNativeAWFModelRoutingSelection(reflectData, selection, expectedProvider, allowedEndpoints, allowEndpointOverride) {
+  const providerAliases = REFLECT_PROVIDER_ALIASES[expectedProvider];
+  if (!providerAliases || expectedProvider === "github") {
+    return { selection: null, error: `AWF model routing provider ${expectedProvider} is not supported by this engine` };
+  }
+  const provider = normalizeReflectProviderName(selection.provider);
+  const wireModel = typeof selection.wire_model === "string" ? selection.wire_model.trim() : "";
+  const endpoint = typeof selection.endpoint === "string" ? selection.endpoint.trim() : "";
+  if (!wireModel || !endpoint) {
+    return { selection: null, error: `AWF /reflect returned an incomplete native ${expectedProvider} routing selection` };
+  }
+  if (!providerAliases.has(provider)) {
+    return { selection: null, error: `AWF /reflect selected provider ${provider || "(none)"}, but this engine routes on the native ${expectedProvider} provider; native routing does not cross providers` };
+  }
+  const endpoints = Array.isArray(reflectData?.endpoints) ? reflectData.endpoints : [];
+  const providerEndpoints = endpoints.filter(candidate => candidate?.configured === true && providerAliases.has(normalizeReflectProviderName(candidate.provider)));
+  if (providerEndpoints.length === 0) {
+    return { selection: null, error: `AWF /reflect has no configured ${expectedProvider} endpoint for native model routing; refusing to fall back to another provider` };
+  }
+  if (!isModelAvailableInReflectData(wireModel, reflectData, providerAliases)) {
+    return { selection: null, error: `AWF /reflect selected unavailable ${expectedProvider} wire model ${wireModel}` };
+  }
+  const normalizedModel = wireModel.toLowerCase();
+  const routingModels = providerEndpoints.flatMap(candidate =>
+    Array.isArray(candidate.routing_models) ? candidate.routing_models.filter(model => typeof model?.model_id === "string" && model.model_id.toLowerCase() === normalizedModel) : []
+  );
+  if (routingModels.length > 1) {
+    return { selection: null, error: `AWF /reflect has ambiguous routing metadata for model ${wireModel}; ${routingModels.length} configured ${expectedProvider} entries list this model` };
+  }
+  const routingModel = routingModels[0];
+  const supportedEndpoints = routingModel?.supported_endpoints;
+  if (routingModel?.candidate_metadata_complete !== true || !Array.isArray(supportedEndpoints)) {
+    return { selection: null, error: `AWF /reflect cannot verify endpoints for ${expectedProvider} model ${wireModel}; candidate metadata is incomplete` };
+  }
+  const supportedPaths = routingEndpointPaths(supportedEndpoints);
+  let effectiveEndpoint = endpoint;
+  if (allowedEndpoints && !allowedEndpoints.includes(endpoint)) {
+    if (!allowEndpointOverride || !ROUTING_ENDPOINTS.includes(endpoint)) {
+      return { selection: null, error: `AWF /reflect selected endpoint ${endpoint}, which is not supported by this engine` };
+    }
+    effectiveEndpoint = allowedEndpoints.find(candidate => supportedPaths.includes(candidate)) || "";
+    if (!effectiveEndpoint) {
+      return {
+        selection: null,
+        error: `AWF model ${wireModel} advertises endpoints [${supportedPaths.join(", ")}], none compatible with this engine API [${allowedEndpoints.join(", ")}]`,
+      };
+    }
+  } else if (!supportedPaths.includes(endpoint)) {
+    return { selection: null, error: `AWF model ${wireModel} does not advertise endpoint ${endpoint}` };
+  }
+  const effort = typeof selection.effort === "string" && selection.effort.trim() ? selection.effort.trim().toLowerCase() : null;
+  if (effort) {
+    if (!isRoutingReasoningEffort(effort)) {
+      return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort}` };
+    }
+    const efforts = routingModel.supported_reasoning_efforts;
+    if (!Array.isArray(efforts) || !efforts.includes(effort)) {
+      return { selection: null, error: `AWF /reflect returned unsupported reasoning effort ${effort} for ${expectedProvider} model ${wireModel}` };
+    }
   }
   return {
     selection: { provider, model: String(selection.model || ""), wire_model: wireModel, effort, endpoint: effectiveEndpoint, selected_endpoint: endpoint },
@@ -229,7 +361,10 @@ module.exports = {
   ROUTING_REASONING_EFFORTS,
   ROUTING_ENDPOINTS,
   AWF_MODEL_ROUTING_POLICIES,
+  AWF_NATIVE_ROUTING_PROVIDERS,
   getAWFModelRoutingPolicy,
+  resolveAWFRoutingProvider,
+  routingEndpointPaths,
   isRoutingReasoningEffort,
   mapAWFRoutingEffort,
   getAWFModelRoutingFailureCode,

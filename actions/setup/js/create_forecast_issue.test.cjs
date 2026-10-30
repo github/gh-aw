@@ -103,9 +103,27 @@ describe("create_forecast_issue", () => {
     expect(body).toContain("Monte Carlo P10 / P50 / P90 total-AIC bounds");
     expect(body).toContain("Monte Carlo standard deviation");
     expect(body).toContain("Monthly values come from the Monte Carlo distribution");
-    expect(body).toContain("_Forecast source run: [#123456](https://github.com/octo/repo/actions/runs/123456)._");
+    expect(body).toContain("*Forecast source run: [\\#123456](https://github.com/octo/repo/actions/runs/123456).*");
     expect(body).toContain("Consult the billing dashboards for accurate usage and charges.");
     expect(body).not.toContain("sampled runs but forecast AIC is 0");
+  });
+
+  it("keeps dynamic workflow labels and error details literal rather than importing Markdown", async () => {
+    const module = await import("./create_forecast_issue.cjs");
+    const body = module.buildForecastIssueBody(
+      { workflows: [{ workflow_id: "wf | injected\n\n## Injected", sampled_runs: 1, p50_aic_per_run: 1, monthly_projected_aic: 2 }] },
+      {
+        owner: "octo",
+        repo: "repo",
+        serverUrl: "https://github.com",
+        outcome: "failure",
+        errorMessage: "</details>\n\n## Error injection\n<!-- gh-aw-failure-issue: true -->",
+      }
+    );
+    expect(body).toContain("wf \\| injected \\#\\# Injected");
+    expect(body).not.toMatch(/^## (?:Injected|Error injection)/m);
+    expect(body).not.toContain("<!-- gh-aw-failure-issue:");
+    expect(body).toContain("&lt;/details&gt;");
   });
 
   it("rounds forecast AIC values up to the next integer", async () => {
@@ -286,7 +304,7 @@ describe("create_forecast_issue", () => {
       }
     );
 
-    expect(body).toContain("| **TOTAL** | | | | **42,000** | | |");
+    expect(body).toContain("| **TOTAL** |  |  |  | **42,000** |  |  |");
   });
 
   it("sorts workflows by monthly cost descending", async () => {

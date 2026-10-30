@@ -371,7 +371,7 @@ describe("report HTML import boundary", () => {
     const example = `<img src="${url}">`;
     const source = `<sub>\ntext</sub>\n\`${example}\``;
     const body = renderReport(parse(sanitizeContent(source))).body;
-    expect(body).toContain("&#32;<sub>");
+    expect(body).toContain("<sub> text</sub>");
     const walker = new Parser().parse(body).walker();
     let event;
     const code = [];

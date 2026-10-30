@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/rhysd/actionlint"
 )
 
@@ -12,13 +13,12 @@ import (
 // expression and its syntax tree without performing semantic validation.
 func ParseActionsExpression(expression string) (string, actionlint.ExprNode, error) {
 	text := strings.TrimSpace(expression)
-	if body, wrapped := strings.CutPrefix(text, "${{"); wrapped {
-		var closed bool
-		text, closed = strings.CutSuffix(body, "}}")
-		if !closed {
+	if strings.HasPrefix(text, "${{") {
+		spans, err := actionslanguageservice.ExtractExpressions(text)
+		if err != nil || len(spans) != 1 || spans[0].Start != 0 || spans[0].End != len(text) {
 			return "", nil, errors.New("expected one valid GitHub Actions expression")
 		}
-		text = strings.TrimSpace(text)
+		text = strings.TrimSpace(spans[0].Content)
 	}
 	input := text + " }}"
 	lexer := actionlint.NewExprLexer(input)

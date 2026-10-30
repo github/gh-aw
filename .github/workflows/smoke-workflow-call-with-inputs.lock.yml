@@ -581,6 +581,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-smoke-workflow-call-with-inputs"
       queue: max
@@ -1417,6 +1418,7 @@ jobs:
     # Permissions for the conclusion job (workflow permissions default to none).
     permissions:
       actions: read
+      checks: read
       issues: write
       pull-requests: read
     concurrency:

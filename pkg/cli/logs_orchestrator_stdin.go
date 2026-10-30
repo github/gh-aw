@@ -71,6 +71,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 
 	if len(opts.RunURLs) == 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
+		if opts.Harbor {
+			if err := logsExportHarborJob(ctx, opts.OutputDir, nil); err != nil {
+				return fmt.Errorf("harbor export: %w", err)
+			}
+		}
 		return nil
 	}
 	// Parse owner/repo (and optional GHES host) from --repo override if provided.
@@ -192,6 +197,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			}
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No valid runs could be loaded from stdin"))
+		if opts.Harbor {
+			if err := logsExportHarborJob(ctx, opts.OutputDir, nil); err != nil {
+				return fmt.Errorf("harbor export: %w", err)
+			}
+		}
 		return nil
 	}
 
@@ -220,7 +230,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	for _, result := range downloadResults {
 		collectionStats.recordResult(result)
 		if result.CachedRun != nil {
-			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun, result.cachedAudit, opts.OutputDir))
+			processedRun := processedRunFromCachedData(*result.CachedRun, result.cachedAudit, opts.OutputDir)
+			if err := exportLogsATIF(ctx, processedRun.Run, opts.OutputDir, storageLimit, false); err != nil {
+				return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
+			}
+			processedRuns = append(processedRuns, processedRun)
 			continue
 		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
@@ -247,7 +261,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		}
 
 		processedRun := buildProcessedRun(ctx, result, opts.Verbose, false)
-
 		if opts.Parse {
 			awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 			detectedEngine := extractEngineFromAwInfo(awInfoPath, opts.Verbose)
@@ -269,6 +282,10 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			}
 		}
 
+		if err := exportLogsATIF(ctx, processedRun.Run, opts.OutputDir, storageLimit, result.storageReserved); err != nil {
+			finalizeLogsRunDownload(storageLimit, result)
+			return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
+		}
 		processedRuns = append(processedRuns, processedRun)
 		if err := cachedJSONLWriter.Append(processedRun); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))
@@ -279,6 +296,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		renderLogsCollectionStats(collectionStats)
 	}
 	logsOrchestratorLog.Printf("Processed %d run(s) into output (storageLimitReached=%t)", len(processedRuns), storageLimitReached)
+	if opts.Harbor {
+		if err := logsExportHarborJob(ctx, opts.OutputDir, processedRuns); err != nil {
+			return fmt.Errorf("harbor export: %w", err)
+		}
+	}
 
 	if len(processedRuns) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)

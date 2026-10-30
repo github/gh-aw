@@ -57,6 +57,7 @@ const CONTROL_ERROR_CODES = new Set([
   "queue_control_github_not_found",
   "queue_control_github_rate_limited",
   "queue_control_github_api_unavailable",
+  "queue_control_github_transport_failed",
   "queue_control_github_request_rejected",
   "queue_control_dispatch_ref_missing",
   "queue_control_dispatch_inputs_mismatch",
@@ -116,6 +117,8 @@ function queueControlErrorExplanation(code) {
       return "GitHub rate-limited the queue request. Respect the reported reset or retry timing, then inspect the authoritative ledger and reconcile existing reservations before retrying.";
     case "queue_control_github_api_unavailable":
       return "GitHub returned a server error. A write or worker launch may already have happened; inspect the ledger and reconcile the original reservation before retrying.";
+    case "queue_control_github_transport_failed":
+      return "The GitHub client failed before receiving an HTTP response; its synthetic status is not a GitHub server response. Inspect transport diagnostics and reconcile the authoritative ledger and original reservation before retrying; failure does not prove that no write or worker launch occurred.";
     case "queue_control_dispatch_ref_missing":
       return "GitHub could not find the worker snapshot ref. Verify that the approved immutable snapshot tag exists in the destination repository before trusted reconciliation.";
     case "queue_control_dispatch_inputs_mismatch":
@@ -212,6 +215,7 @@ function githubFailureMetadata(error) {
   const method = ownValue(request, "method");
   if (["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD"].includes(method)) fields[`http_method_${method.toLowerCase()}`] = true;
   if (request !== undefined) fields.request_present = true;
+  if (request !== undefined && response === undefined && ownValue(error, "status") === 500) fields.transport_response_missing = true;
   if (response !== undefined) fields.response_present = true;
   if (headers !== undefined) {
     fields.response_headers_present = true;
@@ -258,6 +262,7 @@ function queueControlErrorCode(error, metadata) {
   if (status === 403) return "queue_control_github_access_denied";
   if (status === 404) return "queue_control_github_not_found";
   if (status === 429) return "queue_control_github_rate_limited";
+  if (status === 500 && metadata.transport_response_missing) return "queue_control_github_transport_failed";
   if (Number.isInteger(status) && status >= 500 && status <= 599) return "queue_control_github_api_unavailable";
   if (status === 422) {
     const message = ownValue(ownValue(response, "data"), "message");

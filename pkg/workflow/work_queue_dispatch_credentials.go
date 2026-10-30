@@ -61,7 +61,7 @@ func (c *Compiler) buildWorkQueueDispatchAppTokenSteps(data *WorkflowData, app *
 			condition.WriteString("false")
 			break
 		}
-		expression := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(*value, "${{"), "}}"))
+		expression := stripExpressionWrapper(*value)
 		condition.WriteString(" && format('{0}', (")
 		condition.WriteString(expression)
 		condition.WriteString(")) != 'true'")

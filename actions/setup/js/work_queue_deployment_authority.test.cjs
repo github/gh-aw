@@ -86,7 +86,7 @@ describe("verified default worker deployment authority", () => {
     expect(worker.revisions[BRANCH_REF]).toBeUndefined();
     expect(f.state.deployments.get("default").get("other")).toEqual(before.deployments.get("default").get("other"));
     expect(f.state.clocks).toEqual(before.clocks);
-    expect(f.githubClient.rest.git.getRef).toHaveBeenCalledWith({ owner: "owner", repo: "repo", ref: "heads/release/main", request: { retries: 0, retryCount: 0, timeout: 15000 } });
+    expect(f.githubClient.rest.git.getRef).toHaveBeenCalledWith({ owner: "owner", repo: "repo", ref: "heads/release/main", request: { retries: 0, retryCount: 0, signal: expect.any(AbortSignal) } });
     expect(f.githubClient.rest.repos.getContent.mock.calls.every(([call]) => call.path.startsWith(".github/workflows/worker.") && call.ref !== BRANCH_REF)).toBe(true);
     const transactions = canonical(f.transactions);
     await synchronizeDeployments(options, trusted);
@@ -160,7 +160,7 @@ describe("verified default worker deployment authority", () => {
     read.mockRejectedValueOnce(failure);
     await synchronizeDeployments(options, trusted);
     expect(read).toHaveBeenCalledTimes(2);
-    expect(read.mock.calls.every(([parameters]) => parameters.request.retries === 0 && parameters.request.retryCount === 0 && parameters.request.timeout === 15000)).toBe(true);
+    expect(read.mock.calls.every(([parameters]) => parameters.request.retries === 0 && parameters.request.retryCount === 0 && parameters.request.signal instanceof AbortSignal)).toBe(true);
     expect(options.sleepFn).toHaveBeenCalledExactlyOnceWith(1000);
     expect(f.state.deployments.get("default").get("default").current_ref).toBe(DEFAULT_REF);
     expect(f.state.claims.size).toBe(0);
@@ -215,17 +215,15 @@ describe("verified default worker deployment authority", () => {
       else {
         const read = f.githubClient.rest.repos.getContent;
         f.githubClient.rest.repos.getContent = vi.fn(async args => {
-          if (args.path.endsWith(endpoint === "source" ? ".md" : ".lock.yml")) throw failure;
+          if (args.path.endsWith(endpoint === "source" ? ".md" : ".lock.yml")) return reject();
           return read(args);
         });
       }
       const before = canonical(f.transactions);
       await expect(synchronizeDeployments(options, trusted)).rejects.toBe(failure);
       expect(canonical(f.transactions)).toBe(before);
-      if (endpoint === "repository" || endpoint === "reference") {
-        expect(reject).toHaveBeenCalledTimes(status === 500 ? 3 : 1);
-        expect(options.sleepFn).toHaveBeenCalledTimes(status === 500 ? 2 : 0);
-      }
+      expect(reject).toHaveBeenCalledTimes(status === 500 ? 3 : 1);
+      expect(options.sleepFn).toHaveBeenCalledTimes(status === 500 ? 2 : 0);
     }
   });
 

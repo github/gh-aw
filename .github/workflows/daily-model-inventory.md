@@ -378,14 +378,16 @@ tools:
     toolsets: [default]
 
 safe-outputs:
-  create-issue:
+  create-pull-request:
+    exclude-lock-yml: true
     expires: 7d
     title-prefix: "[model-inventory] "
     labels: [automation, models]
     max: 1
-    close-older-issues: true
+    close-older-pull-requests: true
 
 imports:
+  - shared/lock-safe-pull-request.md
   - shared/otlp.md
 features:
   gh-aw-detection: true
@@ -734,20 +736,19 @@ Focus on aliases that provide genuine value to workflow authors. Prioritize:
 - Adding new semantic task-oriented aliases
 - Updating patterns that are stale
 
-### Step 6: Create Issue
+### Step 6: Implement Updates and Create a Pull Request
 
-If you found any meaningful updates to propose, create a GitHub issue using `create_issue`.
+Implement evidence-backed alias, pricing, or unresolvable model-pin corrections. Preserve historical model entries and do not guess replacement pins. Validate the changed mappings and compile any changed workflow Markdown, commit locally, then call `create_pull_request`. Report unresolved inventory or validation blockers with `report_incomplete`.
 
-**Issue title format**: `Model alias inventory update - YYYY-MM-DD`
+**Pull request title format**: `Model alias inventory update - YYYY-MM-DD`
 
-**Workflow model pins**: start the issue body with the contents of
+**Workflow model pins**: start the pull request body with the contents of
 `/tmp/gh-aw/agent/model-inventory/model-pins/model-pins-summary.md` from Step 0.5, copied
 verbatim (it begins with `### Action required` when any pin is unresolvable). Do not edit,
 reorder or summarize it. If `counts.unresolvable` in `model-pins.json` is greater than 0,
-the title must be `Model alias inventory - action required - YYYY-MM-DD`, and the issue
-must be created even if no alias or pricing updates are needed.
+the title must be `Model alias inventory - action required - YYYY-MM-DD`. Implement only replacements supported by live evidence; if none can be validated, report the blocker rather than creating an empty pull request.
 
-**Issue body structure** (use h3 `###` or lower — never h1/h2):
+**Pull request body structure** (use h3 `###` or lower — never h1/h2):
 
 ```markdown
 ### Summary
@@ -815,10 +816,7 @@ Any caveats, historical entries retained, or aliases that are already well-cover
 
 If no updates are needed (all live models are already covered by existing aliases, all
 `models.json` pricing entries are up to date, no new task-oriented aliases are warranted, and
-`counts.unresolvable` in `model-pins.json` is 0), create an issue with
-title `Model alias inventory - no changes needed - YYYY-MM-DD`, starting with the verbatim
-`model-pins-summary.md` contents and then a brief summary confirming coverage is up to date.
-Never use the "no changes needed" title when any workflow model pin is unresolvable.
+`counts.unresolvable` in `model-pins.json` is 0), call `noop` with a brief summary confirming coverage is up to date. Do not create a report-only pull request. Never report no changes needed when any workflow model pin is unresolvable.
 
 
 ### Output Format

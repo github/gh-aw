@@ -29,19 +29,23 @@ the unified session from the agent artifact using the same parsers as audit.
 Reconstructed sessions include only evidence present in the downloaded artifacts.
 
 Writes JSONL to standard output by default. Use --format markdown for a
-privacy-preserving summary, or --output to write the text to a file.
+privacy-preserving summary, --atif for ATIF-v1.8 JSON, or --output to write
+the selected format to a file. --atif retains private source evidence and
+cannot be combined with --format markdown.
 Known historical Pi observations are normalized when trusted run metadata identifies
 the Pi engine. Unknown extensions and other-engine sessions remain unchanged.
 Node.js is required for reconstruction, Pi normalization, and Markdown rendering.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` sessions download 1234567890
   ` + string(constants.CLIExtensionPrefix) + ` sessions download 1234567890 --repo owner/repo --format markdown
-  ` + string(constants.CLIExtensionPrefix) + ` sessions download https://github.com/owner/repo/actions/runs/1234567890 -o session.jsonl`,
+  ` + string(constants.CLIExtensionPrefix) + ` sessions download https://github.com/owner/repo/actions/runs/1234567890 -o session.jsonl
+  ` + string(constants.CLIExtensionPrefix) + ` sessions download 1234567890 --atif -o session.atif`,
 		Args: cobra.ExactArgs(1),
 		RunE: runSessionsDownloadCommand,
 	}
 	addRepoFlag(downloadCmd)
 	downloadCmd.Flags().String("format", "jsonl", "Output format: jsonl or markdown")
 	downloadCmd.Flags().StringP("output", "o", "", "Write session text to a file instead of standard output")
+	addATIFFlag(downloadCmd)
 	_ = downloadCmd.RegisterFlagCompletionFunc("format", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return []string{"jsonl", "markdown"}, cobra.ShellCompDirectiveNoFileComp
 	})
@@ -53,6 +57,10 @@ func runSessionsDownloadCommand(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 	if format != "jsonl" && format != "markdown" {
 		return fmt.Errorf("invalid session format %q: expected jsonl or markdown", format)
+	}
+	exportATIF, _ := cmd.Flags().GetBool("atif")
+	if exportATIF && format != "jsonl" {
+		return errors.New("--atif cannot be combined with --format markdown")
 	}
 	components, err := parser.ParseRunURLExtended(args[0]) //nolint:uncheckedsliceindex // cobra.ExactArgs(1)
 	if err != nil {
@@ -75,6 +83,12 @@ func runSessionsDownloadCommand(cmd *cobra.Command, args []string) error {
 	content, err := downloadSession(cmd.Context(), components, format, verbose)
 	if err != nil {
 		return err
+	}
+	if exportATIF {
+		content, err = convertSessionATIF(cmd.Context(), content)
+		if err != nil {
+			return err
+		}
 	}
 	output, _ := cmd.Flags().GetString("output")
 	if output != "" {

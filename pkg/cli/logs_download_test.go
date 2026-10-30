@@ -499,14 +499,19 @@ printf '%s' 'complete' > "$dir/complete.txt"
 
 func TestDownloadRunArtifacts_UsageFallbackPrefersCompactInfo(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		infoName string
-		cached   bool
+		name      string
+		infoName  string
+		cached    bool
+		harbor    bool
+		usageInfo bool
 	}{
 		{name: "fresh", infoName: "info"},
 		{name: "cached", infoName: "info", cached: true},
 		{name: "prefixed fresh", infoName: "abc123-info"},
 		{name: "prefixed cached", infoName: "abc123-info", cached: true},
+		{name: "harbor compact info", infoName: "info", harbor: true},
+		{name: "harbor prefixed compact info", infoName: "abc123-info", harbor: true},
+		{name: "harbor usage metadata", infoName: "info", harbor: true, usageInfo: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			outputDir := t.TempDir()
@@ -517,6 +522,10 @@ func TestDownloadRunArtifacts_UsageFallbackPrefersCompactInfo(t *testing.T) {
 			}
 			fakeBinDir := t.TempDir()
 			argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+			usageInfo := ""
+			if tt.usageInfo {
+				usageInfo = `printf '%s' '{"engine_id":"claude","dry_run":true}' > "$dir/aw_info.json"`
+			}
 			fakeGHScript := `#!/bin/sh
 printf '%s\n' "$*" >> "` + argsLogPath + `"
 if [ "$1" = "api" ]; then
@@ -537,9 +546,10 @@ case "$name" in
   usage)
     printf '%s\n' '{}' > "$dir/aw_session.jsonl"
     printf '%s\n' '{}' > "$dir/token_usage.jsonl"
+    ` + usageInfo + `
     ;;
   "` + tt.infoName + `")
-    printf '%s' '{"engine_id":"claude"}' > "$dir/aw_info.json"
+    printf '%s' '{"engine_id":"claude","dry_run":true}' > "$dir/aw_info.json"
     ;;
   *) exit 1 ;;
 esac
@@ -548,17 +558,30 @@ esac
 			t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 			err := downloadRunArtifacts(context.Background(), downloadArtifactsOptions{
-				runID: 12345, outputDir: outputDir, owner: "github", repo: "gh-aw", artifactFilter: []string{"usage"},
+				runID: 12345, outputDir: outputDir, owner: "github", repo: "gh-aw",
+				artifactFilter: ResolveArtifactFilter(logsHarborArtifactSets([]string{"usage"}, tt.harbor)),
 			})
 			require.NoError(t, err)
 			awInfo, err := os.ReadFile(filepath.Join(outputDir, "aw_info.json"))
 			require.NoError(t, err)
-			assert.JSONEq(t, `{"engine_id":"claude"}`, string(awInfo))
+			assert.JSONEq(t, `{"engine_id":"claude","dry_run":true}`, string(awInfo))
+			result := DownloadResult{LogsPath: outputDir}
+			assert.False(t, applyRunFilters(t.Context(), result, runFilterOpts{engine: "claude", dryRun: true}, false))
+			assert.True(t, applyRunFilters(t.Context(), result, runFilterOpts{engine: "copilot"}, false))
+			assert.True(t, applyRunFilters(t.Context(), result, runFilterOpts{noDryRun: true}, false))
 			argsLog, err := os.ReadFile(argsLogPath)
 			require.NoError(t, err)
-			assert.Contains(t, string(argsLog), "--name "+tt.infoName)
+			if tt.usageInfo {
+				assert.NotContains(t, string(argsLog), "--name "+tt.infoName)
+			} else {
+				assert.Contains(t, string(argsLog), "--name "+tt.infoName)
+			}
 			assert.NotContains(t, string(argsLog), "--name activation")
-			assert.NotContains(t, string(argsLog), "/12345/logs")
+			if tt.harbor {
+				assert.Contains(t, string(argsLog), "/12345/logs")
+			} else {
+				assert.NotContains(t, string(argsLog), "/12345/logs")
+			}
 			assert.NoDirExists(t, filepath.Join(outputDir, tt.infoName))
 		})
 	}

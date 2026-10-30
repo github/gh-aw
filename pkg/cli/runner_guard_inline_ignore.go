@@ -3,11 +3,13 @@ package cli
 import "strings"
 
 var generatedSafeOutputJobIDs = map[string]struct{}{
-	"activation":       {},
-	"conclusion":       {},
-	"push_evals_state": {},
-	"safe_outputs":     {},
-	"unlock":           {},
+	"activation":           {},
+	"admission":            {},
+	"conclusion":           {},
+	"conclusion_admission": {},
+	"push_evals_state":     {},
+	"safe_outputs":         {},
+	"unlock":               {},
 }
 
 const (
@@ -15,9 +17,11 @@ const (
 	// inline suppression comment in block-style run scripts.
 	runnerGuardIgnoreLookBehind = 3
 	// runnerGuardIgnoreLookAhead catches findings reported on nearby generated setup or step
-	// boundary lines before the suppressed command. Provider inventory steps currently have the
-	// largest observed offset at 15 lines, so 20 leaves a small buffer without scanning the file.
-	runnerGuardIgnoreLookAhead = 20
+	// boundary lines before the suppressed command. The largest observed offset is 28 lines,
+	// for an inline-ignore comment inside a helper function body defined a few lines below the
+	// step's `- name:` boundary (the line runner-guard attributes the finding to), so 35 leaves
+	// a small buffer without scanning the file.
+	runnerGuardIgnoreLookAhead = 35
 )
 
 // filterRunnerGuardIgnoredFindings drops findings that have a local inline suppression comment
@@ -48,6 +52,10 @@ func filterRunnerGuardIgnoredFindings(findings []runnerGuardFinding, gitRoot str
 
 // filterGeneratedSafeOutputPermissionFindings removes RGS-005 findings for compiler-generated
 // jobs whose write permissions are calculated from lifecycle and safe-output configuration.
+// This also covers the admission/conclusion_admission credit-gating jobs: both run a fixed,
+// compiler-shipped script that only requests id-token for the admission service and never
+// executes workflow- or trigger-controlled content, so write-level permissions on an untrusted
+// trigger do not expand the attack surface the way they would for an agent job.
 // Agent jobs are intentionally not included: their declared permissions must remain read-only.
 func filterGeneratedSafeOutputPermissionFindings(findings []runnerGuardFinding, gitRoot string) []runnerGuardFinding {
 	filtered := make([]runnerGuardFinding, 0, len(findings))

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -13,16 +12,36 @@ import (
 	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/types"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 var mcpLog = logger.New("parser:mcp")
-var simpleSecretExpressionPattern = regexp.MustCompile(`^\$\{\{\s*secrets\.[A-Z_][A-Z0-9_]*\s*\}\}$`)
 
 // IsSimpleSecretExpression reports whether value is a direct GitHub Actions
 // secrets reference without additional expression operators.
 func IsSimpleSecretExpression(value string) bool {
-	return simpleSecretExpressionPattern.MatchString(value)
+	if value != strings.TrimSpace(value) {
+		return false
+	}
+	expression, ok := actionslanguageservice.WrappedExpression(value)
+	if !ok {
+		if strings.Contains(value, "${{") {
+			mcpLog.Print("Not a valid standalone secret expression")
+		}
+		return false
+	}
+	path, ok := actionslanguageservice.Reference(expression)
+	if !ok || len(path) != 2 || path[0] != "secrets" || path[1] == "" {
+		return false
+	}
+	// Keep the credential allowlist independent of expression syntax.
+	for i, ch := range path[1] {
+		if ch != '_' && (ch < 'A' || ch > 'Z') && (i == 0 || ch < '0' || ch > '9') {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidMCPTypes defines all supported MCP server types.

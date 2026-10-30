@@ -209,7 +209,7 @@ const ENGINE_ERROR_SUMMARIES = Object.freeze({
   model_not_supported_error: "Requested model is not supported",
   http_400_response_error: "Provider returned HTTP 400 Bad Request",
   capi_quota_exceeded_error: "Provider quota or rate limit exceeded",
-  capi_server_error: "Provider server error after retries",
+  capi_server_error: "Provider server error (HTTP 5xx)",
   invocation_cap_exceeded: "Maximum LLM invocations exceeded",
   max_cache_misses_exceeded: "Maximum consecutive cache misses exceeded",
   missing_model_pricing_error: "Model has no AI credits pricing",
@@ -267,10 +267,16 @@ function agentErrorSummaryText(content, eventsOrSourceEngine = [], rawSourceEngi
   const events = Array.isArray(eventsOrSourceEngine) ? eventsOrSourceEngine : [];
   const sourceEngine = typeof eventsOrSourceEngine === "string" ? eventsOrSourceEngine : rawSourceEngine;
   const execution = collectAgentExecution({ content, events, rawSourceEngine: sourceEngine });
-  return (execution?.data.categories || [])
+  const categories = new Set(execution?.data.categories || []);
+  return [...categories]
     .filter(category => Object.hasOwn(ENGINE_ERROR_SUMMARIES, category))
     .map(category => `Engine error: ${ENGINE_ERROR_SUMMARIES[category]} (${category})`)
     .join("\n");
+}
+
+/** @param {string} text */
+function isAttributedCAPIServerError(text) {
+  return isCAPIServerError(text) || /\bCAPIError:\s*5\d{2}\b/i.test(text);
 }
 
 /**
@@ -354,7 +360,7 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
   for (const line of buildOutputLines(detectErrors(text))) {
     if (line.endsWith("=true")) categorySet.add(line.slice(0, -5));
   }
-  if (isCAPIServerError(text)) categorySet.add("capi_server_error");
+  if (isAttributedCAPIServerError(text)) categorySet.add("capi_server_error");
   if (isAuthenticationFailedError(text)) categorySet.add("authentication_failed");
   const guards = detectNonRetryableHarnessGuard(text);
   if (guards.aiCreditsExceeded) categorySet.add("max_ai_credits_exceeded");

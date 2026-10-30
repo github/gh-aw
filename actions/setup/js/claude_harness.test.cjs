@@ -496,6 +496,97 @@ describe("claude_harness.cjs", () => {
       await expect(buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, () => {})).rejects.toThrow(error);
     });
 
+    describe("native Anthropic routing", () => {
+      // Real-shaped AWF /reflect for apiProxy.routing.provider: anthropic. routing_models follow
+      // buildRoutingModelMetadata: the maintained claude-sonnet-5 family (protocol-name
+      // endpoints, low..max, 1M tokens); Haiku has no maintained routing effort metadata.
+      const sonnetMetadata = modelId => ({
+        model_id: modelId,
+        source: "maintained",
+        supported_endpoints: ["messages"],
+        supported_reasoning_efforts: ["low", "medium", "high", "max"],
+        context_window_tokens: 1000000,
+        candidate_metadata_complete: true,
+      });
+      const nativeReflect = () => ({
+        endpoints: [
+          { provider: "openai", port: 10000, base_url: "http://api-proxy:10000", configured: false, models: null, routing_models: null, models_url: "http://api-proxy:10000/v1/models" },
+          {
+            provider: "anthropic",
+            port: 10001,
+            base_url: "http://api-proxy:10001",
+            configured: true,
+            models: ["claude-haiku-4-5", "claude-sonnet-5", "claude-sonnet-5-5"],
+            routing_models: [
+              { model_id: "claude-haiku-4-5", source: "incomplete", supported_endpoints: [], supported_reasoning_efforts: null, context_window_tokens: null, candidate_metadata_complete: false },
+              sonnetMetadata("claude-sonnet-5"),
+              sonnetMetadata("claude-sonnet-5-5"),
+            ],
+            models_url: "http://api-proxy:10001/v1/models",
+          },
+        ],
+        routing: {
+          status: "selected",
+          selection: { provider: "anthropic", model: "anthropic/claude-sonnet-5-5", wire_model: "claude-sonnet-5-5", effort: "high", endpoint: "/v1/messages" },
+        },
+      });
+      const withSelection = (selection, reflect = nativeReflect()) => ({ ...reflect, routing: { ...reflect.routing, selection: { ...reflect.routing.selection, ...selection } } });
+      const withAnthropicEndpoint = (changes, reflect = nativeReflect()) => ({ ...reflect, endpoints: [reflect.endpoints[0], { ...reflect.endpoints[1], ...changes }] });
+
+      it("native Anthropic selection applies model, effort, and Messages endpoint", async () => {
+        for (const providerEnv of [{ GH_AW_LLM_PROVIDER: "anthropic", GH_AW_LLM_PROVIDER_EXPLICIT: "1" }, { GH_AW_LLM_PROVIDER: "anthropic" }, {}]) {
+          const messages = [];
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-native-routing-"));
+          try {
+            const env = { ...providerEnv, GH_AW_MODEL_ROUTING: "1", GH_AW_TMP_DIR: tmpDir, ANTHROPIC_MODEL: "fixed-model", CLAUDE_CODE_EFFORT_LEVEL: "low" };
+            const child = await buildClaudeChildEnv(nativeReflect(), env, message => messages.push(message));
+            expect(child).toMatchObject({ ANTHROPIC_MODEL: "claude-sonnet-5-5", CLAUDE_CODE_EFFORT_LEVEL: "high", ANTHROPIC_BASE_URL: "http://api-proxy:10001" });
+            expect(messages[0]).toBe("inference routing: mode=awf-routed model=claude-sonnet-5-5 effort=high endpoint=/v1/messages");
+            expect(JSON.parse(fs.readFileSync(path.join(tmpDir, "agent", "awf-routing-outcome.json"), "utf8"))).toMatchObject({
+              status: "selected",
+              wire_model: "claude-sonnet-5-5",
+              endpoint: "/v1/messages",
+              selected_endpoint: "/v1/messages",
+              effort: "high",
+              applied_effort: "high",
+            });
+          } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          }
+        }
+      });
+
+      it.each([
+        ["wrong provider", withSelection({ provider: "copilot", model: "github-copilot/claude-sonnet-5.5", wire_model: "claude-sonnet-5-5" }), "native routing does not cross providers"],
+        [
+          "absent native endpoint",
+          {
+            ...nativeReflect(),
+            endpoints: [
+              { provider: "copilot", port: 10002, base_url: "http://api-proxy:10002", configured: true, models: ["claude-sonnet-5-5"], routing_models: [{ ...sonnetMetadata("claude-sonnet-5-5"), supported_endpoints: ["/v1/messages"] }] },
+            ],
+          },
+          "no configured anthropic endpoint",
+        ],
+        ["unconfigured native endpoint", withAnthropicEndpoint({ configured: false }), "no configured anthropic endpoint"],
+        ["unavailable model", withSelection({ model: "anthropic/claude-opus-5", wire_model: "claude-opus-5" }), "unavailable anthropic wire model claude-opus-5"],
+        ["incomplete Haiku metadata", withSelection({ model: "anthropic/claude-haiku-4-5", wire_model: "claude-haiku-4-5", effort: null }), "candidate metadata is incomplete"],
+        [
+          "incompatible endpoint",
+          withSelection({ endpoint: "/chat/completions" }, withAnthropicEndpoint({ routing_models: [{ ...sonnetMetadata("claude-sonnet-5-5"), supported_endpoints: ["chat_completions"] }] })),
+          "none compatible with this engine API [/v1/messages]",
+        ],
+        ["unsupported effort", withSelection({ effort: "xhigh" }), "unsupported reasoning effort xhigh for anthropic model claude-sonnet-5-5"],
+      ])("rejects native selection: %s", async (_name, reflect, error) => {
+        await expect(buildClaudeChildEnv(reflect, { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "anthropic" }, () => {})).rejects.toThrow(error);
+      });
+
+      it("keeps Copilot routing on GitHub when the reflection also lists a native endpoint", async () => {
+        await expect(buildClaudeChildEnv(nativeReflect(), { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "github" }, () => {})).rejects.toThrow("unsupported Copilot routing selection");
+        await expect(buildClaudeChildEnv(nativeReflect(), { GH_AW_MODEL_ROUTING: "1", GH_AW_LLM_PROVIDER: "openai" }, () => {})).rejects.toThrow("not supported for Claude on provider openai");
+      });
+    });
+
     it("rejects efforts Claude Code cannot represent", async () => {
       const reflect = {
         ...routedReflect,

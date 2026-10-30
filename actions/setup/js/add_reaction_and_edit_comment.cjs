@@ -3,7 +3,8 @@
 
 const { getRunStartedMessage } = require("./messages_run_status.cjs");
 const { getErrorMessage, isLockedError, isRateLimitError } = require("./error_helpers.cjs");
-const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { ERR_API, ERR_NOT_FOUND, ERR_VALIDATION, ERR_PARSE } = require("./error_codes.cjs");
 const { buildWorkflowRunUrl, EVENT_TYPE_DESCRIPTIONS } = require("./workflow_metadata_helpers.cjs");
@@ -248,10 +249,10 @@ async function addCommentWithWorkflowLink(endpoint, runUrl, eventName, invocatio
 
     // Use getRunStartedMessage for the workflow link text (supports custom messages)
     const workflowLinkText = getRunStartedMessage({
-      workflowName,
-      runUrl,
-      eventType: eventTypeDescription,
-      emoji: process.env.GH_AW_WORKFLOW_EMOJI,
+      workflowName: "{workflow_name}",
+      runUrl: "{run_url}",
+      eventType: "{event_type}",
+      emoji: "{emoji}",
     });
 
     const lockForAgent = process.env.GH_AW_LOCK_FOR_AGENT === "true";
@@ -259,14 +260,16 @@ async function addCommentWithWorkflowLink(endpoint, runUrl, eventName, invocatio
     const trackerId = process.env.GH_AW_TRACKER_ID || "";
 
     // Build comment body from parts, sanitizing first to preserve workflow markers
-    const commentParts = [
-      sanitizeContent(workflowLinkText),
-      ...(lockForAgent && (eventName === "issues" || eventName === "issue_comment") ? ["🔒 This issue has been locked while the workflow is running to prevent concurrent modifications."] : []),
-      ...(workflowId ? [generateWorkflowIdMarker(workflowId)] : []),
-      ...(trackerId ? [`<!-- gh-aw-tracker-id: ${trackerId} -->`] : []),
-      "<!-- gh-aw-comment-type: reaction -->",
-    ];
-    const commentBody = commentParts.join("\n\n");
+    const templateContext = Object.fromEntries(Array.from(workflowLinkText.matchAll(/\{(\w+)\}/g), match => [match[1], match[0]]));
+    Object.assign(templateContext, { workflow_name: sanitizeContent(workflowName), run_url: runUrl, event_type: eventTypeDescription, emoji: process.env.GH_AW_WORKFLOW_EMOJI?.trim() || "🚀" });
+    const children = parseReportMarkdown(sanitizeContent(workflowLinkText), { context: templateContext, agentTainted: false });
+    if (lockForAgent && (eventName === "issues" || eventName === "issue_comment")) {
+      children.push({ type: "paragraph", children: [{ type: "text", value: "🔒 This issue has been locked while the workflow is running to prevent concurrent modifications.", agentTainted: false }] });
+    }
+    if (workflowId) children.push({ type: "xml_marker", name: "gh-aw-workflow-id", value: workflowId, agentTainted: false });
+    if (trackerId) children.push({ type: "xml_marker", name: "gh-aw-tracker-id", value: trackerId, agentTainted: false });
+    children.push({ type: "xml_marker", name: "gh-aw-comment-type", value: "reaction", agentTainted: false });
+    const commentBody = renderSizedReport({ type: "report", title: "Workflow status", children }).body;
 
     if (eventName === "discussion" || eventName === "discussion_comment") {
       if (typeof endpoint !== "string") {

@@ -26,11 +26,16 @@ import (
 // the assigned variant must equal variantFilter.
 // The returned bool reports whether the run was skipped (excluded by --experiment,
 // --runtime, or --evals filtering) rather than fully analyzed and reported.
-func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (bool, error) {
+func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (skipped bool, resultErr error) {
 	cfg, err := newAuditRunConfig(runID, opts)
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		if resultErr == nil && !skipped {
+			resultErr = exportRunATIF(ctx, cfg.runID, cfg.outputDir)
+		}
+	}()
 	if err := ensureAuditNotCancelled(ctx); err != nil {
 		return false, renderIncompleteAuditIfTimedOut(cfg, WorkflowRun{}, auditAnalysisResults{}, "metadata", err)
 	}
@@ -114,6 +119,14 @@ func renderIncompleteAuditIfTimedOut(cfg auditRunConfig, run WorkflowRun, result
 }
 
 func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
+	if opts.Models {
+		if opts.Group || opts.JobID > 0 {
+			return auditRunConfig{}, errors.New("--models requires a single run without --group or job selection")
+		}
+		if len(opts.ArtifactSets) > 0 {
+			opts.ArtifactSets = append(append([]string(nil), opts.ArtifactSets...), "agent", "usage", "info")
+		}
+	}
 	if opts.Search != "" {
 		if opts.SearchLimit == 0 {
 			opts.SearchLimit = defaultAuditSearchLimit
@@ -152,6 +165,7 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		noBaseline:             opts.NoBaseline,
 		search:                 opts.Search,
 		searchLimit:            opts.SearchLimit,
+		models:                 opts.Models,
 		evalsArtifactRequested: isEvalsArtifactRequested(opts.EvalsOnly, opts.ArtifactSets),
 	}, nil
 }
@@ -236,6 +250,7 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 		NoBaseline:  cfg.noBaseline,
 		Search:      cfg.search,
 		SearchLimit: cfg.searchLimit,
+		Models:      cfg.models,
 	}
 }
 
@@ -247,6 +262,9 @@ func renderCachedAuditIfAvailable(ctx context.Context, cfg auditRunConfig) (done
 	summary, ok := loadRunSummary(cfg.outputDir, cfg.verbose)
 	if !ok {
 		return false, false, nil
+	}
+	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
+		return false, false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
 	}
 	if cfg.search != "" {
 		path, err := findUnifiedSessionPath(cfg.outputDir)

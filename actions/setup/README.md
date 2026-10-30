@@ -103,6 +103,23 @@ values; the runner-mask policy does not reduce that redaction.
 
 ## Development
 
+### Synthetic message previews
+
+`js/testdata/messages_preview.md` contains locally rendered previews of shared
+comment, issue, pull-request body, and diagnostic templates. All fixture data is
+synthetic; the test does not publish anything to GitHub. Agent-only instruction
+templates are explicitly excluded.
+
+Check for rendering changes:
+
+```bash
+npm --prefix actions/setup/js run test:js -- --no-file-parallelism messages_preview.test.cjs
+```
+
+After an intentional template change, run the same command with `--update` and
+review the Markdown diff before committing it. New bundled Markdown templates
+are included automatically unless explicitly excluded as agent instructions.
+
 ### Structured issue reports
 
 All JavaScript GitHub issue creators publish through `js/issue_report.cjs`.

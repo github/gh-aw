@@ -1,0 +1,80 @@
+[
+  {
+    "name": "quoted closing braces",
+    "markdown": "Use ${{ format('a }} b {0}', env.KEY) }}.",
+    "relevant": ["${{ format('a }} b {0}', env.KEY) }}"],
+    "all": ["${{ format('a }} b {0}', env.KEY) }}"]
+  },
+  {
+    "name": "doubled single quotes",
+    "markdown": "${{ format('it''s }} and ''quoted'' {0}', vars.KEY) }}",
+    "relevant": ["${{ format('it''s }} and ''quoted'' {0}', vars.KEY) }}"],
+    "all": ["${{ format('it''s }} and ''quoted'' {0}', vars.KEY) }}"]
+  },
+  {
+    "name": "multiline expression",
+    "markdown": "Use ${{ env.KEY ||\n'fallback' }}.",
+    "relevant": ["${{ env.KEY ||\n'fallback' }}"],
+    "all": ["${{ env.KEY ||\n'fallback' }}"]
+  },
+  {
+    "name": "complete expressions before unclosed suffix",
+    "markdown": "${{ env.B }} ${{ github.actor }} ${{ env.A",
+    "relevant": ["${{ env.B }}"],
+    "all": ["${{ env.B }}", "${{ github.actor }}"]
+  },
+  {
+    "name": "complete expression before unclosed quote",
+    "markdown": "${{ env.A }} ${{ 'unclosed }} env.B",
+    "relevant": ["${{ env.A }}"],
+    "all": ["${{ env.A }}"]
+  },
+  {
+    "name": "unclosed quote before complete expressions",
+    "markdown": "${{ 'unclosed }}\n${{ env.KEY }} ${{ github.actor }}",
+    "relevant": ["${{ env.KEY }}"],
+    "all": ["${{ env.KEY }}", "${{ github.actor }}"]
+  },
+  {
+    "name": "unclosed quote between complete expressions and unclosed suffix",
+    "markdown": "${{ env.A }} ${{ 'unclosed }} ${{ vars.KEY }} ${{ env.SUFFIX",
+    "relevant": ["${{ env.A }}", "${{ vars.KEY }}"],
+    "all": ["${{ env.A }}", "${{ vars.KEY }}"]
+  },
+  {
+    "name": "opening delimiter inside complete quoted expression",
+    "markdown": "${{ format('${{ env.INNER }} {0}', vars.KEY) }}",
+    "relevant": ["${{ format('${{ env.INNER }} {0}', vars.KEY) }}"],
+    "all": ["${{ format('${{ env.INNER }} {0}', vars.KEY) }}"]
+  },
+  {
+    "name": "single closing brace",
+    "markdown": "${{ format('a } b {0}', env.KEY) }}",
+    "relevant": ["${{ format('a } b {0}', env.KEY) }}"],
+    "all": ["${{ format('a } b {0}', env.KEY) }}"]
+  },
+  {
+    "name": "legacy textual relevance filter",
+    "markdown": "${{ 'env.KEY' }} ${{ env['KEY'] }} ${{ ENV.KEY }}",
+    "relevant": ["${{ 'env.KEY' }}"],
+    "all": ["${{ 'env.KEY' }}", "${{ ENV.KEY }}", "${{ env['KEY'] }}"]
+  },
+  {
+    "name": "hashing does not validate grammar",
+    "markdown": "${{ env.KEY || }} ${{ custom(\"vars.KEY\") }}",
+    "relevant": ["${{ custom(\"vars.KEY\") }}", "${{ env.KEY || }}"],
+    "all": ["${{ custom(\"vars.KEY\") }}", "${{ env.KEY || }}"]
+  },
+  {
+    "name": "empty and duplicate expressions",
+    "markdown": "${{ }} ${{ env.B }} ${{ env.A }} ${{ env.B }}",
+    "relevant": ["${{ env.A }}", "${{ env.B }}"],
+    "all": ["${{ env.A }}", "${{ env.B }}"]
+  },
+  {
+    "name": "only unclosed expression",
+    "markdown": "Use ${{ env.KEY",
+    "relevant": [],
+    "all": []
+  }
+]

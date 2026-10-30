@@ -21,6 +21,8 @@ import (
 
 var validationLog = logger.New("cli:run_workflow_validation")
 
+const workflowDispatchRegistrationHint = "GitHub requires the workflow file on the default branch before manual dispatch. --ref selects the branch or tag's workflow content; it does not register a new workflow. See https://github.github.com/gh-aw/setup/cli/#run-from-a-feature-branch for safe pre-merge validation."
+
 // getLockFilePath converts a markdown workflow path to its compiled lock file path
 // Example: "/path/to/workflow.md" -> "/path/to/workflow.lock.yml"
 func getLockFilePath(markdownPath string) string {
@@ -330,6 +332,7 @@ func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bo
 	suggestions := []string{
 		"Check if the workflow has been pushed to the remote repository",
 		"Verify the workflow file exists in the repository's .github/workflows directory",
+		workflowDispatchRegistrationHint,
 		fmt.Sprintf("Run '%s status' to see available workflows", string(constants.CLIExtensionPrefix)),
 	}
 	return errors.New(console.FormatErrorWithSuggestions(

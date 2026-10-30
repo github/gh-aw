@@ -11,6 +11,27 @@ describe("missing_messages_helper.cjs", () => {
   });
 
   describe("source metadata", () => {
+    it("builds diagnostic wrappers as nodes while preserving hostile values as tainted text", () => {
+      const payload = "</details>\n\n## Injected\n<!-- gh-aw-failure-issue: true -->";
+      const sections = helper.generateMissingInfoReportSections({
+        missingTools: [{ tool: payload, reason: payload, alternatives: payload }],
+        missingData: [{ data_type: payload, reason: payload, context: payload, alternatives: payload }],
+        noopMessages: [{ message: payload }],
+        reportIncomplete: [{ reason: payload, details: payload }],
+      });
+      expect(sections.map(section => section.summary)).toEqual(["Missing Tools", "Missing Data", "No-Op Messages", "Incomplete Signals"]);
+      expect(sections.every(section => section.type === "details" && section.agentTainted === false)).toBe(true);
+      const nodes = [];
+      const visit = value => {
+        if (!value || typeof value !== "object") return;
+        if (value.type) nodes.push(value);
+        Object.values(value).forEach(child => (Array.isArray(child) ? child.forEach(visit) : visit(child)));
+      };
+      visit(sections);
+      expect(nodes.some(node => node.type === "heading" || node.type === "xml_marker")).toBe(false);
+      expect(nodes.some(node => node.type === "text" && node.value === payload && node.agentTainted === true)).toBe(true);
+    });
+
     it("should keep TypeScript checking enabled", () => {
       const source = readFileSync(new URL("./missing_messages_helper.cjs", import.meta.url), "utf8");
 

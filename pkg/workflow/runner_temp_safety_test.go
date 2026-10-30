@@ -76,6 +76,39 @@ func TestRewriteRunnerTempOnlyRewritesRunCommands(t *testing.T) {
 	}
 }
 
+func TestRewriteRunnerTempAdjacentShellCommands(t *testing.T) {
+	for _, separator := range []string{";", "&&", "||", "|", "&", "; ", " && "} {
+		t.Run(separator, func(t *testing.T) {
+			input := "steps:\n  - run: node ${{ runner.temp }}/gh-aw/actions/a.cjs" + separator +
+				"node ${{ runner.temp }}/gh-aw/actions/b.cjs\n"
+			want := "steps:\n  - run: node \"${RUNNER_TEMP}/gh-aw/actions/a.cjs\"" + separator +
+				"node \"${RUNNER_TEMP}/gh-aw/actions/b.cjs\"\n"
+			got, err := finalizeRunnerTempSafety(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != want {
+				t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+			}
+			if twice := rewriteRunnerTempInExecutableBodies(got); twice != got {
+				t.Fatalf("rewrite is not idempotent:\n%s", twice)
+			}
+		})
+	}
+}
+
+func TestRewriteRunnerTempPreservesShellBoundaries(t *testing.T) {
+	for _, suffix := range []string{">output", " 2>&1", ")", "\"", "'", "\\\n"} {
+		t.Run(suffix, func(t *testing.T) {
+			input := "node ${{ runner.temp }}/gh-aw/actions/a.cjs" + suffix
+			want := "node \"${RUNNER_TEMP}/gh-aw/actions/a.cjs\"" + suffix
+			if got := rewriteShellActionCommands(input); got != want {
+				t.Fatalf("got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestRewriteRunnerTempIsIdempotent(t *testing.T) {
 	input := `steps:
   - uses: actions/github-script@v7

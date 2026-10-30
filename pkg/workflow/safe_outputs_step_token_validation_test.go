@@ -116,6 +116,60 @@ safe-outputs:
 	assert.Contains(t, err.Error(), "pre-steps:")
 }
 
+func TestSameJobStepTokenPerOutputMintedInSafeOutputs(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		mintToken bool
+	}{
+		{name: "missing"},
+		{name: "minted", mintToken: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			content := `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+engine: claude
+strict: false
+safe-outputs:
+  add-comment:
+    max: 1
+    target: "*"
+    github-token: ${{ steps.output_mint.outputs.token }}
+`
+			if tt.mintToken {
+				content += `jobs:
+  safe_outputs:
+    pre-steps:
+      - name: Mint safe-output token
+        id: output_mint
+        uses: ` + stsMintStep + "\n"
+			}
+			content += "---\n\n# Job-local safe-output token\n"
+			workflowFile := writeStepTokenWorkflow(t, "per-output", content)
+			err := NewCompiler().CompileWorkflow(workflowFile)
+			if !tt.mintToken {
+				require.ErrorContains(t, err, `job "safe_outputs" has no step with id "output_mint"`)
+				return
+			}
+			require.NoError(t, err)
+			lockContent, err := os.ReadFile(filepath.Join(filepath.Dir(workflowFile), "per-output.lock.yml"))
+			require.NoError(t, err)
+			lockYAML := string(lockContent)
+			assert.NotContains(t, extractJobSection(lockYAML, "agent"), "steps.output_mint.outputs.token")
+			assert.NotContains(t, extractJobSection(lockYAML, "conclusion"), "steps.output_mint.outputs.token")
+			safeOutputs := extractJobSection(lockYAML, "safe_outputs")
+			assert.Contains(t, safeOutputs, `\"github-token\":\"${{ steps.output_mint.outputs.token }}\"`)
+			declarationIndex := jobStepIDDeclarationIndex(safeOutputs, "output_mint")
+			consumptionIndex := jobStepOutputConsumptionIndex(safeOutputs, "output_mint")
+			require.GreaterOrEqual(t, declarationIndex, 0)
+			require.GreaterOrEqual(t, consumptionIndex, 0)
+			assert.Less(t, declarationIndex, consumptionIndex)
+		})
+	}
+}
+
 func TestSameJobStepTokenMentionsOnlyMintedInAgentCompiles(t *testing.T) {
 	workflowFile := writeStepTokenWorkflow(t, "mentions-only", `---
 on:

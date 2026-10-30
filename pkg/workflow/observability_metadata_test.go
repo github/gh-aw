@@ -103,20 +103,20 @@ func TestResolveOTLPMetadataReferences(t *testing.T) {
 			},
 		},
 		{
-			name:     "rejects bracket-selected metadata in attributes",
+			name:     "resolves bracket-selected metadata in attributes",
 			metadata: map[string]any{"version": "1.0"},
 			attributes: map[string]any{
 				"catalogue.version": "${{ github.aw['metadata'].version }}",
 			},
-			wantErr: "observability.otlp.attributes.catalogue.version must be a whole-value reference",
+			want: map[string]any{"catalogue.version": "1.0"},
 		},
 		{
-			name:     "rejects bracket-selected metadata in resource attributes",
+			name:     "resolves bracket-selected metadata in resource attributes",
 			metadata: map[string]any{"version": "1.0"},
 			resource: map[string]any{
-				"catalogue.version": `${{ github.aw["metadata"].version }}`,
+				"catalogue.version": `${{ github['aw']['metadata']['version'] }}`,
 			},
-			wantErr: "observability.otlp.resource-attributes.catalogue.version must be a whole-value reference",
+			wantResource: map[string]any{"catalogue.version": "1.0"},
 		},
 		{
 			name:     "rejects nested metadata access in expressions",

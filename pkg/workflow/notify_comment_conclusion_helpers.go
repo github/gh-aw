@@ -49,6 +49,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	// Add GitHub App token minting step if app is configured
 	if data.SafeOutputs.GitHubApp != nil {
 		permissions := ComputePermissionsForSafeOutputs(data.SafeOutputs)
+		addAgentFailureChecksPermission(data, permissions)
 		var appTokenFallbackRepo string
 		if hasWorkflowCallTrigger(data.On) {
 			appTokenFallbackRepo = activationTargetRepoNameExpr

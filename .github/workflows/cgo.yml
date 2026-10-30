@@ -458,7 +458,7 @@ jobs:
       run: make test-impacted-go BASE_REF=HEAD^ CI_COVERAGE_SOURCE_BRANCH=main
 
   native-javascript-tests:
-    name: Native JavaScript analysis tests
+    name: Native JavaScript and Actions parser tests
     needs: [checkout-cache]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -491,13 +491,19 @@ jobs:
       with:
         node-version: "24"
         cache: npm
-        cache-dependency-path: pkg/workflow/taint/javascript/package-lock.json
+        cache-dependency-path: |
+          pkg/workflow/taint/javascript/package-lock.json
+          pkg/workflow/actionslanguageservice/conformance/package-lock.json
     - name: Install pinned native JavaScript compiler
       run: npm ci --prefix pkg/workflow/taint/javascript --ignore-scripts --no-audit --no-fund
     - name: Run native JavaScript analysis regressions
       run: |
         go test -v -count=1 -timeout=5m ./pkg/workflow/taint
         go test -v -count=1 -timeout=5m ./pkg/cli -run '^(TestJavaScriptLint|TestLintInputParseFailuresPreserveOtherAST)'
+    - name: Install pinned official Actions parsers
+      run: npm ci --prefix pkg/workflow/actionslanguageservice/conformance --ignore-scripts --no-audit --no-fund
+    - name: Compare native Go and official Actions parsers
+      run: make test-actions-parser-conformance
 
   build:
     needs: [checkout-cache]

@@ -1,0 +1,13 @@
+Native Go port of the expression grammar and workflow template reader from
+https://github.com/actions/languageservices
+
+Reference revision: 4043eda158e16579cc5fb1b0b07a4bce2a76f0b5
+Official parser packages used by the conformance suite: 0.3.61
+
+workflow-v1.0.json is copied unchanged from that revision.
+testdata/conformance.json contains inputs from upstream expressions/testdata
+and workflow-parser/testdata/reader, with expectations recorded by the official
+JavaScript parsers. Reader fixtures larger than 100,000 bytes are excluded;
+local boundary cases cover expression length and depth limits.
+
+The upstream MIT license is reproduced in LICENSE.

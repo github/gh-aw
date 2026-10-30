@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createRequire } from "node:module";
+import { renderReport } from "./report_ast.cjs";
 
 const require = createRequire(import.meta.url);
 
@@ -17,8 +18,14 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     process.env.GH_AW_PROMPTS_DIR = path.join(__dirname, "../md");
     const mod = await import("./handle_agent_failure.cjs");
     const exports = mod.default || mod;
-    buildDailyAICExceededContext = exports.buildDailyAICExceededContext;
-    buildDailyAICGuardrailErrorContext = exports.buildDailyAICGuardrailErrorContext;
+    const renderContext =
+      builder =>
+      (...args) => {
+        const children = builder(...args);
+        return children.length ? renderReport({ type: "report", title: "Workflow failure", children }).body : "";
+      };
+    buildDailyAICExceededContext = renderContext(exports.buildDailyAICExceededContext);
+    buildDailyAICGuardrailErrorContext = renderContext(exports.buildDailyAICGuardrailErrorContext);
   });
 
   afterEach(() => {
@@ -66,7 +73,7 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
     expect(rendered).toContain("Daily Workflow AI Credits Could Not Be Verified");
     expect(rendered).toContain("`transient_error`");
     expect(rendered).toContain("run 34616576735");
-    expect(rendered).toContain("detection/token_usage.jsonl is missing");
+    expect(rendered).toContain("detection/token\\_usage.jsonl is missing");
     expect(rendered).toContain("fails closed");
     expect(rendered).toContain("missing, empty, or unreadable");
     expect(rendered).toContain("rolling 24-hour window");
@@ -155,7 +162,7 @@ describe("handle_agent_failure daily workflow AI Credits context", () => {
       expect(rendered).toContain("Daily Workflow AI Credits Could Not Be Verified");
       expect(rendered).toContain("run 34616576735");
       expect(rendered).toContain("rolling 24-hour window");
-      expect(rendered).toContain("detection/token_usage.jsonl is missing");
+      expect(rendered).toContain("detection/token\\_usage.jsonl is missing");
     } finally {
       delete global.core;
       fs.rmSync(directory, { recursive: true, force: true });

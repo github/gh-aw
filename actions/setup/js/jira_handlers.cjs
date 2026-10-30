@@ -3,7 +3,9 @@
 const { createCountGatedHandler } = require("./handler_scaffold.cjs");
 const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { createJiraClient, textToADF } = require("./jira_client.cjs");
-const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
+const { getBodyFooterMessage } = require("./messages_footer.cjs");
+const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
+const { SIZE_NOTICE } = require("./report_size.cjs");
 const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 const { redactDiagnosticText } = require("./diagnostic_sanitization.cjs");
 
@@ -39,6 +41,21 @@ function optionalString(value, field, maxLength = 32767) {
     return undefined;
   }
   return requiredString(value, field, maxLength);
+}
+
+// ADF text is literal; Markdown normalization would corrupt entities and language characters.
+/** @param {string} body @param {string | undefined} template @returns {string} */
+function appendJiraBodyFooter(body, template) {
+  if (!template) return body;
+  const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
+  const runUrl = buildWorkflowRunUrl(context, context.repo);
+  const footer = getBodyFooterMessage(template, { workflowName, runUrl }).trimEnd();
+  if (!footer) return body;
+  const composed = [body.trimEnd(), footer].filter(Boolean).join("\n\n");
+  if (composed.length <= 32767) return composed;
+  const fitted = [SIZE_NOTICE, footer].join("\n\n");
+  if (fitted.length > 32767) throw new Error("Protected Jira footer exceeds the maximum body length of 32767 characters");
+  return fitted;
 }
 
 function jiraHandler(handlerType, handle) {
@@ -93,7 +110,7 @@ const createIssue = jiraHandler("jira_create_issue", async (message, client, isS
   const issueType = requiredString(message.issue_type, "issue_type");
   const rawSummary = requiredString(message.summary, "summary");
   const rawDescription = optionalString(message.description, "description");
-  const description = rawDescription === undefined ? undefined : requiredString(appendConfiguredBodyFooter(rawDescription, config.body_footer, { maxLength: 32767 }), "description", 32767);
+  const description = rawDescription === undefined ? undefined : requiredString(appendJiraBodyFooter(rawDescription, config.body_footer), "description", 32767);
   const summary = requiredString(normalizeJiraText(rawSummary).replace(/\s+/g, " ").trim(), "summary");
   const normalizedDescription = description === undefined ? undefined : normalizeJiraText(description).trim();
   if (normalizedDescription !== undefined && !normalizedDescription) throw new Error("description must be non-empty after normalization");
@@ -137,7 +154,7 @@ const updateIssue = jiraHandler("jira_update_issue", async (message, client, isS
   const issueKey = resolveJiraIssueKey(message.issue_key, resolvedTemporaryIds, isStaged);
   const summary = optionalString(message.summary, "summary", 255);
   const rawDescription = optionalString(message.description, "description");
-  const description = rawDescription === undefined ? undefined : requiredString(appendConfiguredBodyFooter(rawDescription, config.body_footer, { maxLength: 32767 }), "description", 32767);
+  const description = rawDescription === undefined ? undefined : requiredString(appendJiraBodyFooter(rawDescription, config.body_footer), "description", 32767);
   if (summary === undefined && description === undefined) {
     throw new Error("jira_update_issue requires summary or description");
   }
@@ -161,7 +178,7 @@ const updateIssue = jiraHandler("jira_update_issue", async (message, client, isS
 
 const addComment = jiraHandler("jira_add_comment", async (message, client, isStaged, config, resolvedTemporaryIds) => {
   const issueKey = resolveJiraIssueKey(message.issue_key, resolvedTemporaryIds, isStaged);
-  const body = requiredString(appendConfiguredBodyFooter(requiredString(message.body, "body", 32767), config.body_footer, { maxLength: 32767 }), "body", 32767);
+  const body = requiredString(appendJiraBodyFooter(requiredString(message.body, "body", 32767), config.body_footer), "body", 32767);
 
   if (isStaged) {
     logStagedPreviewInfo(`Jira add comment — Issue: ${issueKey}; Body: ${body}`);

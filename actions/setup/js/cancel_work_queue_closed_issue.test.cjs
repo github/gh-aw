@@ -278,6 +278,7 @@ describe("closed backing Issue cancellation", () => {
     expect(args.request.parameters.operations).toEqual([{ kind: "WorkCancellation", work_id: "work_1", reason: "related_issue_closed" }]);
     expect(githubClient.rest.issues.createComment).toHaveBeenCalledOnce();
     expect(githubClient.rest.issues.createComment.mock.calls[0][0].body).toContain("Cancellation was recorded in the work queue ledger. New state: **cancelled**. The work is now canceled.");
+    expect(githubClient.rest.issues.createComment.mock.calls[0][0].body).toMatch(/\[View the work queue ledger\]\(https:\/\/github.com\/owner\/repo\/blob\/work-queue\/work-queue.jsonl\)\.\n\n<!-- gh-aw-issue-closure:[^\s]+ -->$/);
   });
 
   it("cancels enterprise Work bound to a closed backing Issue", async () => {

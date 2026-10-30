@@ -277,6 +277,8 @@ describe("codex_harness.cjs", () => {
   });
 
   describe("AWF model routing", () => {
+    // Copilot routing: the compiled Codex step sets GH_AW_LLM_PROVIDER=github.
+    const COPILOT_ROUTING_ENV = { GH_AW_LLM_PROVIDER: "github" };
     const reflectData = {
       endpoints: [{ provider: "github", configured: true, models: ["gpt-5.6-sol"] }],
       routing: {
@@ -286,7 +288,7 @@ describe("codex_harness.cjs", () => {
     };
 
     it("applies the routed model and reasoning effort over fixed args", () => {
-      const result = resolveCodexModelRouting(reflectData, ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"]);
+      const result = resolveCodexModelRouting(reflectData, ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"], COPILOT_ROUTING_ENV);
       expect(result.error).toBeNull();
       expect(result.model).toBe("gpt-5.6-sol");
       expect(result.args).toEqual(["exec", "-c", 'model_reasoning_effort="xhigh"', "--model", "gpt-5.6-sol", "--json", "-"]);
@@ -305,7 +307,7 @@ describe("codex_harness.cjs", () => {
       ],
       [{ ...reflectData, endpoints: [{ provider: "github", configured: true, models: [] }] }, "unavailable Copilot wire model"],
     ])("fails closed when routing data is invalid: %s", (reflect, error) => {
-      expect(resolveCodexModelRouting(reflect, ["exec", "--model", "fixed"]).error).toContain(error);
+      expect(resolveCodexModelRouting(reflect, ["exec", "--model", "fixed"], COPILOT_ROUTING_ENV).error).toContain(error);
     });
 
     it("uses the Responses endpoint for a routed GPT model selected on Chat Completions", () => {
@@ -314,7 +316,7 @@ describe("codex_harness.cjs", () => {
         endpoints: [{ ...reflectData.endpoints[0], routing_models: [{ model_id: "gpt-5.6-sol", candidate_metadata_complete: true, supported_endpoints: ["/chat/completions", "/responses"] }] }],
         routing: { ...reflectData.routing, selection: { ...reflectData.routing.selection, endpoint: "/chat/completions" } },
       };
-      const result = resolveCodexModelRouting(reflect, ["exec"]);
+      const result = resolveCodexModelRouting(reflect, ["exec"], COPILOT_ROUTING_ENV);
       expect(result.error).toBeNull();
       expect(result.selection).toMatchObject({ endpoint: "/responses", selected_endpoint: "/chat/completions" });
     });
@@ -343,7 +345,7 @@ describe("codex_harness.cjs", () => {
       ["routed_codex_max_starts_with_selected_effort", "max"],
       ["routed_codex_none_starts_with_selected_effort", "none"],
     ])("%s", (_name, effort) => {
-      const direct = resolveCodexModelRouting(reflectFixtures.withRoutingSelection("gpt-5.6-luna", effort), ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"]);
+      const direct = resolveCodexModelRouting(reflectFixtures.withRoutingSelection("gpt-5.6-luna", effort), ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"], COPILOT_ROUTING_ENV);
       expect(direct.error).toBeNull();
       expect(direct.args).toEqual(["exec", "-c", `model_reasoning_effort="${effort}"`, "--model", "gpt-5.6-luna", "--json", "-"]);
 
@@ -368,7 +370,7 @@ describe("codex_harness.cjs", () => {
     });
 
     it("routed_codex_out_of_contract_effort_is_rejected", () => {
-      const direct = resolveCodexModelRouting(reflectFixtures.withRoutingSelection("gpt-5.6-luna", "ultra"), ["exec"]);
+      const direct = resolveCodexModelRouting(reflectFixtures.withRoutingSelection("gpt-5.6-luna", "ultra"), ["exec"], COPILOT_ROUTING_ENV);
       expect(direct.error).toBe("AWF /reflect returned unsupported reasoning effort ultra");
 
       const { result, calls, outcome } = runRoutedHarness("ultra");
@@ -376,6 +378,118 @@ describe("codex_harness.cjs", () => {
       expect(result.stderr).toContain("unsupported reasoning effort ultra; refusing to start Codex");
       expect(calls).toHaveLength(0);
       expect(outcome).toMatchObject({ status: "rejected", failure_code: "unsupported_effort", detail: "AWF /reflect returned unsupported reasoning effort ultra" });
+    });
+
+    describe("native OpenAI routing", () => {
+      // Real-shaped AWF /reflect for apiProxy.routing.provider: openai. routing_models follow
+      // buildRoutingModelMetadata: gpt-5.4 carries the maintained mapping (protocol-name
+      // endpoints, none..xhigh, 1,050,000 tokens); gpt-5.4-mini has no maintained metadata.
+      const nativeReflect = () => ({
+        endpoints: [
+          {
+            provider: "openai",
+            port: 10000,
+            base_url: "http://api-proxy:10000",
+            configured: true,
+            models: ["gpt-5.4", "gpt-5.4-mini"],
+            routing_models: [
+              {
+                model_id: "gpt-5.4",
+                source: "maintained",
+                supported_endpoints: ["chat_completions", "responses"],
+                supported_reasoning_efforts: ["none", "low", "medium", "high", "xhigh"],
+                context_window_tokens: 1050000,
+                candidate_metadata_complete: true,
+              },
+              { model_id: "gpt-5.4-mini", source: "incomplete", supported_endpoints: [], supported_reasoning_efforts: null, context_window_tokens: null, candidate_metadata_complete: false },
+            ],
+            models_url: "http://api-proxy:10000/v1/models",
+          },
+          { provider: "anthropic", port: 10001, base_url: "http://api-proxy:10001", configured: false, models: null, routing_models: null, models_url: "http://api-proxy:10001/v1/models" },
+        ],
+        routing: {
+          status: "selected",
+          selection: { provider: "openai", model: "openai/gpt-5.4", wire_model: "gpt-5.4", effort: "high", endpoint: "/responses" },
+        },
+      });
+      const NATIVE_ENV = { GH_AW_LLM_PROVIDER: "openai" };
+      const withSelection = (selection, reflect = nativeReflect()) => ({ ...reflect, routing: { ...reflect.routing, selection: { ...reflect.routing.selection, ...selection } } });
+
+      it("native OpenAI selection applies model, effort, and Responses endpoint", () => {
+        for (const env of [NATIVE_ENV, {}]) {
+          const result = resolveCodexModelRouting(nativeReflect(), ["exec", "--model", "fixed-model", "-c", 'model_reasoning_effort="low"', "--json", "-"], env);
+          expect(result.error).toBeNull();
+          expect(result.selection).toMatchObject({ provider: "openai", wire_model: "gpt-5.4", effort: "high", endpoint: "/responses", selected_endpoint: "/responses" });
+          expect(result.args).toEqual(["exec", "-c", 'model_reasoning_effort="high"', "--model", "gpt-5.4", "--json", "-"]);
+        }
+
+        const dir = makeHarnessTempDir("native-openai-");
+        const config = path.join(dir, "config.toml");
+        const reflect = path.join(dir, "reflect.json");
+        fs.writeFileSync(config, '[model_providers.openai-proxy]\nname = "OpenAI AWF proxy"\nbase_url = "http://172.30.0.30:10000"\nwire_api = "responses"\n[features]\nplugins = false\n');
+        fs.writeFileSync(reflect, JSON.stringify(nativeReflect()));
+        const configured = configureCodexProviderFromReflect({ codexConfigPath: config, reflectPath: reflect, provider: "openai" });
+        expect(configured.configured).toBe(true);
+        expect(configured.env.OPENAI_BASE_URL).toBe("http://api-proxy:10000");
+        const text = fs.readFileSync(config, "utf8");
+        expect(text).toContain('base_url = "http://api-proxy:10000"');
+        expect(text).toContain('wire_api = "responses"');
+      });
+
+      it("starts Codex natively with the routed model and effort", () => {
+        const { result, calls } = runHarnessFixture("process.exit(0);", {
+          args: ["--model", "fixed-model", "-c", 'model_reasoning_effort="low"'],
+          env: { GH_AW_MODEL_ROUTING: "1", GH_AW_MODEL_AGENT_CODEX: "fixed-model", GH_AW_LLM_PROVIDER: "openai" },
+          reflectData: nativeReflect(),
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].args).toContain("gpt-5.4");
+        expect(calls[0].args).toContain('model_reasoning_effort="high"');
+        expect(calls[0].args).not.toContain("fixed-model");
+        expect(result.stderr).toContain("inference routing: mode=awf-routed model=gpt-5.4 effort=high endpoint=/responses");
+        expect(result.stderr).not.toContain("selected_endpoint=");
+      });
+
+      it("uses the Responses endpoint when the native model advertises it for a Chat Completions selection", () => {
+        const result = resolveCodexModelRouting(withSelection({ endpoint: "/chat/completions" }), ["exec"], NATIVE_ENV);
+        expect(result.error).toBeNull();
+        expect(result.selection).toMatchObject({ endpoint: "/responses", selected_endpoint: "/chat/completions" });
+      });
+
+      it.each([
+        ["wrong provider", withSelection({ provider: "copilot", model: "github-copilot/gpt-5.4" }), "native routing does not cross providers"],
+        [
+          "absent native endpoint",
+          {
+            ...nativeReflect(),
+            endpoints: [{ provider: "copilot", port: 10002, base_url: "http://api-proxy:10002", configured: true, models: ["gpt-5.4"], routing_models: nativeReflect().endpoints[0].routing_models }],
+          },
+          "no configured openai endpoint",
+        ],
+        ["unconfigured native endpoint", { ...nativeReflect(), endpoints: [{ ...nativeReflect().endpoints[0], configured: false }] }, "no configured openai endpoint"],
+        ["unavailable model", withSelection({ model: "openai/gpt-5.5", wire_model: "gpt-5.5" }), "unavailable openai wire model gpt-5.5"],
+        ["incomplete metadata", withSelection({ model: "openai/gpt-5.4-mini", wire_model: "gpt-5.4-mini" }), "candidate metadata is incomplete"],
+        [
+          "incompatible endpoint",
+          withSelection(
+            { endpoint: "/chat/completions" },
+            { ...nativeReflect(), endpoints: [{ ...nativeReflect().endpoints[0], routing_models: [{ ...nativeReflect().endpoints[0].routing_models[0], supported_endpoints: ["chat_completions"] }] }] }
+          ),
+          "none compatible with this engine API [/responses]",
+        ],
+        ["unsupported effort", withSelection({ effort: "max" }), "unsupported reasoning effort max for openai model gpt-5.4"],
+        ["Copilot-routed engine", nativeReflect(), "unsupported Copilot routing selection"],
+      ])("rejects native selection: %s", (name, reflect, error) => {
+        const env = name === "Copilot-routed engine" ? COPILOT_ROUTING_ENV : NATIVE_ENV;
+        const result = resolveCodexModelRouting(reflect, ["exec"], env);
+        expect(result.selection).toBeNull();
+        expect(result.error).toContain(error);
+      });
+
+      it("rejects routing on an unsupported provider", () => {
+        expect(resolveCodexModelRouting(nativeReflect(), ["exec"], { GH_AW_LLM_PROVIDER: "anthropic" }).error).toContain("not supported for Codex on provider anthropic");
+      });
     });
 
     it("starts Codex with the routed model and effort from AWF reflection", () => {

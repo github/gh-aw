@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,12 +19,12 @@ func TestWorkQueueLogicalContractPreservesInputTypes(t *testing.T) {
 func TestWorkQueueLogicalContractScriptImplementationCanEvolve(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "worker.md")
 	source := "---\non: workflow_dispatch\ntools:\n  work-queue:\n    worker: true\nmcp-scripts:\n  analysis:\n    description: Analyze assigned data\n    run: echo original\n    inputs:\n      mode:\n        type: string\n---\nProcess Claims.\n"
-	contract, err := workQueueLogicalContractFromContent(path, source)
+	contract, err := workQueueLogicalContractFromContentWithCache(path, source, parser.NewImportCache(filepath.Dir(path)))
 	require.NoError(t, err)
-	replacement, err := workQueueLogicalContractFromContent(path, strings.ReplaceAll(source, "echo original", "echo replacement"))
+	replacement, err := workQueueLogicalContractFromContentWithCache(path, strings.ReplaceAll(source, "echo original", "echo replacement"), parser.NewImportCache(filepath.Dir(path)))
 	require.NoError(t, err)
 	require.Equal(t, contract, replacement)
-	expanded, err := workQueueLogicalContractFromContent(path, strings.ReplaceAll(source, "type: string", "type: number"))
+	expanded, err := workQueueLogicalContractFromContentWithCache(path, strings.ReplaceAll(source, "type: string", "type: number"), parser.NewImportCache(filepath.Dir(path)))
 	require.NoError(t, err)
 	require.NotEqual(t, contract, expanded)
 }

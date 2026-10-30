@@ -22,7 +22,9 @@ var updateOrgSearchLog = logger.New("cli:update_org_search")
 // orgSearchResponse holds the paginated code-search results returned by the
 // GitHub search/code API when discovering repositories in an organization.
 type orgSearchResponse struct {
-	Items []struct {
+	TotalCount        int  `json:"total_count"`
+	IncompleteResults bool `json:"incomplete_results"`
+	Items             []struct {
 		Path       string `json:"path"`
 		Repository struct {
 			FullName string `json:"full_name"`
@@ -31,6 +33,7 @@ type orgSearchResponse struct {
 }
 
 var searchOrgWorkflowReposFn = searchOrgWorkflowRepos
+var orgSearchAPIFn = workflow.RunGHContextWithHost
 
 const orgSlugConstraintDescription = "must be 1-39 characters, contain only alphanumeric characters or single hyphens, and cannot start or end with a hyphen"
 
@@ -108,11 +111,11 @@ func searchOrgReposByQuery(ctx context.Context, query string, verbose bool) ([]s
 	var repos []string
 
 	for {
-		if err := waitForOrgRateLimitFn(ctx, "search", verbose); err != nil && verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Continuing after search rate limit check failure: %v", err)))
+		if err := waitForOrgRateLimitFn(ctx, "search", verbose); err != nil {
+			return nil, fmt.Errorf("checking search API budget: %w", err)
 		}
 		endpoint := fmt.Sprintf("/search/code?q=%s&per_page=%d&page=%d", url.QueryEscape(query), perPage, page)
-		output, err := workflow.RunGHContext(ctx, "Searching repositories...", "api", endpoint)
+		output, err := orgSearchAPIFn(ctx, "Searching repositories...", getHostFromOriginRemote(), "api", endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("failed to search organization repositories: %w", err)
 		}
@@ -120,6 +123,16 @@ func searchOrgReposByQuery(ctx context.Context, query string, verbose bool) ([]s
 		var response orgSearchResponse
 		if err := json.Unmarshal(output, &response); err != nil {
 			return nil, fmt.Errorf("failed to parse organization search results: %w", err)
+		}
+		if response.TotalCount >= 1000 || response.IncompleteResults {
+			// Org queries are constructed locally; never silently truncate a rollout.
+			for token := range strings.FieldsSeq(query) {
+				if org, ok := strings.CutPrefix(token, "org:"); ok && isValidOrgSlug(org) {
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Code search is incomplete; listing all organization repositories and inspecting workflows locally"))
+					return listOrgRolloutRepos(ctx, org)
+				}
+			}
+			return nil, errors.New("code search returned incomplete results; narrow the organization query")
 		}
 		if len(response.Items) == 0 {
 			break

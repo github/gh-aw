@@ -2,13 +2,8 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
-)
-
-var unavailableTopLevelEnvContextPattern = regexp.MustCompile(
-	`(?i)(?:^|[^A-Za-z0-9_.-])(env|job|jobs|matrix|needs|runner|steps|strategy)(?:[^A-Za-z0-9_-]|$)`,
 )
 
 // validateTopLevelEnvExpressions rejects expression contexts that GitHub Actions
@@ -38,14 +33,12 @@ func validateTopLevelEnvExpressions(env map[string]any) error {
 
 func findUnavailableContextsInExpression(stringValue string) []string {
 	var unavailableContexts []string
-	for _, rawExpr := range extractExpressionsQuoteAware(stringValue) {
-		expression := maskQuotedExpressionLiterals(rawExpr)
-		for _, contextMatch := range unavailableTopLevelEnvContextPattern.FindAllStringSubmatch(expression, -1) {
-			if len(contextMatch) >= 2 {
-				ctxName := strings.ToLower(contextMatch[1])
-				if !slices.Contains(unavailableContexts, ctxName) {
-					unavailableContexts = append(unavailableContexts, ctxName)
-				}
+	for _, path := range interpolationReferences(stringValue) {
+		ctxName := strings.ToLower(path[0])
+		switch ctxName {
+		case "env", "job", "jobs", "matrix", "needs", "runner", "steps", "strategy":
+			if !slices.Contains(unavailableContexts, ctxName) {
+				unavailableContexts = append(unavailableContexts, ctxName)
 			}
 		}
 	}
@@ -82,54 +75,4 @@ func buildTopLevelEnvError(name, stringValue string, unavailableContexts []strin
 		reason,
 		remediation,
 	)
-}
-
-func extractExpressionsQuoteAware(input string) []string {
-	var expressions []string
-	idx := 0
-	for idx < len(input) {
-		start := strings.Index(input[idx:], "${{")
-		if start == -1 {
-			break
-		}
-		exprStart := idx + start + 2
-		i := exprStart
-		var inQuote byte
-		foundEnd := false
-		for i < len(input) {
-			ch := input[i]
-			if inQuote != 0 {
-				if ch == inQuote {
-					if i+1 < len(input) && input[i+1] == inQuote {
-						i += 2
-						continue
-					}
-					inQuote = 0
-				} else if ch == '\\' && inQuote != '\'' {
-					i += 2
-					continue
-				}
-				i++
-				continue
-			}
-
-			if ch == '\'' || ch == '"' || ch == '`' {
-				inQuote = ch
-				i++
-				continue
-			}
-
-			if ch == '}' && i+1 < len(input) && input[i+1] == '}' {
-				expressions = append(expressions, input[exprStart:i])
-				idx = i + 2
-				foundEnd = true
-				break
-			}
-			i++
-		}
-		if !foundEnd {
-			break
-		}
-	}
-	return expressions
 }

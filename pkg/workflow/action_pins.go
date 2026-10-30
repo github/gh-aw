@@ -357,8 +357,23 @@ func applyContainerPinMappingFromData(image string, data *WorkflowData) string {
 // getActionPinWithData returns the pinned action reference for a given action@version,
 // delegating to pkg/actionpins with a PinContext built from WorkflowData.
 func getActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
+	return resolveActionPinWithData(actionRepo, version, data, false)
+}
+
+func getGeneratedActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
+	return resolveActionPinWithData(actionRepo, version, data, true)
+}
+
+func resolveActionPinWithData(actionRepo, version string, data *WorkflowData, generated bool) (string, error) {
 	ctx := pinContextWithoutActionMappings(data)
 	if ctx != nil {
+		if generated {
+			ctx.RecordResolutionFailure = func(f actionpins.ResolutionFailure) {
+				data.ActionResolutionFailures = append(data.ActionResolutionFailures, GHAWManifestResolutionFailure{
+					Repo: f.Repo, Ref: f.Ref, ErrorType: string(f.ErrorType), compilerGenerated: true,
+				})
+			}
+		}
 		if _, mapped := data.ActionPinMappings[actionpins.FormatCacheKey(actionRepo, version)]; mapped {
 			ctx.GHES = false
 			ctx.Mappings = data.ActionPinMappings

@@ -3,14 +3,30 @@ package workflow
 import (
 	"crypto/sha256"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
-var deferredPromptOutputPattern = regexp.MustCompile(`^needs\.([a-zA-Z_][a-zA-Z0-9_-]*)\.(?:outputs\.([a-zA-Z_][a-zA-Z0-9_-]*)|result)$`)
+func deferredPromptOutputReference(content string) (producer, output string, ok bool) {
+	expression, err := actionslanguageservice.ParseSyntax(content)
+	if err != nil {
+		return "", "", false
+	}
+	path, reference := actionslanguageservice.Reference(expression)
+	if !reference || len(path) < 3 || !strings.EqualFold(path[0], "needs") || !credentialIdentifier(path[1], true) {
+		return "", "", false
+	}
+	if len(path) == 3 && strings.EqualFold(path[2], "result") {
+		return path[1], "", true
+	}
+	if len(path) == 4 && strings.EqualFold(path[2], "outputs") && credentialIdentifier(path[3], true) {
+		return path[1], path[3], true
+	}
+	return "", "", false
+}
 
 // Keep activation's prompt rendering independent of jobs that run between
 // activation and the agent. Only direct result and declared output references are deferred.
@@ -45,11 +61,10 @@ func rewriteDeferredPromptExpressions(mappings []*ExpressionMapping, jobs map[st
 }
 
 func canDeferPromptExpression(mapping *ExpressionMapping, mappings []*ExpressionMapping, jobs map[string]any, beforeActivation []string, markdown string) bool {
-	parts := deferredPromptOutputPattern.FindStringSubmatch(mapping.Content)
-	if len(parts) < 3 {
+	producer, output, reference := deferredPromptOutputReference(mapping.Content)
+	if !reference {
 		return false
 	}
-	producer, output := parts[1], parts[2] //nolint:uncheckedsliceindex // The guard above requires all three regex captures.
 	if slices.Contains(beforeActivation, producer) || isBuiltinJobName(producer) {
 		return false
 	}
@@ -67,8 +82,9 @@ func canDeferPromptExpression(mapping *ExpressionMapping, mappings []*Expression
 func filterPromptExpressionsForActivation(mappings []*ExpressionMapping, jobs map[string]any, beforeActivation []string, markdown string) []*ExpressionMapping {
 	activationMappings := filterExpressionsForActivation(mappings, jobs, beforeActivation)
 	for _, mapping := range mappings {
+		_, _, directReference := deferredPromptOutputReference(mapping.Content)
 		if !slices.Contains(activationMappings, mapping) &&
-			(!deferredPromptOutputPattern.MatchString(mapping.Content) || deferredPromptControlsRendering(mapping, mappings, markdown)) {
+			(!directReference || deferredPromptControlsRendering(mapping, mappings, markdown)) {
 			activationMappings = append(activationMappings, mapping)
 		}
 	}
@@ -81,7 +97,7 @@ func deferredPromptControlsRendering(mapping *ExpressionMapping, mappings []*Exp
 			return true
 		}
 	}
-	for _, pattern := range []*regexp.Regexp{TemplateIfPattern, TemplateElseIfPattern} {
+	for _, pattern := range []conditionalPattern{{TemplateIfPattern}, {TemplateElseIfPattern}} {
 		for _, conditional := range pattern.FindAllString(markdown, -1) {
 			if containsPromptReference(conditional, mapping.Content) || strings.Contains(conditional, "__"+mapping.EnvVar+"__") {
 				return true

@@ -24,6 +24,7 @@ type CompileConfig struct {
 	EnvironmentOverride       string   // Override the environment on every generated job
 	RequireSelfHostedRunners  bool     // Require every generated job to select a self-hosted runner
 	Dependabot                bool     // Generate Dependabot manifests for npm dependencies
+	ActionsLock               bool     // Run gh actions-lock --no-narrow after successful compilation
 	ForceOverwrite            bool     // Force overwrite of existing files (dependabot.yml)
 	RefreshStopTime           bool     // Force regeneration of stop-after times instead of preserving existing ones
 	ForceRefreshActionPins    bool     // Force refresh of action pins by clearing cache and resolving from GitHub API

@@ -9,9 +9,12 @@ import (
 // awInfoModelRouting is the configured routing policy recorded in aw_info.model_config.
 // It retains the compiled objective, never the router's per-run selection.
 type awInfoModelRouting struct {
-	Enabled       bool     `json:"enabled"`
-	Goal          string   `json:"goal,omitempty"`
-	Mode          string   `json:"mode,omitempty"`
+	Enabled bool   `json:"enabled"`
+	Goal    string `json:"goal,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+	// Provider is the native routing provider (anthropic or openai) sent to AWF as
+	// apiProxy.routing.provider; it is omitted for GitHub Copilot routing.
+	Provider      string   `json:"provider,omitempty"`
 	AllowedModels []string `json:"allowed_models,omitempty"`
 	// CandidateModels is the router's effective pool sent to AWF: allowed-models with
 	// aliases expanded and narrowed by models.allowed and models.blocked.
@@ -48,7 +51,12 @@ func buildAwInfoModelConfig(data *WorkflowData) (string, string) {
 	config := awInfoModelConfig{}
 	if isModelRoutingEnabled(data) {
 		routing := data.EngineConfig.ModelRouting
-		config.Routing = awInfoModelRouting{Enabled: true, Goal: routing.Goal, Mode: routing.Mode}
+		config.Routing = awInfoModelRouting{
+			Enabled:  true,
+			Goal:     routing.Goal,
+			Mode:     routing.Mode,
+			Provider: modelRoutingNativeProvider(data.EngineConfig.ID, data),
+		}
 		if groups, err := resolveModelRoutingCandidateGroups(data, data.EngineConfig.ID); err == nil {
 			allowed := make([]string, 0, len(groups))
 			for _, group := range groups {

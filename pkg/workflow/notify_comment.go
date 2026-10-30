@@ -202,6 +202,7 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 			conclusionPerms.Set(PermissionPullRequests, PermissionRead)
 		}
 	}
+	addAgentFailureChecksPermission(data, conclusionPerms)
 	// Only request issues: write when at least one conclusion-job mechanism can actually
 	// create/update an issue and that path is not already covered by
 	// ComputePermissionsForSafeOutputs (report-failed-jobs, agent-failure reporting,
@@ -216,6 +217,14 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		}
 	}
 	return conclusionPerms
+}
+
+func addAgentFailureChecksPermission(data *WorkflowData, permissions *Permissions) {
+	if !isWorkQueueParticipant(data) && conclusionReportFailureAsIssueEnabled(data) {
+		if level, ok := permissions.Get(PermissionChecks); !ok || level == PermissionNone {
+			permissions.Set(PermissionChecks, PermissionRead)
+		}
+	}
 }
 
 // conclusionReportFailedJobsEnabled returns true unless safe-outputs.report-failed-jobs is

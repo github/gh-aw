@@ -1726,6 +1726,8 @@ Failure reports keep error diagnostics in fenced code blocks inside collapsed de
 
 Empty-output reports preserve recognized engine failure categories as concise summaries, without copying raw error payloads. Unrecognized failure formats require inspecting the workflow run logs; reports do not publish a fallback log preview.
 
+Cancelled startup failures are suppressed only when check annotations rule out a job timeout and no independent model configuration error is present. If timeout annotations cannot be read, the startup failure remains reportable. The compiler grants the conclusion job and its generated GitHub App reporting tokens `checks: read` when failure issue reporting is enabled. Custom reporting tokens also need this permission.
+
 #### Simple Boolean (Opt-Out All Failures)
 
 Set to `false` to suppress automatic failure issue creation for a specific workflow:
@@ -1818,7 +1820,7 @@ When the Actions jobs API confirms that the entire run has no jobs, failure repo
 
 Without a more specific runtime failure, the failure classification is `missing_terminal_safe_output`, not an inferred engine outage or budget exhaustion. Incompletion descriptions contain only inferred runtime status and validated error codes: driver exit status, last tool status, failed-tool counts, token and LLM-invocation exhaustion signals, and safe-output tool registration. Registration prefers a valid setup cache, falling back to the archived gateway snapshot when the cache is missing, unreadable, or invalid; neither proves continued availability. A recorded gateway zero-tools flag overrides registration evidence as unavailable; an unreadable flag makes availability unknown. CLI attempt counts and gateway request counts are reported separately because one invocation can appear in both. Persistence reports whether the output file is missing, empty, nonempty, or unreadable, with record and malformed-record counts; it does not establish validation or publication.
 
-Explicit `report_incomplete` signals also include registration, call-count, and persistence evidence, even alongside ordinary safe outputs. They are not reclassified as missing terminal output. Agent reasons, tool names, commands, arguments, results, schemas, and error text are excluded, even when they contain no recognized secrets. Missing evidence is reported as unknown or not recorded, and malformed call logs are marked as partial evidence.
+Explicit `report_incomplete` signals also include registration, call-count, and persistence evidence, even alongside ordinary safe outputs. They are not reclassified as missing terminal output. Failure issues, follow-up comments, and run summaries can include a bounded, secret-redacted agent-declared reason labeled unverified; summaries are also written when failure-issue reporting is disabled. A reason matching a trusted collector cause is presented only as runtime-derived classification. Agent tool names, commands, arguments, results, schemas, and diagnostic/error text remain excluded, even when they contain no recognized secrets. Reasons are omitted from summaries when secret redaction fails. Missing evidence is reported as unknown or not recorded, and malformed call logs are marked as partial evidence.
 
 **Use case: Suppress transient infrastructure failures**
 

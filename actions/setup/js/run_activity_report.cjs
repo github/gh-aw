@@ -6,6 +6,8 @@ const { createReportIssue } = require("./issue_report.cjs");
 const { getErrorMessage, isRateLimitError } = require("./error_helpers.cjs");
 const { resolveExecutionOwnerRepo } = require("./repo_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 
 const ISSUE_TITLE = "[aw] agentic status report";
 const REPORT_COUNT = 1000;
@@ -36,9 +38,19 @@ function hasRateLimitText(text) {
  * @param {string} repoSlug
  * @param {ActivityRange} range
  * @param {string} outputDir
- * @returns {Promise<{ heading: string, body: string }>}
+ * @returns {Promise<{ heading: string, body: string, children: import("./report_ast.cjs").ReportBlock[] }>}
  */
 async function runRangeReport(bin, prefixArgs, repoSlug, range, outputDir) {
+  /** @param {import("./report_ast.cjs").ReportBlock[]} children */
+  const section = children => ({
+    heading: range.heading,
+    children,
+    get body() {
+      return renderSizedReport({ type: "report", title: ISSUE_TITLE, children }).body;
+    },
+  });
+  /** @param {string} value @returns {import("./report_ast.cjs").ReportBlock} */
+  const note = value => ({ type: "paragraph", children: [{ type: "emphasis", children: [{ type: "text", value }] }] });
   const args = [...prefixArgs, "logs", "--repo", repoSlug, "--start-date", range.startDate, "--count", String(REPORT_COUNT), "--output", outputDir, "--format", "markdown"];
   core.info(`Running: ${bin} ${args.join(" ")}`);
 
@@ -48,54 +60,33 @@ async function runRangeReport(bin, prefixArgs, repoSlug, range, outputDir) {
     const rateLimited = hasRateLimitText(output);
 
     if (result.exitCode === 0 && result.stdout.trim()) {
-      return {
-        heading: range.heading,
-        body: normalizeReportMarkdown(sanitizeContent(result.stdout.trim())),
-      };
+      return section(parseReportMarkdown(normalizeReportMarkdown(sanitizeContent(result.stdout.trim())), { minimumHeadingLevel: 3, agentTainted: true }));
     }
 
     if (rateLimited && range.optionalOnRateLimit) {
       core.warning(`Skipping ${range.heading} report due to GitHub API rate limiting`);
-      return {
-        heading: range.heading,
-        body: "_Skipped due to GitHub API rate limiting._",
-      };
+      return section([note("Skipped due to GitHub API rate limiting.")]);
     }
 
     if (rateLimited) {
-      return {
-        heading: range.heading,
-        body: "_Could not generate this section due to GitHub API rate limiting._",
-      };
+      return section([note("Could not generate this section due to GitHub API rate limiting.")]);
     }
 
-    return {
-      heading: range.heading,
-      body: `_Report command failed (exit code ${result.exitCode})._\n\n\`\`\`\n${sanitizeContent(output || "No command output was captured.")}\n\`\`\``,
-    };
+    return section([note(`Report command failed (exit code ${result.exitCode}).`), { type: "code_block", language: "", value: output || "No command output was captured." }]);
   } catch (error) {
     const errorMessage = getErrorMessage(error);
     const rateLimited = isRateLimitError(error) || hasRateLimitText(errorMessage);
 
     if (rateLimited && range.optionalOnRateLimit) {
       core.warning(`Skipping ${range.heading} report due to GitHub API rate limiting`);
-      return {
-        heading: range.heading,
-        body: "_Skipped due to GitHub API rate limiting._",
-      };
+      return section([note("Skipped due to GitHub API rate limiting.")]);
     }
 
     if (rateLimited) {
-      return {
-        heading: range.heading,
-        body: "_Could not generate this section due to GitHub API rate limiting._",
-      };
+      return section([note("Could not generate this section due to GitHub API rate limiting.")]);
     }
 
-    return {
-      heading: range.heading,
-      body: `_Report command failed: ${sanitizeContent(errorMessage)}_`,
-    };
+    return section([note(`Report command failed: ${errorMessage}`)]);
   }
 }
 
@@ -132,17 +123,36 @@ async function main() {
     sections.push(await runRangeReport(bin, prefixArgs, repoSlug, range, reportOutputDir));
   }
 
-  const headerLines = ["### Agentic workflow activity report", "", `Repository: \`${repoSlug}\``, `Generated at: ${new Date().toISOString()}`, ""];
-  const sectionLines = sections.flatMap(section => ["<details>", `<summary>${section.heading}</summary>`, "", section.body, "", "</details>", ""]);
-  const body = [...headerLines, ...sectionLines].join("\n");
-
-  const createdIssue = await createReportIssue(github, {
-    owner,
-    repo,
+  /** @type {import("./report_ast.cjs").Report} */
+  const report = {
+    type: "report",
     title: ISSUE_TITLE,
-    body,
-    labels: ["agentic-workflows"],
-  });
+    agentTainted: false,
+    children: [
+      { type: "heading", level: 3, children: [{ type: "text", value: "Agentic workflow activity report", agentTainted: false }] },
+      {
+        type: "paragraph",
+        children: [
+          { type: "text", value: "Repository: ", agentTainted: false },
+          { type: "code", value: repoSlug, agentTainted: false },
+          { type: "soft_break" },
+          { type: "text", value: `Generated at: ${new Date().toISOString()}`, agentTainted: false },
+        ],
+      },
+      ...sections.map(/** @returns {import("./report_ast.cjs").ReportBlock} */ section => ({ type: "details", summary: section.heading, children: section.children, agentTainted: false })),
+    ],
+  };
+
+  const createdIssue = await createReportIssue(
+    github,
+    {
+      owner,
+      repo,
+      title: ISSUE_TITLE,
+      labels: ["agentic-workflows"],
+    },
+    report
+  );
 
   core.info(`Created issue #${createdIssue.data.number}: ${createdIssue.data.html_url}`);
 }

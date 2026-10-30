@@ -52,6 +52,9 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 	if err := c.jobManager.resolveActions(); err != nil {
 		return fmt.Errorf("resolving GitHub Actions workflow: %w", err)
 	}
+	if err := c.wireCreateTokenJobs(data); err != nil {
+		return err
+	}
 	if err := c.guardCustomJobDetection(data); err != nil {
 		return err
 	}
@@ -136,6 +139,9 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, err
 	}
+	if repoConfig != nil {
+		data.RepoProtectedFilesExclude = repoConfig.ProtectedFiles.Exclude
+	}
 	// Compute frontmatter hash BEFORE building jobs so that the stable hash is
 	// available to heredoc-delimiter generation throughout job construction.
 	// Using the hex-encoded SHA-256 frontmatter hash string as an HMAC key keeps
@@ -195,11 +201,16 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// step generators, etc.) can derive stable heredoc delimiters from it.
 	data.FrontmatterHash = frontmatterHash
 	data.BodyHash = bodyHash
+	data.generatedActionRefs = make(map[string]struct{})
+	sourceData := data
 	data = workflowDataWithArtifactRetention(data, repoConfig)
 	data, err = c.prepareDryRunWorkflowData(data)
 	if err != nil {
 		return "", nil, nil, err
 	}
+	// Appending failures can replace a slice's backing array; generatedActionRefs
+	// is a shared map and needs no copy-back.
+	defer func() { sourceData.ActionResolutionFailures = data.ActionResolutionFailures }()
 
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {

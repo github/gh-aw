@@ -65,6 +65,8 @@ strict: false
 
 Omitting `runtime` is equivalent to `runtime: docker`, which keeps the secure default.
 
+Privileged profiles invoke the system-installed AWF binary and preserve exported runner variables by name, including on `sudo-rs` hosts that ignore `sudo -E`. AWF's agent credential exclusions still apply; preserving the launcher environment does not grant those credentials to the agent.
+
 The `nvx` runtime never falls back to another runtime. It requires a workload-specific guest layer, the AWF release's provenance bundle and manifest, and all three security opt-ins. The compiler checks the host and verifies the offline attestation before starting AWF. See [Agent Runtime Selection](/gh-aw/reference/agent-runtimes/#nvx-preview) for the complete configuration and compatibility requirements.
 
 ```yaml wrap

@@ -148,6 +148,9 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) ([]string, error)
 	steps = append(steps, "        env:\n")
 	// The job context is available at step scope, including reusable and matrix jobs.
 	steps = append(steps, "          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}\n")
+	if isWorkQueueParticipant(data) {
+		steps = append(steps, "          GH_AW_CLAIM_FOOTER_LINKS: ${{ steps.work_queue_claim_reconciliation.outputs.claim_footer_links }}\n")
+	}
 	if err := c.addSafeOutputCoreEnvVars(&steps, data); err != nil {
 		return nil, err
 	}

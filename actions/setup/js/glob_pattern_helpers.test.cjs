@@ -46,6 +46,18 @@ describe("glob_pattern_helpers.cjs", () => {
     });
 
     describe("special character escaping", () => {
+      it("should preserve literal placeholder text alongside wildcards", () => {
+        const literal = globPatternToRegex("<!DOUBLESTAR>");
+        expect(literal.test("<!DOUBLESTAR>")).toBe(true);
+        expect(literal.test("package.json")).toBe(false);
+        expect(literal.test(".github/workflows/ci.yml")).toBe(false);
+
+        const wildcard = globPatternToRegex("<!DOUBLESTAR>/**/*.json");
+        expect(wildcard.test("<!DOUBLESTAR>/nested/config.json")).toBe(true);
+        expect(wildcard.test("other/nested/config.json")).toBe(false);
+        expect(wildcard.test("<!DOUBLESTAR>/nested/config.txt")).toBe(false);
+      });
+
       it("should escape dots correctly", () => {
         const regex = globPatternToRegex("file.txt");
 

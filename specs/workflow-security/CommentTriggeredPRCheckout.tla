@@ -6,7 +6,9 @@ ASSUME Fault \in {"none", "event-bypass", "sender-type-bypass",
                   "author-bypass", "actor-bypass", "allowlist-bypass",
                   "repository-bypass", "branch-event-bypass",
                   "branch-action-bypass", "branch-sender-type-bypass",
-                  "branch-sender-bypass", "branch-repository-bypass"}
+                  "branch-sender-bypass", "branch-repository-bypass",
+                  "branch-edited-body-bypass",
+                  "branch-edited-allowlist-bypass"}
 
 Events == {"issue_comment", "pull_request_review_comment",
            "pull_request_review", "pull_request", "pull_request_target",
@@ -16,16 +18,16 @@ ReviewEvents == {"pull_request_review"}
 CommentOrReviewEvents == CommentEvents \cup ReviewEvents
 BranchEvents == {"pull_request", "pull_request_target"}
 BranchActions == {"opened", "synchronize", "ready_for_review",
-                  "reopened", "labeled", "other"}
+                  "reopened", "edited", "labeled", "other"}
 Actors == {"my-app", "my-app[bot]", "other", "other[bot]"}
 SenderTypes == {"Bot", "User"}
 RepositoryRelations == {"same", "fork", "missing-head", "missing-base"}
 Permissions == {"none", "read", "write", "maintain", "admin"}
 
 VARIABLES event, action, actor, sender, commentAuthor, reviewAuthor, senderType,
-         allowListed, repositoryRelation, permission
+         allowListed, bodyOnlyEdit, repositoryRelation, permission
 vars == <<event, action, actor, sender, commentAuthor, reviewAuthor, senderType,
-         allowListed, repositoryRelation, permission>>
+         allowListed, bodyOnlyEdit, repositoryRelation, permission>>
 
 CanonicalBotIdentity(login) ==
     IF login = "my-app[bot]" THEN "my-app"
@@ -36,7 +38,8 @@ CommentEvent == event \in CommentEvents
 CommentOrReviewEvent == event \in CommentOrReviewEvents
 BranchEvent == event \in BranchEvents
 SupportedBranchAction == action \in {"opened", "synchronize",
-                                      "ready_for_review", "reopened"}
+                                      "ready_for_review", "reopened"} \/
+                        (action = "edited" /\ allowListed /\ bodyOnlyEdit)
 AuthorMatchesSender ==
     IF CommentEvent THEN sender = commentAuthor
     ELSE IF event \in ReviewEvents THEN sender = reviewAuthor
@@ -80,7 +83,13 @@ ObservedBotBypass ==
     (Fault = "branch-sender-bypass" /\ BranchEvent /\ SupportedBranchAction /\
       senderType = "Bot" /\ sender # actor /\ repositoryRelation = "same") \/
     (Fault = "branch-repository-bypass" /\ BranchEvent /\ SupportedBranchAction /\
-      senderType = "Bot" /\ sender = actor /\ repositoryRelation # "same")
+      senderType = "Bot" /\ sender = actor /\ repositoryRelation # "same") \/
+    (Fault = "branch-edited-body-bypass" /\ BranchEvent /\ action = "edited" /\
+      allowListed /\ ~bodyOnlyEdit /\ senderType = "Bot" /\ sender = actor /\
+      repositoryRelation = "same") \/
+    (Fault = "branch-edited-allowlist-bypass" /\ BranchEvent /\ action = "edited" /\
+      bodyOnlyEdit /\ ~allowListed /\ senderType = "Bot" /\ sender = actor /\
+      repositoryRelation = "same")
 
 CollaboratorAuthorized ==
     permission \in {"write", "maintain", "admin"}
@@ -96,6 +105,7 @@ Init ==
     /\ reviewAuthor \in Actors
     /\ senderType \in SenderTypes
     /\ allowListed \in BOOLEAN
+    /\ bodyOnlyEdit \in BOOLEAN
     /\ repositoryRelation \in RepositoryRelations
     /\ permission \in Permissions
 
@@ -111,6 +121,7 @@ TypeOK ==
     /\ reviewAuthor \in Actors
     /\ senderType \in SenderTypes
     /\ allowListed \in BOOLEAN
+    /\ bodyOnlyEdit \in BOOLEAN
     /\ repositoryRelation \in RepositoryRelations
     /\ permission \in Permissions
 

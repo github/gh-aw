@@ -91,11 +91,11 @@ func createHealthGitFixture(t *testing.T) (string, string) {
 	require.NoError(t, os.MkdirAll(filepath.Join(root, ".github/workflows"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".github/workflows/example.md"), []byte("Original prompt"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".github/workflows/example.lock.yml"), []byte(healthSnapshotMetadata), 0644))
-	_, err := runHealthGit(root, "add", ".github/workflows")
+	_, err := runHealthGitContext(context.Background(), root, "add", ".github/workflows")
 	require.NoError(t, err)
-	_, err = runHealthGit(root, "-c", "commit.gpgsign=false", "commit", "-qm", "fixture")
+	_, err = runHealthGitContext(context.Background(), root, "-c", "commit.gpgsign=false", "commit", "-qm", "fixture")
 	require.NoError(t, err)
-	out, err := runHealthGit(root, "rev-parse", "HEAD")
+	out, err := runHealthGitContext(context.Background(), root, "rev-parse", "HEAD")
 	require.NoError(t, err)
 	return root, strings.TrimSpace(string(out))
 }
@@ -121,11 +121,11 @@ func TestHealthLocalGitUsesCommittedObjectsAndFreshPushedHead(t *testing.T) {
 	assert.Equal(t, 2, collection.LocalRevisionReads)
 	assert.Empty(t, collection.Warning)
 	// A newer pushed source must still be noticed even with unchanged lock metadata.
-	_, err := runHealthGit(root, "add", ".github/workflows/example.md")
+	_, err := runHealthGitContext(context.Background(), root, "add", ".github/workflows/example.md")
 	require.NoError(t, err)
-	_, err = runHealthGit(root, "-c", "commit.gpgsign=false", "commit", "-qm", "pushed source")
+	_, err = runHealthGitContext(context.Background(), root, "-c", "commit.gpgsign=false", "commit", "-qm", "pushed source")
 	require.NoError(t, err)
-	newHead, err := runHealthGit(root, "rev-parse", "HEAD")
+	newHead, err := runHealthGitContext(context.Background(), root, "rev-parse", "HEAD")
 	require.NoError(t, err)
 	healthRunGH = func(context.Context, string, ...string) ([]byte, error) { return newHead, nil }
 	fresh := &HealthCollection{Host: "github.com", repoOverride: "org/repo", APIRateLimit: &GitHubAPIRateLimitState{Remaining: 4000}}

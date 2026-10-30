@@ -3,12 +3,14 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/constants"
@@ -29,10 +31,18 @@ type updateGitHubClient struct {
 }
 
 func withUpdateGitHubClient(ctx context.Context, verbose bool) context.Context {
+	if updateGitHubClientFromContext(ctx) != nil {
+		return ctx
+	}
 	finish := ctxutil.StartOperation(ctx, "GitHub API client setup")
 	opts := api.ClientOptions{
 		Host:    workflow.GitHubCLIHost(),
 		Timeout: constants.DefaultHTTPClientTimeout,
+	}
+	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker && rollout.cacheDir != "" {
+		opts.EnableCache = true
+		opts.CacheDir = rollout.cacheDir
+		opts.CacheTTL = 5 * time.Minute
 	}
 	client, err := api.NewRESTClient(opts)
 	if err != nil {
@@ -55,8 +65,10 @@ func withUpdateGitHubClient(ctx context.Context, verbose bool) context.Context {
 }
 
 func updateGitHubClientFromContext(ctx context.Context) *updateGitHubClient {
-	client, _ := ctx.Value(updateGitHubClientKey{}).(*updateGitHubClient)
-	return client
+	if client, ok := ctx.Value(updateGitHubClientKey{}).(*updateGitHubClient); ok {
+		return client
+	}
+	return nil
 }
 
 func (c *updateGitHubClient) request(ctx context.Context, client *api.RESTClient, endpoint string) (body []byte, headers http.Header, err error) {
@@ -72,7 +84,11 @@ func (c *updateGitHubClient) request(ctx context.Context, client *api.RESTClient
 	if err != nil {
 		return nil, nil, err
 	}
-	defer response.Body.Close()
+	defer func() {
+		if closeErr := response.Body.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("closing GitHub response for %s: %w", endpoint, closeErr))
+		}
+	}()
 	body, err = io.ReadAll(response.Body)
 	if err != nil {
 		return nil, nil, err

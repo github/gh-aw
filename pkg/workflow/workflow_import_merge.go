@@ -1,10 +1,12 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -12,7 +14,9 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/typeutil"
+	"github.com/github/gh-aw/pkg/workflow/taint"
 	"github.com/goccy/go-yaml"
+	"github.com/rhysd/actionlint"
 )
 
 var workflowImportMergeLog = logger.New("workflow:workflow_import_merge")
@@ -80,13 +84,11 @@ func (c *Compiler) processAndMergeServices(frontmatter map[string]any, workflowD
 }
 
 // mergeJobsFromYAMLImports merges jobs from imported YAML workflows with main workflow jobs
-// Main workflow jobs take precedence over imported jobs (override behavior)
-func (c *Compiler) mergeJobsFromYAMLImports(mainJobs map[string]any, mergedJobsJSON string) map[string]any {
-	workflowImportMergeLog.Print("Merging jobs from imported YAML workflows")
-
+// Main workflow jobs take precedence, with outputs and injected steps merged.
+func (c *Compiler) mergeJobsFromYAMLImports(mainJobs map[string]any, mergedJobsJSON string) (map[string]any, error) {
 	if mergedJobsJSON == "" || mergedJobsJSON == "{}" {
 		workflowImportMergeLog.Print("No imported jobs to merge")
-		return mainJobs
+		return mainJobs, nil
 	}
 
 	// Initialize result with main jobs or create empty map
@@ -99,58 +101,20 @@ func (c *Compiler) mergeJobsFromYAMLImports(mainJobs map[string]any, mergedJobsJ
 	// fields are concatenated in encounter order (import1, import2, ..., main)
 	// rather than being reversed by repeated "imported-first" merges against an
 	// already-merged accumulator.
-	importedAccum := make(map[string]any)
-
-	// Split by newlines to handle multiple JSON objects from different imports
-	lines := strings.Split(mergedJobsJSON, "\n")
-	workflowImportMergeLog.Printf("Processing %d job definition lines", len(lines))
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || line == "{}" {
-			continue
-		}
-
-		// Parse JSON line to map
-		var importedJobs map[string]any
-		if err := json.Unmarshal([]byte(line), &importedJobs); err != nil {
-			workflowImportMergeLog.Printf("Skipping malformed job entry: %v", err)
-			continue
-		}
-
-		for jobName, jobConfig := range importedJobs {
-			existingAccum, exists := importedAccum[jobName]
-			if !exists {
-				importedAccum[jobName] = jobConfig
-				continue
-			}
-
-			// Merge with the previously accumulated imported job, keeping
-			// encounter order: existing accumulated steps first, then the
-			// newly encountered import's steps.
-			mergedJob, merged := mergeJobInjectedSteps(jobName, jobConfig, existingAccum)
-			if merged {
-				workflowImportMergeLog.Printf("Merged injected job steps across imports for job %s (encounter order)", jobName)
-				importedAccum[jobName] = mergedJob
-				continue
-			}
-
-			workflowImportMergeLog.Printf("Skipping duplicate imported job %s (later import does not define step injection fields)", jobName)
-		}
-	}
+	importedAccum, regularStepIDs := accumulateImportedJobLines(mergedJobsJSON)
 
 	// Merge accumulated imported jobs into the main workflow jobs. Main
 	// workflow jobs take precedence (don't override), except for setup/pre/
-	// regular step fields which are merged deterministically (imported steps
-	// first, then main workflow steps).
+	// regular step fields (imported steps first, then main workflow steps) and
+	// outputs (union by name, with main workflow values taking precedence).
 	for jobName, jobConfig := range importedAccum {
 		if _, exists := result[jobName]; !exists {
 			workflowImportMergeLog.Printf("Adding imported job: %s", jobName)
 			result[jobName] = jobConfig
 		} else {
-			mergedJob, merged := mergeJobInjectedSteps(jobName, result[jobName], jobConfig)
+			mergedJob, merged := mergeJobImportFields(jobName, result[jobName], jobConfig)
 			if merged {
-				workflowImportMergeLog.Printf("Merged injected job steps for conflicting job %s (imported first, then main per field)", jobName)
+				workflowImportMergeLog.Printf("Merged outputs and injected steps for conflicting job %s (main output values take precedence)", jobName)
 				result[jobName] = mergedJob
 				continue
 			}
@@ -159,8 +123,188 @@ func (c *Compiler) mergeJobsFromYAMLImports(mainJobs map[string]any, mergedJobsJ
 		}
 	}
 
+	if err := validateMergedJobOutputSteps(result, regularStepIDs); err != nil {
+		return nil, err
+	}
 	workflowImportMergeLog.Printf("Successfully merged jobs: total=%d, imported=%d", len(result), len(result)-len(mainJobs))
-	return result
+	return result, nil
+}
+
+func accumulateImportedJobLines(mergedJobsJSON string) (map[string]any, map[string]map[string]struct{}) {
+	accumulated := make(map[string]any)
+	regularStepIDs := make(map[string]map[string]struct{})
+	lines := strings.Split(mergedJobsJSON, "\n")
+	workflowImportMergeLog.Printf("Processing %d job definition lines", len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "{}" {
+			continue
+		}
+		var importedJobs map[string]any
+		if err := json.Unmarshal([]byte(line), &importedJobs); err != nil {
+			workflowImportMergeLog.Printf("Skipping malformed job entry: %v", err)
+			continue
+		}
+		for jobName, jobConfig := range importedJobs {
+			if regularStepIDs[jobName] == nil {
+				regularStepIDs[jobName] = make(map[string]struct{})
+			}
+			maps.Copy(regularStepIDs[jobName], importedJobStepIDs(jobConfig, "steps"))
+		}
+		accumulateImportedJobs(accumulated, importedJobs)
+	}
+	return accumulated, regularStepIDs
+}
+
+func accumulateImportedJobs(accumulated map[string]any, importedJobs map[string]any) {
+	for jobName, jobConfig := range importedJobs {
+		existing, exists := accumulated[jobName]
+		if !exists {
+			accumulated[jobName] = jobConfig
+			continue
+		}
+
+		// Keep injected steps in encounter order and retain the existing job
+		// definition when a later import only contributes output mappings.
+		mergedJob, merged := mergeJobInjectedSteps(jobName, jobConfig, existing)
+		if outputs, ok := mergeJobOutputField(jobConfig, existing); ok {
+			laterMap, ok := jobConfig.(map[string]any)
+			if !ok {
+				continue
+			}
+			_, hasLaterOutputs := laterMap["outputs"]
+			if existingMap, ok := existing.(map[string]any); ok && (!merged || hasLaterOutputs && len(laterMap) == 1) {
+				mergedJob = maps.Clone(existingMap)
+			}
+			mergedJob["outputs"] = outputs
+			merged = true
+		}
+		if merged {
+			workflowImportMergeLog.Printf("Merged outputs and injected steps across imports for job %s (encounter order)", jobName)
+			accumulated[jobName] = mergedJob
+			continue
+		}
+
+		workflowImportMergeLog.Printf("Skipping duplicate imported job %s (no mergeable fields)", jobName)
+	}
+}
+
+func importedJobStepIDs(job any, fields ...string) map[string]struct{} {
+	ids := make(map[string]struct{})
+	jobMap, ok := job.(map[string]any)
+	if !ok {
+		return ids
+	}
+	for _, field := range fields {
+		steps, _ := extractJobStepField(jobMap, field)
+		for _, step := range steps {
+			stepMap, ok := step.(map[string]any)
+			if !ok {
+				continue
+			}
+			if id, ok := stepMap["id"].(string); ok {
+				ids[strings.ToLower(id)] = struct{}{}
+			}
+		}
+	}
+	return ids
+}
+
+// Check the final outputs after main-workflow overrides, not intermediate
+// imports: a main output or an injected step may resolve an earlier conflict.
+func validateMergedJobOutputSteps(jobs map[string]any, regularStepIDs map[string]map[string]struct{}) error {
+	for _, jobName := range slices.Sorted(maps.Keys(regularStepIDs)) {
+		retained := importedJobStepIDs(jobs[jobName], "steps", "setup-steps", "pre-steps")
+		discarded := maps.Clone(regularStepIDs[jobName])
+		for id := range retained {
+			delete(discarded, id)
+		}
+		if len(discarded) == 0 {
+			continue
+		}
+		jobMap, ok := jobs[jobName].(map[string]any)
+		if !ok {
+			continue
+		}
+		outputs, ok := jobMap["outputs"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, name := range slices.Sorted(maps.Keys(outputs)) {
+			text, ok := outputs[name].(string)
+			if !ok {
+				continue
+			}
+			path := "jobs." + jobName + ".outputs." + name
+			err := taint.VisitInterpolations(context.Background(), text, path, func(_, _, _ int, node actionlint.ExprNode) error {
+				discardedID := discardedOutputStepID(node, discarded)
+				if discardedID != "" {
+					return fmt.Errorf("%s references discarded regular step %q. Keep the producer in the retained job or use pre-steps to share it across imports", path, discardedID)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func discardedOutputStepID(node actionlint.ExprNode, discarded map[string]struct{}) string {
+	var discardedID string
+	actionlint.VisitExprNode(node, func(child, _ actionlint.ExprNode, entering bool) {
+		if !entering || discardedID != "" {
+			return
+		}
+		var receiver actionlint.ExprNode
+		var id string
+		switch access := child.(type) {
+		case *actionlint.ObjectDerefNode:
+			receiver, id = access.Receiver, access.Property
+		case *actionlint.IndexAccessNode:
+			if key, ok := access.Index.(*actionlint.StringNode); ok {
+				receiver, id = access.Operand, key.Value
+			}
+		}
+		if variable, ok := receiver.(*actionlint.VariableNode); ok && strings.EqualFold(variable.Name, "steps") {
+			if _, missing := discarded[strings.ToLower(id)]; missing {
+				discardedID = id
+			}
+		}
+	})
+	return discardedID
+}
+
+func mergeJobImportFields(jobName string, mainJob any, importedJob any) (map[string]any, bool) {
+	merged, mergedAny := mergeJobInjectedSteps(jobName, mainJob, importedJob)
+	if outputs, ok := mergeJobOutputField(mainJob, importedJob); ok {
+		if mainMap, ok := mainJob.(map[string]any); ok && !mergedAny {
+			merged = maps.Clone(mainMap)
+		}
+		merged["outputs"] = outputs
+		mergedAny = true
+	}
+	return merged, mergedAny
+}
+
+func mergeJobOutputField(mainJob any, importedJob any) (map[string]any, bool) {
+	mainMap, mainOK := mainJob.(map[string]any)
+	importedMap, importedOK := importedJob.(map[string]any)
+	if !mainOK || !importedOK {
+		return nil, false
+	}
+	mainOutputs, hasMainOutputs := mainMap["outputs"]
+	importedOutputs, hasImportedOutputs := importedMap["outputs"]
+	mainOutputMap, validMainOutputs := mainOutputs.(map[string]any)
+	importedOutputMap, validImportedOutputs := importedOutputs.(map[string]any)
+	if (mainOutputs != nil && !validMainOutputs) || (importedOutputs != nil && !validImportedOutputs) || (!hasMainOutputs && !hasImportedOutputs) {
+		return nil, false
+	}
+	outputs := make(map[string]any)
+	maps.Copy(outputs, importedOutputMap)
+	maps.Copy(outputs, mainOutputMap)
+	return outputs, true
 }
 
 func mergeJobInjectedSteps(jobName string, mainJob any, importedJob any) (map[string]any, bool) {
@@ -174,9 +318,8 @@ func mergeJobInjectedSteps(jobName string, mainJob any, importedJob any) (map[st
 	}
 
 	merged := make(map[string]any, len(mainMap))
-	// Intentionally shallow-copy the top-level job map: this merge operation only
-	// rewrites the setup-steps and/or pre-steps keys with newly allocated slices
-	// and does not mutate any nested structures from other keys.
+	// Merged slices and output maps are allocated separately, so a shallow copy
+	// preserves the input job configurations.
 	maps.Copy(merged, mainMap)
 
 	mergedAny := false

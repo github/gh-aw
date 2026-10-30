@@ -44,7 +44,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | Runtime repository-list checkout | [`RuntimeRepositoryCheckout.tla`](RuntimeRepositoryCheckout.tla) | Trusted policy, bounded whole-batch validation, visibility, entry authentication, agent/privileged finalization, job-local manifests, staged isolation, and failure reporting. |
 | Pull-request fork admission | [`PullRequestForkAdmission.tla`](PullRequestForkAdmission.tla) | Same-repository default, repository-pattern or explicit author-association admission, non-PR trigger preservation, and permission independence. |
 | `pull_request_target` checkout policy | [`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) | Strict warning acknowledgment, explicit checkout disablement, trusted base checkout, exact allowlisted external checkout, and fail-closed `fetch` handling. |
-| PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions; `labeled` and other unlisted actions retain the collaborator permission floor, as does the stricter allow-listed comment/review exception. |
+| PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions, including allow-listed `edited` events only when `changes` contains a non-null object-valued `body` field and no other fields; other edits and actions retain the collaborator permission floor, as does the stricter allow-listed comment/review exception. |
 | Patch/bundle application | [`SafeOutputTransport.tla`](SafeOutputTransport.tla) | Captured bytes, trusted transformations, private snapshots, publication retries, sticky failures, bounded local checking cost, and finally cleanup. |
 | Bundle Git operations | [`SafeOutputGit.tla`](SafeOutputGit.tla) | Explicit prerequisite recovery, offline optional discovery, bounded comparison/history work, credential roles, and separate size/protection provenance. |
 | Host-side MCP compilation | [`MCPCompile.tla`](MCPCompile.tla) | Startup write capability, actor authorization, early option rejection, filesystem isolation, cached-only imports, repository-root cache selection, validation, and write-enabled emission. |
@@ -63,6 +63,23 @@ must succeed. Failure before request publication causes origin validation to
 fail. Agent failures revoke the modeled engine credential. A minted installation
 token remains live until the `actions/create-github-app-token` post step, which
 revokes it after either safe-output success or failure.
+
+## Cache lifecycle and read-only boundaries
+
+The compiler's [CTR-019 cache contract](../compiler-threat-detection-spec.md#513-cache-access-and-publication-ctr-019)
+separates cache restoration and local edits from artifact handoff and
+detection-gated cache publication. Unlike the safe-output lifecycle above,
+the cache-memory publisher requires the agent job to succeed as well as
+explicit detector acceptance and an eligible runtime event. Artifact existence
+does not authorize publication.
+
+These models do not represent cache-service entries, restore-prefix matching,
+eviction, event-scoped cache tokens, or the cache-memory publisher principal.
+The host-side `MCPCompile.tla` model's read-only filesystem/import-cache
+invariants are independent of runtime job `cache-mode: read`. Entry
+`restore-only: true` also does not make the local workspace immutable.
+Generated-YAML, namespace, lifecycle, and lint tests mapped under CTR-019 are
+the current evidence; the models are not a cache-poisoning proof.
 
 ## Pull-request fork admission
 
@@ -509,11 +526,15 @@ checks; the real-Git `.gitmodules` regression is not replaced by this abstractio
 
 [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) exhaustively
 models `pull_request` and `pull_request_target` actions `opened`, `synchronize`,
-`ready_for_review`, `reopened`, `labeled`, and other unlisted actions, as well as `issue_comment`,
+`ready_for_review`, `reopened`, `edited`, `labeled`, and other unlisted actions, as well as `issue_comment`,
 `pull_request_review_comment`, and `pull_request_review`. The branch-event
 exception requires a Bot sender whose login exactly matches the runtime actor
 and matching positive runtime, PR-head, and PR-base repository identities. The
-comment/review exception separately requires an allow-listed Bot sender, exact
+`edited` branch exception additionally requires an allow-listed actor and a
+`changes` object containing only a non-null object-valued `body` field; missing
+or malformed changes, title/base edits, and mixed body/title or body/base changes
+retain the collaborator permission floor.
+The comment/review exception separately requires an allow-listed Bot sender, exact
 equality between the webhook sender and matching comment or review author,
 canonical equality between the runtime actor and sender, and matching
 repository identities. Every other case retains the write-or-higher
@@ -535,8 +556,9 @@ For each negative control, copy the `.cfg` to a temporary file, set `Fault` to
 one of `"event-bypass"`, `"sender-type-bypass"`, `"author-bypass"` (which covers
 comment and review author mismatches), `"actor-bypass"`, `"allowlist-bypass"`,
 `"repository-bypass"`, `"branch-event-bypass"`, `"branch-action-bypass"`,
-`"branch-sender-type-bypass"`, `"branch-sender-bypass"`, or
-`"branch-repository-bypass"`, and confirm TLC reports
+`"branch-sender-type-bypass"`, `"branch-sender-bypass"`,
+`"branch-repository-bypass"`, `"branch-edited-body-bypass"`, or
+`"branch-edited-allowlist-bypass"`, and confirm TLC reports
 `NoUnauthorizedBotBypass`.
 
 | Predicate | Required safety condition | Architecture / threat rule | Compiler/runtime evidence |

@@ -882,6 +882,30 @@ describe("generateGitPatch – Strategy 3 picks closest remote merge-base", () =
       }
     }
   });
+
+  it("reports filtered Strategy 3 synthesis failures instead of a generic no-changes error", async () => {
+    const base = execSync("git rev-parse HEAD", { cwd: repoDir, encoding: "utf8" }).trim();
+    execSync(`git update-ref refs/remotes/origin/secondary ${base}`, { cwd: repoDir });
+    execSync("git checkout -b agent-branch", { cwd: repoDir });
+    fs.writeFileSync(path.join(repoDir, "agent.txt"), "retained source\n");
+    execSync("git add . && git commit -m 'agent change'", { cwd: repoDir });
+    process.env.GITHUB_SHA = "side-repo-sha-not-in-target-repo";
+
+    const gitHelpers = require("./git_helpers.cjs");
+    const originalExecGitSync = gitHelpers.execGitSync;
+    gitHelpers.execGitSync = (args, options) => {
+      if (args[0] === "write-tree") throw new Error("synthetic tree creation failed");
+      return originalExecGitSync(args, options);
+    };
+    try {
+      const { generateGitPatch } = require("./generate_git_patch.cjs");
+      const result = await generateGitPatch("agent-branch", "missing-default", { cwd: repoDir, excludedFiles: ["*.yml"] });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to generate filtered patch: synthetic tree creation failed");
+    } finally {
+      gitHelpers.execGitSync = originalExecGitSync;
+    }
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -94,20 +94,27 @@ func analyzeAssignStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 	if !ok || assign.Tok != token.ADD_ASSIGN || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 		return
 	}
+	var leftOperand, rhsOperand ast.Expr
+	for _, operand := range assign.Lhs {
+		leftOperand = operand
+	}
+	for _, operand := range assign.Rhs {
+		rhsOperand = operand
+	}
 	var rightExpr ast.Expr
 	var rightOverride string
-	switch rhs := assign.Rhs[0].(type) {
+	switch rhs := astutil.UnwrapParenExpr(rhsOperand).(type) {
 	case *ast.BinaryExpr:
 		if rhs.Op != token.ADD || !isSlashLiteral(rhs.X) {
 			return
 		}
 		rightExpr = rhs.Y
 	default:
-		trimmed, isEmbedded := embeddedSlashLiteral(assign.Rhs[0])
+		trimmed, isEmbedded := embeddedSlashLiteral(rhsOperand)
 		if !isEmbedded {
 			return
 		}
-		rightExpr = assign.Rhs[0]
+		rightExpr = rhsOperand
 		rightOverride = trimmed
 	}
 	pos := pass.Fset.PositionFor(assign.Pos(), false)
@@ -118,13 +125,13 @@ func analyzeAssignStmt(pass *analysis.Pass, n ast.Node, generatedFiles filecheck
 		return
 	}
 
-	leftText := astutil.NodeText(pass.Fset, assign.Lhs[0])
+	leftText := astutil.NodeText(pass.Fset, leftOperand)
 	rightText := astutil.NodeText(pass.Fset, rightExpr)
 	if rightOverride != "" {
 		rightText = rightOverride
 	}
 	message := `manual "/" path concatenation; use filepath.Join (or path.Join) instead`
-	if isShortOperandText(leftText) && isShortOperandText(rightText) && !containsSlashConcat(assign.Lhs[0]) {
+	if isShortOperandText(leftText) && isShortOperandText(rightText) && !containsSlashConcat(leftOperand) {
 		message = fmt.Sprintf(`manual "/" path concatenation; use filepath.Join(%s, %s) (or path.Join) instead`, leftText, rightText)
 	}
 	pass.Report(analysis.Diagnostic{
@@ -145,7 +152,7 @@ func matchSlashSeparator(bin *ast.BinaryExpr) (left ast.Expr, rightOverride stri
 	if bin.Op != token.ADD {
 		return nil, "", false
 	}
-	if inner, isBinary := bin.X.(*ast.BinaryExpr); isBinary && inner.Op == token.ADD && isSlashLiteral(inner.Y) {
+	if inner, isBinary := astutil.UnwrapParenExpr(bin.X).(*ast.BinaryExpr); isBinary && inner.Op == token.ADD && isSlashLiteral(inner.Y) {
 		// A left operand that is itself the separator (e.g. `"/" + "/" + name`)
 		// carries no path segment to join, so it is not a manual join.
 		if isSlashLiteral(inner.X) {
@@ -169,7 +176,7 @@ func matchSlashSeparator(bin *ast.BinaryExpr) (left ast.Expr, rightOverride stri
 
 // isSlashLiteral reports whether expr is the string literal "/".
 func isSlashLiteral(expr ast.Expr) bool {
-	lit, ok := expr.(*ast.BasicLit)
+	lit, ok := astutil.UnwrapParenExpr(expr).(*ast.BasicLit)
 	if !ok || lit.Kind != token.STRING {
 		return false
 	}
@@ -183,7 +190,7 @@ func isSlashLiteral(expr ast.Expr) bool {
 // literal's text quoted without the leading slash (e.g. `"config.yml"`),
 // suitable for a filepath.Join diagnostic argument.
 func embeddedSlashLiteral(expr ast.Expr) (trimmedQuoted string, ok bool) {
-	lit, isLit := expr.(*ast.BasicLit)
+	lit, isLit := astutil.UnwrapParenExpr(expr).(*ast.BasicLit)
 	if !isLit || lit.Kind != token.STRING {
 		return "", false
 	}

@@ -121,6 +121,19 @@ describe("main", () => {
     };
   });
 
+  it("uses a canonical workflow link when the existing marker contains only a numeric run ID", async () => {
+    global.context.payload.issue.body = "<!-- gh-aw-agentic-workflow: my-workflow, id: 456 -->";
+
+    await main();
+
+    expect(process.env.GH_AW_RUN_URL).toBe("456");
+    expect(mockGithub.rest.issues.createComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("[run `456`](https://github.com/test-owner/test-repo/actions/runs/456)"),
+      })
+    );
+  });
+
   it("skips silently when event type is not 'issues'", async () => {
     global.context = { ...global.context, eventName: "pull_request" };
 

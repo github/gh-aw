@@ -576,6 +576,16 @@
           "provider_type": "openai",
           "wire_api": "responses"
         },
+        "gpt-5.6-luna-utility": {
+          "cost": {
+            "input": "2e-07",
+            "output": "1.2e-06",
+            "cache_read": "2e-08",
+            "cache_write": "2.5e-07"
+          },
+          "provider_type": "openai",
+          "wire_api": "responses"
+        },
         "gpt-5.6-sol": {
           "cost": {
             "input": "4e-06",
@@ -632,6 +642,16 @@
             "output": "1e-05",
             "cache_read": "1e-07",
             "cache_write": "2.5e-06"
+          },
+          "provider_type": "openai",
+          "wire_api": "responses"
+        },
+        "gpt-6.1-terra": {
+          "cost": {
+            "input": "1e-06",
+            "output": "5e-06",
+            "cache_read": "5e-08",
+            "cache_write": "1.25e-06"
           },
           "provider_type": "openai",
           "wire_api": "responses"
@@ -1080,6 +1100,16 @@
             "output": "1e-05",
             "cache_read": "1e-07",
             "cache_write": "2.5e-06"
+          },
+          "provider_type": "openai",
+          "wire_api": "responses"
+        },
+        "gpt-6.1-terra": {
+          "cost": {
+            "input": "1e-06",
+            "output": "5e-06",
+            "cache_read": "5e-08",
+            "cache_write": "1.25e-06"
           },
           "provider_type": "openai",
           "wire_api": "responses"

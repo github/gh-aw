@@ -3,8 +3,10 @@
 package workflow
 
 import (
+	"maps"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -159,6 +161,62 @@ func TestValidateSecretsSerializationExpressions(t *testing.T) {
 			wantWarning:     true,
 		},
 		{
+			name:            "single-quoted YAML decodes Actions string literals — strict mode errors",
+			frontmatterYAML: "env:\n  ALL_SECRETS: '${{ format(''{0}'', toJSON(secrets)) }}'\n",
+			strictMode:      true,
+			wantError:       true,
+			errorContains:   "${{ format('{0}', toJSON(secrets)) }}",
+		},
+		{
+			name:            "single-quoted YAML decodes Actions string literals — non-strict warns",
+			frontmatterYAML: "env:\n  ALL_SECRETS: '${{ format(''{0}'', toJSON(secrets)) }}'\n",
+			rawFrontmatter:  map[string]any{"strict": false},
+			wantWarning:     true,
+		},
+		{
+			name:            "double-quoted YAML decodes escaped function name",
+			frontmatterYAML: `env: { ALL_SECRETS: "${{ to\u004aSON(secrets) }}" }`,
+			strictMode:      true,
+			wantError:       true,
+			errorContains:   "${{ toJSON(secrets) }}",
+		},
+		{
+			name:            "nested mapping and sequence scalars are scanned",
+			frontmatterYAML: "steps:\n  - env:\n      ALL_SECRETS: '${{ format(''{0}'', toJSON(secrets)) }}'\n",
+			strictMode:      true,
+			wantError:       true,
+			errorContains:   "secrets serialization",
+		},
+		{
+			name:            "folded YAML scalar is scanned after decoding",
+			frontmatterYAML: "env:\n  ALL_SECRETS: >-\n    ${{ format('{0}',\n    toJSON(secrets)) }}\n",
+			strictMode:      true,
+			wantError:       true,
+			errorContains:   "secrets serialization",
+		},
+		{
+			name:            "single-quoted YAML with Actions string literal remains safe",
+			frontmatterYAML: "env:\n  MESSAGE: '${{ ''toJSON(secrets)'' }}'\n",
+			strictMode:      true,
+		},
+		{
+			name:            "specific secret in single-quoted YAML remains safe",
+			frontmatterYAML: "env:\n  TOKEN: '${{ format(''{0}'', toJSON(secrets.MY_TOKEN)) }}'\n",
+			strictMode:      true,
+		},
+		{
+			name:            "YAML comments are not expressions evaluated by Actions",
+			frontmatterYAML: "# Example: ${{ toJSON(secrets) }}\nenv: {}\n",
+			strictMode:      true,
+		},
+		{
+			name:            "decoded YAML and Markdown matches share one warning",
+			frontmatterYAML: "env:\n  ALL_SECRETS: '${{ toJSON(secrets) }}'\n",
+			markdownBody:    "${{ toJSON(secrets) }}",
+			rawFrontmatter:  map[string]any{"strict": false},
+			wantWarning:     true,
+		},
+		{
 			name: "toJSON(secrets) case-insensitive — strict mode errors",
 			// Split literal to avoid secret-scanning false positive on the uppercase variant.
 			markdownBody:   "Dump: ${{" + " TOJSON(SECRETS) }}",
@@ -203,10 +261,15 @@ func TestValidateSecretsSerializationExpressions(t *testing.T) {
 			compiler := NewCompiler()
 			compiler.strictMode = tt.strictMode
 
+			frontmatter := make(map[string]any)
+			if tt.frontmatterYAML != "" {
+				require.NoError(t, yaml.Unmarshal([]byte(tt.frontmatterYAML), &frontmatter))
+			}
+			maps.Copy(frontmatter, tt.rawFrontmatter)
 			workflowData := &WorkflowData{
 				MarkdownContent: tt.markdownBody,
 				FrontmatterYAML: tt.frontmatterYAML,
-				RawFrontmatter:  tt.rawFrontmatter,
+				RawFrontmatter:  frontmatter,
 			}
 
 			err := compiler.validateSecretsSerializationExpressions(workflowData)
@@ -227,6 +290,34 @@ func TestValidateSecretsSerializationExpressions(t *testing.T) {
 			} else {
 				assert.Equal(t, 0, compiler.GetWarningCount(), "expected no warnings")
 			}
+		})
+	}
+}
+
+func TestValidateSecretsSerializationDecodedFrontmatter(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.strictMode = true
+	err := compiler.validateSecretsSerializationExpressions(&WorkflowData{
+		RawFrontmatter: map[string]any{
+			"env": map[string]any{"ALL_SECRETS": "${{ format('{0}', toJSON(secrets)) }}"},
+		},
+	})
+	require.ErrorContains(t, err, "secrets serialization")
+}
+
+func TestCompileSecretsSerializationDecodedFrontmatter(t *testing.T) {
+	for _, field := range []string{
+		"env:\n  ALL_SECRETS: '${{ format(''{0}'', toJSON(secrets)) }}'\n",
+		"steps:\n  - run: echo example\n    env:\n      ALL_SECRETS: '${{ format(''{0}'', toJSON(secrets)) }}'\n",
+	} {
+		t.Run(field, func(t *testing.T) {
+			compiler := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+			compiler.strictMode = true
+			data, err := compiler.ParseWorkflowString("---\nname: Secrets serialization\non: workflow_dispatch\n"+field+"---\nSummarize this repository.\n", "workflow.md")
+			require.NoError(t, err)
+
+			_, err = compiler.CompileToYAML(data, "workflow.md")
+			require.ErrorContains(t, err, "strict mode: secrets serialization")
 		})
 	}
 }

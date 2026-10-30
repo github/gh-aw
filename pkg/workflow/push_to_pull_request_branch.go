@@ -31,6 +31,7 @@ type PushToPullRequestBranchConfig struct {
 	ProtectedFilesExclude          []string         `yaml:"-"`                                             // Files/prefixes to exclude from the default protected list (from object-form protected-files.exclude). Not sourced from YAML directly; populated during parsing.
 	AllowedFiles                   []string         `yaml:"allowed-files,omitempty"`                       // Strict allowlist of glob patterns for files eligible for push. Checked independently of protected-files; both checks must pass.
 	ExcludedFiles                  []string         `yaml:"excluded-files,omitempty"`                      // List of glob patterns for files to exclude from the patch using git :(exclude) pathspecs. Matching files are stripped by git at generation time and will not appear in the commit or be subject to allowed-files or protected-files checks.
+	ExcludeLockYml                 bool             `yaml:"exclude-lock-yml,omitempty"`                    // Exclude compiled .github/workflows/*.lock.yml files from branch writes.
 	MaxPatchSize                   int              `yaml:"max-patch-size,omitempty"`                      // Maximum allowed patch size in KB for push-to-pull-request-branch only. Overrides safe-outputs.max-patch-size when set.
 	PatchFormat                    string           `yaml:"patch-format,omitempty"`                        // Transport format for packaging changes: "bundle" (default, uses git bundle and preserves merge topology/per-commit metadata) or "am" (uses git format-patch).
 	FallbackAsPullRequest          *bool            `yaml:"fallback-as-pull-request,omitempty"`            // When true (default), creates a fallback pull request if direct push fails due to diverged/non-fast-forward branch. When false, fallback is disabled and pull-requests: write is not requested.
@@ -173,6 +174,9 @@ func (c *Compiler) parsePushToPullRequestBranchFilePolicies(configMap map[string
 	}
 	config.AllowedFiles = ParseStringArrayFromConfig(configMap, "allowed-files", pushToPullRequestBranchLog)
 	config.ExcludedFiles = ParseStringArrayFromConfig(configMap, "excluded-files", pushToPullRequestBranchLog)
+	if value, ok := configMap["exclude-lock-yml"].(bool); ok {
+		config.ExcludeLockYml = value
+	}
 }
 
 func (c *Compiler) parsePushToPullRequestBranchTransport(configMap map[string]any, config *PushToPullRequestBranchConfig) {

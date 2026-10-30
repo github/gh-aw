@@ -2044,12 +2044,12 @@
                       }
                     }
                   ],
-                  "description": "When true, allows workflow to run on pull requests from forked repositories with write permissions. Security consideration: use cautiously as fork PRs run with base repository permissions."
+                  "description": "Filter fork pull requests by repository pattern (string or list). Omission and an empty list both allow only same-repository PRs. Exact owner/repo entries or trusted owner/* patterns admit matching forks; '*' allows all forks. Strict mode warns on any '*' entry and recommends narrower admission, but compilation continues. Strict mode rejects expressions and unsupported pattern forms. Same-repository PRs remain allowed. Actor authorization and checkout restrictions remain mandatory in strict mode; acknowledge-risk neither bypasses them nor suppresses the fork warning. This does not change GitHub's base-repository permissions or secret availability for pull_request_target."
                 },
                 "acknowledge-risk": {
                   "type": "boolean",
                   "default": false,
-                  "description": "Acknowledge elevated permissions and secret access to suppress only the strict-mode pull_request_target trigger warning. Checkout validation remains enforced."
+                  "description": "Acknowledge elevated permissions and secret access to suppress only the strict-mode pull_request_target trigger warning. The unrestricted-forks warning, actor authorization, fork-pattern validation, and checkout validation remain enforced."
                 },
                 "allowed-checkouts": {
                   "type": "array",
@@ -8254,14 +8254,15 @@
                 },
                 "protected-files": {
                   "type": "object",
-                  "description": "Protected files prevent workflow run approval when modified by the associated pull request. Use exclude to remove filenames or path prefixes from the default protected set, or a leading / for an exact repository path.",
+                  "description": "Protected files prevent workflow run approval when modified by the associated pull request. Use exclude to remove filenames or path prefixes from the default protected set, or a leading / for a repository-root path glob.",
                   "properties": {
                     "exclude": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$"
                       },
-                      "description": "Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection everywhere they match. A leading / excludes only the exact repository path (e.g. /pyproject.toml), leaving same-named nested files protected."
+                      "description": "Basenames (e.g. AGENTS.md) and path prefixes (e.g. .agents/) remove protection everywhere they match. A leading / matches a repository-root path glob: * does not match /, while ** does. Without wildcards, /pyproject.toml excludes only that root file. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace."
                     }
                   },
                   "additionalProperties": false
@@ -9081,9 +9082,10 @@
                         "exclude": {
                           "type": "array",
                           "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$"
                           },
-                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
+                          "description": "List of basenames (e.g. AGENTS.md) or path prefixes (e.g. .agents/) to remove from the default protected-file set. A leading / matches a repository-root path glob: * does not match /, while ** does. Without wildcards, /pyproject.toml excludes only that root file. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace.",
                           "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
                         }
                       },
@@ -9109,6 +9111,11 @@
                   "type": "boolean",
                   "description": "When true (and preserve-branch-name is true), allows the handler to force-delete an existing remote branch ref and recreate it from the agent's local HEAD. When false (default), if the agent-specified branch already exists on the remote with preserve-branch-name enabled, the handler falls back (e.g. opens an issue) rather than overwriting the remote ref. Useful for long-lived reusable branches whose previous PR was merged.",
                   "default": false
+                },
+                "exclude-lock-yml": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Exclude .lock.yml files under .github/workflows from both patch and bundle transports to avoid GitHub Actions token workflow-write restrictions. When workflow YAML changes are omitted, the pull request includes a reminder to rerun gh aw compile. Other workflow YAML files are not excluded."
                 },
                 "excluded-files": {
                   "type": "array",
@@ -11394,9 +11401,10 @@
                         "exclude": {
                           "type": "array",
                           "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[^\\s]*[A-Za-z0-9_-][^\\s]*$"
                           },
-                          "description": "List of filenames or path prefixes to remove from the default protected-file set. Items are matched by basename (e.g. \"AGENTS.md\") or path prefix (e.g. \".agents/\"). A leading / matches only the exact repository path (e.g. \"/pyproject.toml\"), keeping nested files with the same name protected.",
+                          "description": "List of basenames (e.g. AGENTS.md) or path prefixes (e.g. .agents/) to remove from the default protected-file set. A leading / matches a repository-root path glob: * does not match /, while ** does. Without wildcards, /pyproject.toml excludes only that root file. Each pattern must contain a letter, digit, underscore, or hyphen and no whitespace.",
                           "examples": [["AGENTS.md"], ["AGENTS.md", ".agents/"], ["/pyproject.toml"]]
                         }
                       },
@@ -11412,6 +11420,11 @@
                     "type": "string"
                   },
                   "description": "Exclusive allowlist of glob patterns. When set, every file in the patch must match at least one pattern \u2014 files outside the list are always refused, including normal source files. This is a restriction, not an exception: setting allowed-files: [\".github/workflows/*\"] blocks all other files. To allow multiple sets of files, list all patterns explicitly. Acts independently of the protected-files policy; both checks must pass. To modify a protected file, it must both match allowed-files and be permitted by protected-files (e.g. protected-files: allowed). Supports * (any characters except /) and ** (any characters including /)."
+                },
+                "exclude-lock-yml": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Exclude .lock.yml files under .github/workflows from both patch and bundle transports to avoid GitHub Actions token workflow-write restrictions. When workflow YAML changes are omitted, the push summary and pull request comment include a reminder to rerun gh aw compile. Other workflow YAML files are not excluded."
                 },
                 "excluded-files": {
                   "type": "array",
@@ -15654,7 +15667,7 @@
             },
             "model-routing": {
               "type": "object",
-              "description": "Experimental per-run GitHub Copilot model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines; requires the AWF firewall and ignores fixed model and effort settings. See https://github.github.com/gh-aw/reference/model-routing/.",
+              "description": "Experimental per-run model and reasoning-effort selection from the task text for Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores fixed model and effort settings. See https://github.github.com/gh-aw/reference/model-routing/.",
               "required": ["goal", "mode"],
               "additionalProperties": false,
               "properties": {
@@ -15685,7 +15698,7 @@
                       }
                     ]
                   },
-                  "description": "Optional exact Copilot model names or gh-aw model aliases (such as small or sonnet) that narrow the router's choice for the main agent only. Aliases expand to their GitHub Copilot model patterns, limited to the engine's model family for Claude and Codex. This is not a request policy; put patterns such as gpt-* in models.allowed or models.blocked. When omitted, the router chooses from the models that policy allows (Claude and Codex only from their own model family). Among workflows that enable routing for the same engine, if any omits allowed-models, the router has no shortlist; otherwise, their lists are combined. GitHub Actions expressions are allowed only when neither models.allowed nor models.blocked is set."
+                  "description": "Optional exact model names of the routing provider or gh-aw model aliases (such as small or sonnet) that narrow the router's choice for the main agent only. Aliases expand to their model patterns for the routing provider (GitHub Copilot, or Anthropic or OpenAI for native Claude and Codex routing), limited to the engine's model family for Claude and Codex. This is not a request policy; put patterns such as gpt-* in models.allowed or models.blocked. When omitted, the router chooses from the models that policy allows (Claude and Codex only from their own model family). Among workflows that enable routing for the same engine, if any omits allowed-models, the router has no shortlist; otherwise, their lists are combined. GitHub Actions expressions are allowed only when neither models.allowed nor models.blocked is set."
                 }
               }
             },
@@ -17043,6 +17056,11 @@
         "pull-request": {
           "type": "boolean",
           "description": "Set to false to disable the compiler-generated PR branch checkout and its associated base-config snapshot/restore steps. The normal repository checkout remains enabled."
+        },
+        "pull-request-floating-head": {
+          "type": "boolean",
+          "default": false,
+          "description": "Explicitly allow the compiler-generated PR checkout to select the current API head instead of the triggering event or review revision. Applies workflow-wide if enabled in any checkout entry. The selected SHA is still fetched, rechecked, and verified; this is current-head execution, not revision approval. Does not enable a disabled PR checkout. Requires a literal boolean."
         },
         "repository": {
           "type": "string",

@@ -225,12 +225,14 @@ func extractSecretsFromStepValue(value any) []string {
 func filterBuiltinTokens(refs []string) []string {
 	out := refs[:0:0]
 	for _, ref := range refs {
-		names := secretsNamePattern.FindAllStringSubmatch(ref, -1)
-		allBuiltin := len(names) > 0
-		for _, m := range names {
-			if len(m) >= 2 && m[1] != "GITHUB_TOKEN" {
-				allBuiltin = false
-				break
+		allBuiltin := false
+		for _, path := range interpolationReferences(ref) {
+			if strings.EqualFold(path[0], "secrets") {
+				if len(path) != 2 || path[1] != "GITHUB_TOKEN" {
+					allBuiltin = false
+					break
+				}
+				allBuiltin = true
 			}
 		}
 		if !allBuiltin {

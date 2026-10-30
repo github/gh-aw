@@ -41,6 +41,7 @@ safe-outputs:
     normalize-closing-keywords: true # strip backticks around recognized issue-closing keywords in PR body text
     preserve-branch-name: true    # omit random salt suffix from branch name (default: false)
     recreate-ref: true            # force-recreate remote branch when it already exists (requires preserve-branch-name; default: false)
+    exclude-lock-yml: true        # omit compiled workflow locks (default: false)
     excluded-files:               # strip these files from the patch entirely
       - "**/*.lock"
       - "dist/**"
@@ -134,6 +135,12 @@ By default a random hex suffix is appended to the agent-provided branch name to 
 ### Patch limits
 
 `excluded-files` strips matching files from the patch before the commit is created — they are also exempt from `allowed-files` and `protected-files` checks. `max-patch-files` (default `100`) and `max-patch-size` (default `4096 KB`) guard against unexpectedly large commits; raise them when the workflow intentionally produces many or large generated files.
+
+When exclusions are configured, patch and bundle transports package the retained, resolved base-to-tip tree as a single commit. This preserves merge-resolution changes but not the original commit topology. Exclusions and omitted-workflow warnings use Git's pathspec matching rules, including basename patterns that match nested files.
+
+`exclude-lock-yml: true` excludes `.lock.yml` files under `.github/workflows/` from both patch and bundle transports. This opt-in protection avoids GitHub's workflow-write restrictions when using the GitHub Actions token. It preserves workflow Markdown sources, lock files elsewhere, and other `.yml`/`.yaml` files; those other workflow YAML files still require workflow-write credentials. When exclusions drop workflow YAML changes, the pull request body (or push summary and PR comment) contains a warning to run `gh aw compile` again and commit the regenerated locks with authorized credentials before merging. If only excluded files changed, no branch is pushed and the tool reports that no changes remain.
+
+When GitHub rejects a push because the token lacks permission to create or update a workflow YAML file, the error preserves GitHub's rejection and suggests `exclude-lock-yml: true` on the relevant safe-output entry for generated lock files. This hint does not change or retry the rejected push.
 
 ### Other notes
 
@@ -397,6 +404,7 @@ safe-outputs:
     required-labels: [automated]         # require all labels
     max: 3                      # max pushes per run (default: 1)
     if-no-changes: "warn"       # "warn" (default), "error", or "ignore"
+    exclude-lock-yml: true        # same compiled-workflow protection as create-pull-request
     excluded-files:               # files to omit from the patch entirely
       - "**/*.lock"
     github-token: ${{ secrets.SOME_CUSTOM_TOKEN }} # optional custom token for permissions
@@ -592,7 +600,19 @@ safe-outputs:
         - .cursor/                # allow updates to the .cursor/ directory
 ```
 
-The `exclude` list names files by **basename** (e.g., `AGENTS.md`) or **path prefix** (e.g., `.agents/`) to remove from the default protected set. To exclude only an **exact repository path**, start it with `/`: `exclude: ["/pyproject.toml"]` allows the root `pyproject.toml` while nested files such as `lib/foo/pyproject.toml` remain protected. Dot-folder path prefixes in the `exclude` list (e.g. `.cursor/`) also opt that directory out of the general top-level-dot-folder protection rule. The remaining protected files still enforce the configured policy. This is useful when a workflow is explicitly designed to manage one specific instruction file or configuration directory without disabling all protection.
+The `exclude` list names files by **basename** (e.g., `AGENTS.md`) or **path prefix** (e.g., `.agents/`) to remove from the default protected set. To exclude only an **exact repository path**, start it with `/`: `exclude: ["/pyproject.toml"]` allows the root `pyproject.toml` while nested files such as `lib/foo/pyproject.toml` remain protected. Rooted entries also support path globs, such as `"/.changeset/*.md"`. Dot-folder path prefixes in the `exclude` list (e.g. `.cursor/`) also opt that directory out of the general top-level-dot-folder protection rule. The remaining protected files still enforce the configured policy. This is useful when a workflow is explicitly designed to manage one specific instruction file or configuration directory without disabling all protection.
+
+To configure exceptions for all workflows compiled in a repository, set `protected_files.exclude` in `.github/workflows/aw.json`:
+
+```json title=".github/workflows/aw.json"
+{
+  "protected_files": {
+    "exclude": [".changeset/*.md"]
+  }
+}
+```
+
+These entries match full repository-root paths; a leading `/` is rejected. `*` matches any characters except `/`; `**` also matches `/`. Both repository and handler exclusion lists require at least one ASCII letter, digit, underscore, or hyphen and reject whitespace. This rejects catch-all patterns such as `"*"`, `"**"`, `"**/*"`, `"/**"`, `"**.*"`, and `".*/**"`. Use a scoped pattern such as `".changeset/*.md"`. This example allows Markdown files directly inside `.changeset/`, while `.changeset/config.json`, nested files, and other dot-folders remain protected. Repository exceptions combine with each handler's `protected-files.exclude` list, apply to both patch and post-apply checks, and never bypass `allowed-files`. Recompile workflows after changing `aw.json`.
 
 :::tip[Workflows that update top-level Markdown files]
 `CHANGELOG.md` is excluded by default. If your workflow is explicitly designed to modify another protected root-level Markdown file such as `README.md`, add it to the `exclude` list so the agent can commit the change.
@@ -668,7 +688,7 @@ safe-outputs:
 
 ### Restricting Changes to Specific Files with `allowed-files`
 
-Use `allowed-files` to restrict a safe output to a fixed set of files. When set, it acts as an **exclusive allowlist**: every file touched by the patch must match at least one pattern, and any file outside the list is always refused — including normal source files. The `allowed-files` and `protected-files` checks are **orthogonal**: both run independently and both must pass. To modify a protected file, it must both match `allowed-files` **and** `protected-files` must be set to `allowed`.
+Use `allowed-files` to restrict a safe output to a fixed set of files. When set, it acts as an **exclusive allowlist**: every file touched by the patch must match at least one pattern, and any file outside the list is always refused — including normal source files. The `allowed-files` and `protected-files` checks run independently. A file matching `allowed-files` remains subject to the [protected-file policy](#policy-options) unless a handler or repository exclusion applies.
 
 > [!CAUTION]
 > `allowed-files` is an **exclusive allowlist**, not an "additionally allow" list. Setting `allowed-files: [".github/workflows/*"]` blocks **all other files**, including normal source code like `src/**`. If you want to allow `.github/workflows/*` alongside regular source files, you must list every pattern explicitly:

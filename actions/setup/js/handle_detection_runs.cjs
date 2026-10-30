@@ -6,9 +6,9 @@ const { createReportIssue } = require("./issue_report.cjs");
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_SYSTEM } = require("./error_codes.cjs");
-const { sanitizeContent } = require("./sanitize_content.cjs");
-const { generateFooterWithExpiration } = require("./ephemerals.cjs");
-const { renderTemplateFromFile, getPromptPath } = require("./messages_core.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+const { getPromptPath } = require("./messages_core.cjs");
 
 /**
  * Classify the warning/failure reasons emitted by parse_threat_detection_results.
@@ -89,18 +89,21 @@ async function ensureDetectionRunsIssue() {
     throw new Error(`${ERR_SYSTEM}: Failed to read file ${templatePath}: ${getErrorMessage(err)}`, { cause: err });
   }
 
-  const parentBody = generateFooterWithExpiration({
-    footerText: parentBodyContent,
-    expiresHours: 24 * 30, // 30 days
-  });
-
-  const { data: newIssue } = await createReportIssue(github, {
-    owner,
-    repo,
-    title: parentTitle,
-    body: parentBody,
-    labels: [parentLabel],
-  });
+  const { data: newIssue } = await createReportIssue(
+    github,
+    {
+      owner,
+      repo,
+      title: parentTitle,
+      labels: [parentLabel],
+    },
+    {
+      type: "report",
+      title: parentTitle,
+      agentTainted: false,
+      children: [...parseReportMarkdown(parentBodyContent, { agentTainted: false }), { type: "expiration", expiresAt: new Date(Date.now() + 24 * 30 * 60 * 60 * 1000).toISOString(), agentTainted: false }],
+    }
+  );
 
   core.info(`✓ Created detection runs issue #${newIssue.number}: ${newIssue.html_url}`);
   return {
@@ -150,17 +153,19 @@ async function main() {
 
     // Load and render comment template from file
     const commentTemplatePath = getPromptPath("detection_runs_comment.md");
-    const commentBody = renderTemplateFromFile(commentTemplatePath, {
-      workflow_name: workflowName,
-      conclusion: detectionConclusion,
-      reason: outcome.reason,
-      category: outcome.category,
-      description: outcome.description,
-      run_url: runUrl,
+    const children = parseReportMarkdown(fs.readFileSync(commentTemplatePath, "utf8"), {
+      context: {
+        workflow_name: workflowName,
+        conclusion: detectionConclusion,
+        reason: outcome.reason,
+        category: outcome.category,
+        description: outcome.description,
+        run_url: runUrl,
+      },
+      minimumHeadingLevel: 2,
+      agentTainted: false,
     });
-
-    // Sanitize the full comment body
-    const fullCommentBody = sanitizeContent(commentBody, { maxLength: 65000 });
+    const fullCommentBody = renderSizedReport({ type: "report", title: "Detection run", children, agentTainted: false }, 65000).body;
 
     try {
       await github.rest.issues.createComment({

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/workflow/cachepolicy"
 	"github.com/goccy/go-yaml"
 )
 
@@ -27,10 +28,25 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 	for i, cache := range caches {
 		if data.DryRun {
 			writeCacheStepWithAction(builder, cache, i, len(caches), "actions/cache/restore")
+		} else if IsDetectionJobEnabled(data.SafeOutputs) {
+			// Match the runner's trigger-scoped cache-write boundary, including
+			// workflows that mix trusted and low-trust events.
+			trusted := cacheWriteAllowedCondition()
+			writeConditionalCacheStep(builder, cache, i, len(caches), "actions/cache", trusted)
+			writeConditionalCacheStep(builder, cache, i, len(caches), "actions/cache/restore", &NotNode{Child: trusted})
 		} else {
 			writeCacheStep(builder, cache, i, len(caches))
 		}
 	}
+}
+
+// cacheWriteAllowedCondition grants writes only for platform-write-capable events.
+func cacheWriteAllowedCondition() ConditionNode {
+	var terms []ConditionNode
+	for _, event := range cachepolicy.WriteEvents() {
+		terms = append(terms, BuildEquals(BuildPropertyAccess("github.event_name"), BuildStringLiteral(event)))
+	}
+	return BuildDisjunction(false, terms...)
 }
 
 func parseCacheStepConfigs(cacheYAML string) ([]map[string]any, error) {
@@ -68,8 +84,15 @@ func writeCacheStep(builder *strings.Builder, cache map[string]any, idx int, tot
 }
 
 func writeCacheStepWithAction(builder *strings.Builder, cache map[string]any, idx int, total int, action string) {
+	writeConditionalCacheStep(builder, cache, idx, total, action, nil)
+}
+
+func writeConditionalCacheStep(builder *strings.Builder, cache map[string]any, idx, total int, action string, condition ConditionNode) {
 	stepName := resolveCacheStepName(cache, idx, total)
 	fmt.Fprintf(builder, "      - name: %s\n", stepName)
+	if condition != nil {
+		builder.WriteString("        if: ${{ " + RenderCondition(condition) + " }}\n")
+	}
 	fmt.Fprintf(builder, "        uses: %s\n", getActionPin(action))
 	builder.WriteString("        with:\n")
 	writeCacheStepValue(builder, "key", cache["key"])

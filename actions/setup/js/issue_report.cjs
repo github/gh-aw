@@ -15,13 +15,13 @@ const renderedIssues = new WeakMap();
  * Import existing issue Markdown at the publication boundary. Metadata is opt-in
  * here, not in diagnostic fragments; it remains typed and cannot close comments.
  * @param {string} title
- * @param {string} body
+ * @param {string | import("./report_ast.cjs").ReportBlock[]} body
  * @param {{allowedMentions?: string[], agentTainted?: boolean, redact?: import("./report_redaction.cjs").ReportRedactionPolicy}} [options]
  * @returns {import("./report_ast.cjs").Report}
  */
 function buildIssueReport(title, body, { allowedMentions = [], agentTainted = true, redact } = {}) {
   /** @type {import("./report_ast.cjs").Report} */
-  const report = { type: "report", title, agentTainted, children: parseReportMarkdown(body, { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions, agentTainted }) };
+  const report = { type: "report", title, agentTainted, children: typeof body === "string" ? parseReportMarkdown(body, { minimumHeadingLevel: 2, allowMetadata: true, allowedMentions, agentTainted }) : body };
   return redact ? redactReport(report, redact) : report;
 }
 

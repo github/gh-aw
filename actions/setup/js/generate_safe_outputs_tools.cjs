@@ -33,6 +33,7 @@ const path = require("path");
 const { ERR_CONFIG, ERR_PARSE, ERR_SAFE_OUTPUT_TOOL_COPY_FAILED, ERR_SYSTEM } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
+const { buildAddLabelsObjectOnlyFieldDesc } = require("./add_labels_schema.cjs");
 const normalizeToolName = name => normalizeSafeOutputName(String(name).replace(/-/g, "_").toLowerCase());
 const ADD_COMMENT_DEFAULT_DISCUSSIONS_NOTE =
   "NOTE: By default, this tool does not require discussions:write permission. Set 'discussions: true' in the workflow's safe-outputs.add-comment configuration to enable discussion comments and request this permission.";
@@ -48,8 +49,8 @@ const ADD_LABELS_STRICT_FIELD_DESC =
   'Labels to add. Each label must be an object with required fields: name (string), rationale (string, max 280 chars), and confidence (exactly one of: LOW, MEDIUM, HIGH). Plain string label names are not permitted. Example: [{"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH"}]. Labels must exist in the repository.';
 const ADD_LABELS_OPTIONAL_FIELD_DESC =
   'Labels to add. Prefer structured label objects: {"name": "bug", "rationale": "The report describes reproducible incorrect behavior.", "confidence": "HIGH", "suggest": true}. Plain strings are also accepted for compatibility. Include rationale (string, max 280 chars) and confidence (LOW, MEDIUM, or HIGH) to improve transparency; use suggest: true to route for human review. Labels must exist in the repository.';
-const ADD_LABELS_OBJECT_ONLY_FIELD_DESC = "Labels to add. Each label must be an object matching the configured item schema; plain string label names are not permitted. Labels must exist in the repository.";
 const ADD_LABELS_STRING_ONLY_FIELD_DESC = "Labels to add. Each label must be a plain string matching the configured item schema. Labels must exist in the repository.";
+
 const ASSIGN_TO_AGENT_EXAMPLE_USAGE_REGEX = /Example usage: assign_to_agent\([^)]+\)(?: or assign_to_agent\([^)]+\))?/g;
 const ASSIGN_TO_AGENT_STRICT_EXAMPLE_USAGE =
   'Example usage: assign_to_agent(issue_number=123, agent="copilot", rationale="Delegate this coding task to the agent.", confidence="HIGH") or assign_to_agent(pull_number=456, agent="copilot", pull_request_repo="owner/repo", rationale="The agent should implement this PR fix.", confidence="HIGH")';
@@ -494,7 +495,7 @@ async function main() {
               /** @type {{type?: unknown, properties?: Record<string, unknown>, required?: unknown}} */
               const configuredItemSchema = itemSchema && typeof itemSchema === "object" ? itemSchema : {};
               if (configuredItemSchema.type === "object") {
-                propertySchema.description = isIssueIntentEnabledForTool(tool.name, config[tool.name]) ? ADD_LABELS_STRICT_FIELD_DESC : ADD_LABELS_OBJECT_ONLY_FIELD_DESC;
+                propertySchema.description = isIssueIntentEnabledForTool(tool.name, config[tool.name]) ? ADD_LABELS_STRICT_FIELD_DESC : buildAddLabelsObjectOnlyFieldDesc(configuredItemSchema);
                 const itemProperties = configuredItemSchema.properties && typeof configuredItemSchema.properties === "object" ? configuredItemSchema.properties : {};
                 const required = Array.isArray(configuredItemSchema.required) ? configuredItemSchema.required : [];
                 if (!isIssueIntentEnabledForTool(tool.name, config[tool.name]) && (!("rationale" in itemProperties) || !("confidence" in itemProperties) || required.includes("rationale") || required.includes("confidence"))) {

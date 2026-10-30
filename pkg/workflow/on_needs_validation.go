@@ -2,21 +2,23 @@ package workflow
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 var onNeedsValidationLog = logger.New("workflow:on_needs_validation")
 
-var (
-	onNeedsOutputExpressionPattern = regexp.MustCompile(`^\$\{\{\s*needs\.([A-Za-z_][A-Za-z0-9_-]*)\.outputs\.[A-Za-z_][A-Za-z0-9_-]*\s*\}\}$`)
-	needsJobReferencePattern       = regexp.MustCompile(`\bneeds\.([A-Za-z_][A-Za-z0-9_-]*)\.`)
-)
+var onNeedsOutputExpressionPattern = actionslanguageservice.ReferencePattern(true, false, func(path []string) []string {
+	if len(path) == 4 && strings.EqualFold(path[0], "needs") && strings.EqualFold(path[2], "outputs") && credentialIdentifier(path[1], true) && credentialIdentifier(path[3], true) {
+		return []string{path[1]}
+	}
+	return nil
+})
 
 func (c *Compiler) validateOnNeeds(data *WorkflowData) error {
 	if data == nil {
@@ -94,14 +96,13 @@ func (c *Compiler) activationDependencySetForPromptNeeds(data *WorkflowData) map
 }
 
 func extractNeedsJobReferencesFromPrompt(promptContent string) []string {
-	matches := needsJobReferencePattern.FindAllStringSubmatch(promptContent, -1)
 	seen := make(map[string]struct{})
 	var jobNames []string
-	for _, match := range matches {
-		if len(match) < 2 {
+	for _, path := range interpolationReferences(wrapExpressionsInTemplateConditionals(promptContent)) {
+		if len(path) < 3 || !strings.EqualFold(path[0], "needs") {
 			continue
 		}
-		jobName := match[1]
+		jobName := path[1]
 		if setutil.Contains(seen, jobName) {
 			continue
 		}

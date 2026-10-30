@@ -9,18 +9,19 @@ const { resolveTarget, isStagedMode } = require("./safe_output_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { renderTemplateFromFile } = require("./messages_core.cjs");
-const { assembleMarkdownBodyParts } = require("./markdown_body_helpers.cjs");
+const { assembleReportBodyParts } = require("./markdown_body_helpers.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { generateHistoryUrl } = require("./generate_history_link.cjs");
 const { enforceCommentLimits } = require("./comment_limit_helpers.cjs");
-const { COMMENT_MEMORY_TAG, COMMENT_MEMORY_MAX_SCAN_PAGES, COMMENT_MEMORY_CODE_FENCE, buildCodeFenceOpener } = require("./comment_memory_helpers.cjs");
-const { getBodyFooterMessage } = require("./messages_footer.cjs");
-const { appendExecutionProvenance } = require("./execution_provenance.cjs");
+const { COMMENT_MEMORY_TAG, COMMENT_MEMORY_MAX_SCAN_PAGES, buildCodeFenceOpener } = require("./comment_memory_helpers.cjs");
+const { getBodyFooterBlocks } = require("./messages_footer.cjs");
+const { appendReportExecutionProvenance } = require("./execution_provenance.cjs");
+const { parseReportMarkdown } = require("./report_markdown.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
 // Require provenance marker to avoid accidentally updating user-authored comments
 // that happen to contain a matching comment-memory tag.
 const MANAGED_COMMENT_PROVENANCE_MARKER = "<!-- gh-aw-agentic-workflow:";
-const MANAGED_COMMENT_HEADER = "### Comment Memory";
 
 function renderManagedCommentDisclosureNote() {
   const promptsDir = process.env.GH_AW_PROMPTS_DIR || `${process.env.RUNNER_TEMP}/gh-aw/prompts`;
@@ -37,25 +38,25 @@ function sanitizeMemoryID(memoryID) {
   return normalized;
 }
 
+/** @returns {import("./report_ast.cjs").ReportBlock} */
 function buildCollapsedMemorySection(rawBody, memoryID) {
-  return `<details>
-<summary>Peek at saved memory (${memoryID})</summary>
-
-${buildCodeFenceOpener(memoryID)}
-${sanitizeContent(rawBody)}
-${COMMENT_MEMORY_CODE_FENCE}
-
-</details>`;
+  return {
+    type: "details",
+    summary: `Peek at saved memory (${memoryID})`,
+    agentTainted: false,
+    children: [{ type: "code_block", language: `${COMMENT_MEMORY_TAG}:${memoryID}`, fenceLength: 6, value: sanitizeContent(rawBody), agentTainted: true, sizeProtected: true }],
+  };
 }
 
-function buildManagedMemoryBody(rawBody, memoryID, options) {
+/** @returns {import("./report_ast.cjs").Report} */
+function buildManagedMemoryReport(rawBody, memoryID, options) {
   const { includeFooter, bodyFooter, runUrl, workflowName, workflowSource, workflowSourceURL, historyUrl, triggeringIssueNumber, triggeringPRNumber } = options;
   if (!/^[a-zA-Z0-9_-]+$/.test(memoryID)) {
     throw new Error(`${SAFE_OUTPUT_E001}: memory_id must contain only alphanumeric characters, hyphens, and underscores`);
   }
   core.info(`comment_memory: building managed body for memory_id='${memoryID}'`);
 
-  const markdownParts = assembleMarkdownBodyParts({
+  const markdownParts = assembleReportBodyParts({
     includeFooter,
     workflowName,
     runUrl,
@@ -67,34 +68,29 @@ function buildManagedMemoryBody(rawBody, memoryID, options) {
     markerWhenFooterDisabled: "xml",
   });
 
-  // Inject CAUTION at top of body if threat detection warning was raised
-  const detectionCaution = markdownParts.detectionCaution;
-  const cautionPrefix = detectionCaution ? detectionCaution + "\n\n" : "";
-
-  // Keep the tagged code fence intact for memory extraction inside the collapsed section.
-  let body = `${cautionPrefix}${MANAGED_COMMENT_HEADER}\n\n${buildCollapsedMemorySection(rawBody, memoryID)}`;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const children = [...markdownParts.detectionCaution, { type: "heading", level: 3, agentTainted: false, children: [{ type: "text", value: "Comment Memory", agentTainted: false }] }, buildCollapsedMemorySection(rawBody, memoryID)];
 
   const tracker = getTrackerID("markdown");
   if (tracker) {
-    body += `\n\n${tracker}`;
+    children.push(...parseReportMarkdown(tracker, { allowMetadata: true, agentTainted: false }));
   }
 
   if (includeFooter) {
     core.info(`comment_memory: footer enabled for memory_id='${memoryID}'`);
     const resolvedDisclosureNote = renderManagedCommentDisclosureNote();
-    body += "\n\n" + resolvedDisclosureNote;
-    body += "\n\n" + markdownParts.footer;
+    children.push(...parseReportMarkdown(resolvedDisclosureNote, { minimumHeadingLevel: 2, agentTainted: false }), ...markdownParts.footer);
   } else {
     core.info(`comment_memory: footer disabled for memory_id='${memoryID}', adding provenance marker only`);
-    body += "\n\n" + markdownParts.noFooterMarker;
+    children.push(...markdownParts.noFooterMarker);
   }
-  const renderedBodyFooter = getBodyFooterMessage(bodyFooter, { workflowName, runUrl });
-  if (renderedBodyFooter) {
-    body += "\n\n" + renderedBodyFooter.trimEnd();
-  }
+  children.push(...getBodyFooterBlocks(bodyFooter, { workflowName, runUrl }));
 
-  core.info(`comment_memory: built body length=${body.length} for memory_id='${memoryID}'`);
-  return body;
+  return { type: "report", title: "Comment Memory", children };
+}
+
+function buildManagedMemoryBody(rawBody, memoryID, options) {
+  return renderSizedReport(buildManagedMemoryReport(rawBody, memoryID, options)).body;
 }
 
 async function findManagedComment(github, owner, repo, itemNumber, memoryID) {
@@ -212,22 +208,20 @@ async function main(config = {}) {
         serverUrl: context.serverUrl,
       }) || undefined;
 
-    const managedBody = appendExecutionProvenance(
-      buildManagedMemoryBody(message.body || "", memoryID, {
-        includeFooter,
-        runUrl,
-        workflowName,
-        workflowSource,
-        workflowSourceURL,
-        historyUrl,
-        triggeringIssueNumber,
-        triggeringPRNumber,
-        bodyFooter: config.body_footer,
-      }),
+    const report = buildManagedMemoryReport(message.body || "", memoryID, {
+      includeFooter,
+      runUrl,
       workflowName,
-      runUrl
-    );
+      workflowSource,
+      workflowSourceURL,
+      historyUrl,
+      triggeringIssueNumber,
+      triggeringPRNumber,
+      bodyFooter: config.body_footer,
+    });
+    let managedBody;
     try {
+      managedBody = renderSizedReport(appendReportExecutionProvenance(report, workflowName, runUrl)).body;
       enforceCommentLimits(managedBody);
     } catch (error) {
       core.warning(`comment_memory: body validation failed: ${getErrorMessage(error)}`);

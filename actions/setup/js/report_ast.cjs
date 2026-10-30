@@ -10,13 +10,13 @@ const { createExpirationLine } = require("./ephemerals.cjs");
  * @typedef {null | boolean | number | string | ReportData[] | {[key: string]: ReportData}} ReportData
  * @typedef {{key: string, value: string}} ReportMarkerField
  * @typedef {ReportProvenance & {type: "image", url: string, alt: string, width?: number, height?: number, align?: "left" | "right" | "center"}} ReportImage
- * @typedef {ReportProvenance & {type: "xml_marker", name: string, value?: string, fields?: ReportMarkerField[]}} ReportXMLMarker
+ * @typedef {ReportProvenance & {type: "xml_marker", name: string, value?: string, fields?: ReportMarkerField[], compact?: boolean}} ReportXMLMarker
  * @typedef {ReportProvenance & {type: "json_marker", name: string, data: ReportData}} ReportJSONMarker
  * @typedef {ReportProvenance & {type: "closing_reference", action: "closes" | "fixes" | "resolves", target: {number: string | number, repository?: string}, enabled: boolean}} ReportClosingReference
  * @typedef {ReportProvenance & ({type: "text" | "code", value: string} | {type: "soft_break" | "hard_break"} | ReportImage | {type: "mention", login: string} | {type: "issue_reference", number: string} | ReportClosingReference | {type: "strong" | "emphasis" | "strike" | "subscript", children: ReportInline[]} | {type: "link", url: string, children: ReportInline[]})} ReportInline
  * @typedef {ReportProvenance & ({type: "paragraph", children: ReportInline[]} |
  *   {type: "heading", level: number, children: ReportInline[]} |
- *   {type: "code_block", value: string, language: string} |
+ *   {type: "code_block", value: string, language: string, fenceLength?: number} |
  *   {type: "list", ordered: boolean, items: ReportBlock[][]} |
  *   {type: "quote", children: ReportBlock[]} |
  *   {type: "alert", kind: string, children: ReportBlock[]} |
@@ -26,6 +26,7 @@ const { createExpirationLine } = require("./ephemerals.cjs");
  *   {type: "separator"} |
  *   {type: "structured_data", data: ReportData} |
  *   ReportXMLMarker | ReportJSONMarker |
+ *   {type: "review_marker", workflowCallId: string} |
  *   {type: "expiration", expiresAt: string} |
  *   {type: "marker", name: "gh-aw-threat-detected" | "gh-aw-threat-engine-error"})} ReportBlock
  * @typedef {ReportXMLMarker & {name: "gh-aw-agentic-workflow" | "gh-aw-failure-issue", value: string, fields: ReportMarkerField[]}} ReportMarker
@@ -250,6 +251,7 @@ function validateMarkerName(name) {
 function normalizeXMLMarker(node) {
   if (node.type !== "xml_marker") throw new TypeError("Expected a report XML marker");
   validateMarkerName(node.name);
+  if (node.compact !== undefined && typeof node.compact !== "boolean") throw new TypeError("Report metadata compact mode must be a boolean");
   if (node.fields?.length && node.value === undefined) throw new TypeError("Report metadata fields require a marker value");
   const keys = new Set([node.name]);
   const fields = node.fields?.map(field => {
@@ -259,7 +261,7 @@ function normalizeXMLMarker(node) {
   });
   const value = node.value === undefined ? undefined : fields !== undefined ? normalizeMarkerValue(node.value) : normalizeReportText(node.value).trim().replace(/,/g, "%2C");
   if (value?.includes("\n")) throw new TypeError("Report metadata must fit on one line");
-  return { type: "xml_marker", name: node.name, ...(value === undefined ? {} : { value }), ...(fields ? { fields } : {}), ...normalizeReportProvenance(node) };
+  return { type: "xml_marker", name: node.name, ...(value === undefined ? {} : { value }), ...(fields ? { fields } : {}), ...(node.compact === undefined ? {} : { compact: node.compact }), ...normalizeReportProvenance(node) };
 }
 
 /**
@@ -379,9 +381,11 @@ function normalizeBlocks(nodes, depth) {
         break;
       }
       case "code_block": {
-        if (!/^[a-zA-Z0-9_+-]*$/.test(node.language)) throw new TypeError("Invalid report code language");
+        if (!/^[a-zA-Z0-9_+:-]*$/.test(node.language)) throw new TypeError("Invalid report code language");
+        if (node.fenceLength !== undefined && (!Number.isSafeInteger(node.fenceLength) || node.fenceLength < 3 || node.fenceLength > 128)) throw new TypeError("Report code fence length must be an integer between 3 and 128");
         const value = normalizeReportText(node.value);
-        if (value.trim()) result.push({ type: "code_block", language: node.language, value });
+        // A protected fence can carry machine-readable identity even with no content.
+        if (value.trim() || node.sizeProtected) result.push({ type: "code_block", language: node.language, value, ...(node.fenceLength === undefined ? {} : { fenceLength: node.fenceLength }) });
         break;
       }
       case "list": {
@@ -425,6 +429,10 @@ function normalizeBlocks(nodes, depth) {
       case "json_marker":
         validateMarkerName(node.name);
         result.push({ type: "json_marker", name: node.name, data: normalizeReportData(node.data, depth + 1) });
+        break;
+      case "review_marker":
+        if (!node.workflowCallId) throw new TypeError("Review metadata requires a workflow call ID");
+        result.push({ type: "review_marker", workflowCallId: normalizeReportText(node.workflowCallId) });
         break;
       case "structured_data": {
         result.push({ type: "structured_data", data: normalizeReportData(node.data, depth + 1) });
@@ -506,9 +514,9 @@ function escapeReportText(value) {
     .join("");
 }
 
-/** @param {string} value */
-function codeFence(value) {
-  return "`".repeat(Array.from(value.matchAll(/`+/g)).reduce((length, match) => Math.max(length, match[0].length + 1), 3));
+/** @param {string} value @param {number} [minimum] */
+function codeFence(value, minimum = 3) {
+  return "`".repeat(Array.from(value.matchAll(/`+/g)).reduce((length, match) => Math.max(length, match[0].length + 1), minimum));
 }
 
 /** @param {ReportInline[]} nodes @returns {ReportInline[]} */
@@ -590,7 +598,7 @@ function renderInlines(nodes, html = false) {
       case "strike":
         return html ? `<del>${renderInlines(node.children, true)}</del>` : `~~${renderInlines(node.children)}~~`;
       case "subscript":
-        return `<sub>${renderInlines(node.children, html)}</sub>`;
+        return `<sub>${renderInlines(node.children, true)}</sub>`;
       case "link":
         return html ? `<a href="${escapeHTMLAttribute(node.url)}">${renderInlines(node.children, true)}</a>` : `[${renderInlines(node.children)}](${escapeURLDestination(node.url)})`;
     }
@@ -631,6 +639,8 @@ function renderBlocks(nodes) {
           return renderXMLMarker(node);
         case "json_marker":
           return `<!-- ${node.name}: ${JSON.stringify(node.data).replace(/[<>&]/g, character => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`)} -->`;
+        case "review_marker":
+          return `[gh-aw-workflow-call-id]: # "${encodeURIComponent(node.workflowCallId)}"`;
         case "structured_data": {
           const value = JSON.stringify(node.data, null, 2);
           const fence = codeFence(value);
@@ -641,7 +651,7 @@ function renderBlocks(nodes) {
         case "heading":
           return `${"#".repeat(node.level)} ${renderInlines(node.children).trim()}`;
         case "code_block": {
-          const fence = codeFence(node.value);
+          const fence = codeFence(node.value, node.fenceLength);
           return `${fence}${node.language}\n${node.value}${node.value.endsWith("\n") ? "" : "\n"}${fence}`;
         }
         case "list":
@@ -679,7 +689,7 @@ function renderBlocks(nodes) {
 function renderXMLMarker(marker) {
   const value = marker.value?.replace(/[<>]/g, character => (character === "<" ? "%3C" : "%3E"));
   const fields = marker.fields?.map(field => `, ${field.key}: ${field.value}`).join("") || "";
-  return `<!-- ${marker.name}${value === undefined ? "" : `: ${value}`}${fields} -->`;
+  return `<!-- ${marker.name}${value === undefined ? "" : `${marker.compact ? ":" : ": "}${value}`}${fields} -->`;
 }
 
 /** @param {ReportFooter} footer */
