@@ -65,7 +65,12 @@ describe("retry session consumers", () => {
   });
 
   it("correlates a resumed completion with its prior attempt", () => {
-    const session = [attempt(1, { attemptId: "a" }), attempt(2, { attemptId: "b", strategy: "resume" }), tool("tool.execution_start", "a"), tool("tool.execution_complete", "b", { success: true })];
+    const session = [
+      attempt(1, { attemptId: "a" }),
+      attempt(2, { attemptId: "b", strategy: "resume" }),
+      tool("tool.execution_start", "a", { sessionId: "observed" }),
+      tool("tool.execution_complete", "b", { sessionId: "observed", success: true }),
+    ];
     expect(createSessionLookups(session).toolCalls).toHaveLength(1);
     expect(createSessionLookups(session).stats.failedToolCalls).toBe(0);
     expect(createSessionLookups([session[1], session[0], ...session.slice(2)]).toolCalls).toHaveLength(1);
@@ -99,7 +104,10 @@ describe("retry session consumers", () => {
     const session = ["startup:1", "startup:2"].flatMap(startupAttemptId => [
       attempt(1, { attemptId: "harness:1", startupAttemptId }),
       attempt(2, { attemptId: "harness:2", startupAttemptId, strategy: "resume" }),
-      ...[tool("tool.execution_start", "harness:1"), tool("tool.execution_complete", "harness:2", { success: true })].map(item => ({ ...item, provenance: { ...item.provenance, startupAttemptId } })),
+      ...[tool("tool.execution_start", "harness:1", { sessionId: "observed" }), tool("tool.execution_complete", "harness:2", { sessionId: "observed", success: true })].map(item => ({
+        ...item,
+        provenance: { ...item.provenance, startupAttemptId },
+      })),
     ]);
     const lookups = createSessionLookups(session);
     expect(lookups.trace.attempts).toHaveLength(4);
@@ -110,13 +118,44 @@ describe("retry session consumers", () => {
   it("uses compound IDs alone to keep resume inside its startup scope", () => {
     const session = [
       ...[1, 2].flatMap(startup => [attempt(1, { attemptId: `startup:${startup}:harness:1` }), attempt(2, { attemptId: `startup:${startup}:harness:2`, strategy: "resume" })]),
-      tool("tool.execution_start", "startup:1:harness:1"),
-      tool("tool.execution_start", "startup:2:harness:1"),
-      tool("tool.execution_complete", "startup:1:harness:2", { success: false }),
-      tool("tool.execution_complete", "startup:2:harness:2", { success: true }),
+      tool("tool.execution_start", "startup:1:harness:1", { sessionId: "observed" }),
+      tool("tool.execution_start", "startup:2:harness:1", { sessionId: "observed" }),
+      tool("tool.execution_complete", "startup:1:harness:2", { sessionId: "observed", success: false }),
+      tool("tool.execution_complete", "startup:2:harness:2", { sessionId: "observed", success: true }),
     ];
     const lookups = createSessionLookups(session);
     expect(lookups.toolCalls.map(call => call.success)).toEqual([false, true]);
     expect(lookups.stats).toMatchObject({ retryCount: 2, toolCallCount: 2 });
+  });
+
+  it("retains distinct observed intervals even when an attempt ID is reused", () => {
+    const session = [
+      attempt(2, { attemptId: "harness:2", startedAt: 10, outcome: "running" }),
+      attempt(2, { attemptId: "harness:2", startedAt: 10, outcome: "failure", finishedAt: 20 }),
+      attempt(2, { attemptId: "harness:2", startedAt: 30, outcome: "success", finishedAt: 40 }),
+    ];
+    const lookups = createSessionLookups(session);
+    expect(lookups.trace.attempts.map(item => item.outcome)).toEqual(["failure", "success"]);
+    expect(lookups.stats.retryCount).toBe(2);
+  });
+
+  it("counts native engine retry observations separately from process retries and errors", () => {
+    const native = (attempt, index, phase = "agent") => event("session.result", { is_error: true, engineRetry: { attempt, maxRetries: 5, backoffMs: 100 } }, { component: "agent", index, phase });
+    const session = [attempt(1), attempt(2), native(1, 0), native(2, 1), native(1, 2), native(1, 0, "detection"), native(0, 3), event("session.result", { is_error: true }, { component: "agent" })];
+    const lookups = createSessionLookups(session);
+    expect(lookups.stats).toMatchObject({ retryCount: 1, harnessRetryCount: 1, engineRetryCount: 3 });
+    expect(lookups.trace.engineRetries.map(retry => retry.attempt)).toEqual([1, 2, 1, 1]);
+    const result = runCustomGraders(session, [{ id: "native-retries", source: "inline", script: "return helpers.createSessionLookups(session).trace.engineRetries.length;" }]);
+    expect(result.output.results[0]).toMatchObject({ value: 4, status: "pass" });
+  });
+
+  it.each([undefined, "different"])("does not infer resumed identity when sessionId is %s", sessionId => {
+    const session = [
+      attempt(1, { attemptId: "a" }),
+      attempt(2, { attemptId: "b", strategy: "resume" }),
+      tool("tool.execution_start", "a", { sessionId: sessionId ? "original" : undefined }),
+      tool("tool.execution_complete", "b", { sessionId, success: true }),
+    ];
+    expect(createSessionLookups(session).toolCalls).toHaveLength(2);
   });
 });

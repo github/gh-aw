@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { collectUnifiedSession, writeUnifiedSession } from "./unified_session.cjs";
+import { collectUnifiedSession, parseEngineSession, writeUnifiedSession } from "./unified_session.cjs";
+import { projectSessionResult } from "./agent_session.cjs";
 import { correlateHarnessAttempts, parseHarnessAttempts } from "./harness_retry_session.cjs";
 import { createSessionLookups } from "./grader_session.cjs";
 
@@ -70,29 +71,39 @@ describe.each(["copilot", "claude", "codex"])("%s attempt conformance", engine =
   });
 });
 
-it.each(["claude", "codex"])("preserves each %s transcript instead of reusing a final canonical projection", engine => {
+it.each([
+  ["claude", false],
+  ["claude", true],
+  ["codex", false],
+  ["codex", true],
+])("preserves each %s transcript and accounting with shared session=%s", (engine, sharedSession) => {
   const { write, collect } = fixture(engine, [attempt(1, 1), attempt(2)]);
   const records = number =>
     engine === "claude"
       ? [
-          { type: "system", subtype: "init", session_id: `session-${number}` },
+          { type: "system", subtype: "init", session_id: sharedSession ? "shared-session" : `session-${number}` },
           { type: "assistant", message: { content: [{ type: "text", text: `attempt-${number}` }] } },
           { type: "result", subtype: "success", num_turns: 1, usage: { input_tokens: number * 10, output_tokens: number } },
         ]
       : [
-          { type: "thread.started", thread_id: `session-${number}` },
+          { type: "thread.started", thread_id: sharedSession ? "shared-session" : `session-${number}` },
           { type: "item.completed", item: { id: "reused-id", type: "agent_message", text: `attempt-${number}` } },
           { type: "turn.completed", usage: { input_tokens: number * 10, output_tokens: number } },
         ];
   write("agent-session.jsonl", `${JSON.stringify({ type: "assistant.message", data: { content: "final-only" } })}\n`);
-  write("agent-stdio.log", [1, 2].map(number => `[${engine}-harness] 2026-10-30T00:00:00Z attempt ${number}: spawning: ${engine}\n${records(number).map(JSON.stringify).join("\n")}\n`).join(""));
+  const content = [1, 2].map(number => `[${engine}-harness] 2026-10-30T00:00:00Z attempt ${number}: spawning: ${engine}\n${records(number).map(JSON.stringify).join("\n")}\n`).join("");
+  write("agent-stdio.log", content);
   const events = collect();
   const messages = events.filter(event => event.type === "assistant.message");
   expect(messages.map(event => event.data.content)).toEqual(["attempt-1", "attempt-2"]);
   expect(messages.map(event => event.provenance.attemptId)).toEqual(["harness:1", "harness:2"]);
   const positions = events.filter(event => event.provenance.component === "agent").map(event => event.provenance.index);
   expect(new Set(positions).size).toBe(positions.length);
-  expect(events.filter(event => event.type === "session.result" && event.data.usage).map(event => event.data.usage.inputTokens)).toEqual([10, 20]);
+  expect(events.filter(event => event.type === "session.result" && event.data.usage).map(event => event.data.usage.inputTokens)).toEqual(engine === "codex" ? [10, 30] : [10, 20]);
+  const expected = projectSessionResult(parseEngineSession(content, engine));
+  const observed = projectSessionResult(events.filter(event => event.provenance.component === "agent"));
+  expect(observed.usage).toMatchObject(expected.usage);
+  expect(observed.num_turns).toEqual(expected.num_turns);
 });
 
 it("retains canonical evidence when spawn markers are incomplete or ambiguous", () => {
@@ -100,6 +111,7 @@ it("retains canonical evidence when spawn markers are incomplete or ambiguous", 
   const parse = () => [{ type: "assistant.message", data: { content: "observed" } }];
   expect(parseHarnessAttempts("[claude-harness] attempt 2: spawning: claude\n", "claude", attempts, parse)).toBeUndefined();
   expect(parseHarnessAttempts("[claude-harness] attempt 1: spawning: claude\n".repeat(2), "claude", attempts, parse)).toBeUndefined();
+  expect(parseHarnessAttempts("[claude-harness] attempt 1: spawning: claude\n[claude-harness] attempt 2: spawning: claude\n", "claude", attempts, parse)).toBeUndefined();
 });
 
 it("uses manifest-bound lifecycle markers and retains an empty interrupted attempt", () => {

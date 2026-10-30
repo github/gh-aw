@@ -562,7 +562,6 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	performanceMetrics := generatePerformanceMetrics(inputs.processedRun, metricsData, inputs.toolUsage)
 	chainMetrics := buildSafeOutputChainMetrics(run.LogsPath)
 	engineConfig := extractEngineConfigWithInferredEngine(run.LogsPath, inputs.inferredEngineID)
-	promptAnalysis := extractPromptAnalysis(run.LogsPath)
 	sessionAnalysis := buildSessionAnalysis(inputs.processedRun, inputs.metrics)
 	safeOutputSummary := buildSafeOutputSummary(inputs.createdItems, chainMetrics)
 	mcpServerHealth := buildMCPServerHealth(inputs.mcpToolUsage, inputs.processedRun.MCPFailures)
@@ -587,7 +586,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		ObservabilityInsights:   inputs.observabilityInsights,
 		PerformanceMetrics:      performanceMetrics,
 		EngineConfig:            engineConfig,
-		PromptAnalysis:          promptAnalysis,
+		PromptAnalysis:          extractPromptAnalysis(run.LogsPath),
 		SessionAnalysis:         sessionAnalysis,
 		SafeOutputSummary:       safeOutputSummary,
 		MCPServerHealth:         mcpServerHealth,

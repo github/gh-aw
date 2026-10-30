@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestAuditRetrySummary(t *testing.T) {
 	}
 	content := sessionTestHeader +
 		record("harness.attempt", "agent", `{"attempt":1,"layer":"harness","exitCode":1,"failureClasses":["network"]}`) +
-		record("harness.attempt", "agent", `{"attempt":2,"attemptId":"harness:2","layer":"harness","exitCode":null,"failureClasses":[],"outcome":"running"}`) +
+		record("harness.attempt", "agent", `{"attempt":2,"attemptId":"harness:2","layer":"harness","exitCode":null,"failureClasses":[],"outcome":"running","startedAt":1}`) +
 		record("harness.attempt", "agent", `{"attempt":2,"attemptId":"harness:2","layer":"harness","exitCode":0,"failureClasses":[],"outcome":"success","strategy":"resume","backoffMs":100,"startedAt":1,"finishedAt":2}`) +
 		record("harness.retry", "agent", `{"attemptResults":[{"attempt":1},{"attempt":2},{"attempt":3}],"startupAttemptResults":[{"attempt":1},{"attempt":2}]}`) +
 		record("harness.attempt", "detection", `{"attempt":1,"layer":"harness","exitCode":1,"failureClasses":[]}`) +
@@ -36,7 +37,7 @@ func TestAuditRetrySummary(t *testing.T) {
 			require.Len(t, report.Attempts, 7)
 			require.Equal(t, "success", report.Attempts[1].Outcome)
 			require.Equal(t, "resume", report.Attempts[1].Strategy)
-			require.Equal(t, float64(100), *report.Attempts[1].BackoffMs)
+			require.InDelta(t, 100, *report.Attempts[1].BackoffMs, 0)
 
 			data := assembleAuditData(auditDataInputs{processedRun: ProcessedRun{Run: WorkflowRun{LogsPath: root}}})
 			require.Equal(t, report, data.Retries)
@@ -78,7 +79,7 @@ func TestAuditRetriesSeparateStartupInvocations(t *testing.T) {
 	var events []sessionModelRoutingEvent
 	for _, scope := range []string{"startup:1", "startup:2"} {
 		for _, attempt := range []int{1, 2} {
-			data, err := json.Marshal(AuditRetryAttempt{Attempt: attempt, AttemptID: "harness:" + fmt.Sprint(attempt), StartupAttemptID: scope, Layer: "harness"})
+			data, err := json.Marshal(AuditRetryAttempt{Attempt: attempt, AttemptID: "harness:" + strconv.Itoa(attempt), StartupAttemptID: scope, Layer: "harness"})
 			require.NoError(t, err)
 			event := sessionModelRoutingEvent{Type: "harness.attempt", Data: data}
 			event.Provenance.Component, event.Provenance.Phase, event.Provenance.Path = "harness", "agent", "retry.json"
@@ -100,10 +101,46 @@ func TestAuditRetriesSeparateStartupInvocations(t *testing.T) {
 	require.Equal(t, 2, report.AgentRetries)
 }
 
+func TestAuditRetriesRetainDistinctObservedIntervals(t *testing.T) {
+	var events []sessionModelRoutingEvent
+	for _, start := range []float64{10, 10, 30} {
+		data, err := json.Marshal(AuditRetryAttempt{Attempt: 2, AttemptID: "harness:2", Layer: "harness", StartedAt: &start})
+		require.NoError(t, err)
+		event := sessionModelRoutingEvent{Type: "harness.attempt", Data: data}
+		event.Provenance.Component, event.Provenance.Phase, event.Provenance.Path = "harness", "agent", "retry.json"
+		events = append(events, event)
+	}
+	report := buildAuditRetrySummary(events)
+	require.Len(t, report.Attempts, 2)
+	require.Equal(t, 2, report.AgentRetries)
+}
+
+func TestAuditRetriesExposeNativeEngineRetriesSeparately(t *testing.T) {
+	root := t.TempDir()
+	record := func(attempt, index int, phase string) string {
+		return fmt.Sprintf(`{"type":"session.result","data":{"is_error":true,"engineRetry":{"attempt":%d,"maxRetries":5,"backoffMs":100}},"provenance":{"component":"agent","phase":%q,"path":"agent.jsonl","index":%d,"attemptId":"harness:2"}}`+"\n", attempt, phase, index)
+	}
+	content := sessionTestHeader + record(1, 0, "agent") + record(2, 1, "agent") + record(1, 2, "agent") + record(1, 0, "detection") + record(0, 3, "agent") +
+		`{"type":"session.result","data":{"is_error":true},"provenance":{"component":"agent","phase":"agent"}}` + "\n"
+	writeSessionTestFile(t, root, "aw_session.jsonl", content)
+	report := readAuditRetrySummary(root)
+	require.NotNil(t, report)
+	require.Zero(t, report.AgentRetries)
+	require.Zero(t, report.DetectionRetries)
+	require.Equal(t, 3, report.EngineRetries)
+	require.Equal(t, 1, report.DetectionEngineRetries)
+	require.Len(t, report.EngineRetryHistory, 4)
+	require.Equal(t, "harness:2", report.EngineRetryHistory[0].AttemptID)
+	require.Equal(t, 5, *report.EngineRetryHistory[0].MaxRetries)
+	console := captureStderrForGuardPolicyReportTest(func() { renderConsoleRetries(report) })
+	require.Contains(t, console, "attempts=0 engine=3 detection_engine=1")
+}
+
 func TestSessionATIFRetainsRetryEvidence(t *testing.T) {
 	content := sessionTestHeader + sessionTestAgentEvent +
 		`{"type":"harness.attempt","data":{"attempt":2,"attemptId":"retry-2","exitCode":null,"failureClasses":[],"startedAt":10,"outcome":"interrupted","strategy":"resume","backoffMs":20,"layer":"harness"},"provenance":{"component":"harness","phase":"agent","path":"retry.json","index":1}}` + "\n" +
-		`{"type":"harness.retry","data":{"attemptResults":[{"attempt":2,"exitCode":null,"failureClasses":[]}],"startupAttemptResults":[{"attempt":2,"exitCode":0,"failureClasses":[]}]},"provenance":{"component":"harness","phase":"agent","path":"retry.json","index":0}}` + "\n"
+		`{"type":"harness.retry","data":{"attemptResults":[{"attempt":2,"exitCode":null,"failureClasses":[]}],"startupAttemptResults":[{"attempt":2,"exitCode":0,"failureClasses":[]}]},"provenance":{"component":"harness","phase":"agent","path":"retry.json","index":0}}` + "\n" +
+		`{"type":"session.result","data":{"engineRetry":{"attempt":1,"maxRetries":5,"backoffMs":100}},"provenance":{"component":"agent","phase":"agent","path":"agent.jsonl","index":0,"attemptId":"harness:2"}}` + "\n"
 	root := t.TempDir()
 	writeSessionTestFile(t, root, "aw_session.jsonl", content)
 	require.NoError(t, exportRunATIF(t.Context(), 123, root))
@@ -115,8 +152,8 @@ func TestSessionATIFRetainsRetryEvidence(t *testing.T) {
 		} `json:"steps"`
 	}
 	require.NoError(t, json.Unmarshal(exported, &trajectory))
-	for _, line := range strings.Split(strings.TrimSpace(content), "\n") {
-		if !bytes.Contains([]byte(line), []byte(`"component":"harness"`)) {
+	for line := range strings.SplitSeq(strings.TrimSpace(content), "\n") {
+		if !strings.Contains(line, `"component":"harness"`) && !strings.Contains(line, `"engineRetry"`) {
 			continue
 		}
 		var want map[string]any

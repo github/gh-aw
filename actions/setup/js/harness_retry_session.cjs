@@ -32,9 +32,28 @@ function parseHarnessAttempts(content, engine, attempts, parse) {
   if (markers.length !== attempts.length || markers.some((marker, index) => marker.attempt !== attempts[index].attempt)) return undefined;
   const segments = markers.map((marker, index) => ({
     attempt: attempts[index],
-    events: parse(content.slice(marker.index, markers[index + 1]?.index ?? content.length), engine),
+    events: parse(content.slice(marker.index, markers[index + 1]?.index ?? content.length), engine).filter(event => event.type !== "agent.execution"),
   }));
   if (!segments.some(segment => segment.events.length)) return undefined;
+  // Attribute the whole-stream parser's observations, not independently reset
+  // accounting snapshots. Codex accumulates per-turn usage across invocations.
+  const combined = parse(content, engine).filter(event => event.type !== "agent.execution");
+  const flattened = segments.flatMap(segment => segment.events);
+  /** @param {import("./types/agent_session").SessionEvent} event */
+  const signature = event => {
+    const data = { ...event.data };
+    if (engine === "codex" && event.type === "session.result") {
+      delete data.usage;
+      delete data.numTurns;
+    }
+    return JSON.stringify({ ...event, data });
+  };
+  if (combined.length !== flattened.length || combined.some((event, index) => signature(event) !== signature(flattened[index]))) return undefined;
+  let offset = 0;
+  for (const segment of segments) {
+    segment.events = combined.slice(offset, offset + segment.events.length);
+    offset += segment.events.length;
+  }
   return segments;
 }
 

@@ -9,9 +9,24 @@ import (
 
 // AuditRetrySummary separates main-agent retries from detection retries.
 type AuditRetrySummary struct {
-	AgentRetries     int                 `json:"agent_retries"`
-	DetectionRetries int                 `json:"detection_retries"`
-	Attempts         []AuditRetryAttempt `json:"attempts"`
+	AgentRetries           int                 `json:"agent_retries"`
+	DetectionRetries       int                 `json:"detection_retries"`
+	Attempts               []AuditRetryAttempt `json:"attempts"`
+	EngineRetries          int                 `json:"engine_retries"`
+	DetectionEngineRetries int                 `json:"detection_engine_retries"`
+	EngineRetryHistory     []AuditEngineRetry  `json:"engine_retry_history,omitempty"`
+}
+
+// AuditEngineRetry is a native retry observation, not a harness invocation.
+type AuditEngineRetry struct {
+	Attempt          int      `json:"attempt"`
+	MaxRetries       *int     `json:"maxRetries,omitempty"`
+	BackoffMs        *float64 `json:"backoffMs,omitempty"`
+	Phase            string   `json:"phase"`
+	Path             string   `json:"path"`
+	Index            *int     `json:"index,omitempty"`
+	AttemptID        string   `json:"attemptId,omitempty"`
+	StartupAttemptID string   `json:"startupAttemptId,omitempty"`
 }
 
 // AuditRetryAttempt retains the observed retry history without changing accounting.
@@ -53,84 +68,120 @@ func readAuditRetrySummary(runDir string) *AuditRetrySummary {
 	return buildAuditRetrySummary(attribution.RetryEvents)
 }
 
+type auditRetryKey struct {
+	phase, path, layer, startupID, id string
+	attempt                           int
+	startedAt                         float64
+	timed                             bool
+}
+
+func auditRetrySequenceKey(event sessionModelRoutingEvent, attempt AuditRetryAttempt, layer string) auditRetryKey {
+	return auditRetryKey{phase: event.Provenance.Phase, path: event.Provenance.Path, layer: layer, startupID: attempt.startupScope(), attempt: attempt.Attempt}
+}
+
+type auditRetryBuilder struct {
+	report    *AuditRetrySummary
+	canonical map[auditRetryKey]struct{}
+	indices   map[auditRetryKey]int
+}
+
+func (builder *auditRetryBuilder) add(event sessionModelRoutingEvent, attempt AuditRetryAttempt, layer string) {
+	if attempt.Attempt < 1 || (layer != "harness" && layer != "startup") {
+		return
+	}
+	attempt.Layer, attempt.Phase, attempt.Path = layer, event.Provenance.Phase, event.Provenance.Path
+	key := auditRetrySequenceKey(event, attempt, layer)
+	key.id = attempt.AttemptID
+	if attempt.StartedAt != nil {
+		key.startedAt, key.timed = *attempt.StartedAt, true
+	}
+	if index, exists := builder.indices[key]; exists && index >= 0 && index < len(builder.report.Attempts) {
+		builder.report.Attempts[index] = attempt
+	} else {
+		builder.indices[key] = len(builder.report.Attempts)
+		builder.report.Attempts = append(builder.report.Attempts, attempt)
+	}
+}
+
+func (builder *auditRetryBuilder) observeSummary(event sessionModelRoutingEvent) {
+	var summary struct {
+		Attempts []AuditRetryAttempt `json:"attemptResults"`
+		Startup  []AuditRetryAttempt `json:"startupAttemptResults"`
+	}
+	if json.Unmarshal(event.Data, &summary) != nil {
+		return
+	}
+	for _, group := range []struct {
+		layer    string
+		attempts []AuditRetryAttempt
+	}{{"harness", summary.Attempts}, {"startup", summary.Startup}} {
+		for _, attempt := range group.attempts {
+			if _, exists := builder.canonical[auditRetrySequenceKey(event, attempt, group.layer)]; !exists {
+				builder.add(event, attempt, group.layer)
+			}
+		}
+	}
+}
+
+func (builder *auditRetryBuilder) observeEngine(event sessionModelRoutingEvent) {
+	var payload struct {
+		EngineRetry *AuditEngineRetry `json:"engineRetry"`
+	}
+	if json.Unmarshal(event.Data, &payload) != nil || payload.EngineRetry == nil || payload.EngineRetry.Attempt <= 0 {
+		return
+	}
+	retry := *payload.EngineRetry
+	retry.Phase, retry.Path, retry.Index = event.Provenance.Phase, event.Provenance.Path, event.Provenance.Index
+	retry.AttemptID, retry.StartupAttemptID = event.Provenance.AttemptID, event.Provenance.StartupAttemptID
+	builder.report.EngineRetryHistory = append(builder.report.EngineRetryHistory, retry)
+	switch retry.Phase {
+	case "agent":
+		builder.report.EngineRetries++
+	case "detection":
+		builder.report.DetectionEngineRetries++
+	}
+}
+
 func buildAuditRetrySummary(events []sessionModelRoutingEvent) *AuditRetrySummary {
-	if len(events) == 0 {
-		return nil
-	}
-	invocation := func(event sessionModelRoutingEvent, layer, startupID string) string {
-		return fmt.Sprintf("%q/%q/%q/%q", event.Provenance.Phase, event.Provenance.Path, layer, startupID)
-	}
-	canonical := make(map[string]bool)
+	builder := auditRetryBuilder{report: &AuditRetrySummary{Attempts: []AuditRetryAttempt{}}, canonical: make(map[auditRetryKey]struct{}), indices: make(map[auditRetryKey]int)}
 	for _, event := range events {
 		var attempt AuditRetryAttempt
 		if event.Type == "harness.attempt" && json.Unmarshal(event.Data, &attempt) == nil {
-			canonical[fmt.Sprintf("%s/%d", invocation(event, attempt.Layer, attempt.startupScope()), attempt.Attempt)] = true
-		}
-	}
-	report := &AuditRetrySummary{}
-	indices := make(map[string]int)
-	add := func(event sessionModelRoutingEvent, attempt AuditRetryAttempt, layer string) {
-		if attempt.Attempt < 1 || (layer != "harness" && layer != "startup") {
-			return
-		}
-		attempt.Layer, attempt.Phase, attempt.Path = layer, event.Provenance.Phase, event.Provenance.Path
-		id := fmt.Sprint(attempt.Attempt)
-		if attempt.AttemptID != "" {
-			id = attempt.AttemptID
-		}
-		key := invocation(event, layer, attempt.startupScope()) + "/" + id
-		if index, exists := indices[key]; exists {
-			report.Attempts[index] = attempt
-		} else {
-			indices[key] = len(report.Attempts)
-			report.Attempts = append(report.Attempts, attempt)
+			builder.canonical[auditRetrySequenceKey(event, attempt, attempt.Layer)] = struct{}{}
 		}
 	}
 	for _, event := range events {
-		if event.Type == "harness.attempt" {
+		switch event.Type {
+		case "session.result":
+			builder.observeEngine(event)
+		case "harness.attempt":
 			var attempt AuditRetryAttempt
 			if json.Unmarshal(event.Data, &attempt) == nil {
-				add(event, attempt, attempt.Layer)
+				builder.add(event, attempt, attempt.Layer)
 			}
-			continue
-		}
-		var summary struct {
-			Attempts []AuditRetryAttempt `json:"attemptResults"`
-			Startup  []AuditRetryAttempt `json:"startupAttemptResults"`
-		}
-		if json.Unmarshal(event.Data, &summary) != nil {
-			continue
-		}
-		for _, group := range []struct {
-			layer    string
-			attempts []AuditRetryAttempt
-		}{{"harness", summary.Attempts}, {"startup", summary.Startup}} {
-			for _, attempt := range group.attempts {
-				if !canonical[fmt.Sprintf("%s/%d", invocation(event, group.layer, attempt.startupScope()), attempt.Attempt)] {
-					add(event, attempt, group.layer)
-				}
-			}
+		case "harness.retry":
+			builder.observeSummary(event)
 		}
 	}
-	for _, attempt := range report.Attempts {
+	for _, attempt := range builder.report.Attempts {
 		if attempt.Attempt <= 1 {
 			continue
 		}
 		switch attempt.Phase {
 		case "agent":
-			report.AgentRetries++
+			builder.report.AgentRetries++
 		case "detection":
-			report.DetectionRetries++
+			builder.report.DetectionRetries++
 		}
 	}
-	if len(report.Attempts) == 0 {
+	if len(builder.report.Attempts) == 0 && len(builder.report.EngineRetryHistory) == 0 {
 		return nil
 	}
-	return report
+	return builder.report
 }
 
 func renderConsoleRetries(report *AuditRetrySummary) {
 	if report != nil {
-		fmt.Fprintf(os.Stderr, "  retries: agent=%d detection=%d attempts=%d\n", report.AgentRetries, report.DetectionRetries, len(report.Attempts))
+		fmt.Fprintf(os.Stderr, "  retries: agent=%d detection=%d attempts=%d engine=%d detection_engine=%d\n", report.AgentRetries, report.DetectionRetries, len(report.Attempts), report.EngineRetries, report.DetectionEngineRetries)
 	}
 }

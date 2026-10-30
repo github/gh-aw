@@ -56,7 +56,7 @@ function attemptHistory(session) {
   const attempts = new Map();
   const add = (event, data, layer) => {
     if (!isRecord(data) || count(data.attempt) === null || data.attempt < 1 || !["harness", "startup"].includes(layer)) return;
-    const key = JSON.stringify([invocation(event, layer, data), data.attemptId ?? data.attempt]);
+    const key = JSON.stringify([invocation(event, layer, data), data.attemptId ?? data.attempt, duration(data.startedAt)]);
     attempts.set(key, { ...data, layer, provenance: event.provenance });
   };
   for (const event of session) {
@@ -109,13 +109,14 @@ function createSessionLookups(session) {
     attemptScopes.set(id, root);
     previousScopes.set(invocation, root);
   }
-  const resolvedAttempt = (id, startupId) => {
+  const resolvedAttempt = (id, startupId, sessionId) => {
     const key = attemptKey(id, startupId);
-    return attemptScopes.get(key) ?? key;
+    // Resume describes requested arguments, not proof that the engine resumed.
+    return typeof sessionId === "string" && sessionId.length > 0 ? (attemptScopes.get(key) ?? key) : key;
   };
   const attemptScope = event => {
     const id = event.provenance.attemptId;
-    return id ? [resolvedAttempt(id, event.provenance.startupAttemptId)] : [];
+    return id ? [resolvedAttempt(id, event.provenance.startupAttemptId, event.data.sessionId)] : [];
   };
   /** @type {any[]} */
   const toolCalls = [];
@@ -168,7 +169,9 @@ function createSessionLookups(session) {
   }
 
   const nativeCallIds = new Set(
-    toolCalls.filter(call => call.toolCallId !== undefined && call.toolCallId !== null).map(call => JSON.stringify([String(call.toolCallId), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId)] : [])]))
+    toolCalls
+      .filter(call => call.toolCallId !== undefined && call.toolCallId !== null)
+      .map(call => JSON.stringify([String(call.toolCallId), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId, call.sessionId)] : [])]))
   );
   const gatewayCalls = new Map();
   for (const event of agentEvents) {
@@ -177,9 +180,16 @@ function createSessionLookups(session) {
     if (data.method && data.method !== "tools/call") continue;
     const id = data.toolCallId ?? data.rpcId ?? data.requestId;
     if (!data.toolName && id === undefined) continue;
-    const key = JSON.stringify([data.serverName, id ?? eventIndices.get(event), ...attemptScope(event)]);
+    const key = JSON.stringify([data.serverName, id ?? eventIndices.get(event), ...attemptScope(event), ...(event.provenance.attemptId ? [data.sessionId ?? "", data.agentId ?? ""] : [])]);
     if (!data.toolName && !gatewayCalls.has(key)) continue;
-    const call = gatewayCalls.get(key) ?? { name: data.toolName ?? "", completed: false, eventIndex: eventIndices.get(event), attemptId: event.provenance.attemptId, startupAttemptId: event.provenance.startupAttemptId };
+    const call = gatewayCalls.get(key) ?? {
+      name: data.toolName ?? "",
+      completed: false,
+      eventIndex: eventIndices.get(event),
+      attemptId: event.provenance.attemptId,
+      startupAttemptId: event.provenance.startupAttemptId,
+      sessionId: data.sessionId,
+    };
     if (data.toolName) call.name = data.toolName;
     if (event.type !== "mcp.rpc.request") Object.assign(call, data, { completed: true });
     gatewayCalls.set(key, call);
@@ -187,7 +197,7 @@ function createSessionLookups(session) {
   toolCalls.push(
     ...[...gatewayCalls.values()].filter(call => {
       const id = call.toolCallId ?? call.rpcId ?? call.requestId;
-      return id === undefined || id === null || !nativeCallIds.has(JSON.stringify([String(id), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId)] : [])]));
+      return id === undefined || id === null || !nativeCallIds.has(JSON.stringify([String(id), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId, call.sessionId)] : [])]));
     })
   );
 
@@ -208,6 +218,10 @@ function createSessionLookups(session) {
   const totalDurationMs = sumMeasurements(tokenUsageEntries.map(entry => entry.duration_ms)) ?? duration(executionDuration);
   const retryEvents = agentEvents.filter(event => event.type.startsWith("mcp.") && (event.data.event === "retry" || event.data.retryHint != null || /\bretry(?:ing)?\b/i.test(String(event.data.message ?? ""))));
   const harnessRetries = attempts.filter(attempt => attempt.provenance.phase === "agent" && attempt.attempt > 1);
+  // Native attempt 1 is already a retry; its sequence may reset per API operation.
+  const engineRetries = session
+    .filter(event => event.type === "session.result" && event.provenance.component === "agent" && isRecord(event.data.engineRetry) && count(event.data.engineRetry.attempt) !== null && event.data.engineRetry.attempt > 0)
+    .map(event => ({ ...(isRecord(event.data.engineRetry) ? event.data.engineRetry : {}), provenance: event.provenance, eventIndex: eventIndices.get(event) }));
   const safeOutputResults = eventsOfType("safe_output.result");
   const safeJobOutcomeTypes = new Set(
     safeOutputResults.filter(event => event.provenance.phase === "safe_outputs" && event.provenance.path === "usage/aw_session.jsonl" && event.data.status !== undefined && typeof event.data.type === "string").map(event => event.data.type)
@@ -235,6 +249,7 @@ function createSessionLookups(session) {
     totalDurationMs,
     retryEvents,
     attempts,
+    engineRetries,
     artifacts,
     trajectoryIR,
   };
@@ -251,6 +266,8 @@ function createSessionLookups(session) {
       totalRequests: usageEvents.length,
       totalDurationMs,
       retryCount: retryEvents.length + harnessRetries.length,
+      harnessRetryCount: harnessRetries.length,
+      engineRetryCount: engineRetries.filter(retry => retry.provenance.phase === "agent").length,
       artifactCount: artifacts.length,
       workingSet,
     },

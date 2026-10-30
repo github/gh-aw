@@ -1339,7 +1339,10 @@ attempt interval establishes correlation. Untimed or ambiguous evidence MUST
 remain unassigned. Distinct attempts MUST retain distinct source positions even
 when native tool IDs repeat. Retry observations MUST NOT introduce usage reports
 or cause terminal snapshots to be summed. Proxy request usage retains precedence
-over compatibility usage copies.
+over compatibility usage copies. Assigning attempt provenance MUST preserve the
+whole-stream parser's existing cumulative accounting; segmentation MUST NOT reset
+Codex per-turn totals. If segmented and whole-stream observations cannot be
+matched, collection retains the canonical evidence without guessing attribution.
 
 Claude and Codex process transcripts can be segmented using the existing harness
 spawn diagnostics only when their full sequence agrees with the manifest.
@@ -1366,6 +1369,12 @@ The deterministic conformance suite is
 normalizer, grader, and audit tests. It exercises single attempts, successful
 retries, exhaustion, interruptions, absent telemetry, source segmentation, and
 usage precedence for Copilot, Claude, and Codex.
+
+Grader lookups expose `trace.attempts` and `trace.engineRetries` separately.
+Audit exposes process attempts and native engine retry history without changing
+usage totals. Session JSONL and lossless exports preserve the observations;
+compact exports retain only the bounded projection and can omit evidence when
+their existing limits are reached.
 
 ## 7. Engine Mappings (Normative)
 
