@@ -8,9 +8,10 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 engine:
   id: factory
-model: factory/claude-sonnet-4-6
+model: copilot/gpt-5.2
 strict: true
 imports:
   - shared/factory.md
@@ -54,6 +55,9 @@ headers, configuration contents, or the prompt.
    inspect `GH_AW_MCP_CONFIG` and verify the GitHub MCP server uses `type: "http"`,
    a container-reachable URL, `oauth: false`, and an authorization header.
    Report only PASS or FAIL, not configuration values.
+5. Verify the agent environment does not contain `FACTORY_API_KEY`,
+   `SECRET_FACTORY_API_KEY`, `COPILOT_GITHUB_TOKEN`, `OPENAI_API_KEY`,
+   `CODEX_API_KEY`, or `ANTHROPIC_API_KEY`. Report only PASS or FAIL.
 
 Always use the `create_issue` safe-output tool to publish a concise report titled
 "Smoke Test: Factory - ${{ github.run_id }}" with each result, overall PASS or

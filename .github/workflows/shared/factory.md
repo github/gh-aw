@@ -1,29 +1,33 @@
 ---
+excluded-env:
+  - FACTORY_API_KEY
+  - SECRET_FACTORY_API_KEY
+  - COPILOT_GITHUB_TOKEN
+  - OPENAI_API_KEY
+  - CODEX_API_KEY
+  - ANTHROPIC_API_KEY
 engine:
   id: factory
   detection-engine: copilot
   display-name: Factory
-  description: Factory Droid CLI with headless execution and native MCP support
+  description: Factory Droid CLI with sandbox-proxied inference and native MCP support
   experimental: true
   version: "0.248.0"
   provider:
-    name: factory
-  auth:
-    - role: api-key
-      secret: FACTORY_API_KEY
+    name: github
   behaviors:
+    secret-strategy: universal-llm-consumer
     manifest:
       files:
         - AGENTS.md
       path-prefixes:
         - .factory/
     network:
-      defaults:
-        - host.docker.internal
-        - github.com
-        - raw.githubusercontent.com
       provider-domains:
-        factory: "*.factory.ai"
+        copilot: api.githubcopilot.com
+        anthropic: api.anthropic.com
+        openai: api.openai.com
+        codex: api.openai.com
     installation:
       package-manager: npm
       package-name: "@factory/cli"
@@ -44,6 +48,7 @@ engine:
         - text
       step-name: Execute Factory Droid CLI
       model-env-var: FACTORY_MODEL
+      provider-env-mode: universal-llm-consumer
       mcp-config-env-var: GH_AW_MCP_CONFIG
       write-timestamp: true
       env:
@@ -67,71 +72,111 @@ engine:
         });
         writeSecureOutput(join(context.extraEnv.GITHUB_WORKSPACE, ".factory", "mcp.json"), JSON.stringify({ mcpServers: servers }, null, 2));
     harness-script: |
-      const { readFileSync } = require("fs");
+      const { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } = require("fs");
+      const { join } = require("path");
       const { spawnSync } = require("child_process");
+      const { fetchAWFReflect, resolveProviderEndpointFromReflect, normalizeReflectProviderName, REFLECT_PROVIDER_ALIASES } = require("./awf_reflect.cjs");
 
       const [command, ...args] = process.argv.slice(2);
       const log = message => process.stderr.write(`[factory-harness] ${message}\n`);
-      try {
+      const main = async () => {
         if (!command) throw new Error("Factory Droid command is required");
-        if (!process.env.FACTORY_API_KEY && process.env.SECRET_FACTORY_API_KEY) {
-          process.env.FACTORY_API_KEY = process.env.SECRET_FACTORY_API_KEY;
-        }
-        if (!process.env.FACTORY_API_KEY) {
-          throw new Error("FACTORY_API_KEY is required; configure the FACTORY_API_KEY Actions secret");
+        if (process.env.AWF_REFLECT_ENABLED !== "1") {
+          throw new Error("Factory requires the AWF API proxy; direct credential authentication is not supported");
         }
         const selectedModel = process.env.FACTORY_MODEL;
-        if (!selectedModel?.startsWith("factory/") || !selectedModel.slice("factory/".length).trim()) {
-          throw new Error("FACTORY_MODEL must use factory/model format");
+        const separator = selectedModel?.indexOf("/") ?? -1;
+        if (separator <= 0 || !selectedModel.slice(separator + 1).trim()) {
+          throw new Error("FACTORY_MODEL must use provider/model format");
         }
-        const model = selectedModel.slice("factory/".length);
+        const model = selectedModel.slice(separator + 1);
+        const provider = process.env.GH_AW_LLM_PROVIDER;
+        if (!["github", "anthropic", "openai"].includes(provider)) {
+          throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
+        }
         const promptPath = process.env.GH_AW_PROMPT;
         if (!promptPath) throw new Error("GH_AW_PROMPT is required");
         if (!readFileSync(promptPath, "utf8").trim()) throw new Error("GH_AW_PROMPT must contain a non-empty instruction");
-        const result = spawnSync(command, [...args, "--model", model, "--file", promptPath], {
-          cwd: process.env.GITHUB_WORKSPACE,
-          env: process.env,
-          stdio: "inherit",
-        });
-        if (result.error) throw result.error;
-        if (result.status !== 0) {
-          log(result.signal ? `Droid terminated by signal ${result.signal}` : `Droid exited with code ${result.status ?? "unknown"}`);
-          process.exitCode = result.status || 1;
+        const reflected = await fetchAWFReflect({ logger: log });
+        if (!reflected.ok || !reflected.reflectData) throw new Error("Unable to discover the Factory LLM endpoint from /reflect");
+        const endpoint = resolveProviderEndpointFromReflect({ provider, reflectData: reflected.reflectData, logger: log });
+        if (!endpoint || !REFLECT_PROVIDER_ALIASES[provider].has(normalizeReflectProviderName(endpoint.endpointProvider))) {
+          throw new Error(`No configured /reflect endpoint found for provider ${provider}`);
         }
-      } catch (error) {
+        const isAnthropic = provider === "anthropic";
+        const settings = {
+          cloudSessionSync: false,
+          blockOnMcpLoad: true,
+          customModels: [{
+            displayName: "gh-aw",
+            model,
+            provider: isAnthropic ? "anthropic" : provider === "openai" ? "openai" : "generic-chat-completion-api",
+            baseUrl: isAnthropic ? endpoint.baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "") : endpoint.baseUrl,
+            apiKey: "awf-proxy",
+          }],
+        };
+        mkdirSync("/tmp/gh-aw/agent", { recursive: true });
+        const settingsDir = mkdtempSync("/tmp/gh-aw/agent/factory-");
+        try {
+          const settingsPath = join(settingsDir, "settings.json");
+          writeFileSync(settingsPath, JSON.stringify(settings), { mode: 0o600 });
+          const result = spawnSync(command, [...args, "--settings", settingsPath, "--model", "custom:gh-aw-0", "--file", promptPath], {
+            cwd: process.env.GITHUB_WORKSPACE,
+            env: process.env,
+            stdio: "inherit",
+          });
+          if (result.error) throw result.error;
+          if (result.status !== 0) {
+            log(result.signal ? `Droid terminated by signal ${result.signal}` : `Droid exited with code ${result.status ?? "unknown"}`);
+            process.exitCode = result.status || 1;
+          }
+        } finally {
+          rmSync(settingsDir, { recursive: true, force: true });
+        }
+      };
+      main().catch(error => {
         log(error instanceof Error ? error.message : String(error));
         process.exitCode = 1;
-      }
+      });
 ---
 
 <!--
 # Factory Droid
 
 Unsupported, experimental sample for the [Factory CLI](https://factory.com/product/cli).
-Import this definition and select a Factory-hosted model:
+Import this definition and select an exact provider/model ID:
 
 ```yaml
 engine:
   id: factory
-model: factory/claude-sonnet-4-6
+model: copilot/gpt-5.2
 imports:
   - shared/factory.md
 ```
 
-Set the `FACTORY_API_KEY` GitHub Actions secret to an API key from
-[Factory settings](https://app.factory.ai/settings/api-keys). The `factory/`
-prefix is removed before passing the model ID to Droid. This sample uses
-Factory-managed inference, not gh-aw universal provider routing or custom BYOK
-models. Factory's documented `*.factory.ai` endpoints are allowed for inference.
+Inference uses Droid's custom-model (BYOK) support through the AWF API proxy.
+Supported prefixes are `copilot/`, `anthropic/`, `openai/`, and `codex/`.
+Configure the corresponding gh-aw provider credential (`COPILOT_GITHUB_TOKEN`,
+`ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`/`CODEX_API_KEY`), or use
+`permissions.copilot-requests: write` for Copilot token-based inference.
+Real credentials remain outside the agent; Droid receives only the
+`awf-proxy` placeholder and a proxy endpoint discovered through `/reflect`.
+
+No Factory account or `FACTORY_API_KEY` is required. Factory-managed inference
+and unsandboxed/direct-key execution are deliberately unsupported because they
+would expose a reusable credential to agent tools. Explicit environment
+exclusions also prevent ambient Factory and provider keys from entering AWF.
+Cloud session sync is disabled. The per-run settings file contains only a
+placeholder credential, is owner-readable, and is removed after execution.
 
 Installation pins `@factory/cli` 0.248.0 and verifies `droid --version`.
 Its npm platform packages support Linux x64 and arm64 with glibc. Lifecycle
 scripts stay disabled: the package's JavaScript shim resolves its pinned
 optional platform dependency without the postinstall optimization.
 
-The harness runs `droid exec --auto high --output-format text --model <model>
---file <prompt>`. High autonomy permits local builds and MCP calls without
-interactive approval; use this sample only inside the gh-aw agent sandbox.
+The harness runs `droid exec --auto high --output-format text --settings <settings>
+--model custom:gh-aw-0 --file <prompt>`. High autonomy permits local builds and
+MCP calls without interactive approval; use this sample only inside the gh-aw agent sandbox.
 Droid's own command blocks and organization policies still apply. The harness
 preserves nonzero CLI exit codes and never prints credentials or prompt contents.
 
@@ -143,6 +188,6 @@ committed. Droid discovers it from the workflow workspace.
 This sample does not implement a structured session parser: text output is
 retained in agent logs, but native tool events, token usage, refusals, and
 reasoning are not normalized. It does not advertise gh-aw tool allowlists,
-max-turn enforcement, Agent Plugins, or custom provider routing. A successful
-process exit is not independent proof of task completion.
+max-turn enforcement, or Agent Plugins. A successful process exit is not
+independent proof of task completion.
 -->

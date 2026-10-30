@@ -37,15 +37,17 @@ func TestFactorySampleExecution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "factory", engine.GetID())
 	assert.True(t, def.Experimental)
-	assert.Equal(t, []string{"FACTORY_API_KEY"}, engine.GetSupportedEnvVarKeys())
+	assert.Empty(t, def.Auth, "provider credentials must be owned by AWF, not passed through engine auth bindings")
+	assert.Equal(t, "universal-llm-consumer", def.Behaviors.SecretStrategy)
 	assert.Empty(t, engine.GetLogParserScriptId(), "text output must not imply structured session support")
 	assert.Equal(t, []string{"exec", "--auto", "high", "--output-format", "text"}, def.Behaviors.Execution.Args)
 	assert.False(t, def.Behaviors.Installation.PostInstallScripts)
 
 	data := &WorkflowData{
 		Name:         "factory-test",
-		Model:        "factory/claude-sonnet-4-6",
+		Model:        "copilot/gpt-5.2",
 		EngineConfig: &EngineConfig{ID: "factory", Version: def.Version},
+		ExcludedEnv:  []string{"FACTORY_API_KEY", "SECRET_FACTORY_API_KEY", "COPILOT_GITHUB_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY"},
 	}
 	var installation strings.Builder
 	for _, step := range engine.GetInstallationSteps(data) {
@@ -54,18 +56,22 @@ func TestFactorySampleExecution(t *testing.T) {
 	assert.Contains(t, installation.String(), "@factory/cli@"+def.Version)
 	assert.Contains(t, installation.String(), "--ignore-scripts")
 	assert.Contains(t, installation.String(), "droid --version")
-	assert.Contains(t, strings.Join(engine.GetSecretValidationStep(data), "\n"), "FACTORY_API_KEY")
+	assert.Contains(t, strings.Join(engine.GetSecretValidationStep(data), "\n"), "COPILOT_GITHUB_TOKEN")
 
 	var execution strings.Builder
 	for _, step := range engine.GetExecutionSteps(data, "/tmp/factory.log") {
 		execution.WriteString(strings.Join(step, "\n"))
 	}
 	assert.Contains(t, execution.String(), "factory_harness.cjs")
-	assert.Contains(t, execution.String(), "FACTORY_MODEL: factory/claude-sonnet-4-6")
-	assert.Contains(t, execution.String(), "FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}")
+	assert.Contains(t, execution.String(), "FACTORY_MODEL: copilot/gpt-5.2")
+	assert.NotContains(t, execution.String(), "FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}")
+	for _, name := range data.ExcludedEnv {
+		assert.Contains(t, execution.String(), "--exclude-env "+name)
+	}
 	assert.Contains(t, execution.String(), "GH_AW_ENGINE_VERSION: "+def.Version)
 	assert.Equal(t, "copilot", def.DetectionEngine)
-	assert.Contains(t, def.Behaviors.Network.ProviderDomains["factory"], "factory.ai")
+	assert.Empty(t, def.Behaviors.Network.Defaults, "the engine must not add unrelated network defaults")
+	assert.NotContains(t, def.Behaviors.Network.ProviderDomains, "factory")
 }
 
 func TestFactorySmokeContract(t *testing.T) {
@@ -82,16 +88,20 @@ func TestFactorySmokeContract(t *testing.T) {
 	for _, expected := range []string{
 		"npm install --ignore-scripts -g @factory/cli@" + loadFactorySample(t).Version,
 		"GH_AW_ENGINE_VERSION: " + loadFactorySample(t).Version,
-		"FACTORY_MODEL: factory/claude-sonnet-4-6",
+		"FACTORY_MODEL: copilot/gpt-5.2",
 		"GH_AW_MCP_CONFIG: .factory/mcp.json",
 		"factory_mcp_config_adapter.cjs",
-		"*.factory.ai",
 		"proxy.golang.org",
 		`"GITHUB_READ_ONLY": "1"`,
 	} {
 		assert.Contains(t, string(lock), expected)
 	}
 	assert.NotContains(t, string(lock), "--enable-gh-proxy")
+	assert.NotContains(t, string(lock), "${{ secrets.FACTORY_API_KEY }}")
+	assert.NotContains(t, string(lock), "*.factory.ai")
+	for _, name := range []string{"FACTORY_API_KEY", "SECRET_FACTORY_API_KEY", "COPILOT_GITHUB_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY"} {
+		assert.Contains(t, string(lock), "--exclude-env "+name)
+	}
 }
 
 func TestFactoryHarness(t *testing.T) {
@@ -99,9 +109,9 @@ func TestFactoryHarness(t *testing.T) {
 	harness := filepath.Join(t.TempDir(), "factory_harness.cjs")
 	require.NoError(t, os.WriteFile(harness, []byte(def.Behaviors.HarnessScript), 0o600))
 	for _, scenario := range []string{
-		"success", "secret-fallback", "missing-key", "missing-model", "wrong-provider",
+		"success", "anthropic", "openai", "codex", "missing-model", "wrong-provider",
 		"empty-model", "missing-prompt", "empty-prompt", "unreadable-prompt",
-		"execution-failure", "signal", "spawn-error",
+		"execution-failure", "signal", "spawn-error", "no-awf", "reflect-failure", "missing-endpoint", "wrong-endpoint",
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -115,35 +125,66 @@ func TestFactoryHarness(t *testing.T) {
 }
 
 const factoryHarnessTestDriver = `
+(async () => {
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const [scriptPath, scenario] = process.argv.slice(1);
 const calls = [];
 const logs = [];
+let settings;
+let cleaned = false;
 const prompt = "--model injected\n$(touch /not-executed)";
-const key = "fixture-factory-key";
-const env = {FACTORY_API_KEY: key, FACTORY_MODEL: "factory/claude-sonnet-4-6",
+const env = {FACTORY_MODEL: "copilot/gpt-5.2", GH_AW_LLM_PROVIDER: "github", AWF_REFLECT_ENABLED: "1",
   GH_AW_PROMPT: "/prompt with spaces.md", GITHUB_WORKSPACE: "/workspace"};
-if (scenario === "secret-fallback") {
-  delete env.FACTORY_API_KEY;
-  env.SECRET_FACTORY_API_KEY = key;
+if (["anthropic", "openai", "codex"].includes(scenario)) {
+  env.GH_AW_LLM_PROVIDER = scenario === "codex" ? "openai" : scenario;
+  env.FACTORY_MODEL = scenario + "/fixture-model";
 }
-if (scenario === "missing-key") delete env.FACTORY_API_KEY;
 if (scenario === "missing-model") delete env.FACTORY_MODEL;
-if (scenario === "wrong-provider") env.FACTORY_MODEL = "openai/gpt-5.2";
-if (scenario === "empty-model") env.FACTORY_MODEL = "factory/ ";
+if (scenario === "wrong-provider") env.GH_AW_LLM_PROVIDER = "factory";
+if (scenario === "empty-model") env.FACTORY_MODEL = "copilot/ ";
 if (scenario === "missing-prompt") delete env.GH_AW_PROMPT;
+if (scenario === "no-awf") delete env.AWF_REFLECT_ENABLED;
 const args = ["exec", "--auto", "high", "--output-format", "text"];
 const mockProcess = {argv: ["node", scriptPath, "droid", ...args], env,
   stderr: {write: text => logs.push(text)}};
-vm.runInNewContext(fs.readFileSync(scriptPath, "utf8"), {
+await vm.runInNewContext(fs.readFileSync(scriptPath, "utf8"), {
   require: name => {
-    if (name === "fs") return {readFileSync: path => {
-      assert.equal(path, "/prompt with spaces.md");
-      if (scenario === "unreadable-prompt") throw new Error("prompt read failed");
-      return scenario === "empty-prompt" ? " \n" : prompt;
-    }};
+    if (name === "fs") return {
+      readFileSync: path => {
+        assert.equal(path, "/prompt with spaces.md");
+        if (scenario === "unreadable-prompt") throw new Error("prompt read failed");
+        return scenario === "empty-prompt" ? " \n" : prompt;
+      },
+      mkdirSync: path => assert.equal(path, "/tmp/gh-aw/agent"),
+      mkdtempSync: prefix => {
+        assert.equal(prefix, "/tmp/gh-aw/agent/factory-");
+        return "/tmp/gh-aw/agent/factory-fixture";
+      },
+      writeFileSync: (path, content, options) => {
+        assert.equal(path, "/tmp/gh-aw/agent/factory-fixture/settings.json");
+        assert.equal(options.mode, 0o600);
+        settings = JSON.parse(content);
+      },
+      rmSync: (path, options) => {
+        assert.equal(path, "/tmp/gh-aw/agent/factory-fixture");
+        assert.equal(options.recursive, true);
+        cleaned = true;
+      },
+    };
+    if (name === "./awf_reflect.cjs") return {
+      fetchAWFReflect: async () => ({ok: scenario !== "reflect-failure", reflectData: {endpoints: []}}),
+      normalizeReflectProviderName: value => value,
+      REFLECT_PROVIDER_ALIASES: {github: new Set(["github"]), anthropic: new Set(["anthropic"]), openai: new Set(["openai"])},
+      resolveProviderEndpointFromReflect: options => {
+        assert.equal(options.provider, env.GH_AW_LLM_PROVIDER);
+        return scenario === "missing-endpoint" ? null : {
+          baseUrl: "http://api-proxy:10001/v1",
+          endpointProvider: scenario === "wrong-endpoint" ? "anthropic" : env.GH_AW_LLM_PROVIDER,
+        };
+      },
+    };
     if (name === "child_process") return {spawnSync: (command, childArgs, options) => {
       calls.push({command, args: Array.from(childArgs), options});
       if (scenario === "execution-failure") return {status: 7};
@@ -156,19 +197,21 @@ vm.runInNewContext(fs.readFileSync(scriptPath, "utf8"), {
   process: mockProcess,
 });
 const output = logs.join("");
-assert.equal(output.includes(key), false);
 assert.equal(output.includes(prompt), false);
 const failures = {
-  "missing-key": "FACTORY_API_KEY is required",
-  "missing-model": "FACTORY_MODEL must use factory/model format",
-  "wrong-provider": "FACTORY_MODEL must use factory/model format",
-  "empty-model": "FACTORY_MODEL must use factory/model format",
+  "missing-model": "FACTORY_MODEL must use provider/model format",
+  "wrong-provider": "GH_AW_LLM_PROVIDER must be github, anthropic, or openai",
+  "empty-model": "FACTORY_MODEL must use provider/model format",
   "missing-prompt": "GH_AW_PROMPT is required",
   "empty-prompt": "GH_AW_PROMPT must contain a non-empty instruction",
   "unreadable-prompt": "prompt read failed",
   "execution-failure": "Droid exited with code 7",
   "signal": "Droid terminated by signal SIGTERM",
   "spawn-error": "spawn failed",
+  "no-awf": "Factory requires the AWF API proxy",
+  "reflect-failure": "Unable to discover the Factory LLM endpoint",
+  "missing-endpoint": "No configured /reflect endpoint found",
+  "wrong-endpoint": "No configured /reflect endpoint found",
 };
 if (failures[scenario]) {
   assert.equal(mockProcess.exitCode, scenario === "execution-failure" ? 7 : 1);
@@ -176,16 +219,29 @@ if (failures[scenario]) {
 } else {
   assert.equal(mockProcess.exitCode || 0, 0);
 }
-const ran = ["success", "secret-fallback", "execution-failure", "signal", "spawn-error"].includes(scenario);
+const ran = ["success", "anthropic", "openai", "codex", "execution-failure", "signal", "spawn-error"].includes(scenario);
 assert.equal(calls.length, ran ? 1 : 0);
+assert.equal(cleaned, ran);
 if (ran) {
   assert.equal(calls[0].command, "droid");
-  assert.deepEqual(calls[0].args, [...args, "--model", "claude-sonnet-4-6", "--file", env.GH_AW_PROMPT]);
+  assert.deepEqual(calls[0].args, [...args, "--settings", "/tmp/gh-aw/agent/factory-fixture/settings.json",
+    "--model", "custom:gh-aw-0", "--file", env.GH_AW_PROMPT]);
   assert.equal(calls[0].options.cwd, "/workspace");
   assert.equal(calls[0].options.shell, undefined);
   assert.equal(calls[0].options.stdio, "inherit");
-  assert.equal(calls[0].options.env.FACTORY_API_KEY, key);
+  for (const name of ["FACTORY_API_KEY", "SECRET_FACTORY_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "COPILOT_GITHUB_TOKEN", "CODEX_API_KEY"]) {
+    assert.equal(calls[0].options.env[name], undefined);
+  }
+  assert.equal(settings.cloudSessionSync, false);
+  assert.equal(settings.blockOnMcpLoad, true);
+  assert.equal(settings.customModels.length, 1);
+  const model = settings.customModels[0];
+  assert.equal(model.apiKey, "awf-proxy");
+  assert.equal(model.model, scenario === "anthropic" || scenario === "openai" || scenario === "codex" ? "fixture-model" : "gpt-5.2");
+  assert.equal(model.provider, scenario === "anthropic" ? "anthropic" : ["openai", "codex"].includes(scenario) ? "openai" : "generic-chat-completion-api");
+  assert.equal(model.baseUrl, scenario === "anthropic" ? "http://api-proxy:10001" : "http://api-proxy:10001/v1");
 }
+})().catch(error => { console.error(error); process.exitCode = 1; });
 `
 
 func TestFactoryMCPAdapter(t *testing.T) {
