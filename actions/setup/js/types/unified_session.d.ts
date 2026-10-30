@@ -37,7 +37,16 @@ export interface UnifiedSessionContextData {
 }
 
 export interface UnifiedSessionResultData extends UnifiedSessionContextData, Pick<SessionResultData, "sourceEngine" | "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics"> {
+  /** Observed engine-native retry progress, distinct from harness attempts. */
+  engineRetry?: EngineRetryData;
   usage?: UnifiedSessionUsage | null;
+}
+
+export interface EngineRetryData {
+  /** @asType integer @minimum 1 @maximum 9007199254740991 */
+  attempt: number;
+  maxRetries?: SessionCount;
+  backoffMs?: SessionCount;
 }
 
 export interface UnifiedMessageData extends Pick<MessageData, "content"> {
@@ -464,20 +473,85 @@ export interface ExecutionResultData {
   finishedAt?: JsonValue;
 }
 
+export type HarnessFailureClass =
+  | "cancelled"
+  | "runtime_guard"
+  | "watchdog"
+  | "unknown_error"
+  | "no_output"
+  | "content_filter"
+  | "model_endpoint_mismatch"
+  | "model_routing_failed"
+  | "invocation_cap_exceeded"
+  | "ai_credits_exhausted"
+  | "api_proxy_guard_rejected"
+  | "capi_quota_exceeded"
+  | "capi_server_error"
+  | "mcp_policy_blocked"
+  | "model_not_supported"
+  | "tool_call_id_schema_error"
+  | "incomplete_tool_call_stream"
+  | "http_400_response_error"
+  | "null_type_tool_call"
+  | "no_auth_info"
+  | "authentication_failed"
+  | "sdk_session_idle_timeout"
+  | "mcp_gateway_shutdown"
+  | "permission_denied"
+  | "capi_error_400"
+  | "long_run_exit"
+  | "partial_execution"
+  | "copilot_model_verification"
+  | "overloaded_error"
+  | "rate_limit_error"
+  | "max_turns"
+  | "no_deferred_marker"
+  | "invalid_model"
+  | "invalid_json_body"
+  | "connection_refused"
+  | "sandbox_runtime_crash"
+  | "cancelled_or_timed_out"
+  | "token_per_minute_rate_limit"
+  | "missing_api_key"
+  | "server_error"
+  | "unsupported_model_tools"
+  | "invalid_request"
+  | "startup_error";
+
+/** @asType integer */
+export type HarnessRetryExitCode = number;
+
 export interface HarnessRetryAttemptData {
   /** @asType integer @minimum 1 @maximum 101 */
   attempt: number;
-  /** @asType integer */
-  exitCode: number;
+  exitCode: HarnessRetryExitCode | null;
   failureClasses: string[];
+  /** Stable identifier including the startup scope when present. @pattern ^(harness:[1-9][0-9]{0,2}|startup:[1-9][0-9]{0,2}(:harness:[1-9][0-9]{0,2})?)$ */
+  attemptId?: string;
+  /** Startup retry scope for a nested harness attempt. @pattern ^startup:[1-9][0-9]{0,2}$ */
+  startupAttemptId?: string;
+  /** Observed Date.now() milliseconds. */
+  startedAt?: SessionCount;
+  /** Observed Date.now() milliseconds; omitted until completion is recorded. */
+  finishedAt?: SessionCount | null;
+  strategy?: "restart" | "resume";
+  /** Observed delay before this attempt, in milliseconds. */
+  backoffMs?: SessionCount;
+  outcome?: "running" | "success" | "failure" | "cancelled" | "interrupted";
+  /** Existing allowlisted harness failure class, never free-form diagnostic text. */
+  reason?: HarnessFailureClass;
+}
+
+export interface HarnessAttemptData extends HarnessRetryAttemptData {
+  layer: "harness" | "startup";
 }
 
 export interface HarnessRetryData {
   /** @asType integer @minimum 0 @maximum 101 */
   attempts: number;
-  /** @asType integer */
-  exitCode: number;
+  exitCode: HarnessRetryExitCode | null;
   attemptResults: HarnessRetryAttemptData[];
+  startupAttemptResults?: HarnessRetryAttemptData[];
 }
 
 /** Conclusion's dependency snapshot, not the still-running conclusion job. */
@@ -767,6 +841,7 @@ export interface UnifiedSessionEventDataMap {
   "usage.report": UsageReportData;
   "execution.result": ExecutionResultData;
   "harness.retry": HarnessRetryData;
+  "harness.attempt": HarnessAttemptData;
   "detection.result": DetectionResultData;
   "guardrail.admission": AdmissionDecisionData;
   "guardrail.daily_aic": DailyAICDecisionData;

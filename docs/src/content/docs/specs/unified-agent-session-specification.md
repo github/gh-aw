@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.5.0"
+version: "2.7.0"
 status: Draft
-publication_date: "2026-10-22"
+publication_date: "2026-10-30"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.5.0<br>
+**Version**: 2.7.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-22<br>
+**Publication Date**: 2026-10-30<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.5.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -566,6 +566,8 @@ preserve encounter order and retain only these event kinds and `data` keys:
 | `workflow.job_result` | `jobId`, `result`, `durationMs` |
 | `memory.push` | `memoryId`, `jobResult`, `outcome`, `status`, `branch`, `commit` |
 | `execution.result` | `outcome`, `conclusion`, `exitCode`, `durationMs`, `startedAt`, `finishedAt` |
+| `harness.retry` | `attempts`, `exitCode`; validated bounded attempt lists from Section 6.4 |
+| `harness.attempt` | Validated bounded attempt fields from Section 6.4 |
 | `grader.result` | `id`, `status`, `value`, `score`, `unit`, `passed`, `direction`, `threshold`, `enabled`, `min`, `max`, `version` |
 
 `session.result`, `usage.report` and `firewall.token_usage` MAY additionally retain `data.usage`, but only
@@ -581,14 +583,21 @@ bytes survive scalar projection. Nulls, arrays, other objects, nonfinite numbers
 oversized strings and unpaired surrogates MUST be omitted, not coerced or
 truncated. At the event level, only `type`, projected `data`, an eligible scalar
 `timestamp`, and projected `provenance` MAY survive. Provenance is restricted to
-eligible scalar `component`, `phase`, `path`, and `index`; native metadata and
+eligible scalar `component`, `phase`, `path`, `index`, `attemptId`, and `startupAttemptId`; native metadata and
 unknown fields MUST NOT survive. Missing values MUST NOT become defaults.
+The validated harness projection additionally retains bounded `failureClasses`
+and attempt lists, and explicit `null` exit or completion fields representing
+incomplete observations; arbitrary arrays or nested objects remain excluded.
 
 All other event kinds MUST be dropped, including user and assistant messages,
 reasoning, refusals, prompts, tool calls, arguments, output and native extensions.
 Unbounded `errors`, `permissionDenials`, `agentMetrics`, grader result arrays,
 inventories, caller context and arbitrary nested payloads MUST NOT be forwarded
 through a superficially eligible event.
+
+`session.result` MAY retain validated `engineRetry` counters from Section 6.4.
+This exception permits only the bounded numeric retry fields, not arbitrary
+provider payloads.
 
 **T-UAS-077 — Hard output limits.** The serialized compact JSONL MUST contain at
 most **128 records** and **16,384 UTF-8 bytes**, including JSON escaping and one LF
@@ -1300,6 +1309,63 @@ For supported snapshots, the reader selects the latest authoritative supplied va
 In particular, Gemini `stats.tool_calls` is not a turn count. Codex completed turns and Pi finalized `turn_end` records can support an observed turn count, including for a partial session; that count is not proof of task completion. A bare total-token figure does not supply an input/output split or USD cost.
 
 **T-UAS-035 — Diagnostic separation.** Source session/provider errors, including empty-content error turns and supported terminal error records, MUST remain separately available in `session.result.data.errors` rather than being hidden, downgraded to assistant answers, or merged into tool output. Distinct error observations MUST remain distinguishable. Deduplication MAY remove a repeated observation with the same supplied source identity, but MUST NOT silently remove separate retries merely because their error text matches.
+
+### 6.4 Retry attempts
+
+**T-UAS-087 — Observed attempts.** Collection MUST emit one `harness.attempt`
+observation for each validated entry in `harness_retry.json`, including an entry
+whose `exitCode` is `null`. The existing `harness.retry` summary remains available
+for backward compatibility; its entries and the corresponding attempt events
+describe the same work and MUST NOT be counted twice. A missing manifest MUST NOT
+be replaced with attempts inferred from messages, session IDs, or continuations.
+
+| Field | Meaning |
+| --- | --- |
+| `layer` | `startup` for an outer AWF invocation; `harness` for an engine process invocation. |
+| `attempt` | Observed one-based sequence within that layer. |
+| `attemptId` | Bounded local correlation key, scoped by run, phase, layer, and source invocation; not a native session ID. |
+| `startupAttemptId` | Optional enclosing startup invocation for a harness attempt. |
+| `exitCode` | Observed process status, or `null` when completion was not observed. |
+| `failureClasses` | Existing allowlisted failure identifiers; never raw exception text. |
+| `startedAt`, `finishedAt` | Optional observed Unix milliseconds; missing completion MUST NOT acquire an invented end time. |
+| `strategy` | Optional observed `restart` or `resume`; a resume retry is not a new task continuation. |
+| `backoffMs` | Optional delay before this attempt; not a usage measurement. |
+| `outcome` | Optional `running`, `success`, `failure`, `cancelled`, or `interrupted`. |
+| `reason` | Optional allowlisted failure identifier explaining the attempt. |
+
+**T-UAS-088 — Correlation and accounting.** Engine and runtime events MAY carry
+`provenance.attemptId` when exact source segmentation or a unique observed
+attempt interval establishes correlation. Untimed or ambiguous evidence MUST
+remain unassigned. Distinct attempts MUST retain distinct source positions even
+when native tool IDs repeat. Retry observations MUST NOT introduce usage reports
+or cause terminal snapshots to be summed. Proxy request usage retains precedence
+over compatibility usage copies.
+
+Claude and Codex process transcripts can be segmented using the existing harness
+spawn diagnostics only when their full sequence agrees with the manifest.
+Copilot native session evidence remains authoritative; resumed cumulative
+transcripts MUST NOT be replayed as additional usage. Native engine reconnects
+remain native evidence, not extra harness process invocations. Supported Claude
+`api_retry` and Codex reconnect observations retain bounded
+`session.result.data.engineRetry` metadata (`attempt`, optional `maxRetries`,
+and optional `backoffMs`) alongside their existing diagnostics; an internal
+request retry MUST NOT acquire a fabricated engine process outcome. Workflow
+continuations and Actions reruns remain separately scoped executions; neither
+is a harness retry merely because a session is resumed.
+
+**T-UAS-089 — Partiality and security.** Producers MUST persist an attempt start
+before execution and its completion before backoff. Interrupted and legacy
+partial records remain readable without requiring new optional fields.
+Telemetry failures MUST NOT change retry decisions. Existing mask collection,
+redaction, symlink rejection, protected-session capture, and trusted execution
+evidence boundaries MUST remain in effect. Compact sessions MAY retain the
+bounded attempt fields but remain subject to their existing loss budgets.
+
+The deterministic conformance suite is
+`actions/setup/js/harness_retry_session.test.cjs`, together with the harness,
+normalizer, grader, and audit tests. It exercises single attempts, successful
+retries, exhaustion, interruptions, absent telemetry, source segmentation, and
+usage precedence for Copilot, Claude, and Codex.
 
 ## 7. Engine Mappings (Normative)
 
@@ -2495,6 +2561,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.7.0 - Draft (2026-10-30)
+
+- Added observed harness and startup attempts, partial lifecycle metadata, and evidence-based event correlation (T-UAS-087 through T-UAS-089).
+- Distinguished retry history from cumulative usage, workflow continuations, and Actions reruns without changing serialization-format version 1.
 
 ### Version 2.6.0 - Draft (2026-10-26)
 

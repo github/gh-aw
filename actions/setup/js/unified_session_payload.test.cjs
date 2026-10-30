@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeUnifiedSessionEvent, normalizeModelInventoryData } from "./unified_session_payload.cjs";
-import { collectUnifiedSession, mergeSessionSources, writeUnifiedSession } from "./unified_session.cjs";
+import { collectUnifiedSession, mergeSessionSources, writeUnifiedSession, parseEngineSession } from "./unified_session.cjs";
 import { generatePlainTextSummary, generateCopilotCliStyleSummary, convertCopilotEventsToLegacyLogEntries } from "./log_parser_shared.cjs";
 import { serializeSessionArtifact } from "./session_artifact.cjs";
 import { normalizeCodexSession } from "./codex_session.cjs";
@@ -17,8 +17,93 @@ import { reconcileSessionUsage, selectSessionResult, sessionTokenTotal } from ".
 import { createSessionValidator, validateSession } from "./scripts/validate_session.cjs";
 import { dynamicWorkflow } from "./fixtures/claude_dynamic_workflow.cjs";
 import { DYNAMIC_WORKFLOW_EVENT_TYPES } from "./dynamic_workflow_session.cjs";
+import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 
 describe("essential unified session payloads", () => {
+  it("preserves observed Codex reconnect progress separately from harness attempts", () => {
+    const native = parseEngineSession("Reconnecting... 2/5 (connection interrupted)\n", "codex").find(event => event.type === "session.result");
+    expect(native).toMatchObject({ reconnectAttempt: 2, maxReconnects: 5 });
+    const event = normalizeUnifiedSessionEvent(native);
+    expect(event.data).toMatchObject({ engineRetry: { attempt: 2, maxRetries: 5 } });
+    expect(event.data).not.toHaveProperty("reconnectAttempt");
+    expect(event).not.toHaveProperty("reconnectAttempt");
+    expect(normalizeUnifiedSessionEvent(event)).toEqual(event);
+    const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: [event] }]);
+    const validate = createSessionValidator("unified").event;
+    expect(validate(unified), JSON.stringify(validate.errors)).toBe(true);
+    expect(unified.type).toBe("session.result");
+  });
+
+  it("preserves observed Claude API retry metadata and existing errors without inventing results", () => {
+    const retry = claudeFailures.find(event => event.subtype === "api_retry");
+    const native = parseEngineSession(JSON.stringify(retry), "claude").find(event => event.type === "session.result");
+    const event = normalizeUnifiedSessionEvent(native);
+    expect(event.data.engineRetry).toEqual({ attempt: 1, maxRetries: 10, backoffMs: 1000 });
+    expect(event.data.errors).toEqual(native.data.errors);
+    expect(event.data).not.toHaveProperty("usage");
+    expect(event.data).not.toHaveProperty("status");
+    expect(normalizeUnifiedSessionEvent(event)).toEqual(event);
+    const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: [event] }]);
+    const validate = createSessionValidator("unified").event;
+    expect(validate(unified), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity, null, "2", { private: "PRIVATE" }])("drops malformed engine reconnect metadata %j", value => {
+    for (const observed of [{ reconnectAttempt: value, maxReconnects: value }, { data: { reconnectAttempt: value, maxReconnects: value } }]) {
+      const event = normalizeUnifiedSessionEvent({ type: "session.result", data: {}, ...observed });
+      expect(event.data).not.toHaveProperty("reconnectAttempt");
+      expect(event.data).not.toHaveProperty("maxReconnects");
+      expect(event.data).not.toHaveProperty("engineRetry");
+      expect(JSON.stringify(event)).not.toContain("PRIVATE");
+    }
+  });
+
+  it("does not fabricate engine reconnect progress or treat native retries as harness attempts", () => {
+    expect(normalizeUnifiedSessionEvent({ type: "session.result", data: {} }).data).toEqual({});
+    const event = normalizeUnifiedSessionEvent({ type: "session.result", reconnectAttempt: 0, data: {} });
+    expect(event.data).toEqual({});
+  });
+
+  it.each([-1, 0, 0.5, Number.MAX_SAFE_INTEGER + 1, null, "1", { private: "PRIVATE" }])("drops malformed native API retry attempts %j", attempt => {
+    const event = normalizeUnifiedSessionEvent({ type: "session.result", data: { subtype: "api_retry", attempt, max_retries: 10, retry_delay_ms: 1000 } });
+    expect(event.data).not.toHaveProperty("engineRetry");
+    expect(JSON.stringify(event)).not.toContain("PRIVATE");
+  });
+
+  it("projects only observed safe nested retry fields, including partial metadata", () => {
+    for (const data of [{ engineRetry: { attempt: 1, maxRetries: -1, backoffMs: "PRIVATE", payload: "PRIVATE" } }, { subtype: "api_retry", attempt: 1, max_retries: Infinity, retry_delay_ms: null }])
+      expect(normalizeUnifiedSessionEvent({ type: "session.result", data }).data).toEqual({ engineRetry: { attempt: 1 } });
+    expect(normalizeUnifiedSessionEvent({ type: "session.result", data: { attempt: 1, max_retries: 10 } }).data).toEqual({});
+  });
+
+  it("normalizes safe nested harness metadata and attempt events idempotently", () => {
+    const raw = { attempt: 1, exit_code: null, failure_classes: [], attempt_id: "harness:1", started_at: 123, strategy: "restart", backoff_ms: 0, outcome: "running", reason: "watchdog", payload: "PRIVATE" };
+    const attempt = { attempt: 1, exitCode: null, failureClasses: [], attemptId: "harness:1", startedAt: 123, strategy: "restart", backoffMs: 0, outcome: "running", reason: "watchdog" };
+    const summary = normalizeUnifiedSessionEvent({ type: "harness.retry", data: { attempts: 1, exit_code: null, attempt_results: [raw], startup_attempt_results: [], output: "PRIVATE" } });
+    expect(summary.data).toEqual({ attempts: 1, exitCode: null, attemptResults: [attempt], startupAttemptResults: [] });
+    const event = normalizeUnifiedSessionEvent({ type: "harness.attempt", data: { ...raw, layer: "harness" } });
+    expect(event.data).toEqual({ ...attempt, layer: "harness" });
+    for (const projected of [summary, event]) {
+      expect(normalizeUnifiedSessionEvent(projected)).toEqual(projected);
+      expect(JSON.stringify(projected)).not.toContain("PRIVATE");
+      const [unified] = mergeSessionSources([{ component: "harness", phase: "agent", path: "harness-retry.json", events: [projected] }]);
+      const validate = createSessionValidator("unified").event;
+      expect(validate(unified), JSON.stringify(validate.errors)).toBe(true);
+    }
+  });
+
+  it.each([
+    { type: "harness.retry", data: { attempts: 1, exitCode: 1, attemptResults: [{ attempt: 1, exitCode: 1, failureClasses: [], reason: "PRIVATE" }] } },
+    { type: "harness.attempt", data: { attempt: 1, exitCode: null, failureClasses: [], layer: "PRIVATE" } },
+  ])("rejects malformed harness evidence without echoing private data", event => {
+    expect(() => normalizeUnifiedSessionEvent(event)).toThrow("valid bounded attempt metadata");
+    try {
+      normalizeUnifiedSessionEvent(event);
+    } catch (error) {
+      expect(error.message).not.toContain("PRIVATE");
+    }
+  });
+
   it("projects job outcomes without copying dependency outputs", () => {
     const event = { type: "workflow.job_result", data: { jobId: "agent", result: "failure", outputs: { secret: "PRIVATE_OUTPUT" }, name: "PRIVATE_NAME" } };
     const projected = normalizeUnifiedSessionEvent(event);

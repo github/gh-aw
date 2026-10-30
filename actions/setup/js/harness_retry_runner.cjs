@@ -42,9 +42,34 @@ function stripExecutionEvidenceEnv(env) {
 }
 
 /**
+ * Observe explicit continuation selectors without retaining their values.
+ * @param {string[]} args
+ * @param {"claude" | "codex" | "copilot"} engine
+ * @returns {"restart" | "resume"}
+ */
+function selectedHarnessStrategy(args, engine) {
+  const valueFlags = new Set(["--prompt", "-p", "--prompt-file", "--model", "-m", "--settings", "--session-id", "--config", "--cd", "-C", "--add-dir", "--allowedTools", "--disallowedTools", ...(engine === "codex" ? ["-c"] : [])]);
+  let codexExec = false;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--") break;
+    if (valueFlags.has(arg)) {
+      index++;
+      continue;
+    }
+    if (arg === "--continue" || arg === "--resume" || arg.startsWith("--resume=") || (engine !== "codex" && arg === "-r") || (engine === "claude" && arg === "-c")) return "resume";
+    if (engine === "codex") {
+      if (arg === "exec") codexExec = true;
+      else if (codexExec && !arg.startsWith("-")) return arg === "resume" ? "resume" : "restart";
+    }
+  }
+  return "restart";
+}
+
+/**
  * `nextDelayMs` overrides the delay before the immediately next attempt; following retries
  * resume exponential backoff from that delay.
- * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number, cancelled?: boolean, failureClasses?: string[] }} HarnessAttemptResult
+ * @typedef {{ exitCode: number, output: string, hasOutput: boolean, durationMs?: number, watchdogFired?: boolean, runtimeGuardFired?: boolean, runtimeGuardReason?: string, safeOutputsByteOffset?: number, cancelled?: boolean, failureClasses?: string[], strategy?: "restart" | "resume" }} HarnessAttemptResult
  * @typedef {{ action: "retry" | "stop", exitCode?: number, nextDelayMs?: number }} HarnessFailureDecision
  */
 
@@ -103,6 +128,60 @@ if (require.main === module && process.argv[2] === "--preflight-noop") {
 }
 
 /**
+ * Host-only startup lifecycle updates. Never forward execution-evidence configuration
+ * or engine output through this advisory telemetry channel.
+ * @param {string} event
+ * @param {number} attempt
+ * @param {number} value Backoff before a start, or the observed exit code on finish.
+ * @param {boolean} startupFailure
+ */
+function recordStartupAttempt(event, attempt, value, startupFailure = false) {
+  try {
+    if (!["start", "finish"].includes(event) || !Number.isSafeInteger(attempt) || attempt < 1 || !Number.isSafeInteger(value) || value < 0) return;
+    const telemetryPath = resolveHarnessRetryTelemetryPath();
+    /** @type {{ attempts: number, exit_code: number, attempt_results: unknown[], startup_attempt_results: Record<string, any>[] }} */
+    let telemetry = { attempts: 0, exit_code: 1, attempt_results: [], startup_attempt_results: [] };
+    if (event !== "start" || attempt !== 1) {
+      try {
+        telemetry = JSON.parse(fs.readFileSync(telemetryPath, "utf8"));
+      } catch {
+        // Missing telemetry must not prevent startup or retry.
+      }
+    }
+    if (!Array.isArray(telemetry.startup_attempt_results)) telemetry.startup_attempt_results = [];
+    if (event === "start") {
+      telemetry.startup_attempt_results.push({
+        attempt,
+        attempt_id: `startup:${attempt}`,
+        started_at: Date.now(),
+        finished_at: null,
+        strategy: "restart",
+        backoff_ms: value,
+        outcome: "running",
+        exit_code: null,
+        failure_classes: [],
+      });
+    } else {
+      const current = telemetry.startup_attempt_results.find(result => result.attempt === attempt);
+      if (!current) return;
+      current.finished_at = Date.now();
+      current.exit_code = value;
+      current.outcome = value === 0 ? "success" : [130, 143].includes(value) ? "cancelled" : "failure";
+      current.failure_classes = startupFailure ? ["startup_error"] : [];
+    }
+    fs.mkdirSync(path.dirname(telemetryPath), { recursive: true });
+    fs.writeFileSync(`${telemetryPath}.tmp`, JSON.stringify(telemetry) + "\n");
+    fs.renameSync(`${telemetryPath}.tmp`, telemetryPath);
+  } catch {
+    // Startup telemetry is advisory, including malformed or unwritable records.
+  }
+}
+
+if (require.main === module && process.argv[2] === "--startup-attempt") {
+  recordStartupAttempt(process.argv[3], Number(process.argv[4]), Number(process.argv[5]), process.argv[6] === "startup_error");
+}
+
+/**
  * Return true when a failed attempt wrote a noop safe-output, making retries wasteful.
  * @param {{ attempt: number, safeOutputsPath: string, hasNoopInSafeOutputs: (path: string, options: { logger: (message: string) => void }) => boolean, log: (message: string) => void }} options
  * @returns {boolean}
@@ -128,7 +207,7 @@ function shouldStopForNoopSafeOutputs({ attempt, safeOutputsPath, hasNoopInSafeO
  *   harnessName: string,
  *   log: (message: string) => void,
  *   softTimeoutGuard: { timeoutMinutes: number, softDeadlineMs: number } | null,
- *   runAttempt: (attempt: number) => Promise<HarnessAttemptResult>,
+ *   runAttempt: (attempt: number, observeStrategy: (strategy: "restart" | "resume") => void) => Promise<HarnessAttemptResult>,
  *   handleFailure: (context: { attempt: number, result: HarnessAttemptResult, maxRetries: number }) => Promise<HarnessFailureDecision> | HarnessFailureDecision,
  *   getRetryMode?: (attempt: number) => string,
  *   sleepFn?: (ms: number) => Promise<void>,
@@ -143,13 +222,38 @@ async function runHarnessRetryLoop(options) {
   /** @type {HarnessAttemptResult | null} */
   let lastResult = null;
   const sleepFor = options.sleepFn ?? sleep;
-  /** @type {{ attempt: number, exit_code: number | null, failure_classes: string[] }[]} */
+  let startupAttemptId;
+  if (options.telemetryPath) {
+    try {
+      const startup = JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).startup_attempt_results?.at(-1);
+      if (startup?.outcome === "running" && Number.isSafeInteger(startup.attempt) && startup.attempt > 0) startupAttemptId = `startup:${startup.attempt}`;
+    } catch {
+      // Standalone harnesses have no host startup scope.
+    }
+  }
+  /** @type {{ attempt: number, attempt_id: string, startup_attempt_id?: string, started_at: number, finished_at: number | null, strategy: "restart" | "resume", backoff_ms: number, outcome: string, exit_code: number | null, failure_classes: string[] }[]} */
   const attemptResults = [];
+  /** @param {"start" | "finish"} event @param {(typeof attemptResults)[number]} result */
+  const writeAttemptMarker = (event, result) => {
+    try {
+      // Use stdout: direct execution may capture stdout only. Never copy raw child
+      // output to new files; the aggregate log's existing redaction remains authoritative.
+      process.stdout.write(`\n[gh-aw-harness-attempt] ${JSON.stringify({ event, attempt_id: result.attempt_id, attempt: result.attempt, ...(result.startup_attempt_id ? { startup_attempt_id: result.startup_attempt_id } : {}) })}\n`);
+    } catch {
+      // Boundary markers are advisory and must not affect retry decisions.
+    }
+  };
   const writeTelemetry = () => {
     if (!options.telemetryPath) return;
     try {
       fs.mkdirSync(path.dirname(options.telemetryPath), { recursive: true });
-      fs.writeFileSync(`${options.telemetryPath}.tmp`, JSON.stringify({ attempts, exit_code: lastExitCode, attempt_results: attemptResults }) + "\n");
+      let startupAttempts;
+      try {
+        startupAttempts = JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).startup_attempt_results;
+      } catch {
+        // A standalone harness has no host startup telemetry.
+      }
+      fs.writeFileSync(`${options.telemetryPath}.tmp`, JSON.stringify({ attempts, exit_code: lastExitCode, attempt_results: attemptResults, ...(Array.isArray(startupAttempts) ? { startup_attempt_results: startupAttempts } : {}) }) + "\n");
       fs.renameSync(`${options.telemetryPath}.tmp`, options.telemetryPath);
     } catch (error) {
       try {
@@ -169,9 +273,14 @@ async function runHarnessRetryLoop(options) {
         break;
       }
 
+      let backoffMs = 0;
+      /** @type {"restart" | "resume"} */
+      let strategy = "restart";
       if (attempt > 0) {
         const retryMode = options.getRetryMode ? options.getRetryMode(attempt) : "fresh run";
+        strategy = /(?:resume|continue)/.test(retryMode) ? "resume" : "restart";
         const sleepDelay = options.softTimeoutGuard ? Math.min(delay, Math.max(0, options.softTimeoutGuard.softDeadlineMs - Date.now())) : delay;
+        backoffMs = sleepDelay;
         options.log(`retry ${attempt}/${options.maxRetries}: sleeping ${sleepDelay}ms before next attempt (${retryMode})`);
         await sleepFor(sleepDelay);
         delay = Math.min(delay * options.backoffMultiplier, options.maxDelayMs);
@@ -185,16 +294,46 @@ async function runHarnessRetryLoop(options) {
 
       attempts = attempt + 1;
       /** @type {(typeof attemptResults)[number]} */
-      const attemptResult = { attempt: attempts, exit_code: null, failure_classes: [] };
+      const attemptResult = {
+        attempt: attempts,
+        attempt_id: `harness:${attempts}`,
+        ...(startupAttemptId ? { startup_attempt_id: startupAttemptId } : {}),
+        started_at: Date.now(),
+        finished_at: null,
+        strategy,
+        backoff_ms: backoffMs,
+        outcome: "running",
+        exit_code: null,
+        failure_classes: [],
+      };
       attemptResults.push(attemptResult);
       writeTelemetry();
-      const result = await options.runAttempt(attempt);
+      writeAttemptMarker("start", attemptResult);
+      let result;
+      try {
+        result = await options.runAttempt(attempt, selected => {
+          if (selected === "restart" || selected === "resume") {
+            attemptResult.strategy = selected;
+            writeTelemetry();
+          }
+        });
+      } catch (error) {
+        attemptResult.finished_at = Date.now();
+        attemptResult.outcome = "interrupted";
+        writeAttemptMarker("finish", attemptResult);
+        throw error;
+      }
       lastResult = result;
       lastExitCode = result.exitCode;
       attemptResult.exit_code = result.exitCode;
+      attemptResult.finished_at = Date.now();
+      attemptResult.outcome = result.cancelled ? "cancelled" : result.exitCode === 0 ? "success" : "failure";
+      if (result.strategy === "restart" || result.strategy === "resume") attemptResult.strategy = result.strategy;
       if (result.exitCode !== 0) {
         attemptResult.failure_classes = [result.cancelled ? "cancelled" : result.runtimeGuardFired ? "runtime_guard" : result.watchdogFired ? "watchdog" : result.hasOutput ? "unknown_error" : "no_output"];
       }
+      writeAttemptMarker("finish", attemptResult);
+      writeTelemetry();
 
       if (result.cancelled) {
         options.log(`attempt ${attempt + 1}: cancelled — not retrying`);
@@ -234,10 +373,12 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     captureExecutionEvidenceConfiguration,
     resolveHarnessRetryTelemetryPath,
+    recordStartupAttempt,
     runHarnessRetryLoop,
     runPreflightNoopCheck,
     shouldSkipForNoopSafeOutputs,
     shouldStopForNoopSafeOutputs,
     stripExecutionEvidenceEnv,
+    selectedHarnessStrategy,
   };
 }

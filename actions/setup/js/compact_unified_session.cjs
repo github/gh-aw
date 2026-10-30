@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
-const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
+const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, MAX_HARNESS_ATTEMPTS } = require("./harness_retry_record.cjs");
 
 const COMPACT_UNIFIED_SESSION_VERSION = 1;
 const MAX_COMPACT_SESSION_BYTES = 16 * 1024;
@@ -24,6 +24,7 @@ const EVENT_FIELDS = {
   "memory.push": ["memoryId", "jobResult", "outcome", "status", "branch", "commit"],
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
   "harness.retry": ["attempts", "exitCode"],
+  "harness.attempt": [],
   "grader.result": ["id", "status", "value", "score", "unit", "passed", "direction", "threshold", "enabled", "min", "max", "version"],
 };
 EVENT_FIELDS["firewall.token_usage"] = EVENT_FIELDS["usage.report"];
@@ -57,8 +58,19 @@ function projectEvent(event) {
   if (!isRecord(event) || typeof event.type !== "string" || !Object.hasOwn(EVENT_FIELDS, event.type) || !isRecord(event.data)) return undefined;
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
-  if (event.type === "harness.retry") {
-    const retry = normalizeHarnessRetryRecord(event.data);
+  if (event.type === "session.result" && isRecord(event.data.engineRetry)) {
+    const retry = event.data.engineRetry;
+    if (typeof retry.attempt === "number" && Number.isSafeInteger(retry.attempt) && retry.attempt >= 1) {
+      const engineRetry = { attempt: retry.attempt };
+      for (const field of ["maxRetries", "backoffMs"]) {
+        const value = retry[field];
+        if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) Object.assign(engineRetry, { [field]: value });
+      }
+      data.engineRetry = engineRetry;
+    }
+  }
+  if (event.type === "harness.retry" || event.type === "harness.attempt") {
+    const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(event.data) : normalizeHarnessAttemptEvent(event.data);
     if (!retry) return undefined;
     Object.assign(data, retry);
   }
@@ -66,7 +78,22 @@ function projectEvent(event) {
   if (event.type === "grader.result" && isRecord(event.data.run)) data.run = projectScalars(event.data.run, GRADER_RUN_FIELDS);
   /** @type {Record<string, unknown>} */
   const projected = { type: event.type, data, ...projectScalars(event, ["timestamp"]) };
-  if (isRecord(event.provenance)) projected.provenance = projectScalars(event.provenance, ["component", "phase", "path", "index"]);
+  if (isRecord(event.provenance)) {
+    const provenance = projectScalars(event.provenance, ["component", "phase", "path", "index"]);
+    for (const field of ["attemptId", "startupAttemptId"]) {
+      const id = event.provenance[field];
+      if (typeof id !== "string") continue;
+      const parts = id.split(":");
+      if (
+        /^(harness:[1-9][0-9]{0,2}|startup:[1-9][0-9]{0,2}(:harness:[1-9][0-9]{0,2})?)$/.test(id) &&
+        Number(parts[1]) <= MAX_HARNESS_ATTEMPTS &&
+        (parts.length === 2 || Number(parts[3]) <= MAX_HARNESS_ATTEMPTS) &&
+        (field !== "startupAttemptId" || (parts.length === 2 && parts[0] === "startup"))
+      )
+        provenance[field] = id;
+    }
+    projected.provenance = provenance;
+  }
   return projected;
 }
 

@@ -72,7 +72,15 @@ const {
 } = require("./process_runner.cjs");
 const { buildCopilotSDKServerArgs, getCopilotSDKServerPort, startCopilotSDKServer, stopCopilotSDKServer, waitForCopilotSDKServer } = require("./copilot_sdk_sidecar.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
-const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const {
+  captureExecutionEvidenceConfiguration,
+  resolveHarnessRetryTelemetryPath,
+  runHarnessRetryLoop,
+  selectedHarnessStrategy,
+  shouldSkipForNoopSafeOutputs,
+  shouldStopForNoopSafeOutputs,
+  stripExecutionEvidenceEnv,
+} = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -2067,7 +2075,7 @@ async function main() {
         log,
         softTimeoutGuard,
         getRetryMode: () => (!copilotSDKMode && useContinueOnRetry ? "--continue" : "fresh run"),
-        runAttempt: async attempt => {
+        runAttempt: async (attempt, observeStrategy) => {
           // Verified native retries resume the exact UUID; other CLI paths retain --continue.
           let currentArgs = !copilotSDKMode && attempt > 0 && useContinueOnRetry ? [...resolvedArgs, "--continue"] : resolvedArgs;
           const verifyModel = !copilotSDKMode && (!process.env.GH_AW_PHASE || process.env.GH_AW_PHASE === "agent") && Boolean(process.env.COPILOT_MODEL);
@@ -2080,6 +2088,8 @@ async function main() {
           }
 
           // Redact --prompt / -p value from logs to avoid leaking prompt content
+          const strategy = copilotSDKMode ? "restart" : attempt > 0 && useContinueOnRetry ? "resume" : selectedHarnessStrategy(currentArgs, "copilot");
+          observeStrategy(strategy);
           const safeArgs = currentArgs.map((arg, i) => (currentArgs[i - 1] === "--prompt" || currentArgs[i - 1] === "-p" ? "<redacted>" : arg));
           const modelObserver = !verifyModel ? { check: () => "" } : createCopilotModelObserver({ configuredModel: selectionConfiguredModel, resolvedModel: process.env.COPILOT_MODEL || "", sessionId, logger: log });
           // Driver mode: run copilot_sdk_driver.cjs as a normal subprocess. The harness has
@@ -2115,7 +2125,7 @@ async function main() {
           detectedCopilotErrors.agenticEngineTimeout ||= attemptDetections.agenticEngineTimeout;
           detectedCopilotErrors.modelNotSupportedError ||= attemptDetections.modelNotSupportedError;
           detectedCopilotErrors.http400ResponseError ||= attemptDetections.http400ResponseError;
-          return result;
+          return { ...result, strategy };
         },
         handleFailure: async ({ attempt, result }) => {
           if (result.runtimeGuardReason === "copilot_model_verification") {

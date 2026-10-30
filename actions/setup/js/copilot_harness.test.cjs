@@ -120,7 +120,7 @@ describe("native invocation model and session selection", () => {
 const { detectNonRetryableHarnessGuard, buildSoftTimeoutGuard } = require("./harness_retry_guard.cjs");
 const { detectErrors } = require("./agent_error_patterns.cjs");
 
-const agentTempDir = "/tmp/gh-aw/agent";
+const agentTempDir = path.join(os.tmpdir(), "gh-aw/agent");
 const harnessChildEnv = {
   ...process.env,
   GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
@@ -178,6 +178,53 @@ function withTemporaryPromptTemplate(prefix, sourceTemplateDir, promptDirResolve
 }
 
 describe("copilot_harness.cjs", () => {
+  it.each([false, true])("records the actual CLI continuation strategy and attempt lifecycle with initial resume: %s", initialResume => {
+    const directory = makeHarnessTempDir("copilot-retry-telemetry-");
+    const stubPath = path.join(directory, "stub.cjs");
+    const callsPath = path.join(directory, "calls.jsonl");
+    fs.writeFileSync(
+      stubPath,
+      `
+      const fs = require("fs");
+      const calls = process.env.COPILOT_HARNESS_STUB_CALLS;
+      fs.appendFileSync(calls, JSON.stringify(process.argv.slice(2)) + "\\n");
+      if (fs.readFileSync(calls, "utf8").trim().split("\\n").length === 1) {
+        console.error("Some work completed before the connection failed");
+        process.exitCode = 1;
+      }
+    `
+    );
+    try {
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt", "test", ...(initialResume ? ["--resume", "private-session"] : [])], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: {
+          ...harnessChildEnv,
+          GH_AW_TMP_DIR: directory,
+          GH_AW_HARNESS_TELEMETRY_DIR: directory,
+          GH_AW_HARNESS_MAX_RETRIES: "1",
+          GH_AW_SAFE_OUTPUTS: "",
+          COPILOT_MODEL: "",
+          COPILOT_HARNESS_STUB_CALLS: callsPath,
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const calls = fs
+        .readFileSync(callsPath, "utf8")
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      expect(calls.map(args => args.includes("--continue"))).toEqual([false, true]);
+      const telemetry = JSON.parse(fs.readFileSync(path.join(directory, "harness_retry.json"), "utf8"));
+      expect(telemetry.attempt_results.map(attempt => attempt.strategy)).toEqual([initialResume ? "resume" : "restart", "resume"]);
+      expect(telemetry.attempt_results.map(attempt => attempt.outcome)).toEqual(["failure", "success"]);
+      expect(telemetry.attempt_results.map(attempt => attempt.attempt_id)).toEqual(["harness:1", "harness:2"]);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   describe("SDK content-filter rejection", () => {
     const content = "The model returned no content because the response was blocked by content filtering.";
     it("skips corrupt JSONL and short-circuits without decoding later records", () => {

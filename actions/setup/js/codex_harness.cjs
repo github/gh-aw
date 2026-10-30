@@ -39,7 +39,15 @@ const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require(".
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
-const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const {
+  captureExecutionEvidenceConfiguration,
+  resolveHarnessRetryTelemetryPath,
+  runHarnessRetryLoop,
+  selectedHarnessStrategy,
+  shouldSkipForNoopSafeOutputs,
+  shouldStopForNoopSafeOutputs,
+  stripExecutionEvidenceEnv,
+} = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -1066,7 +1074,9 @@ async function main() {
     log,
     softTimeoutGuard,
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
-    runAttempt: async attempt => {
+    runAttempt: async (attempt, observeStrategy) => {
+      const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
+      observeStrategy(strategy);
       const terminalErrors = [];
       const mcpWatchdog = createMCPCallWatchdog(item => {
         const server = item.server ?? item.server_name ?? item.serverName;
@@ -1145,9 +1155,9 @@ async function main() {
       // `handleFailure` runs. Normalize the exit code so the failure handler always sees it.
       if (result.runtimeGuardFired && result.exitCode === 0) {
         log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
-        return { ...result, exitCode: 1, safeOutputsByteOffset };
+        return { ...result, exitCode: 1, safeOutputsByteOffset, strategy };
       }
-      return { ...result, safeOutputsByteOffset };
+      return { ...result, safeOutputsByteOffset, strategy };
     },
     handleFailure: ({ attempt, result }) => {
       if (result.runtimeGuardFired) {

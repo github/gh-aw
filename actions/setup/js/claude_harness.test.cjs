@@ -33,7 +33,7 @@ const {
   applyClaudeSettingsEnv,
 } = require("./claude_harness.cjs");
 
-const agentTempDir = "/tmp/gh-aw/agent";
+const agentTempDir = path.join(os.tmpdir(), "gh-aw/agent");
 const harnessChildEnv = {
   ...process.env,
   GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
@@ -85,6 +85,23 @@ function runHarnessWithStub({ stubScript, prompt = "fix the bug", extraArgs = []
 }
 
 describe("claude_harness.cjs", () => {
+  it("checkpoints an initial explicit resume before spawning rather than inferring a retry", () => {
+    const { result, calls, harnessRetry } = runHarnessWithStub({
+      extraArgs: ["--resume", "private-session"],
+      extraEnv: { GH_AW_HARNESS_MAX_RETRIES: "0", GH_AW_SAFE_OUTPUTS: "" },
+      stubScript: `
+        const fs = require("fs");
+        const path = require("path");
+        const attempt = JSON.parse(fs.readFileSync(path.join(process.env.GH_AW_TMP_DIR, "agent/harness_retry.json"), "utf8")).attempt_results[0];
+        fs.appendFileSync(process.env.CLAUDE_HARNESS_STUB_CALLS, JSON.stringify({ strategy: attempt.strategy, outcome: attempt.outcome }) + "\\n");
+      `,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toEqual([{ strategy: "resume", outcome: "running" }]);
+    expect(harnessRetry.attempt_results[0].strategy).toBe("resume");
+    expect(JSON.stringify(harnessRetry)).not.toContain("private-session");
+  });
+
   it.each([
     { failures: 0, exitCode: 0, attempts: 1, phase: "agent" },
     { failures: 2, exitCode: 0, attempts: 3, phase: "agent" },
@@ -108,6 +125,13 @@ describe("claude_harness.cjs", () => {
     expect(result.status, result.stderr).toBe(exitCode);
     expect(harnessRetry).toMatchObject({ attempts, exit_code: exitCode });
     expect(harnessRetry.attempt_results.map(attempt => attempt.failure_classes)).toEqual(Array.from({ length: attempts }, (_, index) => (index < failures ? ["rate_limit_error"] : [])));
+    expect(harnessRetry.attempt_results.map(attempt => attempt.strategy)).toEqual(Array.from({ length: attempts }, (_, index) => (index === 0 ? "restart" : "resume")));
+    expect(harnessRetry.attempt_results.map(attempt => attempt.outcome)).toEqual(Array.from({ length: attempts }, (_, index) => (index < failures ? "failure" : "success")));
+    for (const [index, attempt] of harnessRetry.attempt_results.entries()) {
+      expect(attempt.attempt_id).toBe(`harness:${index + 1}`);
+      expect(attempt.started_at).toBeLessThanOrEqual(attempt.finished_at);
+      expect(attempt.backoff_ms).toBe(index === 0 ? 0 : 1);
+    }
   });
 
   describe("threat detection model aliases", () => {

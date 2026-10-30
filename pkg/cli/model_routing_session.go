@@ -86,6 +86,7 @@ type sessionModelRoutingAttribution struct {
 	Outcome                   *sessionModelRoutingOutcome
 	Mismatches                []ModelEndpointMismatch
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
+	RetryEvents               []sessionModelRoutingEvent
 }
 
 // ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
@@ -178,6 +179,8 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
+	case (event.Type == "harness.attempt" || event.Type == "harness.retry") && event.Provenance.Component == "harness":
+		attribution.RetryEvents = append(attribution.RetryEvents, event)
 	case event.Type == "workflow.info" && event.Provenance.Component == "workflow" &&
 		(event.Provenance.Path == "aw_info.json" ||
 			(event.Provenance.Path == "runtime/aw_info.json" && event.Provenance.Phase == "agent") ||

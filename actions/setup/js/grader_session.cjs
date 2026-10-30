@@ -43,6 +43,38 @@ function isToolFailure(call) {
   return call.completed === false || call.success === false || call.isError === true || call.status === "error" || call.status === "failure" || (call.error !== undefined && call.error !== null);
 }
 
+const startupScope = (id, startupId) => startupId ?? (typeof id === "string" ? /^(startup:[1-9][0-9]*):harness:/.exec(id)?.[1] : undefined);
+
+/**
+ * Prefer per-attempt evidence over matching compatibility-summary entries.
+ * The history remains data-only so isolated graders can inspect it without I/O.
+ * @param {UnifiedSession} session
+ */
+function attemptHistory(session) {
+  const invocation = (event, layer, data) => JSON.stringify([event.provenance.phase, event.provenance.path ?? "", layer, startupScope(data.attemptId, data.startupAttemptId) ?? ""]);
+  const canonical = new Set(session.filter(event => event.type === "harness.attempt" && event.provenance.component === "harness").map(event => JSON.stringify([invocation(event, event.data.layer, event.data), event.data.attempt])));
+  const attempts = new Map();
+  const add = (event, data, layer) => {
+    if (!isRecord(data) || count(data.attempt) === null || data.attempt < 1 || !["harness", "startup"].includes(layer)) return;
+    const key = JSON.stringify([invocation(event, layer, data), data.attemptId ?? data.attempt]);
+    attempts.set(key, { ...data, layer, provenance: event.provenance });
+  };
+  for (const event of session) {
+    if (event.provenance.component !== "harness") continue;
+    if (event.type === "harness.attempt") add(event, event.data, event.data.layer);
+    if (event.type !== "harness.retry") continue;
+    for (const [field, layer] of [
+      ["attemptResults", "harness"],
+      ["startupAttemptResults", "startup"],
+    ]) {
+      for (const data of Array.isArray(event.data[field]) ? event.data[field] : []) {
+        if (isRecord(data) && !canonical.has(JSON.stringify([invocation(event, layer, data), data.attempt]))) add(event, data, layer);
+      }
+    }
+  }
+  return [...attempts.values()];
+}
+
 /**
  * Materialize indexes and accounting once. Only main-agent observations contribute
  * to execution metrics; detection and evals have their own usage in the same log.
@@ -62,14 +94,37 @@ function createSessionLookups(session) {
   /** @param {string} type @returns {UnifiedSession} */
   const eventsOfType = type => eventsByType.get(type) ?? [];
   const agentEvents = session.filter(event => event.provenance?.phase === "agent");
+  const attempts = attemptHistory(session);
+  const attemptScopes = new Map();
+  const previousScopes = new Map();
+  const attemptKey = (id, startupId) => {
+    const scope = startupScope(id, startupId);
+    return scope ? JSON.stringify([scope, id]) : id;
+  };
+  for (const attempt of [...attempts].sort((a, b) => a.attempt - b.attempt)) {
+    if (!attempt.attemptId || attempt.provenance.phase !== "agent") continue;
+    const invocation = JSON.stringify([attempt.provenance.phase, attempt.provenance.path, attempt.layer, startupScope(attempt.attemptId, attempt.startupAttemptId) ?? ""]);
+    const id = attemptKey(attempt.attemptId, attempt.startupAttemptId);
+    const root = attempt.strategy === "resume" ? (previousScopes.get(invocation) ?? id) : id;
+    attemptScopes.set(id, root);
+    previousScopes.set(invocation, root);
+  }
+  const resolvedAttempt = (id, startupId) => {
+    const key = attemptKey(id, startupId);
+    return attemptScopes.get(key) ?? key;
+  };
+  const attemptScope = event => {
+    const id = event.provenance.attemptId;
+    return id ? [resolvedAttempt(id, event.provenance.startupAttemptId)] : [];
+  };
   /** @type {any[]} */
   const toolCalls = [];
   /** @type {Map<string, any>} */
   const toolCallsById = new Map();
   /** @type {Map<string, {calls: any[], next: number}>} */
   const pendingByName = new Map();
-  const sessionScope = event => [event.data.sessionId ?? "", event.data.agentId ?? "", event.provenance.path ?? ""];
-  const correlationScope = event => [event.data.sessionId ?? "", event.data.agentId ?? ""];
+  const sessionScope = event => [event.data.sessionId ?? "", event.data.agentId ?? "", event.provenance.path ?? "", ...attemptScope(event)];
+  const correlationScope = event => [event.data.sessionId ?? "", event.data.agentId ?? "", ...attemptScope(event)];
   const scope = event => JSON.stringify([...correlationScope(event), event.data.toolCallId ?? ""]);
   const nameKey = event => JSON.stringify([...correlationScope(event), event.data.toolName ?? ""]);
   const eventIndices = new Map(session.map((event, index) => [event, index]));
@@ -84,6 +139,8 @@ function createSessionLookups(session) {
         name: data.toolName ?? "",
         arguments: data.input ?? (data.command ? { command: data.command } : undefined),
         completed: false,
+        attemptId: event.provenance.attemptId,
+        startupAttemptId: event.provenance.startupAttemptId,
         sessionScope: sessionScope(event),
         eventIndex: eventIndices.get(event),
       };
@@ -102,7 +159,7 @@ function createSessionLookups(session) {
         call = pending.calls[pending.next++];
       }
       if (!call) {
-        call = { name: data.toolName ?? "", sessionScope: sessionScope(event), eventIndex: eventIndices.get(event) };
+        call = { name: data.toolName ?? "", sessionScope: sessionScope(event), eventIndex: eventIndices.get(event), attemptId: event.provenance.attemptId, startupAttemptId: event.provenance.startupAttemptId };
         toolCalls.push(call);
       }
       Object.assign(call, data, { completed: true });
@@ -111,10 +168,7 @@ function createSessionLookups(session) {
   }
 
   const nativeCallIds = new Set(
-    toolCalls
-      .map(call => call.toolCallId)
-      .filter(id => id !== undefined && id !== null)
-      .map(String)
+    toolCalls.filter(call => call.toolCallId !== undefined && call.toolCallId !== null).map(call => JSON.stringify([String(call.toolCallId), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId)] : [])]))
   );
   const gatewayCalls = new Map();
   for (const event of agentEvents) {
@@ -123,9 +177,9 @@ function createSessionLookups(session) {
     if (data.method && data.method !== "tools/call") continue;
     const id = data.toolCallId ?? data.rpcId ?? data.requestId;
     if (!data.toolName && id === undefined) continue;
-    const key = JSON.stringify([data.serverName, id ?? eventIndices.get(event)]);
+    const key = JSON.stringify([data.serverName, id ?? eventIndices.get(event), ...attemptScope(event)]);
     if (!data.toolName && !gatewayCalls.has(key)) continue;
-    const call = gatewayCalls.get(key) ?? { name: data.toolName ?? "", completed: false, eventIndex: eventIndices.get(event) };
+    const call = gatewayCalls.get(key) ?? { name: data.toolName ?? "", completed: false, eventIndex: eventIndices.get(event), attemptId: event.provenance.attemptId, startupAttemptId: event.provenance.startupAttemptId };
     if (data.toolName) call.name = data.toolName;
     if (event.type !== "mcp.rpc.request") Object.assign(call, data, { completed: true });
     gatewayCalls.set(key, call);
@@ -133,7 +187,7 @@ function createSessionLookups(session) {
   toolCalls.push(
     ...[...gatewayCalls.values()].filter(call => {
       const id = call.toolCallId ?? call.rpcId ?? call.requestId;
-      return id === undefined || id === null || !nativeCallIds.has(String(id));
+      return id === undefined || id === null || !nativeCallIds.has(JSON.stringify([String(id), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId)] : [])]));
     })
   );
 
@@ -153,6 +207,7 @@ function createSessionLookups(session) {
   const executionDuration = agentEvents.find(event => event.type === "execution.result" && duration(event.data.durationMs) !== null)?.data.durationMs;
   const totalDurationMs = sumMeasurements(tokenUsageEntries.map(entry => entry.duration_ms)) ?? duration(executionDuration);
   const retryEvents = agentEvents.filter(event => event.type.startsWith("mcp.") && (event.data.event === "retry" || event.data.retryHint != null || /\bretry(?:ing)?\b/i.test(String(event.data.message ?? ""))));
+  const harnessRetries = attempts.filter(attempt => attempt.provenance.phase === "agent" && attempt.attempt > 1);
   const safeOutputResults = eventsOfType("safe_output.result");
   const safeJobOutcomeTypes = new Set(
     safeOutputResults.filter(event => event.provenance.phase === "safe_outputs" && event.provenance.path === "usage/aw_session.jsonl" && event.data.status !== undefined && typeof event.data.type === "string").map(event => event.data.type)
@@ -179,6 +234,7 @@ function createSessionLookups(session) {
     totalRequests: usageEvents.length,
     totalDurationMs,
     retryEvents,
+    attempts,
     artifacts,
     trajectoryIR,
   };
@@ -194,7 +250,7 @@ function createSessionLookups(session) {
       totalOutputTokens,
       totalRequests: usageEvents.length,
       totalDurationMs,
-      retryCount: retryEvents.length,
+      retryCount: retryEvents.length + harnessRetries.length,
       artifactCount: artifacts.length,
       workingSet,
     },
