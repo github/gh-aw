@@ -387,7 +387,7 @@ describe("empty output outcome", () => {
     const outcome = buildEmptyOutputOutcome([], rootDir);
     const tail = outcome.details.split("Last engine error lines (summarized, oldest first; full text in agent-stdio.log):\n")[1];
     expect(tail).toBeDefined();
-    expect(tail.split("\n").slice(0, 5)).toEqual([...Array(4).fill("Engine error: Provider server error after retries (capi_server_error)"), "Driver execution failed (unhandled JavaScript exception)"]);
+    expect(tail.split("\n").slice(0, 5)).toEqual([...Array(4).fill("Engine error: Provider server error (HTTP 5xx) (capi_server_error)"), "Driver execution failed (unhandled JavaScript exception)"]);
     expect(tail.split("\n")[5]).toBe("Last tool call status: not recorded");
     expect(outcome.details).not.toContain("private-");
   });
@@ -397,8 +397,8 @@ describe("empty output outcome", () => {
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: private-recovered-error\nCAPIError: 503 Service Unavailable\n");
     const outcome = buildEmptyOutputOutcome([], rootDir);
     expect(outcome.failureCause).toBe("engine_outage");
-    expect(outcome.details).toContain("Last driver stderr summary: Engine error: Provider server error after retries");
-    expect(outcome.details).toContain("Driver execution failed (unhandled JavaScript exception)\nEngine error: Provider server error after retries");
+    expect(outcome.details).toContain("Last driver stderr summary: Engine error: Provider server error (HTTP 5xx) (capi_server_error)");
+    expect(outcome.details).toContain("Driver execution failed (unhandled JavaScript exception)\nEngine error: Provider server error (HTTP 5xx) (capi_server_error)");
     expect(outcome.details).not.toContain("private-recovered-error");
   });
 
@@ -867,7 +867,7 @@ describe("empty output outcome", () => {
     ["capi_server_error", [502], "engine_outage"],
     ["agentic_engine_timeout", [], "engine_outage"],
     ["sandbox_runtime_crash", [], "driver_crash"],
-    ["", [503], "engine_outage"],
+    ["", [503], "driver_crash"],
     ["", [], "driver_crash"],
     ["http_400_response_error", [400], "request_rejection"],
     ["invocation_cap_exceeded", [], "prompt_exhaustion"],

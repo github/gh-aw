@@ -1642,7 +1642,7 @@ describe("handle_agent_failure", () => {
         expect(body).toContain(`Failure classification: ${failureCause}`);
         expect(body).toContain(`Driver exit code: ${exitCode}`);
         expect(body).toContain("Last engine error lines (summarized");
-        expect(body).toContain("Provider server error after retries");
+        expect(body).toContain("Provider server error (HTTP 5xx)");
         if (failureCause === "driver_crash") {
           expect(body).toContain("Driver exit signal (inferred from exit code): SIGSEGV");
           expect(body).toContain("Driver exit meaning: Terminated by SIGSEGV");

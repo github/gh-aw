@@ -358,7 +358,7 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
   const isRequestRejection =
     contentFiltered || ["invalid_safe_outputs", "safeoutputs_cli_error"].includes(reason) || executionCategories.some(category => REQUEST_REJECTION_ERROR_CATEGORIES.has(category)) || errorCodes.some(code => code >= 400 && code < 500);
   // Crash categories can be inferred from exit codes alone; they do not establish an outage.
-  const isEngineOutage = executionCategories.some(category => ["agentic_engine_timeout", "capi_server_error"].includes(category)) || errorCodes.some(code => code >= 500);
+  const isEngineOutage = executionCategories.some(category => ["agentic_engine_timeout", "capi_server_error"].includes(category));
   // Missing completion and nonzero driver exits are observed outcomes, not evidence of budget exhaustion or an outage.
   const failureCause = agentNotStarted
     ? "agent_startup_failure"
