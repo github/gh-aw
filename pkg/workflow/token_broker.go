@@ -9,6 +9,11 @@ const tokenBrokerURLEnv = "GH_AW_TOKEN_BROKER_URL"
 const tokenBrokerURLExpression = "${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}"
 const tokenBrokerCopilotRequestOutput = "${{ steps.token_broker_copilot_request.outputs.token }}"
 
+var (
+	errTokenBrokerInferenceRequiresRenewal  = errors.New("token-broker.copilot-request does not support Copilot inference in the main agent job: AWF requires a renewable credential provider, which is not supported by the current runtime")
+	errTokenBrokerRequestPermissionConflict = errors.New("token-broker.copilot-request is incompatible with permissions.copilot-requests: write")
+)
+
 func usesTokenBrokerInference(data *WorkflowData) bool {
 	if !tokenBrokerRequestEnabled(data) {
 		return false
@@ -48,7 +53,7 @@ func (c *Compiler) validateTokenBrokerInference(data *WorkflowData) error {
 		return nil
 	}
 	if usesTokenBrokerInference(data) {
-		return errors.New("token-broker.copilot-request does not support Copilot inference in the main agent job: AWF requires a renewable credential provider, which is not supported by the current runtime")
+		return errTokenBrokerInferenceRequiresRenewal
 	}
 	return nil
 }
@@ -58,7 +63,7 @@ func validateTokenBrokerRequestPermissions(data *WorkflowData, permissions *Perm
 		return nil
 	}
 	if level, exists := permissions.GetExplicit(PermissionCopilotRequests); exists && level == PermissionWrite {
-		return errors.New("token-broker.copilot-request is incompatible with permissions.copilot-requests: write")
+		return errTokenBrokerRequestPermissionConflict
 	}
 	return nil
 }

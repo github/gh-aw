@@ -331,7 +331,7 @@ func TestTokenBrokerRejectsUnsupportedInference(t *testing.T) {
 			Type: SandboxTypeAWF, Version: "v0.25.0",
 		}},
 	}
-	require.ErrorContains(t, compiler.validateTokenBrokerInference(data), "renewable credential provider")
+	require.ErrorIs(t, compiler.validateTokenBrokerInference(data), errTokenBrokerInferenceRequiresRenewal)
 	data.TokenBrokerCopilotRequest = false
 	require.NoError(t, compiler.validateTokenBrokerInference(data))
 }
@@ -493,7 +493,7 @@ func TestTokenBrokerRequestRejectsCopilotRequestsPermission(t *testing.T) {
 	data := &WorkflowData{TokenBrokerCopilotRequest: true}
 	permissions := NewPermissions()
 	permissions.Set(PermissionCopilotRequests, PermissionWrite)
-	require.ErrorContains(t, validateTokenBrokerRequestPermissions(data, permissions), "incompatible")
+	require.ErrorIs(t, validateTokenBrokerRequestPermissions(data, permissions), errTokenBrokerRequestPermissionConflict)
 	permissions.Set(PermissionCopilotRequests, PermissionNone)
 	require.NoError(t, validateTokenBrokerRequestPermissions(data, permissions))
 }
