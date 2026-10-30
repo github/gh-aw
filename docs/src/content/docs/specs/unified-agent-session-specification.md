@@ -568,7 +568,7 @@ preserve encounter order and retain only these event kinds and `data` keys:
 | `execution.result` | `outcome`, `conclusion`, `exitCode`, `durationMs`, `startedAt`, `finishedAt` |
 | `harness.retry` | `attempts`, `exitCode`; validated bounded attempt lists from Section 6.4 |
 | `harness.attempt` | Validated bounded attempt fields from Section 6.4 |
-| `engine.retry` | `sourceEngine`, `sourceType`, `attempt`, `maxRetries`, `backoffMs`, `errors`, `sessionId`, `agentId`, `parentToolUseId` |
+| `engine.retry` | `sourceEngine`, `sourceType`, `attempt`, `maxRetries`, `backoffMs`, `errors`, `sessionId`, `agentId`, `parentToolUseId`, `parentToolCallId` |
 | `grader.result` | `id`, `status`, `value`, `score`, `unit`, `passed`, `direction`, `threshold`, `enabled`, `min`, `max`, `version` |
 
 `session.result`, `usage.report` and `firewall.token_usage` MAY additionally retain `data.usage`, but only
@@ -780,13 +780,14 @@ Distinct observations MUST remain separate even when their diagnostics match.
 | `maxRetries` | Optional observed nonnegative retry limit. |
 | `backoffMs` | Optional observed nonnegative delay in milliseconds. |
 | `errors` | Optional array retaining the native diagnostic strings or structures. |
-| `sessionId`, `agentId`, `parentToolUseId` | Observed native session/caller context, when available. |
+| `sessionId`, `agentId`, `parentToolUseId`, `parentToolCallId` | Observed native session/caller context, when available. |
 
-Counters MUST be safe integers. Invalid or unavailable counters MUST be omitted,
-not inferred; `maxRetries` and `backoffMs` require a valid `attempt`. A retry
+Counters MUST be safe integers. Invalid or unavailable native counters MUST be
+omitted, not inferred; canonical events with an explicitly invalid `attempt`
+MUST be rejected. `maxRetries` and `backoffMs` require a valid `attempt`. A retry
 without counters or diagnostics remains a retry observation. Claude `attempt`,
 `max_retries`, and `retry_delay_ms` map to `attempt`, `maxRetries`, and `backoffMs`;
-Codex `N/M` maps to `attempt` and `maxRetries`. Existing native IDs, timestamps,
+Codex text and structured-error `N/M` maps to `attempt` and `maxRetries`. Existing native IDs, timestamps,
 and provenance remain subject to the normal envelope rules.
 
 Readers MAY include `engine.retry.data.errors` in diagnostic summaries, but MUST
@@ -795,7 +796,7 @@ continuation. Normalization of older `session.result` retry observations with
 valid `data.engineRetry`, Claude `api_retry` counters, or top-level Codex
 `reconnectAttempt`/`maxReconnects` MUST produce this same event rather than a
 second observation. Compact exports retain only the bounded counters and
-engine/source identifiers, subject to existing loss budgets.
+engine/source and session/agent identifiers, subject to existing loss budgets.
 
 ### 4.7 Runtime observation vocabulary
 
@@ -1585,10 +1586,9 @@ redaction, escaping, and byte limits.
 | `todo_list` items | `session.info` with the supplied todo items as structured content. |
 | `turn.completed` with `usage` | Accumulate `input_tokens`, `output_tokens`, `cached_input_tokens` → `cache_read_input_tokens`, and `cache_write_input_tokens` → `cache_creation_input_tokens`; count distinct completed turns. |
 | Supported `turn.failed`, top-level `error`, or completed error item | Session/provider errors in `session.result.errors`, retaining supplied error structure and metadata. |
-| `Reconnecting... N/M (reason)` text or top-level error message | Full unified sessions use `engine.retry` with shared counters and retained diagnostic text (Section 6.4). |
+| `Reconnecting... N/M (reason)` text or top-level error message | One `engine.retry` with shared counters and retained diagnostic text (T-UAS-090); no invented process outcome or accounting. |
 | Legacy `thinking`, recognized tool/exec call and outcome lines | Exact payload text and independently observed tool lifecycle; no source ID if none is exposed. |
 | Legacy `ERROR:` diagnostics | Session errors, separately from successful tool activity. |
-| Legacy `Reconnecting... N/M (diagnostic)` | One `engine.retry` with `attempt: N`, `maxRetries: M`, and the diagnostic in `errors`; no invented process outcome or accounting. |
 
 An item carrying a complete invocation and result can expand to a start and completion at that item position, except `item.updated`, which remains a partial update even without a prior start. An unfinished item or a legacy call lacking an outcome does not supply a successful completion. Declined commands are failures and retain a reported unavailable exit code as `null`. Repeated or revised accounting snapshots reconcile before subsequent turn reports; overflow remains unavailable until a valid authoritative replacement. Recognized model headers and harness spawn metadata can supply a model, but arbitrary text does not establish a Codex session.
 

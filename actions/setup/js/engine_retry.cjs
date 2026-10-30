@@ -32,7 +32,8 @@ function normalizeEngineRetryEvent(event) {
         ? { attempt: source.attempt, maxRetries: source.max_retries, backoffMs: source.retry_delay_ms }
         : { attempt: event.reconnectAttempt, maxRetries: event.maxReconnects }
   );
-  return retry.attempt === undefined ? event : { ...event, type: "engine.retry", data: { ...source, ...retry } };
+  const sourceEngine = source.sourceEngine ?? (source.subtype === "api_retry" ? "claude" : event.reconnectAttempt !== undefined ? "codex" : undefined);
+  return retry.attempt === undefined ? event : { ...event, type: "engine.retry", data: { ...source, ...retry, ...(sourceEngine !== undefined ? { sourceEngine } : {}) } };
 }
 
 module.exports = { normalizeEngineRetryData, normalizeEngineRetryEvent };

@@ -58,10 +58,15 @@ function projectScalars(record, fields) {
 /** @param {unknown} input */
 function projectEvent(input) {
   if (!isRecord(input) || typeof input.type !== "string" || !Object.hasOwn(EVENT_FIELDS, input.type) || !isRecord(input.data)) return undefined;
-  const event = normalizeEngineRetryEvent(/** @type {import("./types/agent_session").SessionEvent} */ input);
+  /** @type {any} */
+  const saved = input;
+  const event = normalizeEngineRetryEvent(saved);
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
-  if (event.type === "engine.retry") Object.assign(data, normalizeEngineRetryData(event.data));
+  if (event.type === "engine.retry") {
+    if (event.data.attempt !== undefined && (typeof event.data.attempt !== "number" || !Number.isSafeInteger(event.data.attempt) || event.data.attempt < 1)) return undefined;
+    Object.assign(data, normalizeEngineRetryData(event.data));
+  }
   if (event.type === "harness.retry" || event.type === "harness.attempt") {
     const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(event.data) : normalizeHarnessAttemptEvent(event.data);
     if (!retry) return undefined;

@@ -71,7 +71,8 @@
         "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
-        "parentToolUseId": { "$ref": "#/definitions/JsonValue" }
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": {},
       "description": "An observed internal request retry, not an engine process invocation or result."

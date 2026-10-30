@@ -87,7 +87,7 @@
         "then": {
           "properties": {
             "data": {
-              "$ref": "#/definitions/Pick%3CEngineRetryData%2C(%22sourceEngine%22%7C%22sourceType%22%7C%22attempt%22%7C%22maxRetries%22%7C%22backoffMs%22%7C%22errors%22%7C%22sessionId%22%7C%22agentId%22%7C%22parentToolUseId%22)%3E"
+              "$ref": "#/definitions/Pick%3CEngineRetryData%2C(%22sourceEngine%22%7C%22sourceType%22%7C%22attempt%22%7C%22maxRetries%22%7C%22backoffMs%22%7C%22errors%22%7C%22sessionId%22%7C%22agentId%22%7C%22parentToolUseId%22%7C%22parentToolCallId%22)%3E"
             }
           }
         }
@@ -1130,7 +1130,7 @@
       },
       "additionalProperties": false
     },
-    "Pick<EngineRetryData,(\"sourceEngine\"|\"sourceType\"|\"attempt\"|\"maxRetries\"|\"backoffMs\"|\"errors\"|\"sessionId\"|\"agentId\"|\"parentToolUseId\")>": {
+    "Pick<EngineRetryData,(\"sourceEngine\"|\"sourceType\"|\"attempt\"|\"maxRetries\"|\"backoffMs\"|\"errors\"|\"sessionId\"|\"agentId\"|\"parentToolUseId\"|\"parentToolCallId\")>": {
       "type": "object",
       "properties": {
         "sourceEngine": { "type": "string" },
@@ -1141,7 +1141,8 @@
         "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
         "sessionId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
-        "parentToolUseId": { "$ref": "#/definitions/JsonValue" }
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false
     },

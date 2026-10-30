@@ -807,7 +807,7 @@ export interface UnifiedSessionEventDataMap {
   "dynamicWorkflows.task_notification": DynamicWorkflowObservationData;
   "dynamicWorkflows.background_tasks_changed": DynamicWorkflowObservationData;
   "session.result": UnifiedSessionResultData;
-  "engine.retry": Pick<EngineRetryData, "sourceEngine" | "sourceType" | "attempt" | "maxRetries" | "backoffMs" | "errors" | "sessionId" | "agentId" | "parentToolUseId">;
+  "engine.retry": Pick<EngineRetryData, "sourceEngine" | "sourceType" | "attempt" | "maxRetries" | "backoffMs" | "errors" | "sessionId" | "agentId" | "parentToolUseId" | "parentToolCallId">;
   "mcp.rpc.request": McpObservationData;
   "mcp.rpc.response": McpObservationData;
   "mcp.difc.filtered": McpObservationData;

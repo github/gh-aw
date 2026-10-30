@@ -2,6 +2,7 @@
 
 const { createSessionEvent, normalizeAgentSession, isSessionEvent, accumulateSessionUsage, normalizeSessionUsage, reconcileSessionUsage, isTokenCount, isMetric, sessionToolSuccess, sessionContext } = require("./agent_session.cjs");
 const { getMessageRefusal } = require("./provider_refusal.cjs");
+const { normalizeEngineRetryData } = require("./engine_retry.cjs");
 
 const TOOL_ITEMS = new Set(["mcp_tool_call", "command_execution", "file_change", "web_search", "collab_tool_call"]);
 const TOKEN_ALIASES = {
@@ -191,12 +192,8 @@ function normalizeCodexSession(records, model = null) {
       const signature = JSON.stringify(error);
       if (key !== undefined && completedErrors.has(key) && completedErrors.get(key) === signature) continue;
       if (key !== undefined) completedErrors.set(key, signature);
-      emit("session.result", {
-        sourceType: record.type,
-        status: record.type === "turn.failed" ? "failed" : undefined,
-        errors: error === undefined ? undefined : [error],
-        ...(retry ? { sourceEngine: "codex", engineRetry: { attempt: Number(retry[1]), maxRetries: Number(retry[2]) } } : {}),
-      });
+      if (retry) emit("engine.retry", { sourceEngine: "codex", sourceType: record.type, ...normalizeEngineRetryData({ attempt: Number(retry[1]), maxRetries: Number(retry[2]) }), errors: [error] });
+      else emit("session.result", { sourceType: record.type, status: record.type === "turn.failed" ? "failed" : undefined, errors: error === undefined ? undefined : [error] });
     } else if (["item.started", "item.updated", "item.completed"].includes(record.type) && isCodexRecord(record)) {
       const item = record.item;
       const completed = record.type === "item.completed";

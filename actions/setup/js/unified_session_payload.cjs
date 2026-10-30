@@ -652,7 +652,10 @@ function normalizeUnifiedSessionEvent(event, phase) {
     if (!retry) throw new Error(`${ERR_VALIDATION}: Harness retry evidence must contain valid bounded attempt metadata`);
     Object.assign(data, retry);
   }
-  if (event.type === "engine.retry") Object.assign(data, normalizeEngineRetryData(source));
+  if (event.type === "engine.retry") {
+    if (source.attempt !== undefined && (!Number.isSafeInteger(source.attempt) || source.attempt < 1)) throw new Error(`${ERR_VALIDATION}: Engine retry evidence must contain a positive safe integer attempt when supplied`);
+    Object.assign(data, normalizeEngineRetryData(source));
+  }
   if (event.type === "model.inventory") {
     const inventory = normalizeModelInventoryData(source);
     if (inventory === undefined) throw new Error(`${ERR_VALIDATION}: Model inventory snapshot must contain valid endpoint model collections`);

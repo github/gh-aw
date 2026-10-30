@@ -142,6 +142,7 @@ export interface EngineRetryData {
   sessionId?: JsonValue;
   agentId?: JsonValue;
   parentToolUseId?: JsonValue;
+  parentToolCallId?: JsonValue;
   [key: string]: unknown;
 }
 

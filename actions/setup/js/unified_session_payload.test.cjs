@@ -146,7 +146,8 @@ describe("essential unified session payloads", () => {
     { type: "session.result", data: { subtype: "api_retry", attempt: 2, max_retries: 5, errors: ["retry"] } },
     { type: "session.result", data: { engineRetry: { attempt: 2, maxRetries: 5 }, errors: ["retry"] } },
   ])("migrates legacy native retry evidence to the shared event without duplicate results", legacy => {
-    expect(normalizeUnifiedSessionEvent(legacy)).toEqual({ type: "engine.retry", data: { attempt: 2, maxRetries: 5, errors: ["retry"] } });
+    const sourceEngine = legacy.reconnectAttempt !== undefined ? "codex" : legacy.data.subtype === "api_retry" ? "claude" : undefined;
+    expect(normalizeUnifiedSessionEvent(legacy)).toEqual({ type: "engine.retry", data: { attempt: 2, maxRetries: 5, errors: ["retry"], ...(sourceEngine ? { sourceEngine } : {}) } });
   });
 
   it.each(["claude", "codex"])("keeps %s retries distinct and accounting unchanged through publication", engine => {
@@ -187,9 +188,12 @@ describe("essential unified session payloads", () => {
     expect(event).toEqual(original);
   });
 
-  it.each([-1, 0, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity, null, "2", { private: "PRIVATE" }])("bounds shared retry counters %j", attempt => {
-    const event = normalizeUnifiedSessionEvent({ type: "engine.retry", data: { attempt, maxRetries: "PRIVATE", backoffMs: -1, output: "PRIVATE" } });
-    expect(event).toEqual({ type: "engine.retry", data: {} });
+  it.each([-1, 0, 0.5, Number.MAX_SAFE_INTEGER + 1, null, "2", { private: "PRIVATE" }])("omits malformed native counters while retaining the retry observation %j", attempt => {
+    const [native] = parseEngineSession(JSON.stringify({ type: "system", subtype: "api_retry", attempt, max_retries: "PRIVATE", retry_delay_ms: -1 }), "claude");
+    const event = normalizeUnifiedSessionEvent(native);
+    expect(event.data).toEqual({ sourceEngine: "claude", sourceType: "system" });
+    const validate = createSessionValidator("agent").event;
+    expect(validate(native), JSON.stringify(validate.errors)).toBe(true);
   });
 
   it("normalizes safe nested harness metadata and attempt events idempotently", () => {
