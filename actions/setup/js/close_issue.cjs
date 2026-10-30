@@ -13,6 +13,7 @@ const { loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./te
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
+const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 
 /**
  * Parse a `duplicate_of` value into { owner, repo, issueNumber }.
@@ -80,11 +81,16 @@ async function markIssueAsDuplicate(github, duplicateNodeId, canonicalOwner, can
 
   let canonicalData = canonicalIssueData;
   if (!canonicalData) {
-    const response = await github.rest.issues.get({
-      owner: canonicalOwner,
-      repo: canonicalRepo,
-      issue_number: canonicalNumber,
-    });
+    const response = await withRetry(
+      () =>
+        github.rest.issues.get({
+          owner: canonicalOwner,
+          repo: canonicalRepo,
+          issue_number: canonicalNumber,
+        }),
+      RATE_LIMIT_RETRY_CONFIG,
+      `get canonical issue ${canonicalOwner}/${canonicalRepo}#${canonicalNumber}`
+    );
     canonicalData = response.data;
   }
 
@@ -197,11 +203,16 @@ async function closeIssue(github, owner, repo, issueNumber, stateReason, intentM
       throw new Error(`${ERR_VALIDATION}: duplicate close intent requires a valid, allowed, non-self duplicate_of reference`);
     }
     if (canonicalIssue) {
-      const { data } = await github.rest.issues.get({
-        owner: canonicalIssue.owner,
-        repo: canonicalIssue.repo,
-        issue_number: canonicalIssue.issueNumber,
-      });
+      const { data } = await withRetry(
+        () =>
+          github.rest.issues.get({
+            owner: canonicalIssue.owner,
+            repo: canonicalIssue.repo,
+            issue_number: canonicalIssue.issueNumber,
+          }),
+        RATE_LIMIT_RETRY_CONFIG,
+        `get canonical issue ${canonicalIssue.owner}/${canonicalIssue.repo}#${canonicalIssue.issueNumber}`
+      );
       canonicalIssueData = data;
       duplicateIssueId = data.id;
       if (!duplicateIssueId) {
