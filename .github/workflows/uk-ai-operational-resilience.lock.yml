@@ -495,6 +495,7 @@ jobs:
       issues: read
       pull-requests: read
       security-events: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
       queue: max

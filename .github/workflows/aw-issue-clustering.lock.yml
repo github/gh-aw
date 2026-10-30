@@ -473,6 +473,7 @@ jobs:
       copilot-requests: write
       discussions: read
       issues: read
+    cache-mode: read
     timeout-minutes: 60
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}

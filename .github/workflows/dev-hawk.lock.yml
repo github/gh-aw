@@ -525,6 +525,7 @@ jobs:
       contents: read
       copilot-requests: write
       pull-requests: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
       queue: max

@@ -64,6 +64,23 @@ fail. Agent failures revoke the modeled engine credential. A minted installation
 token remains live until the `actions/create-github-app-token` post step, which
 revokes it after either safe-output success or failure.
 
+## Cache lifecycle and read-only boundaries
+
+The compiler's [CTR-019 cache contract](../compiler-threat-detection-spec.md#513-cache-access-and-publication-ctr-019)
+separates cache restoration and local edits from artifact handoff and
+detection-gated cache publication. Unlike the safe-output lifecycle above,
+the cache-memory publisher requires the agent job to succeed as well as
+explicit detector acceptance and an eligible runtime event. Artifact existence
+does not authorize publication.
+
+These models do not represent cache-service entries, restore-prefix matching,
+eviction, event-scoped cache tokens, or the cache-memory publisher principal.
+The host-side `MCPCompile.tla` model's read-only filesystem/import-cache
+invariants are independent of runtime job `cache-mode: read`. Entry
+`restore-only: true` also does not make the local workspace immutable.
+Generated-YAML, namespace, lifecycle, and lint tests mapped under CTR-019 are
+the current evidence; the models are not a cache-poisoning proof.
+
 ## Pull-request fork admission
 
 [`PullRequestForkAdmission.tla`](PullRequestForkAdmission.tla) models the
