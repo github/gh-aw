@@ -67,8 +67,7 @@ func isCreateTokenMintStep(step *yaml.Node) bool {
 	if id == nil || id.Value != "create-token" || uses == nil {
 		return false
 	}
-	return strings.HasPrefix(uses.Value, "actions/create-github-app-token@") ||
-		strings.HasPrefix(uses.Value, "tibdex/github-app-token@")
+	return strings.HasPrefix(uses.Value, "actions/create-github-app-token@")
 }
 
 func shouldGrantCreateTokenOIDC(job *Job, data *WorkflowData) bool {

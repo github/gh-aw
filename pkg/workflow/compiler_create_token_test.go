@@ -99,20 +99,50 @@ func TestCreateTokenNonMintingJobUnchanged(t *testing.T) {
 }
 
 func TestCreateTokenIDRequiresTrustedAction(t *testing.T) {
-	compiler := NewCompiler()
-	compiler.jobManager = NewJobManager()
-	job := &Job{Name: "agent", Steps: []string{`      - id: create-token
+	for _, tt := range []struct {
+		name string
+		step string
+	}{
+		{
+			name: "run step",
+			step: `      - id: create-token
         run: echo "token=example" >> "$GITHUB_OUTPUT"
-      - name: Start MCP Gateway
+`,
+		},
+		{
+			name: "third-party action",
+			step: `      - id: create-token
+        uses: tibdex/github-app-token@v3
+`,
+		},
+		{
+			name: "lookalike action",
+			step: `      - id: create-token
+        uses: actions/create-github-app-token-fork@v3
+`,
+		},
+		{
+			name: "official action with different id",
+			step: `      - id: other-token
+        uses: actions/create-github-app-token@v3
+`,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.jobManager = NewJobManager()
+			job := &Job{Name: "agent", Steps: []string{tt.step + `      - name: Start MCP Gateway
         id: start-mcp-gateway
         env:
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
 `}}
-	require.NoError(t, compiler.jobManager.AddJob(job))
-	before := strings.Join(job.Steps, "")
-	require.NoError(t, compiler.wireCreateTokenJobs(nil))
-	assert.Equal(t, before, strings.Join(job.Steps, ""))
-	assert.Empty(t, job.Permissions)
+			require.NoError(t, compiler.jobManager.AddJob(job))
+			before := strings.Join(job.Steps, "")
+			require.NoError(t, compiler.wireCreateTokenJobs(nil))
+			assert.Equal(t, before, strings.Join(job.Steps, ""))
+			assert.Empty(t, job.Permissions)
+		})
+	}
 }
 
 func TestCreateTokenOIDCOptOuts(t *testing.T) {

@@ -38,10 +38,11 @@ Set an explicit `repositories` input and `permission-*` inputs for every `action
 
 Use pre-steps when later checkout or setup must consume outputs from a step in the same job.
 
-For compiler-managed token wiring, give the supported GitHub App token action the reserved
-`id: create-token`. The compiler recognizes this ID only with
-`actions/create-github-app-token` or `tibdex/github-app-token`; it prefers that step's output
-for compiler-owned default GitHub token bindings that run later in the same generated job.
+For compiler-managed token wiring, give the official
+`actions/create-github-app-token` action the reserved `id: create-token`. The compiler
+recognizes only that action with this ID; third-party and similarly named actions do not
+trigger token wiring or automatic OIDC permissions. It prefers the step's output for
+compiler-owned default GitHub token bindings that run later in the same generated job.
 Authored step environments and explicitly configured credentials are left unchanged. The
 compiler also adds `id-token: write` to the minting job unless `id-token: none` is explicitly
 configured or `safe-outputs.id-token: none` disables automatic grants.
