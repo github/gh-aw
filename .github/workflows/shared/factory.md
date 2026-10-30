@@ -6,6 +6,12 @@ excluded-env:
   - OPENAI_API_KEY
   - CODEX_API_KEY
   - ANTHROPIC_API_KEY
+  - GITHUB_TOKEN
+  - GH_TOKEN
+  - GITHUB_ENTERPRISE_TOKEN
+  - GH_ENTERPRISE_TOKEN
+  - GH_AW_GITHUB_TOKEN
+  - GH_AW_AGENT_TOKEN
 engine:
   id: factory
   detection-engine: copilot
@@ -89,7 +95,7 @@ engine:
         if (separator <= 0 || !selectedModel.slice(separator + 1).trim()) {
           throw new Error("FACTORY_MODEL must use provider/model format");
         }
-        const model = selectedModel.slice(separator + 1);
+        const model = selectedModel.slice(separator + 1).trim();
         const provider = process.env.GH_AW_LLM_PROVIDER;
         if (!["github", "anthropic", "openai"].includes(provider)) {
           throw new Error("GH_AW_LLM_PROVIDER must be github, anthropic, or openai");
@@ -120,9 +126,18 @@ engine:
         try {
           const settingsPath = join(settingsDir, "settings.json");
           writeFileSync(settingsPath, JSON.stringify(settings), { mode: 0o600 });
+          const childEnv = { ...process.env };
+          for (const name of [
+            "FACTORY_API_KEY", "SECRET_FACTORY_API_KEY", "COPILOT_GITHUB_TOKEN",
+            "OPENAI_API_KEY", "CODEX_API_KEY", "ANTHROPIC_API_KEY",
+            "GITHUB_TOKEN", "GH_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "GH_ENTERPRISE_TOKEN",
+            "GH_AW_GITHUB_TOKEN", "GH_AW_AGENT_TOKEN",
+          ]) {
+            delete childEnv[name];
+          }
           const result = spawnSync(command, [...args, "--settings", settingsPath, "--model", "custom:gh-aw-0", "--file", promptPath], {
             cwd: process.env.GITHUB_WORKSPACE,
-            env: process.env,
+            env: childEnv,
             stdio: "inherit",
           });
           if (result.error) throw result.error;
@@ -164,8 +179,11 @@ Real credentials remain outside the agent; Droid receives only the
 
 No Factory account or `FACTORY_API_KEY` is required. Factory-managed inference
 and unsandboxed/direct-key execution are deliberately unsupported because they
-would expose a reusable credential to agent tools. Explicit environment
-exclusions also prevent ambient Factory and provider keys from entering AWF.
+would expose a reusable credential to agent tools. Compiler environment exclusions
+keep known ambient Factory, provider, and GitHub credentials outside the agent
+sandbox. As defense in depth, the harness also removes these names from Droid's
+child environment; this cannot protect credentials already exposed to the parent
+process or credentials stored under other names.
 Cloud session sync is disabled. The per-run settings file contains only a
 placeholder credential, is owner-readable, and is removed after execution.
 
