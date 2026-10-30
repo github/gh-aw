@@ -547,6 +547,7 @@ func (c *Compiler) emitExperimentalFeatureWarningsTo(workflowData *WorkflowData,
 	}{
 		{enabled: ResolveEngineID(workflowData) == string(constants.CopilotEngine) && workflowData.EngineConfig.DynamicWorkflowsEnabled(), message: "Using experimental feature: copilot.dynamic-workflows"},
 		{enabled: workflowData.RateLimit != nil, message: "Using experimental feature: rate limiting"},
+		{enabled: workflowData.TokenBrokerEnabled, message: "Using experimental feature: token-broker"},
 		{enabled: len(workflowData.WebhookSubscriptions) > 0, message: "Using experimental feature: on.gateway-dispatch (approved webhook bridge required)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "projects_v2_item" }), message: "Using experimental feature: on.gateway-dispatch.projects-items (hosted CAO triggers)"},
 		{enabled: slices.ContainsFunc(workflowData.WebhookSubscriptions, func(subscription WebhookSubscription) bool { return subscription.Event == "code_scanning_alert" }), message: "Using experimental feature: on.gateway-dispatch.code-scanning-alert (hosted CAO triggers)"},
