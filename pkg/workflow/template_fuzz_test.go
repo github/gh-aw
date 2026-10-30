@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 )
 
 // Prefixes intentionally preserved by wrapExpressionsInTemplateConditionals:
@@ -85,6 +87,7 @@ func FuzzWrapExpressionsInTemplateConditionals(f *testing.F) {
 	f.Add("{{elseif 0")
 	// Malformed nested braces that triggered CGO fuzz failure.
 	f.Add("{{#if{{elseif {}}")
+	f.Add("{{#if 0000000000000$$${{elseif 00000000000000000}}000")
 
 	// Nested braces
 	f.Add("{{#if ${{ ${{ github.actor }} }} }}content{{/if}}")
@@ -192,14 +195,19 @@ func FuzzWrapExpressionsInTemplateConditionals(f *testing.F) {
 		// All complete elseif tags must be normalized to canonical {{#elseif ...}} form.
 		// Ignore partial/malformed fragments produced by fuzzing (e.g. "{{elseif 0").
 		if strings.Contains(input, "{{#if") {
+			expressions, _ := actionslanguageservice.ExtractExpressions(result)
 		patternLoop:
 			for _, pattern := range nonCanonicalElseifPatterns {
-				matches := pattern.FindAllStringSubmatch(result, -1)
+				matches := pattern.FindAllStringSubmatchIndex(result, -1)
+			matchLoop:
 				for _, match := range matches {
-					if len(match) < 2 {
-						continue
+					// Text inside an Actions expression is not a template tag.
+					for _, expression := range expressions {
+						if match[0] >= expression.Start && match[1] <= expression.End {
+							continue matchLoop
+						}
 					}
-					expr := strings.TrimSpace(match[1])
+					expr := strings.TrimSpace(result[match[2]:match[3]])
 					// Fuzz heuristic: treat nested or stray braces as malformed
 					// fragments rather than canonicalization failures.
 					if hasSkippableElseifExprPrefix(expr) ||
