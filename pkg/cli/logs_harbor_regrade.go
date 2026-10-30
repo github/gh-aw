@@ -111,12 +111,12 @@ func harborSanitizeRegradedRun(record *RegradedRun) *RegradedRun {
 	for _, raw := range record.Results {
 		safe.Results = append(safe.Results, harborSanitizeErrorJSON(raw))
 	}
-	safe.OriginalEvidence = append([]RegradeOriginalEvidence(nil), record.OriginalEvidence...)
-	for index := range safe.OriginalEvidence {
-		evidence := &safe.OriginalEvidence[index]
+	safe.OriginalEvidence = make([]RegradeOriginalEvidence, 0, len(record.OriginalEvidence))
+	for _, evidence := range record.OriginalEvidence {
 		evidence.Path = harborRegradedEvidencePath(record.SourceDirectory, evidence.Path)
 		evidence.Error = harborSanitizeLocalPaths(evidence.Error)
 		evidence.Data = harborSanitizeErrorJSON(evidence.Data)
+		safe.OriginalEvidence = append(safe.OriginalEvidence, evidence)
 	}
 	return &safe
 }
