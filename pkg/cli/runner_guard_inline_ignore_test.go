@@ -124,7 +124,7 @@ func TestHasRunnerGuardInlineIgnoreAllowsHelperFunctionBodyOffset(t *testing.T) 
 		"        run: |",              // 4
 		"          set -euo pipefail", // 5
 	)
-	for i := 0; i < 22; i++ {
+	for range 22 {
 		lines = append(lines, "          # setup line")
 	}
 	lines = append(lines,
