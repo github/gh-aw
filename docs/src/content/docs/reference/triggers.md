@@ -158,6 +158,8 @@ The optional `model` defaults to the built-in `decision` alias, which uses the e
 
 The gate supplies only the triggering event context and existing deterministic eligibility evidence. It does not retrieve history, search the repository, fetch pull request diffs, or call additional GitHub APIs. Inference has no tools, MCP servers, function calls, agent loop, or retries. Event text is untrusted data, not instructions.
 
+Enabling `on.decision` opts in to sending selected, bounded event text, including titles and bodies, to the configured LLM provider. The gate uses the same providers and credentials as other LLM inference, including configured custom endpoints; it does not require a separate provider allowlist or egress flag. Repository metadata, sender details, installation data, and arbitrary dispatch inputs are excluded. Credential redaction is best effort, not a general secret or personal-data filter. Enable this feature only when the selected provider is approved to receive the event content.
+
 All questions are checked at compilation time, including questions that runtime short-circuiting might not evaluate. Secret references, including nested expressions and statically traceable indirect references, are compilation errors. Provider credentials authenticate inference requests but are never included in the decision prompt.
 
 | Limit | Maximum |
@@ -171,7 +173,7 @@ All questions are checked at compilation time, including questions that runtime 
 | Total gate evaluation | 30 seconds |
 
 > [!NOTE]
-> A provider failure, timeout, invalid response, or exhausted inference budget treats the affected question as `run`. These fail-open outcomes are recorded separately from explicit approval. The gate is an execution-cost filter, not an authorization or security boundary.
+> A provider failure, timeout, invalid response, or exhausted inference budget treats the affected question as `run`. These fail-open outcomes are recorded separately from explicit approval. The gate is an execution-cost filter, not an authorization or security boundary. Untrusted event text can influence classification despite the prompt instructions; neither a `run` nor a `skip` is a security decision. Keep authorization and required execution checks deterministic.
 
 The job summary records the aggregate outcome. The `decision-gate` artifact also records the resolved model/provider and per-question results, durations, reasons, and token usage when available. It distinguishes fail-open outcomes and questions not evaluated after a skip. The existing `activation` artifact set includes this receipt for `gh aw logs` and `gh aw audit`; the audit JSON exposes it as `decision_gate`, including runs where the agent never starts. Prompts and raw event payloads are not retained.
 

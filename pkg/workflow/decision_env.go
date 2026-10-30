@@ -2,7 +2,9 @@ package workflow
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
+	"strings"
 )
 
 type decisionProviderEndpoint struct {
@@ -34,8 +36,16 @@ func validateDecisionProviderEndpoints(data *WorkflowData) error {
 	for _, provider := range decisionProviders(data) {
 		endpoint := decisionEndpoint(provider)
 		for _, key := range endpoint.overrideKeys {
-			if value, ok := overrides[key]; ok && containsExpression(value) {
+			value, ok := overrides[key]
+			if !ok {
+				continue
+			}
+			if strings.Contains(value, "${") || strings.Contains(value, "}") {
 				return fmt.Errorf("on.decision provider endpoint engine.env.%s must be a literal URL; Actions expressions could route credentials to an event-controlled endpoint", key)
+			}
+			parsed, err := url.Parse(value)
+			if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+				return fmt.Errorf("on.decision provider endpoint engine.env.%s must be an absolute HTTPS URL without user information, query parameters, or fragments", key)
 			}
 		}
 	}

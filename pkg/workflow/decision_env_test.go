@@ -89,6 +89,91 @@ func TestDecisionProviderEndpointOverrides(t *testing.T) {
 	require.NoError(t, validateDecisionProviderEndpoints(data))
 }
 
+func TestDecisionProviderEndpointValidation(t *testing.T) {
+	for _, provider := range []struct {
+		model string
+		keys  []string
+	}{
+		{"copilot/custom", []string{"GITHUB_COPILOT_BASE_URL"}},
+		{"anthropic/custom", []string{"ANTHROPIC_BASE_URL"}},
+		{"openai/custom", []string{"OPENAI_BASE_URL"}},
+		{"codex/custom", []string{"OPENAI_BASE_URL"}},
+		{"google/custom", []string{"GOOGLE_GEMINI_BASE_URL", "GEMINI_API_BASE_URL"}},
+	} {
+		for _, key := range provider.keys {
+			t.Run(provider.model+"/"+key, func(t *testing.T) {
+				for _, tt := range []struct {
+					name  string
+					value string
+					valid bool
+				}{
+					{"custom HTTPS endpoint", "https://provider.example/v1", true},
+					{"custom HTTPS port", "https://provider.example:8443/inference/v1/", true},
+					{"default endpoint", decisionEndpoint(fallbackModelProvider(provider.model, LLMProviderGitHub)).defaultURL, true},
+					{"empty", "", false},
+					{"HTTP", "http://provider.example/v1", false},
+					{"relative", "/v1", false},
+					{"scheme relative", "//provider.example/v1", false},
+					{"missing host", "https:///v1", false},
+					{"empty hostname", "https://:443/v1", false},
+					{"opaque", "https:provider.example/v1", false},
+					{"invalid port", "https://provider.example:invalid/v1", false},
+					{"invalid escape", "https://provider.example/%zz", false},
+					{"user information", "https://private-user:private-password@provider.example/v1", false},
+					{"query", "https://provider.example/v1?private-key=value", false},
+					{"fragment", "https://provider.example/v1#private-fragment", false},
+					{"event expression", "${{ github.event.issue.title }}", false},
+					{"host expression", "https://${{ github.event.issue.title }}/v1", false},
+					{"path expression", "https://provider.example/${{ inputs.path }}", false},
+					{"incomplete expression", "https://provider.example/${{ inputs.path", false},
+					{"shell expression", "https://${PROVIDER_HOST}/v1", false},
+					{"closing expression marker", "https://provider.example/v1}", false},
+				} {
+					t.Run(tt.name, func(t *testing.T) {
+						data := &WorkflowData{
+							Decision: &DecisionConfig{Model: provider.model},
+							EngineConfig: &EngineConfig{Env: map[string]string{
+								key: tt.value,
+							}},
+						}
+						err := validateDecisionProviderEndpoints(data)
+						if tt.valid {
+							require.NoError(t, err)
+							assert.Equal(t, tt.value, decisionEnv(data)[decisionEndpoint(fallbackModelProvider(provider.model, LLMProviderGitHub)).envKey])
+						} else {
+							require.ErrorContains(t, err, "on.decision provider endpoint engine.env."+key)
+							if tt.value != "" {
+								assert.NotContains(t, err.Error(), tt.value, "diagnostics must not echo endpoint credentials or expressions")
+							}
+						}
+					})
+				}
+			})
+		}
+	}
+}
+
+func TestDecisionProviderEndpointValidationScope(t *testing.T) {
+	require.NoError(t, validateDecisionProviderEndpoints(nil))
+	require.NoError(t, validateDecisionProviderEndpoints(&WorkflowData{}))
+	data := &WorkflowData{
+		Decision: &DecisionConfig{Model: "custom"},
+		ModelMappings: map[string][]string{
+			"custom": {"anthropic/private-model", "google/private-model"},
+		},
+		EngineConfig: &EngineConfig{Env: map[string]string{
+			"OPENAI_BASE_URL":        "${{ github.event.issue.title }}",
+			"GOOGLE_GEMINI_BASE_URL": "https://provider.example/v1",
+		}},
+	}
+	require.NoError(t, validateDecisionProviderEndpoints(data), "unselected providers must not affect decision endpoints")
+	data.EngineConfig.Env["GEMINI_API_BASE_URL"] = "http://provider.example/v1"
+	require.ErrorContains(t, validateDecisionProviderEndpoints(data), "engine.env.GEMINI_API_BASE_URL")
+	delete(data.EngineConfig.Env, "GEMINI_API_BASE_URL")
+	data.EngineConfig.Env["ANTHROPIC_BASE_URL"] = "http://provider.example/v1"
+	require.ErrorContains(t, validateDecisionProviderEndpoints(data), "engine.env.ANTHROPIC_BASE_URL")
+}
+
 func TestDecisionCompiledRuntimeContract(t *testing.T) {
 	dir := testutil.TempDir(t, "decision-contract")
 	file := filepath.Join(dir, "decision.md")
