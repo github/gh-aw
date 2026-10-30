@@ -11,7 +11,7 @@ permissions:
   copilot-requests: write
 engine:
   id: factory
-model: copilot/gpt-5.2
+model: copilot/gpt-5.3-codex
 strict: true
 imports:
   - shared/factory.md
