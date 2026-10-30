@@ -325,7 +325,13 @@ const known = [
 ];
 for (const type of interpretedTestTypes) {
   if (!known.some(event => event.type === type)) known.push({
-    type, data:{...(type === "mcp.configuration" ? {servers:[]} : type === "model.inventory" ? {endpoints:[]} : {}), engineId:"aider", content:"INJECTED", toolCallId:"injected", agentMetrics:{injected:{totalNanoAiu:999}}},
+    type, data:{
+      ...(type === "harness.retry" ? {attempts:0, exitCode:0, attemptResults:[]} : {}),
+      ...(type === "harness.attempt" ? {attempt:1, exitCode:0, failureClasses:[], layer:"harness"} : {}),
+      ...(type === "engine.retry" ? {attempt:1, maxRetries:3, backoffMs:0} : {}),
+      ...(type === "mcp.configuration" ? {servers:[]} : type === "model.inventory" ? {endpoints:[]} : {}),
+      engineId:"aider", content:"INJECTED", toolCallId:"injected", agentMetrics:{injected:{totalNanoAiu:999}},
+    },
   });
 }
 const extensions = [

@@ -5,6 +5,7 @@ const { AGENT_LOGIN_NAMES, findAgent, getIssueDetails, assignAgentToIssue, gener
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { sleep } = require("./error_recovery.cjs");
 const { ERR_API, ERR_PERMISSION } = require("./error_codes.cjs");
+const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
 
 /**
  * Assign copilot to issues created by create_issue job.
@@ -42,6 +43,8 @@ async function main() {
   const results = [];
   /** @type {any} */
   let agentId = null;
+  const brokerEnabled = isTokenBrokerEnabled();
+  const githubClient = brokerEnabled ? createTokenBrokerGitHubClient() : null;
 
   for (let i = 0; i < issueEntries.length; i++) {
     const entry = issueEntries[i];
@@ -74,7 +77,7 @@ async function main() {
       // Find agent (reuse cached ID for same repo)
       if (!agentId) {
         core.info(`Looking for ${agentName} coding agent...`);
-        agentId = await findAgent(owner, repo, agentName, issueNumber);
+        agentId = githubClient ? await findAgent(owner, repo, agentName, issueNumber, githubClient) : await findAgent(owner, repo, agentName, issueNumber);
         if (!agentId) {
           throw new Error(`${ERR_PERMISSION}: ${agentName} coding agent is not available for this repository`);
         }
@@ -83,7 +86,7 @@ async function main() {
 
       // Get issue details
       core.info(`Getting details for issue #${issueNumber} in ${repoSlug}...`);
-      const issueDetails = await getIssueDetails(owner, repo, issueNumber);
+      const issueDetails = githubClient ? await getIssueDetails(owner, repo, issueNumber, githubClient) : await getIssueDetails(owner, repo, issueNumber);
       if (!issueDetails) {
         throw new Error(`${ERR_API}: Failed to get issue details`);
       }
@@ -104,7 +107,9 @@ async function main() {
 
       // Assign agent using GraphQL mutation (no allowed list filtering)
       core.info(`Assigning ${agentName} coding agent to issue #${issueNumber}...`);
-      const success = await assignAgentToIssue(issueDetails.issueId, agentId, issueDetails.currentAssignees, agentName, null);
+      const success = githubClient
+        ? await assignAgentToIssue(issueDetails.issueId, agentId, issueDetails.currentAssignees, agentName, null, null, null, null, null, githubClient, issueDetails.taskContext || { owner, repo, type: "issue", number: issueNumber })
+        : await assignAgentToIssue(issueDetails.issueId, agentId, issueDetails.currentAssignees, agentName, null);
 
       if (!success) {
         throw new Error(`${ERR_API}: Failed to assign ${agentName} via GraphQL`);
@@ -172,6 +177,10 @@ async function main() {
   // Warn instead of failing so the conclusion job can propagate the failure details
   // to the agent failure issue/comment with a clear explanatory note
   if (failureCount > 0) {
+    if (brokerEnabled) {
+      core.setFailed(`Failed to assign copilot to ${failureCount} issue(s) using the token broker`);
+      return;
+    }
     core.warning(`Failed to assign copilot to ${failureCount} issue(s) - errors will be reported in conclusion job`);
   }
 }

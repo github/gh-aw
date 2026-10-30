@@ -205,21 +205,24 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 		Tools: map[string]any{
 			"bash": []any{"*"},
 		},
-		SafeOutputs:       nil,
-		Model:             c.resolveEvalsExecutionModel(data),
-		EngineConfig:      evalsEngineConfig,
-		AI:                engineID,
-		Features:          data.Features,
-		Permissions:       data.Permissions,
-		CachedPermissions: data.CachedPermissions,
-		IsDetectionRun:    false,
-		IsEvalsRun:        true,
-		AdmissionEnabled:  admissionBudgetOutputsEnabled(data),
-		TimeoutMinutes:    data.TimeoutMinutes,
-		RunnerConfig:      data.RunnerConfig,    // propagate runner.topology (e.g. arc-dind) to the evals job
-		ModelMappings:     data.ModelMappings,   // propagate alias map so evals awf-config.json can resolve model aliases
-		ModelCosts:        data.ModelCosts,      // propagate pricing providers so evals awf-config.json can resolve AI-credit costs
-		CompiledVersion:   data.CompiledVersion, // propagate compiler version so install steps can inject GH_AW_COMPILED_VERSION
+		SafeOutputs:               nil,
+		Model:                     c.resolveEvalsExecutionModel(data),
+		EngineConfig:              evalsEngineConfig,
+		AI:                        engineID,
+		Features:                  data.Features,
+		Permissions:               data.Permissions,
+		CachedPermissions:         data.CachedPermissions,
+		IsDetectionRun:            false,
+		IsEvalsRun:                true,
+		AdmissionEnabled:          admissionBudgetOutputsEnabled(data),
+		TokenBrokerEnabled:        data.TokenBrokerEnabled,
+		TokenBrokerCopilotRequest: data.TokenBrokerCopilotRequest,
+		TokenBrokerCopilotTask:    data.TokenBrokerCopilotTask,
+		TimeoutMinutes:            data.TimeoutMinutes,
+		RunnerConfig:              data.RunnerConfig,    // propagate runner.topology (e.g. arc-dind) to the evals job
+		ModelMappings:             data.ModelMappings,   // propagate alias map so evals awf-config.json can resolve model aliases
+		ModelCosts:                data.ModelCosts,      // propagate pricing providers so evals awf-config.json can resolve AI-credit costs
+		CompiledVersion:           data.CompiledVersion, // propagate compiler version so install steps can inject GH_AW_COMPILED_VERSION
 		NetworkPermissions: &NetworkPermissions{
 			Allowed: getThreatDetectionAdditionalAllowedDomains(data, engineID),
 		},
@@ -276,6 +279,8 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 			evalsStepsLog.Printf("Failed to generate MCP setup for Codex evals; OpenAI proxy configuration may be incomplete: %v", err)
 		}
 	}
+
+	steps = append(steps, c.buildTokenBrokerRequestStep(evalsData, "")...)
 
 	// Execute the engine through AWF; output is written to evalsLogPath.
 	executionSteps := engine.GetExecutionSteps(evalsData, evalsLogPath)

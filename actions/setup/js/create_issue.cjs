@@ -17,7 +17,7 @@ const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_help
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { ERR_VALIDATION } = require("./error_codes.cjs");
+const { ERR_API, ERR_VALIDATION } = require("./error_codes.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { renderTemplateFromFile } = require("./messages_core.cjs");
 const { MAX_SUB_ISSUES, getSubIssueCount, linkSubIssue } = require("./sub_issue_helpers.cjs");
@@ -30,6 +30,7 @@ const { parseAllowedIssueFields, validateAllowedIssueFields } = require("./allow
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
 const { MAX_LABELS, MAX_ASSIGNEES } = require("./constants.cjs");
 const { findAgent, getIssueDetails, assignAgentToIssue } = require("./assign_agent_helpers.cjs");
+const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
 const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } = require("./issue_title_dedup.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -127,6 +128,7 @@ function getIssueArrayLimitError(labels, assignees) {
  * Create a dedicated GitHub client for copilot assignment operations.
  *
  * Token precedence:
+ *   0. Token broker copilot-task capability, when opted in (never falls back)
  *   1. config["github-token"] — per-handler PAT configured in the workflow frontmatter
  *   2. GH_AW_ASSIGN_TO_AGENT_TOKEN — agent token injected by the compiler as a step env var
  *   3. global github — step-level token (fallback when no agent token is available)
@@ -135,6 +137,7 @@ function getIssueArrayLimitError(labels, assignees) {
  * @returns {Promise<Object>} Authenticated GitHub client
  */
 async function createCopilotAssignmentClient(config) {
+  if (isTokenBrokerEnabled()) return createTokenBrokerGitHubClient();
   const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
   if (!token) {
     core.debug("No dedicated agent token configured — using step-level github client for copilot assignment");
@@ -1309,10 +1312,12 @@ async function main(config = {}) {
         try {
           const agentId = await findAgent(repoParts.owner, repoParts.repo, "copilot", issue.number, copilotClient);
           if (!agentId) {
+            if (isTokenBrokerEnabled()) throw new Error(`${ERR_API}: Broker-authenticated copilot assignment failed for issue #${issue.number}: agent unavailable`);
             core.warning(`copilot coding agent is not available for ${qualifiedItemRepo}`);
           } else {
             const issueDetails = await getIssueDetails(repoParts.owner, repoParts.repo, issue.number, copilotClient);
             if (!issueDetails) {
+              if (isTokenBrokerEnabled()) throw new Error(`${ERR_API}: Broker-authenticated copilot assignment failed for issue #${issue.number}: issue details unavailable`);
               core.warning(`Failed to get issue details for copilot assignment of issue #${issue.number}`);
             } else if (issueDetails.currentAssignees.some(a => a.id === agentId)) {
               core.info(`copilot is already assigned to issue #${issue.number}`);
@@ -1321,12 +1326,14 @@ async function main(config = {}) {
               if (assigned) {
                 core.info(`Successfully assigned copilot coding agent to issue #${issue.number}`);
               } else {
+                if (isTokenBrokerEnabled()) throw new Error(`${ERR_API}: Broker-authenticated copilot assignment failed for issue #${issue.number}`);
                 core.warning(`Failed to assign copilot to issue #${issue.number}`);
               }
             }
           }
         } catch (error) {
           core.warning(`Failed to assign copilot to issue #${issue.number}: ${getErrorMessage(error)}`);
+          if (isTokenBrokerEnabled()) throw error;
         }
       }
 

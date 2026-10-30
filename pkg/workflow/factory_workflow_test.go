@@ -97,7 +97,7 @@ func TestFactorySmokeContract(t *testing.T) {
 	for _, expected := range []string{
 		"npm install --ignore-scripts -g @factory/cli@" + loadFactorySample(t).Version,
 		"GH_AW_ENGINE_VERSION: " + loadFactorySample(t).Version,
-		"FACTORY_MODEL: copilot/gpt-5.2",
+		"FACTORY_MODEL: copilot/gpt-5.3-codex",
 		"GH_AW_MCP_CONFIG: .factory/mcp.json",
 		"factory_mcp_config_adapter.cjs",
 		"proxy.golang.org",
