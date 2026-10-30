@@ -16,6 +16,7 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/fileutil"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 // AuditWorkflowRun audits a single workflow run and generates a report
@@ -26,10 +27,19 @@ import (
 // the assigned variant must equal variantFilter.
 // The returned bool reports whether the run was skipped (excluded by --experiment,
 // --runtime, or --evals filtering) rather than fully analyzed and reported.
-func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (bool, error) {
+func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (skipped bool, resultErr error) {
 	cfg, err := newAuditRunConfig(runID, opts)
 	if err != nil {
 		return false, err
+	}
+	if cfg.atif {
+		defer func() {
+			if resultErr == nil && !skipped {
+				resultErr = exportRunATIF(ctx, &parser.GitHubURLComponents{
+					Number: cfg.runID, Owner: cfg.owner, Repo: cfg.repo, Host: cfg.hostname,
+				}, cfg.outputDir, cfg.verbose)
+			}
+		}()
 	}
 	if err := ensureAuditNotCancelled(ctx); err != nil {
 		return false, renderIncompleteAuditIfTimedOut(cfg, WorkflowRun{}, auditAnalysisResults{}, "metadata", err)
@@ -161,6 +171,7 @@ func newAuditRunConfig(runID int64, opts AuditOptions) (auditRunConfig, error) {
 		search:                 opts.Search,
 		searchLimit:            opts.SearchLimit,
 		models:                 opts.Models,
+		atif:                   opts.ATIF,
 		evalsArtifactRequested: isEvalsArtifactRequested(opts.EvalsOnly, opts.ArtifactSets),
 	}, nil
 }

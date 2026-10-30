@@ -220,7 +220,15 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 	for _, result := range downloadResults {
 		collectionStats.recordResult(result)
 		if result.CachedRun != nil {
-			processedRuns = append(processedRuns, processedRunFromCachedData(*result.CachedRun, result.cachedAudit, opts.OutputDir))
+			processedRun := processedRunFromCachedData(*result.CachedRun, result.cachedAudit, opts.OutputDir)
+			if opts.ATIF {
+				params := buildConcurrentDownloadParams(opts.OutputDir, opts.Verbose, opts.RepoOverride, artifactFilter, opts.EvalsOnly, opts.ArtifactSets)
+				params.storageLimit = storageLimit
+				if err := exportLogsATIF(ctx, processedRun.Run, params, false); err != nil {
+					return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
+				}
+			}
+			processedRuns = append(processedRuns, processedRun)
 			continue
 		}
 		if errors.Is(result.Error, errLogsStorageLimitReached) {
@@ -247,6 +255,14 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		}
 
 		processedRun := buildProcessedRun(ctx, result, opts.Verbose, false)
+		if opts.ATIF {
+			params := buildConcurrentDownloadParams(opts.OutputDir, opts.Verbose, opts.RepoOverride, artifactFilter, opts.EvalsOnly, opts.ArtifactSets)
+			params.storageLimit = storageLimit
+			if err := exportLogsATIF(ctx, processedRun.Run, params, result.storageReserved); err != nil {
+				finalizeLogsRunDownload(storageLimit, result)
+				return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
+			}
+		}
 
 		if opts.Parse {
 			awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")

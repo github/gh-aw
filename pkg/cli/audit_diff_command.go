@@ -9,6 +9,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/spf13/cobra"
 )
 
@@ -76,6 +77,7 @@ analyzes their data, and produces a diff showing:
 			format, _ := cmd.Flags().GetString("format")
 			repoFlag, _ := cmd.Flags().GetString("repo")
 			artifacts, _ := cmd.Flags().GetStringSlice("artifacts")
+			exportATIF, _ := cmd.Flags().GetBool("atif")
 
 			var owner, repo, hostname string
 			if repoFlag != "" {
@@ -96,6 +98,7 @@ analyzes their data, and produces a diff showing:
 				JSONOutput:   jsonOutput,
 				Format:       format,
 				ArtifactSets: artifacts,
+				ATIF:         exportATIF,
 			})
 		},
 	}
@@ -103,6 +106,7 @@ analyzes their data, and produces a diff showing:
 	addOutputFlag(cmd, defaultLogsOutputDir)
 	addJSONFlag(cmd)
 	addRepoFlag(cmd)
+	addATIFFlag(cmd)
 	cmd.Flags().String("format", "pretty", "Output format: pretty, markdown")
 	cmd.Flags().StringSlice("artifacts", nil, "Artifact sets to download (default: all, because auditing requires comprehensive artifacts for analysis). Valid sets: "+strings.Join(ValidArtifactSetNames(), ", "))
 
@@ -162,6 +166,11 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 	if err != nil {
 		return fmt.Errorf("failed to load data for base run %d: %w", baseRunID, err)
 	}
+	if opts.ATIF {
+		if err := exportRunATIF(ctx, &parser.GitHubURLComponents{Number: baseRunID, Owner: owner, Repo: repo, Host: hostname}, resolveAuditOutputDir(outputDir, baseRunID), verbose); err != nil {
+			return err
+		}
+	}
 
 	diffs := make([]*AuditDiff, 0, len(compareRunIDs))
 
@@ -178,6 +187,11 @@ func RunAuditDiff(ctx context.Context, baseRunID int64, compareRunIDs []int64, o
 		compareSummary, err := loadRunSummaryForDiff(ctx, compareRunID, outputDir, owner, repo, hostname, verbose, artifactFilter)
 		if err != nil {
 			return fmt.Errorf("failed to load data for run %d: %w", compareRunID, err)
+		}
+		if opts.ATIF {
+			if err := exportRunATIF(ctx, &parser.GitHubURLComponents{Number: compareRunID, Owner: owner, Repo: repo, Host: hostname}, resolveAuditOutputDir(outputDir, compareRunID), verbose); err != nil {
+				return err
+			}
 		}
 
 		// Warn if no firewall data found for this pair

@@ -1213,7 +1213,7 @@ func TestRunAuditMulti_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := runAuditMulti(t.Context(), tt.args, "", "", false, false, "pretty", nil)
+			err := runAuditMulti(t.Context(), tt.args, auditCommandOptions{format: "pretty"})
 			require.Error(t, err, "runAuditMulti should return an error for invalid input")
 			require.ErrorContains(t, err, tt.wantErr, "error message should be descriptive")
 		})

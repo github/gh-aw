@@ -32,6 +32,7 @@ type AuditOptions struct {
 	Search           string
 	SearchLimit      int
 	Models           bool
+	ATIF             bool
 }
 
 type auditRunConfig struct {
@@ -56,6 +57,7 @@ type auditRunConfig struct {
 	search           string
 	searchLimit      int
 	models           bool
+	atif             bool
 	// evalsArtifactRequested is true when evals were requested via --evals or
 	// explicit --artifacts evals, and is used to trigger legacy dedicated-evals
 	// fallback behavior for older runs.
