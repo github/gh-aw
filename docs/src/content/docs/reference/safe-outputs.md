@@ -31,6 +31,22 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 
 ## Available Safe Output Types
 
+### Trusted completion notification (`repo-done`)
+
+`repo-done` posts one repository-authored notification when an activated agent job finishes, even if it fails or produces no safe-output file. It is declarative: there is no MCP tool, and agent comments do not suppress it.
+
+```yaml wrap
+safe-outputs:
+  repo-done:
+    body: "Repository checks are complete."
+```
+
+`true`, `null`, and `{}` enable the default message; `false` disables it. The optional `body` is followed by the agent job result and a workflow-run link; completion does not assert task success. `staged` and `github-token` use the established safe-output conventions. Global staged mode and compiler dry-run always prevent this notification's API mutations, even when per-type `staged` is `false`.
+
+The notification targets the invocation's issue/PR conversation, discussion, or commit (`push` or `commit_comment` only). Forwarded dispatch contexts use the shared invocation-context resolution, but foreign repository destinations are rejected, even when otherwise allowlisted. All writes stay in the workflow repository. Runs without one of these contexts write a step summary instead; schedule/dispatch runs do not infer a commit destination from the run's SHA. Staged runs preview the notification in the summary without API calls. Skipped/nonactivated agent jobs do not emit it. Work-queue participant workflows reject `repo-done`.
+
+The conclusion job receives write permissions for the declared event contexts: `issues`, `pull-requests`, `discussions`, or `contents`. Dispatch/reusable workflows receive all four scopes because their invocation context can be forwarded. These permissions are not added to the agent job; staged/dry-run notifications do not require these write grants. The token follows the standard safe-output precedence, including a global GitHub App when configured.
+
 The tables below summarize the built-in safe output handlers. `noop`, `report-missing-tool`, and `report-missing-data` are always available, and `create-issue` is auto-injected only when no non-system safe outputs are configured and it is not explicitly disabled.
 
 ### Issues & Discussions

@@ -142,6 +142,7 @@ func compileSchema(schemaJSON, schemaURL string) (*jsonschema.Schema, error) {
 // safeOutputMetaFields are the meta-configuration fields in safe-outputs that are NOT actual safe output types.
 // These are used for configuration, not for defining safe output operations.
 var safeOutputMetaFields = map[string]bool{
+	"repo-done":       true, // Declarative conclusion reporting, not an agent output type.
 	"allowed-domains": true,
 	"body-footer":     true,
 	"data":            true,

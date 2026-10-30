@@ -13420,6 +13420,28 @@
           "pattern": "^[^/]+/[^/]+$|^\\$\\{\\{.*\\}\\}$",
           "examples": ["github/docs-engineering", "myorg/infra-alerts", "${{ inputs.failure-issue-repo }}"]
         },
+        "repo-done": {
+          "description": "Trusted completion notification, independent of agent output. Posts to the invocation's issue/PR, discussion, or commit; context-free runs use the step summary. Not supported for work-queue participants.",
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "null" },
+            {
+              "type": "object",
+              "properties": {
+                "body": {
+                  "type": "string",
+                  "description": "Repository-authored completion message. The agent result and workflow run link are appended."
+                },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
+                "github-token": {
+                  "type": "string",
+                  "description": "Token for the completion notification, using the standard safe-output token precedence."
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "report-failed-jobs": {
           "description": "Controls whether to report failed non-builtin jobs as issues (default: true). Set to false to disable. Supports GitHub Actions expressions.",
           "oneOf": [

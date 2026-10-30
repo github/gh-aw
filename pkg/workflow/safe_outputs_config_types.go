@@ -39,7 +39,8 @@ type BaseSafeOutputConfig struct {
 
 // SafeOutputsConfig holds configuration for automatic output routes
 type SafeOutputsConfig struct {
-	Steer                                  bool                                   `yaml:"steer,omitempty"` // Experimental. Create an issue and steer the agent from issue comments.
+	RepoDone                               *RepoDoneConfig                        `yaml:"repo-done,omitempty"` // Trusted, unconditional conclusion notification
+	Steer                                  bool                                   `yaml:"steer,omitempty"`     // Experimental. Create an issue and steer the agent from issue comments.
 	CreateIssues                           *CreateIssuesConfig                    `yaml:"create-issue,omitempty"`
 	CreateWorkItems                        *CreateWorkItemConfig                  `yaml:"ado-create-work-item,omitempty"`
 	UpdateWorkItems                        *UpdateWorkItemConfig                  `yaml:"ado-update-work-item,omitempty"`

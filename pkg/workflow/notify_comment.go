@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -31,6 +32,9 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	if data.SafeOutputs == nil {
 		notifyCommentLog.Printf("Skipping job: no safe-outputs configured")
 		return nil, nil // No safe-outputs configured, no need for conclusion job
+	}
+	if repoDoneEnabled(data.SafeOutputs) && isWorkQueueParticipant(data) {
+		return nil, errors.New("safe-outputs.repo-done is not supported for work-queue participants; remove repo-done from the participant workflow")
 	}
 	data = c.dryRunConclusionData(data)
 	steps, err := c.buildConclusionJobSteps(data, mainJobName, safeOutputJobNames)
@@ -83,6 +87,7 @@ func (c *Compiler) buildConclusionJobSteps(data *WorkflowData, mainJobName strin
 	steps = append(steps, c.buildConclusionDetectionRunsStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionMissingToolStep(data, mainJobName)...)
 	steps = append(steps, c.buildConclusionReportIncompleteStep(data, mainJobName)...)
+	steps = append(steps, c.buildRepoDoneStep(data, mainJobName)...)
 	messagesJSON := serializeConclusionMessagesJSON(data)
 	steeringTokenSteps, steeringToken := c.buildConclusionSteeringIssueTokenSteps(data)
 	steps = append(steps, steeringTokenSteps...)
@@ -203,6 +208,7 @@ func computeConclusionJobPermissions(data *WorkflowData) *Permissions {
 		}
 	}
 	addAgentFailureChecksPermission(data, conclusionPerms)
+	addRepoDonePermissions(data, conclusionPerms)
 	// Only request issues: write when at least one conclusion-job mechanism can actually
 	// create/update an issue and that path is not already covered by
 	// ComputePermissionsForSafeOutputs (report-failed-jobs, agent-failure reporting,

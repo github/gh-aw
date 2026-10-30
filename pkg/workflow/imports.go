@@ -561,6 +561,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config, topRawSafeOutputs 
 	}
 
 	// Merge additional meta-configuration fields
+	if result.RepoDone == nil && importedConfig.RepoDone != nil {
+		result.RepoDone = importedConfig.RepoDone
+	}
 	if result.Footer == nil && importedConfig.Footer != nil {
 		result.Footer = importedConfig.Footer
 	}

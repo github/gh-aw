@@ -50,6 +50,7 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 	if data.SafeOutputs.GitHubApp != nil {
 		permissions := ComputePermissionsForSafeOutputs(data.SafeOutputs)
 		addAgentFailureChecksPermission(data, permissions)
+		addRepoDonePermissions(data, permissions)
 		var appTokenFallbackRepo string
 		if hasWorkflowCallTrigger(data.On) {
 			appTokenFallbackRepo = activationTargetRepoNameExpr
@@ -640,7 +641,7 @@ func (c *Compiler) buildConclusionJobCondition(data *WorkflowData, mainJobName s
 	}
 	condition := BuildAnd(alwaysFunc, BuildOr(agentNotSkipped, activationGuardrailsFailed))
 
-	if slices.Contains(safeOutputJobNames, "add_comment") {
+	if !repoDoneEnabled(data.SafeOutputs) && slices.Contains(safeOutputJobNames, "add_comment") {
 		noComment := ConditionNode(&NotNode{Child: BuildPropertyAccess("needs.add_comment.outputs.comment_id")})
 		if IsDetectionJobEnabled(data.SafeOutputs) {
 			noComment = BuildOr(noComment, buildDetectionNoVerdictCondition())

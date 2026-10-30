@@ -54,6 +54,7 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			outputMap = normalizeMissingReportKeys(outputMap)
 			safeOutputsConfigLog.Printf("Processing safe-outputs configuration with %d top-level keys", len(outputMap))
 			config = &SafeOutputsConfig{}
+			config.RepoDone = c.parseRepoDoneConfig(outputMap)
 			if adapters, supplied := outputMap["claim-adapters"]; supplied {
 				config.ClaimAdapters, config.claimAdaptersParseError = parseWorkQueueClaimAdapters(adapters)
 			}
