@@ -19,6 +19,7 @@ const MODEL_IDENTIFIER = /^[A-Za-z0-9*][A-Za-z0-9._:/*@+-]{0,127}$/;
 /** Provider error identifiers; matches AWF's identifier-only extraction. */
 const ERROR_IDENTIFIER = /^[A-Za-z0-9_.:-]{1,64}$/;
 const ENGINE_HARNESSES = new Set(["copilot-cli", "copilot-sdk"]);
+const NATIVE_ROUTING_PROVIDERS = new Set(["anthropic", "openai"]);
 const MAX_AI_CREDITS_SOURCES = new Set(["frontmatter", "default"]);
 const MAX_AI_CREDITS = /^[1-9][0-9]{0,9}$/;
 const MAX_AI_CREDITS_LIMIT = 2147483647;
@@ -66,6 +67,7 @@ function sanitizeModelConfig(value) {
   for (const key of ["goal", "mode"]) {
     if (isModelIdentifier(value.routing[key])) routing[key] = value.routing[key];
   }
+  if (NATIVE_ROUTING_PROVIDERS.has(value.routing.provider)) routing.provider = value.routing.provider;
   const allowedModels = identifierList(value.routing.allowed_models);
   if (allowedModels) routing.allowed_models = allowedModels;
   const candidateModels = identifierList(value.routing.candidate_models);

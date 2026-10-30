@@ -83,7 +83,7 @@ const { applyModelFallback, normalizeClaudeModel } = require("./model_fallback.c
 const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const { applyClaudeSubagentModels, isDetectionPhase } = require("./engine_subagent_models.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode, resolveAWFRoutingProvider } = require("./awf_model_routing.cjs");
 const CLAUDE_ROUTING_POLICY = getAWFModelRoutingPolicy("claude");
 
 // Pattern to detect Anthropic API overload errors (HTTP 529).
@@ -376,13 +376,20 @@ function stripContinueArgs(args) {
 }
 
 /**
- * Resolve, validate, and record the routing decision for Claude.
+ * Resolve, validate, and record the routing decision for Claude. Claude routes on
+ * GitHub Copilot (model-provider: github) or natively on Anthropic, matching the
+ * engine's resolved GH_AW_LLM_PROVIDER.
  * @param {any} reflectData
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {{selection: any, effort: string|null, error: string|null}}
  */
 function resolveClaudeModelRouting(reflectData, env = process.env) {
-  const result = resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_POLICY.endpoints, CLAUDE_ROUTING_POLICY.allowEndpointOverride);
+  const routingProvider = resolveAWFRoutingProvider("claude", env.GH_AW_LLM_PROVIDER);
+  const result = routingProvider
+    ? routingProvider === "github"
+      ? resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_POLICY.endpoints, CLAUDE_ROUTING_POLICY.allowEndpointOverride)
+      : resolveAWFModelRoutingSelection(reflectData, true, CLAUDE_ROUTING_POLICY.endpoints, CLAUDE_ROUTING_POLICY.allowEndpointOverride, routingProvider)
+    : { selection: null, error: `AWF model routing is not supported for Claude on provider ${env.GH_AW_LLM_PROVIDER}` };
   if (result.error || !result.selection) {
     const error = result.error || "AWF model routing selection is missing";
     recordAWFModelRoutingOutcome(
@@ -464,6 +471,9 @@ async function buildClaudeChildEnv(reflectData, env = process.env, logger = log,
   const resolved = reflectData ? resolveProviderEndpointFromReflect({ provider: copilotProvider ? "github" : provider, reflectData, logger }) : null;
   if (copilotProvider && (!resolved || !REFLECT_PROVIDER_ALIASES.github.has(normalizeReflectProviderName(resolved.endpointProvider)))) {
     throw new Error("Claude GitHub Copilot inference requires a configured Copilot endpoint from AWF /reflect; keep the agent sandbox enabled and configure permissions.copilot-requests: write or COPILOT_GITHUB_TOKEN");
+  }
+  if (env.GH_AW_MODEL_ROUTING === "1" && !copilotProvider && (!resolved?.baseUrl || !REFLECT_PROVIDER_ALIASES.anthropic.has(normalizeReflectProviderName(resolved.endpointProvider)))) {
+    throw new Error("Claude native Anthropic model routing requires the configured Anthropic endpoint from AWF /reflect; refusing to start Claude");
   }
   if (resolved?.baseUrl) {
     childEnv.ANTHROPIC_BASE_URL = resolved.baseUrl;

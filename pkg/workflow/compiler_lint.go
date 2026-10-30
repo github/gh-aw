@@ -24,11 +24,18 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if err != nil {
 		return formatCompilerError(sourcePath, "error", "cannot parse generated Actions AST for linting", nil)
 	}
+	generatedActionRefs := compilerGeneratedActionRefs(data)
+	// An explicit --action-tag is a caller-selected reference override. Do not
+	// let compiler ownership downgrade mutable fallback refs; callers must opt in
+	// with --allow-action-refs when the override cannot be resolved to a SHA.
+	if c.actionTag != "" {
+		generatedActionRefs = nil
+	}
 	diagnostics, err := workflowlint.Default().Run(c.ctx, workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), SourcePath: sourcePath,
 		AllowActionRefs:     c.allowActionRefs,
 		SafeOutputJobs:      safeOutputLintJobs(data),
-		GeneratedActionRefs: compilerGeneratedActionRefs(data),
+		GeneratedActionRefs: generatedActionRefs,
 	})
 	var failures []error
 	if err != nil {

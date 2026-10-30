@@ -72,7 +72,7 @@ const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const { applyCodexSubagentModels, isDetectionPhase } = require("./engine_subagent_models.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode, resolveAWFRoutingProvider } = require("./awf_model_routing.cjs");
 const CODEX_ROUTING_POLICY = getAWFModelRoutingPolicy("codex");
 
 // Pattern to detect OpenAI rate-limit errors.
@@ -549,13 +549,21 @@ function getCodexRoutingFailureCode(error) {
 }
 
 /**
- * Resolve and apply AWF's selection to a Codex invocation.
+ * Resolve and apply AWF's selection to a Codex invocation. Codex routes on GitHub
+ * Copilot (model-provider: github) or natively on OpenAI, matching the engine's
+ * resolved GH_AW_LLM_PROVIDER.
  * @param {any} reflectData
  * @param {string[]} args
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {{selection: any, model: string, args: string[], error: string|null}}
  */
-function resolveCodexModelRouting(reflectData, args) {
-  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride);
+function resolveCodexModelRouting(reflectData, args, env = process.env) {
+  const routingProvider = resolveAWFRoutingProvider("codex", env.GH_AW_LLM_PROVIDER);
+  const result = routingProvider
+    ? routingProvider === "github"
+      ? resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride)
+      : resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride, routingProvider)
+    : { selection: null, error: `AWF model routing is not supported for Codex on provider ${env.GH_AW_LLM_PROVIDER}` };
   if (result.error || !result.selection) {
     recordAWFModelRoutingOutcome({
       status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",

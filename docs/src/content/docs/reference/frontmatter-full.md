@@ -2736,9 +2736,10 @@ engine:
   fallback-models: []
     # Array of strings
 
-  # Experimental per-run GitHub Copilot model and reasoning-effort selection from
-  # the task text for Copilot, Claude, Codex, and pi engines; requires the AWF
-  # firewall and ignores fixed model and effort settings. See
+  # Experimental per-run model and reasoning-effort selection from the task text for
+  # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
+  # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
+  # fixed model and effort settings. See
   # https://github.github.com/gh-aw/reference/model-routing/.
   # (optional)
   model-routing:
@@ -2751,16 +2752,17 @@ engine:
     # these profiles per task.
     mode: "economy"
 
-    # Optional exact Copilot model names or gh-aw model aliases (such as small or
-    # sonnet) that narrow the router's choice for the main agent only. Aliases expand
-    # to their GitHub Copilot model patterns, limited to the engine's model family for
-    # Claude and Codex. This is not a request policy; put patterns such as gpt-* in
-    # models.allowed or models.blocked. When omitted, the router chooses from the
-    # models that policy allows (Claude and Codex only from their own model family).
-    # Among workflows that enable routing for the same engine, if any omits
-    # allowed-models, the router has no shortlist; otherwise, their lists are
-    # combined. GitHub Actions expressions are allowed only when neither
-    # models.allowed nor models.blocked is set.
+    # Optional exact model names of the routing provider or gh-aw model aliases (such
+    # as small or sonnet) that narrow the router's choice for the main agent only.
+    # Aliases expand to their model patterns for the routing provider (GitHub Copilot,
+    # or Anthropic or OpenAI for native Claude and Codex routing), limited to the
+    # engine's model family for Claude and Codex. This is not a request policy; put
+    # patterns such as gpt-* in models.allowed or models.blocked. When omitted, the
+    # router chooses from the models that policy allows (Claude and Codex only from
+    # their own model family). Among workflows that enable routing for the same
+    # engine, if any omits allowed-models, the router has no shortlist; otherwise,
+    # their lists are combined. GitHub Actions expressions are allowed only when
+    # neither models.allowed nor models.blocked is set.
     # (optional)
     allowed-models: []
       # Array of strings
@@ -21368,9 +21370,10 @@ safe-outputs:
       fallback-models: []
         # Array of strings
 
-      # Experimental per-run GitHub Copilot model and reasoning-effort selection from
-      # the task text for Copilot, Claude, Codex, and pi engines; requires the AWF
-      # firewall and ignores fixed model and effort settings. See
+      # Experimental per-run model and reasoning-effort selection from the task text for
+      # Copilot, Claude, Codex, and pi engines, on GitHub Copilot or, for Claude and
+      # Codex, natively on Anthropic or OpenAI; requires the AWF firewall and ignores
+      # fixed model and effort settings. See
       # https://github.github.com/gh-aw/reference/model-routing/.
       # (optional)
       model-routing:
@@ -21383,16 +21386,17 @@ safe-outputs:
         # these profiles per task.
         mode: "economy"
 
-        # Optional exact Copilot model names or gh-aw model aliases (such as small or
-        # sonnet) that narrow the router's choice for the main agent only. Aliases expand
-        # to their GitHub Copilot model patterns, limited to the engine's model family for
-        # Claude and Codex. This is not a request policy; put patterns such as gpt-* in
-        # models.allowed or models.blocked. When omitted, the router chooses from the
-        # models that policy allows (Claude and Codex only from their own model family).
-        # Among workflows that enable routing for the same engine, if any omits
-        # allowed-models, the router has no shortlist; otherwise, their lists are
-        # combined. GitHub Actions expressions are allowed only when neither
-        # models.allowed nor models.blocked is set.
+        # Optional exact model names of the routing provider or gh-aw model aliases (such
+        # as small or sonnet) that narrow the router's choice for the main agent only.
+        # Aliases expand to their model patterns for the routing provider (GitHub Copilot,
+        # or Anthropic or OpenAI for native Claude and Codex routing), limited to the
+        # engine's model family for Claude and Codex. This is not a request policy; put
+        # patterns such as gpt-* in models.allowed or models.blocked. When omitted, the
+        # router chooses from the models that policy allows (Claude and Codex only from
+        # their own model family). Among workflows that enable routing for the same
+        # engine, if any omits allowed-models, the router has no shortlist; otherwise,
+        # their lists are combined. GitHub Actions expressions are allowed only when
+        # neither models.allowed nor models.blocked is set.
         # (optional)
         allowed-models: []
           # Array of strings
