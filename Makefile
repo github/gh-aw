@@ -170,6 +170,10 @@ test-integration-mcp-other:
 test-integration-logs:
 	go test -v -timeout=3m -tags 'integration' -run 'TestLogs|TestFirewall|TestNoStopTime|TestLocalWorkflow' -skip 'TestLogsMultiTarget' ./pkg/cli
 
+.PHONY: test-harbor-conformance
+test-harbor-conformance:
+	go test -v -timeout=3m -tags integration -run '^TestHarborConformance$$' -count=1 ./pkg/cli
+
 .PHONY: test-integration-logs-multi-target-count
 test-integration-logs-multi-target-count:
 	go test -v -timeout=3m -tags 'integration' -run 'TestLogsMultiTarget' ./pkg/cli

@@ -18,6 +18,7 @@ available unified sessions automatically:
 | `gh aw sessions download RUN --atif` | Emit ATIF JSON instead of JSONL to stdout. |
 | `gh aw sessions download RUN --atif -o session.atif` | Write ATIF JSON to the specified file. |
 | `gh aw logs WORKFLOW` | Retain downloaded JSONL and reports; automatically add a sibling `.atif` when a unified session is available. |
+| `gh aw logs --harbor --output ./harbor-eval` | Export selected runs as a portable native Harbor job, retaining available sessions, experiment assignments, and recorded grading evidence. |
 | `gh aw audit RUN` | Retain downloaded JSONL and audit reports; automatically add a sibling `.atif` when a unified session is available. |
 
 Use the command's existing run ID, Actions URL, `--repo`, output-directory,
@@ -85,10 +86,69 @@ The runner supports built-in graders, custom JavaScript, and repository-owned
 operational-value Bash. Only execute trusted grader code; Bash is not
 microVM-isolated. `logs --graders` retrieves recorded grader results and their
 artifacts alongside automatic ATIF exports when sessions are available; it does
-not recompute historical results. Mapping grader results to Harbor rewards remains an integration step,
-not part of trajectory conversion.
+not recompute historical results. Harbor export is separate from trajectory
+conversion: GitHub conclusions and grader pass/fail flags are not task outcomes
+or verifier rewards.
 
 ## Validate and use with Harbor
+
+### Export a recorded evaluation job
+
+```bash
+gh aw logs --harbor --output ./harbor-eval
+harbor view ./harbor-eval --jobs --no-build
+```
+
+`--harbor` uses normal logs selection, including workflow targets, date and engine
+filters, `--count`, and `--stdin`. It requests agent, usage, experiment, and grader
+artifacts without enabling the `--graders` filter. It never dispatches workflows
+or executes grader code.
+
+The portable job is `harbor-eval/harbor/`. Its root has native Harbor
+`config.json` and `result.json`; each trial has its own config and result,
+`agent/trajectory.json` when a session exists, and `gh-aw/metadata.json`.
+The trial's `gh-aw/evidence/` contains the downloaded evidence, including available
+unified JSONL, grader results and manifests, and experiment state. Copy the
+`harbor/` directory to another machine to inspect it without GitHub access.
+Original download caches and normal logs reports remain outside that job.
+
+This is an import of recorded evidence, not a runnable Harbor task or an agent
+replay. Missing sessions remain missing; invalid available sessions fail export.
+Required unknown task checksums remain empty, and source GitHub conclusions
+remain metadata rather than inferred evaluation outcomes.
+
+Recorded numeric grader values with `pass` or `fail` status are exposed unchanged
+as namespaced `gh-aw.<grader-id>` verifier metrics. These are measurements, not
+inferred task-success rewards: no aggregate reward is synthesized, and
+pass/fail flags, booleans, errors, unavailable results, and missing values do not
+create rewards. Raw results and manifests preserve units, thresholds, direction,
+and provenance for interpretation. Ungraded trials keep `verifier_result: null`.
+
+### Run the conformance test
+
+Compatibility is pinned to the published **Harbor 0.25.0** package (Python 3.12
+or newer). Harbor is needed only for consumption and conformance testing, not
+for Go export.
+
+```bash
+python3 -m venv /tmp/gh-aw-harbor
+/tmp/gh-aw-harbor/bin/python -m pip install harbor==0.25.0
+GH_AW_HARBOR_PYTHON=/tmp/gh-aw-harbor/bin/python make test-harbor-conformance
+```
+
+The dedicated Harbor conformance workflow runs this test in CI. It generates an
+export from representative GH-AW session fixtures and validates the relocated
+directory with Harbor's native job, trial, and trajectory models and disk
+readers. It also starts the actual `harbor view` CLI and checks its HTTP
+consumption endpoints. Missing Harbor, incompatible models, or unreadable viewer
+results fail the test rather than skip it.
+
+The test also consumes Harbor's real
+[`hello-world-invalid-json.trajectory.json` golden fixture](https://github.com/harbor-framework/harbor/blob/fb8162a2209bb2af33f9377ac9f131561ceb51fa/tests/golden/terminus_2/hello-world-invalid-json.trajectory.json)
+from v0.25.0. Its source commit, blob checksum, and Apache-2.0 license are retained
+in `pkg/cli/testdata/harbor/`.
+
+### Validate an individual trajectory
 
 Treat ATIF compliance as a requirement. Check representative generated files
 with Harbor's official models and validator, not only local JSON snapshots:

@@ -300,6 +300,8 @@ func buildContinuationIfNeeded(
 	}
 }
 
+var logsExportHarborJob = exportHarborJob
+
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
 func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err error) {
 	opts = normalizeLogsDownloadOptions(opts)
@@ -324,6 +326,11 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 		defer func() { err = errors.Join(err, collectionErr) }()
 	}
 	var outcomeReports []OutcomesData
+	if opts.Harbor {
+		if err := logsExportHarborJob(ctx, opts.OutputDir, result.processedRuns); err != nil {
+			return fmt.Errorf("harbor export: %w", err)
+		}
+	}
 	if opts.Outcomes {
 		outcomeReports, err = collectLogsOutcomes(ctx, result.processedRuns, opts.OutcomesDir, opts.Verbose)
 		if err != nil {

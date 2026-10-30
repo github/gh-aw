@@ -281,6 +281,11 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 		return context.Cause(ctx)
 	}
 	processedRuns = sortAndLimitLogsTargetRuns(processedRuns, opts.Count, opts.Verbose)
+	if opts.Harbor {
+		if err := logsExportHarborJob(ctx, opts.OutputDir, processedRuns); err != nil {
+			return fmt.Errorf("harbor export: %w", err)
+		}
+	}
 	var outcomeReports []OutcomesData
 	if opts.Outcomes {
 		outcomeReports, err = collectLogsOutcomes(ctx, processedRuns, opts.OutcomesDir, opts.Verbose)
