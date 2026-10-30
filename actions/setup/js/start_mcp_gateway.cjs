@@ -43,7 +43,7 @@ const { getSetupTimeoutMs } = require("./child_process_timeouts.cjs");
 const { applyGatewayRuntimeTimeouts } = require("./tool_timeouts.cjs");
 const { fetchMCPToolsResult } = require("./mount_mcp_as_cli.cjs");
 const { writeMcpConfiguration } = require("./mcp_configuration.cjs");
-const { PROXY_ENV_NAMES } = require("./constants.cjs");
+const { PROXY_ENV_NAMES, STEP_NAME_START_MCP_GATEWAY } = require("./constants.cjs");
 const { redactCliProxyDiagnostics } = require("./redact_cli_proxy_diagnostics.cjs");
 const { prepareMCPServerCAs } = require("./mcp_server_ca.cjs");
 const { ERR_CONFIG, ERR_SYSTEM } = require("./error_codes.cjs");
@@ -318,15 +318,19 @@ async function waitForSafeOutputsReadiness(config, gatewayPort, agentId, retryCo
       () => !permanentFailure && !insufficientBudget
     );
   } catch (err) {
-    throw codedError(
-      `MCP gateway safeoutputs readiness failed after ${attempts} attempt(s): ` +
-        (permanentFailure
-          ? "permanent authentication or MCP protocol failure. The agent will not start. Check gateway credentials and MCP backend configuration."
-          : "no tools registered or backend unavailable. The agent will not start. Check MCP gateway startup logs for connection resets (ECONNRESET) or delayed backend registration.") +
-        ` Last probe: ${lastProbe}.`,
-      ERR_SYSTEM,
-      { cause: err }
+    const readinessError = Object.assign(
+      codedError(
+        `MCP gateway safeoutputs readiness failed after ${attempts} attempt(s): ` +
+          (permanentFailure
+            ? "permanent authentication or MCP protocol failure. The agent will not start. Check gateway credentials and MCP backend configuration."
+            : "no tools registered or backend unavailable. The agent will not start. Check MCP gateway startup logs for connection resets (ECONNRESET) or delayed backend registration.") +
+          ` Last probe: ${lastProbe}.`,
+        ERR_SYSTEM,
+        { cause: err }
+      ),
+      { nonRetryable: permanentFailure }
     );
+    throw readinessError;
   }
 }
 
@@ -729,24 +733,27 @@ function stopGatewayProcess(pid) {
 /**
  * Retry a failed container startup once, without retrying configuration errors.
  * @template T
- * @param {() => Promise<T>} start
+ * @param {(startupDeadline: number) => Promise<T>} start
+ * @param {number} [startupDeadline]
  * @returns {Promise<T>}
  */
-async function startGatewayWithRetry(start) {
+async function startGatewayWithRetry(start, startupDeadline = Infinity) {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await start();
+      return await start(startupDeadline);
     } catch (err) {
       stopGatewayProcess(activeGatewayPid);
       activeGatewayPid = null;
       clearGatewayStartupMarker(getGatewayStartupMarkerPath());
       const message = redactGatewayDiagnostics(getErrorMessage(err));
-      if (message.startsWith(`${ERR_CONFIG}:`)) throw err;
-      if (attempt === 2) {
-        throw codedError(`Pre-agent failure in step "Start MCP Gateway" after 2 startup attempts: ${message}`, ERR_SYSTEM, { cause: err });
+      const isNonRetryable = err instanceof Error && "nonRetryable" in err && err.nonRetryable === true;
+      if (message.startsWith(`${ERR_CONFIG}:`) || message.startsWith(`${ERR_SAFE_OUTPUTS_GATEWAY_CONFIG}:`) || isNonRetryable) throw err;
+      if (attempt === 2 || nowMs() >= startupDeadline) {
+        const attemptDescription = attempt === 1 ? "1 startup attempt" : `${attempt} startup attempts`;
+        throw codedError(`Pre-agent failure in step "${STEP_NAME_START_MCP_GATEWAY}" after ${attemptDescription}: ${message}`, ERR_SYSTEM, { cause: err });
       }
-      core.warning(`Start MCP Gateway: startup attempt 1 failed; retrying once. ${message}`);
-      await sleep(1000);
+      core.warning(`${STEP_NAME_START_MCP_GATEWAY}: startup attempt ${attempt} failed; retrying once. ${message}`);
+      await sleep(Math.min(1000, Math.max(0, startupDeadline - nowMs())));
     }
   }
 }
@@ -1061,7 +1068,10 @@ async function main() {
   // -----------------------------------------------------------------------
   const outputPath = path.join(configDir, "gateway-output.json");
   const gatewayStartupMarker = getGatewayStartupMarkerPath();
-  const { gatewayPid, stderrPath } = await startGatewayWithRetry(async () => {
+  const healthRetryConfig = resolveGatewayHealthRetryConfig();
+  const gatewayStartupStartedAt = nowMs();
+  const startupDeadline = gatewayStartupStartedAt + healthRetryConfig.backendStartupTimeoutMs + MCP_GATEWAY_HEALTH_REGISTRATION_MARGIN_MS;
+  const { gatewayPid, stderrPath } = await startGatewayWithRetry(async sharedStartupDeadline => {
     clearGatewayStartupMarker(gatewayStartupMarker);
 
     // Clean up any stale gateway container from a previous run on this runner.
@@ -1152,7 +1162,7 @@ async function main() {
     // Wait for gateway to initialise
     // -----------------------------------------------------------------------
     core.info("Waiting for gateway to initialize...");
-    await sleep(5000);
+    await sleep(Math.min(5000, Math.max(0, sharedStartupDeadline - nowMs())));
     core.info("Checking if gateway process is still alive after initialization...");
 
     if (!isProcessAlive(gatewayPid)) {
@@ -1172,7 +1182,6 @@ async function main() {
     const healthHost = "localhost";
     const healthUrl = `http://${healthHost}:${gatewayPort}/health`;
 
-    const healthRetryConfig = resolveGatewayHealthRetryConfig();
     const retryBudgetSeconds = Math.round(healthRetryConfig.retryBudgetMs / 1000);
     core.info(`Health endpoint: ${healthUrl}`);
     core.info(`(Note: MCP_GATEWAY_DOMAIN is '${gatewayDomain}' for container access)`);
@@ -1182,7 +1191,6 @@ async function main() {
     core.info("");
 
     const maxTotalAttempts = healthRetryConfig.maxTotalAttempts;
-    const startupDeadline = gatewayStartTime + healthRetryConfig.backendStartupTimeoutMs + MCP_GATEWAY_HEALTH_REGISTRATION_MARGIN_MS;
     let httpCode = 0;
     let healthBody = "";
     let succeeded = false;
@@ -1209,7 +1217,7 @@ async function main() {
           throw codedError(`Health endpoint not ready (HTTP ${httpCode || 0})`);
         },
         healthRetryConfig,
-        startupDeadline,
+        sharedStartupDeadline,
         "MCP gateway health check",
         () => isProcessAlive(gatewayPid)
       );
@@ -1233,7 +1241,7 @@ async function main() {
       printTiming(healthCheckStart, "Health check wait");
       const safeOutputsReadinessStart = nowMs();
       try {
-        await waitForSafeOutputsReadiness(configObj, gatewayPort, agentId, healthRetryConfig, gatewayStartTime);
+        await waitForSafeOutputsReadiness(configObj, gatewayPort, agentId, healthRetryConfig, gatewayStartupStartedAt);
       } finally {
         printTiming(safeOutputsReadinessStart, "Safe outputs readiness wait");
       }

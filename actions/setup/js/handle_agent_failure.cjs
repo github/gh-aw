@@ -40,7 +40,7 @@ const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp
 const { readDedupedTokenUsage, getTokenUsagePaths } = require("./parse_token_usage.cjs");
 const { extractShellCommandDetailsFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
-const { GITHUB_API_VERSION } = require("./constants.cjs");
+const { GITHUB_API_VERSION, STEP_NAME_START_MCP_GATEWAY } = require("./constants.cjs");
 const { buildEmptyOutputOutcome, buildCompletionEvidence, EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { collectUnifiedSession, isModelEndpointMismatchData } = require("./unified_session.cjs");
@@ -53,6 +53,27 @@ const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
 const ALLOWED_AGENT_CONCLUSIONS = new Set(["success", "failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale"]);
+const EXECUTE_AGENT_STEP_NAME_RE = /^Execute .+ CLI$/;
+
+function isExecuteAgentStep(step) {
+  return typeof step.name === "string" && EXECUTE_AGENT_STEP_NAME_RE.test(step.name);
+}
+
+function isGatewayStartupStep(step) {
+  return step.name === STEP_NAME_START_MCP_GATEWAY;
+}
+
+function isCheckoutStep(step) {
+  return typeof step.name === "string" && step.name.startsWith("Checkout ");
+}
+
+function isSetupFailureStep(step) {
+  return isGatewayStartupStep(step) || isCheckoutStep(step);
+}
+
+function isFailedStep(step) {
+  return ["failure", "timed_out"].includes(step.conclusion);
+}
 /** Claude Code error emitted when a `--continue` resume finds no deferred tool marker. */
 const NO_DEFERRED_MARKER_LINE_RE = /No deferred tool marker found/i;
 /** Claude harness line reporting that the no-deferred-marker error was recovered by a fresh retry. */
@@ -2013,21 +2034,23 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
     return { failingStep: "", agentConclusion };
   }
   const steps = agentJob.steps?.slice() || [];
-  const setupBoundary = steps.findIndex(step => step.name === "Start MCP Gateway" || (typeof step.name === "string" && step.name.startsWith("Execute ")));
-  const setupFailure =
-    setupBoundary >= 0 &&
-    ["skipped", "failure", "timed_out"].includes(steps[setupBoundary].conclusion) &&
-    (startupFailure || steps[setupBoundary].conclusion === "skipped" || steps.some(step => typeof step.name === "string" && step.name.startsWith("Execute ") && step.conclusion === "skipped")) &&
-    !steps.some(step => typeof step.name === "string" && step.name.startsWith("Execute ") && step.conclusion !== "skipped")
-      ? steps
-          .slice(0, setupBoundary + (steps[setupBoundary].name === "Start MCP Gateway" ? 1 : 0))
-          .find(step => ["failure", "timed_out"].includes(step.conclusion) && (step.name === "Start MCP Gateway" || (typeof step.name === "string" && step.name.startsWith("Checkout "))))
-      : undefined;
+  const setupBoundary = steps.findIndex(step => isGatewayStartupStep(step) || isExecuteAgentStep(step));
+  let setupFailure;
+  if (setupBoundary >= 0) {
+    const boundaryStep = steps[setupBoundary];
+    const executionSteps = steps.filter(isExecuteAgentStep);
+    const boundaryFailed = ["skipped", "failure", "timed_out"].includes(boundaryStep.conclusion);
+    const agentNeverRan = executionSteps.every(step => step.conclusion === "skipped");
+    const boundaryIndicatesPreAgentFailure = startupFailure || boundaryStep.conclusion === "skipped" || executionSteps.some(step => step.conclusion === "skipped");
+    if (boundaryFailed && boundaryIndicatesPreAgentFailure && agentNeverRan) {
+      const setupStepsEnd = isGatewayStartupStep(boundaryStep) ? setupBoundary + 1 : setupBoundary;
+      setupFailure = steps.slice(0, setupStepsEnd).find(step => isFailedStep(step) && isSetupFailureStep(step));
+    }
+  }
   if (!startupFailure) steps?.reverse();
-  const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && ["failure", "timed_out"].includes(step.conclusion));
+  const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && isFailedStep(step));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
-  const failedStep =
-    (!startupFailure && redactionStep) || setupFailure || steps?.find(step => (["failure", "timed_out"].includes(step.conclusion) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const failedStep = (!startupFailure && redactionStep) || setupFailure || steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
   if (!failedStep) {
     return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }

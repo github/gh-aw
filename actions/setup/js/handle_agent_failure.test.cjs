@@ -630,6 +630,30 @@ describe("handle_agent_failure", () => {
       await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep, agentConclusion: "failure", preAgentFailure: true });
     });
 
+    it("ignores an unrelated Execute step before the generated checkout and execution steps", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Execute migrations", conclusion: "success" },
+              { name: "Checkout repository (gh-aw default)", conclusion: "failure" },
+              { name: "Start MCP Gateway", conclusion: "skipped" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({
+        failingStep: "Checkout repository (gh-aw default)",
+        agentConclusion: "failure",
+        preAgentFailure: true,
+      });
+    });
+
     it("does not classify a checkout after agent execution as pre-agent", async () => {
       global.github = {
         paginate: vi.fn().mockResolvedValue([
