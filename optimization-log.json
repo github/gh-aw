@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-09-09",
-    "workflow_name": "CI Optimization Coach",
-    "workflow_file": "ci-coach",
-    "total_aic_analyzed": 322.78,
-    "runs_audited": 1,
-    "recommendations_count": 3,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 30
-  },
-  {
     "date": "2026-09-10",
     "workflow_name": "PR Code Quality Reviewer",
     "workflow_file": "pr-code-quality-reviewer",
@@ -168,7 +158,7 @@
   },
   {
     "date": "2026-10-08",
-    "workflow_name": "Design Decision Gate 🏗️",
+    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
     "workflow_file": "design-decision-gate",
     "total_aic_analyzed": 102.14,
     "runs_audited": 6,
@@ -238,7 +228,7 @@
   },
   {
     "date": "2026-10-21",
-    "workflow_name": "Design Decision Gate 🏗️",
+    "workflow_name": "Design Decision Gate \ud83c\udfd7\ufe0f",
     "workflow_file": "design-decision-gate",
     "total_aic_analyzed": 121.7,
     "runs_audited": 5,
@@ -295,5 +285,15 @@
     "recommendations_count": 3,
     "subagent_candidates": 0,
     "estimated_aic_savings_per_run": 20
+  },
+  {
+    "date": "2026-10-30",
+    "workflow_name": "Test Quality Sentinel",
+    "workflow_file": "test-quality-sentinel",
+    "total_aic_analyzed": 83.79,
+    "runs_audited": 6,
+    "recommendations_count": 3,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 3
   }
 ]
