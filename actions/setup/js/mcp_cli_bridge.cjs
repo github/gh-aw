@@ -1366,6 +1366,7 @@ function showToolHelp(serverName, toolName, tools) {
     ...renderToolRecommendedExample(serverName, tool).split("\n"),
     `JSON mode: ${serverName} ${toolName} '{"param":"value",...}' (preferred; encode newlines as \\n, double quotes as \\", backslashes as \\\\, apostrophes as \\u0027)`,
     `Stdin is also supported: ${serverName} ${toolName} . reads a JSON object; no extra shell permissions are granted.`,
+    `Per-field stdin: cat file | ${serverName} ${toolName} --<field> . substitutes that one field with the raw stdin text verbatim (no JSON escaping needed). Only use the bare '.' form above when the whole stdin is itself a JSON object; never write '.' as a value inside a quoted JSON literal.`,
   ];
 
   const props = tool.inputSchema?.properties;
