@@ -17,6 +17,10 @@
       "import": "github/gh-aw/.github/workflows/shared/deepseek-harness.md"
     },
     {
+      "id": "factory",
+      "import": "github/gh-aw/.github/workflows/shared/factory.md"
+    },
+    {
       "id": "goose",
       "import": "github/gh-aw/.github/workflows/shared/goose.md"
     },

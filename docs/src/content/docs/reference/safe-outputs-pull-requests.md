@@ -600,7 +600,19 @@ safe-outputs:
         - .cursor/                # allow updates to the .cursor/ directory
 ```
 
-The `exclude` list names files by **basename** (e.g., `AGENTS.md`) or **path prefix** (e.g., `.agents/`) to remove from the default protected set. To exclude only an **exact repository path**, start it with `/`: `exclude: ["/pyproject.toml"]` allows the root `pyproject.toml` while nested files such as `lib/foo/pyproject.toml` remain protected. Dot-folder path prefixes in the `exclude` list (e.g. `.cursor/`) also opt that directory out of the general top-level-dot-folder protection rule. The remaining protected files still enforce the configured policy. This is useful when a workflow is explicitly designed to manage one specific instruction file or configuration directory without disabling all protection.
+The `exclude` list names files by **basename** (e.g., `AGENTS.md`) or **path prefix** (e.g., `.agents/`) to remove from the default protected set. To exclude only an **exact repository path**, start it with `/`: `exclude: ["/pyproject.toml"]` allows the root `pyproject.toml` while nested files such as `lib/foo/pyproject.toml` remain protected. Rooted entries also support path globs, such as `"/.changeset/*.md"`. Dot-folder path prefixes in the `exclude` list (e.g. `.cursor/`) also opt that directory out of the general top-level-dot-folder protection rule. The remaining protected files still enforce the configured policy. This is useful when a workflow is explicitly designed to manage one specific instruction file or configuration directory without disabling all protection.
+
+To configure exceptions for all workflows compiled in a repository, set `protected_files.exclude` in `.github/workflows/aw.json`:
+
+```json title=".github/workflows/aw.json"
+{
+  "protected_files": {
+    "exclude": [".changeset/*.md"]
+  }
+}
+```
+
+These entries match full repository-root paths; a leading `/` is rejected. `*` matches any characters except `/`; `**` also matches `/`. Both repository and handler exclusion lists require at least one ASCII letter, digit, underscore, or hyphen and reject whitespace. This rejects catch-all patterns such as `"*"`, `"**"`, `"**/*"`, `"/**"`, `"**.*"`, and `".*/**"`. Use a scoped pattern such as `".changeset/*.md"`. This example allows Markdown files directly inside `.changeset/`, while `.changeset/config.json`, nested files, and other dot-folders remain protected. Repository exceptions combine with each handler's `protected-files.exclude` list, apply to both patch and post-apply checks, and never bypass `allowed-files`. Recompile workflows after changing `aw.json`.
 
 :::tip[Workflows that update top-level Markdown files]
 `CHANGELOG.md` is excluded by default. If your workflow is explicitly designed to modify another protected root-level Markdown file such as `README.md`, add it to the `exclude` list so the agent can commit the change.
@@ -676,7 +688,7 @@ safe-outputs:
 
 ### Restricting Changes to Specific Files with `allowed-files`
 
-Use `allowed-files` to restrict a safe output to a fixed set of files. When set, it acts as an **exclusive allowlist**: every file touched by the patch must match at least one pattern, and any file outside the list is always refused — including normal source files. The `allowed-files` and `protected-files` checks are **orthogonal**: both run independently and both must pass. To modify a protected file, it must both match `allowed-files` **and** `protected-files` must be set to `allowed`.
+Use `allowed-files` to restrict a safe output to a fixed set of files. When set, it acts as an **exclusive allowlist**: every file touched by the patch must match at least one pattern, and any file outside the list is always refused — including normal source files. The `allowed-files` and `protected-files` checks run independently. A file matching `allowed-files` remains subject to the [protected-file policy](#policy-options) unless a handler or repository exclusion applies.
 
 > [!CAUTION]
 > `allowed-files` is an **exclusive allowlist**, not an "additionally allow" list. Setting `allowed-files: [".github/workflows/*"]` blocks **all other files**, including normal source code like `src/**`. If you want to allow `.github/workflows/*` alongside regular source files, you must list every pattern explicitly:

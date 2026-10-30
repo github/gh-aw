@@ -541,6 +541,7 @@ gh aw run workflow1 workflow2               # Run multiple workflows
 gh aw run workflow --repeat 3               # Run 4 times total (1 initial + 3 repeats)
 gh aw run workflow --push                   # Commit, push, and dispatch the workflow
 gh aw run workflow --push --ref main        # Push to specific branch
+gh aw run workflow --ref feature/my-change  # Run the branch's compiled workflow content
 gh aw run workflow --dry-run                # Preview without triggering workflow runs
 gh aw run workflow --json                   # Output triggered workflow results as JSON
 ```
@@ -554,6 +555,46 @@ When `--push` is used, automatically recompiles outdated `.lock.yml` files, stag
 > [!NOTE]
 > Codespaces Permissions
 > Requires `workflows:write` permission. In Codespaces, either configure custom permissions in `devcontainer.json` ([docs](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-repository-access-for-your-codespaces)) or authenticate manually: `unset GH_TOKEN && gh auth login`
+
+##### Run from a feature branch
+
+`gh aw run workflow --ref feature/my-change` executes the compiled `.github/workflows/workflow.lock.yml` **from the selected branch**, not the default branch's version. The branch or tag must already be pushed and its lock file must declare `workflow_dispatch`. Without `--ref`, local runs use the current branch; `--repo owner/repo` runs use that repository's default branch.
+
+GitHub [requires the workflow file to exist on the default branch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) before manual dispatch. `--ref` selects workflow content, not registration. Neither `run` nor `trial --host-repo` provides ephemeral registration, changes the default branch, or bypasses this platform requirement.
+
+For an already registered workflow, compile and push the candidate source, lock file, and dependencies to the feature branch, then select that ref:
+
+```bash
+gh aw compile workflow --validate --strict
+gh aw run workflow --dry-run --ref feature/my-change  # Preview the dispatch
+gh aw run workflow --ref feature/my-change
+# From another checkout:
+gh aw run workflow --repo owner/repo --ref feature/my-change
+```
+
+Compilation alone does not publish files. Local uncommitted changes are not executed. Use `gh aw run --dry-run` to preview the dispatch command before a live test; it does not dispatch, execute the candidate, or make the compiled workflow safe to execute. For a live test with compiler-managed mutations suppressed, compile with `gh aw compile workflow --dry-run`, review and publish that source/lock revision, then dispatch it. This does not suppress arbitrary script effects or credential use.
+
+For a **new workflow**, a maintainer can first merge a reviewed, inert registration file at the **exact same lock-file path** the candidate will use. For example, this is a plain GitHub Actions bootstrap file, not compiler output:
+
+```yaml title=".github/workflows/workflow.lock.yml"
+name: Workflow registration only
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  registration:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Registration only"
+```
+
+The bootstrap has no automatic trigger, requests no token permissions, references no secrets, and skips its only job. It registers the filename without merging candidate production logic. Keep this bootstrap unchanged on the default branch while the feature branch replaces the same path with its compiled workflow. Dispatch the feature branch explicitly; dispatching the default branch only skips the bootstrap job. Review the candidate before dispatch, retain environment approval and branch protection rules, and grant only the secrets and permissions needed for the test. Registration does not make candidate code trusted.
+
+If even an inert bootstrap cannot be merged, use an isolated trial repository with its own default-branch workflow and test credentials. That does not validate the production repository's secrets, environments, or trigger policy. There is no supported zero-default-branch-change registration mode.
+
+> [!CAUTION]
+> A manual run is a `workflow_dispatch` event, not `pull_request_target` (including `closed`). It has no real pull request payload and does not exercise PR-specific conditions or fork trust rules. Guard trigger-specific fields when supporting both events. `--ref` cannot redirect a real `pull_request_target` event to the PR's workflow version. Do not work around this by executing an untrusted PR ref with elevated credentials. Validate event-specific behavior separately in a controlled repository with trusted code and test credentials; full production-trigger validation remains subject to GitHub's platform constraints.
 
 ### Monitoring
 
@@ -683,13 +724,36 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
 When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes (for example, `--timeout 10`); the default `0` disables the timeout.
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
+
+When a selected run has `aw_session.jsonl`, `logs` automatically adds a sibling
+`aw_session.atif` containing [ATIF-v1.8](https://docs.harborframework.com/agents/atif)
+JSON, retaining the original session and reports. This also applies to cached
+runs and `--stdin`. Missing sessions are skipped without extra downloads or
+ATIF-specific reconstruction; cached summaries alone are not trajectories.
+Invalid sessions and export failures return errors.
+
+`--harbor` additionally exports the selected runs as a portable
+[Harbor](https://harborframework.com/) evaluation job, using the same ATIF
+converter. It requests session, experiment, and recorded grader artifacts without
+requiring every run to have grading results. Existing run filters, `--stdin`,
+and multi-workflow selection still apply.
+
+```bash wrap
+gh aw logs --harbor --output ./harbor-eval
+```
+
+The export preserves recorded metadata and grading evidence; it does not rerun
+agents, execute graders, infer task success from GitHub conclusions, or create
+missing rewards. Keep exports private: trajectories and source sessions can
+contain prompts, reasoning, and tool payloads. Compatibility is tested against
+Harbor **0.25.0** using its native models, CLI, and viewer.
 
 The `graders` artifact set includes conclusion's built-in results in `usage`
 and the optional combined `graders` artifact from the separate custom-grader job,
@@ -851,6 +915,12 @@ The diff shows new or removed network domains, status changes (allowed ↔ denie
 
 **Options:** `--artifacts`, `--format` (pretty, markdown; default: pretty), `--json/-j`, `--output/-o`, `--repo/-r`
 
+`audit` automatically writes a sibling `aw_session.atif` when a selected run has
+`aw_session.jsonl`, retaining the original session and audit reports. This also
+applies to single-run, grouped, and cached audits. Missing sessions are skipped
+without extra downloads or ATIF-specific reconstruction; invalid sessions and
+export failures return errors.
+
 #### `sessions`
 
 Experimental: download a unified agent session for an existing workflow run. The command writes
@@ -865,9 +935,10 @@ Runs from older `gh-aw` versions are parsed into the current unified format from
 gh aw sessions download 1234567890 --repo owner/repo
 gh aw sessions download https://github.com/owner/repo/actions/runs/1234567890 --format markdown
 gh aw sessions download 1234567890 -o session.jsonl
+gh aw sessions download 1234567890 --atif -o session.atif
 ```
 
-**Options:** `--format` (`jsonl` or `markdown`; default: `jsonl`),
+**Options:** `--atif` (ATIF-v1.8 JSON instead of JSONL), `--format` (`jsonl` or `markdown`; default: `jsonl`),
 `--output/-o` (output file), `--repo/-r` (`[HOST/]owner/repo`; defaults to the
 current repository).
 
@@ -876,6 +947,12 @@ bounded summary renderer, omits user prompts and private tool payloads, and
 reports display truncation. Node.js is required for reconstruction and Markdown
 rendering, but not for downloading an existing unified JSONL file. Missing
 artifacts, download failures, and invalid session files return errors.
+`--atif` replaces the session output format on stdout or at the exact `--output`
+path; it cannot be combined with `--format markdown`. The export preserves source
+evidence in schema-approved extensions, including unmatched tools and subagent
+observations. Missing metadata and uncertain accounting are not fabricated.
+ATIF includes private prompts and tool payloads, unlike the bounded Markdown
+summary. Conversion requires no Python/Harbor installation.
 The command and its output formats may change.
 
 #### `graders`

@@ -194,6 +194,7 @@ type processWorkflowRunBatchOptions struct {
 	cachedJSONLWriter      *cachedLogsJSONLWriter
 	countLimit             *logsCountLimit
 	collectionStats        *logsCollectionStats
+	atifError              *error
 }
 
 func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDownloadRuntime, error) {
@@ -378,6 +379,7 @@ type logsCollectionState struct {
 	timeoutReached      bool
 	countLimitReached   bool
 	storageLimitReached bool
+	atifError           error
 }
 
 type logsGuardrailStatus struct {
@@ -556,8 +558,12 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		cachedJSONLWriter:      opts.cachedJSONLWriter,
 		countLimit:             opts.countLimit,
 		collectionStats:        opts.collectionStats,
+		atifError:              &state.atifError,
 	})
 	state.timeoutReached = state.timeoutReached || batchTimedOut
+	if state.atifError != nil {
+		return true, handleLogsATIFBatchError(state, runtime.fetchAllInRange, opts, batchStorageLimitReached)
+	}
 	logProcessedWorkflowRunBatch(opts, runtime.fetchAllInRange, state.iteration, batchProcessed, len(state.processedRuns), opts.Verbose)
 	if opts.rateLimitState.isReached() {
 		// Timeout state is copied above, but preserve the incoming cursor because
@@ -567,6 +573,22 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		return true, errLogsAPIRateLimitReached
 	}
 	return finishLogsBatch(state, runtime, opts, batch, allRunsConsumed, batchStorageLimitReached), nil
+}
+
+func handleLogsATIFBatchError(state *logsCollectionState, fetchAllInRange bool, opts LogsDownloadOptions, batchStorageLimitReached bool) error {
+	stopErr, failure := splitLogsATIFError(state.atifError)
+	var guardrailErr error
+	if stopErr != nil {
+		state.storageLimitReached = batchStorageLimitReached || errors.Is(stopErr, errLogsStorageLimitReached)
+		_, guardrailErr = handleLogsBatchError(state, fetchAllInRange, opts.countLimit, opts.rateLimitState, stopErr)
+		if errors.Is(stopErr, errLogsStorageLimitReached) {
+			guardrailErr = nil
+		}
+	}
+	if failure != nil {
+		failure = &logsATIFExportError{err: failure}
+	}
+	return errors.Join(failure, guardrailErr)
 }
 
 // finishLogsBatch applies the outcome of one processed batch to the collection
@@ -820,6 +842,9 @@ func processWorkflowRunBatch(
 		var chunkStorageLimitReached bool
 		processedRuns, batchProcessed, chunkStorageLimitReached = appendProcessedWorkflowRuns(activeCtx, processedRuns, chunk, batchProcessed, opts)
 		storageLimitReached = storageLimitReached || chunkStorageLimitReached
+		if opts.atifError != nil && *opts.atifError != nil {
+			return processedRuns, batchProcessed, false, false, storageLimitReached
+		}
 		if len(processedRuns) >= opts.count {
 			break
 		}
@@ -863,6 +888,9 @@ type orderedLogsRunCollector struct {
 }
 
 func newOrderedLogsRunCollector(ctx context.Context, count int, chunkSize int, opts processWorkflowRunBatchOptions) *orderedLogsRunCollector {
+	if opts.atifError == nil {
+		opts.atifError = new(error)
+	}
 	collector := &orderedLogsRunCollector{
 		ctx:            ctx,
 		opts:           opts,
@@ -919,9 +947,13 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 		return
 	}
 	if result.CachedRun != nil {
+		processedRun := processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir)
+		if !c.exportATIF(processedRun.Run, false) {
+			return
+		}
 		if c.opts.countLimit.tryAdd() {
-			c.candidates[index] = processedRunFromCachedData(*result.CachedRun, result.cachedAudit, c.opts.outputDir) //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
-			c.accepted[index] = true                                                                                  //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
+			c.candidates[index] = processedRun //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
+			c.accepted[index] = true           //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
 			c.acceptedCount++
 		}
 		return
@@ -935,12 +967,25 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 	}
 	processedRun := buildLogsProcessedRun(c.ctx, result, c.opts.verbose, true)
 	parseWorkflowRunArtifacts(result, processedRun, c.opts.parse, c.opts.verbose)
+	exportCompleted := c.exportATIF(processedRun.Run, result.storageReserved)
 	finalizeLogsRunDownload(c.opts.storageLimit, result)
+	if !exportCompleted {
+		return
+	}
 	if c.opts.countLimit.tryAdd() {
 		c.candidates[index] = processedRun //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches candidates length.
 		c.accepted[index] = true           //nolint:uncheckedsliceindex // index is checked against chunkSize, which matches accepted length.
 		c.acceptedCount++
 	}
+}
+
+func (c *orderedLogsRunCollector) exportATIF(run WorkflowRun, reserved bool) bool {
+	if err := exportLogsATIF(c.ctx, run, c.opts.outputDir, c.opts.storageLimit, reserved); err != nil {
+		*c.opts.atifError = errors.Join(*c.opts.atifError, fmt.Errorf("ATIF export for run %d: %w", run.DatabaseID, err))
+		stop, _ := splitLogsATIFError(err)
+		return stop == nil
+	}
+	return true
 }
 
 func (c *orderedLogsRunCollector) appendAccepted(processedRuns []ProcessedRun, batchProcessed int, writer *cachedLogsJSONLWriter) ([]ProcessedRun, int) {

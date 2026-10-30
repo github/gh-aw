@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -68,7 +69,7 @@ func resolveSetupActionModeRef(ctx context.Context, actionTag string, version st
 	if !ok {
 		return localPath
 	}
-	actionRepo := actionsOrgRepo + "/setup"
+	actionRepo := path.Join(actionsOrgRepo, "setup")
 	remoteRef := fmt.Sprintf("%s@%s", actionRepo, tag)
 	ref := tryResolveSetupSHA(ctx, resolver, actionRepo, tag, remoteRef, "Action mode")
 	if ref != "" {
@@ -129,7 +130,10 @@ func tryResolveSetupSHA(ctx context.Context, resolver SHAResolver, actionRepo, t
 // For dev mode: returns the local path as-is (e.g., "./actions/create-issue")
 // For release mode: converts to SHA-pinned remote reference (e.g., "github/gh-aw/actions/create-issue@SHA # tag")
 // For action mode: converts to SHA-pinned reference in external repo if possible (e.g., "github/gh-aw-actions/create-issue@SHA # version")
-func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) string {
+func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) (reference string) {
+	defer func() {
+		data.recordGeneratedActionRef(reference)
+	}()
 	hasActionTag, frontmatterActionTag := getFrontmatterActionTag(data)
 
 	// For ./actions/setup, check for compiler-level actionTag override first
@@ -152,6 +156,17 @@ func (c *Compiler) resolveActionReference(localActionPath string, data *Workflow
 	// Default to dev mode for unknown modes
 	actionRefLog.Printf("WARNING: Unknown action mode %s, defaulting to dev mode", c.actionMode)
 	return localActionPath
+}
+
+func (data *WorkflowData) recordGeneratedActionRef(reference string) {
+	if data == nil || reference == "" {
+		return
+	}
+	if data.generatedActionRefs == nil {
+		data.generatedActionRefs = make(map[string]struct{})
+	}
+	ref, _, _ := strings.Cut(reference, " # ")
+	data.generatedActionRefs[ref] = struct{}{}
 }
 
 func getFrontmatterActionTag(data *WorkflowData) (bool, string) {
@@ -196,7 +211,7 @@ func (c *Compiler) resolveReleaseActionReference(localActionPath string, data *W
 		actionRefLog.Printf("Release mode: using tag-based remote action reference: %s", remoteRef)
 		return remoteRef
 	}
-	pinnedRef, err := getActionPinWithData(actionRepo, version, data)
+	pinnedRef, err := getGeneratedActionPinWithData(actionRepo, version, data)
 	if err != nil {
 		actionRefLog.Printf("Failed to pin action %s@%s: %v", actionRepo, version, err)
 		return ""
@@ -295,7 +310,7 @@ func (c *Compiler) convertToExternalActionsRef(localPath string, data *WorkflowD
 
 	// Try to resolve the SHA using action pins
 	if data != nil {
-		pinnedRef, err := getActionPinWithData(actionRepo, tag, data)
+		pinnedRef, err := getGeneratedActionPinWithData(actionRepo, tag, data)
 		if err != nil {
 			if hasExactActionPinMapping(actionRepo, tag, data) {
 				actionRefLog.Printf("Failed to resolve exact action pin mapping for %s@%s: %v", actionRepo, tag, err)

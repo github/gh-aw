@@ -2605,6 +2605,38 @@ func TestValidateWithSchema_YAMLTypedSlice(t *testing.T) {
 	}
 }
 
+func TestProtectedFilesExclusionsRequireScope(t *testing.T) {
+	t.Parallel()
+	for _, handler := range []string{"create-pull-request", "push-to-pull-request-branch", "approve-workflow-run"} {
+		for _, pattern := range []string{"", "*", "**", "**/*", "*/**/*", "/**", "/**/*", "**.*", "/**.*", ".*/**", "/.*/**", ".", "/", " ", " docs/**", "docs/** ", "docs/a b.md", "docs/\tfile.md", "docs/\nfile.md", "AGENTS.md", ".agents/", "/pyproject.toml", "/.changeset/*.md", "/docs/**", "/**/*.md", "/_/**", "/-/**", "/1/**"} {
+			t.Run(handler+"/"+pattern, func(t *testing.T) {
+				config := map[string]any{
+					"protected-files": map[string]any{"exclude": []any{pattern}},
+				}
+				if handler == "approve-workflow-run" {
+					config["allowed-workflows"] = []any{"ci.yml"}
+				}
+				frontmatter := map[string]any{
+					"on":           map[string]any{"workflow_dispatch": nil},
+					"engine":       "copilot",
+					"safe-outputs": map[string]any{handler: config},
+				}
+				err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "test.md")
+				switch pattern {
+				case "AGENTS.md", ".agents/", "/pyproject.toml", "/.changeset/*.md", "/docs/**", "/**/*.md", "/_/**", "/-/**", "/1/**":
+					if err != nil {
+						t.Fatalf("scoped exclusion %q rejected: %v", pattern, err)
+					}
+				default:
+					if err == nil {
+						t.Fatalf("unscoped exclusion %q accepted", pattern)
+					}
+				}
+			})
+		}
+	}
+}
+
 // TestValidateMainWorkflowFrontmatterWithSchemaAndLocation_ProtectedFilesObjectForm
 // verifies that the protected-files field on create-pull-request and
 // push-to-pull-request-branch accepts the documented object form

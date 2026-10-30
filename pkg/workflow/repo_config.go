@@ -156,6 +156,9 @@ func (m *MaintenanceConfig) IsJobDisabled(jobName string) bool {
 
 // RepoConfig is the parsed representation of aw.json.
 type RepoConfig struct {
+	// ProtectedFiles configures repository-wide exceptions to safe-output file protection.
+	ProtectedFiles RepoProtectedFilesConfig
+
 	// Admission enables admission and conclusion_admission jobs for all workflows.
 	Admission bool
 
@@ -236,6 +239,11 @@ type RepoConfig struct {
 	ContainerPins map[string]ContainerPinTarget
 }
 
+// RepoProtectedFilesConfig holds repository-root path globs exempt from file protection.
+type RepoProtectedFilesConfig struct {
+	Exclude []string `json:"exclude,omitempty"`
+}
+
 // ContainerPinTarget holds the replacement image reference for a container_pins
 // entry. The image ref and digest are stored separately for independent
 // validation. The combined pinned reference is "Image@Digest".
@@ -279,6 +287,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	// Use an intermediate struct with json.RawMessage to defer maintenance and
 	// auto_upgrade parsing.
 	var raw struct {
+		ProtectedFiles           RepoProtectedFilesConfig      `json:"protected_files,omitzero"`
 		Admission                bool                          `json:"admission,omitempty"`
 		GatewayDispatch          bool                          `json:"gateway-dispatch,omitempty"`
 		Strict                   bool                          `json:"strict,omitempty"`
@@ -303,6 +312,7 @@ func (r *RepoConfig) UnmarshalJSON(data []byte) error { //nolint:largefunc // Po
 	}
 
 	r.GatewayDispatch = raw.GatewayDispatch
+	r.ProtectedFiles = raw.ProtectedFiles
 	r.Admission = raw.Admission
 	r.Strict = raw.Strict
 	r.GHES = raw.GHES

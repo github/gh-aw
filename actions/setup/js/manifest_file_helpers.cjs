@@ -7,6 +7,17 @@ function normalizeDotFolderExcludes(excludes) {
   return new Set((Array.isArray(excludes) ? excludes : []).map(exclude => String(exclude || "").replace(/\/+$/, "")).filter(Boolean));
 }
 
+/**
+ * @param {string[]} paths
+ * @param {string[]} excludes - Repository-root path globs
+ * @returns {string[]}
+ */
+function filterProtectedPaths(paths, excludes) {
+  const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
+  const patterns = excludes.map(pattern => globPatternToRegex(pattern));
+  return paths.filter(path => !patterns.some(pattern => pattern.test(path)));
+}
+
 function formatHeaderLineForError(headerLine) {
   const value = typeof headerLine === "string" ? headerLine : "";
   const truncated = value.length > 200 ? `${value.slice(0, 200)}…` : value;
@@ -88,16 +99,14 @@ function extractPathsFromPatch(patchContent) {
  *
  * @param {string} patchContent - The git patch content
  * @param {string[]} manifestFiles - List of manifest file names to check against (e.g. ["package.json", "go.mod"])
- * @param {string[]} [pathExcludes] - Exact repository paths to skip
+ * @param {string[]} [pathExcludes] - Repository-root path globs to skip
  * @returns {{ hasManifestFiles: boolean, manifestFilesFound: string[] }}
  */
 function checkForManifestFiles(patchContent, manifestFiles, pathExcludes = []) {
   if (!manifestFiles || manifestFiles.length === 0) {
     return { hasManifestFiles: false, manifestFilesFound: [] };
   }
-  const changedFiles = extractPathsFromPatch(patchContent)
-    .filter(path => !pathExcludes.includes(path))
-    .map(path => path.slice(path.lastIndexOf("/") + 1));
+  const changedFiles = filterProtectedPaths(extractPathsFromPatch(patchContent), pathExcludes).map(path => path.slice(path.lastIndexOf("/") + 1));
   const manifestFileSet = new Set(manifestFiles);
   const manifestFilesFound = [...new Set(changedFiles.filter(f => manifestFileSet.has(f)))];
   return { hasManifestFiles: manifestFilesFound.length > 0, manifestFilesFound };
@@ -110,15 +119,15 @@ function checkForManifestFiles(patchContent, manifestFiles, pathExcludes = []) {
  *
  * @param {string} patchContent - The git patch content
  * @param {string[]} pathPrefixes - List of path prefixes to check (e.g. [".github/"])
- * @param {string[]} [pathExcludes] - Exact repository paths to skip
+ * @param {string[]} [pathExcludes] - Repository-root path globs to skip
  * @returns {{ hasProtectedPaths: boolean, protectedPathsFound: string[] }}
  */
 function checkForProtectedPaths(patchContent, pathPrefixes, pathExcludes = []) {
   if (!pathPrefixes || pathPrefixes.length === 0) {
     return { hasProtectedPaths: false, protectedPathsFound: [] };
   }
-  const changedPaths = extractPathsFromPatch(patchContent);
-  const found = changedPaths.filter(p => !pathExcludes.includes(p) && pathPrefixes.some(prefix => p.startsWith(prefix)));
+  const changedPaths = filterProtectedPaths(extractPathsFromPatch(patchContent), pathExcludes);
+  const found = changedPaths.filter(p => pathPrefixes.some(prefix => p.startsWith(prefix)));
   return { hasProtectedPaths: found.length > 0, protectedPathsFound: found };
 }
 
@@ -188,14 +197,13 @@ function checkExcludedFiles(patchContent, excludedFilePatterns) {
  *
  * @param {string} patchContent - The git patch content
  * @param {string[]} [excludes] - Optional list of dot-folder prefixes to skip (e.g. [".agents/"])
- * @param {string[]} [pathExcludes] - Exact repository paths to skip
+ * @param {string[]} [pathExcludes] - Repository-root path globs to skip
  * @returns {{ hasTopLevelDotFolders: boolean, topLevelDotFoldersFound: string[] }}
  */
 function checkForTopLevelDotFolders(patchContent, excludes, pathExcludes = []) {
-  const changedPaths = extractPathsFromPatch(patchContent);
+  const changedPaths = filterProtectedPaths(extractPathsFromPatch(patchContent), pathExcludes);
   const excludeSet = normalizeDotFolderExcludes(excludes);
   const found = changedPaths.filter(p => {
-    if (pathExcludes.includes(p)) return false;
     const slashIdx = p.indexOf("/");
     if (slashIdx === -1) return false; // root-level file, not inside a folder
     const firstComponent = p.substring(0, slashIdx);
@@ -303,7 +311,7 @@ function checkFileProtectionPostApply(actualFiles, config) {
   const prefixes = Array.isArray(config.protected_path_prefixes) ? config.protected_path_prefixes : [];
   const dotFolderExcludes = normalizeDotFolderExcludes(config.protected_dot_folder_excludes);
   const pathExcludes = Array.isArray(config.protected_files_path_exclude) ? config.protected_files_path_exclude : [];
-  const filesToCheck = actualFiles.filter(file => !pathExcludes.includes(file));
+  const filesToCheck = filterProtectedPaths(actualFiles, pathExcludes);
 
   const allProtected = [];
 

@@ -3,6 +3,7 @@ package actions
 import (
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +90,117 @@ func TestParseRejectsInvalidNativeYAML(t *testing.T) {
 		t.Run(source, func(t *testing.T) {
 			_, err := Parse([]byte(source))
 			require.Error(t, err)
+		})
+	}
+}
+
+func TestParseJobCacheModes(t *testing.T) {
+	for _, mode := range []string{"read", "write", "write-only", "none"} {
+		t.Run(mode, func(t *testing.T) {
+			source := "cache-mode: read\non: issue_comment\njobs:\n  runner:\n    runs-on: ubuntu-latest\n    cache-mode: " +
+				mode + "\n    steps: [{run: echo data}]\n  call:\n    uses: ./.github/workflows/worker.yml\n    cache-mode: " + mode + "\n"
+			input, err := Parse([]byte(source))
+			require.NoError(t, err)
+			for _, job := range input.Jobs {
+				assert.Equal(t, mode, job.CacheMode)
+			}
+			fields, err := Lower(input)
+			require.NoError(t, err)
+			content, err := yaml.Marshal(fields)
+			require.NoError(t, err)
+			var lowered map[string]any
+			require.NoError(t, yaml.Unmarshal(content, &lowered))
+			jobs := lowered["jobs"].(map[string]any)
+			for _, id := range []string{"runner", "call"} {
+				assert.Equal(t, mode, jobs[id].(map[string]any)["cache-mode"])
+			}
+			input.Jobs[0].CacheMode = "none"
+			emitted, err := Emit(input)
+			require.NoError(t, err)
+			reparsed, err := Parse([]byte(emitted))
+			require.NoError(t, err)
+			assert.Equal(t, input.Jobs, reparsed.Jobs)
+			assert.Equal(t, input.CacheMode, reparsed.CacheMode)
+		})
+	}
+}
+
+func TestParseCacheModePresence(t *testing.T) {
+	for _, test := range []struct {
+		name, policy string
+		present      bool
+	}{
+		{"absent", "", false},
+		{"read", "cache-mode: read\n", true},
+		{"empty string", "cache-mode: \"\"\n", true},
+		{"empty scalar", "cache-mode:\n", true},
+		{"null", "cache-mode: null\n", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := test.policy + "jobs:\n  check:\n    runs-on: ubuntu-latest\n    steps: [{run: echo data}]\n"
+			if test.policy != "" {
+				source += "    " + test.policy
+			}
+			input, err := Parse([]byte(source))
+			require.NoError(t, err)
+			assert.Equal(t, test.present, input.CacheModeSet)
+			assert.Equal(t, test.present, input.Jobs[0].CacheModeSet)
+			emitted, err := Emit(input)
+			require.NoError(t, err)
+			assert.Equal(t, source, emitted)
+		})
+	}
+}
+
+func TestParseCacheModePresenceThroughAliases(t *testing.T) {
+	source := `cache-mode: &policy null
+jobs:
+  check: &job
+    runs-on: ubuntu-latest
+    cache-mode: *policy
+    steps: [{run: echo data}]
+  inherited:
+    <<: *job
+`
+	input, err := Parse([]byte(source))
+	require.NoError(t, err)
+	assert.True(t, input.CacheModeSet)
+	require.Len(t, input.Jobs, 2)
+	for _, job := range input.Jobs {
+		assert.True(t, job.CacheModeSet)
+		assert.Empty(t, job.CacheMode)
+	}
+}
+
+func TestCacheModeEmissionPreservesScalarBoundary(t *testing.T) {
+	for _, mode := range []string{
+		"read\n    permissions:\n      contents: write",
+		"read\r    permissions: write-all",
+		"read\r\n    steps:\n      - run: echo injected",
+		" read\t ",
+	} {
+		t.Run(mode, func(t *testing.T) {
+			for _, authored := range []bool{false, true} {
+				input := &Workflow{Jobs: []*Job{{
+					ID: "call", Uses: "./.github/workflows/worker.yml",
+				}}}
+				if authored {
+					var err error
+					input, err = Parse([]byte("jobs:\n  call:\n    uses: ./.github/workflows/worker.yml\n"))
+					require.NoError(t, err)
+				}
+				input.Jobs[0].CacheMode = mode
+				content, err := Emit(input)
+				require.NoError(t, err)
+				var parsed map[string]any
+				require.NoError(t, yaml.Unmarshal([]byte(content), &parsed))
+				jobs := parsed["jobs"].(map[string]any)
+				require.Len(t, jobs, 1)
+				fields := jobs["call"].(map[string]any)
+				require.Len(t, fields, 2)
+				assert.Equal(t, mode, fields["cache-mode"])
+				assert.Equal(t, "./.github/workflows/worker.yml", fields["uses"])
+			}
 		})
 	}
 }

@@ -15,7 +15,12 @@ permissions:
   issues: read
   pull-requests: read
 
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 
 network:

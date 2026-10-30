@@ -87,6 +87,7 @@ const logsCommandExampleTemplate = `  # Basic usage
 
   # Output options (default output is compact format optimized for agents)
   %[1]s logs -o ./my-logs              # Custom output directory
+  %[1]s logs --harbor --output ./my-logs # Export a Harbor job to ./my-logs/harbor
   %[1]s logs --tool-graph              # Generate Mermaid tool sequence graph
   %[1]s logs --parse                   # Parse logs and generate Markdown reports
   %[1]s logs --audit                   # Generate audit.json for each downloaded run
@@ -158,6 +159,13 @@ Use --outcomes to evaluate the current GitHub state of each selected run's safe
 outputs and include per-run and episode outcome summaries. This also downloads
 safe-output manifests, without requiring full agent artifacts or workflow logs.
 Use --outcomes-dir to persist the observations as JSONL for downstream processing.
+
+Available unified JSONL sessions are retained and automatically exported to
+sibling .atif trajectories, without changing the report format.
+
+Use --harbor --output DIR to also export a portable Harbor job to DIR/harbor.
+This downloads recorded usage, experiment, grader, and available agent artifacts;
+it does not run graders or evaluate outcomes. The normal logs report is preserved.
 
 Use --episodes to include recorded episode membership and hops in text reports.
 Combine --episodes --outcomes to join the selected episodes with live outcome
@@ -262,6 +270,7 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		JSONOutput:        values.JSONOutput,
 		Episodes:          values.Episodes,
 		Outcomes:          values.Outcomes,
+		Harbor:            values.Harbor,
 		OutcomesDir:       values.OutcomesDir,
 		Timeout:           values.TimeoutMinutes,
 		MaxStorageMB:      values.MaxStorageMB,
@@ -444,6 +453,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		JSONOutput:            getBoolFlag(cmd, "json"),
 		Episodes:              getBoolFlag(cmd, "episodes"),
 		Outcomes:              getBoolFlag(cmd, "outcomes"),
+		Harbor:                getBoolFlag(cmd, "harbor"),
 		OutcomesDir:           getStringFlag(cmd, "outcomes-dir"),
 		TimeoutMinutes:        getIntFlag(cmd, "timeout"),
 		TimeoutSeconds:        getIntFlag(cmd, "timeout-seconds"),
@@ -480,7 +490,7 @@ func logsCommandArtifactSets(cmd *cobra.Command) []string {
 		sets = applyEvalsArtifact(sets, getBoolFlag(cmd, "evals"))
 		sets = applyGradersArtifact(sets, getBoolFlag(cmd, "graders"))
 	}
-	return sets
+	return logsHarborArtifactSets(sets, getBoolFlag(cmd, "harbor"))
 }
 
 func parseIgnoredWorkflowRunIDs(values []string) ([]int64, error) {
@@ -651,6 +661,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().IntP("count", "c", 10, "Maximum matching workflow runs to return across all targets (after applying filters)")
 	addLogsOutcomeFlags(logsCmd)
 	logsCmd.Flags().Bool("episodes", false, "Include recorded episode membership and hops; combine with --outcomes for episode outcome summaries")
+	logsCmd.Flags().Bool("harbor", false, "Export downloaded runs as a Harbor job in the output directory using recorded results and available sessions")
 	logsCmd.Flags().String("start-date", "", "Filter runs created after this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)")
 	logsCmd.Flags().String("end-date", "", "Filter runs created before this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)")
 	addOutputFlag(logsCmd, defaultLogsOutputDir)

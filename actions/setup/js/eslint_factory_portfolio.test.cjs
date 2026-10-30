@@ -68,7 +68,7 @@ describe("ESLint factory producer and dispatcher", () => {
     for (const config of configs) {
       expect(config.allowed_files).toEqual(["eslint-factory/**"]);
       expect(config.protected_files_policy).toBe("fallback-to-issue");
-      expect(config.protected_files_path_exclude).toEqual(["eslint-factory/README.md"]);
+      expect(config.protected_files_path_exclude).toEqual(["eslint-factory/README.md", ".changeset/*.md"]);
       expect(config.protected_files).toContain("README.md");
       for (const [file, action] of [
         ["eslint-factory/README.md", "allow"],

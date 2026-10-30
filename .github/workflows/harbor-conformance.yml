@@ -1,0 +1,58 @@
+name: Harbor Conformance
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/cli/**'
+      - 'pkg/atif/**'
+      - 'pkg/graders/**'
+      - 'actions/setup/js/session*'
+      - 'scripts/test_harbor_conformance.py'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - '.github/workflows/harbor-conformance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'pkg/cli/**'
+      - 'pkg/atif/**'
+      - 'pkg/graders/**'
+      - 'actions/setup/js/session*'
+      - 'scripts/test_harbor_conformance.py'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - '.github/workflows/harbor-conformance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HARBOR_TELEMETRY: '0'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v6
+        with:
+          node-version: '24'
+      - name: Install pinned Harbor
+        run: python -m pip install harbor==0.25.0
+      - name: Validate native Harbor consumption
+        run: make test-harbor-conformance
