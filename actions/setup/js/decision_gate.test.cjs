@@ -615,6 +615,30 @@ describe("registry resolution and transport", () => {
       fs.rmSync(auditDirectory, { recursive: true, force: true });
     }
   });
+
+  it("runs the decision API as an isolated mini harness", async () => {
+    const auditDirectory = fs.mkdtempSync(path.join(process.cwd(), ".decision-gate-harness-"));
+    try {
+      const env = {
+        ...environment(),
+        GH_AW_DECISION_MODEL: "openai/gpt-5-mini",
+        OPENAI_API_KEY: "transport-only",
+        OPENAI_BASE_URL: "https://api.openai.com/v1",
+        GH_AW_DECISION_AUDIT_PATH: path.join(auditDirectory, "audit.json"),
+      };
+      const fetchImpl = vi.fn(async () => reply("run", "Classification complete."));
+      const core = { setOutput: vi.fn(), info: vi.fn(), warning: vi.fn(), summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue(undefined) } };
+
+      const audit = await main({ core, context: eventFixtures[0].context, env, fetchImpl, resolveModel: vi.fn(async () => selection) });
+
+      expect(audit).toMatchObject({ decision: "run", status: "evaluated", activation_allowed: true });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(core.setOutput).toHaveBeenCalledWith("decision_result", "run");
+      expect(JSON.parse(fs.readFileSync(env.GH_AW_DECISION_AUDIT_PATH, "utf8"))).toMatchObject({ decision: "run", status: "evaluated" });
+    } finally {
+      fs.rmSync(auditDirectory, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("paired decision scenario fixtures", () => {

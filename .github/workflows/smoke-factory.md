@@ -11,7 +11,7 @@ permissions:
   copilot-requests: write
 engine:
   id: factory
-model: copilot/gpt-5.6-luna
+model: copilot/gpt-5.3-codex
 strict: true
 imports:
   - shared/factory.md

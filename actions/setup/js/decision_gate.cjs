@@ -539,14 +539,14 @@ async function evaluateDecision({ env = process.env, context, fetchImpl = global
   return finishAudit(audit, audit.decision === "skip" ? "short_circuit" : "budget_exhausted");
 }
 
-async function main({ core = global.core, context = global.context } = {}) {
-  const audit = await evaluateDecision({ context });
+async function main({ core = global.core, context = global.context, env = process.env, fetchImpl = globalThis.fetch, resolveModel = resolveDecisionModel, now = Date.now } = {}) {
+  const audit = await evaluateDecision({ env, context, fetchImpl, resolveModel, now });
   core.setOutput("decision", audit.decision);
   core.setOutput("decision_result", audit.decision);
   core.setOutput("activation_allowed", audit.activation_allowed ? "true" : "false");
   core.setOutput("decision_status", audit.status);
   core.info(`Decision gate: ${audit.decision} (${audit.status}); ${audit.evaluated_count} question(s) evaluated, ${audit.unevaluated_count} unevaluated.`);
-  const auditPath = process.env.GH_AW_DECISION_AUDIT_PATH;
+  const auditPath = env.GH_AW_DECISION_AUDIT_PATH;
   if (auditPath) {
     try {
       fs.mkdirSync(path.dirname(auditPath), { recursive: true });
