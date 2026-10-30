@@ -137,6 +137,55 @@ The duration uses Go duration syntax, such as `5m`, `1h`, or `1h30m`, and must b
 
 The compiler adds `actions: read` to the pre-activation job so it can inspect completed runs. If run history cannot be queried, the cooldown check fails open and allows the agent to run.
 
+### Semantic Event Qualification (`decision:`)
+
+`on.decision` evaluates whether an otherwise eligible event warrants agent execution. It runs inside the existing `pre_activation` job, after deterministic checks such as event filters, eligibility checks, and cooldowns. A deterministic rejection makes no inference calls; the decision gate can reject activation but cannot override those checks.
+
+```aw wrap
+on:
+  issues:
+    types: [opened, edited]
+  decision:
+    questions:
+      - Is this issue actionable rather than informational?
+      - Does it require agent intervention?
+      - Is it relevant to ${{ github.repository }}?
+```
+
+`questions` is a required, nonempty array of inline strings. Each question receives an independent inference call, evaluated sequentially. Every question must return `run`; the first `skip` stops evaluation. Native GitHub Actions expressions are resolved before inference and passed as data, not executable scripts. File imports such as `@path/to/questions.md` are not supported.
+
+The optional `model` defaults to the built-in `decision` alias, which uses the existing lightweight model aliases and model registry. An explicit model or a workflow-defined alias can override it using the existing provider configuration and authentication. Provider endpoint overrides must be literal HTTPS URLs, not event-derived expressions. The gate records the configured alias, resolved model, and provider. An unavailable model fails open rather than blocking eligible agent execution.
+
+The gate supplies only the triggering event context and existing deterministic eligibility evidence. It does not retrieve history, search the repository, fetch pull request diffs, or call additional GitHub APIs. Inference has no tools, MCP servers, function calls, agent loop, or retries. Event text is untrusted data, not instructions.
+
+All questions are checked at compilation time, including questions that runtime short-circuiting might not evaluate. Secret references, including nested expressions and statically traceable indirect references, are compilation errors. Provider credentials authenticate inference requests but are never included in the decision prompt.
+
+| Limit | Maximum |
+|-------|---------|
+| Questions | 8 |
+| Question size, in source and after expression evaluation | 4,096 bytes |
+| Combined system and question/event prompt per call | 32,768 bytes |
+| Output per call | 256 tokens |
+| Response body | 65,536 bytes |
+| Inference call duration | 10 seconds |
+| Total gate evaluation | 30 seconds |
+
+> [!NOTE]
+> A provider failure, timeout, invalid response, or exhausted inference budget treats the affected question as `run`. These fail-open outcomes are recorded separately from explicit approval. The gate is an execution-cost filter, not an authorization or security boundary.
+
+The job summary records the aggregate outcome. The `decision-gate` artifact also records the resolved model/provider and per-question results, durations, reasons, and token usage when available. It distinguishes fail-open outcomes and questions not evaluated after a skip. The existing `activation` artifact set includes this receipt for `gh aw logs` and `gh aw audit`; the audit JSON exposes it as `decision_gate`, including runs where the agent never starts. Prompts and raw event payloads are not retained.
+
+For example, comment workflows can ask whether a comment requests a concrete code change rather than conversation; discussion workflows can ask whether maintainer intervention is needed. Distinguish documentation requests from implementation requests, and require work to be sufficiently specified and suitable for automated execution.
+
+The runtime tests use mocked responses and paired event fixtures for these qualification scenarios. An optional live-model quality suite runs separately from deterministic CI correctness checks. From the repository's `actions/setup/js` directory, with existing provider credentials configured, run:
+
+```bash
+GH_AW_DECISION_LIVE_EVAL=true npx vitest run decision_gate.test.cjs \
+  -t "decision gate live quality evaluation"
+```
+
+Live evaluation sends only the synthetic fixtures to the configured provider and can incur inference costs. It does not dispatch a workflow.
+
 ### Issue Triggers (`issues:`)
 
 Trigger on issue events. [Full event reference](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#issues).

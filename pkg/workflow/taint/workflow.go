@@ -371,6 +371,9 @@ func (a *analyzer) step(fields map[string]any, path string, env, persisted, file
 		if key == "GH_AW_OTLP_ATTRIBUTES" || key == "OTEL_RESOURCE_ATTRIBUTES" {
 			a.emit(Site{Kind: OTLPAttribute, Path: path + ".env." + key, Input: key}, sources)
 		}
+		if id == "decision_gate" && strings.HasPrefix(key, "GH_AW_DECISION_QUESTION_") && key != "GH_AW_DECISION_QUESTION_COUNT" {
+			a.emit(Site{Kind: DecisionQuestion, Path: path + ".env." + key, Input: key}, sources)
+		}
 		bindings["env."+strings.ToLower(key)] = sources
 		bindings["shell."+key] = sources
 	}
@@ -414,12 +417,21 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 			}
 		}
 	}
+	var opaqueSources value
+	if a.rule.ConservativeActionOutputs {
+		for ref, sources := range bindings {
+			if strings.HasPrefix(ref, "env.") {
+				opaqueSources = union(opaqueSources, sources)
+			}
+		}
+	}
 	for _, key := range slices.Sorted(maps.Keys(inputs)) {
 		sources, err := a.text(fmt.Sprint(inputs[key]), path+".with."+key, bindings)
 		if err != nil {
 			return err
 		}
 		a.emit(Site{Kind: ActionInput, Path: path + ".with." + key, Uses: uses, Input: key}, sources)
+		opaqueSources = union(opaqueSources, sources)
 		if actionName(uses) == "actions/upload-artifact" && key == "path" {
 			var contents value
 			patterns := strings.Split(fmt.Sprint(inputs[key]), "\n")
@@ -429,6 +441,11 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 				}
 			}
 			a.emit(Site{Kind: Artifact, Path: path + ".with.path", Uses: uses, Input: key}, contents)
+		}
+	}
+	if a.rule.ConservativeActionOutputs && len(opaqueSources) > 0 {
+		if id, _ := fields["id"].(string); id != "" {
+			bindings["steps."+strings.ToLower(id)+".outputs.*"] = opaqueSources
 		}
 	}
 	if a.rule.ActionSources != nil {

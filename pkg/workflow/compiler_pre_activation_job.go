@@ -59,6 +59,31 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	if err != nil {
 		return nil, err
 	}
+	if data.Decision != nil {
+		eligible, err := buildPreActivationActivatedNode(data, buildPreActivationActivatedConditions(data, needsPermissionCheck))
+		if err != nil {
+			return nil, err
+		}
+		eligible, err = decisionEligibleCondition(data, eligible, onStepIDs, customOutputs)
+		if err != nil {
+			return nil, err
+		}
+		workflowRunSafety, err := ParseExpression(stripExpressionWrapper(c.buildWorkflowRunRepoSafetyCondition()))
+		if err != nil {
+			return nil, errors.New("cannot construct the workflow_run safety check for on.decision")
+		}
+		if _, literal := eligible.(*StringLiteralNode); literal {
+			eligible = workflowRunSafety
+		} else {
+			eligible = BuildAnd(eligible, workflowRunSafety)
+		}
+		if _, literal := eligible.(*StringLiteralNode); literal {
+			steps = c.appendDecisionStep(data, steps, "${{ true }}")
+		} else {
+			steps = c.appendDecisionStep(data, steps, RenderCondition(eligible))
+		}
+		activatedExpression = fmt.Sprintf("${{ (%s) && steps.%s.outputs.decision_result != 'skip' }}", eligible.Render(), decisionStepID)
+	}
 
 	jobIfCondition := c.applyPreActivationIfConditionGuards(data, needsPermissionCheck, c.buildPreActivationBaseIfCondition(data))
 	if c.actionMode.IsScript() {
@@ -119,6 +144,12 @@ func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupAction
 			perms = NewPermissions()
 		}
 		perms.Merge(data.OnPermissions)
+	}
+	if data.Decision != nil && hasCopilotRequestsWritePermission(data) {
+		if perms == nil {
+			perms = NewPermissions()
+		}
+		perms.Set(PermissionCopilotRequests, PermissionWrite)
 	}
 	if perms == nil {
 		return steps, ""
@@ -468,7 +499,7 @@ func buildPreActivationActivatedNode(data *WorkflowData, conditions []ConditionN
 		// The activated output is unconditionally true; the user controls
 		// agent execution through their own if: condition referencing the
 		// on.steps outputs (e.g., needs.pre_activation.outputs.gate_result).
-		if len(data.OnSteps) > 0 || len(data.OnNeeds) > 0 || len(data.SkipAuthorAssociations) > 0 {
+		if len(data.OnSteps) > 0 || len(data.OnNeeds) > 0 || len(data.SkipAuthorAssociations) > 0 || data.Decision != nil {
 			compilerActivationJobsLog.Printf(
 				"Pre-activation created with no output checks (on.steps=%d, on.needs=%d, skip-author-associations=%d); activated output is unconditionally true",
 				len(data.OnSteps), len(data.OnNeeds), len(data.SkipAuthorAssociations),
@@ -519,6 +550,11 @@ func buildPreActivationJobOutputs(data *WorkflowData, activatedExpression string
 	if len(customOutputs) > 0 {
 		compilerActivationJobsLog.Printf("Adding %d custom outputs to pre-activation job", len(customOutputs))
 		maps.Copy(outputs, customOutputs)
+	}
+	if data.Decision != nil {
+		outputs["activated"] = activatedExpression
+		outputs["decision_result"] = "${{ steps.decision_gate.outputs.decision_result }}"
+		outputs["decision_status"] = "${{ steps.decision_gate.outputs.decision_status }}"
 	}
 	return outputs
 }

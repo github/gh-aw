@@ -16,13 +16,19 @@ import (
 )
 
 func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath string) error {
-	if !c.lint {
+	if !c.lint && data.Decision == nil {
 		return nil
 	}
 	workflowLog.Print("Linting generated Actions graph and authored AW document")
 	graph, err := actions.Parse([]byte(content))
 	if err != nil {
 		return formatCompilerError(sourcePath, "error", "cannot parse generated Actions AST for linting", nil)
+	}
+	if err := validateDecisionQuestions(data, graph, sourcePath); err != nil {
+		return err
+	}
+	if !c.lint {
+		return nil
 	}
 	generatedActionRefs := compilerGeneratedActionRefs(data)
 	// An explicit --action-tag is a caller-selected reference override. Do not

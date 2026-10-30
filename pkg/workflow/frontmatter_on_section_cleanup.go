@@ -65,6 +65,7 @@ type onSectionCleanupState struct {
 	inForksArray                 bool
 	forksIndent                  int
 	inSkipIfMatch                bool
+	inDecision                   bool
 	inSkipIfNoMatch              bool
 	inSkipIfCheckFailing         bool
 	inSkipAuthorAssociations     bool
@@ -143,7 +144,7 @@ func (s *onSectionCleanupState) handleEventSectionEntry(info onSectionLine, resu
 }
 
 func (s *onSectionCleanupState) detectEventSection(info onSectionLine) (string, bool) {
-	if s.inOnPermissions || s.inOnSteps || s.inSkipAuthorAssociations {
+	if s.inOnPermissions || s.inOnSteps || s.inSkipAuthorAssociations || s.inDecision {
 		return "", false
 	}
 	if info.indent != 2 && info.indent != 4 {
@@ -301,6 +302,9 @@ func (s *onSectionCleanupState) enterArraySections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) enterObjectSections(info onSectionLine) {
+	if info.indent == 2 && strings.HasPrefix(info.trimmed, "decision:") {
+		s.inDecision = true
+	}
 	if !s.inEventSection() && !s.inSkipIfMatch && ((strings.HasPrefix(info.trimmed, "skip-if-match:") && info.trimmed == "skip-if-match:") ||
 		(strings.HasPrefix(info.trimmed, "# skip-if-match:") && strings.Contains(info.trimmed, "pre-activation job"))) {
 		s.inSkipIfMatch = true
@@ -330,6 +334,9 @@ func (s *onSectionCleanupState) leaveSubsections(info onSectionLine) {
 }
 
 func (s *onSectionCleanupState) leaveObjectSections(info onSectionLine) {
+	if s.inDecision && isLeavingTopLevelObject(info, "decision:", "# decision:", 2) {
+		s.inDecision = false
+	}
 	if s.inSkipIfMatch && isLeavingTopLevelObject(info, "skip-if-match:", "# skip-if-match:", 2) {
 		s.inSkipIfMatch = false
 	}
@@ -397,6 +404,9 @@ func isLeavingArray(info onSectionLine, key string, indent int) bool {
 }
 
 func (s *onSectionCleanupState) determineComment(info onSectionLine, result []string, native map[string]struct{}) (bool, string) {
+	if s.inDecision {
+		return true, ""
+	}
 	if !s.inEventSection() {
 		if shouldComment, reason := s.determineTopLevelComment(info); shouldComment {
 			return true, reason

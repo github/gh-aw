@@ -10,7 +10,7 @@ import (
 
 // Keep this non-trigger allowlist in sync with the gateway-dispatch schema dependency.
 var gatewayDispatchOnSettings = []string{
-	"admission", "allow-bot-authored-trigger-comment", "bots", "cooldown", "github-app", "github-token",
+	"admission", "allow-bot-authored-trigger-comment", "bots", "cooldown", "decision", "github-app", "github-token",
 	"labels", "manual-approval", "needs", "permissions", "reaction", "report-blocked-version",
 	"restore-memory", "roles", "skip-author-associations", "skip-bots", "skip-if-check-failing",
 	"skip-if-match", "skip-if-no-match", "skip-roles", "stale-check", "status-comment", "steps", "stop-after",
