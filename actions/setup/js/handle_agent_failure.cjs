@@ -41,7 +41,7 @@ const { parseTokenUsageJsonl, generateTokenUsageSummary } = require("./parse_mcp
 const { readDedupedTokenUsage, getTokenUsagePaths } = require("./parse_token_usage.cjs");
 const { extractShellCommandDetailsFromToolData } = require("./tool_call_details.cjs");
 const { resolveFailureIssueRepo } = require("./repo_helpers.cjs");
-const { GITHUB_API_VERSION } = require("./constants.cjs");
+const { GITHUB_API_VERSION, STEP_NAME_START_MCP_GATEWAY } = require("./constants.cjs");
 const { buildEmptyOutputOutcome, buildCompletionEvidence, EMPTY_OUTPUT_CAUSES, EMPTY_OUTPUT_FAILURE_CAUSES } = require("./empty_output_outcome.cjs");
 const { isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { collectUnifiedSession, isModelEndpointMismatchData } = require("./unified_session.cjs");
@@ -54,6 +54,27 @@ const path = require("path");
 
 const DEFAULT_ACTION_FAILURE_ISSUE_EXPIRES_HOURS = 24 * 7;
 const ALLOWED_AGENT_CONCLUSIONS = new Set(["success", "failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale"]);
+const EXECUTE_AGENT_STEP_NAME_RE = /^Execute .+ CLI$/;
+
+function isExecuteAgentStep(step) {
+  return typeof step.name === "string" && EXECUTE_AGENT_STEP_NAME_RE.test(step.name);
+}
+
+function isGatewayStartupStep(step) {
+  return step.name === STEP_NAME_START_MCP_GATEWAY;
+}
+
+function isCheckoutStep(step) {
+  return typeof step.name === "string" && step.name.startsWith("Checkout ");
+}
+
+function isSetupFailureStep(step) {
+  return isGatewayStartupStep(step) || isCheckoutStep(step);
+}
+
+function isFailedStep(step) {
+  return ["failure", "timed_out"].includes(step.conclusion);
+}
 /** Claude Code error emitted when a `--continue` resume finds no deferred tool marker. */
 const NO_DEFERRED_MARKER_LINE_RE = /No deferred tool marker found/i;
 /** Claude harness line reporting that the no-deferred-marker error was recovered by a fresh retry. */
@@ -1964,7 +1985,7 @@ async function getSecretRedactionError(jobId, step) {
 /**
  * Find the failed agent step using Actions metadata only, never agent-generated log text.
  * @param {{startupFailure?: boolean}} [options] - Select the first failed step only for a validated collector startup failure.
- * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean}>}
+ * @returns {Promise<{failingStep: string, agentConclusion?: string, attributionUnavailable?: string, hasNoJobs?: boolean, secretRedactionFailed?: boolean, stepError?: string, cancelledWithoutTimeout?: boolean, isTimedOut?: boolean, preAgentFailure?: boolean, checkoutRef?: string}>}
  */
 async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   let jobs;
@@ -2025,11 +2046,24 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   if (agentConclusion !== "failure" && agentConclusion !== "timed_out" && !isCancelledTimeout) {
     return { failingStep: "", agentConclusion };
   }
-  const steps = agentJob.steps?.slice();
+  const steps = agentJob.steps?.slice() || [];
+  const setupBoundary = steps.findIndex(step => isGatewayStartupStep(step) || isExecuteAgentStep(step));
+  let setupFailure;
+  if (setupBoundary >= 0) {
+    const boundaryStep = steps[setupBoundary];
+    const executionSteps = steps.filter(isExecuteAgentStep);
+    const boundaryFailed = ["skipped", "failure", "timed_out"].includes(boundaryStep.conclusion);
+    const agentNeverRan = executionSteps.every(step => step.conclusion === "skipped");
+    const boundaryIndicatesPreAgentFailure = startupFailure || boundaryStep.conclusion === "skipped" || executionSteps.some(step => step.conclusion === "skipped");
+    if (boundaryFailed && boundaryIndicatesPreAgentFailure && agentNeverRan) {
+      const setupStepsEnd = isGatewayStartupStep(boundaryStep) ? setupBoundary + 1 : setupBoundary;
+      setupFailure = steps.slice(0, setupStepsEnd).find(step => isFailedStep(step) && isSetupFailureStep(step));
+    }
+  }
   if (!startupFailure) steps?.reverse();
-  const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && ["failure", "timed_out"].includes(step.conclusion));
+  const redactionStep = steps?.find(step => step.name === "Redact secrets in logs" && isFailedStep(step));
   // Failed redaction blocks safe diagnostics even after an agent crash; startup keeps priority.
-  const failedStep = (!startupFailure && redactionStep) || steps?.find(step => (["failure", "timed_out"].includes(step.conclusion) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
+  const failedStep = (!startupFailure && redactionStep) || setupFailure || steps?.find(step => (isFailedStep(step) || (isCancelledTimeout && step.conclusion === "cancelled")) && typeof step.name === "string");
   if (!failedStep) {
     return { failingStep: "", agentConclusion, ...(isCancelledTimeout ? { isTimedOut: true } : {}), attributionUnavailable: "The failed agent job had no failed step metadata." };
   }
@@ -2041,6 +2075,10 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
   return {
     failingStep,
     agentConclusion,
+    ...(failedStep === setupFailure ? { preAgentFailure: true } : {}),
+    ...(failedStep === setupFailure && failedStep.name === "Checkout repository (gh-aw default)" && process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF === "true" && /^refs\/pull\/[1-9]\d*\/merge$/.test(context.ref || "")
+      ? { checkoutRef: context.ref }
+      : {}),
     ...(isCancelledTimeout ? { isTimedOut: true } : {}),
     ...(failedStep === redactionStep ? { secretRedactionFailed: true, stepError: await getSecretRedactionError(agentJob.id, redactionStep) } : {}),
   };
@@ -2048,10 +2086,21 @@ async function getFailedAgentDiagnostics({ startupFailure = false } = {}) {
 
 /**
  * Add step-level context to generic agent and infrastructure failures.
- * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>}} options
+ * @param {{failureCategories: string[], failingStep: string, agentConclusion?: string, attributionUnavailable?: string, stepError?: string, engineFailureContext: ReportBlock[], checkoutError?: string, items?: Array<any>, preAgentFailure?: boolean, checkoutRef?: string}} options
  * @returns {ReportBlock[]}
  */
-function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentConclusion = "", attributionUnavailable = "", stepError = "", engineFailureContext, checkoutError = "", items = [] }) {
+function buildFailureDiagnosticsContext({
+  failureCategories,
+  failingStep,
+  agentConclusion = "",
+  attributionUnavailable = "",
+  stepError = "",
+  engineFailureContext,
+  checkoutError = "",
+  items = [],
+  preAgentFailure = false,
+  checkoutRef = "",
+}) {
   const checkoutContext = checkoutError
     ? [
         nodes.heading("Runtime Checkout Rejected"),
@@ -2064,7 +2113,8 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
       ]
     : [];
   const infrastructureMessages = items.filter(item => item?.type === "report_incomplete" && item.reason === "infrastructure_error");
-  const isGenericFailure = Boolean(stepError) || failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || failureCategories.includes("agent_startup_failure") || infrastructureMessages.length > 0;
+  const isGenericFailure =
+    preAgentFailure || Boolean(stepError) || failureCategories.includes("agent_failure") || failureCategories.includes("engine_driver_failure") || failureCategories.includes("agent_startup_failure") || infrastructureMessages.length > 0;
   const hasModelEndpointMismatch = failureCategories.includes("model_endpoint_mismatch");
   if (!isGenericFailure && !hasModelEndpointMismatch) {
     return checkoutContext;
@@ -2087,6 +2137,14 @@ function buildFailureDiagnosticsContext({ failureCategories, failingStep, agentC
     metadata.push(nodes.strong([nodes.text("Failing step:")]), nodes.text(" Unavailable"));
   }
   context.push(nodes.paragraph(metadata));
+  if (preAgentFailure) {
+    context.push(nodes.paragraph([nodes.strong([nodes.text("Pre-agent setup failure:")]), nodes.text(" The agent did not start. Inspect the failing setup step in the linked run.")]));
+    if (checkoutRef) {
+      context.push(
+        nodes.paragraph([nodes.text("Requested pull-request merge ref: "), nodes.code(checkoutRef), nodes.text(". Verify that this ref is still available and the pull request is mergeable; checkout did not fall back to the head branch.")])
+      );
+    }
+  }
   if (stepError) {
     context.push(...renderErrorDetails(stepError));
   } else if (engineFailureContext.length) {

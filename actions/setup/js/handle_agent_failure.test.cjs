@@ -579,6 +579,100 @@ describe("handle_agent_failure", () => {
   });
 
   describe("failure diagnostics", () => {
+    it("reports a failed merge-ref checkout as pre-agent with the step and ref", async () => {
+      process.env.GH_AW_DEFAULT_CHECKOUT_USES_TRIGGER_REF = "true";
+      global.context.ref = "refs/pull/42/merge";
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Checkout repository (gh-aw default)", conclusion: "failure" },
+              { name: "Start MCP Gateway", conclusion: "skipped" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+              { name: "Upload logs", conclusion: "failure" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      const diagnostics = await getFailedAgentDiagnostics();
+      expect(diagnostics).toEqual({
+        failingStep: "Checkout repository (gh-aw default)",
+        agentConclusion: "failure",
+        preAgentFailure: true,
+        checkoutRef: "refs/pull/42/merge",
+      });
+      const rendered = buildFailureDiagnosticsContext({ failureCategories: ["agent_failure"], engineFailureContext: "", ...diagnostics });
+      expect(rendered).toContain("Pre-agent setup failure:");
+      expect(rendered).toContain("The agent did not start.");
+      expect(rendered).toContain("`Checkout repository (gh-aw default)`");
+      expect(rendered).toContain("`refs/pull/42/merge`");
+      expect(rendered).toContain("Verify that this ref is still available");
+    });
+
+    it.each(["Start MCP Gateway", "Checkout org/other"])("attributes pre-agent setup failure to %s without assuming the checkout ref", async failingStep => {
+      global.context.ref = "refs/pull/42/merge";
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: failingStep, conclusion: "failure" },
+              { name: "Execute Codex CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep, agentConclusion: "failure", preAgentFailure: true });
+    });
+
+    it("ignores an unrelated Execute step before the generated checkout and execution steps", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Execute migrations", conclusion: "success" },
+              { name: "Checkout repository (gh-aw default)", conclusion: "failure" },
+              { name: "Start MCP Gateway", conclusion: "skipped" },
+              { name: "Execute GitHub Copilot CLI", conclusion: "skipped" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({
+        failingStep: "Checkout repository (gh-aw default)",
+        agentConclusion: "failure",
+        preAgentFailure: true,
+      });
+    });
+
+    it("does not classify a checkout after agent execution as pre-agent", async () => {
+      global.github = {
+        paginate: vi.fn().mockResolvedValue([
+          {
+            name: "agent",
+            conclusion: "failure",
+            steps: [
+              { name: "Start MCP Gateway", conclusion: "success" },
+              { name: "Execute Claude Code CLI", conclusion: "success" },
+              { name: "Checkout org/other", conclusion: "failure" },
+            ],
+          },
+        ]),
+        rest: { actions: { listJobsForWorkflowRun: vi.fn() } },
+      };
+      await expect(getFailedAgentDiagnostics()).resolves.toEqual({ failingStep: "Checkout org/other", agentConclusion: "failure" });
+    });
+
     it("includes the runtime checkout rejection and remediation in failure diagnostics", () => {
       const rendered = buildFailureDiagnosticsContext({
         failureCategories: ["agent_failure"],
