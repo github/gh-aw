@@ -18,7 +18,12 @@ permissions:
 
   copilot-requests: write
 tracker-id: claude-code-user-docs-review
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 
 network:

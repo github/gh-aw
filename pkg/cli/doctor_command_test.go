@@ -94,6 +94,7 @@ func TestDoctorCommandRunsAuthOnlyWhenRepoNotProvided(t *testing.T) {
 	runDoctorSetupAuth = func(opts SetupAuthOptions) error {
 		calledAuth = true
 		gotJSON = opts.JSON
+		assert.True(t, opts.CheckAgentAssignment)
 		return nil
 	}
 	runDoctorSetupRepositoryCheck = func(opts SetupRepositoryCheckOptions) error {
@@ -136,6 +137,7 @@ func TestDoctorCommandRunsRepositoryCheckWhenRepoProvided(t *testing.T) {
 	assert.Equal(t, "org", got.RequireOwnerType)
 	assert.True(t, got.JSON)
 	assert.True(t, got.Verbose)
+	assert.True(t, got.CheckAgentAssignment)
 }
 
 func TestDoctorCommandUsesDefaultRequireOwnerTypeWhenOmitted(t *testing.T) {

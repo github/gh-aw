@@ -122,6 +122,7 @@ func addStandardHandlerConfigs(safeOutputsConfig map[string]any, data *WorkflowD
 		delete(handlerCfg, "_protected_files_exclude")
 		if _, hasProtectedFiles := handlerCfg["protected_files"]; hasProtectedFiles {
 			excludeNames, excludePaths := splitProtectedFilesExcludes(excludeFiles)
+			excludePaths = append(excludePaths, data.RepoProtectedFilesExclude...)
 			fullManifestFiles := getAllManifestFiles(engineManifestFiles...)
 			fullPathPrefixes := getProtectedPathPrefixes(engineManifestPathPrefixes...)
 			handlerCfg["protected_files"] = sliceutil.Exclude(fullManifestFiles, excludeNames...)

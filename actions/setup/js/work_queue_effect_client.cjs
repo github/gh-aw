@@ -396,12 +396,16 @@ function wrapClaimEffectClient(client, options) {
       }
     );
   };
-  const mutate = async (target, receiver, args, repository, number, kind, body) => {
+  const mutate = async (target, receiver, args, repository, number, kind, body, resource) => {
     log.debug("effect.mutate.start", { graphql: false });
     const parameters = body && typeof body === "object" && !Array.isArray(body) ? requestObject(body) : {};
     const expected = {};
     for (const field of ["title", "body", "state", "state_reason", "milestone", "labels", "assignees"]) {
       if (Object.prototype.hasOwnProperty.call(parameters, field)) expected[field] = structuredClone(parameters[field]);
+    }
+    if (kind === "git_ref") {
+      expected.ref = resource.ref;
+      expected.sha = parameters.sha;
     }
     const effect = recordClaimEffect({ repository, number: number || null, kind, expected, outcome: "unknown" });
     let response;
@@ -668,7 +672,7 @@ function wrapClaimEffectClient(client, options) {
                   for (const target of targets) await authorize(repository, number, { ...target, path: entry.path });
                 }
               }
-              return mutate(target, receiver, snapshot.forwarded, repository, number, kind, snapshot.body);
+              return mutate(target, receiver, snapshot.forwarded, repository, number, kind, snapshot.body, resource);
             });
           }
           return read(target, receiver, args);

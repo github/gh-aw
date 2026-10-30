@@ -4,15 +4,16 @@ import "errors"
 
 // Workflow contains only GitHub Actions workflow properties.
 type Workflow struct {
-	Name        string
-	RunName     string
-	On          any
-	Permissions any
-	Env         map[string]Expression
-	Defaults    map[string]any
-	Concurrency any
-	CacheMode   string
-	Jobs        []*Job
+	Name         string
+	RunName      string
+	On           any
+	Permissions  any
+	Env          map[string]Expression
+	Defaults     map[string]any
+	Concurrency  any
+	CacheMode    string
+	CacheModeSet bool // Distinguishes an authored empty value from an absent cache policy.
+	Jobs         []*Job
 
 	source *workflowSource
 }
@@ -28,6 +29,8 @@ type Job struct {
 	Outputs map[OutputName]Expression
 
 	Permissions              any
+	CacheMode                string
+	CacheModeSet             bool
 	Defaults                 map[string]any
 	Concurrency              any
 	Environment              any

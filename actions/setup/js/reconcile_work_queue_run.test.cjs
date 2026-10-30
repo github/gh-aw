@@ -121,9 +121,10 @@ describe("inline trusted worker termination", () => {
     });
     await expect(main(options)).resolves.toMatchObject({ released: true });
     for (const [parameters] of read.mock.calls) {
-      expect(parameters).toEqual(read.mock.calls[0][0]);
+      expect(parameters).toEqual({ ...read.mock.calls[0][0], request: { ...read.mock.calls[0][0].request, signal: expect.any(AbortSignal) } });
       expect(parameters).toMatchObject({ run_id: "42", attempt_number: 1, request: { retries: 0, retryCount: 0, timeout: 15000 } });
     }
+    expect(new Set(read.mock.calls.map(([parameters]) => parameters.request.signal)).size).toBe(3);
     expect(options.sleepFn.mock.calls).toEqual([[1000], [1000]]);
     expect(jobs).toHaveBeenCalledTimes(1);
     const operations = fixture.transactions.flatMap(commit => commit.operations);

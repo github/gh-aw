@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCopilotEngineHarnessScript(t *testing.T) {
@@ -256,6 +258,99 @@ func TestCopilotGeneratedHarnessCommandSupportsSpacedRunnerPaths(t *testing.T) {
 				t.Fatalf("Expected Copilot CLI at mounted runner path: %v", err)
 			}
 		})
+	}
+}
+
+func TestCopilotSandboxHarnessPreservesRunnerTemp(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is required to execute the generated Copilot harness command")
+	}
+	engine := NewCopilotEngine()
+	runnerTemp := filepath.Join(t.TempDir(), "runner temp 'quoted' $literal")
+	harnessPath := filepath.Join(runnerTemp, "gh-aw", "actions", engine.GetHarnessScriptName())
+	require.NoError(t, os.MkdirAll(filepath.Dir(harnessPath), 0o755))
+	require.NoError(t, os.WriteFile(harnessPath, []byte(`process.stdout.write(JSON.stringify(process.argv.slice(1)))`), 0o644))
+
+	for _, runtime := range []AgentRuntime{AgentRuntimeDockerSudoIptables, AgentRuntimeCloudHypervisor} {
+		for _, sdk := range []bool{false, true} {
+			name := string(runtime) + "/CLI"
+			if sdk {
+				name = string(runtime) + "/SDK"
+			}
+			t.Run(name, func(t *testing.T) {
+				data := &WorkflowData{
+					EngineConfig:  &EngineConfig{ID: "copilot", CopilotSDK: sdk},
+					SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Runtime: runtime}},
+				}
+				commandName, _ := engine.resolveCopilotCommand(data, true)
+				invocation := buildAWFInvocationCommand(buildAWFCommandScriptInput{
+					awfCommand:          GetAWFCommandPrefix(data),
+					awfArgs:             BuildAWFArgs(AWFCommandConfig{EngineName: "copilot", WorkflowData: data}),
+					shellWrappedCommand: WrapCommandInShell(engine.buildCopilotExecPrefix(data, commandName)),
+					logFile:             filepath.Join(t.TempDir(), "agent.log"),
+				})
+
+				// Model sudo-rs dropping unnamed variables, then AWF forwarding the
+				// preserved environment through --env-all to the nested sandbox shell.
+				script := `
+set -euo pipefail
+sudo() {
+  local option="$1"
+  shift
+  local -a preserved=()
+  case "$option" in
+    --preserve-env) ;;
+    --preserve-env=*)
+      local names=",${option#--preserve-env=},"
+      local name
+      for name in RUNNER_TEMP GH_AW_NODE_BIN PATH; do
+        if [[ "$names" == *,"$name",* ]]; then
+          preserved+=("$name=${!name}")
+        fi
+      done
+      ;;
+    *) return 90 ;;
+  esac
+  [[ "$1" == /usr/bin/env && "$2" == "PATH=$PATH" && "$3" == /usr/local/bin/awf ]]
+  local path_assignment="$2"
+  shift 3
+  local forward_env=false
+  while [[ "$1" != -- ]]; do
+    if [[ "$1" == --env-all ]]; then forward_env=true; fi
+    shift
+  done
+  shift
+  [[ "$forward_env" == true ]]
+  /usr/bin/env -i "${preserved[@]}" "$path_assignment" "$@"
+}
+set -o pipefail
+` + invocation
+				cmd := exec.Command("bash", "--noprofile", "--norc", "-c", script)
+				cmd.Env = []string{
+					"PATH=" + os.Getenv("PATH"),
+					"RUNNER_TEMP=" + runnerTemp,
+					"GH_AW_NODE_BIN=" + node,
+				}
+				output, err := cmd.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+				var args []string
+				require.NoError(t, json.Unmarshal(output, &args), "%s", output)
+				want := []string{harnessPath, filepath.Join(runnerTemp, "gh-aw", "bin", "copilot")}
+				if sdk {
+					want = []string{harnessPath, node, filepath.Join(runnerTemp, "gh-aw", "actions", "copilot_sdk_driver.cjs"), want[1]}
+				}
+				require.Equal(t, want, args)
+
+				oldScript := strings.Replace(script, GetAWFCommandPrefix(data),
+					`sudo --preserve-env /usr/bin/env PATH="$PATH" /usr/local/bin/awf`, 1)
+				oldCmd := exec.Command("bash", "--noprofile", "--norc", "-c", oldScript)
+				oldCmd.Env = cmd.Env
+				oldOutput, err := oldCmd.CombinedOutput()
+				require.Error(t, err, "blanket environment preservation must reproduce the startup failure")
+				require.Contains(t, string(oldOutput), "Cannot find module '/gh-aw/actions/"+engine.GetHarnessScriptName()+"'")
+			})
+		}
 	}
 }
 

@@ -878,3 +878,94 @@ func TestBuildEvalsEngineStepsModelCostsProvidersPropagated(t *testing.T) {
 		t.Errorf("expected evals awf-config.json to contain custom model pricing key; got:\n%s", steps)
 	}
 }
+
+// compileClaudeEvalsWorkflow compiles a Claude workflow shaped like
+// claude-code-user-docs-review / copilot-session-insights with the given engine
+// block and evals, and returns the agent and evals job sections.
+func compileClaudeEvalsWorkflow(t *testing.T, engineYAML string) (string, string) {
+	t.Helper()
+	workflowPath := filepath.Join(t.TempDir(), "claude-evals.md")
+	content := `---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+` + engineYAML + `strict: true
+network:
+  allowed:
+    - defaults
+    - github
+safe-outputs:
+  create-discussion:
+evals:
+  - id: docs_reviewed
+    question: Did the agent review the project documentation from the perspective of a Claude Code user?
+  - id: feedback_produced
+    question: Was feedback or a report produced identifying documentation gaps for non-Copilot users?
+---
+Review the documentation.
+`
+	if err := os.WriteFile(workflowPath, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+		t.Fatal(err)
+	}
+	result, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled := string(result)
+	agent := extractJobSection(compiled, "agent")
+	evals := extractJobSection(compiled, "evals")
+	if agent == "" || evals == "" {
+		t.Fatal("expected both agent and evals jobs in the compiled workflow")
+	}
+	return agent, evals
+}
+
+func TestEvalsClaudeOnCopilotModelRoutingUsesAPIProxyGateway(t *testing.T) {
+	agent, evals := compileClaudeEvalsWorkflow(t, `engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
+`)
+	const want = "ANTHROPIC_BASE_URL: http://api-proxy:10002\n"
+	if got := strings.Count(evals, want); got != 1 {
+		t.Fatalf("expected evals job to set %q exactly once, got %d", strings.TrimSpace(want), got)
+	}
+	if strings.Contains(evals, "host.docker.internal:10002") {
+		t.Fatal("evals job must not use the unreachable host gateway URL")
+	}
+	if got := strings.Count(agent, want); got != 1 {
+		t.Fatalf("expected agent job to keep %q exactly once, got %d", strings.TrimSpace(want), got)
+	}
+	if strings.Contains(agent, "host.docker.internal:10002") {
+		t.Fatal("agent job must not use the host gateway URL")
+	}
+}
+
+func TestEvalsClaudeOnCopilotWithoutModelRoutingUsesAPIProxyGateway(t *testing.T) {
+	_, evals := compileClaudeEvalsWorkflow(t, `engine:
+  id: claude
+  model-provider: github
+`)
+	if got := strings.Count(evals, "ANTHROPIC_BASE_URL: http://api-proxy:10002\n"); got != 1 {
+		t.Fatalf("expected evals job to set ANTHROPIC_BASE_URL to the api-proxy gateway exactly once, got %d", got)
+	}
+	if strings.Contains(evals, "host.docker.internal:10002") {
+		t.Fatal("evals job must not use the unreachable host gateway URL")
+	}
+}
+
+func TestEvalsClaudeAnthropicProviderHasNoCompilerBaseURL(t *testing.T) {
+	_, evals := compileClaudeEvalsWorkflow(t, `engine:
+  id: claude
+`)
+	if strings.Contains(evals, "ANTHROPIC_BASE_URL:") {
+		t.Fatal("Anthropic-provider evals job must not set a compiler ANTHROPIC_BASE_URL")
+	}
+}

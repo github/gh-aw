@@ -33,6 +33,7 @@ type jobYAML struct {
 	Steps           []map[string]any `yaml:"steps"`
 	Outputs         map[string]any   `yaml:"outputs"`
 	Permissions     any              `yaml:"permissions"`
+	CacheMode       string           `yaml:"cache-mode"`
 	Defaults        map[string]any   `yaml:"defaults"`
 	Concurrency     any              `yaml:"concurrency"`
 	Environment     any              `yaml:"environment"`
@@ -91,10 +92,30 @@ func Parse(content []byte) (*Workflow, error) {
 			return nil, fmt.Errorf("validating job %q: %w", job.ID, err)
 		}
 	}
+	if err := retainCacheModePresence(resolved, content); err != nil {
+		return nil, err
+	}
 	if err := retainWorkflowSource(resolved, content); err != nil {
 		return nil, err
 	}
 	return resolved, nil
+}
+
+func retainCacheModePresence(workflow *Workflow, content []byte) error {
+	// String decoding alone conflates absent, empty, and null policies.
+	var fields map[string]any
+	if err := yaml.Unmarshal(content, &fields); err != nil {
+		return fmt.Errorf("parsing cache-mode presence: %w", err)
+	}
+	_, workflow.CacheModeSet = fields["cache-mode"]
+	if jobs, ok := fields["jobs"].(map[string]any); ok {
+		for _, job := range workflow.Jobs {
+			if fields, ok := jobs[string(job.ID)].(map[string]any); ok {
+				_, job.CacheModeSet = fields["cache-mode"]
+			}
+		}
+	}
+	return nil
 }
 
 func parseJob(id JobID, source *jobYAML) (*Job, error) {
@@ -104,6 +125,7 @@ func parseJob(id JobID, source *jobYAML) (*Job, error) {
 	job := &Job{
 		ID: id, Name: source.Name, RunsOn: source.RunsOn,
 		Permissions: source.Permissions, Defaults: source.Defaults,
+		CacheMode:   source.CacheMode,
 		Concurrency: source.Concurrency, Environment: source.Environment,
 		Strategy: source.Strategy, Container: source.Container,
 		Services: source.Services, Uses: source.Uses,

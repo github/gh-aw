@@ -317,6 +317,14 @@ gh aw doctor --repo github/gh-aw --dir ./gh-aw --require-owner-type org
 
 Use `--repo` to verify a specific repository exists and inspect the local checkout that should correspond to it. `--require-owner-type` accepts `any`, `user`, or `org` and defaults to `any`; `--dir` and `--require-owner-type` require `--repo`.
 
+Inside a checkout, `doctor` also inspects local workflows, their imports, and Markdown `@include` directives for `safe-outputs.assign-to-agent`. It checks repository secrets and organization secrets available to organization-owned repositories; the organization-secret lookup is skipped for personal-account repositories. It also checks secrets in the workflow's effective environment (`safe-outputs.environment`, or top-level `environment` when no override is set). The configured assignment token is checked, or `GH_AW_AGENT_TOKEN` / `GH_AW_GITHUB_TOKEN` by default. Missing credentials produce a prefilled PAT creation link and a repository secret setup link. GitHub App installation tokens and the default `GITHUB_TOKEN` cannot perform Copilot assignment; creating an App does not resolve this requirement.
+
+Secret presence does not verify its value, token type, expiry, permissions, repository access, organization approval/SSO, or Copilot availability. Known repository secrets remain usable when organization metadata is inaccessible, unless an earlier fallback secret has unknown availability. Dynamic credential expressions, dynamic environments, and inaccessible environment secret metadata are reported as unknown, not as configured: environment secrets can override repository and organization secrets. Missing or unknown credentials return a nonzero exit status; `--json` includes the checks and setup links in `agent_assignments`. Outside a checkout, or when the requested repository has no attached local checkout, workflow credential checks are skipped.
+
+For each assignment workflow, `doctor` also samples up to five completed runs created in the past seven days. It inspects the latest run attempt's assignment handler job logs for confirmed assignments, already-assigned targets, credential failures, and other assignment failures. A successful run conclusion or zero exported errors does not establish assignment success: `ignore-if-error` can suppress authentication failures. Detected assignment failures return a nonzero exit status and include run links and credential setup guidance, even when the secret exists.
+
+Run evidence is historical and does not prove that the current credential still works or is still broken. No-op, staged, skipped, and filtered operations are not counted as new assignments. Unavailable logs, unsupported log formats, incomplete metadata, and API errors are reported as unknown or inconclusive rather than success. Inspection is bounded to 40 API requests and 90 seconds across all assignment workflows. `--json` exposes the sample window, limits, per-run evidence, and coverage errors in each workflow's `recent_runs`; raw logs are never included.
+
 `doctor --repo` currently accepts `owner/repo` only. To target GitHub Enterprise Server, select the host via `GH_HOST` rather than prefixing the repository with `[HOST/]`.
 
 ### Building
@@ -534,6 +542,7 @@ gh aw run workflow1 workflow2               # Run multiple workflows
 gh aw run workflow --repeat 3               # Run 4 times total (1 initial + 3 repeats)
 gh aw run workflow --push                   # Commit, push, and dispatch the workflow
 gh aw run workflow --push --ref main        # Push to specific branch
+gh aw run workflow --ref feature/my-change  # Run the branch's compiled workflow content
 gh aw run workflow --dry-run                # Preview without triggering workflow runs
 gh aw run workflow --json                   # Output triggered workflow results as JSON
 ```
@@ -547,6 +556,46 @@ When `--push` is used, automatically recompiles outdated `.lock.yml` files, stag
 > [!NOTE]
 > Codespaces Permissions
 > Requires `workflows:write` permission. In Codespaces, either configure custom permissions in `devcontainer.json` ([docs](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-repository-access-for-your-codespaces)) or authenticate manually: `unset GH_TOKEN && gh auth login`
+
+##### Run from a feature branch
+
+`gh aw run workflow --ref feature/my-change` executes the compiled `.github/workflows/workflow.lock.yml` **from the selected branch**, not the default branch's version. The branch or tag must already be pushed and its lock file must declare `workflow_dispatch`. Without `--ref`, local runs use the current branch; `--repo owner/repo` runs use that repository's default branch.
+
+GitHub [requires the workflow file to exist on the default branch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) before manual dispatch. `--ref` selects workflow content, not registration. Neither `run` nor `trial --host-repo` provides ephemeral registration, changes the default branch, or bypasses this platform requirement.
+
+For an already registered workflow, compile and push the candidate source, lock file, and dependencies to the feature branch, then select that ref:
+
+```bash
+gh aw compile workflow --validate --strict
+gh aw run workflow --dry-run --ref feature/my-change  # Preview the dispatch
+gh aw run workflow --ref feature/my-change
+# From another checkout:
+gh aw run workflow --repo owner/repo --ref feature/my-change
+```
+
+Compilation alone does not publish files. Local uncommitted changes are not executed. Use `gh aw run --dry-run` to preview the dispatch command before a live test; it does not dispatch, execute the candidate, or make the compiled workflow safe to execute. For a live test with compiler-managed mutations suppressed, compile with `gh aw compile workflow --dry-run`, review and publish that source/lock revision, then dispatch it. This does not suppress arbitrary script effects or credential use.
+
+For a **new workflow**, a maintainer can first merge a reviewed, inert registration file at the **exact same lock-file path** the candidate will use. For example, this is a plain GitHub Actions bootstrap file, not compiler output:
+
+```yaml title=".github/workflows/workflow.lock.yml"
+name: Workflow registration only
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  registration:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Registration only"
+```
+
+The bootstrap has no automatic trigger, requests no token permissions, references no secrets, and skips its only job. It registers the filename without merging candidate production logic. Keep this bootstrap unchanged on the default branch while the feature branch replaces the same path with its compiled workflow. Dispatch the feature branch explicitly; dispatching the default branch only skips the bootstrap job. Review the candidate before dispatch, retain environment approval and branch protection rules, and grant only the secrets and permissions needed for the test. Registration does not make candidate code trusted.
+
+If even an inert bootstrap cannot be merged, use an isolated trial repository with its own default-branch workflow and test credentials. That does not validate the production repository's secrets, environments, or trigger policy. There is no supported zero-default-branch-change registration mode.
+
+> [!CAUTION]
+> A manual run is a `workflow_dispatch` event, not `pull_request_target` (including `closed`). It has no real pull request payload and does not exercise PR-specific conditions or fork trust rules. Guard trigger-specific fields when supporting both events. `--ref` cannot redirect a real `pull_request_target` event to the PR's workflow version. Do not work around this by executing an untrusted PR ref with elevated credentials. Validate event-specific behavior separately in a controlled repository with trusted code and test credentials; full production-trigger validation remains subject to GitHub's platform constraints.
 
 ### Monitoring
 
@@ -789,6 +838,7 @@ gh aw audit https://github.com/owner/repo/actions/runs/123/job/456 # By job URL 
 gh aw audit https://github.com/owner/repo/actions/runs/123/job/456#step:7:1 # By step URL (extracts specific step)
 gh aw audit 12345678 --parse                              # Parse logs to markdown
 gh aw audit 12345678 --repo owner/repo                    # Specify repository for bare run ID
+gh aw audit 12345678 --repo owner/repo --models           # Detailed same-run model information
 ```
 
 **`--stdin` flag:** Reads run IDs or URLs from stdin (one per line) instead of positional arguments (mutually exclusive). Blank and `#`-prefixed lines are ignored. Bare numeric IDs require `--repo owner/repo`; full URLs carry their own repo context.
@@ -799,7 +849,9 @@ cat run-ids.txt | gh aw audit --stdin --repo owner/repo
 gh aw audit 1234567890 --runtime cloud-hypervisor        # Skip run unless sandbox agent runtime matches
 ```
 
-**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+**Options:** `--artifacts`, `--evals`, `--experiment`, `--format`, `--group`, `--json/-j`, `--models`, `--no-baseline`, `--output/-o`, `--parse`, `--repo/-r`, `--runtime`, `--search`, `--search-limit`, `--stdin`, `--timeout`, `--variant`
+
+`--models` adds the run's advertised model catalog, discovery completeness, and supported API endpoints alongside the recorded model selection, routing, and usage. With `--json`, the catalog is in `model_catalog`. Missing, invalid, or incomplete inventory is reported explicitly and does not establish model absence. The flag automatically includes the `agent`, `usage`, and `info` artifact sets when `--artifacts` is narrowed. It requires a single run and cannot be combined with `--group` or job/step URLs.
 
 `--search "query"` retrieves evidence from the run's redacted unified session using local BM25 ranking, without changing audit findings. `--search-limit` bounds returned evidence groups (default: `5`, range: `1–20`). Search requires a single run and cannot be combined with `--group` or job/step URLs. See [Searching session evidence](/gh-aw/reference/audit/#searching-session-evidence) for input limits and automatic repetition grouping.
 
