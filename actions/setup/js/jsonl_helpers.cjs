@@ -8,6 +8,7 @@ const { prepareJsonSchema } = require("./json_schema_validation.cjs");
  * @typedef {object} JsonlOptions
  * @property {(line: string, lineNumber: number) => boolean} [lineFilter] Receives trimmed text before transformation and decoding.
  * @property {(line: string, lineNumber: number) => string} [lineTransform] Transforms trimmed record text after filtering, retaining the original rawLine.
+ * @property {(value: any, lineNumber: number) => boolean} [valueFilter] Selects decoded, schema-validated values without skipping invalid records.
  * @property {(error: Error, lineNumber: number) => void} [onError] Reports rejected nonblank lines without exposing their contents.
  * @property {number} [maxLineLength] Optional limit in UTF-16 code units; unlimited by default.
  * @property {{field: string, value: string|number|boolean|null}} [fieldFilter] Match an own top-level field, prefiltering text before decoding.
@@ -246,6 +247,7 @@ function parseEvent(rawLine, lineNumber, options, fieldFilter, schemaValidator) 
     if (fieldFilter && (!value || typeof value !== "object" || Array.isArray(value) || !Object.hasOwn(value, fieldFilter.field) || value[fieldFilter.field] !== fieldFilter.value)) return;
     const validationError = schemaValidator?.(value, line);
     if (validationError) return invalidEvent(rawLine, lineNumber, "schema", options, validationError);
+    if (options.valueFilter && !options.valueFilter(value, lineNumber)) return;
     return { type: "json", value, rawLine, lineNumber };
   }
   return invalidEvent(rawLine, lineNumber, tooLong ? "too-long" : "syntax", options);

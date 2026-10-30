@@ -160,7 +160,7 @@ describe("Copilot tool-search-only completion", () => {
     expect(isCopilotToolSearchOnlyCompletion([])).toBe(false);
   });
 
-  it("reads only the exact native session, never another session in shared HOME", () => {
+  it.each(['{"type":"assistant.message"', '{"type":"assistant.mess', '{"type":"session.shut'])("reads only the exact native session and rejects truncated records (%s)", truncated => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-search-session-"));
     tempDirs.push(root);
     vi.stubEnv("COPILOT_HOME", root);
@@ -173,7 +173,7 @@ describe("Copilot tool-search-only completion", () => {
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", "11223344-1122-3344-5566-778899aabbcc")).toBe(false);
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", "../other")).toBe(false);
     expect(hasCopilotToolSearchOnlyCompletion(`${JSON.stringify({ type: "session.start" })}\n${JSON.stringify(search)}`, undefined)).toBe(true);
-    fs.appendFileSync(path.join(dir, "events.jsonl"), '{"type":"assistant.message"');
+    fs.appendFileSync(path.join(dir, "events.jsonl"), truncated);
     expect(hasCopilotToolSearchOnlyCompletion("plain CLI output", sessionId)).toBe(false);
   });
 

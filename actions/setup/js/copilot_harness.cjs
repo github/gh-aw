@@ -1216,8 +1216,7 @@ function extractTokenCountFromOutput(output) {
 
 /** @param {string} output @returns {boolean} */
 function isCopilotContentFilterError(output) {
-  for (const event of iterateJsonl(output)) {
-    if (event?.type !== "assistant.message") continue;
+  for (const event of iterateJsonl(output, { valueFilter: event => event?.type === "assistant.message" })) {
     const context = copilotSessionContext(event);
     if (context.agentId === undefined && !context.parentToolUseId && getCopilotMessageRefusal(event.data)?.reason === "content_filter") return true;
   }
@@ -1247,6 +1246,7 @@ function isCopilotToolSearchOnlyCompletion(events) {
 }
 
 const copilotAssistantResponseLineFilter = line => /"type"\s*:\s*"assistant\.(?:message|refusal)"/.test(line);
+const copilotAssistantResponseFilter = event => event?.type === "assistant.message" || event?.type === "assistant.refusal";
 
 /**
  * Native CLI stdout is plain text; inspect only this invocation's exact session.
@@ -1259,14 +1259,14 @@ function hasCopilotToolSearchOnlyCompletion(output, sessionId) {
   if (sessionId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(sessionId)) {
     for (const directory of copilotSessionStateDirectories()) {
       try {
-        return isCopilotToolSearchOnlyCompletion(readJsonlFile(path.join(directory, sessionId, "events.jsonl"), { strict: true, lineFilter: copilotAssistantResponseLineFilter }));
+        return isCopilotToolSearchOnlyCompletion(readJsonlFile(path.join(directory, sessionId, "events.jsonl"), { strict: true, valueFilter: copilotAssistantResponseFilter }));
       } catch (error) {
         const missing = error !== null && typeof error === "object" && "code" in error && error.code === "ENOENT";
         if (!missing) log("Could not inspect Copilot completion events; leaving missing-output validation to the collector");
       }
     }
   }
-  return isCopilotToolSearchOnlyCompletion(iterateJsonl(output, { lineFilter: copilotAssistantResponseLineFilter }));
+  return isCopilotToolSearchOnlyCompletion(iterateJsonl(output, { lineFilter: copilotAssistantResponseLineFilter, valueFilter: copilotAssistantResponseFilter }));
 }
 
 /**

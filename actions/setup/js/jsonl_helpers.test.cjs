@@ -14,6 +14,64 @@ async function collect(source) {
 }
 
 describe("jsonl_helpers", () => {
+  describe("parsed-value filtering", () => {
+    const valueFilter = value => value?.type === "wanted";
+
+    it("filters decoded values consistently across text, files, and streams", async () => {
+      const text = 'null\nfalse\n0\n{"nested":{"type":"wanted"}}\n{"type":"other"}\n{"\\u0074ype":"wanted","id":7}\n';
+      const expected = [{ type: "wanted", id: 7 }];
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-jsonl-value-filter-"));
+      const file = path.join(directory, "records.jsonl");
+      try {
+        fs.writeFileSync(file, text);
+        expect([...iterateJsonl(text, { valueFilter })]).toEqual(expected);
+        expect([...readJsonlFile(file, { valueFilter })]).toEqual(expected);
+        expect(await collect(streamJsonl([text], { valueFilter }))).toEqual(expected);
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("stops decoding and closes the file after the first parsed match", () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-jsonl-value-search-"));
+      const file = path.join(directory, "records.jsonl");
+      fs.writeFileSync(file, '{"type":"other"}\n{"type":"wanted"}\n{"broken":}\n');
+      const filter = vi.fn(valueFilter);
+      const parse = vi.spyOn(JSON, "parse");
+      const close = vi.spyOn(fs, "closeSync");
+      try {
+        for (const record of readJsonlFile(file, { strict: true, valueFilter: filter })) {
+          expect(record).toEqual({ type: "wanted" });
+          break;
+        }
+        expect(filter.mock.calls).toEqual([
+          [{ type: "other" }, 1],
+          [{ type: "wanted" }, 2],
+        ]);
+        expect(parse).toHaveBeenCalledTimes(2);
+        expect(close).toHaveBeenCalledTimes(1);
+      } finally {
+        parse.mockRestore();
+        close.mockRestore();
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("preserves strict validation before filtering and propagates predicate errors", () => {
+      const filter = vi.fn(valueFilter);
+      expect(() => [...iterateJsonl('{"type":"wanted"}\n{"type":"oth', { strict: true, valueFilter: filter })]).toThrow(SyntaxError);
+      expect(filter).toHaveBeenCalledTimes(1);
+      const error = new Error("predicate failed");
+      expect(() => [
+        ...iterateJsonl("null", {
+          valueFilter: () => {
+            throw error;
+          },
+        }),
+      ]).toThrow(error);
+    });
+  });
+
   describe("field-value search", () => {
     const options = { fieldFilter: { field: "type", value: "wanted" } };
 
