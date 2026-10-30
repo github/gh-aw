@@ -1,541 +1,565 @@
 {
-  "githubnext/gh-aw-cao": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-09-29",
-    "score": 9,
-    "summary": "Policy-gated control plane running review-first agentic campaigns across repo fleets.",
-    "highlights": [
-      "docs/admission.md: pre-activation admission gates, narrow-only dispatch",
-      "docs/architecture-at-a-glance.md: catalog/control/orchestrator/worker split",
-      "skills/: Agent Plugin skills (setup-cao, debug-cao, ...)"
-    ],
-    "blogged": true
-  },
-  "rshade/gh-aw-fleet": {
-    "kind": "extension",
-    "reviewed": "2026-09-29",
-    "score": 7,
-    "summary": "Declarative fleet manager (fleet.json) that reconciles gh-aw installs via PRs and reports AIC consumption.",
-    "highlights": [
-      "Pin-per-profile refs, never main",
-      "Thin orchestrator over gh aw add/update/upgrade",
-      "consumption subcommand rolls up cost by repo/profile/workflow"
-    ],
-    "blogged": false
-  },
-  "AgentMeter/agentmeter-action": {
-    "kind": "tool",
-    "reviewed": "2026-09-29",
-    "score": 5,
-    "summary": "Action that records agent token usage/cost and comments on PRs; not gh-aw specific, SaaS-backed.",
-    "highlights": [
-      "Never fails the workflow on API errors",
-      "PR/issue cost summary comment"
-    ],
-    "blogged": false
-  },
-  "githubnext/agentics": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-09-30",
-    "score": 7,
-    "summary": "Official sample family of reusable workflows (triage, CI Doctor, Repo Assist, reviewers); very active, 969 stars.",
-    "highlights": [
-      "README.md: categorized catalog with docs/ per workflow",
-      "Community-maintained entries linked (Log Watcher)",
-      "Cost Tracker uses firewall token-usage.jsonl"
-    ],
-    "blogged": false
-  },
-  "githubnext/agentic-ops": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-09-30",
-    "score": 6,
-    "summary": "Installable bundle (gh aw add) for daily AIC spend audit and conservative optimization.",
-    "highlights": [
-      "Single root package, no extra secrets",
-      "Shared snapshots for trend analysis"
-    ],
-    "blogged": false
-  },
-  "petermefrandsen/gh-aw-inspector": {
-    "kind": "extension",
-    "reviewed": "2026-09-30",
-    "score": 5,
-    "summary": "VS Code extension to discover, run and evaluate gh-aw workflows; low activity since Feb 2026.",
-    "highlights": [
-      "Sidebar workflow discovery",
-      "Evaluation reports with verbosity modes"
-    ],
-    "blogged": false
-  },
-  "githubnext/gh-aw-workshop": {
-    "kind": "other",
-    "reviewed": "2026-10-01",
-    "score": 6,
-    "summary": "Hands-on workshop building a safe daily repo-status agentic workflow; excellent onboarding, not a novel tool.",
-    "highlights": [
-      "README.md: end-to-end path from zero to scheduled report",
-      "Docs site at githubnext.github.io/gh-aw-workshop",
-      "Active (pushed 2026-10-01)"
-    ],
-    "blogged": false
-  },
-  "verkyyi/github-agent-runner": {
-    "kind": "tool",
-    "reviewed": "2026-10-01",
-    "score": 5,
-    "summary": "Claude Code plugin to discover/install gh-aw workflows from agentics catalog plus agent-team pattern; stale since June 2026.",
-    "highlights": [
-      "Conversational discover/install skills",
-      "catalog/agent-team: spec→plan→impl→review workflows",
-      "Starter pitch: zero-risk daily-repo-status"
-    ],
-    "blogged": false
-  },
-  "Hack23/European-Parliament-MCP-Server": {
-    "kind": "mcp-server",
-    "reviewed": "2026-10-20",
-    "score": 4,
-    "summary": "General-purpose EU Parliament MCP server tagged gh-aw; only standard CI workflows seen, no gh-aw-specific components verified.",
-    "highlights": [
-      "Topic gh-aw on repo",
-      "Active (updated 2026-10-20), 28 stars"
-    ],
-    "blogged": false
-  },
-  "idorozin/AgentPages": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-02",
-    "score": 6,
-    "summary": "Cron-driven agent maintains an Astro research site and opens auto-merged PRs; fun but stale since Mar 2026 and auto-merge weakens review.",
-    "highlights": [
-      "README.md: user/ -> agent/ -> website/ -> docs/ pipeline",
-      "Tavily web search integration",
-      "Live example sites"
-    ],
-    "blogged": false
-  },
-  "zircote-plugins/github-agentic-workflows": {
-    "kind": "tool",
-    "reviewed": "2026-10-02",
-    "score": 5,
-    "summary": "Claude Code plugin (aw-author) to author/validate/improve gh-aw workflows; stale since Jul 2026.",
-    "highlights": [
-      "Guided + one-shot authoring",
-      "Validation beyond gh aw compile (permissions, safe-output coverage)"
-    ],
-    "blogged": false
-  },
-  "ks6088ts-labs/template-github-agentic-workflows": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-02",
-    "score": 5,
-    "summary": "Persona-based template collection with Makefile tasks and tutorials; mostly onboarding.",
-    "highlights": [
-      "Makefile-driven tasks",
-      "docs/tutorials getting-started",
-      "Use-case index"
-    ],
-    "blogged": false
-  },
-  "yutkat/github-star-organizer": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-03",
-    "score": 6,
-    "summary": "Weekly workflow filing GitHub stars into Lists with deterministic validation before GraphQL mutations.",
-    "highlights": [
-      "README.md: agent plan validated by deterministic step (dry-run repair loop)",
-      "Opens issue instead of creating Lists",
-      "Installable via gh aw add-wizard"
-    ],
-    "blogged": false
-  },
-  "Htkym/workflowVisualEditor": {
-    "kind": "extension",
-    "reviewed": "2026-10-03",
-    "score": 5,
-    "summary": "Unofficial VS Code visual designer for gh-aw markdown; Windows-only, 0 stars, Markdown stays authoritative.",
-    "highlights": [
-      "Side-by-side GUI and Markdown editor",
-      "Templates for new workflows",
-      "Never auto-installs tools"
-    ],
-    "blogged": false
-  },
-  "github/gh-aw-firewall": {
-    "kind": "tool",
-    "reviewed": "2026-10-04",
-    "score": 7,
-    "summary": "Squid-based domain-allowlist network firewall with API-proxy sidecar keeping LLM keys out of the agent.",
-    "highlights": [
-      "README.md: three-container design",
-      "--config JSON/YAML with published schema"
-    ],
-    "blogged": false
-  },
-  "github/gh-aw-mcpg": {
-    "kind": "mcp-server",
-    "reviewed": "2026-10-04",
-    "score": 7,
-    "summary": "MCP gateway used via sandbox.mcp to give sandboxed agents controlled MCP access.",
-    "highlights": [
-      "README.md: gateway config requires agentId/domain",
-      "docs/CONFIGURATION.md server-field reference"
-    ],
-    "blogged": false
-  },
-  "github/gh-aw-actions": {
-    "kind": "shared-component",
-    "reviewed": "2026-10-04",
-    "score": 5,
-    "summary": "Shared actions used by compiled workflows; minimal docs, defers to gh-aw.",
-    "highlights": [
-      "Tags aligned with gh-aw releases"
-    ],
-    "blogged": false
-  },
-  "ianwieds/awesome-agentic-workflows": {
-    "kind": "other",
-    "reviewed": "2026-10-05",
-    "score": 5,
-    "summary": "Curated awesome-list of gh-aw workflows, collections, tools and MCP servers; new (Oct 2026), 1 star.",
-    "highlights": [
-      "README.md: categorized by job (triage, CI repair, security, releases)",
-      "Sections for safe outputs/shared imports and MCP servers"
-    ],
-    "blogged": false
-  },
-  "haslam93/gh-aw-demo-lab": {
-    "kind": "other",
-    "reviewed": "2026-10-05",
-    "score": 5,
-    "summary": "Interactive demo lab with runnable compiled workflows (personas, slash command, no-PAT copilot-requests billing); teaching material, inactive since July.",
-    "highlights": [
-      "README.md: demo table mapping workflows to concepts",
-      "copilot-requests: write instead of PAT"
-    ],
-    "blogged": false
-  },
-  "webmaxru/github-agentic-workflows-book": {
-    "kind": "other",
-    "reviewed": "2026-10-06",
-    "score": 5,
-    "summary": "Interactive multi-page HTML book teaching gh-aw; 1 star, updated Sep 2026 (metadata-level review).",
-    "highlights": [
-      "Topics: agentic-sdlc, github-agentic-workflows",
-      "Educational, not a novel tool"
-    ],
-    "blogged": false
-  },
-  "lculjak/focoit-ai-digest": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-06",
-    "score": 4,
-    "summary": "Personal weekly AI/cloud digest published to GitHub Pages by a gh-aw workflow (engine: copilot); 0 stars (metadata-level review).",
-    "highlights": [
-      "Self-updating static site via gh-aw",
-      "Active Oct 2026"
-    ],
-    "blogged": false
-  },
-  "amjithtitus09/care_fe_aw_v2": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-06",
-    "score": 4,
-    "summary": "Project-specific Jira-to-mergeable-PR gh-aw workflows for care_fe; 0 stars, no activity since Jul 2026 (metadata-level review).",
-    "highlights": [
-      "Jira to PR pipeline concept"
-    ],
-    "blogged": false
-  },
-  "bootc-dev/gh-agentic-workflows": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-07",
-    "score": 7,
-    "summary": "Installable issue-to-PR pipeline (drafter/review/fix/merge) with GitHub App auth and label-based dispatch; strong gotchas documentation.",
-    "highlights": [
-      "README.md: gh aw add bootc-dev/gh-agentic-workflows@v0.1.0 via aw.yml manifest",
-      "github-app at safe-outputs root keeps token out of agent job",
-      "Pins gh-aw version in .github/aw/gh-aw-version"
-    ],
-    "blogged": false
-  },
-  "github/gh-aw-threat-detection": {
-    "kind": "tool",
-    "reviewed": "2026-10-07",
-    "score": 7,
-    "summary": "Standalone Go detector gating safe outputs on prompt injection, secret leaks and malicious patches.",
-    "highlights": [
-      "README.md: artifact-based structural eligibility rules",
-      "Engine timeout kills process group; reasons withheld from uploadable output",
-      "Explicitly advisory, defense-in-depth framing"
-    ],
-    "blogged": false
-  },
-  "githubnext/gh-aw-router": {
-    "kind": "tool",
-    "reviewed": "2026-10-07",
-    "score": 6,
-    "summary": "Offline-table model router service (classify/route) that never calls providers; early (v0.1.0).",
-    "highlights": [
-      "openapi.yaml contract",
-      "Stores no request history; 1 MiB/64 in-flight bounds"
-    ],
-    "blogged": false
-  },
-  "githubnext/gh-aw-wizard": {
-    "kind": "tool",
-    "reviewed": "2026-10-08",
-    "score": 6,
-    "summary": "Web wizard that turns a few answers into a ready gh-aw workflow; config-driven via src/wizard.json, very active curated archetypes.",
-    "highlights": [
-      "README.md: wizard.json-driven, self-hostable",
-      "Active (commits 2026-10-07)",
-      "patterns/ library of archetypes"
-    ],
-    "blogged": false
-  },
-  "githubnext/gh-aw-canvas": {
-    "kind": "tool",
-    "reviewed": "2026-10-08",
-    "score": 4,
-    "summary": "Copilot App canvas for gh-aw; README is one line, no commits since June 2026.",
-    "highlights": [
-      "Imported dashboard project",
-      "Minimal documentation"
-    ],
-    "blogged": false
-  },
-  "Software-SE-Pod/storyplan": {
-    "kind": "tool",
-    "reviewed": "2026-10-09",
-    "score": 6,
-    "summary": "Typed pre-PR plan per user story: MCP server + gh-aw workflow files plan as sub-issue, CI verifies PR against it.",
-    "highlights": [
-      "README.md: story issue -> pre-PR issue -> storyplan-verify flow",
-      "F# plan model exposed via MCP server",
-      "Pins Copilot model; org-billed copilot-requests"
-    ],
-    "blogged": false
-  },
-  "victorperr/agentic-workflow-observatory": {
-    "kind": "tool",
-    "reviewed": "2026-10-09",
-    "score": 6,
-    "summary": "Maps gh-aw runs to Datadog Agent Observability traces, flagging runs that pass CI but fail as agents; experimental.",
-    "highlights": [
-      "README.md: loop detection and firewall-blocked egress flagged",
-      "Parses firewall logs",
-      "Marked experimental, 0 stars"
-    ],
-    "blogged": false
-  },
-  "cnotv/agentic-extension": {
-    "kind": "extension",
-    "reviewed": "2026-10-09",
-    "score": 5,
-    "summary": "Rancher UI extension/controller cataloguing gh-aw workflows, dispatching runs and showing cost stats as k8s resources.",
-    "highlights": [
-      "AgentRepository/Agent/AgentRun CRDs",
-      "Dispatch via AgentRun origin: rancher",
-      "Created 2026-10-07, very new"
-    ],
-    "blogged": false
-  },
-  "githubnext/gh-aw-test": {
-    "kind": "other",
-    "reviewed": "2026-10-10",
-    "score": 4,
-    "summary": "E2E test suite for gh-aw itself; useful internally, not a reusable ecosystem tool.",
-    "highlights": [
-      "README.md: e2e runner exercising issue/PR/comment-creating workflows"
-    ],
-    "blogged": false
-  },
-  "githubnext/ado-aw": {
-    "kind": "tool",
-    "reviewed": "2026-10-11",
-    "score": 7,
-    "summary": "Compiles gh-aw-style markdown agents into multi-stage Azure DevOps pipelines (agent, threat detection, safe-outputs executor); active, v0.53.0.",
-    "highlights": [
-      "README.md: three-stage Agent/Detection/SafeOutputs pipeline",
-      "Agent never gets write token; AWF network sandbox",
-      "prompts/ for create/update/debug by AI agents"
-    ],
-    "blogged": false
-  },
-  "zwave-js/bot-workflows": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-12",
-    "score": 8,
-    "summary": "Shared pinned package of agentic bots (docs answering, logfile analysis, classification) with gated pre-activation retrieval and capped agent.",
-    "highlights": [
-      "workflows/answer-from-docs.md: on.steps retrieval gate, max-turns 5, network {}",
-      "aw.yml package manifest + SHA-pinned shared imports",
-      "README consumer contract and release/pinning policy"
-    ],
-    "blogged": true
-  },
-  "ArcavenAE/beadle": {
-    "kind": "tool",
-    "reviewed": "2026-10-12",
-    "score": 5,
-    "summary": "Rust intent-aligned issue triage dashboard; README only skimmed, gh-aw link not confirmed.",
-    "highlights": [
-      "DESIGN.md intent-scoring idea"
-    ],
-    "blogged": false
-  },
-  "xhandlr/ghaw-security-adoption": {
-    "kind": "other",
-    "reviewed": "2026-10-12",
-    "score": 4,
-    "summary": "Research data/scripts on gh-aw security adoption; not read in depth.",
-    "highlights": [
-      "scripts/ and results/ dirs"
-    ],
-    "blogged": false
-  },
-  "cgwalters-forge/agentic-job": {
-    "kind": "tool",
-    "reviewed": "2026-10-14",
-    "score": 7,
-    "summary": "Hardened-runner setup step (secure-host) plus sandbox exec to run untrusted/agent steps as a tokenless user behind a filtering proxy.",
-    "highlights": [
-      "secure-host removes sudo, stops container daemon, self-probes restrictions",
-      "sandbox exec runs steps as a second user with filtered HTTP(S)",
-      "README documents limits (DNS leakage)"
-    ],
-    "blogged": false
-  },
-  "rknightion/renovate-repair": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-14",
-    "score": 6,
-    "summary": "gh-aw workflow repairing CI failures on Renovate PRs via target repo just check; never touches manifests, lockfiles or .github.",
-    "highlights": [
-      "README states explicit file-scope guardrails",
-      "Dependency-bumped via Renovate to gh-aw-actions"
-    ],
-    "blogged": false
-  },
-  "Hack23/euparliamentmonitor": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-14",
-    "score": 6,
-    "summary": "EU Parliament political-intelligence site with AI-generated news in 14 languages; large, actively maintained, strong supply-chain badges.",
-    "highlights": [
-      "OpenSSF Scorecard and SLSA 3 badges",
-      "14-language AI-generated news pipeline"
-    ],
-    "blogged": false
-  },
-  "cbachhuber/mirrors-gh-aw": {
-    "kind": "tool",
-    "reviewed": "2026-10-15",
-    "score": 6,
-    "summary": "prek/pre-commit mirror that runs gh aw compile without gh installed; checksum-verified binary download.",
-    "highlights": [
-      "README.md: gh-aw-compile hook, rev pinned to lock compiler_version",
-      "Verifies binary against committed checksums.txt",
-      "Automated mirror workflow tracks releases"
-    ],
-    "blogged": false
-  },
-  "Gayathri-Radha/ai-agentic-workflows": {
-    "kind": "other",
-    "reviewed": "2026-10-15",
-    "score": 2,
-    "summary": "Fresh gh aw init scaffold; no original content.",
-    "highlights": [
-      "Standard layout only"
-    ],
-    "blogged": false
-  },
-  "eslint/tsc-meetings": {
-    "kind": "other",
-    "reviewed": "2026-10-16",
-    "score": 0,
-    "summary": "unreadable: file access filtered by policy",
-    "highlights": [],
-    "blogged": false
-  },
-  "Hack23/riksdagsmonitor": {
-    "kind": "other",
-    "reviewed": "2026-10-16",
-    "score": 0,
-    "summary": "unreadable file contents; sibling of euparliamentmonitor (6)",
-    "highlights": [],
-    "blogged": false
-  },
-  "skills/agentic-workflows-that-read-the-room": {
-    "kind": "other",
-    "reviewed": "2026-10-16",
-    "score": 0,
-    "summary": "GitHub Skills exercise; README unreadable (oversized); not an ecosystem tool",
-    "highlights": [],
-    "blogged": false
-  },
-  "microsoft/frontier-agentic-devops-rvas": {
-    "kind": "other",
-    "reviewed": "2026-10-19",
-    "score": 5,
-    "summary": "Microsoft training portal for agentic DevSecOps sessions; gh-aw is one outcome among five.",
-    "highlights": [
-      "README.md outcome/module catalog",
-      "AGENTS.md"
-    ],
-    "blogged": false
-  },
-  "vscheuber/repo-concierge": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-22",
-    "score": 7,
-    "summary": "Installable issue-to-release harness: complexity/risk axes gate autonomy via label handoffs, pinned releases with digest manifest.",
-    "highlights": [
-      "README.md: complexity and risk axes control autonomy",
-      "Deterministic dependency-watch and plan-approval-resume (no LLM)",
-      "Bot-authored issues skipped at activation to save credits",
-      "release-manifest.json with per-file digests"
-    ],
-    "blogged": false
-  },
-  "SitoaderOrg/ForgeFlow": {
-    "kind": "other",
-    "reviewed": "2026-10-22",
-    "score": 0,
-    "summary": "Only app READMEs resolved at root (apps/ferret-heist); not reviewed in depth, no gh-aw extension/tool evident.",
-    "highlights": [],
-    "blogged": false
-  },
-  "VeeraMS/GH-AW-Demo": {
-    "kind": "other",
-    "reviewed": "2026-10-22",
-    "score": 3,
-    "summary": "Demo storefront app (Node/SQLite) with sample agentic workflows; example only.",
-    "highlights": [
-      "Dependency-free demo app"
-    ],
-    "blogged": false
-  },
-  "curryriiiice/black-triage-sandbox": {
-    "kind": "other",
-    "reviewed": "2026-10-22",
-    "score": 0,
-    "summary": "Sandbox repo, not reviewed in depth.",
-    "highlights": [],
-    "blogged": false
-  },
-  "Martz/agentic-factory-starter": {
-    "kind": "workflow-collection",
-    "reviewed": "2026-10-23",
-    "score": 6,
-    "summary": "Starter software factory from gh-aw: label issue -> spec -> approved build -> draft PR -> CI + independent review; weekly learn step.",
-    "highlights": [
-      "README: human approval gates between spec and build",
-      "Independent second-model review station",
-      "Weekly LEARN workflow proposes AGENTS.md rules via issue"
-    ],
-    "blogged": false
-  }
+ "githubnext/gh-aw-cao": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-09-29",
+  "score": 9,
+  "summary": "Policy-gated control plane running review-first agentic campaigns across repo fleets.",
+  "highlights": [
+   "docs/admission.md: pre-activation admission gates, narrow-only dispatch",
+   "docs/architecture-at-a-glance.md: catalog/control/orchestrator/worker split",
+   "skills/: Agent Plugin skills (setup-cao, debug-cao, ...)"
+  ],
+  "blogged": true
+ },
+ "rshade/gh-aw-fleet": {
+  "kind": "extension",
+  "reviewed": "2026-09-29",
+  "score": 7,
+  "summary": "Declarative fleet manager (fleet.json) that reconciles gh-aw installs via PRs and reports AIC consumption.",
+  "highlights": [
+   "Pin-per-profile refs, never main",
+   "Thin orchestrator over gh aw add/update/upgrade",
+   "consumption subcommand rolls up cost by repo/profile/workflow"
+  ],
+  "blogged": false
+ },
+ "AgentMeter/agentmeter-action": {
+  "kind": "tool",
+  "reviewed": "2026-09-29",
+  "score": 5,
+  "summary": "Action that records agent token usage/cost and comments on PRs; not gh-aw specific, SaaS-backed.",
+  "highlights": [
+   "Never fails the workflow on API errors",
+   "PR/issue cost summary comment"
+  ],
+  "blogged": false
+ },
+ "githubnext/agentics": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-09-30",
+  "score": 7,
+  "summary": "Official sample family of reusable workflows (triage, CI Doctor, Repo Assist, reviewers); very active, 969 stars.",
+  "highlights": [
+   "README.md: categorized catalog with docs/ per workflow",
+   "Community-maintained entries linked (Log Watcher)",
+   "Cost Tracker uses firewall token-usage.jsonl"
+  ],
+  "blogged": false
+ },
+ "githubnext/agentic-ops": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-09-30",
+  "score": 6,
+  "summary": "Installable bundle (gh aw add) for daily AIC spend audit and conservative optimization.",
+  "highlights": [
+   "Single root package, no extra secrets",
+   "Shared snapshots for trend analysis"
+  ],
+  "blogged": false
+ },
+ "petermefrandsen/gh-aw-inspector": {
+  "kind": "extension",
+  "reviewed": "2026-09-30",
+  "score": 5,
+  "summary": "VS Code extension to discover, run and evaluate gh-aw workflows; low activity since Feb 2026.",
+  "highlights": [
+   "Sidebar workflow discovery",
+   "Evaluation reports with verbosity modes"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-workshop": {
+  "kind": "other",
+  "reviewed": "2026-10-01",
+  "score": 6,
+  "summary": "Hands-on workshop building a safe daily repo-status agentic workflow; excellent onboarding, not a novel tool.",
+  "highlights": [
+   "README.md: end-to-end path from zero to scheduled report",
+   "Docs site at githubnext.github.io/gh-aw-workshop",
+   "Active (pushed 2026-10-01)"
+  ],
+  "blogged": false
+ },
+ "verkyyi/github-agent-runner": {
+  "kind": "tool",
+  "reviewed": "2026-10-01",
+  "score": 5,
+  "summary": "Claude Code plugin to discover/install gh-aw workflows from agentics catalog plus agent-team pattern; stale since June 2026.",
+  "highlights": [
+   "Conversational discover/install skills",
+   "catalog/agent-team: spec\u2192plan\u2192impl\u2192review workflows",
+   "Starter pitch: zero-risk daily-repo-status"
+  ],
+  "blogged": false
+ },
+ "Hack23/European-Parliament-MCP-Server": {
+  "kind": "mcp-server",
+  "reviewed": "2026-10-20",
+  "score": 4,
+  "summary": "General-purpose EU Parliament MCP server tagged gh-aw; only standard CI workflows seen, no gh-aw-specific components verified.",
+  "highlights": [
+   "Topic gh-aw on repo",
+   "Active (updated 2026-10-20), 28 stars"
+  ],
+  "blogged": false
+ },
+ "idorozin/AgentPages": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-02",
+  "score": 6,
+  "summary": "Cron-driven agent maintains an Astro research site and opens auto-merged PRs; fun but stale since Mar 2026 and auto-merge weakens review.",
+  "highlights": [
+   "README.md: user/ -> agent/ -> website/ -> docs/ pipeline",
+   "Tavily web search integration",
+   "Live example sites"
+  ],
+  "blogged": false
+ },
+ "zircote-plugins/github-agentic-workflows": {
+  "kind": "tool",
+  "reviewed": "2026-10-02",
+  "score": 5,
+  "summary": "Claude Code plugin (aw-author) to author/validate/improve gh-aw workflows; stale since Jul 2026.",
+  "highlights": [
+   "Guided + one-shot authoring",
+   "Validation beyond gh aw compile (permissions, safe-output coverage)"
+  ],
+  "blogged": false
+ },
+ "ks6088ts-labs/template-github-agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-02",
+  "score": 5,
+  "summary": "Persona-based template collection with Makefile tasks and tutorials; mostly onboarding.",
+  "highlights": [
+   "Makefile-driven tasks",
+   "docs/tutorials getting-started",
+   "Use-case index"
+  ],
+  "blogged": false
+ },
+ "yutkat/github-star-organizer": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-03",
+  "score": 6,
+  "summary": "Weekly workflow filing GitHub stars into Lists with deterministic validation before GraphQL mutations.",
+  "highlights": [
+   "README.md: agent plan validated by deterministic step (dry-run repair loop)",
+   "Opens issue instead of creating Lists",
+   "Installable via gh aw add-wizard"
+  ],
+  "blogged": false
+ },
+ "Htkym/workflowVisualEditor": {
+  "kind": "extension",
+  "reviewed": "2026-10-03",
+  "score": 5,
+  "summary": "Unofficial VS Code visual designer for gh-aw markdown; Windows-only, 0 stars, Markdown stays authoritative.",
+  "highlights": [
+   "Side-by-side GUI and Markdown editor",
+   "Templates for new workflows",
+   "Never auto-installs tools"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-firewall": {
+  "kind": "tool",
+  "reviewed": "2026-10-04",
+  "score": 7,
+  "summary": "Squid-based domain-allowlist network firewall with API-proxy sidecar keeping LLM keys out of the agent.",
+  "highlights": [
+   "README.md: three-container design",
+   "--config JSON/YAML with published schema"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-mcpg": {
+  "kind": "mcp-server",
+  "reviewed": "2026-10-04",
+  "score": 7,
+  "summary": "MCP gateway used via sandbox.mcp to give sandboxed agents controlled MCP access.",
+  "highlights": [
+   "README.md: gateway config requires agentId/domain",
+   "docs/CONFIGURATION.md server-field reference"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-actions": {
+  "kind": "shared-component",
+  "reviewed": "2026-10-04",
+  "score": 5,
+  "summary": "Shared actions used by compiled workflows; minimal docs, defers to gh-aw.",
+  "highlights": [
+   "Tags aligned with gh-aw releases"
+  ],
+  "blogged": false
+ },
+ "ianwieds/awesome-agentic-workflows": {
+  "kind": "other",
+  "reviewed": "2026-10-05",
+  "score": 5,
+  "summary": "Curated awesome-list of gh-aw workflows, collections, tools and MCP servers; new (Oct 2026), 1 star.",
+  "highlights": [
+   "README.md: categorized by job (triage, CI repair, security, releases)",
+   "Sections for safe outputs/shared imports and MCP servers"
+  ],
+  "blogged": false
+ },
+ "haslam93/gh-aw-demo-lab": {
+  "kind": "other",
+  "reviewed": "2026-10-05",
+  "score": 5,
+  "summary": "Interactive demo lab with runnable compiled workflows (personas, slash command, no-PAT copilot-requests billing); teaching material, inactive since July.",
+  "highlights": [
+   "README.md: demo table mapping workflows to concepts",
+   "copilot-requests: write instead of PAT"
+  ],
+  "blogged": false
+ },
+ "webmaxru/github-agentic-workflows-book": {
+  "kind": "other",
+  "reviewed": "2026-10-06",
+  "score": 5,
+  "summary": "Interactive multi-page HTML book teaching gh-aw; 1 star, updated Sep 2026 (metadata-level review).",
+  "highlights": [
+   "Topics: agentic-sdlc, github-agentic-workflows",
+   "Educational, not a novel tool"
+  ],
+  "blogged": false
+ },
+ "lculjak/focoit-ai-digest": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-06",
+  "score": 4,
+  "summary": "Personal weekly AI/cloud digest published to GitHub Pages by a gh-aw workflow (engine: copilot); 0 stars (metadata-level review).",
+  "highlights": [
+   "Self-updating static site via gh-aw",
+   "Active Oct 2026"
+  ],
+  "blogged": false
+ },
+ "amjithtitus09/care_fe_aw_v2": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-06",
+  "score": 4,
+  "summary": "Project-specific Jira-to-mergeable-PR gh-aw workflows for care_fe; 0 stars, no activity since Jul 2026 (metadata-level review).",
+  "highlights": [
+   "Jira to PR pipeline concept"
+  ],
+  "blogged": false
+ },
+ "bootc-dev/gh-agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-07",
+  "score": 7,
+  "summary": "Installable issue-to-PR pipeline (drafter/review/fix/merge) with GitHub App auth and label-based dispatch; strong gotchas documentation.",
+  "highlights": [
+   "README.md: gh aw add bootc-dev/gh-agentic-workflows@v0.1.0 via aw.yml manifest",
+   "github-app at safe-outputs root keeps token out of agent job",
+   "Pins gh-aw version in .github/aw/gh-aw-version"
+  ],
+  "blogged": false
+ },
+ "github/gh-aw-threat-detection": {
+  "kind": "tool",
+  "reviewed": "2026-10-07",
+  "score": 7,
+  "summary": "Standalone Go detector gating safe outputs on prompt injection, secret leaks and malicious patches.",
+  "highlights": [
+   "README.md: artifact-based structural eligibility rules",
+   "Engine timeout kills process group; reasons withheld from uploadable output",
+   "Explicitly advisory, defense-in-depth framing"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-router": {
+  "kind": "tool",
+  "reviewed": "2026-10-07",
+  "score": 6,
+  "summary": "Offline-table model router service (classify/route) that never calls providers; early (v0.1.0).",
+  "highlights": [
+   "openapi.yaml contract",
+   "Stores no request history; 1 MiB/64 in-flight bounds"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-wizard": {
+  "kind": "tool",
+  "reviewed": "2026-10-08",
+  "score": 6,
+  "summary": "Web wizard that turns a few answers into a ready gh-aw workflow; config-driven via src/wizard.json, very active curated archetypes.",
+  "highlights": [
+   "README.md: wizard.json-driven, self-hostable",
+   "Active (commits 2026-10-07)",
+   "patterns/ library of archetypes"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-canvas": {
+  "kind": "tool",
+  "reviewed": "2026-10-08",
+  "score": 4,
+  "summary": "Copilot App canvas for gh-aw; README is one line, no commits since June 2026.",
+  "highlights": [
+   "Imported dashboard project",
+   "Minimal documentation"
+  ],
+  "blogged": false
+ },
+ "Software-SE-Pod/storyplan": {
+  "kind": "tool",
+  "reviewed": "2026-10-09",
+  "score": 6,
+  "summary": "Typed pre-PR plan per user story: MCP server + gh-aw workflow files plan as sub-issue, CI verifies PR against it.",
+  "highlights": [
+   "README.md: story issue -> pre-PR issue -> storyplan-verify flow",
+   "F# plan model exposed via MCP server",
+   "Pins Copilot model; org-billed copilot-requests"
+  ],
+  "blogged": false
+ },
+ "victorperr/agentic-workflow-observatory": {
+  "kind": "tool",
+  "reviewed": "2026-10-09",
+  "score": 6,
+  "summary": "Maps gh-aw runs to Datadog Agent Observability traces, flagging runs that pass CI but fail as agents; experimental.",
+  "highlights": [
+   "README.md: loop detection and firewall-blocked egress flagged",
+   "Parses firewall logs",
+   "Marked experimental, 0 stars"
+  ],
+  "blogged": false
+ },
+ "cnotv/agentic-extension": {
+  "kind": "extension",
+  "reviewed": "2026-10-09",
+  "score": 5,
+  "summary": "Rancher UI extension/controller cataloguing gh-aw workflows, dispatching runs and showing cost stats as k8s resources.",
+  "highlights": [
+   "AgentRepository/Agent/AgentRun CRDs",
+   "Dispatch via AgentRun origin: rancher",
+   "Created 2026-10-07, very new"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-test": {
+  "kind": "other",
+  "reviewed": "2026-10-10",
+  "score": 4,
+  "summary": "E2E test suite for gh-aw itself; useful internally, not a reusable ecosystem tool.",
+  "highlights": [
+   "README.md: e2e runner exercising issue/PR/comment-creating workflows"
+  ],
+  "blogged": false
+ },
+ "githubnext/ado-aw": {
+  "kind": "tool",
+  "reviewed": "2026-10-11",
+  "score": 7,
+  "summary": "Compiles gh-aw-style markdown agents into multi-stage Azure DevOps pipelines (agent, threat detection, safe-outputs executor); active, v0.53.0.",
+  "highlights": [
+   "README.md: three-stage Agent/Detection/SafeOutputs pipeline",
+   "Agent never gets write token; AWF network sandbox",
+   "prompts/ for create/update/debug by AI agents"
+  ],
+  "blogged": false
+ },
+ "zwave-js/bot-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-12",
+  "score": 8,
+  "summary": "Shared pinned package of agentic bots (docs answering, logfile analysis, classification) with gated pre-activation retrieval and capped agent.",
+  "highlights": [
+   "workflows/answer-from-docs.md: on.steps retrieval gate, max-turns 5, network {}",
+   "aw.yml package manifest + SHA-pinned shared imports",
+   "README consumer contract and release/pinning policy"
+  ],
+  "blogged": true
+ },
+ "ArcavenAE/beadle": {
+  "kind": "tool",
+  "reviewed": "2026-10-12",
+  "score": 5,
+  "summary": "Rust intent-aligned issue triage dashboard; README only skimmed, gh-aw link not confirmed.",
+  "highlights": [
+   "DESIGN.md intent-scoring idea"
+  ],
+  "blogged": false
+ },
+ "xhandlr/ghaw-security-adoption": {
+  "kind": "other",
+  "reviewed": "2026-10-12",
+  "score": 4,
+  "summary": "Research data/scripts on gh-aw security adoption; not read in depth.",
+  "highlights": [
+   "scripts/ and results/ dirs"
+  ],
+  "blogged": false
+ },
+ "cgwalters-forge/agentic-job": {
+  "kind": "tool",
+  "reviewed": "2026-10-14",
+  "score": 7,
+  "summary": "Hardened-runner setup step (secure-host) plus sandbox exec to run untrusted/agent steps as a tokenless user behind a filtering proxy.",
+  "highlights": [
+   "secure-host removes sudo, stops container daemon, self-probes restrictions",
+   "sandbox exec runs steps as a second user with filtered HTTP(S)",
+   "README documents limits (DNS leakage)"
+  ],
+  "blogged": false
+ },
+ "rknightion/renovate-repair": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-14",
+  "score": 6,
+  "summary": "gh-aw workflow repairing CI failures on Renovate PRs via target repo just check; never touches manifests, lockfiles or .github.",
+  "highlights": [
+   "README states explicit file-scope guardrails",
+   "Dependency-bumped via Renovate to gh-aw-actions"
+  ],
+  "blogged": false
+ },
+ "Hack23/euparliamentmonitor": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-14",
+  "score": 6,
+  "summary": "EU Parliament political-intelligence site with AI-generated news in 14 languages; large, actively maintained, strong supply-chain badges.",
+  "highlights": [
+   "OpenSSF Scorecard and SLSA 3 badges",
+   "14-language AI-generated news pipeline"
+  ],
+  "blogged": false
+ },
+ "cbachhuber/mirrors-gh-aw": {
+  "kind": "tool",
+  "reviewed": "2026-10-15",
+  "score": 6,
+  "summary": "prek/pre-commit mirror that runs gh aw compile without gh installed; checksum-verified binary download.",
+  "highlights": [
+   "README.md: gh-aw-compile hook, rev pinned to lock compiler_version",
+   "Verifies binary against committed checksums.txt",
+   "Automated mirror workflow tracks releases"
+  ],
+  "blogged": false
+ },
+ "Gayathri-Radha/ai-agentic-workflows": {
+  "kind": "other",
+  "reviewed": "2026-10-15",
+  "score": 2,
+  "summary": "Fresh gh aw init scaffold; no original content.",
+  "highlights": [
+   "Standard layout only"
+  ],
+  "blogged": false
+ },
+ "eslint/tsc-meetings": {
+  "kind": "other",
+  "reviewed": "2026-10-16",
+  "score": 0,
+  "summary": "unreadable: file access filtered by policy",
+  "highlights": [],
+  "blogged": false
+ },
+ "Hack23/riksdagsmonitor": {
+  "kind": "other",
+  "reviewed": "2026-10-16",
+  "score": 0,
+  "summary": "unreadable file contents; sibling of euparliamentmonitor (6)",
+  "highlights": [],
+  "blogged": false
+ },
+ "skills/agentic-workflows-that-read-the-room": {
+  "kind": "other",
+  "reviewed": "2026-10-16",
+  "score": 0,
+  "summary": "GitHub Skills exercise; README unreadable (oversized); not an ecosystem tool",
+  "highlights": [],
+  "blogged": false
+ },
+ "microsoft/frontier-agentic-devops-rvas": {
+  "kind": "other",
+  "reviewed": "2026-10-19",
+  "score": 5,
+  "summary": "Microsoft training portal for agentic DevSecOps sessions; gh-aw is one outcome among five.",
+  "highlights": [
+   "README.md outcome/module catalog",
+   "AGENTS.md"
+  ],
+  "blogged": false
+ },
+ "vscheuber/repo-concierge": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-22",
+  "score": 7,
+  "summary": "Installable issue-to-release harness: complexity/risk axes gate autonomy via label handoffs, pinned releases with digest manifest.",
+  "highlights": [
+   "README.md: complexity and risk axes control autonomy",
+   "Deterministic dependency-watch and plan-approval-resume (no LLM)",
+   "Bot-authored issues skipped at activation to save credits",
+   "release-manifest.json with per-file digests"
+  ],
+  "blogged": false
+ },
+ "SitoaderOrg/ForgeFlow": {
+  "kind": "other",
+  "reviewed": "2026-10-22",
+  "score": 0,
+  "summary": "Only app READMEs resolved at root (apps/ferret-heist); not reviewed in depth, no gh-aw extension/tool evident.",
+  "highlights": [],
+  "blogged": false
+ },
+ "VeeraMS/GH-AW-Demo": {
+  "kind": "other",
+  "reviewed": "2026-10-22",
+  "score": 3,
+  "summary": "Demo storefront app (Node/SQLite) with sample agentic workflows; example only.",
+  "highlights": [
+   "Dependency-free demo app"
+  ],
+  "blogged": false
+ },
+ "curryriiiice/black-triage-sandbox": {
+  "kind": "other",
+  "reviewed": "2026-10-22",
+  "score": 0,
+  "summary": "Sandbox repo, not reviewed in depth.",
+  "highlights": [],
+  "blogged": false
+ },
+ "Martz/agentic-factory-starter": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-23",
+  "score": 6,
+  "summary": "Starter software factory from gh-aw: label issue -> spec -> approved build -> draft PR -> CI + independent review; weekly learn step.",
+  "highlights": [
+   "README: human approval gates between spec and build",
+   "Independent second-model review station",
+   "Weekly LEARN workflow proposes AGENTS.md rules via issue"
+  ],
+  "blogged": false
+ },
+ "eedorenko/agentic-factory-v2": {
+  "kind": "other",
+  "reviewed": "2026-10-30",
+  "score": 4,
+  "summary": "Experimental Copilot-first software factory repo; README lists experiments only, little documentation.",
+  "highlights": [
+   "README.md: dispatch loop, plan/verify, multi-agent chaining experiments",
+   "Self-improving AGENTS.md loop idea"
+  ],
+  "blogged": false
+ },
+ "gearsnlevers/issue-concierge": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-10-30",
+  "score": 7,
+  "summary": "Pinned-release gh-aw harness for issue triage-to-release with complexity/risk autonomy axes and label gates.",
+  "highlights": [
+   "README.md: complexity and risk axes control autonomy",
+   "Label-based gates (-ready, -handoff, -required)",
+   "docs/flows.md: 19 flows with end-to-end scenario tests",
+   "Deployments pin released versions"
+  ],
+  "blogged": false
+ }
 }
