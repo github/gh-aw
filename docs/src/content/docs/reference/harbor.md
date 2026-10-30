@@ -1,5 +1,5 @@
 ---
-title: Harbor reference
+title: Harbor
 description: Reference for exporting recorded gh-aw sessions and grader evidence to Harbor.
 sidebar:
   order: 299
