@@ -16,7 +16,7 @@ tools:
 ---
 ```
 
-Stores files at `/tmp/gh-aw/cache-memory/` using a workflow-scoped cache key. Use standard file operations to store/retrieve JSON/YAML, text files, or subdirectories.
+Files are stored at `/tmp/gh-aw/cache-memory/` using a workflow-scoped cache key, via standard file operations.
 
 ## Advanced Configuration
 
@@ -50,7 +50,7 @@ tools:
 
 ### File Type Restrictions
 
-The `allowed-extensions` field restricts which file types can be written to cache-memory. By default, only `.json`, `.jsonl`, `.txt`, `.md`, and `.csv` files are allowed. When specified, only files with listed extensions can be stored.
+The `allowed-extensions` field restricts which file types can be written to cache-memory (default: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`).
 
 ```aw wrap
 ---
@@ -72,7 +72,7 @@ The file format is inferred from each matched file's `.json` or `.jsonl` extensi
 
 The supported vocabulary is limited to `type` (including type lists and `null`), primitive `enum`, `required`, nested `properties`, `additionalProperties: false`, object-schema `items`, and standalone `oneOf`/`anyOf`, with a maximum nesting depth of 32 and no sibling constraints beside alternatives. Numeric enum integers must be exactly representable by JavaScript, and values checked against numeric enums must not lose precision during JSON parsing. This is not full JSON Schema: `$ref`, `const`, schema `format`, `pattern`, numeric/string/array bounds, and `uniqueItems` are rejected. Use `validation.script` for domain-specific constraints such as cross-file uniqueness, positive-ID checks, or timestamp policies.
 
-The optional JavaScript body is executed with Node.js over the complete configured cache-memory directory after agent execution and before the cache is saved. When threat detection is enabled, it also runs again in the `update_cache_memory` job before `actions/cache/save`. Schemas always run first when both mechanisms are configured.
+The optional JavaScript body runs with Node.js over the whole cache-memory directory after the agent and before the cache is saved (again in `update_cache_memory` when threat detection is enabled). Schemas always run first.
 
 Available globals are Node.js `fs` and `path`, plus `memoryRoot`/`memoryDir`, `memoryId`, and `memoryKind` (`"cache"`). The working directory is the cache root. Environment variables available to the validator are intentionally limited to basic runner paths plus `GH_AW_MEMORY_ROOT`, `GH_AW_MEMORY_DIR`, `GH_AW_MEMORY_ID`, and `GH_AW_MEMORY_KIND`; GitHub tokens and write credentials are not passed to the validator subprocess. Network access follows the workflow runner's normal network policy. The default timeout is 1 minute and may be set with `validation.timeout-minutes` (1-5 minutes).
 
@@ -97,24 +97,17 @@ Mounts at `/tmp/gh-aw/cache-memory/` (default) or `/tmp/gh-aw/cache-memory-{id}/
 
 ## Using with MCP Servers
 
-```aw wrap
----
-tools:
-  cache-memory: true
----
-```
-
-MCP servers can persist temporary state by reading and writing files under `/tmp/gh-aw/cache-memory/` when `tools.cache-memory` is enabled. Configure the server directly in the workflow and point it at a subdirectory such as `/tmp/gh-aw/cache-memory/<server-name>/`.
+With `tools.cache-memory` enabled, MCP servers can persist temporary state under `/tmp/gh-aw/cache-memory/`. Configure the server in the workflow and point it at a subdirectory such as `/tmp/gh-aw/cache-memory/<server-name>/`.
 
 ## Behavior
 
-GitHub Actions cache evicts unused entries after 7 days and provides a 10GB per-repository limit with LRU eviction. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime. The repository-wide [artifact retention policy](/gh-aw/reference/compiler-enterprise-environment-controls/#artifact-retention) overrides this per-cache artifact setting when configured.
+GitHub Actions cache provides a 10GB per-repository limit with LRU eviction, and evicts unused entries after 7 days. `retention-days` controls only uploaded artifact retention (1-90 days); it does not extend cache lifetime. The repository-wide [artifact retention policy](/gh-aw/reference/compiler-enterprise-environment-controls/#artifact-retention) overrides this per-cache artifact setting when configured.
 
 Cache memory is branch-scoped: runs restore from the same branch first, then can fall back to the default branch. On a non-default branch, the first restore often comes from the default branch; later saves create a branch-local cache lineage.
 
 Absent cache files are expected on cold starts or after eviction. When the workflow defines initialization or a full-analysis fallback, the agent follows that path without reporting `report_missing_data`. Required cached inputs with no fallback still produce `report_missing_data`; malformed or unreadable required state also remains a failure unless the workflow explicitly defines recovery.
 
-The compiler strips `${{ github.run_id }}` from restore keys so each run can fall back to earlier runs. For `scope: repo`, it also adds a broader restore key for cross-workflow sharing within the same branch scope. Custom user-supplied keys automatically append `-${{ github.run_id }}` when needed.
+The compiler strips `${{ github.run_id }}` from restore keys so each run can fall back to earlier runs. For `scope: repo`, it also adds a broader restore key for cross-workflow sharing within the same branch scope.
 
 ## Best Practices
 
@@ -131,11 +124,9 @@ Use cache-memory for short-lived, branch-local state. Prefer scheduled runs on t
 | Performance | Fast | Slower |
 | Best For | Temporary/sessions | Long-term/history |
 
-For unlimited retention with version control, see [Repo Memory](/gh-aw/reference/repo-memory/).
-
 ## Automatic Cleanup
 
-The [agentic maintenance](/gh-aw/reference/ephemerals/#cache-memory-cleanup) workflow automatically removes outdated cache-memory entries on a schedule by grouping caches by key prefix (everything before the run ID) and keeping only the latest entry in each group. You can also trigger the same cleanup manually from the GitHub Actions UI by running the `Agentic Maintenance` workflow with the `clean_cache_memories` operation.
+The [agentic maintenance](/gh-aw/reference/ephemerals/#cache-memory-cleanup) workflow periodically groups caches by key prefix (everything before the run ID) and keeps only the latest entry per group. Run the `Agentic Maintenance` workflow with the `clean_cache_memories` operation to trigger it manually.
 
 ## Troubleshooting
 
@@ -173,4 +164,4 @@ See [Grumpy Code Reviewer](https://github.com/github/gh-aw/blob/main/.github/wor
 
 ## Learn More
 
-See [Repo Memory](/gh-aw/reference/repo-memory/) for git branch-based persistent storage with unlimited retention, [Frontmatter](/gh-aw/reference/frontmatter/) for the full configuration model, and [Safe Outputs](/gh-aw/reference/safe-outputs/) for output processing and automation. For cache mechanics, refer to the [GitHub Actions cache documentation](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows).
+See [Repo Memory](/gh-aw/reference/repo-memory/) for git branch-based storage with unlimited retention, [Frontmatter](/gh-aw/reference/frontmatter/) for the full configuration model, and [Safe Outputs](/gh-aw/reference/safe-outputs/) for output processing and automation. For cache mechanics, refer to the [GitHub Actions cache documentation](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows).
