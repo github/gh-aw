@@ -724,7 +724,7 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
@@ -738,6 +738,22 @@ JSON, retaining the original session and reports. This also applies to cached
 runs and `--stdin`. Missing sessions are skipped without extra downloads or
 ATIF-specific reconstruction; cached summaries alone are not trajectories.
 Invalid sessions and export failures return errors.
+
+`--harbor` additionally exports the selected runs as a portable
+[Harbor](https://harborframework.com/) evaluation job, using the same ATIF
+converter. It requests session, experiment, and recorded grader artifacts without
+requiring every run to have grading results. Existing run filters, `--stdin`,
+and multi-workflow selection still apply.
+
+```bash wrap
+gh aw logs --harbor --output ./harbor-eval
+```
+
+The export preserves recorded metadata and grading evidence; it does not rerun
+agents, execute graders, infer task success from GitHub conclusions, or create
+missing rewards. Keep exports private: trajectories and source sessions can
+contain prompts, reasoning, and tool payloads. Compatibility is tested against
+Harbor **0.25.0** using its native models, CLI, and viewer.
 
 The `graders` artifact set includes conclusion's built-in results in `usage`
 and the optional combined `graders` artifact from the separate custom-grader job,

@@ -71,6 +71,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 
 	if len(opts.RunURLs) == 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No run IDs or URLs provided on stdin"))
+		if opts.Harbor {
+			if err := logsExportHarborJob(ctx, opts.OutputDir, nil); err != nil {
+				return fmt.Errorf("harbor export: %w", err)
+			}
+		}
 		return nil
 	}
 	// Parse owner/repo (and optional GHES host) from --repo override if provided.
@@ -192,6 +197,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			}
 		}
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No valid runs could be loaded from stdin"))
+		if opts.Harbor {
+			if err := logsExportHarborJob(ctx, opts.OutputDir, nil); err != nil {
+				return fmt.Errorf("harbor export: %w", err)
+			}
+		}
 		return nil
 	}
 
@@ -286,6 +296,11 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		renderLogsCollectionStats(collectionStats)
 	}
 	logsOrchestratorLog.Printf("Processed %d run(s) into output (storageLimitReached=%t)", len(processedRuns), storageLimitReached)
+	if opts.Harbor {
+		if err := logsExportHarborJob(ctx, opts.OutputDir, processedRuns); err != nil {
+			return fmt.Errorf("harbor export: %w", err)
+		}
+	}
 
 	if len(processedRuns) == 0 {
 		finishGitHubAPIRateLimitReports(ctx, allAPIRateLimits, opts.JSONOutput)

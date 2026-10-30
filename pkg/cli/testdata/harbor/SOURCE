@@ -1,0 +1,12 @@
+hello-world-invalid-json.trajectory.json is a Harbor golden fixture.
+Modification: a trailing newline was added; the JSON content is unchanged.
+Project: https://github.com/harbor-framework/harbor
+Release: v0.25.0
+Commit: fb8162a2209bb2af33f9377ac9f131561ceb51fa
+Path: tests/golden/terminus_2/hello-world-invalid-json.trajectory.json
+Git blob SHA-1: a6ea0ce8715916d8c6d437503f2be003d3375df9
+License: Apache-2.0; see LICENSE in this directory.
+
+The fixture exercises a recorded terminus-2 trajectory, including a rejected
+agent response, tool calls, observations, and final token/cost metrics. It is
+consumed as data only, never executed.
