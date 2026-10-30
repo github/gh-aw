@@ -129,6 +129,41 @@ func TestActionPinTypedAndRawSteps(t *testing.T) {
 	assert.Equal(t, diagnostics[0].Message, diagnostics[1].Message)
 }
 
+func TestActionPinGeneratedReferences(t *testing.T) {
+	t.Parallel()
+	document, err := aw.Parse("---\non: workflow_dispatch\n---\nTest.\n")
+	require.NoError(t, err)
+	const generated = "github/gh-aw-actions/setup@v0.93.5"
+	const malformed = "github/gh-aw-actions/setup@"
+	workflow := &actions.Workflow{Jobs: []*actions.Job{
+		{ID: "test", Steps: []actions.Step{
+			actions.ActionStep{Uses: generated},
+			actions.RawStep{Fields: map[string]any{"uses": generated}},
+			actions.ActionStep{Uses: "github/gh-aw-actions/setup@main"},
+			actions.ActionStep{Uses: "example/action@v1"},
+			actions.ActionStep{Uses: malformed},
+		}},
+		{ID: "reuse", Uses: "example/repo/.github/workflows/test.yml@v1"},
+	}}
+	diagnostics := integrityTestRun(t, ActionPinRule(), Input{
+		Workflow: workflow, Document: document,
+		GeneratedActionRefs: map[string]struct{}{
+			generated: {}, malformed: {}, "example/repo/.github/workflows/test.yml@v1": {},
+		},
+	})
+	require.Len(t, diagnostics, 6)
+	severities := make(map[string]Severity)
+	for _, diagnostic := range diagnostics {
+		severities[diagnostic.Path] = diagnostic.Severity
+	}
+	assert.Equal(t, Warning, severities["jobs.test.steps[0].uses"])
+	assert.Equal(t, Warning, severities["jobs.test.steps[1].uses"])
+	assert.Equal(t, Error, severities["jobs.test.steps[2].uses"])
+	assert.Equal(t, Error, severities["jobs.test.steps[3].uses"])
+	assert.Equal(t, Error, severities["jobs.test.steps[4].uses"])
+	assert.Equal(t, Error, severities["jobs.reuse.uses"])
+}
+
 func TestActionPinFormattingAcrossASTs(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
 	for _, reference := range []string{

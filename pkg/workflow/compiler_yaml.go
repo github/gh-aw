@@ -198,11 +198,16 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// step generators, etc.) can derive stable heredoc delimiters from it.
 	data.FrontmatterHash = frontmatterHash
 	data.BodyHash = bodyHash
+	data.generatedActionRefs = make(map[string]struct{})
+	sourceData := data
 	data = workflowDataWithArtifactRetention(data, repoConfig)
 	data, err = c.prepareDryRunWorkflowData(data)
 	if err != nil {
 		return "", nil, nil, err
 	}
+	// Appending failures can replace a slice's backing array; generatedActionRefs
+	// is a shared map and needs no copy-back.
+	defer func() { sourceData.ActionResolutionFailures = data.ActionResolutionFailures }()
 
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {

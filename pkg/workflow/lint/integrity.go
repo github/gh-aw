@@ -77,7 +77,11 @@ func checkActionPins(ctx context.Context, input Input) ([]Diagnostic, error) {
 					failures = append(failures, fmt.Errorf("cannot inspect action reference at %s.uses: expected a string", stepPath))
 					continue
 				}
-				if diagnostic := integrityPinDiagnostic(uses, false, severity, stepPath+".uses"); diagnostic != nil {
+				stepSeverity := severity
+				if _, generated := input.GeneratedActionRefs[uses]; generated {
+					stepSeverity = Warning
+				}
+				if diagnostic := integrityPinDiagnostic(uses, false, stepSeverity, stepPath+".uses"); diagnostic != nil {
 					diagnostics = append(diagnostics, *diagnostic)
 				}
 			}

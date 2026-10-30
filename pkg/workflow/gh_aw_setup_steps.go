@@ -61,13 +61,14 @@ func generateGhAwSetupStep(config ghAwSetupStepConfig) (GitHubActionStep, error)
 }
 
 // resolveGhAwSetupActionRef resolves the setup-cli action reference in priority order:
-//  1. Use workflow-aware pin resolution (getActionPinWithData) when WorkflowData exists.
+//  1. Use workflow-aware pin resolution when WorkflowData exists.
 //  2. Otherwise use the static pin table (getActionPin) when available.
 //  3. Otherwise fall back to repo@tag, then repo with no ref as a final fallback.
-func resolveGhAwSetupActionRef(config ghAwSetupStepConfig) (string, error) {
+func resolveGhAwSetupActionRef(config ghAwSetupStepConfig) (reference string, err error) {
+	defer func() { config.workflowData.recordGeneratedActionRef(reference) }()
 	if config.workflowData != nil {
 		actionRef := fmt.Sprintf("%s@%s", config.actionRepo, config.cliVersion)
-		pinnedRef, err := getActionPinWithData(config.actionRepo, config.cliVersion, config.workflowData)
+		pinnedRef, err := getGeneratedActionPinWithData(config.actionRepo, config.cliVersion, config.workflowData)
 		if err != nil {
 			return actionRef, err
 		}
