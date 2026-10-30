@@ -173,6 +173,7 @@ def run_grader(binary, workflow, grader_id, session):
             try:
                 os.killpg(child.pid, signal.SIGKILL)
             except ProcessLookupError:
+                # The process group already exited, so no cleanup signal is needed.
                 pass
             child.wait()
             for stream in streams:
