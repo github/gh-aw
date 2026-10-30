@@ -339,6 +339,13 @@ type ObservabilityConfig struct {
 	OTLP *OTLPConfig `json:"otlp,omitempty"`
 }
 
+// TokenBrokerConfig selects the independent Copilot capabilities to authenticate
+// through the OIDC token broker.
+type TokenBrokerConfig struct {
+	CopilotRequest bool `json:"copilot-request,omitempty" yaml:"copilot-request,omitempty"`
+	CopilotTask    bool `json:"copilot-task,omitempty" yaml:"copilot-task,omitempty"`
+}
+
 // FrontmatterConfig represents the structured configuration from workflow frontmatter
 // This provides compile-time type safety and clearer error messages compared to map[string]any
 type FrontmatterConfig struct {
@@ -367,7 +374,7 @@ type FrontmatterConfig struct {
 	MaxToolDenials              *TemplatableInt32            `json:"max-tool-denials,omitempty"`
 	MaxToolCalls                *TemplatableInt32            `json:"max-tool-calls,omitempty"`
 	Strict                      *bool                        `json:"strict,omitempty"` // Pointer to distinguish unset from false
-	TokenBroker                 *bool                        `json:"token-broker,omitempty" yaml:"token-broker,omitempty"`
+	TokenBroker                 *TokenBrokerConfig           `json:"token-broker,omitempty" yaml:"token-broker,omitempty"`
 	Private                     *bool                        `json:"private,omitempty"` // If true, workflow cannot be added to other repositories
 	Labels                      []string                     `json:"labels,omitempty"`
 	Skills                      []any                        `json:"skills,omitempty"`

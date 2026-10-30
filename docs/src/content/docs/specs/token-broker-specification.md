@@ -21,7 +21,7 @@ This specification defines a deployment-owned HTTPS service that exchanges a ver
 
 This is a project specification following W3C-style conventions, not a W3C Recommendation. Repository maintainers govern changes through the normal contribution and review process. Version numbers follow semantic versioning: incompatible contract changes increment the major version, backward-compatible features increment the minor version, and clarifications increment the patch version.
 
-**Implementation status (informative): Partial integration.** The shared client supports both token types. Coding-agent task creation and issue-assignment integrations obtain credentials at request time and renew them as necessary. Cloud inference remains blocked on a native renewable AWF credential provider. The compiler rejects broker-enabled GitHub-backed inference in the main agent, detection, and evals jobs, including applicable fallback models; this is not limited to the engine named `copilot`. A successful standalone `copilot-request` exchange does not establish working cloud inference. Full end-to-end acceptance has not been achieved. Server implementation, deployment, and issuer integrations remain deployment-owned.
+**Implementation status (informative): Partial integration.** The shared client supports both token types. Coding-agent task creation and issue-assignment integrations obtain credentials at request time and renew them as necessary. Brokered Copilot inference is wired for the bounded detection and evals jobs. Main-agent inference remains blocked on a renewable AWF credential provider. The compiler rejects broker-enabled GitHub-backed inference in the main agent job, including applicable fallback models; this is not limited to the engine named `copilot`. A successful standalone `copilot-request` exchange does not establish working cloud inference. Full end-to-end acceptance has not been achieved. Server implementation, deployment, and issuer integrations remain deployment-owned.
 
 ## Table of Contents
 
@@ -72,9 +72,9 @@ These are role-based classes, not escalating Basic/Standard/Complete levels. Inf
 
 ## 3. Runtime Configuration and Trust Boundaries
 
-Workflow source MUST explicitly set the top-level boolean `token-broker: true` to opt in. Omission or `false` MUST preserve existing authentication. An inherited broker URL alone MUST NOT enable workflow-handler broker authentication.
+Workflow source MUST explicitly select one or both capabilities using `token-broker.copilot-request: true` and/or `token-broker.copilot-task: true`. Omission MUST preserve existing authentication. An inherited broker URL alone MUST NOT enable workflow-handler broker authentication. `copilot-request` MUST NOT be combined with `permissions.copilot-requests: write`.
 
-For opted-in task consumers, the compiler MUST carry the reserved boolean member `_token_broker: true` in the existing `GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG` JSON object. Workflow handlers MUST enable broker authentication only when this member is exactly boolean `true`; missing, false, malformed, or string-valued markers MUST NOT enable it. This marker introduces no new environment variable. A true marker with a missing or empty `GH_AW_TOKEN_BROKER_URL` MUST fail closed when a credential is requested, rather than disable broker authentication or select a legacy credential.
+For opted-in task consumers, the compiler MUST carry the reserved member `_token_broker: {"copilot-task": true}` in the existing `GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG` JSON object. Workflow handlers MUST enable broker authentication only when this member selects `copilot-task` as boolean `true`; missing, false, malformed, or string-valued markers MUST NOT enable it. This marker introduces no new environment variable. A selected capability with a missing or empty `GH_AW_TOKEN_BROKER_URL` MUST fail closed when a credential is requested, rather than disable broker authentication or select a legacy credential.
 
 The explicit low-level `getToken(tokenType)` exchange API is marker-independent. A caller invoking it directly requests an exchange, subject to URL validation and all protocol requirements. The marker gates workflow-handler integration, not the broker server or this low-level API.
 
@@ -235,7 +235,7 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 
 | Test ID | Class | Scenario and expected outcome |
 | --- | --- | --- |
-| T-TBR-001 | Client | Omitted/false opt-in preserves authentication; inherited URL alone does not enable workflow-handler exchange. Only boolean `_token_broker: true` in existing handler-config JSON enables task integration; a true marker with missing/empty URL fails closed. Explicit low-level exchanges remain marker-independent. Runtime variable/secret resolution works without a compile-time URL. |
+| T-TBR-001 | Client | Omitted capability selection preserves authentication; inherited URL alone does not enable workflow-handler exchange. Only `_token_broker.copilot-task: true` in existing handler-config JSON enables task integration; a selected capability with missing/empty URL fails closed. Explicit low-level exchanges remain marker-independent. Runtime variable/secret resolution works without a compile-time URL. |
 | T-TBR-002 | Server | Exercise support sets `{}`, request-only, task-only, and both. Authorized supported types succeed; unsupported known types return 501 (or documented 404/422); no alternate capability is minted. |
 | T-TBR-003 | Server | Wrong issuer/audience/signature, multi-audience JWT, unsigned token, disallowed algorithm, and attacker-controlled key URLs return 401 without attacker-directed discovery. |
 | T-TBR-004 | Server | Missing/non-numeric/expired `exp`, future `nbf`/`iat`, invalid ordering, and excessive age/lifetime return 401 under the configured time policy; test exact boundaries. |

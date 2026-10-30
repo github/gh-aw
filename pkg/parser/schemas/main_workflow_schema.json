@@ -8,9 +8,24 @@
   "required": ["on"],
   "properties": {
     "token-broker": {
-      "description": "Use the OIDC token broker for agent task operations. Disabled unless explicitly true. Copilot inference requires a renewable AWF credential provider and is not currently supported.",
-      "type": "boolean",
-      "default": false
+      "description": "Select independent Copilot capabilities to authenticate through the OIDC token broker.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "copilot-request": {
+          "description": "Use brokered authentication for supported Copilot inference jobs.",
+          "type": "boolean"
+        },
+        "copilot-task": {
+          "description": "Use brokered authentication for Copilot task creation and issue assignment.",
+          "type": "boolean"
+        }
+      },
+      "anyOf": [
+        { "properties": { "copilot-request": { "const": true } }, "required": ["copilot-request"] },
+        { "properties": { "copilot-task": { "const": true } }, "required": ["copilot-task"] }
+      ]
     },
     "work-queue-policy": {
       "description": "Deprecated legacy version-3 Policy proposal. Use scheduling-only work_queue in .github/workflows/aw.json and AW-approved dispatch targets. Cannot be combined with repository work_queue settings. Installed Policy remains authoritative and historical ledgers remain readable.",

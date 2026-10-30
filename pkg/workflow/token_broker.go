@@ -1,33 +1,40 @@
 package workflow
 
 import (
-	"fmt"
+	"errors"
 	"slices"
 )
 
 const tokenBrokerURLEnv = "GH_AW_TOKEN_BROKER_URL"
 const tokenBrokerURLExpression = "${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}"
+const tokenBrokerCopilotRequestOutput = "${{ steps.token_broker_copilot_request.outputs.token }}"
 
 func usesTokenBrokerInference(data *WorkflowData) bool {
-	if data == nil || !data.TokenBrokerEnabled {
+	if !tokenBrokerRequestEnabled(data) {
 		return false
 	}
 	if slices.Contains(fallbackModelProviders(data), LLMProviderGitHub) {
 		return true
 	}
 	engineID := ResolveEngineID(data)
-	if engineID == "copilot" {
-		return !isCopilotBYOKMode(data, isFirewallEnabled(data))
-	}
-	provider, known := resolveWorkflowEngineProvider(data, engineID)
-	if !known || provider != LLMProviderGitHub {
+	if engineID == "copilot" && isCopilotBYOKMode(data, isFirewallEnabled(data)) {
 		return false
 	}
-	return true
+	if provider, known := resolveWorkflowEngineProvider(data, engineID); known {
+		return provider == LLMProviderGitHub
+	}
+	if engineID == "copilot" {
+		return true
+	}
+	return false
+}
+
+func tokenBrokerRequestEnabled(data *WorkflowData) bool {
+	return data != nil && data.TokenBrokerCopilotRequest
 }
 
 func usesTokenBrokerTasks(data *WorkflowData) bool {
-	if data == nil || !data.TokenBrokerEnabled || data.SafeOutputs == nil {
+	if data == nil || !data.TokenBrokerCopilotTask || data.SafeOutputs == nil {
 		return false
 	}
 	outputs := data.SafeOutputs
@@ -37,42 +44,51 @@ func usesTokenBrokerTasks(data *WorkflowData) bool {
 }
 
 func (c *Compiler) validateTokenBrokerInference(data *WorkflowData) error {
-	if data == nil || !data.TokenBrokerEnabled {
+	if !tokenBrokerRequestEnabled(data) {
 		return nil
 	}
-	unsupported := func(job string) error {
-		return fmt.Errorf("token-broker: true does not support Copilot inference in the %s job: AWF requires a renewable token-broker credential provider, which is not supported by the current runtime. Use a non-Copilot inference provider (including threat detection and evals) for task-only broker authentication, or disable token-broker", job)
-	}
 	if usesTokenBrokerInference(data) {
-		return unsupported("agent")
-	}
-	if IsDetectionJobEnabled(data.SafeOutputs) && !data.SafeOutputs.ThreatDetection.EngineDisabled {
-		engineID := c.getThreatDetectionEngineID(data)
-		detection := buildExternalDetectorWorkflowData(data, engineID)
-		detection.Model = inheritedDetectionModel(data, engineID)
-		if model := data.SafeOutputs.ThreatDetection.Model; model != "" {
-			detection.Model = model
-		}
-		if usesTokenBrokerInference(detection) {
-			return unsupported("detection")
-		}
-	}
-	if data.Evals.HasEvals() {
-		evals := *data
-		evals.AI = c.getEvalsEngineID(data)
-		evals.Model = c.resolveEvalsExecutionModel(data)
-		if usesTokenBrokerInference(&evals) {
-			return unsupported("evals")
-		}
-		for _, question := range data.Evals.Questions {
-			if question.Model == "" {
-				continue
-			}
-			evals.Model = question.Model
-			if usesTokenBrokerInference(&evals) {
-				return unsupported("evals")
-			}
-		}
+		return errors.New("token-broker.copilot-request does not support Copilot inference in the main agent job: AWF requires a renewable credential provider, which is not supported by the current runtime")
 	}
 	return nil
+}
+
+func validateTokenBrokerRequestPermissions(data *WorkflowData, permissions *Permissions) error {
+	if !tokenBrokerRequestEnabled(data) || permissions == nil {
+		return nil
+	}
+	if level, exists := permissions.GetExplicit(PermissionCopilotRequests); exists && level == PermissionWrite {
+		return errors.New("token-broker.copilot-request is incompatible with permissions.copilot-requests: write")
+	}
+	return nil
+}
+
+func inheritTokenBrokerConfig(source, destination *WorkflowData) {
+	destination.TokenBrokerEnabled = source.TokenBrokerEnabled
+	destination.TokenBrokerCopilotRequest = source.TokenBrokerCopilotRequest
+	destination.TokenBrokerCopilotTask = source.TokenBrokerCopilotTask
+}
+
+func (c *Compiler) buildTokenBrokerRequestStep(data *WorkflowData, condition string) []string {
+	if !usesTokenBrokerInference(data) {
+		return nil
+	}
+	var step []string
+	step = append(step,
+		"      - name: Request brokered Copilot inference credential\n",
+		"        id: token_broker_copilot_request\n",
+	)
+	if condition != "" {
+		step = append(step, "        if: "+condition+"\n")
+	}
+	step = append(step,
+		"        uses: "+getCachedActionPin("actions/github-script", data)+"\n",
+		"        env:\n",
+		"          "+tokenBrokerURLEnv+": "+tokenBrokerURLExpression+"\n",
+		"        with:\n",
+		"          script: |\n",
+		"            const { getBrokerToken } = require('"+SetupActionDestination+"/setup/js/token_broker.cjs');\n",
+		"            core.setOutput('token', await getBrokerToken('copilot-request', { mask: token => core.setSecret(token) }));\n",
+	)
+	return step
 }

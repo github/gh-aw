@@ -115,7 +115,11 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	}
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
 	ctx.workflowData.SourceDocument = ctx.document
-	ctx.workflowData.TokenBrokerEnabled = ctx.frontmatter.Frontmatter["token-broker"] == true
+	if config := ctx.workflowData.ParsedFrontmatter; config != nil && config.TokenBroker != nil {
+		ctx.workflowData.TokenBrokerCopilotRequest = config.TokenBroker.CopilotRequest
+		ctx.workflowData.TokenBrokerCopilotTask = config.TokenBroker.CopilotTask
+		ctx.workflowData.TokenBrokerEnabled = config.TokenBroker.CopilotRequest || config.TokenBroker.CopilotTask
+	}
 	resolveMaxDailyAICBackendIntoWorkflowData(ctx.workflowData, ctx.frontmatter.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 	return nil
 }

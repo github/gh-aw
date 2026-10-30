@@ -23,7 +23,8 @@ function failure(kind) {
 function isTokenBrokerEnabled(env = process.env) {
   try {
     const config = JSON.parse(env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG || "");
-    return config !== null && typeof config === "object" && !Array.isArray(config) && config._token_broker === true;
+    const marker = config !== null && typeof config === "object" && !Array.isArray(config) ? config._token_broker : null;
+    return marker !== null && typeof marker === "object" && !Array.isArray(marker) && marker["copilot-task"] === true;
   } catch {
     return false;
   }

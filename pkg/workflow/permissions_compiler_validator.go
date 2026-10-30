@@ -187,6 +187,9 @@ func (c *Compiler) validatePermissions(workflowData *WorkflowData, markdownPath 
 	if err := validateCodexCopilotAwfVersion(workflowData); err != nil {
 		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
+	if err := validateTokenBrokerRequestPermissions(workflowData, workflowPermissions); err != nil {
+		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	if err := c.validateTokenBrokerInference(workflowData); err != nil {
 		return nil, formatCompilerError(markdownPath, "error", err.Error(), err)
 	}

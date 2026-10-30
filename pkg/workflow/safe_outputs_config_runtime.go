@@ -38,7 +38,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 	// non-handler keys ("mentions") are documented in safe_outputs_config_generation.go.
 	config := make(map[string]any)
 	if usesTokenBrokerTasks(data) {
-		config["_token_broker"] = true
+		config["_token_broker"] = map[string]bool{"copilot-task": true}
 	}
 	addWorkQueueClaimAdapterRuntimeConfig(config, data)
 

@@ -75,19 +75,20 @@ The same configuration enables an isolated conclusion-admission job to post to `
 ## OIDC Token Broker
 
 > [!WARNING]
-> Broker integration currently supports coding-agent tasks and issue assignment only. Cloud inference integration is blocked on a renewable credential provider in AWF. Broker-enabled workflows that use Copilot inference are rejected rather than silently using existing credentials. Use a separately authenticated, non-Copilot inference provider for task-only adoption.
+> Brokered Copilot inference is supported in threat-detection and evals jobs. Main-agent inference remains blocked pending a renewable credential provider in AWF. Enable task and request capabilities independently; task-only adoption does not change the workflow's inference authentication.
 
 Enterprise administrators can distribute a broker endpoint through an organization Actions variable named `GH_AW_TOKEN_BROKER_URL`, with access limited to enrolled repositories. A repository Actions variable can override the organization value. An Actions secret with the same name is also supported; a nonempty variable takes precedence over the secret. For enterprise-wide deployment, provision the setting in each organization rather than assuming an enterprise Actions-variable scope.
 
 Workflows must explicitly opt in:
 
 ```aw
-token-broker: true
+token-broker:
+  copilot-task: true
 ```
 
 The compiler emits runtime references to the variable and secret, not the endpoint value. Setting the variable alone does not enable the feature. After opting in and recompiling, changing the endpoint does not require recompilation.
 
-The broker contract defines independent authorization for `copilot-request` (cloud inference) and `copilot-task` (coding-agent task creation and issue assignment). The shared client supports both exchanges; only the task capability is connected to runtime operations in this implementation. The broker validates GitHub's signature, issuer, expiration, audience, repository, workflow identity, and run claims against its enrollment policy; the audience is the configured broker URL. Restrict runner egress and protect the workflow and configuration that select this destination.
+The broker contract defines independent authorization for `copilot-request` (Copilot inference) and `copilot-task` (coding-agent task creation and issue assignment). Enable either capability or both. Brokered Copilot inference is supported in threat-detection and evals jobs; main agent inference still requires a renewable AWF credential provider. Do not combine `copilot-request` with `permissions.copilot-requests: write`. The broker validates GitHub's signature, issuer, expiration, audience, repository, workflow identity, and run claims against its enrollment policy; the audience is the configured broker URL. Restrict runner egress and protect the workflow and configuration that select this destination.
 
 Broker-enabled jobs require `id-token: write`. Reusable workflow callers must grant that permission to the caller job. The runner must reach both the GitHub OIDC endpoint and the broker over HTTPS. Broker failures, including a missing endpoint, must not select a PAT, GitHub App token, or `GITHUB_TOKEN` as a fallback. Unrelated GitHub operations retain their existing authentication.
 

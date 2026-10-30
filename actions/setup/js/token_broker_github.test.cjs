@@ -15,7 +15,7 @@ describe("broker-authenticated agent operations", () => {
   let scripts;
 
   beforeEach(() => {
-    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ _token_broker: true }));
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", JSON.stringify({ _token_broker: { "copilot-task": true } }));
     vi.stubEnv("GH_AW_TOKEN_BROKER_URL", "https://broker.example/token");
     vi.stubEnv("GH_AW_AGENT_SESSION_TOKEN", "legacy-session");
     vi.stubEnv("GH_AW_ASSIGN_TO_AGENT_TOKEN", "legacy-assignment");
@@ -409,7 +409,7 @@ describe("broker-authenticated agent operations", () => {
         ["missing", undefined],
         ["absent marker", "{}"],
         ["false marker", '{"_token_broker":false}'],
-        ["non-boolean marker", '{"_token_broker":"true"}'],
+        ["non-boolean marker", '{"_token_broker":{"copilot-task":"true"}}'],
         ["invalid JSON", "{"],
       ].map(([label, config]) => [operation, label, config])
     )

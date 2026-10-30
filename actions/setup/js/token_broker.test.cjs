@@ -46,15 +46,27 @@ describe("token broker", () => {
     expect(isTokenBrokerEnabled({})).toBe(false);
     expect(isTokenBrokerEnabled(makeEnv())).toBe(false);
     expect(isTokenBrokerEnabled(Object.create({ GH_AW_TOKEN_BROKER_URL: "https://broker.example.test" }))).toBe(false);
-    for (const config of ["", "not-json", "null", "true", "[]", "{}", '{"_token_broker":false}', '{"_token_broker":"true"}', '{"_token_broker":1}', '{"assign_to_agent":{"_token_broker":true}}']) {
+    for (const config of [
+      "",
+      "not-json",
+      "null",
+      "true",
+      "[]",
+      "{}",
+      '{"_token_broker":false}',
+      '{"_token_broker":"true"}',
+      '{"_token_broker":1}',
+      '{"_token_broker":{"copilot-task":"true"}}',
+      '{"assign_to_agent":{"_token_broker":{"copilot-task":true}}}',
+    ]) {
       expect(isTokenBrokerEnabled({ ...makeEnv(), GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: config })).toBe(false);
     }
-    expect(isTokenBrokerEnabled({ GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"_token_broker":true}' })).toBe(true);
-    expect(isTokenBrokerEnabled({ ...makeEnv(), GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"_token_broker":true,"assign_to_agent":{}}' })).toBe(true);
+    expect(isTokenBrokerEnabled({ GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"_token_broker":{"copilot-task":true}}' })).toBe(true);
+    expect(isTokenBrokerEnabled({ ...makeEnv(), GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"_token_broker":{"copilot-task":true},"assign_to_agent":{}}' })).toBe(true);
   });
 
   it("fails closed on missing or empty URL even when the workflow marker is enabled", async () => {
-    const marker = { GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"_token_broker":true}' };
+    const marker = { GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: '{"_token_broker":{"copilot-task":true}}' };
     for (const env of [marker, { ...marker, GH_AW_TOKEN_BROKER_URL: "" }, { ...marker, GH_AW_TOKEN_BROKER_URL: undefined }]) {
       expect(isTokenBrokerEnabled(env)).toBe(true);
       const fixture = setup({ env });

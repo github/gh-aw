@@ -92,13 +92,14 @@ if: github.event_name == 'push'
 
 ### Token Broker (`token-broker:`)
 
-An optional boolean that explicitly enables OIDC-authenticated Copilot credential exchange. The default is `false`.
+An optional object that independently enables OIDC-authenticated Copilot credential exchange.
 
 ```aw
-token-broker: true
+token-broker:
+  copilot-task: true
 ```
 
-The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime, not from workflow source or the compiler environment. When enabled, missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. Currently only task creation and issue assignment are integrated; workflows using Copilot inference are rejected pending renewable AWF credential support. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
+Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions variable or secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
 
 ### Imports (`imports:`)
 

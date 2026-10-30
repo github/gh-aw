@@ -226,6 +226,9 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		copilotSDKServerArgsJSON,
 		copilotSDKToolConfigJSON,
 	)
+	if usesTokenBrokerInference(workflowData) {
+		env["COPILOT_GITHUB_TOKEN"] = tokenBrokerCopilotRequestOutput
+	}
 
 	return []GitHubActionStep{e.buildCopilotExecutionStep(workflowData, command, env, timeoutValue)}
 }
@@ -587,7 +590,7 @@ func (e *CopilotEngine) buildCopilotBaseStepEnv(workflowData *WorkflowData, llmP
 	if isBYOKMode {
 		copilotExecLog.Print("Skipping COPILOT_GITHUB_TOKEN injection: BYOK mode active (COPILOT_PROVIDER_BASE_URL is set)")
 	} else {
-		env["COPILOT_GITHUB_TOKEN"] = e.buildCopilotGitHubTokenExpression(useCopilotRequests)
+		env["COPILOT_GITHUB_TOKEN"] = e.buildCopilotGitHubTokenExpression(workflowData, useCopilotRequests)
 	}
 	injectWorkflowCallNetworkAllowedEnv(env, workflowData)
 	// When permissions.copilot-requests is write, set S2STOKENS=true to allow the Copilot CLI
@@ -598,7 +601,10 @@ func (e *CopilotEngine) buildCopilotBaseStepEnv(workflowData *WorkflowData, llmP
 	return env
 }
 
-func (e *CopilotEngine) buildCopilotGitHubTokenExpression(useCopilotRequests bool) string {
+func (e *CopilotEngine) buildCopilotGitHubTokenExpression(workflowData *WorkflowData, useCopilotRequests bool) string {
+	if usesTokenBrokerInference(workflowData) {
+		return tokenBrokerCopilotRequestOutput
+	}
 	// COPILOT_GITHUB_TOKEN injection: the token is only needed for GitHub's own Copilot backend.
 	// When not in BYOK mode, use the GitHub Actions token when permissions.copilot-requests is write,
 	// otherwise use the COPILOT_GITHUB_TOKEN secret.

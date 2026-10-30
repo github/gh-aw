@@ -14,17 +14,25 @@ import (
 
 func TestTokenBrokerCompileOptIn(t *testing.T) {
 	t.Setenv(tokenBrokerURLEnv, "https://compile-time.invalid/never")
-	for _, optIn := range []string{"", "token-broker: false\n", "token-broker: true\n"} {
-		t.Run(strings.TrimSpace(optIn), func(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		optIn  string
+		broker bool
+		fail   bool
+	}{
+		{name: "disabled"},
+		{name: "task-only", optIn: "token-broker:\n  copilot-task: true\n", broker: true},
+		{name: "request-only", optIn: "token-broker:\n  copilot-request: true\n", broker: true, fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			compiler := NewCompiler()
-			source := "---\non: workflow_dispatch\nstrict: false\nengine: copilot\n" + optIn + "safe-outputs:\n  noop:\n  threat-detection: false\n---\nTest broker."
+			source := "---\non: workflow_dispatch\nstrict: false\nengine: copilot\n" + tc.optIn + "safe-outputs:\n  noop:\n  threat-detection: false\n---\nTest broker."
 			data, err := compiler.ParseWorkflowString(source, "broker.md")
 			require.NoError(t, err)
-			enabled := strings.Contains(optIn, "true")
-			assert.Equal(t, enabled, data.TokenBrokerEnabled)
+			assert.Equal(t, tc.broker, data.TokenBrokerEnabled)
 			output, err := compiler.CompileToYAML(data, "broker.md")
-			if enabled {
-				require.ErrorContains(t, err, "renewable token-broker credential provider")
+			if tc.fail {
+				require.ErrorContains(t, err, "renewable credential provider")
 				assert.Empty(t, output)
 				return
 			}
@@ -75,7 +83,7 @@ func TestTokenBrokerBootstrapExcluded(t *testing.T) {
 
 func TestTokenBrokerHandlerConfigExplicitOptIn(t *testing.T) {
 	t.Setenv(tokenBrokerURLEnv, "https://inherited.invalid")
-	for _, field := range []string{"", "token-broker: false\n", "token-broker: true\n"} {
+	for _, field := range []string{"", "token-broker:\n  copilot-task: true\n"} {
 		t.Run(strings.TrimSpace(field), func(t *testing.T) {
 			compiler := NewCompiler()
 			source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\n" + field + "safe-outputs:\n  assign-to-agent:\n  threat-detection: false\n---\nTest."
@@ -101,7 +109,7 @@ func TestTokenBrokerHandlerConfigExplicitOptIn(t *testing.T) {
 				var config map[string]any
 				require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG"]), &config))
 				if data.TokenBrokerEnabled {
-					assert.Equal(t, true, config["_token_broker"])
+					assert.Equal(t, map[string]any{"copilot-task": true}, config["_token_broker"])
 					assert.Equal(t, tokenBrokerURLExpression, step.Env[tokenBrokerURLEnv])
 				} else {
 					assert.NotContains(t, config, "_token_broker")
@@ -124,7 +132,7 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 	} {
 		t.Run(strings.TrimSpace(handler), func(t *testing.T) {
 			compiler := NewCompiler()
-			source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker: true\nsafe-outputs:\n  threat-detection: false\n" + handler + "---\nTest task."
+			source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker:\n  copilot-task: true\nsafe-outputs:\n  threat-detection: false\n" + handler + "---\nTest task."
 			data, err := compiler.ParseWorkflowString(source, "broker.md")
 			require.NoError(t, err)
 			assert.False(t, usesTokenBrokerInference(data))
@@ -153,7 +161,7 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 						assert.Equal(t, "write", job.Permissions["id-token"])
 						var config map[string]any
 						require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG"]), &config))
-						assert.Equal(t, true, config["_token_broker"])
+						assert.Equal(t, map[string]any{"copilot-task": true}, config["_token_broker"])
 						consumers++
 					}
 				}
@@ -170,28 +178,37 @@ func TestTokenBrokerFrontmatterModel(t *testing.T) {
 	config, err := ParseFrontmatterConfig(map[string]any{})
 	require.NoError(t, err)
 	assert.Nil(t, config.TokenBroker)
-	for _, enabled := range []bool{false, true} {
-		config, err := ParseFrontmatterConfig(map[string]any{"token-broker": enabled})
+	for _, values := range []map[string]any{
+		{"copilot-request": true},
+		{"copilot-task": true},
+		{"copilot-request": true, "copilot-task": true},
+	} {
+		config, err := ParseFrontmatterConfig(map[string]any{"token-broker": values})
 		require.NoError(t, err)
 		require.NotNil(t, config.TokenBroker)
-		assert.Equal(t, enabled, *config.TokenBroker)
+		assert.Equal(t, values["copilot-request"] == true, config.TokenBroker.CopilotRequest)
+		assert.Equal(t, values["copilot-task"] == true, config.TokenBroker.CopilotTask)
 	}
 }
 
 func TestTokenBrokerDetectionInheritance(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		detection := buildThreatDetectionWorkflowData(&WorkflowData{
-			TokenBrokerEnabled: enabled,
-			AI:                 "claude",
+			TokenBrokerEnabled:        enabled,
+			TokenBrokerCopilotRequest: enabled,
+			TokenBrokerCopilotTask:    enabled,
+			AI:                        "claude",
 		}, "copilot")
 		assert.Equal(t, enabled, detection.TokenBrokerEnabled)
+		assert.Equal(t, enabled, detection.TokenBrokerCopilotRequest)
+		assert.Equal(t, enabled, detection.TokenBrokerCopilotTask)
 		assert.Equal(t, enabled, usesTokenBrokerInference(detection))
 	}
 }
 
 func TestTokenBrokerStrictDefault(t *testing.T) {
 	compiler := NewCompiler()
-	data, err := compiler.ParseWorkflowString("---\non: workflow_dispatch\nengine: claude\ntoken-broker: true\nsafe-outputs:\n  assign-to-agent:\n  threat-detection: false\n---\nTest.", "broker.md")
+	data, err := compiler.ParseWorkflowString("---\non: workflow_dispatch\nengine: claude\ntoken-broker:\n  copilot-task: true\nsafe-outputs:\n  assign-to-agent:\n  threat-detection: false\n---\nTest.", "broker.md")
 	require.NoError(t, err)
 	_, err = compiler.CompileToYAML(data, "broker.md")
 	require.NoError(t, err)
@@ -200,20 +217,22 @@ func TestTokenBrokerStrictDefault(t *testing.T) {
 func TestTokenBrokerRejectsUnsupportedInference(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{
-		TokenBrokerEnabled: true,
-		AI:                 "copilot",
+		TokenBrokerEnabled:        true,
+		TokenBrokerCopilotRequest: true,
+		AI:                        "copilot",
 		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
 			Type: SandboxTypeAWF, Version: "v0.25.0",
 		}},
 	}
-	require.ErrorContains(t, compiler.validateTokenBrokerInference(data), "renewable token-broker")
-	data.TokenBrokerEnabled = false
+	require.ErrorContains(t, compiler.validateTokenBrokerInference(data), "renewable credential provider")
+	data.TokenBrokerCopilotRequest = false
 	require.NoError(t, compiler.validateTokenBrokerInference(data))
 }
 
 func TestTokenBrokerDoesNotReplaceBYOK(t *testing.T) {
 	data := &WorkflowData{
-		TokenBrokerEnabled: true,
+		TokenBrokerEnabled:        true,
+		TokenBrokerCopilotRequest: true,
 		EngineConfig: &EngineConfig{ID: "copilot", Env: map[string]string{
 			"COPILOT_PROVIDER_BASE_URL": "https://provider.invalid",
 		}},
@@ -225,18 +244,19 @@ func TestTokenBrokerDoesNotReplaceBYOK(t *testing.T) {
 
 func TestTokenBrokerRejectsLegacyInferenceFallback(t *testing.T) {
 	data := &WorkflowData{
-		TokenBrokerEnabled: true,
+		TokenBrokerEnabled:        true,
+		TokenBrokerCopilotRequest: true,
 		EngineConfig: &EngineConfig{ID: "copilot", Env: map[string]string{
 			"COPILOT_GITHUB_TOKEN": "${{ secrets.LEGACY_TOKEN }}",
 			tokenBrokerURLEnv:      "https://not-runtime.invalid",
 		}},
 	}
-	require.ErrorContains(t, NewCompiler().validateTokenBrokerInference(data), "renewable token-broker")
+	require.ErrorContains(t, NewCompiler().validateTokenBrokerInference(data), "renewable credential provider")
 }
 
 func TestTokenBrokerWithoutTaskConsumer(t *testing.T) {
 	compiler := NewCompiler()
-	data, err := compiler.ParseWorkflowString("---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker: true\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest.", "broker.md")
+	data, err := compiler.ParseWorkflowString("---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker:\n  copilot-task: true\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest.", "broker.md")
 	require.NoError(t, err)
 	output, err := compiler.CompileToYAML(data, "broker.md")
 	require.NoError(t, err)
@@ -246,7 +266,7 @@ func TestTokenBrokerWithoutTaskConsumer(t *testing.T) {
 
 func TestTokenBrokerDoesNotGrantOIDCToCustomJobs(t *testing.T) {
 	compiler := NewCompiler()
-	source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker: true\nsafe-outputs:\n  assign-to-agent:\n  threat-detection: false\njobs:\n  custom:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo custom\n        env:\n          GH_AW_TOKEN_BROKER_URL: ${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}\n---\nTest."
+	source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker:\n  copilot-task: true\nsafe-outputs:\n  assign-to-agent:\n  threat-detection: false\njobs:\n  custom:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo custom\n        env:\n          GH_AW_TOKEN_BROKER_URL: ${{ vars.GH_AW_TOKEN_BROKER_URL || secrets.GH_AW_TOKEN_BROKER_URL }}\n---\nTest."
 	data, err := compiler.ParseWorkflowString(source, "broker.md")
 	require.NoError(t, err)
 	_, err = compiler.CompileToYAML(data, "broker.md")
@@ -256,77 +276,92 @@ func TestTokenBrokerDoesNotGrantOIDCToCustomJobs(t *testing.T) {
 	assert.NotContains(t, job.Permissions, "id-token")
 }
 
-func TestTokenBrokerRejectsAuxiliaryCopilotInference(t *testing.T) {
-	for _, config := range []struct {
-		name   string
-		fields string
-		job    string
-	}{
-		{"detector", "safe-outputs:\n  assign-to-agent:\n  threat-detection:\n    engine: copilot\n", "detection"},
-		{"evals", "safe-outputs:\n  assign-to-agent:\n  threat-detection: false\nevals:\n  model: copilot/claude-sonnet-4.5\n  questions:\n    - id: result\n      question: Was the task completed?\n", "evals"},
-		{"github-provider", "engine:\n  id: codex\n  model-provider: github\nsafe-outputs:\n  noop:\n  threat-detection: false\n", "agent"},
-	} {
-		t.Run(config.name, func(t *testing.T) {
-			compiler := NewCompiler()
-			engine := "engine: claude\n"
-			if config.name == "github-provider" {
-				engine = ""
-			}
-
-			source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker: true\n" + engine + config.fields + "---\nTest."
-			data, err := compiler.ParseWorkflowString(source, "broker.md")
-			require.NoError(t, err)
-			output, err := compiler.CompileToYAML(data, "broker.md")
-			require.ErrorContains(t, err, "renewable token-broker credential provider")
-			require.ErrorContains(t, err, config.job+" job")
-			assert.Empty(t, output)
-		})
-	}
+func TestTokenBrokerSupportsDetectionInference(t *testing.T) {
+	compiler := NewCompiler()
+	source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker:\n  copilot-request: true\nengine: claude\nsafe-outputs:\n  noop:\n  threat-detection:\n    engine: copilot\n---\nTest."
+	data, err := compiler.ParseWorkflowString(source, "broker.md")
+	require.NoError(t, err)
+	output, err := compiler.CompileToYAML(data, "broker.md")
+	require.NoError(t, err)
+	assert.Contains(t, output, "name: detection")
+	assert.Contains(t, output, "id-token: write")
+	assert.Contains(t, output, "id: token_broker_copilot_request")
+	assert.Contains(t, output, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
+	assert.NotContains(t, output, "copilot-requests: write")
 }
 
-func TestTokenBrokerGitHubProviderAcrossEngines(t *testing.T) {
+func TestTokenBrokerSupportsEvalsInference(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI:                        "copilot",
+		EngineConfig:              &EngineConfig{ID: "copilot"},
+		TokenBrokerEnabled:        true,
+		TokenBrokerCopilotRequest: true,
+		Evals:                     &EvalsConfig{Questions: []EvalDefinition{{ID: "result", Question: "Done?"}}},
+	}
+	job, err := compiler.buildEvalsJob(data)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	assert.Contains(t, job.Permissions, "id-token: write")
+	assert.NotContains(t, job.Permissions, "copilot-requests: write")
+	steps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+	assert.Contains(t, steps, "id: token_broker_copilot_request")
+	assert.Contains(t, steps, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
+}
+
+func TestTokenBrokerGitHubProviderInAgentRemainsUnsupported(t *testing.T) {
 	for _, engineID := range []string{"copilot", "claude", "codex", "pi"} {
 		t.Run(engineID, func(t *testing.T) {
 			compiler := NewCompiler()
-			source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker: true\nengine:\n  id: " + engineID + "\n  model-provider: github\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest."
+			source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker:\n  copilot-request: true\nengine:\n  id: " + engineID + "\n  model-provider: github\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest."
 			data, err := compiler.ParseWorkflowString(source, "broker.md")
 			require.NoError(t, err)
 			output, err := compiler.CompileToYAML(data, "broker.md")
-			require.ErrorContains(t, err, "renewable token-broker credential provider")
+			require.ErrorContains(t, err, "renewable credential provider")
 			assert.Empty(t, output)
 		})
 	}
-}
-
-func TestTokenBrokerRejectsDefaultCopilotEvals(t *testing.T) {
-	data := &WorkflowData{
-		TokenBrokerEnabled: true,
-		Evals:              &EvalsConfig{Questions: []EvalDefinition{{ID: "result", Question: "Done?"}}},
-	}
-	assert.Equal(t, "copilot", NewCompiler().getEvalsEngineID(data))
-	require.ErrorContains(t, NewCompiler().validateTokenBrokerInference(data), "evals job")
 }
 
 func TestTokenBrokerRejectsCopilotFallback(t *testing.T) {
 	data := &WorkflowData{
-		TokenBrokerEnabled: true,
+		TokenBrokerEnabled:        true,
+		TokenBrokerCopilotRequest: true,
 		EngineConfig: &EngineConfig{
 			ID: "claude", FallbackModels: []string{"copilot/claude-sonnet-4.5"},
 		},
 	}
-	require.ErrorContains(t, NewCompiler().validateTokenBrokerInference(data), "agent job")
+	require.ErrorContains(t, NewCompiler().validateTokenBrokerInference(data), "main agent job")
 }
 
-func TestTokenBrokerRejectsDirectCopilotDeclaredProvider(t *testing.T) {
+func TestTokenBrokerDoesNotReplaceNonGitHubCopilotProvider(t *testing.T) {
 	for _, provider := range []string{"openai", "anthropic"} {
 		t.Run(provider, func(t *testing.T) {
 			compiler := NewCompiler()
-			source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker: true\nengine:\n  id: copilot\n  model-provider: " + provider + "\nsandbox:\n  agent: false\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest."
+			source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker:\n  copilot-request: true\nengine:\n  id: copilot\n  model-provider: " + provider + "\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest."
 			data, err := compiler.ParseWorkflowString(source, "broker.md")
 			require.NoError(t, err)
 			output, err := compiler.CompileToYAML(data, "broker.md")
-			require.ErrorContains(t, err, "renewable token-broker credential provider")
-			assert.Empty(t, output)
+			require.NoError(t, err)
+			assert.NotContains(t, output, "id: token_broker_copilot_request")
 		})
 	}
+}
+
+func TestTokenBrokerRequestRejectsCopilotRequestsPermission(t *testing.T) {
+	data := &WorkflowData{TokenBrokerCopilotRequest: true}
+	permissions := NewPermissions()
+	permissions.Set(PermissionCopilotRequests, PermissionWrite)
+	require.ErrorContains(t, validateTokenBrokerRequestPermissions(data, permissions), "incompatible")
+	permissions.Set(PermissionCopilotRequests, PermissionNone)
+	require.NoError(t, validateTokenBrokerRequestPermissions(data, permissions))
+}
+
+func TestTokenBrokerRequestPermissionCompilerError(t *testing.T) {
+	compiler := NewCompiler()
+	source := "---\non: workflow_dispatch\nstrict: false\ntoken-broker:\n  copilot-request: true\npermissions:\n  copilot-requests: write\nengine: claude\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nTest."
+	data, err := compiler.ParseWorkflowString(source, "broker.md")
+	require.NoError(t, err)
+	_, err = compiler.CompileToYAML(data, "broker.md")
+	require.ErrorContains(t, err, "token-broker.copilot-request is incompatible")
 }

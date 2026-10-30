@@ -81,10 +81,22 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 	}
 
 	// Determine permissions for the evals job (same rationale as the detection job).
-	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data)
+	evalsAuthData := *data
+	evalsAuthData.AI = c.getEvalsEngineID(data)
+	evalsAuthData.Model = c.resolveEvalsExecutionModel(data)
+	if data.EngineConfig != nil {
+		engineConfig := *data.EngineConfig
+		engineConfig.ID = evalsAuthData.AI
+		evalsAuthData.EngineConfig = &engineConfig
+	}
+	brokeredInference := usesTokenBrokerInference(&evalsAuthData)
+	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data) && !brokeredInference
 	perms := NewPermissionsContentsRead()
 	if copilotRequestsEnabled {
 		perms.Set(PermissionCopilotRequests, PermissionWrite)
+	}
+	if brokeredInference {
+		perms.Set(PermissionIdToken, PermissionWrite)
 	}
 	if data.EngineConfig != nil && data.EngineConfig.Auth != nil && data.EngineConfig.Auth.Type == "github-oidc" {
 		perms.Set(PermissionIdToken, PermissionWrite)
