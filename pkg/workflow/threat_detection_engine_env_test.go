@@ -3,6 +3,9 @@
 package workflow
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -785,5 +788,73 @@ func TestBuildDetectionEngineExecutionStepPropagatesModelCostsProviders(t *testi
 	}
 	if !strings.Contains(allSteps, "accounts/fireworks/models/minimax-m3") {
 		t.Errorf("expected detection awf-config.json to contain custom model pricing key; got:\n%s", allSteps)
+	}
+}
+
+// compileClaudeOnCopilotDetectionWorkflow compiles a workflow shaped like
+// daily-byok-ollama-test: a Copilot agent whose threat detection runs Claude on
+// the GitHub (Copilot) provider. externalDetector selects the external
+// threat-detect path (gh-aw-detection: true) or inline detection.
+func compileClaudeOnCopilotDetectionWorkflow(t *testing.T, externalDetector bool) string {
+	t.Helper()
+	workflowPath := filepath.Join(t.TempDir(), "claude-detection.md")
+	content := fmt.Sprintf(`---
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+engine:
+  id: copilot
+strict: true
+safe-outputs:
+  threat-detection:
+    engine:
+      id: claude
+      model-provider: github
+      model: claude-haiku-4.5
+  create-issue:
+features:
+  gh-aw-detection: %t
+sandbox:
+  agent:
+    id: awf
+---
+Test workflow.
+`, externalDetector)
+	if err := os.WriteFile(workflowPath, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+		t.Fatal(err)
+	}
+	result, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	detection := extractJobSection(string(result), "detection")
+	if detection == "" {
+		t.Fatal("detection job missing")
+	}
+	return detection
+}
+
+func TestDetectionClaudeNonAnthropicProviderUsesAPIProxyGateway(t *testing.T) {
+	for _, tt := range []struct {
+		name             string
+		externalDetector bool
+	}{
+		{name: "inline detection", externalDetector: false},
+		{name: "external threat-detect", externalDetector: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			detection := compileClaudeOnCopilotDetectionWorkflow(t, tt.externalDetector)
+			if !strings.Contains(detection, "ANTHROPIC_BASE_URL: http://api-proxy:10002\n") {
+				t.Fatalf("expected detection job to set ANTHROPIC_BASE_URL to the api-proxy gateway.\nDetection job:\n%s", detection)
+			}
+			if strings.Contains(detection, "host.docker.internal:10002") {
+				t.Fatal("detection job must not use the unreachable host gateway URL")
+			}
+		})
 	}
 }
