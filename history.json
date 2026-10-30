@@ -45,8 +45,31 @@
       "avg_comments": 4.67,
       "success_rate": 0.5,
       "note": "primary analysis window (2026-10-27T00:00:00Z..2026-10-28T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=6, 1 still open at collection time (#72273, Claude on Vertex AI, created 00:59:48Z, open >24h); agent_prs_merged_from_created=3 (#72405, #72403, #72272), closed_prs=2 (#72466, #72404, both draft PRs closed within ~20-30min without merge, no WIP placeholder text but #72466 targeted the same issue #72320 as the later-merged #72403, suggesting a superseded attempt); agent_success_rate=50.0%, down from 10-26's 61.5% (-11.5pp, -18.75% relative, significant), continuing a 4-day decline from 90.9% on 10-24; avg_duration created->merged over 3 merged PRs=374.2min, up sharply vs 10-26 (223.9->374.2, +67.1%, significant); agent_prs_merged (event-scoped)=3, cross-checked against live GitHub search (is:merged, author:app/copilot-swe-agent) which returned only 2 due to search-index lag (PR #72403 confirmed merged via direct pull_request_read but missing from is:merged search at collection time, same failure mode as 10-26's #72100) - treat live search as lower bound, local dataset count (3) used instead, cross-checked against 34 all-author merged PRs in window; avg_comments=4.67 is total issue-comment count per PR via pull_request_read get (not filtered to humans); get_review_comments was blocked by an integrity-policy filter on 4 of 6 PRs (#72405, #72403, #72273, #72272), so review-thread comments are not included and this figure is not directly comparable across days"
+    },
+    {
+      "date": "2026-10-28",
+      "agent_prs_total": 1,
+      "agent_prs_merged": 1,
+      "agent_prs_merged_from_created": 1,
+      "closed_prs": 0,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 412.8,
+      "success_rate": 1.0,
+      "note": "gap-fill; true UTC calendar-day window (2026-10-28T00:00:00Z..2026-10-29T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=1 (#72632), merged, 0 open; agent_prs_merged_from_created=1; agent_success_rate=100% (n=1, not meaningful for trend comparison); avg_duration created->merged=412.8min; agent_prs_merged (event-scoped, local dataset)=1; avg_comments not collected for this backfilled single-PR day"
+    },
+    {
+      "date": "2026-10-29",
+      "agent_prs_total": 22,
+      "agent_prs_merged": 6,
+      "agent_prs_merged_from_created": 9,
+      "closed_prs": 2,
+      "open_prs": 11,
+      "avg_agent_duration_minutes": 398.1,
+      "avg_comments": 1.0,
+      "success_rate": 0.4091,
+      "note": "primary analysis window (2026-10-29T00:00:00Z..2026-10-30T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=22, 11 still open at collection time (~1 day after window close, so success rate likely understated: #73052, #73034, #73033, #72970, #72968, #72940, #72939, #72938, #72936, #72932, #72929); agent_prs_merged_from_created=9 (#73046, #73032, #73031, #73010, #72969, #72941, #72933, #72934, #72930), closed_prs=2 (#72937, #72935, both with substantive bodies, no WIP placeholders); agent_success_rate=40.9%, down from 10-27's 50.0% (-9.1pp, -18.2% relative, significant, but likely to rise as the 11 open PRs resolve); avg_duration created->merged over 9 merged PRs=398.1min, up vs 10-27 (374.2->398.1, +6.4%, not significant); agent_prs_merged (event-scoped, local 30-day dataset, not independently paginated-verified)=6, this is a lower bound and not directly comparable to the creation-cohort count; avg_comments=1.0 is unique human comments per PR via pull_request_read get_comments (filtered out all github-actions[bot] and the Copilot agent's own replies) across all 22 cohort PRs - get_review_comments was blocked by an integrity-policy filter on 21 of 22 PRs, so review-thread comments are not included; nearly all human engagement came from one maintainer (pelikhan) giving short follow-up directives (e.g. '@copilot run pr-finisher skill'), not substantive discussion"
     }
   ],
-  "last_updated": "2026-10-27",
+  "last_updated": "2026-10-29",
   "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward"
 }
