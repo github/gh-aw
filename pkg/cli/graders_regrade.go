@@ -208,7 +208,7 @@ func regradeSessionResult(ctx context.Context, definition graderRunDefinition, p
 		Implementation json.RawMessage `json:"implementation"`
 	}
 	if json.Unmarshal(raw, &record) == nil && record.ID == definition.ID &&
-		record.Status != "" && len(record.Implementation) > 0 &&
+		validRegradeResultStatus(record.Status) && len(record.Implementation) > 0 &&
 		(executionErr == nil || record.Status == "error") {
 		return json.RawMessage(bytes.Clone(raw))
 	}
@@ -216,6 +216,15 @@ func regradeSessionResult(ctx context.Context, definition graderRunDefinition, p
 		executionErr = errors.New("grader runtime returned an invalid result")
 	}
 	return regradeErrorResult(definition, "error", regradeExecutionError(executionErr))
+}
+
+func validRegradeResultStatus(status string) bool {
+	switch status {
+	case "pass", "fail", "error", "unavailable":
+		return true
+	default:
+		return false
+	}
 }
 
 func regradeExecutionError(err error) string {
@@ -331,6 +340,9 @@ func regradeSessionPayload(ctx context.Context, source string, run *RegradedRun)
 	var events []json.RawMessage
 	if err := json.Unmarshal(payload, &events); err != nil || len(events) == 0 {
 		return nil, errors.New("unified session contains no recorded events")
+	}
+	if err := regradeValidateSessionIdentity(events, source, run.Run); err != nil {
+		return nil, err
 	}
 	run.PayloadDigest = regradeDigest(payload)
 	run.SessionStatus = "recorded"

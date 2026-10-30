@@ -77,8 +77,19 @@ func TestOfflineGradersMissingCollectionSourceRetainsMetadata(t *testing.T) {
 
 func TestOfflineGradersRejectsConflictingOriginalScores(t *testing.T) {
 	root := t.TempDir()
-	regradeTestFile(t, root, "summary.json", `{"runs":[{"graders":{"results":[{"id":"quality","value":1}]}},{"graders":{"results":[{"id":"quality","value":2}]}}]}`)
+	regradeTestFile(t, root, "summary.json", `{"runs":[{"run_id":77,"repository":"owner/repo","url":"https://github.com/owner/repo/actions/runs/77","run_attempt":"1","graders":{"results":[{"id":"quality","value":1}]}},{"run_id":77,"repository":"owner/repo","url":"https://github.com/owner/repo/actions/runs/77","run_attempt":"1","graders":{"results":[{"id":"quality","value":2}]}}]}`)
 	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 77, Repository: "owner/repo", Attempt: 1}}
 	_, err := offlineGradingOriginals(root, []ProcessedRun{run, run})
 	require.ErrorContains(t, err, "conflicting recorded grader evidence")
+}
+
+func TestOfflineGradersOriginalsMatchSummaryByIdentityNotOrder(t *testing.T) {
+	root := t.TempDir()
+	regradeTestFile(t, root, "summary.json", `{"runs":[{"run_id":1,"repository":"owner/repo","url":"https://github.com/owner/repo/actions/runs/1","run_attempt":"1","graders":{"results":[{"id":"quality","value":1}]}},{"run_id":2,"repository":"owner/repo","url":"https://github.com/owner/repo/actions/runs/2","run_attempt":"2","graders":{"results":[{"id":"quality","value":2}]}}]}`)
+	first := ProcessedRun{Run: WorkflowRun{DatabaseID: 1, Repository: "owner/repo", Attempt: 1, URL: "https://github.com/owner/repo/actions/runs/1"}}
+	second := ProcessedRun{Run: WorkflowRun{DatabaseID: 2, Repository: "owner/repo", Attempt: 2, URL: "https://github.com/owner/repo/actions/runs/2"}}
+	originals, err := offlineGradingOriginals(root, []ProcessedRun{second, first})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"results":[{"id":"quality","value":1}]}`, string(originals[harborRunIdentity(first)].Data))
+	assert.JSONEq(t, `{"results":[{"id":"quality","value":2}]}`, string(originals[harborRunIdentity(second)].Data))
 }

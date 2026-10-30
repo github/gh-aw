@@ -66,17 +66,37 @@ func offlineGradingOriginals(directory string, runs []ProcessedRun) (map[string]
 	}
 	var document struct {
 		Runs []struct {
-			Graders json.RawMessage `json:"graders"`
+			RunID      int64           `json:"run_id"`
+			URL        string          `json:"url"`
+			Repository string          `json:"repository"`
+			RunAttempt string          `json:"run_attempt"`
+			Graders    json.RawMessage `json:"graders"`
 		} `json:"runs"`
 	}
 	if err := json.Unmarshal(data, &document); err != nil {
 		return nil, err
 	}
+	if len(document.Runs) != len(runs) {
+		return nil, fmt.Errorf("logs summary contains %d runs but offline discovery produced %d; cannot safely correlate original grader evidence", len(document.Runs), len(runs))
+	}
+	uniqueRuns, err := offlineGradingUniqueRuns(runs)
+	if err != nil {
+		return nil, err
+	}
 	for index, entry := range document.Runs {
-		if len(entry.Graders) == 0 || string(entry.Graders) == "null" || index >= len(runs) {
+		if len(entry.Graders) == 0 || string(entry.Graders) == "null" {
 			continue
 		}
-		identity := harborRunIdentity(runs[index]) //nolint:uncheckedsliceindex // index < len(runs) is checked above.
+		summaryRun, err := offlineGradingRunDataMetadata(RunData{
+			RunID: entry.RunID, URL: entry.URL, Repository: entry.Repository, RunAttempt: entry.RunAttempt,
+		})
+		if err != nil {
+			return nil, err
+		}
+		identity, err := offlineGradingOriginalIdentity(summaryRun, uniqueRuns, entry.RunID)
+		if err != nil {
+			return nil, err
+		}
 		if previous, exists := originals[identity]; exists && regradeDigest(previous.Data) != regradeDigest(entry.Graders) {
 			return nil, fmt.Errorf("run identity %s has conflicting recorded grader evidence", identity)
 		}
@@ -86,6 +106,38 @@ func offlineGradingOriginals(directory string, runs []ProcessedRun) (map[string]
 		}
 	}
 	return originals, nil
+}
+
+func offlineGradingOriginalIdentity(summaryRun WorkflowRun, runs []ProcessedRun, runID int64) (string, error) {
+	var identity string
+	matches := 0
+	for _, run := range runs {
+		if err := validateOfflineRunIdentity(summaryRun, run.Run); err == nil {
+			identity = harborRunIdentity(run)
+			matches++
+		}
+	}
+	if matches != 1 {
+		return "", fmt.Errorf("cannot safely correlate original grader evidence for summary run %d: matched %d downloaded runs", runID, matches)
+	}
+	return identity, nil
+}
+
+func offlineGradingUniqueRuns(runs []ProcessedRun) ([]ProcessedRun, error) {
+	uniqueRuns := make([]ProcessedRun, 0, len(runs))
+	seenRuns := make(map[string]string, len(runs))
+	for _, run := range runs {
+		identity := harborRunIdentity(run)
+		if previousPath, exists := seenRuns[identity]; exists {
+			if previousPath != run.Run.LogsPath {
+				return nil, fmt.Errorf("run identity %s has conflicting evidence directories", identity)
+			}
+			continue
+		}
+		seenRuns[identity] = run.Run.LogsPath
+		uniqueRuns = append(uniqueRuns, run)
+	}
+	return uniqueRuns, nil
 }
 
 // regradeCheckSourcePath rejects links and exported Harbor evidence, including
@@ -188,10 +240,14 @@ func discoverOfflineGradingRuns(root string) ([]ProcessedRun, error) {
 }
 
 func discoverOfflineGradingDirectory(path string, entry fs.DirEntry, runs *[]ProcessedRun) error {
-	if entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() {
+	if entry.Type()&os.ModeSymlink != 0 {
+		return fmt.Errorf("offline logs collection contains a symbolic link: %s", path)
+	}
+	if !entry.IsDir() {
 		return nil
 	}
-	if strings.EqualFold(entry.Name(), "harbor") || strings.HasPrefix(entry.Name(), ".harbor-stage-") {
+	if strings.EqualFold(entry.Name(), "harbor") || strings.HasPrefix(entry.Name(), ".harbor-stage-") ||
+		strings.HasPrefix(entry.Name(), ".harbor-backup-") {
 		return filepath.SkipDir
 	}
 	id, kind, artifact := strings.Cut(entry.Name(), "-")
@@ -215,7 +271,8 @@ func discoverOfflineGradingDirectory(path string, entry fs.DirEntry, runs *[]Pro
 		}
 		for _, existing := range *runs {
 			if harborRunIdentity(existing) == harborRunIdentity(run) {
-				return filepath.SkipDir // WalkDir selects the first immutable collection in lexical order.
+				return fmt.Errorf("duplicate episode collection identity %s in %s and %s",
+					harborRunIdentity(run), existing.Run.LogsPath, run.Run.LogsPath)
 			}
 		}
 		*runs = append(*runs, run)
@@ -294,6 +351,9 @@ func offlineGradingRun(directory string, fallbackID int64) (ProcessedRun, error)
 	if fallbackID > 0 && run.DatabaseID != fallbackID {
 		return ProcessedRun{}, fmt.Errorf("downloaded run identity %d does not match selected run %d", run.DatabaseID, fallbackID)
 	}
+	if err := validateOfflineRunIdentity(run, run); err != nil {
+		return ProcessedRun{}, err
+	}
 	run.LogsPath = directory
 	return ProcessedRun{Run: run, AwContext: awContext}, nil
 }
@@ -304,7 +364,8 @@ func offlineGradingSummaryRuns(root, summaryPath string) ([]ProcessedRun, error)
 		return nil, err
 	}
 	var summary struct {
-		Runs []RunData `json:"runs"`
+		Runs         []RunData `json:"runs"`
+		LogsLocation string    `json:"logs_location"`
 	}
 	if err := json.Unmarshal(data, &summary); err != nil {
 		return nil, fmt.Errorf("invalid logs collection %s: %w", summaryPath, err)
@@ -317,7 +378,7 @@ func offlineGradingSummaryRuns(root, summaryPath string) ([]ProcessedRun, error)
 		if entry.RunID <= 0 {
 			return nil, fmt.Errorf("logs collection %s contains a run without a positive identity", summaryPath)
 		}
-		source, err := offlineGradingSummarySource(root, entry.LogsPath, entry.RunID)
+		source, err := offlineGradingSummarySource(root, summary.LogsLocation, entry.LogsPath, entry.RunID)
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +404,7 @@ func offlineGradingSummaryRuns(root, summaryPath string) ([]ProcessedRun, error)
 	return runs, nil
 }
 
-func offlineGradingSummarySource(root, recorded string, id int64) (string, error) {
+func offlineGradingSummarySource(root, logsLocation, recorded string, id int64) (string, error) {
 	if recorded != "" {
 		candidate, err := filepath.Abs(recorded)
 		if err != nil {
@@ -354,7 +415,11 @@ func offlineGradingSummarySource(root, recorded string, id int64) (string, error
 			return "", err
 		}
 		if relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return candidate, regradeCheckSourcePath(candidate)
+			if _, err := os.Lstat(candidate); err == nil {
+				return candidate, regradeCheckSourcePath(candidate)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return "", err
+			}
 		}
 		if !filepath.IsAbs(recorded) {
 			relative = filepath.Clean(recorded)
@@ -364,6 +429,28 @@ func offlineGradingSummarySource(root, recorded string, id int64) (string, error
 			candidate = filepath.Join(root, relative)
 			if _, err := os.Lstat(candidate); err == nil {
 				return candidate, regradeCheckSourcePath(candidate)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return "", err
+			}
+		}
+		if logsLocation != "" {
+			oldRoot, err := filepath.Abs(logsLocation)
+			if err != nil {
+				return "", err
+			}
+			oldPath := recorded
+			if !filepath.IsAbs(recorded) {
+				oldPath = filepath.Join(oldRoot, recorded)
+			}
+			relative, err := filepath.Rel(oldRoot, oldPath)
+			if err == nil && relative != ".." &&
+				!strings.HasPrefix(relative, ".."+string(filepath.Separator)) && !filepath.IsAbs(relative) {
+				candidate = filepath.Join(root, relative)
+				if _, err := os.Lstat(candidate); err == nil {
+					return candidate, regradeCheckSourcePath(candidate)
+				} else if !errors.Is(err, os.ErrNotExist) {
+					return "", err
+				}
 			}
 		}
 	}

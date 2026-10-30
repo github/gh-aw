@@ -174,6 +174,54 @@ func TestRegradeSessionEvidenceVariants(t *testing.T) {
 	}
 }
 
+func TestRegradeSessionRejectsConflictingRecordedIdentity(t *testing.T) {
+	for _, test := range []struct {
+		name, file, content string
+	}{
+		{"aw_info attempt", "aw_info.json", `{"run_id":21,"run_attempt":"1","repository":"owner/repo","server_url":"https://github.com"}`},
+		{"workflow info attempt", "unused", ""},
+		{"aw_info repository", "aw_info.json", `{"run_id":21,"run_attempt":"2","repository":"other/repo","server_url":"https://github.com"}`},
+		{"aw_info host", "aw_info.json", `{"run_id":21,"run_attempt":"2","repository":"owner/repo","server_url":"https://ghe.example"}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			run := regradeTestRun(t, root, 21, regradeTestEvent)
+			if test.name == "workflow info attempt" {
+				info := `{"type":"workflow.info","data":{"runId":21,"runAttempt":1,"repository":"owner/repo","serverUrl":"https://github.com"},"provenance":{"component":"workflow","phase":"activation","path":"aw_info.json","index":0}}`
+				regradeTestFile(t, run.Run.LogsPath, "usage/aw_session.jsonl", regradeTestEvent+"\n"+info)
+			} else {
+				regradeTestFile(t, run.Run.LogsPath, test.file, test.content)
+			}
+			record := RegradedRun{SessionStatus: "missing", Run: run.Run}
+			_, err := regradeSessionPayload(t.Context(), run.Run.LogsPath, &record)
+			require.Error(t, err)
+			assert.Equal(t, "invalid", record.SessionStatus)
+			assert.Contains(t, err.Error(), map[string]string{
+				"aw_info attempt":       "attempt",
+				"workflow info attempt": "attempt",
+				"aw_info repository":    "repository",
+				"aw_info host":          "host",
+			}[test.name])
+		})
+	}
+}
+
+func TestRegradeSessionAllowsAbsentIdentityMetadata(t *testing.T) {
+	root := t.TempDir()
+	run := regradeTestRun(t, root, 21, regradeTestEvent)
+	record := RegradedRun{SessionStatus: "missing", Run: run.Run}
+	_, err := regradeSessionPayload(t.Context(), run.Run.LogsPath, &record)
+	require.NoError(t, err)
+	assert.Equal(t, "recorded", record.SessionStatus)
+}
+
+func TestRegradeSessionResultRejectsUnknownStatus(t *testing.T) {
+	require.False(t, validRegradeResultStatus("unexpected"))
+	for _, status := range []string{"pass", "fail", "error", "unavailable"} {
+		require.True(t, validRegradeResultStatus(status))
+	}
+}
+
 func TestRegradeRejectsBashAndUnsafeDefinitionsBeforeEvidence(t *testing.T) {
 	for _, definition := range []graderRunDefinition{
 		{ID: "shell", Source: "operational-value"},

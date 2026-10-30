@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,6 +37,7 @@ func TestLogsHarborAdditionalGraderOptions(t *testing.T) {
 }
 
 func TestLogsHarborRegradingPreservesEvidence(t *testing.T) {
+	regradeTestRequireNode(t)
 	workflow := writeGraderRunWorkflow(t, `---
 on: workflow_dispatch
 graders:
@@ -94,6 +96,8 @@ Test.
 			} `json:"results"`
 		}
 		require.NoError(t, json.Unmarshal(raw, &record))
+		assert.NotContains(t, string(raw), root)
+		assert.NotContains(t, string(raw), workflow)
 		statuses := map[string]string{}
 		for _, r := range record.Results {
 			statuses[r.ID] = r.Status
@@ -110,6 +114,36 @@ Test.
 	raw, err := os.ReadFile(filepath.Join(source, "usage", "aw_session.jsonl"))
 	require.NoError(t, err)
 	require.Equal(t, session, string(raw))
+}
+
+func TestHarborSanitizesRegradingPathsAndErrors(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "run")
+	record := &RegradedRun{
+		SourceDirectory: source,
+		Run:             WorkflowRun{LogsPath: source},
+		SessionPath:     filepath.Join(source, "usage", "aw_session.jsonl"),
+		SessionError:    "cannot read " + filepath.Join(source, "private.json"),
+		Definitions:     []RegradeDefinition{{ID: "loops", Workflow: filepath.Join(root, ".github/workflows/test.md"), Selector: filepath.Join(root, ".github/workflows/test.md") + ":loops"}},
+		Results:         []json.RawMessage{json.RawMessage(`{"id":"loops","status":"error","error":"failed at /tmp/secret.js"}`)},
+		OriginalEvidence: []RegradeOriginalEvidence{{
+			Path: filepath.Join(source, "graders", "grader_results.json"),
+			Data: json.RawMessage(`{"results":[{"id":"loops","status":"error","error":"failed at /tmp/recorded.js"}]}`),
+		}},
+	}
+	safe := harborSanitizeRegradedRun(record)
+	encoded, err := json.Marshal(safe)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), root)
+	assert.NotContains(t, string(encoded), "/tmp/")
+	assert.Equal(t, "gh-aw/evidence", safe.SourceDirectory)
+	assert.Equal(t, "gh-aw/evidence", safe.Run.LogsPath)
+	assert.Equal(t, "gh-aw/evidence/usage/aw_session.jsonl", safe.SessionPath)
+	assert.Equal(t, "loops", safe.Definitions[0].Selector)
+	assert.Empty(t, safe.Definitions[0].Workflow)
+	assert.Equal(t, "gh-aw/evidence/graders/grader_results.json", safe.OriginalEvidence[0].Path)
+	assert.Contains(t, safe.SessionError, "[local path]")
+	assert.NotContains(t, string(record.Results[0]), "[local path]", "sanitization must not mutate source records")
 }
 
 func TestHarborRegradedRewardCollision(t *testing.T) {

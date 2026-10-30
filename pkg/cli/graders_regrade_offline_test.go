@@ -73,6 +73,12 @@ func TestOfflineGradersCommandCollection(t *testing.T) {
 	assert.Len(t, files, 1, "offline grading must not write new files into run evidence")
 }
 
+func TestAdditionalGradersCollectionLoadDoesNotResolveRemoteImports(t *testing.T) {
+	workflow := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\nimports:\n  - owner/repo/shared.md@main\ngraders:\n  loops:\n    script: return session.length\n---\nTest.\n")
+	_, err := loadAdditionalGraders([]string{workflow + ":loops"})
+	require.ErrorContains(t, err, "offline imports require a cached pinned import")
+}
+
 func TestOfflineGradersNoArgumentsAndSummaryScores(t *testing.T) {
 	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\n---\nTest.\n")
 	root := t.TempDir()
@@ -147,6 +153,22 @@ func TestOfflineGradersRejectsHarborAncestorsAndSymlinks(t *testing.T) {
 		_, err := loadOfflineGradingRuns(filepath.Join(root, "link"))
 		require.ErrorContains(t, err, "symlink")
 	})
+	t.Run("symlink run directory", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(root, "actual"), 0o700))
+		require.NoError(t, os.Symlink(filepath.Join(root, "actual"), filepath.Join(root, "run-77")))
+		_, err := loadOfflineGradingRuns(root)
+		require.ErrorContains(t, err, "symbolic link")
+	})
+	t.Run("harbor backup directory", func(t *testing.T) {
+		root := t.TempDir()
+		run := regradeTestRun(t, root, 77, "")
+		regradeTestFile(t, root, ".harbor-backup-interrupted/gh-aw-export.json", `{"format":"gh-aw-harbor"}`)
+		runs, err := loadOfflineGradingRuns(root)
+		require.NoError(t, err)
+		require.Len(t, runs, 1)
+		assert.Equal(t, run.Run.DatabaseID, runs[0].Run.DatabaseID)
+	})
 	t.Run("symlink session parent", func(t *testing.T) {
 		root := t.TempDir()
 		run := regradeTestRun(t, root, 1, "")
@@ -216,6 +238,48 @@ func TestOfflineGradersRelocatedSummary(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
 	assert.Equal(t, filepath.Join(root, "run-7"), runs[0].Run.LogsPath)
+}
+
+func TestOfflineGradersRebasesNestedSummaryPaths(t *testing.T) {
+	root := t.TempDir()
+	source := regradeEpisodeFixture(t, root, 2, "collection-a")
+	recordedRoot := filepath.Join(t.TempDir(), "old-logs")
+	recorded := filepath.Join(recordedRoot, "episodes", "github.com", "owner", "repo", "run-77", "attempt-2", "collection-a")
+	summary := map[string]any{
+		"logs_location": recordedRoot,
+		"runs": []map[string]any{{
+			"run_id": 77, "repository": "owner/repo", "url": "https://github.com/owner/repo/actions/runs/77",
+			"run_attempt": "2", "logs_path": recorded,
+		}},
+	}
+	data, err := json.Marshal(summary)
+	require.NoError(t, err)
+	regradeTestFile(t, root, "summary.json", string(data))
+	runs, err := loadOfflineGradingRuns(root)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, source, runs[0].Run.LogsPath)
+}
+
+func TestOfflineGradersOriginalScoreSummaryRunCountMustMatch(t *testing.T) {
+	root := t.TempDir()
+	regradeTestFile(t, root, "summary.json", `{"runs":[{"graders":{"results":[]}}]}`)
+	_, err := offlineGradingOriginals(root, nil)
+	require.ErrorContains(t, err, "cannot safely correlate")
+}
+
+func TestOfflineGradersRejectsRawOnlyURLIdentityConflict(t *testing.T) {
+	root := t.TempDir()
+	regradeTestFile(t, root, "run.json", `{"id":77,"html_url":"https://github.com/owner/repo/actions/runs/88","repository":{"full_name":"owner/repo"}}`)
+	_, err := loadOfflineGradingRuns(root)
+	require.ErrorContains(t, err, "URL conflicts with recorded run ID")
+}
+
+func TestOfflineGradersRejectsSummaryOuterIDAndRunURLConflict(t *testing.T) {
+	root := t.TempDir()
+	regradeTestFile(t, root, "run_summary.json", `{"run_id":77,"run":{"url":"https://github.com/owner/repo/actions/runs/88"}}`)
+	_, err := loadOfflineGradingRuns(root)
+	require.ErrorContains(t, err, "URL conflicts with recorded run ID")
 }
 
 func TestAdditionalGradersRejectsCrossWorkflowIDCollisions(t *testing.T) {

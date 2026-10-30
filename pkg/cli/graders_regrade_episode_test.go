@@ -44,7 +44,6 @@ func TestRegradeEpisodeCollectionInventorySession(t *testing.T) {
 func TestOfflineGradersEpisodeAttemptDiscovery(t *testing.T) {
 	root := t.TempDir()
 	first := regradeEpisodeFixture(t, root, 2, "collection-a")
-	regradeEpisodeFixture(t, root, 2, "collection-b")
 	second := regradeEpisodeFixture(t, root, 3, "collection-c")
 	runs, err := loadOfflineGradingRuns(root)
 	require.NoError(t, err)
@@ -64,6 +63,14 @@ func TestOfflineGradersEpisodeAttemptDiscovery(t *testing.T) {
 		assert.Equal(t, "recorded", result.SessionStatus)
 		assert.Empty(t, result.IdentityMissing)
 	}
+}
+
+func TestOfflineGradersRejectsDuplicateEpisodeIdentities(t *testing.T) {
+	root := t.TempDir()
+	regradeEpisodeFixture(t, root, 2, "collection-a")
+	regradeEpisodeFixture(t, root, 2, "collection-b")
+	_, err := loadOfflineGradingRuns(root)
+	require.ErrorContains(t, err, "duplicate episode collection identity")
 }
 
 func TestOfflineGradersEpisodeSummaryAttemptConflict(t *testing.T) {

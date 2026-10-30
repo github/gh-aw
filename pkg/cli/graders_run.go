@@ -76,7 +76,11 @@ func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) 
 	if err != nil {
 		return graderRunDefinition{}, err
 	}
-	data, err := workflow.NewCompiler().ParseWorkflowFile(workflowPath)
+	compiler := workflow.NewCompiler()
+	if collection {
+		compiler.SetReadOnly(true)
+	}
+	data, err := compiler.ParseWorkflowFile(workflowPath)
 	if err != nil {
 		return graderRunDefinition{}, fmt.Errorf("cannot parse graders in %s: %w", workflowPath, err)
 	}

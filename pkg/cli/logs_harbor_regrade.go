@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 func exportLogsHarbor(ctx context.Context, outputDir string, runs []ProcessedRun, selectors []string) error {
@@ -38,7 +41,8 @@ func harborRegradedRewards(dir string, regrading *RegradedRun, metadata map[stri
 		return rewards, mapping, nil
 	}
 	const source = "gh-aw/regrading.json"
-	if err := harborWriteJSON(filepath.Join(dir, filepath.FromSlash(source)), regrading); err != nil {
+	exportRecord := harborSanitizeRegradedRun(regrading)
+	if err := harborWriteJSON(filepath.Join(dir, filepath.FromSlash(source)), exportRecord); err != nil {
 		return nil, nil, err
 	}
 	metadata["regrading"] = source
@@ -53,7 +57,7 @@ func harborRegradedRewards(dir string, regrading *RegradedRun, metadata map[stri
 		return nil, nil, errors.New("invalid Harbor reward mapping")
 	}
 	seen := make(map[string]struct{})
-	for index, raw := range regrading.Results {
+	for index, raw := range exportRecord.Results {
 		var result struct {
 			ID     string          `json:"id"`
 			Status string          `json:"status"`
@@ -87,4 +91,85 @@ func harborRegradedRewards(dir string, regrading *RegradedRun, metadata map[stri
 	}
 	mapping["additional_policy"] = "additional status=pass/fail finite numeric values only; originals unchanged; provenance in gh-aw/regrading.json"
 	return rewards, mapping, nil
+}
+
+var harborLocalPathPattern = regexp.MustCompile(`(^|[\s("'=])([A-Za-z]:[\\/]|/)[^\s"'<>)]*`)
+
+func harborSanitizeRegradedRun(record *RegradedRun) *RegradedRun {
+	safe := *record
+	safe.SourceDirectory = "gh-aw/evidence"
+	safe.Run.LogsPath = "gh-aw/evidence"
+	safe.SessionPath = harborRegradedEvidencePath(record.SourceDirectory, record.SessionPath)
+	safe.SessionError = harborSanitizeLocalPaths(record.SessionError)
+	safe.OriginalGraders = harborSanitizeErrorJSON(record.OriginalGraders)
+	safe.Definitions = append([]RegradeDefinition(nil), record.Definitions...)
+	for index := range safe.Definitions {
+		safe.Definitions[index].Workflow = ""
+		safe.Definitions[index].Selector = safe.Definitions[index].ID
+	}
+	safe.Results = make([]json.RawMessage, 0, len(record.Results))
+	for _, raw := range record.Results {
+		safe.Results = append(safe.Results, harborSanitizeErrorJSON(raw))
+	}
+	safe.OriginalEvidence = append([]RegradeOriginalEvidence(nil), record.OriginalEvidence...)
+	for index := range safe.OriginalEvidence {
+		evidence := &safe.OriginalEvidence[index]
+		evidence.Path = harborRegradedEvidencePath(record.SourceDirectory, evidence.Path)
+		evidence.Error = harborSanitizeLocalPaths(evidence.Error)
+		evidence.Data = harborSanitizeErrorJSON(evidence.Data)
+	}
+	return &safe
+}
+
+func harborRegradedEvidencePath(source, path string) string {
+	if source == "" || path == "" {
+		return ""
+	}
+	relative, err := filepath.Rel(source, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return ""
+	}
+	if relative == "." {
+		return "gh-aw/evidence"
+	}
+	return filepath.ToSlash(filepath.Join("gh-aw/evidence", relative))
+}
+
+func harborSanitizeLocalPaths(value string) string {
+	return harborLocalPathPattern.ReplaceAllString(value, `${1}[local path]`)
+}
+
+func harborSanitizeErrorJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || !json.Valid(raw) {
+		return raw
+	}
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if decoder.Decode(&value) != nil {
+		return raw
+	}
+	harborSanitizeErrorFields(value)
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return raw
+	}
+	return encoded
+}
+
+func harborSanitizeErrorFields(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if message, ok := child.(string); ok && (key == "error" || key == "message") {
+				typed[key] = harborSanitizeLocalPaths(message)
+			} else {
+				harborSanitizeErrorFields(child)
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			harborSanitizeErrorFields(child)
+		}
+	}
 }
