@@ -98,6 +98,47 @@ async function aliasedCheckpointFixture() {
 }
 
 describe("shared version-3 checkpoint conformance", () => {
+  it.each([readWorkQueueLog, readCheckedQueue])("retains the verified head when checkpoint ancestry exceeds the proof cache (%#)", async read => {
+    const f = await aliasedCheckpointFixture();
+    const token = "static-checkpoint-token";
+    Object.assign(f.fake.githubClient, { auth: async () => ({ type: "token", token }) });
+    registerStaticQueueAuthentication(f.fake.githubClient, token);
+    f.fake.refs.set("work-queue", f.parent);
+    for (let index = 0; index < 160; index++) await f.store(f.checkpoint);
+    const git = f.fake.githubClient.rest.git;
+    const getCommit = git.getCommit;
+    const commits = [];
+    git.getCommit = parameters => {
+      commits.push(parameters.commit_sha);
+      return getCommit(parameters);
+    };
+    const input = { githubClient: f.fake.githubClient, owner: "owner", repo: "repo" };
+    const first = await read(input);
+    assert.ok(commits.includes(f.prior));
+    assert.ok(new Set(commits).size > 128);
+    commits.length = 0;
+    const repeated = await read(input);
+    assert.equal(repeated.sha, first.sha);
+    assert.equal(canonical(repeated.transactions), canonical(f.checkpoint));
+    assert.ok(
+      commits.every(sha => sha === first.sha),
+      "an unchanged verified head must not replay ancestry"
+    );
+    assert.ok(commits.length <= 1, `expected at most one head refresh, got ${commits.length}`);
+
+    const next = await f.store(f.valid);
+    commits.length = 0;
+    const advanced = await read(input);
+    assert.equal(advanced.sha, next);
+    assert.equal(canonical(advanced.transactions), canonical(f.valid));
+    assert.ok(commits.length <= 4, `expected bounded ancestry reads, got ${commits.length}`);
+    assert.ok(!commits.includes(f.prior));
+    const forged = structuredClone(f.valid);
+    forged[0].at++;
+    await f.store(forged);
+    await assert.rejects(() => read(input), /checkpoint_invalid/);
+  });
+
   it.each([readWorkQueueLog, readCheckedQueue])("reuses verified immutable ancestry while refreshing refs and replaying detached projections (%#)", async read => {
     const f = await aliasedCheckpointFixture();
     const token = "static-checkpoint-token";

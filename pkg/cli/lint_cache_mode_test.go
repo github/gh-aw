@@ -95,7 +95,7 @@ func TestLintCacheModeLiteralsCLI(t *testing.T) {
 					source += "    cache-mode: " + test.mode + "\n"
 				}
 				source += "    steps: [{run: echo data}]\n"
-				file := filepath.Join(t.TempDir(), "cache.yml")
+				file := filepath.Join(actionlintTestDir(t), "cache.yml")
 				require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 				for _, args := range [][]string{{file}, {"--rules=cache-poisoning", file}} {
 					cmd := NewLintCommand()

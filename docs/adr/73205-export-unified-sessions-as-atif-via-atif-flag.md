@@ -1,0 +1,51 @@
+# ADR-73205: Export Unified Sessions as ATIF-v1.8 via a Reusable Converter
+
+**Date**: 2026-10-30
+**Status**: Accepted
+**Deciders**: pelikhan (PR #73205)
+
+---
+
+### Context
+
+gh-aw records agent runs as versioned unified session JSONL (`aw_session.jsonl`), which can be retrieved through `gh aw sessions download`, `gh aw logs`, and `gh aw audit`. Users want to bring these recorded sessions into [Harbor](https://docs.harborframework.com/agents/atif), whose tooling consumes trajectories in the Agent Trajectory Interchange Format (ATIF). The unified session format contains evidence that does not map one-to-one to ATIF dialogue: subagent activity, ambiguous or unmatched tool observations, and provenance-scoped tool calls. Any export must stay valid against Harbor's unmodified `TrajectoryValidator` without inventing dialogue, and it must preserve the original unified JSONL and existing reports in log and audit directories.
+
+### Decision
+
+Use a reusable `pkg/atif` package that converts one unified session into an ATIF-v1.8 `Trajectory`. Evidence that cannot safely become ATIF steps or tool calls goes into schema-approved `extra` fields rather than being dropped or fabricated. Instead of adding a separate ATIF command or download path, `sessions download --atif` replaces the selected session output with ATIF. `logs` and `audit` automatically write a sibling `.atif` file whenever a unified session is available locally, retaining JSONL and reports without an ATIF flag. Missing sessions are skipped without additional downloads or ATIF-specific reconstruction; invalid available sessions and export failures return errors.
+
+Accounting uses the latest supplied value for each supported terminal session-result metric, not sums of overlapping snapshots or auxiliary usage. Omitted metrics retain earlier supplied evidence; supplied unusable or overflowing values remain unknown rather than retaining stale totals. Token totals respect cache-inclusion semantics.
+
+### Alternatives Considered
+
+#### Alternative 1: Standalone `gh aw atif` command or separate download path
+
+A dedicated command would keep ATIF concerns isolated and simplify flag interactions. It was rejected because it would duplicate run resolution, artifact download, caching, multi-run handling, and session reconstruction that already live in the session-download commands. The PR description explicitly avoids "a separate download path or standalone ATIF command."
+
+#### Alternative 2: Lossy direct mapping (drop or synthesize unmappable events)
+
+The converter could map only clean request/response/tool pairs and either discard subagent and ambiguous observations or synthesize dialogue or embedded trajectories for them. That would make the output smaller and more "native" ATIF. It was rejected because it loses audit evidence or invents content the agent never produced. Keeping the source records in `extra.unified_event` and `extra.line` keeps the export faithful and traceable to the source.
+
+#### Alternative 3: Convert outside gh-aw (external script or Harbor-side adapter)
+
+Users or Harbor could convert the unified JSONL themselves. This was not chosen because the unified format is versioned and owned by gh-aw. Keeping the converter in-tree lets it change with the format and be tested against fixtures.
+
+### Consequences
+
+#### Positive
+- Recorded sessions can be exported for Harbor from the commands users already run. Run IDs, URLs, `--repo`, filtering, caching, and multi-run options work unchanged.
+- `pkg/atif` is a reusable library boundary that other callers, such as graders or future exporters, can share.
+- Source records and line ordering are kept in extras, so ATIF output can be traced back to the original unified session.
+- The output is validated against Harbor's unmodified `TrajectoryValidator` using checked-in fixtures (`pkg/atif/testdata/*.atif`).
+
+#### Negative
+- gh-aw now has to track an external schema (ATIF-v1.8). Schema revisions upstream will need converter and fixture updates.
+- Automatic exports add local processing and storage to `logs` and `audit`; invalid available sessions or unwritable export destinations can now cause these commands to return an error. `sessions download` remains opt-in through `--atif`, which conflicts with `--format markdown`.
+- ATIF output keeps private prompts and tool payloads. It is not a privacy-preserving artifact and must be handled like raw session JSONL.
+- Subagent and ambiguous observations stay as extension evidence. Harbor consumers that ignore `extra` will see an incomplete picture of those interactions.
+
+#### Neutral
+- Conversion is bounded by a 64 MiB input limit (`MaxSessionBytes`). Larger sessions fail rather than being truncated.
+- Reconstructing or normalizing historical sessions can still require Node.js through the existing session-download path.
+- Structured non-text content is JSON-encoded into messages and not exported as ATIF media assets.
+- New user-facing guidance is in `.github/aw/harbor.md`, and `docs/src/content/docs/setup/cli.md` is updated.

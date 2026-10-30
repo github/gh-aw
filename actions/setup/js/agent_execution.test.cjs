@@ -36,6 +36,18 @@ describe("driver stderr classification", () => {
     expect(collectAgentExecution({ content: record })).toBeUndefined();
   });
 
+  it.each([502, 503])("summarizes attributed HTTP %s engine errors without copying payloads", code => {
+    const line = `CAPIError: ${code} private-provider-payload`;
+    expect(agentErrorSummaryText(line)).toBe("Engine error: Provider server error (HTTP 5xx) (capi_server_error)");
+    expect(agentErrorSummaryText(line, [{ type: "assistant.message", data: { content: line } }])).toBe("");
+  });
+
+  it("does not attribute an unrelated numeric 5xx error code to the provider", () => {
+    const record = JSON.stringify({ type: "session.error", data: { code: 503, errorType: "MCPError", message: "private MCP failure" } });
+    expect(collectAgentExecution({ content: record }).data.categories).not.toContain("capi_server_error");
+    expect(agentErrorSummaryText(record)).toBe("");
+  });
+
   it("recognizes redirected shell startup errors as diagnostics", () => {
     expect(agentErrorDiagnosticText("bash: missing-driver: command not found")).toBe("bash: missing-driver: command not found");
     expect(agentErrorDiagnosticText("Error: spawn missing-driver ENOENT")).toBe("Error: spawn missing-driver ENOENT");
