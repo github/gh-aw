@@ -1,0 +1,88 @@
+{
+  "schema_version": "ATIF-v1.8",
+  "agent": {
+    "name": "gh-aw-unified",
+    "version": "unknown"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "source": "system",
+      "message": "",
+      "extra": {
+        "line": 2,
+        "unified_event": {
+          "type": "tool.execution_complete",
+          "data": {
+            "toolCallId": "orphan",
+            "output": false
+          }
+        }
+      }
+    },
+    {
+      "step_id": 2,
+      "source": "agent",
+      "message": "",
+      "reasoning_content": "Consider the result.",
+      "extra": {
+        "line": 3,
+        "unified_event": {
+          "type": "assistant.reasoning",
+          "data": {
+            "content": "Consider the result."
+          },
+          "timestamp": 123
+        }
+      }
+    },
+    {
+      "step_id": 3,
+      "source": "system",
+      "message": "",
+      "extra": {
+        "line": 4,
+        "unified_event": {
+          "type": "assistant.message",
+          "agentId": "child",
+          "data": {
+            "content": "Child evidence."
+          }
+        }
+      }
+    },
+    {
+      "step_id": 4,
+      "source": "system",
+      "message": "",
+      "extra": {
+        "line": 5,
+        "unified_event": {
+          "type": "vendor.extension",
+          "data": {
+            "opaque": [
+              false,
+              0,
+              null
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "notes": "Converted from a gh-aw unified session. Source records and their order are retained in extra.unified_event and extra.line. Tool observations are attached to their initiating step. Unmapped and subagent evidence remains in system-step extras. Unknown agent versions are labeled unknown; empty tool arguments may indicate unavailable input. Structured non-text content is JSON-encoded, not exported as media assets.",
+  "final_metrics": {
+    "total_steps": 4
+  },
+  "extra": {
+    "unified_header": {
+      "type": "session.format",
+      "data": {
+        "version": 1
+      },
+      "provenance": {
+        "component": "collector"
+      }
+    }
+  }
+}

@@ -159,6 +159,9 @@ outputs and include per-run and episode outcome summaries. This also downloads
 safe-output manifests, without requiring full agent artifacts or workflow logs.
 Use --outcomes-dir to persist the observations as JSONL for downstream processing.
 
+Available unified JSONL sessions are retained and automatically exported to
+sibling .atif trajectories, without changing the report format.
+
 Use --episodes to include recorded episode membership and hops in text reports.
 Combine --episodes --outcomes to join the selected episodes with live outcome
 observations and downloaded usage in the same invocation; no separate

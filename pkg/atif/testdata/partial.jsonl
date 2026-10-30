@@ -1,0 +1,5 @@
+{"type":"session.format","data":{"version":1},"provenance":{"component":"collector"}}
+{"type":"tool.execution_complete","data":{"toolCallId":"orphan","output":false}}
+{"type":"assistant.reasoning","data":{"content":"Consider the result."},"timestamp":123}
+{"type":"assistant.message","agentId":"child","data":{"content":"Child evidence."}}
+{"type":"vendor.extension","data":{"opaque":[false,0,null]}}

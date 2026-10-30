@@ -27,6 +27,9 @@ When a single run is provided, generates a detailed Markdown report for that run
 When two or more runs are provided, the first is used as the base (reference) and the
 remaining runs are compared against it, producing a diff report.
 
+Available unified JSONL sessions are retained and automatically exported to
+sibling .atif trajectories, without changing the report format.
+
 Each argument accepts:
 - A numeric run ID (e.g., 1234567890)
 - A GitHub Actions run URL (e.g., https://github.com/owner/repo/actions/runs/1234567890)
@@ -148,7 +151,7 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 			[]string{"Provide a single run ID with --evals to filter by evals results"},
 		))
 	}
-	return runAuditMulti(ctx, args, opts.repoFlag, opts.outputDir, opts.verbose, opts.jsonOutput, opts.format, opts.artifacts)
+	return runAuditMulti(ctx, args, opts)
 }
 
 func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
@@ -293,7 +296,7 @@ func firstAuditArg(args []string) (string, bool) {
 // The first argument is the base run; remaining arguments are comparison runs.
 // Each argument may be a numeric run ID, a GitHub Actions run URL, or a job/step
 // URL — job and step specificity is silently normalized to the parent run ID.
-func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir string, verbose, jsonOutput bool, format string, artifacts []string) error {
+func runAuditMulti(ctx context.Context, args []string, opts auditCommandOptions) error {
 	// Parse base run (job/step URLs are accepted; only the run number is used)
 	baseComponents, err := parser.ParseRunURLExtended(args[0]) //nolint:uncheckedsliceindex // multi-run mode requires at least two arguments
 	if err != nil {
@@ -301,7 +304,7 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 	}
 
 	// Resolve owner/repo/hostname from --repo flag or base URL
-	if err := applyAuditRepoFlag(repoFlag, baseComponents); err != nil {
+	if err := applyAuditRepoFlag(opts.repoFlag, baseComponents); err != nil {
 		return err
 	}
 	owner := baseComponents.Owner
@@ -326,15 +329,15 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 		compareRunIDs = append(compareRunIDs, c.Number)
 	}
 
-	auditCommandLog.Printf("Running multi-run diff audit: base=%d, compare_count=%d, format=%s", baseComponents.Number, len(compareRunIDs), format)
+	auditCommandLog.Printf("Running multi-run diff audit: base=%d, compare_count=%d, format=%s", baseComponents.Number, len(compareRunIDs), opts.format)
 	return RunAuditDiff(ctx, baseComponents.Number, compareRunIDs, AuditOptions{
 		Owner:        owner,
 		Repo:         repo,
 		Hostname:     hostname,
-		OutputDir:    outputDir,
-		Verbose:      verbose,
-		JSONOutput:   jsonOutput,
-		Format:       format,
-		ArtifactSets: artifacts,
+		OutputDir:    opts.outputDir,
+		Verbose:      opts.verbose,
+		JSONOutput:   opts.jsonOutput,
+		Format:       opts.format,
+		ArtifactSets: opts.artifacts,
 	})
 }

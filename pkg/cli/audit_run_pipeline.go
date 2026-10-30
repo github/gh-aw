@@ -26,11 +26,16 @@ import (
 // the assigned variant must equal variantFilter.
 // The returned bool reports whether the run was skipped (excluded by --experiment,
 // --runtime, or --evals filtering) rather than fully analyzed and reported.
-func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (bool, error) {
+func AuditWorkflowRun(ctx context.Context, runID int64, opts AuditOptions) (skipped bool, resultErr error) {
 	cfg, err := newAuditRunConfig(runID, opts)
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		if resultErr == nil && !skipped {
+			resultErr = exportRunATIF(ctx, cfg.runID, cfg.outputDir)
+		}
+	}()
 	if err := ensureAuditNotCancelled(ctx); err != nil {
 		return false, renderIncompleteAuditIfTimedOut(cfg, WorkflowRun{}, auditAnalysisResults{}, "metadata", err)
 	}
