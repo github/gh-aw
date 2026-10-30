@@ -18,7 +18,7 @@ import (
 
 // Snapshot only recorded grading/session/provenance inputs, never source code
 // scripts or a task environment. Original bytes and artifact-relative paths survive.
-func harborSnapshot(ctx context.Context, source, destination string) ([]string, error) { //nolint:largefunc // Keep rooted traversal, symlink rejection, bounded reads, and snapshot writes in one security-sensitive walk.
+func harborSnapshot(ctx context.Context, source, destination string) (files []string, resultErr error) {
 	if err := harborCheckPath(source); err != nil {
 		return nil, err
 	}
@@ -29,8 +29,8 @@ func harborSnapshot(ctx context.Context, source, destination string) ([]string, 
 	if err != nil {
 		return nil, err
 	}
-	defer root.Close()
-	files := []string{}
+	defer func() { resultErr = errors.Join(resultErr, root.Close()) }()
+	files = []string{}
 	err = fs.WalkDir(root.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -39,7 +39,7 @@ func harborSnapshot(ctx context.Context, source, destination string) ([]string, 
 			return walkErr
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("Harbor evidence contains a symbolic link: %s", path)
+			return fmt.Errorf("harbor evidence contains a symbolic link: %s", path)
 		}
 		if entry.IsDir() {
 			if entry.Name() == harborExportDirectory || entry.Name() == ".git" ||
@@ -55,32 +55,7 @@ func harborSnapshot(ctx context.Context, source, destination string) ([]string, 
 		default:
 			return nil
 		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("Harbor evidence must be a regular file: %s", path)
-		}
-		if info.Size() > atif.MaxSessionBytes {
-			return fmt.Errorf("Harbor evidence exceeds the 64 MiB input limit: %s", path)
-		}
-		file, err := root.Open(path)
-		if err != nil {
-			return err
-		}
-		content, readErr := io.ReadAll(io.LimitReader(file, atif.MaxSessionBytes+1))
-		if err := errors.Join(readErr, file.Close()); err != nil {
-			return err
-		}
-		if len(content) > atif.MaxSessionBytes {
-			return fmt.Errorf("Harbor evidence exceeds the 64 MiB input limit: %s", path)
-		}
-		target := filepath.Join(destination, filepath.FromSlash(path))
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			return err
-		}
-		if err := os.WriteFile(target, content, 0o600); err != nil {
+		if err := harborSnapshotFile(root, path, destination, entry); err != nil {
 			return err
 		}
 		files = append(files, "gh-aw/evidence/"+path)
@@ -89,9 +64,38 @@ func harborSnapshot(ctx context.Context, source, destination string) ([]string, 
 	return files, err
 }
 
+func harborSnapshotFile(root *os.Root, path, destination string, entry fs.DirEntry) error {
+	info, err := entry.Info()
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("harbor evidence must be a regular file: %s", path)
+	}
+	if info.Size() > atif.MaxSessionBytes {
+		return fmt.Errorf("harbor evidence exceeds the 64 MiB input limit: %s", path)
+	}
+	file, err := root.Open(path)
+	if err != nil {
+		return err
+	}
+	content, readErr := io.ReadAll(io.LimitReader(file, atif.MaxSessionBytes+1))
+	if err := errors.Join(readErr, file.Close()); err != nil {
+		return err
+	}
+	if len(content) > atif.MaxSessionBytes {
+		return fmt.Errorf("harbor evidence exceeds the 64 MiB input limit: %s", path)
+	}
+	target := filepath.Join(destination, filepath.FromSlash(path))
+	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(target, content, 0o600)
+}
+
 // Audit summaries normalize boolean values to 1/0. Gate rewards on the original
 // JSON token instead, and retain its precision rather than re-encoding a float64.
-func harborRecordedRewards(evidence string, graders *GradersData) (map[string]json.Number, map[string]any, error) { //nolint:largefunc // Preserve the eligibility checks, exact numeric token, and corresponding provenance together for each recorded metric.
+func harborRecordedRewards(evidence string, graders *GradersData) (map[string]json.Number, map[string]any, error) {
 	if graders == nil {
 		return nil, nil, nil
 	}
@@ -122,18 +126,8 @@ func harborRecordedRewards(evidence string, graders *GradersData) (map[string]js
 		if (result.Status != "pass" && result.Status != "fail") || result.ID == "" || counts[result.ID] != 1 {
 			continue
 		}
-		var value any
-		decoder := json.NewDecoder(bytes.NewReader(result.Value))
-		decoder.UseNumber()
-		if err := decoder.Decode(&value); err != nil {
-			continue
-		}
-		number, ok := value.(json.Number)
+		number, ok := harborRawNumericValue(result.Value)
 		if !ok {
-			continue
-		}
-		finite, err := number.Float64()
-		if err != nil || math.IsNaN(finite) || math.IsInf(finite, 0) {
 			continue
 		}
 		key := "gh-aw." + result.ID
@@ -150,6 +144,21 @@ func harborRecordedRewards(evidence string, graders *GradersData) (map[string]js
 		"policy":  "recorded status=pass/fail finite JSON numbers only; unchanged metrics, not Harbor task success; booleans, passed flags and Actions conclusions never become rewards",
 		"metrics": metrics,
 	}, nil
+}
+
+func harborRawNumericValue(raw json.RawMessage) (json.Number, bool) {
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		return "", false
+	}
+	number, ok := value.(json.Number)
+	if !ok {
+		return "", false
+	}
+	finite, err := number.Float64()
+	return number, err == nil && !math.IsNaN(finite) && !math.IsInf(finite, 0)
 }
 
 func harborRecordedAgent(evidence string) (map[string]any, string) {

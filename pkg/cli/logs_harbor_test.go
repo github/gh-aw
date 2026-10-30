@@ -57,7 +57,7 @@ func TestExportHarborMissingSessionUnknownRewards(t *testing.T) {
 			require.Contains(t, result, "verifier_result")
 			require.Nil(t, result["verifier_result"])
 			require.Nil(t, result["agent_result"])
-			require.Equal(t, "", result["task_checksum"])
+			require.Empty(t, result["task_checksum"])
 			require.Nil(t, result["started_at"])
 			require.Nil(t, result["finished_at"])
 			require.Equal(t, map[string]any{"name": "gh-aw", "version": "unknown"}, result["agent_info"])
@@ -112,7 +112,7 @@ func TestExportHarborRecordedSessionAndEvidence(t *testing.T) {
 	require.Equal(t, "123", metadata["experiment_assignment_run_id"])
 	require.Equal(t, map[string]any{"prompt": "B"}, metadata["experiments"].(map[string]any)["assignments"])
 	grader := metadata["graders"].(map[string]any)["results"].([]any)[0].(map[string]any)
-	require.Equal(t, float64(42), grader["value"])
+	require.InDelta(t, 42, grader["value"], 1e-9)
 	require.Equal(t, true, grader["passed"])
 	require.Equal(t, "maximize", grader["direction"])
 	require.Equal(t, map[string]any{"rewards": map[string]any{"gh-aw.quality": float64(42)}},
@@ -124,7 +124,7 @@ func TestExportHarborRecordedSessionAndEvidence(t *testing.T) {
 	require.Equal(t, "none; original numeric JSON value", mapping["transformation"])
 	require.Equal(t, "pass", mapping["status"])
 	require.Equal(t, "maximize", mapping["direction"])
-	require.Equal(t, float64(10), mapping["threshold"])
+	require.InDelta(t, 10, mapping["threshold"], 1e-9)
 	for path, content := range fixtures {
 		original, err := os.ReadFile(filepath.Join(source, path))
 		require.NoError(t, err)

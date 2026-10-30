@@ -22,7 +22,7 @@ class HarborConformance(unittest.TestCase):
             raise RuntimeError("Conformance requires harbor==0.25.0; install the pinned dependency")
         # These imports must fail, not skip, if the installed dependency is broken.
         from harbor.models.job.config import JobConfig
-        from harbor.models.job.result import JobResult
+        from harbor.models.job.result import JobResult, JobStats
         from harbor.models.trial.config import TrialConfig
         from harbor.models.trial.result import TrialResult
         from harbor.models.trial.paths import TrialPaths
@@ -31,6 +31,7 @@ class HarborConformance(unittest.TestCase):
 
         cls.JobConfig = JobConfig
         cls.JobResult = JobResult
+        cls.JobStats = JobStats
         cls.TrialConfig = TrialConfig
         cls.TrialResult = TrialResult
         cls.TrialPaths = TrialPaths
@@ -84,6 +85,12 @@ class HarborConformance(unittest.TestCase):
         self.assertEqual(len(trials), 3)
         self.assertEqual(job_result.n_total_trials, len(trials))
         self.assertEqual(len(job_result.trial_results), len(trials))
+        self.assertEqual(
+            job_result.stats,
+            self.JobStats.from_trial_results(
+                job_result.trial_results, n_total_trials=job_result.n_total_trials
+            ),
+        )
         embedded_results = {result.trial_name: result for result in job_result.trial_results}
         observed_graders = []
         observed_tools = 0
@@ -234,7 +241,15 @@ class HarborConformance(unittest.TestCase):
                 self.assertEqual(jobs["total"], 1)
                 self.assertEqual(jobs["items"][0]["name"], JOB)
                 prefix = "/api/jobs/" + quote(JOB, safe="")
-                self.assertEqual(get(prefix)["n_total_trials"], 3)
+                job = get(prefix)
+                self.assertEqual(job["n_total_trials"], 3)
+                native_job = self.scanner.get_job_result(JOB)
+                self.assertEqual(
+                    self.JobStats.model_validate(job["stats"]),
+                    self.JobStats.from_trial_results(
+                        native_job.trial_results, n_total_trials=native_job.n_total_trials
+                    ),
+                )
                 self.assertIsInstance(get(prefix + "/config"), dict)
                 trials = get(prefix + "/trials")
                 self.assertEqual(trials["total"], 3)

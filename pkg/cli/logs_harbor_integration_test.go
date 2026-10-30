@@ -20,7 +20,7 @@ func TestHarborConformance(t *testing.T) {
 	if python == "" {
 		python = "python3"
 	}
-	root, err := os.MkdirTemp(".", ".harbor-conformance-")
+	root, err := os.MkdirTemp("/tmp", "gh-aw-harbor-conformance-")
 	require.NoError(t, err)
 	root, err = filepath.Abs(root)
 	require.NoError(t, err)

@@ -12,15 +12,13 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/github/gh-aw/pkg/atif"
 )
 
 const harborExportDirectory = "harbor"
 
 // exportHarborJob imports recorded evidence, not runnable Harbor tasks. Only
 // explicitly recorded numeric grader values become namespaced native rewards.
-func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun) error { //nolint:largefunc // Keep deterministic native job assembly and the staged publication/rollback lifecycle together.
+func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -43,7 +41,16 @@ func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun)
 		return err
 	}
 	defer os.RemoveAll(staging)
+	if err := harborExportJobRecords(ctx, outputDir, staging, runs); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return harborReplace(staging, destination)
+}
 
+func harborUniqueRuns(runs []ProcessedRun) (map[string]ProcessedRun, []string) {
 	// Sorting and deduplication make job and trial identities independent of selection order.
 	selected := make(map[string]ProcessedRun)
 	for _, run := range runs {
@@ -57,6 +64,11 @@ func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun)
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
+	return selected, keys
+}
+
+func harborExportJobRecords(ctx context.Context, outputDir, staging string, runs []ProcessedRun) error {
+	selected, keys := harborUniqueRuns(runs)
 	jobID := harborUUID("job\x00" + strings.Join(keys, "\x00"))
 	results := make([]map[string]any, 0, len(keys))
 	trialNames := make([]string, 0, len(keys))
@@ -74,6 +86,10 @@ func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun)
 		results = append(results, result)
 		trialNames = append(trialNames, trialName)
 	}
+	return harborWriteJobFiles(staging, jobID, results, trialNames)
+}
+
+func harborWriteJobFiles(staging, jobID string, results []map[string]any, trialNames []string) error {
 	now := time.Now().UTC()
 	config := map[string]any{
 		"job_name": harborExportDirectory, "jobs_dir": ".", "agents": []any{harborAgentConfig()},
@@ -81,7 +97,7 @@ func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun)
 	}
 	job := map[string]any{
 		"id": jobID, "started_at": now, "finished_at": now, "n_total_trials": len(results),
-		"stats":         map[string]any{"n_completed_trials": len(results), "n_errored_trials": 0, "evals": map[string]any{}},
+		"stats":         harborJobStats(results),
 		"trial_results": results,
 	}
 	metadata := map[string]any{
@@ -97,10 +113,7 @@ func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun)
 			return err
 		}
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return harborReplace(staging, destination)
+	return nil
 }
 
 func harborAttempt(run WorkflowRun) int {
@@ -142,141 +155,6 @@ func harborAgentConfig() map[string]any {
 	}
 }
 
-func harborExportTrial(ctx context.Context, staging, name, jobID, source string, processed ProcessedRun) (map[string]any, error) { //nolint:largefunc // Assemble the native trial and its evidence/provenance sidecar in one transaction so their fields cannot diverge.
-	dir := filepath.Join(staging, name)
-	evidence := filepath.Join(dir, "gh-aw", "evidence")
-	if err := os.MkdirAll(evidence, 0o700); err != nil {
-		return nil, err
-	}
-	files, err := harborSnapshot(ctx, source, evidence)
-	if err != nil {
-		return nil, err
-	}
-	sessionPath, err := findUnifiedSessionPath(evidence)
-	if err != nil {
-		return nil, err
-	}
-	sessionStatus := "missing"
-	agentInfo, agentProvenance := harborRecordedAgent(evidence)
-	if sessionPath != "" {
-		content, err := readATIFSessionFile(sessionPath)
-		if err != nil {
-			return nil, err
-		}
-		content, err = normalizeATIFSession(ctx, content, sessionPath, evidence)
-		if err != nil {
-			return nil, err
-		}
-		trajectory, err := convertSessionATIF(ctx, content)
-		if err != nil {
-			return nil, err
-		}
-		if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o700); err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(filepath.Join(dir, "agent", "trajectory.json"), trajectory, 0o600); err != nil {
-			return nil, err
-		}
-		var identity struct {
-			Agent atif.Agent `json:"agent"`
-		}
-		if err := json.Unmarshal(trajectory, &identity); err != nil {
-			return nil, err
-		}
-		if identity.Agent.Name != "gh-aw-unified" {
-			if agentInfo["name"] != identity.Agent.Name {
-				agentInfo["version"] = "unknown"
-				delete(agentInfo, "model_info")
-			}
-			agentInfo["name"] = identity.Agent.Name
-		} else if agentInfo["name"] == "gh-aw" {
-			agentInfo["name"] = identity.Agent.Name
-		}
-		if identity.Agent.Version != "unknown" {
-			agentInfo["version"] = identity.Agent.Version
-		}
-		if identity.Agent.ModelName != "" {
-			agentInfo["model_info"] = map[string]any{"name": identity.Agent.ModelName}
-		}
-		agentProvenance = "agent/trajectory.json#/agent via existing ATIF converter; missing identity fields fall back to " + agentProvenance
-		sessionStatus = "recorded"
-	}
-	run := processed.Run
-	run.LogsPath = "gh-aw/evidence"
-	config := map[string]any{
-		"task": map[string]any{"path": "gh-aw/evidence"}, "trial_name": name,
-		"trials_dir": ".", "agent": harborAgentConfig(), "job_id": jobID,
-		"environment": map[string]any{"type": nil},
-	}
-	result := map[string]any{
-		"id": harborUUID(harborRunIdentity(processed)), "task_name": run.WorkflowName,
-		"trial_name": name, "trial_uri": "./" + name, "task_id": map[string]any{"path": "gh-aw/evidence"},
-		"task_checksum": "", "config": config,
-		"agent_info":   agentInfo,
-		"agent_result": nil, "verifier_result": nil, "exception_info": nil,
-		"started_at": harborRecordedTime(run.StartedAt), "finished_at": nil,
-	}
-	if run.Status == "completed" {
-		result["finished_at"] = harborRecordedTime(run.UpdatedAt)
-	}
-	graders := extractGradersData(evidence)
-	rewards, mapping, err := harborRecordedRewards(evidence, graders)
-	if err != nil {
-		return nil, err
-	}
-	metadata := map[string]any{
-		"format": "gh-aw-harbor-trial", "version": 1, "run": run,
-		"context": processed.AwContext, "episode_contexts": processed.EpisodeContexts,
-		"session_status": sessionStatus, "evidence_files": files,
-		"graders": graders, "experiments": extractExperimentData(evidence),
-		"experiment_assignment_provenance": "recorded_usage_summary_or_unavailable",
-		"reward_mapping":                   nil, "verifier_status": "not-recorded",
-		"task_identity":             "unknown; task.path references evidence, not a runnable Harbor task",
-		"agent_identity":            "recorded GH-AW execution; import_path is an inert identity, not an installed agent",
-		"agent_identity_provenance": agentProvenance,
-		"trial_timestamps":          "started_at from Actions startedAt; finished_at from updatedAt only for completed runs",
-	}
-	if len(rewards) > 0 {
-		result["verifier_result"] = map[string]any{"rewards": rewards}
-		metadata["reward_mapping"] = mapping
-		metadata["verifier_status"] = "recorded-gh-aw-grader-metrics"
-		if err := os.MkdirAll(filepath.Join(dir, "verifier"), 0o700); err != nil {
-			return nil, err
-		}
-		if err := harborWriteJSON(filepath.Join(dir, "verifier", "reward.json"), rewards); err != nil {
-			return nil, err
-		}
-	}
-	if state := findExperimentStatePath(evidence); state != "" {
-		relative, err := filepath.Rel(dir, state)
-		if err != nil {
-			return nil, err
-		}
-		metadata["experiment_state"] = filepath.ToSlash(relative)
-		raw, err := os.ReadFile(state)
-		if err != nil {
-			return nil, err
-		}
-		parsed := parseExperimentState(raw)
-		if parsed != nil && len(parsed.Counts) > 0 {
-			metadata["experiment_assignment_provenance"] = "legacy_max_count_heuristic"
-			if len(parsed.Runs) > 0 && len(parsed.Runs[len(parsed.Runs)-1].Assignments) > 0 {
-				record := parsed.Runs[len(parsed.Runs)-1]
-				metadata["experiment_assignment_provenance"] = "recorded_ledger_latest_run"
-				metadata["experiment_assignment_run_id"] = record.RunID
-			}
-		}
-	}
-	for path, value := range map[string]any{
-		"config.json": config, "result.json": result, "gh-aw/metadata.json": metadata,
-	} {
-		if err := harborWriteJSON(filepath.Join(dir, filepath.FromSlash(path)), value); err != nil {
-			return nil, err
-		}
-	}
-	return result, ctx.Err()
-}
-
 func harborRecordedTime(value time.Time) any {
 	if value.IsZero() {
 		return nil
@@ -304,7 +182,7 @@ func harborCheckPath(path string) error {
 			return err
 		}
 		if err == nil && info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("Harbor export path is a symbolic link: %s", current)
+			return fmt.Errorf("harbor export path is a symbolic link: %s", current)
 		}
 		if filepath.Dir(current) == current {
 			return nil
@@ -324,7 +202,7 @@ func harborCheckDestination(destination string) error {
 		return err
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("Harbor export destination is not a directory: %s", destination)
+		return fmt.Errorf("harbor export destination is not a directory: %s", destination)
 	}
 	marker := filepath.Join(destination, "gh-aw-export.json")
 	if err := harborCheckPath(marker); err != nil {
