@@ -944,8 +944,12 @@ cat aw_session.jsonl | gh aw graders run weekly-research operational-value
 ```
 
 The command always emits `{"version": 1, "definition": {...}, "result": {...}}`.
-The definition includes resolved acceptance metadata and data-only configuration,
-but no executable source. Read the measurement from `.result.value` and the
+The definition includes resolved acceptance metadata, but no executable source.
+Configuration is used unchanged for computation but omitted from output:
+`definition.config` is always `{}` with `definition.config_omitted: true`.
+This envelope is not a complete reproduction record. The unchanged `result`
+can contain free-form grader diagnostics; review it before publishing.
+Runtime stderr is omitted from CLI errors. Read the measurement from `.result.value` and the
 threshold outcome from `.result.passed`; scripts expecting the former flat
 result can pipe the output through `jq '.result'`.
 

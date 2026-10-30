@@ -3,6 +3,7 @@
 
 import copy
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -136,6 +137,87 @@ class PublicationTests(unittest.TestCase):
         self.assertFalse((self.output / "reward.json").exists())
         self.assertEqual(len(self.report()["results"]), 2)
 
+    def test_only_reward_mapping_fields_are_persisted(self):
+        secret = "synthetic-unclassified-private-content"
+        result = envelope()
+        result["definition"].update({
+            "config": {"token": secret, "nested": {"target": secret}},
+            "name": secret, "description": secret, "unit": secret,
+            "script": secret, "unexpected": secret,
+        })
+        result["result"].update({
+            "message": secret, "error": secret, "details": {"innocent": [secret]},
+            "diagnostics": [{"message": secret}], "metrics": [{"id": secret, "value": 7}],
+            "implementation": {"id": secret, "digest": secret},
+        })
+        result["unexpected"] = secret
+        original = copy.deepcopy(result)
+        with patch.object(verify, "run_grader", return_value=(0, result, secret)), patch(
+            "sys.stderr", new_callable=io.StringIO
+        ) as stderr:
+            self.assertEqual(verify.verify(self.config, self.session, self.output, sys.executable), 0)
+        report = self.report()
+        self.assertNotIn(secret, json.dumps(report) + stderr.getvalue())
+        self.assertEqual(report["results"][0], {
+            "selection": selection(), "output": {
+                **envelope(), "definition": {
+                    **envelope()["definition"], "config": {}, "config_omitted": True,
+                },
+            },
+            "exit_code": 0, "stderr": "", "stderr_omitted": True, "diagnostics_omitted": True,
+        })
+        self.assertEqual(result, original)
+        self.assertEqual(json.loads((self.output / "reward.json").read_text()), {"reward": 1})
+
+    def test_free_form_fields_cannot_bypass_allowlist(self):
+        secret = "synthetic-invalid-field-secret"
+        for field in ("version", "definition", "result"):
+            result = envelope()
+            result[field] = secret
+            with self.subTest(field=field):
+                self.assertEqual(self.run_with([(0, result)]), 1)
+                self.assertNotIn(secret, json.dumps(self.report()))
+        for section, fields in (
+            ("definition", ("id", "threshold", "direction")),
+            ("result", ("id", "status", "value", "passed")),
+        ):
+            for field in fields:
+                result = envelope()
+                result[section][field] = {"unclassified": secret}
+                with self.subTest(section=section, field=field):
+                    self.assertEqual(self.run_with([(0, result)]), 1)
+                    self.assertNotIn(secret, json.dumps(self.report()))
+
+    def test_evaluator_and_parser_errors_do_not_echo_content(self):
+        secret = "synthetic-evaluator-error-secret"
+        result = envelope(None, None, "error")
+        result["result"]["error"] = secret
+        with patch.object(verify, "run_grader", return_value=(1, result, secret)), patch(
+            "sys.stderr", new_callable=io.StringIO
+        ) as stderr:
+            self.assertEqual(verify.verify(self.config, self.session, self.output, sys.executable), 1)
+        self.assertNotIn(secret, json.dumps(self.report()) + stderr.getvalue())
+        for error in (
+            verify.VerificationError(secret), ValueError(secret), OSError(secret),
+        ):
+            with self.subTest(error=type(error)), patch.object(
+                verify, "run_grader", side_effect=error
+            ), patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                self.assertEqual(verify.verify(self.config, self.session, self.output, sys.executable), 1)
+                self.assertNotIn(secret, json.dumps(self.report()) + stderr.getvalue())
+                self.assertFalse((self.output / "reward.json").exists())
+
+    def test_malformed_stdout_is_not_disclosed(self):
+        secret = "synthetic-malformed-stdout-secret"
+        executable = self.root / "fake-grader"
+        for output in (secret, '{"' + secret + '":1,"' + secret + '":2}'):
+            executable.write_text(f"#!{sys.executable}\nprint({output!r})\n")
+            executable.chmod(0o700)
+            with self.subTest(output=output), patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                self.assertEqual(verify.verify(self.config, self.session, self.output, executable), 1)
+                self.assertNotIn(secret, json.dumps(self.report()) + stderr.getvalue())
+                self.assertFalse((self.output / "reward.json").exists())
+
     def test_invalid_config(self):
         cases = []
         for field, value in (
@@ -185,6 +267,34 @@ class PublicationTests(unittest.TestCase):
 
 @unittest.skipUnless((ROOT / "gh-aw").is_file(), "build gh-aw before running real-runtime tests")
 class RuntimeTests(unittest.TestCase):
+    def test_config_and_evaluator_diagnostics_are_not_persisted(self):
+        secret = "synthetic-runtime-config-secret"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            session = root / "session.jsonl"
+            session.write_text("[]")
+            config = root / "mapping.json"
+            config.write_text(json.dumps({"version": 1, "workflow": "workflow.md", "metrics": [selection()]}))
+            for script, expected_code in (
+                ("return { value: config.score, message: config.token, details: { nested: config.token } }", 0),
+                ("throw new Error(config.token)", 1),
+            ):
+                (root / "workflow.md").write_text(
+                    "---\non: workflow_dispatch\ngraders:\n  outcome:\n"
+                    "    threshold: 1\n    direction: higher_is_better\n"
+                    f"    config:\n      score: 1\n      token: {secret}\n"
+                    f"    script: |\n      {script}\n---\nTest.\n"
+                )
+                with self.subTest(script=script), patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                    self.assertEqual(verify.verify(config, session, root / "output", ROOT / "gh-aw"), expected_code)
+                    report = (root / "output/gh-aw-graders.json").read_text()
+                    self.assertNotIn(secret, report + stderr.getvalue())
+                    reward = root / "output/reward.json"
+                    if expected_code == 0:
+                        self.assertEqual(json.loads(reward.read_text()), {"reward": 1})
+                    else:
+                        self.assertFalse(reward.exists())
+
     def test_invalid_definitions_never_publish_rewards(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -17,8 +17,11 @@ and mixed edits continue to require write-or-higher repository permission.
 `definition` and `result`. Read `.result.value`, `.result.status`, and other
 measurement fields under `.result` instead of at the top level, or pipe through
 `jq '.result'` to recover the former object shape. The definition includes resolved
-acceptance metadata without executable source; no `--include-definition` flag
-is required. Exit behavior is unchanged.
+acceptance metadata without executable source; configuration is used unchanged
+for grading but emitted as `config: {}` with `config_omitted: true`.
+No `--include-definition` flag is required. Harbor reports retain only typed
+reward-mapping fields and provenance/coverage metadata, explicitly omitting
+free-form diagnostics and stderr. Exit behavior and reward mapping are unchanged.
 
 `pull_request_target` workflows now default to same-repository PRs only in both
 strict and non-strict mode. Omitting `forks` is equivalent to `forks: []`; no

@@ -39,6 +39,8 @@ func decodeGraderRunResult(t *testing.T, content []byte, result any) {
 	require.NotEmpty(t, envelope.Definition["id"])
 	assert.NotContains(t, envelope.Definition, "script")
 	assert.NotContains(t, envelope.Definition, "shellScript")
+	assert.Equal(t, map[string]any{}, envelope.Definition["config"])
+	assert.Equal(t, true, envelope.Definition["config_omitted"])
 	require.NoError(t, json.Unmarshal(envelope.Result, result))
 }
 
@@ -187,7 +189,7 @@ func TestRunCustomGraderFromUnifiedSession(t *testing.T) {
 	if _, err := exec.LookPath("node"); err != nil {
 		t.Skip("node unavailable")
 	}
-	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  custom-count:\n    script: return helpers.createSessionLookups(session).stats.toolCallCount + config.offset\n    config:\n      offset: 3\n---\nTest.\n")
+	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  custom-count:\n    script: return helpers.createSessionLookups(session).stats.toolCallCount + config.offset\n    config:\n      offset: 3\n      token: synthetic-config-secret\n      nested:\n        identifier: synthetic-private-target\n---\nTest.\n")
 	var output bytes.Buffer
 	require.NoError(t, runGrader(context.Background(), graderRunConfig{
 		Workflow: workflowID, GraderID: "custom-count", Input: strings.NewReader("[]"), Output: &output,
@@ -201,6 +203,19 @@ func TestRunCustomGraderFromUnifiedSession(t *testing.T) {
 	assert.Equal(t, "custom-count", result.ID)
 	assert.Equal(t, "inline", result.Source)
 	assert.InDelta(t, 3.0, result.Value, 1e-9)
+	assert.NotContains(t, output.String(), "synthetic-config-secret")
+	assert.NotContains(t, output.String(), "synthetic-private-target")
+}
+
+func TestRunSessionGraderOmitsRuntimeStderrFromErrors(t *testing.T) {
+	directory := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(directory, "node"), []byte("#!/bin/sh\nprintf 'synthetic-runtime-secret' >&2\nexit 1\n"), 0o700))
+	t.Setenv("PATH", directory)
+	var output bytes.Buffer
+	err := runSessionGrader(context.Background(), graderRunDefinition{Source: "operational-value"}, json.RawMessage("[]"), &output, "")
+	require.ErrorContains(t, err, "runtime diagnostics omitted")
+	assert.NotContains(t, err.Error(), "synthetic-runtime-secret")
+	assert.Empty(t, output.String())
 }
 
 func TestLoadGraderRunDefinitionResolvesImports(t *testing.T) {
@@ -287,6 +302,8 @@ func TestGraderDefinitionEnvelopeContract(t *testing.T) {
 			assert.Equal(t, "outcome", envelope.Definition["id"])
 			assert.Equal(t, test.threshold, envelope.Definition["threshold"])
 			assert.Equal(t, "inline", envelope.Definition["source"])
+			assert.Equal(t, map[string]any{}, envelope.Definition["config"])
+			assert.Equal(t, true, envelope.Definition["config_omitted"])
 			assert.NotContains(t, envelope.Definition, "script")
 			assert.NotContains(t, envelope.Definition, "shellScript")
 			assert.Equal(t, "outcome", envelope.Result["id"])

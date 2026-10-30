@@ -137,6 +137,35 @@ def map_result(envelope, metric):
     return int(passed)
 
 
+def diagnostic_output(envelope, metric):
+    """Retain only typed reward-mapping fields, never free-form evaluator text."""
+    if not isinstance(envelope, dict):
+        return None
+    output = {"definition": {"config": {}, "config_omitted": True}, "result": {}}
+    if type(envelope.get("version")) is int and envelope["version"] == 1:
+        output["version"] = 1
+    definition, result = envelope.get("definition"), envelope.get("result")
+    if isinstance(definition, dict):
+        if definition.get("id") == metric["grader"]:
+            output["definition"]["id"] = metric["grader"]
+        threshold = definition.get("threshold")
+        if threshold is None or finite_number(threshold):
+            output["definition"]["threshold"] = threshold
+        if definition.get("direction") in ("higher_is_better", "lower_is_better"):
+            output["definition"]["direction"] = definition["direction"]
+    if isinstance(result, dict):
+        if result.get("id") == metric["grader"]:
+            output["result"]["id"] = metric["grader"]
+        if result.get("status") in ("pass", "fail", "unavailable", "error"):
+            output["result"]["status"] = result["status"]
+        value, passed = result.get("value"), result.get("passed")
+        if value is None or finite_number(value):
+            output["result"]["value"] = value
+        if passed is None or type(passed) is bool:
+            output["result"]["passed"] = passed
+    return output
+
+
 def run_grader(binary, workflow, grader_id, session):
     with tempfile.TemporaryFile() as source:
         source.write(session)
@@ -225,7 +254,9 @@ def verify(config_path, session_path, output_dir, binary):
         for metric in config["metrics"]:
             code, envelope, stderr = run_grader(binary_path, workflow, metric["grader"], session)
             report["results"].append({
-                "selection": metric, "output": envelope, "exit_code": code, "stderr": stderr,
+                "selection": metric, "output": diagnostic_output(envelope, metric),
+                "exit_code": code, "stderr": "", "stderr_omitted": bool(stderr),
+                "diagnostics_omitted": True,
             })
             if code != 0:
                 raise VerificationError("grader process failed: " + metric["grader"])
@@ -245,9 +276,11 @@ def verify(config_path, session_path, output_dir, binary):
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report["status"] = "unavailable" if isinstance(error, UnavailableError) else "error"
-        report["error"] = str(error)
+        # Parser and OS exceptions can contain grader output, JSON keys, or paths.
+        # Do not let those bypass the diagnostic field allowlist.
+        report["error"] = "required grader unavailable" if isinstance(error, UnavailableError) else "verification failed"
         atomic_json(output_dir / "gh-aw-graders.json", report)
-        print(f"gh-aw verifier {report['status']}: {error}", file=sys.stderr)
+        print(f"gh-aw verifier {report['status']}: {report['error']} (diagnostics omitted)", file=sys.stderr)
         return 2 if isinstance(error, UnavailableError) else 1
 
 

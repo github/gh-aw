@@ -25,7 +25,8 @@ func newGradersRunCommand() *cobra.Command {
 the unified session is downloaded from the run's usage artifact. Otherwise,
 read the unified session from standard input as JSONL or a JSON event array.
 Always writes a versioned JSON envelope with the resolved grader definition and
-its result. Executable source is excluded from the definition.
+its result. Executable source and config values are excluded from the definition;
+config is {} with config_omitted: true. Results may contain sensitive diagnostics.
 Built-ins and JavaScript compute over the session in memory. Repository-owned
 operational-value Bash reads a staged session file and emits legacy metric arrays.
 Shell is trusted code, not yet microVM-isolated; detected file writes are rejected.`,

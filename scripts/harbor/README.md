@@ -24,10 +24,20 @@ The output directory is verifier-owned. Each invocation removes only
 Use a distinct directory per concurrent trial.
 
 `reward.json` contains `{"reward": 1}` for the reference fixture.
-`gh-aw-graders.json` retains resolved definitions, original results,
-implementation identity, input/config/workflow/binary hashes, and coverage.
+`gh-aw-graders.json` retains only typed reward-mapping fields: envelope version,
+matching grader IDs, finite threshold/value, supported direction/status, and
+boolean/null threshold outcome. It also retains selection, exit codes,
+input/config/workflow/binary hashes, and coverage. It is not a full replay record.
+Free-form metadata, nested metrics, messages, errors, and implementation details
+are omitted, not regex-redacted. Each result marks `diagnostics_omitted: true`;
+`stderr` is empty and `stderr_omitted` indicates whether captured stderr was nonempty.
+Report errors and verifier stderr use fixed messages rather than exception text,
+including on malformed output and evaluator failures.
 The CLI always includes the versioned definition/result envelope; no
 `--include-definition` flag is needed.
+Its `definition.config` is always `{}` with `config_omitted: true`; the trusted
+workflow configuration is still used for computation. The CLI result itself can
+contain sensitive grader diagnostics and is not safe to publish without review.
 Input is capped at 50 MiB, each stdout/stderr stream at 1 MiB, and each
 grader process group at 130 seconds. Only `PATH` is inherited by the CLI;
 its established runtime further restricts grader workers.
@@ -54,7 +64,7 @@ matching boolean `passed` from the resolved grader definition/result. A native
 `status: "pass"` with `passed: null` means computation succeeded, **not** task
 success. Use `raw` for such measurements or configure an acceptance threshold.
 Raw values retain their units; there is no implicit normalization or aggregation.
-Extra operational-value Bash metrics remain diagnostics.
+Extra operational-value Bash metrics do not affect rewards and are not persisted.
 
 | Outcome | Exit | Publication |
 |---|---|---|

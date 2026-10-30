@@ -191,10 +191,11 @@ cat aw_session.jsonl | gh aw graders run weekly-research loops
 
 Every invocation emits a version 1 envelope with `definition` and `result`.
 No flag is required. The definition contains the resolved
-ID, name, description, source, unit, direction, threshold, and data-only
-configuration from the same parsed workflow used for execution. Executable
-JavaScript and Bash source is excluded; result implementation identities and
-digests remain available. Consumers of the former flat output must read
+ID, name, description, source, unit, direction, and threshold from the same
+parsed workflow used for execution. Configuration is used unchanged for execution
+but emitted as `config: {}` with `config_omitted: true`. Executable JavaScript
+and Bash source is excluded; result implementation identities and digests remain
+available in CLI output. Consumers of the former flat output must read
 `.result.value`, `.result.status`, and other result fields under `.result`.
 To retain the former object shape in a pipeline, use `jq '.result'`.
 
@@ -208,7 +209,10 @@ separate when consuming output.
 The [Harbor verifier example](https://github.com/github/gh-aw/tree/main/scripts/harbor)
 maps explicitly selected measurements into numeric rewards in a separate
 verifier environment. Required unavailable evidence and grader errors produce
-diagnostics without a reward file; they are not valid zero rewards. The example
+diagnostics without a reward file; they are not valid zero rewards. Its report
+retains only typed reward-mapping fields, selection, exit codes, hashes, and
+coverage, not implementation identities, free-form diagnostics, or stderr.
+Configuration and diagnostic omissions are explicitly marked. The example
 uses the canonical unified session, independently of ATIF trajectory export,
 and does not execute a fresh workflow.
 

@@ -184,8 +184,12 @@ contract as the separate job; Node's permission model does not sandbox Bash.
 Local replay MUST always emit an envelope with numeric
 `version: 1`, a `definition` object, and the unchanged `result` object.
 The definition MUST contain resolved ID, name, description, source, unit,
-direction, threshold, and data-only configuration from the same parsed
-definition used for computation. It MUST NOT include executable script source.
+direction, and threshold from the same parsed definition used for computation.
+It MUST emit `config: {}` and `config_omitted: true` rather than the data-only
+configuration, and MUST NOT include executable script source.
+Computation MUST still receive the original configuration. This output is not a
+complete reproduction record; the unchanged result MAY contain sensitive
+free-form diagnostics. CLI process errors MUST NOT echo runtime stderr.
 No opt-in flag is required. The former flat result fields are nested under
 `result`; existing exit behavior MUST remain unchanged.
 
@@ -193,6 +197,15 @@ A numeric result without a threshold MAY have status `pass` while `passed`
 is null. Consumers MUST NOT interpret that status as task acceptance.
 A threshold miss is a valid measurement, not a process error; unavailable
 and error results MUST NOT be converted to numeric zero.
+
+The Harbor bridge MUST compute rewards from the original envelope but persist
+only allowlisted, typed reward-mapping fields, selection, exit codes, hashes,
+and coverage. It MUST omit free-form metadata, nested diagnostics/metrics,
+and captured stderr rather than claim arbitrary text can be reliably redacted.
+Persisted output MUST mark configuration and diagnostics as omitted. Report
+error fields and verifier stderr MUST NOT echo exception or evaluator text,
+including parser failures. Diagnostic minimization MUST NOT change reward
+mapping, grader execution, or exit status.
 
 ## 7. Experiment metric references
 

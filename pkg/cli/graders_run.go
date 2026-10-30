@@ -238,13 +238,12 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 	}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stdout = output
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	cmd.Stderr = io.Discard
 	if err := cmd.Run(); err != nil {
 		if errors.Is(commandCtx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("grader timed out after %s", timeout)
 		}
-		return fmt.Errorf("grader failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("grader failed: %w (runtime diagnostics omitted)", err)
 	}
 	return nil
 }

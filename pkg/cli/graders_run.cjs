@@ -24,7 +24,8 @@ const output = {
     unit: grader.unit,
     direction: grader.direction,
     threshold: grader.threshold,
-    config: grader.config ?? {},
+    config: {},
+    config_omitted: true,
   },
   result,
 };
