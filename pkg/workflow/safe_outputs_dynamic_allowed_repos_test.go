@@ -93,7 +93,7 @@ Test workflow
 		"safe-outputs MCP server JSON env block should include GH_AW_INPUT_BASE_BRANCH so the nested container inherits the value")
 }
 
-func TestSafeOutputsConfigPreservesSecretPlaceholdersOnDisk(t *testing.T) {
+func TestSafeOutputsConfigExcludesHandlerCredentialsOnDisk(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "safe-outputs-secret-placeholders")
 	mdFile := filepath.Join(tmpDir, "secret-safe-outputs.md")
 
@@ -123,12 +123,10 @@ Test workflow
 	require.NoError(t, err, "Failed to read compiled workflow")
 	compiled := string(compiledBytes)
 
-	assert.Contains(t, compiled, "GH_AW_SECRET_WRITE_PROJECT_PAT: ${{ secrets.WRITE_PROJECT_PAT }}",
-		"Generate Safe Outputs Config step should map secret expressions to prefixed env vars")
-	assert.GreaterOrEqual(t, strings.Count(compiled, "GH_AW_SECRET_WRITE_PROJECT_PAT: ${{ secrets.WRITE_PROJECT_PAT }}"), 1,
-		"Secret env vars should be exported anywhere the runtime still resolves the placeholder in memory")
-	assert.Contains(t, compiled, `\"github-token\":\"${GH_AW_SECRET_WRITE_PROJECT_PAT}\"`,
-		"config.json payload should preserve the prefixed secret placeholder instead of the secret value")
+	assert.NotContains(t, extractJobSection(compiled, "agent"), "WRITE_PROJECT_PAT",
+		"Handler credentials must not be passed to the agent job")
+	assert.Contains(t, extractJobSection(compiled, "safe_outputs"), `\"github-token\":\"${{ secrets.WRITE_PROJECT_PAT }}\"`,
+		"The safe_outputs job must retain the handler credential")
 
 	assert.Contains(t, compiled, "create_files.cjs",
 		"Safe outputs config should be written by the JavaScript file renderer")

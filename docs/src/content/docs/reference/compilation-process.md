@@ -329,8 +329,8 @@ unrecognized versions fall back to Docker. Local actionlint uses shellcheck and
 pyflakes from `PATH` when those integrations are enabled; it does not install them.
 
 Compilation and `gh aw lint` ignore actionlint's unsupported-key diagnostic for
-workflow-level `cache-mode`. Other syntax and security diagnostics, including
-misplaced `cache-mode` keys, are unaffected.
+workflow- and job-level `cache-mode`. Other syntax and security diagnostics,
+including step-level keys, misspelled keys, and malformed values, are unaffected.
 
 ### Development Testing Mode
 

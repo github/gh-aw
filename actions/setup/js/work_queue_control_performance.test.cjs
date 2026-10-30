@@ -219,6 +219,7 @@ describe("trusted work queue control step performance", () => {
     { profiles: 3, depth: 8 },
     { profiles: 3, depth: 32 },
     { profiles: 3, depth: 64 },
+    { profiles: 3, depth: 160 },
     { profiles: 3, depth: 8, works: 27, retained: 100 },
   ])(
     "bounds cold history verification and full-batch idempotent recovery: %j",

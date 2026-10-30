@@ -7,13 +7,105 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFormatWorkflowRunError_DispatchGuidance(t *testing.T) {
+	t.Setenv("CODESPACES", "false")
+	tests := []struct {
+		name     string
+		message  string
+		wantHint string
+	}{
+		{
+			name:     "unregistered branch workflow",
+			message:  "HTTP 404: workflow test.lock.yml not found on the default branch",
+			wantHint: workflowDispatchRegistrationHint,
+		},
+		{
+			name:     "case insensitive registration error",
+			message:  "workflow test.lock.yml NOT FOUND ON THE DEFAULT BRANCH",
+			wantHint: workflowDispatchRegistrationHint,
+		},
+		{
+			name:     "selected ref lacks manual trigger",
+			message:  "HTTP 422: Workflow does not have 'workflow_dispatch' trigger",
+			wantHint: "The workflow at the selected ref must declare on.workflow_dispatch",
+		},
+		{name: "missing ref", message: "HTTP 422: No ref found for: feature/missing"},
+		{name: "repository not found", message: "HTTP 404: Not Found"},
+		{name: "permission denied", message: "HTTP 403: Resource not accessible by integration"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := &exec.ExitError{Stderr: []byte(tt.message)}
+			err := formatWorkflowRunError(original)
+			require.ErrorIs(t, err, original)
+			if tt.wantHint != "" {
+				assert.Contains(t, err.Error(), tt.wantHint)
+				assert.Contains(t, err.Error(), "https://github.github.com/gh-aw/setup/cli/#run-from-a-feature-branch")
+			} else {
+				assert.NotContains(t, err.Error(), "default branch")
+				assert.NotContains(t, err.Error(), "on.workflow_dispatch")
+			}
+		})
+	}
+	t.Run("non-exit error", func(t *testing.T) {
+		original := errors.New("gh executable not found")
+		require.ErrorIs(t, formatWorkflowRunError(original), original)
+	})
+}
+
+func TestRunWorkflowOnGitHub_RemoteFeatureBranch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fake gh is not supported on Windows")
+	}
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args.log")
+	t.Setenv("RUN_ARGS_PATH", argsPath)
+	script := `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  exit 0
+fi
+printf '%s\n' "$@" >> "$RUN_ARGS_PATH"
+case "$1" in
+  api)
+    printf '%s\n' '[{"workflows":[{"id":1,"path":".github/workflows/test.lock.yml","state":"active"}]}]'
+    ;;
+  workflow)
+    printf '%s\n' 'https://github.com/owner/repo/actions/runs/12345678'
+    ;;
+  *) exit 1 ;;
+esac
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+
+	err := RunWorkflowOnGitHub(context.Background(), "test", RunOptions{
+		WorkflowRunFlags: WorkflowRunFlags{
+			RepoOverride: "owner/repo",
+			RefOverride:  "feature/my-change",
+		},
+		Inputs: []string{"topic=branch test"},
+	})
+	require.NoError(t, err)
+	args, err := os.ReadFile(argsPath)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"api", "--paginate", "--slurp", "repos/owner/repo/actions/workflows?per_page=100",
+		"workflow", "run", "test.lock.yml", "--repo", "owner/repo",
+		"--ref", "feature/my-change", "-f", "topic=branch test",
+	}, strings.Split(strings.TrimSpace(string(args)), "\n"))
+}
 
 // TestRunWorkflowOnGitHub_InputValidation tests input validation in RunWorkflowOnGitHub
 func TestRunWorkflowOnGitHub_InputValidation(t *testing.T) {

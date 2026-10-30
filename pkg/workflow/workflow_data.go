@@ -231,6 +231,7 @@ type WorkflowData struct {
 	ModelPolicyBlocked             []string                        // merged models.blocked policy list (union across imports + main frontmatter)
 	DefaultAiCreditsPricing        *AiCreditsPricingConfig         // fallback per-token pricing from frontmatter models.default-ai-credits-pricing; used by AWF API proxy for unrecognized models
 	ActionPinMappings              map[string]string               // action-pin redirect table from aw.json action_pins: maps "owner/repo@version" → "owner/repo@version"
+	generatedActionRefs            map[string]struct{}             // compiler-owned references, including tag fallbacks when SHA resolution is unavailable
 	ActionPinPrefixes              map[string]string               // repository-prefix redirects from aw.json action_pin_prefixes
 	ActionPinSourceVersions        map[string]string               // inline labels for frontmatter steps already pinned by SHA
 	ContainerPinMappings           map[string]string               // container-pin redirect table from aw.json container_pins: maps source image → replacement image

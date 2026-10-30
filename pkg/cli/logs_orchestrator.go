@@ -300,6 +300,8 @@ func buildContinuationIfNeeded(
 	}
 }
 
+var logsExportHarborJob = exportHarborJob
+
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
 func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err error) {
 	opts = normalizeLogsDownloadOptions(opts)
@@ -316,9 +318,19 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	apiRateLimit := startGitHubAPIRateLimitReport(ctx, logsRateLimitHost(opts.RepoOverride))
 	result, err := collectWorkflowLogs(ctx, opts)
 	if err != nil {
-		return err
+		var exportErr *logsATIFExportError
+		if !errors.As(err, &exportErr) {
+			return err
+		}
+		collectionErr := err
+		defer func() { err = errors.Join(err, collectionErr) }()
 	}
 	var outcomeReports []OutcomesData
+	if opts.Harbor {
+		if err := logsExportHarborJob(ctx, opts.OutputDir, result.processedRuns); err != nil {
+			return fmt.Errorf("harbor export: %w", err)
+		}
+	}
 	if opts.Outcomes {
 		outcomeReports, err = collectLogsOutcomes(ctx, result.processedRuns, opts.OutcomesDir, opts.Verbose)
 		if err != nil {
@@ -334,6 +346,10 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 		return err
 	}
 
+	return renderCollectedWorkflowLogs(result, opts, apiRateLimit, outcomeReports)
+}
+
+func renderCollectedWorkflowLogs(result workflowLogsResult, opts LogsDownloadOptions, apiRateLimit *GitHubAPIRateLimitReport, outcomeReports []OutcomesData) error {
 	return renderLogsOutput(result.processedRuns, renderLogsOutputOptions{
 		outputDir:         opts.OutputDir,
 		summaryFile:       opts.SummaryFile,
@@ -370,12 +386,9 @@ func collectWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (workflo
 
 	processedRuns, timeoutReached, countLimitReached, storageLimitReached, lastFetchedBeforeDate, err := collectProcessedWorkflowRuns(runtime, opts)
 	if err != nil {
-		var continuation *ContinuationData
-		if errors.Is(err, errLogsAPIRateLimitReached) {
-			continuationOpts := logsTargetContinuationOptions(opts)
-			continuationOpts.lastFetchedBeforeDate = lastFetchedBeforeDate
-			continuation = buildContinuationIfNeeded(processedRuns, false, false, false, true, continuationOpts)
-		}
+		continuationOpts := logsTargetContinuationOptions(opts)
+		continuationOpts.lastFetchedBeforeDate = lastFetchedBeforeDate
+		continuation := buildContinuationIfNeeded(processedRuns, timeoutReached, countLimitReached, storageLimitReached, errors.Is(err, errLogsAPIRateLimitReached), continuationOpts)
 		return workflowLogsResult{
 			processedRuns:       processedRuns,
 			artifactFilter:      runtime.artifactFilter,

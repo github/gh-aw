@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// CachePoisoningRule checks release/tag workflow cache restoration. It does not
-// infer publication from job names or prove the provenance of cached files.
+// CachePoisoningRule checks release/tag restores and explicit low-trust writes.
+// It does not infer trust from job names or prove cached-file provenance.
 func CachePoisoningRule() Rule {
 	return Rule{
-		ID: "cache-poisoning", Description: "Keep release builds from restoring shared dependency caches",
+		ID: "cache-poisoning", Description: "Review shared cache restores and low-trust cache-write overrides",
 		Severity: Warning, Targets: ActionsAST | AWAST, Check: checkCachePoisoning,
 	}
 }
@@ -21,6 +21,8 @@ func checkCachePoisoning(ctx context.Context, input Input) ([]Diagnostic, error)
 	if err := integrityInput(ctx, input); err != nil {
 		return nil, err
 	}
+	blocks, blockErr := executionPolicyBlocks(ctx, input)
+	diagnostics, modeErr := cacheWriteOverrides(ctx, input, blocks)
 	var on any
 	if input.Workflow != nil {
 		on = input.Workflow.On
@@ -28,12 +30,20 @@ func checkCachePoisoning(ctx context.Context, input Input) ([]Diagnostic, error)
 		on = input.Document.Frontmatter["on"]
 	}
 	release, err := cacheReleaseTrigger(ctx, on)
-	if err != nil || !release {
-		return nil, err
+	if err != nil {
+		return nil, errors.Join(modeErr, err)
 	}
-	blocks, err := executionPolicyBlocks(ctx, input)
-	failures := []error{err}
-	var diagnostics []Diagnostic
+	lowTrust, err := cacheLowTrustTrigger(ctx, on)
+	if !lowTrust {
+		diagnostics = nil
+	}
+	if err != nil || (!release && !lowTrust) {
+		return diagnostics, errors.Join(modeErr, err)
+	}
+	failures := []error{blockErr, modeErr}
+	if !release {
+		return diagnostics, errors.Join(failures...)
+	}
 	for _, block := range blocks {
 		for _, step := range block.Steps {
 			if err := ctx.Err(); err != nil {
@@ -87,7 +97,7 @@ func cacheReleaseTrigger(ctx context.Context, on any) (bool, error) {
 func actionRestoresCache(ctx context.Context, fields map[string]any, path string) (bool, error) {
 	name := actionName(fields["uses"])
 	switch name {
-	case "actions/cache", "actions/cache/restore", "actions/setup-go", "actions/setup-node":
+	case "actions/cache", "actions/cache/restore", "actions/setup-go", "actions/setup-node", "actions/setup-python", "actions/setup-java":
 	default:
 		return false, nil
 	}
@@ -112,6 +122,18 @@ func actionRestoresCache(ctx context.Context, fields map[string]any, path string
 			}
 		}
 		flag, defaultEnabled = "package-manager-cache", !actionMajorBefore(fields["uses"], 5)
+	case "actions/setup-python", "actions/setup-java":
+		if value, explicit := with["cache"]; explicit && value != nil {
+			text, ok := value.(string)
+			if !ok {
+				return false, fmt.Errorf("cache-poisoning requires a string at %s.with.cache; correct the action inputs before linting", path)
+			}
+			if strings.TrimSpace(text) == "" {
+				return false, nil
+			}
+			return true, nil
+		}
+		defaultEnabled = false
 	}
 	value, explicit := with[flag]
 	if !explicit {

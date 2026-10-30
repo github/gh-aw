@@ -32,3 +32,6 @@ pkg/workflow/actionslanguageservice/testdata/conformance.json
 
 # Verbatim routing-analytics run artifacts (github/gh-aw#70668)
 actions/setup/js/fixtures/routing-analytics/**/*.json
+
+# Pinned upstream Harbor golden fixtures (Git blob checksum verified)
+pkg/cli/testdata/harbor/*.json

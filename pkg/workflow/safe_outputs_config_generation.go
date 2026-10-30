@@ -40,6 +40,7 @@ func generateSafeOutputsConfig(data *WorkflowData) (string, error) {
 	safeOutputsConfig := make(map[string]any)
 	addStandardHandlerConfigs(safeOutputsConfig, data)
 	if handlerConfig := buildCommentMemoryHandlerConfig(data.CommentMemoryConfig, data.SafeOutputs.Footer, data.SafeOutputs.BodyFooter); handlerConfig != nil {
+		delete(handlerConfig, "github-token")
 		safeOutputsConfig[commentMemoryHandlerKey] = handlerConfig
 	}
 
@@ -113,6 +114,16 @@ func addStandardHandlerConfigs(safeOutputsConfig map[string]any, data *WorkflowD
 		handlerCfg := builder(data.SafeOutputs)
 		if handlerCfg == nil {
 			continue
+		}
+		// Credentials are only needed by the safe_outputs job, never by the agent.
+		delete(handlerCfg, "github-token")
+		delete(handlerCfg, "head-github-token")
+		if tools, ok := handlerCfg["tools"].(map[string]any); ok {
+			for _, tool := range tools {
+				if toolConfig, ok := tool.(map[string]any); ok {
+					delete(toolConfig, "github-token")
+				}
+			}
 		}
 		injectCurrentCheckoutPatchWorkspacePath(handlerName, handlerCfg, data)
 		injectCheckoutMapping(handlerName, handlerCfg, data)

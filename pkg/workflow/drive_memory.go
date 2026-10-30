@@ -237,7 +237,7 @@ func (c *Compiler) buildUpdateDriveMemoryJob(data *WorkflowData, threatDetection
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
 		BuildStringLiteral("success"),
 	)
-	condition := RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionSuccessCondition()), agentSucceeded))
+	condition := RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionAcceptedCondition()), agentSucceeded))
 	perms := NewPermissionsEmpty()
 	perms.Set(PermissionContents, PermissionRead)
 	perms.Set(PermissionIdToken, PermissionWrite)

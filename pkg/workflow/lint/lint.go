@@ -55,6 +55,9 @@ type Input struct {
 	// AllowActionRefs permits well-formed mutable references as warnings.
 	// Malformed references remain errors regardless of this compiler allowance.
 	AllowActionRefs bool
+	// GeneratedActionRefs records exact compiler-owned action references. Their
+	// well-formed tag fallbacks remain warnings; authored pinning is enforced separately.
+	GeneratedActionRefs map[string]struct{}
 	// SafeOutputJobs includes imported integration jobs resolved by the compiler.
 	SafeOutputJobs []string
 }

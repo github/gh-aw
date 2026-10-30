@@ -485,6 +485,7 @@ jobs:
       actions: read
       contents: read
       issues: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-claude-${{ github.workflow }}"
       queue: max
