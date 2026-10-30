@@ -194,9 +194,11 @@ export interface ModelConfigData {
     enabled: boolean;
     goal?: string;
     mode?: string;
+    /** Native routing provider (`anthropic` or `openai`) sent to AWF as `apiProxy.routing.provider`; absent for GitHub Copilot routing. */
+    provider?: "anthropic" | "openai";
     /** Configured routing candidates as authored (exact ids or gh-aw aliases) without provider prefix; absent means the router default or unknown. */
     allowedModels?: string[];
-    /** Effective router pool sent to AWF as provider-qualified ids or patterns: aliases expanded, narrowed by the model policy; absent when unknown or expression-valued. */
+    /** Effective router pool sent to AWF: `github-copilot/` ids or patterns for Copilot routing, or bare ids or patterns of the native `provider`; aliases expanded, narrowed by the model policy; absent when unknown or expression-valued. */
     candidateModels?: string[];
   };
   /** Configured model allow/block policy; empty lists mean no restriction was configured. */

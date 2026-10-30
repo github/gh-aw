@@ -366,6 +366,23 @@ describe("model_pin_check collection and rules", () => {
     expect(pin(report, "engine.fallback-models[1]")).toMatchObject({ provider: "copilot", status: "unresolvable", cause: "model_unavailable" });
   });
 
+  it("does not check native Claude and Codex routing candidates against the Copilot catalogue", () => {
+    const notChecked = { status: "not_checked", reason: "provider not in the Copilot catalogue" };
+    const codex = check({ ".github/workflows/codex.md": "---\nengine:\n  id: codex\n  model-routing:\n    allowed-models: [gpt-5.4, openai/gpt-5.4]\n---\n" });
+    expect(pin(codex, "engine.model-routing.allowed-models[0]")).toMatchObject({ ...notChecked, provider: "openai" });
+    expect(pin(codex, "engine.model-routing.allowed-models[1]")).toMatchObject({ ...notChecked, provider: "openai" });
+    const claude = check({ ".github/workflows/claude.md": "---\nengine:\n  id: claude\n  model-routing:\n    allowed-models: [claude-sonnet-5, anthropic/claude-sonnet-5]\n---\n" });
+    expect(pin(claude, "engine.model-routing.allowed-models[0]")).toMatchObject({ ...notChecked, provider: "anthropic" });
+    expect(pin(claude, "engine.model-routing.allowed-models[1]")).toMatchObject({ ...notChecked, provider: "anthropic" });
+  });
+
+  it("checks Claude and Codex routing candidates against the Copilot catalogue with model-provider: github", () => {
+    const codex = check({ ".github/workflows/codex.md": "---\nengine:\n  id: codex\n  model-provider: github\n  model-routing:\n    allowed-models: [gpt-5.4]\n---\n" });
+    expect(pin(codex, "engine.model-routing.allowed-models[0]")).toMatchObject({ provider: "copilot", status: "exact", resolved: "gpt-5.4" });
+    const claude = check({ ".github/workflows/claude.md": "---\nengine:\n  id: claude\n  model-provider: github\n  model-routing:\n    allowed-models: [claude-sonnet-5]\n---\n" });
+    expect(pin(claude, "engine.model-routing.allowed-models[0]")).toMatchObject({ provider: "copilot", status: "exact", resolved: "claude-sonnet-5" });
+  });
+
   it("reports catalog_unavailable when /reflect has no Copilot model list", () => {
     const report = check({ ".github/workflows/mini.md": "---\nengine: copilot\nmodel: gpt-5-mini\n---\n" }, incompleteDiscovery());
     expect(pin(report, "model")).toMatchObject({ status: "unresolvable", cause: "catalog_unavailable" });

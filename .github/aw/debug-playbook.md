@@ -33,7 +33,7 @@ Unknown: [unmapped codes](#unmapped-codes).
 | --- | --- | --- |
 | `workflow_failed` | First failed step; native error. | Route specific cause; conclusion isn't root cause. |
 | `workflow_timeout` | Step/budget/result. | Remove blockers/narrow scope; justify timeout changes. |
-| `multiple_errors` | First error versus cascades. | Fix cause, not repeats. |
+| `multiple_errors` | First error vs cascades. | Fix cause, not repeats. |
 | `mcp_server_failures`, `tools_not_available` | MCP startup, registration, failed calls. | Fix tool/server/config/auth; no blind permission expansion. |
 | `model_unavailable`, `model_endpoint_unsupported` | Complete same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
@@ -42,7 +42,7 @@ Unknown: [unmapped codes](#unmapped-codes).
 | `subagent_model_unavailable` | Child model, request, provider policy/catalog. | Verify child separately; follow [model/engine guide](debug-model-engine-misconfiguration.md). |
 | `subagent_failed` | Child error; parent dispatch. | Fix child cause; parent success != child success. |
 | `blocked_network_requests` | Destination, caller, denial, necessity. | Fix URL/tool or authorize narrow destination; retain firewall. |
-| `threat_detection_job_failed` | Detector startup/runtime versus verdict. | Repair detector; failure isn't a clean verdict. |
+| `threat_detection_job_failed` | Detector startup/runtime vs verdict. | Repair detector; failure isn't a clean verdict. |
 | `threat_detected` | Private structured verdict/artifact. | Stop unsafe effects; follow [security guidance](debug-security-review.md). Never publish payloads. |
 | `high_token_usage`, `many_iterations` | Tokens/cache/turns, repeated calls. | [Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps. |
 | `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work; retain necessary judgment. |
@@ -63,8 +63,8 @@ Inventory: [Model availability](#model-availability).
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't establish availability. |
 | `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone doesn't prove model removal. |
-| `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch` | Selection versus harness model/API/metadata. | Align selection/API; never invent evidence. |
-| `unsupported_effort` | Effort versus engine/model support. | Use supported effort/mapping; no silent discard. |
+| `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch` | Selection vs harness model/API/metadata. | Align selection/API; never invent evidence. |
+| `unsupported_effort` | Effort vs engine/model support. | Use supported effort/mapping; no silent discard. |
 | `missing_model_pricing_error`, `unknown_model_ai_credits` | Proxy pricing table and `missing_model_pricing_model_name`. | Correct supported pricing/version/config; never disable credit accounting. |
 | `invocation_cap_exceeded`, `max_runs_exceeded` | Used/max pooled inference calls. | Narrow work/loops; exhausted run cannot recover through identical retries. |
 | `max_ai_credits_exceeded`, `ai_credits_rate_limit_error`, `ai_credits_limit_exceeded` | Used/max credits; cap. | Stop; reduce work or authorize future budget. |
@@ -75,7 +75,7 @@ Inventory: [Model availability](#model-availability).
 | `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone doesn't establish authentication failure. |
 | `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
 | `capi_server_error`, `engine_outage`, `infrastructure_error` | Exhausted native 5xx/infrastructure timeline. | Report cause; bounded backoff, no unapproved redispatch. |
-| `agentic_engine_timeout` | Step/SDK budget versus post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone doesn't establish timeout. |
+| `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone doesn't establish timeout. |
 | `sandbox_runtime_crash` | Exit/signal, resources, runtime revision. | Fix crash/resources; retain redacted diagnostic/version. |
 | `goal_already_active` | Unfinished goal. | Update/complete existing goal; no duplicate. |
 | `shell_expansion_guard_rejected` | Private denied command; allowed syntax. | Use allowed tools without dangerous expansion; no obfuscation/bypass. |
@@ -170,19 +170,19 @@ Nonempty `safeoutputs.jsonl` doesn't prove publication.
 | `E008` | URL count/limit. | Reduce links; no concealment. |
 | `ERR_API`, `E007` | GitHub status; operation guard. | Resolve API/target cause; policy skip != failed mutation. |
 | `ERR_CONFIG`, `ERR_ADMISSION` | Config/schema, OIDC permissions, admission decision. | Fix config/service; honor denials/outage policy; recompile; withhold credentials/environment. |
-| `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Compiler version versus provenance/compatibility minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
+| `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Compiler version vs provenance/compatibility minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
 | `ERR_GRADER_SESSION_INVALID` | Unified event array: type/data/provenance. | Fix producer/caller; never fabricate sessions. |
 | `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Tool deep-copy failure. | Fix definition/loader; retain copy isolation. |
 | `ERR_SAFE_OUTPUTS_GATEWAY_CONFIG` | Numeric `MCP_GATEWAY_PORT`; present `MCP_GATEWAY_AGENT_ID` (private). | Repair configuration; retain readiness/authentication checks. |
 | `ERR_NOT_FOUND`, `TARGET_NOT_FOUND` | Target/repository; visibility. | Correct target/access; 404 may conceal inaccessible resources. |
 | `ERR_PARSE` | JSON/NDJSON framing/schema/producer. | Fix producer/format; retain private evidence. |
 | `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout; wrapper is not cause. |
-| `E009`, `CONFIG_HASH_MISMATCH` | Source versus lock hash. | Recompile/publish source+lock together; no manual hash edit. |
+| `E009`, `CONFIG_HASH_MISMATCH` | Source vs lock hash. | Recompile/publish source+lock together; no manual hash edit. |
 | `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff; reduce API work. |
 | `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files and attempted patch. | Respect intentional skip; constrain change, do not disable protection. |
 | `NO_CONTEXT` | Trigger context; explicit target. | Supply authorized target/context-appropriate output. |
 | `NO_LABELS_PROVIDED` | Requested/existing labels. | Supply valid labels; don't claim mutation. |
-| `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title versus guards. | Respect deliberate skip; fix mistaken target/config only. |
+| `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect deliberate skip; fix mistaken target/config only. |
 | `TARGET_LOCKED`, `NOT_AWAITING_APPROVAL` | Lock/approval state. | Respect state; no unrelated unlock/approval. |
 | `DAILY_AIC_QUOTA_STOP`, `quota_reserve`, `quota_exhausted`, `rate_limited` | Response quota; retry-not-before. | Stop/defer within bounds; missing accounting != zero usage. |
 | `AIC_USAGE_UNKNOWN` | Missing usage/accounting. | Fix collection/access; remaining budget stays unknown. |
@@ -265,8 +265,8 @@ or bypass profiles/effect scopes.
 | Codes or signature | Check | Remedy |
 | --- | --- | --- |
 | HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone is insufficient. |
-| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol versus tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
-| `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal versus caught. | Fix boundary; caught `/run/awf-config-audit` warning does not prove later inference failure. |
+| JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
+| `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning does not prove later inference failure. |
 | Unlisted code, compile/schema/scanner error | Exact identifier at producing revision; emitter/caller. | Trace cause; add regression/code row; report gaps, never guess. |
 
 No run: inspect file/line; follow [compile-only gates](debug-compilation.md).

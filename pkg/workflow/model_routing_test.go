@@ -492,8 +492,10 @@ func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
 		{name: "pi accepts Claude models", engine: "pi", provider: LLMProviderGitHub, model: "claude-sonnet-5"},
 		{name: "Claude rejects GPT models", engine: "claude", provider: LLMProviderGitHub, model: "gpt-5.6-sol", wantError: "native Messages API"},
 		{name: "Codex rejects Claude models", engine: "codex", provider: LLMProviderGitHub, model: "claude-sonnet-5", wantError: "Responses API"},
-		{name: "Claude rejects non-Copilot provider", engine: "claude", provider: LLMProviderAnthropic, model: "claude-sonnet-5", wantError: "requires GitHub Copilot inference"},
-		{name: "Codex rejects non-Copilot provider", engine: "codex", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
+		{name: "Claude accepts native Anthropic provider", engine: "claude", provider: LLMProviderAnthropic, model: "claude-sonnet-5"},
+		{name: "Codex accepts native OpenAI provider", engine: "codex", provider: LLMProviderOpenAI, model: "gpt-5.4"},
+		{name: "Claude rejects OpenAI provider", engine: "claude", provider: LLMProviderOpenAI, model: "claude-sonnet-5", wantError: "does not cross providers"},
+		{name: "Codex rejects Anthropic provider", engine: "codex", provider: LLMProviderAnthropic, model: "gpt-5.4", wantError: "does not cross providers"},
 		{name: "pi rejects non-Copilot provider", engine: "pi", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
 		{name: "Copilot rejects non-Copilot provider", engine: "copilot", provider: LLMProviderOpenAI, model: "gpt-5.6-sol", wantError: "requires GitHub Copilot inference"},
 		{name: "unknown engine rejected", engine: "gemini", model: "gpt-5.6-sol", wantError: "supported only by Copilot, Claude, Codex, and pi"},
@@ -517,7 +519,7 @@ func TestValidateModelRoutingEngineCompatibility(t *testing.T) {
 	}
 }
 
-func TestCompileModelRoutingRequiresGitHubProvider(t *testing.T) {
+func TestCompileModelRoutingProviderSupport(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		engine       string
@@ -526,11 +528,11 @@ func TestCompileModelRoutingRequiresGitHubProvider(t *testing.T) {
 		allowedModel string
 		wantError    string
 	}{
-		{name: "codex without provider", engine: "codex", allowedModel: "gpt-5.6-luna", wantError: `resolves to the "openai" provider`},
+		{name: "codex without provider routes natively on openai", engine: "codex", allowedModel: "gpt-5.4"},
 		{name: "codex with copilot-prefixed fixed model and no provider", engine: "codex", fixedModel: "copilot/gpt-5.6-luna", allowedModel: "gpt-5.6-luna", wantError: `resolves to the "openai" provider`},
-		{name: "claude without provider", engine: "claude", allowedModel: "claude-sonnet-5", wantError: `resolves to the "anthropic" provider`},
-		{name: "claude with anthropic", engine: "claude", provider: "anthropic", allowedModel: "claude-sonnet-5", wantError: `resolves to the "anthropic" provider`},
-		{name: "codex with openai", engine: "codex", provider: "openai", allowedModel: "gpt-5.6-luna", wantError: `resolves to the "openai" provider`},
+		{name: "claude without provider routes natively on anthropic", engine: "claude", allowedModel: "claude-sonnet-5"},
+		{name: "claude with anthropic", engine: "claude", provider: "anthropic", allowedModel: "claude-sonnet-5"},
+		{name: "codex with openai", engine: "codex", provider: "openai", allowedModel: "gpt-5.4"},
 		{name: "pi with anthropic", engine: "pi", provider: "anthropic", allowedModel: "claude-sonnet-5", wantError: `resolves to the "anthropic" provider`},
 		{name: "copilot with openai", engine: "copilot", provider: "openai", allowedModel: "gpt-5.6-luna", wantError: `resolves to the "openai" provider`},
 		{name: "codex with incompatible candidate", engine: "codex", provider: "github", allowedModel: "claude-sonnet-5", wantError: "incompatible with Codex's Responses API"},

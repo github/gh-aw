@@ -58,12 +58,25 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  *   `ai_credits_limit_exceeded` routing failure, and agent execution
  *   succeeded; T4 every other check passed
  *
+ * - N1–N3 native provider routing (only when `nativeProvider` is `anthropic` or
+ *   `openai`; Copilot smokes never set it): N1 the selection record's
+ *   `provider` and `selected_provider` are the native provider, its exact
+ *   `wire_model` is in allowed-models (no Copilot normalization) and
+ *   `selected_model` is `<provider>/<wire_model>`, with a non-null selected
+ *   effort; N2 every main-agent token-usage record and firewall
+ *   `stage: "request"` event is on the native provider and the selected wire
+ *   model; N3 /reflect has a configured endpoint for the native provider that
+ *   lists the wire model with complete routing metadata. With `nativeProvider`,
+ *   R3 and P1 read /reflect metadata from that provider's endpoint only, and
+ *   protocol names (`messages`, `responses`, `chat_completions`) map to paths.
  * - U1–U3 unified-session contract. `main` runs them only when the smoke opts
  *   in; `sessionContractMain` always runs E2 and U1–U3 alone for unrouted
  *   smokes. Session-contract fields:
  *   - `expectModelInventory: true` opts in and enables U2
  *   - `copilotInventory: true` opts in, enables U2 and also requires a
  *     configured `copilot` endpoint with models
+ *   - with `expectModelInventory`, `nativeProvider` makes U2 require a
+ *     configured endpoint for that provider with models
  *   - `resolutionRoles` (any array, including `[]`) opts in and lists the
  *     roles U3 requires; `[]` requires none
  *   `false` or omitted booleans and an omitted `resolutionRoles` do not opt
@@ -113,6 +126,14 @@ const AI_CREDITS_LIMIT_CODE = "ai_credits_limit_exceeded";
 const CREDIT_EPSILON = 1e-6;
 const ROUTING_PROFILES = ["economy", "balanced", "robust"];
 const RESOLVED_STATUSES = ["exact", "resolved"];
+const NATIVE_PROVIDERS = ["anthropic", "openai"];
+// AWF native /reflect routing metadata names protocols, not paths.
+/** @type {Record<string, string[]>} */
+const PROTOCOL_ENDPOINTS = {
+  messages: ["/v1/messages"],
+  responses: ["/responses", "/v1/responses"],
+  chat_completions: ["/chat/completions", "/v1/chat/completions"],
+};
 
 /**
  * @typedef {{ name: string, model: string, endpoint: string | string[] }} SubAgentExpectation
@@ -120,6 +141,7 @@ const RESOLVED_STATUSES = ["exact", "resolved"];
  * @typedef {{
  *   expectModelInventory?: boolean,
  *   copilotInventory?: boolean,
+ *   nativeProvider?: "anthropic" | "openai",
  *   resolutionRoles?: string[],
  *   requiredSubAgents?: string[],
  * }} SessionContractExpectations
@@ -225,20 +247,36 @@ function eventRequestId(event) {
 }
 
 /**
+ * /reflect endpoints to read routing metadata from: all of them, or only the
+ * native provider's endpoint when one is expected.
+ * @param {any} reflect
+ * @param {string} [provider]
+ * @returns {any[]}
+ */
+function reflectEndpointsFor(reflect, provider) {
+  const endpoints = Array.isArray(reflect?.endpoints) ? reflect.endpoints : [];
+  return provider ? endpoints.filter(endpoint => endpoint?.provider === provider) : endpoints;
+}
+
+/**
  * Supported endpoints for a model, according to the routing selection and the
- * AWF `/reflect` routing metadata.
+ * AWF `/reflect` routing metadata. Native protocol names map to request paths.
  * @param {string} model
  * @param {any} selection
  * @param {any} reflect
+ * @param {string} [provider] native provider whose endpoint holds the metadata
  * @returns {Set<string>}
  */
-function supportedEndpoints(model, selection, reflect) {
+function supportedEndpoints(model, selection, reflect, provider) {
   const endpoints = new Set();
-  const reflectEndpoints = Array.isArray(reflect?.endpoints) ? reflect.endpoints : [];
-  for (const endpoint of reflectEndpoints) {
+  for (const endpoint of reflectEndpointsFor(reflect, provider)) {
     for (const entry of Array.isArray(endpoint?.routing_models) ? endpoint.routing_models : []) {
       if (servedModel(entry?.model_id) !== model || !Array.isArray(entry?.supported_endpoints)) continue;
-      for (const value of entry.supported_endpoints) endpoints.add(normalizeEndpoint(value));
+      for (const value of entry.supported_endpoints) {
+        const protocol = PROTOCOL_ENDPOINTS[String(value)];
+        if (protocol) for (const pathValue of protocol) endpoints.add(pathValue);
+        else endpoints.add(normalizeEndpoint(value));
+      }
     }
   }
   // The selection's endpoint is used only when /reflect has no metadata for the model.
@@ -252,13 +290,13 @@ function supportedEndpoints(model, selection, reflect) {
  * metadata, or null when /reflect has no effort list for the model.
  * @param {string} model
  * @param {any} reflect
+ * @param {string} [provider] native provider whose endpoint holds the metadata
  * @returns {Set<string> | null}
  */
-function supportedEfforts(model, reflect) {
+function supportedEfforts(model, reflect, provider) {
   /** @type {Set<string> | null} */
   let efforts = null;
-  const reflectEndpoints = Array.isArray(reflect?.endpoints) ? reflect.endpoints : [];
-  for (const endpoint of reflectEndpoints) {
+  for (const endpoint of reflectEndpointsFor(reflect, provider)) {
     for (const entry of Array.isArray(endpoint?.routing_models) ? endpoint.routing_models : []) {
       if (servedModel(entry?.model_id) !== model || !Array.isArray(entry?.supported_reasoning_efforts)) continue;
       efforts ??= new Set();
@@ -315,6 +353,9 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   const allowedList = [...new Set((expectations.allowedModels ?? []).map(servedModel).filter(Boolean))];
   const allowed = new Set(allowedList);
   const subAgents = expectations.subAgents ?? [];
+  const nativeProvider = expectations.nativeProvider;
+  if (nativeProvider !== undefined && !NATIVE_PROVIDERS.includes(nativeProvider)) fail("N1", `nativeProvider must be one of ${NATIVE_PROVIDERS.join(", ")}, got ${nativeProvider}`);
+  const metadataProvider = nativeProvider && NATIVE_PROVIDERS.includes(nativeProvider) ? nativeProvider : undefined;
 
   // C1: sub-agent models must be disjoint from the routing candidates and from
   // each other, otherwise requests cannot be attributed by model.
@@ -393,7 +434,7 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   if (!selectedModel) {
     fail("R3", `no selected model to verify; observed main-agent requests: ${observedMain}`);
   } else {
-    const endpoints = supportedEndpoints(selectedModel, selection, reflect);
+    const endpoints = supportedEndpoints(selectedModel, selection, reflect, metadataProvider);
     const onModel = mainRequests.filter(request => servedModel(request.model) === selectedModel);
     if (!endpoints.size) {
       fail("R3", `no supported-endpoint metadata for ${selectedModel} in the routing selection or /reflect; observed: ${onModel.length ? describeRequests(onModel) : observedMain}`);
@@ -443,13 +484,19 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
       const requested = selection.objective?.mode;
       if (requested !== expectations.routingMode) p1Problems.push(`requested mode (objective.mode) is ${requested ?? "missing"}, expected ${expectations.routingMode}`);
       if (!ROUTING_PROFILES.includes(selection.mode)) p1Problems.push(`recommended profile (mode) is ${selection.mode ?? "missing"}, expected one of ${ROUTING_PROFILES.join(", ")}`);
-      const efforts = supportedEfforts(selectedModel, reflect);
+      const efforts = supportedEfforts(selectedModel, reflect, metadataProvider);
       if (!efforts) p1Problems.push(`no /reflect supported_reasoning_efforts for ${selectedModel} to check selected effort ${selectedEffort ?? "null"} against`);
       else if (!efforts.size && selectedEffort !== null) p1Problems.push(`selected effort is ${selectedEffort}, expected null because /reflect lists no supported efforts for ${selectedModel}`);
       else if (efforts.size && !efforts.has(String(selectedEffort))) p1Problems.push(`selected effort ${selectedEffort ?? "null"} is not among ${selectedModel}'s /reflect supported efforts [${[...efforts].join(", ")}]`);
     }
     if (p1Problems.length) fail("P1", p1Problems.join("; "));
     else pass("P1", `requested mode ${expectations.routingMode}; recommended profile ${selection?.mode} and selected effort ${selectedEffort ?? "null"} are valid for ${selectedModel}`);
+  }
+
+  if (metadataProvider) {
+    const native = evaluateNativeProviderEvidence({ events, mainRequests, selection, reflect, provider: metadataProvider, allowedModels: expectations.allowedModels ?? [], subAgentModels: subAgents.map(agent => agent.model) });
+    results.passes.push(...native.passes);
+    results.failures.push(...native.failures);
   }
 
   for (const [index, { agent, model, started, activity, correlated }] of subAgentEvidence.entries()) {
@@ -500,6 +547,87 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
     if (undeclared.length) fail("S4", `sub-agent events carry undeclared agent name(s); declared: [${[...declared].join(", ")}]; observed: ${describeEvents(undeclared)}`);
   }
 
+  return results;
+}
+
+/** @param {unknown} model @returns {string} */
+function undatedModel(model) {
+  return String(model || "")
+    .trim()
+    .replace(/-[0-9]{4}(?:-[0-9]{2}-[0-9]{2}|[0-9]{4})$/, "");
+}
+
+/**
+ * N1–N3: native provider routing evidence. Unlike the provider-blind R checks,
+ * these compare exact native provider names and wire model IDs.
+ * @param {{ events: any[], mainRequests: any[], selection: any, reflect: any, provider: string, allowedModels: string[], subAgentModels?: string[] }} input
+ * @returns {RoutingAssertionResults}
+ */
+function evaluateNativeProviderEvidence({ events, mainRequests, selection, reflect, provider, allowedModels, subAgentModels = [] }) {
+  /** @type {RoutingAssertionResults} */
+  const results = { passes: [], failures: [], info: [] };
+  /** @param {string} id @param {string} message */
+  const pass = (id, message) => results.passes.push(`PASS ${id} ${message}`);
+  /** @param {string} id @param {string} message */
+  const fail = (id, message) => results.failures.push(`FAIL ${id} ${message}`);
+  const allowed = new Set(allowedModels.map(model => String(model).trim()).filter(Boolean));
+  const wireModel = typeof selection?.wireModel === "string" ? selection.wireModel : "";
+
+  // N1: the proxy selected a native model on the native provider.
+  const n1Problems = [];
+  if (!selection) n1Problems.push("no firewall model_routing selection record with a selected model");
+  else {
+    if (selection.provider !== provider) n1Problems.push(`selection provider is ${selection.provider ?? "missing"}, expected ${provider}`);
+    if (selection.selectedProvider !== provider) n1Problems.push(`selected_provider is ${selection.selectedProvider ?? "missing"}, expected ${provider}`);
+    if (!wireModel) n1Problems.push("selection has no wire_model");
+    else if (!allowed.has(wireModel)) n1Problems.push(`wire_model ${wireModel} is not exactly one of allowed-models [${[...allowed].join(", ")}]`);
+    if (wireModel && selection.selectedModel !== `${provider}/${wireModel}`) n1Problems.push(`selected_model is ${selection.selectedModel ?? "missing"}, expected ${provider}/${wireModel}`);
+    if (selection.selectedEffort === null || selection.selectedEffort === undefined) n1Problems.push("selected effort is null; native routing metadata advertises efforts for every allowed model");
+  }
+  if (n1Problems.length) fail("N1", `native ${provider} selection: ${n1Problems.join("; ")}`);
+  else pass("N1", `native ${provider} selection ${selection.selectedModel} (wire_model=${wireModel}, effort=${selection.selectedEffort})`);
+
+  // N2: main-agent traffic reached the native provider on the selected wire model.
+  const subAgentServed = new Set(subAgentModels.map(servedModel));
+  const requestEvents = events
+    .filter(event => event?.type === "firewall.model_routing" && event.provenance?.component === "firewall" && event.data?.stage === "request")
+    .map(event => event.data)
+    .filter(data => data.purpose !== CLASSIFIER_PURPOSE && !subAgentServed.has(servedModel(data.requestedModel)));
+  const n2Problems = [];
+  if (!mainRequests.length) n2Problems.push("no main-agent token-usage records");
+  const offProvider = mainRequests.filter(request => request?.provider !== provider || undatedModel(request?.model) !== wireModel);
+  if (offProvider.length)
+    n2Problems.push(
+      `token-usage record(s) not on ${provider} ${wireModel || "<no wire model>"}: ${offProvider
+        .slice(0, MAX_OBSERVED)
+        .map(request => `${request?.provider ?? "<no provider>"} ${request?.model ?? "<no model>"}`)
+        .join(", ")}`
+    );
+  if (!requestEvents.length) n2Problems.push("no main-agent firewall model_routing request events");
+  const offEvents = requestEvents.filter(data => data.provider !== provider || data.requestedModel !== wireModel);
+  if (offEvents.length)
+    n2Problems.push(
+      `request event(s) not on ${provider} ${wireModel || "<no wire model>"}: ${offEvents
+        .slice(0, MAX_OBSERVED)
+        .map(data => `${data.provider ?? "<no provider>"} ${data.requestedModel ?? "<no model>"}`)
+        .join(", ")}`
+    );
+  if (n2Problems.length) fail("N2", n2Problems.join("; "));
+  else pass("N2", `all ${mainRequests.length} main-agent request(s) and ${requestEvents.length} request event(s) used ${provider} ${wireModel}`);
+
+  // N3: the native endpoint served the model with complete routing metadata.
+  const endpoints = reflectEndpointsFor(reflect, provider);
+  const configured = endpoints.find(endpoint => endpoint?.configured === true);
+  const n3Problems = [];
+  if (!configured) n3Problems.push(`/reflect has no configured ${provider} endpoint (observed: ${endpoints.length ? endpoints.map(endpoint => `configured=${endpoint?.configured}`).join(", ") : "none"})`);
+  else {
+    const models = Array.isArray(configured.models) ? configured.models : [];
+    if (!wireModel || !models.includes(wireModel)) n3Problems.push(`${provider} endpoint does not list ${wireModel || "<no wire model>"} (models: ${models.slice(0, MAX_OBSERVED).join(", ") || "none"})`);
+    const metadata = (Array.isArray(configured.routing_models) ? configured.routing_models : []).filter(entry => entry?.model_id === wireModel);
+    if (metadata.length !== 1 || metadata[0].candidate_metadata_complete !== true) n3Problems.push(`${provider} endpoint has no complete routing metadata for ${wireModel || "<no wire model>"}`);
+  }
+  if (n3Problems.length) fail("N3", n3Problems.join("; "));
+  else pass("N3", `${provider} endpoint ${configured.base_url ?? "<no base_url>"} lists ${wireModel} with complete routing metadata`);
   return results;
 }
 
@@ -738,10 +866,18 @@ function evaluateSessionContract({ events, expectations }) {
     } else {
       const inventory = agentInventories[0];
       const source = inventory.provenance?.path ?? "<no path>";
-      const copilot = (Array.isArray(inventory.data?.endpoints) ? inventory.data.endpoints : []).find(endpoint => endpoint?.provider === "copilot");
+      const inventoryEndpoints = Array.isArray(inventory.data?.endpoints) ? inventory.data.endpoints : [];
+      const copilot = inventoryEndpoints.find(endpoint => endpoint?.provider === "copilot");
       const copilotModels = Array.isArray(copilot?.models) ? copilot.models.length : 0;
+      const nativeProvider = expectations.nativeProvider;
+      const native = nativeProvider ? inventoryEndpoints.find(endpoint => endpoint?.provider === nativeProvider && endpoint?.configured === true) : undefined;
+      const nativeModels = Array.isArray(native?.models) ? native.models.length : 0;
       if (expectations.copilotInventory && (copilot?.configured !== true || !copilotModels)) {
         fail("U2", `agent-phase model.inventory from ${source} has no configured copilot endpoint with models; observed endpoints: ${describeInventoryEndpoints(inventory)}`);
+      } else if (nativeProvider && !nativeModels) {
+        fail("U2", `agent-phase model.inventory from ${source} has no configured ${nativeProvider} endpoint with models; observed endpoints: ${describeInventoryEndpoints(inventory)}`);
+      } else if (nativeProvider) {
+        pass("U2", `one agent-phase model.inventory from ${source}; ${nativeProvider} endpoint configured with ${nativeModels} model(s)`);
       } else {
         pass("U2", `one agent-phase model.inventory from ${source}${expectations.copilotInventory ? `; copilot endpoint configured with ${copilotModels} model(s)` : ""}`);
       }
@@ -1163,6 +1299,7 @@ module.exports = {
   evaluateSteeringEvidence,
   evaluateSelectedEffortCoverage,
   evaluateRequestedEffort,
+  evaluateNativeProviderEvidence,
   collectModelRoutingEvidence,
   checkModelRoutingEvidence,
   main,

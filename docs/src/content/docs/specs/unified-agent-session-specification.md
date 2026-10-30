@@ -1015,8 +1015,9 @@ selected `aw_info.json` copy) as exactly one `model.config` event per run, with
 | --- | --- | --- |
 | `routing.enabled` | Compiler → runner | Whether `engine.model-routing` is configured. `false` is an explicit unrouted run. |
 | `routing.goal`, `routing.mode` | Compiler → runner | Configured routing objective and mode. Never the router's per-run classification (`workflow.info.modelRouting.mode`). |
-| `routing.allowedModels` | Compiler → runner | Configured routing candidates as authored (exact ids or gh-aw aliases) without the `github-copilot/` prefix; absent when unset or expression-valued. |
-| `routing.candidateModels` | Compiler → runner | Effective router pool sent to AWF (`routing.candidateModels`, or the allow list on AWF without it): `github-copilot/` ids and patterns with aliases expanded and narrowed by `models.allowed` and `models.blocked`, or the Claude/Codex family default. Absent when the router has no shortlist or a candidate is expression-valued. |
+| `routing.provider` | Compiler → runner | Native routing provider sent to AWF as `apiProxy.routing.provider`: `anthropic` (Claude) or `openai` (Codex). Absent for GitHub Copilot routing. |
+| `routing.allowedModels` | Compiler → runner | Configured routing candidates as authored (exact ids or gh-aw aliases) without the routing provider prefix; absent when unset or expression-valued. |
+| `routing.candidateModels` | Compiler → runner | Effective router pool sent to AWF (`routing.candidateModels`, or the allow list on AWF without it): `github-copilot/` ids and patterns for Copilot routing, or bare ids and patterns of the native `routing.provider`, with aliases expanded and narrowed by `models.allowed` and `models.blocked`, or the Claude/Codex family default. Absent when the router has no shortlist or a candidate is expression-valued. |
 | `models.allowed`, `models.blocked` | Compiler → runner | Configured model allow/block policy sent to AWF, kept separate from the runtime inventory and routing candidate pool. Empty lists mean no restriction; the object is absent without the firewall or when a rule is expression-valued. |
 | `maxAiCredits` | Runner | Effective per-run budget: the evaluated compiled literal or repository-default expression (`vars.GH_AW_DEFAULT_MAX_AI_CREDITS`, falling back to `1000`), or the admitted allowance. |
 | `maxAiCreditsSource` | Compiler → runner; collector | `frontmatter` (explicit `max-ai-credits`), `default` (the repository-default expression), or `admission` when an admitted `guardrail.admission` allowance replaced the configured budget. Recorded from configuration provenance, never inferred from the value. |
@@ -2495,6 +2496,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.6.1 - Draft (2026-10-29)
+
+- Added `model.config` `routing.provider` for native Anthropic (Claude) and OpenAI (Codex) model routing; native `routing.candidateModels` are bare ids or patterns of that provider.
+- Retained serialization-format version 1.
 
 ### Version 2.6.0 - Draft (2026-10-26)
 

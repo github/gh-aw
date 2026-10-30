@@ -15,6 +15,7 @@ function makeFixture({ engine, model, endpoint, supportedEndpoints, effort = "hi
       {
         provider: "github",
         configured: true,
+        port: 10002,
         models: [model],
         routing_models: [
           {

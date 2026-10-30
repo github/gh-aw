@@ -380,6 +380,19 @@ function engineProvider(engine, mainModel, definitionProviders) {
 }
 
 /**
+ * The provider whose models `engine.model-routing.allowed-models` names (modelRoutingProvider):
+ * Claude and Codex route natively unless `model-provider` selects another provider; every
+ * other engine routes on GitHub Copilot.
+ * @param {EngineInfo} engine
+ * @returns {string} canonical provider
+ */
+function modelRoutingProvider(engine) {
+  const id = engine.id || "copilot";
+  if (id !== "claude" && id !== "codex") return "copilot";
+  return engine.explicitProvider ? canonicalModelProvider(engine.explicitProvider) : ENGINE_DEFAULT_PROVIDERS[id];
+}
+
+/**
  * Whether resolving a model alias could depend on a GitHub Actions expression before
  * reaching a statically resolvable candidate. A live exact model ID always takes
  * precedence over an alias with the same name.
@@ -546,8 +559,8 @@ function collectWorkflowPins(workflowFile, options) {
     }
     const routing = engineValue["model-routing"];
     if (isObject(routing) && Array.isArray(routing["allowed-models"])) {
-      // Model routing always selects among Copilot models.
-      routing["allowed-models"].forEach((model, index) => addPin(file, `${prefix}.model-routing.allowed-models[${index}]`, model, { ...scope, provider: scope.provider === "byok" ? "byok" : "copilot" }));
+      const routingProvider = scope.provider === "byok" ? "byok" : modelRoutingProvider(scope.engine);
+      routing["allowed-models"].forEach((model, index) => addPin(file, `${prefix}.model-routing.allowed-models[${index}]`, model, { ...scope, provider: routingProvider }));
     }
   };
 
