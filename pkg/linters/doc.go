@@ -18,6 +18,7 @@
 //   - errorfwrapv — flags fmt.Errorf calls that pass error arguments without %w wrapping
 //   - errormessage — flags non-actionable error message patterns in changed files
 //   - errortypeassertion — flags type assertions from error to concrete types and recommends errors.As
+//   - errorsnewerror — flags errors.New(err.Error()) calls that discard the original error chain
 //   - errstringmatch — flags brittle strings.Contains(err.Error(), "...") checks
 //   - excessivefuncparams — flags function declarations with too many positional parameters
 //   - execcommandwithoutcontext — flags exec.Command calls inside functions that already receive context.Context

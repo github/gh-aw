@@ -26,6 +26,7 @@ import (
 	deferrerrorunchecked "github.com/github/gh-aw/pkg/linters/deferred-error-unchecked"
 	"github.com/github/gh-aw/pkg/linters/errorfwrapv"
 	"github.com/github/gh-aw/pkg/linters/errormessage"
+	"github.com/github/gh-aw/pkg/linters/errorsnewerror"
 	"github.com/github/gh-aw/pkg/linters/errortypeassertion"
 	"github.com/github/gh-aw/pkg/linters/errstringmatch"
 	"github.com/github/gh-aw/pkg/linters/excessivefuncparams"
@@ -117,7 +118,7 @@ type docAnalyzer struct {
 //
 // Spec (README "Public API > Subpackages"):
 //
-//	appendbytestring, appendoneelement, blankassigncomma, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage,
+//	appendbytestring, appendoneelement, blankassigncomma, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage, errorsnewerror,
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
@@ -142,6 +143,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"errorfwrapv", errorfwrapv.Analyzer},
 		{"excessivefuncparams", excessivefuncparams.Analyzer},
 		{"errormessage", errormessage.Analyzer},
+		{"errorsnewerror", errorsnewerror.Analyzer},
 		{"errortypeassertion", errortypeassertion.Analyzer},
 		{"errstringmatch", errstringmatch.Analyzer},
 		{"execcommandwithoutcontext", execcommandwithoutcontext.Analyzer},
