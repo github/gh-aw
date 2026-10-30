@@ -15,9 +15,11 @@ const (
 	// inline suppression comment in block-style run scripts.
 	runnerGuardIgnoreLookBehind = 3
 	// runnerGuardIgnoreLookAhead catches findings reported on nearby generated setup or step
-	// boundary lines before the suppressed command. Provider inventory steps currently have the
-	// largest observed offset at 15 lines, so 20 leaves a small buffer without scanning the file.
-	runnerGuardIgnoreLookAhead = 20
+	// boundary lines before the suppressed command. The largest observed offset is 28 lines,
+	// for an inline-ignore comment inside a helper function body defined a few lines below the
+	// step's `- name:` boundary (the line runner-guard attributes the finding to), so 35 leaves
+	// a small buffer without scanning the file.
+	runnerGuardIgnoreLookAhead = 35
 )
 
 // filterRunnerGuardIgnoredFindings drops findings that have a local inline suppression comment
