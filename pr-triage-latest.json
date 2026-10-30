@@ -1,91 +1,47 @@
 {
-  "run_date": "2026-10-30T12:27:40Z",
-  "run_id": "41055117607",
+  "run_date": "2026-10-30T18:23:28.882774Z",
+  "run_id": "41105506987",
   "source": "pr-triage",
-  "eligible_total": 9,
+  "eligible_total": 2,
   "cooldown_skipped": 5,
-  "open_copilot_prs": 14,
+  "open_copilot_prs": 7,
   "category_counts": {
-    "feature": 4,
-    "bug": 5
+    "feature": 2
   },
   "risk_counts": {
     "high": 1,
-    "medium": 8
+    "medium": 1
   },
   "priority_counts": {
     "high": 1,
-    "medium": 8
+    "medium": 1
   },
   "action_counts": {
-    "fast_track": 3,
-    "batch_review": 6
+    "fast_track": 1,
+    "batch_review": 1
   },
-  "batches": [
-    {
-      "id": "pr-batch:model-routing-cost-savings",
-      "members": [
-        73052,
-        73034,
-        73033
-      ]
-    },
-    {
-      "id": "pr-batch:agentic-safety-fixes",
-      "members": [
-        72968,
-        72940,
-        72939,
-        72936,
-        72929
-      ]
-    }
-  ],
+  "batches": [],
   "selected_candidates": [
     {
-      "number": 73052,
-      "title": "Support engine.model-routing for Claude on native Anthropic and Codex on native OpenAI",
+      "number": 72273,
+      "title": "Support Claude on Vertex AI with GCP WIF",
       "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
+      "risk": "high",
+      "priority": "high",
       "action": "fast_track",
-      "score": 62,
+      "score": 74,
       "score_breakdown": {
-        "impact": 30,
-        "urgency": 14,
+        "impact": 35,
+        "urgency": 21,
         "quality": 18
       },
-      "batch": "pr-batch:model-routing-cost-savings",
+      "batch": null,
       "labels": [
         "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
+        "pr-risk:high",
+        "pr-priority:high",
         "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:model-routing-cost-savings"
-      ]
-    },
-    {
-      "number": 73034,
-      "title": "Route Safe Output Health Monitor with model routing (goal: cost, mode: economy)",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "fast_track",
-      "score": 62,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 14,
-        "quality": 18
-      },
-      "batch": "pr-batch:model-routing-cost-savings",
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:model-routing-cost-savings"
+        "pr-agent:copilot"
       ]
     },
     {
@@ -101,150 +57,12 @@
         "urgency": 14,
         "quality": 16
       },
-      "batch": "pr-batch:model-routing-cost-savings",
+      "batch": null,
       "labels": [
         "pr-type:feature",
         "pr-risk:medium",
         "pr-priority:medium",
         "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:model-routing-cost-savings"
-      ]
-    },
-    {
-      "number": 72968,
-      "title": "Surface incomplete-result reasons in failure issues and conclusion summaries",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 64,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 19,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72940,
-      "title": "Preserve agent config permissions and restore only after PR checkout",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 67,
-      "score_breakdown": {
-        "impact": 33,
-        "urgency": 20,
-        "quality": 14
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72939,
-      "title": "Reject Copilot discovery-only responses as successful completion",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 65,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 20,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72936,
-      "title": "Fix compilation errors for compiler-generated setup action fallbacks",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 62,
-      "score_breakdown": {
-        "impact": 27,
-        "urgency": 18,
-        "quality": 17
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72929,
-      "title": "Auto-migrate literal safe-output appends in post-steps",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 18,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72273,
-      "title": "Support Claude on Vertex AI with GCP WIF",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 74,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 21,
-        "quality": 18
-      },
-      "batch": "",
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
         "pr-agent:copilot"
       ]
     }
