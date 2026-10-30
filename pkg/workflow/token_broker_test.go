@@ -230,6 +230,57 @@ func TestTokenBrokerTaskOnly(t *testing.T) {
 	}
 }
 
+func TestTokenBrokerRequestOnlyPreservesTaskCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		handler string
+		env     string
+	}{
+		{handler: "  assign-to-agent:\n", env: "GH_AW_ASSIGN_TO_AGENT_TOKEN"},
+		{handler: "  create-agent-session:\n", env: "GH_AW_AGENT_SESSION_TOKEN"},
+		{handler: "  create-issue:\n    assignees: [copilot]\n", env: "GH_AW_ASSIGN_TO_AGENT_TOKEN"},
+		{handler: "  create-pull-request:\n    assignees: [copilot]\n", env: "GH_AW_ASSIGN_TO_AGENT_TOKEN"},
+	} {
+		t.Run(strings.TrimSpace(tc.handler), func(t *testing.T) {
+			compiler := NewCompiler()
+			source := "---\non: workflow_dispatch\nstrict: false\nengine: claude\ntoken-broker:\n  copilot-request: true\nsafe-outputs:\n  threat-detection: false\n" + tc.handler + "---\nTest."
+			data, err := compiler.ParseWorkflowString(source, "broker.md")
+			require.NoError(t, err)
+			_, err = compiler.CompileToYAML(data, "broker.md")
+			require.NoError(t, err)
+			job, exists := compiler.jobManager.GetJob("safe_outputs")
+			require.True(t, exists)
+			steps := strings.Join(job.Steps, "")
+			assert.Contains(t, steps, tc.env+": ${{ secrets.GH_AW_AGENT_TOKEN")
+			assert.NotContains(t, steps, tokenBrokerURLEnv+":")
+			assert.NotContains(t, steps, `\"_token_broker\"`)
+		})
+	}
+}
+
+func TestTokenBrokerTaskOnlyDoesNotInvalidateEvalsCredentials(t *testing.T) {
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		AI:                     "claude",
+		EngineConfig:           &EngineConfig{ID: "claude"},
+		TokenBrokerEnabled:     true,
+		TokenBrokerCopilotTask: true,
+		SafeOutputs: &SafeOutputsConfig{
+			AssignToAgent: &AssignToAgentConfig{},
+		},
+		Evals: &EvalsConfig{Questions: []EvalDefinition{{ID: "result", Question: "Done?"}}},
+	}
+	require.True(t, usesTokenBrokerTasks(data))
+	authData, _ := compiler.buildEvalsJobPermissions(data)
+	assert.False(t, usesTokenBrokerTasks(authData))
+	assert.NotNil(t, data.SafeOutputs)
+	job, err := compiler.buildEvalsJob(data)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	assert.NotContains(t, job.Permissions, "id-token")
+	assert.NotContains(t, strings.Join(job.Steps, ""), tokenBrokerURLEnv+":")
+	assert.NotContains(t, strings.Join(job.Steps, ""), "Invalidate brokered Copilot credentials")
+}
+
 func TestTokenBrokerFrontmatterModel(t *testing.T) {
 	config, err := ParseFrontmatterConfig(map[string]any{})
 	require.NoError(t, err)

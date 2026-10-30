@@ -106,6 +106,7 @@ func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
 func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, string) {
 	// Determine permissions for the evals job (same rationale as the detection job).
 	evalsAuthData := *data
+	evalsAuthData.SafeOutputs = nil
 	evalsAuthData.AI = c.getEvalsEngineID(data)
 	evalsAuthData.Model = c.resolveEvalsExecutionModel(data)
 	if data.EngineConfig != nil {
