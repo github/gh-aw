@@ -43,6 +43,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 | [Crush](https://github.com/charmbracelet/crush) | [crush.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/crush.md) |
 | [Cursor](https://cursor.com/docs/cli) | [cursor.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/cursor.md) |
 | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | [deepseek-harness.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/deepseek-harness.md) |
+| [Factory Droid](https://factory.com/product/cli) | [factory.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/factory.md) |
 | [Goose](https://github.com/aaif-goose/goose) | [goose.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/goose.md) |
 | [Kiro](https://kiro.dev/) | [kiro.md](https://github.com/github/gh-aw/blob/main/.github/workflows/shared/kiro.md) |
 | [Pydantic AI](https://ai.pydantic.dev/) | [Publisher definition](https://github.com/pydantic/pydantic-ai/blob/main/src/pydantic_ai_harness/gh-aw/pydantic.md) |
@@ -53,6 +54,7 @@ These definitions are examples for integration authors, **not supported gh-aw en
 | --- | --- |
 | OpenCode | Installs OpenCode 2 from `@opencode/cli`, uses `--standalone`, native MCP with Code Mode disabled, and JSONL events. Copilot requires AWF; direct Anthropic/OpenAI BYOK is supported without it. Repository JSON/JSONC settings are overlaid; updates/sharing are disabled. V2 has no language servers, and V1 plugins require porting. Native npm plugins are not gh-aw Agent Plugins. |
 | DeepSeek Harness | Pins `dsh` v0.2.0-rc.2. Uses headless stdin prompts, a private per-run configuration patch, and CLI-proxy tools rather than native MCP. Copilot requires AWF; direct Anthropic/OpenAI credentials apply only without AWF. Per-command native bash restrictions are rejected. No native reasoning, tool, refusal, or token-accounting observations are inferred from stdout. |
+| Factory Droid | Pins `@factory/cli` 0.248.0 with lifecycle scripts disabled. Uses `FACTORY_API_KEY`, `factory/<model>` names, file-based prompts, high autonomy inside the agent sandbox, and native authenticated HTTP MCP. Factory-managed inference only; no structured session parser, gh-aw tool allowlists, max-turn enforcement, or Agent Plugins. |
 | Goose | Pins CLI v1.53.0 with archive checksum verification. Uses OpenAI-compatible inference, native authenticated MCP, file-based prompts, and JSONL tool/usage events. Configuration/session state is temporary; keyring is disabled. No native gh-aw `web-fetch`; use MCP or shell. Copilot can use `copilot-requests: write` without a PAT. |
 | Kiro | Sample pins CLI 2.31.1 with the V2 harness; Powers plugins are not supported. |
 
