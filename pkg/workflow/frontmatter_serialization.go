@@ -86,6 +86,9 @@ func (fc *FrontmatterConfig) ToMap() map[string]any { //nolint:largefunc // Seri
 	if fc.TrackerID != "" {
 		result["tracker-id"] = fc.TrackerID
 	}
+	if fc.TokenBroker != nil {
+		result["token-broker"] = fc.TokenBroker
+	}
 	if fc.TimeoutMinutes != nil {
 		result["timeout-minutes"] = fc.TimeoutMinutes.ToValue()
 	}

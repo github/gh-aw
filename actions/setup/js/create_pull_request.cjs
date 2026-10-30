@@ -46,6 +46,7 @@ const { extractPatchBaseCommit } = require("./commit_sha_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { createOrUpdatePullRequest } = require("./create_or_update_pull_request.cjs");
 const { findAgent, getIssueDetails, assignAgentToIssue } = require("./assign_agent_helpers.cjs");
+const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
 const { ensureFullHistoryForBundle, importLocalBundle, offlineGitOptions, getBundlePrerequisites, linearizeRangeAsCommit } = require("./git_helpers.cjs");
 const { parseDiffGitHeader: parseDiffGitHeaderPaths, extractDiffGitHeaderEntries } = require("./patch_path_helpers.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
@@ -88,6 +89,7 @@ const MAX_GITHUB_BODY_LENGTH = 65536;
  * assignment API requires a PAT rather than a GitHub App token.
  *
  * Token priority:
+ *   0. Token broker copilot-task capability, when opted in (never falls back)
  *   1. config["github-token"] — explicit per-handler override
  *   2. GH_AW_ASSIGN_TO_AGENT_TOKEN — injected by the compiler when copilot is in assignees
  *   3. global github — step-level token (fallback when no agent token is available)
@@ -96,6 +98,7 @@ const MAX_GITHUB_BODY_LENGTH = 65536;
  * @returns {Promise<Object>} Authenticated GitHub client
  */
 async function createCopilotAssignmentClient(config) {
+  if (isTokenBrokerEnabled()) return createTokenBrokerGitHubClient();
   const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
   if (!token) {
     core.debug("No dedicated agent token configured — using step-level github client for copilot assignment");
@@ -759,11 +762,13 @@ async function main(config = {}) {
     try {
       const agentId = await findAgent(owner, repo, "copilot", issueNumber, copilotClient);
       if (!agentId) {
+        if (isTokenBrokerEnabled()) throw new Error(`Broker-authenticated copilot assignment failed for fallback issue #${issueNumber}: agent unavailable`);
         core.warning(`copilot coding agent is not available for ${owner}/${repo}`);
         return;
       }
       const issueDetails = await getIssueDetails(owner, repo, issueNumber, copilotClient);
       if (!issueDetails) {
+        if (isTokenBrokerEnabled()) throw new Error(`Broker-authenticated copilot assignment failed for fallback issue #${issueNumber}: issue details unavailable`);
         core.warning(`Failed to get issue details for copilot assignment of fallback issue #${issueNumber}`);
         return;
       }
@@ -787,10 +792,12 @@ async function main(config = {}) {
       if (assigned) {
         core.info(`Successfully assigned copilot coding agent to fallback issue #${issueNumber}`);
       } else {
+        if (isTokenBrokerEnabled()) throw new Error(`Broker-authenticated copilot assignment failed for fallback issue #${issueNumber}`);
         core.warning(`Failed to assign copilot to fallback issue #${issueNumber}`);
       }
     } catch (error) {
       core.warning(`Failed to assign copilot to fallback issue #${issueNumber}: ${getErrorMessage(error)}`);
+      if (isTokenBrokerEnabled()) throw error;
     }
   }
 

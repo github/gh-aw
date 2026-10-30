@@ -122,6 +122,11 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	if err != nil {
 		return err
 	}
+	if config := ctx.workflowData.ParsedFrontmatter; config != nil && config.TokenBroker != nil {
+		ctx.workflowData.TokenBrokerCopilotRequest = config.TokenBroker.CopilotRequest
+		ctx.workflowData.TokenBrokerCopilotTask = config.TokenBroker.CopilotTask
+		ctx.workflowData.TokenBrokerEnabled = config.TokenBroker.CopilotRequest || config.TokenBroker.CopilotTask
+	}
 	resolveMaxDailyAICBackendIntoWorkflowData(ctx.workflowData, ctx.frontmatter.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 	return nil
 }
