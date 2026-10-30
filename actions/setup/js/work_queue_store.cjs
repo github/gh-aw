@@ -420,7 +420,6 @@ async function verifyCheckpointGitHistory(options, head, root) {
   if (!scope || (queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient))) !== scope) return;
   // Traversal runs newest to oldest; retain the head when ancestry exceeds the cache.
   for (const proof of [...pending].reverse()) {
-    verified.delete(proof);
     verified.add(proof);
     if (verified.size > 128) {
       const oldest = verified.values().next().value;
