@@ -75,8 +75,7 @@ func TestClaudeVertexEnvironment(t *testing.T) {
 				data.IsEvalsRun = phase == "evals"
 				env := engine.buildClaudeCommandEnv(data)
 				host := constants.AWFAPIProxyHostname
-				if runtime == AgentRuntimeDockerSudoIptables ||
-					(phase != "agent" && runtime != AgentRuntimeNVX) {
+				if runtime == AgentRuntimeDockerSudoIptables {
 					host = "host.docker.internal"
 				}
 				assert.Equal(t, "http://"+host+":10004/v1", env["ANTHROPIC_VERTEX_BASE_URL"])
