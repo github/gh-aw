@@ -3,11 +3,13 @@ package cli
 import "strings"
 
 var generatedSafeOutputJobIDs = map[string]struct{}{
-	"activation":       {},
-	"conclusion":       {},
-	"push_evals_state": {},
-	"safe_outputs":     {},
-	"unlock":           {},
+	"activation":           {},
+	"admission":            {},
+	"conclusion":           {},
+	"conclusion_admission": {},
+	"push_evals_state":     {},
+	"safe_outputs":         {},
+	"unlock":               {},
 }
 
 const (
@@ -48,6 +50,10 @@ func filterRunnerGuardIgnoredFindings(findings []runnerGuardFinding, gitRoot str
 
 // filterGeneratedSafeOutputPermissionFindings removes RGS-005 findings for compiler-generated
 // jobs whose write permissions are calculated from lifecycle and safe-output configuration.
+// This also covers the admission/conclusion_admission credit-gating jobs: both run a fixed,
+// compiler-shipped script that only requests id-token for the admission service and never
+// executes workflow- or trigger-controlled content, so write-level permissions on an untrusted
+// trigger do not expand the attack surface the way they would for an agent job.
 // Agent jobs are intentionally not included: their declared permissions must remain read-only.
 func filterGeneratedSafeOutputPermissionFindings(findings []runnerGuardFinding, gitRoot string) []runnerGuardFinding {
 	filtered := make([]runnerGuardFinding, 0, len(findings))

@@ -54,6 +54,8 @@ func TestFilterGeneratedSafeOutputPermissionFindings(t *testing.T) {
 
 	findings := []runnerGuardFinding{
 		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "activation"},
+		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "admission"},
+		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "conclusion_admission"},
 		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "agent"},
 		{RuleID: "RGS-005", File: "user-workflow.yml", JobID: "safe_outputs"},
 		{RuleID: "RGS-012", File: "generated.lock.yml", JobID: "safe_outputs"},
