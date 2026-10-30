@@ -37,9 +37,10 @@ func TestHarborConformance(t *testing.T) {
 		"claude-awf-selected-messages",
 		"pi-claude-two-subagents",
 	}
+	runIDs := []int64{37886511291, 37971713032, 37971726317}
 	var runs []ProcessedRun
 	for index, fixture := range fixtures {
-		runID := int64(101 + index)
+		runID := runIDs[index]
 		runDir := filepath.Join(source, fmt.Sprintf("run-%d", runID))
 		fixtureDir := filepath.Join("testdata", "model_routing_golden", fixture)
 		require.NoError(t, os.CopyFS(runDir, os.DirFS(fixtureDir)))
