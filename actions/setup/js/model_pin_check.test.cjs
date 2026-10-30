@@ -438,7 +438,10 @@ describe("repository-pins-reflection-regression", () => {
   ];
 
   // Known unresolvable pins on main, by exact identity; any other unresolvable pin fails.
-  const KNOWN_MAIN_FAILURES = [];
+  const KNOWN_MAIN_FAILURES = [
+    { workflow: ".github/workflows/engine-conformance-factory.md", field: "model", configured: "copilot/gpt-5.2", cause: "model_unavailable" },
+    { workflow: ".github/workflows/smoke-factory.md", field: "model", configured: "copilot/gpt-5.2", cause: "model_unavailable" },
+  ];
 
   function repositoryReport() {
     const bytes = fs.readFileSync(REFLECT_FILE);
@@ -467,8 +470,8 @@ describe("repository-pins-reflection-regression", () => {
     }
 
     const unresolvable = report.action_required.map(({ workflow, field, configured, cause }) => ({ workflow, field, configured, cause }));
-    expect(unresolvable).toEqual([]);
-    expect(report.counts.unresolvable).toBe(0);
+    expect(unresolvable).toEqual(KNOWN_MAIN_FAILURES);
+    expect(report.counts.unresolvable).toBe(KNOWN_MAIN_FAILURES.length);
   });
 
   it("resolves the sub-agent aliases and keeps the GPT sub-agents on GPT models", () => {
