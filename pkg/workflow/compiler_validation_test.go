@@ -328,6 +328,72 @@ jobs:
 			wantErr: false,
 		},
 		{
+			name: "valid workflow cache mode",
+			yaml: `cache-mode: read
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello`,
+		},
+		{
+			name: "valid job cache mode",
+			yaml: `on: push
+jobs:
+  test:
+    cache-mode: write-only
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello`,
+		},
+		{
+			name: "valid reusable job cache mode",
+			yaml: `on: push
+jobs:
+  test:
+    cache-mode: none
+    uses: ./.github/workflows/test.yml`,
+		},
+		{
+			name: "invalid cache mode",
+			yaml: `cache-mode: invalid
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello`,
+			wantErr: true,
+			errMsg:  "cache-mode",
+		},
+		{
+			name: "invalid step cache mode",
+			yaml: `on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello
+        cache-mode: read`,
+			wantErr: true,
+			errMsg:  "cache-mode",
+		},
+		{
+			name: "invalid expression with cache mode",
+			yaml: `cache-mode: read
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      VALUE: '${{ github.ref + 1 }}'
+    steps:
+      - run: echo hello`,
+			wantErr: true,
+			errMsg:  "unexpected symbol",
+		},
+		{
 			name: "invalid workflow - missing jobs",
 			yaml: `name: "Test Workflow"
 on: push`,

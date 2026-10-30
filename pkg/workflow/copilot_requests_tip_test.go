@@ -114,3 +114,52 @@ permissions:
 		})
 	}
 }
+
+func TestCopilotRequestsEnableTipAcrossWorkflows(t *testing.T) {
+	dir := testutil.TempDir(t, "copilot-requests-tip-batch")
+	const content = `---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+---
+
+# Test Workflow
+`
+	paths := []string{filepath.Join(dir, "first.md"), filepath.Join(dir, "second.md")}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, batch := range []bool{false, true} {
+		t.Run(map[bool]string{false: "verbose", true: "batch"}[batch], func(t *testing.T) {
+			compiler := NewCompiler(WithVerbose(!batch), WithNoEmit(true))
+			compiler.SetStrictMode(false)
+			compiler.SetBatchMode(batch)
+			compiler.SetQuiet(batch)
+
+			stderr := testutil.CaptureStderr(t, func() {
+				for _, path := range paths {
+					compiler.ResetWarningCount()
+					if err := compiler.CompileWorkflow(path); err != nil {
+						t.Fatalf("compile %s: %v", path, err)
+					}
+				}
+			})
+
+			const tip = "Tip: set permissions.copilot-requests: write"
+			expectedCount := 1
+			if batch {
+				expectedCount = 0
+			}
+			if count := strings.Count(stderr, tip); count != expectedCount {
+				t.Fatalf("expected %d inline tips, got %d:\n%s", expectedCount, count, stderr)
+			}
+			if compiler.CopilotRequestsTipNeeded() != batch {
+				t.Fatalf("batch tip needed = %t, want %t", compiler.CopilotRequestsTipNeeded(), batch)
+			}
+		})
+	}
+}

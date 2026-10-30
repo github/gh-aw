@@ -627,6 +627,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
+    cache-mode: read
     timeout-minutes: 60
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -2628,7 +2629,7 @@ jobs:
             -- /bin/bash -c 'set +o histexpand; GH_AW_NODE_EXEC="${GH_AW_NODE_BIN:-}"; if [ -z "$GH_AW_NODE_EXEC" ] || [ ! -x "$GH_AW_NODE_EXEC" ]; then GH_AW_NODE_EXEC="$(command -v node 2>/dev/null || true)"; fi; if [ -z "$GH_AW_NODE_EXEC" ]; then echo "node runtime missing on this runner — check runtimes.node in workflow YAML" >&2; exit 127; fi; GH_AW_NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"; if [ -n "$GH_AW_NPM_GLOBAL_ROOT" ]; then export NODE_PATH="${GH_AW_NPM_GLOBAL_ROOT}${NODE_PATH:+:${NODE_PATH}}"; fi; "$GH_AW_NODE_EXEC" ${RUNNER_TEMP}/gh-aw/actions/shell_harness.cjs gemini '\'': "${RUNNER_TOOL_CACHE:?RUNNER_TOOL_CACHE must be set}"; GH_AW_TOOL_CACHE="$RUNNER_TOOL_CACHE"; GH_AW_TOOL_BINS="$(find "$GH_AW_TOOL_CACHE" -maxdepth 5 -type d -name bin 2>/dev/null | tr "\n" ":")"; GH_AW_TOOL_BINS="${GH_AW_TOOL_BINS%:}"; export PATH="$PATH${GH_AW_TOOL_BINS:+:}$GH_AW_TOOL_BINS"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; [ -n "$ERLANG_HOME" ] && export PATH="$ERLANG_HOME/bin:$PATH" || true && cd "${GITHUB_WORKSPACE}" && gemini --yolo --skip-trust --output-format stream-json --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"'\'''
         env:
           DEBUG: gemini-cli:*
-          GEMINI_API_BASE_URL: http://host.docker.internal:10003
+          GEMINI_API_BASE_URL: http://api-proxy:10003
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_CLI_TRUST_WORKSPACE: true
           GEMINI_MODEL: evals
@@ -3134,12 +3135,17 @@ jobs:
       - activation
       - agent
       - detection
-    if: always() && needs.detection.result == 'success' && needs.agent.result == 'success'
+    if: >
+      always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' &&
+      needs.agent.result == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' || github.event_name == 'delete' || github.event_name == 'registry_package' ||
+      github.event_name == 'page_build' || github.event_name == 'schedule' || github.event_name == 'pull_request')
     runs-on: ubuntu-slim
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
       actions: write
       contents: read
+    cache-mode: write-only
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
       GH_AW_WORKFLOW_ID_SANITIZED: smokegemini

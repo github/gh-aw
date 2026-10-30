@@ -2,6 +2,8 @@ package workflow
 
 import (
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
@@ -129,4 +131,13 @@ func formatCompilerMessage(filePath string, msgType string, message string) stri
 		Type:    msgType,
 		Message: message,
 	})
+}
+
+// emitTipOnce prints each distinct tip only once across workflows compiled by c.
+func (c *Compiler) emitTipOnce(filePath, message string) {
+	if c.quiet || c.tipsShown[message] {
+		return
+	}
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(filePath, "info", message))
+	c.tipsShown[message] = true
 }

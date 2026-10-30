@@ -36,6 +36,7 @@ type SkipIfCheckFailingConfig struct {
 	AllowPending bool     // if true, pending/in-progress checks are not treated as failing (default: treat pending as failing)
 }
 type WorkflowData struct {
+	RepoProtectedFilesExclude      []string     // Repository-root path globs from aw.json, additive to handler exclusions
 	SourceDocument                 *aw.Document // Authored source before preprocessing, import merging, or defaults
 	WorkQueuePolicy                *WorkQueuePolicyConfig
 	workQueueRepoIssuesConfigured  bool
