@@ -77,15 +77,36 @@ func TestHarborConformance(t *testing.T) {
 		}})
 	}
 	require.NoError(t, exportHarborJob(t.Context(), output, runs))
+	workflowPath := filepath.Join(root, "offline.md")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(`---
+on: workflow_dispatch
+graders:
+  recorded-tools:
+    script: return session.filter(e => e.type === "tool.execution_start").length;
+  absent:
+    script: return null;
+  broken:
+    script: throw new Error("conformance failure");
+---
+Offline conformance.
+`), 0o600))
+	regradedOutput := filepath.Join(root, "regraded")
+	require.NoError(t, exportLogsHarbor(t.Context(), regradedOutput, runs, []string{
+		workflowPath + ":recorded-tools", workflowPath + ":absent", workflowPath + ":broken",
+	}))
 	// Delete the original artifacts and move the export before asking Harbor to read
 	// it: neither an original absolute path nor GitHub access may be required.
 	require.NoError(t, os.RemoveAll(source))
 	relocated := filepath.Join(root, "relocated")
 	require.NoError(t, os.Rename(output, relocated))
-	job := filepath.Join(relocated, harborExportDirectory)
-	require.FileExists(t, filepath.Join(job, "config.json"))
-	command := exec.CommandContext(t.Context(), python, "../../scripts/test_harbor_conformance.py", job)
-	result, err := command.CombinedOutput()
-	require.NoError(t, err, "native Harbor conformance failed (install harbor==0.25.0):\n%s", result)
-	t.Logf("%s", result)
+	regradedRelocated := filepath.Join(root, "regraded-relocated")
+	require.NoError(t, os.Rename(regradedOutput, regradedRelocated))
+	for _, directory := range []string{relocated, regradedRelocated} {
+		job := filepath.Join(directory, harborExportDirectory)
+		require.FileExists(t, filepath.Join(job, "config.json"))
+		command := exec.CommandContext(t.Context(), python, "../../scripts/test_harbor_conformance.py", job)
+		result, err := command.CombinedOutput()
+		require.NoError(t, err, "native Harbor conformance failed (install harbor==0.25.0):\n%s", result)
+		t.Logf("%s", result)
+	}
 }

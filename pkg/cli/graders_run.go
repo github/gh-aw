@@ -40,6 +40,8 @@ type graderRunConfig struct {
 }
 
 type graderRunDefinition struct {
+	Selector    string         `json:"-"`
+	Workflow    string         `json:"-"`
 	ID          string         `json:"id"`
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
@@ -66,6 +68,10 @@ func runGrader(ctx context.Context, config graderRunConfig) error {
 }
 
 func loadGraderRunDefinition(workflowArg, graderID string) (graderRunDefinition, error) {
+	return loadGraderRunDefinitionMode(workflowArg, graderID, false)
+}
+
+func loadGraderRunDefinitionMode(workflowArg, graderID string, collection bool) (graderRunDefinition, error) {
 	workflowPath, err := ResolveWorkflowPath(workflowArg)
 	if err != nil {
 		return graderRunDefinition{}, err
@@ -86,11 +92,15 @@ func loadGraderRunDefinition(workflowArg, graderID string) (graderRunDefinition,
 		source = "inline"
 	} else if definition.Run != "" {
 		source = "operational-value"
+		if collection {
+			return graderRunDefinition{}, fmt.Errorf("grader %q uses Bash; collection regrading supports only built-in and isolated JavaScript graders", graderID)
+		}
 		if err := definition.PrepareShellScript(workflowPath); err != nil {
 			return graderRunDefinition{}, err
 		}
 	}
 	return graderRunDefinition{
+		Workflow: workflowPath, Selector: workflowPath + ":" + graderID,
 		ID: graderID, Name: definition.Name, Description: definition.Description, Source: source, Unit: definition.Unit,
 		Direction: definition.Direction, Threshold: definition.Threshold, Config: definition.Config, Script: definition.Script,
 		Run: definition.Run, ShellScript: definition.ShellScript,
