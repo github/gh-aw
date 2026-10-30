@@ -51,7 +51,15 @@ const {
   claudeSafeOutputsOffset,
   removeClaudePlugin,
 } = require("./claude_runtime.cjs");
-const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const {
+  captureExecutionEvidenceConfiguration,
+  resolveHarnessRetryTelemetryPath,
+  runHarnessRetryLoop,
+  selectedHarnessStrategy,
+  shouldSkipForNoopSafeOutputs,
+  shouldStopForNoopSafeOutputs,
+  stripExecutionEvidenceEnv,
+} = require("./harness_retry_runner.cjs");
 const { resolveRetryConfig: resolveSharedRetryConfig } = require("./harness_retry_config.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
@@ -641,7 +649,7 @@ async function main() {
     log,
     softTimeoutGuard,
     getRetryMode: () => (useContinueOnRetry ? `--resume ${sessionId}` : "fresh run"),
-    runAttempt: async attempt => {
+    runAttempt: async (attempt, observeStrategy) => {
       // Resume only the captured session; never select the latest unrelated conversation.
       // Claude Code resumes the session from on-disk state; re-sending the original
       // instructions would re-execute the full task from scratch.
@@ -658,6 +666,8 @@ async function main() {
       }
 
       // Use redacted args for logging when the run carries the prompt text.
+      const strategy = selectedHarnessStrategy(currentArgs, "claude");
+      observeStrategy(strategy);
       const logArgs = attempt === 0 ? safeInitialArgs : useContinueOnRetry ? currentArgs : safeFreshRetryArgs;
       const safeOutputsByteOffset = claudeSafeOutputsOffset(safeOutputsPath);
       const result = await runProcess({
@@ -681,7 +691,7 @@ async function main() {
           : undefined,
       });
       sessionId = claudeSessionId(result.output) || sessionId;
-      return { ...result, exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode, safeOutputsByteOffset };
+      return { ...result, exitCode: result.runtimeGuardFired && result.exitCode === 0 ? 1 : result.exitCode, safeOutputsByteOffset, strategy };
     },
     handleFailure: ({ attempt, result }) => {
       if (result.runtimeGuardFired && softTimeoutGuard) {

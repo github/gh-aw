@@ -29,6 +29,7 @@ func renderConsole(data AuditData, logsPath string) {
 	renderConsoleComparison(data.Comparison)
 	renderConsoleFingerprint(data.BehaviorFingerprint)
 	renderConsoleMetrics(data.Metrics)
+	renderConsoleRetries(data.Retries)
 	if data.Ledger != nil {
 		if data.Ledger.TransactionsAdded != nil {
 			fmt.Fprintf(os.Stderr, "  ledger: transactions_added=%d\n", *data.Ledger.TransactionsAdded)

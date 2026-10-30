@@ -1,6 +1,6 @@
 // @ts-check
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -8,11 +8,37 @@ import os from "node:os";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const {
+  captureExecutionEvidenceConfiguration,
+  recordStartupAttempt,
+  resolveHarnessRetryTelemetryPath,
+  runHarnessRetryLoop,
+  selectedHarnessStrategy,
+  shouldSkipForNoopSafeOutputs,
+  shouldStopForNoopSafeOutputs,
+  stripExecutionEvidenceEnv,
+} = require("./harness_retry_runner.cjs");
 
 describe("harness_retry_runner.cjs", () => {
+  it.each([
+    ["claude", ["--resume", "private-session"], "resume"],
+    ["claude", ["--resume=private-session"], "resume"],
+    ["claude", ["-c"], "resume"],
+    ["claude", ["--model", "--resume"], "restart"],
+    ["copilot", ["--continue"], "resume"],
+    ["copilot", ["--prompt", "--resume"], "restart"],
+    ["copilot", ["--", "--resume"], "restart"],
+    ["codex", ["exec", "--json", "resume", "private-session", "-"], "resume"],
+    ["codex", ["exec", "--model", "resume", "-"], "restart"],
+    ["codex", ["exec", "-c", "resume", "-"], "restart"],
+  ])("observes selected %s strategy without exposing selector values: %j", (engine, args, expected) => {
+    expect(selectedHarnessStrategy(args, engine)).toBe(expected);
+  });
+
   let directory;
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     if (directory) fs.rmSync(directory, { recursive: true, force: true });
     directory = undefined;
   });
@@ -72,7 +98,17 @@ describe("harness_retry_runner.cjs", () => {
     expect(JSON.parse(content)).toEqual({
       attempts,
       exit_code: exitCode,
-      attempt_results: exitCodes.map((code, index) => ({ attempt: index + 1, exit_code: code, failure_classes: code === 0 ? [] : ["rate_limit_error"] })),
+      attempt_results: exitCodes.map((code, index) => ({
+        attempt: index + 1,
+        attempt_id: `harness:${index + 1}`,
+        started_at: expect.any(Number),
+        finished_at: expect.any(Number),
+        strategy: "restart",
+        backoff_ms: index === 0 ? 0 : 2 ** (index - 1),
+        outcome: code === 0 ? "success" : "failure",
+        exit_code: code,
+        failure_classes: code === 0 ? [] : ["rate_limit_error"],
+      })),
     });
     expect(content).not.toContain("private output");
     expect(fs.existsSync(`${options.telemetryPath}.tmp`)).toBe(false);
@@ -85,7 +121,7 @@ describe("harness_retry_runner.cjs", () => {
     expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toMatchObject({
       attempts: 1,
       exit_code: 143,
-      attempt_results: [{ attempt: 1, exit_code: 143, failure_classes: ["cancelled"] }],
+      attempt_results: [{ attempt: 1, outcome: "cancelled", exit_code: 143, failure_classes: ["cancelled"] }],
     });
   });
 
@@ -103,11 +139,111 @@ describe("harness_retry_runner.cjs", () => {
       throw new Error("spawn failed");
     };
     await expect(runHarnessRetryLoop(options)).rejects.toThrow("spawn failed");
-    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toEqual({
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"))).toMatchObject({
       attempts: 1,
       exit_code: 1,
-      attempt_results: [{ attempt: 1, exit_code: null, failure_classes: [] }],
+      attempt_results: [{ attempt: 1, outcome: "interrupted", finished_at: expect.any(Number), exit_code: null, failure_classes: [] }],
     });
+  });
+
+  it("checkpoints an explicit initial resume strategy before spawn even when execution throws", async () => {
+    const options = telemetryOptions();
+    options.runAttempt = async (_attempt, observeStrategy) => {
+      observeStrategy("resume");
+      expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0]).toMatchObject({ strategy: "resume", outcome: "running" });
+      throw new Error("spawn failed");
+    };
+    await expect(runHarnessRetryLoop(options)).rejects.toThrow("spawn failed");
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[0]).toMatchObject({ strategy: "resume", outcome: "interrupted", exit_code: null });
+  });
+
+  it("checkpoints completed failures before an interrupted backoff without inventing another attempt", async () => {
+    const options = telemetryOptions([1, 0]);
+    vi.spyOn(Date, "now").mockReturnValue(1234);
+    options.sleepFn = async () => {
+      expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results).toEqual([
+        { attempt: 1, attempt_id: "harness:1", started_at: 1234, finished_at: 1234, strategy: "restart", backoff_ms: 0, outcome: "failure", exit_code: 1, failure_classes: ["rate_limit_error"] },
+      ]);
+      throw new Error("sleep interrupted");
+    };
+    await expect(runHarnessRetryLoop(options)).rejects.toThrow("sleep interrupted");
+    expect(JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempts).toBe(1);
+  });
+
+  it("records running lifecycle and the actual selected strategy without persisting captured output", async () => {
+    const options = telemetryOptions([1, 0]);
+    let now = 100;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    options.getRetryMode = () => "--continue";
+    options.runAttempt = async attempt => {
+      const current = JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results[attempt];
+      expect(current).toMatchObject({ outcome: "running", finished_at: null, exit_code: null, started_at: now, strategy: attempt ? "resume" : "restart" });
+      now += 10;
+      return { exitCode: attempt ? 0 : 1, output: "::add-mask::secret\nprivate output", hasOutput: true, strategy: "restart" };
+    };
+    options.sleepFn = async () => {
+      now += 5;
+    };
+    await runHarnessRetryLoop(options);
+    const attempts = JSON.parse(fs.readFileSync(options.telemetryPath, "utf8")).attempt_results;
+    expect(attempts.map(({ started_at, finished_at, strategy, backoff_ms }) => ({ started_at, finished_at, strategy, backoff_ms }))).toEqual([
+      { started_at: 100, finished_at: 110, strategy: "restart", backoff_ms: 0 },
+      { started_at: 115, finished_at: 125, strategy: "restart", backoff_ms: 1 },
+    ]);
+    expect(fs.readdirSync(directory)).toEqual(["harness_retry.json"]);
+  });
+
+  it("preserves host startup lifecycle across harness checkpoints and finishes", async () => {
+    const options = telemetryOptions();
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    vi.stubEnv("GH_AW_PHASE", "agent");
+    vi.spyOn(Date, "now").mockReturnValue(100);
+    recordStartupAttempt("start", 1, 0);
+    recordStartupAttempt("finish", 1, 1, true);
+    recordStartupAttempt("start", 2, 5000);
+    await runHarnessRetryLoop(options);
+    recordStartupAttempt("finish", 2, 0);
+    const telemetry = JSON.parse(fs.readFileSync(options.telemetryPath, "utf8"));
+    expect(telemetry.attempts).toBe(1);
+    expect(telemetry.attempt_results[0].attempt_id).toBe("harness:1");
+    expect(telemetry.attempt_results[0].startup_attempt_id).toBe("startup:2");
+    expect(telemetry.startup_attempt_results).toEqual([
+      { attempt: 1, attempt_id: "startup:1", started_at: 100, finished_at: 100, strategy: "restart", backoff_ms: 0, outcome: "failure", exit_code: 1, failure_classes: ["startup_error"] },
+      { attempt: 2, attempt_id: "startup:2", started_at: 100, finished_at: 100, strategy: "restart", backoff_ms: 5000, outcome: "success", exit_code: 0, failure_classes: [] },
+    ]);
+  });
+
+  it("emits bounded stdout boundaries that agree with the startup-scoped manifest", async () => {
+    const options = telemetryOptions([1, 0]);
+    vi.stubEnv("GH_AW_HARNESS_TELEMETRY_DIR", directory);
+    vi.stubEnv("GH_AW_PHASE", "agent");
+    recordStartupAttempt("start", 1, 0);
+    const output = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    await runHarnessRetryLoop(options);
+    const markers = output.mock.calls
+      .map(([text]) => String(text))
+      .filter(text => text.startsWith("\n[gh-aw-harness-attempt] "))
+      .map(text => JSON.parse(text.slice("\n[gh-aw-harness-attempt] ".length)));
+    expect(markers).toEqual([
+      { event: "start", attempt_id: "harness:1", attempt: 1, startup_attempt_id: "startup:1" },
+      { event: "finish", attempt_id: "harness:1", attempt: 1, startup_attempt_id: "startup:1" },
+      { event: "start", attempt_id: "harness:2", attempt: 2, startup_attempt_id: "startup:1" },
+      { event: "finish", attempt_id: "harness:2", attempt: 2, startup_attempt_id: "startup:1" },
+    ]);
+    expect(JSON.stringify(markers)).not.toContain("private output");
+  });
+
+  it("keeps the original exception and closes the boundary when an attempt throws", async () => {
+    const options = telemetryOptions();
+    const output = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    options.runAttempt = async () => {
+      throw new Error("spawn failed");
+    };
+    await expect(runHarnessRetryLoop(options)).rejects.toThrow("spawn failed");
+    expect(output.mock.calls.map(([text]) => String(text))).toEqual([
+      '\n[gh-aw-harness-attempt] {"event":"start","attempt_id":"harness:1","attempt":1}\n',
+      '\n[gh-aw-harness-attempt] {"event":"finish","attempt_id":"harness:1","attempt":1}\n',
+    ]);
   });
 
   it("does not change the harness outcome when telemetry cannot be written", async () => {
