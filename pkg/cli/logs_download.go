@@ -641,7 +641,7 @@ func retryCaseCollisionArtifacts(ctx context.Context, opts downloadArtifactsOpti
 }
 
 func ensureUsageAwInfoFallback(ctx context.Context, opts downloadArtifactsOptions) {
-	if !isUsageOnlyArtifactFilter(opts.artifactFilter) {
+	if !artifactMatchesFilter(constants.UsageArtifactName.String(), opts.artifactFilter) {
 		return
 	}
 

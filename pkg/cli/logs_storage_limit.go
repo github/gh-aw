@@ -579,6 +579,9 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 			}
 			return walkErr
 		}
+		if info != nil && info.IsDir() && info.Name() == harborExportDirectory && harborCheckDestination(candidatePath) == nil {
+			return filepath.SkipDir
+		}
 		if info == nil || !info.Mode().IsRegular() {
 			return nil
 		}

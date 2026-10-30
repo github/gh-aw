@@ -86,6 +86,11 @@ func harborTrialMetadata(processed ProcessedRun, sessionStatus string, files []s
 func harborExportTrajectory(ctx context.Context, dir, evidence string) (string, map[string]any, string, error) {
 	agentInfo, provenance := harborRecordedAgent(evidence)
 	sessionPath, err := findUnifiedSessionPath(evidence)
+	if err == nil && sessionPath == "" {
+		if usageDir := findArtifactDir(evidence, "usage", ""); usageDir != "" {
+			sessionPath, err = findUnifiedSessionPath(usageDir)
+		}
+	}
 	if err != nil || sessionPath == "" {
 		return "missing", agentInfo, provenance, err
 	}

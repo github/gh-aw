@@ -172,7 +172,7 @@ test-integration-logs:
 
 .PHONY: test-harbor-conformance
 test-harbor-conformance:
-	go test -v -timeout=3m -tags integration -run '^TestHarborConformance$$' -count=1 ./pkg/cli
+	go test -v -timeout=3m -tags 'integration harbor' -run '^TestHarborConformance$$' -count=1 ./pkg/cli
 
 .PHONY: test-integration-logs-multi-target-count
 test-integration-logs-multi-target-count:

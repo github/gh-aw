@@ -163,6 +163,41 @@ func TestExportHarborFallbackPathAndOverwrite(t *testing.T) {
 	require.NoDirExists(t, trial)
 }
 
+func TestExportHarborPrefixedUsageSession(t *testing.T) {
+	output, source := t.TempDir(), t.TempDir()
+	writeSessionTestFile(t, source, "abc123-usage/aw_session.jsonl", sessionTestHeader+sessionTestAgentEvent)
+	require.NoError(t, exportHarborJob(t.Context(), output, []ProcessedRun{harborTestRun(source)}))
+	trial := filepath.Join(output, harborExportDirectory, harborTestTrials(t, output)[0])
+	assertATIFFile(t, filepath.Join(trial, "agent", "trajectory.json"))
+	require.Equal(t, "recorded", harborTestJSON(t, filepath.Join(trial, "gh-aw", "metadata.json"))["session_status"])
+	require.FileExists(t, filepath.Join(trial, "gh-aw", "evidence", "abc123-usage", "aw_session.jsonl"))
+}
+
+func TestExportHarborSurvivesCachePruning(t *testing.T) {
+	output := t.TempDir()
+	source := resolveAuditOutputDir(output, 123)
+	writeSessionTestFile(t, source, "aw_session.jsonl", sessionTestHeader+sessionTestAgentEvent)
+	run := harborTestRun(source)
+	require.NoError(t, exportHarborJob(t.Context(), output, []ProcessedRun{run}))
+	trial := filepath.Join(output, harborExportDirectory, harborTestTrials(t, output)[0])
+	writeSessionTestFile(t, source, "agent/disposable.log", "cached log")
+	writeSessionTestFile(t, output, "unowned/harbor/agent/disposable.log", "unowned log")
+	size, err := logsDirectorySize(output)
+	require.NoError(t, err)
+	freed, err := pruneLogsCache(output, 1<<30, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, len("cached log")+len("unowned log"), freed)
+	remaining, err := logsDirectorySize(output)
+	require.NoError(t, err)
+	require.Equal(t, size-freed, remaining)
+	require.NoFileExists(t, filepath.Join(source, "agent", "disposable.log"))
+	require.NoFileExists(t, filepath.Join(output, "unowned", "harbor", "agent", "disposable.log"))
+	assertATIFFile(t, filepath.Join(trial, "agent", "trajectory.json"))
+	writeSessionTestFile(t, source, "aw_session.jsonl", "invalid JSONL\n")
+	require.Error(t, exportHarborJob(t.Context(), output, []ProcessedRun{run}))
+	assertATIFFile(t, filepath.Join(trial, "agent", "trajectory.json"))
+}
+
 func TestExportHarborStableRepositoryHostAttemptIDs(t *testing.T) {
 	output, source := t.TempDir(), t.TempDir()
 	first := harborTestRun(source)
