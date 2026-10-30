@@ -499,6 +499,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
       queue: max

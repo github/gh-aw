@@ -473,6 +473,7 @@ jobs:
       contents: read
       copilot-requests: write
       issues: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-codex-${{ github.workflow }}"
       queue: max

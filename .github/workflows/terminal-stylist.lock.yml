@@ -481,6 +481,7 @@ jobs:
     permissions:
       contents: read
       copilot-requests: write
+    cache-mode: read
     concurrency:
       group: "gh-aw-pi-${{ github.workflow }}"
       queue: max
