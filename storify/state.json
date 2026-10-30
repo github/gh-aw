@@ -1,34 +1,32 @@
 {
-  "last_run_date": "2026-10-29",
+  "last_run_date": "2026-10-30",
   "last_window": {
-    "start": "2026-10-28T07:55:49Z",
-    "end": "2026-10-29T07:55:49Z"
+    "start": "2026-10-29T07:55:58Z",
+    "end": "2026-10-30T07:55:58Z"
   },
   "observed_window": {
-    "coverage": "421 prefetched runs plus 59 continuation runs; continuation returned no further cursor. Five representative MCP audits and PR REST reads; causal review not exhaustive.",
+    "coverage": "453 prefetched runs plus 85 continuation runs; continuation returned no cursor. Five representative MCP audits and PR REST reads; causal review not exhaustive.",
     "representative_audits": [
-      40687536087,
-      40675051360,
-      40765587560,
-      40792230830,
-      40791835794
+      40861774464,
+      40856237978,
+      40859102835,
+      40964645356,
+      40868959457
     ]
   },
   "key_themes": [
-    "PR 72543 cross-engine smoke fan-out, mixed results and review-driven revision",
-    "Publication-boundary failures in PR Sous Chef and Smoke Project",
-    "Separate scheduled agent execution stalls"
+    "Publication-boundary failure across reviewer and scheduled workflows",
+    "Activation restore burst before agent work",
+    "PR 72958 ADR and review-driven revision merged"
   ],
   "carry_forward_questions": [
-    "Did PR 72543 post-revision smoke runs clear the three failing boundaries?",
-    "What caused Process Safe Outputs failures in PR Sous Chef and Smoke Project, and did later schedules recover?",
-    "Did Daily Caveman Optimizer and Smoke Azure Codex recover on later schedules?"
+    "What causes Process Safe Outputs failures, and did later PR Sous Chef or reviewer schedules recover?",
+    "Did Restore daily AIC scan observations recur after the observed burst?",
+    "Did PR 72958 merged exclusions behave as intended in subsequent runs?"
   ],
   "representative_runs": [
-    40687536087,
-    40675051360,
-    40765587560,
-    40792230830,
-    40791835794
+    40861774464,
+    40856237978,
+    40868959457
   ]
 }
