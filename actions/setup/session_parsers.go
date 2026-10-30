@@ -73,6 +73,7 @@ import "embed"
 //go:embed js/read_buffer.cjs js/repo_helpers.cjs js/safe_output_helpers.cjs js/staged_preview.cjs
 //go:embed js/constants.cjs js/error_codes.cjs js/error_helpers.cjs js/model_costs.cjs js/models.json js/shim.cjs
 //go:embed js/agent_execution.cjs js/agent_error_patterns.cjs js/harness_error_patterns.cjs js/harness_crash_signals.cjs js/harness_retry_record.cjs
+//go:embed js/harness_retry_session.cjs
 //go:embed js/engine_log_parser.cjs
 //go:embed js/routing_analytics.cjs js/resolve_model_alias.cjs
 //go:embed js/parse_kiro_log.cjs

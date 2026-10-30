@@ -103,10 +103,11 @@ func harborWriteJobFiles(staging, jobID string, results []map[string]any, trialN
 	metadata := map[string]any{
 		"format": "gh-aw-harbor", "version": 1, "harbor_version": "0.25.0",
 		"mode": "recorded-evidence", "trials": trialNames,
-		"job_timestamps": "export time, not workflow execution time",
-		"trial_counts":   "imported records, not evaluation outcomes",
-		"reward_mapping": "recorded status=pass/fail finite JSON numeric grader values, unchanged, keyed gh-aw.<grader-id>; no synthetic aggregate or Harbor task success",
-		"runnable":       false,
+		"job_timestamps":            "export time, not workflow execution time",
+		"trial_counts":              "imported records, not evaluation outcomes",
+		"reward_mapping":            "recorded status=pass/fail finite JSON numeric grader values, unchanged, keyed gh-aw.<grader-id>; no synthetic aggregate or Harbor task success",
+		"additional_reward_mapping": "when explicitly selected, offline status=pass/fail finite numeric values keyed gh-aw.regraded.<grader-id>; separate provenance in each trial's gh-aw/regrading.json",
+		"runnable":                  false,
 	}
 	for name, value := range map[string]any{"config.json": config, "result.json": job, "gh-aw-export.json": metadata} {
 		if err := harborWriteJSON(filepath.Join(staging, name), value); err != nil {
