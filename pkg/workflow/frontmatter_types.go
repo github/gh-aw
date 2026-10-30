@@ -366,7 +366,8 @@ type FrontmatterConfig struct {
 	MaxDailyAICredits           *TemplatableInt32            `json:"max-daily-ai-credits,omitempty"` // Normalized threshold; object-form guardrail settings are read from raw frontmatter
 	MaxToolDenials              *TemplatableInt32            `json:"max-tool-denials,omitempty"`
 	MaxToolCalls                *TemplatableInt32            `json:"max-tool-calls,omitempty"`
-	Strict                      *bool                        `json:"strict,omitempty"`  // Pointer to distinguish unset from false
+	Strict                      *bool                        `json:"strict,omitempty"` // Pointer to distinguish unset from false
+	TokenBroker                 *bool                        `json:"token-broker,omitempty" yaml:"token-broker,omitempty"`
 	Private                     *bool                        `json:"private,omitempty"` // If true, workflow cannot be added to other repositories
 	Labels                      []string                     `json:"labels,omitempty"`
 	Skills                      []any                        `json:"skills,omitempty"`

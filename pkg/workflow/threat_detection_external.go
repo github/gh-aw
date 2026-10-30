@@ -118,7 +118,6 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if engineID == "" {
 		engineID = "claude"
 	}
-
 	detectionData := &WorkflowData{
 		AI:                   engineID,
 		ActionCache:          data.ActionCache,
@@ -130,6 +129,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 		ModelCosts:           data.ModelCosts,
 		IsDetectionRun:       true,
 		AdmissionEnabled:     admissionBudgetOutputsEnabled(data),
+		TokenBrokerEnabled:   data.TokenBrokerEnabled,
 		RunnerConfig:         data.RunnerConfig,
 		TimeoutMinutes:       "timeout-minutes: " + resolveDetectionJobTimeoutValue(data),
 		CompiledVersion:      data.CompiledVersion,

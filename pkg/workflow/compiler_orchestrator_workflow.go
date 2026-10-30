@@ -115,6 +115,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	}
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
 	ctx.workflowData.SourceDocument = ctx.document
+	ctx.workflowData.TokenBrokerEnabled = ctx.frontmatter.Frontmatter["token-broker"] == true
 	resolveMaxDailyAICBackendIntoWorkflowData(ctx.workflowData, ctx.frontmatter.Frontmatter, engineSetup.importsResult.MergedMaxDailyAICredits)
 	return nil
 }

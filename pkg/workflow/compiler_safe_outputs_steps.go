@@ -590,6 +590,12 @@ func (c *Compiler) addSafeOutputTokenEnvVars(steps *[]string, data *WorkflowData
 }
 
 func (c *Compiler) addSafeOutputAgentTokenEnvVars(steps *[]string, data *WorkflowData) {
+	if data.TokenBrokerEnabled {
+		if usesTokenBrokerTasks(data) {
+			*steps = append(*steps, "          "+tokenBrokerURLEnv+": "+tokenBrokerURLExpression+"\n")
+		}
+		return
+	}
 	// Add GH_AW_ASSIGN_TO_AGENT_TOKEN when assign-to-agent is configured OR when create-issue
 	// or create-pull-request is configured with copilot in assignees. All handlers create a
 	// dedicated Octokit using this token (agent token preference chain), which is required

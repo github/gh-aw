@@ -7,6 +7,11 @@
   "type": "object",
   "required": ["on"],
   "properties": {
+    "token-broker": {
+      "description": "Use the OIDC token broker for agent task operations. Disabled unless explicitly true. Copilot inference requires a renewable AWF credential provider and is not currently supported.",
+      "type": "boolean",
+      "default": false
+    },
     "work-queue-policy": {
       "description": "Deprecated legacy version-3 Policy proposal. Use scheduling-only work_queue in .github/workflows/aw.json and AW-approved dispatch targets. Cannot be combined with repository work_queue settings. Installed Policy remains authoritative and historical ledgers remain readable.",
       "deprecated": true,

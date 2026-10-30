@@ -79,6 +79,7 @@ type WorkflowData struct {
 	ImportInputs                   map[string]any       // input values from imports with inputs (for github.aw.inputs.* substitution)
 	On                             string
 	AdmissionEnabled               bool // Opt-in from on.admission or repository admission configuration
+	TokenBrokerEnabled             bool // Explicit opt-in to task-only OIDC token broker authentication
 	WebhookSubscriptions           []WebhookSubscription
 	Permissions                    string
 	Network                        string // top-level network permissions configuration

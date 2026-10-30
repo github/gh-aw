@@ -8,11 +8,13 @@ const { getBaseBranch } = require("./get_base_branch.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { generateStagedPreview } = require("./staged_preview.cjs");
 const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
+const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
 
 /**
  * Create a dedicated GitHub client for create-agent-session operations.
  *
  * Token precedence:
+ *   0. Token broker copilot-task capability, when opted in (never falls back)
  *   1. config["github-token"] — per-handler PAT configured in the workflow frontmatter
  *   2. GH_AW_AGENT_SESSION_TOKEN — agent token injected by the compiler as a step env var
  *      (evaluates to: GH_AW_AGENT_TOKEN || GH_AW_GITHUB_TOKEN || GITHUB_TOKEN)
@@ -22,6 +24,7 @@ const { appendConfiguredBodyFooter } = require("./body_footer.cjs");
  * @returns {Promise<Object>} Authenticated GitHub client
  */
 async function createAgentSessionGitHubClient(config) {
+  if (isTokenBrokerEnabled()) return createTokenBrokerGitHubClient();
   const token = config["github-token"] || process.env.GH_AW_AGENT_SESSION_TOKEN;
   if (!token) {
     core.debug("No dedicated agent token configured — using step-level github client for create-agent-session operations");
@@ -130,7 +133,9 @@ async function main(config = {}) {
       const errorMessage = getErrorMessage(error);
 
       // Check for authentication/permission errors
-      if (errorMessage.includes("authentication") || errorMessage.includes("permission") || errorMessage.includes("forbidden") || errorMessage.includes("401") || errorMessage.includes("403")) {
+      if (isTokenBrokerEnabled()) {
+        core.error(`Error creating agent session: ${errorMessage}`);
+      } else if (errorMessage.includes("authentication") || errorMessage.includes("permission") || errorMessage.includes("forbidden") || errorMessage.includes("401") || errorMessage.includes("403")) {
         core.error(`Failed to create agent session due to authentication/permission error.`);
         core.error(`The default GITHUB_TOKEN may not have permission to create agent sessions.`);
         core.error(`Configure a Personal Access Token (PAT) using the handler's github-token setting or GH_AW_AGENT_SESSION_TOKEN.`);

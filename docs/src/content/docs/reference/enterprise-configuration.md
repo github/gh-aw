@@ -72,6 +72,27 @@ Approved admission supersedes daily-AIC validation and supplies the primary and 
 
 The same configuration enables an isolated conclusion-admission job to post to `/api/conclusion` on the authority's origin. The ordinary conclusion job first publishes the full unified-session artifact, finishes any upload retry, and passes only bounded compact metadata and artifact IDs to the callback job. The callback obtains its own fresh OIDC token for the same audience; unrelated conclusion and safe-output steps do not receive this permission. The compact profile excludes agent conversation and tool content and is bounded to 128 records/16 KiB JSONL; the whole request is capped at 64 KiB. The authority can resolve the unchanged full session through authenticated, invocation-verified artifact reads. Failed artifact publication does not suppress compact delivery, but the request explicitly carries no IDs if neither upload produced one. Endpoint enrollment covers both compact delivery and protected full-session retrieval. Delivery failures warn without changing completed workflow results, even with outage policy `block`; the authority remains responsible for secure, deduplicated processing and retention.
 
+## OIDC Token Broker
+
+> [!WARNING]
+> Broker integration currently supports coding-agent tasks and issue assignment only. Cloud inference integration is blocked on a renewable credential provider in AWF. Broker-enabled workflows that use Copilot inference are rejected rather than silently using existing credentials. Use a separately authenticated, non-Copilot inference provider for task-only adoption.
+
+Enterprise administrators can distribute a broker endpoint through an organization Actions variable named `GH_AW_TOKEN_BROKER_URL`, with access limited to enrolled repositories. A repository Actions variable can override the organization value. An Actions secret with the same name is also supported; a nonempty variable takes precedence over the secret. For enterprise-wide deployment, provision the setting in each organization rather than assuming an enterprise Actions-variable scope.
+
+Workflows must explicitly opt in:
+
+```aw
+token-broker: true
+```
+
+The compiler emits runtime references to the variable and secret, not the endpoint value. Setting the variable alone does not enable the feature. After opting in and recompiling, changing the endpoint does not require recompilation.
+
+The broker contract defines independent authorization for `copilot-request` (cloud inference) and `copilot-task` (coding-agent task creation and issue assignment). The shared client supports both exchanges; only the task capability is connected to runtime operations in this implementation. The broker validates GitHub's signature, issuer, expiration, audience, repository, workflow identity, and run claims against its enrollment policy; the audience is the configured broker URL. Restrict runner egress and protect the workflow and configuration that select this destination.
+
+Broker-enabled jobs require `id-token: write`. Reusable workflow callers must grant that permission to the caller job. The runner must reach both the GitHub OIDC endpoint and the broker over HTTPS. Broker failures, including a missing endpoint, must not select a PAT, GitHub App token, or `GITHUB_TOKEN` as a fallback. Unrelated GitHub operations retain their existing authentication.
+
+See the [Token Broker Specification](/gh-aw/specs/token-broker-specification/) for the server contract, identity validation, authorization, expiration, and conformance requirements. Admission remains a separate opt-in: the admission outage policy does not apply to credential exchange.
+
 ## Copilot Engine on GHES
 
 For Copilot-specific prerequisites, licensing requirements, and firewall configuration on GHES, see [Copilot Engine Prerequisites on GHES](/gh-aw/troubleshooting/common-issues/#copilot-engine-prerequisites-on-ghes).

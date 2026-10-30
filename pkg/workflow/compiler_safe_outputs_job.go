@@ -805,6 +805,9 @@ func (c *Compiler) buildSafeOutputsJobFromParts(
 	}
 	safeOutputStepNames := opts.safeOutputStepNames
 	permissions := opts.permissions
+	if usesTokenBrokerTasks(data) {
+		permissions.Set(PermissionIdToken, PermissionWrite)
+	}
 	threatDetectionEnabled := opts.threatDetectionEnabled
 
 	// Build and insert preamble token minting steps (GitHub App tokens) before checkout/safe-output steps.
