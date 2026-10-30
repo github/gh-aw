@@ -943,6 +943,12 @@ cat aw_session.jsonl | gh aw graders run weekly-research loops
 cat aw_session.jsonl | gh aw graders run weekly-research operational-value
 ```
 
+The command always emits `{"version": 1, "definition": {...}, "result": {...}}`.
+The definition includes resolved acceptance metadata and data-only configuration,
+but no executable source. Read the measurement from `.result.value` and the
+threshold outcome from `.result.passed`; scripts expecting the former flat
+result can pipe the output through `jq '.result'`.
+
 **Options:** `--repo/-r`
 
 #### `logs --outcomes`

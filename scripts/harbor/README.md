@@ -26,6 +26,8 @@ Use a distinct directory per concurrent trial.
 `reward.json` contains `{"reward": 1}` for the reference fixture.
 `gh-aw-graders.json` retains resolved definitions, original results,
 implementation identity, input/config/workflow/binary hashes, and coverage.
+The CLI always includes the versioned definition/result envelope; no
+`--include-definition` flag is needed.
 Input is capped at 50 MiB, each stdout/stderr stream at 1 MiB, and each
 grader process group at 130 seconds. Only `PATH` is inherited by the CLI;
 its established runtime further restricts grader workers.

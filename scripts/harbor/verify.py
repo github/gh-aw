@@ -142,7 +142,7 @@ def run_grader(binary, workflow, grader_id, session):
         source.write(session)
         source.seek(0)
         child = subprocess.Popen(
-            [str(binary), "graders", "run", str(workflow), grader_id, "--include-definition"],
+            [str(binary), "graders", "run", str(workflow), grader_id],
             stdin=source, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             cwd=workflow.parent, env={"PATH": os.environ.get("PATH", os.defpath)},
             start_new_session=True,

@@ -24,6 +24,8 @@ func newGradersRunCommand() *cobra.Command {
 		Long: `Run one enabled built-in, JavaScript, or operational-value Bash grader from a local workflow. When run-id is provided,
 the unified session is downloaded from the run's usage artifact. Otherwise,
 read the unified session from standard input as JSONL or a JSON event array.
+Always writes a versioned JSON envelope with the resolved grader definition and
+its result. Executable source is excluded from the definition.
 Built-ins and JavaScript compute over the session in memory. Repository-owned
 operational-value Bash reads a staged session file and emits legacy metric arrays.
 Shell is trusted code, not yet microVM-isolated; detected file writes are rejected.`,
@@ -43,24 +45,18 @@ Shell is trusted code, not yet microVM-isolated; detected file writes are reject
 			if err != nil {
 				return err
 			}
-			includeDefinition, err := cmd.Flags().GetBool("include-definition")
-			if err != nil {
-				return err
-			}
 			return runGrader(cmd.Context(), graderRunConfig{
-				Workflow:          args[0], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
-				GraderID:          args[1], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
-				RunID:             runID,
-				Repo:              repoOverride,
-				Input:             cmd.InOrStdin(),
-				Output:            cmd.OutOrStdout(),
-				Path:              os.Getenv("PATH"), //nolint:osgetenvlibrary // CLI boundary supplies executable search paths, not credentials.
-				IncludeDefinition: includeDefinition,
+				Workflow: args[0], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
+				GraderID: args[1], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
+				RunID:    runID,
+				Repo:     repoOverride,
+				Input:    cmd.InOrStdin(),
+				Output:   cmd.OutOrStdout(),
+				Path:     os.Getenv("PATH"), //nolint:osgetenvlibrary // CLI boundary supplies executable search paths, not credentials.
 			})
 		},
 	}
 	addRepoFlag(cmd)
-	cmd.Flags().Bool("include-definition", false, "Wrap the result with schema-versioned resolved acceptance metadata (without executable source)")
 	cmd.SetIn(os.Stdin)
 	cmd.SetOut(os.Stdout)
 	return cmd

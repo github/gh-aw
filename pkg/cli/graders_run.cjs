@@ -14,21 +14,19 @@ if (grader.source === "inline" || grader.source === "operational-value") {
 } else {
   throw new Error("unsupported grader source");
 }
-const output = input.includeDefinition
-  ? {
-      version: 1,
-      definition: {
-        id: grader.id,
-        name: grader.name,
-        description: grader.description ?? "",
-        source: grader.source,
-        unit: grader.unit,
-        direction: grader.direction,
-        threshold: grader.threshold,
-        config: grader.config ?? {},
-      },
-      result,
-    }
-  : result;
+const output = {
+  version: 1,
+  definition: {
+    id: grader.id,
+    name: grader.name,
+    description: grader.description ?? "",
+    source: grader.source,
+    unit: grader.unit,
+    direction: grader.direction,
+    threshold: grader.threshold,
+    config: grader.config ?? {},
+  },
+  result,
+};
 process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 if (result.status === "error") process.exitCode = 1;

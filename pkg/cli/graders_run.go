@@ -30,14 +30,13 @@ const (
 var gradersRunScript []byte
 
 type graderRunConfig struct {
-	Workflow          string
-	GraderID          string
-	RunID             int64
-	Repo              string
-	Input             io.Reader
-	Output            io.Writer
-	Path              string
-	IncludeDefinition bool
+	Workflow string
+	GraderID string
+	RunID    int64
+	Repo     string
+	Input    io.Reader
+	Output   io.Writer
+	Path     string
 }
 
 type graderRunDefinition struct {
@@ -63,7 +62,7 @@ func runGrader(ctx context.Context, config graderRunConfig) error {
 	if err != nil {
 		return err
 	}
-	return runSessionGrader(ctx, grader, payload, config.Output, config.Path, config.IncludeDefinition)
+	return runSessionGrader(ctx, grader, payload, config.Output, config.Path)
 }
 
 func loadGraderRunDefinition(workflowArg, graderID string) (graderRunDefinition, error) {
@@ -188,7 +187,7 @@ func readGraderPayload(reader io.Reader, source string) (json.RawMessage, error)
 	return json.Marshal(events)
 }
 
-func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload json.RawMessage, output io.Writer, searchPath string, includeDefinition bool) error {
+func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload json.RawMessage, output io.Writer, searchPath string) error {
 	nodePath, err := exec.LookPath("node")
 	if err != nil {
 		return errors.New("node is required to run graders")
@@ -210,10 +209,9 @@ func runSessionGrader(ctx context.Context, grader graderRunDefinition, payload j
 		return err
 	}
 	input, err := json.Marshal(struct {
-		Grader            graderRunDefinition `json:"grader"`
-		Payload           json.RawMessage     `json:"payload"`
-		IncludeDefinition bool                `json:"includeDefinition"`
-	}{grader, payload, includeDefinition})
+		Grader  graderRunDefinition `json:"grader"`
+		Payload json.RawMessage     `json:"payload"`
+	}{grader, payload})
 	if err != nil {
 		return fmt.Errorf("failed to encode grader input: %w", err)
 	}

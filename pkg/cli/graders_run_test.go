@@ -27,6 +27,21 @@ func writeGraderRunWorkflow(t *testing.T, content string) string {
 	return "test"
 }
 
+func decodeGraderRunResult(t *testing.T, content []byte, result any) {
+	t.Helper()
+	var envelope struct {
+		Version    int
+		Definition map[string]any
+		Result     json.RawMessage
+	}
+	require.NoError(t, json.Unmarshal(content, &envelope))
+	assert.Equal(t, 1, envelope.Version)
+	require.NotEmpty(t, envelope.Definition["id"])
+	assert.NotContains(t, envelope.Definition, "script")
+	assert.NotContains(t, envelope.Definition, "shellScript")
+	require.NoError(t, json.Unmarshal(envelope.Result, result))
+}
+
 func TestStageGraderRuntimeLoadsDependencies(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
@@ -72,7 +87,7 @@ func TestRunGraderFromUnifiedSession(t *testing.T) {
 			Status string
 			Source string
 		}
-		require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+		decodeGraderRunResult(t, output.Bytes(), &result)
 		assert.Equal(t, "loops", result.ID)
 		assert.InDelta(t, 1.0, result.Value, 1e-9)
 		assert.Equal(t, "pass", result.Status)
@@ -115,7 +130,7 @@ func TestRunOperationalValueFromUnifiedSession(t *testing.T) {
 		Value   float64
 		Metrics []map[string]any
 	}
-	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	decodeGraderRunResult(t, output.Bytes(), &result)
 	assert.Equal(t, "operational-value", result.ID)
 	assert.Equal(t, "operational-value", result.Source)
 	assert.InDelta(t, 2.0, result.Value, 0)
@@ -162,7 +177,7 @@ func TestOperationalValueCommandSessionFileContract(t *testing.T) {
 			Value  float64
 			Source string
 		}
-		require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+		decodeGraderRunResult(t, output.Bytes(), &result)
 		assert.InDelta(t, 4.0, result.Value, 0)
 		assert.Equal(t, "operational-value", result.Source)
 	}
@@ -182,7 +197,7 @@ func TestRunCustomGraderFromUnifiedSession(t *testing.T) {
 		Value  float64
 		Source string
 	}
-	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	decodeGraderRunResult(t, output.Bytes(), &result)
 	assert.Equal(t, "custom-count", result.ID)
 	assert.Equal(t, "inline", result.Source)
 	assert.InDelta(t, 3.0, result.Value, 1e-9)
@@ -249,9 +264,10 @@ func TestGraderDefinitionEnvelopeContract(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  outcome:\n    "+test.body+"\n---\nTest.\n")
 			cmd := newGradersRunCommand()
+			assert.Nil(t, cmd.Flags().Lookup("include-definition"))
 			cmd.SilenceUsage = true
 			cmd.SilenceErrors = true
-			cmd.SetArgs([]string{workflowID, "outcome", "--include-definition"})
+			cmd.SetArgs([]string{workflowID, "outcome"})
 			cmd.SetIn(strings.NewReader("[]"))
 			var output bytes.Buffer
 			cmd.SetOut(&output)

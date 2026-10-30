@@ -189,13 +189,14 @@ gh aw graders run weekly-research loops 123456789
 cat aw_session.jsonl | gh aw graders run weekly-research loops
 ```
 
-For verifier integrations, add `--include-definition` to emit a version 1
-envelope with `definition` and `result`. The definition contains the resolved
+Every invocation emits a version 1 envelope with `definition` and `result`.
+No flag is required. The definition contains the resolved
 ID, name, description, source, unit, direction, threshold, and data-only
 configuration from the same parsed workflow used for execution. Executable
 JavaScript and Bash source is excluded; result implementation identities and
-digests remain available. Without this flag, the existing result output is
-unchanged.
+digests remain available. Consumers of the former flat output must read
+`.result.value`, `.result.status`, and other result fields under `.result`.
+To retain the former object shape in a pipeline, use `jq '.result'`.
 
 A finite measurement without a threshold has `status: "pass"` and
 `passed: null`: computation succeeded, but task acceptance was not evaluated.

@@ -13,6 +13,13 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+`gh aw graders run` now always emits a versioned JSON envelope containing
+`definition` and `result`. Read `.result.value`, `.result.status`, and other
+measurement fields under `.result` instead of at the top level, or pipe through
+`jq '.result'` to recover the former object shape. The definition includes resolved
+acceptance metadata without executable source; no `--include-definition` flag
+is required. Exit behavior is unchanged.
+
 `pull_request_target` workflows now default to same-repository PRs only in both
 strict and non-strict mode. Omitting `forks` is equivalent to `forks: []`; no
 explicit empty list is required. To admit forks, configure exact `owner/repo`
