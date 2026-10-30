@@ -1582,6 +1582,7 @@ describe("handle_agent_failure", () => {
           if (crashed) expect(issue.body).toContain("Failure classification: driver_crash");
         }
         expect(write).toHaveBeenCalledWith(require("./handle_agent_failure.cjs").FAILURE_CATEGORIES_PATH, expect.stringContaining(`"${cause}"`));
+        if (!startup) expect(global.core.summary.addRaw).not.toHaveBeenCalled();
         if (!startup && !crashed) expect(global.core.setFailed).not.toHaveBeenCalled();
       } finally {
         write.mockRestore();
@@ -2015,6 +2016,28 @@ describe("handle_agent_failure", () => {
         expect(body).not.toContain("private-tool");
         expect(body).toContain("Completion signal: agent reported incomplete");
         expect(body).toContain("Safe-output persistence: not recorded");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it.each([{}, " "])("does not write an empty incomplete-result summary for invalid reason %s", async reason => {
+      const outputPath = path.join(tmpDir, "agent_output.json");
+      fs.writeFileSync(outputPath, JSON.stringify({ items: [{ type: "report_incomplete", reason }] }));
+      vi.stubEnv("GH_AW_AGENT_OUTPUT", outputPath);
+      vi.stubEnv("GH_AW_FAILURE_REPORT_AS_ISSUE", "false");
+      global.github = {
+        rest: {
+          search: { issuesAndPullRequests: vi.fn(async () => ({ data: { total_count: 0, items: [] } })) },
+          issues: { create: vi.fn(), createComment: vi.fn() },
+        },
+        graphql: vi.fn(),
+      };
+
+      try {
+        await main();
+        expect(global.core.summary.addRaw).not.toHaveBeenCalled();
+        expect(global.core.summary.write).not.toHaveBeenCalled();
       } finally {
         vi.unstubAllEnvs();
       }
@@ -6161,6 +6184,7 @@ describe("handle_agent_failure", () => {
         expect(result).toContain("completion could not be confirmed");
         expect(result).toContain("missing_terminal_safe_output");
         expect(result).toContain("Failure classification: missing_terminal_safe_output");
+        expect(result).not.toContain("Reported reason (agent-declared, unverified)");
         expect(result).toContain("Last tool call status: started");
         expect(result).not.toContain("Last tool call: read");
         expect(result).toContain("Driver exit code: 0");

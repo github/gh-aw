@@ -1884,21 +1884,26 @@ function loadReportIncompleteMessages(items) {
  * @returns {ReportBlock[]}
  */
 function buildReportIncompleteContext(items, { collectorEmptyOutputCause, rootDir } = {}) {
-  const messages = loadReportIncompleteMessages(items);
+  const trustedCollectorCause = typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause) ? collectorEmptyOutputCause : undefined;
+  const messages = loadReportIncompleteMessages(items).filter(message => message.reason !== trustedCollectorCause);
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !trustedCollectorCause) {
     return [];
   }
 
-  core.info(`Found ${messages.length} report_incomplete signal(s)`);
+  if (messages.length > 0) {
+    core.info(`Found ${messages.length} report_incomplete signal(s)`);
+  }
 
   const context = nodes.warning("Task Could Not Be Completed", [nodes.text("The workflow recorded a "), nodes.code("report_incomplete"), nodes.text(" signal: the task was not completed or completion could not be confirmed.")]);
-  context.push(
-    nodes.list(messages.map(message => [nodes.paragraph([nodes.strong([nodes.text("Reported reason (agent-declared, unverified):")]), nodes.text(" "), nodes.code(redactAndBoundDiagnostics(message.reason, { maxLength: 1000 }))])]))
-  );
+  if (messages.length > 0) {
+    context.push(
+      nodes.list(messages.map(message => [nodes.paragraph([nodes.strong([nodes.text("Reported reason (agent-declared, unverified):")]), nodes.text(" "), nodes.code(redactAndBoundDiagnostics(message.reason, { maxLength: 1000 }))])]))
+    );
+  }
   // Rebuild collector diagnostics from runtime evidence, never from message text.
-  if (typeof collectorEmptyOutputCause === "string" && Object.hasOwn(EMPTY_OUTPUT_CAUSES, collectorEmptyOutputCause)) {
-    const outcome = buildEmptyOutputOutcome(collectorEmptyOutputCause === "invalid_safe_outputs" ? ["validation_failed"] : [], rootDir);
+  if (trustedCollectorCause) {
+    const outcome = buildEmptyOutputOutcome(trustedCollectorCause === "invalid_safe_outputs" ? ["validation_failed"] : [], rootDir);
     if (outcome.details) context.push(...renderErrorDetails(outcome.details));
   } else {
     context.push(...renderErrorDetails(["Completion signal: agent reported incomplete", ...buildCompletionEvidence(rootDir)].join("\n")));
@@ -4598,7 +4603,7 @@ async function main() {
     );
     const hasReportedIncomplete = hasReportIncomplete && reportItems.some(item => item?.type === "report_incomplete");
     const reportIncompleteContext = buildReportIncompleteContext(reportItems, { collectorEmptyOutputCause: emptyOutputCause, rootDir: path.dirname(getAgentStdioLogPath()) });
-    if (hasReportedIncomplete) {
+    if (hasReportedIncomplete && reportIncompleteContext.length > 0 && !failureDiagnostics.secretRedactionFailed) {
       try {
         const summary = renderSizedReport({ type: "report", title: "Incomplete result", children: reportIncompleteContext, agentTainted: false }).body;
         await core.summary.addRaw(redactStepSummaryContent(summary)).write();
