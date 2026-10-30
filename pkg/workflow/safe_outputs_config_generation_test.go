@@ -116,6 +116,9 @@ func TestGenerateSafeOutputsConfigExcludesGitHubTokens(t *testing.T) {
 					},
 					Mentions: &MentionsConfig{GitHubToken: token, AllowedTeams: []string{"my-org/my-team"}},
 				},
+				CommentMemoryConfig: &CommentMemoryConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: token},
+				},
 			}
 
 			result, err := generateSafeOutputsConfig(data)
@@ -127,6 +130,7 @@ func TestGenerateSafeOutputsConfigExcludesGitHubTokens(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(result), &parsed))
 			assert.InDelta(t, float64(1), parsed["add_comment"].(map[string]any)["max"], 0.0001)
 			assert.Contains(t, parsed, "mentions")
+			assert.NotContains(t, parsed["comment_memory"], "github-token")
 			for _, handler := range []string{"add_comment", "create_issue"} {
 				assert.Contains(t, parsed, handler)
 				assert.Equal(t, token, handlerRegistry[handler](data.SafeOutputs)["github-token"],

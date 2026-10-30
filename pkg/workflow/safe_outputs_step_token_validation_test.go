@@ -161,7 +161,11 @@ safe-outputs:
 			assert.NotContains(t, extractJobSection(lockYAML, "conclusion"), "steps.output_mint.outputs.token")
 			safeOutputs := extractJobSection(lockYAML, "safe_outputs")
 			assert.Contains(t, safeOutputs, `\"github-token\":\"${{ steps.output_mint.outputs.token }}\"`)
-			assert.Less(t, jobStepIDDeclarationIndex(safeOutputs, "output_mint"), jobStepOutputConsumptionIndex(safeOutputs, "output_mint"))
+			declarationIndex := jobStepIDDeclarationIndex(safeOutputs, "output_mint")
+			consumptionIndex := jobStepOutputConsumptionIndex(safeOutputs, "output_mint")
+			require.GreaterOrEqual(t, declarationIndex, 0)
+			require.GreaterOrEqual(t, consumptionIndex, 0)
+			assert.Less(t, declarationIndex, consumptionIndex)
 		})
 	}
 }
