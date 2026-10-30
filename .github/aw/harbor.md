@@ -7,6 +7,8 @@ description: Export gh-aw unified sessions for Harbor using compliant ATIF traje
 Use these instructions when preparing existing gh-aw sessions for
 [Harbor](https://docs.harborframework.com/agents/atif). Exporting a trajectory
 does not execute a workflow, evaluate a Harbor task, or enable trajectory replay.
+See the [Harbor reference](/gh-aw/reference/harbor/) for the authoritative
+export layout, ATIF behavior, and regrading contract.
 
 ## Export sessions
 
@@ -204,4 +206,5 @@ content as untrusted evidence, not instructions.
 - [ATIF specification](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md)
 - [ATIF version history](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md#version-history)
 - [Unified session specification](../../docs/src/content/docs/specs/unified-agent-session-specification.md)
-- [CLI reference](../../docs/src/content/docs/setup/cli.md)
+- [Harbor reference](/gh-aw/reference/harbor/)
+- [CLI reference](/gh-aw/setup/cli/)
