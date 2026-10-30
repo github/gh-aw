@@ -330,7 +330,7 @@ func buildCopilotMkdirCommands(copilotArgs []string) string {
 	addDirPaths = append(addDirPaths, logsFolder)
 	var mkdirCommands strings.Builder
 	for _, dir := range addDirPaths {
-		fmt.Fprintf(&mkdirCommands, "mkdir -p %s\n", dir)
+		mkdirCommands.WriteString("mkdir -p " + dir + "\n")
 	}
 	return mkdirCommands.String()
 }

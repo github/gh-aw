@@ -301,6 +301,9 @@ func TestTokenBrokerSupportsDetectionInference(t *testing.T) {
 	assert.Contains(t, output, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
 	assert.Contains(t, output, "name: Invalidate brokered Copilot credentials\n        if: always()")
 	assert.NotContains(t, output, "copilot-requests: write")
+	job, exists := compiler.jobManager.GetJob("detection")
+	require.True(t, exists)
+	assertTokenBrokerInvalidationLast(t, job)
 }
 
 func TestTokenBrokerSupportsEvalsInference(t *testing.T) {
@@ -321,6 +324,34 @@ func TestTokenBrokerSupportsEvalsInference(t *testing.T) {
 	assert.Contains(t, steps, "id: token_broker_copilot_request")
 	assert.Contains(t, steps, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
 	assert.Contains(t, strings.Join(job.Steps, ""), "name: Invalidate brokered Copilot credentials\n        if: always()")
+	assertTokenBrokerInvalidationLast(t, job)
+}
+
+func assertTokenBrokerInvalidationLast(t *testing.T, job *Job) {
+	t.Helper()
+	var compiled struct {
+		Steps []struct {
+			ID   string `yaml:"id"`
+			Name string `yaml:"name"`
+			If   string `yaml:"if"`
+		} `yaml:"steps"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte("steps:\n"+strings.Join(job.Steps, "")), &compiled))
+	require.NotEmpty(t, compiled.Steps)
+	requestIndex := -1
+	invalidationIndex := -1
+	for index, step := range compiled.Steps {
+		if step.ID == "token_broker_copilot_request" {
+			requestIndex = index
+		}
+		if step.Name == "Invalidate brokered Copilot credentials" {
+			assert.Equal(t, "always()", step.If)
+			invalidationIndex = index
+		}
+	}
+	require.NotEqual(t, -1, requestIndex)
+	assert.Greater(t, invalidationIndex, requestIndex)
+	assert.Equal(t, len(compiled.Steps)-1, invalidationIndex)
 }
 
 func TestTokenBrokerGitHubProviderInAgentRemainsUnsupported(t *testing.T) {
