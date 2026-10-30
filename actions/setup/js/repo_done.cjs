@@ -13,7 +13,7 @@ const { renderSizedReport } = require("./report_size.cjs");
 async function main() {
   const result = process.env.GH_AW_REPO_DONE_AGENT_RESULT;
   if (process.env.GH_AW_REPO_DONE_ACTIVATION_RESULT !== "success" || !["success", "failure", "cancelled"].includes(result || "")) {
-    core.info("Skipping repo-done: the agent was not activated.");
+    core.info("Skipping report-done: the agent was not activated.");
     return;
   }
   const staged = parseBoolTemplatable(process.env.GH_AW_REPO_DONE_DRY_RUN, false) || parseBoolTemplatable(process.env.GH_AW_SAFE_OUTPUTS_STAGED, false) || parseBoolTemplatable(process.env.GH_AW_REPO_DONE_STAGED, false);
@@ -46,7 +46,7 @@ async function main() {
   // Invocation resolution normalizes forwarded metadata; it does not authorize
   // every possible repository override. This notification is workflow-repo only.
   if (repo.owner.toLowerCase() !== context.repo.owner.toLowerCase() || repo.repo.toLowerCase() !== context.repo.repo.toLowerCase()) {
-    throw new Error("repo-done: completion notifications are restricted to the workflow repository");
+    throw new Error("report-done: completion notifications are restricted to the workflow repository");
   }
   const number = payload.issue?.number || payload.pull_request?.number;
   if (Number.isSafeInteger(number) && number > 0) {
@@ -62,7 +62,7 @@ async function main() {
       }`,
       { ...repo, number: discussionNumber }
     );
-    if (!data.repository?.discussion?.id) throw new Error("repo-done: discussion not found");
+    if (!data.repository?.discussion?.id) throw new Error("report-done: discussion not found");
     await github.graphql(
       `mutation($discussionId: ID!, $body: String!) {
         addDiscussionComment(input: {discussionId: $discussionId, body: $body}) { comment { id } }

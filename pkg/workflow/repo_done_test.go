@@ -20,8 +20,8 @@ func TestRepoDoneParsingAndSchema(t *testing.T) {
 		"body": "Done\nwith checks", "github-token": "${{ secrets.DONE_TOKEN }}", "staged": "${{ inputs.preview }}",
 	}} {
 		t.Run(fmt.Sprint(value), func(t *testing.T) {
-			frontmatter := map[string]any{"on": "workflow_dispatch", "safe-outputs": map[string]any{"repo-done": value}}
-			require.NoError(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "repo-done.md"))
+			frontmatter := map[string]any{"on": "workflow_dispatch", "safe-outputs": map[string]any{"report-done": value}}
+			require.NoError(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "report-done.md"))
 			config := NewCompiler().extractSafeOutputsConfig(frontmatter)
 			require.NotNil(t, config.RepoDone)
 			assert.Equal(t, value != false, repoDoneEnabled(config))
@@ -34,31 +34,31 @@ func TestRepoDoneParsingAndSchema(t *testing.T) {
 	}
 	for _, value := range []any{"true", 1, []any{}, map[string]any{"body": false}, map[string]any{"target": "other/repo"}, map[string]any{"github-app": map[string]any{}}, map[string]any{"staged": 1}} {
 		err := parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
-			"on": "workflow_dispatch", "safe-outputs": map[string]any{"repo-done": value},
-		}, "repo-done.md")
+			"on": "workflow_dispatch", "safe-outputs": map[string]any{"report-done": value},
+		}, "report-done.md")
 		require.Error(t, err, "%v", value)
 	}
 	assert.Nil(t, NewCompiler().parseRepoDoneConfig(map[string]any{}))
 	keys, err := parser.GetSafeOutputTypeKeys()
 	require.NoError(t, err)
-	assert.NotContains(t, keys, "repo-done", "declarative reporting must not be registered as an agent tool")
+	assert.NotContains(t, keys, "report-done", "declarative reporting must not be registered as an agent tool")
 }
 
 func TestRepoDoneImports(t *testing.T) {
 	c := NewCompiler()
 	for _, enabled := range []bool{false, true} {
-		raw := map[string]any{"repo-done": enabled}
+		raw := map[string]any{"report-done": enabled}
 		top := c.extractSafeOutputsConfig(map[string]any{"safe-outputs": raw})
-		result, err := c.MergeSafeOutputs(top, []string{`{"repo-done":{"body":"Imported"}}`}, raw)
+		result, err := c.MergeSafeOutputs(top, []string{`{"report-done":{"body":"Imported"}}`}, raw)
 		require.NoError(t, err)
 		assert.Equal(t, enabled, repoDoneEnabled(result))
 		assert.Empty(t, result.RepoDone.Body, "explicit main configuration wins")
 	}
-	result, err := c.MergeSafeOutputs(&SafeOutputsConfig{}, []string{`{"repo-done":{"body":"Imported"}}`}, nil)
+	result, err := c.MergeSafeOutputs(&SafeOutputsConfig{}, []string{`{"report-done":{"body":"Imported"}}`}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, result.RepoDone)
 	assert.Equal(t, "Imported", result.RepoDone.Body)
-	result, err = c.MergeSafeOutputs(&SafeOutputsConfig{}, []string{`{"repo-done":false}`, `{"repo-done":true}`}, nil)
+	result, err = c.MergeSafeOutputs(&SafeOutputsConfig{}, []string{`{"report-done":false}`, `{"report-done":true}`}, nil)
 	require.NoError(t, err)
 	assert.False(t, repoDoneEnabled(result), "the first explicit import is retained")
 }
@@ -67,13 +67,13 @@ func TestRepoDoneConclusion(t *testing.T) {
 	c := NewCompiler()
 	data := &WorkflowData{AI: "copilot", SafeOutputs: &SafeOutputsConfig{RepoDone: &RepoDoneConfig{}}}
 	applyDefaultCreateIssue(data)
-	assert.Nil(t, data.SafeOutputs.CreateIssues, "repo-done must not enable an agent issue-writing tool")
+	assert.Nil(t, data.SafeOutputs.CreateIssues, "report-done must not enable an agent issue-writing tool")
 	configJSON, err := generateSafeOutputsConfig(data)
 	require.NoError(t, err)
-	assert.Empty(t, configJSON, "repo-done must not be exposed in agent handler configuration")
+	assert.Empty(t, configJSON, "report-done must not be exposed in agent handler configuration")
 	condition := RenderCondition(c.buildConclusionJobCondition(data, "agent", []string{"add_comment"}))
 	assert.Contains(t, condition, "always()")
-	assert.NotContains(t, condition, "needs.add_comment.outputs.comment_id", "agent comments cannot suppress repo-done")
+	assert.NotContains(t, condition, "needs.add_comment.outputs.comment_id", "agent comments cannot suppress report-done")
 	steps := strings.Join(c.buildRepoDoneStep(data, "agent"), "")
 	assert.Contains(t, steps, "always() && needs.activation.result == 'success' && needs.agent.result != 'skipped' && needs.agent.result != ''")
 	assert.Contains(t, steps, "/repo_done.cjs")
@@ -132,7 +132,7 @@ func TestRepoDoneRejectsWorkQueueParticipants(t *testing.T) {
 	}
 	require.True(t, isWorkQueueParticipant(data))
 	_, err := c.buildConclusionJob(data, "agent", nil)
-	require.ErrorContains(t, err, "repo-done is not supported for work-queue participants")
+	require.ErrorContains(t, err, "report-done is not supported for work-queue participants")
 }
 
 func TestRepoDoneNativePermissions(t *testing.T) {
@@ -197,7 +197,7 @@ engine: copilot
 permissions:
   contents: read
 safe-outputs:
-  repo-done:
+  report-done:
     body: "Checks complete."
     github-token: "${{ secrets.DONE_TOKEN }}"
     staged: false
@@ -209,7 +209,7 @@ safe-outputs:
 Run the repository checks.
 `
 	dir := t.TempDir()
-	path := filepath.Join(dir, "repo-done.md")
+	path := filepath.Join(dir, "report-done.md")
 	require.NoError(t, os.WriteFile(path, []byte(source), 0600))
 	for _, dryRun := range []bool{false, true} {
 		c := NewCompiler()
@@ -217,7 +217,7 @@ Run the repository checks.
 		c.SetSkipValidation(true)
 		c.SetDryRun(dryRun)
 		require.NoError(t, c.CompileWorkflow(path))
-		content, err := os.ReadFile(filepath.Join(dir, "repo-done.lock.yml"))
+		content, err := os.ReadFile(filepath.Join(dir, "report-done.lock.yml"))
 		require.NoError(t, err)
 		var compiled map[string]any
 		require.NoError(t, yaml.Unmarshal(content, &compiled))

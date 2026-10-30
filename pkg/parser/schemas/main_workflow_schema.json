@@ -13420,7 +13420,7 @@
           "pattern": "^[^/]+/[^/]+$|^\\$\\{\\{.*\\}\\}$",
           "examples": ["github/docs-engineering", "myorg/infra-alerts", "${{ inputs.failure-issue-repo }}"]
         },
-        "repo-done": {
+        "report-done": {
           "description": "Trusted completion notification, independent of agent output. Posts to the invocation's issue/PR, discussion, or commit; context-free runs use the step summary. Not supported for work-queue participants.",
           "oneOf": [
             { "type": "boolean" },

@@ -13,7 +13,7 @@ type RepoDoneConfig struct {
 }
 
 func (c *Compiler) parseRepoDoneConfig(outputMap map[string]any) *RepoDoneConfig {
-	value, exists := outputMap["repo-done"]
+	value, exists := outputMap["report-done"]
 	if !exists {
 		return nil
 	}

@@ -34,7 +34,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		return nil, nil // No safe-outputs configured, no need for conclusion job
 	}
 	if repoDoneEnabled(data.SafeOutputs) && isWorkQueueParticipant(data) {
-		return nil, errors.New("safe-outputs.repo-done is not supported for work-queue participants; remove repo-done from the participant workflow")
+		return nil, errors.New("safe-outputs.report-done is not supported for work-queue participants; remove report-done from the participant workflow")
 	}
 	data = c.dryRunConclusionData(data)
 	steps, err := c.buildConclusionJobSteps(data, mainJobName, safeOutputJobNames)

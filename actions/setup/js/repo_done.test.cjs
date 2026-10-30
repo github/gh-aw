@@ -36,7 +36,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("repo-done trusted completion", () => {
+describe("report-done trusted completion", () => {
   it.each([
     ["issues", { issue: { number: 42 } }],
     ["issue_comment", { issue: { number: 42 }, comment: { body: "agent comment", id: 9 } }],
