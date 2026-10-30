@@ -220,8 +220,8 @@ function createSessionLookups(session) {
   const harnessRetries = attempts.filter(attempt => attempt.provenance.phase === "agent" && attempt.attempt > 1);
   // Native attempt 1 is already a retry; its sequence may reset per API operation.
   const engineRetries = session
-    .filter(event => event.type === "session.result" && event.provenance.component === "agent" && isRecord(event.data.engineRetry) && count(event.data.engineRetry.attempt) !== null && event.data.engineRetry.attempt > 0)
-    .map(event => ({ ...(isRecord(event.data.engineRetry) ? event.data.engineRetry : {}), provenance: event.provenance, eventIndex: eventIndices.get(event) }));
+    .filter(event => event.type === "engine.retry" && event.provenance.component === "agent" && (count(event.data.attempt) ?? 0) > 0)
+    .map(event => ({ ...event.data, provenance: event.provenance, eventIndex: eventIndices.get(event) }));
   const safeOutputResults = eventsOfType("safe_output.result");
   const safeJobOutcomeTypes = new Set(
     safeOutputResults.filter(event => event.provenance.phase === "safe_outputs" && event.provenance.path === "usage/aw_session.jsonl" && event.data.status !== undefined && typeof event.data.type === "string").map(event => event.data.type)

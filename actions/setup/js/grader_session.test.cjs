@@ -140,7 +140,7 @@ describe("retry session consumers", () => {
   });
 
   it("counts native engine retry observations separately from process retries and errors", () => {
-    const native = (attempt, index, phase = "agent") => event("session.result", { is_error: true, engineRetry: { attempt, maxRetries: 5, backoffMs: 100 } }, { component: "agent", index, phase });
+    const native = (attempt, index, phase = "agent") => event("engine.retry", { attempt, maxRetries: 5, backoffMs: 100 }, { component: "agent", index, phase });
     const session = [attempt(1), attempt(2), native(1, 0), native(2, 1), native(1, 2), native(1, 0, "detection"), native(0, 3), event("session.result", { is_error: true }, { component: "agent" })];
     const lookups = createSessionLookups(session);
     expect(lookups.stats).toMatchObject({ retryCount: 1, harnessRetryCount: 1, engineRetryCount: 3 });

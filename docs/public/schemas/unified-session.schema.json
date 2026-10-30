@@ -82,6 +82,7 @@
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_progress" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_started" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_updated" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "engine.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EngineRetryData" } } } },
       { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
       { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
       { "if": { "properties": { "type": { "const": "experiment.assignment" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentAssignmentData" } } } },
@@ -544,9 +545,21 @@
     },
     "EngineRetryData": {
       "type": "object",
-      "properties": { "attempt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }, "maxRetries": { "$ref": "#/definitions/SessionCount" }, "backoffMs": { "$ref": "#/definitions/SessionCount" } },
+      "properties": {
+        "sourceEngine": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "maxRetries": { "$ref": "#/definitions/SessionCount" },
+        "backoffMs": { "$ref": "#/definitions/SessionCount" }
+      },
       "required": ["attempt"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Observed engine-native retry progress, not a process attempt or session result."
     },
     "EpisodeLineageData": {
       "type": "object",
@@ -1299,7 +1312,6 @@
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
-        "engineRetry": { "$ref": "#/definitions/EngineRetryData", "description": "Observed engine-native retry progress, distinct from harness attempts." },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
       "additionalProperties": false

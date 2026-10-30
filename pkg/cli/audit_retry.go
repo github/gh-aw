@@ -124,13 +124,20 @@ func (builder *auditRetryBuilder) observeSummary(event sessionModelRoutingEvent)
 }
 
 func (builder *auditRetryBuilder) observeEngine(event sessionModelRoutingEvent) {
-	var payload struct {
-		EngineRetry *AuditEngineRetry `json:"engineRetry"`
+	data := event.Data
+	if event.Type == "session.result" {
+		var payload struct {
+			EngineRetry json.RawMessage `json:"engineRetry"`
+		}
+		if json.Unmarshal(data, &payload) != nil {
+			return
+		}
+		data = payload.EngineRetry
 	}
-	if json.Unmarshal(event.Data, &payload) != nil || payload.EngineRetry == nil || payload.EngineRetry.Attempt <= 0 {
+	var retry AuditEngineRetry
+	if json.Unmarshal(data, &retry) != nil || retry.Attempt <= 0 {
 		return
 	}
-	retry := *payload.EngineRetry
 	retry.Phase, retry.Path, retry.Index = event.Provenance.Phase, event.Provenance.Path, event.Provenance.Index
 	retry.AttemptID, retry.StartupAttemptID = event.Provenance.AttemptID, event.Provenance.StartupAttemptID
 	builder.report.EngineRetryHistory = append(builder.report.EngineRetryHistory, retry)
@@ -152,7 +159,7 @@ func buildAuditRetrySummary(events []sessionModelRoutingEvent) *AuditRetrySummar
 	}
 	for _, event := range events {
 		switch event.Type {
-		case "session.result":
+		case "engine.retry", "session.result":
 			builder.observeEngine(event)
 		case "harness.attempt":
 			var attempt AuditRetryAttempt

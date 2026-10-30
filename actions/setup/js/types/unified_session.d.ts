@@ -37,12 +37,11 @@ export interface UnifiedSessionContextData {
 }
 
 export interface UnifiedSessionResultData extends UnifiedSessionContextData, Pick<SessionResultData, "sourceEngine" | "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics"> {
-  /** Observed engine-native retry progress, distinct from harness attempts. */
-  engineRetry?: EngineRetryData;
   usage?: UnifiedSessionUsage | null;
 }
 
-export interface EngineRetryData {
+/** Observed engine-native retry progress, not a process attempt or session result. */
+export interface EngineRetryData extends UnifiedSessionContextData, Pick<SessionResultData, "sourceEngine" | "sourceType" | "errors"> {
   /** @asType integer @minimum 1 @maximum 9007199254740991 */
   attempt: number;
   maxRetries?: SessionCount;
@@ -815,6 +814,7 @@ export interface UnifiedSessionEventDataMap {
   "dynamicWorkflows.task_notification": DynamicWorkflowObservationData;
   "dynamicWorkflows.background_tasks_changed": DynamicWorkflowObservationData;
   "session.result": UnifiedSessionResultData;
+  "engine.retry": EngineRetryData;
   "mcp.rpc.request": McpObservationData;
   "mcp.rpc.response": McpObservationData;
   "mcp.difc.filtered": McpObservationData;

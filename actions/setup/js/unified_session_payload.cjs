@@ -34,6 +34,7 @@ const SCOPED_AGENT_TYPES = new Set([
   "tool.execution_complete",
   "usage.report",
   "session.result",
+  "engine.retry",
   "model.call_final_result",
 ]);
 
@@ -207,6 +208,7 @@ const EVENT_FIELDS = {
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "harness.retry": {},
   "harness.attempt": {},
+  "engine.retry": { sourceEngine: ["sourceEngine"], sourceType: ["sourceType"], errors: ["errors"] },
   "skill.invoked": { name: ["name"], path: ["path"], source: ["source"], trigger: ["trigger"], model: ["model"], invokedAtTurn: ["invokedAtTurn"] },
   "skill.context_delivered_ref": { interactionId: ["interactionId"], source: ["source"], contentId: ["contentId"] },
   "skill.inventory": { skills: ["skills"] },
@@ -641,13 +643,6 @@ function normalizeRankedChoices(choices) {
 function normalizeUnifiedSessionEvent(event, phase) {
   /** @type {any} */
   const source = event.data;
-  const known = Object.hasOwn(EVENT_FIELDS, event.type);
-  const data = event.type === "mcp.configuration" ? normalizeMcpConfigurationData(source) : known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
-  if (event.type === "harness.retry" || event.type === "harness.attempt") {
-    const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(source) : normalizeHarnessAttemptEvent(source);
-    if (!retry) throw new Error(`${ERR_VALIDATION}: Harness retry evidence must contain valid bounded attempt metadata`);
-    Object.assign(data, retry);
-  }
   if (event.type === "session.result") {
     const retry =
       source.engineRetry && typeof source.engineRetry === "object" && !Array.isArray(source.engineRetry)
@@ -656,10 +651,34 @@ function normalizeUnifiedSessionEvent(event, phase) {
           ? { attempt: source.attempt, maxRetries: source.max_retries, backoffMs: source.retry_delay_ms }
           : { attempt: event.reconnectAttempt, maxRetries: event.maxReconnects };
     if (Number.isSafeInteger(retry.attempt) && retry.attempt >= 1) {
-      data.engineRetry = { attempt: retry.attempt };
-      for (const field of ["maxRetries", "backoffMs"]) {
-        if (Number.isSafeInteger(retry[field]) && retry[field] >= 0) data.engineRetry[field] = retry[field];
-      }
+      return normalizeUnifiedSessionEvent(
+        {
+          ...event,
+          type: "engine.retry",
+          data: {
+            ...source,
+            attempt: retry.attempt,
+            maxRetries: retry.maxRetries,
+            backoffMs: retry.backoffMs,
+            sourceEngine: source.sourceEngine ?? (source.subtype === "api_retry" ? "claude" : event.reconnectAttempt !== undefined ? "codex" : undefined),
+          },
+        },
+        phase
+      );
+    }
+  }
+  const known = Object.hasOwn(EVENT_FIELDS, event.type);
+  const data = event.type === "mcp.configuration" ? normalizeMcpConfigurationData(source) : known ? selectFields(source, EVENT_FIELDS[event.type]) : structuredClone(source);
+  if (event.type === "harness.retry" || event.type === "harness.attempt") {
+    const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(source) : normalizeHarnessAttemptEvent(source);
+    if (!retry) throw new Error(`${ERR_VALIDATION}: Harness retry evidence must contain valid bounded attempt metadata`);
+    Object.assign(data, retry);
+  }
+  if (event.type === "engine.retry") {
+    if (!Number.isSafeInteger(source.attempt) || source.attempt < 1) throw new Error(`${ERR_VALIDATION}: Engine retry evidence must contain a positive safe integer attempt`);
+    data.attempt = source.attempt;
+    for (const field of ["maxRetries", "backoffMs"]) {
+      if (Number.isSafeInteger(source[field]) && source[field] >= 0) data[field] = source[field];
     }
   }
   if (event.type === "model.inventory") {

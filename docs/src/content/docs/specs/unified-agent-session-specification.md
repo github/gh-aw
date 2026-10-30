@@ -568,6 +568,7 @@ preserve encounter order and retain only these event kinds and `data` keys:
 | `execution.result` | `outcome`, `conclusion`, `exitCode`, `durationMs`, `startedAt`, `finishedAt` |
 | `harness.retry` | `attempts`, `exitCode`; validated bounded attempt lists from Section 6.4 |
 | `harness.attempt` | Validated bounded attempt fields from Section 6.4 |
+| `engine.retry` | `sourceEngine`, `sourceType`, `sessionId`, `agentId`, and validated `attempt`, `maxRetries`, `backoffMs` from Section 6.4 |
 | `grader.result` | `id`, `status`, `value`, `score`, `unit`, `passed`, `direction`, `threshold`, `enabled`, `min`, `max`, `version` |
 
 `session.result`, `usage.report` and `firewall.token_usage` MAY additionally retain `data.usage`, but only
@@ -595,9 +596,9 @@ Unbounded `errors`, `permissionDenials`, `agentMetrics`, grader result arrays,
 inventories, caller context and arbitrary nested payloads MUST NOT be forwarded
 through a superficially eligible event.
 
-`session.result` MAY retain validated `engineRetry` counters from Section 6.4.
-This exception permits only the bounded numeric retry fields, not arbitrary
-provider payloads.
+`engine.retry` MUST retain a positive safe integer `attempt`; optional
+`maxRetries` and `backoffMs` survive only as nonnegative safe integers.
+Retry diagnostics and arbitrary provider payloads MUST NOT enter compact output.
 
 **T-UAS-077 — Hard output limits.** The serialized compact JSONL MUST contain at
 most **128 records** and **16,384 UTF-8 bytes**, including JSON escaping and one LF
@@ -748,7 +749,7 @@ Native `parameters` remains a reader alias for `input`. If both are present, rea
 
 ### 4.6 `session.result`
 
-**T-UAS-015 — Session accounting and diagnostics.** Exposed session accounting and session/provider errors MUST be represented in `session.result.data` using the fields below. Errors and permission denials MUST preserve their supplied entries and structures. Tool failures MUST remain on tool completions and MUST NOT automatically become session errors; a source that explicitly reports the same failure at both levels retains both observations.
+**T-UAS-015 — Session accounting and diagnostics.** Exposed session accounting and session/provider errors MUST be represented in `session.result.data` using the fields below, except observed engine-native retry diagnostics, which use `engine.retry` in full unified sessions (Section 6.4). Errors and permission denials MUST preserve their supplied entries and structures. Tool failures MUST remain on tool completions and MUST NOT automatically become session errors; a source that explicitly reports the same failure at both levels retains both observations.
 
 | Field | Value and availability |
 | --- | --- |
@@ -779,6 +780,7 @@ source for opaque fields.
 | Event type | Source observation |
 | --- | --- |
 | `agent.execution` | One aggregate execution/error observation for the main agent, as defined in Section 4.8. |
+| `engine.retry` | One observed engine-native API retry or reconnect, with shared counters and retained diagnostics as defined in Section 6.4; not a session result or harness invocation. |
 | `subagent.started`, `subagent.configured`, `subagent.completed`, `subagent.failed` | Cross-engine sub-agent lifecycle observations. `agentId` identifies the invocation; `data.invocationId` preserves an available engine invocation ID. Failures may include `errorCode`, including `SUBAGENT_MODEL_UNAVAILABLE`. |
 | `subagent.request` | A sub-agent inference observation with `agentId`, `invocationId`, model, and the available input, output, cache-read, and cache-write token counts. It provides the per-request evidence used to correlate proxy accounting. |
 | `prompt.system`, `prompt.user` | Split activation prompt file contents with source provenance, when available; omitted from default summaries. |
@@ -1309,7 +1311,7 @@ For supported snapshots, the reader selects the latest authoritative supplied va
 
 In particular, Gemini `stats.tool_calls` is not a turn count. Codex completed turns and Pi finalized `turn_end` records can support an observed turn count, including for a partial session; that count is not proof of task completion. A bare total-token figure does not supply an input/output split or USD cost.
 
-**T-UAS-035 — Diagnostic separation.** Source session/provider errors, including empty-content error turns and supported terminal error records, MUST remain separately available in `session.result.data.errors` rather than being hidden, downgraded to assistant answers, or merged into tool output. Distinct error observations MUST remain distinguishable. Deduplication MAY remove a repeated observation with the same supplied source identity, but MUST NOT silently remove separate retries merely because their error text matches.
+**T-UAS-035 — Diagnostic separation.** Source session/provider errors, including empty-content error turns and supported terminal error records, MUST remain separately available in `session.result.data.errors` rather than being hidden, downgraded to assistant answers, or merged into tool output. Full unified sessions retain observed engine-native retry diagnostics in `engine.retry.data.errors` instead (Section 6.4). Distinct error observations MUST remain distinguishable. Deduplication MAY remove a repeated observation with the same supplied source identity, but MUST NOT silently remove separate retries merely because their error text matches.
 
 ### 6.4 Retry attempts
 
@@ -1350,10 +1352,34 @@ spawn diagnostics only when their full sequence agrees with the manifest.
 Copilot native session evidence remains authoritative; resumed cumulative
 transcripts MUST NOT be replayed as additional usage. Native engine reconnects
 remain native evidence, not extra harness process invocations. Supported Claude
-`api_retry` and Codex reconnect observations retain bounded
-`session.result.data.engineRetry` metadata (`attempt`, optional `maxRetries`,
-and optional `backoffMs`) alongside their existing diagnostics; an internal
-request retry MUST NOT acquire a fabricated engine process outcome. Workflow
+`api_retry` and Codex reconnect observations MUST normalize to the single
+`engine.retry` event type in full unified sessions, not `session.result`.
+Each source retry produces one event, without a duplicate session-result
+diagnostic. Native parser traces MAY retain their original diagnostic shape;
+the unified normalizer also accepts saved `session.result.data.engineRetry`
+metadata and projects it to `engine.retry`.
+
+| `engine.retry.data` field | Meaning |
+| --- | --- |
+| `attempt` | Required observed one-based retry counter, a positive safe integer. Attempt 1 is already a retry; the sequence can reset for each API operation. |
+| `maxRetries` | Optional observed retry limit, a nonnegative safe integer; never inferred from exhaustion or other events. |
+| `backoffMs` | Optional observed delay in whole milliseconds, a nonnegative safe integer. |
+| `sourceEngine`, `sourceType` | Available engine identifier and native observation type. |
+| `sessionId`, `agentId`, `parentToolUseId`, `parentToolCallId` | Available native caller context; not inferred process-attempt identity. |
+| `errors` | Existing retry diagnostics, preserving supplied entries and structures. |
+
+Claude `attempt`, `max_retries`, and `retry_delay_ms` map respectively to
+`attempt`, `maxRetries`, and `backoffMs`. Codex text and structured-error
+`Reconnecting... N/M (reason)` observations map `N` to `attempt` and `M` to
+`maxRetries`; no backoff is invented. Invalid required counters MUST NOT create
+a retry event; a native diagnostic without valid counters remains a diagnostic.
+Invalid optional counters are omitted. Normalization MUST be idempotent and
+MUST NOT retain native retry wrappers or opaque provider fields.
+
+An engine retry carries neither usage nor a terminal session status, and an internal
+request retry MUST NOT acquire a fabricated engine process outcome. Grader
+`trace.engineRetries` and `stats.engineRetryCount` read `engine.retry` observations;
+process retry counts and the default `retries` grader keep their existing meanings. Workflow
 continuations and Actions reruns remain separately scoped executions; neither
 is a harness retry merely because a session is resumed.
 
@@ -1396,7 +1422,8 @@ All mappings inherit Sections 3–6. The tables identify supported signatures an
 | Direct `type: "message", role: "assistant"` or `"user"` envelopes | The same content-block mappings as SDK assistant/user envelopes; only assistant usage contributes to session accounting. |
 | `type: "result"` with recognized accounting/diagnostic fields | `session.result`; preserve source result metadata, expose `sourceType: "result"` and the terminal subtype as `status`. Explicit `is_error` or an error subtype takes precedence and maps to `status: "error"`. |
 | `system/permission_denied` | `session.result.permissionDenials`; no inferred tool completion. Later terminal denial snapshots reconcile by observed tool and caller identity. |
-| `assistant.error`, `system/api_retry`, or Messages API error | `session.result.errors`; native diagnostic/retry metadata remains on the canonical event, without a duplicate Claude-specific envelope. |
+| `assistant.error` or Messages API error | `session.result.errors`; native diagnostic metadata remains on the canonical event, without a duplicate Claude-specific envelope. |
+| `system/api_retry` | Native diagnostic mapped to `engine.retry` in full unified sessions, with shared retry counters and retained `errors` (Section 6.4). |
 | `system/task_started` with `task_type: "local_agent"` | `subagent.started`; task ID identifies the target agent, with launcher tool, agent type, execution mode, and observed spawn depth. |
 | Agent launch tool result with `agentId` and `resolvedModel` | Retain the tool completion and emit `subagent.configured` for the observed target model. |
 | `system/task_notification` for an observed local agent | `subagent.completed` or `subagent.failed`; retain observed token/tool/duration counters, and mark stopped tasks as cancelled. Other local-agent statuses remain native observations rather than dynamic-workflow events. |
@@ -1550,6 +1577,7 @@ redaction, escaping, and byte limits.
 | `todo_list` items | `session.info` with the supplied todo items as structured content. |
 | `turn.completed` with `usage` | Accumulate `input_tokens`, `output_tokens`, `cached_input_tokens` → `cache_read_input_tokens`, and `cache_write_input_tokens` → `cache_creation_input_tokens`; count distinct completed turns. |
 | Supported `turn.failed`, top-level `error`, or completed error item | Session/provider errors in `session.result.errors`, retaining supplied error structure and metadata. |
+| `Reconnecting... N/M (reason)` text or top-level error message | Full unified sessions use `engine.retry` with shared counters and retained diagnostic text (Section 6.4). |
 | Legacy `thinking`, recognized tool/exec call and outcome lines | Exact payload text and independently observed tool lifecycle; no source ID if none is exposed. |
 | Legacy `ERROR:` / recognized reconnect diagnostics | Session errors, separately from successful tool activity. |
 
@@ -2575,6 +2603,7 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 ### Version 2.7.0 - Draft (2026-10-30)
 
 - Added observed harness and startup attempts, partial lifecycle metadata, and evidence-based event correlation (T-UAS-087 through T-UAS-089).
+- Normalized Claude API retries and Codex reconnects to the shared `engine.retry` event, with one counter schema and separate retry diagnostics.
 - Distinguished retry history from cumulative usage, workflow continuations, and Actions reruns without changing serialization-format version 1.
 
 ### Version 2.6.1 - Draft (2026-10-29)
