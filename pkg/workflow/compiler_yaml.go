@@ -202,6 +202,8 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, err
 	}
+	// Appending failures can replace a slice's backing array; generatedActionRefs
+	// is a shared map and needs no copy-back.
 	defer func() { sourceData.ActionResolutionFailures = data.ActionResolutionFailures }()
 
 	// Build all jobs and validate dependencies

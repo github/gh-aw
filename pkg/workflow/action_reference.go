@@ -132,13 +132,7 @@ func tryResolveSetupSHA(ctx context.Context, resolver SHAResolver, actionRepo, t
 // For action mode: converts to SHA-pinned reference in external repo if possible (e.g., "github/gh-aw-actions/create-issue@SHA # version")
 func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) (reference string) {
 	defer func() {
-		if data != nil && reference != "" {
-			if data.generatedActionRefs == nil {
-				data.generatedActionRefs = make(map[string]struct{})
-			}
-			ref, _, _ := strings.Cut(reference, " # ")
-			data.generatedActionRefs[ref] = struct{}{}
-		}
+		data.recordGeneratedActionRef(reference)
 	}()
 	hasActionTag, frontmatterActionTag := getFrontmatterActionTag(data)
 
@@ -162,6 +156,17 @@ func (c *Compiler) resolveActionReference(localActionPath string, data *Workflow
 	// Default to dev mode for unknown modes
 	actionRefLog.Printf("WARNING: Unknown action mode %s, defaulting to dev mode", c.actionMode)
 	return localActionPath
+}
+
+func (data *WorkflowData) recordGeneratedActionRef(reference string) {
+	if data == nil || reference == "" {
+		return
+	}
+	if data.generatedActionRefs == nil {
+		data.generatedActionRefs = make(map[string]struct{})
+	}
+	ref, _, _ := strings.Cut(reference, " # ")
+	data.generatedActionRefs[ref] = struct{}{}
 }
 
 func getFrontmatterActionTag(data *WorkflowData) (bool, string) {
@@ -206,7 +211,7 @@ func (c *Compiler) resolveReleaseActionReference(localActionPath string, data *W
 		actionRefLog.Printf("Release mode: using tag-based remote action reference: %s", remoteRef)
 		return remoteRef
 	}
-	pinnedRef, err := getActionPinWithData(actionRepo, version, data)
+	pinnedRef, err := getGeneratedActionPinWithData(actionRepo, version, data)
 	if err != nil {
 		actionRefLog.Printf("Failed to pin action %s@%s: %v", actionRepo, version, err)
 		return ""
@@ -305,7 +310,7 @@ func (c *Compiler) convertToExternalActionsRef(localPath string, data *WorkflowD
 
 	// Try to resolve the SHA using action pins
 	if data != nil {
-		pinnedRef, err := getActionPinWithData(actionRepo, tag, data)
+		pinnedRef, err := getGeneratedActionPinWithData(actionRepo, tag, data)
 		if err != nil {
 			if hasExactActionPinMapping(actionRepo, tag, data) {
 				actionRefLog.Printf("Failed to resolve exact action pin mapping for %s@%s: %v", actionRepo, tag, err)

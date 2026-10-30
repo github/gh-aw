@@ -6,9 +6,9 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
-	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
@@ -76,31 +76,69 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 func compilerGeneratedActionRefs(data *WorkflowData) map[string]struct{} {
 	generated := maps.Clone(data.generatedActionRefs)
 	// Authored pin failures must not inherit a matching compiler-generated fallback.
+	// Authored pre-/post-/agent steps are pinned before rendering; unresolved
+	// literal collisions are covered here without re-parsing their YAML strings.
 	for _, failure := range data.ActionResolutionFailures {
+		if failure.compilerGenerated {
+			continue
+		}
 		for reference := range generated {
-			if gitutil.ExtractBaseRepo(extractActionRepo(reference)) == gitutil.ExtractBaseRepo(failure.Repo) &&
+			if extractActionRepo(reference) == failure.Repo &&
 				extractActionVersion(reference) == failure.Ref {
 				delete(generated, reference)
 			}
 		}
 	}
-	removeAuthoredActionRefs(generated, data.Jobs)
+	for _, value := range data.Jobs {
+		if job, ok := value.(map[string]any); ok {
+			removeAuthoredActionRef(generated, job)
+			for _, field := range []string{"steps", "pre-steps", "post-steps"} {
+				removeAuthoredStepActionRefs(generated, job[field])
+			}
+		}
+	}
+	for _, step := range data.OnSteps {
+		removeAuthoredActionRef(generated, step)
+	}
+	if data.SecretMasking != nil {
+		for _, step := range data.SecretMasking.Steps {
+			removeAuthoredActionRef(generated, step)
+		}
+	}
+	if data.SafeOutputs != nil {
+		removeAuthoredStepActionRefs(generated, data.SafeOutputs.Steps)
+		for _, action := range data.SafeOutputs.Actions {
+			reference := action.ResolvedRef
+			if reference == "" {
+				reference = action.Uses
+			}
+			reference, _, _ = strings.Cut(reference, " # ")
+			delete(generated, reference)
+		}
+		for _, job := range data.SafeOutputs.Jobs {
+			removeAuthoredStepActionRefs(generated, job.Steps)
+		}
+		if detection := data.SafeOutputs.ThreatDetection; detection != nil {
+			removeAuthoredStepActionRefs(generated, detection.Steps)
+			removeAuthoredStepActionRefs(generated, detection.PostSteps)
+		}
+	}
 	return generated
 }
 
-func removeAuthoredActionRefs(generated map[string]struct{}, value any) {
-	switch value := value.(type) {
-	case map[string]any:
-		if uses, ok := value["uses"].(string); ok {
-			delete(generated, uses)
+func removeAuthoredStepActionRefs(generated map[string]struct{}, value any) {
+	if steps, ok := value.([]any); ok {
+		for _, value := range steps {
+			if step, ok := value.(map[string]any); ok {
+				removeAuthoredActionRef(generated, step)
+			}
 		}
-		for _, child := range value {
-			removeAuthoredActionRefs(generated, child)
-		}
-	case []any:
-		for _, child := range value {
-			removeAuthoredActionRefs(generated, child)
-		}
+	}
+}
+
+func removeAuthoredActionRef(generated map[string]struct{}, value map[string]any) {
+	if uses, ok := value["uses"].(string); ok {
+		delete(generated, uses)
 	}
 }
 

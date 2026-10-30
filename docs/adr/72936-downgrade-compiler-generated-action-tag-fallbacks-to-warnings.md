@@ -12,7 +12,7 @@ The `action-pin` lint rule (`pkg/workflow/lint/integrity.go`) requires every `us
 
 ### Decision
 
-We will record the exact references the compiler emits from `resolveActionReference` in a private `WorkflowData.generatedActionRefs` set. We will pass that set to the linter through a new `lint.Input.GeneratedActionRefs` field. Well-formed tag fallbacks in that set will be reported as **warnings** rather than errors. Before linting, `compilerGeneratedActionRefs` removes from the set any reference that matches a recorded `ActionResolutionFailures` entry or that appears as a `uses:` value in the user-authored `data.Jobs` tree. This means that authored references remain errors even when they match a generated fallback exactly. Malformed references remain errors whatever their origin. SHA pinning is still preferred and is used whenever resolution succeeds. Generated references and resolution failures are carried across the `WorkflowData` copies created for artifact-retention and dry-run rendering.
+We will record the exact references the compiler emits from `resolveActionReference` and `resolveGhAwSetupActionRef` in a private `WorkflowData.generatedActionRefs` set. We will pass that set to the linter through a new `lint.Input.GeneratedActionRefs` field. Well-formed tag fallbacks in that set will be reported as **warnings** rather than errors. Before linting, `compilerGeneratedActionRefs` removes references matching an authored pin failure by exact action path and version, excluding compiler-owned failures. It also checks actual authored reusable-workflow and step-level `uses:` fields, including merged secret-masking and threat-detection hooks and safe-output actions. Environment variables and action inputs named `uses` are not action references. Authored references therefore remain errors even when they match a generated fallback exactly. Malformed references remain errors whatever their origin. SHA pinning is still preferred and is used whenever resolution succeeds. Generated references and resolution failures are carried across the `WorkflowData` copies created for artifact-retention and dry-run rendering.
 
 ### Alternatives Considered
 
@@ -37,12 +37,12 @@ The compiler could keep the error and require network or cache access so the set
 
 #### Negative
 - Lock files may now contain mutable tag references for compiler-owned actions. These are only warnings, so a CI that ignores warnings could ship them unnoticed.
-- `WorkflowData` gains hidden mutable state (`generatedActionRefs`) that must be propagated by hand across rendering copies (see the deferred copy-back in `compiler_yaml.go`). Future copy paths could drop it without any error.
-- `removeAuthoredActionRefs` walks the whole `data.Jobs` tree and removes any matching `uses` string. This depends on authored content staying reachable through that structure.
+- `WorkflowData` gains hidden mutable state (`generatedActionRefs`), shared as a map across rendering copies. Appended resolution failures require an explicit slice copy-back in `compiler_yaml.go`.
+- New authored execution locations must be included in the structural reference checks or the authored pin-failure path.
 
 #### Neutral
 - `resolveActionReference` now uses a named return value with a `defer` to record every emitted reference. `resolveSetupActionModeRef` builds the repository path with `path.Join`.
-- Regression tests cover action and release modes, artifact rendering copies, and several authored-reference shapes (`pre-steps`, safe-output `actions`, custom `jobs`).
+- Regression tests cover action and release modes, setup-cli generation, artifact rendering copies, sibling actions, environment/input values, and authored-reference shapes including imported hooks.
 
 ---
 

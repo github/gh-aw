@@ -41,9 +41,10 @@ type GHAWManifestContainer struct {
 // GHAWManifestResolutionFailure represents an action-ref pinning failure captured
 // during compilation. These failures are embedded for lock-file auditing.
 type GHAWManifestResolutionFailure struct {
-	Repo      string `json:"repo"`
-	Ref       string `json:"ref"`
-	ErrorType string `json:"error_type"`
+	Repo              string `json:"repo"`
+	Ref               string `json:"ref"`
+	ErrorType         string `json:"error_type"`
+	compilerGenerated bool
 }
 
 // GHAWManifestMemoryValidationScript represents a custom memory validation
