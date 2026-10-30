@@ -159,8 +159,8 @@ outputs and include per-run and episode outcome summaries. This also downloads
 safe-output manifests, without requiring full agent artifacts or workflow logs.
 Use --outcomes-dir to persist the observations as JSONL for downstream processing.
 
-Use --atif to retain unified JSONL sessions and also write sibling .atif
-trajectories for the selected runs, without changing the report format.
+Available unified JSONL sessions are retained and automatically exported to
+sibling .atif trajectories, without changing the report format.
 
 Use --episodes to include recorded episode membership and hops in text reports.
 Combine --episodes --outcomes to join the selected episodes with live outcome
@@ -276,7 +276,6 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		EvalsOnly:         values.EvalsOnly,
 		GradersOnly:       values.GradersOnly,
 		Audit:             values.Audit,
-		ATIF:              values.ATIF,
 		Train:             values.Train,
 		Drain3Weights:     values.Drain3Weights,
 		Format:            values.Format,
@@ -461,7 +460,6 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		EvalsOnly:             getBoolFlag(cmd, "evals"),
 		GradersOnly:           getBoolFlag(cmd, "graders"),
 		Audit:                 getBoolFlag(cmd, "audit"),
-		ATIF:                  getBoolFlag(cmd, "atif"),
 		Train:                 getBoolFlag(cmd, "train"),
 		Drain3Weights:         getStringFlag(cmd, "drain3-weights"),
 		Format:                getStringFlag(cmd, "format"),
@@ -679,7 +677,6 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Bool("graders", false, "Filter to runs containing deterministic grader results; includes conclusion and separate custom-grader artifacts")
 	logsCmd.Flags().Bool("parse", false, "Run JavaScript parsers on agent logs and firewall logs, writing Markdown to log.md and firewall.md")
 	logsCmd.Flags().Bool("audit", false, "Generate audit.json in each workflow run cache directory (comparisons use downloaded runs only)")
-	addATIFFlag(logsCmd)
 	addJSONFlag(logsCmd)
 	logsCmd.Flags().Int("timeout", 0, "Total download timeout in minutes across all targets (0 = no timeout)")
 	logsCmd.Flags().Int("timeout-seconds", 0, "Download timeout in seconds (0 = use --timeout)")

@@ -27,8 +27,8 @@ When a single run is provided, generates a detailed Markdown report for that run
 When two or more runs are provided, the first is used as the base (reference) and the
 remaining runs are compared against it, producing a diff report.
 
-Use --atif to retain unified JSONL sessions and also write sibling .atif
-trajectories for the selected runs, without changing the report format.
+Available unified JSONL sessions are retained and automatically exported to
+sibling .atif trajectories, without changing the report format.
 
 Each argument accepts:
 - A numeric run ID (e.g., 1234567890)
@@ -79,7 +79,6 @@ type auditCommandOptions struct {
 	search           string
 	searchLimit      int
 	models           bool
-	atif             bool
 }
 
 // NewAuditCommand creates the audit command
@@ -101,7 +100,6 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	addOutputFlag(cmd, defaultLogsOutputDir)
 	addJSONFlag(cmd)
 	addRepoFlag(cmd)
-	addATIFFlag(cmd)
 	cmd.Flags().Bool("parse", false, "Run JavaScript parsers on agent logs and firewall logs, writing Markdown to log.md and firewall.md")
 	cmd.Flags().String("format", "pretty", "Diff output format for multi-run mode: pretty, markdown")
 	cmd.Flags().StringSlice("artifacts", nil, "Artifact sets to download (default: all — comprehensive artifacts required for analysis). Valid sets: "+strings.Join(ValidArtifactSetNames(), ", "))
@@ -176,7 +174,6 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.search, _ = cmd.Flags().GetString("search")
 	opts.searchLimit, _ = cmd.Flags().GetInt("search-limit")
 	opts.models, _ = cmd.Flags().GetBool("models")
-	opts.atif, _ = cmd.Flags().GetBool("atif")
 	if cmd.Flags().Changed("search") || cmd.Flags().Changed("search-limit") {
 		if err := validateAuditSearch(opts.search, opts.searchLimit); err != nil {
 			return auditCommandOptions{}, err
@@ -271,7 +268,6 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		Search:           opts.search,
 		SearchLimit:      opts.searchLimit,
 		Models:           opts.models,
-		ATIF:             opts.atif,
 	})
 	return err
 }
@@ -343,6 +339,5 @@ func runAuditMulti(ctx context.Context, args []string, opts auditCommandOptions)
 		JSONOutput:   opts.jsonOutput,
 		Format:       opts.format,
 		ArtifactSets: opts.artifacts,
-		ATIF:         opts.atif,
 	})
 }

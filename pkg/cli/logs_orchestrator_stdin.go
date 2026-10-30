@@ -221,12 +221,8 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		collectionStats.recordResult(result)
 		if result.CachedRun != nil {
 			processedRun := processedRunFromCachedData(*result.CachedRun, result.cachedAudit, opts.OutputDir)
-			if opts.ATIF {
-				params := buildConcurrentDownloadParams(opts.OutputDir, opts.Verbose, opts.RepoOverride, artifactFilter, opts.EvalsOnly, opts.ArtifactSets)
-				params.storageLimit = storageLimit
-				if err := exportLogsATIF(ctx, processedRun.Run, params, false); err != nil {
-					return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
-				}
+			if err := exportLogsATIF(ctx, processedRun.Run, opts.OutputDir, storageLimit, false); err != nil {
+				return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
 			}
 			processedRuns = append(processedRuns, processedRun)
 			continue
@@ -255,15 +251,6 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 		}
 
 		processedRun := buildProcessedRun(ctx, result, opts.Verbose, false)
-		if opts.ATIF {
-			params := buildConcurrentDownloadParams(opts.OutputDir, opts.Verbose, opts.RepoOverride, artifactFilter, opts.EvalsOnly, opts.ArtifactSets)
-			params.storageLimit = storageLimit
-			if err := exportLogsATIF(ctx, processedRun.Run, params, result.storageReserved); err != nil {
-				finalizeLogsRunDownload(storageLimit, result)
-				return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
-			}
-		}
-
 		if opts.Parse {
 			awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 			detectedEngine := extractEngineFromAwInfo(awInfoPath, opts.Verbose)
@@ -285,6 +272,10 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) (
 			}
 		}
 
+		if err := exportLogsATIF(ctx, processedRun.Run, opts.OutputDir, storageLimit, result.storageReserved); err != nil {
+			finalizeLogsRunDownload(storageLimit, result)
+			return fmt.Errorf("ATIF export for run %d: %w", processedRun.Run.DatabaseID, err)
+		}
 		processedRuns = append(processedRuns, processedRun)
 		if err := cachedJSONLWriter.Append(processedRun); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(err.Error()))

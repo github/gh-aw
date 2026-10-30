@@ -194,7 +194,6 @@ type processWorkflowRunBatchOptions struct {
 	cachedJSONLWriter      *cachedLogsJSONLWriter
 	countLimit             *logsCountLimit
 	collectionStats        *logsCollectionStats
-	atif                   bool
 	atifError              *error
 }
 
@@ -559,7 +558,6 @@ func fetchAndProcessLogsBatch(state *logsCollectionState, runtime logsDownloadRu
 		cachedJSONLWriter:      opts.cachedJSONLWriter,
 		countLimit:             opts.countLimit,
 		collectionStats:        opts.collectionStats,
-		atif:                   opts.ATIF,
 		atifError:              &state.atifError,
 	})
 	if state.atifError != nil {
@@ -871,6 +869,9 @@ type orderedLogsRunCollector struct {
 }
 
 func newOrderedLogsRunCollector(ctx context.Context, count int, chunkSize int, opts processWorkflowRunBatchOptions) *orderedLogsRunCollector {
+	if opts.atifError == nil {
+		opts.atifError = new(error)
+	}
 	collector := &orderedLogsRunCollector{
 		ctx:            ctx,
 		opts:           opts,
@@ -955,14 +956,7 @@ func (c *orderedLogsRunCollector) processReadyResult(index int) {
 }
 
 func (c *orderedLogsRunCollector) exportATIF(run WorkflowRun, reserved bool) {
-	if !c.opts.atif {
-		return
-	}
-	params := buildConcurrentDownloadParams(c.opts.outputDir, c.opts.verbose, c.opts.repoOverride, c.opts.artifactFilter, c.opts.evalsOnly, c.opts.artifactSets)
-	params.storageLimit = c.opts.storageLimit
-	params.maxGitHubAPIRateLimit = c.opts.maxGitHubAPIRateLimit
-	params.rateLimitState = c.opts.rateLimitState
-	if err := exportLogsATIF(c.ctx, run, params, reserved); err != nil {
+	if err := exportLogsATIF(c.ctx, run, c.opts.outputDir, c.opts.storageLimit, reserved); err != nil {
 		*c.opts.atifError = errors.Join(*c.opts.atifError, fmt.Errorf("ATIF export for run %d: %w", run.DatabaseID, err))
 	}
 }

@@ -10,22 +10,23 @@ does not execute a workflow, evaluate a Harbor task, or enable trajectory replay
 
 ## Export sessions
 
-The existing download commands accept `--atif`:
+`sessions download` selects ATIF with `--atif`; `logs` and `audit` export
+available unified sessions automatically:
 
 | Command | Behavior |
 | --- | --- |
 | `gh aw sessions download RUN --atif` | Emit ATIF JSON instead of JSONL to stdout. |
 | `gh aw sessions download RUN --atif -o session.atif` | Write ATIF JSON to the specified file. |
-| `gh aw logs WORKFLOW --atif` | Retain downloaded JSONL and reports; add a sibling `.atif` for each selected run. |
-| `gh aw audit RUN --atif` | Retain downloaded JSONL and audit reports; add a sibling `.atif`. |
+| `gh aw logs WORKFLOW` | Retain downloaded JSONL and reports; automatically add a sibling `.atif` when a unified session is available. |
+| `gh aw audit RUN` | Retain downloaded JSONL and audit reports; automatically add a sibling `.atif` when a unified session is available. |
 
 Use the command's existing run ID, Actions URL, `--repo`, output-directory,
 filtering, and multi-run options. For example:
 
 ```bash
 gh aw sessions download https://github.com/owner/repo/actions/runs/1234567890 --atif -o session.atif
-gh aw logs weekly-research --repo owner/repo --atif
-gh aw audit 1234567890 1234567891 --repo owner/repo --atif
+gh aw logs weekly-research --repo owner/repo
+gh aw audit 1234567890 1234567891 --repo owner/repo
 ```
 
 In logs/audit directories, `usage/aw_session.jsonl` has a sibling
@@ -33,10 +34,12 @@ In logs/audit directories, `usage/aw_session.jsonl` has a sibling
 These `.atif` files contain a single ATIF JSON document, not JSON Lines.
 `sessions download --atif` selects the output format rather than creating a
 second file; do not combine it with `--format markdown`. Without `--atif`,
-existing output behavior is unchanged.
+`sessions download` retains its existing output behavior. `logs` and `audit`
+have no `--atif` flag: missing sessions are skipped without extra downloads or
+ATIF-specific reconstruction, while invalid available sessions return errors.
 
-Prefer published unified sessions. When one is unavailable, the existing
-session-download path reconstructs it from available engine artifacts.
+Prefer published unified sessions. When one is unavailable, `sessions download`
+can reconstruct it from available engine artifacts.
 Reconstruction and historical Pi normalization can require Node.js; converting
 an already unified session does not. Missing evidence remains missing:
 never dispatch a workflow solely to fill gaps in an export.
@@ -56,8 +59,8 @@ and subagent evidence remain extensions rather than fabricated dialogue or
 invalid references. Embedded subagent trajectories are not currently emitted.
 
 Missing metadata is not inferred. Required unavailable agent identity/version
-fields use `gh-aw-unified` and `unknown`, respectively. Numeric or invalid timestamps
-remain in source extensions rather than acquiring guessed units. Accounting
+fields use `gh-aw-unified` and `unknown`, respectively. Numeric or invalid
+timestamps remain in source extensions rather than acquiring guessed units. Accounting
 uses supported session-result evidence, respects cache-inclusion semantics,
 and does not sum overlapping snapshots or auxiliary usage. Structured non-text
 content is retained as JSON text and extension evidence; the exporter does not
@@ -72,14 +75,14 @@ workflow against a run or an existing file:
 ```bash
 gh aw graders run WORKFLOW GRADER RUN --repo owner/repo
 gh aw graders run WORKFLOW GRADER < aw_session.jsonl
-gh aw logs WORKFLOW --graders --atif --repo owner/repo
+gh aw logs WORKFLOW --graders --repo owner/repo
 ```
 
 The runner supports built-in graders, custom JavaScript, and repository-owned
 operational-value Bash. Only execute trusted grader code; Bash is not
 microVM-isolated. `logs --graders` retrieves recorded grader results and their
-artifacts alongside the optional ATIF export; it does not recompute historical
-results. Mapping grader results to Harbor rewards remains an integration step,
+artifacts alongside automatic ATIF exports when sessions are available; it does
+not recompute historical results. Mapping grader results to Harbor rewards remains an integration step,
 not part of trajectory conversion.
 
 ## Validate and use with Harbor

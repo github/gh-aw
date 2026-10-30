@@ -11,8 +11,6 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/atif"
-	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/spf13/cobra"
 )
 
@@ -32,26 +30,19 @@ func convertSessionATIF(ctx context.Context, content []byte) ([]byte, error) {
 	return output.Bytes(), nil
 }
 
-// exportRunATIF retains the original JSONL and adds a sibling trajectory. Missing
-// unified sessions use the same acquisition/reconstruction path as sessions download.
-func exportRunATIF(ctx context.Context, run *parser.GitHubURLComponents, runDir string, verbose bool) error {
+// exportRunATIF adds a sibling trajectory when a unified session is available.
+// It retains the original JSONL and never downloads missing sessions.
+func exportRunATIF(ctx context.Context, runID int64, runDir string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	sessionPath, err := findUnifiedSessionPath(runDir)
-	if err != nil {
+	if err != nil || sessionPath == "" {
 		return err
 	}
-	missing := sessionPath == ""
-	var content []byte
-	if missing {
-		content, err = downloadSession(ctx, run, "jsonl", verbose)
-		sessionPath = filepath.Join(runDir, "usage", "aw_session.jsonl")
-	} else {
-		content, err = readATIFSessionFile(sessionPath)
-	}
+	content, err := readATIFSessionFile(sessionPath)
 	if err != nil {
-		return fmt.Errorf("read session for run %d ATIF export: %w", run.Number, err)
+		return fmt.Errorf("read session for run %d ATIF export: %w", runID, err)
 	}
 	conversionContent, err := normalizeATIFSession(ctx, content, sessionPath, runDir)
 	if err != nil {
@@ -59,22 +50,14 @@ func exportRunATIF(ctx context.Context, run *parser.GitHubURLComponents, runDir 
 	}
 	output, err := convertSessionATIF(ctx, conversionContent)
 	if err != nil {
-		return fmt.Errorf("run %d: %w", run.Number, err)
+		return fmt.Errorf("run %d: %w", runID, err)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if missing {
-		if err := os.MkdirAll(filepath.Dir(sessionPath), constants.DirPermSensitive); err != nil {
-			return err
-		}
-		if err := writeSessionFileAtomically(sessionPath, content); err != nil {
-			return fmt.Errorf("write unified session for run %d: %w", run.Number, err)
-		}
-	}
 	outputPath := strings.TrimSuffix(sessionPath, filepath.Ext(sessionPath)) + ".atif"
 	if err := writeSessionFileAtomically(outputPath, output); err != nil {
-		return fmt.Errorf("write ATIF trajectory for run %d: %w", run.Number, err)
+		return fmt.Errorf("write ATIF trajectory for run %d: %w", runID, err)
 	}
 	return nil
 }
@@ -126,24 +109,24 @@ func normalizeATIFSession(ctx context.Context, content []byte, sessionPath, runD
 	return runSessionParser(ctx, "normalize", sessionPath, "pi")
 }
 
-func exportLogsATIF(ctx context.Context, run WorkflowRun, params concurrentRunDownloadParams, reserved bool) (err error) {
-	params = resolveRunRepoContext(run, params)
+func exportLogsATIF(ctx context.Context, run WorkflowRun, outputDir string, storageLimit *logsStorageLimit, reserved bool) (err error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	runDir := run.LogsPath
 	if runDir == "" {
-		runDir = resolveAuditOutputDir(params.outputDir, run.DatabaseID)
+		runDir = resolveAuditOutputDir(outputDir, run.DatabaseID)
 	}
-	if !reserved && params.storageLimit != nil {
-		if err := params.storageLimit.reserve(runDir); err != nil {
+	if sessionPath, err := findUnifiedSessionPath(runDir); err != nil || sessionPath == "" {
+		return err
+	}
+	if !reserved && storageLimit != nil {
+		if err := storageLimit.reserve(runDir); err != nil {
 			return err
 		}
-		defer func() { err = errors.Join(err, params.storageLimit.finalizeDownload(runDir)) }()
+		defer func() { err = errors.Join(err, storageLimit.finalizeDownload(runDir)) }()
 	}
-	return params.storageLimit.runDownloadWithPruning(ctx, runDir, func() error {
-		if err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, logsRunPreflightAPIReserve, params.rateLimitState); err != nil {
-			return err
-		}
-		return exportRunATIF(ctx, &parser.GitHubURLComponents{
-			Number: run.DatabaseID, Owner: params.dlOwner, Repo: params.dlRepo, Host: params.dlHost,
-		}, runDir, params.verbose)
+	return storageLimit.runDownloadWithPruning(ctx, runDir, func() error {
+		return exportRunATIF(ctx, run.DatabaseID, runDir)
 	}, false, true)
 }

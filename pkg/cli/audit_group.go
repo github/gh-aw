@@ -51,7 +51,6 @@ func runAuditGrouped(ctx context.Context, args []string, opts auditCommandOption
 			RuntimeFilter:    opts.runtimeFilter,
 			EvalsOnly:        opts.evalsOnly,
 			Group:            true,
-			ATIF:             opts.atif,
 		})
 		if err != nil {
 			return err

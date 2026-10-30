@@ -724,7 +724,7 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--after-run-id`, `--artifacts`, `--atif`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
@@ -732,11 +732,12 @@ When multiple targets run concurrently, `--count` limits the combined number of 
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
 
-`--atif` retains unified session JSONL and adds a sibling `aw_session.atif`
-containing [ATIF-v1.8](https://docs.harborframework.com/agents/atif) JSON for each
-selected run, without changing reports. Cached summaries alone are not
-trajectories: missing sessions are downloaded or reconstructed from available
-artifacts, and export failures return errors.
+When a selected run has `aw_session.jsonl`, `logs` automatically adds a sibling
+`aw_session.atif` containing [ATIF-v1.8](https://docs.harborframework.com/agents/atif)
+JSON, retaining the original session and reports. This also applies to cached
+runs and `--stdin`. Missing sessions are skipped without extra downloads or
+ATIF-specific reconstruction; cached summaries alone are not trajectories.
+Invalid sessions and export failures return errors.
 
 The `graders` artifact set includes conclusion's built-in results in `usage`
 and the optional combined `graders` artifact from the separate custom-grader job,
@@ -896,11 +897,13 @@ gh aw audit 12345 12346 --format markdown   # Markdown for PR comments (or --jso
 
 The diff shows new or removed network domains, status changes (allowed ↔ denied), volume changes (>100%), MCP tool invocation changes, run metrics (tokens, duration, turns, tokens per turn), and per-tool and per-bash-command call breakdowns.
 
-**Options:** `--artifacts`, `--atif`, `--format` (pretty, markdown; default: pretty), `--json/-j`, `--output/-o`, `--repo/-r`
+**Options:** `--artifacts`, `--format` (pretty, markdown; default: pretty), `--json/-j`, `--output/-o`, `--repo/-r`
 
-`--atif` writes a sibling `aw_session.atif` beside each selected run's unified
-JSONL, retaining the original session and audit reports. It also applies to
-single-run and grouped audits.
+`audit` automatically writes a sibling `aw_session.atif` when a selected run has
+`aw_session.jsonl`, retaining the original session and audit reports. This also
+applies to single-run, grouped, and cached audits. Missing sessions are skipped
+without extra downloads or ATIF-specific reconstruction; invalid sessions and
+export failures return errors.
 
 #### `sessions`
 

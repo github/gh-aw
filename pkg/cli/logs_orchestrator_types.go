@@ -53,7 +53,6 @@ type LogsDownloadOptions struct {
 	EvalsOnly         bool
 	GradersOnly       bool
 	Audit             bool
-	ATIF              bool
 	Train             bool
 	Drain3Weights     string
 	Format            string
@@ -127,7 +126,6 @@ type StdinLogsOptions struct {
 	EvalsOnly         bool
 	GradersOnly       bool
 	Audit             bool
-	ATIF              bool
 	Train             bool
 	Drain3Weights     string
 	Format            string
