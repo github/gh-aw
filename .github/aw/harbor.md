@@ -61,8 +61,11 @@ invalid references. Embedded subagent trajectories are not currently emitted.
 Missing metadata is not inferred. Required unavailable agent identity/version
 fields use `gh-aw-unified` and `unknown`, respectively. Numeric or invalid
 timestamps remain in source extensions rather than acquiring guessed units. Accounting
-uses supported session-result evidence, respects cache-inclusion semantics,
-and does not sum overlapping snapshots or auxiliary usage. Structured non-text
+uses the latest supplied value for each supported terminal session-result metric,
+respects cache-inclusion semantics, and does not sum overlapping snapshots or
+auxiliary usage. Omitted metrics retain earlier supplied evidence; supplied
+unusable or overflowing values remain unknown rather than retaining stale totals.
+Structured non-text
 content is retained as JSON text and extension evidence; the exporter does not
 copy media assets or claim native multimodal replay.
 

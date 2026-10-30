@@ -18,6 +18,42 @@ func addATIFFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("atif", false, "Export unified sessions as ATIF-v1.8 JSON (.atif)")
 }
 
+type logsATIFExportError struct{ err error }
+
+func (e *logsATIFExportError) Error() string { return e.err.Error() }
+func (e *logsATIFExportError) Unwrap() error { return e.err }
+
+// Separate joined guardrail stops from conversion failures: errors.Is alone
+// would hide a real failure joined with a cancellation during cache cleanup.
+func splitLogsATIFError(err error) (stop, failure error) {
+	if err == nil {
+		return nil, nil
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			childStop, childFailure := splitLogsATIFError(child)
+			stop = errors.Join(stop, childStop)
+			failure = errors.Join(failure, childFailure)
+		}
+		return stop, failure
+	}
+	if child := errors.Unwrap(err); child != nil {
+		stop, failure = splitLogsATIFError(child)
+		if failure == nil {
+			return err, nil
+		}
+		if stop == nil {
+			return nil, err
+		}
+		return stop, failure
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, errLogsAPIRateLimitReached) || errors.Is(err, errLogsStorageLimitReached) {
+		return err, nil
+	}
+	return nil, err
+}
+
 func convertSessionATIF(ctx context.Context, content []byte) ([]byte, error) {
 	trajectory, err := atif.Convert(ctx, bytes.NewReader(content))
 	if err != nil {

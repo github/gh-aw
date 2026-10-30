@@ -15,26 +15,41 @@ import (
 const MaxSessionBytes = 64 * 1024 * 1024
 
 type event struct {
-	Type       string                     `json:"type"`
-	Data       map[string]json.RawMessage `json:"data"`
-	AgentID    string                     `json:"agentId"`
-	Timestamp  json.RawMessage            `json:"timestamp"`
-	Provenance struct {
+	Type           string                     `json:"type"`
+	Data           map[string]json.RawMessage `json:"data"`
+	AgentID        string                     `json:"agentId"`
+	SessionID      json.RawMessage            `json:"sessionId"`
+	SessionIDAlias json.RawMessage            `json:"session_id"`
+	Timestamp      json.RawMessage            `json:"timestamp"`
+	Provenance     struct {
 		Component string `json:"component"`
+		Phase     string `json:"phase"`
 		Path      string `json:"path"`
 	} `json:"provenance"`
 }
 
 type toolIdentity struct {
-	id        string
+	id string
+	eventScope
+}
+
+type sourceScope struct {
 	component string
+	phase     string
 	path      string
+}
+
+type eventScope struct {
+	sourceScope
+	sessionID string
 }
 
 type converter struct {
 	trajectory *Trajectory
 	calls      map[toolIdentity][]int
 	terminal   map[string]json.RawMessage
+	terminals  map[eventScope]map[string]json.RawMessage
+	engines    map[sourceScope]string
 	headerSeen bool
 }
 
@@ -51,7 +66,10 @@ func Convert(ctx context.Context, input io.Reader) (*Trajectory, error) {
 			"Tool observations are attached to their initiating step. Unmapped and subagent evidence remains in system-step extras. " +
 			"Unknown agent versions are labeled unknown; empty tool arguments may indicate unavailable input. Structured non-text content is JSON-encoded, not exported as media assets.",
 	}
-	conversion := converter{trajectory: trajectory, calls: make(map[toolIdentity][]int)}
+	conversion := converter{
+		trajectory: trajectory, calls: make(map[toolIdentity][]int),
+		terminals: make(map[eventScope]map[string]json.RawMessage), engines: make(map[sourceScope]string),
+	}
 	for line := 1; scanner.Scan(); line++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -119,8 +137,12 @@ func (c *converter) consume(raw []byte, line int) error {
 		}
 	}
 	// Identified subagent events remain evidence, never primary-agent dialogue.
-	if isPrimaryEvent(ev) {
-		if c.mapPrimaryEvent(ev, &step) {
+	if c.isPrimaryEvent(ev) {
+		mapped, err := c.mapPrimaryEvent(ev, &step)
+		if err != nil {
+			return err
+		}
+		if mapped {
 			return nil
 		}
 	}
@@ -128,17 +150,43 @@ func (c *converter) consume(raw []byte, line int) error {
 	return nil
 }
 
-func isPrimaryEvent(ev event) bool {
-	if ev.AgentID != "" || text(ev.Data["agentId"]) != "" || text(ev.Data["parentToolUseId"]) != "" {
+func (ev event) scope() eventScope {
+	sessionID, ok := ev.Data["sessionId"]
+	if !ok {
+		sessionID = ev.SessionID
+		if len(sessionID) == 0 {
+			sessionID = ev.SessionIDAlias
+		}
+		if len(sessionID) == 0 {
+			sessionID = ev.Data["session_id"]
+		}
+	}
+	return eventScope{
+		sourceScope: sourceScope{component: ev.Provenance.Component, phase: ev.Provenance.Phase, path: ev.Provenance.Path},
+		sessionID:   text(sessionID),
+	}
+}
+
+func (c *converter) isPrimaryEvent(ev event) bool {
+	parent, explicit := ev.Data["parentToolUseId"]
+	engine := text(ev.Data["sourceEngine"])
+	if engine == "" {
+		engine = c.engines[ev.scope().sourceScope]
+	}
+	if !explicit && engine == "copilot" {
+		parent = ev.Data["parentToolCallId"]
+	}
+	if ev.AgentID != "" || text(ev.Data["agentId"]) != "" || text(parent) != "" {
 		return false
 	}
 	return ev.Provenance.Component == "" || ev.Provenance.Component == "agent" || strings.HasPrefix(ev.Type, "prompt.")
 }
 
-func (c *converter) mapPrimaryEvent(ev event, step *Step) bool {
+func (c *converter) mapPrimaryEvent(ev event, step *Step) (bool, error) {
 	switch ev.Type {
-	case "session.init":
+	case "session.init", "session.start":
 		if name := text(ev.Data["sourceEngine"]); name != "" {
+			c.engines[ev.scope().sourceScope] = name
 			c.trajectory.Agent.Name = name
 		}
 		if model := text(ev.Data["model"]); model != "" {
@@ -164,16 +212,22 @@ func (c *converter) mapPrimaryEvent(ev event, step *Step) bool {
 	case "assistant.reasoning":
 		step.Source, step.ReasoningContent = "agent", content(ev.Data["content"])
 	case "tool.execution_start", "tool.execution_complete":
-		return c.mapToolEvent(ev, step)
+		return c.mapToolEvent(ev, step), nil
 	case "session.result":
-		c.terminal = ev.Data
+		scope := ev.scope()
+		terminal, err := reconcileMetrics(c.terminals[scope], ev.Data)
+		if err != nil {
+			return false, fmt.Errorf("reconcile unified ATIF metrics: %w", err)
+		}
+		c.terminal = terminal
+		c.terminals[scope] = c.terminal
 	}
-	return false
+	return false, nil
 }
 
 func (c *converter) mapToolEvent(ev event, step *Step) bool {
 	id := text(ev.Data["toolCallId"])
-	key := toolIdentity{id: id, component: ev.Provenance.Component, path: ev.Provenance.Path}
+	key := toolIdentity{id: id, eventScope: ev.scope()}
 	if ev.Type == "tool.execution_start" {
 		name := text(ev.Data["toolName"])
 		args, ok := arguments(ev.Data)

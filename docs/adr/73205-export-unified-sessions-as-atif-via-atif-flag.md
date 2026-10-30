@@ -1,8 +1,8 @@
 # ADR-73205: Export Unified Sessions as ATIF-v1.8 via a Reusable Converter
 
-**Date**: 2026-05-08
-**Status**: Draft
-**Deciders**: pelikhan, Unknown
+**Date**: 2026-10-30
+**Status**: Accepted
+**Deciders**: pelikhan (PR #73205)
 
 ---
 
@@ -12,7 +12,9 @@ gh-aw records agent runs as versioned unified session JSONL (`aw_session.jsonl`)
 
 ### Decision
 
-We will add a reusable `pkg/atif` package that converts one unified session into an ATIF-v1.8 `Trajectory`. Evidence that cannot safely become ATIF steps or tool calls goes into schema-approved `extra` fields rather than being dropped or fabricated. Instead of adding a separate ATIF command or download path, `sessions download --atif` replaces the selected session output with ATIF. `logs` and `audit` automatically write a sibling `.atif` file whenever a unified session is available locally, retaining JSONL and reports without an ATIF flag. Missing sessions are skipped without additional downloads or ATIF-specific reconstruction; invalid available sessions and export failures return errors.
+Use a reusable `pkg/atif` package that converts one unified session into an ATIF-v1.8 `Trajectory`. Evidence that cannot safely become ATIF steps or tool calls goes into schema-approved `extra` fields rather than being dropped or fabricated. Instead of adding a separate ATIF command or download path, `sessions download --atif` replaces the selected session output with ATIF. `logs` and `audit` automatically write a sibling `.atif` file whenever a unified session is available locally, retaining JSONL and reports without an ATIF flag. Missing sessions are skipped without additional downloads or ATIF-specific reconstruction; invalid available sessions and export failures return errors.
+
+Accounting uses the latest supplied value for each supported terminal session-result metric, not sums of overlapping snapshots or auxiliary usage. Omitted metrics retain earlier supplied evidence; supplied unusable or overflowing values remain unknown rather than retaining stale totals. Token totals respect cache-inclusion semantics.
 
 ### Alternatives Considered
 
@@ -47,7 +49,3 @@ Users or Harbor could convert the unified JSONL themselves. This was not chosen 
 - Reconstructing or normalizing historical sessions can still require Node.js through the existing session-download path.
 - Structured non-text content is JSON-encoded into messages and not exported as ATIF media assets.
 - New user-facing guidance is in `.github/aw/harbor.md`, and `docs/src/content/docs/setup/cli.md` is updated.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
