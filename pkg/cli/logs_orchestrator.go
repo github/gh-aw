@@ -225,7 +225,7 @@ func selectPaginationCursorDate(filteredRuns []WorkflowRun, oldestFetchedCreated
 	if len(filteredRuns) == 0 {
 		return "", false
 	}
-	return filteredRuns[len(filteredRuns)-1].CreatedAt.Format(time.RFC3339), true
+	return filteredRuns[len(filteredRuns)-1].CreatedAt.Format(time.RFC3339), true //nolint:uncheckedsliceindex // Empty slices return above.
 }
 
 // buildContinuationIfNeeded returns a ContinuationData cursor when more runs may
@@ -256,7 +256,7 @@ func buildContinuationIfNeeded(
 	// and never advances (see github/gh-aw#58022).
 	oldestRunID := opts.previousBeforeRunID
 	if len(processedRuns) > 0 {
-		oldestRunID = processedRuns[len(processedRuns)-1].Run.DatabaseID
+		oldestRunID = processedRuns[len(processedRuns)-1].Run.DatabaseID //nolint:uncheckedsliceindex // len(processedRuns) > 0.
 	}
 	// Prefer the actual pagination date cursor over the fixed request end_date: when
 	// many non-matching runs are interspersed across the window (the scenario this
@@ -327,7 +327,7 @@ func DownloadWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (err er
 	}
 	var outcomeReports []OutcomesData
 	if opts.Harbor {
-		if err := logsExportHarborJob(ctx, opts.OutputDir, result.processedRuns); err != nil {
+		if err := exportLogsHarbor(ctx, opts.OutputDir, result.processedRuns, opts.AdditionalGraders); err != nil {
 			return fmt.Errorf("harbor export: %w", err)
 		}
 	}

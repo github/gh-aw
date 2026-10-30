@@ -131,6 +131,25 @@ class HarborConformance(unittest.TestCase):
                         self.assertEqual(json.loads(observation.content), data["output"])
                 rewards = result.verifier_result.rewards if result.verifier_result else None
                 metadata = json.loads((paths.trial_dir / "gh-aw/metadata.json").read_text())
+                recorded_rewards = rewards
+                if "regrading" in metadata:
+                    regraded = json.loads((paths.trial_dir / metadata["regrading"]).read_text())
+                    results = {r["id"]: r for r in regraded["results"]}
+                    self.assertEqual(results["absent"]["status"], "unavailable")
+                    self.assertEqual(results["broken"]["status"], "error")
+                    self.assertIn("implementation", results["recorded-tools"])
+                    expected = sum(
+                        json.loads(line)["type"] == "tool.execution_start"
+                        for line in session.read_text().splitlines()
+                    )
+                    self.assertEqual(rewards["gh-aw.regraded.recorded-tools"], expected)
+                    self.assertNotIn("gh-aw.regraded.absent", rewards)
+                    self.assertNotIn("gh-aw.regraded.broken", rewards)
+                    self.assertEqual(json.loads(paths.reward_json_path.read_text()), rewards)
+                    recorded_rewards = {
+                        key: value for key, value in rewards.items()
+                        if not key.startswith("gh-aw.regraded.")
+                    } or None
                 self.assertEqual(metadata["experiments"]["assignments"], {"strategy": "candidate"})
                 self.assertEqual(metadata["session_status"], "recorded")
                 self.assertIn("not a runnable Harbor task", metadata["task_identity"])
@@ -146,7 +165,7 @@ class HarborConformance(unittest.TestCase):
                     self.assertEqual(quality["status"], "pass" if quality["passed"] else "fail")
                     self.assertEqual(quality["threshold"], 0.5)
                     self.assertEqual(quality["direction"], "maximize")
-                    self.assertEqual(rewards, {"gh-aw.quality": quality["value"]})
+                    self.assertEqual(recorded_rewards, {"gh-aw.quality": quality["value"]})
                     self.assertEqual(json.loads(paths.reward_json_path.read_text()), rewards)
                     mapping = metadata["reward_mapping"]["metrics"]["gh-aw.quality"]
                     self.assertEqual(mapping["grader_id"], "quality")
@@ -172,9 +191,10 @@ class HarborConformance(unittest.TestCase):
                     )
                     self.assertEqual(manifest["graders"][0]["threshold"], 0.5)
                 else:
-                    self.assertIsNone(rewards, "missing grading must remain unknown")
-                    self.assertFalse(paths.reward_json_path.exists())
-                    self.assertIsNone(metadata["reward_mapping"])
+                    self.assertIsNone(recorded_rewards, "missing original grading must remain unknown")
+                    if "regrading" not in metadata:
+                        self.assertFalse(paths.reward_json_path.exists())
+                        self.assertIsNone(metadata["reward_mapping"])
         self.assertEqual(sum(g is None for g in observed_graders), 1)
         self.assertEqual(sum(g is not None for g in observed_graders), 2)
         self.assertGreater(observed_tools, 0, "real fixture tool calls must survive export")
@@ -254,9 +274,10 @@ class HarborConformance(unittest.TestCase):
                 trials = get(prefix + "/trials")
                 self.assertEqual(trials["total"], 3)
                 for trial in trials["items"]:
-                    self.assertIn(trial["reward"], [None, 0.25, 0.75])
                     path = prefix + "/trials/" + quote(trial["name"], safe="")
                     result = self.TrialResult.model_validate(get(path))
+                    values = list(result.verifier_result.rewards.values()) if result.verifier_result else [None]
+                    self.assertIn(trial["reward"], values)
                     self.assertEqual(result.trial_name, trial["name"])
                     trajectory = self.Trajectory.model_validate(get(path + "/trajectory"))
                     self.assertTrue(trajectory.steps)
