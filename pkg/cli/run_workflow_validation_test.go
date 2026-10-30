@@ -77,6 +77,9 @@ func TestValidateRemoteWorkflowPaginated(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.ErrorContains(t, err, tt.wantError)
+				if tt.wantError == "not found in repository" {
+					assert.Contains(t, err.Error(), workflowDispatchRegistrationHint)
+				}
 			}
 			args, err := os.ReadFile(argsPath)
 			require.NoError(t, err)

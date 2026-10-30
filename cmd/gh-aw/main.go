@@ -316,12 +316,16 @@ This command accepts one or more workflow IDs.
 The workflows must have been compiled into GitHub Actions YAML files.
 
 This command only works with workflows that have workflow_dispatch triggers.
+Use --ref to execute the workflow content from a branch or tag before merging.
+GitHub still requires the workflow file to exist on the default branch; --ref
+does not register new workflows or reproduce pull_request_target events.
+See https://github.github.com/gh-aw/setup/cli/#run-from-a-feature-branch
 
 ` + cli.WorkflowIDExplanation,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` run                          # Interactive mode
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver.md   # Alternative format
-  ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --ref main  # Run on specific branch
+  ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --ref feature/my-change  # Run branch workflow content
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --repeat 3  # Run 4 times total (1 initial + 3 repeats)
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --enable-if-needed  # Enable if disabled, run, then restore state
   ` + string(constants.CLIExtensionPrefix) + ` run daily-perf-improver --auto-merge-prs  # Auto-merge any PRs created during execution
@@ -915,7 +919,7 @@ func configureOtherCommandFlags() {
 	runCmd.Flags().Bool("enable-if-needed", false, "Enable the workflow before running if needed, and restore state afterward")
 	runCmd.Flags().StringP("engine", "e", "", cli.EngineFlagOverrideUsage)
 	runCmd.Flags().StringP("repo", "r", "", "Target repository ([HOST/]owner/repo format). Defaults to current repository")
-	runCmd.Flags().String("ref", "", "Branch or tag name to run the workflow on (default: current branch)")
+	runCmd.Flags().String("ref", "", "Branch or tag whose workflow content to run (requires default-branch registration; default: current branch, or repository default with --repo)")
 	runCmd.Flags().Bool("auto-merge-prs", false, "Auto-merge any pull requests created during the workflow execution")
 	runCmd.Flags().StringArrayP("raw-field", "F", []string{}, "Pass a workflow dispatch input in key=value format (can be specified multiple times)")
 	_ = runCmd.Flags().MarkShorthandDeprecated("raw-field", "use the long form --raw-field instead")

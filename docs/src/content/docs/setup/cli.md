@@ -541,6 +541,7 @@ gh aw run workflow1 workflow2               # Run multiple workflows
 gh aw run workflow --repeat 3               # Run 4 times total (1 initial + 3 repeats)
 gh aw run workflow --push                   # Commit, push, and dispatch the workflow
 gh aw run workflow --push --ref main        # Push to specific branch
+gh aw run workflow --ref feature/my-change  # Run the branch's compiled workflow content
 gh aw run workflow --dry-run                # Preview without triggering workflow runs
 gh aw run workflow --json                   # Output triggered workflow results as JSON
 ```
@@ -554,6 +555,46 @@ When `--push` is used, automatically recompiles outdated `.lock.yml` files, stag
 > [!NOTE]
 > Codespaces Permissions
 > Requires `workflows:write` permission. In Codespaces, either configure custom permissions in `devcontainer.json` ([docs](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-repository-access-for-your-codespaces)) or authenticate manually: `unset GH_TOKEN && gh auth login`
+
+##### Run from a feature branch
+
+`gh aw run workflow --ref feature/my-change` executes the compiled `.github/workflows/workflow.lock.yml` **from the selected branch**, not the default branch's version. The branch or tag must already be pushed and its lock file must declare `workflow_dispatch`. Without `--ref`, local runs use the current branch; `--repo owner/repo` runs use that repository's default branch.
+
+GitHub [requires the workflow file to exist on the default branch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow) before manual dispatch. `--ref` selects workflow content, not registration. Neither `run` nor `trial --host-repo` provides ephemeral registration, changes the default branch, or bypasses this platform requirement.
+
+For an already registered workflow, compile and push the candidate source, lock file, and dependencies to the feature branch, then select that ref:
+
+```bash
+gh aw compile workflow --validate --strict
+gh aw run workflow --dry-run --ref feature/my-change  # Preview the dispatch
+gh aw run workflow --ref feature/my-change
+# From another checkout:
+gh aw run workflow --repo owner/repo --ref feature/my-change
+```
+
+Compilation alone does not publish files. Local uncommitted changes are not executed. Use `gh aw run --dry-run` to preview the dispatch command before a live test; it does not dispatch, execute the candidate, or make the compiled workflow safe to execute. For a live test with compiler-managed mutations suppressed, compile with `gh aw compile workflow --dry-run`, review and publish that source/lock revision, then dispatch it. This does not suppress arbitrary script effects or credential use.
+
+For a **new workflow**, a maintainer can first merge a reviewed, inert registration file at the **exact same lock-file path** the candidate will use. For example, this is a plain GitHub Actions bootstrap file, not compiler output:
+
+```yaml title=".github/workflows/workflow.lock.yml"
+name: Workflow registration only
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  registration:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Registration only"
+```
+
+The bootstrap has no automatic trigger, requests no token permissions, references no secrets, and skips its only job. It registers the filename without merging candidate production logic. Keep this bootstrap unchanged on the default branch while the feature branch replaces the same path with its compiled workflow. Dispatch the feature branch explicitly; dispatching the default branch only skips the bootstrap job. Review the candidate before dispatch, retain environment approval and branch protection rules, and grant only the secrets and permissions needed for the test. Registration does not make candidate code trusted.
+
+If even an inert bootstrap cannot be merged, use an isolated trial repository with its own default-branch workflow and test credentials. That does not validate the production repository's secrets, environments, or trigger policy. There is no supported zero-default-branch-change registration mode.
+
+> [!CAUTION]
+> A manual run is a `workflow_dispatch` event, not `pull_request_target` (including `closed`). It has no real pull request payload and does not exercise PR-specific conditions or fork trust rules. Guard trigger-specific fields when supporting both events. `--ref` cannot redirect a real `pull_request_target` event to the PR's workflow version. Do not work around this by executing an untrusted PR ref with elevated credentials. Validate event-specific behavior separately in a controlled repository with trusted code and test credentials; full production-trigger validation remains subject to GitHub's platform constraints.
 
 ### Monitoring
 
