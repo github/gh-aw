@@ -186,17 +186,24 @@ func unknownModelRoutingEntryError(model, namespace string, aliases map[string][
 // an allowed-models entry and reports whether it had one. Copilot routing accepts the
 // github-copilot/ and copilot/ prefixes. Native routing accepts its own provider prefix
 // and rejects any other provider, so a mismatched entry is never silently retargeted.
+// A literal provider prefix before a GitHub Actions expression (for example
+// anthropic/${{ vars.MODEL }}) is handled the same way; slashes inside expressions are
+// ignored, and an entry whose provider is itself an expression is left unchanged.
 func stripModelRoutingNamespacePrefix(model, namespace string) (string, bool, error) {
 	if namespace == copilotRoutingNamespace {
 		unprefixed := strings.TrimPrefix(model, "github-copilot/")
 		unprefixed = strings.TrimPrefix(unprefixed, "copilot/")
 		return unprefixed, unprefixed != model, nil
 	}
-	if containsExpression(model) {
+	masked := ExpressionPattern.ReplaceAllStringFunc(model, func(expression string) string {
+		return strings.Repeat("x", len(expression))
+	})
+	slash := strings.IndexByte(masked, '/')
+	if slash < 0 {
 		return model, false, nil
 	}
-	provider, name, qualified := strings.Cut(model, "/")
-	if !qualified {
+	provider, name := model[:slash], model[slash+1:]
+	if containsExpression(provider) {
 		return model, false, nil
 	}
 	if strings.EqualFold(provider, namespace) {
@@ -485,8 +492,9 @@ func modelPatternsMayOverlap(a, b string) bool {
 // modelRoutingAWFCandidates returns the router's candidate pool emitted to AWF: the
 // policy-narrowed routing.candidateModels (or the Claude/Codex family default), or, for
 // AWF without routing.candidateModels, the list that replaces models.allowed. Copilot
-// candidates keep their github-copilot/ prefix; native candidates are emitted as bare
-// model ids or patterns of the routing provider named by apiProxy.routing.provider.
+// candidates keep their github-copilot/ prefix; native routing.candidateModels are bare
+// model ids or patterns of the routing provider named by apiProxy.routing.provider, while
+// native candidates on the legacy allowlist keep their provider prefix.
 func modelRoutingAWFCandidates(data *WorkflowData, engineName string, allowed, blocked []string) ([]string, error) {
 	modelRoutingCandidatesLog.Printf("Resolving model-routing AWF candidates for engine=%s", engineName)
 	groups, err := resolveModelRoutingCandidateGroups(data, engineName)
@@ -508,7 +516,10 @@ func modelRoutingAWFCandidates(data *WorkflowData, engineName string, allowed, b
 		}
 		candidates = modelRoutingDefaultCandidates(engineName, namespace)
 	}
-	if namespace != copilotRoutingNamespace {
+	// Native candidates lose their provider prefix only in routing.candidateModels. Without
+	// it, the candidates replace the request-wide apiProxy.allowedModels and keep their
+	// provider prefix, so a bare id never also authorizes the model on another provider.
+	if namespace != copilotRoutingNamespace && supportsCandidates {
 		for i, candidate := range candidates {
 			candidates[i] = strings.TrimPrefix(candidate, namespace+"/")
 		}

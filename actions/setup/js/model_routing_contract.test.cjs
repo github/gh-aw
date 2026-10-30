@@ -45,6 +45,8 @@ describe("cross-module model routing contract", () => {
 
   function writeFixture(fixture) {
     process.env.GH_AW_ENGINE_ID = fixture.engine;
+    // The fixtures route on GitHub Copilot, as compiled locks declare with GH_AW_LLM_PROVIDER.
+    process.env.GH_AW_LLM_PROVIDER = "github";
     const agentDir = path.join(root, "agent");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, "awf-reflect.json"), JSON.stringify(fixture.reflectData));

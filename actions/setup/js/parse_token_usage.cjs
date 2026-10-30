@@ -142,11 +142,23 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
     };
     const policy = getAWFModelRoutingPolicy(String(env.GH_AW_ENGINE_ID || ""));
     // Native Claude (Anthropic) and Codex (OpenAI) selections are checked against their own provider's endpoint.
-    const routingProvider = (routing.provider && resolveAWFRoutingProvider(String(env.GH_AW_ENGINE_ID || ""), routing.provider)) || "github";
+    // Only a selection that omits its provider defaults to GitHub; an unrecognized provider, one the engine
+    // cannot route on, or one that differs from the compiled routing provider is rejected, never coerced.
+    const configuredRouting = readJSONIfExists(path.join(ghAwDir, "aw_info.json"))?.model_config?.routing;
+    const configuredProvider = configuredRouting && typeof configuredRouting === "object" ? configuredRouting.provider || "github" : "";
+    const routingProvider = routing.provider ? resolveAWFRoutingProvider(String(env.GH_AW_ENGINE_ID || ""), routing.provider) : "github";
+    const providerMismatch = !routingProvider || (configuredProvider !== "" && routingProvider !== configuredProvider);
     const selectedAdvisory = advisory?.status === "selected" && (advisory.endpoint !== undefined || advisory.selected_endpoint !== undefined);
     const advisoryEndpointOverride = selectedAdvisory && ((typeof advisory.endpoint === "string" && advisory.endpoint !== routing.endpoint) || advisory.selected_endpoint !== routing.endpoint);
     const endpointOverride = !policy.endpoints.includes(routing.endpoint) || advisoryEndpointOverride;
-    if (advisory?.status === "selected" && advisory.wire_model && advisory.wire_model !== wireModel) {
+    if (providerMismatch) {
+      routing = {
+        ...routing,
+        status: "rejected",
+        failure_code: "provider_mismatch",
+        detail: `AWF model routing selected provider ${JSON.stringify(String(routing.provider || "github"))}, which ${routingProvider ? `does not match the compiled ${JSON.stringify(configuredProvider)} routing provider` : `the ${String(env.GH_AW_ENGINE_ID || "")} engine cannot route on`}`,
+      };
+    } else if (advisory?.status === "selected" && advisory.wire_model && advisory.wire_model !== wireModel) {
       routing = { ...routing, status: "rejected", failure_code: "harness_selection_mismatch", detail: "Harness routing outcome did not match the proxy selection" };
     } else if (["failed", "rejected", "pending", "unavailable"].includes(advisory?.status)) {
       routing = { ...routing, status: advisory.status, failure_code: advisory.failure_code || routing.failure_code, detail: advisory.detail || routing.detail };

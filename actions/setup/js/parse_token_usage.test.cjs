@@ -421,6 +421,49 @@ describe("parse_token_usage", () => {
       });
     });
 
+    test.each([
+      ["a malformed provider", "claude", "not a provider"],
+      ["another native provider", "claude", "openai"],
+      ["the other engine's native provider", "codex", "anthropic"],
+    ])("rejects a native selection with %s instead of checking it against GitHub", async (_name, engine, selectedProvider) => {
+      setupNativeRoutingFixture({
+        engine,
+        provider: selectedProvider,
+        reflectProvider: "copilot",
+        wireModel: "claude-sonnet-5",
+        selectedEndpoint: "/v1/messages",
+        upstreamEndpoint: "/v1/messages",
+        supportedEndpoints: ["/v1/messages"],
+        efforts: ["low", "medium", "high", "max"],
+        effort: "high",
+      });
+
+      await main();
+
+      const info = JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8"));
+      expect(info.model_routing).toMatchObject({ status: "rejected", failure_code: "provider_mismatch" });
+      expect(info.model).toBe("agent");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "rejected");
+    });
+
+    test("rejects a GitHub selection when the compiled routing provider is native", async () => {
+      setupNativeRoutingFixture({
+        engine: "claude",
+        provider: "copilot",
+        wireModel: "claude-sonnet-5",
+        selectedEndpoint: "/v1/messages",
+        upstreamEndpoint: "/v1/messages",
+        supportedEndpoints: ["/v1/messages"],
+        efforts: ["low", "medium", "high", "max"],
+        effort: "high",
+      });
+      fs.writeFileSync(path.join(tmpDir, "aw_info.json"), JSON.stringify({ model: "agent", model_config: { routing: { enabled: true, provider: "anthropic" } } }));
+
+      await main();
+
+      expect(JSON.parse(originalReadFileSync(path.join(tmpDir, "aw_info.json"), "utf8")).model_routing).toMatchObject({ status: "rejected", failure_code: "provider_mismatch" });
+    });
+
     test("records selected AWF model and mapped effort in aw_info and step outputs", async () => {
       process.env.GH_AW_TMP_DIR = tmpDir;
       process.env.GH_AW_MODEL_ROUTING_ENABLED = "true";

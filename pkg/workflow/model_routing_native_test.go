@@ -128,6 +128,10 @@ func TestModelRoutingNativeAllowedModelsAndAliases(t *testing.T) {
 		{name: "bare allow policy narrows alias", engine: "claude", models: "[sonnet]", policy: "models:\n  allowed: [\"claude-sonnet-5*\"]\n", want: []string{"claude-sonnet-5*"}},
 		{name: "Copilot allow policy does not authorize Anthropic", engine: "claude", models: "[claude-sonnet-5]", policy: "models:\n  allowed: [\"github-copilot/claude-*\"]\n", wantError: "excluded by models.allowed or models.blocked"},
 		{name: "native block policy excludes exact id", engine: "codex", models: "[gpt-5.4, gpt-5.5]", policy: "models:\n  blocked: [\"openai/gpt-5.4\"]\n", want: []string{"gpt-5.5"}},
+		{name: "Anthropic prefix before an expression is normalized", engine: "claude", models: `["anthropic/${{ vars.ROUTING_MODEL }}"]`, want: []string{"${{ vars.ROUTING_MODEL }}"}},
+		{name: "OpenAI prefix before an expression is normalized", engine: "codex", models: `["openai/${{ vars.ROUTING_MODEL }}"]`, want: []string{"${{ vars.ROUTING_MODEL }}"}},
+		{name: "mismatched prefix before an expression is rejected", engine: "claude", models: `["openai/${{ vars.ROUTING_MODEL }}"]`, wantError: `provider "openai" differs from the native "anthropic" provider`},
+		{name: "Codex rejects Anthropic prefix before an expression", engine: "codex", models: `["anthropic/${{ vars.ROUTING_MODEL }}"]`, wantError: `provider "anthropic" differs from the native "openai" provider`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			compiled := compileRoutedWorkflowSource(t, nativeRoutedWorkflowSource(tc.engine, "", tc.models, "", tc.policy))
@@ -169,6 +173,60 @@ func TestModelRoutingNativeAllowedModelsAndAliases(t *testing.T) {
 		require.NoError(t, compiled.err, "a Copilot block rule does not exclude the native Anthropic family")
 		require.Equal(t, []string{"claude-*"}, compiled.candidates(t))
 	})
+}
+
+// TestModelRoutingNativeLegacyAllowlistKeepsProviderPrefix verifies that, without
+// routing.candidateModels support, native candidates replace apiProxy.allowedModels
+// with their provider prefix, so a bare id never also authorizes a Copilot model.
+func TestModelRoutingNativeLegacyAllowlistKeepsProviderPrefix(t *testing.T) {
+	for _, engine := range []struct {
+		name     string
+		provider LLMProvider
+		models   []string
+		want     []any
+	}{
+		{name: "claude", provider: LLMProviderAnthropic, models: []string{"anthropic/claude-sonnet-5", "claude-haiku-4-5"}, want: []any{"anthropic/claude-sonnet-5", "anthropic/claude-haiku-4-5"}},
+		{name: "codex", provider: LLMProviderOpenAI, models: []string{"openai/gpt-5.4", "gpt-5.5"}, want: []any{"openai/gpt-5.4", "openai/gpt-5.5"}},
+	} {
+		for _, legacy := range []struct {
+			name  string
+			setup func(data *WorkflowData)
+		}{
+			{name: "older AWF version", setup: func(data *WorkflowData) {
+				data.NetworkPermissions.Firewall.Version = "v0.28.32"
+			}},
+			{name: "digest-only api-proxy image", setup: func(data *WorkflowData) {
+				data.SandboxConfig = &SandboxConfig{Agent: &AgentSandboxConfig{Images: map[string]string{
+					awfImageRoleAPIProxy: "ghcr.io/github/gh-aw-firewall/api-proxy@sha256:" + strings.Repeat("a", 64),
+				}}}
+			}},
+		} {
+			t.Run(engine.name+"/"+legacy.name, func(t *testing.T) {
+				data := &WorkflowData{
+					EngineConfig: &EngineConfig{
+						ID:           engine.name,
+						LLMProvider:  engine.provider,
+						ModelRouting: &CopilotModelRoutingConfig{Goal: "cost", Mode: "economy", AllowedModels: engine.models},
+					},
+					NetworkPermissions: &NetworkPermissions{Firewall: &FirewallConfig{Enabled: true, Version: "v0.29.0"}},
+				}
+				legacy.setup(data)
+				require.False(t, apiProxySupportsRoutingCandidateModels(data))
+				configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{EngineName: engine.name, AllowedDomains: "github.com", WorkflowData: data})
+				require.NoError(t, err)
+				var config map[string]any
+				require.NoError(t, json.Unmarshal([]byte(configJSON), &config))
+				proxy := config["apiProxy"].(map[string]any)
+				routing := proxy["routing"].(map[string]any)
+				require.Equal(t, string(engine.provider), routing["provider"])
+				require.NotContains(t, routing, "candidateModels")
+				require.Equal(t, engine.want, proxy["allowedModels"])
+				for _, model := range proxy["allowedModels"].([]any) {
+					require.True(t, strings.HasPrefix(model.(string), string(engine.provider)+"/"), "bare native id %q reached apiProxy.allowedModels", model)
+				}
+			})
+		}
+	}
 }
 
 func TestModelRoutingRejectsUnsupportedProviderTargets(t *testing.T) {

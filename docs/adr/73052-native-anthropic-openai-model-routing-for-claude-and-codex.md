@@ -23,7 +23,7 @@ gh-aw resolves one **effective routing provider** per workflow and uses it consi
 For native routing only, the compiler:
 
 - emits `apiProxy.routing.provider`. Copilot routing still omits the field, so existing locks stay byte-identical.
-- emits bare native candidates: `claude-*` or `gpt-*` by default, exact IDs unchanged (dash-form Anthropic IDs such as `claude-sonnet-5-5`), and aliases expanded from the native namespace of the shared alias table, limited to the engine family.
+- emits bare native candidates: `claude-*` or `gpt-*` by default, exact IDs unchanged (dash-form Anthropic IDs such as `claude-sonnet-5-5`), and aliases expanded from the native namespace of the shared alias table, limited to the engine family. Bare IDs are used only in `routing.candidateModels`; with AWF older than v0.28.33, or an api-proxy image without a version tag at or above it, the candidates replace the request-wide `apiProxy.allowedModels` and keep their `anthropic/` or `openai/` prefix, so native routing never also authorizes a Copilot model.
 - applies policy rules for the native provider, plus bare rules. A `github-copilot/` rule never authorizes a native model.
 - rejects cross-provider combinations (Claude on OpenAI, Codex on Anthropic). It also rejects targets that move inference off the native HTTPS endpoint: a custom `engine.api-target`, a custom `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL`, a `sandbox.agent.targets` gateway, or `engine.auth` for another cloud such as Azure.
 
