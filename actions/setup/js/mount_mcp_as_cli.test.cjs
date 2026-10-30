@@ -18,6 +18,7 @@ import {
   parseMCPResponseBody,
   recoverSafeOutputsToolsIfNeeded,
   toContainerUrl,
+  toHostUrl,
   TOOLS_EMPTY_MAX_RETRIES,
   TOOLS_EMPTY_RETRY_DELAY_MS,
 } from "./mount_mcp_as_cli.cjs";
@@ -132,6 +133,11 @@ describe("mount_mcp_as_cli.cjs", () => {
         process.env.MCP_GATEWAY_PORT = originalPort;
       }
     }
+  });
+
+  it("rewrites the gateway URL to the runner-host loopback endpoint", () => {
+    expect(toHostUrl("http://0.0.0.0:8080/mcp/safeoutputs")).toBe("http://localhost:8080/mcp/safeoutputs");
+    expect(() => toHostUrl("not a url")).toThrow("Invalid MCP gateway URL");
   });
 
   it("fails hard even when tools.json has tools, and writes gateway-empty flag", () => {
@@ -589,9 +595,31 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
     delete process.env.MCP_GATEWAY_DOMAIN;
     delete process.env.MCP_GATEWAY_PORT;
     delete process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS;
+    delete process.env.GH_AW_MCP_CLI_REQUIRE_HOST_SAFEOUTPUTS;
     delete global.core;
     vi.resetModules();
   });
+
+  const expectRequiredMountFailure = async (manifestContents, message) => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-cli-required-safeoutputs-"));
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS = "true";
+    if (manifestContents !== null) {
+      const manifestDir = path.join(tempDir, "gh-aw/mcp-cli");
+      fs.mkdirSync(manifestDir, { recursive: true });
+      fs.writeFileSync(path.join(manifestDir, "manifest.json"), manifestContents, "utf8");
+    }
+    global.core = {
+      info: () => {},
+      warning: () => {},
+      addPath: () => {},
+      setOutput: () => {},
+    };
+
+    vi.resetModules();
+    const mod = await import("./mount_mcp_as_cli.cjs?t=" + Date.now());
+    await expect(mod.main()).rejects.toThrow(message);
+  };
 
   it("fails when safeoutputs is required but no CLI manifest was generated", async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-cli-required-safeoutputs-"));
@@ -607,6 +635,18 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
     vi.resetModules();
     const mod = await import("./mount_mcp_as_cli.cjs?t=" + Date.now());
     await expect(mod.main()).rejects.toThrow("safeoutputs CLI is required, but the MCP CLI manifest was not generated");
+  });
+
+  it("fails when the required CLI manifest is malformed", async () => {
+    await expectRequiredMountFailure("{", "safeoutputs CLI is required, but the MCP CLI manifest could not be read");
+  });
+
+  it("fails when the required CLI manifest contains no servers", async () => {
+    await expectRequiredMountFailure('{"servers":[]}', "safeoutputs CLI is required, but the MCP CLI manifest contains no servers");
+  });
+
+  it("fails when the safeoutputs wrapper is not generated", async () => {
+    await expectRequiredMountFailure('{"servers":[{"name":"safeoutputs","url":"not a url"}]}', "safeoutputs CLI is required, but its wrapper script was not generated");
   });
 
   it("rewrites an existing 0o755 CLI wrapper script to owner-only permissions (0o700)", async () => {
@@ -632,6 +672,7 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-cli-mount-test-"));
     process.env.RUNNER_TEMP = tempDir;
     process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS = "true";
+    process.env.GH_AW_MCP_CLI_REQUIRE_HOST_SAFEOUTPUTS = "true";
     process.env.MCP_GATEWAY_AGENT_ID = "super-secret-gateway-agent";
     delete process.env.MCP_GATEWAY_DOMAIN;
     delete process.env.MCP_GATEWAY_PORT;
@@ -648,10 +689,11 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
 
     const infos = [];
     const warnings = [];
+    const paths = [];
     global.core = {
       info: msg => infos.push(msg),
       warning: msg => warnings.push(msg),
-      addPath: () => {},
+      addPath: value => paths.push(value),
       setOutput: () => {},
     };
 
@@ -668,5 +710,10 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
 
     const scriptContent = fs.readFileSync(scriptPath, "utf8");
     expect(scriptContent).toContain("super-secret-gateway-agent");
+
+    const hostBinDir = path.join(tempDir, "gh-aw-host-mcp-cli/bin");
+    const hostScript = fs.readFileSync(path.join(hostBinDir, "safeoutputs"), "utf8");
+    expect(hostScript).toContain(`--server-url "http://localhost:${port}/mcp"`);
+    expect(paths).not.toContain(hostBinDir);
   });
 });

@@ -35,6 +35,8 @@ const MANIFEST_FILE = path.join(process.env.RUNNER_TEMP || "/home/runner/work/_t
 const RUNNER_TEMP = process.env.RUNNER_TEMP || "/home/runner/work/_temp";
 const CLI_BIN_DIR = `${RUNNER_TEMP}/gh-aw/mcp-cli/bin`;
 const TOOLS_DIR = `${RUNNER_TEMP}/gh-aw/mcp-cli/tools`;
+// Keep the host-only endpoint outside the AWF bind mount used by agent processes.
+const HOST_CLI_BIN_DIR = `${RUNNER_TEMP}/gh-aw-host-mcp-cli/bin`;
 const AWF_GATEWAY_IP = "172.30.0.1";
 const SAFEOUTPUTS_SERVER_NAME = "safeoutputs";
 
@@ -225,6 +227,23 @@ function toContainerUrl(rawUrl) {
     return rawUrl.replace(/^https?:\/\/[^/]+\/mcp\//, `http://${domain}:${port}/mcp/`);
   }
   return rawUrl;
+}
+
+/**
+ * Rewrite the gateway manifest URL to its host-loopback endpoint.
+ *
+ * @param {string} rawUrl - URL from the manifest
+ * @returns {string} URL reachable from runner-host steps
+ */
+function toHostUrl(rawUrl) {
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch (error) {
+    throw new Error(`Invalid MCP gateway URL: ${getErrorMessage(error)}`, { cause: error });
+  }
+  url.hostname = "localhost";
+  return url.toString();
 }
 
 /**
@@ -549,15 +568,15 @@ async function fetchMCPToolsWithRetry(serverUrl, agentId, serverName, core, { sl
  * @param {string} bridgeScript - Absolute path to mcp_cli_bridge.cjs
  * @returns {string} Content of the bash wrapper script
  */
-function generateCLIWrapperScript(serverName, serverUrl, toolsFile, agentId, bridgeScript) {
+function generateCLIWrapperScript(serverName, serverUrl, toolsFile, agentId, bridgeScript, cliBinDir = CLI_BIN_DIR) {
   // Sanitize all values that are embedded in the shell script to prevent injection.
   // Server names are pre-validated by isValidServerName(), but we still escape all
   // values for defense-in-depth.
   const safeName = shellEscapeDoubleQuoted(serverName);
   const safeUrl = shellEscapeDoubleQuoted(serverUrl);
-  const safeToolsFile = shellEscapeDoubleQuoted(path.relative(CLI_BIN_DIR, toolsFile));
+  const safeToolsFile = shellEscapeDoubleQuoted(path.relative(cliBinDir, toolsFile));
   const safeAgentId = shellEscapeDoubleQuoted(agentId);
-  const safeBridge = shellEscapeDoubleQuoted(path.relative(CLI_BIN_DIR, bridgeScript));
+  const safeBridge = shellEscapeDoubleQuoted(path.relative(cliBinDir, bridgeScript));
 
   return `#!/usr/bin/env bash
 set +o histexpand
@@ -591,12 +610,13 @@ exec node "\${CLI_DIR}/${safeBridge}" \\
 async function main() {
   const core = global.core;
   const requireSafeOutputsCLI = process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS === "true";
+  const requireHostSafeOutputsCLI = process.env.GH_AW_MCP_CLI_REQUIRE_HOST_SAFEOUTPUTS === "true";
 
   core.info("Mounting MCP servers as CLI tools...");
   clearStaleSafeOutputsRegistrationEvidence();
 
   if (!fs.existsSync(MANIFEST_FILE)) {
-    if (requireSafeOutputsCLI) {
+    if (requireSafeOutputsCLI || requireHostSafeOutputsCLI) {
       throw new Error("safeoutputs CLI is required, but the MCP CLI manifest was not generated");
     }
     core.info("No MCP CLI manifest found, skipping CLI mounting");
@@ -608,7 +628,7 @@ async function main() {
   try {
     manifest = JSON.parse(fs.readFileSync(MANIFEST_FILE, "utf8"));
   } catch (err) {
-    if (requireSafeOutputsCLI) {
+    if (requireSafeOutputsCLI || requireHostSafeOutputsCLI) {
       throw new Error("safeoutputs CLI is required, but the MCP CLI manifest could not be read", { cause: err });
     }
     core.warning(`Failed to read MCP CLI manifest: ${getErrorMessage(err)}`);
@@ -618,7 +638,7 @@ async function main() {
   const servers = manifest.servers || [];
 
   if (servers.length === 0) {
-    if (requireSafeOutputsCLI) {
+    if (requireSafeOutputsCLI || requireHostSafeOutputsCLI) {
       throw new Error("safeoutputs CLI is required, but the MCP CLI manifest contains no servers");
     }
     core.info("No MCP servers in manifest, skipping CLI mounting");
@@ -655,6 +675,7 @@ async function main() {
   }
 
   const mountedServers = [];
+  let mountedHostSafeOutputs = false;
   /** @type {Array<{name: string, tools: Array<{name: string, description?: string, inputSchema?: unknown}>}>} */
   const mountedServerTools = [];
   const skippedServers = [];
@@ -733,27 +754,58 @@ async function main() {
         }
       }
     }
+
+    if (requireHostSafeOutputsCLI && name === SAFEOUTPUTS_SERVER_NAME) {
+      let hostScriptFd;
+      try {
+        fs.mkdirSync(HOST_CLI_BIN_DIR, { recursive: true, mode: 0o700 });
+        fs.chmodSync(HOST_CLI_BIN_DIR, 0o700);
+        const hostScriptPath = path.join(HOST_CLI_BIN_DIR, name);
+        hostScriptFd = fs.openSync(hostScriptPath, "w", 0o700);
+        fs.fchmodSync(hostScriptFd, 0o700);
+        fs.writeFileSync(hostScriptFd, generateCLIWrapperScript(name, toHostUrl(url), toolsFile, agentId, bridgeScript, HOST_CLI_BIN_DIR), "utf8");
+        fs.closeSync(hostScriptFd);
+        hostScriptFd = undefined;
+        mountedHostSafeOutputs = true;
+        core.info(`  ✓ Mounted runner-host safeoutputs wrapper: ${hostScriptPath}`);
+      } catch (err) {
+        core.warning(`  Failed to write runner-host safeoutputs wrapper: ${getErrorMessage(err)}`);
+      } finally {
+        if (hostScriptFd !== undefined) {
+          try {
+            fs.closeSync(hostScriptFd);
+          } catch {
+            // Ignore close errors in cleanup path; main error already reported above.
+          }
+        }
+      }
+    }
   }
 
   if (requireSafeOutputsCLI && !mountedServers.includes(SAFEOUTPUTS_SERVER_NAME)) {
     throw new Error("safeoutputs CLI is required, but its wrapper script was not generated");
   }
+  if (requireHostSafeOutputsCLI && !mountedHostSafeOutputs) {
+    throw new Error("runner-host safeoutputs CLI is required, but its wrapper script was not generated");
+  }
 
-  if (mountedServers.length === 0) {
+  if (mountedServers.length === 0 && !mountedHostSafeOutputs) {
     core.info("No MCP servers were successfully mounted as CLI tools");
     return;
   }
 
-  // Lock the bin directory so the agent cannot modify or inject scripts
-  try {
-    fs.chmodSync(CLI_BIN_DIR, 0o555);
-    core.info(`CLI bin directory locked (read-only): ${CLI_BIN_DIR}`);
-  } catch (err) {
-    core.warning(`Failed to lock CLI bin directory: ${getErrorMessage(err)}`);
-  }
+  if (mountedServers.length > 0) {
+    // Lock the bin directory so the agent cannot modify or inject scripts
+    try {
+      fs.chmodSync(CLI_BIN_DIR, 0o555);
+      core.info(`CLI bin directory locked (read-only): ${CLI_BIN_DIR}`);
+    } catch (err) {
+      core.warning(`Failed to lock CLI bin directory: ${getErrorMessage(err)}`);
+    }
 
-  // Add the bin directory to PATH for subsequent steps
-  core.addPath(CLI_BIN_DIR);
+    // Add the bin directory to PATH for subsequent steps
+    core.addPath(CLI_BIN_DIR);
+  }
 
   core.info("");
   core.info(`Successfully mounted ${mountedServers.length} MCP server(s) as CLI tools:`);
@@ -780,6 +832,7 @@ module.exports = {
   shellEscapeDoubleQuoted,
   parseMCPResponseBody,
   toContainerUrl,
+  toHostUrl,
   loadToolsFromJSONFile,
   recoverSafeOutputsToolsIfNeeded,
   getSafeOutputsGatewayEmptyFlagPath,

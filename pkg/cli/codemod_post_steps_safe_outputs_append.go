@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -52,8 +53,7 @@ func getPostStepsSafeOutputsAppendCodemod() Codemod {
 						}
 						step["run"] = replacement
 						if !workflow.IsLiteralSafeOutputsToolStep(step) {
-							step["run"] = run
-							break
+							return errors.New("rewrote a safe-output append to an invalid tool call")
 						}
 						postStepsSafeOutputsAppendLog.Print("Rewrote literal safe-output append to safeoutputs CLI")
 					}
@@ -104,6 +104,9 @@ func rewritePostStepSafeOutputsAppend(run string) (string, bool) {
 		return run, false
 	}
 	delete(fields, "type")
+	if len(fields) == 0 {
+		return run, false
+	}
 	args, err := json.Marshal(fields)
 	if err != nil {
 		return run, false

@@ -13,6 +13,8 @@ import (
 
 var compilerYamlStepLifecycleLog = logger.New("workflow:compiler_yaml:steps")
 
+const runnerHostSafeOutputsCLIPrefix = "${{ runner.temp }}/gh-aw-host-mcp-cli/bin/safeoutputs "
+
 func writeFormattedYAML(yaml *strings.Builder, format string, args ...any) {
 	formatted := fmt.Sprintf(format, args...)
 	yaml.WriteString(formatted)
@@ -31,6 +33,20 @@ func (c *Compiler) generatePostSteps(yaml *strings.Builder, data *WorkflowData) 
 // Only move a self-contained prefix: ordinary post-steps retain their ordering
 // and artifact uploads remain after secret redaction.
 func splitSafeOutputsPostSteps(source string) (early, late string) {
+	versionComments := make(map[string]string)
+	for line := range strings.SplitSeq(source, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "uses:") || !strings.Contains(trimmed, " # ") {
+			continue
+		}
+		usesField, versionComment, found := strings.Cut(trimmed, " # ")
+		if !found {
+			continue
+		}
+		usesValue := strings.TrimSpace(strings.TrimPrefix(usesField, "uses:"))
+		versionComments[usesValue] = " # " + versionComment
+	}
+
 	var section struct {
 		Steps []map[string]any `yaml:"post-steps"`
 	}
@@ -47,18 +63,30 @@ func splitSafeOutputsPostSteps(source string) (early, late string) {
 	if count == 0 {
 		return "", source
 	}
-	encode := func(steps []map[string]any) (string, error) {
+	encode := func(steps []map[string]any, hostSafeOutputs bool) (string, error) {
 		if len(steps) == 0 {
 			return "", nil
 		}
+		for _, step := range steps {
+			if hostSafeOutputs {
+				if run, ok := step["run"].(string); ok {
+					step["run"] = strings.Replace(run, "safeoutputs ", runnerHostSafeOutputsCLIPrefix, 1)
+				}
+			}
+			if uses, ok := step["uses"].(string); ok {
+				if comment, ok := versionComments[uses]; ok {
+					step["uses"] = uses + comment
+				}
+			}
+		}
 		encoded, err := yaml.Marshal(map[string]any{"post-steps": steps})
-		return string(encoded), err
+		return unquoteUsesWithComments(string(encoded)), err
 	}
-	early, err := encode(section.Steps[:count])
+	early, err := encode(section.Steps[:count], true)
 	if err != nil {
 		return "", source
 	}
-	late, err = encode(section.Steps[count:])
+	late, err = encode(section.Steps[count:], false)
 	if err != nil {
 		return "", source
 	}

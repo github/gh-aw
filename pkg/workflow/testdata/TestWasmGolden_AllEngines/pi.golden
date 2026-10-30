@@ -768,8 +768,8 @@ jobs:
           GH_AW_MCP_CONFIG_NORM_EOF
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
-        continue-on-error: true
         env:
+          GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: "true"
           MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}
           MCP_GATEWAY_DOMAIN: ${{ steps.start-mcp-gateway.outputs.gateway-domain }}
           MCP_GATEWAY_PORT: ${{ steps.start-mcp-gateway.outputs.gateway-port }}

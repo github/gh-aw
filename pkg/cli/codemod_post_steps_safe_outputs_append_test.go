@@ -177,6 +177,7 @@ Report results.
 	require.NoError(t, err)
 	// Ignore frontmatter embedded in comments; these are actual emitted steps.
 	text := string(lock)
+	assert.Contains(t, text, `${{ runner.temp }}/gh-aw-host-mcp-cli/bin/safeoutputs add_comment`)
 	previous := -1
 	for _, step := range []string{
 		"      - name: Execute Claude Code CLI",

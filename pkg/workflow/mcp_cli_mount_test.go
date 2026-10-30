@@ -16,14 +16,38 @@ import (
 func TestGenerateMCPCLIMountStepRequiresSafeOutputsCLI(t *testing.T) {
 	t.Parallel()
 
-	t.Run("safe outputs makes mounting mandatory", func(t *testing.T) {
+	t.Run("early safe-output calls require the host CLI", func(t *testing.T) {
+		var output strings.Builder
+		NewCompiler().generateMCPCLIMountStep(&output, &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
+			PostSteps:   "post-steps:\n  - run: safeoutputs create_issue '{\"title\":\"test\"}'\n",
+		})
+
+		assert.Contains(t, output.String(), `GH_AW_MCP_CLI_REQUIRE_HOST_SAFEOUTPUTS: "true"`)
+		assert.NotContains(t, output.String(), `GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: "true"`)
+		assert.NotContains(t, output.String(), "continue-on-error: true")
+	})
+
+	t.Run("cli-proxy requires the container CLI", func(t *testing.T) {
+		var output strings.Builder
+		NewCompiler().generateMCPCLIMountStep(&output, &WorkflowData{
+			ParsedTools: &Tools{CLIProxy: true},
+			SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
+		})
+
+		assert.Contains(t, output.String(), `GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: "true"`)
+		assert.NotContains(t, output.String(), `GH_AW_MCP_CLI_REQUIRE_HOST_SAFEOUTPUTS: "true"`)
+		assert.NotContains(t, output.String(), "continue-on-error: true")
+	})
+
+	t.Run("native MCP keeps CLI mounting best effort", func(t *testing.T) {
 		var output strings.Builder
 		NewCompiler().generateMCPCLIMountStep(&output, &WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
 		})
 
-		assert.Contains(t, output.String(), `GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: "true"`)
-		assert.NotContains(t, output.String(), "continue-on-error: true")
+		assert.Contains(t, output.String(), "continue-on-error: true")
+		assert.NotContains(t, output.String(), "GH_AW_MCP_CLI_REQUIRE_")
 	})
 
 	t.Run("other CLI mounts remain best effort", func(t *testing.T) {

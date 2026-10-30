@@ -306,6 +306,21 @@ func getMCPCLIExcludeFromAgentConfig(data *WorkflowData) []string {
 	return getMCPCLIServerNames(data)
 }
 
+func requiresSafeOutputsCLI(data *WorkflowData) bool {
+	return data != nil &&
+		HasSafeOutputsEnabled(data.SafeOutputs) &&
+		data.ParsedTools != nil &&
+		data.ParsedTools.CLIProxy
+}
+
+func requiresHostSafeOutputsCLI(data *WorkflowData) bool {
+	if data == nil || !HasSafeOutputsEnabled(data.SafeOutputs) {
+		return false
+	}
+	earlyPostSteps, _ := splitSafeOutputsPostSteps(data.PostSteps)
+	return earlyPostSteps != ""
+}
+
 // generateMCPCLIMountStep generates the "Mount MCP servers as CLIs" workflow step.
 // This step runs after the MCP gateway is started and creates executable CLI wrapper
 // scripts for each MCP server in a read-only directory on $PATH.
@@ -316,14 +331,19 @@ func (c *Compiler) generateMCPCLIMountStep(yaml *strings.Builder, data *Workflow
 	}
 	mcpCLIMountLog.Printf("Generating MCP CLI mount step for %d servers: %v", len(servers), servers)
 
+	requireSafeOutputsCLI := requiresSafeOutputsCLI(data)
+	requireHostSafeOutputsCLI := requiresHostSafeOutputsCLI(data)
 	yaml.WriteString("      - name: Mount MCP servers as CLIs\n")
 	yaml.WriteString("        id: mount-mcp-clis\n")
-	if !HasSafeOutputsEnabled(data.SafeOutputs) {
+	if !requireSafeOutputsCLI && !requireHostSafeOutputsCLI {
 		yaml.WriteString("        continue-on-error: true\n")
 	}
 	yaml.WriteString("        env:\n")
-	if HasSafeOutputsEnabled(data.SafeOutputs) {
+	if requireSafeOutputsCLI {
 		yaml.WriteString("          GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: \"true\"\n")
+	}
+	if requireHostSafeOutputsCLI {
+		yaml.WriteString("          GH_AW_MCP_CLI_REQUIRE_HOST_SAFEOUTPUTS: \"true\"\n")
 	}
 	if !enclavesEnabled(data) {
 		yaml.WriteString("          MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}\n")

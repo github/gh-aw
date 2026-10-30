@@ -48,22 +48,26 @@ func TestSplitSafeOutputsPostSteps(t *testing.T) {
     if true; then
       echo done
     fi
+- name: Pinned action
+  uses: actions/upload-artifact@0123456789abcdef0123456789abcdef01234567 # v4
 - name: Later
   run: safeoutputs noop '{}'
 `
 	early, late := splitSafeOutputsPostSteps(source)
 	assert.Contains(t, early, "name: First")
+	assert.Contains(t, early, "${{ runner.temp }}/gh-aw-host-mcp-cli/bin/safeoutputs")
 	assert.Contains(t, early, "name: Second")
 	assert.NotContains(t, early, "name: Ordinary")
 	assert.NotContains(t, early, "name: Later")
 	assert.Contains(t, late, "name: Ordinary")
+	assert.Contains(t, late, "uses: actions/upload-artifact@0123456789abcdef0123456789abcdef01234567 # v4")
 	assert.Contains(t, late, "name: Later")
 	assert.NotContains(t, late, "name: First")
 	var parsed struct {
 		Steps []map[string]any `yaml:"post-steps"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(late), &parsed))
-	require.Len(t, parsed.Steps, 2)
+	require.Len(t, parsed.Steps, 3)
 	assert.Equal(t, "if true; then\n  echo done\nfi\n", parsed.Steps[0]["run"])
 	for _, source := range []string{"", "post-steps:\n- run: echo done\n", "invalid: ["} {
 		early, late := splitSafeOutputsPostSteps(source)
