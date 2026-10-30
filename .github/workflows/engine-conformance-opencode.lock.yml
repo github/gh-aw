@@ -604,7 +604,7 @@ jobs:
       - name: Verify OpenCode CLI installation
         run: opencode --version
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github .opencode"
           GH_AW_AGENT_FILES: "AGENTS.md opencode.json opencode.jsonc"
