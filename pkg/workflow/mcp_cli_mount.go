@@ -318,8 +318,13 @@ func (c *Compiler) generateMCPCLIMountStep(yaml *strings.Builder, data *Workflow
 
 	yaml.WriteString("      - name: Mount MCP servers as CLIs\n")
 	yaml.WriteString("        id: mount-mcp-clis\n")
-	yaml.WriteString("        continue-on-error: true\n")
+	if !HasSafeOutputsEnabled(data.SafeOutputs) {
+		yaml.WriteString("        continue-on-error: true\n")
+	}
 	yaml.WriteString("        env:\n")
+	if HasSafeOutputsEnabled(data.SafeOutputs) {
+		yaml.WriteString("          GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: \"true\"\n")
+	}
 	if !enclavesEnabled(data) {
 		yaml.WriteString("          MCP_GATEWAY_AGENT_ID: ${{ steps.start-mcp-gateway.outputs.gateway-agent-id }}\n")
 	}

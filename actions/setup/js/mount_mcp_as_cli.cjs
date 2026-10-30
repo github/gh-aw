@@ -590,11 +590,15 @@ exec node "\${CLI_DIR}/${safeBridge}" \\
  */
 async function main() {
   const core = global.core;
+  const requireSafeOutputsCLI = process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS === "true";
 
   core.info("Mounting MCP servers as CLI tools...");
   clearStaleSafeOutputsRegistrationEvidence();
 
   if (!fs.existsSync(MANIFEST_FILE)) {
+    if (requireSafeOutputsCLI) {
+      throw new Error("safeoutputs CLI is required, but the MCP CLI manifest was not generated");
+    }
     core.info("No MCP CLI manifest found, skipping CLI mounting");
     return;
   }
@@ -604,6 +608,9 @@ async function main() {
   try {
     manifest = JSON.parse(fs.readFileSync(MANIFEST_FILE, "utf8"));
   } catch (err) {
+    if (requireSafeOutputsCLI) {
+      throw new Error("safeoutputs CLI is required, but the MCP CLI manifest could not be read", { cause: err });
+    }
     core.warning(`Failed to read MCP CLI manifest: ${getErrorMessage(err)}`);
     return;
   }
@@ -611,6 +618,9 @@ async function main() {
   const servers = manifest.servers || [];
 
   if (servers.length === 0) {
+    if (requireSafeOutputsCLI) {
+      throw new Error("safeoutputs CLI is required, but the MCP CLI manifest contains no servers");
+    }
     core.info("No MCP servers in manifest, skipping CLI mounting");
     return;
   }
@@ -723,6 +733,10 @@ async function main() {
         }
       }
     }
+  }
+
+  if (requireSafeOutputsCLI && !mountedServers.includes(SAFEOUTPUTS_SERVER_NAME)) {
+    throw new Error("safeoutputs CLI is required, but its wrapper script was not generated");
   }
 
   if (mountedServers.length === 0) {

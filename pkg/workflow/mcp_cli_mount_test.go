@@ -5,12 +5,41 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGenerateMCPCLIMountStepRequiresSafeOutputsCLI(t *testing.T) {
+	t.Parallel()
+
+	t.Run("safe outputs makes mounting mandatory", func(t *testing.T) {
+		var output strings.Builder
+		NewCompiler().generateMCPCLIMountStep(&output, &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{CreateIssues: &CreateIssuesConfig{}},
+		})
+
+		assert.Contains(t, output.String(), `GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS: "true"`)
+		assert.NotContains(t, output.String(), "continue-on-error: true")
+	})
+
+	t.Run("other CLI mounts remain best effort", func(t *testing.T) {
+		var output strings.Builder
+		NewCompiler().generateMCPCLIMountStep(&output, &WorkflowData{
+			MCPScripts: &MCPScriptsConfig{
+				Tools: map[string]*MCPScriptToolConfig{
+					"hello": {Name: "hello", Script: "return 'ok';"},
+				},
+			},
+		})
+
+		assert.Contains(t, output.String(), "continue-on-error: true")
+		assert.NotContains(t, output.String(), "GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS")
+	})
+}
 
 func TestGetMCPCLIExcludeFromAgentConfig(t *testing.T) {
 	safeOutputs := &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}

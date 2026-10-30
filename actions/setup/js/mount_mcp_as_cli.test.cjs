@@ -588,8 +588,25 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
     delete process.env.MCP_GATEWAY_AGENT_ID;
     delete process.env.MCP_GATEWAY_DOMAIN;
     delete process.env.MCP_GATEWAY_PORT;
+    delete process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS;
     delete global.core;
     vi.resetModules();
+  });
+
+  it("fails when safeoutputs is required but no CLI manifest was generated", async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-cli-required-safeoutputs-"));
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS = "true";
+    global.core = {
+      info: () => {},
+      warning: () => {},
+      addPath: () => {},
+      setOutput: () => {},
+    };
+
+    vi.resetModules();
+    const mod = await import("./mount_mcp_as_cli.cjs?t=" + Date.now());
+    await expect(mod.main()).rejects.toThrow("safeoutputs CLI is required, but the MCP CLI manifest was not generated");
   });
 
   it("rewrites an existing 0o755 CLI wrapper script to owner-only permissions (0o700)", async () => {
@@ -614,17 +631,18 @@ describe("mount_mcp_as_cli.cjs main() file permissions", () => {
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-cli-mount-test-"));
     process.env.RUNNER_TEMP = tempDir;
+    process.env.GH_AW_MCP_CLI_REQUIRE_SAFEOUTPUTS = "true";
     process.env.MCP_GATEWAY_AGENT_ID = "super-secret-gateway-agent";
     delete process.env.MCP_GATEWAY_DOMAIN;
     delete process.env.MCP_GATEWAY_PORT;
 
     const manifestDir = path.join(tempDir, "gh-aw/mcp-cli");
     fs.mkdirSync(manifestDir, { recursive: true });
-    fs.writeFileSync(path.join(manifestDir, "manifest.json"), JSON.stringify({ servers: [{ name: "testserver", url: `http://127.0.0.1:${port}/mcp` }] }), "utf8");
+    fs.writeFileSync(path.join(manifestDir, "manifest.json"), JSON.stringify({ servers: [{ name: "safeoutputs", url: `http://127.0.0.1:${port}/mcp` }] }), "utf8");
 
     const binDir = path.join(tempDir, "gh-aw/mcp-cli/bin");
     fs.mkdirSync(binDir, { recursive: true });
-    const scriptPath = path.join(binDir, "testserver");
+    const scriptPath = path.join(binDir, "safeoutputs");
     fs.writeFileSync(scriptPath, "#!/usr/bin/env bash\necho preexisting\n", { mode: 0o755 });
     fs.chmodSync(scriptPath, 0o755);
 
