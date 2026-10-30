@@ -67,6 +67,7 @@ If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a to
 - `.github/aw/github-mcp-server-pagination.md`
 - `.github/aw/github-mcp-server-tools.md`
 - `.github/aw/github-mcp-server.md`
+- `.github/aw/harbor.md`
 - `.github/aw/instructions.md`
 - `.github/aw/intent.md`
 - `.github/aw/jobs.md`
