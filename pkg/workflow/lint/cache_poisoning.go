@@ -97,7 +97,7 @@ func cacheReleaseTrigger(ctx context.Context, on any) (bool, error) {
 func actionRestoresCache(ctx context.Context, fields map[string]any, path string) (bool, error) {
 	name := actionName(fields["uses"])
 	switch name {
-	case "actions/cache", "actions/cache/restore", "actions/setup-go", "actions/setup-node":
+	case "actions/cache", "actions/cache/restore", "actions/setup-go", "actions/setup-node", "actions/setup-python", "actions/setup-java":
 	default:
 		return false, nil
 	}
@@ -122,6 +122,18 @@ func actionRestoresCache(ctx context.Context, fields map[string]any, path string
 			}
 		}
 		flag, defaultEnabled = "package-manager-cache", !actionMajorBefore(fields["uses"], 5)
+	case "actions/setup-python", "actions/setup-java":
+		if value, explicit := with["cache"]; explicit && value != nil {
+			text, ok := value.(string)
+			if !ok {
+				return false, fmt.Errorf("cache-poisoning requires a string at %s.with.cache; correct the action inputs before linting", path)
+			}
+			if strings.TrimSpace(text) == "" {
+				return false, nil
+			}
+			return true, nil
+		}
+		defaultEnabled = false
 	}
 	value, explicit := with[flag]
 	if !explicit {
