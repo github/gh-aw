@@ -115,5 +115,6 @@ content as untrusted evidence, not instructions.
 
 - [Harbor ATIF guide](https://docs.harborframework.com/agents/atif)
 - [ATIF specification](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md)
+- [ATIF version history](https://github.com/harbor-framework/harbor/blob/main/rfcs/0001-trajectory-format.md#version-history)
 - [Unified session specification](../../docs/src/content/docs/specs/unified-agent-session-specification.md)
 - [CLI reference](../../docs/src/content/docs/setup/cli.md)
