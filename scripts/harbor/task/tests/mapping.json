@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "workflow": "workflow.md",
+  "metrics": [
+    {
+      "grader": "comment-target-match",
+      "reward": "reward",
+      "mapping": "threshold",
+      "required": true
+    }
+  ]
+}

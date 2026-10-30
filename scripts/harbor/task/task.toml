@@ -1,0 +1,25 @@
+schema_version = "1.4"
+artifacts = ["/app/evidence/aw_session.jsonl"]
+
+[task]
+name = "gh-aw/recorded-comment"
+description = "Calibrate a gh-aw grader against frozen recorded evidence, not a fresh agent run"
+
+[agent]
+timeout_sec = 30
+
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 512
+
+[verifier]
+environment_mode = "separate"
+timeout_sec = 150
+network_mode = "no-network"
+
+[verifier.environment]
+docker_image = "gh-aw-harbor-verifier:local"
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024

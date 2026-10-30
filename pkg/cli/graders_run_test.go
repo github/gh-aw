@@ -224,3 +224,60 @@ func TestGraderNodePermissionFlagProbeFailure(t *testing.T) {
 	_, err := graderNodePermissionFlag(context.Background(), "/nonexistent/node")
 	require.ErrorContains(t, err, "failed to detect Node.js permission support")
 }
+
+func TestGraderDefinitionEnvelopeContract(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("node unavailable")
+	}
+	for _, test := range []struct {
+		name      string
+		body      string
+		status    string
+		value     any
+		passed    any
+		threshold any
+		wantError bool
+	}{
+		{name: "zero without threshold", body: "script: return 0", status: "pass", value: float64(0)},
+		{name: "threshold pass", body: "script: return 1\n    threshold: 1\n    direction: higher_is_better", status: "pass", value: float64(1), passed: true, threshold: float64(1)},
+		{name: "threshold miss is not a process error", body: "script: return 0\n    threshold: 1\n    direction: higher_is_better", status: "fail", value: float64(0), passed: false, threshold: float64(1)},
+		{name: "lower is better", body: "script: return 0\n    threshold: 1\n    direction: lower_is_better", status: "pass", value: float64(0), passed: true, threshold: float64(1)},
+		{name: "unavailable", body: "script: return null", status: "unavailable"},
+		{name: "runtime error retains structured output", body: "script: throw new Error('fixture error')", status: "error", wantError: true},
+		{name: "nonfinite result", body: "script: return Infinity", status: "error", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\ngraders:\n  outcome:\n    "+test.body+"\n---\nTest.\n")
+			cmd := newGradersRunCommand()
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			cmd.SetArgs([]string{workflowID, "outcome", "--include-definition"})
+			cmd.SetIn(strings.NewReader("[]"))
+			var output bytes.Buffer
+			cmd.SetOut(&output)
+			err := cmd.Execute()
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			var envelope struct {
+				Version    int
+				Definition map[string]any
+				Result     map[string]any
+			}
+			require.NoError(t, json.Unmarshal(output.Bytes(), &envelope))
+			assert.Equal(t, 1, envelope.Version)
+			assert.Equal(t, "outcome", envelope.Definition["id"])
+			assert.Equal(t, test.threshold, envelope.Definition["threshold"])
+			assert.Equal(t, "inline", envelope.Definition["source"])
+			assert.NotContains(t, envelope.Definition, "script")
+			assert.NotContains(t, envelope.Definition, "shellScript")
+			assert.Equal(t, "outcome", envelope.Result["id"])
+			assert.Equal(t, test.status, envelope.Result["status"])
+			assert.Equal(t, test.value, envelope.Result["value"])
+			assert.Equal(t, test.passed, envelope.Result["passed"])
+			assert.Contains(t, envelope.Result, "implementation")
+		})
+	}
+}

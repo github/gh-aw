@@ -189,4 +189,26 @@ gh aw graders run weekly-research loops 123456789
 cat aw_session.jsonl | gh aw graders run weekly-research loops
 ```
 
+For verifier integrations, add `--include-definition` to emit a version 1
+envelope with `definition` and `result`. The definition contains the resolved
+ID, name, description, source, unit, direction, threshold, and data-only
+configuration from the same parsed workflow used for execution. Executable
+JavaScript and Bash source is excluded; result implementation identities and
+digests remain available. Without this flag, the existing result output is
+unchanged.
+
+A finite measurement without a threshold has `status: "pass"` and
+`passed: null`: computation succeeded, but task acceptance was not evaluated.
+A threshold miss has `status: "fail"` and does not by itself cause a nonzero
+exit. An unavailable measurement has a null value, not zero. Runtime errors
+return nonzero and can still emit a structured result on stdout; keep stderr
+separate when consuming output.
+
+The [Harbor verifier example](https://github.com/github/gh-aw/tree/main/scripts/harbor)
+maps explicitly selected measurements into numeric rewards in a separate
+verifier environment. Required unavailable evidence and grader errors produce
+diagnostics without a reward file; they are not valid zero rewards. The example
+uses the canonical unified session, independently of ATIF trajectory export,
+and does not execute a fresh workflow.
+
 For normative requirements, see the [Graders Specification](/gh-aw/specs/graders-specification/).

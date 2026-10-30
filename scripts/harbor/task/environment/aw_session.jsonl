@@ -1,0 +1,2 @@
+{"type":"session.format","data":{"version":1},"provenance":{"component":"collector","phase":"conclusion","path":"aw_session.jsonl","index":0}}
+{"type":"safe_output.result","data":{"type":"add_comment","repo":"example/project","number":42,"status":"success","url":"https://github.com/example/project/issues/42#issuecomment-123"},"provenance":{"component":"safe-output","phase":"safe-output","path":"safe-output-results.json","index":0}}

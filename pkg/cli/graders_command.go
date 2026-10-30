@@ -43,18 +43,24 @@ Shell is trusted code, not yet microVM-isolated; detected file writes are reject
 			if err != nil {
 				return err
 			}
+			includeDefinition, err := cmd.Flags().GetBool("include-definition")
+			if err != nil {
+				return err
+			}
 			return runGrader(cmd.Context(), graderRunConfig{
-				Workflow: args[0], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
-				GraderID: args[1], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
-				RunID:    runID,
-				Repo:     repoOverride,
-				Input:    cmd.InOrStdin(),
-				Output:   cmd.OutOrStdout(),
-				Path:     os.Getenv("PATH"), //nolint:osgetenvlibrary // CLI boundary supplies executable search paths, not credentials.
+				Workflow:          args[0], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
+				GraderID:          args[1], //nolint:uncheckedsliceindex // cobra.RangeArgs requires at least two arguments.
+				RunID:             runID,
+				Repo:              repoOverride,
+				Input:             cmd.InOrStdin(),
+				Output:            cmd.OutOrStdout(),
+				Path:              os.Getenv("PATH"), //nolint:osgetenvlibrary // CLI boundary supplies executable search paths, not credentials.
+				IncludeDefinition: includeDefinition,
 			})
 		},
 	}
 	addRepoFlag(cmd)
+	cmd.Flags().Bool("include-definition", false, "Wrap the result with schema-versioned resolved acceptance metadata (without executable source)")
 	cmd.SetIn(os.Stdin)
 	cmd.SetOut(os.Stdout)
 	return cmd

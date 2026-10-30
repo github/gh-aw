@@ -7,7 +7,7 @@ sidebar:
 
 # Graders Specification
 
-**Version**: 0.5.0
+**Version**: 0.6.0
 **Status**: Draft Specification
 **Feature Status**: Experimental
 
@@ -181,6 +181,18 @@ The grader itself still receives only the session and data configuration.
 Shell replay MUST use the same bounded Bash compatibility runtime and session-file
 contract as the separate job; Node's permission model does not sandbox Bash.
 
+With `--include-definition`, local replay MUST emit an envelope with numeric
+`version: 1`, a `definition` object, and the unchanged `result` object.
+The definition MUST contain resolved ID, name, description, source, unit,
+direction, threshold, and data-only configuration from the same parsed
+definition used for computation. It MUST NOT include executable script source.
+Without this flag, existing result output and exit behavior MUST remain unchanged.
+
+A numeric result without a threshold MAY have status `pass` while `passed`
+is null. Consumers MUST NOT interpret that status as task acceptance.
+A threshold miss is a valid measurement, not a process error; unavailable
+and error results MUST NOT be converted to numeric zero.
+
 ## 7. Experiment metric references
 
 Experiment metrics MAY reference `grader:<id>` or `graders.<id>.value`.
@@ -209,10 +221,16 @@ Conforming implementations MUST cover:
 - Conclusion-only execution after unified-session collection and redaction.
 - Matching persisted results and unified-session grader events.
 - The same behavior in workflow execution and CLI replay.
+- Optional definition-envelope output, resolved acceptance metadata, and unchanged default output.
 - A measurable large-session performance bound for the default set.
 - Grader-backed experiment reference validation.
 
 ## 9. Change log
+
+### Version 0.6.0
+
+- Adds an opt-in local replay envelope for resolved acceptance metadata.
+- Clarifies measurement success, threshold outcomes, and unavailable reward semantics.
 
 ### Version 0.5.0
 
