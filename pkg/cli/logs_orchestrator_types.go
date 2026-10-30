@@ -29,6 +29,7 @@ type LogsDownloadOptions struct {
 	JSONOutput         bool
 	Episodes           bool
 	Outcomes           bool
+	Harbor             bool
 	OutcomesDir        string
 	TimeoutMinutes     int
 	TimeoutSeconds     int
@@ -116,6 +117,7 @@ type StdinLogsOptions struct {
 	JSONOutput        bool
 	Episodes          bool
 	Outcomes          bool
+	Harbor            bool
 	OutcomesDir       string
 	Timeout           int
 	MaxStorageMB      int

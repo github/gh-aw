@@ -1,0 +1,135 @@
+{
+  "schema_version": "ATIF-v1.8",
+  "agent": {
+    "name": "gh-aw-unified",
+    "version": "unknown"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "timestamp": "2026-10-01T10:00:00Z",
+      "source": "user",
+      "message": "Read the file.\n",
+      "extra": {
+        "line": 2,
+        "unified_event": {
+          "type": "user.message",
+          "data": {
+            "content": "Read the file.\n"
+          },
+          "timestamp": "2026-10-01T10:00:00Z"
+        }
+      }
+    },
+    {
+      "step_id": 2,
+      "source": "agent",
+      "message": "",
+      "tool_calls": [
+        {
+          "tool_call_id": "read-1",
+          "function_name": "read_file",
+          "arguments": {
+            "path": "hello.txt"
+          }
+        }
+      ],
+      "observation": {
+        "results": [
+          {
+            "source_call_id": "read-1",
+            "content": "Hello\n",
+            "extra": {
+              "line": 4,
+              "unified_event": {
+                "type": "tool.execution_complete",
+                "data": {
+                  "toolCallId": "read-1",
+                  "success": true,
+                  "output": "Hello\n"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "extra": {
+        "line": 3,
+        "unified_event": {
+          "type": "tool.execution_start",
+          "data": {
+            "toolCallId": "read-1",
+            "toolName": "read_file",
+            "input": {
+              "path": "hello.txt"
+            }
+          }
+        }
+      }
+    },
+    {
+      "step_id": 3,
+      "source": "agent",
+      "message": "The file says Hello.\n",
+      "extra": {
+        "line": 5,
+        "unified_event": {
+          "type": "assistant.message",
+          "data": {
+            "content": "The file says Hello.\n"
+          }
+        }
+      }
+    },
+    {
+      "step_id": 4,
+      "source": "system",
+      "message": "",
+      "extra": {
+        "line": 6,
+        "unified_event": {
+          "type": "session.result",
+          "data": {
+            "totalCostUsd": 0,
+            "usage": {
+              "input_tokens": 20,
+              "output_tokens": 5,
+              "cache_read_input_tokens": 10,
+              "input_tokens_include_cache": true
+            }
+          }
+        }
+      }
+    }
+  ],
+  "notes": "Converted from a gh-aw unified session. Source records and their order are retained in extra.unified_event and extra.line. Tool observations are attached to their initiating step. Unmapped and subagent evidence remains in system-step extras. Unknown agent versions are labeled unknown; empty tool arguments may indicate unavailable input. Structured non-text content is JSON-encoded, not exported as media assets.",
+  "final_metrics": {
+    "total_prompt_tokens": 20,
+    "total_completion_tokens": 5,
+    "total_cached_tokens": 10,
+    "total_cost_usd": 0,
+    "total_steps": 4,
+    "extra": {
+      "unified_session_result": {
+        "totalCostUsd": 0,
+        "usage": {
+          "input_tokens": 20,
+          "output_tokens": 5,
+          "cache_read_input_tokens": 10,
+          "input_tokens_include_cache": true
+        }
+      }
+    }
+  },
+  "extra": {
+    "unified_header": {
+      "type": "session.format",
+      "data": {
+        "version": 1
+      },
+      "provenance": {
+        "component": "collector"
+      }
+    }
+  }
+}

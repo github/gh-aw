@@ -127,6 +127,19 @@ const maxArtifactHintExamples = 2
 
 const downloadedArtifactsMarkerDir = ".downloaded-artifacts"
 
+func logsHarborArtifactSets(sets []string, harbor bool) []string {
+	if !harbor || len(sets) == 0 || slices.Contains(sets, string(ArtifactSetAll)) {
+		return sets
+	}
+	sets = slices.Clone(sets)
+	for _, set := range []ArtifactSet{ArtifactSetUsage, ArtifactSetExperiment, ArtifactSetGraders, ArtifactSetAgent} {
+		if !slices.Contains(sets, string(set)) {
+			sets = append(sets, string(set))
+		}
+	}
+	return sets
+}
+
 // ValidArtifactSetNames returns a sorted list of valid artifact set names,
 // derived dynamically from the artifactSetArtifacts map to stay in sync automatically.
 func ValidArtifactSetNames() []string {

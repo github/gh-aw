@@ -179,34 +179,43 @@ async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = tru
  * @param {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string}} options
  * @param {string} sha
  * @param {Record<string, unknown> | undefined} [request]
+ * @param {(code: string, message: string) => Error} [onInvalid]
+ * @throws {Error} If queue contents are invalid, using onInvalid when provided.
  */
-async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, request = undefined) {
+async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, request = undefined, onInvalid = undefined) {
+  /**
+   * @type {(code: string, message: string) => never}
+   * @throws {Error} Always throws the error from onInvalid or queueError.
+   */
+  const fail = (code, message) => {
+    throw onInvalid ? onInvalid(code, message) : queueError(code, message);
+  };
   const requestOptions = request ? { request } : {};
   const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha, ...requestOptions });
   const treeSha = commit?.data?.tree?.sha;
-  if (typeof treeSha !== "string" || !treeSha) throw queueError("ledger_invalid", "queue commit has no tree");
+  if (typeof treeSha !== "string" || !treeSha) fail("ledger_invalid", "queue commit has no tree");
   const response = await githubClient.rest.git.getTree({ owner, repo, tree_sha: treeSha, ...requestOptions });
-  if (response?.data?.truncated === true || !Array.isArray(response?.data?.tree)) throw queueError("ledger_invalid", "queue tree is missing or truncated");
+  if (response?.data?.truncated === true || !Array.isArray(response?.data?.tree)) fail("ledger_invalid", "queue tree is missing or truncated");
   const entries = response.data.tree;
-  if (entries.length > 16384) throw queueError("resource_limit", "queue tree entry limit exceeded");
-  if (entries.some(entry => LEGACY_LOGS.includes(entry.path))) throw queueError("unsupported_protocol", "legacy transaction log cannot be adopted");
+  if (entries.length > 16384) fail("resource_limit", "queue tree entry limit exceeded");
+  if (entries.some(entry => LEGACY_LOGS.includes(entry.path))) fail("unsupported_protocol", "legacy transaction log cannot be adopted");
   const logs = entries.filter(entry => entry.path === WORK_QUEUE_LOG_PATH);
-  if (logs.length !== 1 || logs[0].type !== "blob" || typeof logs[0].sha !== "string" || logs[0].mode !== "100644") throw queueError("ledger_invalid", "existing queue must contain exactly one regular canonical log");
+  if (logs.length !== 1 || logs[0].type !== "blob" || typeof logs[0].sha !== "string" || logs[0].mode !== "100644") fail("ledger_invalid", "existing queue must contain exactly one regular canonical log");
   const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: logs[0].sha, ...requestOptions });
-  if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") throw queueError("ledger_invalid", "queue blob encoding is unsupported");
+  if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") fail("ledger_invalid", "queue blob encoding is unsupported");
   const encoded = blob.data.content.replace(/\s/g, "");
-  if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4) throw queueError("resource_limit", "queue blob exceeds cold parser limit");
+  if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4) fail("resource_limit", "queue blob exceeds cold parser limit");
   const paddingAt = encoded.indexOf("=");
   // A repeated quartet regexp over multi-MiB ledgers overflows V8's regexp stack.
-  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded) || (paddingAt !== -1 && (paddingAt < encoded.length - 2 || !["=", "=="].includes(encoded.slice(paddingAt)))))
-    throw queueError("ledger_invalid", "malformed queue blob base64");
+  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded) || (paddingAt !== -1 && (paddingAt < encoded.length - 2 || !["=", "=="].includes(encoded.slice(paddingAt))))) fail("ledger_invalid", "malformed queue blob base64");
   const bytes = Buffer.from(encoded, "base64");
-  if (bytes.length > 80 * 1024 * 1024 || (typeof blob.data.size === "number" && blob.data.size !== bytes.length)) throw queueError("ledger_invalid", "queue blob is oversized or truncated");
+  if (bytes.toString("base64") !== encoded) fail("ledger_invalid", "malformed queue blob base64");
+  if (bytes.length > 80 * 1024 * 1024 || (typeof blob.data.size === "number" && blob.data.size !== bytes.length)) fail("ledger_invalid", "queue blob is oversized or truncated");
   let contents;
   try {
     contents = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
-    throw queueError("ledger_invalid", "queue blob contains malformed UTF-8");
+    fail("ledger_invalid", "queue blob contains malformed UTF-8");
   }
   return { treeSha, contents };
 }
@@ -409,7 +418,8 @@ async function verifyCheckpointGitHistory(options, head, root) {
     }
   }
   if (!scope || (queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient))) !== scope) return;
-  for (const proof of pending) {
+  // Traversal runs newest to oldest; retain the head when ancestry exceeds the cache.
+  for (const proof of [...pending].reverse()) {
     verified.add(proof);
     if (verified.size > 128) {
       const oldest = verified.values().next().value;
@@ -463,26 +473,7 @@ async function validateCompactionExtension(previous, current, { githubClient, ow
     ancestor = parent.data.parents[0].sha;
   }
   if (ancestor !== checkpoint.prior_git_sha) throw queueError("ledger_invalid", message);
-  const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: checkpoint.prior_git_sha });
-  const treeSha = commit?.data?.tree?.sha;
-  if (typeof treeSha !== "string" || !treeSha) throw queueError("ledger_invalid", message);
-  const tree = await githubClient.rest.git.getTree({ owner, repo, tree_sha: treeSha });
-  const entries = tree?.data?.tree;
-  if (tree?.data?.truncated || !Array.isArray(entries)) throw queueError("ledger_invalid", message);
-  const logs = entries.filter(entry => entry.path === WORK_QUEUE_LOG_PATH && entry.mode === "100644" && entry.type === "blob");
-  if (logs.length !== 1 || typeof logs[0].sha !== "string") throw queueError("ledger_invalid", message);
-  const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: logs[0].sha });
-  if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") throw queueError("ledger_invalid", message);
-  const encoded = blob.data.content.replace(/\s/g, "");
-  if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4 || encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded)) throw queueError("ledger_invalid", message);
-  const bytes = Buffer.from(encoded, "base64");
-  if (bytes.length > 80 * 1024 * 1024 || bytes.toString("base64") !== encoded) throw queueError("ledger_invalid", message);
-  let contents;
-  try {
-    contents = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
-  } catch {
-    throw queueError("ledger_invalid", message);
-  }
+  const { contents } = await readQueueContentsAtSHA({ githubClient, owner, repo }, checkpoint.prior_git_sha, undefined, () => queueError("ledger_invalid", message));
   const source = replayTransactionLog(contents);
   if (
     source.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase() ||

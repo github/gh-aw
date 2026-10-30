@@ -87,6 +87,51 @@ This means that if you compiled a workflow months ago with an older version of `
 
 Setup action dependency upgrades can also introduce runtime requirements that older generated workflows do not meet. If activation reports that a workflow is too old for safe-output publishing, update `gh-aw`, run `gh aw compile`, and commit the regenerated workflow files. Updating only the pinned setup action is not sufficient; older workflows must pass the publishing job's check-run context for execution provenance. This requirement is enforced by the newer setup runtime and does not retroactively block workflows that remain pinned to an older runtime.
 
+## Common Compatibility Fixes After Upgrading
+
+Older workflow sources can fail compilation after a CLI upgrade. For the two configuration patterns below, preview and apply the existing automatic fixes, then regenerate lock files:
+
+```bash
+gh aw fix
+gh aw fix --write
+gh aw compile
+```
+
+Review and commit the changed workflow `.md` and generated `.lock.yml` files. Fixing compilation does not restore removed tool capabilities; review the workflow's tool requirements before running it.
+
+### Copilot Web Tools in Offline BYOK Mode
+
+Copilot runs with `COPILOT_OFFLINE=true` in offline BYOK mode. Compilation rejects `tools.web-search` in both CLI and SDK modes, and `tools.web-fetch` in CLI mode.
+
+`gh aw fix --write` removes these unsupported declarations. If the workflow still needs web access, configure an [MCP server](/gh-aw/reference/tools/#custom-mcp-servers-mcp-servers) instead, or switch to an engine that supports the required tools, such as `engine: codex`. See [web search configuration](/gh-aw/reference/web-search/).
+
+For fetching only, enable Copilot SDK mode to retain `tools.web-fetch`:
+
+```aw
+engine:
+  id: copilot
+  copilot-sdk: true
+tools:
+  web-fetch:
+```
+
+SDK mode provides a custom proxy-aware fetch tool that follows `network.allowed`; it does **not** enable native web search.
+
+### Explicit Bash Configuration with `min-integrity: none`
+
+Strict mode requires an explicit `tools.bash` setting when `tools.github.min-integrity` is `none`, so shell access is intentional when processing untrusted content.
+
+`gh aw fix --write` inserts `tools.bash: false` when the setting is absent. Keep this value if shell access is unnecessary. If the workflow needs shell commands, declare a limited allowlist instead:
+
+```aw
+tools:
+  bash: ["cat", "ls", "find", "grep", "head", "tail", "wc"]
+  github:
+    min-integrity: none
+```
+
+Choose only the commands the workflow needs. Setting `min-integrity: none` disables the automatic integrity protection for public repositories; use it only for workflows designed to handle untrusted input. See [integrity filtering](/gh-aw/reference/integrity/) and [Bash configuration](/gh-aw/reference/tools/#bash-tool-bash).
+
 ## How Lock Files Are Pinned
 
 When `gh aw compile` generates a `.lock.yml`, it pins every GitHub Actions reference to a commit SHA:

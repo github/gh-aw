@@ -75,7 +75,7 @@ func jobToActions(original *Job) (*actions.Job, error) {
 	name := original.Name
 	job := &actions.Job{
 		ID: actions.JobID(name), Outputs: make(map[actions.OutputName]actions.Expression),
-		Uses: original.Uses,
+		Uses: original.Uses, CacheMode: original.CacheMode,
 	}
 	if original.RunsOn != "" {
 		job.RunsOn = original.RunsOn
@@ -161,6 +161,7 @@ func copyEnclosingJobSettings(job *actions.Job, original *Job, typed *actions.Jo
 
 func hasActionsExecutionSettings(job *actions.Job) bool {
 	return job.Name != "" || job.RunsOn != nil || job.Permissions != nil || job.Defaults != nil ||
+		job.CacheMode != "" ||
 		job.Concurrency != nil || job.Environment != nil || job.Strategy != nil ||
 		job.Container != nil || job.Services != nil || job.TimeoutMinutes != 0 || job.TimeoutMinutesExpression != nil || job.ContinueOnError != nil ||
 		job.Uses != "" || len(job.With) > 0 || len(job.Secrets) > 0 || job.SecretsInherit || len(job.CallOutputs) > 0

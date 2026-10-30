@@ -41,6 +41,42 @@ func TestLLMProviderGatewayBaseURLFollowsNetworkTopology(t *testing.T) {
 			provider:    LLMProviderOpenAI,
 			expectedURL: "http://host.docker.internal:" + strconv.Itoa(constants.CodexLLMGatewayPort),
 		},
+		{
+			name: "detection run on default isolated Docker runtime",
+			workflowData: &WorkflowData{
+				IsDetectionRun: true,
+				SandboxConfig:  &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF}},
+			},
+			provider:    LLMProviderGitHub,
+			expectedURL: "http://" + constants.AWFAPIProxyHostname + ":" + strconv.Itoa(constants.CopilotLLMGatewayPort),
+		},
+		{
+			name: "detection run on host-access runtime",
+			workflowData: &WorkflowData{
+				IsDetectionRun: true,
+				SandboxConfig:  &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Runtime: AgentRuntimeDockerSudoIptables}},
+			},
+			provider:    LLMProviderGitHub,
+			expectedURL: "http://host.docker.internal:" + strconv.Itoa(constants.CopilotLLMGatewayPort),
+		},
+		{
+			name: "evals run on default isolated Docker runtime",
+			workflowData: &WorkflowData{
+				IsEvalsRun:    true,
+				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF}},
+			},
+			provider:    LLMProviderGitHub,
+			expectedURL: "http://" + constants.AWFAPIProxyHostname + ":" + strconv.Itoa(constants.CopilotLLMGatewayPort),
+		},
+		{
+			name: "evals run on host-access runtime",
+			workflowData: &WorkflowData{
+				IsEvalsRun:    true,
+				SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Runtime: AgentRuntimeDockerSudoIptables}},
+			},
+			provider:    LLMProviderGitHub,
+			expectedURL: "http://host.docker.internal:" + strconv.Itoa(constants.CopilotLLMGatewayPort),
+		},
 	}
 
 	for _, tt := range tests {

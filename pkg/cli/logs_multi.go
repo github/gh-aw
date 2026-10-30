@@ -265,6 +265,14 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 		resolveLogsCollectionTargetRepositories(results, workflowRunListRepository(""))
 	}
 	processedRuns, continuations, timeoutReached, countLimitReached, storageLimitReached, allErrors := mergeLogsTargetResults(results, initialErrors)
+	var atifErrors []error
+	for _, result := range results {
+		var exportErr *logsATIFExportError
+		if errors.As(result.err, &exportErr) {
+			atifErrors = append(atifErrors, fmt.Errorf("%s: %w", result.target.displayName(), exportErr))
+		}
+	}
+	defer func() { err = errors.Join(err, errors.Join(atifErrors...)) }()
 	renderLogsCollectionStats(opts.collectionStats)
 	for _, err := range allErrors {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Skipping workflow target: "+err.Error()))
@@ -273,6 +281,11 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 		return context.Cause(ctx)
 	}
 	processedRuns = sortAndLimitLogsTargetRuns(processedRuns, opts.Count, opts.Verbose)
+	if opts.Harbor {
+		if err := logsExportHarborJob(ctx, opts.OutputDir, processedRuns); err != nil {
+			return fmt.Errorf("harbor export: %w", err)
+		}
+	}
 	var outcomeReports []OutcomesData
 	if opts.Outcomes {
 		outcomeReports, err = collectLogsOutcomes(ctx, processedRuns, opts.OutcomesDir, opts.Verbose)
@@ -490,7 +503,8 @@ func mergeLogsTargetResults(
 	storageLimitReached := false
 	var continuations []WorkflowContinuation
 	for _, targetResult := range results {
-		if targetResult.err != nil && !errors.Is(targetResult.err, errLogsAPIRateLimitReached) {
+		var exportErr *logsATIFExportError
+		if targetResult.err != nil && (!errors.Is(targetResult.err, errLogsAPIRateLimitReached) || errors.As(targetResult.err, &exportErr)) {
 			allErrors = append(allErrors, fmt.Errorf("%s: %w", targetResult.target.displayName(), targetResult.err))
 		}
 		processedRuns = append(processedRuns, targetResult.result.processedRuns...)

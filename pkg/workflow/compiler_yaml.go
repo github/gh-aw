@@ -136,6 +136,9 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	if err != nil {
 		return "", nil, nil, err
 	}
+	if repoConfig != nil {
+		data.RepoProtectedFilesExclude = repoConfig.ProtectedFiles.Exclude
+	}
 	// Compute frontmatter hash BEFORE building jobs so that the stable hash is
 	// available to heredoc-delimiter generation throughout job construction.
 	// Using the hex-encoded SHA-256 frontmatter hash string as an HMAC key keeps

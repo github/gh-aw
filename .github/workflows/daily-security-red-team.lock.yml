@@ -539,6 +539,7 @@ jobs:
       copilot-requests: write
       issues: read
       security-events: read
+    cache-mode: read
     concurrency:
       group: "gh-aw-opencode-${{ github.workflow }}"
       queue: max
@@ -2844,12 +2845,12 @@ jobs:
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_EVALS_MAX_AI_CREDITS || '400' }}
           GH_AW_MAX_TURNS: ${{ vars.GH_AW_DEFAULT_MAX_TURNS || '' }}
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GITHUB_COPILOT_BASE_URL: http://host.docker.internal:10002
+          GITHUB_COPILOT_BASE_URL: http://api-proxy:10002
           GITHUB_WORKSPACE: ${{ github.workspace }}
           NO_COLOR: 1
           NO_PROXY: localhost,127.0.0.1,host.docker.internal,host.docker.internal:10000,host.docker.internal:10001,host.docker.internal:10002,host.docker.internal:10003,172.30.0.30,172.30.0.30:10000,172.30.0.30:10001,172.30.0.30:10002,172.30.0.30:10003
           OPENAI_API_KEY: ${{ github.token }}
-          OPENAI_BASE_URL: http://host.docker.internal:10002
+          OPENAI_BASE_URL: http://api-proxy:10002
           OPENCODE_DISABLE_MODELS_FETCH: 1
           OPENCODE_MODEL: copilot/auto
           RUNNER_TEMP: ${{ runner.temp }}
@@ -3264,12 +3265,17 @@ jobs:
       - activation
       - agent
       - detection
-    if: always() && needs.detection.result == 'success' && needs.agent.result == 'success'
+    if: >
+      always() && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' &&
+      needs.agent.result == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' || github.event_name == 'delete' || github.event_name == 'registry_package' ||
+      github.event_name == 'page_build' || github.event_name == 'schedule' || github.event_name == 'pull_request')
     runs-on: ubuntu-slim
     # Permissions for the update_cache_memory job (workflow permissions default to none).
     permissions:
       actions: write
       contents: read
+    cache-mode: write-only
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
       GH_AW_WORKFLOW_ID_SANITIZED: dailysecurityredteam

@@ -1189,6 +1189,107 @@ describe("close_issue", () => {
   });
 
   describe("duplicate_of native marking", () => {
+    it.each([50, "50", "#50", "test-owner/test-repo#50", "https://github.com/test-owner/test-repo/issues/50", "other-org/other-repo#50"])("should resolve %s to a database ID before sending a duplicate close intent", async duplicateOf => {
+      const handler = await main({ allowed_repos: ["other-org/other-repo"] });
+      const getCalls = [];
+      const requestCalls = [];
+      const graphqlCalls = [];
+      mockGithub.rest.issues.get = async params => {
+        getCalls.push(params);
+        return { data: { id: 100000 + params.issue_number, node_id: `node_${params.issue_number}`, number: params.issue_number, title: "Test Issue", labels: [], state: "open" } };
+      };
+      mockGithub.request = async (route, params) => {
+        expect(getCalls).toHaveLength(2);
+        requestCalls.push({ route, params });
+        return { data: { number: params.issue_number, node_id: `node_${params.issue_number}`, title: "Test Issue", state: "open" } };
+      };
+      mockGithub.graphql = async (mutation, variables) => graphqlCalls.push(variables);
+
+      const result = await handler({ issue_number: 100, body: "Duplicate", state_reason: "duplicate", duplicate_of: duplicateOf, suggest: true, rationale: "Same defect", confidence: "high" }, {});
+
+      expect(result.success).toBe(true);
+      expect(getCalls[1]).toEqual({
+        owner: String(duplicateOf).startsWith("other-org/") ? "other-org" : "test-owner",
+        repo: String(duplicateOf).startsWith("other-org/") ? "other-repo" : "test-repo",
+        issue_number: 50,
+      });
+      expect(requestCalls).toEqual([
+        {
+          route: "PATCH /repos/{owner}/{repo}/issues/{issue_number}",
+          params: {
+            owner: "test-owner",
+            repo: "test-repo",
+            issue_number: 100,
+            state: { value: "closed", suggest: true, rationale: "Same defect", confidence: "HIGH" },
+            state_reason: "duplicate",
+            duplicate_issue_id: 100050,
+          },
+        },
+      ]);
+      expect(getCalls).toHaveLength(2);
+      expect(graphqlCalls).toHaveLength(1);
+      expect(graphqlCalls[0].canonicalId).toBe("node_50");
+    });
+
+    it.each([403, 404, "missing ID"])("should fail closed when canonical issue lookup fails with %s", async failure => {
+      const handler = await main();
+      const mutations = [];
+      mockGithub.rest.issues.get = async ({ issue_number }) => {
+        if (issue_number === 50 && typeof failure === "number") {
+          throw Object.assign(new Error("Canonical issue unavailable"), { status: failure });
+        }
+        return { data: { number: issue_number, title: "Test Issue", labels: [], state: "open" } };
+      };
+      mockGithub.request = async () => mutations.push("intent");
+      mockGithub.rest.issues.update = async () => mutations.push("legacy close");
+      mockGithub.graphql = async () => mutations.push("duplicate marking");
+
+      const result = await handler({ issue_number: 100, body: "Duplicate", state_reason: "duplicate", duplicate_of: 50, suggest: true }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain(failure === "missing ID" ? "id missing for canonical issue" : "Canonical issue unavailable");
+      expect(mutations).toEqual([]);
+    });
+
+    it.each([
+      { fields: { duplicate_of: "invalid" }, rejected: true },
+      { fields: { duplicate_of: 100 }, rejected: true },
+      { fields: { duplicate_of: "Test-Owner/Test-Repo#100" }, rejected: true },
+      { fields: { duplicate_of: "other-org/other-repo#50" }, rejected: true },
+      { fields: { duplicate_of: 50, state_reason: "completed" }, rejected: false },
+    ])("should handle an ineligible duplicate reference safely: %j", async ({ fields, rejected }) => {
+      const handler = await main();
+      const getCalls = [];
+      const requestCalls = [];
+      const updateCalls = [];
+      mockGithub.rest.issues.get = async params => {
+        getCalls.push(params);
+        return { data: { number: params.issue_number, title: "Test Issue", labels: [], state: "open" } };
+      };
+      mockGithub.request = async (route, params) => {
+        requestCalls.push(params);
+        return { data: { number: params.issue_number, title: "Test Issue" } };
+      };
+      mockGithub.rest.issues.update = async params => {
+        updateCalls.push(params);
+        return { data: { number: params.issue_number, title: "Test Issue" } };
+      };
+
+      const result = await handler({ issue_number: 100, body: "Close", state_reason: "duplicate", suggest: true, ...fields }, {});
+
+      expect(getCalls).toHaveLength(1);
+      if (rejected) {
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("duplicate close intent requires a valid");
+        expect(requestCalls).toHaveLength(0);
+        expect(updateCalls).toHaveLength(0);
+      } else {
+        expect(result.success).toBe(true);
+        expect(requestCalls).toHaveLength(1);
+        expect(requestCalls[0].duplicate_issue_id).toBeUndefined();
+      }
+    });
+
     it("should call markAsDuplicate mutation when duplicate_of and state_reason DUPLICATE are set", async () => {
       const handler = await main({ max: 10, state_reason: "DUPLICATE" });
       const graphqlCalls = [];
@@ -1520,6 +1621,7 @@ describe("close_issue", () => {
 
       mockGithub.rest.issues.get = async ({ owner, repo, issue_number }) => ({
         data: {
+          id: 100000 + issue_number,
           number: issue_number,
           title: "Test Issue",
           labels: [],
@@ -1563,6 +1665,7 @@ describe("close_issue", () => {
       expect(requestCalls).toHaveLength(1);
       expect(requestCalls[0].route).toBe("PATCH /repos/{owner}/{repo}/issues/{issue_number}");
       expect(requestCalls[0].params.state).toMatchObject({ value: "closed", suggest: true, rationale: "Same CSV defect.", confidence: "HIGH" });
+      expect(requestCalls[0].params.duplicate_issue_id).toBe(100050);
 
       // Verify the native duplicate GraphQL mutation was also executed
       expect(graphqlCalls.length).toBeGreaterThan(0);

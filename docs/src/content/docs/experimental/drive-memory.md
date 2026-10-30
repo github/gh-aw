@@ -16,9 +16,13 @@ Drive memory is an experimental, feature-gated integration backed by the [GitHub
 
 For enrolled preview repositories, the compiler mounts configured drives into the agent at `/tmp/gh-aw/drive-memory/` (or `/tmp/gh-aw/drive-memory-{id}/` for named entries). It grants the generated job `contents: read`, `id-token: write`, and the required `drives` permission.
 
-The compiler checks out each drive before the agent and commits validated changes afterward. With threat detection enabled, it stages drive contents as an artifact; a separate `update_drive_memory` job publishes it only after detection succeeds and verifies the drive has not changed since checkout.
+The compiler checks out each drive before the agent and commits validated changes afterward. With threat detection enabled, it stages drive contents as an artifact; a separate `update_drive_memory` job publishes it only after the agent succeeds and detection explicitly accepts the output, and verifies the drive has not changed since checkout. Failed, skipped, missing, or rejected detection blocks publication, including rejection in warning mode.
 
 Drive names are repository-wide and branch-aware according to the preview service. GitHub Drives allows one active writer for a drive, so overlapping runs that write the same drive can contend for the writer lease.
+
+Drive publication intentionally supports admitted issue and slash-command runs; it does not use the Actions cache service's event allowlist or `cache-mode` policy. The pinned preview action requests storage using the repository, `GITHUB_REF`, and drive name. Runs sharing that scope can exchange persisted content across event types. Detection acceptance and configured validation do not authenticate the content or guarantee safe interpretation by a later agent; the detector's no-output short-circuit is not a scan of every drive file. Do not share a drive scope across contexts that require stronger producer isolation.
+
+`restore-only: true` and dry-run prevent compiler-managed drive publication, not local file edits or arbitrary script effects. Without threat detection, writable drives retain same-job publication without a detection gate. The compiler does not verify the preview service's server-side namespace enforcement.
 
 ## Validation
 

@@ -27,6 +27,9 @@ When a single run is provided, generates a detailed Markdown report for that run
 When two or more runs are provided, the first is used as the base (reference) and the
 remaining runs are compared against it, producing a diff report.
 
+Available unified JSONL sessions are retained and automatically exported to
+sibling .atif trajectories, without changing the report format.
+
 Each argument accepts:
 - A numeric run ID (e.g., 1234567890)
 - A GitHub Actions run URL (e.g., https://github.com/owner/repo/actions/runs/1234567890)
@@ -49,6 +52,7 @@ var auditCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` audit 
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -o ./audit-reports # Custom output directory
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -v                 # Verbose output
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --parse            # Parse agent logs and firewall logs, generating log.md and firewall.md
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo --models  # Report same-run model catalog and routing
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --repo owner/repo  # Audit run from a specific repository
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891         # Diff two runs (base vs comparison)
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 1234567891 1234567892  # Diff base against multiple runs
@@ -74,6 +78,7 @@ type auditCommandOptions struct {
 	timeout          time.Duration
 	search           string
 	searchLimit      int
+	models           bool
 }
 
 // NewAuditCommand creates the audit command
@@ -108,6 +113,7 @@ func registerAuditCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().Duration("timeout", 0, "Maximum audit duration (e.g., 50s or 5m; 0 means no additional deadline). JSON single-run audits return explicitly incomplete results on timeout")
 	cmd.Flags().String("search", "", "Retrieve relevant evidence from the unified session using local BM25 search (single-run only)")
 	cmd.Flags().Int("search-limit", defaultAuditSearchLimit, "Maximum evidence groups returned by --search (1-20)")
+	cmd.Flags().Bool("models", false, "Include the run's model catalog, discovery status, and supported endpoints (single-run only)")
 	RegisterDirFlagCompletion(cmd, "output")
 }
 
@@ -122,6 +128,9 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 	}
 	if opts.search != "" && (len(args) != 1 || opts.group) {
 		return errors.New("--search requires a single run without --group")
+	}
+	if opts.models && (len(args) != 1 || opts.group) {
+		return errors.New("--models requires a single run without --group")
 	}
 	auditCommandLog.Printf("Dispatching audit command: run_count=%d, format=%s, parse=%t, evals_only=%t", len(args), opts.format, opts.parse, opts.evalsOnly)
 	ctx := cmd.Context()
@@ -142,7 +151,7 @@ func runAuditCommand(cmd *cobra.Command, args []string) error {
 			[]string{"Provide a single run ID with --evals to filter by evals results"},
 		))
 	}
-	return runAuditMulti(ctx, args, opts.repoFlag, opts.outputDir, opts.verbose, opts.jsonOutput, opts.format, opts.artifacts)
+	return runAuditMulti(ctx, args, opts)
 }
 
 func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
@@ -164,6 +173,7 @@ func getAuditCommandOptions(cmd *cobra.Command) (auditCommandOptions, error) {
 	opts.timeout, _ = cmd.Flags().GetDuration("timeout")
 	opts.search, _ = cmd.Flags().GetString("search")
 	opts.searchLimit, _ = cmd.Flags().GetInt("search-limit")
+	opts.models, _ = cmd.Flags().GetBool("models")
 	if cmd.Flags().Changed("search") || cmd.Flags().Changed("search-limit") {
 		if err := validateAuditSearch(opts.search, opts.searchLimit); err != nil {
 			return auditCommandOptions{}, err
@@ -234,6 +244,9 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 	if opts.search != "" && components.JobID > 0 {
 		return errors.New("--search is not supported with job or step URLs; provide a run ID or run URL")
 	}
+	if opts.models && components.JobID > 0 {
+		return errors.New("--models is not supported with job or step URLs; provide a run ID or run URL")
+	}
 	auditCommandLog.Printf("Running single-run audit: run=%d, owner=%s, repo=%s, job_id=%d", components.Number, components.Owner, components.Repo, components.JobID)
 	_, err = AuditWorkflowRun(ctx, components.Number, AuditOptions{
 		Owner:            components.Owner,
@@ -254,6 +267,7 @@ func runAuditSingle(ctx context.Context, runIDOrURL string, opts auditCommandOpt
 		NoBaseline:       opts.noBaseline,
 		Search:           opts.search,
 		SearchLimit:      opts.searchLimit,
+		Models:           opts.models,
 	})
 	return err
 }
@@ -282,7 +296,7 @@ func firstAuditArg(args []string) (string, bool) {
 // The first argument is the base run; remaining arguments are comparison runs.
 // Each argument may be a numeric run ID, a GitHub Actions run URL, or a job/step
 // URL — job and step specificity is silently normalized to the parent run ID.
-func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir string, verbose, jsonOutput bool, format string, artifacts []string) error {
+func runAuditMulti(ctx context.Context, args []string, opts auditCommandOptions) error {
 	// Parse base run (job/step URLs are accepted; only the run number is used)
 	baseComponents, err := parser.ParseRunURLExtended(args[0]) //nolint:uncheckedsliceindex // multi-run mode requires at least two arguments
 	if err != nil {
@@ -290,7 +304,7 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 	}
 
 	// Resolve owner/repo/hostname from --repo flag or base URL
-	if err := applyAuditRepoFlag(repoFlag, baseComponents); err != nil {
+	if err := applyAuditRepoFlag(opts.repoFlag, baseComponents); err != nil {
 		return err
 	}
 	owner := baseComponents.Owner
@@ -315,15 +329,15 @@ func runAuditMulti(ctx context.Context, args []string, repoFlag, outputDir strin
 		compareRunIDs = append(compareRunIDs, c.Number)
 	}
 
-	auditCommandLog.Printf("Running multi-run diff audit: base=%d, compare_count=%d, format=%s", baseComponents.Number, len(compareRunIDs), format)
+	auditCommandLog.Printf("Running multi-run diff audit: base=%d, compare_count=%d, format=%s", baseComponents.Number, len(compareRunIDs), opts.format)
 	return RunAuditDiff(ctx, baseComponents.Number, compareRunIDs, AuditOptions{
 		Owner:        owner,
 		Repo:         repo,
 		Hostname:     hostname,
-		OutputDir:    outputDir,
-		Verbose:      verbose,
-		JSONOutput:   jsonOutput,
-		Format:       format,
-		ArtifactSets: artifacts,
+		OutputDir:    opts.outputDir,
+		Verbose:      opts.verbose,
+		JSONOutput:   opts.jsonOutput,
+		Format:       opts.format,
+		ArtifactSets: opts.artifacts,
 	})
 }

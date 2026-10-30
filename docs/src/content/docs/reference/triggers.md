@@ -29,6 +29,8 @@ All gateway families forward only canonical resource URLs, event type arrays, an
 
 Run workflows manually from the GitHub UI, API, or via `gh aw run`/`gh aw trial`. [Full syntax reference](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#on).
 
+`gh aw run <workflow> --ref <branch>` runs that branch's compiled workflow content, but GitHub requires the workflow file to be registered on the default branch first. See [Run from a feature branch](/gh-aw/setup/cli/#run-from-a-feature-branch) for inert registration and the limits of testing `pull_request_target` through manual dispatch.
+
 **Basic trigger:**
 
 ```yaml wrap

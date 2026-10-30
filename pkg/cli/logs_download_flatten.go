@@ -316,12 +316,12 @@ func flattenDownloadedArtifacts(ctx context.Context, opts downloadArtifactsOptio
 		return fmt.Errorf("failed to flatten activation artifact: %w", err)
 	}
 
-	ensureUsageAwInfoFallback(ctx, opts)
-
 	// Flatten unified agent directory structure
 	if err := flattenUnifiedArtifact(opts.outputDir, opts.verbose); err != nil {
 		return fmt.Errorf("failed to flatten unified artifact: %w", err)
 	}
+
+	ensureUsageAwInfoFallback(ctx, opts)
 
 	// Flatten the fallback after the unified artifact so primary files win when
 	// both artifacts are present, while fallback files populate the run root when

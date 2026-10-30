@@ -74,6 +74,10 @@ func renderPreparedAuditReport(ctx context.Context, auditData AuditData, opts Au
 	}
 	// Query-specific evidence never enters the shared deterministic audit cache.
 	auditData.EvidenceSearch = nil
+	auditData.ModelCatalog = nil
+	if opts.Models {
+		auditData.ModelCatalog = buildAuditModelCatalog(runOutputDir)
+	}
 	if opts.Search != "" {
 		search, err := searchAuditSession(ctx, runOutputDir, runID, opts.Search, opts.SearchLimit)
 		if err != nil {
