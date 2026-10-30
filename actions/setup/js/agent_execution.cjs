@@ -274,6 +274,11 @@ function agentErrorSummaryText(content, eventsOrSourceEngine = [], rawSourceEngi
     .join("\n");
 }
 
+/** @param {string} text */
+function isAttributedCAPIServerError(text) {
+  return isCAPIServerError(text) || /\bCAPIError:\s*5\d{2}\b/i.test(text);
+}
+
 /**
  * @param {any[]} errors
  */
@@ -355,7 +360,7 @@ function collectAgentExecution({ content = "", events = [], categories = [], exi
   for (const line of buildOutputLines(detectErrors(text))) {
     if (line.endsWith("=true")) categorySet.add(line.slice(0, -5));
   }
-  if (isCAPIServerError(text) || /\bCAPIError:\s*5\d{2}\b/i.test(text)) categorySet.add("capi_server_error");
+  if (isAttributedCAPIServerError(text)) categorySet.add("capi_server_error");
   if (isAuthenticationFailedError(text)) categorySet.add("authentication_failed");
   const guards = detectNonRetryableHarnessGuard(text);
   if (guards.aiCreditsExceeded) categorySet.add("max_ai_credits_exceeded");
