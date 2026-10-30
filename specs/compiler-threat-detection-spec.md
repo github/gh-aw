@@ -160,6 +160,8 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 ### 5.1 Core Rule Catalog
 
 - **CTR-001 Privilege Escalation**: Reject unauthorized generated-job write permissions. `id-token: write` MUST be exempt from repository-write rejection because it permits OIDC token issuance, not repository modification. Its audience and cloud-provider trust-policy reminder MUST be informational, MUST NOT increment the compiler warning count, and MUST NOT by itself fail warnings-as-errors validation. Missing required OIDC permissions and invalid `id-token: read` declarations MUST still be rejected.
+
+  Compiler-managed create-token wiring MUST recognize a minting step only when both `id: create-token` and a `uses` reference to the official `actions/create-github-app-token` action are present. Third-party actions and similarly named action references MUST NOT trigger automatic `id-token: write` grants or minted-token rewriting. Explicit job/workflow `id-token: none` and `safe-outputs.id-token: none` opt-outs MUST remain effective.
 - **CTR-002 Unpinned Action Integrity**: Reject unpinned action references in strict contexts.
 - **CTR-003 Unsafe Tool Scope Expansion**: Reject or warn on policy-violating wildcard or overbroad tool scope.
 - **CTR-004 Sandbox Bypass Configuration**: Reject generated configuration that disables required sandboxing.
