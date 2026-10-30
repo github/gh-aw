@@ -10,6 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow/actions"
+	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,7 +89,7 @@ func TestDecisionCannotOverrideDeterministicChecks(t *testing.T) {
 	text := strings.Join(job.Steps, "")
 	assert.Contains(t, text, "GH_AW_DECISION_ELIGIBLE:")
 	assert.Contains(t, text, "steps.check_skip_bots.outputs.skip_bots_ok == 'true'")
-	assert.Contains(t, job.Outputs["activated"], "steps.check_skip_bots.outputs.skip_bots_ok == 'true'")
+	assert.Contains(t, job.Outputs["activated"], "steps.decision_eligibility.outputs.eligible == 'true'")
 	assert.Contains(t, job.Outputs["activated"], "steps.decision_gate.outputs.decision_result != 'skip'")
 	outputs := buildPreActivationJobOutputs(data, "protected", nil, map[string]string{"activated": "'true'"})
 	assert.Equal(t, "protected", outputs["activated"])
@@ -115,12 +116,30 @@ func TestDecisionWorkflowRunSafety(t *testing.T) {
 	assert.Contains(t, text, "GH_AW_DECISION_ELIGIBLE:")
 	assert.Contains(t, text, "github.event.workflow_run.repository.id == github.repository_id")
 	assert.Contains(t, text, "!(github.event.workflow_run.repository.fork)")
-	assert.Contains(t, job.Outputs["activated"], "github.event.workflow_run.repository.id == github.repository_id")
-	assert.Contains(t, job.Outputs["activated"], "!(github.event.workflow_run.repository.fork)")
+	assert.Contains(t, job.Outputs["activated"], "steps.decision_eligibility.outputs.eligible == 'true'")
 
 	_, err = decisionEligibleCondition(&WorkflowData{If: "needs.pre_activation.outputs.loop == 'yes'"},
 		BuildStringLiteral("true"), nil, map[string]string{"loop": "${{ needs.pre_activation.outputs.loop }}"})
 	require.ErrorContains(t, err, "cyclic")
+}
+
+func TestDecisionStatusConditionsStayInStepIf(t *testing.T) {
+	for _, status := range []string{"always()", "success()", "failure()", "cancelled()"} {
+		t.Run(status, func(t *testing.T) {
+			data := &WorkflowData{
+				If:       status,
+				Decision: &DecisionConfig{Model: "decision", Questions: []string{"Run?"}},
+			}
+			job, err := NewCompiler().buildPreActivationJob(data, false)
+			require.NoError(t, err)
+			assert.NotContains(t, job.Outputs["activated"], status, "status functions are not allowed in job outputs")
+			text := strings.Join(job.Steps, "")
+			workflow := "on: workflow_dispatch\njobs:\n  pre_activation:\n    runs-on: ubuntu-latest\n    outputs:\n      activated: " + job.Outputs["activated"] + "\n    steps:\n" + text
+			require.NoError(t, actionslanguageservice.ValidateWorkflow("decision.lock.yml", workflow))
+			assert.Contains(t, text, "id: decision_eligibility")
+			assert.Contains(t, text, status)
+		})
+	}
 }
 
 func TestDecisionEligibleCustomPredicates(t *testing.T) {

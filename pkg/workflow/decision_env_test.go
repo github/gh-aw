@@ -146,7 +146,7 @@ Perform the requested work.
 	}
 	require.NotNil(t, env)
 	assert.Equal(t, "team-decision", env["GH_AW_DECISION_MODEL"])
-	assert.Contains(t, env["GH_AW_DECISION_ELIGIBLE"], "github.event.workflow_run.repository.id == github.repository_id")
+	assert.Equal(t, "${{ steps.decision_eligibility.outputs.eligible == 'true' }}", env["GH_AW_DECISION_ELIGIBLE"])
 	assert.Equal(t, "1", env["GH_AW_DECISION_QUESTION_COUNT"])
 	assert.Equal(t, "Is ${{ github.event.issue.title }} actionable?", env["GH_AW_DECISION_QUESTION_0"])
 	assert.Equal(t, "${{ secrets.DECISION_KEY }}", env["OPENAI_API_KEY"])

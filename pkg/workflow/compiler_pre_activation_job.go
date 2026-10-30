@@ -109,12 +109,17 @@ func (c *Compiler) appendPreActivationDecisionGate(data *WorkflowData, steps []s
 	} else {
 		eligible = BuildAnd(eligible, workflowRunSafety)
 	}
-	if _, literal := eligible.(*StringLiteralNode); literal {
-		steps = c.appendDecisionStep(data, steps, "${{ true }}")
-	} else {
-		steps = c.appendDecisionStep(data, steps, RenderCondition(eligible))
-	}
-	activatedExpression := fmt.Sprintf("${{ (%s) && steps.%s.outputs.decision_result != 'skip' }}", eligible.Render(), decisionStepID)
+	// Status functions are valid in step conditions, not in env or job outputs.
+	steps = append(steps,
+		"      - name: Check decision eligibility\n",
+		"        id: decision_eligibility\n",
+		"        if: "+RenderCondition(eligible)+"\n",
+		"        shell: bash\n",
+		"        run: echo 'eligible=true' >> \"$GITHUB_OUTPUT\"\n",
+	)
+	const eligibleOutput = "steps.decision_eligibility.outputs.eligible == 'true'"
+	steps = c.appendDecisionStep(data, steps, "${{ "+eligibleOutput+" }}")
+	activatedExpression := fmt.Sprintf("${{ (%s) && steps.%s.outputs.decision_result != 'skip' }}", eligibleOutput, decisionStepID)
 	return steps, activatedExpression, nil
 }
 
