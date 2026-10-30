@@ -282,7 +282,7 @@ func DownloadWorkflowLogsForTargets( //nolint:largefunc // Keeps shared collecti
 	}
 	processedRuns = sortAndLimitLogsTargetRuns(processedRuns, opts.Count, opts.Verbose)
 	if opts.Harbor {
-		if err := logsExportHarborJob(ctx, opts.OutputDir, processedRuns); err != nil {
+		if err := exportLogsHarbor(ctx, opts.OutputDir, processedRuns, opts.AdditionalGraders); err != nil {
 			return fmt.Errorf("harbor export: %w", err)
 		}
 	}

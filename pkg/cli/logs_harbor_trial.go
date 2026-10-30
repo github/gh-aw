@@ -30,6 +30,10 @@ func harborExportTrial(ctx context.Context, staging, name, jobID, source string,
 		return nil, err
 	}
 	metadata := harborTrialMetadata(processed, sessionStatus, files, graders, agentProvenance, evidence)
+	rewards, mapping, err = harborRegradedRewards(dir, processed.Regrading, metadata, rewards, mapping)
+	if err != nil {
+		return nil, err
+	}
 	if err := harborExperimentProvenance(dir, evidence, metadata); err != nil {
 		return nil, err
 	}
@@ -150,6 +154,9 @@ func harborPublishRewards(dir string, result, metadata map[string]any, rewards m
 	result["verifier_result"] = map[string]any{"rewards": rewards}
 	metadata["reward_mapping"] = mapping
 	metadata["verifier_status"] = "recorded-gh-aw-grader-metrics"
+	if metadata["regrading"] != nil {
+		metadata["verifier_status"] = "gh-aw-grader-metrics-with-offline-regrading"
+	}
 	if err := os.MkdirAll(filepath.Join(dir, "verifier"), 0o700); err != nil {
 		return err
 	}

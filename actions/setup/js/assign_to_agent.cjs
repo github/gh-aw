@@ -12,6 +12,7 @@ const { resolvePullRequestRepo } = require("./pr_helpers.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { normalizeIssueIntentMetadata } = require("./issue_intents.cjs");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
+const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token_broker_github.cjs");
 
 /** @type {Array<[string, string]>} */
 const TOKEN_FORMATS = [
@@ -35,6 +36,7 @@ function classifyTokenFormat(token) {
  * Create a dedicated GitHub client for assign-to-agent operations.
  *
  * Token precedence:
+ *   0. Token broker copilot-task capability, when opted in (never falls back)
  *   1. config["github-token"] — per-handler PAT configured in the workflow frontmatter
  *   2. GH_AW_ASSIGN_TO_AGENT_TOKEN — agent token injected by the compiler as a step env var
  *      (evaluates to: GH_AW_AGENT_TOKEN || GH_AW_GITHUB_TOKEN || GITHUB_TOKEN)
@@ -44,6 +46,7 @@ function classifyTokenFormat(token) {
  * @returns {Promise<Object>} Authenticated GitHub client
  */
 async function createAssignToAgentGitHubClient(config) {
+  if (isTokenBrokerEnabled()) return createTokenBrokerGitHubClient();
   const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
   if (!token) {
     core.debug("No dedicated agent token configured — using step-level github client for assign-to-agent operations");
@@ -60,6 +63,7 @@ async function createAssignToAgentGitHubClient(config) {
  * @returns {string}
  */
 function describeAssignmentCredentialFailure(config, errorMessage) {
+  if (isTokenBrokerEnabled()) return `${errorMessage}. Agent assignment uses the token broker copilot-task capability; check broker authorization.`;
   const token = config["github-token"] || process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN;
   const compiledSource = process.env.GH_AW_ASSIGN_TO_AGENT_TOKEN_SOURCE || "";
   const knownSources = new Set(["GH_AW_AGENT_TOKEN", "GH_AW_GITHUB_TOKEN", "GITHUB_TOKEN"]);
@@ -82,6 +86,7 @@ async function validateAssignmentCredential(githubClient, config) {
   try {
     await githubClient.request("GET /rate_limit");
   } catch (error) {
+    if (isTokenBrokerEnabled()) throw error;
     const status = Number(error && typeof error === "object" ? error.status || error.response?.status || 0 : 0);
     const errorMessage = getErrorMessage(error);
     if (status !== 401 && !/\b(?:bad credentials|not authenticated)\b/i.test(errorMessage)) {
@@ -210,6 +215,7 @@ async function writeAssignSummary(allResults, batchError = "") {
  * @returns {Promise<Function>} Message processor function
  */
 async function main(config = {}) {
+  const brokerEnabled = isTokenBrokerEnabled();
   // Parse configuration (replaces env vars from the old standalone step)
   const maxCount = parseInt(String(config.max ?? "1"), 10);
   if (Number.isNaN(maxCount) || maxCount < 1) {
@@ -331,6 +337,7 @@ async function main(config = {}) {
     });
     await credentialPreflight;
     if (credentialError) {
+      if (brokerEnabled) return { success: false, error: credentialError };
       return { success: true, skipped: true };
     }
 
@@ -349,6 +356,7 @@ async function main(config = {}) {
       })();
       await pullRequestRepoResolution;
       if (repositoryError) {
+        if (brokerEnabled) return { success: false, error: repositoryError };
         return { success: true, skipped: true };
       }
     }
@@ -628,7 +636,7 @@ async function main(config = {}) {
         errorMessage = describeAssignmentCredentialFailure(config, errorMessage);
       }
 
-      if (ignoreIfError && (isAuthError || isAvailabilityError)) {
+      if (!brokerEnabled && ignoreIfError && (isAuthError || isAvailabilityError)) {
         const errorType = isAuthError ? "authentication/permission" : "agent availability";
         core.warning(`Agent assignment failed for ${agentName} on ${type} #${number} due to ${errorType} error. Skipping due to ignore-if-error=true.`);
         core.info(`Error details: ${errorMessage}`);
@@ -659,7 +667,7 @@ async function main(config = {}) {
 
       // Post failure comment on the issue/PR so the user sees the failure in context
       try {
-        await githubClient.rest.issues.createComment({
+        await (brokerEnabled ? github : githubClient).rest.issues.createComment({
           owner: effectiveOwner,
           repo: effectiveRepo,
           issue_number: number,
@@ -684,7 +692,8 @@ async function main(config = {}) {
         });
         core.info(`Posted failure comment on ${type} #${number} in ${effectiveOwner}/${effectiveRepo}`);
       } catch (commentError) {
-        core.warning(`Failed to post failure comment on ${type} #${number}: ${getErrorMessage(commentError)}`);
+        const commentDiagnostic = brokerEnabled ? "GitHub comment request failed." : getErrorMessage(commentError);
+        core.warning(`Failed to post failure comment on ${type} #${number}: ${commentDiagnostic}`);
       }
 
       allResults.push({ issue_number: issueNumber, pull_number: pullNumber, agent: agentName, owner: effectiveOwner, repo: effectiveRepo, pull_request_repo: effectivePullRequestRepoSlug, success: false, error: errorMessage });
@@ -694,7 +703,7 @@ async function main(config = {}) {
 
   handleMessage.getAssignToAgentAssigned = () => formatAssignedOutput(allResults);
   handleMessage.getAssignToAgentErrors = () => credentialError || repositoryError || formatErrorsOutput(allResults);
-  handleMessage.getAssignToAgentErrorCount = () => (repositoryError || (credentialError && !ignoreIfError) ? 1 : countHardFailures(allResults));
+  handleMessage.getAssignToAgentErrorCount = () => (repositoryError || (credentialError && (brokerEnabled || !ignoreIfError)) ? 1 : countHardFailures(allResults));
   handleMessage.writeAssignToAgentSummary = () => writeAssignSummary(allResults, credentialError || repositoryError);
 
   return handleMessage;
