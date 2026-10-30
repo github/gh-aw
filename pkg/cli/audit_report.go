@@ -553,13 +553,7 @@ type auditDataInputs struct {
 
 func assembleAuditData(inputs auditDataInputs) AuditData {
 	run := inputs.processedRun.Run
-	metricsData := inputs.metricsData
-	if run.ActionMinutes > 0 {
-		metricsData.ActionMinutes = run.ActionMinutes
-	} else if run.Duration > 0 {
-		metricsData.ActionMinutes = math.Ceil(run.Duration.Minutes())
-	}
-
+	metricsData := setAuditActionMinutes(run, inputs.metricsData)
 	performanceMetrics := generatePerformanceMetrics(inputs.processedRun, metricsData, inputs.toolUsage)
 	chainMetrics := buildSafeOutputChainMetrics(run.LogsPath)
 	engineConfig := extractEngineConfigWithInferredEngine(run.LogsPath, inputs.inferredEngineID)
@@ -613,6 +607,15 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		DecisionGate:            extractDecisionGateData(run.LogsPath),
 		Graders:                 extractGradersData(run.LogsPath),
 	}
+}
+
+func setAuditActionMinutes(run WorkflowRun, metricsData MetricsData) MetricsData {
+	if run.ActionMinutes > 0 {
+		metricsData.ActionMinutes = run.ActionMinutes
+	} else if run.Duration > 0 {
+		metricsData.ActionMinutes = math.Ceil(run.Duration.Minutes())
+	}
+	return metricsData
 }
 
 func auditEngineConfigWarnings(config *AuditEngineConfig) []ValidationIssue {
