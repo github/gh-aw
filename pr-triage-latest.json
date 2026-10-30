@@ -1,102 +1,240 @@
 {
-  "run_date": "2026-10-30T00:50:12.975401Z",
-  "run_id": "40981316485",
+  "run_date": "2026-10-30T06:28:54.808Z",
+  "run_id": "41014115007",
   "source": "pr-triage",
-  "eligible_total": 13,
-  "cooldown_skipped": 1,
+  "eligible_total": 15,
+  "cooldown_skipped": 0,
   "open_copilot_prs": 15,
   "category_counts": {
     "bug": 10,
-    "feature": 2,
+    "feature": 4,
     "docs": 1
   },
   "risk_counts": {
     "high": 2,
-    "medium": 10,
+    "medium": 12,
     "low": 1
   },
   "priority_counts": {
     "high": 2,
-    "medium": 10,
+    "medium": 12,
     "low": 1
   },
   "action_counts": {
     "fast_track": 3,
-    "batch_review": 9,
+    "batch_review": 11,
     "auto_merge": 1
   },
   "batches": [
     {
       "id": "pr-batch:agentic-safety-fixes",
       "members": [
-        72970,
-        72969,
-        72968,
-        72940,
-        72939,
-        72938,
-        72936,
+        72929,
         72932,
-        72929
+        72936,
+        72938,
+        72939,
+        72940,
+        72968,
+        72969,
+        72970
       ]
     }
   ],
   "selected_candidates": [
     {
-      "number": 73034,
-      "title": "Route Safe Output Health Monitor with model routing (goal: cost, mode: economy)",
+      "number": 72273,
+      "title": "Support Claude on Vertex AI with GCP WIF",
       "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
+      "risk": "high",
+      "priority": "high",
       "action": "fast_track",
-      "score": 62,
+      "score": 74,
       "score_breakdown": {
-        "impact": 30,
-        "urgency": 14,
+        "impact": 35,
+        "urgency": 21,
         "quality": 18
       },
       "batch": null,
       "labels": [
         "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
+        "pr-risk:high",
+        "pr-priority:high",
         "pr-action:fast_track",
         "pr-agent:copilot"
       ]
     },
     {
-      "number": 73033,
-      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
-      "category": "feature",
+      "number": 72929,
+      "title": "Auto-migrate literal safe-output appends in post-steps",
+      "category": "bug",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 58,
+      "score": 60,
       "score_breakdown": {
-        "impact": 28,
-        "urgency": 14,
+        "impact": 26,
+        "urgency": 18,
         "quality": 16
       },
-      "batch": null,
+      "batch": "pr-batch:agentic-safety-fixes",
       "labels": [
-        "pr-type:feature",
+        "pr-type:bug",
         "pr-risk:medium",
         "pr-priority:medium",
         "pr-action:batch_review",
-        "pr-agent:copilot"
+        "pr-agent:copilot",
+        "pr-batch:agentic-safety-fixes"
       ]
     },
     {
-      "number": 72970,
-      "title": "Retry MCP gateway startup and identify pre-agent checkout failures",
+      "number": 72932,
+      "title": "Wire minted-token env bindings and OIDC permissions in create-token jobs",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 61,
+      "score_breakdown": {
+        "impact": 27,
+        "urgency": 18,
+        "quality": 16
+      },
+      "batch": "pr-batch:agentic-safety-fixes",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agentic-safety-fixes"
+      ]
+    },
+    {
+      "number": 72936,
+      "title": "Fix compilation errors for compiler-generated setup action fallbacks",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 62,
+      "score_breakdown": {
+        "impact": 27,
+        "urgency": 18,
+        "quality": 17
+      },
+      "batch": "pr-batch:agentic-safety-fixes",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agentic-safety-fixes"
+      ]
+    },
+    {
+      "number": 72938,
+      "title": "Keep safe-output credentials out of agent configuration",
+      "category": "bug",
+      "risk": "high",
+      "priority": "high",
+      "action": "fast_track",
+      "score": 82,
+      "score_breakdown": {
+        "impact": 40,
+        "urgency": 24,
+        "quality": 18
+      },
+      "batch": "pr-batch:agentic-safety-fixes",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:agentic-safety-fixes"
+      ]
+    },
+    {
+      "number": 72939,
+      "title": "Reject Copilot discovery-only responses as successful completion",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 65,
+      "score_breakdown": {
+        "impact": 29,
+        "urgency": 20,
+        "quality": 16
+      },
+      "batch": "pr-batch:agentic-safety-fixes",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agentic-safety-fixes"
+      ]
+    },
+    {
+      "number": 72940,
+      "title": "Preserve agent config permissions and restore only after PR checkout",
       "category": "bug",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
       "score": 67,
       "score_breakdown": {
-        "impact": 31,
+        "impact": 33,
         "urgency": 20,
+        "quality": 14
+      },
+      "batch": "pr-batch:agentic-safety-fixes",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:agentic-safety-fixes"
+      ]
+    },
+    {
+      "number": 72941,
+      "title": "Clarify feature-branch dispatch and document safe pre-merge validation",
+      "category": "docs",
+      "risk": "low",
+      "priority": "low",
+      "action": "auto_merge",
+      "score": 42,
+      "score_breakdown": {
+        "impact": 20,
+        "urgency": 10,
+        "quality": 12
+      },
+      "batch": null,
+      "labels": [
+        "pr-type:docs",
+        "pr-risk:low",
+        "pr-priority:low",
+        "pr-action:auto_merge",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 72968,
+      "title": "Surface incomplete-result reasons in failure issues and conclusion summaries",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 64,
+      "score_breakdown": {
+        "impact": 29,
+        "urgency": 19,
         "quality": 16
       },
       "batch": "pr-batch:agentic-safety-fixes",
@@ -133,83 +271,15 @@
       ]
     },
     {
-      "number": 72968,
-      "title": "Surface incomplete-result reasons in failure issues and conclusion summaries",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 64,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 19,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72941,
-      "title": "Clarify feature-branch dispatch and document safe pre-merge validation",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 42,
-      "score_breakdown": {
-        "impact": 20,
-        "urgency": 10,
-        "quality": 12
-      },
-      "batch": null,
-      "labels": [
-        "pr-type:docs",
-        "pr-risk:low",
-        "pr-priority:low",
-        "pr-action:auto_merge",
-        "pr-agent:copilot"
-      ]
-    },
-    {
-      "number": 72940,
-      "title": "Preserve agent config permissions and restore only after PR checkout",
+      "number": 72970,
+      "title": "Retry MCP gateway startup and identify pre-agent checkout failures",
       "category": "bug",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
       "score": 67,
       "score_breakdown": {
-        "impact": 33,
-        "urgency": 20,
-        "quality": 14
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72939,
-      "title": "Reject Copilot discovery-only responses as successful completion",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 65,
-      "score_breakdown": {
-        "impact": 29,
+        "impact": 31,
         "urgency": 20,
         "quality": 16
       },
@@ -224,116 +294,90 @@
       ]
     },
     {
-      "number": 72938,
-      "title": "Keep safe-output credentials out of agent configuration",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 82,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 24,
-        "quality": 18
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72936,
-      "title": "Fix compilation errors for compiler-generated setup action fallbacks",
-      "category": "bug",
+      "number": 73033,
+      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
+      "category": "feature",
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
+      "score": 58,
+      "score_breakdown": {
+        "impact": 28,
+        "urgency": 14,
+        "quality": 16
+      },
+      "batch": null,
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 73034,
+      "title": "Route Safe Output Health Monitor with model routing (goal: cost, mode: economy)",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "fast_track",
       "score": 62,
       "score_breakdown": {
-        "impact": 27,
-        "urgency": 18,
-        "quality": 17
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72932,
-      "title": "Wire minted-token env bindings and OIDC permissions in create-token jobs",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 61,
-      "score_breakdown": {
-        "impact": 27,
-        "urgency": 18,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72929,
-      "title": "Auto-migrate literal safe-output appends in post-steps",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 18,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72273,
-      "title": "Support Claude on Vertex AI with GCP WIF",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 74,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 21,
+        "impact": 30,
+        "urgency": 14,
         "quality": 18
       },
       "batch": null,
       "labels": [
         "pr-type:feature",
-        "pr-risk:high",
-        "pr-priority:high",
+        "pr-risk:medium",
+        "pr-priority:medium",
         "pr-action:fast_track",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 73052,
+      "title": "Support engine.model-routing for Claude on native Anthropic and Codex on native OpenAI",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 61,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 15,
+        "quality": 16
+      },
+      "batch": null,
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 73078,
+      "title": "Include canonical issue IDs in duplicate close intents",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 57,
+      "score_breakdown": {
+        "impact": 27,
+        "urgency": 14,
+        "quality": 16
+      },
+      "batch": null,
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
         "pr-agent:copilot"
       ]
     }
