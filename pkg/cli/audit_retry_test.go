@@ -118,7 +118,7 @@ func TestAuditRetriesRetainDistinctObservedIntervals(t *testing.T) {
 func TestAuditRetriesExposeNativeEngineRetriesSeparately(t *testing.T) {
 	root := t.TempDir()
 	record := func(attempt, index int, phase string) string {
-		return fmt.Sprintf(`{"type":"session.result","data":{"is_error":true,"engineRetry":{"attempt":%d,"maxRetries":5,"backoffMs":100}},"provenance":{"component":"agent","phase":%q,"path":"agent.jsonl","index":%d,"attemptId":"harness:2"}}`+"\n", attempt, phase, index)
+		return fmt.Sprintf(`{"type":"engine.retry","data":{"sourceEngine":"codex","attempt":%d,"maxRetries":5,"backoffMs":100},"provenance":{"component":"agent","phase":%q,"path":"agent.jsonl","index":%d,"attemptId":"harness:2"}}`+"\n", attempt, phase, index)
 	}
 	content := sessionTestHeader + record(1, 0, "agent") + record(2, 1, "agent") + record(1, 2, "agent") + record(1, 0, "detection") + record(0, 3, "agent") +
 		`{"type":"session.result","data":{"is_error":true},"provenance":{"component":"agent","phase":"agent"}}` + "\n"
@@ -131,16 +131,34 @@ func TestAuditRetriesExposeNativeEngineRetriesSeparately(t *testing.T) {
 	require.Equal(t, 1, report.DetectionEngineRetries)
 	require.Len(t, report.EngineRetryHistory, 4)
 	require.Equal(t, "harness:2", report.EngineRetryHistory[0].AttemptID)
+	require.Equal(t, "codex", report.EngineRetryHistory[0].SourceEngine)
 	require.Equal(t, 5, *report.EngineRetryHistory[0].MaxRetries)
 	console := captureStderrForGuardPolicyReportTest(func() { renderConsoleRetries(report) })
 	require.Contains(t, console, "attempts=0 engine=3 detection_engine=1")
+}
+
+func TestAuditRetriesRetainPartialAndLegacyNativeObservations(t *testing.T) {
+	root := t.TempDir()
+	writeSessionTestFile(t, root, "aw_session.jsonl", sessionTestHeader+
+		`{"type":"engine.retry","data":{"sourceEngine":"claude","errors":["retry"]},"provenance":{"component":"agent","phase":"agent","path":"agent.jsonl","index":0}}`+"\n"+
+		`{"type":"session.result","data":{"engineRetry":{"attempt":1,"maxRetries":5}},"provenance":{"component":"agent","phase":"agent","path":"agent.jsonl","index":1}}`+"\n")
+	report := readAuditRetrySummary(root)
+	require.NotNil(t, report)
+	require.Equal(t, 2, report.EngineRetries)
+	require.Len(t, report.EngineRetryHistory, 2)
+	require.Nil(t, report.EngineRetryHistory[0].Attempt)
+	require.Equal(t, "claude", report.EngineRetryHistory[0].SourceEngine)
+	require.Equal(t, 1, *report.EngineRetryHistory[1].Attempt)
+	encoded, err := json.Marshal(report.EngineRetryHistory[0])
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), `"attempt"`)
 }
 
 func TestSessionATIFRetainsRetryEvidence(t *testing.T) {
 	content := sessionTestHeader + sessionTestAgentEvent +
 		`{"type":"harness.attempt","data":{"attempt":2,"attemptId":"retry-2","exitCode":null,"failureClasses":[],"startedAt":10,"outcome":"interrupted","strategy":"resume","backoffMs":20,"layer":"harness"},"provenance":{"component":"harness","phase":"agent","path":"retry.json","index":1}}` + "\n" +
 		`{"type":"harness.retry","data":{"attemptResults":[{"attempt":2,"exitCode":null,"failureClasses":[]}],"startupAttemptResults":[{"attempt":2,"exitCode":0,"failureClasses":[]}]},"provenance":{"component":"harness","phase":"agent","path":"retry.json","index":0}}` + "\n" +
-		`{"type":"session.result","data":{"engineRetry":{"attempt":1,"maxRetries":5,"backoffMs":100}},"provenance":{"component":"agent","phase":"agent","path":"agent.jsonl","index":0,"attemptId":"harness:2"}}` + "\n"
+		`{"type":"engine.retry","data":{"sourceEngine":"claude","attempt":1,"maxRetries":5,"backoffMs":100},"provenance":{"component":"agent","phase":"agent","path":"agent.jsonl","index":0,"attemptId":"harness:2"}}` + "\n"
 	root := t.TempDir()
 	writeSessionTestFile(t, root, "aw_session.jsonl", content)
 	require.NoError(t, exportRunATIF(t.Context(), 123, root))
@@ -153,7 +171,7 @@ func TestSessionATIFRetainsRetryEvidence(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(exported, &trajectory))
 	for line := range strings.SplitSeq(strings.TrimSpace(content), "\n") {
-		if !strings.Contains(line, `"component":"harness"`) && !strings.Contains(line, `"engineRetry"`) {
+		if !strings.Contains(line, `"component":"harness"`) && !strings.Contains(line, `"engine.retry"`) {
 			continue
 		}
 		var want map[string]any

@@ -57,6 +57,7 @@ function recordErrors(record) {
   const data = record.data ?? record;
   if (["error", "session.error"].includes(record.type) && ["warning", "info"].includes(data.severity)) return [];
   if (["session.error", "claude.assistant_error", "claude.api_retry", "error", "turn.failed"].includes(record.type)) return [data];
+  if (record.type === "engine.retry") return Array.isArray(data.errors) ? data.errors : [];
   if (record.type === "session.result") return [...(Array.isArray(data.errors) ? data.errors : []), ...(data.is_error === true || data.status === "failed" ? [data] : [])];
   if (record.type === "assistant" && record.is_api_error_message === true) return [record];
   if (record.type === "system" && record.subtype === "api_retry") return [record];

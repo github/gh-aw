@@ -371,7 +371,18 @@ function normalizeAgentSession(entries, { sourceEngine } = {}) {
  * @returns {Record<string, any>|undefined}
  */
 function selectSessionResult(events, { includeNested = false } = {}) {
-  const normalized = normalizeAgentSession(events);
+  const normalized = normalizeAgentSession(events).flatMap(event => {
+    if (event.type !== "engine.retry") return [event];
+    // Retry diagnostics contribute errors, never accounting or terminal status.
+    if (!Array.isArray(event.data.errors) || !event.data.errors.length) return [];
+    /** @type {SessionEvent} */
+    const diagnostic = {
+      ...event,
+      type: "session.result",
+      data: { ...sessionContext(event), sourceEngine: typeof event.data.sourceEngine === "string" ? event.data.sourceEngine : undefined, errors: event.data.errors },
+    };
+    return [diagnostic];
+  });
   const claudeSessions = new Map();
   for (const event of normalized) {
     const context = sessionContext(event);

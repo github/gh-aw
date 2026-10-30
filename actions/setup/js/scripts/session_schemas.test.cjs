@@ -57,6 +57,8 @@ describe("Generated session schemas", () => {
       { type: "tool.execution_start", data: { input: false } },
       { type: "tool.execution_complete", data: { success: false, output: 0, result: [], error: null, durationMs: 0 } },
       { type: "session.result", data: { numTurns: 0, totalCostUsd: 0, usage: { input_tokens: 0, totalTokens: 0 }, errors: [] } },
+      { type: "engine.retry", data: { sourceEngine: "claude", attempt: 1, maxRetries: 5, backoffMs: 0, errors: [{ error_status: 502 }] } },
+      { type: "engine.retry", data: { sourceEngine: "codex" } },
       { type: "vendor.progress", data: { nested: [false, 0, null, "", {}, []] } },
     ];
     const content = JSON.stringify(events);
@@ -78,6 +80,10 @@ describe("Generated session schemas", () => {
     { type: "session.result", data: { durationMs: -1 } },
     { type: "session.result", data: { usage: { input_tokens: 0.5 } } },
     { type: "session.result", data: { usage: { input_tokens: Number.MAX_SAFE_INTEGER + 1 } } },
+    { type: "engine.retry", data: { attempt: 0 } },
+    { type: "engine.retry", data: { attempt: 0.5 } },
+    { type: "engine.retry", data: { maxRetries: -1 } },
+    { type: "engine.retry", data: { backoffMs: Number.MAX_SAFE_INTEGER + 1 } },
     { type: "detection.result", data: { promptInjection: "false" } },
     { type: "session.format", data: {} },
     { type: "session.format", data: { version: 0 } },
@@ -97,6 +103,14 @@ describe("Generated session schemas", () => {
     expect(() => validateSession(jsonl([header, unified(canonical)]))).toThrow("Invalid session event");
     expect(() => validateSession(jsonl([header, unified({ type: "session.init", data: { tools: [] } })]))).toThrow("Invalid session event");
     expect(validateSession(jsonl([header, unified({ type: "vendor.progress", data: { arbitrary: { body: false } } })]))).toBe(2);
+  });
+
+  it("validates the shared retry payload and rejects legacy or accounting fields in its unified projection", () => {
+    const event = { type: "engine.retry", data: { sourceEngine: "codex", attempt: 1, maxRetries: 5, errors: ["retry"] } };
+    expect(validateSession(jsonl([header, unified(event)]))).toBe(2);
+    for (const extra of [{ engineRetry: { attempt: 1 } }, { reconnectAttempt: 1 }, { usage: { inputTokens: 1 } }, { status: "failed" }]) {
+      expect(() => validateSession(jsonl([header, unified({ ...event, data: { ...event.data, ...extra } })]))).toThrow("Invalid session event");
+    }
   });
 
   it("validates dependency job results with required IDs and native Actions outcomes", () => {

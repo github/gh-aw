@@ -1,4 +1,5 @@
 // @ts-check
+const { normalizeEngineRetryData } = require("./engine_retry.cjs");
 /// <reference types="@actions/github-script" />
 
 const {
@@ -393,7 +394,7 @@ function parseCodexLegacySession(lines, model, accounting = { inlineTokens: 0, h
         emit(source, "session.result", { errors: [payload.replace(/^ERROR: ?/, "")] });
       } else {
         const retry = payload.match(/^Reconnecting\.\.\.\s+(\d+)\/(\d+)\s*\((.*)\)$/);
-        if (retry) emit({ ...source, reconnectAttempt: Number(retry[1]), maxReconnects: Number(retry[2]) }, "session.result", { errors: [retry[3]] });
+        if (retry) emit(source, "engine.retry", { sourceEngine: "codex", ...normalizeEngineRetryData({ attempt: Number(retry[1]), maxRetries: Number(retry[2]) }), errors: [retry[3]] });
         else if (payload === "tokens used") {
           const count = extractCodexLegacyTokens(`tokens used: ${lines[i + 1] ?? ""}`);
           if (count !== undefined) {

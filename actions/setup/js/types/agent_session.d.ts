@@ -130,6 +130,21 @@ export interface SessionResultData {
   [key: string]: unknown;
 }
 
+/** An observed internal request retry, not an engine process invocation or result. */
+export interface EngineRetryData {
+  sourceEngine?: string;
+  sourceType?: string;
+  /** @asType integer @minimum 1 @maximum 9007199254740991 */
+  attempt?: number;
+  maxRetries?: SessionCount;
+  backoffMs?: SessionCount;
+  errors?: JsonValue[];
+  sessionId?: JsonValue;
+  agentId?: JsonValue;
+  parentToolUseId?: JsonValue;
+  [key: string]: unknown;
+}
+
 export interface SessionInitEvent extends EventMetadata {
   type: "session.init";
   data: SessionInitData;
@@ -168,6 +183,11 @@ export interface ToolExecutionCompleteEvent extends EventMetadata {
 export interface SessionResultEvent extends EventMetadata {
   type: "session.result";
   data: SessionResultData;
+}
+
+export interface EngineRetryEvent extends EventMetadata {
+  type: "engine.retry";
+  data: EngineRetryData;
 }
 
 export interface AgentExecutionData {
@@ -221,6 +241,7 @@ export type CoreSessionEvent =
   | ToolExecutionStartEvent
   | ToolExecutionCompleteEvent
   | SessionResultEvent
+  | EngineRetryEvent
   | SessionFileFormatEvent
   | DetectionResultEvent
   | AgentExecutionEvent;
@@ -237,6 +258,7 @@ export interface SessionEventDataMap {
   "tool.execution_start": ToolExecutionStartData;
   "tool.execution_complete": ToolExecutionCompleteData;
   "session.result": SessionResultData;
+  "engine.retry": EngineRetryData;
 }
 
 export type SessionEventData<T extends string> = T extends keyof SessionEventDataMap ? SessionEventDataMap[T] : Record<string, unknown>;

@@ -188,6 +188,8 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 	switch {
 	case (event.Type == "harness.attempt" || event.Type == "harness.retry") && event.Provenance.Component == "harness":
 		attribution.RetryEvents = append(attribution.RetryEvents, event)
+	case event.Type == "engine.retry" && event.Provenance.Component == "agent":
+		attribution.RetryEvents = append(attribution.RetryEvents, event)
 	case event.Type == "session.result" && event.Provenance.Component == "agent":
 		var payload struct {
 			EngineRetry json.RawMessage `json:"engineRetry"`

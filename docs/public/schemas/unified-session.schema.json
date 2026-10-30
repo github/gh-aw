@@ -82,6 +82,16 @@
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_progress" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_started" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_updated" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      {
+        "if": { "properties": { "type": { "const": "engine.retry" } }, "required": ["type"] },
+        "then": {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/Pick%3CEngineRetryData%2C(%22sourceEngine%22%7C%22sourceType%22%7C%22attempt%22%7C%22maxRetries%22%7C%22backoffMs%22%7C%22errors%22%7C%22sessionId%22%7C%22agentId%22%7C%22parentToolUseId%22)%3E"
+            }
+          }
+        }
+      },
       { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
       { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
       { "if": { "properties": { "type": { "const": "experiment.assignment" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentAssignmentData" } } } },
@@ -540,12 +550,6 @@
         "sessionId": { "type": "string" },
         "parentToolUseId": { "type": ["string", "null"] }
       },
-      "additionalProperties": false
-    },
-    "EngineRetryData": {
-      "type": "object",
-      "properties": { "attempt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }, "maxRetries": { "$ref": "#/definitions/SessionCount" }, "backoffMs": { "$ref": "#/definitions/SessionCount" } },
-      "required": ["attempt"],
       "additionalProperties": false
     },
     "EpisodeLineageData": {
@@ -1126,6 +1130,21 @@
       },
       "additionalProperties": false
     },
+    "Pick<EngineRetryData,(\"sourceEngine\"|\"sourceType\"|\"attempt\"|\"maxRetries\"|\"backoffMs\"|\"errors\"|\"sessionId\"|\"agentId\"|\"parentToolUseId\")>": {
+      "type": "object",
+      "properties": {
+        "sourceEngine": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "maxRetries": { "$ref": "#/definitions/SessionCount" },
+        "backoffMs": { "$ref": "#/definitions/SessionCount" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": false
+    },
     "Pick<MessageData,\"content\">": { "type": "object", "properties": { "content": { "$ref": "#/definitions/JsonValue" } }, "additionalProperties": false },
     "PluginInstallationData": {
       "type": "object",
@@ -1299,7 +1318,6 @@
         "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
         "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
         "agentId": { "$ref": "#/definitions/JsonValue" },
-        "engineRetry": { "$ref": "#/definitions/EngineRetryData", "description": "Observed engine-native retry progress, distinct from harness attempts." },
         "usage": { "anyOf": [{ "$ref": "#/definitions/UnifiedSessionUsage" }, { "type": "null" }] }
       },
       "additionalProperties": false

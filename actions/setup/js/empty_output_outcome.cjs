@@ -375,15 +375,16 @@ function buildEmptyOutputOutcome(errors, rootDir = "/tmp/gh-aw", session) {
               : driverExitCode > 0
                 ? "driver_crash"
                 : "unknown";
-  const retryEvents = events.filter(event => event.type === "claude.api_retry" || (event.type === "system" && event.data.subtype === "api_retry"));
+  const retryEvents = events.filter(event => event.type === "engine.retry" || event.type === "claude.api_retry" || (event.type === "system" && event.data.subtype === "api_retry"));
   const harnessRetryLines = stdio.split(/\r?\n/).filter(line => /^\[(?:copilot|claude|codex)-harness\].*\bretrying\b/i.test(line));
   const harnessRetryCount = harnessRetryLines.length;
   const retryCount = Math.max(retryEvents.length, harnessRetryCount);
   const retryStatusCodes = [
     ...new Set(
-      [...retryEvents.map(event => event.data.status ?? event.data.error_status ?? event.data.code), ...harnessRetryLines.flatMap(line => [...line.matchAll(/\b(?:HTTP\s+|status=)([1-5]\d{2})\b/gi)].map(match => Number(match[1])))].filter(
-        code => Number.isSafeInteger(code) && code >= 100 && code <= 599
-      )
+      [
+        ...retryEvents.map(event => event.data.status ?? event.data.error_status ?? event.data.errors?.[0]?.error_status ?? event.data.code),
+        ...harnessRetryLines.flatMap(line => [...line.matchAll(/\b(?:HTTP\s+|status=)([1-5]\d{2})\b/gi)].map(match => Number(match[1]))),
+      ].filter(code => Number.isSafeInteger(code) && code >= 100 && code <= 599)
     ),
   ];
   const completionEvidence = buildCompletionEvidence(rootDir);

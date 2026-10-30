@@ -87,12 +87,12 @@ describe("Claude canonical diagnostics from live run shapes", () => {
   it("retains API failures and retries once, as canonical errors rather than duplicate opaque envelopes", () => {
     const events = parse(failure);
     expect(events.some(event => event.type === "claude.assistant_error" || (event.type === "claude.system" && event.data.subtype === "api_retry"))).toBe(false);
-    const errors = events.filter(event => event.type === "session.result" && event.data.errors);
+    const errors = events.filter(event => ["session.result", "engine.retry"].includes(event.type) && event.data.errors);
     expect(errors).toHaveLength(3);
     expect(errors[0]).toMatchObject({ uuid: "provider-error-example", data: { sourceType: "assistant", is_api_error_message: true, error: "server_error" } });
-    expect(errors[2].data).toMatchObject({ sourceType: "system", subtype: "api_retry", max_retries: 10, retry_delay_ms: 1000 });
+    expect(errors[2]).toMatchObject({ type: "engine.retry", data: { sourceType: "system", attempt: 1, maxRetries: 10, backoffMs: 1000 } });
     expect(projectSessionResult(events).errors).toHaveLength(3);
-    expect(project(events).filter(event => event.type === "session.result" && event.data.errors)).toHaveLength(3);
+    expect(project(events).filter(event => ["session.result", "engine.retry"].includes(event.type) && event.data.errors)).toHaveLength(3);
     expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
   });
 

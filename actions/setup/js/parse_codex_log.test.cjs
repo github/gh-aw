@@ -769,9 +769,9 @@ ERROR: connection lost`;
 
       const assistantMessages = result.logEntries.filter(e => e.type === "assistant.message");
       expect(assistantMessages).toEqual([]);
-      const diagnostics = result.logEntries.filter(e => e.type === "session.result");
+      const diagnostics = result.logEntries.filter(e => ["session.result", "engine.retry"].includes(e.type));
       expect(diagnostics.map(e => e.data.errors)).toEqual([["connection lost"], ["connection lost"], ["connection lost"]]);
-      expect(diagnostics[1]).toMatchObject({ reconnectAttempt: 2, maxReconnects: 3 });
+      expect(diagnostics[1]).toMatchObject({ type: "engine.retry", data: { attempt: 2, maxRetries: 3 } });
     });
 
     it("should not add error assistant entries when tool calls are present", () => {
@@ -917,7 +917,7 @@ ERROR: This user's access to o4-mini has been temporarily limited`;
         );
         const { projectSessionResult } = require("./agent_session.cjs");
         expect(projectSessionResult(result.logEntries)).toMatchObject({ num_turns: 1, errors: ["Model access denied", "connection lost"], usage: { input_tokens: 10, output_tokens: 2 } });
-        expect(result.logEntries.find(event => event.reconnectAttempt === 1)?.maxReconnects).toBe(5);
+        expect(result.logEntries.find(event => event.type === "engine.retry" && event.data.attempt === 1)?.data.maxRetries).toBe(5);
         expect(generateCopilotCliStyleSummary(result.logEntries)).toContain("Model access denied");
       });
 

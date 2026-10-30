@@ -15,6 +15,7 @@
       { "if": { "properties": { "type": { "const": "assistant.reasoning" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/MessageData" } } } },
       { "if": { "properties": { "type": { "const": "assistant.refusal" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AssistantRefusalData" } } } },
       { "if": { "properties": { "type": { "const": "detection.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DetectionResultData" } } } },
+      { "if": { "properties": { "type": { "const": "engine.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EngineRetryData" } } } },
       { "if": { "properties": { "type": { "const": "session.format" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionFileFormatData" } } } },
       { "if": { "properties": { "type": { "const": "session.init" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionInitData" } } } },
       { "if": { "properties": { "type": { "const": "session.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/SessionResultData" } } } },
@@ -58,6 +59,22 @@
         "maliciousPatch": { "type": "boolean" }
       },
       "additionalProperties": {}
+    },
+    "EngineRetryData": {
+      "type": "object",
+      "properties": {
+        "sourceEngine": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "maxRetries": { "$ref": "#/definitions/SessionCount" },
+        "backoffMs": { "$ref": "#/definitions/SessionCount" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" }
+      },
+      "additionalProperties": {},
+      "description": "An observed internal request retry, not an engine process invocation or result."
     },
     "EventMetadata": { "type": "object", "properties": { "id": { "type": "string" }, "parentId": { "type": ["string", "null"] }, "timestamp": { "type": ["string", "number"] } }, "additionalProperties": {} },
     "JsonValue": {

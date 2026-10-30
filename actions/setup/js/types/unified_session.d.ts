@@ -3,6 +3,7 @@ import type {
   AssistantRefusalData,
   DetectionResultData,
   EventMetadata,
+  EngineRetryData,
   JsonValue,
   MessageData,
   SessionCount,
@@ -37,16 +38,7 @@ export interface UnifiedSessionContextData {
 }
 
 export interface UnifiedSessionResultData extends UnifiedSessionContextData, Pick<SessionResultData, "sourceEngine" | "numTurns" | "durationMs" | "totalCostUsd" | "status" | "sourceType" | "errors" | "permissionDenials" | "agentMetrics"> {
-  /** Observed engine-native retry progress, distinct from harness attempts. */
-  engineRetry?: EngineRetryData;
   usage?: UnifiedSessionUsage | null;
-}
-
-export interface EngineRetryData {
-  /** @asType integer @minimum 1 @maximum 9007199254740991 */
-  attempt: number;
-  maxRetries?: SessionCount;
-  backoffMs?: SessionCount;
 }
 
 export interface UnifiedMessageData extends Pick<MessageData, "content"> {
@@ -815,6 +807,7 @@ export interface UnifiedSessionEventDataMap {
   "dynamicWorkflows.task_notification": DynamicWorkflowObservationData;
   "dynamicWorkflows.background_tasks_changed": DynamicWorkflowObservationData;
   "session.result": UnifiedSessionResultData;
+  "engine.retry": Pick<EngineRetryData, "sourceEngine" | "sourceType" | "attempt" | "maxRetries" | "backoffMs" | "errors" | "sessionId" | "agentId" | "parentToolUseId">;
   "mcp.rpc.request": McpObservationData;
   "mcp.rpc.response": McpObservationData;
   "mcp.difc.filtered": McpObservationData;

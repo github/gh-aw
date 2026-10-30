@@ -10065,7 +10065,13 @@
                         "type": "object",
                         "properties": {
                           "attempt": {
-                            "type": "integer"
+                            "type": [
+                              "null",
+                              "integer"
+                            ]
+                          },
+                          "sourceEngine": {
+                            "type": "string"
                           },
                           "maxRetries": {
                             "type": [
@@ -10099,7 +10105,6 @@
                           }
                         },
                         "required": [
-                          "attempt",
                           "phase",
                           "path"
                         ],

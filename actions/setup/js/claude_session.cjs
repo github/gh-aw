@@ -1,4 +1,5 @@
 // @ts-check
+const { normalizeEngineRetryData } = require("./engine_retry.cjs");
 
 const {
   isSessionEvent,
@@ -488,8 +489,14 @@ function normalizeClaudeSession(records) {
         const denial = sourceFields(source);
         const event = emit(source, "session.result", { ...denial, sourceEngine: "claude", sourceType: source.type, permissionDenials: [denial] });
         denialReports.push({ event, denial: event.data.permissionDenials[0] });
-      } else if (source.subtype === "api_retry" && source.error != null) {
-        reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
+      } else if (source.subtype === "api_retry") {
+        const { attempt, max_retries, retry_delay_ms, ...fields } = sourceFields(source);
+        emit(source, "engine.retry", {
+          ...fields,
+          sourceType: source.type,
+          ...normalizeEngineRetryData({ attempt, maxRetries: max_retries, backoffMs: retry_delay_ms }),
+          ...(source.error != null ? { errors: [{ error: source.error, error_status: source.error_status, attempt: source.attempt }] } : {}),
+        });
       } else if (source.error != null && !task && !isBashLifecycle) {
         reportError(source, source.error);
       } else if (task && source.subtype === "task_started") {

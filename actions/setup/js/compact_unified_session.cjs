@@ -4,6 +4,7 @@
 const fs = require("node:fs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent, MAX_HARNESS_ATTEMPTS } = require("./harness_retry_record.cjs");
+const { normalizeEngineRetryData, normalizeEngineRetryEvent } = require("./engine_retry.cjs");
 
 const COMPACT_UNIFIED_SESSION_VERSION = 1;
 const MAX_COMPACT_SESSION_BYTES = 16 * 1024;
@@ -25,6 +26,7 @@ const EVENT_FIELDS = {
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
   "harness.retry": ["attempts", "exitCode"],
   "harness.attempt": [],
+  "engine.retry": ["sourceEngine", "sourceType"],
   "grader.result": ["id", "status", "value", "score", "unit", "passed", "direction", "threshold", "enabled", "min", "max", "version"],
 };
 EVENT_FIELDS["firewall.token_usage"] = EVENT_FIELDS["usage.report"];
@@ -53,22 +55,13 @@ function projectScalars(record, fields) {
   return projected;
 }
 
-/** @param {unknown} event */
-function projectEvent(event) {
-  if (!isRecord(event) || typeof event.type !== "string" || !Object.hasOwn(EVENT_FIELDS, event.type) || !isRecord(event.data)) return undefined;
+/** @param {unknown} input */
+function projectEvent(input) {
+  if (!isRecord(input) || typeof input.type !== "string" || !Object.hasOwn(EVENT_FIELDS, input.type) || !isRecord(input.data)) return undefined;
+  const event = normalizeEngineRetryEvent(/** @type {import("./types/agent_session").SessionEvent} */ input);
   /** @type {Record<string, unknown>} */
   const data = projectScalars(event.data, EVENT_FIELDS[event.type]);
-  if (event.type === "session.result" && isRecord(event.data.engineRetry)) {
-    const retry = event.data.engineRetry;
-    if (typeof retry.attempt === "number" && Number.isSafeInteger(retry.attempt) && retry.attempt >= 1) {
-      const engineRetry = { attempt: retry.attempt };
-      for (const field of ["maxRetries", "backoffMs"]) {
-        const value = retry[field];
-        if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) Object.assign(engineRetry, { [field]: value });
-      }
-      data.engineRetry = engineRetry;
-    }
-  }
+  if (event.type === "engine.retry") Object.assign(data, normalizeEngineRetryData(event.data));
   if (event.type === "harness.retry" || event.type === "harness.attempt") {
     const retry = event.type === "harness.retry" ? normalizeHarnessRetryRecord(event.data) : normalizeHarnessAttemptEvent(event.data);
     if (!retry) return undefined;

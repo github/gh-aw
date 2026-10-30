@@ -19,7 +19,8 @@ type AuditRetrySummary struct {
 
 // AuditEngineRetry is a native retry observation, not a harness invocation.
 type AuditEngineRetry struct {
-	Attempt          int      `json:"attempt"`
+	Attempt          *int     `json:"attempt,omitempty"`
+	SourceEngine     string   `json:"sourceEngine,omitempty"`
 	MaxRetries       *int     `json:"maxRetries,omitempty"`
 	BackoffMs        *float64 `json:"backoffMs,omitempty"`
 	Phase            string   `json:"phase"`
@@ -124,13 +125,23 @@ func (builder *auditRetryBuilder) observeSummary(event sessionModelRoutingEvent)
 }
 
 func (builder *auditRetryBuilder) observeEngine(event sessionModelRoutingEvent) {
+	var retry AuditEngineRetry
 	var payload struct {
 		EngineRetry *AuditEngineRetry `json:"engineRetry"`
 	}
-	if json.Unmarshal(event.Data, &payload) != nil || payload.EngineRetry == nil || payload.EngineRetry.Attempt <= 0 {
+	if event.Type == "engine.retry" {
+		if json.Unmarshal(event.Data, &retry) != nil {
+			return
+		}
+	} else {
+		if json.Unmarshal(event.Data, &payload) != nil || payload.EngineRetry == nil || payload.EngineRetry.Attempt == nil {
+			return
+		}
+		retry = *payload.EngineRetry
+	}
+	if retry.Attempt != nil && *retry.Attempt <= 0 {
 		return
 	}
-	retry := *payload.EngineRetry
 	retry.Phase, retry.Path, retry.Index = event.Provenance.Phase, event.Provenance.Path, event.Provenance.Index
 	retry.AttemptID, retry.StartupAttemptID = event.Provenance.AttemptID, event.Provenance.StartupAttemptID
 	builder.report.EngineRetryHistory = append(builder.report.EngineRetryHistory, retry)
@@ -152,7 +163,7 @@ func buildAuditRetrySummary(events []sessionModelRoutingEvent) *AuditRetrySummar
 	}
 	for _, event := range events {
 		switch event.Type {
-		case "session.result":
+		case "engine.retry", "session.result":
 			builder.observeEngine(event)
 		case "harness.attempt":
 			var attempt AuditRetryAttempt

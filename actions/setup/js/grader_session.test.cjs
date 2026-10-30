@@ -140,7 +140,7 @@ describe("retry session consumers", () => {
   });
 
   it("counts native engine retry observations separately from process retries and errors", () => {
-    const native = (attempt, index, phase = "agent") => event("session.result", { is_error: true, engineRetry: { attempt, maxRetries: 5, backoffMs: 100 } }, { component: "agent", index, phase });
+    const native = (attempt, index, phase = "agent") => event("engine.retry", { attempt, maxRetries: 5, backoffMs: 100 }, { component: "agent", index, phase });
     const session = [attempt(1), attempt(2), native(1, 0), native(2, 1), native(1, 2), native(1, 0, "detection"), native(0, 3), event("session.result", { is_error: true }, { component: "agent" })];
     const lookups = createSessionLookups(session);
     expect(lookups.stats).toMatchObject({ retryCount: 1, harnessRetryCount: 1, engineRetryCount: 3 });
@@ -149,6 +149,22 @@ describe("retry session consumers", () => {
     expect(result.output.results[0]).toMatchObject({ value: 4, status: "pass" });
   });
 
+  it("counts an observed retry without counters without inventing a process attempt", () => {
+    const lookups = createSessionLookups([event("engine.retry", { sourceEngine: "claude", errors: ["retry"] }, { component: "agent" })]);
+    expect(lookups.stats).toMatchObject({ retryCount: 0, harnessRetryCount: 0, engineRetryCount: 1 });
+    expect(lookups.trace.attempts).toEqual([]);
+    expect(lookups.trace.engineRetries).toHaveLength(1);
+    expect(lookups.trace.engineRetries[0]).not.toHaveProperty("attempt");
+  });
+
+  it("replays saved legacy retry diagnostics through the same history lookup", () => {
+    const saved = event("session.result", { engineRetry: { attempt: 2, maxRetries: 5 } }, { component: "agent", index: 7 });
+    const original = structuredClone(saved);
+    const lookups = createSessionLookups([saved]);
+    expect(lookups.stats.engineRetryCount).toBe(1);
+    expect(lookups.trace.engineRetries).toMatchObject([{ attempt: 2, maxRetries: 5, eventIndex: 0, provenance: { index: 7 } }]);
+    expect(saved).toEqual(original);
+  });
   it.each([undefined, "different"])("does not infer resumed identity when sessionId is %s", sessionId => {
     const session = [
       attempt(1, { attemptId: "a" }),

@@ -126,14 +126,20 @@ describe("compact unified session projection", () => {
   });
 
   it("preserves bounded native reconnect counters without creating harness events", () => {
-    const events = [
-      event("session.result", { engineRetry: { attempt: 2, maxRetries: 5, backoffMs: 1000, output: "PRIVATE" } }),
-      event("session.result", { engineRetry: { attempt: -1, maxRetries: "PRIVATE" } }),
-      event("session.result", { engineRetry: { attempt: 1, backoffMs: -1 } }),
-    ];
+    const events = [event("engine.retry", { attempt: 2, maxRetries: 5, backoffMs: 1000, output: "PRIVATE" }), event("engine.retry", { attempt: -1, maxRetries: "PRIVATE" }), event("engine.retry", { attempt: 1, backoffMs: -1 })];
     const result = parse(compactUnifiedSession(events));
-    expect(result.map(item => item.type)).toEqual(["session.result", "session.result", "session.result"]);
-    expect(result.map(item => item.data)).toEqual([{ engineRetry: { attempt: 2, maxRetries: 5, backoffMs: 1000 } }, {}, { engineRetry: { attempt: 1 } }]);
+    expect(result.map(item => item.type)).toEqual(["engine.retry", "engine.retry", "engine.retry"]);
+    expect(result.map(item => item.data)).toEqual([{ attempt: 2, maxRetries: 5, backoffMs: 1000 }, {}, { attempt: 1 }]);
+  });
+
+  it("upgrades saved retry diagnostics without discarding counters or adding an event", () => {
+    const legacy = event("session.result", { sourceEngine: "claude", engineRetry: { attempt: 1, maxRetries: 5, backoffMs: 0 } });
+    const original = structuredClone(legacy);
+    const result = parse(compactUnifiedSession([legacy]));
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ type: "engine.retry", data: { sourceEngine: "claude", attempt: 1, maxRetries: 5, backoffMs: 0 } });
+    expect(result[0].data).not.toHaveProperty("engineRetry");
+    expect(legacy).toEqual(original);
   });
 
   it("drops all conversation, reasoning, prompt, tool and unknown event kinds", () => {

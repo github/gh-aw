@@ -21,24 +21,25 @@ import { failure as claudeFailures } from "./fixtures/claude_ci_sessions.cjs";
 
 describe("essential unified session payloads", () => {
   it("preserves observed Codex reconnect progress separately from harness attempts", () => {
-    const native = parseEngineSession("Reconnecting... 2/5 (connection interrupted)\n", "codex").find(event => event.type === "session.result");
-    expect(native).toMatchObject({ reconnectAttempt: 2, maxReconnects: 5 });
+    const native = parseEngineSession("Reconnecting... 2/5 (connection interrupted)\n", "codex").find(event => event.type === "engine.retry");
+    expect(native.data).toMatchObject({ attempt: 2, maxRetries: 5 });
     const event = normalizeUnifiedSessionEvent(native);
-    expect(event.data).toMatchObject({ engineRetry: { attempt: 2, maxRetries: 5 } });
+    expect(event.data).toEqual({ sourceEngine: "codex", attempt: 2, maxRetries: 5, errors: ["connection interrupted"] });
     expect(event.data).not.toHaveProperty("reconnectAttempt");
     expect(event).not.toHaveProperty("reconnectAttempt");
     expect(normalizeUnifiedSessionEvent(event)).toEqual(event);
     const [unified] = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: [event] }]);
     const validate = createSessionValidator("unified").event;
     expect(validate(unified), JSON.stringify(validate.errors)).toBe(true);
-    expect(unified.type).toBe("session.result");
+    expect(unified.type).toBe("engine.retry");
   });
 
   it("preserves observed Claude API retry metadata and existing errors without inventing results", () => {
     const retry = claudeFailures.find(event => event.subtype === "api_retry");
-    const native = parseEngineSession(JSON.stringify(retry), "claude").find(event => event.type === "session.result");
+    const native = parseEngineSession(JSON.stringify(retry), "claude").find(event => event.type === "engine.retry");
     const event = normalizeUnifiedSessionEvent(native);
-    expect(event.data.engineRetry).toEqual({ attempt: 1, maxRetries: 10, backoffMs: 1000 });
+    expect(event.type).toBe("engine.retry");
+    expect(event.data).toMatchObject({ sourceEngine: "claude", attempt: 1, maxRetries: 10, backoffMs: 1000 });
     expect(event.data.errors).toEqual(native.data.errors);
     expect(event.data).not.toHaveProperty("usage");
     expect(event.data).not.toHaveProperty("status");
@@ -72,8 +73,59 @@ describe("essential unified session payloads", () => {
 
   it("projects only observed safe nested retry fields, including partial metadata", () => {
     for (const data of [{ engineRetry: { attempt: 1, maxRetries: -1, backoffMs: "PRIVATE", payload: "PRIVATE" } }, { subtype: "api_retry", attempt: 1, max_retries: Infinity, retry_delay_ms: null }])
-      expect(normalizeUnifiedSessionEvent({ type: "session.result", data }).data).toEqual({ engineRetry: { attempt: 1 } });
+      expect(normalizeUnifiedSessionEvent({ type: "session.result", data })).toEqual({ type: "engine.retry", data: { attempt: 1 } });
     expect(normalizeUnifiedSessionEvent({ type: "session.result", data: { attempt: 1, max_retries: 10 } }).data).toEqual({});
+  });
+
+  it.each([
+    { type: "session.result", reconnectAttempt: 2, maxReconnects: 5, data: { errors: ["retry"] } },
+    { type: "session.result", data: { subtype: "api_retry", attempt: 2, max_retries: 5, errors: ["retry"] } },
+    { type: "session.result", data: { engineRetry: { attempt: 2, maxRetries: 5 }, errors: ["retry"] } },
+  ])("migrates legacy native retry evidence to the shared event without duplicate results", legacy => {
+    expect(normalizeUnifiedSessionEvent(legacy)).toEqual({ type: "engine.retry", data: { attempt: 2, maxRetries: 5, errors: ["retry"] } });
+  });
+
+  it.each(["claude", "codex"])("keeps %s retries distinct and accounting unchanged through publication", engine => {
+    const content =
+      engine === "claude"
+        ? [1, 2].map(attempt => JSON.stringify({ type: "system", subtype: "api_retry", session_id: "retry-session", attempt, max_retries: 5, error: "retry" })).join("\n")
+        : "Reconnecting... 1/5 (retry)\nReconnecting... 2/5 (retry)\n";
+    const native = parseEngineSession(content, engine);
+    const unified = mergeSessionSources([{ component: "agent", phase: "agent", path: "agent-stdio.log", events: native }]);
+    expect(unified.filter(event => event.type === "engine.retry").map(event => event.data.attempt)).toEqual([1, 2]);
+    expect(unified.some(event => event.type === "session.result")).toBe(false);
+    expect(unified.every(event => event.data.usage === undefined && event.data.status === undefined)).toBe(true);
+    const result = selectSessionResult(unified);
+    expect(result.errors).toHaveLength(2);
+    expect(result.usage).toBeUndefined();
+    const withUsage = [...unified, { type: "session.result", data: { usage: { input_tokens: 10 }, status: "success" } }];
+    expect(selectSessionResult(withUsage)).toMatchObject({ usage: { input_tokens: 10 }, status: "success" });
+    expect(normalizeUnifiedSessionEvent(unified[0]).data.sourceEngine).toBe(engine);
+  });
+
+  it("retains a Claude retry without optional counters or an error without inventing a result", () => {
+    const [native] = parseEngineSession(JSON.stringify({ type: "system", subtype: "api_retry", session_id: "partial" }), "claude");
+    const event = normalizeUnifiedSessionEvent(native);
+    expect(event).toMatchObject({ type: "engine.retry", data: { sourceEngine: "claude", sourceType: "system", sessionId: "partial" } });
+    expect(event.data).not.toHaveProperty("attempt");
+    expect(event.data).not.toHaveProperty("errors");
+    expect(selectSessionResult([event])).toBeUndefined();
+  });
+
+  it("never derives accounting or terminal status from native retry extension fields", () => {
+    const event = { type: "engine.retry", data: { sourceEngine: "claude", sessionId: "s", attempt: 1, errors: ["retry"], usage: { input_tokens: 999 }, status: "failed", numTurns: 999 } };
+    const original = structuredClone(event);
+    const result = selectSessionResult([event]);
+    expect(result).toMatchObject({ errors: ["retry"] });
+    for (const field of ["usage", "status", "numTurns", "attempt"]) expect(result).not.toHaveProperty(field);
+    const normalized = normalizeUnifiedSessionEvent(event);
+    expect(normalized.data).toEqual({ sourceEngine: "claude", sessionId: "s", attempt: 1, errors: ["retry"] });
+    expect(event).toEqual(original);
+  });
+
+  it.each([-1, 0, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity, null, "2", { private: "PRIVATE" }])("bounds shared retry counters %j", attempt => {
+    const event = normalizeUnifiedSessionEvent({ type: "engine.retry", data: { attempt, maxRetries: "PRIVATE", backoffMs: -1, output: "PRIVATE" } });
+    expect(event).toEqual({ type: "engine.retry", data: {} });
   });
 
   it("normalizes safe nested harness metadata and attempt events idempotently", () => {

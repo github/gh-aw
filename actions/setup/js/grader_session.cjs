@@ -2,6 +2,7 @@
 
 const { calculateWorkingSetFromEntries } = require("./working_set_metrics.cjs");
 const { ERR_GRADER_SESSION_INVALID } = require("./error_codes.cjs");
+const { normalizeEngineRetryEvent } = require("./engine_retry.cjs");
 
 /** @typedef {import("./types/unified_session").UnifiedSession} UnifiedSession */
 
@@ -219,9 +220,11 @@ function createSessionLookups(session) {
   const retryEvents = agentEvents.filter(event => event.type.startsWith("mcp.") && (event.data.event === "retry" || event.data.retryHint != null || /\bretry(?:ing)?\b/i.test(String(event.data.message ?? ""))));
   const harnessRetries = attempts.filter(attempt => attempt.provenance.phase === "agent" && attempt.attempt > 1);
   // Native attempt 1 is already a retry; its sequence may reset per API operation.
-  const engineRetries = session
-    .filter(event => event.type === "session.result" && event.provenance.component === "agent" && isRecord(event.data.engineRetry) && count(event.data.engineRetry.attempt) !== null && event.data.engineRetry.attempt > 0)
-    .map(event => ({ ...(isRecord(event.data.engineRetry) ? event.data.engineRetry : {}), provenance: event.provenance, eventIndex: eventIndices.get(event) }));
+  const engineRetries = session.flatMap(event => {
+    const observed = normalizeEngineRetryEvent(event);
+    if (observed.type !== "engine.retry" || event.provenance.component !== "agent" || (observed.data.attempt !== undefined && (count(observed.data.attempt) ?? 0) <= 0)) return [];
+    return [{ ...observed.data, provenance: event.provenance, eventIndex: eventIndices.get(event) }];
+  });
   const safeOutputResults = eventsOfType("safe_output.result");
   const safeJobOutcomeTypes = new Set(
     safeOutputResults.filter(event => event.provenance.phase === "safe_outputs" && event.provenance.path === "usage/aw_session.jsonl" && event.data.status !== undefined && typeof event.data.type === "string").map(event => event.data.type)

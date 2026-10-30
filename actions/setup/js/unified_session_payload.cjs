@@ -13,6 +13,7 @@ const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
 const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent } = require("./harness_retry_record.cjs");
+const { normalizeEngineRetryData, normalizeEngineRetryEvent } = require("./engine_retry.cjs");
 
 /** AWF failed-request origins: provider response versus AWF-originated rejection. */
 const ERROR_SOURCES = new Set(["upstream", "awf"]);
@@ -34,6 +35,7 @@ const SCOPED_AGENT_TYPES = new Set([
   "tool.execution_complete",
   "usage.report",
   "session.result",
+  "engine.retry",
   "model.call_final_result",
 ]);
 
@@ -207,6 +209,7 @@ const EVENT_FIELDS = {
   "agent.execution": { categories: ["categories"], errorCodes: ["errorCodes"], errorTypes: ["errorTypes"], exitCode: ["exitCode", "exit_code"] },
   "harness.retry": {},
   "harness.attempt": {},
+  "engine.retry": { sourceEngine: ["sourceEngine"], sourceType: ["sourceType"], errors: ["errors"] },
   "skill.invoked": { name: ["name"], path: ["path"], source: ["source"], trigger: ["trigger"], model: ["model"], invokedAtTurn: ["invokedAtTurn"] },
   "skill.context_delivered_ref": { interactionId: ["interactionId"], source: ["source"], contentId: ["contentId"] },
   "skill.inventory": { skills: ["skills"] },
@@ -639,6 +642,7 @@ function normalizeRankedChoices(choices) {
  * @returns {SessionEvent}
  */
 function normalizeUnifiedSessionEvent(event, phase) {
+  event = normalizeEngineRetryEvent(event);
   /** @type {any} */
   const source = event.data;
   const known = Object.hasOwn(EVENT_FIELDS, event.type);
@@ -648,20 +652,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
     if (!retry) throw new Error(`${ERR_VALIDATION}: Harness retry evidence must contain valid bounded attempt metadata`);
     Object.assign(data, retry);
   }
-  if (event.type === "session.result") {
-    const retry =
-      source.engineRetry && typeof source.engineRetry === "object" && !Array.isArray(source.engineRetry)
-        ? source.engineRetry
-        : source.subtype === "api_retry"
-          ? { attempt: source.attempt, maxRetries: source.max_retries, backoffMs: source.retry_delay_ms }
-          : { attempt: event.reconnectAttempt, maxRetries: event.maxReconnects };
-    if (Number.isSafeInteger(retry.attempt) && retry.attempt >= 1) {
-      data.engineRetry = { attempt: retry.attempt };
-      for (const field of ["maxRetries", "backoffMs"]) {
-        if (Number.isSafeInteger(retry[field]) && retry[field] >= 0) data.engineRetry[field] = retry[field];
-      }
-    }
-  }
+  if (event.type === "engine.retry") Object.assign(data, normalizeEngineRetryData(source));
   if (event.type === "model.inventory") {
     const inventory = normalizeModelInventoryData(source);
     if (inventory === undefined) throw new Error(`${ERR_VALIDATION}: Model inventory snapshot must contain valid endpoint model collections`);
