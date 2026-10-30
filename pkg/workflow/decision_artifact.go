@@ -6,6 +6,8 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+const decisionAuditPath = "${{ runner.temp }}/gh-aw/decision-gate.json"
+
 func (c *Compiler) appendDecisionArtifactStep(data *WorkflowData, steps []string) []string {
 	name := constants.DecisionGateArtifactName.String()
 	if hasWorkflowCallTrigger(data.On) {
@@ -18,7 +20,7 @@ func (c *Compiler) appendDecisionArtifactStep(data *WorkflowData, steps []string
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/upload-artifact", data)),
 		"        with:\n",
 		"          name: "+name+"\n",
-		"          path: ${{ runner.temp }}/gh-aw/decision-gate.json\n",
+		"          path: "+decisionAuditPath+"\n",
 		"          if-no-files-found: ignore\n",
 	)
 }

@@ -69,9 +69,9 @@ type Rule struct {
 	IsSink        func(Site) bool
 	IsFilter      func(actionlint.ExprNode) bool
 	ActionSources func(uses string) []string
-	// ConservativeActionOutputs treats opaque action outputs as credential-derived
-	// when the action receives credentials that cannot be inspected statically.
-	ConservativeActionOutputs bool
+	// ConservativeOpaqueOutputs treats action and unsupported-shell outputs as
+	// credential-derived when their inputs cannot be inspected statically.
+	ConservativeOpaqueOutputs bool
 	JavaScript                *JavaScriptOptions
 	IsJavaScriptFilter        func(*JavaScriptNode) bool
 	// SafeOutputJobs identifies compiled third-party integration jobs from

@@ -420,6 +420,11 @@ describe("registry resolution and transport", () => {
     expect(resolved.model).toBe("gpt-5-mini");
   });
 
+  it("routes Codex-qualified models through OpenAI credentials", async () => {
+    const resolved = await resolveDecisionModel({ OPENAI_API_KEY: "openai-fixture-key", GH_AW_DECISION_MODEL: "codex/gpt-5.4-mini" });
+    expect(resolved).toMatchObject({ provider: "openai", model: "gpt-5.4-mini", token: "openai-fixture-key" });
+  });
+
   it("uses shared provider preference for an exact bare model available through multiple credentials", async () => {
     const resolved = await resolveDecisionModel({ COPILOT_GITHUB_TOKEN: "copilot-fixture-key", OPENAI_API_KEY: "openai-fixture-key", GH_AW_DECISION_MODEL: "gpt-5-mini" });
     expect(resolved).toMatchObject({ provider: "copilot", model: "gpt-5-mini", token: "copilot-fixture-key", type: "responses" });
@@ -515,13 +520,14 @@ describe("registry resolution and transport", () => {
     await expect(resolveDecisionModel({})).rejects.toThrow();
     await expect(resolveDecisionModel({ OPENAI_API_KEY: "transport-only", GH_AW_DECISION_MODEL: "anthropic/claude-haiku-4.5" })).rejects.toThrow();
     await expect(resolveDecisionModel({ OPENAI_API_KEY: "transport-only", GH_AW_DECISION_MODEL: "openai/nonexistent-model" })).rejects.toThrow();
+    await expect(resolveDecisionModel({ OPENAI_API_KEY: "transport-only", GH_AW_DECISION_PROVIDERS: "not-json" })).rejects.toThrow();
   });
 
   it("rejects insecure endpoints and embedded credentials", async () => {
     const embeddedCredentials = new URL("https://example.com");
     embeddedCredentials.username = "user";
     embeddedCredentials.password = "fixture";
-    for (const base of ["http://localhost:1234", embeddedCredentials.href, "https://example.com?token=private"]) {
+    for (const base of ["http://localhost:1234", "https://", embeddedCredentials.href, "https://example.com?token=private"]) {
       await expect(resolveDecisionModel({ OPENAI_API_KEY: "transport-only", OPENAI_BASE_URL: base })).rejects.toThrow();
     }
   });

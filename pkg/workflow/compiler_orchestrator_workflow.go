@@ -153,6 +153,9 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.validateWorkflowModelAliasMap(ctx); err != nil {
 		return err
 	}
+	if err := validateDecisionProviderEndpoints(ctx.workflowData); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
+	}
 	c.warnCodexCopilotModelCompatibility(ctx.workflowData, ctx.cleanPath)
 	c.warnEngineCannotResolveModelAlias(ctx.workflowData, ctx.cleanPath)
 	c.warnCopilotIntegrationModelAvailability(ctx.workflowData, ctx.cleanPath)

@@ -32,17 +32,17 @@ func validateAuthoredDecision(frontmatter map[string]any, document *aw.Document,
 	if err != nil || config == nil {
 		return err
 	}
-	on, _ := frontmatter["on"].(map[string]any)
+	on := decisionMap(frontmatter["on"])
 	jobs := map[string]any{}
-	authoredJobs, _ := frontmatter["jobs"].(map[string]any)
+	authoredJobs := decisionMap(frontmatter["jobs"])
 	var steps []any
 	for name, value := range authoredJobs {
-		job, ok := value.(map[string]any)
-		if !ok {
+		job := decisionMap(value)
+		if job == nil {
 			continue
 		}
 		if normalizeBuiltinJobAlias(name) == "pre_activation" {
-			custom, _ := job["steps"].([]any)
+			custom := decisionSteps(job["steps"])
 			steps = append(steps, custom...)
 			continue
 		}
@@ -51,7 +51,7 @@ func validateAuthoredDecision(frontmatter map[string]any, document *aw.Document,
 		}
 		jobs[name] = job
 	}
-	onSteps, _ := on["steps"].([]any)
+	onSteps := decisionSteps(on["steps"])
 	steps = append(steps, onSteps...)
 	env := map[string]any{}
 	for i, question := range config.Questions {
@@ -86,7 +86,7 @@ func validateAuthoredDecision(frontmatter map[string]any, document *aw.Document,
 }
 
 func extractDecision(frontmatter map[string]any) (*DecisionConfig, error) {
-	on, _ := frontmatter["on"].(map[string]any)
+	on := decisionMap(frontmatter["on"])
 	value, exists := on["decision"]
 	if !exists {
 		return nil, nil
@@ -130,12 +130,33 @@ func extractDecision(frontmatter map[string]any) (*DecisionConfig, error) {
 	return config, nil
 }
 
+func decisionMap(value any) map[string]any {
+	if result, ok := value.(map[string]any); ok {
+		return result
+	}
+	return nil
+}
+
+func decisionSteps(value any) []any {
+	if result, ok := value.([]any); ok {
+		return result
+	}
+	return nil
+}
+
+func decisionReferencePart(reference []string, index int) string {
+	if index < 0 || index >= len(reference) {
+		return ""
+	}
+	return reference[index]
+}
+
 func decisionSecretRule() taint.Rule {
 	rule := taint.SecretLeakRule()
 	rule.ID = "decision-secret"
 	// Even presence tests send information about credentials to a model.
 	rule.IsFilter = nil
-	rule.ConservativeActionOutputs = true
+	rule.ConservativeOpaqueOutputs = true
 	rule.IsSink = func(site taint.Site) bool {
 		return site.Kind == taint.DecisionQuestion
 	}
@@ -208,10 +229,15 @@ func decisionEligibleCondition(data *WorkflowData, original ConditionNode, stepI
 	for range 8 {
 		changed := false
 		source = actionslanguageservice.RewriteReferences(source, func(ref []string) (string, bool) {
-			if len(ref) != 4 || !strings.EqualFold(ref[0], "needs") || !strings.EqualFold(ref[1], "pre_activation") || !strings.EqualFold(ref[2], "outputs") {
+			if len(ref) != 4 {
 				return "", false
 			}
-			value, exists := outputs[ref[3]]
+			if !strings.EqualFold(decisionReferencePart(ref, 0), "needs") ||
+				!strings.EqualFold(decisionReferencePart(ref, 1), "pre_activation") ||
+				!strings.EqualFold(decisionReferencePart(ref, 2), "outputs") {
+				return "", false
+			}
+			value, exists := outputs[decisionReferencePart(ref, 3)]
 			changed = changed || exists
 			return "(" + stripExpressionWrapper(value) + ")", exists
 		})
@@ -224,8 +250,8 @@ func decisionEligibleCondition(data *WorkflowData, original ConditionNode, stepI
 		return nil, errors.New("on.decision requires a valid if condition that can be evaluated before activation")
 	}
 	for _, ref := range actionslanguageservice.References(expression) {
-		if len(ref) > 0 && strings.EqualFold(ref[0], "needs") {
-			if len(ref) < 2 || !slices.Contains(data.OnNeeds, ref[1]) {
+		if strings.EqualFold(decisionReferencePart(ref, 0), "needs") {
+			if len(ref) < 2 || !slices.Contains(data.OnNeeds, decisionReferencePart(ref, 1)) {
 				return nil, errors.New("on.decision cannot evaluate the deferred if condition before activation; remove cyclic pre_activation output references and declare upstream dependencies in on.needs")
 			}
 		}

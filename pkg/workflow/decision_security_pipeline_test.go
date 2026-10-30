@@ -101,3 +101,58 @@ Perform the requested work.
 	require.NoError(t, os.WriteFile(file, []byte(source), 0600))
 	require.NoError(t, NewCompiler(WithLint(false)).CompileWorkflow(file))
 }
+
+func TestDecisionCompileRejectsEventControlledProviderEndpoint(t *testing.T) {
+	dir := testutil.TempDir(t, "decision-event-endpoint")
+	file := filepath.Join(dir, "decision.md")
+	source := `---
+strict: false
+on:
+  workflow_dispatch:
+  roles: all
+  decision:
+    model: openai/gpt-5.4
+    questions:
+      - Should this run?
+engine:
+  id: copilot
+  env:
+    OPENAI_BASE_URL: ${{ github.event.issue.title }}
+---
+Perform the requested work.
+`
+	require.NoError(t, os.WriteFile(file, []byte(source), 0600))
+	err := NewCompiler(WithLint(false)).CompileWorkflow(file)
+	require.ErrorContains(t, err, "event-controlled endpoint")
+	_, statErr := os.Stat(filepath.Join(dir, "decision.lock.yml"))
+	require.True(t, os.IsNotExist(statErr), "unsafe decision must not create a lock file")
+}
+
+func TestDecisionCompileRejectsSecretFromUnsupportedShellOutput(t *testing.T) {
+	dir := testutil.TempDir(t, "decision-unsupported-shell-output")
+	file := filepath.Join(dir, "decision.md")
+	source := `---
+strict: false
+on:
+  workflow_dispatch:
+  roles: all
+  decision:
+    questions:
+      - Should ${{ steps.collect.outputs.value }} run?
+  steps:
+    - id: collect
+      shell: pwsh
+      env:
+        PRIVATE_VALUE: ${{ secrets.PRIVATE_VALUE }}
+      run: '"value=$env:PRIVATE_VALUE" >> $env:GITHUB_OUTPUT'
+engine: copilot
+---
+Perform the requested work.
+`
+	require.NoError(t, os.WriteFile(file, []byte(source), 0600))
+	err := NewCompiler(WithLint(false)).CompileWorkflow(file)
+	require.ErrorContains(t, err, "on.decision.questions[0]: credential-derived values are not allowed")
+	assert.NotContains(t, err.Error(), "PRIVATE_VALUE")
+	_, statErr := os.Stat(filepath.Join(dir, "decision.lock.yml"))
+	require.True(t, os.IsNotExist(statErr), "unsafe decision must not create a lock file")
+}

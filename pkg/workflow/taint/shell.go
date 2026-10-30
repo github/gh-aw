@@ -92,6 +92,7 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 	if shellName != "" && shellName != "bash" && shellName != "sh" &&
 		!strings.HasPrefix(shellName, "bash ") && !strings.HasPrefix(shellName, "sh ") {
 		a.gap(path, "only bash and sh run scripts are modeled")
+		a.conservativeShellOutputs(s, path)
 		return nil, nil, nil
 	}
 	s.initialTrace = shellInvocationTraces(shellName)
@@ -108,10 +109,34 @@ func (a *analyzer) parseShell(text string, fields map[string]any, path string, b
 	tree, parseErr := syntax.NewParser().Parse(strings.NewReader(rendered), "")
 	if parseErr != nil {
 		a.gap(path, "shell syntax could not be analyzed")
+		a.conservativeShellOutputs(s, path)
 		return nil, nil, nil
 	}
 	s.javascriptExecutables = javascriptExecutables(tree)
 	return s, tree, nil
+}
+
+func (a *analyzer) conservativeShellOutputs(s *shell, path string) {
+	if !a.rule.ConservativeOpaqueOutputs || a.stepOutput == nil || !outputIdentifier.MatchString(a.stepOutput.id) {
+		return
+	}
+	var sources value
+	for _, taint := range s.bindings {
+		sources = union(sources, taint)
+	}
+	for _, taint := range s.markers {
+		sources = union(sources, taint)
+	}
+	if len(sources) == 0 {
+		return
+	}
+	id := strings.ToLower(a.stepOutput.id)
+	ref := "steps." + id + ".outputs.*"
+	a.stepOutput.bindings[ref] = union(a.stepOutput.bindings[ref], sources)
+	a.stepOutput.recordSources = union(a.stepOutput.recordSources, sources)
+	a.stepOutput.recordStateKnown = false
+	a.stepOutput.modeled = false
+	a.gap(path, "outputs from an unsupported shell are conservatively credential-derived")
 }
 
 func (s *shell) renderActionsScript(text string) (string, error) {

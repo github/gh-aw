@@ -418,7 +418,7 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 		}
 	}
 	var opaqueSources value
-	if a.rule.ConservativeActionOutputs {
+	if a.rule.ConservativeOpaqueOutputs {
 		for ref, sources := range bindings {
 			if strings.HasPrefix(ref, "env.") {
 				opaqueSources = union(opaqueSources, sources)
@@ -443,8 +443,8 @@ func (a *analyzer) action(fields map[string]any, path string, bindings, files sc
 			a.emit(Site{Kind: Artifact, Path: path + ".with.path", Uses: uses, Input: key}, contents)
 		}
 	}
-	if a.rule.ConservativeActionOutputs && len(opaqueSources) > 0 {
-		if id, _ := fields["id"].(string); id != "" {
+	if a.rule.ConservativeOpaqueOutputs && len(opaqueSources) > 0 {
+		if id, ok := fields["id"].(string); ok && id != "" {
 			bindings["steps."+strings.ToLower(id)+".outputs.*"] = opaqueSources
 		}
 	}

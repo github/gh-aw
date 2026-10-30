@@ -169,7 +169,10 @@ func (c *Compiler) validateEnvSecretsSection(config map[string]any, sectionName 
 	}
 
 	strictModeValidationLog.Printf("Found %d secret(s) in %s section: %v", len(secrets), sectionName, secretRefs)
+	return c.reportEnvSecretFindings(sectionName, secretRefs)
+}
 
+func (c *Compiler) reportEnvSecretFindings(sectionName string, secretRefs []string) error {
 	// In strict mode, this is an error
 	if c.strictMode {
 		if sectionName == "engine.env" {

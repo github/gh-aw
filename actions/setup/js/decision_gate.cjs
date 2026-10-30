@@ -166,7 +166,12 @@ function providerConfigurations(env) {
 function overlayProviderModels(registry, encoded) {
   if (!encoded) return registry;
   if (Buffer.byteLength(encoded) > LIMITS.responseBytes) throw new DecisionError("model_unavailable");
-  const providers = JSON.parse(encoded);
+  let providers;
+  try {
+    providers = JSON.parse(encoded);
+  } catch {
+    throw new DecisionError("model_unavailable");
+  }
   const record = value => value && typeof value === "object" && !Array.isArray(value);
   if (!record(providers)) throw new DecisionError("model_unavailable");
   let modelCount = 0;
@@ -195,13 +200,30 @@ function overlayProviderModels(registry, encoded) {
   return registry;
 }
 
+function parseProviderBaseURL(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new DecisionError("model_unavailable");
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new DecisionError("model_unavailable");
+  return url;
+}
+
 /**
  * Reuse the shipped provider registry and the same alias resolver used by
  * engines, but never start an engine, retry discovery, or retrieve repository context.
  */
 async function resolveDecisionModel(env) {
   const configurations = providerConfigurations(env);
-  const registry = overlayProviderModels(JSON.parse(fs.readFileSync(path.join(__dirname, "models.json"), "utf8")), env.GH_AW_DECISION_PROVIDERS);
+  let registry;
+  try {
+    registry = JSON.parse(fs.readFileSync(path.join(__dirname, "models.json"), "utf8"));
+  } catch {
+    throw new DecisionError("model_unavailable");
+  }
+  registry = overlayProviderModels(registry, env.GH_AW_DECISION_PROVIDERS);
   const catalog = [];
   for (const [name, entry] of Object.entries(registry.providers || {})) {
     const provider = canonicalModelProvider(name);
@@ -223,8 +245,7 @@ async function resolveDecisionModel(env) {
   const selected = candidates.find(candidate => candidate.provider === preferredProvider) || candidates[0];
   const credentials = [...configurations.map(config => config.token), env.GITHUB_TOKEN].filter(value => typeof value === "string");
   if (redactBuiltInPatterns(redactSecrets(model, credentials).content).content !== model) throw new DecisionError("model_unavailable");
-  const url = new URL(selected.base);
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new DecisionError("model_unavailable");
+  parseProviderBaseURL(selected.base);
   const registryProvider = selected.provider === "copilot" ? "github-copilot" : selected.provider;
   const metadata = getCatalogModelEntry(registry, model, registryProvider);
   // Pure inference can use the model's native API, independent of engine routing policy.
@@ -236,7 +257,7 @@ function inferenceRequest(selection, prompt) {
   const base = selection.base.replace(/\/+$/, "");
   const headers = { "Content-Type": "application/json" };
   if (selection.provider === "copilot") {
-    const hostname = new URL(selection.base).hostname;
+    const hostname = parseProviderBaseURL(selection.base).hostname;
     const enterprise = ["api.enterprise.githubcopilot.com", "api.business.githubcopilot.com"].includes(hostname);
     const scheme = enterprise && !selection.token.startsWith("github_pat_") ? "token" : "Bearer";
     headers.Authorization = [scheme, selection.token].join(" ");

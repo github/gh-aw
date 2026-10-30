@@ -1,6 +1,46 @@
 package workflow
 
-import "slices"
+import (
+	"fmt"
+	"slices"
+)
+
+type decisionProviderEndpoint struct {
+	envKey       string
+	overrideKeys []string
+	defaultURL   string
+}
+
+func decisionEndpoint(provider LLMProvider) decisionProviderEndpoint {
+	switch provider {
+	case LLMProviderGitHub:
+		return decisionProviderEndpoint{envKey: "GITHUB_COPILOT_BASE_URL", overrideKeys: []string{"GITHUB_COPILOT_BASE_URL"}, defaultURL: "https://api.githubcopilot.com"}
+	case LLMProviderAnthropic:
+		return decisionProviderEndpoint{envKey: "ANTHROPIC_BASE_URL", overrideKeys: []string{"ANTHROPIC_BASE_URL"}, defaultURL: "https://api.anthropic.com"}
+	case LLMProviderOpenAI:
+		return decisionProviderEndpoint{envKey: "OPENAI_BASE_URL", overrideKeys: []string{"OPENAI_BASE_URL"}, defaultURL: "https://api.openai.com/v1"}
+	case "gemini":
+		return decisionProviderEndpoint{envKey: "GOOGLE_GEMINI_BASE_URL", overrideKeys: []string{"GOOGLE_GEMINI_BASE_URL", "GEMINI_API_BASE_URL"}, defaultURL: "https://generativelanguage.googleapis.com/v1beta"}
+	default:
+		return decisionProviderEndpoint{}
+	}
+}
+
+func validateDecisionProviderEndpoints(data *WorkflowData) error {
+	if data == nil || data.Decision == nil {
+		return nil
+	}
+	overrides := getEngineEnvOverrides(data)
+	for _, provider := range decisionProviders(data) {
+		endpoint := decisionEndpoint(provider)
+		for _, key := range endpoint.overrideKeys {
+			if value, ok := overrides[key]; ok && containsExpression(value) {
+				return fmt.Errorf("on.decision provider endpoint engine.env.%s must be a literal URL; Actions expressions could route credentials to an event-controlled endpoint", key)
+			}
+		}
+	}
+	return nil
+}
 
 func decisionProviders(data *WorkflowData) []LLMProvider {
 	aliases := data.ModelMappings
@@ -24,16 +64,13 @@ func decisionProviders(data *WorkflowData) []LLMProvider {
 func decisionEnv(data *WorkflowData) map[string]string {
 	env := map[string]string{
 		"GH_AW_DECISION_ELIGIBLE":   "true",
-		"GH_AW_DECISION_AUDIT_PATH": "${{ runner.temp }}/gh-aw/decision-gate.json",
+		"GH_AW_DECISION_AUDIT_PATH": decisionAuditPath,
 	}
 	applyModelAliasesEnv(env, data)
 	overrides := getEngineEnvOverrides(data)
 	for _, provider := range decisionProviders(data) {
 		names := llmProviderSecretNames(provider)
-		name := names[0]
-		if provider == LLMProviderOpenAI {
-			name = "OPENAI_API_KEY"
-		}
+		name := decisionProviderTokenEnv(provider)
 		env[name] = llmProviderSecretExpression(provider, data)
 		if provider == "gemini" {
 			names = append(names, "GOOGLE_API_KEY")
@@ -44,23 +81,29 @@ func decisionEnv(data *WorkflowData) map[string]string {
 				break
 			}
 		}
-		var baseURLKeys []string
-		switch provider {
-		case LLMProviderGitHub:
-			baseURLKeys = []string{"GITHUB_COPILOT_BASE_URL"}
-		case LLMProviderAnthropic:
-			baseURLKeys = []string{"ANTHROPIC_BASE_URL"}
-		case LLMProviderOpenAI:
-			baseURLKeys = []string{"OPENAI_BASE_URL"}
-		case "gemini":
-			baseURLKeys = []string{"GOOGLE_GEMINI_BASE_URL", "GEMINI_API_BASE_URL"}
+		endpoint := decisionEndpoint(provider)
+		if endpoint.envKey != "" {
+			env[endpoint.envKey] = endpoint.defaultURL
 		}
-		for _, key := range baseURLKeys {
+		for _, key := range endpoint.overrideKeys {
 			if value, ok := overrides[key]; ok {
-				env[baseURLKeys[0]] = value
+				env[endpoint.envKey] = value
 				break
 			}
 		}
 	}
 	return env
+}
+
+func decisionProviderTokenEnv(provider LLMProvider) string {
+	switch provider {
+	case LLMProviderGitHub:
+		return "COPILOT_GITHUB_TOKEN"
+	case LLMProviderOpenAI:
+		return "OPENAI_API_KEY"
+	case "gemini":
+		return "GEMINI_API_KEY"
+	default:
+		return "ANTHROPIC_API_KEY"
+	}
 }

@@ -61,6 +61,34 @@ func TestDecisionProviderAliasEnv(t *testing.T) {
 	assert.JSONEq(t, `{"custom":["anthropic/private-model","openai/private-model"]}`, env["GH_AW_MODEL_ALIASES"])
 }
 
+func TestDecisionCodexProviderEnv(t *testing.T) {
+	data := &WorkflowData{
+		Decision: &DecisionConfig{Model: "codex/gpt-5.4"},
+		EngineConfig: &EngineConfig{Env: map[string]string{
+			"CODEX_API_KEY":   "${{ secrets.CUSTOM_CODEX_KEY }}",
+			"OPENAI_BASE_URL": "https://provider.example/v1",
+		}},
+	}
+	env := decisionEnv(data)
+	assert.Equal(t, "${{ secrets.CUSTOM_CODEX_KEY }}", env["OPENAI_API_KEY"])
+	assert.Equal(t, "https://provider.example/v1", env["OPENAI_BASE_URL"])
+	assert.NotContains(t, env, "COPILOT_GITHUB_TOKEN")
+}
+
+func TestDecisionProviderEndpointOverrides(t *testing.T) {
+	data := &WorkflowData{Decision: &DecisionConfig{Model: "openai/gpt-5.4"}}
+	env := decisionEnv(data)
+	assert.Equal(t, "https://api.openai.com/v1", env["OPENAI_BASE_URL"])
+
+	data.EngineConfig = &EngineConfig{Env: map[string]string{
+		"OPENAI_BASE_URL": "${{ github.event.issue.title }}",
+	}}
+	require.ErrorContains(t, validateDecisionProviderEndpoints(data), "event-controlled endpoint")
+
+	data.EngineConfig.Env["OPENAI_BASE_URL"] = "https://provider.example/v1"
+	require.NoError(t, validateDecisionProviderEndpoints(data))
+}
+
 func TestDecisionCompiledRuntimeContract(t *testing.T) {
 	dir := testutil.TempDir(t, "decision-contract")
 	file := filepath.Join(dir, "decision.md")
@@ -130,7 +158,7 @@ Perform the requested work.
 	assert.NotContains(t, script, "github.event.issue.title")
 	output := document.Jobs["pre_activation"].Outputs["activated"]
 	assert.Contains(t, output, "steps.decision_gate.outputs.decision_result != 'skip'")
-	assert.False(t, strings.Contains(output, "steps.decision_gate.outputs.decision !="))
+	assert.NotContains(t, output, "steps.decision_gate.outputs.decision !=")
 	assert.Equal(t, "${{ steps.decision_gate.outputs.decision_result }}", document.Jobs["pre_activation"].Outputs["decision_result"])
 	assert.Equal(t, "${{ steps.decision_gate.outputs.decision_status }}", document.Jobs["pre_activation"].Outputs["decision_status"])
 }
@@ -150,6 +178,6 @@ func TestDecisionIneligibleRuntimeStillRecordsReceipt(t *testing.T) {
 	assert.Equal(t, decisionStepID, document.Steps[0].ID)
 	assert.Empty(t, document.Steps[0].If)
 	assert.Equal(t, "${{ false }}", document.Steps[0].Env["GH_AW_DECISION_ELIGIBLE"])
-	assert.Equal(t, "${{ runner.temp }}/gh-aw/decision-gate.json", document.Steps[0].Env["GH_AW_DECISION_AUDIT_PATH"])
+	assert.Equal(t, decisionAuditPath, document.Steps[0].Env["GH_AW_DECISION_AUDIT_PATH"])
 	assert.Equal(t, "always()", document.Steps[1].If)
 }

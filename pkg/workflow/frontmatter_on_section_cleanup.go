@@ -611,8 +611,8 @@ func shouldCommentNamesArrayItem(result []string, trimmedLine string) bool {
 	if trimmedLine == "" || !strings.HasPrefix(trimmedLine, "-") {
 		return false
 	}
-	for i := range slices.Backward(result) {
-		prevTrimmed := strings.TrimSpace(result[i])
+	for _, line := range slices.Backward(result) {
+		prevTrimmed := strings.TrimSpace(line)
 		if prevTrimmed == "" {
 			continue
 		}
@@ -670,27 +670,55 @@ func (s *onSectionCleanupState) renderCommentedLine(line, commentReason string) 
 // Only the final block is adjusted. Commented blocks with real `on:` content after them
 // already have a matching indentation anchor below and are left untouched.
 func dedentTrailingOnCommentBlock(lines []string) []string {
-	// Locate the last non-blank line; the trailing block must end in a comment.
+	start, last, ok := trailingOnCommentBlockBounds(lines)
+	if !ok || !shouldDedentTrailingOnCommentBlock(lines, start) {
+		return lines
+	}
+
+	frontmatterLog.Printf("Dedenting trailing 'on' comment block: lines %d-%d", start, last)
+	dedented := make([]string, 0, len(lines))
+	for index, line := range lines {
+		if index >= start && index <= last {
+			line = strings.TrimLeft(line, " \t")
+		}
+		dedented = append(dedented, line)
+	}
+	return dedented
+}
+
+func trailingOnCommentBlockBounds(lines []string) (int, int, bool) {
 	last := len(lines) - 1
-	for last >= 0 && strings.TrimSpace(lines[last]) == "" {
+	for last >= 0 {
+		line, ok := onSectionLineAt(lines, last)
+		if !ok || strings.TrimSpace(line) != "" {
+			break
+		}
 		last--
 	}
-	if last < 0 || !strings.HasPrefix(strings.TrimSpace(lines[last]), "#") {
-		return lines
+	lastLine, ok := onSectionLineAt(lines, last)
+	if !ok || !strings.HasPrefix(strings.TrimSpace(lastLine), "#") {
+		return 0, 0, false
 	}
 
 	// Walk back over the consecutive comment lines that form the trailing block.
 	start := last
-	for start-1 >= 0 && strings.HasPrefix(strings.TrimSpace(lines[start-1]), "#") {
+	for start > 0 {
+		previous, ok := onSectionLineAt(lines, start-1)
+		if !ok || !strings.HasPrefix(strings.TrimSpace(previous), "#") {
+			break
+		}
 		start--
 	}
 
 	// The block must sit under the `on:` mapping (i.e. be indented) and be preceded by
 	// real content, so a file that is entirely comments is left alone.
 	if start == 0 {
-		return lines
+		return 0, 0, false
 	}
+	return start, last, true
+}
 
+func shouldDedentTrailingOnCommentBlock(lines []string, start int) bool {
 	// Comments at the direct `on:` children level (≤2 spaces / 1 tab) always dedent
 	// to column 0. Comments nested deeper — e.g. `forks:` inside `pull_request:` at
 	// 4-space indent — are usually part of a nested event section that still has real
@@ -704,30 +732,44 @@ func dedentTrailingOnCommentBlock(lines []string) []string {
 	// aligns with neither that key nor the column-0 top-level key that follows the `on:`
 	// section, and yamllint's comments-indentation rule flags it. In that case dedent to
 	// column 0 (matching the following content) to clear the warning.
-	firstLineIndent := len(lines[start]) - len(strings.TrimLeft(lines[start], " \t"))
+	firstLine, ok := onSectionLineAt(lines, start)
+	if !ok {
+		return false
+	}
+	firstLineIndent := len(firstLine) - len(strings.TrimLeft(firstLine, " \t"))
 	if firstLineIndent > 2 {
 		// Find the nearest preceding real (non-blank) content line — the anchor the
 		// comment block visually attaches to.
 		anchor := start - 1
-		for anchor >= 0 && strings.TrimSpace(lines[anchor]) == "" {
+		for anchor >= 0 {
+			line, ok := onSectionLineAt(lines, anchor)
+			if !ok || strings.TrimSpace(line) != "" {
+				break
+			}
 			anchor--
 		}
 		if anchor < 0 {
-			return lines
+			return false
 		}
-		anchorIndent := len(lines[anchor]) - len(strings.TrimLeft(lines[anchor], " \t"))
+		anchorLine, ok := onSectionLineAt(lines, anchor)
+		if !ok {
+			return false
+		}
+		anchorIndent := len(anchorLine) - len(strings.TrimLeft(anchorLine, " \t"))
 		// A sibling at the same (or deeper) indent anchors the block — leave it as-is.
 		// Only a strictly shallower anchor (the parent key) needs dedenting.
 		if anchorIndent >= firstLineIndent {
-			return lines
+			return false
 		}
 	}
+	return true
+}
 
-	frontmatterLog.Printf("Dedenting trailing 'on' comment block: lines %d-%d", start, last)
-	for i := start; i <= last; i++ {
-		lines[i] = strings.TrimLeft(lines[i], " \t")
+func onSectionLineAt(lines []string, index int) (string, bool) {
+	if index < 0 || index >= len(lines) {
+		return "", false
 	}
-	return lines
+	return lines[index], true
 }
 
 // addZizmorIgnoreForWorkflowRun adds a zizmor ignore comment for workflow_run triggers

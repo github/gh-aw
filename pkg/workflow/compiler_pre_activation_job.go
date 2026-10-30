@@ -60,29 +60,10 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		return nil, err
 	}
 	if data.Decision != nil {
-		eligible, err := buildPreActivationActivatedNode(data, buildPreActivationActivatedConditions(data, needsPermissionCheck))
+		steps, activatedExpression, err = c.appendPreActivationDecisionGate(data, steps, onStepIDs, customOutputs, needsPermissionCheck)
 		if err != nil {
 			return nil, err
 		}
-		eligible, err = decisionEligibleCondition(data, eligible, onStepIDs, customOutputs)
-		if err != nil {
-			return nil, err
-		}
-		workflowRunSafety, err := ParseExpression(stripExpressionWrapper(c.buildWorkflowRunRepoSafetyCondition()))
-		if err != nil {
-			return nil, errors.New("cannot construct the workflow_run safety check for on.decision")
-		}
-		if _, literal := eligible.(*StringLiteralNode); literal {
-			eligible = workflowRunSafety
-		} else {
-			eligible = BuildAnd(eligible, workflowRunSafety)
-		}
-		if _, literal := eligible.(*StringLiteralNode); literal {
-			steps = c.appendDecisionStep(data, steps, "${{ true }}")
-		} else {
-			steps = c.appendDecisionStep(data, steps, RenderCondition(eligible))
-		}
-		activatedExpression = fmt.Sprintf("${{ (%s) && steps.%s.outputs.decision_result != 'skip' }}", eligible.Render(), decisionStepID)
 	}
 
 	jobIfCondition := c.applyPreActivationIfConditionGuards(data, needsPermissionCheck, c.buildPreActivationBaseIfCondition(data))
@@ -90,6 +71,10 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 
+	return c.finishPreActivationJob(data, steps, jobIfCondition, permissions, activatedExpression, onStepIDs, customOutputs), nil
+}
+
+func (c *Compiler) finishPreActivationJob(data *WorkflowData, steps []string, jobIfCondition, permissions, activatedExpression string, onStepIDs []string, customOutputs map[string]string) *Job {
 	runsOn := c.formatFrameworkJobRunsOn(data)
 	if data.OnRestoreMemory && data.DriveMemoryConfig != nil && len(data.DriveMemoryConfig.Drives) > 0 {
 		runsOn = "runs-on: ubuntu-latest"
@@ -103,7 +88,34 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		Steps:       steps,
 		Outputs:     buildPreActivationJobOutputs(data, activatedExpression, onStepIDs, customOutputs),
 		Needs:       sliceutil.Deduplicate(data.OnNeeds),
-	}, nil
+	}
+}
+
+func (c *Compiler) appendPreActivationDecisionGate(data *WorkflowData, steps []string, onStepIDs []string, customOutputs map[string]string, needsPermissionCheck bool) ([]string, string, error) {
+	eligible, err := buildPreActivationActivatedNode(data, buildPreActivationActivatedConditions(data, needsPermissionCheck))
+	if err != nil {
+		return nil, "", err
+	}
+	eligible, err = decisionEligibleCondition(data, eligible, onStepIDs, customOutputs)
+	if err != nil {
+		return nil, "", err
+	}
+	workflowRunSafety, err := ParseExpression(stripExpressionWrapper(c.buildWorkflowRunRepoSafetyCondition()))
+	if err != nil {
+		return nil, "", errors.New("cannot construct the workflow_run safety check for on.decision")
+	}
+	if _, literal := eligible.(*StringLiteralNode); literal {
+		eligible = workflowRunSafety
+	} else {
+		eligible = BuildAnd(eligible, workflowRunSafety)
+	}
+	if _, literal := eligible.(*StringLiteralNode); literal {
+		steps = c.appendDecisionStep(data, steps, "${{ true }}")
+	} else {
+		steps = c.appendDecisionStep(data, steps, RenderCondition(eligible))
+	}
+	activatedExpression := fmt.Sprintf("${{ (%s) && steps.%s.outputs.decision_result != 'skip' }}", eligible.Render(), decisionStepID)
+	return steps, activatedExpression, nil
 }
 
 func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupActionRef string) ([]string, string) {

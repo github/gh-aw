@@ -32,6 +32,7 @@ var llmProviderAliases = map[string]LLMProvider{
 	"github_models":  LLMProviderGitHub,
 	"anthropic":      LLMProviderAnthropic,
 	"openai":         LLMProviderOpenAI,
+	"codex":          LLMProviderOpenAI,
 }
 
 type llmProviderProfile struct {

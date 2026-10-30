@@ -51,6 +51,17 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if checkoutErr != nil {
 		failures = append(failures, checkoutErr)
 	}
+	if err := c.reportLintDiagnostics(data, sourcePath, diagnostics, checkouts); err != nil {
+		failures = append(failures, err)
+	}
+	if err := errors.Join(failures...); err != nil {
+		return formatCompilerError(sourcePath, "error", err.Error(), err)
+	}
+	return nil
+}
+
+func (c *Compiler) reportLintDiagnostics(data *WorkflowData, sourcePath string, diagnostics []workflowlint.Diagnostic, checkouts map[string]struct{}) error {
+	var failures []error
 	for _, diagnostic := range diagnostics {
 		_, exemptCheckout := checkouts[diagnostic.Path]
 		if diagnostic.RuleID == "artipacked" && diagnostic.Severity == workflowlint.Warning && exemptCheckout {
@@ -80,10 +91,7 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 			c.IncrementWarningCount()
 		}
 	}
-	if err := errors.Join(failures...); err != nil {
-		return formatCompilerError(sourcePath, "error", err.Error(), err)
-	}
-	return nil
+	return errors.Join(failures...)
 }
 
 func compilerGeneratedActionRefs(data *WorkflowData) map[string]struct{} {
