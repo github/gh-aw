@@ -495,7 +495,7 @@ function normalizeClaudeSession(records) {
           ...fields,
           sourceType: source.type,
           ...normalizeEngineRetryData({ attempt, maxRetries: max_retries, backoffMs: retry_delay_ms }),
-          ...(source.error != null ? { errors: [{ error: source.error, error_status: source.error_status, attempt: source.attempt }] } : {}),
+          ...(source.error != null ? { errors: [{ error: source.error, ...(source.error_status !== undefined ? { error_status: source.error_status } : {}), ...(source.attempt !== undefined ? { attempt: source.attempt } : {}) }] } : {}),
         });
       } else if (source.error != null && !task && !isBashLifecycle) {
         reportError(source, source.error);

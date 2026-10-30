@@ -26,7 +26,7 @@ const EVENT_FIELDS = {
   "execution.result": ["outcome", "conclusion", "exitCode", "durationMs", "startedAt", "finishedAt"],
   "harness.retry": ["attempts", "exitCode"],
   "harness.attempt": [],
-  "engine.retry": ["sourceEngine", "sourceType"],
+  "engine.retry": ["sourceEngine", "sourceType", "sessionId", "agentId"],
   "grader.result": ["id", "status", "value", "score", "unit", "passed", "direction", "threshold", "enabled", "min", "max", "version"],
 };
 EVENT_FIELDS["firewall.token_usage"] = EVENT_FIELDS["usage.report"];

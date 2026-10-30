@@ -93,6 +93,10 @@ describe("Claude canonical diagnostics from live run shapes", () => {
     expect(errors[2]).toMatchObject({ type: "engine.retry", data: { sourceType: "system", attempt: 1, maxRetries: 10, backoffMs: 1000 } });
     expect(projectSessionResult(events).errors).toHaveLength(3);
     expect(project(events).filter(event => ["session.result", "engine.retry"].includes(event.type) && event.data.errors)).toHaveLength(3);
+    const unified = project(events);
+    expect(unified.filter(event => event.type === "session.result" && event.data.errors)).toHaveLength(2);
+    expect(unified.filter(event => event.type === "engine.retry")).toHaveLength(1);
+    expect(unified.find(event => event.type === "engine.retry").data).toMatchObject({ attempt: 1, maxRetries: 10, backoffMs: 1000, errors: errors[2].data.errors });
     expect(normalizeClaudeSession(JSON.parse(JSON.stringify(events)))).toEqual(JSON.parse(JSON.stringify(events)));
   });
 

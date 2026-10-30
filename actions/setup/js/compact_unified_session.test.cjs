@@ -126,7 +126,7 @@ describe("compact unified session projection", () => {
   });
 
   it("preserves bounded native reconnect counters without creating harness events", () => {
-    const events = [event("engine.retry", { attempt: 2, maxRetries: 5, backoffMs: 1000, output: "PRIVATE" }), event("engine.retry", { attempt: -1, maxRetries: "PRIVATE" }), event("engine.retry", { attempt: 1, backoffMs: -1 })];
+    const events = [event("engine.retry", { attempt: 2, maxRetries: 5, backoffMs: 1000, output: "PRIVATE", errors: ["PRIVATE"] }), event("engine.retry", { attempt: -1, maxRetries: "PRIVATE" }), event("engine.retry", { attempt: 1, backoffMs: -1 })];
     const result = parse(compactUnifiedSession(events));
     expect(result.map(item => item.type)).toEqual(["engine.retry", "engine.retry", "engine.retry"]);
     expect(result.map(item => item.data)).toEqual([{ attempt: 2, maxRetries: 5, backoffMs: 1000 }, {}, { attempt: 1 }]);

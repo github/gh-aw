@@ -154,6 +154,18 @@ func TestAuditRetriesRetainPartialAndLegacyNativeObservations(t *testing.T) {
 	require.NotContains(t, string(encoded), `"attempt"`)
 }
 
+func TestAuditRetriesReadLegacyEngineMetadata(t *testing.T) {
+	root := t.TempDir()
+	content := sessionTestHeader +
+		`{"type":"session.result","data":{"engineRetry":{"attempt":1,"maxRetries":5,"backoffMs":100}},"provenance":{"component":"agent","phase":"agent","path":"agent.jsonl","index":0}}` + "\n"
+	writeSessionTestFile(t, root, "aw_session.jsonl", content)
+	report := readAuditRetrySummary(root)
+	require.NotNil(t, report)
+	require.Equal(t, 1, report.EngineRetries)
+	require.Len(t, report.EngineRetryHistory, 1)
+	require.Equal(t, 5, *report.EngineRetryHistory[0].MaxRetries)
+}
+
 func TestSessionATIFRetainsRetryEvidence(t *testing.T) {
 	content := sessionTestHeader + sessionTestAgentEvent +
 		`{"type":"harness.attempt","data":{"attempt":2,"attemptId":"retry-2","exitCode":null,"failureClasses":[],"startedAt":10,"outcome":"interrupted","strategy":"resume","backoffMs":20,"layer":"harness"},"provenance":{"component":"harness","phase":"agent","path":"retry.json","index":1}}` + "\n" +
@@ -171,7 +183,7 @@ func TestSessionATIFRetainsRetryEvidence(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(exported, &trajectory))
 	for line := range strings.SplitSeq(strings.TrimSpace(content), "\n") {
-		if !strings.Contains(line, `"component":"harness"`) && !strings.Contains(line, `"engine.retry"`) {
+		if !strings.Contains(line, `"component":"harness"`) && !strings.Contains(line, `"type":"engine.retry"`) {
 			continue
 		}
 		var want map[string]any
