@@ -732,6 +732,13 @@ When multiple targets run concurrently, `--count` limits the combined number of 
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
 
+When a selected run has `aw_session.jsonl`, `logs` automatically adds a sibling
+`aw_session.atif` containing [ATIF-v1.8](https://docs.harborframework.com/agents/atif)
+JSON, retaining the original session and reports. This also applies to cached
+runs and `--stdin`. Missing sessions are skipped without extra downloads or
+ATIF-specific reconstruction; cached summaries alone are not trajectories.
+Invalid sessions and export failures return errors.
+
 The `graders` artifact set includes conclusion's built-in results in `usage`
 and the optional combined `graders` artifact from the separate custom-grader job,
 with workflow-call-prefixed and historical agent artifacts supported.
@@ -892,6 +899,12 @@ The diff shows new or removed network domains, status changes (allowed ↔ denie
 
 **Options:** `--artifacts`, `--format` (pretty, markdown; default: pretty), `--json/-j`, `--output/-o`, `--repo/-r`
 
+`audit` automatically writes a sibling `aw_session.atif` when a selected run has
+`aw_session.jsonl`, retaining the original session and audit reports. This also
+applies to single-run, grouped, and cached audits. Missing sessions are skipped
+without extra downloads or ATIF-specific reconstruction; invalid sessions and
+export failures return errors.
+
 #### `sessions`
 
 Experimental: download a unified agent session for an existing workflow run. The command writes
@@ -906,9 +919,10 @@ Runs from older `gh-aw` versions are parsed into the current unified format from
 gh aw sessions download 1234567890 --repo owner/repo
 gh aw sessions download https://github.com/owner/repo/actions/runs/1234567890 --format markdown
 gh aw sessions download 1234567890 -o session.jsonl
+gh aw sessions download 1234567890 --atif -o session.atif
 ```
 
-**Options:** `--format` (`jsonl` or `markdown`; default: `jsonl`),
+**Options:** `--atif` (ATIF-v1.8 JSON instead of JSONL), `--format` (`jsonl` or `markdown`; default: `jsonl`),
 `--output/-o` (output file), `--repo/-r` (`[HOST/]owner/repo`; defaults to the
 current repository).
 
@@ -917,6 +931,12 @@ bounded summary renderer, omits user prompts and private tool payloads, and
 reports display truncation. Node.js is required for reconstruction and Markdown
 rendering, but not for downloading an existing unified JSONL file. Missing
 artifacts, download failures, and invalid session files return errors.
+`--atif` replaces the session output format on stdout or at the exact `--output`
+path; it cannot be combined with `--format markdown`. The export preserves source
+evidence in schema-approved extensions, including unmatched tools and subagent
+observations. Missing metadata and uncertain accounting are not fabricated.
+ATIF includes private prompts and tool payloads, unlike the bounded Markdown
+summary. Conversion requires no Python/Harbor installation.
 The command and its output formats may change.
 
 #### `graders`
