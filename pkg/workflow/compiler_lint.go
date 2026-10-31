@@ -3,8 +3,10 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -22,10 +24,18 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 	if err != nil {
 		return formatCompilerError(sourcePath, "error", "cannot parse generated Actions AST for linting", nil)
 	}
+	generatedActionRefs := compilerGeneratedActionRefs(data)
+	// An explicit --action-tag is a caller-selected reference override. Do not
+	// let compiler ownership downgrade mutable fallback refs; callers must opt in
+	// with --allow-action-refs when the override cannot be resolved to a SHA.
+	if c.actionTag != "" {
+		generatedActionRefs = nil
+	}
 	diagnostics, err := workflowlint.Default().Run(c.ctx, workflowlint.Input{
 		Workflow: graph, Document: c.lintPolicyDocument(data), SourcePath: sourcePath,
-		AllowActionRefs: c.allowActionRefs,
-		SafeOutputJobs:  safeOutputLintJobs(data),
+		AllowActionRefs:     c.allowActionRefs,
+		SafeOutputJobs:      safeOutputLintJobs(data),
+		GeneratedActionRefs: generatedActionRefs,
 	})
 	var failures []error
 	if err != nil {
@@ -68,6 +78,75 @@ func (c *Compiler) lintCompiledWorkflow(data *WorkflowData, content, sourcePath 
 		return formatCompilerError(sourcePath, "error", err.Error(), err)
 	}
 	return nil
+}
+
+func compilerGeneratedActionRefs(data *WorkflowData) map[string]struct{} {
+	generated := maps.Clone(data.generatedActionRefs)
+	// Authored pin failures must not inherit a matching compiler-generated fallback.
+	// Authored pre-/post-/agent steps are pinned before rendering; unresolved
+	// literal collisions are covered here without re-parsing their YAML strings.
+	for _, failure := range data.ActionResolutionFailures {
+		if failure.compilerGenerated {
+			continue
+		}
+		for reference := range generated {
+			if extractActionRepo(reference) == failure.Repo &&
+				extractActionVersion(reference) == failure.Ref {
+				delete(generated, reference)
+			}
+		}
+	}
+	for _, value := range data.Jobs {
+		if job, ok := value.(map[string]any); ok {
+			removeAuthoredActionRef(generated, job)
+			for _, field := range []string{"steps", "pre-steps", "post-steps"} {
+				removeAuthoredStepActionRefs(generated, job[field])
+			}
+		}
+	}
+	for _, step := range data.OnSteps {
+		removeAuthoredActionRef(generated, step)
+	}
+	if data.SecretMasking != nil {
+		for _, step := range data.SecretMasking.Steps {
+			removeAuthoredActionRef(generated, step)
+		}
+	}
+	if data.SafeOutputs != nil {
+		removeAuthoredStepActionRefs(generated, data.SafeOutputs.Steps)
+		for _, action := range data.SafeOutputs.Actions {
+			reference := action.ResolvedRef
+			if reference == "" {
+				reference = action.Uses
+			}
+			reference, _, _ = strings.Cut(reference, " # ")
+			delete(generated, reference)
+		}
+		for _, job := range data.SafeOutputs.Jobs {
+			removeAuthoredStepActionRefs(generated, job.Steps)
+		}
+		if detection := data.SafeOutputs.ThreatDetection; detection != nil {
+			removeAuthoredStepActionRefs(generated, detection.Steps)
+			removeAuthoredStepActionRefs(generated, detection.PostSteps)
+		}
+	}
+	return generated
+}
+
+func removeAuthoredStepActionRefs(generated map[string]struct{}, value any) {
+	if steps, ok := value.([]any); ok {
+		for _, value := range steps {
+			if step, ok := value.(map[string]any); ok {
+				removeAuthoredActionRef(generated, step)
+			}
+		}
+	}
+}
+
+func removeAuthoredActionRef(generated map[string]struct{}, value map[string]any) {
+	if uses, ok := value["uses"].(string); ok {
+		delete(generated, uses)
+	}
 }
 
 func (c *Compiler) lintPolicyDocument(data *WorkflowData) *aw.Document {

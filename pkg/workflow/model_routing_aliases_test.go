@@ -26,6 +26,7 @@ type routedAliasCompilation struct {
 	err       error
 	awfConfig map[string]any
 	infoEnv   map[string]string
+	lock      string
 }
 
 // compileRoutedAliasWorkflow compiles a routed workflow and returns the agent job's
@@ -40,14 +41,27 @@ func compileRoutedAliasWorkflow(t *testing.T, engine, provider, allowedModels, p
 	source.WriteString("  model-routing:\n    goal: cost\n    mode: auto\n    allowed-models: " + allowedModels + "\n")
 	source.WriteString(policy)
 	source.WriteString("---\nReport a finding.\n")
+	return compileRoutedWorkflowSource(t, source.String())
+}
+
+// compileRoutedWorkflowSource compiles a routed workflow source and returns the agent
+// job's compiled AWF config, the generate_aw_info step env, and the lock file.
+func compileRoutedWorkflowSource(t *testing.T, source string) routedAliasCompilation {
+	t.Helper()
 	workflowPath := filepath.Join(t.TempDir(), "routed.md")
-	require.NoError(t, os.WriteFile(workflowPath, []byte(source.String()), 0o600))
+	require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0o600))
 	if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
 		return routedAliasCompilation{err: err}
 	}
 	content, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
 	require.NoError(t, err)
+	return routedAliasCompilation{infoEnv: awInfoStepEnv(t, string(content)), lock: string(content), awfConfig: agentAWFConfigFromLock(t, content)}
+}
 
+// agentAWFConfigFromLock decodes the agent job's AWF config from the shell-escaped
+// printf that the compiled lock uses to write awf-config.json.
+func agentAWFConfigFromLock(t *testing.T, content []byte) map[string]any {
+	t.Helper()
 	var lock struct {
 		Jobs map[string]struct {
 			Steps []struct {
@@ -58,17 +72,17 @@ func compileRoutedAliasWorkflow(t *testing.T, engine, provider, allowedModels, p
 		} `yaml:"jobs"`
 	}
 	require.NoError(t, yaml.Unmarshal(content, &lock))
-	result := routedAliasCompilation{infoEnv: awInfoStepEnv(t, string(content))}
+	var awfConfig map[string]any
 	for _, step := range lock.Jobs["agent"].Steps {
 		if match := awfConfigWritePattern.FindStringSubmatch(step.Run); match != nil {
 			// The AI-credit budget is substituted by the shell at run time.
 			config := strings.ReplaceAll(match[1], "${GH_AW_MAX_AI_CREDITS}", "0")
-			require.NoError(t, json.Unmarshal([]byte(shellEscapePattern.ReplaceAllString(config, "$1")), &result.awfConfig))
+			require.NoError(t, json.Unmarshal([]byte(shellEscapePattern.ReplaceAllString(config, "$1")), &awfConfig))
 			break
 		}
 	}
-	require.NotNil(t, result.awfConfig, "agent job has no compiled AWF config")
-	return result
+	require.NotNil(t, awfConfig, "agent job has no compiled AWF config")
+	return awfConfig
 }
 
 func (c routedAliasCompilation) routing(t *testing.T) map[string]any {
@@ -332,7 +346,7 @@ func TestRoutingAllowedModelsPrefixedIdStaysExact(t *testing.T) {
 	// The bare names are aliases but not bundled model ids, so only the prefix keeps them exact.
 	for _, tc := range []struct{ prefix, name string }{{"github-copilot/", "gpt-5"}, {"copilot/", "gpt-5.6"}} {
 		require.Contains(t, BuiltinModelAliases(), tc.name)
-		require.False(t, isBundledCopilotModelID(tc.name))
+		require.False(t, isBundledProviderModelID(copilotRoutingNamespace, tc.name))
 		compiled := compileRoutedAliasWorkflow(t, "copilot", "", "["+tc.prefix+tc.name+"]", "")
 		require.Equal(t, []string{"github-copilot/" + tc.name}, compiled.candidates(t), tc.prefix+tc.name)
 	}
@@ -343,7 +357,7 @@ func TestRoutingAllowedModelsKnownCopilotIdStaysExact(t *testing.T) {
 	// resolveConfiguredModel, the model id wins.
 	for _, model := range []string{"gpt-5.4", "gpt-5-mini", "gemini-3.8-flash"} {
 		require.Contains(t, BuiltinModelAliases(), model)
-		require.True(t, isBundledCopilotModelID(model))
+		require.True(t, isBundledProviderModelID(copilotRoutingNamespace, model))
 		compiled := compileRoutedAliasWorkflow(t, "copilot", "", "["+model+"]", "")
 		require.Equal(t, []string{"github-copilot/" + model}, compiled.candidates(t), model)
 	}
@@ -355,7 +369,7 @@ func TestRoutingAllowedModelsKnownCopilotIdStaysExact(t *testing.T) {
 func TestRoutingAllowedModelsAliasNamedLikeIdFollowsEngineModelRule(t *testing.T) {
 	aliases := BuiltinModelAliases()
 	var catalog []string
-	for id := range bundledCopilotModelIDs() {
+	for id := range bundledProviderModelIDs()[copilotRoutingNamespace] {
 		catalog = append(catalog, "github-copilot/"+id)
 	}
 	names := []string{"gemini-3.8-flash", "gpt-5-mini", "gpt-5.5", "gpt-5", "gpt-5-codex", "gpt-6"}

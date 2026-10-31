@@ -118,12 +118,14 @@ func effectiveLogsMaxStorageMB(maxStorageMB int, explicitlySet bool) int {
 func normalizeLogsDownloadOptions(opts LogsDownloadOptions) LogsDownloadOptions {
 	opts.MaxStorageMB = effectiveLogsMaxStorageMB(opts.MaxStorageMB, opts.MaxStorageMBSet)
 	opts.ArtifactSets = logsOutcomeArtifactSets(opts.ArtifactSets, opts.Outcomes)
+	opts.ArtifactSets = logsHarborArtifactSets(opts.ArtifactSets, opts.Harbor)
 	return opts
 }
 
 func normalizeStdinLogsOptions(opts StdinLogsOptions) StdinLogsOptions {
 	opts.MaxStorageMB = effectiveLogsMaxStorageMB(opts.MaxStorageMB, opts.MaxStorageMBSet)
 	opts.ArtifactSets = logsOutcomeArtifactSets(opts.ArtifactSets, opts.Outcomes)
+	opts.ArtifactSets = logsHarborArtifactSets(opts.ArtifactSets, opts.Harbor)
 	return opts
 }
 
@@ -576,6 +578,9 @@ func pruneLogsCache(path string, bytesToFree int64, completedPaths map[string]st
 				return nil
 			}
 			return walkErr
+		}
+		if info != nil && info.IsDir() && info.Name() == harborExportDirectory && harborCheckDestination(candidatePath) == nil {
+			return filepath.SkipDir
 		}
 		if info == nil || !info.Mode().IsRegular() {
 			return nil

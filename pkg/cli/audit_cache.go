@@ -51,6 +51,9 @@ func loadCachedAuditData(runOutputDir string, run WorkflowRun, source auditCache
 	}
 	auditData.Outcomes = nil
 	auditData.OutcomeSummary = nil
+	if auditData.Retries == nil {
+		auditData.Retries = readAuditRetrySummary(runOutputDir)
+	}
 	return auditData, true
 }
 
@@ -105,6 +108,9 @@ func writeLogsAuditFile(processedRun ProcessedRun, processedRuns []ProcessedRun,
 	}
 	if processedRun.WorkQueue != nil {
 		auditData.WorkQueue = processedRun.WorkQueue
+	}
+	if auditData.Retries == nil {
+		auditData.Retries = readAuditRetrySummary(runOutputDir)
 	}
 	hydratedProcessedRuns := hydrateProcessedRunsWithCachedAudit(processedRuns)
 	auditData.Comparison = buildAuditComparisonForProcessedRuns(hydrateProcessedRunWithCachedAudit(processedRun), hydratedProcessedRuns)

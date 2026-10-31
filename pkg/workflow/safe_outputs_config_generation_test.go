@@ -93,6 +93,61 @@ func TestGenerateSafeOutputsConfigNeutralizesUnresolvableNeedsExpression(t *test
 		"allowed_pull_requests should be neutralized to an empty array in the agent job's config")
 }
 
+func TestGenerateSafeOutputsConfigExcludesGitHubTokens(t *testing.T) {
+	for _, token := range []string{
+		"${{ steps.mint.outputs.token }}",
+		"${{ secrets.CUSTOM_TOKEN }}",
+	} {
+		t.Run(token, func(t *testing.T) {
+			data := &WorkflowData{
+				SafeOutputs: &SafeOutputsConfig{
+					AddComments: &AddCommentsConfig{
+						BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: token, Max: strPtr("1")},
+					},
+					CreateIssues: &CreateIssuesConfig{
+						BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: token},
+					},
+					CreatePullRequests:      &CreatePullRequestsConfig{HeadGitHubToken: token},
+					PushToPullRequestBranch: &PushToPullRequestBranchConfig{HeadGitHubToken: token},
+					DispatchRepository: &DispatchRepositoryConfig{
+						Tools: map[string]*DispatchRepositoryToolConfig{
+							"trigger_ci": {GitHubToken: token, EventType: "ci"},
+						},
+					},
+					Mentions: &MentionsConfig{GitHubToken: token, AllowedTeams: []string{"my-org/my-team"}},
+				},
+				CommentMemoryConfig: &CommentMemoryConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{GitHubToken: token},
+				},
+			}
+
+			result, err := generateSafeOutputsConfig(data)
+			require.NoError(t, err)
+			assert.NotContains(t, result, token)
+			assert.NotContains(t, result, "github-token")
+
+			var parsed map[string]any
+			require.NoError(t, json.Unmarshal([]byte(result), &parsed))
+			assert.InDelta(t, float64(1), parsed["add_comment"].(map[string]any)["max"], 0.0001)
+			assert.Contains(t, parsed, "mentions")
+			assert.NotContains(t, parsed["comment_memory"], "github-token")
+			for _, handler := range []string{"add_comment", "create_issue"} {
+				assert.Contains(t, parsed, handler)
+				assert.Equal(t, token, handlerRegistry[handler](data.SafeOutputs)["github-token"],
+					"generating agent config must not mutate handler credentials")
+			}
+			for _, handler := range []string{"create_pull_request", "push_to_pull_request_branch"} {
+				assert.Contains(t, parsed, handler)
+				assert.Equal(t, token, handlerRegistry[handler](data.SafeOutputs)["head-github-token"])
+			}
+			tools := parsed["dispatch_repository"].(map[string]any)["tools"].(map[string]any)
+			assert.Equal(t, "ci", tools["trigger_ci"].(map[string]any)["event_type"])
+			handlerTools := handlerRegistry["dispatch_repository"](data.SafeOutputs)["tools"].(map[string]any)
+			assert.Equal(t, token, handlerTools["trigger_ci"].(map[string]any)["github-token"])
+		})
+	}
+}
+
 func TestGenerateSafeOutputsConfigNeutralizesAllUnresolvableNeedsForms(t *testing.T) {
 	data := &WorkflowData{
 		SafeOutputs: &SafeOutputsConfig{
@@ -1338,7 +1393,7 @@ func TestGenerateSafeOutputsConfigClosePullRequest(t *testing.T) {
 	assert.InDelta(t, float64(3), closePRConfig["max"], 0.0001, "max should be 3")
 	assert.Equal(t, "*", closePRConfig["target"], "target should be set")
 	assert.Equal(t, "org/repo", closePRConfig["target-repo"], "target-repo should be set")
-	assert.Equal(t, "${{ secrets.MY_TOKEN }}", closePRConfig["github-token"], "github-token should be set")
+	assert.NotContains(t, closePRConfig, "github-token", "agent config must not contain handler credentials")
 	assert.Equal(t, "[my-prefix]", closePRConfig["required_title_prefix"], "required_title_prefix should be set")
 
 	allowedRepos, ok := closePRConfig["allowed_repos"].([]any)

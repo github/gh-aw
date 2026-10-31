@@ -150,6 +150,7 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	if isModelRoutingEnabled(config.WorkflowData) {
 		routing := config.WorkflowData.EngineConfig.ModelRouting
 		apiProxy.Routing = &AWFModelRoutingConfig{
+			Provider:  modelRoutingNativeProvider(config.EngineName, config.WorkflowData),
 			Objective: AWFModelRoutingObjective{Goal: routing.Goal, Mode: routing.Mode},
 			Task:      AWFModelRoutingTask{ConversationFile: modelRoutingConversationFile},
 		}

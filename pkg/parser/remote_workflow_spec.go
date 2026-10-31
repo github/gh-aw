@@ -26,15 +26,22 @@ func downloadIncludeFromWorkflowSpec(spec string, cache *ImportCache) (string, e
 	}
 	remoteLog.Printf("Parsed workflowspec: host=%s, owner=%s, repo=%s, file=%s, ref=%s", host, owner, repo, filePath, ref)
 
+	if cache != nil && cache.readOnly {
+		if !gitutil.IsValidFullSHACaseInsensitive(ref) {
+			return "", fmt.Errorf("remote import %s is not pinned to a commit SHA; offline imports require a cached pinned import", spec)
+		}
+		if cachedPath, found := cache.Get(owner, repo, filePath, ref); found {
+			remoteLog.Printf("Using cached import: %s/%s/%s@%s (SHA: %s)", owner, repo, filePath, ref, ref)
+			return cachedPath, nil
+		}
+		return "", fmt.Errorf("remote import %s is not cached; populate the import cache with a trusted compile before using --read-only", spec)
+	}
 	sha := resolveWorkflowSpecSHAForCache(owner, repo, ref, host, cache)
 	if cache != nil && sha != "" {
 		if cachedPath, found := cache.Get(owner, repo, filePath, sha); found {
 			remoteLog.Printf("Using cached import: %s/%s/%s@%s (SHA: %s)", owner, repo, filePath, ref, sha)
 			return cachedPath, nil
 		}
-	}
-	if cache != nil && cache.readOnly {
-		return "", fmt.Errorf("remote import %s is not cached; populate the import cache with a trusted compile before using --read-only", spec)
 	}
 
 	remoteLog.Printf("Fetching file from GitHub: %s/%s/%s@%s", owner, repo, filePath, ref)
@@ -66,12 +73,9 @@ func parseWorkflowSpecParts(spec string) (string, string, string, string, string
 	if before, _, ok := strings.Cut(spec, "#"); ok {
 		cleanSpec = before
 	}
-	parts := strings.SplitN(cleanSpec, "@", 2)
-	pathPart := parts[0]
-	ref := "main"
-	if len(parts) == 2 {
-		ref = parts[1]
-	} else {
+	pathPart, ref, hasRef := strings.Cut(cleanSpec, "@")
+	if !hasRef {
+		ref = "main"
 		remoteLog.Print("No ref specified, defaulting to 'main'")
 	}
 
@@ -79,17 +83,23 @@ func parseWorkflowSpecParts(spec string) (string, string, string, string, string
 		return "", "", "", "", "", fmt.Errorf("invalid workflowspec ref: %w", err)
 	}
 
-	slashParts := strings.Split(pathPart, "/")
-	if len(slashParts) < 3 {
+	first, remaining, hasSlash := strings.Cut(pathPart, "/")
+	if !hasSlash {
+		remoteLog.Printf("Invalid workflowspec format: %s", spec)
+		return "", "", "", "", "", errors.New("invalid workflowspec: must be owner/repo/path[@ref]")
+	}
+	second, remaining, hasSlash := strings.Cut(remaining, "/")
+	if !hasSlash {
 		remoteLog.Printf("Invalid workflowspec format: %s", spec)
 		return "", "", "", "", "", errors.New("invalid workflowspec: must be owner/repo/path[@ref]")
 	}
 
 	// Optional host-prefixed format: host/owner/repo/path[@ref]
-	if len(slashParts) >= 4 && strings.Contains(slashParts[0], ".") {
-		host := slashParts[0]
-		owner := slashParts[1]
-		repo := slashParts[2]
+	third, filePath, hasPath := strings.Cut(remaining, "/")
+	if hasPath && strings.Contains(first, ".") {
+		host := first
+		owner := second
+		repo := third
 		if !IsGitHubHost(host) {
 			return "", "", "", "", "", fmt.Errorf("invalid workflowspec host %q — expected a GitHub host: 'github.com', 'raw.githubusercontent.com', '*.ghe.com' or '*.github.com' (for example: 'github.com/owner/repo/workflows/ci.md@main')", host)
 		}
@@ -101,18 +111,19 @@ func parseWorkflowSpecParts(spec string) (string, string, string, string, string
 		if host == "raw.githubusercontent.com" {
 			host = "github.com"
 		}
-		filePath := strings.Join(slashParts[3:], "/")
 		if err := gitutil.ValidateGitPath(filePath); err != nil {
 			return "", "", "", "", "", fmt.Errorf("invalid workflowspec path: %w", err)
 		}
 		return host, owner, repo, filePath, ref, nil
 	}
 
-	filePath := strings.Join(slashParts[2:], "/")
+	owner := first
+	repo := second
+	filePath = remaining
 	if err := gitutil.ValidateGitPath(filePath); err != nil {
 		return "", "", "", "", "", fmt.Errorf("invalid workflowspec path: %w", err)
 	}
-	return "", slashParts[0], slashParts[1], filePath, ref, nil
+	return "", owner, repo, filePath, ref, nil
 }
 
 func resolveWorkflowSpecSHAForCache(owner, repo, ref, host string, cache *ImportCache) string {

@@ -122,7 +122,7 @@ All 233 tests pass, including 17 new tests specifically for template delimiter n
 ### After Fix
 - All template delimiters explicitly detected and escaped
 - Defense-in-depth protection against template injection
-- Clear logging when template patterns are detected
+- Logging when template patterns are detected
 - Documented security measure with test coverage
 
 ## Usage

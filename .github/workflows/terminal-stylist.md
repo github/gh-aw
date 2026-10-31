@@ -10,8 +10,11 @@ permissions:
   copilot-requests: write
   contents: read
 
-engine: pi
-model: copilot/gpt-5.6-sol
+engine:
+  id: pi
+  model-routing:
+    goal: cost
+    mode: economy
 
 timeout-minutes: 10
 

@@ -1,0 +1,6 @@
+{"type":"session.format","data":{"version":1},"provenance":{"component":"collector"}}
+{"type":"user.message","data":{"content":"Read the file.\n"},"timestamp":"2026-10-01T10:00:00Z"}
+{"type":"tool.execution_start","data":{"toolCallId":"read-1","toolName":"read_file","input":{"path":"hello.txt"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"read-1","success":true,"output":"Hello\n"}}
+{"type":"assistant.message","data":{"content":"The file says Hello.\n"}}
+{"type":"session.result","data":{"totalCostUsd":0,"usage":{"input_tokens":20,"output_tokens":5,"cache_read_input_tokens":10,"input_tokens_include_cache":true}}}

@@ -154,6 +154,9 @@ describe("routing analytics in aw_session.jsonl", () => {
     // Supplied model allow/block policy is retained separately from routing candidates.
     const supplied = projectModelConfig({ routing: { enabled: true }, models: { allowed: ["github-copilot/*sonnet*"], blocked: ["openai/gpt-5*"] }, max_ai_credits: 250, max_ai_credits_source: "frontmatter" });
     expect(supplied).toEqual({ routing: { enabled: true }, models: { allowed: ["github-copilot/*sonnet*"], blocked: ["openai/gpt-5*"] }, maxAiCredits: 250, maxAiCreditsSource: "frontmatter" });
+    // Native routing records its provider; Copilot routing omits it and unknown values are dropped.
+    expect(projectModelConfig({ routing: { enabled: true, provider: "anthropic", candidate_models: ["claude-sonnet-5"] } })).toEqual({ routing: { enabled: true, provider: "anthropic", candidateModels: ["claude-sonnet-5"] } });
+    expect(projectModelConfig({ routing: { enabled: true, provider: "copilot" } })).toEqual({ routing: { enabled: true } });
   });
 
   it("model_config_records_unrouted_resolved_baseline", async () => {

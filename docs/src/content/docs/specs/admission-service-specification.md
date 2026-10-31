@@ -1,6 +1,6 @@
 ---
 title: AW Admission Service Specification
-description: Cooperative OIDC-authenticated admission, conclusion session delivery, optional component allowances, and centralized Agentic Workflows cost controls
+description: OIDC-authenticated admission, conclusion session delivery, component allowances, and the independent opt-in token broker contract
 sidebar:
   order: 1362
 ---
@@ -22,6 +22,10 @@ The gate is a **cooperative admission check** for participating workflows, not a
 The isolated compiler-owned `conclusion_admission` job provides the corresponding **completion notification** after the ordinary `conclusion` job publishes the full unified agentic session as a usage artifact. The conclusion job passes only a size-bounded compact unified session and the usage artifact IDs through job outputs; the callback then posts them to `/api/conclusion`. The authority can process the compact metadata immediately and resolve the full session through GitHub without polling or waiting for a workflow-completion webhook. This is end-of-session delivery, not a live event stream while the agent runs. It neither authorizes execution nor settles billing. Delivery is best-effort and does not change completed agent or safe-output results.
 
 The protocol uses REST POST with a JSON body, authenticated exclusively by a GitHub Actions OIDC identity token with an audience restricted to the intended authority deployment. The client MUST NOT send `GITHUB_TOKEN`, a PAT, Copilot token, GitHub App JWT, installation access token, App private key, API key, or custom activation credential to the admission service. The feature MUST support only this protocol, with no GET, alternate authentication mode, negotiation, or credential fallback.
+
+## OIDC Token Broker Contract
+
+The token broker is independent of admission. Its normative server and client contracts, capability authorization, issuance requirements, compliance tests, and implementation limitations are defined in the [Token Broker Specification](/gh-aw/specs/token-broker-specification/). Admission success or an ignored admission outage does not authorize token issuance or permit broker authentication to fail open.
 
 ## 2. Configuration and Provisioning
 

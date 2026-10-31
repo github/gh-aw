@@ -361,6 +361,12 @@
           "additionalProperties": false,
           "required": ["objective", "task"],
           "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["copilot", "openai", "anthropic"],
+              "default": "copilot",
+              "description": "Provider slot whose native model catalogue is routed. Defaults to Copilot."
+            },
             "candidateModels": {
               "type": "array",
               "items": { "type": "string" },

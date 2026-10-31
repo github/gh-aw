@@ -488,8 +488,9 @@ function normalizeClaudeSession(records) {
         const denial = sourceFields(source);
         const event = emit(source, "session.result", { ...denial, sourceEngine: "claude", sourceType: source.type, permissionDenials: [denial] });
         denialReports.push({ event, denial: event.data.permissionDenials[0] });
-      } else if (source.subtype === "api_retry" && source.error != null) {
-        reportError(source, { error: source.error, error_status: source.error_status, attempt: source.attempt });
+      } else if (source.subtype === "api_retry") {
+        if (source.error != null) reportError(source, { error: source.error, ...(source.error_status !== undefined ? { error_status: source.error_status } : {}), ...(source.attempt !== undefined ? { attempt: source.attempt } : {}) });
+        else emit(source, "session.result", { ...sourceFields(source), sourceEngine: "claude", sourceType: source.type });
       } else if (source.error != null && !task && !isBashLifecycle) {
         reportError(source, source.error);
       } else if (task && source.subtype === "task_started") {

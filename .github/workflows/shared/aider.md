@@ -453,6 +453,7 @@ engine:
           "assistant.usage", "assistant.turn_end", "model.call_failure", "model.inventory",
           "tool.execution_start", "tool.execution_update", "tool.execution_complete",
           "session.result", "session.error", "agent.execution", "harness.retry",
+          "harness.attempt", "engine.retry",
           "detection.result", "session.format",
           "session.collection", "session.collection_warning",
           "prompt.system", "prompt.user",

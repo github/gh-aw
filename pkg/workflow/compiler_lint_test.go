@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -379,6 +380,174 @@ func TestCompilerLintAllowsOnlyWellFormedMutableActionRefs(t *testing.T) {
 			}
 			require.ErrorContains(t, compiler.lintCompiledWorkflow(data,
 				"on: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: example/action\n", "test.md"), "Malformed action")
+		})
+	}
+}
+
+func TestCompilerLintGeneratedActionFallback(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []ActionMode{ActionModeAction, ActionModeRelease} {
+		t.Run(mode.String(), func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "triage.md")
+			source := `---
+on: issues
+permissions:
+  contents: read
+  issues: read
+tools:
+  github:
+    toolsets: [issues]
+safe-outputs:
+  add-labels:
+    allowed: [bug]
+---
+Triage new issues.
+`
+			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+			compiler := NewCompiler(WithVersion("v0.93.5"), WithLint(true))
+			compiler.gitRoot = dir
+			compiler.SetActionMode(mode)
+			compiler.SetReadOnly(true)
+			compiler.SetSkipValidation(true)
+			_, resolver := compiler.ensureSharedActionCacheAndResolver()
+			repo := GitHubActionsOrgRepo + "/setup"
+			if mode == ActionModeRelease {
+				repo = GitHubOrgRepo + "/actions/setup"
+			}
+			resolver.failedResolutions[repo+"@v0.93.5"] = struct{}{}
+			baseRepo := GitHubActionsOrgRepo
+			if mode == ActionModeRelease {
+				baseRepo = GitHubOrgRepo
+			}
+			resolver.failedResolutions[baseRepo+"@v0.93.5"] = struct{}{}
+			require.NoError(t, compiler.CompileWorkflow(path))
+			require.Positive(t, compiler.GetWarningCount(), "unresolved generated refs must remain visible")
+			lock, err := os.ReadFile(filepath.Join(dir, "triage.lock.yml"))
+			require.NoError(t, err)
+			require.Contains(t, string(lock), "uses: "+repo+"@v0.93.5")
+
+			artifactSource := strings.Replace(source, "safe-outputs:\n", "safe-outputs:\n  upload-artifact:\n", 1)
+			require.NoError(t, os.WriteFile(path, []byte(artifactSource), 0o600))
+			require.NoError(t, compiler.CompileWorkflow(path), "rendering copies must preserve generated references")
+
+			if mode == ActionModeAction {
+				runtimeSource := strings.Replace(source, "tools:\n", "tools:\n  agentic-workflows: true\n", 1)
+				runtimeSource = strings.Replace(runtimeSource, "permissions:\n", "permissions:\n  actions: read\n", 1)
+				resolver.failedResolutions[GitHubActionsOrgRepo+"/setup-cli@v0.93.5"] = struct{}{}
+				require.NoError(t, os.WriteFile(path, []byte(runtimeSource), 0o600))
+				require.NoError(t, compiler.CompileWorkflow(path), "compiler-owned setup-cli failures must remain advisory")
+				lock, err := os.ReadFile(filepath.Join(dir, "triage.lock.yml"))
+				require.NoError(t, err)
+				require.Contains(t, string(lock), "uses: "+GitHubActionsOrgRepo+"/setup-cli@v0.93.5")
+			}
+
+			// The same reference authored by the user must still be pinned.
+			authored := "pre-steps:\n  - uses: " + repo + "@v0.93.5\n"
+			authoredSource := strings.Replace(source, "on: issues\n", "on: issues\n"+authored, 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			authoredSource = strings.Replace(source, "  add-labels:\n    allowed: [bug]\n",
+				"  actions:\n    setup:\n      uses: "+repo+"@v0.93.5\n      inputs: {}\n", 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			authoredSource = strings.Replace(authoredSource, "safe-outputs:\n", "safe-outputs:\n  upload-artifact:\n", 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			authored = "jobs:\n  pre_activation:\n    steps:\n      - uses: " + repo + "@v0.93.5\n"
+			authoredSource = strings.Replace(source, "on: issues\n", "on: issues\n"+authored, 1)
+			require.NoError(t, os.WriteFile(path, []byte(authoredSource), 0o600))
+			require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+
+			for _, hook := range []string{
+				"secret-masking:\n  steps:\n    - uses: " + repo + "@v0.93.5\n",
+				"safe-outputs:\n  threat-detection:\n    steps:\n      - uses: " + repo + "@v0.93.5\n",
+				"safe-outputs:\n  threat-detection:\n    post-steps:\n      - uses: " + repo + "@v0.93.5\n",
+			} {
+				for _, imported := range []bool{false, true} {
+					hookSource := strings.Replace(source, "safe-outputs:\n  add-labels:\n    allowed: [bug]\n", "", 1)
+					if imported {
+						require.NoError(t, os.WriteFile(filepath.Join(dir, "hook.md"), []byte("---\n"+hook+"---\nShared hook.\n"), 0o600))
+						hookSource = strings.Replace(hookSource, "on: issues\n", "on: issues\nimports: [hook.md]\n", 1)
+					} else {
+						hookSource = strings.Replace(hookSource, "on: issues\n", "on: issues\n"+hook, 1)
+					}
+					require.NoError(t, os.WriteFile(path, []byte(hookSource), 0o600))
+					require.ErrorContains(t, compiler.CompileWorkflow(path), "[action-pin]")
+				}
+			}
+		})
+	}
+}
+
+func TestCompilerLintGhAwRuntimeFallback(t *testing.T) {
+	originalRelease := IsRelease()
+	SetIsRelease(true)
+	t.Cleanup(func() { SetIsRelease(originalRelease) })
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runtime.md")
+	require.NoError(t, os.WriteFile(path, []byte(`---
+on: workflow_dispatch
+tools:
+  github: false
+runtimes:
+  gh-aw:
+    version: v0.93.5
+steps:
+  - run: gh aw version
+    env:
+      GH_TOKEN: ${{ github.token }}
+---
+Inspect workflows.
+`), 0o600))
+	compiler := NewCompiler(WithVersion("v0.93.5"), WithLint(true))
+	compiler.gitRoot = dir
+	compiler.SetActionMode(ActionModeAction)
+	compiler.SetReadOnly(true)
+	compiler.SetSkipValidation(true)
+	_, resolver := compiler.ensureSharedActionCacheAndResolver()
+	for _, repo := range []string{GitHubActionsOrgRepo, GitHubActionsOrgRepo + "/setup", GitHubActionsOrgRepo + "/setup-cli"} {
+		resolver.failedResolutions[repo+"@v0.93.5"] = struct{}{}
+	}
+	require.NoError(t, compiler.CompileWorkflow(path))
+	lock, err := os.ReadFile(filepath.Join(dir, "runtime.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(lock), "uses: "+GitHubActionsOrgRepo+"/setup-cli@v0.93.5")
+}
+
+func TestCompilerGeneratedActionRefsOwnership(t *testing.T) {
+	t.Parallel()
+	const reference = "github/gh-aw-actions/setup@v0.93.5"
+	for _, tc := range []struct {
+		name    string
+		failure GHAWManifestResolutionFailure
+		jobs    map[string]any
+		want    bool
+	}{
+		{name: "authored matching failure", failure: GHAWManifestResolutionFailure{Repo: "github/gh-aw-actions/setup", Ref: "v0.93.5"}},
+		{name: "sibling action failure", failure: GHAWManifestResolutionFailure{Repo: "github/gh-aw-actions/create-issue", Ref: "v0.93.5"}, want: true},
+		{name: "different version failure", failure: GHAWManifestResolutionFailure{Repo: "github/gh-aw-actions/setup", Ref: "v1"}, want: true},
+		{name: "generated matching failure", failure: GHAWManifestResolutionFailure{Repo: "github/gh-aw-actions/setup", Ref: "v0.93.5", compilerGenerated: true}, want: true},
+		{name: "job env is not an action", jobs: map[string]any{"custom": map[string]any{"env": map[string]any{"uses": reference}}}, want: true},
+		{name: "step env and inputs are not actions", jobs: map[string]any{"custom": map[string]any{"steps": []any{map[string]any{
+			"env": map[string]any{"uses": reference}, "with": map[string]any{"uses": reference},
+		}}}}, want: true},
+		{name: "authored step", jobs: map[string]any{"custom": map[string]any{"steps": []any{map[string]any{"uses": reference}}}}},
+		{name: "authored reusable workflow", jobs: map[string]any{"custom": map[string]any{"uses": reference}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			data := &WorkflowData{generatedActionRefs: map[string]struct{}{reference: {}}, Jobs: tc.jobs}
+			if tc.failure.Repo != "" {
+				data.ActionResolutionFailures = []GHAWManifestResolutionFailure{tc.failure}
+			}
+			_, got := compilerGeneratedActionRefs(data)[reference]
+			require.Equal(t, tc.want, got)
+			require.Contains(t, data.generatedActionRefs, reference, "filtering must not mutate rendering state")
 		})
 	}
 }

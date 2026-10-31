@@ -85,7 +85,7 @@ func (c *Compiler) validateGitHubActionsSchema(yamlContent string) error {
 	if err := c.validateGitHubActionsSchemaFromParsed(workflowData); err != nil {
 		return err
 	}
-	return actionslanguageservice.ValidateWorkflow("workflow.yml", yamlContent)
+	return actionslanguageservice.ValidateWorkflowWithCacheMode("workflow.yml", yamlContent)
 }
 
 // validateGitHubActionsSchemaFromParsed validates pre-parsed workflow data against the

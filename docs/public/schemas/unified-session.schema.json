@@ -82,6 +82,7 @@
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_progress" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_started" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
       { "if": { "properties": { "type": { "const": "dynamicWorkflows.task_updated" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DynamicWorkflowObservationData" } } } },
+      { "if": { "properties": { "type": { "const": "engine.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EngineRetryData" } } } },
       { "if": { "properties": { "type": { "const": "eval.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/EvalResultData" } } } },
       { "if": { "properties": { "type": { "const": "execution.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExecutionResultData" } } } },
       { "if": { "properties": { "type": { "const": "experiment.assignment" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/ExperimentAssignmentData" } } } },
@@ -97,6 +98,7 @@
       { "if": { "properties": { "type": { "const": "grader.result" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/GraderResultData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.admission" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/AdmissionDecisionData" } } } },
       { "if": { "properties": { "type": { "const": "guardrail.daily_aic" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/DailyAICDecisionData" } } } },
+      { "if": { "properties": { "type": { "const": "harness.attempt" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessAttemptData" } } } },
       { "if": { "properties": { "type": { "const": "harness.retry" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/HarnessRetryData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.configuration" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpConfigurationData" } } } },
       { "if": { "properties": { "type": { "const": "mcp.difc.filtered" } }, "required": ["type"] }, "then": { "properties": { "data": { "$ref": "#/definitions/McpObservationData" } } } },
@@ -541,6 +543,24 @@
       },
       "additionalProperties": false
     },
+    "EngineRetryData": {
+      "type": "object",
+      "properties": {
+        "sourceEngine": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "errors": { "type": "array", "items": { "$ref": "#/definitions/JsonValue" } },
+        "sessionId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolUseId": { "$ref": "#/definitions/JsonValue" },
+        "parentToolCallId": { "$ref": "#/definitions/JsonValue" },
+        "agentId": { "$ref": "#/definitions/JsonValue" },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "maxRetries": { "$ref": "#/definitions/SessionCount" },
+        "backoffMs": { "$ref": "#/definitions/SessionCount" }
+      },
+      "required": ["attempt"],
+      "additionalProperties": false,
+      "description": "Observed engine-native retry progress, not a process attempt or session result."
+    },
     "EpisodeLineageData": {
       "type": "object",
       "properties": {
@@ -756,18 +776,103 @@
       },
       "additionalProperties": false
     },
+    "HarnessAttemptData": {
+      "type": "object",
+      "properties": {
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 101 },
+        "exitCode": { "anyOf": [{ "$ref": "#/definitions/HarnessRetryExitCode" }, { "type": "null" }] },
+        "failureClasses": { "type": "array", "items": { "type": "string" } },
+        "attemptId": { "type": "string", "description": "Stable identifier including the startup scope when present.", "pattern": "^(harness:[1-9][0-9]{0,2}|startup:[1-9][0-9]{0,2}(:harness:[1-9][0-9]{0,2})?)$" },
+        "startupAttemptId": { "type": "string", "description": "Startup retry scope for a nested harness attempt.", "pattern": "^startup:[1-9][0-9]{0,2}$" },
+        "startedAt": { "$ref": "#/definitions/SessionCount", "description": "Observed Date.now() milliseconds." },
+        "finishedAt": { "anyOf": [{ "$ref": "#/definitions/SessionCount" }, { "type": "null" }], "description": "Observed Date.now() milliseconds; omitted until completion is recorded." },
+        "strategy": { "type": "string", "enum": ["restart", "resume"] },
+        "backoffMs": { "$ref": "#/definitions/SessionCount", "description": "Observed delay before this attempt, in milliseconds." },
+        "outcome": { "type": "string", "enum": ["running", "success", "failure", "cancelled", "interrupted"] },
+        "reason": { "$ref": "#/definitions/HarnessFailureClass", "description": "Existing allowlisted harness failure class, never free-form diagnostic text." },
+        "layer": { "type": "string", "enum": ["harness", "startup"] }
+      },
+      "required": ["attempt", "exitCode", "failureClasses", "layer"],
+      "additionalProperties": false
+    },
+    "HarnessFailureClass": {
+      "type": "string",
+      "enum": [
+        "cancelled",
+        "runtime_guard",
+        "watchdog",
+        "unknown_error",
+        "no_output",
+        "content_filter",
+        "model_endpoint_mismatch",
+        "model_routing_failed",
+        "invocation_cap_exceeded",
+        "ai_credits_exhausted",
+        "api_proxy_guard_rejected",
+        "capi_quota_exceeded",
+        "capi_server_error",
+        "mcp_policy_blocked",
+        "model_not_supported",
+        "tool_call_id_schema_error",
+        "incomplete_tool_call_stream",
+        "http_400_response_error",
+        "null_type_tool_call",
+        "no_auth_info",
+        "authentication_failed",
+        "sdk_session_idle_timeout",
+        "mcp_gateway_shutdown",
+        "permission_denied",
+        "capi_error_400",
+        "long_run_exit",
+        "partial_execution",
+        "copilot_model_verification",
+        "overloaded_error",
+        "rate_limit_error",
+        "max_turns",
+        "no_deferred_marker",
+        "invalid_model",
+        "invalid_json_body",
+        "connection_refused",
+        "sandbox_runtime_crash",
+        "cancelled_or_timed_out",
+        "token_per_minute_rate_limit",
+        "missing_api_key",
+        "server_error",
+        "unsupported_model_tools",
+        "invalid_request",
+        "startup_error"
+      ]
+    },
     "HarnessRetryAttemptData": {
       "type": "object",
-      "properties": { "attempt": { "type": "integer", "minimum": 1, "maximum": 101 }, "exitCode": { "type": "integer" }, "failureClasses": { "type": "array", "items": { "type": "string" } } },
+      "properties": {
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 101 },
+        "exitCode": { "anyOf": [{ "$ref": "#/definitions/HarnessRetryExitCode" }, { "type": "null" }] },
+        "failureClasses": { "type": "array", "items": { "type": "string" } },
+        "attemptId": { "type": "string", "description": "Stable identifier including the startup scope when present.", "pattern": "^(harness:[1-9][0-9]{0,2}|startup:[1-9][0-9]{0,2}(:harness:[1-9][0-9]{0,2})?)$" },
+        "startupAttemptId": { "type": "string", "description": "Startup retry scope for a nested harness attempt.", "pattern": "^startup:[1-9][0-9]{0,2}$" },
+        "startedAt": { "$ref": "#/definitions/SessionCount", "description": "Observed Date.now() milliseconds." },
+        "finishedAt": { "anyOf": [{ "$ref": "#/definitions/SessionCount" }, { "type": "null" }], "description": "Observed Date.now() milliseconds; omitted until completion is recorded." },
+        "strategy": { "type": "string", "enum": ["restart", "resume"] },
+        "backoffMs": { "$ref": "#/definitions/SessionCount", "description": "Observed delay before this attempt, in milliseconds." },
+        "outcome": { "type": "string", "enum": ["running", "success", "failure", "cancelled", "interrupted"] },
+        "reason": { "$ref": "#/definitions/HarnessFailureClass", "description": "Existing allowlisted harness failure class, never free-form diagnostic text." }
+      },
       "required": ["attempt", "exitCode", "failureClasses"],
       "additionalProperties": false
     },
     "HarnessRetryData": {
       "type": "object",
-      "properties": { "attempts": { "type": "integer", "minimum": 0, "maximum": 101 }, "exitCode": { "type": "integer" }, "attemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } } },
+      "properties": {
+        "attempts": { "type": "integer", "minimum": 0, "maximum": 101 },
+        "exitCode": { "anyOf": [{ "$ref": "#/definitions/HarnessRetryExitCode" }, { "type": "null" }] },
+        "attemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } },
+        "startupAttemptResults": { "type": "array", "items": { "$ref": "#/definitions/HarnessRetryAttemptData" } }
+      },
       "required": ["attempts", "exitCode", "attemptResults"],
       "additionalProperties": false
     },
+    "HarnessRetryExitCode": { "type": "integer" },
     "JsonValue": {
       "anyOf": [
         { "type": "string" },
@@ -859,11 +964,12 @@
             "enabled": { "type": "boolean" },
             "goal": { "type": "string" },
             "mode": { "type": "string" },
+            "provider": { "type": "string", "enum": ["anthropic", "openai"], "description": "Native routing provider (`anthropic` or `openai`) sent to AWF as `apiProxy.routing.provider`; absent for GitHub Copilot routing." },
             "allowedModels": { "type": "array", "items": { "type": "string" }, "description": "Configured routing candidates as authored (exact ids or gh-aw aliases) without provider prefix; absent means the router default or unknown." },
             "candidateModels": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "Effective router pool sent to AWF as provider-qualified ids or patterns: aliases expanded, narrowed by the model policy; absent when unknown or expression-valued."
+              "description": "Effective router pool sent to AWF: `github-copilot/` ids or patterns for Copilot routing, or bare ids or patterns of the native `provider`; aliases expanded, narrowed by the model policy; absent when unknown or expression-valued."
             }
           },
           "required": ["enabled"],
@@ -1101,6 +1207,8 @@
         "path": { "type": "string" },
         "index": { "$ref": "#/definitions/SessionCount", "description": "Position in the source's normalized event array, not necessarily a raw line." },
         "timestampMs": { "type": "number", "description": "Ordering key only; numeric native timestamp units are schema-dependent." },
+        "attemptId": { "type": "string", "description": "Retry attempt correlation, assigned only when the source evidence is unambiguous.", "pattern": "^(harness:[1-9][0-9]{0,2}|startup:[1-9][0-9]{0,2}(:harness:[1-9][0-9]{0,2})?)$" },
+        "startupAttemptId": { "type": "string", "description": "Optional startup scope for an unambiguous nested harness correlation.", "pattern": "^startup:[1-9][0-9]{0,2}$" },
         "native": { "description": "Preserves a source event's preexisting provenance field." }
       },
       "required": ["component", "phase", "path", "index"],

@@ -29,6 +29,34 @@ safe-outputs:
 
 The agent requests issue creation; a separate job with `issues: write` creates it.
 
+## CLI Payloads
+
+When the runtime exposes safe outputs through the `safeoutputs` CLI, tool names
+use underscores, such as `create_issue`. Run `safeoutputs --help` to list
+available tools and `safeoutputs create_issue --help` for that tool's schema.
+Calls request real actions for downstream processing; they are not previews.
+
+Pass a complete JSON object as one single-quoted shell argument:
+
+```bash
+safeoutputs create_issue '{"title":"Documentation findings","body":"First finding.\nSecond finding."}'
+```
+
+Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes
+as `\\`, and apostrophes as `\u0027` to preserve the surrounding shell quote.
+For a Markdown report already saved in a file, per-field stdin avoids manually
+escaping its body:
+
+```bash
+cat /tmp/gh-aw/agent/report.md | safeoutputs create_issue --title "Documentation findings" --body .
+```
+
+The `--body .` form supplies the text to one field. The bare
+`safeoutputs create_issue .` form instead requires the entire stdin content to
+be a valid JSON object. Raw Markdown is not valid input for that bare form,
+and `{"body": .}` is not valid JSON. Use only tools and shell operations
+available in the workflow's runtime.
+
 ## Available Safe Output Types
 
 The tables below summarize the built-in safe output handlers. `noop`, `report-missing-tool`, and `report-missing-data` are always available, and `create-issue` is auto-injected only when no non-system safe outputs are configured and it is not explicitly disabled.
@@ -1820,7 +1848,7 @@ When the Actions jobs API confirms that the entire run has no jobs, failure repo
 
 Without a more specific runtime failure, the failure classification is `missing_terminal_safe_output`, not an inferred engine outage or budget exhaustion. Incompletion descriptions contain only inferred runtime status and validated error codes: driver exit status, last tool status, failed-tool counts, token and LLM-invocation exhaustion signals, and safe-output tool registration. Registration prefers a valid setup cache, falling back to the archived gateway snapshot when the cache is missing, unreadable, or invalid; neither proves continued availability. A recorded gateway zero-tools flag overrides registration evidence as unavailable; an unreadable flag makes availability unknown. CLI attempt counts and gateway request counts are reported separately because one invocation can appear in both. Persistence reports whether the output file is missing, empty, nonempty, or unreadable, with record and malformed-record counts; it does not establish validation or publication.
 
-Explicit `report_incomplete` signals also include registration, call-count, and persistence evidence, even alongside ordinary safe outputs. They are not reclassified as missing terminal output. Agent reasons, tool names, commands, arguments, results, schemas, and error text are excluded, even when they contain no recognized secrets. Missing evidence is reported as unknown or not recorded, and malformed call logs are marked as partial evidence.
+Explicit `report_incomplete` signals also include registration, call-count, and persistence evidence, even alongside ordinary safe outputs. They are not reclassified as missing terminal output. Failure issues, follow-up comments, and run summaries can include a bounded, secret-redacted agent-declared reason labeled unverified; summaries are also written when failure-issue reporting is disabled. A reason matching a trusted collector cause is presented only as runtime-derived classification. Agent tool names, commands, arguments, results, schemas, and diagnostic/error text remain excluded, even when they contain no recognized secrets. Reasons are omitted from summaries when secret redaction fails. Missing evidence is reported as unknown or not recorded, and malformed call logs are marked as partial evidence.
 
 **Use case: Suppress transient infrastructure failures**
 

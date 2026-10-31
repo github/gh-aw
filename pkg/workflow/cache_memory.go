@@ -553,16 +553,16 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 	// Prepend setup steps to all cache steps
 	steps = append(setupSteps, steps...)
 
-	// Job condition: run only if detection job succeeded (no threats found),
-	// AND the agent job succeeded (do not persist cache when agent failed or was skipped).
-	// Using always() so this condition is evaluated even if an upstream job is skipped/failed.
-	// Detection always runs when the agent ran (even for noop), so detection.result == 'success'
-	// is sufficient — detection short-circuits with success=true when there is nothing to analyze.
+	// Warning mode can leave the detection job successful with a rejected verdict.
+	// Require its explicit acceptance as well as successful agent/job completion.
 	agentSucceeded := BuildEquals(
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
 		BuildStringLiteral("success"),
 	)
-	jobCondition := RenderCondition(BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionSuccessCondition()), agentSucceeded))
+	jobCondition := RenderCondition(BuildAnd(
+		BuildAnd(BuildAnd(BuildFunctionCall("always"), buildDetectionAcceptedCondition()), agentSucceeded),
+		cacheWriteAllowedCondition(),
+	))
 
 	// Set up permissions for the cache update job.
 	// actions: write is required only when this job actually emits cache-save steps.
@@ -594,6 +594,10 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		Needs:       []string{string(constants.AgentJobName), string(constants.DetectionJobName), string(constants.ActivationJobName)},
 		Env:         jobEnv,
 		Steps:       steps,
+	}
+	if !data.GHES && !data.DryRun {
+		// Only this detection-gated publisher may save; it never restores caches.
+		job.CacheMode = "write-only"
 	}
 
 	return job, nil

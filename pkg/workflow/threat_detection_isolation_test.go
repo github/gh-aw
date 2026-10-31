@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -1140,5 +1141,103 @@ Test workflow`, tt.provider, network, tt.provider)
 				}
 			}
 		})
+	}
+}
+
+// TestDetectionAndEvalsSidecarOutputUnchanged pins the sidecar-related output for
+// detection and evals runs. These runs have no MCP sidecars, so the MCP gateway
+// host, DIFC/CLI proxy host, and AWF network section must stay on the
+// non-isolated values even though the LLM gateway URL follows the AWF topology.
+func TestDetectionAndEvalsSidecarOutputUnchanged(t *testing.T) {
+	cliTools := func() map[string]any { return map[string]any{"github": map[string]any{"mode": "cli"}} }
+	detectionData := buildThreatDetectionWorkflowData(&WorkflowData{AI: "copilot"}, "claude")
+	detectionData.Tools = cliTools()
+	// Mirrors the evals WorkflowData built in buildEvalsEngineSteps.
+	evalsData := &WorkflowData{
+		AI:            "claude",
+		IsEvalsRun:    true,
+		Tools:         cliTools(),
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF}},
+	}
+
+	for _, tt := range []struct {
+		name string
+		data *WorkflowData
+	}{
+		{name: "detection", data: detectionData},
+		{name: "evals", data: evalsData},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if isAWFNetworkIsolationEnabled(tt.data) {
+				t.Fatal("detection and evals runs must not attach sidecars to the isolated topology")
+			}
+
+			_, domain, _, _, _ := resolveMCPGatewayValues(tt.data, &MCPGatewayRuntimeConfig{})
+			if domain != "host.docker.internal" {
+				t.Errorf("MCP gateway domain = %q, want %q", domain, "host.docker.internal")
+			}
+
+			gotArgs := appendCliProxyArgs(AWFCommandConfig{WorkflowData: tt.data}, nil, nil)
+			wantArgs := []string{"--difc-proxy-host", "host.docker.internal:18443", "--difc-proxy-ca-cert", constants.TmpDIFCProxyTLSCACert}
+			if !slices.Equal(gotArgs, wantArgs) {
+				t.Errorf("CLI proxy args = %q, want %q", gotArgs, wantArgs)
+			}
+
+			gotStep := NewCompiler().buildStartCliProxyStepYAML(tt.data)
+			wantStep := `      - name: Start CLI Proxy
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GH_HOST: ${{ env.GH_HOST }}
+          GITHUB_HOST: ${{ env.GITHUB_HOST }}
+          GITHUB_ENTERPRISE_HOST: ${{ env.GITHUB_ENTERPRISE_HOST }}
+          GITHUB_GRAPHQL_URL: ${{ env.GITHUB_GRAPHQL_URL }}
+          GITHUB_COPILOT_BASE_URL: ${{ env.GITHUB_COPILOT_BASE_URL }}
+          CLI_PROXY_POLICY: '{"allow-only":{"repos":"${{ steps.determine-automatic-lockdown.outputs.repos }}","min-integrity":"${{ steps.determine-automatic-lockdown.outputs.min_integrity }}"}}'
+          CLI_PROXY_IMAGE: '` + resolveProxyContainerImage(tt.data.SandboxConfig.MCP) + `'
+        run: |
+          bash "${RUNNER_TEMP}/gh-aw/actions/start_cli_proxy.sh"
+`
+			if gotStep != wantStep {
+				t.Errorf("CLI proxy step changed.\ngot:\n%s\nwant:\n%s", gotStep, wantStep)
+			}
+
+			configJSON, err := BuildAWFConfigJSON(AWFCommandConfig{
+				EngineName:     "claude",
+				WorkflowData:   tt.data,
+				AllowedDomains: "api.github.com,example.com",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var config map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+				t.Fatal(err)
+			}
+			if got, want := string(config["network"]), `{"allowDomains":["api.github.com","example.com"]}`; got != want {
+				t.Errorf("awf-config network section = %s, want %s", got, want)
+			}
+		})
+	}
+
+	// Compiled jobs shaped like the affected locks must carry no sidecar topology.
+	_, evalsJob := compileClaudeEvalsWorkflow(t, "engine:\n  id: claude\n  model-provider: github\n")
+	compiledJobs := map[string]string{
+		"evals":              evalsJob,
+		"inline detection":   compileClaudeOnCopilotDetectionWorkflow(t, false),
+		"external detection": compileClaudeOnCopilotDetectionWorkflow(t, true),
+	}
+	for name, job := range compiledJobs {
+		if !strings.Contains(job, `awf-config.json`) {
+			t.Errorf("%s job must write an awf-config.json", name)
+		}
+		// Current main emits no network section at all in the compiled detection and
+		// evals awf-config.json (allowed domains are passed on the awf command line).
+		for _, forbidden := range []string{`\"network\":`, "--network-isolation", "GH_AW_NETWORK_ISOLATION", "MCP_GATEWAY_DOMAIN", "awmg-mcpg", "awmg-cli-proxy", "topologyAttach"} {
+			if strings.Contains(job, forbidden) {
+				t.Errorf("%s job must not contain %q", name, forbidden)
+			}
+		}
 	}
 }

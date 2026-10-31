@@ -29,6 +29,12 @@ func validateJobDefinition(job *Job) error {
 		return errors.New("job definition cannot be nil")
 	}
 
+	switch job.CacheMode {
+	case "", "read", "write", "write-only", "none":
+	default:
+		return fmt.Errorf("job '%s' cache-mode must be read, write, write-only, or none; omit cache-mode to use the default", job.Name)
+	}
+
 	if job.Uses != "" && (job.TimeoutMinutes > 0 || job.TimeoutMinutesExpression != "") {
 		return fmt.Errorf(
 			"job '%s' uses a reusable workflow and cannot set timeout-minutes; remove timeout-minutes from the caller job or move it into the called workflow",

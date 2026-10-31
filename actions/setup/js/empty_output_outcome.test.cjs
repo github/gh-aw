@@ -381,6 +381,36 @@ describe("empty output outcome", () => {
     expect(outcome.details).not.toContain("private-final-failure");
   });
 
+  it("bounds final error summaries and preserves their order without publishing payloads", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), ["Error: Authentication failed", ...Array(4).fill("CAPIError: 503 Service Unavailable"), "TypeError: private-final-failure", "[ERROR] private-unclassified-error"].join("\n"));
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    const tail = outcome.details.split("Last engine error lines (summarized, oldest first; full text in agent-stdio.log):\n")[1];
+    expect(tail).toBeDefined();
+    expect(tail.split("\n").slice(0, 5)).toEqual([...Array(4).fill("Engine error: Provider server error (HTTP 5xx) (capi_server_error)"), "Driver execution failed (unhandled JavaScript exception)"]);
+    expect(tail.split("\n")[5]).toBe("Last tool call status: not recorded");
+    expect(outcome.details).not.toContain("private-");
+  });
+
+  it("does not classify a recovered runtime exception as the final failure", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: private-recovered-error\nCAPIError: 503 Service Unavailable\n");
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe("engine_outage");
+    expect(outcome.details).toContain("Last driver stderr summary: Engine error: Provider server error (HTTP 5xx) (capi_server_error)");
+    expect(outcome.details).toContain("Driver execution failed (unhandled JavaScript exception)\nEngine error: Provider server error (HTTP 5xx) (capi_server_error)");
+    expect(outcome.details).not.toContain("private-recovered-error");
+  });
+
+  it("preserves a final timeout over a recovered runtime exception", () => {
+    fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "143");
+    fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: private-recovered-error\n[copilot-harness] attempt 2: process closed exitCode=143 signal=SIGTERM watchdogFired=false\n");
+    const outcome = buildEmptyOutputOutcome([], rootDir);
+    expect(outcome.failureCause).toBe("engine_outage");
+    expect(outcome.details).toContain("Last driver stderr summary: Engine error: Engine timed out");
+    expect(outcome.details).not.toContain("private-recovered-error");
+  });
+
   it("does not classify a stale diagnostic beyond the final tail", () => {
     fs.writeFileSync(path.join(rootDir, "agent_execution_exit_code.txt"), "1");
     fs.writeFileSync(path.join(rootDir, "agent-stdio.log"), "TypeError: old failure\n" + "noise\n".repeat(21));
@@ -837,7 +867,7 @@ describe("empty output outcome", () => {
     ["capi_server_error", [502], "engine_outage"],
     ["agentic_engine_timeout", [], "engine_outage"],
     ["sandbox_runtime_crash", [], "driver_crash"],
-    ["", [503], "engine_outage"],
+    ["", [503], "driver_crash"],
     ["", [], "driver_crash"],
     ["http_400_response_error", [400], "request_rejection"],
     ["invocation_cap_exceeded", [], "prompt_exhaustion"],

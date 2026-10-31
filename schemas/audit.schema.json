@@ -5887,6 +5887,243 @@
             "matches"
           ],
           "additionalProperties": false
+        },
+        "model_catalog": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "models_fetch_complete": {
+              "type": "boolean"
+            },
+            "endpoints": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "configured": {
+                    "type": "boolean"
+                  },
+                  "models": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "supported_endpoints": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "warning": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "configured",
+                  "models"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "warnings": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "source",
+            "models_fetch_complete",
+            "endpoints"
+          ],
+          "additionalProperties": false
+        },
+        "retries": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "agent_retries": {
+              "type": "integer"
+            },
+            "detection_retries": {
+              "type": "integer"
+            },
+            "attempts": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "attempt": {
+                    "type": "integer"
+                  },
+                  "attemptId": {
+                    "type": "string"
+                  },
+                  "startupAttemptId": {
+                    "type": "string"
+                  },
+                  "exitCode": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "failureClasses": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "startedAt": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "finishedAt": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "strategy": {
+                    "type": "string"
+                  },
+                  "backoffMs": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "outcome": {
+                    "type": "string"
+                  },
+                  "layer": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "attempt",
+                  "exitCode",
+                  "failureClasses",
+                  "layer",
+                  "phase",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "engine_retries": {
+              "type": "integer"
+            },
+            "detection_engine_retries": {
+              "type": "integer"
+            },
+            "engine_retry_history": {
+              "type": [
+                "null",
+                "array"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "attempt": {
+                    "type": "integer"
+                  },
+                  "maxRetries": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "backoffMs": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "index": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "attemptId": {
+                    "type": "string"
+                  },
+                  "startupAttemptId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "attempt",
+                  "phase",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "agent_retries",
+            "detection_retries",
+            "attempts",
+            "engine_retries",
+            "detection_engine_retries"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

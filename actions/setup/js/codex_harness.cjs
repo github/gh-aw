@@ -39,7 +39,15 @@ const { DEFAULT_MCP_CALL_WATCHDOG_MS, MCP_CALL_TRANSPORT_GRACE_MS } = require(".
 const { loadCompiledConfig, mergeConfig } = require("./codex_config.cjs");
 const { parseJsonPrefix } = require("./parse_json_prefix.cjs");
 const { runProcess, formatDuration, sleep, MIN_POST_RESULT_WATCHDOG_TIMEOUT_MS, DEFAULT_POST_RESULT_WATCHDOG_IDLE_TIMEOUT_MS, MAX_POST_RESULT_WATCHDOG_TIMEOUT_MS, resolvePostResultWatchdogIdleTimeoutMs } = require("./process_runner.cjs");
-const { captureExecutionEvidenceConfiguration, resolveHarnessRetryTelemetryPath, runHarnessRetryLoop, shouldSkipForNoopSafeOutputs, shouldStopForNoopSafeOutputs, stripExecutionEvidenceEnv } = require("./harness_retry_runner.cjs");
+const {
+  captureExecutionEvidenceConfiguration,
+  resolveHarnessRetryTelemetryPath,
+  runHarnessRetryLoop,
+  selectedHarnessStrategy,
+  shouldSkipForNoopSafeOutputs,
+  shouldStopForNoopSafeOutputs,
+  stripExecutionEvidenceEnv,
+} = require("./harness_retry_runner.cjs");
 const {
   AWF_API_PROXY_REFLECT_URL,
   AWF_REFLECT_OUTPUT_PATH,
@@ -64,7 +72,7 @@ const { resolveEngineModel } = require("./resolve_model_alias.cjs");
 const { applyCodexSubagentModels, isDetectionPhase } = require("./engine_subagent_models.cjs");
 const { parseMaxAICreditsExceededFromAuditLog } = require("./ai_credits_context.cjs");
 const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
-const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode } = require("./awf_model_routing.cjs");
+const { resolveAWFModelRoutingSelection, mapAWFRoutingEffort, recordAWFModelRoutingOutcome, getAWFModelRoutingPolicy, getAWFModelRoutingFailureCode, resolveAWFRoutingProvider } = require("./awf_model_routing.cjs");
 const CODEX_ROUTING_POLICY = getAWFModelRoutingPolicy("codex");
 
 // Pattern to detect OpenAI rate-limit errors.
@@ -541,13 +549,21 @@ function getCodexRoutingFailureCode(error) {
 }
 
 /**
- * Resolve and apply AWF's selection to a Codex invocation.
+ * Resolve and apply AWF's selection to a Codex invocation. Codex routes on GitHub
+ * Copilot (model-provider: github) or natively on OpenAI, matching the engine's
+ * resolved GH_AW_LLM_PROVIDER.
  * @param {any} reflectData
  * @param {string[]} args
+ * @param {NodeJS.ProcessEnv} [env]
  * @returns {{selection: any, model: string, args: string[], error: string|null}}
  */
-function resolveCodexModelRouting(reflectData, args) {
-  const result = resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride);
+function resolveCodexModelRouting(reflectData, args, env = process.env) {
+  const routingProvider = resolveAWFRoutingProvider("codex", env.GH_AW_LLM_PROVIDER);
+  const result = routingProvider
+    ? routingProvider === "github"
+      ? resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride)
+      : resolveAWFModelRoutingSelection(reflectData, true, CODEX_ROUTING_POLICY.endpoints, CODEX_ROUTING_POLICY.allowEndpointOverride, routingProvider)
+    : { selection: null, error: `AWF model routing is not supported for Codex on provider ${env.GH_AW_LLM_PROVIDER}` };
   if (result.error || !result.selection) {
     recordAWFModelRoutingOutcome({
       status: reflectData?.routing?.status === "failed" ? "failed" : "rejected",
@@ -1066,7 +1082,9 @@ async function main() {
     log,
     softTimeoutGuard,
     getRetryMode: () => (resumeArgs ? `resume ${lastThreadId}` : "fresh run"),
-    runAttempt: async attempt => {
+    runAttempt: async (attempt, observeStrategy) => {
+      const strategy = selectedHarnessStrategy(resumeArgs || resolvedArgs, "codex");
+      observeStrategy(strategy);
       const terminalErrors = [];
       const mcpWatchdog = createMCPCallWatchdog(item => {
         const server = item.server ?? item.server_name ?? item.serverName;
@@ -1145,9 +1163,9 @@ async function main() {
       // `handleFailure` runs. Normalize the exit code so the failure handler always sees it.
       if (result.runtimeGuardFired && result.exitCode === 0) {
         log(`attempt ${attempt + 1}: runtime guard fired but process exited 0 — normalizing exit code to 1`);
-        return { ...result, exitCode: 1, safeOutputsByteOffset };
+        return { ...result, exitCode: 1, safeOutputsByteOffset, strategy };
       }
-      return { ...result, safeOutputsByteOffset };
+      return { ...result, safeOutputsByteOffset, strategy };
     },
     handleFailure: ({ attempt, result }) => {
       if (result.runtimeGuardFired) {

@@ -54,6 +54,8 @@ func TestFilterGeneratedSafeOutputPermissionFindings(t *testing.T) {
 
 	findings := []runnerGuardFinding{
 		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "activation"},
+		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "admission"},
+		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "conclusion_admission"},
 		{RuleID: "RGS-005", File: "generated.lock.yml", JobID: "agent"},
 		{RuleID: "RGS-005", File: "user-workflow.yml", JobID: "safe_outputs"},
 		{RuleID: "RGS-012", File: "generated.lock.yml", JobID: "safe_outputs"},
@@ -110,4 +112,27 @@ func TestHasRunnerGuardInlineIgnoreAllowsNearbyGeneratedLineOffsets(t *testing.T
 	// Line 3 simulates runner-guard attributing a finding to a generated setup line 15 lines
 	// before the inline suppression comment that justifies the provider request.
 	assert.True(t, hasRunnerGuardInlineIgnore(lines, 3, "RGS-012"))
+}
+
+func TestHasRunnerGuardInlineIgnoreAllowsHelperFunctionBodyOffset(t *testing.T) {
+	t.Parallel()
+	lines := make([]string, 0, 30)
+	lines = append(lines,
+		"      - name: Verify raw GitHub remote MCP handshake", // 1
+		"        env:", // 2
+		"          GITHUB_MCP_SERVER_TOKEN: ${{ secrets.TOKEN }}", // 3
+		"        run: |",              // 4
+		"          set -euo pipefail", // 5
+	)
+	for range 22 {
+		lines = append(lines, "          # setup line")
+	}
+	lines = append(lines,
+		"          # runner-guard:ignore RGS-012 -- pinned request to the official endpoint; no data is exfiltrated.",
+		"          curl -fsS https://api.example.com",
+	)
+
+	// The finding is reported on the step's `- name:` line (line 1), 28 lines before the
+	// inline-ignore comment that sits next to the actual curl call inside a helper function.
+	assert.True(t, hasRunnerGuardInlineIgnore(lines, 1, "RGS-012"))
 }

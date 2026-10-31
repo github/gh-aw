@@ -1267,10 +1267,12 @@ describe("mcp_cli_bridge.cjs", () => {
 
       expect(() => parseToolArgs(["."], schemaProperties, "not json at all")).toThrow(/stdin is not valid JSON/i);
       expect(() => parseToolArgs(["."], schemaProperties, "not json at all")).toThrow(/requested with '\.'/i);
+      expect(() => parseToolArgs(["."], schemaProperties, "not json at all")).toThrow(/per-field stdin notation.*--body \./i);
     });
 
     it("throws when JSON payload mode receives non-object JSON", () => {
       expect(() => parseToolArgs(["."], {}, '["a","b","c"]')).toThrow(/payload must be an object/i);
+      expect(() => parseToolArgs(["."], {}, '["a","b","c"]')).toThrow(/per-field stdin notation.*--body \./i);
     });
 
     it("throws a parse error when no-flag piped stdin payload is invalid JSON", () => {
