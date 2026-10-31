@@ -95,12 +95,16 @@ func harborRegradedRewards(dir string, regrading *RegradedRun, metadata map[stri
 
 var harborLocalPathPattern = regexp.MustCompile(`(^|[\s("'=])([A-Za-z]:[\\/]|/)[^\s"'<>)]*`)
 
+var harborSensitiveInlinePattern = regexp.MustCompile(`(?i)(\b(?:[a-z][a-z0-9]*[_-])*(?:token|api[_-]?key|secret|password|passwd|credential|client[_-]?secret|access[_-]?key(?:[_-]?id)?|secret[_-]?access[_-]?key)\b["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\\r\n]){16,}"|'(?:\\.|[^'\\\r\n]){16,}'|[^\s"'<>(),;{}&]{16,})`)
+var harborBearerPattern = regexp.MustCompile(`(?i)(\b(?:bearer|basic)\s+)[a-z0-9._~+/=-]{8,}`)
+var harborCredentialPattern = regexp.MustCompile(`\b(?:gh[pousr]_[a-zA-Z0-9._-]{36,}|github_pat_[a-zA-Z0-9_]{82,}|sk-(?:proj-|ant-api03-)?[a-zA-Z0-9_-]{20,}|AIzaSy[a-zA-Z0-9_-]{33}|(?:AKIA|ASIA)[A-Z0-9]{16}|lin_api_[a-zA-Z0-9]{40}|xox[baprs]-[a-zA-Z0-9-]{20,}|eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,})\b`)
+
 func harborSanitizeRegradedRun(record *RegradedRun) *RegradedRun {
 	safe := *record
 	safe.SourceDirectory = "gh-aw/evidence"
 	safe.Run.LogsPath = "gh-aw/evidence"
 	safe.SessionPath = harborRegradedEvidencePath(record.SourceDirectory, record.SessionPath)
-	safe.SessionError = harborSanitizeLocalPaths(record.SessionError)
+	safe.SessionError = harborSanitizeSensitiveText(record.SessionError)
 	safe.OriginalGraders = harborSanitizeErrorJSON(record.OriginalGraders)
 	safe.Definitions = append([]RegradeDefinition(nil), record.Definitions...)
 	for index := range safe.Definitions {
@@ -114,7 +118,7 @@ func harborSanitizeRegradedRun(record *RegradedRun) *RegradedRun {
 	safe.OriginalEvidence = make([]RegradeOriginalEvidence, 0, len(record.OriginalEvidence))
 	for _, evidence := range record.OriginalEvidence {
 		evidence.Path = harborRegradedEvidencePath(record.SourceDirectory, evidence.Path)
-		evidence.Error = harborSanitizeLocalPaths(evidence.Error)
+		evidence.Error = harborSanitizeSensitiveText(evidence.Error)
 		evidence.Data = harborSanitizeErrorJSON(evidence.Data)
 		safe.OriginalEvidence = append(safe.OriginalEvidence, evidence)
 	}
@@ -139,6 +143,14 @@ func harborSanitizeLocalPaths(value string) string {
 	return harborLocalPathPattern.ReplaceAllString(value, `${1}[local path]`)
 }
 
+// Mask recognizable credentials, not arbitrary sensitive session prose.
+func harborSanitizeSensitiveText(value string) string {
+	value = harborSanitizeLocalPaths(value)
+	value = harborSensitiveInlinePattern.ReplaceAllString(value, `${1}[REDACTED]`)
+	value = harborBearerPattern.ReplaceAllString(value, `${1}[REDACTED]`)
+	return harborCredentialPattern.ReplaceAllString(value, "[REDACTED]")
+}
+
 func harborSanitizeErrorJSON(raw json.RawMessage) json.RawMessage {
 	if len(raw) == 0 || !json.Valid(raw) {
 		return raw
@@ -149,7 +161,7 @@ func harborSanitizeErrorJSON(raw json.RawMessage) json.RawMessage {
 	if decoder.Decode(&value) != nil {
 		return raw
 	}
-	harborSanitizeErrorFields(value)
+	value = harborSanitizeErrorFields(value)
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return raw
@@ -157,19 +169,18 @@ func harborSanitizeErrorJSON(raw json.RawMessage) json.RawMessage {
 	return encoded
 }
 
-func harborSanitizeErrorFields(value any) {
+func harborSanitizeErrorFields(value any) any {
 	switch typed := value.(type) {
+	case string:
+		return harborSanitizeSensitiveText(typed)
 	case map[string]any:
 		for key, child := range typed {
-			if message, ok := child.(string); ok && (key == "error" || key == "message") {
-				typed[key] = harborSanitizeLocalPaths(message)
-			} else {
-				harborSanitizeErrorFields(child)
-			}
+			typed[key] = harborSanitizeErrorFields(child)
 		}
 	case []any:
-		for _, child := range typed {
-			harborSanitizeErrorFields(child)
+		for index, child := range typed {
+			typed[index] = harborSanitizeErrorFields(child)
 		}
 	}
+	return value
 }

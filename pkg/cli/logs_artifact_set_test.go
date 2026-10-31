@@ -127,9 +127,9 @@ func TestResolveArtifactFilter(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "activation resolves to activation artifact",
+			name:     "activation resolves to activation and decision gate artifacts",
 			sets:     []string{"activation"},
-			expected: []string{"activation"},
+			expected: []string{"activation", "decision-gate"},
 		},
 		{
 			name:     "info resolves to info artifact",
@@ -189,7 +189,7 @@ func TestResolveArtifactFilter(t *testing.T) {
 		{
 			name:     "multiple sets are merged and deduplicated",
 			sets:     []string{"activation", "agent"},
-			expected: []string{constants.ActivationArtifactName.String(), constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
+			expected: []string{constants.ActivationArtifactName.String(), constants.DecisionGateArtifactName.String(), constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
 		},
 		{
 			name:     "github-api and agent deduplicates agent",

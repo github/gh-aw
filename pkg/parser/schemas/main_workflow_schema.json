@@ -780,6 +780,7 @@
                   "allow-bot-authored-trigger-comment",
                   "bots",
                   "cooldown",
+                  "decision",
                   "github-app",
                   "github-token",
                   "labels",
@@ -2812,6 +2813,36 @@
               "default": true,
               "description": "Controls whether the activation job creates or updates a notification issue when the workflow is compiled with a blocked compile-agentic version. Set to false to suppress only that notification issue while keeping the blocked-version check itself (and its hard failure) active. This is independent of 'check-for-updates' (which disables the whole check) and 'safe-outputs.report-failure-as-issue' (which also gates the notification).",
               "examples": [true, false]
+            },
+            "decision": {
+              "type": "object",
+              "description": "Optional non-deterministic execution-cost filter evaluated after deterministic checks and custom on.steps. A valid skip response suppresses the agent; unavailable or invalid inference fails open without overriding deterministic rejection. Event text can attempt prompt injection. This filter is not an authorization or security boundary; privileged actions and required execution must use deterministic policy, not model output.",
+              "additionalProperties": false,
+              "required": ["questions"],
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "description": "Literal model identifier or configured alias, independent of the agent model.",
+                  "default": "decision",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "questions": {
+                  "type": "array",
+                  "description": "One to eight nonblank inline questions, each limited to 4096 UTF-8 bytes by the compiler. Native Actions expressions are supported; credential-derived values and @filespec references are rejected. Interpolated event text remains untrusted evidence. Prefer static qualification questions and the separately supplied event evidence over embedding event bodies in questions.",
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "\\S",
+                    "not": { "pattern": "^\\s*@" }
+                  },
+                  "examples": [["Does this event need action?"]]
+                }
+              },
+              "examples": [{ "questions": ["Does this event need action?"] }]
             }
           },
           "additionalProperties": false,

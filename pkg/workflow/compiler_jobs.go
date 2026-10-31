@@ -492,7 +492,7 @@ func (c *Compiler) buildPreActivationAndActivationJobs(data *WorkflowData, front
 	//   - membership checks, stop-time validation, skip-if-match/no-match checks
 	//   - skip-roles/bots checks, rate limit check, command position check
 	//   - on.steps injection, label-names filter
-	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasSkipRoles || hasSkipBots || hasSkipAuthorAssociations || hasCommandTrigger || hasRateLimit || hasCooldown || hasOnSteps || hasOnNeeds || hasLabelNames {
+	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasSkipRoles || hasSkipBots || hasSkipAuthorAssociations || hasCommandTrigger || hasRateLimit || hasCooldown || hasOnSteps || hasOnNeeds || hasLabelNames || data.Decision != nil {
 		preActivationJobCreated, err = c.addPreActivationJob(data, needsPermissionCheck)
 		if err != nil {
 			return false, false, err

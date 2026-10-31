@@ -214,6 +214,9 @@ const ArtifactPrefixOutputName = "artifact_prefix"
 // (aw_info.json and prompt.txt).
 const ActivationArtifactName ArtifactName = "activation"
 
+// DecisionGateArtifactName contains the pre-activation decision gate receipt.
+const DecisionGateArtifactName ArtifactName = "decision-gate"
+
 // InfoArtifactName is the artifact name for the agentic workflow run information
 // uploaded by the activation job.
 const InfoArtifactName ArtifactName = "info"

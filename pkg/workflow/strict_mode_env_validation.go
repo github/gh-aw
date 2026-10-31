@@ -31,6 +31,11 @@ func (c *Compiler) validateEnvSecrets(frontmatter map[string]any) error {
 }
 
 func (c *Compiler) validateEarlyEnvSecrets(frontmatter map[string]any) error {
+	if on, ok := frontmatter["on"].(map[string]any); ok && on["decision"] != nil {
+		// Decision aliases can be contributed by imports. Validate provider auth
+		// overrides after the merged alias map is available.
+		return c.validateEnvSecretsSection(frontmatter, "env", nil)
+	}
 	_, config, _ := c.ExtractEngineConfig(frontmatter)
 	if config != nil && len(config.FallbackModels) > 0 {
 		// Provider aliases are not available until imports have been merged.
@@ -57,6 +62,21 @@ func (c *Compiler) validateEnvSecretsWithModels(frontmatter map[string]any, mode
 				data := &WorkflowData{EngineConfig: engineConfig, Model: model, ModelMappings: models}
 				for _, name := range fallbackProviderSecretNames(data) {
 					allowedEnvVarKeys[name] = struct{}{}
+				}
+			}
+			decision, err := extractDecision(frontmatter)
+			if err != nil {
+				return err
+			}
+			if decision != nil {
+				data := &WorkflowData{Decision: decision, ModelMappings: models}
+				for _, provider := range decisionProviders(data) {
+					for _, name := range llmProviderSecretNames(provider) {
+						allowedEnvVarKeys[name] = struct{}{}
+					}
+					if provider == "gemini" {
+						allowedEnvVarKeys["GOOGLE_API_KEY"] = struct{}{}
+					}
 				}
 			}
 
@@ -149,7 +169,10 @@ func (c *Compiler) validateEnvSecretsSection(config map[string]any, sectionName 
 	}
 
 	strictModeValidationLog.Printf("Found %d secret(s) in %s section: %v", len(secrets), sectionName, secretRefs)
+	return c.reportEnvSecretFindings(sectionName, secretRefs)
+}
 
+func (c *Compiler) reportEnvSecretFindings(sectionName string, secretRefs []string) error {
 	// In strict mode, this is an error
 	if c.strictMode {
 		if sectionName == "engine.env" {

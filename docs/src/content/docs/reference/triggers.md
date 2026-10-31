@@ -137,6 +137,63 @@ The duration uses Go duration syntax, such as `5m`, `1h`, or `1h30m`, and must b
 
 The compiler adds `actions: read` to the pre-activation job so it can inspect completed runs. If run history cannot be queried, the cooldown check fails open and allows the agent to run.
 
+### Semantic Event Qualification (`decision:`)
+
+`on.decision` evaluates whether an otherwise eligible event warrants agent execution. Deterministic checks such as event filters, eligibility checks, and cooldowns run in `pre_activation`; inference runs in the `decision` job after admission, when enabled, has resolved the AI credit allowance. A deterministic rejection makes no inference calls; the decision gate can reject activation but cannot override those checks.
+
+```aw wrap
+on:
+  issues:
+    types: [opened, edited]
+  decision:
+    questions:
+      - Is this issue actionable rather than informational?
+      - Does it require agent intervention?
+      - Is it relevant to ${{ github.repository }}?
+```
+
+`questions` is a required, nonempty array of inline strings. Each question receives an independent inference call, evaluated sequentially. Every question must return `run`; the first `skip` stops evaluation. Native GitHub Actions expressions are resolved before inference and passed as data, not executable scripts. Interpolated event text is still untrusted; prefer static questions over embedding event bodies, which are already supplied separately as evidence. File imports such as `@path/to/questions.md` are not supported.
+
+The optional `model` defaults to the built-in `decision` alias, which uses the existing lightweight model aliases and model registry. An explicit model or a workflow-defined alias can override it using the existing provider configuration and authentication. Provider endpoint overrides must be literal HTTPS URLs, not event-derived expressions. The gate records the configured alias, resolved model, and provider. An unavailable model fails open rather than blocking eligible agent execution.
+
+The gate supplies only the triggering event context and existing deterministic eligibility evidence. It does not retrieve history, search the repository, fetch pull request diffs, or call additional GitHub APIs. Inference has no tools, MCP servers, function calls, agent loop, or retries. Event titles and bodies are attacker-controlled quoted data, not instructions; the prompt tells the model to ignore instructions in both event evidence and interpolated question text. This prompt separation reduces risk but cannot guarantee resistance to prompt injection.
+
+Enabling `on.decision` opts in to sending selected, bounded event text, including titles and bodies, to the configured LLM provider, which may be external. The gate uses the same providers and credentials as other LLM inference, including configured custom endpoints; it does not require a separate provider allowlist or egress flag. Repository metadata, sender details, installation data, and arbitrary dispatch inputs are excluded. Credential redaction is best effort, not a guarantee or a general secret or personal-data filter. Use only providers approved to receive the event content and trusted HTTPS endpoints. Do not enable this feature when events may contain secrets or regulated personal data.
+
+All questions are checked at compilation time, including questions that runtime short-circuiting might not evaluate. Secret references, including nested expressions and statically traceable indirect references, are compilation errors. Provider credentials authenticate inference requests but are never included in the decision prompt.
+
+| Limit | Maximum |
+|-------|---------|
+| Questions | 8 |
+| Question size, in source and after expression evaluation | 4,096 bytes |
+| Combined system and question/event prompt per call | 8,192 UTF-8 bytes |
+| Serialized request per call, including schema and instructions | 12,288 UTF-8 bytes |
+| Output per call | Explicit 64-token cap, except the fixed-choice `/decisions` API |
+| Reserved cost per call | At most 1 AI credit |
+| Response body | 65,536 bytes |
+| Inference call duration | 10 seconds |
+| Total gate evaluation | 30 seconds |
+
+Decision inference shares the resolved `max-ai-credits` budget with the main agent. Before each call, the gate reserves a conservative upper bound using the bounded text bytes, protocol framing allowance, output cap, and bundled model pricing. Unknown pricing, expensive queries, or insufficient credits make no request. Reservations are retained even when a request fails or usage is missing; their total is rounded up when deducted from the agent's integer budget. Only the remainder is passed to the agent's existing proxy limit, and a zero remainder prevents agent activation. Actual reported decision token usage also contributes to total AIC reporting; reserved credits are recorded separately and are not added again as measured usage.
+
+> [!NOTE]
+> A provider failure, timeout, invalid response, or exhausted inference budget treats the affected question as `run`. These fail-open outcomes are recorded separately from explicit approval. The gate is a non-deterministic execution-cost filter, not an authorization or security boundary. Untrusted event text can influence classification despite the prompt instructions, including unwanted skips; neither a `run` nor a `skip` is a security decision. Protect sensitive or privileged actions with deterministic policy outside model output. Do not use this filter when execution is required, or as the sole condition for privileged actions.
+
+The job summary records the aggregate outcome. The `decision-gate` artifact also records the resolved model/provider and per-question results, durations, machine-readable causes, and token usage when available. It distinguishes fail-open outcomes and questions not evaluated after a skip. The existing `activation` artifact set includes this receipt for `gh aw logs` and `gh aw audit`; the audit JSON exposes it as `decision_gate`, including runs where the agent never starts. Prompts, raw event payloads, and free-form model reasons are not retained.
+
+Step logs report model resolution, request dispatch and byte counts, per-question outcomes and stable failure causes, durations, reported token usage, and reserved and remaining AI credits. Logs never include prompts, event content, credentials, provider endpoints, raw errors, or free-form model explanations.
+
+For example, comment workflows can ask whether a comment requests a concrete code change rather than conversation; discussion workflows can ask whether maintainer intervention is needed. Distinguish documentation requests from implementation requests, and require work to be sufficiently specified and suitable for automated execution.
+
+The runtime tests use mocked responses and paired event fixtures for these qualification scenarios. An optional live-model quality suite runs separately from deterministic CI correctness checks. From the repository's `actions/setup/js` directory, with existing provider credentials configured, run:
+
+```bash
+GH_AW_DECISION_LIVE_EVAL=true npx vitest run decision_gate.test.cjs \
+  -t "decision gate live quality evaluation"
+```
+
+Live evaluation sends only the synthetic fixtures to the configured provider and can incur inference costs. It does not dispatch a workflow.
+
 ### Issue Triggers (`issues:`)
 
 Trigger on issue events. [Full event reference](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#issues).

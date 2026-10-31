@@ -8025,6 +8025,205 @@
                   ],
                   "additionalProperties": false
                 },
+                "decision_gate": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    },
+                    "decision": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "cause": {
+                      "type": "string"
+                    },
+                    "configured_alias": {
+                      "type": "string"
+                    },
+                    "resolved_model": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "duration_ms": {
+                      "type": "integer"
+                    },
+                    "max_ai_credits": {
+                      "type": "integer"
+                    },
+                    "reserved_ai_credits": {
+                      "type": "number"
+                    },
+                    "remaining_ai_credits": {
+                      "type": "integer"
+                    },
+                    "activation_allowed": {
+                      "type": "boolean"
+                    },
+                    "deterministic_eligible": {
+                      "type": "boolean"
+                    },
+                    "fail_open": {
+                      "type": "boolean"
+                    },
+                    "question_count": {
+                      "type": "integer"
+                    },
+                    "evaluated_count": {
+                      "type": "integer"
+                    },
+                    "unevaluated_count": {
+                      "type": "integer"
+                    },
+                    "unevaluated_questions": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "index",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "usage": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer"
+                        },
+                        "output_tokens": {
+                          "type": "integer"
+                        },
+                        "total_tokens": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens",
+                        "total_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "usage_complete": {
+                      "type": "boolean"
+                    },
+                    "questions": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer"
+                          },
+                          "decision": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "cause": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "configured_alias": {
+                            "type": "string"
+                          },
+                          "resolved_model": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "duration_ms": {
+                            "type": "integer"
+                          },
+                          "evaluated": {
+                            "type": "boolean"
+                          },
+                          "fail_open": {
+                            "type": "boolean"
+                          },
+                          "usage": {
+                            "type": [
+                              "null",
+                              "object"
+                            ],
+                            "properties": {
+                              "input_tokens": {
+                                "type": "integer"
+                              },
+                              "output_tokens": {
+                                "type": "integer"
+                              },
+                              "total_tokens": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "input_tokens",
+                              "output_tokens",
+                              "total_tokens"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "index",
+                          "decision",
+                          "status",
+                          "duration_ms",
+                          "evaluated",
+                          "fail_open"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "decision",
+                    "status",
+                    "duration_ms",
+                    "activation_allowed",
+                    "deterministic_eligible",
+                    "fail_open",
+                    "question_count",
+                    "evaluated_count",
+                    "unevaluated_count",
+                    "unevaluated_questions",
+                    "usage_complete",
+                    "questions"
+                  ],
+                  "additionalProperties": false
+                },
                 "graders": {
                   "type": [
                     "null",

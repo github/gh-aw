@@ -36,7 +36,8 @@ const (
 	ArtifactSetAll ArtifactSet = "all"
 
 	// ArtifactSetActivation downloads the activation artifact (aw_info.json, prompt.txt,
-	// and github_rate_limits.jsonl from the activation job).
+	// and github_rate_limits.jsonl from the activation job), plus the optional
+	// pre-activation decision gate receipt.
 	ArtifactSetActivation ArtifactSet = "activation"
 
 	// ArtifactSetInfo downloads the compact aw_info.json artifact produced by the
@@ -101,7 +102,7 @@ const (
 // ResolveArtifactFilter means no filter is active so the caller downloads all artifacts).
 var artifactSetArtifacts = map[ArtifactSet][]string{
 	ArtifactSetAll:        nil, // no filtering – download all artifacts
-	ArtifactSetActivation: {constants.ActivationArtifactName.String()},
+	ArtifactSetActivation: {constants.ActivationArtifactName.String(), constants.DecisionGateArtifactName.String()},
 	ArtifactSetInfo:       {constants.InfoArtifactName.String()},
 	ArtifactSetAgent:      {constants.AgentArtifactName.String(), constants.AgentOutputFallbackArtifactName.String()},
 	ArtifactSetMCP:        {constants.AgentArtifactName.String()},

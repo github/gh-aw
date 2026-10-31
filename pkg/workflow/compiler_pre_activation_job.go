@@ -59,12 +59,22 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	if err != nil {
 		return nil, err
 	}
+	if data.Decision != nil {
+		steps, activatedExpression, err = c.appendPreActivationDecisionGate(data, steps, onStepIDs, customOutputs, needsPermissionCheck)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	jobIfCondition := c.applyPreActivationIfConditionGuards(data, needsPermissionCheck, c.buildPreActivationBaseIfCondition(data))
 	if c.actionMode.IsScript() {
 		steps = append(steps, c.generateScriptModeCleanupStep())
 	}
 
+	return c.finishPreActivationJob(data, steps, jobIfCondition, permissions, activatedExpression, onStepIDs, customOutputs), nil
+}
+
+func (c *Compiler) finishPreActivationJob(data *WorkflowData, steps []string, jobIfCondition, permissions, activatedExpression string, onStepIDs []string, customOutputs map[string]string) *Job {
 	runsOn := c.formatFrameworkJobRunsOn(data)
 	if data.OnRestoreMemory && data.DriveMemoryConfig != nil && len(data.DriveMemoryConfig.Drives) > 0 {
 		runsOn = "runs-on: ubuntu-latest"
@@ -78,7 +88,38 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		Steps:       steps,
 		Outputs:     buildPreActivationJobOutputs(data, activatedExpression, onStepIDs, customOutputs),
 		Needs:       sliceutil.Deduplicate(data.OnNeeds),
-	}, nil
+	}
+}
+
+func (c *Compiler) appendPreActivationDecisionGate(data *WorkflowData, steps []string, onStepIDs []string, customOutputs map[string]string, needsPermissionCheck bool) ([]string, string, error) {
+	eligible, err := buildPreActivationActivatedNode(data, buildPreActivationActivatedConditions(data, needsPermissionCheck))
+	if err != nil {
+		return nil, "", err
+	}
+	eligible, err = decisionEligibleCondition(data, eligible, onStepIDs, customOutputs)
+	if err != nil {
+		return nil, "", err
+	}
+	workflowRunSafety, err := ParseExpression(stripExpressionWrapper(c.buildWorkflowRunRepoSafetyCondition()))
+	if err != nil {
+		return nil, "", errors.New("cannot construct the workflow_run safety check for on.decision")
+	}
+	if _, literal := eligible.(*StringLiteralNode); literal {
+		eligible = workflowRunSafety
+	} else {
+		eligible = BuildAnd(eligible, workflowRunSafety)
+	}
+	// Status functions are valid in step conditions, not in env or job outputs.
+	steps = append(steps,
+		"      - name: Check decision eligibility\n",
+		"        id: decision_eligibility\n",
+		"        if: "+RenderCondition(eligible)+"\n",
+		"        shell: bash\n",
+		"        run: echo 'eligible=true' >> \"$GITHUB_OUTPUT\"\n",
+	)
+	const eligibleOutput = "steps.decision_eligibility.outputs.eligible == 'true'"
+	activatedExpression := "${{ " + eligibleOutput + " }}"
+	return steps, activatedExpression, nil
 }
 
 func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupActionRef string) ([]string, string) {
@@ -468,7 +509,7 @@ func buildPreActivationActivatedNode(data *WorkflowData, conditions []ConditionN
 		// The activated output is unconditionally true; the user controls
 		// agent execution through their own if: condition referencing the
 		// on.steps outputs (e.g., needs.pre_activation.outputs.gate_result).
-		if len(data.OnSteps) > 0 || len(data.OnNeeds) > 0 || len(data.SkipAuthorAssociations) > 0 {
+		if len(data.OnSteps) > 0 || len(data.OnNeeds) > 0 || len(data.SkipAuthorAssociations) > 0 || data.Decision != nil {
 			compilerActivationJobsLog.Printf(
 				"Pre-activation created with no output checks (on.steps=%d, on.needs=%d, skip-author-associations=%d); activated output is unconditionally true",
 				len(data.OnSteps), len(data.OnNeeds), len(data.SkipAuthorAssociations),
@@ -519,6 +560,12 @@ func buildPreActivationJobOutputs(data *WorkflowData, activatedExpression string
 	if len(customOutputs) > 0 {
 		compilerActivationJobsLog.Printf("Adding %d custom outputs to pre-activation job", len(customOutputs))
 		maps.Copy(outputs, customOutputs)
+	}
+	if data.Decision != nil {
+		outputs["activated"] = activatedExpression
+		outputs["decision_eligible"] = "${{ steps.decision_eligibility.outputs.eligible }}"
+		_, inputs := decisionQuestionInputs(data)
+		maps.Copy(outputs, inputs)
 	}
 	return outputs
 }

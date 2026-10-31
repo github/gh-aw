@@ -370,6 +370,17 @@ func buildMaxAICreditsExport(config AWFCommandConfig, awfConfigJSON string) (str
 fi
 `
 	}
+	decisionBudget := ""
+	if config.WorkflowData != nil && config.WorkflowData.Decision != nil && !config.WorkflowData.IsDetectionRun && !config.WorkflowData.IsEvalsRun {
+		decisionBudget = `
+if [[ ! "${GH_AW_DECISION_REMAINING_AI_CREDITS:-}" =~ ^[1-9][0-9]{0,9}$ ]] || (( GH_AW_DECISION_REMAINING_AI_CREDITS > 2147483647 )); then
+  echo "ERR_DECISION: Missing or invalid remaining decision budget." >&2
+  exit 1
+fi
+GH_AW_MAX_AI_CREDITS="$GH_AW_DECISION_REMAINING_AI_CREDITS"
+unset GH_AW_DECISION_REMAINING_AI_CREDITS
+`
+	}
 	return fmt.Sprintf(`%s
 if [[ ! "$%s" =~ ^[0-9]+$ ]]; then
   %s="%s"
@@ -385,7 +396,7 @@ if [[ "${GH_AW_ADMISSION_RESULT:-}" == "admitted" && -n "${GH_AW_ADMISSION_MAX_A
 else
   echo "No component admission allowance; retaining existing budget policy (value withheld)."
 fi
-unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS`, assignment, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary), awfConfigJSON
+unset GH_AW_ADMISSION_RESULT GH_AW_ADMISSION_MAX_AI_CREDITS%s`, assignment, awfMaxAICreditsVarName, awfMaxAICreditsVarName, defaultMaxAICredits, requirePrimary, decisionBudget), awfConfigJSON
 }
 
 func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) string {

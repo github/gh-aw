@@ -37,6 +37,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 		// empty placeholder token_usage.jsonl), fall through to the agent_usage.json
 		// fallback rather than returning nil immediately.
 		if summary != nil {
+			applyDecisionGateTokenUsage(summary, runDir)
 			applyGatewaySteeringSummary(summary, runDir)
 			applySteeringNotices(summary, runDir)
 			augmentSubagentModelAttribution(runDir, summary)
@@ -46,7 +47,8 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 
 	agentUsagePath := findAgentUsageFile(runDir)
 	if agentUsagePath == "" {
-		return nil, nil
+		summary := decisionGateTokenUsageSummary(runDir)
+		return summary, nil
 	}
 	agentFileInfo, _ := os.Stat(agentUsagePath)
 	if agentFileInfo != nil {
@@ -57,6 +59,7 @@ func analyzeTokenUsage(runDir string, verbose bool) (*TokenUsageSummary, error) 
 	if err != nil || summary == nil {
 		return summary, err
 	}
+	applyDecisionGateTokenUsage(summary, runDir)
 	applyGatewaySteeringSummary(summary, runDir)
 	applySteeringNotices(summary, runDir)
 	augmentSubagentModelAttribution(runDir, summary)
@@ -105,6 +108,9 @@ func analyzeTokenUsageAICOnly(runDir string, verbose bool) (*TokenUsageSummary, 
 	if err := applyTokenUsageAICFallbacks(runDir, verbose, usageJSONLFiles, seenRequestIDs, phases); err != nil {
 		return nil, err
 	}
+	if activation := decisionGateTokenUsageSummary(runDir); activation != nil {
+		phases["activation"] = activation
+	}
 	return combineTokenUsageAICPhases(phases, warnings), nil
 }
 
@@ -135,6 +141,7 @@ func analyzeEpisodeUsage(dirs []string, verbose, details bool) (*TokenUsageSumma
 			applySteeringNotices(usage, dir)
 			augmentSubagentModelAttribution(dir, usage)
 		}
+		applyDecisionGateTokenUsage(usage, dir)
 		mergeTokenUsageSummary(summary, usage)
 		console.LogVerbose(verbose, fmt.Sprintf("  Analyzed %d compact usage streams", len(files)))
 	}

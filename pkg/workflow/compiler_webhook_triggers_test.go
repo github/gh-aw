@@ -241,6 +241,7 @@ func TestGatewayDispatchSettingsSchemaParity(t *testing.T) {
 		"report-blocked-version": false, "restore-memory": false, "roles": []any{"write"},
 		"skip-author-associations": map[string]any{"issue": []any{"BOT"}}, "skip-bots": []any{"other-bot"},
 		"skip-if-check-failing": true, "skip-if-match": "is:issue", "skip-if-no-match": "is:pr",
+		"decision":   map[string]any{"questions": []any{"Should this run?"}},
 		"skip-roles": []any{"triage"}, "stale-check": false, "status-comment": false,
 		"steps": []any{map[string]any{"run": "echo ready"}}, "stop-after": "+1d",
 	}

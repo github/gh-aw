@@ -13,16 +13,17 @@ import (
 type Kind string
 
 const (
-	Log           Kind = "log"
-	Summary       Kind = "summary"
-	Output        Kind = "output"
-	Display       Kind = "display"
-	ActionInput   Kind = "action-input"
-	WorkflowInput Kind = "workflow-input"
-	Artifact      Kind = "artifact"
-	Network       Kind = "network"
-	OTLPAttribute Kind = "otlp-attribute"
-	Prompt        Kind = "prompt"
+	Log              Kind = "log"
+	Summary          Kind = "summary"
+	Output           Kind = "output"
+	Display          Kind = "display"
+	ActionInput      Kind = "action-input"
+	WorkflowInput    Kind = "workflow-input"
+	Artifact         Kind = "artifact"
+	Network          Kind = "network"
+	OTLPAttribute    Kind = "otlp-attribute"
+	Prompt           Kind = "prompt"
+	DecisionQuestion Kind = "decision-question"
 )
 
 // Site identifies a sink without including its potentially sensitive contents.
@@ -63,13 +64,16 @@ type Result struct {
 // Filters must apply to the entire expression, not merely one of its children.
 // ActionSources names credential outputs produced by a known action.
 type Rule struct {
-	ID                 string
-	IsSource           func(reference string) bool
-	IsSink             func(Site) bool
-	IsFilter           func(actionlint.ExprNode) bool
-	ActionSources      func(uses string) []string
-	JavaScript         *JavaScriptOptions
-	IsJavaScriptFilter func(*JavaScriptNode) bool
+	ID            string
+	IsSource      func(reference string) bool
+	IsSink        func(Site) bool
+	IsFilter      func(actionlint.ExprNode) bool
+	ActionSources func(uses string) []string
+	// ConservativeOpaqueOutputs treats action and unsupported-shell outputs as
+	// credential-derived when their inputs cannot be inspected statically.
+	ConservativeOpaqueOutputs bool
+	JavaScript                *JavaScriptOptions
+	IsJavaScriptFilter        func(*JavaScriptNode) bool
 	// SafeOutputJobs identifies compiled third-party integration jobs from
 	// compiler provenance, not job-name heuristics.
 	SafeOutputJobs []string

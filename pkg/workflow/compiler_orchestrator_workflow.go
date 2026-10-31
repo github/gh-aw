@@ -53,6 +53,9 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 		return nil, err
 	}
 	ctx := newWorkflowBuildContext(parseResult)
+	if err := validateAuthoredDecision(ctx.frontmatter.Frontmatter, ctx.document, ctx.cleanPath); err != nil {
+		return nil, err
+	}
 	if err := c.setupWorkflowBuildContext(ctx); err != nil {
 		return nil, err
 	}
@@ -116,6 +119,10 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
 	ctx.workflowData.engineDefinition = c.engineCatalog.Get(engineSetup.engineSetting)
 	ctx.workflowData.SourceDocument = ctx.document
+	ctx.workflowData.Decision, err = extractDecision(ctx.frontmatter.Frontmatter)
+	if err != nil {
+		return err
+	}
 	if config := ctx.workflowData.ParsedFrontmatter; config != nil && config.TokenBroker != nil {
 		ctx.workflowData.TokenBrokerCopilotRequest = config.TokenBroker.CopilotRequest
 		ctx.workflowData.TokenBrokerCopilotTask = config.TokenBroker.CopilotTask
@@ -152,6 +159,9 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.validateWorkflowModelAliasMap(ctx); err != nil {
 		return err
 	}
+	if err := validateDecisionProviderEndpoints(ctx.workflowData); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
+	}
 	c.warnCodexCopilotModelCompatibility(ctx.workflowData, ctx.cleanPath)
 	c.warnEngineCannotResolveModelAlias(ctx.workflowData, ctx.cleanPath)
 	c.warnCopilotIntegrationModelAvailability(ctx.workflowData, ctx.cleanPath)
@@ -164,7 +174,7 @@ func (c *Compiler) validateWorkflowBuildContext(ctx *workflowBuildContext) error
 	if err := c.validateWorkflowEngineSettings(ctx.cleanPath, ctx.workflowData); err != nil {
 		return err
 	}
-	if cfg := ctx.workflowData.EngineConfig; cfg != nil && len(cfg.FallbackModels) > 0 {
+	if cfg := ctx.workflowData.EngineConfig; (cfg != nil && len(cfg.FallbackModels) > 0) || ctx.workflowData.Decision != nil {
 		if err := c.withEffectiveStrictMode(ctx.frontmatter.Frontmatter, func() error {
 			return c.validateEnvSecretsWithModels(ctx.frontmatter.Frontmatter, ctx.workflowData.ModelMappings)
 		}); err != nil {
@@ -895,6 +905,11 @@ func (c *Compiler) processOnSectionAndFilters( //nolint:largefunc // Existing or
 	}
 
 	workflowData.OnSteps = onSteps
+	decision, err := extractDecision(frontmatter)
+	if err != nil {
+		return err
+	}
+	workflowData.Decision = decision
 
 	// Extract on.permissions for pre-activation job permissions
 	workflowData.OnPermissions = extractOnPermissions(frontmatter)
