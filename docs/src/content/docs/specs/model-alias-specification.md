@@ -570,7 +570,7 @@ AWF ships the following builtin aliases. Workflow frontmatter definitions (and i
 | Alias | Resolves to (in order) |
 |-------|------------------------|
 | `small` | `mini` |
-| `decision` | `small` |
+| `decision` | `copilot/gpt-*luna*`, `openai/gpt-*luna*`, `small` |
 | `mini` | `haiku`, `gpt-5-mini`, `gpt-5-nano`, `gemini-flash-lite` |
 | `large` | `sonnet`, `gpt-5`, `gemini-pro` |
 | `auto` | `copilot/auto`, `large` |

@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const fs = require("fs");
 const path = require("path");
 const { main, evaluateDecision, selectEvent, buildPrompt, resolveDecisionModel, inferenceRequest, parseDecision, LIMITS } = require("./decision_gate.cjs");
+const { loadModelAliasMap, resolveModelAlias } = require("./resolve_model_alias.cjs");
 const { eventFixtures } = require("./fixtures/decision_events.cjs");
 const selection = { provider: "openai", type: "chat", base: "https://api.openai.com/v1", model: "gpt-5-mini", token: "transport-only-fixture" };
 
@@ -602,6 +603,7 @@ describe("registry resolution and transport", () => {
     const text = '{"decision":"run","reason":"Actionable."}';
     const envelopes = {
       chat: { choices: [{ finish_reason: "stop", message: { content: text } }] },
+      decisions: { answers: [{ type: "choice", name: "decision", choice: "run" }] },
       responses: { status: "completed", output: [{ type: "message", content: [{ type: "output_text", text }] }] },
       anthropic: { stop_reason: "end_turn", content: [{ type: "text", text }] },
       gemini: { candidates: [{ finishReason: "STOP", content: { parts: [{ text }] } }] },
@@ -618,12 +620,31 @@ describe("registry resolution and transport", () => {
     expect(options.redirect).toBe("error");
   });
 
-  it("resolves the default decision alias from the shipped model registry for available credentials", async () => {
-    const resolved = await resolveDecisionModel({ OPENAI_API_KEY: "transport-only" });
-    expect(resolved.provider).toBe("openai");
-    expect(resolved.type).toBe("responses");
-    expect(resolved.model).not.toBe("decision");
-    expect(resolved.model).toMatch(/mini|nano/);
+  it.each([
+    [{ OPENAI_API_KEY: "transport-only" }, { provider: "openai", model: "gpt-6-luna", type: "decisions" }],
+    [{ COPILOT_GITHUB_TOKEN: "transport-only" }, { provider: "copilot", model: "gpt-6-luna", type: "responses" }],
+    [
+      { OPENAI_API_KEY: "openai-fixture", COPILOT_GITHUB_TOKEN: "copilot-fixture" },
+      { provider: "copilot", model: "gpt-6-luna", type: "responses" },
+    ],
+  ])("prefers Luna for the default decision alias with available provider credentials %j", async (env, expected) => {
+    expect(await resolveDecisionModel(env)).toMatchObject(expected);
+  });
+
+  it.each([
+    [["copilot/claude-haiku-5.5", "copilot/gpt-5.6-luna", "copilot/gpt-6-luna"], "copilot/gpt-6-luna"],
+    [["copilot/claude-haiku-5.5", "openai/gpt-6-luna"], "openai/gpt-6-luna"],
+    [["copilot/gpt-5.6-luna", "openai/gpt-6-luna"], "copilot/gpt-5.6-luna"],
+    [["copilot/claude-haiku-5.5", "openai/gpt-5-mini"], "copilot/claude-haiku-5.5"],
+    [["openai/gpt-5-mini"], "openai/gpt-5-mini"],
+  ])("resolves decision priority against the available catalog %j", (catalog, expected) => {
+    expect(resolveModelAlias("decision", loadModelAliasMap({ env: {} }), catalog)).toBe(expected);
+  });
+
+  it("falls back to lightweight models when the configured provider has no Luna models", async () => {
+    const resolved = await resolveDecisionModel({ ANTHROPIC_API_KEY: "transport-only" });
+    expect(resolved.provider).toBe("anthropic");
+    expect(resolved.model).toMatch(/haiku/);
   });
 
   it("reuses workflow model aliases independently of any agent model", async () => {
@@ -640,7 +661,7 @@ describe("registry resolution and transport", () => {
 
   it("uses the Decisions API end to end for OpenAI Luna", async () => {
     const deps = dependencies();
-    deps.env = { ...deps.env, OPENAI_API_KEY: "luna-fixture-key", GH_AW_DECISION_MODEL: "openai/gpt-6-luna" };
+    deps.env = { ...deps.env, OPENAI_API_KEY: "luna-fixture-key" };
     deps.resolveModel = resolveDecisionModel;
     deps.fetchImpl.mockResolvedValue(new Response(JSON.stringify({ answers: [{ type: "choice", name: "decision", choice: "skip" }], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } })));
     const audit = await evaluateDecision(deps);
@@ -705,13 +726,15 @@ describe("registry resolution and transport", () => {
     const deps = dependencies();
     deps.env.COPILOT_GITHUB_TOKEN = selection.token;
     deps.resolveModel = resolveDecisionModel;
-    deps.fetchImpl.mockResolvedValue(new Response(JSON.stringify({ stop_reason: "end_turn", content: [{ type: "text", text: '{"decision":"skip","reason":"Not actionable."}' }], usage: { input_tokens: 10, output_tokens: 2 } })));
+    deps.fetchImpl.mockResolvedValue(
+      new Response(JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: '{"decision":"skip","reason":"Not actionable."}' }] }], usage: { input_tokens: 10, output_tokens: 2 } }))
+    );
     const audit = await evaluateDecision(deps);
     expect(audit).toMatchObject({ decision: "skip", status: "evaluated", provider: "copilot", usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } });
-    expect(audit.resolved_model).toMatch(/^copilot\/claude-haiku-/);
+    expect(audit.resolved_model).toBe("copilot/gpt-6-luna");
     expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
     const [url, options] = deps.fetchImpl.mock.calls[0];
-    expect(url).toBe("https://api.githubcopilot.com/v1/messages");
+    expect(url).toBe("https://api.githubcopilot.com/responses");
     expect(options.headers.Authorization).toBe(["Bearer", selection.token].join(" "));
     expect(options.headers).not.toHaveProperty("x-api-key");
     expect(JSON.parse(options.body).model).toBe(audit.resolved_model.split("/")[1]);
