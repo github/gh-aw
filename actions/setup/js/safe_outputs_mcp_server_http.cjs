@@ -25,6 +25,8 @@ moduleLogger.debug("Module is being loaded");
  *
  * Usage:
  *   node safe_outputs_mcp_server_http.cjs [--port 3000]
+ *   Requires GH_AW_SAFE_OUTPUTS_API_KEY; POST requests send it in Authorization.
+ *   Uploads are limited to 1 MiB and 30 seconds; GET /health is unauthenticated.
  *
  * Options:
  *   --port <number>    Port to listen on (default: 3000)
@@ -45,7 +47,7 @@ const { normalizeTool } = require("./mcp_server_core.cjs");
 const { attachHandlers, registerPredefinedTools, registerDynamicTools } = require("./safe_outputs_tools_loader.cjs");
 moduleLogger.debug("Loaded safe_outputs_tools_loader.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { runHttpServer, logStartupError } = require("./mcp_http_server_runner.cjs");
+const { runHttpServer, logStartupError, requireHttpApiKey } = require("./mcp_http_server_runner.cjs");
 const { normalizeSafeOutputToolArguments, stripInternalSafeOutputSchemaMetadata } = require("./safe_outputs_mcp_arguments.cjs");
 moduleLogger.debug("All modules loaded successfully");
 
@@ -271,10 +273,12 @@ function createMCPServer(options = {}) {
  * Start the HTTP server with MCP protocol support
  * @param {Object} options - Server options
  * @param {number} [options.port] - Port to listen on (default: 3000)
+ * @param {string} [options.apiKey] - API key (defaults to GH_AW_SAFE_OUTPUTS_API_KEY)
  * @param {string} [options.logDir] - Override log directory from config
  */
 async function startHttpServer(options = {}) {
-  const port = options.port || 3000;
+  const apiKey = requireHttpApiKey(options.apiKey ?? process.env.GH_AW_SAFE_OUTPUTS_API_KEY, "GH_AW_SAFE_OUTPUTS_API_KEY");
+  const port = options.port ?? 3000;
 
   const logger = createMCPLogger("safe-outputs-startup");
 
@@ -315,6 +319,7 @@ async function startHttpServer(options = {}) {
     return await runHttpServer({
       transport,
       port,
+      apiKey,
       getHealthPayload: () => ({
         status: "ok",
         server: "safeoutputs",
@@ -324,12 +329,9 @@ async function startHttpServer(options = {}) {
       logger,
       serverLabel: "Safe Outputs MCP",
       configureServer: httpServer => {
-        // Disable all HTTP server timeouts to prevent idle connections from being dropped
-        // during long agent runs where safe-output tools may not be called for several minutes.
+        // Preserve long tool calls and idle gateway connections; the runner bounds uploads.
         httpServer.timeout = 0;
         httpServer.keepAliveTimeout = 0;
-        httpServer.headersTimeout = 0;
-        httpServer.requestTimeout = 0;
       },
     });
   } catch (error) {
