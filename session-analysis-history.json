@@ -343,8 +343,26 @@
         "100% single-branch day (copilot/improve-claim-footer-rendering, 6.5h span); confound-controlled hourly analysis found a real 13:00 UTC failure cluster (1/10 non-gate workflows succeeded) vs ~60% in adjacent hours",
         "100% bot-driven successes (15/15); true-agentic 0/17 resolved (action_required); orphan 0/12 NORMAL, 57th healthy day"
       ]
+    },
+    {
+      "date": "2026-10-31",
+      "run_id": "41177460552",
+      "sessions_analyzed": 50,
+      "completion_rate": 90.0,
+      "average_duration_minutes": 5.73,
+      "median_duration_minutes": 7.475,
+      "successful": 45,
+      "skipped": 5,
+      "failure": 0,
+      "transcripts_analyzed": 15,
+      "sessions_with_loops": 1,
+      "total_aiu": 359.7,
+      "orphan_rate": 0.0,
+      "orphan_rate_pct": 0.0,
+      "escalations": 0,
+      "experimental_strategy": null
     }
   ],
-  "last_updated": "2026-10-29",
+  "last_updated": "2026-10-31",
   "version": "1.11"
 }
