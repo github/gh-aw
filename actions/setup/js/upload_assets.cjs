@@ -8,6 +8,7 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
+const { readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
 
 /**
  * @typedef {{ type: string, path?: string, fileName: string, sha: string, size: number, targetFileName: string, url?: string }} UploadAssetItem
@@ -122,14 +123,18 @@ async function main() {
       // Check if file exists in the staged-assets directory
       const stagedFileName = pathFileName ? `${crypto.createHash("sha256").update(declaredPath).digest("hex")}${path.extname(fileName).toLowerCase()}` : fileName;
       const assetSourcePath = path.join(assetsDir, stagedFileName);
-      if (!fs.existsSync(assetSourcePath)) {
+      let fileContent;
+      try {
+        const maxSizeKB = process.env.GH_AW_ASSETS_MAX_SIZE_KB ? Number(process.env.GH_AW_ASSETS_MAX_SIZE_KB) : 10240;
+        fileContent = readGuardedFile(assetSourcePath, maxSizeKB * 1024);
+      } catch (error) {
+        if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") throw error;
         core.warning(`${ERR_SYSTEM}: Asset file not found: ${assetSourcePath} — skipping`);
         missingAssetCount++;
         continue;
       }
 
       // Verify SHA matches
-      const fileContent = fs.readFileSync(assetSourcePath);
       const computedSha = crypto.createHash("sha256").update(fileContent).digest("hex");
 
       if (asset.sha && computedSha !== asset.sha) {
@@ -154,6 +159,10 @@ async function main() {
 
       // Check if file already exists in the branch
       if (fs.existsSync(targetFileName)) {
+        if (!readGuardedFile(targetFileName, fileContent.length).equals(fileContent)) {
+          core.setFailed(`${ERR_VALIDATION}: Existing asset content differs from staged content: ${targetFileName}`);
+          return;
+        }
         core.info(`Asset ${targetFileName} already exists, skipping`);
         processedAssets.push(processedAsset);
         continue;
@@ -161,7 +170,7 @@ async function main() {
 
       // Copy file to branch with target filename
       try {
-        fs.copyFileSync(assetSourcePath, targetFileName);
+        writeGuardedFile(targetFileName, fileContent);
 
         // Add to git
         await exec.exec("git", ["add", targetFileName]);

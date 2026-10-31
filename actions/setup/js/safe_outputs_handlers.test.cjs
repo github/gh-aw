@@ -673,16 +673,7 @@ describe("safe_outputs_handlers", () => {
       process.env.GH_AW_ASSETS_BRANCH = "test-branch";
 
       const testFile = `/tmp/test-upload-${Date.now()}.png`;
-      const localFile = path.join(testWorkspaceDir, "test-upload.png");
-      fs.writeFileSync(localFile, "test content");
-      const originalExistsSync = fs.existsSync;
-      const originalStatSync = fs.statSync;
-      const originalReadFileSync = fs.readFileSync;
-      const originalCopyFileSync = fs.copyFileSync;
-      const existsSpy = vi.spyOn(fs, "existsSync").mockImplementation(filePath => filePath === testFile || originalExistsSync(filePath));
-      const statSpy = vi.spyOn(fs, "statSync").mockImplementation((filePath, options) => originalStatSync(filePath === testFile ? localFile : filePath, options));
-      const readSpy = vi.spyOn(fs, "readFileSync").mockImplementation((filePath, options) => originalReadFileSync(filePath === testFile ? localFile : filePath, options));
-      const copySpy = vi.spyOn(fs, "copyFileSync").mockImplementation((source, destination, flags) => originalCopyFileSync(source === testFile ? localFile : source, destination, flags));
+      fs.writeFileSync(testFile, "test content");
 
       try {
         const args = { path: testFile };
@@ -691,11 +682,76 @@ describe("safe_outputs_handlers", () => {
         expect(mockAppendSafeOutput).toHaveBeenCalled();
         expect(result.content[0].type).toBe("text");
       } finally {
-        existsSpy.mockRestore();
-        statSpy.mockRestore();
-        readSpy.mockRestore();
-        copySpy.mockRestore();
+        fs.unlinkSync(testFile);
       }
+    });
+
+    it.each(["file", "dangling", "parent", "hardlink", "directory"])("rejects %s sources without staging sentinel content", kind => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const sentinel = path.join(testScratchRoot, "external-sentinel.png");
+      fs.writeFileSync(sentinel, "harmless external sentinel");
+      const source = path.join(testWorkspaceDir, "leak.png");
+      let requestedPath = source;
+      if (kind === "file") fs.symlinkSync(sentinel, source);
+      else if (kind === "dangling") fs.symlinkSync(path.join(testScratchRoot, "missing-sentinel"), source);
+      else if (kind === "parent") {
+        fs.symlinkSync(testScratchRoot, source, "dir");
+        requestedPath = path.join(source, "external-sentinel.png");
+      } else if (kind === "hardlink") fs.linkSync(sentinel, source);
+      else fs.mkdirSync(source);
+
+      expect(() => handlers.uploadAssetHandler({ path: requestedPath })).toThrow(/symlinks are not allowed|isolated regular file/);
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets"))).toBe(false);
+      expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
+    });
+
+    it("rejects workspace and tmp prefix lookalikes", () => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      for (const source of [`${testWorkspaceDir}-sibling/leak.png`, "/tmp-lookalike/leak.png"]) {
+        expect(() => handlers.uploadAssetHandler({ path: source })).toThrow("File path must be within workspace directory");
+      }
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["file", "parent"])("rejects a %s symlink in the staging destination", kind => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const source = path.join(testWorkspaceDir, "chart.png");
+      fs.writeFileSync(source, "safe chart");
+      const sentinel = path.join(testWorkspaceDir, "sentinel");
+      fs.writeFileSync(sentinel, "unchanged sentinel");
+      const assets = path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets");
+      fs.mkdirSync(path.dirname(assets), { recursive: true });
+      if (kind === "parent") fs.symlinkSync(testWorkspaceDir, assets, "dir");
+      else {
+        fs.mkdirSync(assets);
+        fs.symlinkSync(sentinel, path.join(assets, `${crypto.createHash("sha256").update(source).digest("hex")}.png`));
+      }
+
+      expect(() => handlers.uploadAssetHandler({ path: source })).toThrow(/symlinks are not allowed|EEXIST/);
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      expect(fs.readFileSync(sentinel, "utf8")).toBe("unchanged sentinel");
+    });
+
+    it("stages the exact hashed snapshot even if the source changes before staging", () => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const source = path.join(testWorkspaceDir, "chart.png");
+      fs.writeFileSync(source, "original chart");
+      const originalWrite = fs.writeFileSync;
+      const spy = vi.spyOn(fs, "writeFileSync").mockImplementation((filename, ...args) => {
+        if (typeof filename === "number") originalWrite(source, "replacement chart");
+        return originalWrite(filename, ...args);
+      });
+      try {
+        handlers.uploadAssetHandler({ path: source });
+      } finally {
+        spy.mockRestore();
+      }
+      const entry = mockAppendSafeOutput.mock.calls[0][0];
+      const staged = path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets", `${crypto.createHash("sha256").update(source).digest("hex")}.png`);
+      expect(fs.readFileSync(staged, "utf8")).toBe("original chart");
+      expect(entry.sha).toBe(crypto.createHash("sha256").update("original chart").digest("hex"));
+      expect(entry.size).toBe(Buffer.byteLength("original chart"));
     });
 
     it("should reject file with disallowed extension", () => {

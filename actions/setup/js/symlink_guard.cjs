@@ -14,6 +14,7 @@
  */
 
 const fs = require("fs");
+const path = require("path");
 
 /**
  * Calls `fs.lstatSync(filePath)` and returns the Stats object unless the path
@@ -33,4 +34,134 @@ function lstatGuard(filePath) {
   return stat.isSymbolicLink() ? null : stat;
 }
 
-module.exports = { lstatGuard };
+/**
+ * Resolve only platform-owned aliases, not agent-controlled symlinks.
+ * @param {string} filename
+ */
+function normalizeGuardedPath(filename) {
+  const absolute = path.resolve(filename);
+  if (process.platform === "darwin") {
+    for (const alias of ["/tmp", "/var"]) {
+      if (absolute === alias || absolute.startsWith(`${alias}/`)) {
+        return fs.realpathSync(alias) + absolute.slice(alias.length);
+      }
+    }
+  }
+  return absolute;
+}
+
+/**
+ * Pin each directory while walking, rejecting links before opening children.
+ * Linux uses descriptor-relative paths so a renamed/replaced ancestor cannot
+ * redirect the next open. Other platforms additionally revalidate directory
+ * identities around the operation.
+ * @template T
+ * @param {string} directory
+ * @param {boolean} create
+ * @param {(directoryPath: string) => T} operation
+ * @returns {T}
+ */
+function withGuardedDirectory(directory, create, operation) {
+  if (fs.constants.O_NOFOLLOW === undefined || fs.constants.O_DIRECTORY === undefined) {
+    throw new Error("Cannot safely access assets: no-follow directory opens are unavailable");
+  }
+  const absolute = normalizeGuardedPath(directory);
+  const root = path.parse(absolute).root;
+  /** @type {Array<{fd: number, filename: string, stat: import('fs').Stats}>} */
+  const directories = [];
+  let current = root;
+  try {
+    for (const component of [root, ...absolute.slice(root.length).split(path.sep).filter(Boolean)]) {
+      if (component !== root) {
+        const parent = directories[directories.length - 1];
+        current = process.platform === "linux" ? `/proc/self/fd/${parent.fd}/${component}` : path.join(current, component);
+      }
+      let stat;
+      try {
+        stat = lstatGuard(current);
+      } catch (error) {
+        if (!create || !error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") throw error;
+        try {
+          fs.mkdirSync(current, { mode: 0o700 });
+        } catch (mkdirError) {
+          if (!mkdirError || typeof mkdirError !== "object" || !("code" in mkdirError) || mkdirError.code !== "EEXIST") throw mkdirError;
+        }
+        stat = lstatGuard(current);
+      }
+      if (!stat) throw new Error("Asset symlinks are not allowed, including parent directories");
+      if (!stat.isDirectory()) throw new Error("Asset parent must be a directory");
+      const fd = fs.openSync(current, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_DIRECTORY);
+      directories.push({ fd, filename: current, stat });
+      const opened = fs.fstatSync(fd);
+      if (opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("Asset directory changed while opening");
+    }
+    const verify = () => {
+      for (const directory of directories) {
+        const stat = lstatGuard(directory.filename);
+        if (!stat || stat.dev !== directory.stat.dev || stat.ino !== directory.stat.ino) throw new Error("Asset directory changed during access");
+      }
+    };
+    verify();
+    const final = directories[directories.length - 1];
+    const result = operation(process.platform === "linux" ? `/proc/self/fd/${final.fd}` : absolute);
+    verify();
+    return result;
+  } finally {
+    for (const directory of directories.reverse()) fs.closeSync(directory.fd);
+  }
+}
+
+/**
+ * Read one isolated regular-file snapshot; never reopen the source for copying.
+ * @param {string} filename
+ * @param {number} [maximumBytes]
+ * @returns {Buffer}
+ */
+function readGuardedFile(filename, maximumBytes = 10 * 1024 * 1024) {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw new Error("Invalid asset maximum size");
+  return withGuardedDirectory(path.dirname(filename), false, directory => {
+    const source = path.join(directory, path.basename(filename));
+    const expected = lstatGuard(source);
+    if (!expected) throw new Error("Asset symlinks are not allowed");
+    if (!expected.isFile() || expected.nlink !== 1) throw new Error("Asset must be an isolated regular file");
+    const fd = fs.openSync(source, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+    try {
+      const opened = fs.fstatSync(fd);
+      if (!opened.isFile() || opened.nlink !== 1 || opened.dev !== expected.dev || opened.ino !== expected.ino) throw new Error("Asset file changed while opening");
+      const current = lstatGuard(source);
+      if (!current || current.dev !== opened.dev || current.ino !== opened.ino) throw new Error("Asset file changed while opening");
+      if (opened.size > maximumBytes) throw new Error(`Asset exceeds maximum allowed size ${maximumBytes / 1024} KB`);
+      const content = Buffer.alloc(opened.size);
+      let offset = 0;
+      while (offset < content.length) {
+        const count = fs.readSync(fd, content, offset, content.length - offset, offset);
+        if (!count) throw new Error("Asset file changed while reading");
+        offset += count;
+      }
+      const after = fs.fstatSync(fd);
+      if (after.nlink !== 1 || after.size !== opened.size || after.mtimeMs !== opened.mtimeMs || after.ctimeMs !== opened.ctimeMs) throw new Error("Asset file changed while reading");
+      return content;
+    } finally {
+      fs.closeSync(fd);
+    }
+  });
+}
+
+/**
+ * Exclusively create a staged/published file without following destination links.
+ * @param {string} filename
+ * @param {Buffer} content
+ */
+function writeGuardedFile(filename, content) {
+  return withGuardedDirectory(path.dirname(filename), true, directory => {
+    const target = path.join(directory, path.basename(filename));
+    const fd = fs.openSync(target, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);
+    try {
+      fs.writeFileSync(fd, content);
+    } finally {
+      fs.closeSync(fd);
+    }
+  });
+}
+
+module.exports = { lstatGuard, normalizeGuardedPath, readGuardedFile, writeGuardedFile };

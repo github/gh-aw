@@ -103,6 +103,75 @@ describe("upload_assets.cjs", () => {
     });
   });
 
+  describe("guarded staged asset access", () => {
+    it.each(["file", "dangling", "parent", "hardlink", "directory"])("rejects %s staged sources without publishing external sentinel content", async kind => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const assets = getAssetsDir();
+      fs.mkdirSync(assets, { recursive: true });
+      const sentinel = path.join(tempBase, "sentinel.png");
+      fs.writeFileSync(sentinel, "harmless external sentinel");
+      const source = path.join(assets, "chart.png");
+      if (kind === "file") fs.symlinkSync(sentinel, source);
+      else if (kind === "dangling") fs.symlinkSync(path.join(tempBase, "missing"), source);
+      else if (kind === "parent") {
+        fs.rmdirSync(assets);
+        fs.symlinkSync(tempBase, assets, "dir");
+        fs.writeFileSync(path.join(tempBase, "chart.png"), "harmless external sentinel");
+      } else if (kind === "hardlink") fs.linkSync(sentinel, source);
+      else fs.mkdirSync(source);
+      const target = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      setAgentOutput({ items: [{ type: "upload_asset", fileName: "chart.png", targetFileName: path.basename(target), sha: crypto.createHash("sha256").update("harmless external sentinel").digest("hex") }] });
+
+      await executeScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringMatching(/symlinks are not allowed|isolated regular file/));
+      expect(fs.existsSync(target)).toBe(false);
+      expect(mockExec.exec.mock.calls.some(([command, args]) => isGitCommand(command, args, "add"))).toBe(false);
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
+    });
+
+    it("publishes the verified bytes if staged content changes before writing", async () => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const assets = getAssetsDir();
+      fs.mkdirSync(assets, { recursive: true });
+      const { assetPath, sha, size } = makeAsset(assets, "chart.png", "verified chart");
+      const target = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      setAgentOutput({ items: [{ type: "upload_asset", fileName: "chart.png", sha, size, targetFileName: path.basename(target) }] });
+      const originalWrite = fs.writeFileSync;
+      const spy = vi.spyOn(fs, "writeFileSync").mockImplementation((filename, ...args) => {
+        if (typeof filename === "number") originalWrite(assetPath, "replacement chart");
+        return originalWrite(filename, ...args);
+      });
+      try {
+        await executeScript();
+      } finally {
+        spy.mockRestore();
+      }
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(fs.readFileSync(target, "utf8")).toBe("verified chart");
+      expect(crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex")).toBe(sha);
+    });
+
+    it("rejects a symlink in the publication destination without changing its target", async () => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const assets = getAssetsDir();
+      fs.mkdirSync(assets, { recursive: true });
+      const { sha, size } = makeAsset(assets, "chart.png");
+      const sentinel = path.join(tempBase, "sentinel.png");
+      fs.writeFileSync(sentinel, "unchanged sentinel");
+      const target = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      fs.symlinkSync(sentinel, target);
+      setAgentOutput({ items: [{ type: "upload_asset", fileName: "chart.png", sha, size, targetFileName: path.basename(target) }] });
+
+      await executeScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("symlinks are not allowed"));
+      expect(fs.readFileSync(sentinel, "utf8")).toBe("unchanged sentinel");
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+  });
+
   describe("no upload items", () => {
     it("should output upload_count=0 and branch_name when no upload-asset items found", async () => {
       process.env.GH_AW_ASSETS_BRANCH = "assets/test-workflow";

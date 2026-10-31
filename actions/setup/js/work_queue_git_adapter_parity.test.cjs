@@ -384,6 +384,26 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
 });
 
 describe("standalone adapter rejection before file or native effect access", () => {
+  it.each(["symlink", "dangling", "hardlink"])("rejects %s Claim assets before native publication", async kind => {
+    const root = directory();
+    const original = assignment();
+    const reportRoot = scope.claimArtifactPath(root, "h1", original);
+    fs.mkdirSync(reportRoot, { recursive: true });
+    const sentinel = path.join(root, "external-sentinel.png");
+    fs.writeFileSync(sentinel, "harmless external sentinel");
+    const staged = path.join(reportRoot, digest("chart.png") + ".png");
+    if (kind === "hardlink") fs.linkSync(sentinel, staged);
+    else fs.symlinkSync(kind === "dangling" ? path.join(root, "missing-sentinel.png") : sentinel, staged);
+    const github = { rest: { repos: { get: vi.fn() }, git: { createBlob: vi.fn() } } };
+    await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize: allow }, async () => {
+      const handler = await assets.main({ "assets-dir": root, "target-repo": "owner/repo" }, github);
+      await expect(handler({ type: "upload_asset", claim_handle: "h1", path: "chart.png" })).rejects.toThrow();
+    });
+    expect(github.rest.repos.get).not.toHaveBeenCalled();
+    expect(github.rest.git.createBlob).not.toHaveBeenCalled();
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
+  });
+
   it.each(["cancelled", "result"])("rejects terminal %s selectors before accessing any standalone upload endpoint", async state => {
     const access = vi.fn(() => {
       throw new Error("terminal Claim cannot access native credentials or endpoints");
