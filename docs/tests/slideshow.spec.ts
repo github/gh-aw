@@ -297,7 +297,8 @@ test("presents the security diagram and layers, then cost dashboard and guardrai
   const dialog = presentation(page);
   for (const [number, title, visible, absent] of [
     [5, "Safe by default", ".tri-fig", "[data-safe-root]"],
-    [6, "Six layers of defence", "[data-safe-root]", ".tri-fig"],
+    [6, "Read. Propose. Check. Apply.", ".security-flow", "[data-safe-root]"],
+    [7, "Six layers of defence", "[data-safe-root]", ".tri-fig"],
     [9, "Cost under control", ".aw-dash", ".aw-points"],
     [10, "Budget guardrails", ".aw-points", ".aw-dash"],
   ] as const) {
