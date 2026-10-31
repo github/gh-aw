@@ -660,7 +660,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		executionCondition += " && steps.detection_staging_reset.outcome == 'success'"
 	}
 	steps := []string{
-		"      - name: Execute threat detection with AWF\n",
+		"      - name: " + constants.ThreatDetectionExecutionStepName + "\n",
 		"        id: detection_agentic_execution\n",
 		fmt.Sprintf("        if: %s\n", executionCondition),
 		"        continue-on-error: true\n",

@@ -31,6 +31,7 @@ func generateFindings(processedRun ProcessedRun, metrics MetricsData, errors []V
 	findings := appendFailureAndTimeoutFindings(nil, processedRun, metrics, errors)
 	findings = append(findings, generateModelAvailabilityFindings(processedRun.Run)...)
 	findings = append(findings, generateThreatDetectionFindings(processedRun)...)
+	findings = append(findings, generateEngineStepFailureFindings(processedRun)...)
 	findings = append(findings, generatePerformanceFindings(metrics)...)
 	findings = append(findings, generateErrorVolumeFindings(errors)...)
 	findings = append(findings, generateToolingFindings(processedRun)...)

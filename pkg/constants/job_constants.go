@@ -1,5 +1,7 @@
 package constants
 
+import "strings"
+
 // JobName represents a GitHub Actions job identifier.
 // This semantic type distinguishes job names from arbitrary strings,
 // preventing mixing of job identifiers with other string types.
@@ -81,6 +83,28 @@ const UpdateDriveMemoryJobName JobName = "update_drive_memory"
 
 // AgentFailureStepName is the generated conclusion step that reports agent failures.
 const AgentFailureStepName = "Handle agent failure"
+
+// ThreatDetectionExecutionStepName is the external threat-detect engine step in the detection job.
+const ThreatDetectionExecutionStepName = "Execute threat detection with AWF"
+
+// EngineExecutionStepNamePrefix and EngineExecutionStepNameSuffix bound the
+// "Execute <engine> CLI" step names that engines emit and that the evals and
+// inline detection jobs reuse.
+const (
+	EngineExecutionStepNamePrefix = "Execute "
+	EngineExecutionStepNameSuffix = " CLI"
+)
+
+// IsEngineExecutionStepName reports whether name is a compiler-emitted engine or
+// threat-detection execution step name.
+func IsEngineExecutionStepName(name string) bool {
+	if name == ThreatDetectionExecutionStepName {
+		return true
+	}
+	return len(name) > len(EngineExecutionStepNamePrefix)+len(EngineExecutionStepNameSuffix) &&
+		strings.HasPrefix(name, EngineExecutionStepNamePrefix) &&
+		strings.HasSuffix(name, EngineExecutionStepNameSuffix)
+}
 
 // DeferredPromptStepName identifies the generated agent step resolving deferred prompt bindings.
 const DeferredPromptStepName = "Resolve deferred prompt expressions"

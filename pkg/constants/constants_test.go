@@ -426,3 +426,20 @@ func TestGetEngineOption_AllBuiltInEngines(t *testing.T) {
 
 	assert.Nil(t, GetEngineOption("unknown-engine-xyz"))
 }
+
+func TestIsEngineExecutionStepName(t *testing.T) {
+	tests := map[string]bool{
+		"Execute Claude Code CLI":           true,
+		"Execute GitHub Copilot CLI":        true,
+		"Execute threat detection with AWF": true,
+		"Execute CLI":                       false,
+		"Install Claude Code CLI":           false,
+		"Execute the deploy custom job":     false,
+		"":                                  false,
+	}
+	for name, want := range tests {
+		if got := IsEngineExecutionStepName(name); got != want {
+			t.Errorf("IsEngineExecutionStepName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

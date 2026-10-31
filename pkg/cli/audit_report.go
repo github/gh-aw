@@ -73,6 +73,7 @@ type AuditData struct {
 	OutcomeSummary             *OutcomeSummary          `json:"outcome_summary,omitempty"`
 	Experiments                *ExperimentData          `json:"experiments,omitempty"`
 	Graders                    *GradersData             `json:"graders,omitempty"`
+	Evals                      *EvalsSummary            `json:"evals,omitempty"`
 	Ledger                     *LedgerActivity          `json:"ledger,omitempty"`
 	WorkQueue                  *WorkQueueReport         `json:"work_queue,omitempty"`
 	Friction                   *FrictionCostSummary     `json:"friction,omitempty"`
@@ -566,9 +567,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 	safeOutputSummary := buildSafeOutputSummary(inputs.createdItems, chainMetrics)
 	mcpServerHealth := buildMCPServerHealth(inputs.mcpToolUsage, inputs.processedRun.MCPFailures)
 
-	if auditReportLog.Enabled() {
-		auditReportLog.Printf("Built audit data: %d jobs, %d errors, %d tool types, %d findings, %d recommendations", len(inputs.jobs), len(inputs.errors), len(inputs.toolUsage), len(inputs.findings), len(inputs.recommendations))
-	}
+	logAssembledAuditData(inputs)
 
 	return AuditData{
 		SchemaVersion:           auditSchemaVersion,
@@ -610,6 +609,13 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		CreatedItems:            inputs.createdItems,
 		Experiments:             inputs.expData,
 		Graders:                 extractGradersData(run.LogsPath),
+		Evals:                   buildEvalsSummary(run),
+	}
+}
+
+func logAssembledAuditData(inputs auditDataInputs) {
+	if auditReportLog.Enabled() {
+		auditReportLog.Printf("Built audit data: %d jobs, %d errors, %d tool types, %d findings, %d recommendations", len(inputs.jobs), len(inputs.errors), len(inputs.toolUsage), len(inputs.findings), len(inputs.recommendations))
 	}
 }
 
