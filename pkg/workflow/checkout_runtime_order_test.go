@@ -146,8 +146,8 @@ steps:
 
 	t.Logf("Found %d steps: %v", len(stepNames), stepNames)
 
-	if len(stepNames) < 9 {
-		t.Fatalf("Expected at least 9 steps, got %d: %v", len(stepNames), stepNames)
+	if len(stepNames) < 10 {
+		t.Fatalf("Expected at least 10 steps, got %d: %v", len(stepNames), stepNames)
 	}
 
 	// Verify the order in dev mode (when local actions are used):
@@ -157,9 +157,10 @@ steps:
 	// 4. Fourth step should be "Create gh-aw temp directory" (before custom steps)
 	// 5. Fifth step should be "Configure gh CLI for GitHub Enterprise" (GHE host setup)
 	// 6. Sixth step should be "Download activation artifact" (moved before custom steps)
-	// 7. Seventh step should be "Checkout code" (from custom steps - full checkout, no separate .github checkout needed)
-	// 8. Eighth step should be "Setup Node.js" (runtime setup, inserted after checkout)
-	// 9. Ninth step should be "Use Node" (from custom steps)
+	// 7. Seventh step should be "Retry activation artifact download" (before custom steps)
+	// 8. Eighth step should be "Checkout code" (from custom steps - full checkout, no separate .github checkout needed)
+	// 9. Ninth step should be "Setup Node.js" (runtime setup, inserted after checkout)
+	// 10. Tenth step should be "Use Node" (from custom steps)
 	// NOTE: The .github sparse checkout is skipped because custom steps contain a full checkout
 
 	if stepNames[0] != "Checkout actions folder" {
@@ -186,16 +187,20 @@ steps:
 		t.Errorf("Sixth step should be 'Download activation artifact', got '%s'", stepNames[5])
 	}
 
-	if stepNames[6] != "Checkout code" {
-		t.Errorf("Seventh step should be 'Checkout code', got '%s'", stepNames[6])
+	if stepNames[6] != "Retry activation artifact download" {
+		t.Errorf("Seventh step should be 'Retry activation artifact download', got '%s'", stepNames[6])
 	}
 
-	if stepNames[7] != "Setup Node.js" {
-		t.Errorf("Eighth step should be 'Setup Node.js' (runtime setup after checkout), got '%s'", stepNames[7])
+	if stepNames[7] != "Checkout code" {
+		t.Errorf("Eighth step should be 'Checkout code', got '%s'", stepNames[7])
 	}
 
-	if stepNames[8] != "Use Node" {
-		t.Errorf("Ninth step should be 'Use Node', got '%s'", stepNames[8])
+	if stepNames[8] != "Setup Node.js" {
+		t.Errorf("Ninth step should be 'Setup Node.js' (runtime setup after checkout), got '%s'", stepNames[8])
+	}
+
+	if stepNames[9] != "Use Node" {
+		t.Errorf("Tenth step should be 'Use Node', got '%s'", stepNames[9])
 	}
 
 	// Verify that .github checkout is NOT present (redundant with full checkout in custom steps)
