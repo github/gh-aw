@@ -1438,7 +1438,7 @@ func TestCompileStagedHandlerReadPermissions(t *testing.T) {
 						if app == "per-handler" {
 							stepID = handler.key + "-app-token"
 						}
-						step := compiledStepBlockForTest(compiled, stepID)
+						step := compiledStepBlockForTest(job, stepID)
 						require.NotEmpty(t, step)
 						for _, scope := range handler.scopes {
 							assert.Contains(t, step, "permission-"+string(scope)+": read")

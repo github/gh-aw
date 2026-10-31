@@ -2140,6 +2140,62 @@ func TestConclusionJobIssuesWritePermissionDerivedFromConfig(t *testing.T) {
 	})
 }
 
+func TestConclusionGitHubAppTokenUsesConclusionPermissions(t *testing.T) {
+	tests := []struct {
+		name                 string
+		reportFailedJobs     *TemplatableBool
+		reportFailureAsIssue *TemplatableBool
+		wantIssuesWrite      bool
+	}{
+		{
+			name:            "includes issue reporting permissions by default",
+			wantIssuesWrite: true,
+		},
+		{
+			name:                 "omits issue permission when issue reporting is disabled",
+			reportFailedJobs:     templatableBoolPtr("false"),
+			reportFailureAsIssue: templatableBoolPtr("false"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workflowData := &WorkflowData{
+				Name: "Test Workflow",
+				SafeOutputs: &SafeOutputsConfig{
+					CreatePullRequestReviewComments: &CreatePullRequestReviewCommentsConfig{},
+					ReportFailedJobs:                tt.reportFailedJobs,
+					ReportFailureAsIssue:            tt.reportFailureAsIssue,
+					GitHubApp: &GitHubAppConfig{
+						AppID:      "${{ vars.APP_ID }}",
+						PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}",
+					},
+				},
+			}
+
+			job, err := NewCompiler().buildConclusionJob(workflowData, string(constants.AgentJobName), nil)
+			if err != nil {
+				t.Fatalf("buildConclusionJob returned error: %v", err)
+			}
+			if job == nil {
+				t.Fatal("Expected conclusion job to be non-nil")
+			}
+
+			steps := strings.Join(job.Steps, "")
+			if !strings.Contains(steps, "permission-actions: read") {
+				t.Errorf("conclusion App token should include 'permission-actions: read', got:\n%s", steps)
+			}
+			if tt.wantIssuesWrite {
+				if !strings.Contains(steps, "permission-issues: write") {
+					t.Errorf("conclusion App token should include 'permission-issues: write', got:\n%s", steps)
+				}
+			} else if strings.Contains(steps, "permission-issues:") {
+				t.Errorf("conclusion App token should omit issue permissions when issue reporting is disabled, got:\n%s", steps)
+			}
+		})
+	}
+}
+
 func TestConclusionReportFailedJobsExpression(t *testing.T) {
 	compiler := NewCompiler()
 	reportFailedJobs := TemplatableBool("${{ inputs.report-failed-jobs }}")
