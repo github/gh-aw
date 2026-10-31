@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunSyftOnImage_NilContext(t *testing.T) {
@@ -232,5 +234,101 @@ func TestRunSyftOnImage_AcceptsValidImageRef(t *testing.T) {
 	}
 	if result.ImageRef != "ghcr.io/anchore/syft:v1.0.0" {
 		t.Fatalf("Expected result image ref to match input, got %q", result.ImageRef)
+	}
+}
+
+func TestRunSyftOnLockFiles_PrivateOutputs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Fake Docker executable uses a POSIX shell")
+	}
+	for _, precreation := range []string{"directory", "symlink"} {
+		t.Run(precreation, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			t.Setenv("TMPDIR", tmpDir)
+			prependFakeDockerToPath(t, `{"artifacts":[{"name":"test","version":"1.0","type":"test"}]}`)
+			target := t.TempDir()
+			legacyDir := filepath.Join(tmpDir, "gh-aw-syft-sboms")
+			if precreation == "symlink" {
+				require.NoError(t, os.Symlink(target, legacyDir))
+			} else {
+				require.NoError(t, os.Mkdir(legacyDir, 0o777))
+				target = legacyDir
+			}
+			victim := filepath.Join(target, "sbom-alpine_latest.json")
+			require.NoError(t, os.WriteFile(victim, []byte("untouched"), 0o644))
+			lockFile := filepath.Join(t.TempDir(), "test.lock.yml")
+			require.NoError(t, os.WriteFile(lockFile, []byte("# gh-aw-manifest: {\"version\":1,\"containers\":[{\"image\":\"alpine:latest\"}]}\n"), 0o600))
+
+			for range 2 {
+				require.NoError(t, runSyftOnLockFiles([]string{lockFile}, true, true))
+			}
+			directories, err := filepath.Glob(filepath.Join(tmpDir, "gh-aw-syft-sboms-*"))
+			require.NoError(t, err)
+			require.Len(t, directories, 2, "each scan must retain its own outputs")
+			for _, dir := range directories {
+				info, err := os.Stat(dir)
+				require.NoError(t, err)
+				require.Equal(t, os.FileMode(0o700), info.Mode().Perm())
+				sbom := filepath.Join(dir, "sbom-alpine_latest.json")
+				info, err = os.Stat(sbom)
+				require.NoError(t, err)
+				require.Equal(t, constants.FilePermSensitive, info.Mode().Perm())
+				data, err := os.ReadFile(sbom)
+				require.NoError(t, err)
+				var output syftOutput
+				require.NoError(t, json.Unmarshal(data, &output))
+				require.Len(t, output.Artifacts, 1)
+			}
+			data, err := os.ReadFile(victim)
+			require.NoError(t, err)
+			require.Equal(t, "untouched", string(data))
+		})
+	}
+}
+
+func TestRunSyftOnImage_RefusesPreexistingOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Fake Docker executable uses a POSIX shell")
+	}
+	prependFakeDockerToPath(t, `{"artifacts":[]}`)
+	for _, precreation := range []string{"file", "symlink"} {
+		t.Run(precreation, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "sbom-alpine_latest.json")
+			victim := path
+			if precreation == "symlink" {
+				victim = filepath.Join(t.TempDir(), "victim")
+				require.NoError(t, os.Symlink(victim, path))
+			}
+			require.NoError(t, os.WriteFile(victim, []byte("untouched"), 0o600))
+			_, err := runSyftOnImage(context.Background(), "alpine:latest", dir, false)
+			require.ErrorContains(t, err, "failed to write SBOM")
+			data, err := os.ReadFile(victim)
+			require.NoError(t, err)
+			require.Equal(t, "untouched", string(data))
+		})
+	}
+}
+
+func TestRunSyftOnLockFiles_CleansFailedScanDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Fake Docker executable uses a POSIX shell")
+	}
+	tmpDir := t.TempDir()
+	t.Setenv("TMPDIR", tmpDir)
+	prependFakeDockerToPath(t, `{"artifacts":[]}`)
+	t.Setenv("TEST_DOCKER_EXIT_CODE", "1")
+	lockFile := filepath.Join(t.TempDir(), "test.lock.yml")
+	require.NoError(t, os.WriteFile(lockFile, []byte("# gh-aw-manifest: {\"version\":1,\"containers\":[{\"image\":\"alpine:latest\"}]}\n"), 0o600))
+	for _, strict := range []bool{true, false} {
+		err := runSyftOnLockFiles([]string{lockFile}, false, strict)
+		if strict {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+		entries, err := os.ReadDir(tmpDir)
+		require.NoError(t, err)
+		require.Empty(t, entries, "failed scans must not leave empty output directories")
 	}
 }

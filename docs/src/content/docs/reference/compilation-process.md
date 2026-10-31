@@ -19,6 +19,8 @@ Workflow schemas and built-in Actions/AW lint rules are bundled with the CLI; th
 
 Interactive compilation performs a best-effort compiler update check at most once every 24 hours. It runs in the background with a three-second total budget, cancels outstanding requests when compilation finishes, and probes identical current/latest release tags only once. `--no-check-update` disables this check; CI and non-interactive invocations skip it.
 
+Update-check timestamps persist in `gh-aw-update-check` under the operating system's per-user cache directory, with owner-only permissions on Unix. Legacy shared temporary markers are ignored. Opt-in Syft scans save SBOMs in a unique, private `gh-aw-syft-sboms-*` temporary directory and print each file's path. Successful outputs remain available for inspection and can be deleted when no longer needed; directories with no successful scans are removed.
+
 `gh aw update` refreshes upstream state on each invocation, but shares action release lists and tag resolutions across actions from the same repository within that invocation. Release lists use 100 entries per page, and source content already fetched for comparison or merging is reused. By default, `update` also recompiles workflows, so a separate `gh aw compile` is unnecessary unless additional compilation options are required.
 
 When SDK authentication is available, update uses native GitHub API clients with pooled HTTP connections for source metadata, workflow downloads, release lists, and action tags, instead of starting a fresh `gh api` subprocess for each request. Host selection follows the GitHub CLI helpers, including `GH_HOST` and repository detection. If native client setup fails, existing GitHub CLI requests remain available.
