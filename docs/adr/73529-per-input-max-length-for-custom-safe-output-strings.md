@@ -1,4 +1,4 @@
-# ADR-73529: Per-Input `max-length` for Custom Safe-Output String Inputs
+# ADR-73529: Per-Input `maxLength` for Custom Safe-Output String Inputs
 
 **Date**: 2026-10-31
 **Status**: Draft
@@ -12,7 +12,7 @@ Custom safe-output jobs (`safe-outputs.jobs.<name>.inputs`) are exposed to the a
 
 ### Decision
 
-We will add an optional `max-length` property to custom safe-output job input definitions. It accepts integers from 1 to 1,000,000, is valid only for `string` inputs or inputs with no `type`, and the frontmatter schema rejects it for `boolean`, `number`, `choice`, and `environment` inputs. The compiler stores it as `InputDefinition.MaxLength` (`*int`) and emits it as the MCP tool property `maxLength`. That value then replaces the default 10,240-byte limit for that input. Inputs that omit `max-length` keep the existing byte-based default unchanged. We chose this approach because it reuses the existing runtime `maxLength` handling and keeps the decision explicit and per-input.
+We will add an optional `maxLength` property to custom safe-output job input definitions. It accepts integers from 1 to 1,000,000, is valid only for `string` inputs or inputs with no `type`, and the frontmatter schema rejects it for `boolean`, `number`, `choice`, and `environment` inputs. The compiler stores it as `InputDefinition.MaxLength` (`*int`) and emits it as the MCP tool property `maxLength`. That value then replaces the default 10,240-byte limit for that input. Inputs that omit `maxLength` keep the existing byte-based default unchanged. We chose this approach because it reuses the existing runtime `maxLength` handling and keeps the decision explicit and per-input.
 
 ### Alternatives Considered
 
@@ -34,10 +34,10 @@ Express the override in bytes to match the default unit. We did not choose this 
 - Authors can allow large string payloads for a specific input without affecting other inputs or workflows.
 - Large values stay in the safe-output item, so threat detection and post-processing can still inspect them.
 - No runtime change is needed: the compiler emits the standard `maxLength`, which `schema-validation.cjs` already enforces.
-- The change is backward compatible because inputs without `max-length` keep the 10,240-byte default.
+- The change is backward compatible because inputs without `maxLength` keep the 10,240-byte default.
 
 #### Negative
-- The units differ: the default limit is measured in bytes, while `max-length` is measured in characters. With multi-byte text, a `max-length` of N can allow more than N bytes.
+- The units differ: the default limit is measured in bytes, while `maxLength` is measured in characters. With multi-byte text, a `maxLength` of N can allow more than N bytes.
 - A per-input ceiling of 1,000,000 characters allows very large agent outputs, which can increase safe-output artifact size, detection cost, and the amount of untrusted data passed to custom jobs.
 - The type restriction is enforced in two places: the JSON Schema `allOf`/`if`/`then` rule and a type check in `populateCustomJobToolProperties`. Both must stay in sync.
 

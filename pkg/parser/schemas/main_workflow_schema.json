@@ -12964,7 +12964,7 @@
                             "type": "string"
                           }
                         },
-                        "max-length": {
+                        "maxLength": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 1000000,
@@ -12983,7 +12983,7 @@
                           },
                           "then": {
                             "not": {
-                              "required": ["max-length"]
+                              "required": ["maxLength"]
                             }
                           }
                         }

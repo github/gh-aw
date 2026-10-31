@@ -151,8 +151,8 @@ func TestParseInputDefinitions(t *testing.T) {
 			"default": 10,
 		},
 		"report": map[string]any{
-			"type":       "string",
-			"max-length": 40000,
+			"type":      "string",
+			"maxLength": 40000,
 		},
 	}
 

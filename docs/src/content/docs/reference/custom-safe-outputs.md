@@ -367,12 +367,12 @@ All jobs must define `inputs`:
 | `choice` | Selection from predefined options |
 
 Input definitions also support `description`, `required`, and `default`. String
-inputs (including inputs with an omitted `type`) may set `max-length` to override
+inputs (including inputs with an omitted `type`) may set `maxLength` to override
 the default 10,240-byte input limit:
 
 | Property | Type | Applies to | Description |
 |----------|------|------------|-------------|
-| `max-length` | integer | `string` inputs | Maximum allowed length in characters; 1–1,000,000. Replaces the default 10,240-byte limit for this input. |
+| `maxLength` | integer | `string` inputs | Maximum allowed length in characters; 1–1,000,000. Replaces the default 10,240-byte limit for this input. |
 
 This is useful for large structured values that must remain in the safe-output
 item, such as data inspected by threat detection or post-processing steps. Use
@@ -385,7 +385,7 @@ inputs:
     description: "Message content"
     required: true
     type: string
-    max-length: 40000
+    maxLength: 40000
   notify:
     description: "Send notification"
     required: false
@@ -473,7 +473,7 @@ safe-outputs:
             echo "processing bundle"
 ```
 
-Each entry must be a literal path or glob rooted under `/tmp/gh-aw/` (the same tree the compiler already scans for secrets before upload); GitHub Actions expressions and control characters are rejected. Directory paths must end with `/`; the compiler expands them to recursive globs so only files with extensions covered by secret redaction (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, or `.patch`) are persisted. File paths or globs must use one of those extensions. Paths outside that root, entries containing `..` path traversal segments, and entries referencing hidden files or directories (any path segment starting with `.`, since the unified artifact upload does not include hidden files) are all rejected at compile time. The redaction pass also removes symbolic links before upload so they cannot resolve outside the scanned tree. Prefer embedding values directly in the safe-output item when later stages must inspect them; use `max-length` for larger strings. Reach for `artifacts:` when the payload is a directory or multiple files that do not need to be part of the safe-output item.
+Each entry must be a literal path or glob rooted under `/tmp/gh-aw/` (the same tree the compiler already scans for secrets before upload); GitHub Actions expressions and control characters are rejected. Directory paths must end with `/`; the compiler expands them to recursive globs so only files with extensions covered by secret redaction (`.txt`, `.json`, `.log`, `.md`, `.mdx`, `.yml`, `.jsonl`, or `.patch`) are persisted. File paths or globs must use one of those extensions. Paths outside that root, entries containing `..` path traversal segments, and entries referencing hidden files or directories (any path segment starting with `.`, since the unified artifact upload does not include hidden files) are all rejected at compile time. The redaction pass also removes symbolic links before upload so they cannot resolve outside the scanned tree. Prefer embedding values directly in the safe-output item when later stages must inspect them; use `maxLength` for larger strings. Reach for `artifacts:` when the payload is a directory or multiple files that do not need to be part of the safe-output item.
 
 If artifact secret redaction fails, the source is removed and the step fails. Diagnostics include a fixed operation stage (`read`, `redact`, `write`, `replace`, or `unlink`) and an allowlisted filesystem error code, such as `EACCES`, `EPERM`, or `ENOSPC`; unrecognized errors use `unknown`. Exception messages, file paths, secret values, and runtime masks are excluded from these failure diagnostics. A failed removal remains a fatal error, not permission to upload the unsanitized source.
 
