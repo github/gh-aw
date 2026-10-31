@@ -367,7 +367,8 @@ All jobs must define `inputs`:
 | `choice` | Selection from predefined options |
 
 Input definitions also support `description`, `required`, and `default`. String
-inputs (including inputs with an omitted `type`) may set `maxLength` to override
+inputs (including inputs with an omitted `type`) in jobs and scripts may set
+`maxLength` to override
 the default 10,240-byte input limit:
 
 | Property | Type | Applies to | Description |

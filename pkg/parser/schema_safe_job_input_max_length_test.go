@@ -94,3 +94,38 @@ func TestMainWorkflowSchemaSafeJobInputMaxLength(t *testing.T) {
 		})
 	}
 }
+
+func TestMainWorkflowSchemaSafeScriptInputMaxLength(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		input       map[string]any
+		wantErr     bool
+		errContains string
+	}{
+		{name: "string", input: map[string]any{"type": "string", "maxLength": 40000}},
+		{name: "unset type", input: map[string]any{"maxLength": 40000}},
+		{name: "boolean", input: map[string]any{"type": "boolean", "maxLength": 40000}, wantErr: true, errContains: "payload"},
+		{name: "number", input: map[string]any{"type": "number", "maxLength": 40000}, wantErr: true, errContains: "payload"},
+		{name: "out of range", input: map[string]any{"type": "string", "maxLength": 1000001}, wantErr: true, errContains: "payload"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+				"on": "push",
+				"safe-outputs": map[string]any{
+					"scripts": map[string]any{
+						"publish": map[string]any{
+							"inputs": map[string]any{"payload": tc.input},
+							"script": "return item.payload",
+						},
+					},
+				},
+			}, "safe-script-max-length.md")
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

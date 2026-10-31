@@ -268,6 +268,9 @@ func buildSafeOutputInputsConfig(inputs map[string]*InputDefinition) map[string]
 		if len(inputDef.Options) > 0 {
 			inputConfig["options"] = inputDef.Options
 		}
+		if inputDef.MaxLength != nil {
+			inputConfig["maxLength"] = *inputDef.MaxLength
+		}
 		inputsConfig[inputName] = inputConfig
 	}
 	return inputsConfig

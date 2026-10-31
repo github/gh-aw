@@ -214,6 +214,20 @@ func TestParseInputDefinitions(t *testing.T) {
 	}
 }
 
+func TestParseInputDefinitionInvalidMaxLength(t *testing.T) {
+	for _, value := range []any{"not-a-number", 0, -1, 1.5} {
+		t.Run(reflect.TypeOf(value).String(), func(t *testing.T) {
+			input := ParseInputDefinition(map[string]any{
+				"type":      "string",
+				"maxLength": value,
+			})
+			if input.MaxLength != nil {
+				t.Fatalf("MaxLength = %d, want nil for invalid value %v", *input.MaxLength, value)
+			}
+		})
+	}
+}
+
 func TestParseInputDefinitionsNil(t *testing.T) {
 	result := ParseInputDefinitions(nil)
 	if result != nil {

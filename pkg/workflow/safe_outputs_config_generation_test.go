@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildSafeOutputInputsConfigIncludesMaxLength(t *testing.T) {
+	maxLength := 40000
+	result := buildSafeOutputInputsConfig(map[string]*InputDefinition{
+		"payload": {
+			Type:      "string",
+			MaxLength: &maxLength,
+		},
+		"legacy": {
+			Type: "string",
+		},
+	})
+
+	require.Equal(t, maxLength, result["payload"].(map[string]any)["maxLength"])
+	assert.NotContains(t, result["legacy"].(map[string]any), "maxLength")
+}
+
 // TestGenerateSafeOutputsConfigDispatchWorkflow tests that generateSafeOutputsConfig correctly
 // includes dispatch_workflow configuration with workflow_files mapping.
 func TestGenerateSafeOutputsConfigDispatchWorkflow(t *testing.T) {
