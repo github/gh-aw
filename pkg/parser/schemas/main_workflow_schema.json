@@ -12964,7 +12964,7 @@
                             "type": "string"
                           }
                         },
-                        "maxLength": {
+                        "max-length": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 1000000,
@@ -12983,7 +12983,7 @@
                           },
                           "then": {
                             "not": {
-                              "required": ["maxLength"]
+                              "required": ["max-length"]
                             }
                           }
                         }
@@ -13220,7 +13220,7 @@
                           "description": "Input parameter type",
                           "default": "string"
                         },
-                        "maxLength": {
+                        "max-length": {
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 1000000,
@@ -13239,7 +13239,7 @@
                           },
                           "then": {
                             "not": {
-                              "required": ["maxLength"]
+                              "required": ["max-length"]
                             }
                           }
                         }

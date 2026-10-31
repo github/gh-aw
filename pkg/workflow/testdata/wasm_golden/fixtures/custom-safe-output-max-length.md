@@ -16,7 +16,7 @@ safe-outputs:
           description: The complete report content
           required: true
           type: string
-          maxLength: 40000
+          max-length: 40000
       steps:
         - run: echo "Report received"
 ---

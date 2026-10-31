@@ -1,4 +1,4 @@
-# ADR-73529: Per-Input `maxLength` for Custom Safe-Output String Inputs
+# ADR-73529: Per-Input `max-length` for Custom Safe-Output String Inputs
 
 **Date**: 2026-10-31
 **Status**: Draft
@@ -8,11 +8,11 @@
 
 ### Context
 
-Custom safe-output jobs and scripts (`safe-outputs.jobs.<name>.inputs` and `safe-outputs.scripts.<name>.inputs`) are exposed to the agent as MCP tools, and every string input is validated at runtime by `schema-validation.cjs` against a fixed default limit of 10,240 bytes (`MAX_STRING_INPUT_BYTES`). Some workflows need to pass larger structured values (for example, generated reports) through a custom safe output, and the fixed limit forces the agent to shorten or truncate those payloads. The existing workaround, `artifacts:`, moves the payload out of the safe-output item, so later stages that inspect the item, such as threat detection and post-processing, cannot see it. The runtime validator already honors a JSON Schema `maxLength` on tool input properties (measured in characters), so workflow authors should be able to set the corresponding field (issue #73520).
+Custom safe-output jobs and scripts (`safe-outputs.jobs.<name>.inputs` and `safe-outputs.scripts.<name>.inputs`) are exposed to the agent as MCP tools, and every string input is validated at runtime by `schema-validation.cjs` against a fixed default limit of 10,240 bytes (`MAX_STRING_INPUT_BYTES`). Some workflows need to pass larger structured values (for example, generated reports) through a custom safe output, and the fixed limit forces the agent to shorten or truncate those payloads. The existing workaround, `artifacts:`, moves the payload out of the safe-output item, so later stages that inspect the item, such as threat detection and post-processing, cannot see it. The runtime validator already honors a JSON Schema `maxLength` on tool input properties (measured in characters), so workflow authors should be able to set the corresponding frontmatter field `max-length` (issue #73520).
 
 ### Decision
 
-We will add an optional `maxLength` property to custom safe-output job and script input definitions. It accepts integers from 1 to 1,000,000, is valid only for `string` inputs or inputs with no `type`, and the frontmatter schema rejects it for non-string input types. The compiler stores it as `InputDefinition.MaxLength` (`*int`) and emits it as the MCP tool property `maxLength`. That value replaces the default 10,240-byte limit for that input. Inputs that omit `maxLength` keep the existing byte-based default unchanged. We chose this approach because it reuses the existing runtime `maxLength` handling and keeps the decision explicit and per-input.
+We will add an optional `max-length` property to custom safe-output job and script input definitions. It accepts integers from 1 to 1,000,000, is valid only for `string` inputs or inputs with no `type`, and the frontmatter schema rejects it for non-string input types. The compiler stores it as `InputDefinition.MaxLength` (`*int`) and emits it as the MCP tool property `maxLength`. That value replaces the default 10,240-byte limit for that input. Inputs that omit `max-length` keep the existing byte-based default unchanged. We chose this approach because it reuses the existing runtime `maxLength` handling and keeps the decision explicit and per-input.
 
 ### Alternatives Considered
 
@@ -34,10 +34,10 @@ Express the override in bytes to match the default unit. We did not choose this 
 - Authors can allow large string payloads for a specific input without affecting other inputs or workflows.
 - Large values stay in the safe-output item, so threat detection and post-processing can still inspect them.
 - The runtime preserves opted-in values through collection and automatic large-content handling so threat detection and custom handlers receive the complete field.
-- The change is backward compatible because inputs without `maxLength` keep the 10,240-byte default.
+- The change is backward compatible because inputs without `max-length` keep the 10,240-byte default.
 
 #### Negative
-- The units differ: the default limit is measured in bytes, while `maxLength` is measured in characters. With multi-byte text, a `maxLength` of N can allow more than N bytes.
+- The units differ: the default limit is measured in bytes, while `max-length` is measured in characters. With multi-byte text, a `max-length` of N can allow more than N bytes.
 - A per-input ceiling of 1,000,000 characters allows very large agent outputs, which can increase safe-output artifact size, detection cost, and the amount of untrusted data passed to custom jobs.
 - The type restriction is enforced in two places: the JSON Schema `allOf`/`if`/`then` rule and a type check in `populateCustomJobToolProperties`. Both must stay in sync.
 

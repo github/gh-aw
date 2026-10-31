@@ -62,7 +62,7 @@ func ParseInputDefinition(inputConfig map[string]any) *InputDefinition {
 		}
 	}
 
-	if maxLength, exists := inputConfig["maxLength"]; exists {
+	if maxLength, exists := inputConfig["max-length"]; exists {
 		input.MaxLength = parseInputMaxLength(maxLength)
 	}
 

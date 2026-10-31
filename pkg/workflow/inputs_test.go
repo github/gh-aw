@@ -151,8 +151,8 @@ func TestParseInputDefinitions(t *testing.T) {
 			"default": 10,
 		},
 		"report": map[string]any{
-			"type":      "string",
-			"maxLength": 40000,
+			"type":       "string",
+			"max-length": 40000,
 		},
 	}
 
@@ -218,8 +218,8 @@ func TestParseInputDefinitionInvalidMaxLength(t *testing.T) {
 	for _, value := range []any{"not-a-number", 0, -1, 1.5} {
 		t.Run(reflect.TypeOf(value).String(), func(t *testing.T) {
 			input := ParseInputDefinition(map[string]any{
-				"type":      "string",
-				"maxLength": value,
+				"type":       "string",
+				"max-length": value,
 			})
 			if input.MaxLength != nil {
 				t.Fatalf("MaxLength = %d, want nil for invalid value %v", *input.MaxLength, value)

@@ -18,7 +18,7 @@ type InputDefinition struct {
 	Default     any      `yaml:"default,omitempty" json:"default,omitempty"` // Can be string, number, or boolean
 	Type        string   `yaml:"type,omitempty" json:"type,omitempty"`       // "string", "choice", "boolean", "number", "environment"
 	Options     []string `yaml:"options,omitempty" json:"options,omitempty"` // Options for choice type
-	MaxLength   *int     `yaml:"maxLength,omitempty" json:"maxLength,omitempty"`
+	MaxLength   *int     `yaml:"max-length,omitempty" json:"max-length,omitempty"`
 }
 
 // GetDefaultAsString returns the default value as a string.
