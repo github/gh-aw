@@ -51,6 +51,16 @@ func checkDoctorTokens(ctx context.Context, repo, dir string) ([]DoctorTokenVali
 	if err != nil || len(checks) == 0 {
 		return checks, err
 	}
+	hasSecrets := false
+	for _, check := range checks {
+		if len(check.Secrets) > 0 {
+			hasSecrets = true
+			break
+		}
+	}
+	if !hasSecrets {
+		return checks, nil
+	}
 	remote, _, err := resolveRemoteURL(root)
 	if err != nil {
 		return nil, err
@@ -71,11 +81,15 @@ func checkDoctorTokens(ctx context.Context, repo, dir string) ([]DoctorTokenVali
 	defer cancel()
 	miner := doctorAssignmentRunMiner{
 		ctx: ctx, repo: repo, host: host, now: time.Now().UTC(), runGH: workflow.RunGHContext,
-		classify: classifyDoctorTokenLog, allJobs: true, limit: 1,
+		runGHLimited: runDoctorGHContextLimited, classify: classifyDoctorTokenLog,
+		allJobs: true, limit: 1, maxLogBytes: doctorTokenRunLogLimitBytes,
 	}
 	var ordered []*DoctorTokenValidation
 	for i := range checks {
 		check := &checks[i]
+		if len(check.Secrets) == 0 {
+			continue
+		}
 		check.SecretsURL = fmt.Sprintf("%s/%s/settings/secrets/actions", host, repo)
 		available, coverageErr := availableDoctorTokenSecrets(ctx, repo, host, names, check.Environments, environments)
 		diagnoseDoctorTokenValidation(check, available, errors.Join(lookupErr, coverageErr))
@@ -119,18 +133,27 @@ func discoverDoctorTokenValidations(root string) ([]DoctorTokenValidation, error
 	}
 	cache := parser.NewImportCache(root)
 	cache.SetReadOnly(true)
+	return discoverDoctorTokenValidationsFromFiles(root, files, cache)
+}
+
+func discoverDoctorTokenValidationsFromFiles(root string, files []string, cache *parser.ImportCache) ([]DoctorTokenValidation, error) {
 	var checks []DoctorTokenValidation
 	for _, file := range files {
-		names, environments, err := discoverDoctorTokens(file, cache)
-		if err != nil {
-			return nil, err
-		}
-		if len(names) == 0 {
-			continue
-		}
 		rel, err := filepath.Rel(root, file)
 		if err != nil {
 			return nil, err
+		}
+		names, environments, err := discoverDoctorTokens(file, cache)
+		if err != nil {
+			checks = append(checks, DoctorTokenValidation{
+				Workflow: filepath.ToSlash(rel),
+				Status:   "unknown",
+				Message:  fmt.Sprintf("Token discovery is incomplete: %v", err),
+			})
+			continue
+		}
+		if len(names) == 0 {
+			continue
 		}
 		checks = append(checks, DoctorTokenValidation{Workflow: filepath.ToSlash(rel), Secrets: names, Environments: environments})
 	}
@@ -267,7 +290,7 @@ func scanDoctorImportedTokens(document *aw.Document, file string, cache *parser.
 		imports.MergedTools, imports.MergedMCPServers, imports.MergedEnv,
 		imports.MergedJobs, imports.MergedSteps, imports.MergedPreSteps,
 		imports.MergedPreAgentSteps, imports.MergedPostSteps,
-		imports.MergedCheckout, imports.MergedServices,
+		imports.CopilotSetupSteps, imports.MergedCheckout, imports.MergedServices,
 		imports.MergedObservability, imports.MergedSecretMasking,
 	}, imports.MergedEngines...)
 	for _, section := range sections {
@@ -394,7 +417,7 @@ func scanDoctorTokenExpression(value, field string, names map[string]struct{}) e
 
 func doctorTokenField(field string) bool {
 	field = strings.ToUpper(field)
-	return field == "TOKEN" || field == "GITHUB-TOKEN" || strings.HasSuffix(field, "_TOKEN") || strings.HasSuffix(field, "_PAT")
+	return field == "TOKEN" || field == "GITHUB-TOKEN" || field == "HEAD-GITHUB-TOKEN" || strings.HasSuffix(field, "_TOKEN") || strings.HasSuffix(field, "_PAT")
 }
 
 func classifyDoctorTokenLog(content string, evidence DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence {
@@ -402,7 +425,7 @@ func classifyDoctorTokenLog(content string, evidence DoctorAssignmentRunEvidence
 		line = strings.TrimSpace(line)
 		diagnostic := strings.HasPrefix(line, "##[error]") || strings.HasPrefix(line, "##[warning]")
 		line = strings.TrimPrefix(strings.TrimPrefix(line, "##[warning]"), "##[error]")
-		if (diagnostic && strings.HasPrefix(line, "Failed ")) || strings.HasPrefix(line, "Agent assignment credential validation failed:") {
+		if (diagnostic && strings.HasPrefix(line, "Failed ")) || doctorTokenFailureDiagnostic(line) {
 			if doctorAssignmentCredentialFailure(line) || strings.Contains(strings.ToLower(line), "http 403") {
 				evidence.Outcome = "credential_error"
 				evidence.Message = "Workflow logs report an authentication or permission failure. The failing token cannot be identified from secret metadata alone."
@@ -412,6 +435,22 @@ func classifyDoctorTokenLog(content string, evidence DoctorAssignmentRunEvidence
 	}
 	evidence.Outcome, evidence.Message = "no_evidence", "No recognized credential failure found; this does not validate tokens or prove an operation succeeded."
 	return evidence
+}
+
+func doctorTokenFailureDiagnostic(line string) bool {
+	for _, prefix := range []string{
+		"✗ Message",
+		"✗ Retry of message",
+		"✗ Failed to submit PR review",
+		"✗ Exception while submitting PR review",
+		"Agent assignment failed for",
+		"Agent assignment credential validation failed:",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func doctorTokenValidationError(checks []DoctorTokenValidation) error {

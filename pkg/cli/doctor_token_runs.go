@@ -13,6 +13,9 @@ const doctorTokenFailureListingPages = 2
 func collectDoctorTokenRunEvidence(checks []*DoctorTokenValidation, miner *doctorAssignmentRunMiner) {
 	prioritizeDoctorTokenChecks(checks)
 	targets, byPath := doctorTokenFailureTargets(checks)
+	if len(targets) == 0 {
+		return
+	}
 	failures, inventoryErr := listDoctorTokenFailureCandidates(miner, targets)
 	representatives := map[string]WorkflowRun{}
 	for _, run := range failures {
@@ -38,6 +41,9 @@ func doctorTokenFailureTargets(checks []*DoctorTokenValidation) ([]GitHubWorkflo
 	var targets []GitHubWorkflow
 	byPath := make(map[string]*DoctorTokenValidation)
 	for _, check := range checks {
+		if len(check.Secrets) == 0 && check.Status == "unknown" {
+			continue
+		}
 		path := stringutil.MarkdownToLockFile(check.Workflow)
 		targets = append(targets, GitHubWorkflow{Path: path})
 		byPath[path] = check

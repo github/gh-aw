@@ -43,6 +43,31 @@ func TestDoctorTokenFailureFirstBudget(t *testing.T) {
 	assert.Equal(t, 40, miner.requests)
 }
 
+func TestDoctorTokenLogInspectionIsBounded(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	miner := doctorAssignmentRunMiner{
+		ctx: t.Context(), repo: "octo/repo", host: "https://github.com", now: now,
+		allJobs: true, maxLogBytes: 32,
+		runGH: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			switch {
+			case strings.Contains(args[3], "/jobs?"):
+				return []byte(`{"total_count":1,"jobs":[{"id":11,"run_id":42,"run_attempt":1,"name":"agent","status":"completed","conclusion":"success"}]}`), nil
+			case strings.HasSuffix(args[3], "/jobs/11/logs"):
+				return []byte(strings.Repeat("x", 33)), nil
+			default:
+				t.Fatalf("Unexpected request: %s", args[3])
+				return nil, errors.New("unexpected request")
+			}
+		},
+	}
+
+	evidence := miner.inspect(doctorAssignmentRunMetadata{ID: 42, Attempt: 1, CreatedAt: now, Status: "completed"}, now.Add(-time.Hour))
+	assert.Equal(t, "unknown", evidence.Outcome)
+	assert.Contains(t, evidence.Message, "truncated")
+	assert.Equal(t, 2, miner.requests)
+}
+
 func TestDoctorTokenPriorityUsesDiscoveredAvailability(t *testing.T) {
 	t.Parallel()
 	missing := &DoctorTokenValidation{Workflow: "a.md", Missing: []string{"OTHER_TOKEN"}}

@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
@@ -22,6 +24,7 @@ const (
 	doctorAssignmentRunLimit     = 5
 	doctorAssignmentRunLookback  = 7 * 24 * time.Hour
 	doctorAssignmentRequestLimit = 40
+	doctorTokenRunLogLimitBytes  = 1 << 20
 )
 
 // DoctorAssignmentRunHistory describes a bounded historical sample, not current token validity.
@@ -47,15 +50,18 @@ type DoctorAssignmentRunEvidence struct {
 }
 
 type doctorAssignmentRunMiner struct {
-	ctx      context.Context
-	repo     string
-	host     string
-	now      time.Time
-	requests int
-	runGH    func(context.Context, string, ...string) ([]byte, error)
-	classify func(string, DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence
-	allJobs  bool
-	limit    int
+	ctx          context.Context
+	repo         string
+	host         string
+	now          time.Time
+	requests     int
+	runGH        func(context.Context, string, ...string) ([]byte, error)
+	runGHLimited func(context.Context, int, ...string) ([]byte, bool, error)
+	classify     func(string, DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence
+	allJobs      bool
+	limit        int
+	maxLogBytes  int
+	logBytes     int
 }
 
 type doctorAssignmentRunMetadata struct {
@@ -83,15 +89,30 @@ func collectDoctorAssignmentRunEvidence(ctx context.Context, repo, host string, 
 }
 
 func (m *doctorAssignmentRunMiner) api(endpoint string, extra ...string) ([]byte, error) {
+	data, _, err := m.apiWithLimit(endpoint, 0, extra...)
+	return data, err
+}
+
+func (m *doctorAssignmentRunMiner) apiWithLimit(endpoint string, maxBytes int, extra ...string) ([]byte, bool, error) {
 	if m.requests >= doctorAssignmentRequestLimit {
-		return nil, errors.New("recent-run inspection reached the 40-request limit")
+		return nil, false, errors.New("recent-run inspection reached the 40-request limit")
 	}
 	if err := m.ctx.Err(); err != nil {
-		return nil, fmt.Errorf("recent-run inspection interrupted: %w", err)
+		return nil, false, fmt.Errorf("recent-run inspection interrupted: %w", err)
 	}
 	m.requests++
 	args := append([]string{"api", "--hostname", strings.TrimPrefix(m.host, "https://"), endpoint}, extra...)
-	return m.runGH(m.ctx, "Checking recent agent assignments...", args...)
+	if maxBytes > 0 && m.runGHLimited != nil {
+		return m.runGHLimited(m.ctx, maxBytes, args...)
+	}
+	data, err := m.runGH(m.ctx, "Checking recent agent assignments...", args...)
+	if err != nil {
+		return nil, false, err
+	}
+	if maxBytes > 0 && len(data) > maxBytes {
+		return data[:maxBytes], true, nil
+	}
+	return data, false, nil
 }
 
 func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmentRunHistory {
@@ -131,6 +152,7 @@ func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmen
 }
 
 func (m *doctorAssignmentRunMiner) inspect(run doctorAssignmentRunMetadata, since time.Time) DoctorAssignmentRunEvidence {
+	m.logBytes = 0
 	evidence := DoctorAssignmentRunEvidence{
 		RunID: run.ID, Attempt: run.Attempt, URL: run.URL,
 		CreatedAt: run.CreatedAt, Conclusion: run.Conclusion, Outcome: "unknown",
@@ -184,9 +206,27 @@ func (m *doctorAssignmentRunMiner) inspectJob(job JobInfo, evidence DoctorAssign
 		evidence.Outcome, evidence.Message = "not_attempted", "The assignment handler job was skipped."
 		return evidence
 	}
-	data, err := m.api(fmt.Sprintf("repos/%s/actions/jobs/%d/logs", m.repo, job.ID), "--allow-escape-sequences")
+	endpoint := fmt.Sprintf("repos/%s/actions/jobs/%d/logs", m.repo, job.ID)
+	var data []byte
+	var truncated bool
+	var err error
+	if m.maxLogBytes > 0 {
+		remaining := m.maxLogBytes - m.logBytes
+		if remaining <= 0 {
+			evidence.Outcome, evidence.Message = "unknown", "The per-run log-inspection byte limit was reached; remaining job logs are unknown."
+			return evidence
+		}
+		data, truncated, err = m.apiWithLimit(endpoint, remaining, "--allow-escape-sequences")
+		m.logBytes += len(data)
+	} else {
+		data, err = m.api(endpoint, "--allow-escape-sequences")
+	}
 	if err != nil {
 		evidence.Message = fmt.Sprintf("Assignment logs are unavailable; outcome is unknown: %v", err)
+		return evidence
+	}
+	if truncated {
+		evidence.Outcome, evidence.Message = "unknown", "Job log inspection was truncated at the per-run byte limit; credential validity is unknown."
 		return evidence
 	}
 	// Logs can contain ANSI sequences, source code, and masked credentials. Never
@@ -195,6 +235,38 @@ func (m *doctorAssignmentRunMiner) inspectJob(job JobInfo, evidence DoctorAssign
 		return m.classify(string(data), evidence)
 	}
 	return classifyDoctorAssignmentLog(string(data), evidence)
+}
+
+func runDoctorGHContextLimited(ctx context.Context, maxBytes int, args ...string) ([]byte, bool, error) {
+	cmd := workflow.ExecGHContext(ctx, args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, false, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return nil, false, err
+	}
+	data, err := io.ReadAll(io.LimitReader(stdout, int64(maxBytes)+1))
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return nil, false, err
+	}
+	if len(data) > maxBytes {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return data[:maxBytes], true, nil
+	}
+	if err := cmd.Wait(); err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message != "" {
+			return nil, false, fmt.Errorf("%w: %s", err, message)
+		}
+		return nil, false, err
+	}
+	return data, false, nil
 }
 
 var doctorAssignmentSuccessPattern = regexp.MustCompile(`^Successfully assigned [A-Za-z0-9_-]+ coding agent to (?:issue|pull request) #[1-9][0-9]*$`)

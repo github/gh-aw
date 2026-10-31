@@ -25,6 +25,7 @@ func TestDoctorTokenASTDiscovery(t *testing.T) {
 		wantErr       bool
 	}{
 		{"custom handler fallbacks", "safe-outputs:\n  add-comment:\n    github-token: ${{ secrets.MAINTENANCE || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", []string{"GH_AW_GITHUB_TOKEN", "MAINTENANCE"}, false},
+		{"head github token", "head-github-token: ${{ secrets.FORK_CREDENTIAL }}", []string{"FORK_CREDENTIAL"}, false},
 		{"env custom token", "env:\n  GH_TOKEN: ${{ secrets['CUSTOM_CREDENTIAL'] }}", []string{"CUSTOM_CREDENTIAL"}, false},
 		{"named token in header", "headers:\n  Authorization: Bearer ${{ secrets.CUSTOM_TOKEN }}", []string{"CUSTOM_TOKEN"}, false},
 		{"case insensitive", "env:\n  GH_TOKEN: ${{ SECRETS['custom_credential'] }}", []string{"CUSTOM_CREDENTIAL"}, false},
@@ -65,12 +66,30 @@ func TestDoctorTokensDiscoverImportedConfiguration(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	file := filepath.Join(root, "main.md")
-	require.NoError(t, os.WriteFile(file, []byte("---\non: workflow_dispatch\nimports:\n  - shared.md\nsafe-outputs:\n  add-comment:\n    github-token: ${{ secrets.LOCAL_TOKEN }}\n---\nPrompt\n"), 0600))
+	require.NoError(t, os.WriteFile(file, []byte("---\non: workflow_dispatch\nimports:\n  - shared.md\n  - copilot-setup-steps.yml\nsafe-outputs:\n  add-comment:\n    github-token: ${{ secrets.LOCAL_TOKEN }}\n---\nPrompt\n"), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "shared.md"), []byte("---\nenv:\n  GH_TOKEN: ${{ secrets.SHARED_CREDENTIAL }}\njobs:\n  prefilter:\n    runs-on: ubuntu-latest\n    environment: staging\n    steps:\n      - run: echo ready\nsafe-outputs:\n  approve-workflow-run:\n    github-token: ${{ secrets.APPROVAL }}\n---\nShared\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "copilot-setup-steps.yml"), []byte("name: Copilot Setup Steps\non: workflow_dispatch\njobs:\n  copilot-setup-steps:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          GH_TOKEN: ${{ secrets.SETUP_TOKEN }}\n        run: echo setup\n"), 0600))
 	names, environments, err := discoverDoctorTokens(file, parser.NewImportCache(root))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"APPROVAL", "LOCAL_TOKEN", "SHARED_CREDENTIAL"}, names)
+	assert.Equal(t, []string{"APPROVAL", "LOCAL_TOKEN", "SETUP_TOKEN", "SHARED_CREDENTIAL"}, names)
 	assert.Equal(t, []string{"staging"}, environments)
+}
+
+func TestDoctorTokenDiscoveryKeepsPartialResults(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	broken := filepath.Join(root, "broken.md")
+	valid := filepath.Join(root, "valid.md")
+	require.NoError(t, os.WriteFile(broken, []byte("---\non: workflow_dispatch\ngithub-token: ${{ secrets.BROKEN + }}\n---\nBroken\n"), 0600))
+	require.NoError(t, os.WriteFile(valid, []byte("---\non: workflow_dispatch\ngithub-token: ${{ secrets.VALID_TOKEN }}\n---\nValid\n"), 0600))
+
+	checks, err := discoverDoctorTokenValidationsFromFiles(root, []string{broken, valid}, parser.NewImportCache(root))
+	require.NoError(t, err)
+	require.Len(t, checks, 2)
+	assert.Equal(t, "broken.md", checks[0].Workflow)
+	assert.Equal(t, "unknown", checks[0].Status)
+	assert.Contains(t, checks[0].Message, "Token discovery is incomplete")
+	assert.Equal(t, []string{"VALID_TOKEN"}, checks[1].Secrets)
 }
 
 func TestDoctorTokensRepositoryRegression(t *testing.T) {
@@ -95,6 +114,11 @@ func TestDoctorTokenLogEvidence(t *testing.T) {
 		{"2026-10-31T16:45:12.5445378Z ##[error]Failed to add comment: Bad credentials - token-not-for-output", "credential_error"},
 		{"##[error]Failed to approve workflow run: Resource not accessible by integration", "credential_error"},
 		{"##[warning]Agent assignment credential validation failed: Bad credentials (HTTP 401)", "credential_error"},
+		{"✗ Message: Bad credentials (HTTP 401)", "credential_error"},
+		{"✗ Retry of message failed: Bad credentials", "credential_error"},
+		{"✗ Failed to submit PR review: Bad credentials", "credential_error"},
+		{"✗ Exception while submitting PR review: HTTP 401", "credential_error"},
+		{"Agent assignment failed for copilot on issue #42 due to Bad credentials", "credential_error"},
 		{`core.error("Failed to add comment: Bad credentials");`, "no_evidence"},
 		{"OTLP export authorization failed: HTTP 401 Unauthorized", "no_evidence"},
 		{"##[error]Failed to add comment: invalid issue number", "no_evidence"},
