@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,8 +96,11 @@ func TestLintCacheModeLiteralsCLI(t *testing.T) {
 					source += "    cache-mode: " + test.mode + "\n"
 				}
 				source += "    steps: [{run: echo data}]\n"
-				file := filepath.Join(actionlintTestDir(t), "cache.yml")
-				require.NoError(t, os.WriteFile(file, []byte(source), 0600))
+				dir := actionlintTestDir(t)
+				// Docker actionlint runs as guest, so its non-sensitive fixture must be readable.
+				require.NoError(t, os.Chmod(dir, constants.DirPermPublic))
+				file := filepath.Join(dir, "cache.yml")
+				require.NoError(t, os.WriteFile(file, []byte(source), constants.FilePermPublic))
 				for _, args := range [][]string{{file}, {"--rules=cache-poisoning", file}} {
 					cmd := NewLintCommand()
 					var output bytes.Buffer

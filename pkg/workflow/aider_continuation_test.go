@@ -89,7 +89,7 @@ class Coder:
                 self.shell_commands = []
             if os.environ["AIDER_TEST_SCENARIO"] == "loop":
                 self.shell_commands = self.shell_commands[:-1] + ["discover"]
-            if os.environ["AIDER_TEST_SCENARIO"] in ("budget", "malformed"):
+            if os.environ["AIDER_TEST_SCENARIO"] in ("budget", "malformed", "extended-budget"):
                 self.shell_commands = ["discover"]
                 if self.num_reflections == self.max_reflections:
                     assert "This is your last available reflection." in context[-1]["content"]
@@ -113,7 +113,7 @@ class Coder:
             if self.num_reflections == 2:
                 self.shell_commands = []
                 self.reflected_message = None
-                if os.environ["AIDER_TEST_SCENARIO"] not in ("loop", "budget", "malformed", "edit-only"):
+                if os.environ["AIDER_TEST_SCENARIO"] not in ("loop", "budget", "malformed", "edit-only", "extended-budget"):
                     return
 
 def run_cmd(command, *args, **kwargs):
@@ -150,21 +150,35 @@ def main():
     assert "first run its repository discovery commands in fenced bash blocks" in messages[0]["content"]
     assert messages[1] == {"role": "assistant", "content": "Ok."}
     coder.run(with_message="perform workflow")
-    assert coder.max_reflections == 3
-    if os.environ["AIDER_TEST_SCENARIO"] in ("loop", "budget", "malformed"):
-        assert coder.num_reflections == 3
+    limit = int(os.environ.get("GH_AW_AIDER_MAX_REFLECTIONS", "3"))
+    assert coder.max_reflections == limit
+    if os.environ["AIDER_TEST_SCENARIO"] in ("loop", "budget", "malformed", "extended-budget"):
+        assert coder.num_reflections == limit
     return 0
 `), 0o600))
 	prompt := filepath.Join(dir, "prompt.md")
 	require.NoError(t, os.WriteFile(prompt, []byte("perform workflow"), 0o600))
-	for _, scenario := range []string{"empty-context", "output", "empty", "failed", "existing", "no-shell", "loop", "budget", "malformed", "edit-only", "exception"} {
+	for _, scenario := range []string{"empty-context", "output", "empty", "failed", "existing", "no-shell", "loop", "budget", "malformed", "edit-only", "exception", "extended-budget", "invalid-budget", "invalid-budget-format"} {
 		t.Run(scenario, func(t *testing.T) {
 			terminal := filepath.Join(t.TempDir(), "terminal")
 			cmd := exec.Command("python3", loadAiderSample(t).Behaviors.Execution.Args...)
 			cmd.Env = append(os.Environ(), "PYTHONPATH="+dir, "GH_AW_PROMPT="+prompt,
 				"AIDER_TEST_SCENARIO="+scenario, "AIDER_TEST_TERMINAL="+terminal)
+			switch scenario {
+			case "extended-budget":
+				cmd.Env = append(cmd.Env, "GH_AW_AIDER_MAX_REFLECTIONS=8")
+			case "invalid-budget":
+				cmd.Env = append(cmd.Env, "GH_AW_AIDER_MAX_REFLECTIONS=9")
+			case "invalid-budget-format":
+				cmd.Env = append(cmd.Env, "GH_AW_AIDER_MAX_REFLECTIONS=invalid")
+			default:
+				cmd.Env = append(cmd.Env, "GH_AW_AIDER_MAX_REFLECTIONS=3")
+			}
 			output, err := cmd.CombinedOutput()
-			if scenario == "exception" {
+			if strings.HasPrefix(scenario, "invalid-budget") {
+				require.Error(t, err, "%s", output)
+				assert.Contains(t, string(output), "GH_AW_AIDER_MAX_REFLECTIONS must be an integer from 1 to 8")
+			} else if scenario == "exception" {
 				require.Error(t, err, "%s", output)
 				assert.Contains(t, string(output), "discovery interrupted")
 			} else {
@@ -172,12 +186,16 @@ def main():
 			}
 			record, readErr := os.ReadFile(terminal)
 			switch scenario {
-			case "no-shell", "loop", "exception":
+			case "no-shell", "loop", "exception", "invalid-budget", "invalid-budget-format":
 				require.ErrorIs(t, readErr, os.ErrNotExist, "must not fabricate a terminal output")
 			case "budget", "malformed":
 				require.NoError(t, readErr, "%s", output)
 				assert.Equal(t, "report_incomplete", string(record))
 				assert.Contains(t, string(output), `"numTurns": 4`)
+			case "extended-budget":
+				require.NoError(t, readErr, "%s", output)
+				assert.Equal(t, "report_incomplete", string(record))
+				assert.Contains(t, string(output), `"numTurns": 9`)
 			case "edit-only":
 				require.NoError(t, readErr, "%s", output)
 				assert.Equal(t, "noop", string(record))

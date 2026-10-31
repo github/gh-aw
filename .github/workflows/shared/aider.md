@@ -59,6 +59,13 @@ engine:
           from aider.coders import base_coder
           from aider.io import InputOutput
 
+          try:
+              max_reflections = int(os.environ.get("GH_AW_AIDER_MAX_REFLECTIONS", "3"))
+          except ValueError as error:
+              raise ValueError("GH_AW_AIDER_MAX_REFLECTIONS must be an integer from 1 to 8") from error
+          if not 1 <= max_reflections <= 8:
+              raise ValueError("GH_AW_AIDER_MAX_REFLECTIONS must be an integer from 1 to 8")
+
           session_id = str(uuid4())
           started_at = time.monotonic()
           turns = 0
@@ -218,6 +225,7 @@ engine:
           original_get_chat_files_messages = base_coder.Coder.get_chat_files_messages
 
           def workflow_get_chat_files_messages(coder):
+              coder.max_reflections = max_reflections
               messages = original_get_chat_files_messages(coder)
               for message in messages:
                   if message["role"] == "user" and message["content"] == coder.gpt_prompts.files_no_full_files:
@@ -229,7 +237,7 @@ engine:
                           "Do not stop or ask the user to supply files merely because the initial file list is empty. "
                           "Emit the appropriate safeoutputs command only after evaluating the actual task results."
                       )
-              if getattr(coder, "num_reflections", 0) == getattr(coder, "max_reflections", 3):
+              if getattr(coder, "num_reflections", 0) == coder.max_reflections:
                   messages.append({
                       "role": "user",
                       "content": (
@@ -530,6 +538,8 @@ After shell commands, a bounded reflection loop lets you consume their results a
 Shell suggestions are scoped to each response: an edit-only reply never reruns a prior command.
 After applied edits, continue with verification and reporting even if no shell command was suggested.
 Plan discovery, edits, verification, and the terminal safe output within that limit:
+The default is three reflections. Workflows requiring separate validation phases can
+set `env.GH_AW_AIDER_MAX_REFLECTIONS` to an integer from 1 to 8; invalid values fail startup.
 
 - **Edit files with *SEARCH/REPLACE* blocks.** Aider applies them for you, including for new
   files (empty `SEARCH` section). Put the repository-relative filename on its own line
@@ -592,7 +602,8 @@ model to the workflow's discovery commands. Existing editable-file content and
 repository-map messages are unchanged. This removes an interactive file-supply
 assumption, not the requirement to inspect results before editing or emitting
 a safe output; it cannot guarantee model compliance.
-The existing three-reflection limit is unchanged; exhausting it without a
+The default three-reflection limit is unchanged unless the workflow explicitly
+sets `GH_AW_AIDER_MAX_REFLECTIONS` (1 to 8). Exhausting the configured limit without a
 terminal safe output remains an incomplete task. Only the safe-output gateway,
 not shell text or the entrypoint, establishes that a terminal output was recorded.
 The entrypoint emits canonical session events for exact provider reply text,

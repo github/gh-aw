@@ -45,7 +45,7 @@ steps:
         --output "$tools/tla2tools.jar" \
         'https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar'
       printf '%s  %s\n' \
-        d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f \
+        011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd \
         "$tools/tla2tools.jar" | sha256sum --check --strict
       "$tools/jre/bin/java" -version
       go build -o "$tools/verify-lock" ./cmd/gh-aw-security-model
