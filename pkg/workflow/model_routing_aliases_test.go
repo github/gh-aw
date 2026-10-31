@@ -346,7 +346,7 @@ func TestRoutingAllowedModelsPrefixedIdStaysExact(t *testing.T) {
 	// The bare names are aliases but not bundled model ids, so only the prefix keeps them exact.
 	for _, tc := range []struct{ prefix, name string }{{"github-copilot/", "gpt-5"}, {"copilot/", "gpt-5.6"}} {
 		require.Contains(t, BuiltinModelAliases(), tc.name)
-		require.False(t, isBundledCopilotModelID(tc.name))
+		require.False(t, isBundledProviderModelID(copilotRoutingNamespace, tc.name))
 		compiled := compileRoutedAliasWorkflow(t, "copilot", "", "["+tc.prefix+tc.name+"]", "")
 		require.Equal(t, []string{"github-copilot/" + tc.name}, compiled.candidates(t), tc.prefix+tc.name)
 	}
@@ -357,7 +357,7 @@ func TestRoutingAllowedModelsKnownCopilotIdStaysExact(t *testing.T) {
 	// resolveConfiguredModel, the model id wins.
 	for _, model := range []string{"gpt-5.4", "gpt-5-mini", "gemini-3.8-flash"} {
 		require.Contains(t, BuiltinModelAliases(), model)
-		require.True(t, isBundledCopilotModelID(model))
+		require.True(t, isBundledProviderModelID(copilotRoutingNamespace, model))
 		compiled := compileRoutedAliasWorkflow(t, "copilot", "", "["+model+"]", "")
 		require.Equal(t, []string{"github-copilot/" + model}, compiled.candidates(t), model)
 	}
@@ -369,7 +369,7 @@ func TestRoutingAllowedModelsKnownCopilotIdStaysExact(t *testing.T) {
 func TestRoutingAllowedModelsAliasNamedLikeIdFollowsEngineModelRule(t *testing.T) {
 	aliases := BuiltinModelAliases()
 	var catalog []string
-	for id := range bundledCopilotModelIDs() {
+	for id := range bundledProviderModelIDs()[copilotRoutingNamespace] {
 		catalog = append(catalog, "github-copilot/"+id)
 	}
 	names := []string{"gemini-3.8-flash", "gpt-5-mini", "gpt-5.5", "gpt-5", "gpt-5-codex", "gpt-6"}
