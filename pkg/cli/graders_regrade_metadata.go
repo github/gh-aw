@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -100,7 +101,7 @@ func regradeValidateRecordedIdentity(expected WorkflowRun, raw json.RawMessage) 
 	if err != nil {
 		return err
 	}
-	if int64(int(attempt)) != attempt {
+	if attempt < math.MinInt || attempt > math.MaxInt {
 		return errors.New("recorded run attempt is outside the supported range")
 	}
 	repository, err := regradeIdentityString(metadata, "repository", "repo")
