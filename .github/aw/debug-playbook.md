@@ -59,7 +59,7 @@ Inventory: [Model availability](#model-availability).
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
+| `inference_access_error`, `inference_access_denied`, `authentication_failed`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Native status, auth/config/policy, proxy guards. | Fix access/config; don't rotate credentials for budget/policy denial. |
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't establish availability. |
 | `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone doesn't prove model removal. |
