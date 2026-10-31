@@ -27,6 +27,67 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("decision gate logging", () => {
+  it("logs request dispatch before fetching, usage, budget, and short-circuit completion", async () => {
+    const deps = dependencies(["Private qualification question", "Private second question"]);
+    const log = vi.fn();
+    deps.fetchImpl.mockImplementation(async () => {
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("question=1; dispatching request; request_bytes="));
+      return reply("skip", "Private model explanation", { prompt_tokens: 33, completion_tokens: 2, total_tokens: 35 });
+    });
+    await evaluateDecision({ ...deps, log });
+    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("question_count=2; max_ai_credits=1000"));
+    expect(log).toHaveBeenCalledWith("Decision gate: provider=openai; resolved_model=openai/gpt-5-mini; transport=chat.");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("cause=model_skip; request_sent=true; duration_ms="));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("input_tokens=33; output_tokens=2."));
+    expect(log).toHaveBeenLastCalledWith(expect.stringContaining("unevaluated_causes=short_circuit"));
+    expect(log).toHaveBeenLastCalledWith(expect.stringContaining("remaining_ai_credits=999"));
+    const messages = JSON.stringify(log.mock.calls);
+    for (const value of ["Private qualification question", "Private second question", "Private model explanation", selection.token, selection.base, eventFixtures[0].context.payload.issue.body]) expect(messages).not.toContain(value);
+  });
+
+  it("logs stable provider-error causes without exception text or credentials", async () => {
+    const deps = dependencies();
+    const log = vi.fn();
+    deps.fetchImpl.mockRejectedValue(new Error(`Private provider failure: ${selection.token}`));
+    const audit = await evaluateDecision({ ...deps, log });
+    expect(audit.questions[0].cause).toBe("provider_error");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("status=fail_open; cause=provider_error; request_sent=true"));
+    expect(log).toHaveBeenLastCalledWith(expect.stringContaining("remaining_ai_credits=999"));
+    for (const value of ["Private provider failure", selection.token]) expect(JSON.stringify(log.mock.calls)).not.toContain(value);
+  });
+
+  it("distinguishes pre-dispatch rejection from a failed provider call", async () => {
+    const deps = dependencies();
+    const log = vi.fn();
+    deps.resolveModel.mockResolvedValue({ ...selection, provider: "test", model: "unpriced" });
+    await evaluateDecision({ ...deps, log });
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("cause=pricing_unavailable; request_sent=false"));
+    expect(log).not.toHaveBeenCalledWith(expect.stringContaining("dispatching request"));
+  });
+
+  it("logs missing budgets without dispatching or swallowing the error", async () => {
+    const deps = dependencies();
+    const log = vi.fn();
+    delete deps.env.GH_AW_MAX_AI_CREDITS;
+    await expect(evaluateDecision({ ...deps, log })).rejects.toThrow("ERR_DECISION");
+    expect(log).toHaveBeenLastCalledWith("Decision gate: invalid or missing resolved AI-credit budget; inference blocked.");
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("logs model-resolution failures without leaking the exception", async () => {
+    const deps = dependencies();
+    const log = vi.fn();
+    deps.resolveModel.mockRejectedValue(new Error("Private registry error"));
+    await evaluateDecision({ ...deps, log });
+    expect(log).toHaveBeenCalledWith("Decision gate: model resolution failed; cause=model_unavailable; no provider request.");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("Private registry error");
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
 describe("decision gate bounds and sequencing", () => {
   it("requires a resolved credit budget before an eligible inference call", async () => {
     const deps = dependencies();
@@ -806,6 +867,8 @@ describe("registry resolution and transport", () => {
       expect(core.setOutput).toHaveBeenCalledWith("decision_result", decision);
       expect(core.setOutput).toHaveBeenCalledWith("activation_allowed", decision === "run" ? "true" : "false");
       expect(core.setOutput).toHaveBeenCalledWith("decision_status", "evaluated");
+      expect(core.info).toHaveBeenCalledWith("Decision gate: starting bounded REST inference.");
+      expect(core.info).toHaveBeenCalledWith(expect.stringContaining("question=1; dispatching request"));
       const audit = JSON.parse(fs.readFileSync(path.join(auditDirectory, "audit.json"), "utf8"));
       expect(audit).toMatchObject({ decision, status: "evaluated" });
       expect(audit.questions[0]).not.toHaveProperty("reason");

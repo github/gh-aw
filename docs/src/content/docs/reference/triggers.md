@@ -181,6 +181,8 @@ Decision inference shares the resolved `max-ai-credits` budget with the main age
 
 The job summary records the aggregate outcome. The `decision-gate` artifact also records the resolved model/provider and per-question results, durations, machine-readable causes, and token usage when available. It distinguishes fail-open outcomes and questions not evaluated after a skip. The existing `activation` artifact set includes this receipt for `gh aw logs` and `gh aw audit`; the audit JSON exposes it as `decision_gate`, including runs where the agent never starts. Prompts, raw event payloads, and free-form model reasons are not retained.
 
+Step logs report model resolution, request dispatch and byte counts, per-question outcomes and stable failure causes, durations, reported token usage, and reserved and remaining AI credits. Logs never include prompts, event content, credentials, provider endpoints, raw errors, or free-form model explanations.
+
 For example, comment workflows can ask whether a comment requests a concrete code change rather than conversation; discussion workflows can ask whether maintainer intervention is needed. Distinguish documentation requests from implementation requests, and require work to be sufficiently specified and suitable for automated execution.
 
 The runtime tests use mocked responses and paired event fixtures for these qualification scenarios. An optional live-model quality suite runs separately from deterministic CI correctness checks. From the repository's `actions/setup/js` directory, with existing provider credentials configured, run:

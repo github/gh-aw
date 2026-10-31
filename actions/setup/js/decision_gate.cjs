@@ -424,8 +424,8 @@ function responseUsage(response, type) {
   return { input_tokens: input, output_tokens: output, total_tokens: total };
 }
 
-/** @template {DecisionAudit} T @param {T} audit @param {string} unevaluatedReason @returns {T} */
-function finishAudit(audit, unevaluatedReason) {
+/** @template {DecisionAudit} T @param {T} audit @param {string} unevaluatedReason @param {(message: string) => void} [log] @returns {T} */
+function finishAudit(audit, unevaluatedReason, log = _message => {}) {
   audit.activation_allowed = audit.deterministic_eligible && audit.decision !== "skip" && audit.remaining_ai_credits > 0;
   audit.evaluated_count = audit.questions.filter(question => question.evaluated).length;
   audit.unevaluated_count = audit.question_count - audit.evaluated_count;
@@ -442,6 +442,9 @@ function finishAudit(audit, unevaluatedReason) {
     });
   }
   audit.usage_complete = audit.evaluated_count > 0 && knownUsage.length === audit.evaluated_count;
+  log(
+    `Decision gate: ${audit.decision} (${audit.status}); ${audit.evaluated_count} question(s) evaluated, ${audit.unevaluated_count} unevaluated; activation_allowed=${audit.activation_allowed}; reserved_ai_credits=${audit.reserved_ai_credits}; remaining_ai_credits=${audit.remaining_ai_credits}; duration_ms=${audit.duration_ms}; unevaluated_causes=${audit.unevaluated_questions.map(question => question.reason).join(",") || "none"}.`
+  );
   return audit;
 }
 
@@ -449,9 +452,16 @@ function finishAudit(audit, unevaluatedReason) {
  * Dependencies are injectable only in-process for tests; workflow input cannot
  * enable tools, retries, or change the fixed runtime limits.
  */
-async function evaluateDecision({ env = process.env, context, fetchImpl = globalThis.fetch, resolveModel = resolveDecisionModel, now = Date.now }) {
+async function evaluateDecision({ env = process.env, context, fetchImpl = globalThis.fetch, resolveModel = resolveDecisionModel, now = Date.now, log = _message => {} }) {
   const started = now();
-  const budget = env.GH_AW_DECISION_ELIGIBLE === "false" ? 0 : resolveDecisionBudget(env);
+  log("Decision gate: starting bounded REST inference.");
+  let budget;
+  try {
+    budget = env.GH_AW_DECISION_ELIGIBLE === "false" ? 0 : resolveDecisionBudget(env);
+  } catch (error) {
+    log("Decision gate: invalid or missing resolved AI-credit budget; inference blocked.");
+    throw error;
+  }
   const credentials = [...providerConfigurations(env).map(config => config.token), env.GITHUB_TOKEN];
   const count = /^[1-8]$/.test(env.GH_AW_DECISION_QUESTION_COUNT || "") ? Number(env.GH_AW_DECISION_QUESTION_COUNT) : 0;
   /** @type {DecisionQuestion[]} */
@@ -479,24 +489,31 @@ async function evaluateDecision({ env = process.env, context, fetchImpl = global
     reserved_ai_credits: 0,
     remaining_ai_credits: budget,
   };
-  if (env.GH_AW_DECISION_ELIGIBLE === "false") return finishAudit({ ...audit, decision: "skip", status: "ineligible" }, "deterministic_ineligible");
-  if (env.GH_AW_DECISION_ELIGIBLE !== "true") return finishAudit({ ...audit, status: "fail_open", fail_open: true, cause: "invalid_eligibility" }, "invalid_eligibility");
+  log(
+    `Decision gate: deterministic_eligible=${audit.deterministic_eligible}; question_count=${count}; max_ai_credits=${budget}; prompt_byte_limit=${LIMITS.promptBytes}; request_byte_limit=${LIMITS.requestBytes}; generative_output_token_limit=${LIMITS.outputTokens}.`
+  );
+  if (env.GH_AW_DECISION_ELIGIBLE === "false") return finishAudit({ ...audit, decision: "skip", status: "ineligible" }, "deterministic_ineligible", log);
+  if (env.GH_AW_DECISION_ELIGIBLE !== "true") return finishAudit({ ...audit, status: "fail_open", fail_open: true, cause: "invalid_eligibility" }, "invalid_eligibility", log);
   let questions;
   try {
     questions = readQuestions(env);
   } catch {
-    return finishAudit({ ...audit, status: "fail_open", fail_open: true, cause: "invalid_configuration" }, "invalid_configuration");
+    return finishAudit({ ...audit, status: "fail_open", fail_open: true, cause: "invalid_configuration" }, "invalid_configuration", log);
   }
   let selection;
   if (questions.some(validQuestion)) {
     try {
+      log("Decision gate: resolving configured model.");
       selection = await withinBudget(() => resolveModel(env), Math.min(LIMITS.callMs, LIMITS.totalMs - (now() - started)));
     } catch (error) {
-      return finishAudit({ ...audit, status: "fail_open", fail_open: true, cause: error instanceof DecisionError ? error.code : "model_unavailable", duration_ms: Math.max(0, now() - started) }, "model_unavailable");
+      const cause = error instanceof DecisionError ? error.code : "model_unavailable";
+      log(`Decision gate: model resolution failed; cause=${cause}; no provider request.`);
+      return finishAudit({ ...audit, status: "fail_open", fail_open: true, cause, duration_ms: Math.max(0, now() - started) }, "model_unavailable", log);
     }
     credentials.push(selection.token);
     audit.resolved_model = safeModelName(`${selection.provider}/${selection.model}`, credentials);
     audit.provider = safeModelName(selection.provider, credentials);
+    log(`Decision gate: provider=${audit.provider}; resolved_model=${audit.resolved_model}; transport=${safeModelName(selection.type, credentials)}.`);
   }
   for (const [index, question] of questions.entries()) {
     const questionStarted = now();
@@ -532,6 +549,7 @@ async function evaluateDecision({ env = process.env, context, fetchImpl = global
           result.evaluated = true;
           audit.reserved_ai_credits += reservation;
           audit.remaining_ai_credits = Math.max(0, budget - Math.ceil(audit.reserved_ai_credits));
+          log(`Decision gate: question=${index + 1}; dispatching request; request_bytes=${requestBytes}; reserved_ai_credits=${audit.reserved_ai_credits}; remaining_ai_credits=${audit.remaining_ai_credits}.`);
           const response = await fetchImpl(request.url, { method: "POST", headers: request.headers, body, signal, redirect: "error" });
           const envelope = await readJson(response, LIMITS.responseBytes);
           return { classification: parseDecision(envelope, selection.type), usage: responseUsage(envelope, selection.type) };
@@ -551,23 +569,25 @@ async function evaluateDecision({ env = process.env, context, fetchImpl = global
     }
     result.duration_ms = Math.max(0, now() - questionStarted);
     audit.questions.push(result);
+    log(
+      `Decision gate: question=${index + 1}; decision=${result.decision}; status=${result.status}; cause=${result.cause}; request_sent=${result.evaluated}; duration_ms=${result.duration_ms}; input_tokens=${result.usage?.input_tokens ?? "unknown"}; output_tokens=${result.usage?.output_tokens ?? "unknown"}.`
+    );
     if (result.decision === "skip") {
       audit.decision = "skip";
       break;
     }
   }
   audit.duration_ms = Math.max(0, now() - started);
-  return finishAudit(audit, audit.decision === "skip" ? "short_circuit" : "budget_exhausted");
+  return finishAudit(audit, audit.decision === "skip" ? "short_circuit" : "budget_exhausted", log);
 }
 
 async function main({ core = global.core, context = global.context, env = process.env, fetchImpl = globalThis.fetch, resolveModel = resolveDecisionModel, now = Date.now } = {}) {
-  const audit = await evaluateDecision({ env, context, fetchImpl, resolveModel, now });
+  const audit = await evaluateDecision({ env, context, fetchImpl, resolveModel, now, log: message => core.info(message) });
   core.setOutput("decision", audit.decision);
   core.setOutput("decision_result", audit.decision);
   core.setOutput("activation_allowed", audit.activation_allowed ? "true" : "false");
   core.setOutput("decision_status", audit.status);
   core.setOutput("remaining-ai-credits", String(audit.remaining_ai_credits));
-  core.info(`Decision gate: ${audit.decision} (${audit.status}); ${audit.evaluated_count} question(s) evaluated, ${audit.unevaluated_count} unevaluated.`);
   const auditPath = env.GH_AW_DECISION_AUDIT_PATH;
   if (auditPath) {
     try {
