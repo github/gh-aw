@@ -8,8 +8,11 @@ permissions:
   copilot-requests: write
   contents: read
   issues: read
-engine: pi
-model: copilot/gpt-6-astra
+engine:
+  id: pi
+  model-routing:
+    goal: cost
+    mode: balanced
 network: defaults
 strict: true
 tracker-id: weekly-network-domains-audit
