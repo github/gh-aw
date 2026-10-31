@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 test("explains the security boundaries in an ordered flow", async ({ page }) => {
   const section = page.locator("main #security-model");
   const order = await page.locator("main [data-slideshow-slides] > section").evaluateAll(sections => sections.map(section => section.id).filter(id => ["safety", "security-model", "safety-layers"].includes(id)));
-  expect(order).toEqual(["safety", "security-model", "safety-layers"]);
+  expect(order).toEqual(["safety", "safety-layers", "security-model"]);
   await expect(section.getByRole("heading", { level: 3 })).toHaveText(["Trigger", "Agent", "Safe outputs"]);
   await expect(section.locator(".graph-node")).toHaveText(["Issues", "Pull requests", "Pushes", "Actions"]);
   const jira = section.getByRole("link", { name: /Jira/ });
