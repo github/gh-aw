@@ -5,7 +5,9 @@ sidebar:
   order: 750
 ---
 
-The `gh aw compile --dependabot` command scans workflows for runtime tools (`npx`, `pip install`, `go install`), generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`), and configures Dependabot to monitor for updates
+The `gh aw compile --dependabot` command scans workflows for runtime tools (`npx`, `pip install`, `go install`) and agentic engine packages, generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`), and configures Dependabot to monitor for updates and security alerts.
+
+Engine entries use the effective installed version: `engine.version` when set, otherwise the compiler default. Copilot CLI releases are tracked through `@github/copilot`; Copilot SDK packages use their independently pinned SDK version. Declarative engines can declare npm, pip, or Go installation metadata. Non-package engines and dynamic GitHub Actions version expressions are not represented as engine package dependencies.
 
 ## Usage
 
@@ -49,6 +51,8 @@ All ecosystems update `.github/dependabot.yml` with weekly update schedules. Exi
 > **Never merge Dependabot PRs that only modify manifest files.** These changes are overwritten on next compilation.
 
 **Correct workflow**: Update source `.md` files, then recompile to regenerate manifests.
+
+For engine alerts, update `engine.version` in affected workflows, or upgrade gh-aw to obtain newer engine defaults, then run `gh aw compile --dependabot`. SDK defaults are updated through gh-aw, not `engine.version`.
 
 ```bash
 # Find affected workflows
