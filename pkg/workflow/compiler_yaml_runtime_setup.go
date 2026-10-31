@@ -295,18 +295,19 @@ func (c *Compiler) generateActivationArtifactAndCommentMemorySteps(yaml *strings
 	// before the base-branch restore in generateEngineInstallAndPreAgentSteps.
 	compilerYamlLog.Print("Adding activation artifact download step")
 	activationArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String()
+	downloadStepID := "download-activation-artifact"
 	download := ArtifactDownloadConfig{
 		ArtifactName: activationArtifactName,
 		DownloadPath: constants.TmpGhAwDir,
 		StepName:     "Download activation artifact",
-		StepID:       "download-activation-artifact",
+		StepID:       downloadStepID,
 	}
 	yaml.WriteString(strings.Join(buildArtifactDownloadSteps(download, c.getActionPin), ""))
 	// A fresh action invocation refreshes the blob URL after internal retries are exhausted.
 	continueOnError := false
 	download.StepName = "Retry activation artifact download"
 	download.StepID = ""
-	download.IfCondition = "${{ !cancelled() && steps.download-activation-artifact.outcome == 'failure' }}"
+	download.IfCondition = fmt.Sprintf("${{ !cancelled() && steps.%s.outcome == 'failure' }}", downloadStepID)
 	download.ContinueOnError = &continueOnError
 	yaml.WriteString(strings.Join(buildArtifactDownloadSteps(download, c.getActionPin), ""))
 	generateRestoreAmbientFoldersStep(yaml, data)
