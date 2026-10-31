@@ -199,6 +199,9 @@ const (
 
 	// GeminiLLMGatewayPort is the port for the Gemini LLM gateway
 	GeminiLLMGatewayPort = 10003
+
+	// VertexLLMGatewayPort is the port for AWF's Vertex AI adapter.
+	VertexLLMGatewayPort = 10004
 )
 
 // AWFNoProxyHosts is the value for the NO_PROXY and no_proxy environment variables
@@ -221,6 +224,14 @@ const AWFNoProxyHosts = "localhost,127.0.0.1," +
 	AWFAPIProxyContainerIP + ":10001," +
 	AWFAPIProxyContainerIP + ":10002," +
 	AWFAPIProxyContainerIP + ":10003"
+
+// AWFVertexNoProxyHosts adds the Vertex adapter endpoint without changing
+// proxy bypass configuration for workflows that do not use Vertex.
+const AWFVertexNoProxyHosts = AWFNoProxyHosts + "," +
+	"host.docker.internal:10004," +
+	AWFAPIProxyHostname + "," +
+	AWFAPIProxyHostname + ":10004," +
+	AWFAPIProxyContainerIP + ":10004"
 
 // DefaultGitHubLockdown is the default value for the GitHub MCP server lockdown setting.
 // Lockdown mode restricts the GitHub MCP server to the triggering repository only.
