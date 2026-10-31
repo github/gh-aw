@@ -138,6 +138,7 @@ describe("decision gate bounds and sequencing", () => {
   });
 
   it.each([
+    ["decisions", { answers: [{ type: "choice", name: "decision", choice: "run" }], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } }],
     ["responses", { status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: '{"decision":"run","reason":"Relevant."}' }] }], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } }],
     ["anthropic", { stop_reason: "end_turn", content: [{ type: "text", text: '{"decision":"run","reason":"Relevant."}' }], usage: { input_tokens: 10, output_tokens: 2 } }],
     ["gemini", { candidates: [{ finishReason: "STOP", content: { parts: [{ text: '{"decision":"run","reason":"Relevant."}' }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 2, totalTokenCount: 12 } }],
@@ -420,6 +421,24 @@ describe("registry resolution and transport", () => {
     expect(resolved.model).toBe("gpt-5-mini");
   });
 
+  it("selects the OpenAI Decisions driver only for OpenAI gpt-6-luna", async () => {
+    const openai = await resolveDecisionModel({ OPENAI_API_KEY: "transport-only", GH_AW_DECISION_MODEL: "openai/gpt-6-luna" });
+    const copilot = await resolveDecisionModel({ COPILOT_GITHUB_TOKEN: "transport-only", GH_AW_DECISION_MODEL: "copilot/gpt-6-luna" });
+    expect(openai).toMatchObject({ provider: "openai", model: "gpt-6-luna", type: "decisions" });
+    expect(copilot).toMatchObject({ provider: "copilot", model: "gpt-6-luna", type: "responses" });
+  });
+
+  it("uses the Decisions API end to end for OpenAI Luna", async () => {
+    const deps = dependencies();
+    deps.env = { ...deps.env, OPENAI_API_KEY: "luna-fixture-key", GH_AW_DECISION_MODEL: "openai/gpt-6-luna" };
+    deps.resolveModel = resolveDecisionModel;
+    deps.fetchImpl.mockResolvedValue(new Response(JSON.stringify({ answers: [{ type: "choice", name: "decision", choice: "skip" }], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } })));
+    const audit = await evaluateDecision(deps);
+    expect(audit).toMatchObject({ decision: "skip", provider: "openai", resolved_model: "openai/gpt-6-luna", usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } });
+    expect(deps.fetchImpl.mock.calls[0][0]).toBe("https://api.openai.com/v1/decisions");
+    expect(JSON.parse(deps.fetchImpl.mock.calls[0][1].body).model).toBe("gpt-6-luna");
+  });
+
   it("routes Codex-qualified models through OpenAI credentials", async () => {
     const resolved = await resolveDecisionModel({ OPENAI_API_KEY: "openai-fixture-key", GH_AW_DECISION_MODEL: "codex/gpt-5.4-mini" });
     expect(resolved).toMatchObject({ provider: "openai", model: "gpt-5.4-mini", token: "openai-fixture-key" });
@@ -508,6 +527,28 @@ describe("registry resolution and transport", () => {
     expect(request.headers).not.toHaveProperty("x-api-key");
   });
 
+  it("builds the typed OpenAI Decisions request for Luna", () => {
+    const request = inferenceRequest({ ...selection, model: "gpt-6-luna", type: "decisions" }, { system: "trusted", user: '{"question":"Run?","event_evidence":{}}' });
+    expect(request.url).toBe("https://api.openai.com/v1/decisions");
+    expect(request.headers.Authorization).toBe(["Bearer", selection.token].join(" "));
+    expect(request.body).toEqual({
+      model: "gpt-6-luna",
+      input: '{"question":"Run?","event_evidence":{}}',
+      questions: [
+        {
+          type: "choice",
+          name: "decision",
+          instructions: expect.any(String),
+          choices: [
+            { value: "run", description: "The workflow should run." },
+            { value: "skip", description: "The workflow should be skipped." },
+          ],
+        },
+      ],
+    });
+    expect(request.body.questions[0].instructions).not.toContain("JSON");
+  });
+
   it("uses compiler-normalized provider API keys and custom base URLs", async () => {
     const resolved = await resolveDecisionModel({ OPENAI_API_KEY: "custom-provider-key", OPENAI_BASE_URL: "https://inference.example/v1", GH_AW_DECISION_MODEL: "openai/gpt-5-mini" });
     const request = inferenceRequest(resolved, { system: "trusted", user: "event" });
@@ -559,6 +600,27 @@ describe("registry resolution and transport", () => {
     expect(parseDecision(response, "responses")).toEqual({ decision: "skip", reason: "Not relevant." });
     expect(() => parseDecision({ ...response, output: [...response.output, { type: "function_call" }] }, "responses")).toThrow();
     expect(() => parseDecision({ ...response, status: "incomplete" }, "responses")).toThrow();
+  });
+
+  it("accepts only a single typed Decisions API answer", () => {
+    expect(parseDecision({ answers: [{ type: "choice", name: "decision", choice: "skip" }] }, "decisions")).toEqual({
+      decision: "skip",
+      reason: "Decision API selected skip.",
+    });
+    for (const response of [
+      { answers: [] },
+      { answers: [{ type: "predicate", name: "decision", probability: 1 }] },
+      { answers: [{ type: "choice", name: "other", choice: "skip" }] },
+      { answers: [{ type: "choice", name: "decision", choice: "maybe" }] },
+      {
+        answers: [
+          { type: "choice", name: "decision", choice: "skip" },
+          { type: "choice", name: "decision", choice: "run" },
+        ],
+      },
+    ]) {
+      expect(() => parseDecision(response, "decisions")).toThrow();
+    }
   });
 
   it.each(["run", "skip"])("supports no-argument github-script main with canonical decision output for %s and sanitized audit and summary", async decision => {
