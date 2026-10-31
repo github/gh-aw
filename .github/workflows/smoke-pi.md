@@ -99,14 +99,16 @@ post-steps:
 
 ## Test Requirements
 
-Execute the following tests sequentially in a single turn:
+Execute the following tests sequentially. Wait for each tool result and verify its
+success before starting the next test; use additional turns as needed. Never submit
+file creation, its readback, and Codemode verification as parallel tool calls.
 
 1. **GitHub CLI Testing**: Use `gh` CLI commands to fetch details of exactly 2 merged pull requests from ${{ github.repository }} (title and number only)
 2. **Web Fetch Testing**: Use the web-fetch MCP tool to fetch https://github.com and verify the response contains "GitHub" (do NOT use bash or playwright for this test - use the web-fetch MCP tool directly)
 3. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-pi-${{ github.run_id }}.txt` with content "Smoke test passed for Pi at $(date)" (create the directory if it doesn't exist)
 4. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 5. **Build gh-aw**: Run `GOCACHE=/tmp/gh-aw/agent/go-cache GOMODCACHE=/tmp/gh-aw/agent/go-mod make build` to verify the agent can successfully build the gh-aw project. If the command fails, mark this test as ❌ and report the failure.
-6. **Codemode Testing**: Use the native `codemode` tool to read the test file and run `echo pi-codemode-ok` in parallel, returning only the file contents and command output. Verify both results.
+6. **Codemode Testing**: Only after the file creation and readback succeed, use the native `codemode` tool's provided tool-call API to invoke the registered Bash tool for `cat /tmp/gh-aw/agent/smoke-test-pi-${{ github.run_id }}.txt` and `echo pi-codemode-ok` in parallel. Await both calls and return only their actual file contents and command output. Verify both results. Codemode is not Node.js: do not use `require`, import filesystem modules, or fabricate the echo result as a constant.
 
 ## Output
 

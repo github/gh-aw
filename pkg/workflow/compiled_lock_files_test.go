@@ -15,6 +15,67 @@ import (
 // workflowsDir is the path to the .github/workflows directory relative to this test file.
 const workflowsDir = "../../.github/workflows"
 
+func TestSmokeAndCoverageFailureContracts(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		required []string
+		rejected []string
+	}{
+		{
+			name: "purelock",
+			required: []string{
+				`> "$GITHUB_WORKSPACE/coverage/purelock-cobertura.xml"`,
+				`file: "coverage/purelock-cobertura.xml"`,
+				"If generation or upload fails, call `report_incomplete`",
+			},
+			rejected: []string{
+				`file: "/tmp/gh-aw/purelock/cobertura.xml"`,
+				`> "$RUNNER_TEMP/gh-aw/safeoutputs/upload-code-coverage/`,
+			},
+		},
+		{
+			name: "smoke-pi",
+			required: []string{
+				"Wait for each tool result",
+				"Only after the file creation and readback succeed",
+				"provided tool-call API",
+				"do not use `require`",
+				"return only their actual file contents and command output",
+			},
+			rejected: []string{"sequentially in a single turn"},
+		},
+		{
+			name: "smoke-pydantic",
+			required: []string{
+				"run: mkdir -p generated_reports",
+				"generated_reports/smoke-pydantic-${{ github.run_id }}.txt",
+				"Wait for success, then use `read_file`",
+				"mark this test as failed and report the concrete error",
+			},
+		},
+		{
+			name: "daily-workflow-security-model",
+			required: []string{
+				"https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
+				"011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
+				`"$tools/tla2tools.jar" | sha256sum --check --strict`,
+			},
+			rejected: []string{"d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join(workflowsDir, test.name+".md"))
+			require.NoError(t, err)
+			for _, required := range test.required {
+				assert.Contains(t, string(content), required)
+			}
+			for _, rejected := range test.rejected {
+				assert.NotContains(t, string(content), rejected)
+			}
+		})
+	}
+}
+
 // lockFileOutputMapping describes what outputs a compiled lock file must expose, derived from
 // the SafeOutputsConfig parsed from the source .md file.
 type lockFileOutputMapping struct {

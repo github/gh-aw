@@ -14,6 +14,8 @@ sandbox:
   agent:
     id: awf
 tracker-id: daily-code-debt-aider
+env:
+  GH_AW_AIDER_MAX_REFLECTIONS: "8"
 engine:
   id: aider
 model: copilot/auto
@@ -65,12 +67,19 @@ From the output, identify at most **3 comments** that are:
 Skip any comment that references an issue number (`#\d+`) or requires discussion.
 Only actual source comments are candidates, not identifiers, string literals, generated
 workflow templates, or test fixtures. Do not rename a symbol just because its name contains TODO.
+Never assume discovery found a candidate. If the command returns no eligible comments,
+call `safeoutputs noop` and stop without edits. Do not invent `example.go`, sample code,
+or a hypothetical TODO to demonstrate a cleanup.
 
 ## Step 2 — Resolve selected comments
 
 For each selected comment:
 1. Read the surrounding function in a fenced `bash` command and consume its output
    before proposing an edit. SEARCH must match the exact source, not a grep excerpt.
+   Use only an existing tracked file returned by discovery. Verify it with
+   `git ls-files --error-unmatch` before reading it; do not create, rename, or delete files.
+   Do not use an empty SEARCH block or edit a file whose contents have not been returned
+   by a successful read in this session.
 2. Apply a minimal, correct fix with a *SEARCH/REPLACE* block.
 3. Remove or update the TODO/FIXME marker after the fix.
 
@@ -79,11 +88,27 @@ For each selected comment:
 If any code was changed, run these commands (one per line):
 
 ```bash
-make fmt-go && go build ./... && git checkout -b code-debt-$GITHUB_RUN_ID && git add -A && git commit -m "Resolve actionable TODO/FIXME comments" && safeoutputs create_pull_request --title "Resolve actionable TODO/FIXME comments" --body "Automated cleanup of self-contained TODO and FIXME comments." --branch "code-debt-$GITHUB_RUN_ID" || safeoutputs report_incomplete --reason "Could not format, build, commit, or submit the cleanup changes — no pull request confirmed."
+make fmt-go
+go build ./...
 ```
 
-Formatting and build failures must stop publication and be reported as incomplete.
+Run formatting first and consume its output before running the build. Run the build
+separately and consume its exit status and complete compiler diagnostics before any
+commit or publication. On either failure, stop and call `safeoutputs report_incomplete`
+with the failed command in `--reason` and the concrete stderr and exit code in `--details`.
+Do not combine validation with a generic `|| safeoutputs report_incomplete` fallback:
+that masks which command failed and can make a failed build appear successful.
 Preserve TLS verification; do not retry certificate failures with insecure settings.
+
+Only after both commands pass, inspect `git diff --name-status` and `git diff --check`.
+Confirm every changed file is an existing selected source file and the diff contains
+only the intended cleanup. If unexpected files appear, report the mismatch as incomplete
+and do not commit or publish them. Stage only those explicitly inspected paths, never
+`git add -A`. Create branch `code-debt-$GITHUB_RUN_ID`, commit the selected cleanup, then call
+`safeoutputs create_pull_request` with that branch, title "Resolve actionable TODO/FIXME comments",
+and body describing the actual changes and successful validation. Report any commit or
+publication error with its concrete diagnostics; do not claim a PR was created without
+confirmation from the safe-output tool.
 
 If nothing was changed (no actionable items found), run instead:
 
