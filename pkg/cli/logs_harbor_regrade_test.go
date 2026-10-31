@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -161,6 +162,7 @@ func TestHarborRegradedRewardCollision(t *testing.T) {
 
 func TestHarborSanitizeSensitiveText(t *testing.T) {
 	githubToken := "ghp_" + strings.Repeat("a", 36)
+	basicAuth := base64.StdEncoding.EncodeToString([]byte("synthetic-user:synthetic-password"))
 	for _, tt := range []struct {
 		name, input, want string
 	}{
@@ -181,7 +183,7 @@ func TestHarborSanitizeSensitiveText(t *testing.T) {
 		{"Slack token", "xoxb-" + strings.Repeat("1", 12) + "-" + strings.Repeat("2", 12) + "-" + strings.Repeat("a", 24), "[REDACTED]"},
 		{"JWT", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnopqrstuvwx", "[REDACTED]"},
 		{"bearer header", "Authorization: Bearer opaque.token-value+/==; status=401", "Authorization: Bearer [REDACTED]; status=401"},
-		{"basic header", "Authorization: Basic dXNlcjpwYXNzd29yZA==", "Authorization: Basic [REDACTED]"},
+		{"basic header", "Authorization: Basic " + basicAuth, "Authorization: Basic [REDACTED]"},
 		{"lowercase bearer", "authorization: bearer abcdefghijklmnop", "authorization: bearer [REDACTED]"},
 		{"token assignment", "token=abcdefghijklmnop failed", "token=[REDACTED] failed"},
 		{"API key header", "X-Api-Key: abcdefghijklmnop\nstatus: 401", "X-Api-Key: [REDACTED]\nstatus: 401"},
