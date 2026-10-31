@@ -862,7 +862,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
       } catch (err) {
         const parseError = getErrorMessage(err);
         throw new Error(
-          `stdin is not valid JSON: ${parseError}. JSON payload mode was requested ${isExplicitJsonSentinel ? "with '.'" : "from piped stdin with no flags"}. Prefer one single-quoted JSON object argument, or correct the stdin JSON.`
+          `stdin is not valid JSON: ${parseError}. JSON payload mode was requested ${isExplicitJsonSentinel ? "with '.'" : "from piped stdin with no flags"}. Prefer one single-quoted JSON object argument, or correct the stdin JSON. For raw text in one field, use per-field stdin notation such as '--body .' (replace 'body' with the field name).`
         );
       }
       if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -873,7 +873,7 @@ function parseToolArgs(args, schemaProperties = {}, stdinContent = null, options
         return { args: normalizeArgs(result), json: false };
       }
       throw new Error(
-        `stdin JSON payload must be an object. JSON payload mode was requested ${isExplicitJsonSentinel ? "with '.'" : "from piped stdin with no flags"}. Prefer one single-quoted JSON object argument, or provide a JSON object on stdin.`
+        `stdin JSON payload must be an object. JSON payload mode was requested ${isExplicitJsonSentinel ? "with '.'" : "from piped stdin with no flags"}. Prefer one single-quoted JSON object argument, or provide a JSON object on stdin. For raw text in one field, use per-field stdin notation such as '--body .' (replace 'body' with the field name).`
       );
     }
   }
@@ -1366,6 +1366,7 @@ function showToolHelp(serverName, toolName, tools) {
     ...renderToolRecommendedExample(serverName, tool).split("\n"),
     `JSON mode: ${serverName} ${toolName} '{"param":"value",...}' (preferred; encode newlines as \\n, double quotes as \\", backslashes as \\\\, apostrophes as \\u0027)`,
     `Stdin is also supported: ${serverName} ${toolName} . reads a JSON object; no extra shell permissions are granted.`,
+    `Per-field stdin: cat file | ${serverName} ${toolName} --<field> . substitutes that one field with the raw stdin text verbatim (no JSON escaping needed). Only use the bare '.' form above when the whole stdin is itself a JSON object; never write '.' as a value inside a quoted JSON literal.`,
   ];
 
   const props = tool.inputSchema?.properties;
