@@ -1,8 +1,8 @@
 # ADR-73556: Audit Engine Step Failures
 
 **Date**: 2026-10-31
-**Status**: Draft
-**Deciders**: gh-aw maintainers
+**Status**: Proposed
+**Deciders**: the gh-aw maintainers
 
 ---
 
@@ -12,7 +12,15 @@
 
 ### Decision
 
-We will add a dedicated `engine_step_failed` audit finding for compiler-emitted engine and judge steps in the `evals` and `detection` jobs. The audit will identify these steps through shared constants, inspect cached job metadata and downloaded logs within each step's timestamp window, and use evals execution evidence to detect a judge that never started; it will report the first health-check error or non-zero process-exit error regardless of the overall run conclusion. We will also add an `evals` summary to structured and console audit output, reuse the existing eval-result path discovery, version the audit cache and schemas, and document the new finding in the debug playbook.
+We will add a dedicated `engine_step_failed` audit finding for compiler-emitted engine and judge steps in the `evals` and `detection` jobs, reported regardless of the overall run conclusion. The audit identifies these steps through shared constants and inspects the cached jobs API steps together with the downloaded job logs:
+
+- **Step log window.** Nested per-step logs are read whole. Flat per-job logs are limited to the step's `started_at`..`completed_at` window and narrowed to the step's own `##[group]Run` header. Because the jobs API reports whole seconds, the header is chosen by the step's position among the jobs API steps that start in the same second, not by "last header in the start second", so a successor that starts in the same second does not take over the engine step's window.
+- **Failure signal.** A step fails when its window contains a non-zero `Process completed with exit code` line. The finding quotes the first AWF health-check error, else the first `##[error]` line.
+- **Sanitized error line.** The log-derived line passes through `stringutil.SanitizeErrorMessage` and additional redaction of token values, bearer credentials and URL userinfo, and control characters are replaced, before truncation. Only the redacted line reaches the finding, the cached `audit.json` and the console.
+- **Evals execution evidence per invocation.** A judge that never started (`not_started`) is reported even with a clean step log. Reusable-workflow invocations upload separate `<hash>-usage` and `<hash>-evals` artifacts with the same run ID and attempt, so the evidence is matched to each evals job through the artifact prefix logged by its upload step. Without that prefix, the state is used only when every matching artifact agrees; otherwise it is unavailable.
+- **Evals summary.** Structured and console audit output gain an `evals` section (questions, YES, NO, UNKNOWN, execution state) built through the existing eval-result path discovery. Only records whose `runid` matches the audited run are counted, because `evals.jsonl` restored from the evals state branch also holds earlier runs' rows.
+
+We will also version the audit cache and schemas, and document the new finding in the debug playbook.
 
 ### Alternatives Considered
 
@@ -34,12 +42,14 @@ The existing error extractor could be changed to scan green runs and emit generi
 - Green jobs no longer hide failed evals or threat-detection engine startup and execution steps when the downloaded evidence proves a non-zero exit.
 - Findings name the affected job and step and preserve the most useful first diagnostic line, making proxy or engine startup failures actionable.
 - Evals output distinguishes YES, NO, and UNKNOWN answers and exposes `not_started`, so an unexecuted judge is not presented as a healthy result.
+- Log-derived text is redacted before it is persisted or printed; the evals summary counts only the audited run's answers, and execution evidence is attributed per reusable-workflow invocation.
 - Shared step-name constants and compiled-lock tests keep the audit selector aligned with compiler-emitted workflow steps.
 
 #### Negative
-- Audit logic must correlate jobs API timestamps with flat or nested log layouts and can miss a failure when logs or execution artifacts are unavailable or malformed.
+- Audit logic must correlate jobs API timestamps with flat or nested log layouts and can miss a failure when logs or execution artifacts are unavailable or malformed, or when execution evidence from several reusable-workflow invocations cannot be attributed and disagrees.
 - The audit JSON contract and cache version change, requiring schema updates and regeneration of stale cached audit data for downstream consumers.
 - The additional evidence parsing increases maintenance and test surface in the CLI, including edge cases where neighboring steps log within the same second.
+- Redaction can hide part of a legitimate diagnostic, such as a snake_case identifier or URL credentials, in the reported error line.
 
 #### Neutral
 - The `continue-on-error` settings, compiler step outcomes, existing `threat_detection_job_failed` and `workflow_succeeded` logic, and the generic `errors` section remain unchanged.
@@ -48,4 +58,4 @@ The existing error extractor could be changed to scan green runs and emit generi
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*ADR reviewed and completed by @copilot from the generated draft.*
