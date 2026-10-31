@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,6 +35,36 @@ func loadKiroWorkflowDefinition(t *testing.T) EngineDefinition {
 		t.Fatal("shared Kiro workflow has no MCP behaviors")
 	}
 	return frontmatter.Engine
+}
+
+func TestKiroNetworkDefaultsExcludeOptionalVendorServices(t *testing.T) {
+	definition := loadKiroWorkflowDefinition(t)
+	engine, err := NewBehaviorDefinedEngine(&definition)
+	require.NoError(t, err)
+	data := &WorkflowData{
+		Model: "kiro/auto", EngineConfig: &EngineConfig{},
+		NetworkPermissions: &NetworkPermissions{Allowed: []string{}},
+	}
+	domains := domainSet(t, engine.allowedDomains(data))
+	for _, host := range []string{
+		"api.kiro.dev", "prod.download.cli.kiro.dev", "cognito-identity.us-east-1.amazonaws.com",
+		"codewhisperer.us-east-1.amazonaws.com", "q.us-east-1.amazonaws.com",
+	} {
+		assert.Contains(t, domains, host)
+	}
+	telemetry := []string{
+		"client-telemetry.us-east-1.amazonaws.com", "prod.us-east-1.telemetry.kiro.aws.dev",
+	}
+	for _, host := range append(telemetry, "prod.assets.shortbread.aws.dev", "unrelated.kiro.dev") {
+		for rule := range domains {
+			assert.False(t, awfDomainAllowsHost(rule, host), "rule %q must not allow optional host %q", rule, host)
+		}
+	}
+	data.NetworkPermissions.Allowed = telemetry
+	optedIn := domainSet(t, engine.allowedDomains(data))
+	for _, host := range telemetry {
+		assert.Contains(t, optedIn, host, "telemetry must remain available through explicit opt-in")
+	}
 }
 
 func TestKiroWorkflowConfiguresContainerRuntime(t *testing.T) {

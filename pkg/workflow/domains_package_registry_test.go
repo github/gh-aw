@@ -4,6 +4,8 @@ package workflow
 
 import (
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // GitHub Packages is a documented exception, tested separately below.
@@ -177,6 +180,42 @@ func TestEngineDefaultDomainsDoNotOverlapEcosystems(t *testing.T) {
 	require.NotEmpty(t, ecosystems)
 	assert.Empty(t, engineDefaultEcosystemOverlaps(ecosystems, engineDefaultDomainSets),
 		"package ecosystems require explicit opt-in via network.allowed or runtimes")
+}
+
+func TestBehaviorDefinedEngineDefaultsDoNotOverlapEcosystems(t *testing.T) {
+	paths, err := filepath.Glob("../../.github/workflows/shared/*.md")
+	require.NoError(t, err)
+	require.NotEmpty(t, paths)
+	defaults := make(map[string][]string)
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		if !strings.HasPrefix(string(content), "---\n") {
+			continue
+		}
+		parts := strings.SplitN(string(content), "---", 3)
+		require.Len(t, parts, 3, path)
+		var frontmatter struct {
+			Engine yaml.Node `yaml:"engine"`
+		}
+		require.NoError(t, yaml.Unmarshal([]byte(parts[1]), &frontmatter), path)
+		if frontmatter.Engine.Kind != yaml.MappingNode {
+			continue
+		}
+		var definition EngineDefinition
+		require.NoError(t, frontmatter.Engine.Decode(&definition), path)
+		if definition.Behaviors == nil || definition.Behaviors.Network == nil {
+			continue
+		}
+		network := definition.Behaviors.Network
+		defaults[path+"/defaults"] = network.Defaults
+		for provider, domain := range network.ProviderDomains {
+			defaults[path+"/provider/"+provider] = []string{domain}
+		}
+	}
+	require.NotEmpty(t, defaults, "shared behavior-defined engines must be checked")
+	assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults),
+		"behavior-defined engine defaults and provider domains require the same package ecosystem opt-in as static engines")
 }
 
 func TestEngineDefaultEcosystemOverlapGuard(t *testing.T) {
