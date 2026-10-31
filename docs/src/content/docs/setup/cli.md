@@ -968,7 +968,8 @@ The command and its output formats may change.
 
 Run one enabled built-in, custom JavaScript, or operational-value Bash grader against a unified session from a saved run's
 `usage` artifact or from standard input. Input accepts unified-session JSONL
-or a JSON event array. The ten fast built-ins are available without explicit
+or a JSON event array. The fourteen fast built-ins, including failure observability,
+are available without explicit
 frontmatter configuration. Custom JavaScript uses a separate restricted worker
 with the same in-memory interface as the downstream graders job. Repository-owned
 `graders.operational-value.run` Bash uses that job's session-file compatibility

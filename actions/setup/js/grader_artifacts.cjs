@@ -38,7 +38,10 @@ function readGraderManifestEnvironment(prefix = "GH_AW_GRADER_MANIFEST") {
  * @returns {import("./types/unified_session").UnifiedSession}
  */
 function writeGraderArtifacts(session, usageDirectory, graders, customGraderIds = []) {
-  const computed = computeGraders(session, graders);
+  // Grade and return the same filtered ordering, so reference indices address
+  // the published array even when historical grader events were interleaved.
+  const evidenceSession = session.filter(event => event.type !== "failure.observation" && !event.type.startsWith("grader."));
+  const computed = computeGraders(evidenceSession, graders);
   const manifest = { ...computed.manifest, ...(customGraderIds.length ? { customGraders: customGraderIds } : {}) };
   const output = computed.output;
   const directory = path.join(usageDirectory, "graders");
@@ -58,26 +61,34 @@ function writeGraderArtifacts(session, usageDirectory, graders, customGraderIds 
     ...normalizeUnifiedSessionEvent({ type, data }, "conclusion"),
     provenance: { component: "grader", phase: "conclusion", path: `usage/graders/${file}`, index: 0 },
   }));
-  const previous = session.filter(event => event.type.startsWith("grader."));
+  for (const result of output.results) {
+    const observations = result.diagnostics?.failureObservations;
+    if (!Array.isArray(observations)) continue;
+    for (const observation of observations) {
+      events.push({
+        ...normalizeUnifiedSessionEvent({ type: "failure.observation", data: observation }, "conclusion"),
+        provenance: { component: "grader", phase: "conclusion", path: "usage/graders/grader_results.json", index: events.length - 2 },
+      });
+    }
+  }
+  const previous = session.filter(event => event.type.startsWith("grader.") || event.type === "failure.observation");
   const previousUntimed = previous.filter(previousEvent => previousEvent.timestamp === undefined).length;
   const newUntimed = events.filter(graderEvent => graderEvent.timestamp === undefined).length;
-  const collected = session
-    .filter(event => !event.type.startsWith("grader."))
-    .map(sessionEvent => {
-      if (sessionEvent.type !== "session.collection") return sessionEvent;
-      return {
-        ...sessionEvent,
-        data: {
-          ...sessionEvent.data,
-          sources: [
-            ...(Array.isArray(sessionEvent.data.sources) ? sessionEvent.data.sources : []).filter(source => source.component !== "grader"),
-            ...events.map(({ provenance: { component, phase, path } }) => ({ component, phase, path, events: 1 })),
-          ],
-          absentComponents: (Array.isArray(sessionEvent.data.absentComponents) ? sessionEvent.data.absentComponents : []).filter(component => component !== "grader"),
-          untimedEvents: (typeof sessionEvent.data.untimedEvents === "number" ? sessionEvent.data.untimedEvents : 0) - previousUntimed + newUntimed,
-        },
-      };
-    });
+  const collected = evidenceSession.map(sessionEvent => {
+    if (sessionEvent.type !== "session.collection") return sessionEvent;
+    return {
+      ...sessionEvent,
+      data: {
+        ...sessionEvent.data,
+        sources: [
+          ...(Array.isArray(sessionEvent.data.sources) ? sessionEvent.data.sources : []).filter(source => source.component !== "grader"),
+          ...events.map(({ provenance: { component, phase, path } }) => ({ component, phase, path, events: 1 })),
+        ],
+        absentComponents: (Array.isArray(sessionEvent.data.absentComponents) ? sessionEvent.data.absentComponents : []).filter(component => component !== "grader"),
+        untimedEvents: (typeof sessionEvent.data.untimedEvents === "number" ? sessionEvent.data.untimedEvents : 0) - previousUntimed + newUntimed,
+      },
+    };
+  });
   return [...collected, ...events];
 }
 

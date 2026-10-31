@@ -434,7 +434,45 @@ export interface GraderManifestData {
   customGraders?: string[];
 }
 
+/** Versioned derived evidence, not an execution result or an orchestration decision. */
+export interface FailureObservation {
+  schemaVersion: 1;
+  categoryId: string;
+  severity: "warning" | "error";
+  confidence: "low" | "medium" | "high";
+  evidenceState: "observed" | "missing";
+  recoverability: "recoverable" | "recovered" | "unknown";
+  /** @maxItems 4 */
+  evidence: {
+    eventIndex: SessionCount;
+    type: string;
+    provenance: {
+      component: string;
+      phase: string;
+      path?: string;
+      index?: SessionCount;
+      attemptId?: string;
+      startupAttemptId?: string;
+    };
+  }[];
+  summary: string;
+}
+
+export interface FailureObservationDiagnostics {
+  /** @maxItems 32 */
+  failureObservations: FailureObservation[];
+  totalFailureObservations: SessionCount;
+  failureObservationsTruncated: boolean;
+  coverage: {
+    assessed: SessionCount;
+    missing: SessionCount;
+    scopeCount: SessionCount;
+    state: "partial" | "complete";
+  };
+}
+
 export interface GraderMeasurementData extends GraderData {
+  diagnostics?: FailureObservationDiagnostics | { [key: string]: JsonValue };
   implementation?: {
     id?: JsonValue;
     version?: JsonValue;
@@ -839,6 +877,7 @@ export interface UnifiedSessionEventDataMap {
   "experiment.assignment": ExperimentAssignmentData;
   "grader.manifest": GraderManifestData;
   "grader.result": GraderResultData;
+  "failure.observation": FailureObservation;
   "eval.result": EvalResultData;
   "usage.report": UsageReportData;
   "execution.result": ExecutionResultData;

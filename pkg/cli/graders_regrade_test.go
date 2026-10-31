@@ -100,6 +100,31 @@ func TestRegradeProcessedRunsPreservesEvidenceAndProvenance(t *testing.T) {
 	require.Equal(t, "z-count", definitions[0].ID, "caller-owned definitions must not be sorted in place")
 }
 
+func TestRegradeFailureGradersOffline(t *testing.T) {
+	regradeTestRequireNode(t)
+	root := t.TempDir()
+	run := regradeTestRun(t, root, 21, regradeTestEvent)
+	definitions := []graderRunDefinition{}
+	for _, id := range []string{"progress-stagnation", "ineffective-retries", "premature-termination", "completion-misrepresentation"} {
+		definitions = append(definitions, graderRunDefinition{ID: id, Source: "builtin"})
+	}
+	results, err := regradeProcessedRuns(t.Context(), root, []ProcessedRun{run}, definitions)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Len(t, results[0].Results, 4)
+	for _, raw := range results[0].Results {
+		var result struct {
+			ID             string          `json:"id"`
+			Diagnostics    json.RawMessage `json:"diagnostics"`
+			Implementation json.RawMessage `json:"implementation"`
+		}
+		require.NoError(t, json.Unmarshal(raw, &result))
+		assert.NotEmpty(t, result.ID)
+		assert.NotEmpty(t, result.Diagnostics)
+		assert.NotEmpty(t, result.Implementation)
+	}
+}
+
 func TestRegradeMultipleRunsAndFailuresAreDeterministic(t *testing.T) {
 	regradeTestRequireNode(t)
 	root := t.TempDir()

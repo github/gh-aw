@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -42,7 +43,20 @@ func GenerateSchema[T any]() (*jsonschema.Schema, error) {
 
 // GenerateOutputSchema generates a JSON schema for a structured command output type.
 func GenerateOutputSchema[T any]() (*jsonschema.Schema, error) {
-	return GenerateSchema[T]()
+	// Diagnostics are JSON values, not the byte arrays underlying RawMessage.
+	graderResult, err := jsonschema.For[GraderResult](&jsonschema.ForOptions{
+		TypeSchemas: map[reflect.Type]*jsonschema.Schema{
+			reflect.TypeFor[json.RawMessage](): {},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return jsonschema.For[T](&jsonschema.ForOptions{
+		TypeSchemas: map[reflect.Type]*jsonschema.Schema{
+			reflect.TypeFor[GraderResult](): graderResult,
+		},
+	})
 }
 
 // MarshalOutputSchema serializes a generated output schema using the CLI's

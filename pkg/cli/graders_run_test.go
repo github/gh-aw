@@ -41,7 +41,7 @@ func TestStageGraderRuntimeLoadsDependencies(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, node, flag, "--allow-fs-read="+directory, "--eval", `
 const path = require("node:path");
-for (const name of ["trace_graders.cjs", "custom_graders.cjs", "operational_value_grader.cjs"]) {
+for (const name of ["trace_graders.cjs", "failure_graders.cjs", "failure_observations.cjs", "custom_graders.cjs", "operational_value_grader.cjs"]) {
   require(path.join(process.argv[1], name));
 }
 `, directory)
@@ -80,6 +80,38 @@ func TestRunGraderFromUnifiedSession(t *testing.T) {
 	}
 }
 
+func TestRunFailureGradersOffline(t *testing.T) {
+	regradeTestRequireNode(t)
+	workflowID := writeGraderRunWorkflow(t, "---\non: workflow_dispatch\n---\nTest.\n")
+	for _, id := range []string{"progress-stagnation", "ineffective-retries", "premature-termination", "completion-misrepresentation"} {
+		t.Run(id, func(t *testing.T) {
+			definition, err := loadGraderRunDefinition(workflowID, id)
+			require.NoError(t, err)
+			assert.Equal(t, "builtin", definition.Source)
+			assert.Equal(t, "count", definition.Unit)
+			assert.Equal(t, "lower_is_better", definition.Direction)
+			require.NotNil(t, definition.Threshold)
+			assert.Zero(t, *definition.Threshold)
+			var output bytes.Buffer
+			require.NoError(t, runGrader(t.Context(), graderRunConfig{
+				Workflow: workflowID, GraderID: id, Input: strings.NewReader("[]"), Output: &output,
+			}))
+			var result GraderResult
+			require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+			assert.Equal(t, id, result.ID)
+			assert.Equal(t, "unavailable", result.Status)
+			assert.Nil(t, result.Value)
+			var diagnostics struct {
+				Observations []FailureObservation `json:"failureObservations"`
+			}
+			require.NoError(t, json.Unmarshal(result.Diagnostics, &diagnostics))
+			require.NotEmpty(t, diagnostics.Observations)
+			for _, observation := range diagnostics.Observations {
+				assert.Equal(t, "missing", observation.EvidenceState)
+			}
+		})
+	}
+}
 func TestRunGraderRejectsCustomCode(t *testing.T) {
 	for _, entry := range []string{
 		"operational-value:\n    run: ../evaluator.sh",

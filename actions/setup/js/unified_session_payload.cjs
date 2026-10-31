@@ -13,6 +13,7 @@ const { redactWebhookPayloads } = require("./webhook_context.cjs");
 const { isErrorIdentifier, normalizeEngineHarness } = require("./routing_analytics.cjs");
 const { projectSafeOutputData } = require("./safe_output_outcomes.cjs");
 const { normalizeHarnessRetryRecord, normalizeHarnessAttemptEvent } = require("./harness_retry_record.cjs");
+const { projectFailureDiagnostics } = require("./failure_graders.cjs");
 
 /** AWF failed-request origins: provider response versus AWF-originated rejection. */
 const ERROR_SOURCES = new Set(["upstream", "awf"]);
@@ -399,6 +400,7 @@ const EVENT_FIELDS = {
   "experiment.state": { runId: ["runId", "run_id"], assignments: ["assignments"], counts: ["counts"] },
   "grader.manifest": { version: ["version"], customGraders: ["customGraders"] },
   "grader.result": GRADER_FIELDS,
+  "failure.observation": {},
   "eval.result": { id: ["id"], answer: ["answer"], model: ["model"], error: ["error"], runId: ["runId", "runid", "run_id"], assignments: ["assignments", "experiments"] },
   "github_api.rate_limit": {
     source: ["source"],
@@ -834,6 +836,10 @@ function normalizeUnifiedSessionEvent(event, phase) {
     data.assignments = structuredClone(assignments && typeof assignments === "object" && !Array.isArray(assignments) ? assignments : source);
   }
   if (event.type === "grader.manifest" && Array.isArray(source.graders)) data.graders = source.graders.map(grader => selectFields(grader, GRADER_FIELDS));
+  if (event.type === "failure.observation") {
+    const observation = projectFailureDiagnostics({ failureObservations: [source] })?.failureObservations[0];
+    if (observation) Object.assign(data, observation);
+  }
   if (event.type === "grader.result") {
     if (source.version !== undefined) data.version = structuredClone(source.version);
     if (source.run !== undefined) data.run = source.run === null ? null : selectFields(source.run, { id: ["id"], attempt: ["attempt"], graderCount: ["graderCount"], passed: ["passed"], failed: ["failed"], errors: ["errors"] });
@@ -841,6 +847,7 @@ function normalizeUnifiedSessionEvent(event, phase) {
       ...selectFields(result, GRADER_FIELDS),
       ...(result?.implementation !== undefined ? { implementation: result.implementation === null ? null : selectFields(result.implementation, { id: ["id"], version: ["version"], digest: ["digest"] }) } : {}),
       ...(Array.isArray(result?.metrics) ? { metrics: result.metrics.map(metric => selectFields(metric, { id: ["id"], value: ["value"] })) } : {}),
+      ...(projectFailureDiagnostics(result?.diagnostics) ? { diagnostics: projectFailureDiagnostics(result.diagnostics) } : {}),
     });
     Object.assign(data, projectResult(source));
     if (Array.isArray(source.results)) data.results = source.results.map(projectResult);

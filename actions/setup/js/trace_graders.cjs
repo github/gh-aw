@@ -2,6 +2,7 @@
 
 const { createSessionLookups, stableStringify, isRecord } = require("./grader_session.cjs");
 const { TRAJECTORY_GRADERS } = require("./trajectory_graders.cjs");
+const { collectFailureObservations, FAILURE_CATEGORY_IDS } = require("./failure_graders.cjs");
 const BUILTIN_META = require("./builtin_graders.json");
 
 /** @typedef {import("./types/unified_session").UnifiedSession} UnifiedSession */
@@ -10,7 +11,31 @@ const BUILTIN_META = require("./builtin_graders.json");
 
 const GRADER_VERSION = 2;
 const IMPLEMENTATION_ID = "gh-aw/graders";
-const DEFAULT_GRADER_IDS = ["tool-success-rate", "tool-failure-count", "retries", "loops", "trajectory-efficiency", "execution-step-count", "execution-duration", "working-set-rebuild-factor", "context-growth", "artifact-production"];
+const DEFAULT_GRADER_IDS = [
+  "tool-success-rate",
+  "tool-failure-count",
+  "retries",
+  "loops",
+  "trajectory-efficiency",
+  "execution-step-count",
+  "execution-duration",
+  "working-set-rebuild-factor",
+  "context-growth",
+  "artifact-production",
+  ...FAILURE_CATEGORY_IDS,
+];
+
+/** @type {WeakMap<SessionLookups, ReturnType<typeof collectFailureObservations>>} */
+const failureCache = new WeakMap();
+/** @param {UnifiedSession} session @param {SessionLookups} lookups */
+function failureResults(session, lookups) {
+  let results = failureCache.get(lookups);
+  if (!results) {
+    results = collectFailureObservations(session, lookups);
+    failureCache.set(lookups, results);
+  }
+  return results;
+}
 
 /** @param {(lookups: SessionLookups) => any} grade @returns {Grader} */
 function fromStats(grade) {
@@ -44,6 +69,7 @@ const BUILTIN_GRADERS = {
     return firstTokens ? (trace.totalInputTokens + trace.totalOutputTokens) / firstTokens : null;
   }),
   "artifact-production": fromStats(({ stats }) => stats.artifactCount),
+  ...Object.fromEntries(FAILURE_CATEGORY_IDS.map(id => [id, (session, _config, lookups = createSessionLookups(session)) => failureResults(session, lookups)[id]])),
   ...Object.fromEntries(Object.entries(TRAJECTORY_GRADERS).map(([id, grade]) => [id, (session, config, lookups = createSessionLookups(session)) => grade(lookups.trace, config)])),
 };
 
@@ -69,7 +95,7 @@ function evaluateThreshold(value, direction, threshold) {
  * @property {string} [message]
  * @property {string} [details]
  * @property {string} [severity]
- * @property {object} [diagnostics]
+ * @property {Record<string, any>} [diagnostics]
  * @property {{id: string, version: number}} implementation
  */
 

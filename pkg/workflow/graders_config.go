@@ -40,6 +40,10 @@ var BuiltinGraderRegistry = []BuiltinGraderMeta{
 	{ID: "working-set-rebuild-factor", Name: "Working-Set Rebuild Factor", Description: "Cumulative input tokens divided by peak invocation input tokens", Unit: "factor", Direction: "lower_is_better", Min: new(1.0)},
 	{ID: "context-growth", Name: "Context Growth", Description: "Ratio of total tokens to first-request tokens", Unit: "factor", Direction: "lower_is_better"},
 	{ID: "artifact-production", Name: "Artifact Production", Description: "Count of outputs/artifacts produced by the agent", Unit: "count", Direction: "higher_is_better"},
+	{ID: "progress-stagnation", Name: "Progress Stagnation", Description: "Repeated unchanged tool failures without observed progress", Unit: "count", Direction: "lower_is_better", Threshold: new(0.0)},
+	{ID: "ineffective-retries", Name: "Ineffective Retries", Description: "Repeated failures of an unchanged scoped tool operation", Unit: "count", Direction: "lower_is_better", Threshold: new(0.0)},
+	{ID: "premature-termination", Name: "Premature Termination", Description: "Session termination with explicitly recorded unmet objectives", Unit: "count", Direction: "lower_is_better", Threshold: new(0.0)},
+	{ID: "completion-misrepresentation", Name: "Completion Misrepresentation", Description: "Explicit success claims contradicted by scoped execution evidence", Unit: "count", Direction: "lower_is_better", Threshold: new(0.0)},
 	// Opt-in trajectory analyses use projections of the unified session and
 	// report unavailable when the required evidence is absent.
 	{ID: "policy-near-miss", Name: "Policy Near-Miss Rate", Description: "Fraction of successful traces that left guard or policy objectives unsatisfied", Unit: "ratio", Direction: "lower_is_better", Min: new(0.0), Max: new(1.0)},
@@ -170,6 +174,7 @@ func (gc *GradersConfig) CustomGraderIDs() []string {
 var DefaultGraderIDs = []string{
 	"tool-success-rate", "tool-failure-count", "retries", "loops", "trajectory-efficiency",
 	"execution-step-count", "execution-duration", "working-set-rebuild-factor", "context-growth", "artifact-production",
+	"progress-stagnation", "ineffective-retries", "premature-termination", "completion-misrepresentation",
 }
 
 // graderIDPattern validates grader IDs: lowercase alphanumeric + hyphens, 1-64 chars.

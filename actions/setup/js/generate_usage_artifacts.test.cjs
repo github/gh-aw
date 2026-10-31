@@ -81,7 +81,7 @@ describe("generate_usage_artifacts.cjs", () => {
     expect(core.info).toHaveBeenCalledWith(expect.stringContaining("=== Unified session ==="));
     expect(core.warning).not.toHaveBeenCalled();
     const graderOutput = JSON.parse(fs.readFileSync(path.join(usageDirectory, "graders", "grader_results.json"), "utf8"));
-    expect(graderOutput.results.length).toBe(10);
+    expect(graderOutput.results.length).toBe(14);
     expect(events.some(event => event.type === "grader.result" && event.provenance.phase === "conclusion")).toBe(true);
     expect(core.summary.addDetails).toHaveBeenCalledWith("Graders", expect.stringContaining("Tool Success Rate"));
   });

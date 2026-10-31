@@ -22,16 +22,18 @@ var gradersDataLog = logger.New("cli:audit_report_graders")
 
 // GraderResult is a single grader outcome surfaced in the audit report.
 type GraderResult struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name,omitempty"`
-	Status    string   `json:"status"`
-	Value     *float64 `json:"value,omitempty"`
-	Unit      string   `json:"unit,omitempty"`
-	Passed    *bool    `json:"passed,omitempty"`
-	Direction string   `json:"direction,omitempty"`
-	Threshold *float64 `json:"threshold,omitempty"`
-	Message   string   `json:"message,omitempty"`
-	Error     string   `json:"error,omitempty"`
+	ID                  string               `json:"id"`
+	Name                string               `json:"name,omitempty"`
+	Status              string               `json:"status"`
+	Value               *float64             `json:"value,omitempty"`
+	Unit                string               `json:"unit,omitempty"`
+	Passed              *bool                `json:"passed,omitempty"`
+	Direction           string               `json:"direction,omitempty"`
+	Threshold           *float64             `json:"threshold,omitempty"`
+	Message             string               `json:"message,omitempty"`
+	Error               string               `json:"error,omitempty"`
+	Diagnostics         json.RawMessage      `json:"diagnostics,omitempty"`
+	FailureObservations []FailureObservation `json:"failure_observations,omitempty"`
 }
 
 // GradersData aggregates the grader results recorded for a single workflow run.
@@ -49,14 +51,15 @@ type GradersData struct {
 // It extends the subset parsed for experiment observations with the display fields
 // (name, unit, passed, message, error) used by the audit report.
 type graderArtifactFullResult struct {
-	ID      string          `json:"id"`
-	Name    string          `json:"name"`
-	Status  string          `json:"status"`
-	Value   json.RawMessage `json:"value"`
-	Unit    string          `json:"unit"`
-	Passed  *bool           `json:"passed"`
-	Message string          `json:"message"`
-	Error   string          `json:"error"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Status      string          `json:"status"`
+	Value       json.RawMessage `json:"value"`
+	Unit        string          `json:"unit"`
+	Passed      *bool           `json:"passed"`
+	Message     string          `json:"message"`
+	Error       string          `json:"error"`
+	Diagnostics json.RawMessage `json:"diagnostics,omitempty"`
 }
 
 type graderArtifactFullDocument struct {
@@ -228,15 +231,23 @@ func loadGraderManifestEntries(logsPath string) map[string]graderManifestEntry {
 
 func buildGraderResult(result graderArtifactFullResult, manifest graderManifestEntry) GraderResult {
 	summary := GraderResult{
-		ID:        result.ID,
-		Name:      result.Name,
-		Status:    result.Status,
-		Unit:      result.Unit,
-		Passed:    result.Passed,
-		Message:   result.Message,
-		Error:     result.Error,
-		Direction: manifest.Direction,
-		Threshold: manifest.Threshold,
+		ID:          result.ID,
+		Name:        result.Name,
+		Status:      result.Status,
+		Unit:        result.Unit,
+		Passed:      result.Passed,
+		Message:     result.Message,
+		Error:       result.Error,
+		Direction:   manifest.Direction,
+		Threshold:   manifest.Threshold,
+		Diagnostics: result.Diagnostics,
+	}
+	// Keep diagnostics intact even when a future observation schema cannot be projected.
+	var diagnostics struct {
+		FailureObservations []FailureObservation `json:"failureObservations"`
+	}
+	if err := json.Unmarshal(result.Diagnostics, &diagnostics); err == nil {
+		summary.FailureObservations = diagnostics.FailureObservations
 	}
 	if summary.Name == "" {
 		summary.Name = manifest.Name

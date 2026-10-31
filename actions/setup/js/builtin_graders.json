@@ -68,6 +68,34 @@
     "unit": "count",
     "direction": "higher_is_better"
   },
+  "progress-stagnation": {
+    "name": "Progress Stagnation",
+    "description": "Repeated unchanged tool failures without observed progress",
+    "unit": "count",
+    "direction": "lower_is_better",
+    "threshold": 0
+  },
+  "ineffective-retries": {
+    "name": "Ineffective Retries",
+    "description": "Repeated failures of an unchanged scoped tool operation",
+    "unit": "count",
+    "direction": "lower_is_better",
+    "threshold": 0
+  },
+  "premature-termination": {
+    "name": "Premature Termination",
+    "description": "Session termination with explicitly recorded unmet objectives",
+    "unit": "count",
+    "direction": "lower_is_better",
+    "threshold": 0
+  },
+  "completion-misrepresentation": {
+    "name": "Completion Misrepresentation",
+    "description": "Explicit success claims contradicted by scoped execution evidence",
+    "unit": "count",
+    "direction": "lower_is_better",
+    "threshold": 0
+  },
   "policy-near-miss": {
     "name": "Policy Near-Miss Rate",
     "description": "Fraction of successful traces that left guard or policy objectives unsatisfied",

@@ -61,6 +61,10 @@ describe("pure unified-session graders", () => {
       "working-set-rebuild-factor": 40 / 30,
       "context-growth": 50 / 15,
       "artifact-production": 1,
+      "progress-stagnation": null,
+      "ineffective-retries": null,
+      "premature-termination": null,
+      "completion-misrepresentation": null,
     });
     expect(output.run.id).toBe("123");
     expect(output.context).toEqual({

@@ -33,6 +33,29 @@ func TestParseGradersDefaults(t *testing.T) {
 	}
 }
 
+func TestFailureGradersRegistryAndOverrides(t *testing.T) {
+	ids := []string{"progress-stagnation", "ineffective-retries", "premature-termination", "completion-misrepresentation"}
+	cfg, err := ParseGradersFromFrontmatter(map[string]any{})
+	require.NoError(t, err)
+	for _, id := range ids {
+		assert.Contains(t, DefaultGraderIDs, id)
+		assert.Contains(t, BuiltinGraderIDs, id)
+		definition := cfg.Graders[id]
+		require.NotNil(t, definition)
+		assert.Equal(t, "count", definition.Unit)
+		assert.Equal(t, "lower_is_better", definition.Direction)
+		require.NotNil(t, definition.Threshold)
+		assert.Zero(t, *definition.Threshold)
+		override, err := ParseGradersFromFrontmatter(map[string]any{
+			"graders": map[string]any{id: map[string]any{"threshold": 2.0, "config": map[string]any{"window": 4}}},
+		})
+		require.NoError(t, err)
+		assert.InDelta(t, 2, *override.Graders[id].Threshold, 0)
+		assert.Equal(t, 4, override.Graders[id].Config["window"])
+		assert.Empty(t, override.CustomGraderIDs())
+	}
+}
+
 func TestParseGradersOverrides(t *testing.T) {
 	cfg, err := ParseGradersFromFrontmatter(map[string]any{
 		"graders": map[string]any{

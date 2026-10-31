@@ -17,7 +17,7 @@ Graders and their result format are experimental.
 ## Default graders
 
 No configuration is required. Omitting `graders` or setting `graders: {}` enables
-these ten fast, linear-time built-ins:
+these fourteen fast, linear-time built-ins:
 
 | ID | Measurement |
 |---|---|
@@ -31,11 +31,37 @@ these ten fast, linear-time built-ins:
 | `working-set-rebuild-factor` | Cumulative input tokens / peak invocation input tokens |
 | `context-growth` | Total tokens / first-request tokens |
 | `artifact-production` | Number of safe-output results |
+| `progress-stagnation` | Repeated activity without changed observable evidence |
+| `ineffective-retries` | Repeated failures without changed strategy or outcome |
+| `premature-termination` | Completion declarations despite recorded unfinished work |
+| `completion-misrepresentation` | Completion claims contradicted by execution evidence |
 
 Detection and eval usage do not count toward main-agent execution statistics.
 Native tool calls take precedence over duplicate gateway records, and proxy
 token telemetry takes precedence over aggregate usage. Missing required
 evidence yields `unavailable` rather than an invented score.
+
+### Failure observability
+
+The four failure graders produce evidence-backed observations inspired by
+MANDATE's delegation-failure taxonomy. They do not call a model or change the
+run's stop, resume, or retry behavior.
+
+Inspect `graders.results[].diagnostics.failureObservations` in audit or logs JSON
+for stable category IDs, severity, confidence, evidence state, recoverability,
+and references into the unified session. The same observations are published
+as `failure.observation` events in `usage/aw_session.jsonl`. Each reference includes
+source provenance and available attempt attribution; earlier failed attempts
+remain visible after successful recovery.
+
+`evidenceState: observed` identifies recorded failure evidence. `missing` means
+the available session cannot establish the outcome; it is not a failure verdict.
+A null grader value is `unavailable`, not zero. Successful repeated operations
+are not necessarily stagnation, and an agent's success statement is not proof
+that an operation executed. These conservative detectors do not verify arbitrary
+natural-language task requirements. Observation output is bounded; inspect
+truncation metadata and the original session for the remaining evidence.
+See the [failure classification contract](/gh-aw/specs/graders-specification/#41-failure-observations).
 
 ## Configuration
 

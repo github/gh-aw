@@ -7,7 +7,7 @@ sidebar:
 
 # Graders Specification
 
-**Version**: 0.5.0
+**Version**: 0.6.0
 **Status**: Draft Specification
 **Feature Status**: Experimental
 
@@ -48,7 +48,7 @@ Missing required evidence MUST produce `unavailable`, not fabricated measurement
 ## 3. Configuration model
 
 Omitting `graders`, setting it to null, or using `graders: {}` MUST enable the
-ten fast built-ins listed below. Other registered built-ins require explicit
+fourteen fast built-ins listed below. Other registered built-ins require explicit
 configuration.
 
 ```yaml
@@ -88,11 +88,62 @@ The default set MUST contain only fast, linear-time metrics:
 | `working-set-rebuild-factor` | Cumulative input tokens / peak invocation input tokens |
 | `context-growth` | Total tokens / first-request tokens |
 | `artifact-production` | Safe-output result count |
+| `progress-stagnation` | Repeated activity with unchanged observable evidence |
+| `ineffective-retries` | Repeated failures with unchanged recovery strategy and outcome |
+| `premature-termination` | Completion declarations contradicted by recorded unfinished work |
+| `completion-misrepresentation` | Completion claims contradicted by execution evidence |
 
 Trajectory analyses MUST remain opt-in. Reference-dependent results MUST be
 unavailable when the unified session does not contain the required evidence.
 Potentially quadratic trajectory analyses MUST retain bounded input sizes.
 The full registry is documented in the [Graders Reference](/gh-aw/experimental/trace-graders/).
+
+### 4.1 Failure observations
+
+The four failure graders provide observations informed by
+[MANDATE's delegation-failure taxonomy](https://arxiv.org/abs/2610.34748), not a complete
+implementation of the taxonomy or a semantic assessment by a model. They MUST
+compute exclusively from the redacted in-memory session. Their observations
+MUST NOT change execution, continuation, stop, resume, or retry decisions.
+
+A numeric value counts observed failure observations; missing required evidence
+MUST return `null` with status `unavailable`. Repetition alone MUST NOT prove
+failure: successful repeated operations and changing results can represent
+legitimate progress. An unfinished tool call is missing execution evidence,
+even though the existing `tool-failure-count` metric counts unfinished calls.
+An agent's completion declaration MUST NOT itself establish successful execution.
+
+Results retain bounded observations in `diagnostics.failureObservations`.
+Each observation MUST follow the independently versioned classification contract:
+
+| Field | Contract |
+|---|---|
+| `schemaVersion` | Integer `1`; independent of grader artifact and session format versions |
+| `categoryId` | Stable string ID; initially the four failure grader IDs above |
+| `severity` | `warning` or `error` |
+| `confidence` | `low`, `medium`, or `high`; describes evidence strength, not a calibrated probability |
+| `evidenceState` | `observed` for recorded failure evidence, `missing` for insufficient evidence |
+| `recoverability` | `recoverable`, `recovered`, or `unknown`; observational, not a recovery instruction |
+| `evidence` | References containing the zero-based `eventIndex`, event `type`, and source `provenance` |
+| `summary` | Fixed explanatory text without copied prompts, tool arguments, or result bodies |
+
+Evidence references MUST identify the source event and preserve available
+attempt and startup-attempt attribution. Detectors MUST NOT correlate unrelated
+agents or invocations merely because a tool name or native call ID matches.
+Recovery MUST NOT erase an earlier failure observation. Historical sessions
+without required fields remain valid; missing evidence MUST NOT be reclassified
+as a confirmed failure or proof of success.
+
+Implementations MUST bound emitted observations and evidence per observation,
+report truncation, and retain the original execution and attempt events.
+Each grader retains at most 32 observations with at most four evidence references
+per observation. `totalFailureObservations` and `failureObservationsTruncated`
+describe output loss; `coverage` reports assessed and missing evidence. These
+limits do not authorize dropping the underlying session events.
+Consumers SHOULD preserve unknown category IDs for extensibility and MUST NOT
+interpret unfamiliar schema versions as verified current-version evidence.
+`gh aw audit` and `gh aw logs` MUST retain the classifications in JSON and
+expose evidence strength and recovery state alongside the existing grader results.
 
 ## 5. Execution and artifacts
 
@@ -106,7 +157,8 @@ persistence boundary MUST:
 
 1. Compute enabled graders from the collected, redacted event array.
 2. Write `usage/graders/grader_manifest.json` and `usage/graders/grader_results.json`.
-3. Append `grader.manifest` and `grader.result` events with conclusion provenance.
+3. Append `grader.manifest`, `grader.result`, and derived `failure.observation`
+   events with conclusion provenance.
 4. Persist `usage/aw_session.jsonl` and upload the `usage` artifact.
 
 Manifest and result schema version is 2. Results MUST preserve stable grader IDs,
@@ -210,9 +262,19 @@ Conforming implementations MUST cover:
 - Matching persisted results and unified-session grader events.
 - The same behavior in workflow execution and CLI replay.
 - A measurable large-session performance bound for the default set.
+- Synthetic loops, ineffective retries, legitimate repeated operations, incomplete
+  tasks, unsupported success claims, and successful recovery.
+- Attempt-scoped evidence, missing-versus-observed classifications, bounded output,
+  and idempotent publication of derived observations.
 - Grader-backed experiment reference validation.
 
 ## 9. Change log
+
+### Version 0.6.0
+
+- Adds four default failure-observability graders with versioned classifications.
+- Preserves failure and recovery evidence in unified sessions and audit/logs output.
+- Requires missing-evidence, purity, determinism, and bounded-resource conformance.
 
 ### Version 0.5.0
 

@@ -163,7 +163,7 @@ function createSessionLookups(session) {
         call = { name: data.toolName ?? "", sessionScope: sessionScope(event), eventIndex: eventIndices.get(event), attemptId: event.provenance.attemptId, startupAttemptId: event.provenance.startupAttemptId };
         toolCalls.push(call);
       }
-      Object.assign(call, data, { completed: true });
+      Object.assign(call, data, { completed: true, completionEventIndex: eventIndices.get(event) });
       if (data.toolCallId) toolCallsById.set(key, call);
     }
   }
@@ -189,9 +189,11 @@ function createSessionLookups(session) {
       attemptId: event.provenance.attemptId,
       startupAttemptId: event.provenance.startupAttemptId,
       sessionId: data.sessionId,
+      agentId: data.agentId,
+      sessionScope: correlationScope(event),
     };
     if (data.toolName) call.name = data.toolName;
-    if (event.type !== "mcp.rpc.request") Object.assign(call, data, { completed: true });
+    if (event.type !== "mcp.rpc.request") Object.assign(call, data, { completed: true, completionEventIndex: eventIndices.get(event) });
     gatewayCalls.set(key, call);
   }
   toolCalls.push(
@@ -255,6 +257,8 @@ function createSessionLookups(session) {
   };
   return {
     eventsOfType,
+    eventIndices,
+    scopeOf: event => JSON.stringify(event.data.sessionId ? correlationScope(event) : sessionScope(event)),
     toolCalls,
     toolCallsById,
     trace,

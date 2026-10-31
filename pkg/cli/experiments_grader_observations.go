@@ -75,6 +75,7 @@ type graderArtifactResult struct {
 	ID             string                       `json:"id"`
 	Status         string                       `json:"status"`
 	Value          json.RawMessage              `json:"value"`
+	Diagnostics    json.RawMessage              `json:"diagnostics,omitempty"`
 	Implementation graderArtifactImplementation `json:"implementation"`
 }
 

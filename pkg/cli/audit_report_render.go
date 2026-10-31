@@ -769,6 +769,9 @@ func renderConsoleGraders(graders *GradersData) {
 			line += " (" + detail + ")"
 		}
 		fmt.Fprintln(os.Stderr, line)
+		for _, observation := range result.FailureObservations {
+			fmt.Fprintln(os.Stderr, "      "+formatFailureObservation(observation))
+		}
 	}
 }
 

@@ -3,9 +3,9 @@ title: Unified Agent Session Specification
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.7.0"
+version: "2.8.0"
 status: Draft
-publication_date: "2026-10-30"
+publication_date: "2026-10-31"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -13,9 +13,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.7.0<br>
+**Version**: 2.8.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-10-30<br>
+**Publication Date**: 2026-10-31<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -30,7 +30,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.7.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.8.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -92,7 +92,9 @@ content and source path. These prompt events are omitted from default summaries.
 Built-in graders compute from the redacted in-memory unified session in
 conclusion, after all sources are collected. Their manifest and result events
 are appended before the session is persisted; grader files are written into
-the `usage` artifact. Graders never reread the session or source files. Collection and upload
+the `usage` artifact. Derived `failure.observation` events expose bounded,
+versioned evidence-backed classifications from the same redacted input; they
+never replace execution or retry evidence. Graders never reread the session or source files. Collection and upload
 run after conclusion handlers, before setup cleanup. The existing usage JSON,
 JSONL accounting, activity summary, and result files remain available.
 
@@ -250,7 +252,7 @@ opaque because its essential fields are not defined by this specification.
 | Firewall | Host, method, status, decision, byte count, duration; steering/tracker event, level, message, reason, and request ID. |
 | Safe outputs | Operation type, repository/number, provider/identifier/URL, status, and errors; no requested title/body or arbitrary operation payload. |
 | Experiments | Run ID, assignments, and counts. `experiment.assignment.data.assignments` retains the complete current-run name-to-variant map, including an experiment named `assignments`; historical ledger entries remain separate `experiment.state` observations. |
-| Graders and evals | Grader IDs/names, sources, enabled flags, bounds, values, units, statuses, decisions, thresholds, errors, severity, and diagnostic messages. Manifest/result versions, run ID/attempt and counts, implementation ID/version/digest, and metric ID/value pairs are retained when supplied. Eval ID, answer, model, error, run ID, and experiment assignments are retained. No grader scripts, opaque diagnostics, or eval questions. |
+| Graders and evals | Grader IDs/names, sources, enabled flags, bounds, values, units, statuses, decisions, thresholds, errors, severity, and diagnostic messages. Manifest/result versions, run ID/attempt and counts, implementation ID/version/digest, metric ID/value pairs, and validated bounded failure classifications with evidence references are retained when supplied. Eval ID, answer, model, error, run ID, and experiment assignments are retained. No grader scripts, other opaque diagnostics, or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. Detection and eval usage reports resolve per-observation AIC from known model pricing only when explicit AIC is unavailable; unknown pricing leaves AIC absent, while explicit zero and checkpoints remain authoritative. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
 | Model routing | `firewall.model_routing` retains its stage, purpose, provider, labels, selection, endpoint, router, request, outcome, and deviation fields, plus AWF's ranked choices, pool counts, request endpoints, telemetry availability, HTTP status, and failure phase when supplied. `workflow.info` includes the observed `model`, `requestedModel`, and a compact `modelRouting` object. `model_routing.outcome` records the harness's status, wire model, effective and selected endpoints, effort, applied effort, and failure code. |
@@ -797,6 +799,7 @@ source for opaque fields.
 | `safe_output.outcome` | Handler application outcomes from `safe-output-outcomes.jsonl`, transported in `safe-outputs-items`: operation `type`, zero-based `messageIndex`, `status`, and `staged`. Status is `success`, `failed`, `skipped`, `warning`, `cancelled`, `deferred`, `delegated`, or `staged`. Buffered reviews remain deferred until final submission; submission failures and skips replace provisional success. Delegation to a standalone step, custom action, or custom job is not evidence of application. Exporting a custom action payload records delegation, not application; available `workflow.job_result` observations preserve actual job success or failure separately. An optional canonical HTTPS GitHub resource `url` preserves numeric resource IDs, commit hashes, and recognized comment/review anchors, without credentials, query parameters, or free-form fragments. GitHub Enterprise uses the configured server origin; unrecognized URLs are omitted. Claim-scoped outcome files retain their source path in provenance. |
 | `experiment.state`, `experiment.assignment` | Downloaded state and assignment observations, including historical state retained in the supplied snapshot. |
 | `grader.manifest`, `grader.result` | Essential deterministic grader definitions/results, without scripts; grading does not invent event time. |
+| `failure.observation` | Derived versioned failure classification with severity, confidence, evidence state, recoverability, and source references; never a runtime decision. |
 | `eval.result` | Evals JSONL observations, preserving answers, IDs, and observed timestamps. |
 | `usage.report`, `execution.result`, `detection.result`, `workflow.info` | Existing accounting, execution evidence, detection verdicts, and run metadata. `workflow.info` retains available `cliVersion` (gh-aw), `awfVersion`, `mcpgVersion`, `engineId`, `agentVersion`, observed `model`, `requestedModel`, compact `modelRouting`, and `triggerType` from `aw_info.json`. `requestedModel` prefers `requested_model` and falls back to `model` for earlier metadata. Unavailable values are not inferred. |
 | `workflow.job_result` | Conclusion's GitHub Actions dependency snapshot from `needs`, passed through `GH_AW_JOB_RESULTS`. Each record contains the stable `jobId` and its observed `result`: `success`, `failure`, `cancelled`, or `skipped`. Optional `durationMs` is the completed Actions job's `completed_at - started_at` in milliseconds, excluding queue time. Outputs and other dependency fields are excluded. Records have workflow component, conclusion phase, and `usage/aw_session.jsonl` provenance, with deterministic job-ID order and no invented timestamp. |
@@ -1131,6 +1134,25 @@ own output unchanged, survive a JSON round trip, and leave the source unchanged.
 Each value comes from the recorded AWF source; credentials, headers, URLs,
 pricing, candidate-completeness flags, source labels, and other unrecognized
 endpoint or model fields MUST be excluded.
+
+### Failure observation contract
+
+`failure.observation` records MUST follow the independently versioned
+[failure classification schema](/gh-aw/specs/graders-specification/#41-failure-observations).
+Conclusion MUST derive these records only after redaction and before publishing
+the full session. Evidence references identify zero-based positions in that
+session and preserve source provenance, including available attempt attribution.
+Derived observations MUST NOT serve as execution evidence for subsequent grading.
+Republication MUST replace previous derived records without duplicating them.
+
+An `observed` classification describes recorded failure evidence; `missing`
+describes insufficient evidence and MUST NOT imply a confirmed failure.
+Successful recovery MUST NOT delete earlier attempt evidence or failure
+observations. Historical sessions without classifications or attempt attribution
+remain valid; consumers MUST NOT infer complete coverage from their absence.
+These records do not change engine execution or recovery decisions.
+The compact profile remains a lossy projection and MUST NOT be treated as complete
+failure evidence.
 
 ### 4.8 `agent.execution`
 
@@ -2002,7 +2024,7 @@ its title as a standalone heading.
 | MCPG | Method, server, RPC ID, tool name, observed responses/errors, and filter/block diagnostics. Raw RPC arguments and response bodies are omitted. |
 | AWF | Network host/method/status/decision, observed token usage, steering messages, and tracker event names. |
 | Safe outputs | Requested versus execution-recorded operations, target metadata, and structured error counts. Requests are not displayed as successes. |
-| Experiments, graders, evals | Assignments/state, grader value/unit/outcome, implementation identity, diagnostic messages and metrics, and eval ID/answer/model with run and experiment attribution. Grader scripts, opaque diagnostics, and raw evaluation questions are omitted. |
+| Experiments, graders, evals | Assignments/state, grader value/unit/outcome, implementation identity, diagnostic messages and metrics, validated bounded failure observations and evidence references, and eval ID/answer/model with run and experiment attribution. Grader scripts, other opaque diagnostics, and raw evaluation questions are omitted. |
 | Execution, detection, collection | Recorded outcomes/verdict flags, detection job result/conclusion/categorical reason, source coverage, warnings, untimed counts, and absent components. No detector transcript or free-form reasons. |
 | Unknown extensions | Type and provenance only; opaque payloads are not dumped. |
 
@@ -2599,6 +2621,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.8.0 - Draft (2026-10-31)
+
+- Adds derived `failure.observation` records and versioned evidence references.
+- Distinguishes missing evidence from observed failure and retains recovered episodes.
+- Preserves the pure in-memory grading and historical-session contracts.
 
 ### Version 2.7.0 - Draft (2026-10-30)
 

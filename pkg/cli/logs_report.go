@@ -920,6 +920,12 @@ func renderLogsConsoleToWriter(w io.Writer, data LogsData) {
 		console.PrintErrorMessage("Cannot render work queue diagnostics: " + err.Error())
 		return
 	}
+	if _, err := fmt.Fprint(w, console.RenderStructStdout(struct {
+		Observations []failureObservationDisplay `console:"title:Failure Observations,omitempty"`
+	}{Observations: failureObservationDisplays(data.Runs)})); err != nil {
+		console.PrintErrorMessage("Cannot render failure observations: " + err.Error())
+		return
+	}
 	if err := renderFailureReportToWriter(w, data.FailureClusters, data.FailureInvestigation, "", false); err != nil {
 		console.PrintErrorMessage("Cannot render failure clusters: " + err.Error())
 		return

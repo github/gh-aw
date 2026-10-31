@@ -4089,6 +4089,104 @@
                   },
                   "error": {
                     "type": "string"
+                  },
+                  "diagnostics": true,
+                  "failure_observations": {
+                    "type": [
+                      "null",
+                      "array"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "integer"
+                        },
+                        "categoryId": {
+                          "type": "string"
+                        },
+                        "severity": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "string"
+                        },
+                        "evidenceState": {
+                          "type": "string"
+                        },
+                        "recoverability": {
+                          "type": "string"
+                        },
+                        "evidence": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "eventIndex": {
+                                "type": "integer"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "type": "object",
+                                "properties": {
+                                  "component": {
+                                    "type": "string"
+                                  },
+                                  "phase": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  },
+                                  "index": {
+                                    "type": [
+                                      "null",
+                                      "integer"
+                                    ]
+                                  },
+                                  "attemptId": {
+                                    "type": "string"
+                                  },
+                                  "startupAttemptId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "component",
+                                  "phase"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "eventIndex",
+                              "type",
+                              "provenance"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "summary": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "categoryId",
+                        "severity",
+                        "confidence",
+                        "evidenceState",
+                        "recoverability",
+                        "evidence",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
                   }
                 },
                 "required": [
