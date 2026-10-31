@@ -116,6 +116,54 @@ func TestGenerateUnifiedPromptCreationStep_TreatsUserContentAsData(t *testing.T)
 	}
 }
 
+func TestGenerateUnifiedPromptCreationStep_StaticValuesAsData(t *testing.T) {
+	payloads := []string{
+		`{"description":"user's cache"}`,
+		`{"description":"'; touch \"$CANARY\"; #"}`,
+		`{"description":"$(touch \"$CANARY\") ` + "`touch \\\"$CANARY\\\"`" + `"}`,
+		"single ' and double \" quotes\n${PATH}; | & > * \\ backslash",
+		"",
+	}
+	for _, payload := range payloads {
+		t.Run(payload, func(t *testing.T) {
+			compiler := &Compiler{}
+			data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
+			sections := []PromptSection{{
+				Content: "__GH_AW_STATIC__",
+				EnvVars: map[string]string{"GH_AW_STATIC": payload},
+			}}
+			var creation strings.Builder
+			mappings := compiler.generateUnifiedPromptCreationStep(&creation, sections, nil, nil, data)
+			require.Len(t, mappings, 1)
+			assert.True(t, mappings[0].IsLiteral, "Static values must not be reconstructed as quoted expressions")
+			assert.Equal(t, payload, mappings[0].Content)
+
+			var substitution strings.Builder
+			generatePlaceholderSubstitutionStep(&substitution, mappings, "      ", data)
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Run  string            `yaml:"run"`
+						Env  map[string]string `yaml:"env"`
+						With map[string]string `yaml:"with"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte("jobs:\n  test:\n    steps:\n"+creation.String()+substitution.String()), &workflow))
+			steps := workflow.Jobs["test"].Steps
+			require.Len(t, steps, 2)
+			assert.NotContains(t, steps[0].Env, "GH_AW_STATIC", "Static values are only needed during substitution")
+			assert.Equal(t, payload, steps[1].Env["GH_AW_STATIC"], "YAML must preserve static values byte for byte")
+			for _, step := range steps {
+				assert.Empty(t, step.Run, "Prompt values must never enter a shell step")
+				if payload != "" {
+					assert.NotContains(t, step.With["script"], payload, "Static values must not enter JavaScript source")
+				}
+			}
+		})
+	}
+}
+
 func TestGenerateUnifiedPromptCreationStep_SplitsSystemAndUserItems(t *testing.T) {
 	compiler := &Compiler{}
 	data := &WorkflowData{ParsedTools: NewTools(map[string]any{})}
