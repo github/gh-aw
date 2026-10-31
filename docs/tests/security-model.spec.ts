@@ -11,6 +11,11 @@ test("explains the security boundaries in an ordered flow", async ({ page }) => 
   await expect(jira).toBeVisible();
   await expect(jira).toContainText("Via authenticated repository dispatch");
   await expect(jira).toHaveAttribute("href", "/gh-aw/reference/triggers/");
+  const inputs = section.locator(".agent").getByRole("link", { name: /Integrity filtered Inputs/ });
+  await expect(inputs).toBeVisible();
+  await expect(inputs).toHaveAttribute("href", "/gh-aw/reference/integrity/");
+  await expect(section.locator(".trigger .input-gate")).toHaveCount(0);
+  await expect(section).not.toContainText("Sanitized inputs");
   for (const name of ["GitHub Copilot", "Codex", "Claude Code"]) {
     await expect(section.getByRole("img", { name, exact: true })).toBeVisible();
   }
@@ -21,6 +26,7 @@ test("explains the security boundaries in an ordered flow", async ({ page }) => 
   await expect(section.getByRole("link", { name: /MicroVM/ })).toContainText("optional / preview");
   await expect(section.getByRole("link", { name: /Self-hosted/ })).toBeVisible();
   await expect(section.getByRole("link", { name: /Agent firewall/ })).toBeVisible();
+  await expect(section.getByRole("link", { name: "OIDC credential providers supported", exact: true })).toHaveAttribute("href", "/gh-aw/reference/auth/");
   const checks = section.locator(".output-path");
   await expect(checks).toContainText(/Sanitization.*Threat detection.*Writes applied/s);
 });
