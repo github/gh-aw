@@ -1,0 +1,12 @@
+package writebytestring
+
+import (
+	"bytes"
+	"io"
+)
+
+func badParenConversion() {
+	var buf bytes.Buffer
+	s := "hello"
+	io.WriteString(&buf, s) // want `buf\.Write\(\[\]byte\(s\)\) can be replaced with io\.WriteString\(&buf, s\) to potentially avoid a \[\]byte allocation if the writer implements io\.StringWriter`
+}

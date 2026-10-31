@@ -70,7 +70,9 @@ func roundTripCalls(n ast.Node) (*ast.CallExpr, *ast.CallExpr, bool) {
 	if !ok || len(outer.Args) != 1 || outer.Ellipsis.IsValid() {
 		return nil, nil, false
 	}
-	inner, ok := outer.Args[0].(*ast.CallExpr)
+	// astutil.UnwrapParenExpr handles a parenthesized inner conversion, e.g.
+	// string(([]byte(s))).
+	inner, ok := astutil.UnwrapParenExpr(outer.Args[0]).(*ast.CallExpr)
 	if !ok || len(inner.Args) != 1 || inner.Ellipsis.IsValid() {
 		return nil, nil, false
 	}
