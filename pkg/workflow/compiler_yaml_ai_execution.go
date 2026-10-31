@@ -135,6 +135,36 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 	return injected
 }
 
+// enforceEngineExecutionStepName rewrites the "- name:" line of an evals or detection
+// engine execution step so the name satisfies constants.IsEngineExecutionStepName.
+// gh aw audit relies on that contract to find the step, because the jobs API does
+// not expose step ids.
+func enforceEngineExecutionStepName(step GitHubActionStep) GitHubActionStep {
+	for i, line := range step {
+		indent, name, found := strings.Cut(line, "- name: ")
+		if !found || strings.TrimSpace(indent) != "" {
+			continue
+		}
+		quote := ""
+		for _, q := range []string{`"`, "'"} {
+			if inner, ok := strings.CutPrefix(name, q); ok {
+				if unquoted, ok := strings.CutSuffix(inner, q); ok {
+					quote, name = q, unquoted
+					break
+				}
+			}
+		}
+		if constants.IsEngineExecutionStepName(name) {
+			return step
+		}
+		rewritten := make(GitHubActionStep, 0, len(step))
+		rewritten = append(rewritten, step[:i]...)
+		rewritten = append(rewritten, indent+"- name: "+quote+constants.EngineExecutionStepName(name)+quote)
+		return append(rewritten, step[i+1:]...)
+	}
+	return step
+}
+
 // generateEngineExecutionSteps generates the GitHub Actions steps for executing the AI engine
 func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, logFile string) {
 	// --use-samples (hidden) replaces the agent step with a deterministic driver

@@ -12,9 +12,10 @@
 
 ### Decision
 
-We will add a dedicated `engine_step_failed` audit finding for compiler-emitted engine and judge steps in the `evals` and `detection` jobs, reported regardless of the overall run conclusion. The audit identifies these steps through shared constants and inspects the cached jobs API steps together with the downloaded job logs:
+We will add a dedicated `engine_step_failed` audit finding for compiler-emitted engine and judge steps in the `evals` and `detection` jobs, reported regardless of the overall run conclusion. The audit inspects the cached jobs API steps together with the downloaded job logs:
 
-- **Step log window.** Nested per-step logs are read whole. Flat per-job logs are limited to the step's `started_at`..`completed_at` window and narrowed to the step's own `##[group]Run` header. Because the jobs API reports whole seconds, the header is chosen by the step's position among the jobs API steps that start in the same second, not by "last header in the start second", so a successor that starts in the same second does not take over the engine step's window.
+- **Engine step naming contract.** The jobs API does not expose step ids, so the engine step cannot be found by its `evals_agentic_execution` or `detection_agentic_execution` id. Instead, `constants.IsEngineExecutionStepName` (the `Execute ` prefix) is a naming contract shared by the compiler and the audit: when the compiler emits an evals or detection engine step, it keeps a name that satisfies the predicate and prefixes any other name, such as a custom engine's `step-name`, through `constants.EngineExecutionStepName`. Compiler tests check that every emitted evals and detection engine step satisfies the predicate and that no other step in those jobs does.
+- **Step log window.** Nested per-step logs are read whole. Flat per-job logs are limited to the step's `started_at`..`completed_at` window and narrowed to the step's own `##[group]Run` header. Because the jobs API reports whole seconds, the header is chosen by its order among all headers logged in the window: the steps that the jobs API places before it and that start in the same second log their headers first. The header is not limited to the start second, because the runner can log it in the second after the API start time, and a successor that starts in the same second does not take over the engine step's window.
 - **Failure signal.** A step fails when its window contains a non-zero `Process completed with exit code` line. The finding quotes the first AWF health-check error, else the first `##[error]` line.
 - **Sanitized error line.** The log-derived line passes through `stringutil.SanitizeErrorMessage` and additional redaction of token values, bearer credentials and URL userinfo, and control characters are replaced, before truncation. Only the redacted line reaches the finding, the cached `audit.json` and the console.
 - **Evals execution evidence per invocation.** A judge that never started (`not_started`) is reported even with a clean step log. Reusable-workflow invocations upload separate `<hash>-usage` and `<hash>-evals` artifacts with the same run ID and attempt, so the evidence is matched to each evals job through the artifact prefix logged by its upload step. Without that prefix, the state is used only when every matching artifact agrees; otherwise it is unavailable.
@@ -44,16 +45,17 @@ The existing error extractor could be changed to scan green runs and emit generi
 - Findings name the affected job and step and preserve the most useful first diagnostic line, making proxy or engine startup failures actionable.
 - Evals output distinguishes YES, NO, and UNKNOWN answers and exposes `not_started`, so an unexecuted judge is not presented as a healthy result.
 - Log-derived text is redacted before it is persisted or printed; the evals summary counts only the audited run's answers, and execution evidence is attributed per reusable-workflow invocation.
-- Shared step-name constants and compiled-lock tests keep the audit selector aligned with compiler-emitted workflow steps.
+- A shared, compiler-enforced step-name predicate and compiler tests keep the audit selector aligned with compiler-emitted workflow steps, including custom engine step names.
 
 #### Negative
+- A custom engine `step-name` that does not start with `Execute ` is prefixed with it in the evals and detection jobs.
 - Audit logic must correlate jobs API timestamps with flat or nested log layouts and can miss a failure when logs or execution artifacts are unavailable or malformed, or when execution evidence from several reusable-workflow invocations cannot be attributed and disagrees.
 - The audit JSON contract and cache version change, requiring schema updates and regeneration of stale cached audit data for downstream consumers.
 - The additional evidence parsing increases maintenance and test surface in the CLI, including edge cases where neighboring steps log within the same second.
 - Redaction can hide part of a legitimate diagnostic, such as a snake_case identifier or URL credentials, in the reported error line.
 
 #### Neutral
-- The `continue-on-error` settings, compiler step outcomes, existing `threat_detection_job_failed` and `workflow_succeeded` logic, and the generic `errors` section remain unchanged.
+- The `continue-on-error` settings, compiler step outcomes, built-in engine step names, existing `threat_detection_job_failed` and `workflow_succeeded` logic, and the generic `errors` section remain unchanged.
 - The new finding is produced only for the compiler-emitted evals and detection engine/judge steps; ordinary agent engine steps and unrelated continue-on-error steps remain out of scope.
 - `gh aw logs` without `--audit` remains unchanged, while `gh aw logs --audit` benefits from the shared audit data and cache versioning.
 

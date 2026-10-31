@@ -969,3 +969,106 @@ func TestEvalsClaudeAnthropicProviderHasNoCompilerBaseURL(t *testing.T) {
 		t.Fatal("Anthropic-provider evals job must not set a compiler ANTHROPIC_BASE_URL")
 	}
 }
+
+// TestEvalsAndDetectionEngineStepNamesFollowAuditContract verifies that the compiler
+// enforces the engine execution step naming contract that gh aw audit uses to find
+// the evals and detection engine steps (the jobs API does not expose step ids):
+// a custom engine step name that already follows it is kept, and one that does not
+// is prefixed.
+func TestEvalsAndDetectionEngineStepNamesFollowAuditContract(t *testing.T) {
+	for _, tc := range []struct{ stepName, want string }{
+		{stepName: "Execute DeepSeek Harness", want: "Execute DeepSeek Harness"},
+		{stepName: "Run DeepSeek Harness", want: "Execute Run DeepSeek Harness"},
+	} {
+		t.Run(tc.stepName, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			sharedDir := filepath.Join(tmpDir, "shared")
+			if err := os.MkdirAll(sharedDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			shared := `---
+engine:
+  id: harness-engine
+  display-name: Harness Engine
+  behaviors:
+    secret-strategy: universal-llm-consumer
+    execution:
+      command-name: harness-engine
+      step-name: ` + tc.stepName + `
+---
+
+# Shared Engine Definition
+`
+			if err := os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(shared), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			workflowPath := filepath.Join(tmpDir, "test.md")
+			content := `---
+on: push
+engine:
+  id: harness-engine
+  model: copilot/gpt-5
+imports:
+  - shared/engine.md
+safe-outputs:
+  create-issue:
+evals:
+  - id: completed
+    question: Did the agent complete the task?
+---
+
+# Test Workflow
+`
+			if err := os.WriteFile(workflowPath, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+				t.Fatal(err)
+			}
+			result, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var lock struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Name string `yaml:"name"`
+						ID   string `yaml:"id"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			if err := yaml.Unmarshal(result, &lock); err != nil {
+				t.Fatal(err)
+			}
+			engineSteps := map[string]string{
+				string(constants.EvalsJobName):     "evals_agentic_execution",
+				string(constants.DetectionJobName): "detection_agentic_execution",
+			}
+			for jobName, engineStepID := range engineSteps {
+				job, ok := lock.Jobs[jobName]
+				if !ok {
+					t.Fatalf("expected %s job in the compiled workflow", jobName)
+				}
+				found := false
+				for _, step := range job.Steps {
+					if step.ID == engineStepID {
+						found = true
+						if !constants.IsEngineExecutionStepName(step.Name) {
+							t.Errorf("%s engine step %q must satisfy constants.IsEngineExecutionStepName", jobName, step.Name)
+						}
+						if jobName == string(constants.EvalsJobName) && step.Name != tc.want {
+							t.Errorf("evals engine step name = %q, want %q", step.Name, tc.want)
+						}
+						continue
+					}
+					if constants.IsEngineExecutionStepName(step.Name) {
+						t.Errorf("%s step %q (id %q) is not the engine step but satisfies constants.IsEngineExecutionStepName", jobName, step.Name, step.ID)
+					}
+				}
+				if !found {
+					t.Errorf("expected %s job to contain step id %s", jobName, engineStepID)
+				}
+			}
+		})
+	}
+}

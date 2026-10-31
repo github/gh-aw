@@ -600,13 +600,14 @@ func readLogLines(path string) []string {
 // covers the full start and completed seconds and lines without a timestamp inherit
 // the previous decision. Neighbouring steps can log in those same seconds, so the
 // result is then narrowed to the step's own "##[group]Run " header up to the next step
-// header. The step's header is identified from the jobs API steps that start in the
-// same second: the step's position among them is its position among the headers
-// logged in that second.
+// header. The step's header is identified by its order among all the headers logged
+// in the window: the steps that the jobs API places before it in the job and that
+// start in its start second log their headers first. The step's header itself can be
+// logged in a later second than its API start time, so it is not limited to the start
+// second.
 func filterLogLinesByWindow(lines []string, steps []JobStep, step JobStep) []string {
 	windowStart := step.StartedAt.Truncate(time.Second)
 	windowEnd := step.CompletedAt.Truncate(time.Second).Add(time.Second)
-	startSecondEnd := windowStart.Add(time.Second)
 	type timedLine struct {
 		text string
 		ts   time.Time
@@ -623,15 +624,15 @@ func filterLogLinesByWindow(lines []string, steps []JobStep, step JobStep) []str
 			kept = append(kept, timedLine{text: line, ts: lastTS})
 		}
 	}
-	var startSecondHeaders []int
+	var windowHeaders []int
 	for i, entry := range kept {
-		if isStepHeaderLine(entry.text) && entry.ts.Before(startSecondEnd) {
-			startSecondHeaders = append(startSecondHeaders, i)
+		if isStepHeaderLine(entry.text) {
+			windowHeaders = append(windowHeaders, i)
 		}
 	}
 	begin := -1
-	if position := min(sameSecondPredecessorSteps(steps, step), len(startSecondHeaders)-1); position >= 0 && position < len(startSecondHeaders) {
-		begin = startSecondHeaders[position]
+	if position := min(sameSecondPredecessorSteps(steps, step), len(windowHeaders)-1); position >= 0 && position < len(windowHeaders) {
+		begin = windowHeaders[position]
 	}
 	finalSecond := step.CompletedAt.Truncate(time.Second)
 	stop := len(kept)

@@ -389,6 +389,48 @@ func TestAuditEngineStepFailure_SameSecondSuccessorStep(t *testing.T) {
 	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
 }
 
+func TestAuditEngineStepFailure_HeaderInSecondAfterAPIStart(t *testing.T) {
+	runDir := t.TempDir()
+	// The jobs API starts step 22 at 22:27:58Z, the same second as step 21, but the
+	// runner logs step 22's header at 22:27:59.010Z.
+	jobLog := strings.NewReplacer(
+		"2026-10-28T22:27:58.5197572Z ##[group]Run mkdir", "2026-10-28T22:27:59.0100000Z ##[group]Run mkdir",
+		"2026-10-28T22:27:58.5198127Z mkdir", "2026-10-28T22:27:59.0100500Z mkdir",
+	).Replace(detectionPreflightJobLog40779352178)
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:         detectionPreflightJobs40779352178,
+		"workflow-logs/3_detection.txt": jobLog,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40779352178, "Daily BYOK Ollama Test", "success")
+
+	job := processedRun.JobDetails[0]
+	lines := readEngineStepLogLines(filepath.Join(runDir, "workflow-logs"), job.JobInfo, job.Steps[1])
+	require.NotEmpty(t, lines)
+	assert.True(t, strings.HasPrefix(lines[0], "2026-10-28T22:27:59.0100000Z ##[group]Run mkdir"), "step 22 begins at its own header, not step 21's")
+	for _, line := range lines {
+		assert.NotContains(t, line, "threat-detect installation complete", "step 21 output attributed to step 22")
+	}
+
+	findings := generateEngineStepFailureFindings(processedRun)
+	require.Len(t, findings, 1, "the engine's non-zero exit must be reported when its header is logged after its API start second")
+	assert.Contains(t, findings[0].Description, `step 22 "Execute threat detection with AWF"`)
+	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
+}
+
+func TestAuditEngineStepFailure_CustomNamedEngineStep(t *testing.T) {
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:     strings.ReplaceAll(evalsPreflightJobs40955414354, "Execute Claude Code CLI", "Execute DeepSeek Harness"),
+		"workflow-logs/3_evals.txt": evalsPreflightJobLog40955414354,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Smoke DeepSeek Harness", "success")
+
+	findings := generateEngineStepFailureFindings(processedRun)
+	require.Len(t, findings, 1, "a custom-named engine step that exits non-zero must be reported")
+	assert.Contains(t, findings[0].Description, `step 15 "Execute DeepSeek Harness"`)
+	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
+}
+
 func TestAuditEngineStepFailure_EvalsExecutionStatePerInvocation(t *testing.T) {
 	invocationLog := func(prefix string) string {
 		return `2026-10-29T21:18:59.0334305Z ##[group]Run set -o pipefail
