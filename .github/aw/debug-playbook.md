@@ -165,7 +165,7 @@ Nonempty `safeoutputs.jsonl` doesn't prove publication.
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
 | `E002`, `MAX_COUNT_REACHED` | Operation cap; accepted records. | Reduce count; never replay applied mutations. |
 | `E003` | Named count/size limit. | Split/reduce authorized payload. |
-| `ERR_PERMISSION`, `E004`, `APPROVE_WORKFLOW_RUN_PERMISSION_DENIED`, `DISCUSSIONS_TOKEN_SCOPE_MISMATCH` | Target/scope, permissions, token type. | Fix authorized permissions; never expose tokens/evade guards. |
+| `ERR_PERMISSION`, `E004`, `APPROVE_WORKFLOW_RUN_PERMISSION_DENIED`, `DISCUSSIONS_TOKEN_SCOPE_MISMATCH`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Scope, permissions, token type. | Fix permissions; never expose tokens/evade guards. |
 | `E006` | Body/string length. | Shorten; retain required content. |
 | `E008` | URL count/limit. | Reduce links; no concealment. |
 | `ERR_API`, `E007` | GitHub status; operation guard. | Resolve API/target cause; policy skip != failed mutation. |
