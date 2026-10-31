@@ -268,6 +268,9 @@ func buildSafeOutputInputsConfig(inputs map[string]*InputDefinition) map[string]
 		if len(inputDef.Options) > 0 {
 			inputConfig["options"] = inputDef.Options
 		}
+		if inputDef.MaxLength != nil {
+			inputConfig["maxLength"] = *inputDef.MaxLength
+		}
 		inputsConfig[inputName] = inputConfig
 	}
 	return inputsConfig
@@ -390,6 +393,10 @@ func populateCustomJobToolProperties(properties map[string]any, inputs map[strin
 			property["type"] = "number"
 		default:
 			property["type"] = "string"
+		}
+
+		if inputDef.MaxLength != nil && (inputDef.Type == "" || inputDef.Type == "string") {
+			property["maxLength"] = *inputDef.MaxLength
 		}
 
 		if inputDef.Default != nil {

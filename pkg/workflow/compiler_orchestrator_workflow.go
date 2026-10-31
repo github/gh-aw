@@ -117,6 +117,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
+	ctx.workflowData.engineDefinition = c.engineCatalog.Get(engineSetup.engineSetting)
 	ctx.workflowData.SourceDocument = ctx.document
 	ctx.workflowData.Decision, err = extractDecision(ctx.frontmatter.Frontmatter)
 	if err != nil {

@@ -642,6 +642,27 @@ func TestComputePermissionsForSafeOutputsExcludesPerHandlerAppsFromGlobalAppToke
 	assert.Equal(t, PermissionRead, perms.permissions[PermissionIssues])
 }
 
+func TestComputePermissionsForSafeOutputsExcludesHandlerTokensFromGlobalAppToken(t *testing.T) {
+	safeOutputs := &SafeOutputsConfig{
+		GitHubApp: &GitHubAppConfig{AppID: "global-app", PrivateKey: "global-key"},
+		DispatchWorkflow: &DispatchWorkflowConfig{
+			Workflows: []string{"downstream.yml"},
+			BaseSafeOutputConfig: BaseSafeOutputConfig{
+				Max:         strPtr("1"),
+				GitHubToken: "${{ secrets.GITHUB_TOKEN }}",
+			},
+		},
+	}
+
+	appPermissions := computePermissionsForSafeOutputs(safeOutputs, true)
+	require.NotNil(t, appPermissions)
+	assert.NotContains(t, appPermissions.permissions, PermissionActions)
+
+	jobPermissions := computePermissionsForSafeOutputs(safeOutputs, false)
+	require.NotNil(t, jobPermissions)
+	assert.Equal(t, PermissionWrite, jobPermissions.permissions[PermissionActions])
+}
+
 func TestComputePermissionsForSafeOutputsDispatchRepositoryAppSplit(t *testing.T) {
 	safeOutputs := &SafeOutputsConfig{
 		DispatchRepository: &DispatchRepositoryConfig{
@@ -1438,7 +1459,7 @@ func TestCompileStagedHandlerReadPermissions(t *testing.T) {
 						if app == "per-handler" {
 							stepID = handler.key + "-app-token"
 						}
-						step := compiledStepBlockForTest(compiled, stepID)
+						step := compiledStepBlockForTest(job, stepID)
 						require.NotEmpty(t, step)
 						for _, scope := range handler.scopes {
 							assert.Contains(t, step, "permission-"+string(scope)+": read")

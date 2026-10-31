@@ -12994,8 +12994,31 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "max-length": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000,
+                          "description": "Maximum allowed string length in characters"
                         }
                       },
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "type": {
+                                "enum": ["boolean", "choice", "number", "environment"]
+                              }
+                            },
+                            "required": ["type"]
+                          },
+                          "then": {
+                            "not": {
+                              "required": ["max-length"]
+                            }
+                          }
+                        }
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -13227,8 +13250,31 @@
                           "enum": ["string", "boolean", "number"],
                           "description": "Input parameter type",
                           "default": "string"
+                        },
+                        "max-length": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000,
+                          "description": "Maximum allowed string length in characters"
                         }
                       },
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "type": {
+                                "enum": ["boolean", "number"]
+                              }
+                            },
+                            "required": ["type"]
+                          },
+                          "then": {
+                            "not": {
+                              "required": ["max-length"]
+                            }
+                          }
+                        }
+                      ],
                       "additionalProperties": false
                     }
                   },

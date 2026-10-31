@@ -29,6 +29,41 @@ func loadAiderSample(t *testing.T) *EngineDefinition {
 	return &frontmatter.Engine
 }
 
+func TestAiderNetworkRequiresPackageEcosystemOptIn(t *testing.T) {
+	engine, err := NewBehaviorDefinedEngine(loadAiderSample(t))
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name     string
+		allowed  []string
+		runtimes map[string]any
+		wantPyPI bool
+	}{
+		{name: "no opt-in", allowed: []string{}},
+		{name: "explicit network opt-in", allowed: []string{"python"}, wantPyPI: true},
+		{
+			name: "explicit runtime opt-in", allowed: []string{},
+			runtimes: map[string]any{"python": map[string]any{"version": "3.12"}}, wantPyPI: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			domains := domainSet(t, engine.allowedDomains(&WorkflowData{
+				Model: "openai/gpt-5", EngineConfig: &EngineConfig{},
+				NetworkPermissions: &NetworkPermissions{Allowed: test.allowed},
+				Runtimes:           test.runtimes,
+			}))
+			assert.Contains(t, domains, "api.openai.com")
+			for _, registry := range packageRegistryDomains {
+				allowed := false
+				for rule := range domains {
+					allowed = allowed || awfDomainAllowsHost(rule, registry)
+				}
+				assert.Equal(t, test.wantPyPI && registry != "registry.npmjs.org" && registry != "registry.npmjs.com",
+					allowed, registry)
+			}
+		})
+	}
+}
+
 func aiderHarnessCommand(t *testing.T, tempDir, command string, args ...string) *exec.Cmd {
 	t.Helper()
 	harnessPath := filepath.Join(tempDir, "aider_harness.cjs")
