@@ -93,25 +93,25 @@ reflect v1.7.0-era defaults rather than legacy `MCPGODEBUG` opt-outs.
 1. **Stateless HTTP mode** (`StreamableHTTPOptions.Stateless = true`) would opt the HTTP
    server into the `2026-07-28` protocol revision. Given the deliberate 2 hour
    `SessionTimeout` (session affinity for long-running `logs` / `audit` calls), staying
-   stateful remains the right call for now.
+   stateful is retained for now because switching would break that session affinity.
 2. **Custom JSON-RPC method registration** (new in v1.7.0) — no current need, but available
    if gh-aw ever wants a lightweight non-tool RPC endpoint.
 3. **`x-mcp-header` passthrough** for `logs` / `audit` tool params — only relevant if the
    HTTP server is ever placed behind a reverse proxy; the server is loopback-only today.
 
-### Best Practice Alignment
+### Convention Alignment
 
-- Correct annotation types (bare `bool` hints matching the v1.7.0 defaults)
+- Annotation types match the v1.7.0 defaults (bare `bool` hints)
 - Deliberate avoidance of premature schema defaults
 - In-code comments tracking SDK version-specific behavior
 
 ## Recommendations
 
-1. No action needed this cycle — the module is current and usage is idiomatic.
+1. No action needed this cycle — the module is current and usage follows the patterns shown in the SDK documentation.
 2. Keep the `Stateless` HTTP mode decision on the radar if the MCP ecosystem drops support
    for stateful sessions on newer protocol revisions.
 3. Continue the practice of commenting *why* an SDK default is or is not used (for example
-   the `timeout` schema default) — it has already prevented a subtle bug class.
+   the `timeout` schema default) — it has already prevented the timeout default from silently overriding a handler-computed value.
 
 ## References
 

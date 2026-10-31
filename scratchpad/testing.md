@@ -420,7 +420,7 @@ go run test_validation.go
 ### Defense in Depth
 Security tests are organized in layers:
 
-1. **Input Validation Layer**: Fuzz tests and input validation tests ensure all user inputs are handled safely
+1. **Input Validation Layer**: Fuzz tests and input validation tests check that user inputs are validated before use
 2. **Expression Safety Layer**: Expression parser tests prevent secret and token leakage
 3. **Compilation Layer**: Workflow compilation tests ensure secure YAML generation
 4. **Output Layer**: Safe output tests ensure operations are properly restricted
@@ -486,9 +486,9 @@ This testing framework ensures:
 ## Test Maintenance
 
 The testing framework is designed to be:
-- **Self-validating**: The validation script ensures all tests work correctly  
-- **Complete**: Covers all aspects of functionality and interface design
-- **Maintainable**: Clear structure and documentation for future updates
+- **Self-checking**: The validation script checks that tests run and pass
+- **Coverage-tracked**: Covers the functionality and interface areas listed in this document
+- **Maintainable**: Structure and documentation are kept current for future updates
 - **Scalable**: Tests can be added incrementally as functionality is implemented
 - **Security-focused**: Security regression tests prevent reintroduction of vulnerabilities
 
