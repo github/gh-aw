@@ -660,9 +660,13 @@ func runMCPAuditSubprocess(ctx context.Context, responseDeadline time.Time, exec
 	if timeout <= mcpAuditResponseMargin {
 		return nil, &mcpStageError{stage: "subprocess_slot", err: context.DeadlineExceeded}
 	}
-	cmdArgs := buildAuditCommandArgs(args, nil)
-	cmdArgs = append(cmdArgs, "--timeout", (timeout - mcpAuditResponseMargin).String())
-	cmdArgs = appendMCPPositionals(cmdArgs, runItems...)
+	cmdArgs := buildAuditCommandArgs(args, runItems)
+	timeoutArgs := []string{"--timeout", (timeout - mcpAuditResponseMargin).String()}
+	if boundary := slices.Index(cmdArgs, "--"); boundary >= 0 {
+		cmdArgs = slices.Insert(cmdArgs, boundary, timeoutArgs...)
+	} else {
+		cmdArgs = append(cmdArgs, timeoutArgs...)
+	}
 	cmd := execCmd(ctx, cmdArgs...)
 	cmd.WaitDelay = time.Second
 	stdout, err := cmd.Output()
@@ -809,7 +813,7 @@ func summarizeMCPAuditPartialResults(partial map[string]any) map[string]any {
 		for _, field := range []string{"run_id", "workflow_name", "status", "conclusion", "event"} {
 			if value, ok := overview[field]; ok {
 				if text, ok := value.(string); ok {
-					value = sanitizeMCPUntrustedText(text)
+					value = sanitizeMCPUntrustedIdentifier(text)
 				}
 				summary[field] = value
 			}

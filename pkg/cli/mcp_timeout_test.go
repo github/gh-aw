@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -149,7 +151,8 @@ func TestMCPCompileTimeoutReturnsSanitizedPartialResults(t *testing.T) {
 			require.Len(t, results, 1)
 			partial, ok := results[0].(map[string]any)
 			require.True(t, ok)
-			assert.Equal(t, "| checkpoint.md", partial["workflow"])
+			assert.Equal(t, "checkpoint.md", partial["workflow"])
+			assert.NotContains(t, partial, "scope")
 			errors, ok := partial["errors"].([]any)
 			require.True(t, ok)
 			require.Len(t, errors, 1)
@@ -196,6 +199,65 @@ func TestMCPCompileProgressSnapshot(t *testing.T) {
 	assert.NotContains(t, message, "\u0001")
 }
 
+func TestMCPCompileProgressPreservesCanonicalMetadata(t *testing.T) {
+	progressDir, err := os.MkdirTemp("", "gh-aw-mcp-compile-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(progressDir) })
+	progressPath := filepath.Join(progressDir, "results.json")
+	writeMCPCompileProgress(progressPath, []ValidationResult{{
+		Scope: "batch", Workflow: "compiler.md",
+		Errors: []ValidationIssue{{
+			Type: "compiler_warning", Message: "compiler reported warnings",
+			File: "workflow.md", Severity: scanfindings.SeverityHigh,
+		}},
+	}})
+
+	results := readMCPCompileProgress(progressPath)
+
+	require.Len(t, results, 1)
+	assert.Equal(t, "batch", results[0].Scope)
+	assert.Equal(t, "compiler.md", results[0].Workflow)
+	require.Len(t, results[0].Errors, 1)
+	assert.Equal(t, "compiler_warning", results[0].Errors[0].Type)
+	assert.Equal(t, "workflow.md", results[0].Errors[0].File)
+	assert.Equal(t, "high", results[0].Errors[0].Severity)
+}
+
+func TestMCPCompileProgressStopsAtResponseBudget(t *testing.T) {
+	progressDir, err := os.MkdirTemp("", "gh-aw-mcp-compile-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(progressDir) })
+	progressPath := filepath.Join(progressDir, "results.json")
+
+	input := make([]ValidationResult, 16)
+	for i := range input {
+		input[i] = ValidationResult{
+			Workflow: fmt.Sprintf("workflow-%02d.md", i), Valid: false,
+			Errors:   []ValidationIssue{{Type: "compile_error", Message: strings.Repeat("x", maxMCPCompileDiagnosticBytes)}},
+			Warnings: []ValidationIssue{},
+		}
+	}
+	writeMCPCompileProgress(progressPath, input)
+
+	results := readMCPCompileProgress(progressPath)
+
+	require.NotEmpty(t, results)
+	assert.Less(t, len(results), len(input))
+	output, err := json.Marshal(results)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(output), maxMCPCompileProgressResultsBytes)
+	next := input[len(results)]
+	candidate := append(append([]mcpCompilePartialResult(nil), results...), mcpCompilePartialResult{
+		Workflow: sanitizeMCPUntrustedIdentifier(next.Workflow),
+		Valid:    next.Valid,
+		Errors:   sanitizeMCPCompilePartialIssues(next.Errors),
+		Warnings: sanitizeMCPCompilePartialIssues(next.Warnings),
+	})
+	output, err = json.Marshal(candidate)
+	require.NoError(t, err)
+	assert.Greater(t, len(output), maxMCPCompileProgressResultsBytes)
+}
+
 func TestMCPCompileDockerPreparationTimeout(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Docker timeout test requires a POSIX shell")
@@ -238,7 +300,7 @@ func TestMCPCompileDockerPreparationTimeout(t *testing.T) {
 }
 
 func TestMCPAuditTimeoutReturnsStage(t *testing.T) {
-	for _, output := range []string{`{"partial":true,"complete":false,"stage":"analysis","overview":{"run_id":123,"workflow_name":"example","status":"completed"},"jobs":[{},{}],"missing_data":[{}]}`, ""} {
+	for _, output := range []string{`{"partial":true,"complete":false,"stage":"analysis","overview":{"run_id":123,"workflow_name":"example","status":"completed","conclusion":"success","event":"push"},"jobs":[{},{}],"missing_data":[{}]}`, ""} {
 		t.Run(output, func(t *testing.T) {
 			execCmd := func(ctx context.Context, _ ...string) *exec.Cmd {
 				cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMCPTimeoutChild$")
@@ -262,8 +324,10 @@ func TestMCPAuditTimeoutReturnsStage(t *testing.T) {
 				require.True(t, ok)
 				assert.Equal(t, true, partialResults["available"])
 				assert.InDelta(t, 123, partialResults["run_id"], 0)
-				assert.Equal(t, "| example", partialResults["workflow_name"])
-				assert.Equal(t, "| completed", partialResults["status"])
+				assert.Equal(t, "example", partialResults["workflow_name"])
+				assert.Equal(t, "completed", partialResults["status"])
+				assert.Equal(t, "success", partialResults["conclusion"])
+				assert.Equal(t, "push", partialResults["event"])
 				assert.InDelta(t, 2, partialResults["jobs_count"], 0)
 				assert.InDelta(t, 1, partialResults["missing_data_count"], 0)
 				assert.NotContains(t, extractTextResult(t, result), "overview")
@@ -303,6 +367,24 @@ func TestMCPAuditPipeDrainTimeoutSummarizesReport(t *testing.T) {
 func TestMCPAuditSkipsBaselineDiscovery(t *testing.T) {
 	assert.Contains(t, buildAuditCommandArgs(auditArgs{}, []string{"123"}), "--no-baseline")
 	assert.NotContains(t, buildAuditCommandArgs(auditArgs{}, []string{"123", "456"}), "--no-baseline")
+}
+
+func TestMCPAuditHandlerPassesNoBaselineBeforePositionals(t *testing.T) {
+	var capturedArgs []string
+	execCmd := func(ctx context.Context, args ...string) *exec.Cmd {
+		capturedArgs = append([]string(nil), args...)
+		return mockCommandWithOutput(`{}`, "")(ctx)
+	}
+
+	result, _, err := newAuditToolHandler(execCmd, "", false)(context.Background(), nil, auditArgs{RunID: "123"})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	boundary := slices.Index(capturedArgs, "--")
+	require.GreaterOrEqual(t, boundary, 0)
+	assert.Contains(t, capturedArgs[:boundary], "--no-baseline")
+	assert.Contains(t, capturedArgs[:boundary], "--timeout")
+	assert.Equal(t, []string{"123"}, capturedArgs[boundary+1:])
 }
 
 func TestMCPTimeoutWaitingForSubprocessSlot(t *testing.T) {

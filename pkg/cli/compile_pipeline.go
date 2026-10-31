@@ -211,6 +211,9 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 			}
 		}
 
+		if len(*validationResults) == 0 {
+			appendMCPCachedModelInventoryWarning(config, &fileResult.validationResult)
+		}
 		*validationResults = append(*validationResults, fileResult.validationResult)
 		writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
 	}

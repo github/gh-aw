@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,19 +40,49 @@ func TestDevelopmentModelInventoryRefreshWarnings(t *testing.T) {
 }
 
 func TestMCPDevelopmentModelInventoryUsesCachedArtifacts(t *testing.T) {
-	original := compileBuildModelsReport
-	t.Cleanup(func() { compileBuildModelsReport = original })
-	compileBuildModelsReport = func(_ context.Context, opts modelsReportOptions) modelsReport {
-		assert.False(t, opts.refreshObserved)
-		return modelsReport{Observed: []observedModelRow{{Model: "cached-model"}}}
+	for _, test := range []struct {
+		name     string
+		observed []observedModelRow
+	}{
+		{name: "cached inventory", observed: []observedModelRow{{Model: "cached-model"}}},
+		{name: "empty inventory"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			original := compileBuildModelsReport
+			t.Cleanup(func() { compileBuildModelsReport = original })
+			compileBuildModelsReport = func(_ context.Context, opts modelsReportOptions) modelsReport {
+				assert.False(t, opts.refreshObserved)
+				return modelsReport{Observed: test.observed}
+			}
+
+			config := CompileConfig{DryRun: true, MCPProgressFile: "results.json"}
+			PrepareCompileModelValidation(context.Background(), &config)
+			assert.Empty(t, config.modelValidationWarnings)
+			if len(test.observed) == 0 {
+				assert.Nil(t, config.activeModels)
+				messages := configuredModelValidationMessages(
+					&workflow.WorkflowData{ModelPolicyAllowed: []string{"configured-model"}},
+					config.activeModels,
+					true,
+				)
+				require.Len(t, messages, 1)
+				assert.Contains(t, messages[0], "inventory is unavailable")
+			} else {
+				require.NotNil(t, config.activeModels)
+				assert.True(t, config.activeModels.contains("cached-model", nil))
+			}
+
+			result := ValidationResult{Workflow: "a.md", Valid: true}
+			appendMCPCachedModelInventoryWarning(config, &result)
+			require.Len(t, result.Warnings, 1)
+			assert.Equal(t, "cached_model_inventory", result.Warnings[0].Type)
+			assert.Equal(t, mcpCachedModelInventoryWarning, result.Warnings[0].Message)
+			assert.Equal(t, scanfindings.SeverityInfo, result.Warnings[0].Severity)
+			results := []ValidationResult{result}
+			require.NoError(t, enforceDevelopmentDiagnostics(config, workflow.NewCompiler(), &CompilationStats{}, &results))
+			assert.True(t, results[0].Valid)
+		})
 	}
-
-	config := CompileConfig{DryRun: true, MCPProgressFile: "results.json"}
-	PrepareCompileModelValidation(context.Background(), &config)
-
-	require.NotNil(t, config.activeModels)
-	assert.True(t, config.activeModels.contains("cached-model", nil))
-	assert.Empty(t, config.modelValidationWarnings)
 }
 
 func TestModelInventoryWarningsOrdinaryCompilation(t *testing.T) {

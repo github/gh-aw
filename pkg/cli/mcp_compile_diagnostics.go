@@ -18,11 +18,13 @@ import (
 )
 
 const (
-	maxMCPCompileDiagnosticBytes = 4 << 10
-	maxMCPCompileFallbackBytes   = 48 << 10
-	maxMCPCompileProgressBytes   = 1 << 20
-	compileDiagnosticTruncation  = "\n... (diagnostic truncated)"
-	compileDebugNamespace        = `[[:alnum:]_]+(?:[:./-][[:alnum:]_]+)*`
+	maxMCPCompileDiagnosticBytes              = 4 << 10
+	maxMCPCompileFallbackBytes                = 48 << 10
+	maxMCPCompileProgressEnvelopeReserveBytes = 8 << 10 // Reserve space for the timeout envelope and diagnostics.
+	maxMCPCompileProgressResultsBytes         = maxMCPCompileFallbackBytes - maxMCPCompileProgressEnvelopeReserveBytes
+	maxMCPCompileProgressBytes                = 1 << 20
+	compileDiagnosticTruncation               = "\n... (diagnostic truncated)"
+	compileDebugNamespace                     = `[[:alnum:]_]+(?:[:./-][[:alnum:]_]+)*`
 )
 
 // Match the logger's namespace/message/elapsed format, not a fixed namespace set.
@@ -328,6 +330,27 @@ func boundMCPCompileDiagnostic(message string) string {
 }
 
 func sanitizeMCPUntrustedText(message string) string {
+	message = sanitizeMCPUntrustedTextContent(message)
+	lines := strings.Split(message, "\n")
+	for i := range lines {
+		if !strings.HasPrefix(lines[i], "| ") {
+			lines[i] = "| " + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func sanitizeMCPUntrustedIdentifier(identifier string) string {
+	identifier = sanitizeMCPUntrustedTextContent(identifier)
+	return strings.Map(func(char rune) rune {
+		if char == '\n' || char == '\t' {
+			return -1
+		}
+		return char
+	}, identifier)
+}
+
+func sanitizeMCPUntrustedTextContent(message string) string {
 	message = strings.ToValidUTF8(message, "\uFFFD")
 	var sanitized strings.Builder
 	for _, char := range message {
@@ -342,14 +365,7 @@ func sanitizeMCPUntrustedText(message string) string {
 			sanitized.WriteRune('\u200B')
 		}
 	}
-	message = mcpInstructionRolePattern.ReplaceAllString(sanitized.String(), "$1\u200B$2")
-	lines := strings.Split(message, "\n")
-	for i := range lines {
-		if !strings.HasPrefix(lines[i], "| ") {
-			lines[i] = "| " + lines[i]
-		}
-	}
-	return strings.Join(lines, "\n")
+	return mcpInstructionRolePattern.ReplaceAllString(sanitized.String(), "$1\u200B$2")
 }
 
 func runMCPCompileOutput(ctx context.Context, execCmd execCmdFunc, args ...string) ([]byte, *mcpCompileDiagnostics, error) {
@@ -433,15 +449,15 @@ func readMCPCompileProgress(progressPath string) (results []mcpCompilePartialRes
 			break
 		}
 		partial := mcpCompilePartialResult{
-			Scope:    sanitizeMCPUntrustedText(result.Scope),
-			Workflow: sanitizeMCPUntrustedText(result.Workflow),
+			Scope:    sanitizeMCPUntrustedIdentifier(result.Scope),
+			Workflow: sanitizeMCPUntrustedIdentifier(result.Workflow),
 			Valid:    result.Valid,
 			Errors:   sanitizeMCPCompilePartialIssues(result.Errors),
 			Warnings: sanitizeMCPCompilePartialIssues(result.Warnings),
 		}
 		candidate := append(append([]mcpCompilePartialResult(nil), results...), partial)
 		output, err := json.Marshal(candidate)
-		if err != nil || len(output) > maxMCPCompileFallbackBytes-8*1024 {
+		if err != nil || len(output) > maxMCPCompileProgressResultsBytes {
 			break
 		}
 		results = candidate
@@ -453,11 +469,11 @@ func sanitizeMCPCompilePartialIssues(issues []ValidationIssue) []mcpCompileParti
 	sanitized := make([]mcpCompilePartialIssue, 0, len(issues))
 	for _, issue := range issues {
 		sanitized = append(sanitized, mcpCompilePartialIssue{
-			Type:     sanitizeMCPUntrustedText(issue.Type),
+			Type:     sanitizeMCPUntrustedIdentifier(issue.Type),
 			Message:  boundMCPCompileDiagnostic(issue.Message),
 			Line:     issue.Line,
-			File:     sanitizeMCPUntrustedText(issue.File),
-			Severity: sanitizeMCPUntrustedText(string(issue.Severity)),
+			File:     sanitizeMCPUntrustedIdentifier(issue.File),
+			Severity: sanitizeMCPUntrustedIdentifier(string(issue.Severity)),
 		})
 	}
 	return sanitized

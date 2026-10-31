@@ -7,8 +7,11 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/modelsdev"
+	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+const mcpCachedModelInventoryWarning = "MCP dry-run used cached model inventory; results may be stale"
 
 type activeModelInventory struct {
 	models  []string
@@ -138,6 +141,17 @@ func PrepareCompileModelValidation(ctx context.Context, config *CompileConfig) {
 	})
 	config.activeModels = buildActiveModelInventory(report)
 	config.modelValidationWarnings = slices.Clone(report.Warnings)
+}
+
+func appendMCPCachedModelInventoryWarning(config CompileConfig, result *ValidationResult) {
+	if !config.DryRun || config.MCPProgressFile == "" {
+		return
+	}
+	result.Warnings = append(result.Warnings, ValidationIssue{
+		Type:     "cached_model_inventory",
+		Message:  mcpCachedModelInventoryWarning,
+		Severity: scanfindings.SeverityInfo,
+	})
 }
 
 func unknownConfiguredModelMessages(data *workflow.WorkflowData, inventory *activeModelInventory) []string {
