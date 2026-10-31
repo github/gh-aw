@@ -398,7 +398,7 @@ func doctorAssignmentPATURL(host, repo, secret string) string {
 }
 
 func doctorAssignmentRemedy(repo, secret string) string {
-	return fmt.Sprintf("Create a fine-grained PAT with Actions, Contents, Issues, and Pull requests: read and write (Metadata: read), select the resource owner and all assignment/PR target repositories, and obtain any required organization approval/SSO. Store it as the Actions secret %s in %s and reference that secret in assign-to-agent.github-token. A classic PAT needs the repo scope. GitHub App installation tokens and GITHUB_TOKEN cannot assign Copilot.", secret, repo)
+	return fmt.Sprintf("Create a fine-grained PAT with Actions, Contents, Issues, and Pull requests: read and write (Metadata: read), select the resource owner and all assignment/PR target repositories, and obtain any required organization approval/SSO. Store it as the Actions secret %s in %s and reference that secret in assign-to-agent.github-token. A classic PAT needs the repo scope. GitHub App installation tokens and GITHUB_TOKEN cannot assign Copilot. %s", secret, repo, doctorTokenReplacementGuidance)
 }
 
 func doctorAgentAssignmentError(checks []DoctorAgentAssignmentCheck) error {
