@@ -1123,23 +1123,35 @@ func runHasDifcFilteredItems(runDir string, verbose bool) (bool, error) {
 //  4. runDir/usage/evals.jsonl — compact usage artifact captured by the conclusion job.
 //  5. runDir/{hash}-usage/evals.jsonl — workflow_call hash-prefixed compact usage artifact.
 func runHasEvals(runDir string, verbose bool) bool {
+	if findEvalsResultFile(runDir) != "" {
+		return true
+	}
+	if verbose {
+		logsOrchestratorLog.Printf("No evals results found in: %s", runDir)
+	}
+	return false
+}
+
+// findEvalsResultFile returns the first evals.jsonl path found in the locations
+// documented on runHasEvals, or an empty string when the run has no evals results.
+func findEvalsResultFile(runDir string) string {
 	logsOrchestratorLog.Printf("Checking run for evals results: dir=%s", runDir)
 
 	// Case 1: flattenSingleFileArtifacts moved the file directly to the run root.
 	rootEvalsFile := filepath.Join(runDir, constants.EvalsResultFilename.String())
 	if fileutil.FileExists(rootEvalsFile) {
 		logsOrchestratorLog.Printf("Found evals results at: %s", rootEvalsFile)
-		return true
+		return rootEvalsFile
 	}
 	usageEvalsFile := filepath.Join(runDir, constants.UsageArtifactName.String(), constants.EvalsResultFilename.String())
 	if fileutil.FileExists(usageEvalsFile) {
 		logsOrchestratorLog.Printf("Found evals results in usage artifact at: %s", usageEvalsFile)
-		return true
+		return usageEvalsFile
 	}
 
 	entries, err := os.ReadDir(runDir)
 	if err != nil {
-		return false
+		return ""
 	}
 
 	for _, entry := range entries {
@@ -1152,7 +1164,7 @@ func runHasEvals(runDir string, verbose bool) bool {
 			evalsFile := filepath.Join(runDir, name, constants.EvalsResultFilename.String())
 			if fileutil.FileExists(evalsFile) {
 				logsOrchestratorLog.Printf("Found evals results at: %s", evalsFile)
-				return true
+				return evalsFile
 			}
 		}
 		// Match workflow_call-prefixed "{hash}-usage".
@@ -1160,13 +1172,9 @@ func runHasEvals(runDir string, verbose bool) bool {
 			evalsFile := filepath.Join(runDir, name, constants.EvalsResultFilename.String())
 			if fileutil.FileExists(evalsFile) {
 				logsOrchestratorLog.Printf("Found evals results in workflow_call usage artifact at: %s", evalsFile)
-				return true
+				return evalsFile
 			}
 		}
 	}
-
-	if verbose {
-		logsOrchestratorLog.Printf("No evals results found in: %s", runDir)
-	}
-	return false
+	return ""
 }
