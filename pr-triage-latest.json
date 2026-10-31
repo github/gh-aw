@@ -1,38 +1,39 @@
 {
-  "run_date": "2026-10-31T12:19:58Z",
-  "run_id": "41200453633",
+  "run_date": "2026-10-31T18:17:54Z",
+  "run_id": "41228481975",
   "source": "pr-triage",
-  "eligible_total": 5,
-  "cooldown_skipped": [73373, 73412, 73431, 73434],
-  "open_copilot_prs": 5,
+  "eligible_total": 4,
+  "cooldown_skipped": [
+    73536,
+    73534,
+    73532,
+    73529,
+    73527
+  ],
+  "open_copilot_prs": 9,
   "category_counts": {
     "bug": 1,
-    "feature": 4,
+    "feature": 3,
     "docs": 0
   },
   "risk_counts": {
     "high": 2,
-    "medium": 3,
+    "medium": 2,
     "low": 0
   },
   "priority_counts": {
     "high": 1,
-    "medium": 4,
+    "medium": 3,
     "low": 0
   },
   "action_counts": {
-    "fast_track": 1,
-    "batch_review": 3,
-    "defer": 1,
     "auto_merge": 0,
-    "close": 0
+    "batch_review": 2,
+    "close": 0,
+    "defer": 1,
+    "fast_track": 1
   },
-  "batches": [
-    {
-      "id": "pr-batch:model-routing-and-auth",
-      "members": [72273, 73033, 73388]
-    }
-  ],
+  "batches": [],
   "selected_candidates": [
     {
       "number": 72273,
@@ -47,14 +48,12 @@
         "urgency": 21,
         "quality": 18
       },
-      "batch": "pr-batch:model-routing-and-auth",
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
         "pr-priority:high",
         "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:model-routing-and-auth"
+        "pr-agent:copilot"
       ]
     },
     {
@@ -66,11 +65,10 @@
       "action": "batch_review",
       "score": 67,
       "score_breakdown": {
-        "impact": 31,
+        "impact": 33,
         "urgency": 20,
-        "quality": 16
+        "quality": 14
       },
-      "batch": null,
       "labels": [
         "pr-type:bug",
         "pr-risk:medium",
@@ -92,37 +90,12 @@
         "urgency": 16,
         "quality": 16
       },
-      "batch": "pr-batch:model-routing-and-auth",
       "labels": [
         "pr-type:feature",
         "pr-risk:medium",
         "pr-priority:medium",
         "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:model-routing-and-auth"
-      ]
-    },
-    {
-      "number": 73388,
-      "title": "Route Documentation Unbloat instead of pinning claude-sonnet-5.5",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 15,
-        "quality": 16
-      },
-      "batch": "pr-batch:model-routing-and-auth",
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:model-routing-and-auth"
+        "pr-agent:copilot"
       ]
     },
     {
@@ -138,7 +111,6 @@
         "urgency": 12,
         "quality": 11
       },
-      "batch": null,
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
@@ -148,5 +120,5 @@
       ]
     }
   ],
-  "notes": "Five eligible open Copilot PRs were triaged after the required 1-hour cooldown; labels applied for categorization, risk, priority, action, and batch grouping. PR comments are unsupported in this workflow context because safeoutputs add_comment requires a PR/issue-triggered target."
+  "notes": "The four eligible Copilot PRs are older than the one-hour cooldown window; none meet the 3+ member batching threshold, so the focus is on the highest-value feature and the guarded bug fix."
 }

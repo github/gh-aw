@@ -1,20 +1,20 @@
 # PR Triage Summary
 
-- Run: 2026-10-31T12:19:58Z
-- Open Copilot PRs: 5
-- Eligible PRs: 5
-- Skipped by cooldown: 4
+- Run: 2026-10-31T18:17:54Z
+- Open Copilot PRs: 9
+- Eligible PRs: 4
+- Skipped by cooldown: 5
 
 ## Selected candidates
 - #72273 — Support Claude on Vertex AI with GCP WIF — feature / high risk / priority high / action fast_track / score 74
 - #72940 — Preserve agent config permissions and restore only after PR checkout — bug / medium risk / priority medium / action batch_review / score 67
 - #73033 — Route Agent Job Health Monitor with model routing (goal: cost, mode: economy) — feature / medium risk / priority medium / action batch_review / score 60
-- #73388 — Route Documentation Unbloat instead of pinning claude-sonnet-5.5 — feature / medium risk / priority medium / action batch_review / score 60
 - #73299 — WIP: Add on.decision semantic event qualification gate — feature / high risk / priority medium / action defer / score 56
 
 ## Batch
-- pr-batch:model-routing-and-auth — #72273, #73033, #73388
+- none (no eligible cluster reached 3 members)
 
 ## Notes
-- The strongest action is to prioritize the Vertex AI feature work and keep the model-routing batch under human review.
-- One high-risk WIP feature remains deferred pending more evidence and a clearer readiness signal.
+- The highest-value work is the Vertex-AI feature change; it is well-scoped and fully validated, so it should move first.
+- The config-permissions bug fix is a solid medium-risk review target with green CI and a clear fix.
+- The WIP semantic-event gate remains deferred because the draft explicitly says it is not ready to merge.
