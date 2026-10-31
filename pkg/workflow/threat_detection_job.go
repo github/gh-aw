@@ -202,10 +202,20 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	//   api-proxy returns HTTP 401 on every request (mirrors validateOIDCPermissions logic).
 	// - When observability.otlp.github-app is configured without app-id/private-key
 	//   credentials, id-token: write is also needed (mirrors validateOIDCPermissions).
-	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data)
+	detectionAuthData := buildExternalDetectorWorkflowData(data, detectionEngineID)
+	detectionAuthData.Model = inheritedDetectionModel(data, detectionEngineID)
+	if model := data.SafeOutputs.ThreatDetection.Model; model != "" {
+		detectionAuthData.Model = model
+	}
+	brokeredInference := usesTokenBrokerInference(detectionAuthData)
+	steps = append(steps, c.buildTokenBrokerInvalidationStep(detectionAuthData)...)
+	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data) && !brokeredInference
 	perms := NewPermissionsContentsRead()
 	if copilotRequestsEnabled {
 		perms.Set(PermissionCopilotRequests, PermissionWrite)
+	}
+	if brokeredInference {
+		perms.Set(PermissionIdToken, PermissionWrite)
 	}
 	if data.EngineConfig != nil && data.EngineConfig.Auth != nil && data.EngineConfig.Auth.Type == "github-oidc" {
 		perms.Set(PermissionIdToken, PermissionWrite)

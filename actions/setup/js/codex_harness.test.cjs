@@ -108,6 +108,7 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
     GH_AW_HARNESS_INITIAL_DELAY_MS: "1",
     GH_AW_LLM_PROVIDER_EXPLICIT: "0",
     GH_AW_SAFE_OUTPUTS: "",
+    GH_AW_HARNESS_TELEMETRY_DIR: dir,
     CODEX_HARNESS_STUB_CALLS: callsPath,
     ...env,
   };
@@ -137,10 +138,35 @@ function runHarnessFixture(script, { prompt = "fix the bug", args = [], env = {}
         .split("\n")
         .map(line => JSON.parse(line))
     : [];
-  return { result, calls };
+  const telemetryPath = path.join(childEnv.GH_AW_HARNESS_TELEMETRY_DIR, "harness_retry.json");
+  return { result, calls, harnessRetry: fs.existsSync(telemetryPath) ? JSON.parse(fs.readFileSync(telemetryPath, "utf8")) : null };
 }
 
 describe("codex_harness.cjs", () => {
+  it("records an initial explicit Codex resume as continuation, not a retry", () => {
+    const { result, calls, harnessRetry } = runHarnessFixture("", { args: ["resume", "00000000-0000-4000-8000-000000000001"] });
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toHaveLength(1);
+    expect(harnessRetry.attempt_results[0]).toMatchObject({ strategy: "resume", backoff_ms: 0, attempt: 1 });
+  });
+
+  it.each([false, true])("records the selected retry strategy with captured thread: %s", hasThread => {
+    const { result, calls, harnessRetry } = runHarnessFixture(`
+      const count = fs.readFileSync(process.env.CODEX_HARNESS_STUB_CALLS, "utf8").trim().split("\\n").length;
+      if (count === 1) {
+        ${hasThread ? 'console.log(JSON.stringify({type:"thread.started",thread_id:"00000000-0000-4000-8000-000000000001"}));' : ""}
+        console.error("server_error: interrupted");
+        process.exitCode = 1;
+      }
+    `);
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toHaveLength(2);
+    expect(calls[1].args.includes("resume")).toBe(hasThread);
+    expect(harnessRetry.attempt_results.map(attempt => attempt.strategy)).toEqual(["restart", hasThread ? "resume" : "restart"]);
+    expect(harnessRetry.attempt_results.map(attempt => attempt.outcome)).toEqual(["failure", "success"]);
+    expect(harnessRetry.attempt_results.map(attempt => attempt.attempt_id)).toEqual(["harness:1", "harness:2"]);
+  });
+
   describe("Azure OIDC", () => {
     const env = { CODEX_API_KEY: "", OPENAI_API_KEY: "", GH_AW_CODEX_OIDC_AUTH: "azure", AWF_REFLECT_ENABLED: "1", GH_AW_LLM_PROVIDER: "openai" };
     const endpoint = { provider: "openai", configured: true, auth_type: "github-oidc/azure", port: 10000, models_url: "http://api-proxy:10000/v1/models", models: ["gpt-5.4"] };

@@ -79,6 +79,7 @@ type AuditData struct {
 	Friction                   *FrictionCostSummary     `json:"friction,omitempty"`
 	EvidenceSearch             *AuditEvidenceSearch     `json:"evidence_search,omitempty"`
 	ModelCatalog               *AuditModelCatalog       `json:"model_catalog,omitempty"`
+	Retries                    *AuditRetrySummary       `json:"retries,omitempty"`
 }
 
 // AuditFinding represents a key insight discovered during audit
@@ -552,13 +553,7 @@ type auditDataInputs struct {
 
 func assembleAuditData(inputs auditDataInputs) AuditData {
 	run := inputs.processedRun.Run
-	metricsData := inputs.metricsData
-	if run.ActionMinutes > 0 {
-		metricsData.ActionMinutes = run.ActionMinutes
-	} else if run.Duration > 0 {
-		metricsData.ActionMinutes = math.Ceil(run.Duration.Minutes())
-	}
-
+	metricsData := setAuditActionMinutes(run, inputs.metricsData)
 	performanceMetrics := generatePerformanceMetrics(inputs.processedRun, metricsData, inputs.toolUsage)
 	chainMetrics := buildSafeOutputChainMetrics(run.LogsPath)
 	engineConfig := extractEngineConfigWithInferredEngine(run.LogsPath, inputs.inferredEngineID)
@@ -572,6 +567,7 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 
 	return AuditData{
 		SchemaVersion:           auditSchemaVersion,
+		Retries:                 readAuditRetrySummary(run.LogsPath),
 		Overview:                inputs.overview,
 		TaskDomain:              inputs.taskDomain,
 		BehaviorFingerprint:     inputs.behaviorFingerprint,
@@ -611,6 +607,15 @@ func assembleAuditData(inputs auditDataInputs) AuditData {
 		DecisionGate:            extractDecisionGateData(run.LogsPath),
 		Graders:                 extractGradersData(run.LogsPath),
 	}
+}
+
+func setAuditActionMinutes(run WorkflowRun, metricsData MetricsData) MetricsData {
+	if run.ActionMinutes > 0 {
+		metricsData.ActionMinutes = run.ActionMinutes
+	} else if run.Duration > 0 {
+		metricsData.ActionMinutes = math.Ceil(run.Duration.Minutes())
+	}
+	return metricsData
 }
 
 func auditEngineConfigWarnings(config *AuditEngineConfig) []ValidationIssue {

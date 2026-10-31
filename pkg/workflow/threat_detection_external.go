@@ -118,7 +118,6 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if engineID == "" {
 		engineID = "claude"
 	}
-
 	detectionData := &WorkflowData{
 		AI:                   engineID,
 		ActionCache:          data.ActionCache,
@@ -143,6 +142,7 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 			},
 		},
 	}
+	inheritTokenBrokerConfig(data, detectionData)
 	if isOTLPEnabled(data) {
 		detectionData.ExcludedEnv = append(detectionData.ExcludedEnv, otlpSandboxExcludedEnvVarNames...)
 	}
@@ -695,7 +695,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		steps = append(steps, prefixed)
 	}
 
-	return steps
+	return append(c.buildTokenBrokerRequestStep(threatDetectionData, detectionExecutionCondition), steps...)
 }
 
 func codexAzureOIDCReflectionGuard() string {

@@ -122,7 +122,9 @@ func TestWritableRemoteIncludeCacheRefreshesBranch(t *testing.T) {
 		return nil, errors.New("unauthorized: authentication required")
 	}
 	sha := "0123456789abcdef0123456789abcdef01234567"
+	resolutions := 0
 	resolveRefToSHAViaGitFunc = func(context.Context, string, string, string, string) (string, error) {
+		resolutions++
 		return sha, nil
 	}
 	downloads := 0
@@ -131,20 +133,32 @@ func TestWritableRemoteIncludeCacheRefreshesBranch(t *testing.T) {
 		return []byte("instructions at " + sha), nil
 	}
 	cache := NewImportCache(t.TempDir())
+	_, err := cache.Set("owner", "repo", "shared.md", sha, []byte("instructions at "+sha))
+	require.NoError(t, err)
+	cache.SetReadOnly(true)
+	pinned, err := ResolveIncludePath("owner/repo/shared.md@"+sha, "", cache)
+	require.NoError(t, err)
+	require.Contains(t, pinned, sha)
+	_, err = ResolveIncludePath("owner/repo/shared.md@main", "", cache)
+	require.ErrorContains(t, err, "offline imports require a cached pinned import")
+	require.Equal(t, 0, resolutions, "read-only imports must not resolve refs")
+	require.Equal(t, 0, downloads, "read-only imports must not download files")
+	_, err = ResolveIncludePath("owner/repo/uncached.md@"+sha, "", cache)
+	require.ErrorContains(t, err, "is not cached")
+	require.Equal(t, 0, resolutions)
+	require.Equal(t, 0, downloads)
+
+	cache.SetReadOnly(false)
 	first, err := ResolveIncludePath("owner/repo/shared.md@main", "", cache)
 	require.NoError(t, err)
 	require.Contains(t, first, sha)
-	cache.SetReadOnly(true)
-	_, err = ResolveIncludePath("owner/repo/shared.md@main", "", cache)
-	require.NoError(t, err)
+	require.Equal(t, 1, resolutions)
+	require.Zero(t, downloads)
 	sha = "abcdef0123456789abcdef0123456789abcdef01"
-	_, err = ResolveIncludePath("owner/repo/shared.md@main", "", cache)
-	require.ErrorContains(t, err, "is not cached")
-	require.Equal(t, 1, downloads, "read-only cache miss must fail before downloading")
-	cache.SetReadOnly(false)
 	second, err := ResolveIncludePath("owner/repo/shared.md@main", "", cache)
 	require.NoError(t, err)
 	require.Contains(t, second, sha)
 	require.NotEqual(t, first, second)
-	require.Equal(t, 2, downloads)
+	require.Equal(t, 2, resolutions)
+	require.Equal(t, 1, downloads)
 }

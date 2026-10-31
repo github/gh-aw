@@ -75,9 +75,12 @@ type sessionModelRoutingEvent struct {
 	Type       string          `json:"type"`
 	Data       json.RawMessage `json:"data"`
 	Provenance struct {
-		Component string `json:"component"`
-		Phase     string `json:"phase"`
-		Path      string `json:"path"`
+		Component        string `json:"component"`
+		Phase            string `json:"phase"`
+		Path             string `json:"path"`
+		Index            *int   `json:"index"`
+		AttemptID        string `json:"attemptId"`
+		StartupAttemptID string `json:"startupAttemptId"`
 	} `json:"provenance"`
 }
 
@@ -86,6 +89,7 @@ type sessionModelRoutingAttribution struct {
 	Outcome                   *sessionModelRoutingOutcome
 	Mismatches                []ModelEndpointMismatch
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
+	RetryEvents               []sessionModelRoutingEvent
 }
 
 // ModelEndpointMismatch describes a model/API incompatibility reported by the unified session.
@@ -149,8 +153,12 @@ func readSessionModelRouting(runDir string) (*sessionModelRoutingAttribution, bo
 	return nil, false, nil
 }
 
-func readSessionModelRoutingEvents(file *os.File) (*sessionModelRoutingAttribution, error) {
-	defer file.Close()
+func readSessionModelRoutingEvents(file *os.File) (result *sessionModelRoutingAttribution, err error) {
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
 	attribution := &sessionModelRoutingAttribution{}
 	reader := bufio.NewReader(file)
 	for lineNumber := 1; ; lineNumber++ {
@@ -178,6 +186,17 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 		return fmt.Errorf("invalid session event on line %d: %w", lineNumber, err)
 	}
 	switch {
+	case (event.Type == "harness.attempt" || event.Type == "harness.retry") && event.Provenance.Component == "harness":
+		attribution.RetryEvents = append(attribution.RetryEvents, event)
+	case event.Type == "engine.retry" && event.Provenance.Component == "agent":
+		attribution.RetryEvents = append(attribution.RetryEvents, event)
+	case event.Type == "session.result" && event.Provenance.Component == "agent":
+		var payload struct {
+			EngineRetry json.RawMessage `json:"engineRetry"`
+		}
+		if json.Unmarshal(event.Data, &payload) == nil && len(payload.EngineRetry) > 0 {
+			attribution.RetryEvents = append(attribution.RetryEvents, event)
+		}
 	case event.Type == "workflow.info" && event.Provenance.Component == "workflow" &&
 		(event.Provenance.Path == "aw_info.json" ||
 			(event.Provenance.Path == "runtime/aw_info.json" && event.Provenance.Phase == "agent") ||

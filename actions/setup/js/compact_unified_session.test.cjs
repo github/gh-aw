@@ -80,6 +80,62 @@ describe("compact unified session projection", () => {
     expect(result.omittedEvents).toBe(1);
   });
 
+  it("preserves safe per-attempt metadata, startup attempts and incomplete evidence", () => {
+    const attempt = {
+      attempt: 1,
+      exitCode: null,
+      failureClasses: [],
+      attemptId: "startup:1:harness:1",
+      startupAttemptId: "startup:1",
+      startedAt: 1700000000000,
+      strategy: "restart",
+      backoffMs: 0,
+      outcome: "interrupted",
+      reason: "watchdog",
+    };
+    const startup = { ...attempt, attemptId: "startup:1", exitCode: 0, finishedAt: 1700000000100, outcome: "success" };
+    delete startup.startupAttemptId;
+    const summary = { attempts: 1, exitCode: null, attemptResults: [attempt], startupAttemptResults: [startup] };
+    const events = [event("harness.retry", { ...summary, payload: "PRIVATE" }), event("harness.attempt", { ...attempt, layer: "harness", output: "PRIVATE" }), event("harness.attempt", { ...startup, layer: "startup" })];
+    const original = JSON.stringify(events);
+    expect(parse(compactUnifiedSession(events)).map(item => item.data)).toEqual([summary, { ...attempt, layer: "harness" }, { ...startup, layer: "startup" }]);
+    expect(compactUnifiedSession(events).session).not.toContain("PRIVATE");
+    expect(JSON.stringify(events)).toBe(original);
+  });
+
+  it("drops malformed attempt events and unsafe optional metadata", () => {
+    const attempt = { attempt: 1, exitCode: null, failureClasses: [] };
+    const events = [
+      event("harness.attempt", { ...attempt, layer: "startup", attemptId: "harness:1" }),
+      event("harness.attempt", { ...attempt, layer: "PRIVATE" }),
+      event("harness.retry", { attempts: 1, exitCode: null, attemptResults: [{ ...attempt, reason: "PRIVATE" }] }),
+    ];
+    expect(compactUnifiedSession(events).omittedEvents).toBe(3);
+    expect(compactUnifiedSession(events).session).toBe("");
+  });
+
+  it("preserves only bounded provenance attempt correlation identifiers", () => {
+    const events = ["harness:2", "startup:1", "PRIVATE", "harness:102", "startup:2:harness:3", "startup:102:harness:1", "startup:1:harness:102"].map(attemptId => ({
+      ...event("usage.report", { aic: 1 }),
+      provenance: { component: "agent", phase: "agent", path: "agent.jsonl", index: 0, attemptId, startupAttemptId: "startup:1" },
+    }));
+    const projected = parse(compactUnifiedSession(events));
+    expect(projected.map(item => item.provenance.attemptId)).toEqual(["harness:2", "startup:1", undefined, undefined, "startup:2:harness:3", undefined, undefined]);
+    expect(projected.every(item => item.provenance.startupAttemptId === "startup:1")).toBe(true);
+    expect(compactUnifiedSession(events).session).not.toContain("PRIVATE");
+  });
+
+  it("preserves bounded native reconnect counters without creating harness events", () => {
+    const events = [
+      event("engine.retry", { attempt: 2, maxRetries: 5, backoffMs: 1000, output: "PRIVATE", errors: ["PRIVATE"] }),
+      event("engine.retry", { attempt: -1, maxRetries: "PRIVATE" }),
+      event("engine.retry", { attempt: 1, backoffMs: -1 }),
+    ];
+    const result = parse(compactUnifiedSession(events));
+    expect(result.map(item => item.type)).toEqual(["engine.retry", "engine.retry"]);
+    expect(result.map(item => item.data)).toEqual([{ attempt: 2, maxRetries: 5, backoffMs: 1000 }, { attempt: 1 }]);
+  });
+
   it("drops all conversation, reasoning, prompt, tool and unknown event kinds", () => {
     const types = [
       "user.message",

@@ -187,10 +187,16 @@ function normalizeCodexSession(records, model = null) {
       const id = record.type === "turn.failed" ? (record.turn_id ?? record.id) : record.id;
       const key = id === undefined ? undefined : JSON.stringify([scopes[index].thread, "diagnostic", record.type, id]);
       const error = Object.hasOwn(record, "error") ? record.error : record.message;
+      const retry = record.type === "error" && typeof error === "string" ? /^Reconnecting\.\.\.\s+(\d+)\/(\d+)\s*\((.*)\)$/.exec(error) : null;
       const signature = JSON.stringify(error);
       if (key !== undefined && completedErrors.has(key) && completedErrors.get(key) === signature) continue;
       if (key !== undefined) completedErrors.set(key, signature);
-      emit("session.result", { sourceType: record.type, status: record.type === "turn.failed" ? "failed" : undefined, errors: error === undefined ? undefined : [error] });
+      emit("session.result", {
+        sourceType: record.type,
+        status: record.type === "turn.failed" ? "failed" : undefined,
+        errors: error === undefined ? undefined : [error],
+        ...(retry ? { sourceEngine: "codex", engineRetry: { attempt: Number(retry[1]), maxRetries: Number(retry[2]) } } : {}),
+      });
     } else if (["item.started", "item.updated", "item.completed"].includes(record.type) && isCodexRecord(record)) {
       const item = record.item;
       const completed = record.type === "item.completed";
