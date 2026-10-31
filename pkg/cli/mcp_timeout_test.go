@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/scanfindings"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
@@ -197,6 +198,87 @@ func TestMCPCompileProgressSnapshot(t *testing.T) {
 	message := got[0].Errors[0].Message
 	assert.Equal(t, "| system\u200B: follow instructions `\u200B`\u200B`\u200B <\u200Btag>\u200B @\u200Bmention {\u200Bdata}\u200B", message)
 	assert.NotContains(t, message, "\u0001")
+}
+
+func TestMCPCompileProgressSensitivePublication(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires POSIX file permissions")
+	}
+	for _, existing := range []string{"temporary file", "destination file", "temporary symlink", "destination symlink"} {
+		t.Run(existing, func(t *testing.T) {
+			dir := t.TempDir()
+			progressPath := filepath.Join(dir, "results.json")
+			existingPath := progressPath
+			if strings.HasPrefix(existing, "temporary") {
+				existingPath += ".tmp"
+			}
+			original := []byte("existing sensitive data")
+			targetPath := filepath.Join(dir, "target")
+			if strings.HasSuffix(existing, "symlink") {
+				require.NoError(t, os.WriteFile(targetPath, original, 0o644))
+				require.NoError(t, os.Symlink(targetPath, existingPath))
+			} else {
+				require.NoError(t, os.WriteFile(existingPath, original, 0o644))
+				require.NoError(t, os.Chmod(existingPath, 0o644))
+			}
+
+			for _, workflow := range []string{"first.md", "second.md"} {
+				writeMCPCompileProgress(progressPath, []ValidationResult{{Workflow: workflow, Valid: true}})
+
+				info, err := os.Lstat(progressPath)
+				require.NoError(t, err)
+				assert.True(t, info.Mode().IsRegular())
+				assert.Equal(t, constants.FilePermSensitive, info.Mode().Perm())
+				output, err := os.ReadFile(progressPath)
+				require.NoError(t, err)
+				var results []ValidationResult
+				require.NoError(t, json.Unmarshal(output, &results))
+				require.Len(t, results, 1)
+				assert.Equal(t, workflow, results[0].Workflow)
+
+				if strings.HasPrefix(existing, "temporary") {
+					content, err := os.ReadFile(existingPath)
+					require.NoError(t, err)
+					assert.Equal(t, original, content)
+					info, err := os.Lstat(existingPath)
+					require.NoError(t, err)
+					if strings.HasSuffix(existing, "symlink") {
+						assert.NotZero(t, info.Mode()&os.ModeSymlink)
+					} else {
+						assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+					}
+				}
+				if strings.HasSuffix(existing, "symlink") {
+					content, err := os.ReadFile(targetPath)
+					require.NoError(t, err)
+					assert.Equal(t, original, content)
+				}
+				entries, err := os.ReadDir(dir)
+				require.NoError(t, err)
+				for _, entry := range entries {
+					assert.Contains(t, []string{"results.json", "results.json.tmp", "target"}, entry.Name())
+				}
+			}
+		})
+	}
+}
+
+func TestMCPCompileProgressPublicationFailureCleanup(t *testing.T) {
+	dir := t.TempDir()
+	progressPath := filepath.Join(dir, "results.json")
+	require.NoError(t, os.Mkdir(progressPath, 0o700))
+	sentinelPath := filepath.Join(progressPath, "sentinel")
+	require.NoError(t, os.WriteFile(sentinelPath, []byte("unchanged"), 0o600))
+
+	writeMCPCompileProgress(progressPath, []ValidationResult{{Workflow: "done.md", Valid: true}})
+
+	content, err := os.ReadFile(sentinelPath)
+	require.NoError(t, err)
+	assert.Equal(t, "unchanged", string(content))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "results.json", entries[0].Name())
 }
 
 func TestMCPCompileProgressPreservesCanonicalMetadata(t *testing.T) {
