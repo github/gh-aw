@@ -422,9 +422,10 @@ func buildAWFConfigPrintfArg(awfConfigJSON string, hasMaxAICreditsExport bool) s
 }
 
 func buildConfigFilePrintfLine(printfArg string) string {
-	printfLine := "printf '%%s\\n' %s > %q"
+	const runnerGuardIgnoreComment = "# runner-guard:ignore RGS-018 -- writes the compiler-generated AWF firewall config (pinned image digests, model alias table) verbatim from the gh-aw compiler template; hex digest or alias-name substrings can coincidentally match threat-signature fragments, not real payload execution."
+	printfLine := runnerGuardIgnoreComment + "\nprintf '%%s\\n' %s > %q"
 	if strings.HasPrefix(printfArg, "'") {
-		printfLine = "# shellcheck disable=SC2016\nprintf '%%s\\n' %s > %q"
+		printfLine = runnerGuardIgnoreComment + "\n# shellcheck disable=SC2016\nprintf '%%s\\n' %s > %q"
 	}
 	return fmt.Sprintf(printfLine, printfArg, awfConfigRuntimePathExpr)
 }
