@@ -199,6 +199,19 @@ This workflow only uses the default engine.
 		t.Fatalf("failed to write workflow file: %v", err)
 	}
 
+	expressionWorkflow := `---
+on: push
+engine:
+  id: codex
+  version: "${{ vars.CODEX_VERSION }}"
+---
+
+# Dynamic Engine Version
+`
+	if err := os.WriteFile(filepath.Join(workflowsDir, "dynamic-engine.md"), []byte(expressionWorkflow), 0644); err != nil {
+		t.Fatalf("failed to write expression workflow: %v", err)
+	}
+
 	// Compile with Dependabot flag (compile all files, not specific ones)
 	config := CompileConfig{
 		MarkdownFiles:  nil, // Compile all markdown files
@@ -227,6 +240,9 @@ This workflow only uses the default engine.
 	}
 	if got := pkgJSON.Dependencies["@github/copilot"]; got != string(constants.DefaultCopilotVersion) {
 		t.Errorf("expected default Copilot version %q, got %q", constants.DefaultCopilotVersion, got)
+	}
+	if got := pkgJSON.Dependencies["@openai/codex"]; got != "" {
+		t.Errorf("expected GitHub Actions expression version to be omitted, got %q", got)
 	}
 	if _, err := os.Stat(filepath.Join(workflowsDir, "package-lock.json")); err != nil {
 		t.Errorf("package-lock.json was not created: %v", err)

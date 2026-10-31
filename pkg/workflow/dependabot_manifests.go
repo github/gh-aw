@@ -127,28 +127,28 @@ func parseNpmPackage(pkg string) NpmDependency {
 	// Handle scoped packages (@org/package@version)
 	if strings.HasPrefix(pkg, "@") {
 		// Find the second @ for version separator
-		parts := strings.Split(pkg, "@")
-		if len(parts) >= 3 {
+		name, version, found := strings.Cut(pkg[1:], "@")
+		if found {
+			version, _, _ = strings.Cut(version, "@")
 			// @org/package@version
 			return NpmDependency{
-				Name:    "@" + parts[1],
-				Version: parts[2],
+				Name:    "@" + name,
+				Version: version,
 			}
-		} else if len(parts) == 2 {
-			// @org/package (no version)
-			return NpmDependency{
-				Name:    pkg,
-				Version: "latest",
-			}
+		}
+		// @org/package (no version)
+		return NpmDependency{
+			Name:    pkg,
+			Version: "latest",
 		}
 	}
 
 	// Handle non-scoped packages (package@version)
-	parts := strings.SplitN(pkg, "@", 2)
-	if len(parts) == 2 {
+	name, version, found := strings.Cut(pkg, "@")
+	if found {
 		return NpmDependency{
-			Name:    parts[0],
-			Version: parts[1],
+			Name:    name,
+			Version: version,
 		}
 	}
 
