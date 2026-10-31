@@ -33,7 +33,7 @@ safe-outputs:
 Analyze the issue and suggest follow-up tasks.
 ```
 
-With this configuration the workflow runs fully — the AI completes its analysis — but no issues are created. Instead, the Actions run summary shows a preview of what would have been created.
+The workflow runs fully, but no issues are created; the run summary shows a preview instead.
 
 ## Scoping Staged Mode per Output Type
 
@@ -57,7 +57,7 @@ or `--dry-run`.
 
 ## What the Preview Looks Like
 
-When staged mode is active, the step summary contains a structured preview for each output type. The 🎭 emoji marks every heading so previews are easy to spot:
+The step summary contains a preview for each output type, with every heading marked 🎭:
 
 ```markdown
 ## 🎭 Staged Mode: Issue Creation Preview
@@ -83,11 +83,11 @@ Performance profiling shows repeated queries to the users table …
 **Preview Summary**: 2 operations previewed. No GitHub resources were created.
 ```
 
-The preview includes every populated field — title, body, labels, assignees, and similar metadata — so you can review the full output before enabling it.
+The preview includes every populated field.
 
 ## Supported Output Types
 
-Staged mode is supported by all built-in safe output types:
+All built-in safe output types support staged mode:
 
 | Output type | What the preview shows |
 |---|---|
@@ -115,13 +115,9 @@ Staged mode is supported by all built-in safe output types:
 | [`assign-to-user`](/gh-aw/reference/safe-outputs/#assign-to-user-assign-to-user) | Target item, user |
 | [`create-agent-session`](/gh-aw/reference/copilot-cloud-agent/#create-agent-session) | Session details |
 
-[Custom safe output jobs](/gh-aw/reference/custom-safe-outputs/) receive the `GH_AW_SAFE_OUTPUTS_STAGED` environment variable set to `"true"` when staged mode is active, allowing you to implement your own preview behavior.
-They are not automatically skipped: their code must honor the staging signal,
-and their credentials and external effects still require review.
-
 ## Staged Mode for Custom Safe Output Jobs
 
-Custom jobs check `GH_AW_SAFE_OUTPUTS_STAGED` to skip the real operation and display a preview instead:
+[Custom safe output jobs](/gh-aw/reference/custom-safe-outputs/) receive `GH_AW_SAFE_OUTPUTS_STAGED=true` when staged mode is active. They are not automatically skipped: their code must check it to show a preview instead of the real operation, and their credentials and external effects still require review.
 
 ```javascript
 if (process.env.GH_AW_SAFE_OUTPUTS_STAGED === 'true') {
@@ -158,17 +154,11 @@ The `{operation}` placeholder is replaced with the safe output operation name (f
 
 ## Recommended Workflow
 
-A common adoption pattern is:
-
-1. Enable `staged: true` and trigger the workflow on a real event.
-2. Review the 🎭 preview in the Actions run summary.
-3. Adjust the prompt or configuration.
-4. Repeat until the output looks correct.
-5. Disable staged mode to start creating real GitHub resources.
+Enable `staged: true`, trigger the workflow on a real event, review the 🎭 preview, and adjust the prompt or configuration until the output looks correct. Then disable staged mode.
 
 > [!TIP]
-> Keep staged mode enabled while iterating on prompt changes, and re-enable it for a single output type when introducing a new safe output.
+> Re-enable staging for a single output type when introducing a new safe output.
 
 ## Learn More
 
-See [Safe Outputs](/gh-aw/reference/safe-outputs/) for built-in output types, [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/) for custom jobs with staged mode support, [Frontmatter (Full)](/gh-aw/reference/frontmatter-full/) for the full configuration reference, and [Threat Detection](/gh-aw/reference/threat-detection/) for security scanning of safe output content.
+See [Safe Outputs](/gh-aw/reference/safe-outputs/), [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/), [Frontmatter (Full)](/gh-aw/reference/frontmatter-full/), and [Threat Detection](/gh-aw/reference/threat-detection/).
