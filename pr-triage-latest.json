@@ -1,30 +1,47 @@
 {
-  "run_date": "2026-10-31T00:36:18Z",
-  "run_id": "41150834979",
+  "run_date": "2026-10-31T06:22:16Z",
+  "run_id": "41176168051",
   "source": "pr-triage",
-  "eligible_total": 2,
+  "eligible_total": 5,
   "cooldown_skipped": [
-    73299,
-    73033
+    73373,
+    73412,
+    73431,
+    73434
   ],
-  "open_copilot_prs": 4,
+  "open_copilot_prs": 5,
   "category_counts": {
     "bug": 1,
-    "feature": 1
+    "feature": 4,
+    "docs": 0
   },
   "risk_counts": {
-    "high": 1,
-    "medium": 1
+    "high": 2,
+    "medium": 3,
+    "low": 0
   },
   "priority_counts": {
     "high": 1,
-    "medium": 1
+    "medium": 4,
+    "low": 0
   },
   "action_counts": {
     "fast_track": 1,
-    "batch_review": 1
+    "batch_review": 3,
+    "defer": 1,
+    "auto_merge": 0,
+    "close": 0
   },
-  "batches": [],
+  "batches": [
+    {
+      "id": "pr-batch:model-routing-and-auth",
+      "members": [
+        72273,
+        73033,
+        73388
+      ]
+    }
+  ],
   "selected_candidates": [
     {
       "number": 72273,
@@ -39,13 +56,14 @@
         "urgency": 21,
         "quality": 18
       },
-      "batch": null,
+      "batch": "pr-batch:model-routing-and-auth",
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
         "pr-priority:high",
         "pr-action:fast_track",
-        "pr-agent:copilot"
+        "pr-agent:copilot",
+        "pr-batch:model-routing-and-auth"
       ]
     },
     {
@@ -55,10 +73,10 @@
       "risk": "medium",
       "priority": "medium",
       "action": "batch_review",
-      "score": 58,
+      "score": 67,
       "score_breakdown": {
-        "impact": 28,
-        "urgency": 14,
+        "impact": 31,
+        "urgency": 20,
         "quality": 16
       },
       "batch": null,
@@ -69,6 +87,75 @@
         "pr-action:batch_review",
         "pr-agent:copilot"
       ]
+    },
+    {
+      "number": 73033,
+      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 60,
+      "score_breakdown": {
+        "impact": 28,
+        "urgency": 16,
+        "quality": 16
+      },
+      "batch": "pr-batch:model-routing-and-auth",
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:model-routing-and-auth"
+      ]
+    },
+    {
+      "number": 73388,
+      "title": "Route Documentation Unbloat instead of pinning claude-sonnet-5.5",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 60,
+      "score_breakdown": {
+        "impact": 29,
+        "urgency": 15,
+        "quality": 16
+      },
+      "batch": "pr-batch:model-routing-and-auth",
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:model-routing-and-auth"
+      ]
+    },
+    {
+      "number": 73299,
+      "title": "WIP: Add on.decision semantic event qualification gate",
+      "category": "feature",
+      "risk": "high",
+      "priority": "medium",
+      "action": "defer",
+      "score": 56,
+      "score_breakdown": {
+        "impact": 33,
+        "urgency": 12,
+        "quality": 11
+      },
+      "batch": null,
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:high",
+        "pr-priority:medium",
+        "pr-action:defer",
+        "pr-agent:copilot"
+      ]
     }
-  ]
+  ],
+  "notes": "Five eligible open Copilot PRs were triaged after the required 1-hour cooldown; labels applied for categorization, risk, priority, action, and batch grouping. A consolidated triage issue was created. PR comments are unsupported in this workflow context because safeoutputs add_comment requires a PR/issue-triggered target."
 }
