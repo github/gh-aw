@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.13<br>
+**Version**: 1.29.14<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-10-18<br>
+**Publication Date**: 2026-10-31<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -1516,7 +1516,7 @@ In `workflow_call` and other reusable-workflow scenarios, conforming implementat
 
 1. When `safe-outputs.<safe-output-type>.github-app` is configured for a handler that executes GitHub API calls in the `safe_outputs` job, implementations MUST mint a dedicated installation token for that handler using only the permissions required by that handler.
 2. When a handler-specific token is minted, that handler MUST use the dedicated token in preference to the shared `safe-outputs.github-token` or global `safe-outputs.github-app` token.
-3. The global `safe-outputs.github-app` token MUST be computed from only the handlers that do **not** declare a type-specific `github-app` override.
+3. The global `safe-outputs.github-app` token MUST exclude permissions used solely through a type-specific `github-app` override or a non-empty handler `github-token`. Operations that still use the global credential MUST retain their required permissions, as specified in GP5b.
 4. When the effective permission set for a handler is empty (for example, staged-only execution paths or handlers that perform no GitHub API call in `safe_outputs`), implementations MUST NOT mint a dedicated handler token.
 5. When no dedicated handler token is minted, implementations MUST fall back to the handler's configured `github-token` (if any) or to the shared safe-outputs credential flow.
 
@@ -1544,6 +1544,25 @@ safe-outputs:
 ```
 
 In this example, `add-comment` and `dispatch-workflow` MUST use separate installation tokens scoped to their respective handler permissions, while any other safe output types continue using the global `safe-outputs.github-app` fallback.
+
+#### GP5b: Handler Tokens and Global App Permissions
+
+**Syntax**: `safe-outputs.<safe-output-type>.github-token: <github-expression>`
+
+**Default**: No handler token override; the handler uses the shared safe-outputs credential unless a dedicated App token is minted.
+
+**Semantics**: A non-empty handler `github-token` supplies the credential for that handler when no dedicated handler App token is minted. Implementations MUST distinguish job-level `GITHUB_TOKEN` requirements from the permissions requested when minting the global App token.
+
+**Permission Rules**:
+
+1. Permissions used solely through a handler's own token MUST NOT contribute to the global App mint. This rule also applies to individual `safe-outputs.dispatch-repository.<tool>.github-token` overrides.
+2. Handler token overrides MUST NOT remove the handler's permissions from job-level `GITHUB_TOKEN` permission aggregation. Handlers without an override MUST continue contributing their required permissions to the global App mint.
+3. Every global App mint, including the `conclusion` job's mint, MUST include only permissions required by operations using that token. Conclusion reporting permissions MUST be preserved independently of handler overrides.
+4. Review finalization, code-scanning autofix, and pull-request cleanup MUST either use the corresponding handler credential or retain the permissions they require on the global App token. A handler override alone MUST NOT remove permissions for an operation that still uses the global credential.
+
+For example, `dispatch-workflow` configured with `github-token: ${{ secrets.DISPATCH_TOKEN }}` and `workflows: [fixer]` MUST retain `actions: write` in job permissions but MUST NOT add `actions: write` to any global App mint solely for that handler. Without the handler token, the App mint MUST retain the dispatch permission.
+
+**Conformance**: Tests MUST verify the generated global App mints and job permissions with and without a handler token, including dispatch-repository tools. Tests MUST also cover mixed configurations where another handler keeps the global App mint enabled while credential-overridden handlers perform finalization, autofix, or cleanup.
 
 #### GP6: data
 
@@ -6430,6 +6449,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.14** (2026-10-31):
+
+- **Clarified**: Handler token overrides exclude only permissions used solely through those credentials from every global App mint, while preserving job-level permissions and scopes for operations that still use the global credential.
+- **Specified**: Dispatch-repository token overrides and generated-mint conformance coverage, including mixed-credential finalization, autofix, and cleanup.
 
 **Version 1.29.13** (2026-10-18):
 
