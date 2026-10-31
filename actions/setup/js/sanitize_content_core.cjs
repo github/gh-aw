@@ -1328,12 +1328,13 @@ function neutralizeGitHubReferences(s, allowedRepos) {
  * Apply truncation limits to content
  * @param {string} content - The content to truncate
  * @param {number} [maxLength] - Maximum length of content (default: 524288)
+ * @param {number} [maxLines] - Maximum number of lines (default: 65000)
  * @returns {string} The truncated content
  */
-function applyTruncation(content, maxLength) {
+function applyTruncation(content, maxLength, maxLines) {
   maxLength = maxLength || 524288;
   const lines = content.split("\n");
-  const maxLines = 65000;
+  maxLines = maxLines || 65000;
 
   // If content has too many lines, truncate by lines (primary limit)
   if (lines.length > maxLines) {
@@ -1641,9 +1642,10 @@ function canonicalizePublicationText(text, { preserveImageAttributes = false } =
  * @param {string} content - The content to sanitize
  * @param {number} [maxLength] - Maximum length of content (default: 524288)
  * @param {number} [maxBotMentions] - Max bot trigger references before filtering (default: MAX_BOT_TRIGGER_REFERENCES)
+ * @param {number} [maxLines] - Maximum number of lines (default: 65000)
  * @returns {string} The sanitized content
  */
-function sanitizeContentCore(content, maxLength, maxBotMentions) {
+function sanitizeContentCore(content, maxLength, maxBotMentions, maxLines) {
   if (!content || typeof content !== "string") {
     return "";
   }
@@ -1651,7 +1653,7 @@ function sanitizeContentCore(content, maxLength, maxBotMentions) {
   // Apply truncation early to avoid running expensive operations on oversized inputs.
   // This is a pre-pass truncation on raw content; a second truncation pass is applied
   // later after normalization (which may reduce length via stripping invisible chars).
-  content = applyTruncation(content, maxLength);
+  content = applyTruncation(content, maxLength, maxLines);
 
   // Build list of allowed domains from environment and GitHub context
   const allowedDomains = buildAllowedDomains();
@@ -1695,7 +1697,7 @@ function sanitizeContentCore(content, maxLength, maxBotMentions) {
   sanitized = applyURLSanitizationPolicy(sanitized, allowedDomains);
 
   // Apply truncation limits
-  sanitized = applyTruncation(sanitized, maxLength);
+  sanitized = applyTruncation(sanitized, maxLength, maxLines);
 
   // Neutralize ALL @mentions after truncation so a length boundary cannot split
   // an inserted code-span delimiter and reactivate the mention.

@@ -63,6 +63,7 @@ function expandAllowedAliases(aliases) {
 /**
  * @typedef {Object} SanitizeOptions
  * @property {number} [maxLength] - Maximum length of content (default: 524288)
+ * @property {number} [maxLines] - Maximum number of lines (default: 65000)
  * @property {string[]} [allowedAliases] - List of aliases (@mentions) that should not be neutralized
  * @property {number} [maxMentions] - Maximum number of unique allowed aliases to preserve
  * @property {Set<string>} [allowedAliasesSeen] - Allowed aliases already preserved in this output item
@@ -86,6 +87,8 @@ function sanitizeContent(content, maxLengthOrOptions) {
   let maxMentions;
   /** @type {number | undefined} */
   let maxBotMentions;
+  /** @type {number | undefined} */
+  let maxLines;
   let deferMentions = false;
   /** @type {Set<string> | undefined} */
   let allowedAliasesSeen;
@@ -99,13 +102,14 @@ function sanitizeContent(content, maxLengthOrOptions) {
     allowedAliasesLowercase = expandAllowedAliases(normalizedAllowedAliases);
     maxMentions = maxLengthOrOptions.maxMentions;
     maxBotMentions = maxLengthOrOptions.maxBotMentions;
+    maxLines = maxLengthOrOptions.maxLines;
     deferMentions = maxLengthOrOptions.deferMentions === true;
     allowedAliasesSeen = maxLengthOrOptions.allowedAliasesSeen;
   }
 
   // If no allowed aliases specified, use core sanitization (which neutralizes all mentions)
   if (allowedAliasesLowercase.length === 0 && !deferMentions) {
-    return sanitizeContentCore(content, maxLength, maxBotMentions);
+    return sanitizeContentCore(content, maxLength, maxBotMentions, maxLines);
   }
 
   // If allowed aliases are specified, we need custom mention filtering
@@ -154,7 +158,7 @@ function sanitizeContent(content, maxLengthOrOptions) {
   sanitized = applyURLSanitizationPolicy(sanitized, allowedDomains);
 
   // Apply truncation limits (shared with core)
-  sanitized = applyTruncation(sanitized, maxLength);
+  sanitized = applyTruncation(sanitized, maxLength, maxLines);
 
   // Neutralize mentions after truncation so the length boundary cannot split an
   // inserted code-span delimiter and reactivate a mention.
