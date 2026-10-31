@@ -310,3 +310,126 @@ func TestAuditEngineStepFailure_NestedStepLogLayout(t *testing.T) {
 	assert.Contains(t, findings[0].Description, `step 22 "Execute threat detection with AWF"`)
 	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
 }
+
+func TestAuditEngineStepFailure_ErrorLineSanitized(t *testing.T) {
+	runDir := t.TempDir()
+	// Built from parts so the fixture holds no literal credential.
+	tokenValue := "gh" + "p_" + strings.Repeat("Ab12", 9)
+	userinfo := "x-access-token:" + "s3cr3t" + "Passw0rd"
+	leakyLog := strings.Replace(detectionPreflightJobLog40779352178,
+		"[health-check][ERROR] Cannot connect to Anthropic API proxy at http://host.docker.internal:10002\n",
+		"[health-check][ERROR] Cannot connect to https://"+userinfo+"@proxy.example.com:10002 with token "+tokenValue+" and ANTHROPIC_API_KEY\n", 1)
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:         detectionPreflightJobs40779352178,
+		"workflow-logs/3_detection.txt": leakyLog,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40779352178, "Daily BYOK Ollama Test", "success")
+
+	findings := generateEngineStepFailureFindings(processedRun)
+
+	require.Len(t, findings, 1)
+	description := findings[0].Description
+	assert.Contains(t, description, "Cannot connect to https://[REDACTED]@proxy.example.com:10002", "the error line keeps its diagnostic context")
+	assert.NotContains(t, description, userinfo, "URL userinfo must not reach the finding")
+	assert.NotContains(t, description, "x-access-token", "URL userinfo must not reach the finding")
+	assert.NotContains(t, description, tokenValue, "token values must not reach the finding")
+	assert.Contains(t, description, "with token [REDACTED]")
+	assert.NotContains(t, description, "ANTHROPIC_API_KEY", "secret names must not reach the finding")
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryOnlyAuditedRun(t *testing.T) {
+	runDir := t.TempDir()
+	olderRunRow := `{"id":"legacy_question","question":"Removed question","answer":"YES","model":"","timestamp":"2026-10-20T10:00:00.000Z","runid":"40000000000"}` + "\n"
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:     evalsPreflightJobs40955414354,
+		"workflow-logs/3_evals.txt": evalsPreflightJobLog40955414354,
+		// evals.jsonl restored from the evals state branch holds earlier runs' rows.
+		"evals.jsonl": olderRunRow + evalsPreflightResults40955414354,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Claude Code User Documentation Review", "success")
+
+	summary := buildEvalsSummary(processedRun.Run)
+
+	require.NotNil(t, summary)
+	assert.Equal(t, EvalsSummary{Questions: 2, Unknown: 2}, *summary, "only the audited run's answers are counted")
+	findings := generateEngineStepFailureFindings(processedRun)
+	require.Len(t, findings, 1)
+	assert.Contains(t, findings[0].Description, "all 2 evals answers are UNKNOWN")
+}
+
+func TestAuditEngineStepFailure_SameSecondSuccessorStep(t *testing.T) {
+	runDir := t.TempDir()
+	jobLog := `2026-10-28T22:28:40.1000000Z ##[group]Run cp /tmp/gh-aw/aw-prompts/prompt.txt /tmp/gh-aw/threat-detection/prompt.txt
+2026-10-28T22:28:41.1000000Z ##[group]Run mkdir -p "/tmp/gh-aw/threat-detection"
+2026-10-28T22:28:41.2000000Z [health-check][ERROR] Cannot connect to Anthropic API proxy at http://host.docker.internal:10002
+2026-10-28T22:28:41.3000000Z ##[error]Process completed with exit code 1.
+2026-10-28T22:28:41.4000000Z ##[group]Run mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall
+2026-10-28T22:28:41.5000000Z mkdir -p /tmp/gh-aw/threat-detection/sandbox/firewall
+`
+	jobs := `[{"total_count":1,"jobs":[{"id":1,"run_id":40779352178,"name":"detection","status":"completed","conclusion":"success","started_at":"2026-10-28T22:28:30Z","completed_at":"2026-10-28T22:28:42Z","steps":[
+{"name":"Set up job","status":"completed","conclusion":"success","number":1,"started_at":"2026-10-28T22:28:30Z","completed_at":"2026-10-28T22:28:31Z"},
+{"name":"Prepare threat detection files","status":"completed","conclusion":"success","number":21,"started_at":"2026-10-28T22:28:40Z","completed_at":"2026-10-28T22:28:41Z"},
+{"name":"Execute threat detection with AWF","status":"completed","conclusion":"success","number":22,"started_at":"2026-10-28T22:28:41Z","completed_at":"2026-10-28T22:28:41Z"},
+{"name":"Copy detection firewall logs","status":"completed","conclusion":"success","number":23,"started_at":"2026-10-28T22:28:41Z","completed_at":"2026-10-28T22:28:41Z"}]}]}]`
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:         jobs,
+		"workflow-logs/3_detection.txt": jobLog,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40779352178, "Daily BYOK Ollama Test", "success")
+
+	job := processedRun.JobDetails[0]
+	lines := readEngineStepLogLines(filepath.Join(runDir, "workflow-logs"), job.JobInfo, job.Steps[2])
+	require.Len(t, lines, 3, "step 22 spans its own header up to step 23's header")
+	assert.Contains(t, lines[0], `##[group]Run mkdir -p "/tmp/gh-aw/threat-detection"`)
+
+	findings := generateEngineStepFailureFindings(processedRun)
+	require.Len(t, findings, 1, "the engine's exit-code line must stay in its window when its successor starts in the same second")
+	assert.Contains(t, findings[0].Description, `step 22 "Execute threat detection with AWF"`)
+	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
+}
+
+func TestAuditEngineStepFailure_EvalsExecutionStatePerInvocation(t *testing.T) {
+	invocationLog := func(prefix string) string {
+		return `2026-10-29T21:18:59.0334305Z ##[group]Run set -o pipefail
+2026-10-29T21:19:40.0000000Z Process exiting with code: 0
+2026-10-29T21:19:44.1335928Z ##[group]Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+2026-10-29T21:19:44.1336376Z with:
+2026-10-29T21:19:44.1336400Z   name: ` + prefix + `evals
+2026-10-29T21:19:44.1336500Z   if-no-files-found: ignore
+`
+	}
+	jobs := `[{"total_count":2,"jobs":[
+{"id":1,"run_id":40955414354,"name":"caller-a / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]},
+{"id":2,"run_id":40955414354,"name":"caller-b / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]}]}]`
+	writeFixture := func(t *testing.T, withLogs bool) ProcessedRun {
+		runDir := t.TempDir()
+		files := map[string]string{
+			jobsAPIResponseFileName:               jobs,
+			"aaaaaaaa-usage/evals/execution.json": `{"version":1,"component":"evals","run_id":40955414354,"run_attempt":1,"state":"not_started"}` + "\n",
+			"bbbbbbbb-usage/evals/execution.json": `{"version":1,"component":"evals","run_id":40955414354,"run_attempt":1,"state":"started"}` + "\n",
+		}
+		if withLogs {
+			files["workflow-logs/3_caller-a _ evals.txt"] = invocationLog("aaaaaaaa-")
+			files["workflow-logs/4_caller-b _ evals.txt"] = invocationLog("bbbbbbbb-")
+		}
+		writeEngineStepFixture(t, runDir, files)
+		return engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+	}
+
+	t.Run("evidence attributed by artifact prefix", func(t *testing.T) {
+		findings := generateEngineStepFailureFindings(writeFixture(t, true))
+
+		require.Len(t, findings, 1, "only the not_started invocation is reported")
+		assert.Contains(t, findings[0].Description, `Job "caller-a / evals"`)
+		assert.Contains(t, findings[0].Description, "execution state: not_started")
+	})
+
+	t.Run("ambiguous evidence is unavailable", func(t *testing.T) {
+		processedRun := writeFixture(t, false)
+
+		assert.Empty(t, generateEngineStepFailureFindings(processedRun), "conflicting unattributed evidence must not mark clean invocations as failed")
+		assert.Empty(t, readEvalsExecutionState(processedRun.Run, "", false))
+	})
+}
