@@ -1235,7 +1235,7 @@ func TestAuditTimeoutErrorSummarizesPartialResults(t *testing.T) {
 			assert.Equal(t, true, partialResults["available"])
 			if strings.Contains(output, `"run_id":123`) {
 				assert.InDelta(t, 123, partialResults["run_id"], 0)
-				assert.Equal(t, "| example", partialResults["workflow_name"])
+				assert.Equal(t, "example", partialResults["workflow_name"])
 			}
 			assert.NotContains(t, content.Text, "overview")
 		} else {
