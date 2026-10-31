@@ -216,8 +216,8 @@ func applyDoctorTokenRunEvidence(check *DoctorTokenValidation) {
 		}
 	}
 	if doctorAssignmentRunFailure(check.RecentRuns) {
-		check.Status = "credential_error"
-		check.Message += " Existing runs report credential failures; this is historical workflow evidence, not proof that every listed token is invalid."
+		check.Status = "unknown"
+		check.Message += " Existing-run diagnostics need attention; workflow logs and run conclusions do not establish invalid credentials."
 	}
 }
 
@@ -229,12 +229,12 @@ func applyDoctorAssignmentTokenEvidence(checks []DoctorTokenValidation, assignme
 				continue
 			}
 			for _, run := range assignment.RecentRuns.Runs {
-				if run.Outcome == "credential_error" {
-					check.Status = "credential_error"
+				if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" || run.Outcome == "unknown" {
+					check.Status = "unknown"
 					check.RecentRuns = assignment.RecentRuns
 					var message strings.Builder
 					message.WriteString(check.Message)
-					message.WriteString(" The assignment handler's existing-run sample reports a credential failure; this sample covers assignment, not every operation in the workflow.")
+					message.WriteString(" The assignment handler's existing-run sample needs attention, but logs do not establish invalid credentials; this sample covers assignment, not every operation in the workflow.")
 					check.Message = message.String()
 					break
 				}
@@ -428,6 +428,7 @@ func classifyDoctorTokenLog(content string, evidence DoctorAssignmentRunEvidence
 		if (diagnostic && strings.HasPrefix(line, "Failed ")) || doctorTokenFailureDiagnostic(line) {
 			if doctorAssignmentCredentialFailure(line) || strings.Contains(strings.ToLower(line), "http 403") {
 				evidence.Outcome = "unknown"
+				evidence.credentialDiagnostic = true
 				evidence.Message = "Workflow logs contain a credential-like diagnostic, but workflow code can emit log text; token validity is unknown."
 				return evidence
 			}

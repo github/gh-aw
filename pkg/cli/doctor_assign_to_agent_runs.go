@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -38,15 +39,16 @@ type DoctorAssignmentRunHistory struct {
 
 // DoctorAssignmentRunEvidence contains recognized handler outcomes, never raw log text.
 type DoctorAssignmentRunEvidence struct {
-	RunID           int64     `json:"run_id"`
-	Attempt         int       `json:"attempt"`
-	URL             string    `json:"url,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	Conclusion      string    `json:"conclusion"`
-	Outcome         string    `json:"outcome"`
-	Assigned        int       `json:"assigned"`
-	AlreadyAssigned int       `json:"already_assigned"`
-	Message         string    `json:"message"`
+	RunID                int64     `json:"run_id"`
+	Attempt              int       `json:"attempt"`
+	URL                  string    `json:"url,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	Conclusion           string    `json:"conclusion"`
+	Outcome              string    `json:"outcome"`
+	Assigned             int       `json:"assigned"`
+	AlreadyAssigned      int       `json:"already_assigned"`
+	Message              string    `json:"message"`
+	credentialDiagnostic bool
 }
 
 type doctorAssignmentRunMiner struct {
@@ -83,7 +85,7 @@ func collectDoctorAssignmentRunEvidence(ctx context.Context, repo, host string, 
 		check := &checks[i]
 		check.RecentRuns = miner.collect(check.Workflow)
 		if check.Status == "configured" && doctorAssignmentRunFailure(check.RecentRuns) {
-			check.Message = fmt.Sprintf("%s Recent runs contain assignment failures. %s", check.Message, doctorAssignmentRemedy(repo, check.SuggestedSecret))
+			check.Message = fmt.Sprintf("%s Recent assignment evidence needs attention; logs alone do not establish invalid credentials. %s", check.Message, doctorAssignmentRemedy(repo, check.SuggestedSecret))
 		}
 	}
 }
@@ -175,19 +177,44 @@ func (m *doctorAssignmentRunMiner) inspect(run doctorAssignmentRunMetadata, sinc
 		evidence.Message = "Incomplete jobs metadata; assignment outcome is unknown."
 		return evidence
 	}
+	if m.allJobs {
+		slices.SortStableFunc(response.Jobs, func(a, b JobInfo) int {
+			return doctorTokenJobPriority(b) - doctorTokenJobPriority(a)
+		})
+	}
+	coverageMessage := ""
 	for _, job := range response.Jobs {
 		if !m.allJobs && job.Name != "safe_outputs" && job.Name != "assign_to_agent" {
 			continue
 		}
-		current := m.inspectJob(job, evidence)
+		jobEvidence := evidence
+		jobEvidence.Outcome, jobEvidence.Message = "unknown", ""
+		jobEvidence.credentialDiagnostic = false
+		current := m.inspectJob(job, jobEvidence)
 		if !m.allJobs || current.Outcome == "credential_error" {
 			return current
 		}
 		if current.Outcome == "unknown" {
-			evidence = current
+			if current.credentialDiagnostic {
+				evidence = current
+			} else {
+				if coverageMessage == "" {
+					coverageMessage = current.Message
+				}
+				if !evidence.credentialDiagnostic {
+					evidence = current
+				}
+			}
 		}
 	}
+	return m.finishInspection(evidence, coverageMessage)
+}
+
+func (m *doctorAssignmentRunMiner) finishInspection(evidence DoctorAssignmentRunEvidence, coverageMessage string) DoctorAssignmentRunEvidence {
 	if m.allJobs {
+		if evidence.credentialDiagnostic && coverageMessage != "" {
+			evidence.Message += " Inspection coverage is incomplete: " + coverageMessage
+		}
 		if evidence.Message == "" {
 			evidence.Outcome, evidence.Message = "no_evidence", "No recognized credential failure found; token validity remains unverified."
 		}
@@ -195,6 +222,17 @@ func (m *doctorAssignmentRunMiner) inspect(run doctorAssignmentRunMetadata, sinc
 	}
 	evidence.Outcome, evidence.Message = "no_evidence", "No assignment handler job found in this run attempt."
 	return evidence
+}
+
+func doctorTokenJobPriority(job JobInfo) int {
+	priority := 0
+	if job.Conclusion == "failure" {
+		priority += 2
+	}
+	if job.Name == "safe_outputs" || job.Name == "assign_to_agent" {
+		priority++
+	}
+	return priority
 }
 
 func (m *doctorAssignmentRunMiner) inspectJob(job JobInfo, evidence DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence {
@@ -301,7 +339,8 @@ func classifyDoctorAssignmentLog(content string, evidence DoctorAssignmentRunEvi
 	}
 	switch {
 	case credentialError:
-		evidence.Outcome, evidence.Message = "credential_error", "Assignment handler reported an authentication or permission failure, even if the run succeeded or ignore-if-error suppressed errors."
+		evidence.credentialDiagnostic = true
+		evidence.Outcome, evidence.Message = "unknown", "Assignment logs contain a credential-like diagnostic, but workflow code can emit log text; token validity is unknown even if the run failed."
 	case assignmentFailure:
 		evidence.Outcome, evidence.Message = "assignment_failed", "Assignment handler reported a failure without conclusive credential evidence."
 	case evidence.Assigned > 0:
@@ -331,7 +370,7 @@ func doctorAssignmentCredentialFailure(message string) bool {
 func doctorAssignmentRunFailure(history *DoctorAssignmentRunHistory) bool {
 	if history != nil {
 		for _, run := range history.Runs {
-			if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" {
+			if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" || run.Outcome == "unknown" {
 				return true
 			}
 		}

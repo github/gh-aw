@@ -181,7 +181,7 @@ func TestDoctorTokenMetadataDoesNotValidateValues(t *testing.T) {
 		{name: "metadata denied", status: "unknown", coverageErr: errors.New("HTTP 403")},
 		{name: "logs denied", status: "unknown", history: &DoctorAssignmentRunHistory{Error: "HTTP 403"}},
 		{name: "partial jobs", status: "unknown", history: &DoctorAssignmentRunHistory{Runs: []DoctorAssignmentRunEvidence{{Outcome: "unknown"}}}},
-		{name: "green run with failure", status: "credential_error", history: &DoctorAssignmentRunHistory{Runs: []DoctorAssignmentRunEvidence{{Conclusion: "success", Outcome: "credential_error"}}}},
+		{name: "green run with failure", status: "unknown", history: &DoctorAssignmentRunHistory{Runs: []DoctorAssignmentRunEvidence{{Conclusion: "success", Outcome: "credential_error"}}}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
