@@ -298,7 +298,7 @@ test("presents the security diagram and layers, then cost dashboard and guardrai
   for (const [number, title, visible, absent] of [
     [5, "Safe by default", ".tri-fig", "[data-safe-root]"],
     [6, "Six layers of defence", "[data-safe-root]", ".tri-fig"],
-    [7, "Read. Propose. Check. Apply.", ".security-flow", "[data-safe-root]"],
+    [8, "Read. Propose. Check. Apply.", ".security-flow", "[data-safe-root]"],
     [9, "Cost under control", ".aw-dash", ".aw-points"],
     [10, "Budget guardrails", ".aw-points", ".aw-dash"],
   ] as const) {

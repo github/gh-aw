@@ -259,8 +259,7 @@ test("makes standalone code editable and leaves non-code expanded content read-o
   await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
-  await page.keyboard.press("PageDown");
-  await expect(page.locator("[data-slideshow-status]")).toContainText("8 / 14");
+  await expect(page.locator("[data-slideshow-status]")).toContainText("7 / 14");
   const inlineCode = page.getByRole("button", { name: "Expand gh aw compile", exact: true });
   await inlineCode.click();
   const editor = zoom.getByRole("textbox");
@@ -285,7 +284,6 @@ test("expands output mocks and terminal snippets and respects reduced motion", a
   await expect(zoom.locator(".gh")).toHaveCSS("position", "relative");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Exit slideshow", exact: true }).focus();
-  await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
   await page.keyboard.press("PageDown");
