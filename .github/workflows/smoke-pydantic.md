@@ -52,6 +52,9 @@ features:
 sandbox:
   agent:
     id: awf
+steps:
+  - name: Prepare smoke report directory
+    run: mkdir -p generated_reports
 ---
 
 # Smoke Test: Pydantic AI Engine Validation
@@ -61,13 +64,14 @@ sandbox:
 1. **Model Connectivity Testing**: Answer the question "What is 2 + 2?" in a single short line.
 2. **MCP Tool Testing**: Confirm that the `safeoutputs` MCP tools are available to you.
 3. **Coder Toolset Testing**: Use your `read_file` tool to read `README.md` from the repository root and quote its first line verbatim. Do not shell out and do not guess the content — this test only passes when the file tool returns it.
+4. **File Writing Testing**: The setup step already created `generated_reports` in the repository root. Use `write_file` to write the single line `Pydantic AI smoke file write passed` to `generated_reports/smoke-pydantic-${{ github.run_id }}.txt`. Wait for success, then use `read_file` to verify that exact line. Do not read before the write finishes or use a different, nonexistent parent directory. If either file tool fails, mark this test as failed and report the concrete error; do not repeatedly retry the same failing call. After submitting the required summary, call `report_incomplete` with that error so an unavailable or failed file check cannot be reported as a successful run.
 
 ## Output
 
 **ALWAYS create an issue** using the `create_issue` safe-output tool:
 - Title: "Smoke Test: Pydantic AI - ${{ github.run_id }}"
 - Body should include:
-  - Test results (✅ or ❌ for each test), including the quoted first line of `README.md`
+  - Test results (✅ or ❌ for each test), including the quoted first line of `README.md` and file readback
   - Overall status: PASS or FAIL
   - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
