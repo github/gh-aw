@@ -29,6 +29,34 @@ safe-outputs:
 
 The agent requests issue creation; a separate job with `issues: write` creates it.
 
+## CLI Payloads
+
+When the runtime exposes safe outputs through the `safeoutputs` CLI, tool names
+use underscores, such as `create_issue`. Run `safeoutputs --help` to list
+available tools and `safeoutputs create_issue --help` for that tool's schema.
+Calls request real actions for downstream processing; they are not previews.
+
+Pass a complete JSON object as one single-quoted shell argument:
+
+```bash
+safeoutputs create_issue '{"title":"Documentation findings","body":"First finding.\nSecond finding."}'
+```
+
+Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes
+as `\\`, and apostrophes as `\u0027` to preserve the surrounding shell quote.
+For a Markdown report already saved in a file, per-field stdin avoids manually
+escaping its body:
+
+```bash
+cat /tmp/gh-aw/agent/report.md | safeoutputs create_issue --title "Documentation findings" --body .
+```
+
+The `--body .` form supplies the text to one field. The bare
+`safeoutputs create_issue .` form instead requires the entire stdin content to
+be a valid JSON object. Raw Markdown is not valid input for that bare form,
+and `{"body": .}` is not valid JSON. Use only tools and shell operations
+available in the workflow's runtime.
+
 ## Available Safe Output Types
 
 The tables below summarize the built-in safe output handlers. `noop`, `report-missing-tool`, and `report-missing-data` are always available, and `create-issue` is auto-injected only when no non-system safe outputs are configured and it is not explicitly disabled.

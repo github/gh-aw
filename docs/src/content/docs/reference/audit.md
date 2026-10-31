@@ -35,6 +35,28 @@ Top-level fields in `--json` output are stable; nested sub-fields may be extende
 
 By default a single-run audit renders a Comparison section against an earlier run of the same workflow. Use `--no-baseline` when that baseline is unrepresentative or to avoid the extra downloads. A `--no-baseline` result is never written to the audit cache, so it cannot suppress the Comparison section of a later default audit.
 
+### Retry history
+
+When unified-session retry evidence is available, `--json` includes a `retries`
+object. `agent_retries` and `detection_retries` count observed harness and startup
+retries separately for the main agent and threat detection. `attempts` retains
+harness and startup attempts, including interrupted attempts, with available IDs,
+timestamps, strategy, backoff, exit code, failure classes, and outcome.
+Checkpoint and completion records for the same attempt are deduplicated.
+
+`engine_retries` and `detection_engine_retries` count native engine retries
+separately; `engine_retry_history` preserves their available metadata and source
+references. Native retries are associated with harness attempts only when the
+recorded evidence supports that association. Missing evidence does not prove
+that no retries occurred, and a missing exit code is not a successful exit.
+
+Retry history does not change token accounting or classify ordinary
+continuations as retries. See the
+[Unified Agent Session Specification](/gh-aw/specs/unified-agent-session-specification/)
+for `harness.attempt` records and
+[Harness Retry Policy](/gh-aw/reference/engines/#harness-retry-and-post-result-watchdog-policy)
+for execution behavior.
+
 ### Searching session evidence
 
 ```bash
