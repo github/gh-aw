@@ -6,7 +6,7 @@ disable-model-invocation: true
 # Debug Playbook
 
 Fix first failing boundary; follow [debugging gates](debug-agentic-workflow.md).
-Do not dispatch workflows or execute artifacts. Keep secrets/prompts/configuration/reasoning private.
+Do not dispatch workflows or execute artifacts; keep context private.
 
 ## Start here
 
@@ -23,8 +23,8 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
 
 Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
-Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
-Preserve codes/severity; advisory/pending/skipped/policy-denied aren't necessarily bugs.
+Read only the linked row; [cluster fleets](analyzing-runs.md).
+Preserve codes/severity; advisory/pending/skipped/policy-denied may not be bugs.
 Unknown: [unmapped codes](#unmapped-codes).
 
 ## Audit findings
@@ -60,6 +60,7 @@ Inventory: [Model availability](#model-availability).
 | Codes | Check | Remedy |
 | --- | --- | --- |
 | `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
+| `ERR_TOKEN_BROKER_AUTHENTICATION` | Auth failure. | Check broker config. |
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't establish availability. |
 | `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone doesn't prove model removal. |
