@@ -140,6 +140,38 @@ func TestArtifactDownloadSingleArtifactUsesExactName(t *testing.T) {
 	assert.NotContains(t, steps, "merge-multiple: true", "single-artifact downloads should not merge multiple matches")
 }
 
+func TestActivationArtifactDownloadRetriesBeforeRestore(t *testing.T) {
+	for _, trigger := range []string{"push", "workflow_call"} {
+		for _, ghes := range []bool{false, true} {
+			t.Run(trigger+map[bool]string{false: "/github", true: "/ghes"}[ghes], func(t *testing.T) {
+				compiler := NewCompiler()
+				compiler.ghesArtifactCompat = ghes
+				data := &WorkflowData{On: trigger, AmbientFolders: []string{"instructions"}}
+				var steps strings.Builder
+				compiler.generateActivationArtifactAndCommentMemorySteps(&steps, data)
+				generated := steps.String()
+				first := extractWorkflowStepByName(t, generated, "Download activation artifact")
+				retry := extractWorkflowStepByName(t, generated, "Retry activation artifact download")
+
+				assert.Contains(t, first, "id: download-activation-artifact\n")
+				assert.Contains(t, first, "continue-on-error: true\n")
+				assert.NotContains(t, first, "        if:")
+				assert.Contains(t, retry, "if: ${{ !cancelled() && steps.download-activation-artifact.outcome == 'failure' }}")
+				assert.NotContains(t, retry, "continue-on-error:")
+				assert.Equal(t, 2, strings.Count(generated, "uses: "+compiler.getActionPin("actions/download-artifact")))
+				for _, step := range []string{first, retry} {
+					assert.Contains(t, step, "name: "+artifactPrefixExprForDownstreamJob(data)+"activation\n")
+					assert.True(t, strings.HasSuffix(step, "path: /tmp/gh-aw"))
+					assert.NotContains(t, step, "pattern:")
+					assert.NotContains(t, step, "merge-multiple:")
+				}
+				assert.Less(t, strings.Index(generated, "Download activation artifact"), strings.Index(generated, "Retry activation artifact download"))
+				assert.Less(t, strings.Index(generated, "Retry activation artifact download"), strings.Index(generated, "Restore ambient"))
+			})
+		}
+	}
+}
+
 func TestArtifactDownloadFallbackUsesPatternWhenSupported(t *testing.T) {
 	steps := strings.Join(buildArtifactDownloadSteps(ArtifactDownloadConfig{
 		ArtifactName:     "agent",

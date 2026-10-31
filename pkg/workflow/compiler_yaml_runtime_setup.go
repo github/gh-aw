@@ -295,11 +295,20 @@ func (c *Compiler) generateActivationArtifactAndCommentMemorySteps(yaml *strings
 	// before the base-branch restore in generateEngineInstallAndPreAgentSteps.
 	compilerYamlLog.Print("Adding activation artifact download step")
 	activationArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.ActivationArtifactName.String()
-	yaml.WriteString("      - name: Download activation artifact\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/download-artifact")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	yaml.WriteString("        with:\n")
-	fmt.Fprintf(yaml, "          name: %s\n", activationArtifactName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	yaml.WriteString("          path: /tmp/gh-aw\n")
+	download := ArtifactDownloadConfig{
+		ArtifactName: activationArtifactName,
+		DownloadPath: constants.TmpGhAwDir,
+		StepName:     "Download activation artifact",
+		StepID:       "download-activation-artifact",
+	}
+	yaml.WriteString(strings.Join(buildArtifactDownloadSteps(download, c.getActionPin), ""))
+	// A fresh action invocation refreshes the blob URL after internal retries are exhausted.
+	continueOnError := false
+	download.StepName = "Retry activation artifact download"
+	download.StepID = ""
+	download.IfCondition = "${{ !cancelled() && steps.download-activation-artifact.outcome == 'failure' }}"
+	download.ContinueOnError = &continueOnError
+	yaml.WriteString(strings.Join(buildArtifactDownloadSteps(download, c.getActionPin), ""))
 	generateRestoreAmbientFoldersStep(yaml, data)
 	// Resolve staged instructions before their later workspace restore, and split prompts
 	// before comment-memory appends guidance only to the combined prompt.
