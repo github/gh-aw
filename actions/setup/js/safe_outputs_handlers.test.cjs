@@ -3813,6 +3813,22 @@ describe("safe_outputs_handlers", () => {
       expect(droppedEntry.body).toContain("[Content too large, saved to file:");
     });
 
+    it("keeps explicitly length-limited custom input fields inline", () => {
+      const payload = "A".repeat(70000);
+      const h = createHandlers(mockServer, mockAppendSafeOutput, {
+        publish_report: {
+          inputs: {
+            payload: { type: "string", maxLength: 100000 },
+          },
+        },
+      });
+
+      const response = h.defaultHandler("publish_report")({ payload });
+
+      expect(JSON.parse(response.content[0].text)).toEqual({ result: "success" });
+      expect(mockAppendSafeOutput).toHaveBeenCalledExactlyOnceWith({ payload, type: "publish_report" });
+    });
+
     it("should reject invalid deduplicate-by-title configuration", () => {
       expect(() =>
         createHandlers(mockServer, mockAppendSafeOutput, {

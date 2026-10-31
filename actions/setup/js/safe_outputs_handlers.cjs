@@ -570,9 +570,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     let largeContent = null;
     /** @type {any} */
     let largeFieldName = null;
+    const configuredInputs = getSafeOutputsToolConfig(config, entry.type).inputs || {};
 
     for (const [key, value] of Object.entries(entry)) {
       if (typeof value === "string") {
+        if (typeof configuredInputs[key]?.maxLength === "number") {
+          continue;
+        }
         const tokens = estimateTokens(value);
         if (tokens > TOKEN_THRESHOLD) {
           largeContent = value;

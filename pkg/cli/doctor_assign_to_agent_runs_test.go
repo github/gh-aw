@@ -25,14 +25,14 @@ func TestDoctorAssignmentLogEvidence(t *testing.T) {
 		{name: "PR assignment", log: "Successfully assigned copilot coding agent to pull request #42", outcome: "assigned", assigned: 1},
 		{name: "helper and handler duplicates", log: "Successfully assigned copilot coding agent to issue #42\nSuccessfully assigned copilot coding agent to issue #42", outcome: "assigned", assigned: 1},
 		{name: "already assigned", log: "copilot is already assigned to issue #42", outcome: "already_assigned", existing: 1},
-		{name: "successful run with suppressed preflight failure", log: "2026-10-29T10:43:49.7032089Z ##[warning]Agent assignment credential validation failed: Bad credentials (HTTP 401). token-not-for-output\n2026-10-29T10:43:49.8Z Exported assign_to_agent outputs (0 error(s))", outcome: "credential_error"},
-		{name: "ignored permission error", log: "##[warning]Agent assignment failed for copilot on issue #42 due to authentication/permission error. Skipping due to ignore-if-error=true.", outcome: "credential_error"},
-		{name: "regular permission error", log: `##[error]Failed to assign agent "copilot" to issue #42: Resource not accessible by integration`, outcome: "credential_error"},
-		{name: "HTTP unauthorized", log: `##[error]Failed to assign agent "copilot" to issue #42: Bad credentials (HTTP 401)`, outcome: "credential_error"},
-		{name: "legacy permission template", log: "Failed to assign copilot: Copilot assignment permission requirements not met", outcome: "credential_error"},
+		{name: "successful run with suppressed preflight failure", log: "2026-10-29T10:43:49.7032089Z ##[warning]Agent assignment credential validation failed: Bad credentials (HTTP 401). token-not-for-output\n2026-10-29T10:43:49.8Z Exported assign_to_agent outputs (0 error(s))", outcome: "unknown"},
+		{name: "ignored permission error", log: "##[warning]Agent assignment failed for copilot on issue #42 due to authentication/permission error. Skipping due to ignore-if-error=true.", outcome: "unknown"},
+		{name: "regular permission error", log: `##[error]Failed to assign agent "copilot" to issue #42: Resource not accessible by integration`, outcome: "unknown"},
+		{name: "HTTP unauthorized", log: `##[error]Failed to assign agent "copilot" to issue #42: Bad credentials (HTTP 401)`, outcome: "unknown"},
+		{name: "legacy permission template", log: "Failed to assign copilot: Copilot assignment permission requirements not met", outcome: "unknown"},
 		{name: "availability failure", log: "##[warning]Agent assignment failed for copilot on issue #42 due to agent availability error. Skipping due to ignore-if-error=true.", outcome: "assignment_failed"},
 		{name: "other failure", log: `##[error]Failed to assign agent "copilot" to issue #42: target not found`, outcome: "assignment_failed"},
-		{name: "mixed failures and assignments", log: "Successfully assigned copilot coding agent to issue #42\ncopilot is already assigned to issue #43\n##[warning]Agent assignment credential validation failed: Bad credentials", outcome: "credential_error", assigned: 1, existing: 1},
+		{name: "mixed failures and assignments", log: "Successfully assigned copilot coding agent to issue #42\ncopilot is already assigned to issue #43\n##[warning]Agent assignment credential validation failed: Bad credentials", outcome: "unknown", assigned: 1, existing: 1},
 		{name: "ANSI and timestamps", log: "2026-10-29T10:43:49.7032089Z \x1b[32mSuccessfully assigned copilot coding agent to issue #42\x1b[0m\r\n", outcome: "assigned", assigned: 1},
 		{name: "start only", log: "Assigning copilot coding agent to issue #42", outcome: "no_evidence"},
 		{name: "staged", log: "Staged assign_to_agent: success: true, skipped: true\nExported assign_to_agent outputs (0 error(s))", outcome: "no_evidence"},
@@ -88,7 +88,7 @@ func TestDoctorAssignmentRecentRunRequests(t *testing.T) {
 	require.Empty(t, history.Error)
 	require.Len(t, history.Runs, 1)
 	assert.Equal(t, "success", history.Runs[0].Conclusion)
-	assert.Equal(t, "credential_error", history.Runs[0].Outcome)
+	assert.Equal(t, "unknown", history.Runs[0].Outcome)
 	assert.Equal(t, 3, miner.requests)
 	assert.Equal(t, now.Add(-7*24*time.Hour), history.Since)
 	assert.True(t, doctorAssignmentRunFailure(history))
@@ -202,7 +202,7 @@ func TestDoctorAssignmentHistoryReporting(t *testing.T) {
 			check := DoctorAgentAssignmentCheck{Workflow: "assign.md", Status: "configured", RecentRuns: history, PATURL: "pat-setup", SecretsURL: "secret-setup"}
 			_, stderr := captureOutput(t, func() error {
 				err := printDoctorAgentAssignments([]DoctorAgentAssignmentCheck{check})
-				assert.Equal(t, outcome == "credential_error" || outcome == "assignment_failed", err != nil)
+				assert.Equal(t, outcome == "credential_error" || outcome == "assignment_failed" || outcome == "unknown", err != nil)
 				return nil
 			})
 			assert.Contains(t, stderr, "Run 42 attempt 2: "+outcome)

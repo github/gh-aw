@@ -1,0 +1,135 @@
+---
+import Octicon from '../Octicon.astro';
+import LandingSection from './LandingSection.astro';
+import { engineLogos } from './HowItWorksEngineLogos';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const engines = [
+  { id: 'copilot', name: 'GitHub Copilot' },
+  { id: 'codex', name: 'Codex' },
+  { id: 'claude', name: 'Claude Code' },
+] as const;
+---
+
+<LandingSection
+  id="security-model"
+  title="Read. Propose. Check. Apply."
+  lede="The agent reasons about your repository. It does not hold the authority to change it."
+>
+  <figure class="security-flow" aria-label="Security flow from GitHub and Jira triggers through the agent to safe outputs">
+    <ol class="flow">
+      <li class="phase trigger">
+        <div class="phase-heading"><span class="step">01</span><h3>Trigger</h3></div>
+        <div class="graph" aria-hidden="true">
+          <span class="graph-node"><Octicon name="issue-opened" size={16} />Issues</span>
+          <span class="graph-node"><Octicon name="git-pull-request" size={16} />Pull requests</span>
+          <span class="graph-node"><Octicon name="git-branch" size={16} />Pushes</span>
+          <span class="graph-node"><Octicon name="play" size={16} />Actions</span>
+          <span class="graph-hub"><Octicon name="mark-github" size={26} /></span>
+        </div>
+        <a class="gate external-trigger" href={`${base}/reference/triggers/`}>
+          <Octicon name="issue-opened" size={16} />
+          <span><strong>Jira</strong><small>Via authenticated repository dispatch</small></span>
+          <Octicon name="arrow-right" size={16} />
+        </a>
+        <p class="detail">Also runs on schedules and manual dispatch.</p>
+      </li>
+      <li class="phase agent">
+        <div class="phase-heading"><span class="step">02</span><h3>Agent</h3></div>
+        <a class="gate input-gate" href={`${base}/reference/integrity/`}>
+          <Octicon name="filter" size={16} />
+          <strong>Integrity filtered Inputs</strong>
+          <Octicon name="arrow-down" size={16} />
+        </a>
+        <div class="sandbox">
+          <span class="sandbox-label"><Octicon name="container" size={14} />Isolated agent sandbox</span>
+          <div class="agent-engines">
+            {engines.map(engine => (
+              <svg width="28" height="28" viewBox={engineLogos[engine.id].viewBox} fill="currentColor" role="img" aria-label={engine.name}>
+                <title>{engine.name}</title>
+                {engineLogos[engine.id].paths.map(path => <path d={path} />)}
+              </svg>
+            ))}
+          </div>
+          <div class="agent-core"><strong>0 secrets</strong></div>
+          <div class="agent-rules"><span>Read-only GitHub tools</span><span>Allowlisted network</span></div>
+        </div>
+        <div class="staged">
+          <Octicon name="stack" size={20} />
+          <strong>Writes staged as artifacts</strong>
+        </div>
+      </li>
+      <li class="phase outputs">
+        <div class="phase-heading"><span class="step">03</span><h3>Safe outputs</h3></div>
+        <div class="output-path">
+          <a class="gate" href={`${base}/reference/safe-outputs/`}>
+            <Octicon name="filter" size={20} />
+            <strong>Sanitization</strong>
+          </a>
+          <span class="path-arrow" aria-hidden="true"><Octicon name="arrow-down" size={18} /></span>
+          <a class="gate" href={`${base}/reference/threat-detection/`}>
+            <Octicon name="shield" size={20} />
+            <strong>Threat detection</strong>
+          </a>
+          <span class="path-arrow" aria-hidden="true"><Octicon name="arrow-down" size={18} /></span>
+          <div class="applied"><Octicon name="check-circle" size={22} /><span><strong>Declared writes applied</strong><small>Separate job with scoped permissions</small></span></div>
+        </div>
+      </li>
+    </ol>
+    <figcaption>
+      <div class="legend" aria-label="Deployment and isolation options">
+        <a href={`${base}/reference/self-hosted-runners/`}><Octicon name="server" size={14} />Self-hosted supported</a>
+        <a href={`${base}/reference/sandbox/`}><Octicon name="container" size={14} />MicroVM optional / preview</a>
+        <a href={`${base}/introduction/architecture/#agent-workflow-firewall-awf`}><Octicon name="shield" size={14} />Agent firewall</a>
+        <a href={`${base}/reference/auth/`}><Octicon name="key" size={14} />OIDC credential providers supported</a>
+      </div>
+      <p>Default security model shown. Custom steps and integrations need separate review. Threat findings follow configured block or review policy.</p>
+      <a class="architecture-link" href={`${base}/introduction/architecture/`}>Explore the security architecture <Octicon name="arrow-right" size={14} /></a>
+    </figcaption>
+  </figure>
+</LandingSection>
+
+<style>
+  .security-flow { margin: 2.5rem 0 0; }
+  .flow { display: grid; grid-template-columns: 1fr; gap: 1.5rem; list-style: none; padding: 0; margin: 0; }
+  .phase { position: relative; min-width: 0; margin: 0; padding: 1.5rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-lg); background: var(--aw-color-surface); }
+  .phase-heading { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .step { font-family: var(--aw-font-mono); font-size: var(--aw-step--1); color: var(--aw-color-text-muted); }
+  h3 { margin: 0; font-size: var(--aw-step-2); font-weight: 550; letter-spacing: -0.025em; }
+  .detail { font-size: var(--aw-step--1); line-height: 1.6; color: var(--aw-color-text-secondary); }
+  .graph { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4rem 1rem; padding-block: 0.5rem; }
+  .graph::before, .graph::after { content: ''; position: absolute; inset: 50% 15%; height: 1px; background: var(--aw-color-border-strong); transform: rotate(32deg); }
+  .graph::after { transform: rotate(-32deg); }
+  .graph-node { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.6rem 0.4rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-md); background: var(--aw-color-bg); font-size: var(--aw-step--1); white-space: nowrap; }
+  .graph-hub { position: absolute; z-index: 2; inset: 50% auto auto 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 3rem; height: 3rem; border: 1px solid var(--aw-color-border-strong); border-radius: 50%; background: var(--aw-color-surface); }
+  .gate { display: flex; align-items: center; gap: 0.75rem; padding: 1rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-md); background: var(--aw-color-bg); color: var(--aw-color-text); font-size: var(--aw-step--1); text-decoration: none; }
+  .gate:hover { border-color: var(--aw-color-accent); }
+  a:focus-visible { outline: 2px solid var(--aw-color-accent); outline-offset: 4px; }
+  .gate > :global(svg), .staged > :global(svg), .applied > :global(svg) { flex-shrink: 0; }
+  .input-gate { margin-bottom: 1rem; }
+  .external-trigger { margin-top: 1rem; }
+  .input-gate > :global(svg:last-child), .external-trigger > :global(svg:last-child) { margin-left: auto; }
+  small { display: block; margin-top: 0.25rem; font-size: var(--aw-step--1); font-weight: 400; line-height: 1.5; color: var(--aw-color-text-secondary); }
+  .sandbox { padding: 1rem; border: 1px dashed var(--aw-color-border-strong); border-radius: var(--aw-radius-md); text-align: center; }
+  .sandbox-label { display: flex; justify-content: center; align-items: center; gap: 0.4rem; color: var(--aw-color-text-secondary); font-size: var(--aw-step--1); }
+  .agent-engines { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; }
+  .agent-core { display: flex; justify-content: center; align-items: center; margin-top: 0.75rem; }
+  .agent-core strong { font-size: var(--aw-step-3); font-weight: 550; letter-spacing: -0.035em; }
+  .agent-rules { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.25rem; }
+  .agent-rules span { padding: 0.3rem 0.6rem; border-radius: var(--aw-radius-pill); background: var(--aw-color-bg); font-size: var(--aw-step--1); }
+  .staged { display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-md); font-size: var(--aw-step--1); }
+  .output-path { display: flex; flex-direction: column; }
+  .path-arrow { display: flex; justify-content: center; padding-block: 0.35rem; color: var(--aw-color-text-muted); }
+  .applied { display: flex; align-items: center; gap: 0.75rem; padding: 1rem; border: 1px solid var(--aw-color-border-strong); border-radius: var(--aw-radius-md); font-size: var(--aw-step--1); }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 1.5rem; }
+  .legend a { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-pill); font-size: var(--aw-step--1); color: var(--aw-color-text-secondary); text-decoration: none; }
+  .legend a:hover, .architecture-link { color: var(--aw-color-accent-text); }
+  figcaption { text-align: center; }
+  figcaption p { max-width: 38rem; margin: 1rem auto; color: var(--aw-color-text-secondary); font-size: var(--aw-step--1); line-height: 1.6; }
+  .architecture-link { display: inline-flex; align-items: center; gap: 0.4rem; font-size: var(--aw-step--1); text-underline-offset: 0.2em; }
+  :global(#landing-slideshow[open]) .security-flow { padding-bottom: 6rem; }
+  @media (min-width: 60rem) {
+    .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .phase:not(:last-child)::after { content: '→'; position: absolute; z-index: 3; top: 50%; right: -1.75rem; width: 2rem; text-align: center; color: var(--aw-color-text-muted); font-size: var(--aw-step-2); }
+  }
+</style>

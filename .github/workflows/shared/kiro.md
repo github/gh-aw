@@ -26,14 +26,16 @@ engine:
         - raw.githubusercontent.com
         - api.github.com
         - objects.githubusercontent.com
+        # The harness downloads the pinned CLI archive from this host.
+        - prod.download.cli.kiro.dev
+        - management.us-east-1.kiro.dev
         - codewhisperer.us-east-1.amazonaws.com
+        # Concrete identity endpoint for Kiro authentication:
+        # https://kiro.dev/docs/privacy-and-security/firewalls/
         - cognito-identity.us-east-1.amazonaws.com
         - q.us-east-1.amazonaws.com
-        - client-telemetry.us-east-1.amazonaws.com
-        - prod.us-east-1.telemetry.kiro.aws.dev
-        - prod.assets.shortbread.aws.dev
       provider-domains:
-        kiro: "*.kiro.dev"
+        kiro: runtime.us-east-1.kiro.dev
     execution:
       command-name: kiro-cli
       args:
@@ -250,6 +252,15 @@ imports:
 Configure the `KIRO_API_KEY` GitHub Actions secret with an API key from Kiro.
 Kiro serves the selected model through its own API, so this engine does not use
 universal provider routing.
+
+Network defaults cover the concrete API, authentication, and CLI download hosts,
+not every `kiro.dev` subdomain. Telemetry and application assets are excluded
+from defaults. To opt into telemetry, explicitly add
+`client-telemetry.us-east-1.amazonaws.com` and
+`prod.us-east-1.telemetry.kiro.aws.dev` to the importing workflow's
+`network.allowed`. The passing run cited in
+[the earlier failure investigation](https://github.com/github/gh-aw/issues/50519)
+had telemetry denied; that evidence does not establish a correctness dependency.
 
 The harness pins [Kiro CLI 2.31.1](https://kiro.dev/changelog/cli/2-31/) and
 verifies the x86_64 or aarch64 Linux archive against the SHA-256 checksum in
