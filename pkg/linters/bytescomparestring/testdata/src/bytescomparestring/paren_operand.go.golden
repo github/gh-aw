@@ -1,0 +1,7 @@
+package bytescomparestring
+
+import "bytes"
+
+func badParenOperand(a, b []byte) bool {
+	return bytes.Equal(a, b) // want `string\(a\) == string\(b\) is a \[\]byte comparison written the long way; use bytes\.Equal\(a, b\) for clearer intent`
+}
