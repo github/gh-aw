@@ -5056,3 +5056,6 @@
 {"id":"adr-check-performed","question":"Does the agent output confirm that it checked for existing ADRs before deciding on an action?","answer":"NO","model":"evals","timestamp":"2026-10-31T14:41:03.241Z","runid":"41210801308"}
 {"id":"action-taken","question":"Did the agent add a PR comment, push a draft ADR, or call noop?","answer":"YES","model":"evals","timestamp":"2026-10-31T14:41:03.241Z","runid":"41210801308"}
 {"id":"decision-justified","question":"Does the agent output explain why an ADR is required or why no ADR gate was triggered for this PR?","answer":"YES","model":"evals","timestamp":"2026-10-31T14:41:03.241Z","runid":"41210801308"}
+{"id":"adr-check-performed","question":"Does the agent output confirm that it checked for existing ADRs before deciding on an action?","answer":"NO","model":"evals","timestamp":"2026-10-31T14:42:57.566Z","runid":"41210973024"}
+{"id":"action-taken","question":"Did the agent add a PR comment, push a draft ADR, or call noop?","answer":"YES","model":"evals","timestamp":"2026-10-31T14:42:57.566Z","runid":"41210973024"}
+{"id":"decision-justified","question":"Does the agent output explain why an ADR is required or why no ADR gate was triggered for this PR?","answer":"YES","model":"evals","timestamp":"2026-10-31T14:42:57.566Z","runid":"41210973024"}
