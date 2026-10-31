@@ -40,23 +40,23 @@ func resolveUniversalLLMBackendFromModel(model string) (UniversalLLMBackend, err
 		return "", errors.New("for universal consumer engines, engine.model is required and must use provider/model format (supported providers: copilot, anthropic, openai, codex)")
 	}
 
-	parts := strings.SplitN(model, "/", 2)
-	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+	provider, modelID, ok := strings.Cut(model, "/")
+	if !ok || strings.TrimSpace(provider) == "" || strings.TrimSpace(modelID) == "" {
 		return "", errors.New("for universal consumer engines, engine.model must use provider/model format (for example: copilot/gpt-5, anthropic/claude-sonnet-4, openai/gpt-4.1)")
 	}
 
-	switch strings.ToLower(strings.TrimSpace(parts[0])) {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "copilot":
-		universalLLMConsumerLog.Printf("Resolved backend: copilot (model=%s)", parts[1])
+		universalLLMConsumerLog.Printf("Resolved backend: copilot (model=%s)", modelID)
 		return UniversalLLMBackendCopilot, nil
 	case "anthropic":
-		universalLLMConsumerLog.Printf("Resolved backend: anthropic (model=%s)", parts[1])
+		universalLLMConsumerLog.Printf("Resolved backend: anthropic (model=%s)", modelID)
 		return UniversalLLMBackendAnthropic, nil
 	case "openai", "codex":
-		universalLLMConsumerLog.Printf("Resolved backend: codex/openai (model=%s)", parts[1])
+		universalLLMConsumerLog.Printf("Resolved backend: codex/openai (model=%s)", modelID)
 		return UniversalLLMBackendCodex, nil
 	default:
-		return "", fmt.Errorf("unsupported provider %q in engine.model; supported providers: copilot, anthropic, openai, codex", parts[0])
+		return "", fmt.Errorf("unsupported provider %q in engine.model; supported providers: copilot, anthropic, openai, codex", provider)
 	}
 }
 
@@ -92,7 +92,6 @@ func getUniversalLLMBackendProfile(backend UniversalLLMBackend, useCopilotReques
 			coreSecretNames: coreSecrets,
 			env: map[string]string{
 				"COPILOT_GITHUB_TOKEN": copilotToken,
-				"OPENAI_API_KEY":       copilotToken,
 			},
 			baseURLEnvName:  "GITHUB_COPILOT_BASE_URL",
 			extraURLEnvName: "OPENAI_BASE_URL",
@@ -199,9 +198,8 @@ func (e *UniversalLLMConsumerEngine) ApplyUniversalProviderEnv(env map[string]st
 func resolveBackendWithAliases(model string, extraAliases map[string]UniversalLLMBackend) (UniversalLLMBackend, error) {
 	if len(extraAliases) > 0 {
 		model = strings.TrimSpace(model)
-		parts := strings.SplitN(model, "/", 2)
-		if len(parts) == 2 {
-			provider := strings.ToLower(strings.TrimSpace(parts[0]))
+		if provider, _, ok := strings.Cut(model, "/"); ok {
+			provider = strings.ToLower(strings.TrimSpace(provider))
 			if backend, ok := extraAliases[provider]; ok {
 				universalLLMConsumerLog.Printf("Resolved backend via alias %q → %s", provider, backend)
 				return backend, nil

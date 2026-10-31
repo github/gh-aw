@@ -624,6 +624,9 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 	maps.Copy(env, exec.Env)
 	if exec.ProviderEnvMode == behaviorProviderEnvModeUniversalLLMConsumer {
 		e.ApplyUniversalProviderEnv(env, workflowData, firewallEnabled)
+		if firewallEnabled && e.resolveBackend(workflowData) == UniversalLLMBackendCopilot {
+			env[constants.CopilotBYOKDummyAPIKeyEnvVar] = constants.CopilotBYOKDummyAPIKey
+		}
 	}
 	e.applyBehaviorDefinedMCPEnv(exec, workflowData, env)
 	for _, binding := range e.definition.Auth {
@@ -722,6 +725,10 @@ func (e *BehaviorDefinedEngine) buildFirewallCommand(exec *EngineExecutionDefini
 	// from the YAML env block, but Bun (and other runtimes) also check the
 	// lowercase variant, so we export it explicitly from the uppercase value.
 	engineCommandWithPath := fmt.Sprintf("export no_proxy=\"${NO_PROXY:-}\" && %s && %s", GetNpmBinPathSetup(), engineCommand)
+	if exec.ProviderEnvMode == behaviorProviderEnvModeUniversalLLMConsumer && e.resolveBackend(workflowData) == UniversalLLMBackendCopilot {
+		// Introduce the client key after AWF credential discovery, never in its startup environment.
+		engineCommandWithPath = `export OPENAI_API_KEY="$` + constants.CopilotBYOKDummyAPIKeyEnvVar + `" && ` + engineCommandWithPath
+	}
 	// microVM runtimes stage the engine CLI under ${RUNNER_TEMP}/gh-aw/engine-cli/bin
 	// because the runner tool cache is not mounted inside the sandbox.
 	if microVMCLIPath := GetMicroVMNpmCLIPathSetup(workflowData); microVMCLIPath != "" {
