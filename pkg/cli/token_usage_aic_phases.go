@@ -31,7 +31,7 @@ func markTokenUsageExecutedPhases(runDir string, phases map[string]*TokenUsageSu
 	if usageDir == "" {
 		return
 	}
-	for _, phase := range []string{"agent", "detection", "evals"} {
+	for _, phase := range []string{"activation", "agent", "detection", "evals"} {
 		path := filepath.Join(usageDir, phase, "execution.json")
 		if info, err := os.Stat(path); err == nil && !info.IsDir() && phases[phase] == nil {
 			phases[phase] = &TokenUsageSummary{}
@@ -50,7 +50,7 @@ func tokenUsageAICPhaseCostFound(phases map[string]*TokenUsageSummary) bool {
 
 func combineTokenUsageAICPhases(phases map[string]*TokenUsageSummary, warnings []string) *TokenUsageSummary {
 	summary := &TokenUsageSummary{Warnings: warnings}
-	for _, phase := range []string{"agent", "detection", "evals"} {
+	for _, phase := range []string{"activation", "agent", "detection", "evals"} {
 		if usage := phases[phase]; usage != nil {
 			summary.TotalAIC += usage.TotalAIC
 			summary.AICFound = summary.AICFound || usage.AICFound
@@ -58,7 +58,7 @@ func combineTokenUsageAICPhases(phases map[string]*TokenUsageSummary, warnings [
 		}
 	}
 	if summary.AICFound {
-		for _, phase := range []string{"agent", "detection", "evals"} {
+		for _, phase := range []string{"activation", "agent", "detection", "evals"} {
 			if usage := phases[phase]; usage != nil && !usage.AICFound && len(usage.Warnings) == 0 {
 				addTokenUsageWarning(summary, phase+" usage: no usable accounting; observed cost may be incomplete")
 			}
