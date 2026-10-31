@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
-	"os"
 	"strings"
 	"sync"
 
@@ -118,7 +117,8 @@ const BuiltinPathPrefix = "@builtin:"
 // readFileFunc is the function used to read file contents throughout the parser.
 // In wasm builds, this is overridden to read from a virtual filesystem
 // populated by the browser via SetVirtualFiles.
-// In native builds, builtin virtual files are checked first, then os.ReadFile.
+// In native builds, builtin virtual files are checked first, then cache-confined
+// reads for import cache paths, or os.ReadFile for other paths.
 var readFileFunc = func(path string) ([]byte, error) {
 	builtinVirtualFilesMu.RLock()
 	defer builtinVirtualFilesMu.RUnlock()
@@ -126,7 +126,7 @@ var readFileFunc = func(path string) ([]byte, error) {
 	if ok {
 		return bytes.Clone(content), nil
 	}
-	return os.ReadFile(path)
+	return readCacheAwareFile(path)
 }
 
 // ReadFile reads a file using the parser's file reading function, which

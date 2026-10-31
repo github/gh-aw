@@ -412,9 +412,7 @@ func TestImportCacheSetIdempotent(t *testing.T) {
 	assert.Equal(t, string(secondContent), string(content), "file should contain second (latest) content")
 }
 
-func TestImportCacheGetDoesNotValidateComponents(t *testing.T) {
-	// Document that Get does not validate components (unlike Set).
-	// If validation is added in the future, this test should be updated.
+func TestImportCacheGetValidatesComponents(t *testing.T) {
 	tempDir := t.TempDir()
 	cache := NewImportCache(tempDir)
 
