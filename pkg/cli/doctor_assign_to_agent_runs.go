@@ -1,14 +1,17 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +25,7 @@ const (
 	doctorAssignmentRunLimit     = 5
 	doctorAssignmentRunLookback  = 7 * 24 * time.Hour
 	doctorAssignmentRequestLimit = 40
+	doctorTokenRunLogLimitBytes  = 1 << 20
 )
 
 // DoctorAssignmentRunHistory describes a bounded historical sample, not current token validity.
@@ -35,24 +39,31 @@ type DoctorAssignmentRunHistory struct {
 
 // DoctorAssignmentRunEvidence contains recognized handler outcomes, never raw log text.
 type DoctorAssignmentRunEvidence struct {
-	RunID           int64     `json:"run_id"`
-	Attempt         int       `json:"attempt"`
-	URL             string    `json:"url,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	Conclusion      string    `json:"conclusion"`
-	Outcome         string    `json:"outcome"`
-	Assigned        int       `json:"assigned"`
-	AlreadyAssigned int       `json:"already_assigned"`
-	Message         string    `json:"message"`
+	RunID                int64     `json:"run_id"`
+	Attempt              int       `json:"attempt"`
+	URL                  string    `json:"url,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	Conclusion           string    `json:"conclusion"`
+	Outcome              string    `json:"outcome"`
+	Assigned             int       `json:"assigned"`
+	AlreadyAssigned      int       `json:"already_assigned"`
+	Message              string    `json:"message"`
+	credentialDiagnostic bool
 }
 
 type doctorAssignmentRunMiner struct {
-	ctx      context.Context
-	repo     string
-	host     string
-	now      time.Time
-	requests int
-	runGH    func(context.Context, string, ...string) ([]byte, error)
+	ctx          context.Context
+	repo         string
+	host         string
+	now          time.Time
+	requests     int
+	runGH        func(context.Context, string, ...string) ([]byte, error)
+	runGHLimited func(context.Context, int, ...string) ([]byte, bool, error)
+	classify     func(string, DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence
+	allJobs      bool
+	limit        int
+	maxLogBytes  int
+	logBytes     int
 }
 
 type doctorAssignmentRunMetadata struct {
@@ -74,30 +85,49 @@ func collectDoctorAssignmentRunEvidence(ctx context.Context, repo, host string, 
 		check := &checks[i]
 		check.RecentRuns = miner.collect(check.Workflow)
 		if check.Status == "configured" && doctorAssignmentRunFailure(check.RecentRuns) {
-			check.Message = fmt.Sprintf("%s Recent runs contain assignment failures. %s", check.Message, doctorAssignmentRemedy(repo, check.SuggestedSecret))
+			check.Message = fmt.Sprintf("%s Recent assignment evidence needs attention; logs alone do not establish invalid credentials. %s", check.Message, doctorAssignmentRemedy(repo, check.SuggestedSecret))
 		}
 	}
 }
 
 func (m *doctorAssignmentRunMiner) api(endpoint string, extra ...string) ([]byte, error) {
+	data, _, err := m.apiWithLimit(endpoint, 0, extra...)
+	return data, err
+}
+
+func (m *doctorAssignmentRunMiner) apiWithLimit(endpoint string, maxBytes int, extra ...string) ([]byte, bool, error) {
 	if m.requests >= doctorAssignmentRequestLimit {
-		return nil, errors.New("recent-run inspection reached the 40-request limit")
+		return nil, false, errors.New("recent-run inspection reached the 40-request limit")
 	}
 	if err := m.ctx.Err(); err != nil {
-		return nil, fmt.Errorf("recent-run inspection interrupted: %w", err)
+		return nil, false, fmt.Errorf("recent-run inspection interrupted: %w", err)
 	}
 	m.requests++
 	args := append([]string{"api", "--hostname", strings.TrimPrefix(m.host, "https://"), endpoint}, extra...)
-	return m.runGH(m.ctx, "Checking recent agent assignments...", args...)
+	if maxBytes > 0 && m.runGHLimited != nil {
+		return m.runGHLimited(m.ctx, maxBytes, args...)
+	}
+	data, err := m.runGH(m.ctx, "Checking recent agent assignments...", args...)
+	if err != nil {
+		return nil, false, err
+	}
+	if maxBytes > 0 && len(data) > maxBytes {
+		return data[:maxBytes], true, nil
+	}
+	return data, false, nil
 }
 
 func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmentRunHistory {
+	limit := doctorAssignmentRunLimit
+	if m.limit > 0 && m.limit < limit {
+		limit = m.limit
+	}
 	history := &DoctorAssignmentRunHistory{
 		Since: m.now.Add(-doctorAssignmentRunLookback), Until: m.now,
-		Limit: doctorAssignmentRunLimit, Runs: []DoctorAssignmentRunEvidence{},
+		Limit: limit, Runs: []DoctorAssignmentRunEvidence{},
 	}
 	query := url.Values{
-		"status": {"completed"}, "per_page": {strconv.Itoa(doctorAssignmentRunLimit)},
+		"status": {"completed"}, "per_page": {strconv.Itoa(limit)},
 		"created": {history.Since.Format(time.RFC3339) + ".." + history.Until.Format(time.RFC3339)},
 	}
 	filename := strings.TrimSuffix(path.Base(workflowPath), ".md") + ".lock.yml"
@@ -115,7 +145,7 @@ func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmen
 		return history
 	}
 	for i, run := range response.Runs {
-		if i >= doctorAssignmentRunLimit {
+		if i >= limit {
 			break
 		}
 		history.Runs = append(history.Runs, m.inspect(run, history.Since))
@@ -124,6 +154,7 @@ func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmen
 }
 
 func (m *doctorAssignmentRunMiner) inspect(run doctorAssignmentRunMetadata, since time.Time) DoctorAssignmentRunEvidence {
+	m.logBytes = 0
 	evidence := DoctorAssignmentRunEvidence{
 		RunID: run.ID, Attempt: run.Attempt, URL: run.URL,
 		CreatedAt: run.CreatedAt, Conclusion: run.Conclusion, Outcome: "unknown",
@@ -146,14 +177,62 @@ func (m *doctorAssignmentRunMiner) inspect(run doctorAssignmentRunMetadata, sinc
 		evidence.Message = "Incomplete jobs metadata; assignment outcome is unknown."
 		return evidence
 	}
+	if m.allJobs {
+		slices.SortStableFunc(response.Jobs, func(a, b JobInfo) int {
+			return doctorTokenJobPriority(b) - doctorTokenJobPriority(a)
+		})
+	}
+	coverageMessage := ""
 	for _, job := range response.Jobs {
-		if job.Name != "safe_outputs" && job.Name != "assign_to_agent" {
+		if !m.allJobs && job.Name != "safe_outputs" && job.Name != "assign_to_agent" {
 			continue
 		}
-		return m.inspectJob(job, evidence)
+		jobEvidence := evidence
+		jobEvidence.Outcome, jobEvidence.Message = "unknown", ""
+		jobEvidence.credentialDiagnostic = false
+		current := m.inspectJob(job, jobEvidence)
+		if !m.allJobs || current.Outcome == "credential_error" {
+			return current
+		}
+		if current.Outcome == "unknown" {
+			if current.credentialDiagnostic {
+				evidence = current
+			} else {
+				if coverageMessage == "" {
+					coverageMessage = current.Message
+				}
+				if !evidence.credentialDiagnostic {
+					evidence = current
+				}
+			}
+		}
+	}
+	return m.finishInspection(evidence, coverageMessage)
+}
+
+func (m *doctorAssignmentRunMiner) finishInspection(evidence DoctorAssignmentRunEvidence, coverageMessage string) DoctorAssignmentRunEvidence {
+	if m.allJobs {
+		if evidence.credentialDiagnostic && coverageMessage != "" {
+			evidence.Message += " Inspection coverage is incomplete: " + coverageMessage
+		}
+		if evidence.Message == "" {
+			evidence.Outcome, evidence.Message = "no_evidence", "No recognized credential failure found; token validity remains unverified."
+		}
+		return evidence
 	}
 	evidence.Outcome, evidence.Message = "no_evidence", "No assignment handler job found in this run attempt."
 	return evidence
+}
+
+func doctorTokenJobPriority(job JobInfo) int {
+	priority := 0
+	if job.Conclusion == "failure" {
+		priority += 2
+	}
+	if job.Name == "safe_outputs" || job.Name == "assign_to_agent" {
+		priority++
+	}
+	return priority
 }
 
 func (m *doctorAssignmentRunMiner) inspectJob(job JobInfo, evidence DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence {
@@ -165,14 +244,67 @@ func (m *doctorAssignmentRunMiner) inspectJob(job JobInfo, evidence DoctorAssign
 		evidence.Outcome, evidence.Message = "not_attempted", "The assignment handler job was skipped."
 		return evidence
 	}
-	data, err := m.api(fmt.Sprintf("repos/%s/actions/jobs/%d/logs", m.repo, job.ID), "--allow-escape-sequences")
+	endpoint := fmt.Sprintf("repos/%s/actions/jobs/%d/logs", m.repo, job.ID)
+	var data []byte
+	var truncated bool
+	var err error
+	if m.maxLogBytes > 0 {
+		remaining := m.maxLogBytes - m.logBytes
+		if remaining <= 0 {
+			evidence.Outcome, evidence.Message = "unknown", "The per-run log-inspection byte limit was reached; remaining job logs are unknown."
+			return evidence
+		}
+		data, truncated, err = m.apiWithLimit(endpoint, remaining, "--allow-escape-sequences")
+		m.logBytes += len(data)
+	} else {
+		data, err = m.api(endpoint, "--allow-escape-sequences")
+	}
 	if err != nil {
 		evidence.Message = fmt.Sprintf("Assignment logs are unavailable; outcome is unknown: %v", err)
 		return evidence
 	}
+	if truncated {
+		evidence.Outcome, evidence.Message = "unknown", "Job log inspection was truncated at the per-run byte limit; credential validity is unknown."
+		return evidence
+	}
 	// Logs can contain ANSI sequences, source code, and masked credentials. Never
 	// render or retain raw lines; export only recognized handler outcomes.
+	if m.classify != nil {
+		return m.classify(string(data), evidence)
+	}
 	return classifyDoctorAssignmentLog(string(data), evidence)
+}
+
+func runDoctorGHContextLimited(ctx context.Context, maxBytes int, args ...string) ([]byte, bool, error) {
+	cmd := workflow.ExecGHContext(ctx, args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, false, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return nil, false, err
+	}
+	data, err := io.ReadAll(io.LimitReader(stdout, int64(maxBytes)+1))
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return nil, false, err
+	}
+	if len(data) > maxBytes {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return data[:maxBytes], true, nil
+	}
+	if err := cmd.Wait(); err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message != "" {
+			return nil, false, fmt.Errorf("%w: %s", err, message)
+		}
+		return nil, false, err
+	}
+	return data, false, nil
 }
 
 var doctorAssignmentSuccessPattern = regexp.MustCompile(`^Successfully assigned [A-Za-z0-9_-]+ coding agent to (?:issue|pull request) #[1-9][0-9]*$`)
@@ -207,7 +339,8 @@ func classifyDoctorAssignmentLog(content string, evidence DoctorAssignmentRunEvi
 	}
 	switch {
 	case credentialError:
-		evidence.Outcome, evidence.Message = "credential_error", "Assignment handler reported an authentication or permission failure, even if the run succeeded or ignore-if-error suppressed errors."
+		evidence.credentialDiagnostic = true
+		evidence.Outcome, evidence.Message = "unknown", "Assignment logs contain a credential-like diagnostic, but workflow code can emit log text; token validity is unknown even if the run failed."
 	case assignmentFailure:
 		evidence.Outcome, evidence.Message = "assignment_failed", "Assignment handler reported a failure without conclusive credential evidence."
 	case evidence.Assigned > 0:
@@ -237,7 +370,7 @@ func doctorAssignmentCredentialFailure(message string) bool {
 func doctorAssignmentRunFailure(history *DoctorAssignmentRunHistory) bool {
 	if history != nil {
 		for _, run := range history.Runs {
-			if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" {
+			if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" || run.Outcome == "unknown" {
 				return true
 			}
 		}
@@ -246,16 +379,25 @@ func doctorAssignmentRunFailure(history *DoctorAssignmentRunHistory) bool {
 }
 
 func printDoctorAssignmentRunHistory(history *DoctorAssignmentRunHistory) {
+	printDoctorRunHistory(history, "assignment")
+}
+
+func printDoctorRunHistory(history *DoctorAssignmentRunHistory, kind string) {
 	if history == nil {
 		return
 	}
 	if history.Error != "" {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(history.Error))
-		return
+		if len(history.Runs) == 0 {
+			return
+		}
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Recent assignment evidence: %d completed run(s) sampled since %s (limit %d).", len(history.Runs), history.Since.Format(time.RFC3339), history.Limit)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Recent %s evidence: %d completed run(s) sampled since %s (limit %d).", kind, len(history.Runs), history.Since.Format(time.RFC3339), history.Limit)))
 	for _, run := range history.Runs {
-		message := fmt.Sprintf("Run %d attempt %d: %s; %d assigned, %d already assigned. %s %s", run.RunID, run.Attempt, run.Outcome, run.Assigned, run.AlreadyAssigned, run.Message, run.URL)
+		message := fmt.Sprintf("Run %d attempt %d: %s. %s %s", run.RunID, run.Attempt, run.Outcome, run.Message, run.URL)
+		if kind == "assignment" {
+			message = fmt.Sprintf("Run %d attempt %d: %s; %d assigned, %d already assigned. %s %s", run.RunID, run.Attempt, run.Outcome, run.Assigned, run.AlreadyAssigned, run.Message, run.URL)
+		}
 		if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" || run.Outcome == "unknown" {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 		} else {

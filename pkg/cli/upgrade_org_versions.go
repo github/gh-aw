@@ -60,10 +60,18 @@ func extractCompilerVersionsFromWorkflowsDir(directory string) ([]string, int, e
 
 // Read the comment header from the existing checkout, without per-file API calls
 // or loading the generated workflow body.
-func readCompilerVersionFromLockHeader(path string) (version string, err error) {
+func readCompilerVersionFromLockHeader(path string) (string, error) {
+	metadata, err := readLockMetadataFromHeader(path)
+	if err != nil || metadata == nil {
+		return "", err
+	}
+	return normalizeDisplayVersion(metadata.CompilerVersion), nil
+}
+
+func readLockMetadataFromHeader(path string) (metadata *workflow.LockMetadata, err error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
@@ -74,26 +82,26 @@ func readCompilerVersionFromLockHeader(path string) (version string, err error) 
 	for {
 		line, readErr := reader.ReadString('\n')
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
-			return "", readErr
+			return nil, readErr
 		}
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "#") {
-			return "", nil
+			return nil, nil
 		}
 		comment := strings.TrimSpace(strings.TrimPrefix(line, "#"))
 		if payload, found := strings.CutPrefix(comment, "gh-aw-metadata:"); found {
 			payload = strings.TrimSpace(payload)
 			if !strings.HasPrefix(payload, "{") {
-				return "", errors.New("invalid gh-aw-metadata header: expected a JSON object; recompile with gh aw compile")
+				return nil, errors.New("invalid gh-aw-metadata header: expected a JSON object; recompile with gh aw compile")
 			}
 			var metadata workflow.LockMetadata
 			if err := json.Unmarshal([]byte(payload), &metadata); err != nil {
-				return "", fmt.Errorf("lock metadata JSON must be a valid JSON object; recompile with gh aw compile: %w", err)
+				return nil, fmt.Errorf("lock metadata JSON must be a valid JSON object; recompile with gh aw compile: %w", err)
 			}
-			return normalizeDisplayVersion(metadata.CompilerVersion), nil
+			return &metadata, nil
 		}
 		if errors.Is(readErr, io.EOF) {
-			return "", nil
+			return nil, nil
 		}
 	}
 }

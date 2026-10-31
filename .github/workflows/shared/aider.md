@@ -39,8 +39,6 @@ engine:
         - raw.githubusercontent.com
         - api.github.com
         - objects.githubusercontent.com
-        - pypi.org
-        - files.pythonhosted.org
       provider-domains:
         copilot: api.githubcopilot.com
         anthropic: api.anthropic.com
