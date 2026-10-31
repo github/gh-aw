@@ -3,12 +3,14 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/fileutil"
 )
 
 // ResolveIncludePath resolves include path based on workflowspec format or relative path
@@ -57,10 +59,19 @@ func resolveAndValidateLocalIncludePath(filePath, resolveBase, securityBase stri
 		return "", fmt.Errorf("security: path %s must be within %s folder (resolves to: %s)", filePath, allowedFolder, relativePath)
 	}
 
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		remoteLog.Printf("Local file not found: %s", fullPath)
-		// Return a simple error that will be wrapped with source location by the caller
-		return "", fmt.Errorf("file not found: %s", fullPath)
+	if err := validateIncludeSecurityBase(normalizedSecurityBase); err != nil {
+		return "", err
+	}
+	if err := fileutil.ValidatePathWithinBase(normalizedSecurityBase, normalizedFullPath); err != nil {
+		return "", fmt.Errorf("security: path %s must be within %s folder: %w", filePath, filepath.Base(normalizedSecurityBase), err)
+	}
+	// Strict resolution rejects dangling links and other resolution failures;
+	// ValidatePathWithinBase also supports paths that do not exist yet.
+	if _, err := filepath.EvalSymlinks(fullPath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("file not found: %s: %w", fullPath, err)
+		}
+		return "", fmt.Errorf("failed to resolve local include %s: %w", fullPath, err)
 	}
 	remoteLog.Printf("Resolved to local file: %s", fullPath)
 	return fullPath, nil

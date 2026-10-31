@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -118,7 +120,8 @@ const BuiltinPathPrefix = "@builtin:"
 // readFileFunc is the function used to read file contents throughout the parser.
 // In wasm builds, this is overridden to read from a virtual filesystem
 // populated by the browser via SetVirtualFiles.
-// In native builds, builtin virtual files are checked first, then os.ReadFile.
+// In native builds, builtin virtual files are checked first, then a rooted read
+// for files under .github or .agents.
 var readFileFunc = func(path string) ([]byte, error) {
 	builtinVirtualFilesMu.RLock()
 	defer builtinVirtualFilesMu.RUnlock()
@@ -126,7 +129,30 @@ var readFileFunc = func(path string) ([]byte, error) {
 	if ok {
 		return bytes.Clone(content), nil
 	}
+	return readDiskFile(path)
+}
+
+func readDiskFile(path string) ([]byte, error) {
+	for dir := filepath.Dir(path); ; dir = filepath.Dir(dir) {
+		if name := filepath.Base(dir); name == ".github" || name == ".agents" {
+			return fileutil.ReadFileWithinBase(dir, path)
+		}
+		if parent := filepath.Dir(dir); parent == dir {
+			break
+		}
+	}
 	return os.ReadFile(path)
+}
+
+func validateIncludeSecurityBase(base string) error {
+	info, err := os.Lstat(base)
+	if err != nil {
+		return fmt.Errorf("failed to inspect include base directory %q: %w", base, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("security: include base directory %q must not be a symlink", base)
+	}
+	return nil
 }
 
 // ReadFile reads a file using the parser's file reading function, which
