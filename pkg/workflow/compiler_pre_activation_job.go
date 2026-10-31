@@ -118,8 +118,7 @@ func (c *Compiler) appendPreActivationDecisionGate(data *WorkflowData, steps []s
 		"        run: echo 'eligible=true' >> \"$GITHUB_OUTPUT\"\n",
 	)
 	const eligibleOutput = "steps.decision_eligibility.outputs.eligible == 'true'"
-	steps = c.appendDecisionStep(data, steps, "${{ "+eligibleOutput+" }}")
-	activatedExpression := fmt.Sprintf("${{ (%s) && steps.%s.outputs.decision_result != 'skip' }}", eligibleOutput, decisionStepID)
+	activatedExpression := "${{ " + eligibleOutput + " }}"
 	return steps, activatedExpression, nil
 }
 
@@ -161,12 +160,6 @@ func (c *Compiler) buildPreActivationPermissions(data *WorkflowData, setupAction
 			perms = NewPermissions()
 		}
 		perms.Merge(data.OnPermissions)
-	}
-	if data.Decision != nil && hasCopilotRequestsWritePermission(data) {
-		if perms == nil {
-			perms = NewPermissions()
-		}
-		perms.Set(PermissionCopilotRequests, PermissionWrite)
 	}
 	if perms == nil {
 		return steps, ""
@@ -570,8 +563,9 @@ func buildPreActivationJobOutputs(data *WorkflowData, activatedExpression string
 	}
 	if data.Decision != nil {
 		outputs["activated"] = activatedExpression
-		outputs["decision_result"] = "${{ steps.decision_gate.outputs.decision_result }}"
-		outputs["decision_status"] = "${{ steps.decision_gate.outputs.decision_status }}"
+		outputs["decision_eligible"] = "${{ steps.decision_eligibility.outputs.eligible }}"
+		_, inputs := decisionQuestionInputs(data)
+		maps.Copy(outputs, inputs)
 	}
 	return outputs
 }

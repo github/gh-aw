@@ -222,7 +222,7 @@ Perform the requested work.
 	require.NoError(t, yaml.Unmarshal(lock, &document))
 	var env map[string]string
 	var script string
-	for _, step := range document.Jobs["pre_activation"].Steps {
+	for _, step := range document.Jobs["decision"].Steps {
 		if step.ID == decisionStepID {
 			env = step.Env
 			script = step.With.Script
@@ -231,7 +231,7 @@ Perform the requested work.
 	}
 	require.NotNil(t, env)
 	assert.Equal(t, "team-decision", env["GH_AW_DECISION_MODEL"])
-	assert.Equal(t, "${{ steps.decision_eligibility.outputs.eligible == 'true' }}", env["GH_AW_DECISION_ELIGIBLE"])
+	assert.Equal(t, "${{ needs.pre_activation.outputs.decision_eligible == 'true' }}", env["GH_AW_DECISION_ELIGIBLE"])
 	assert.Equal(t, "1", env["GH_AW_DECISION_QUESTION_COUNT"])
 	assert.Equal(t, "Is ${{ github.event.issue.title }} actionable?", env["GH_AW_DECISION_QUESTION_0"])
 	assert.Equal(t, "${{ secrets.DECISION_KEY }}", env["OPENAI_API_KEY"])
@@ -242,10 +242,10 @@ Perform the requested work.
 	assert.Contains(t, script, "decision_gate.cjs")
 	assert.NotContains(t, script, "github.event.issue.title")
 	output := document.Jobs["pre_activation"].Outputs["activated"]
-	assert.Contains(t, output, "steps.decision_gate.outputs.decision_result != 'skip'")
-	assert.NotContains(t, output, "steps.decision_gate.outputs.decision !=")
-	assert.Equal(t, "${{ steps.decision_gate.outputs.decision_result }}", document.Jobs["pre_activation"].Outputs["decision_result"])
-	assert.Equal(t, "${{ steps.decision_gate.outputs.decision_status }}", document.Jobs["pre_activation"].Outputs["decision_status"])
+	assert.Contains(t, output, "steps.decision_eligibility.outputs.eligible")
+	assert.NotContains(t, output, "steps.decision_gate")
+	assert.Equal(t, "${{ steps.decision_gate.outputs.decision_result }}", document.Jobs["decision"].Outputs["decision_result"])
+	assert.Equal(t, "${{ steps.decision_gate.outputs.decision_status }}", document.Jobs["decision"].Outputs["decision_status"])
 }
 
 func TestDecisionIneligibleRuntimeStillRecordsReceipt(t *testing.T) {

@@ -13,14 +13,17 @@ const maxDecisionGateArtifactBytes = 64 << 10
 // DecisionGateData is the bounded receipt produced before agent activation.
 // Question text, inference inputs, and model explanations are deliberately not included.
 type DecisionGateData struct {
-	Version         int    `json:"version"`
-	Decision        string `json:"decision"`
-	Status          string `json:"status"`
-	Cause           string `json:"cause,omitempty"`
-	ConfiguredAlias string `json:"configured_alias,omitempty"`
-	ResolvedModel   string `json:"resolved_model,omitempty"`
-	Provider        string `json:"provider,omitempty"`
-	DurationMS      int64  `json:"duration_ms"`
+	Version            int     `json:"version"`
+	Decision           string  `json:"decision"`
+	Status             string  `json:"status"`
+	Cause              string  `json:"cause,omitempty"`
+	ConfiguredAlias    string  `json:"configured_alias,omitempty"`
+	ResolvedModel      string  `json:"resolved_model,omitempty"`
+	Provider           string  `json:"provider,omitempty"`
+	DurationMS         int64   `json:"duration_ms"`
+	MaxAICredits       int64   `json:"max_ai_credits,omitempty"`
+	ReservedAICredits  float64 `json:"reserved_ai_credits,omitempty"`
+	RemainingAICredits int64   `json:"remaining_ai_credits,omitempty"`
 	// ActivationAllowed describes admission by this gate, not downstream job execution.
 	ActivationAllowed     bool                              `json:"activation_allowed"`
 	DeterministicEligible bool                              `json:"deterministic_eligible"`

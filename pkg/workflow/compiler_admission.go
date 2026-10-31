@@ -247,6 +247,16 @@ func (c *Compiler) buildActivationAndAdmissionJobs(data *WorkflowData, preActiva
 		}
 		c.connectActivationAdmission(activation)
 	}
+	if data.Decision != nil {
+		decision, err := c.buildDecisionJob(data, activation)
+		if err != nil {
+			return fmt.Errorf("decision job could not be built: %w", err)
+		}
+		if err := c.jobManager.AddJob(decision); err != nil {
+			return fmt.Errorf("decision job could not be added: %w", err)
+		}
+		c.connectActivationDecision(activation)
+	}
 	if err := c.jobManager.AddJob(activation); err != nil {
 		return fmt.Errorf("activation job could not be added: %w. Check that no other job in the workflow reuses its name", err)
 	}

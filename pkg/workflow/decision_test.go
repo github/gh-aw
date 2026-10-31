@@ -71,12 +71,12 @@ Perform the requested work.
 	assert.Contains(t, text, "pre_activation:")
 	assert.Contains(t, text, "GH_AW_DECISION_MODEL: \"decision\"")
 	assert.Contains(t, text, `GH_AW_DECISION_QUESTION_0: "Is ${{ github.event.issue.title }} actionable?"`)
-	assert.Contains(t, text, "steps.decision_gate.outputs.decision_result != 'skip'")
+	assert.Contains(t, text, "needs.decision.outputs.decision_result != 'skip'")
 	assert.Less(t, strings.Index(text, "id: custom_check"), strings.Index(text, "id: decision_gate"))
 	graph, err := actions.Parse(lock)
 	require.NoError(t, err)
 	require.NoError(t, validateDecisionQuestions(&WorkflowData{Decision: &DecisionConfig{Questions: []string{"safe"}}}, graph, file))
-	assert.NotContains(t, text, "\n  decision:\n")
+	assert.Contains(t, text, "\n  decision:\n")
 }
 
 func TestDecisionCannotOverrideDeterministicChecks(t *testing.T) {
@@ -87,10 +87,10 @@ func TestDecisionCannotOverrideDeterministicChecks(t *testing.T) {
 	job, err := NewCompiler().buildPreActivationJob(data, false)
 	require.NoError(t, err)
 	text := strings.Join(job.Steps, "")
-	assert.Contains(t, text, "GH_AW_DECISION_ELIGIBLE:")
+	assert.NotContains(t, text, "decision_gate.cjs")
 	assert.Contains(t, text, "steps.check_skip_bots.outputs.skip_bots_ok == 'true'")
 	assert.Contains(t, job.Outputs["activated"], "steps.decision_eligibility.outputs.eligible == 'true'")
-	assert.Contains(t, job.Outputs["activated"], "steps.decision_gate.outputs.decision_result != 'skip'")
+	assert.NotContains(t, job.Outputs["activated"], "decision_gate")
 	outputs := buildPreActivationJobOutputs(data, "protected", nil, map[string]string{"activated": "'true'"})
 	assert.Equal(t, "protected", outputs["activated"])
 }
@@ -104,7 +104,7 @@ func TestDecisionOnlyCreatesPreActivation(t *testing.T) {
 	lock, err := os.ReadFile(filepath.Join(dir, "decision.lock.yml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(lock), "pre_activation:")
-	assert.Contains(t, string(lock), "steps.decision_gate.outputs.decision_result != 'skip'")
+	assert.Contains(t, string(lock), "needs.decision.outputs.decision_result != 'skip'")
 }
 
 func TestDecisionWorkflowRunSafety(t *testing.T) {
@@ -113,7 +113,7 @@ func TestDecisionWorkflowRunSafety(t *testing.T) {
 	job, err := compiler.buildPreActivationJob(data, false)
 	require.NoError(t, err)
 	text := strings.Join(job.Steps, "")
-	assert.Contains(t, text, "GH_AW_DECISION_ELIGIBLE:")
+	assert.NotContains(t, text, "decision_gate.cjs")
 	assert.Contains(t, text, "github.event.workflow_run.repository.id == github.repository_id")
 	assert.Contains(t, text, "!(github.event.workflow_run.repository.fork)")
 	assert.Contains(t, job.Outputs["activated"], "steps.decision_eligibility.outputs.eligible == 'true'")

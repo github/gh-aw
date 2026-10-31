@@ -139,7 +139,7 @@ The compiler adds `actions: read` to the pre-activation job so it can inspect co
 
 ### Semantic Event Qualification (`decision:`)
 
-`on.decision` evaluates whether an otherwise eligible event warrants agent execution. It runs inside the existing `pre_activation` job, after deterministic checks such as event filters, eligibility checks, and cooldowns. A deterministic rejection makes no inference calls; the decision gate can reject activation but cannot override those checks.
+`on.decision` evaluates whether an otherwise eligible event warrants agent execution. Deterministic checks such as event filters, eligibility checks, and cooldowns run in `pre_activation`; inference runs in the `decision` job after admission, when enabled, has resolved the AI credit allowance. A deterministic rejection makes no inference calls; the decision gate can reject activation but cannot override those checks.
 
 ```aw wrap
 on:
@@ -166,11 +166,15 @@ All questions are checked at compilation time, including questions that runtime 
 |-------|---------|
 | Questions | 8 |
 | Question size, in source and after expression evaluation | 4,096 bytes |
-| Combined system and question/event prompt per call | 32,768 bytes |
-| Output per call | 256 tokens |
+| Combined system and question/event prompt per call | 8,192 UTF-8 bytes |
+| Serialized request per call, including schema and instructions | 12,288 UTF-8 bytes |
+| Output per call | Explicit 64-token cap, except the fixed-choice `/decisions` API |
+| Reserved cost per call | At most 1 AI credit |
 | Response body | 65,536 bytes |
 | Inference call duration | 10 seconds |
 | Total gate evaluation | 30 seconds |
+
+Decision inference shares the resolved `max-ai-credits` budget with the main agent. Before each call, the gate reserves a conservative upper bound using the bounded text bytes, protocol framing allowance, output cap, and bundled model pricing. Unknown pricing, expensive queries, or insufficient credits make no request. Reservations are retained even when a request fails or usage is missing; their total is rounded up when deducted from the agent's integer budget. Only the remainder is passed to the agent's existing proxy limit, and a zero remainder prevents agent activation. Actual reported decision token usage also contributes to total AIC reporting; reserved credits are recorded separately and are not added again as measured usage.
 
 > [!NOTE]
 > A provider failure, timeout, invalid response, or exhausted inference budget treats the affected question as `run`. These fail-open outcomes are recorded separately from explicit approval. The gate is a non-deterministic execution-cost filter, not an authorization or security boundary. Untrusted event text can influence classification despite the prompt instructions, including unwanted skips; neither a `run` nor a `skip` is a security decision. Protect sensitive or privileged actions with deterministic policy outside model output. Do not use this filter when execution is required, or as the sole condition for privileged actions.

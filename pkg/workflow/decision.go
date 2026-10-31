@@ -268,11 +268,11 @@ func decisionEligibleCondition(data *WorkflowData, original ConditionNode, stepI
 
 func (c *Compiler) appendDecisionStep(data *WorkflowData, steps []string, eligible string) []string {
 	steps = append(steps, "      - name: Evaluate activation decision\n", "        id: "+decisionStepID+"\n")
-	steps = append(steps, "        continue-on-error: true\n")
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)), "        env:\n")
 	steps = append(steps, formatYAMLEnv("          ", "GH_AW_DECISION_MODEL", data.Decision.Model))
 	steps = append(steps, fmt.Sprintf("          GH_AW_DECISION_QUESTION_COUNT: \"%d\"\n", len(data.Decision.Questions)))
-	for i, question := range data.Decision.Questions {
+	questions, _ := decisionQuestionInputs(data)
+	for i, question := range questions {
 		steps = append(steps, formatYAMLEnv("          ", decisionQuestionPrefix+strconv.Itoa(i), question))
 	}
 	env := decisionEnv(data)

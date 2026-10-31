@@ -21,6 +21,9 @@ func applyDefaultMaxAICreditsEnvToMap(env map[string]string, workflowData *Workf
 	if env == nil {
 		return
 	}
+	if workflowData != nil && workflowData.Decision != nil && !workflowData.IsDetectionRun && !workflowData.IsEvalsRun {
+		env["GH_AW_DECISION_REMAINING_AI_CREDITS"] = "${{ needs.activation.outputs.decision-remaining-ai-credits }}"
+	}
 	if admissionBudgetOutputsEnabled(workflowData) {
 		output := "admission-max-ai-credits"
 		if workflowData.IsEvalsRun {

@@ -10,7 +10,7 @@ const { eventFixtures } = require("./fixtures/decision_events.cjs");
 const selection = { provider: "openai", type: "chat", base: "https://api.openai.com/v1", model: "gpt-5-mini", token: "transport-only-fixture" };
 
 function environment(questions = ["Should this workflow run?"]) {
-  return { GH_AW_DECISION_ELIGIBLE: "true", GH_AW_DECISION_QUESTION_COUNT: String(questions.length), ...Object.fromEntries(questions.map((question, index) => [`GH_AW_DECISION_QUESTION_${index}`, question])) };
+  return { GH_AW_MAX_AI_CREDITS: "1000", GH_AW_DECISION_ELIGIBLE: "true", GH_AW_DECISION_QUESTION_COUNT: String(questions.length), ...Object.fromEntries(questions.map((question, index) => [`GH_AW_DECISION_QUESTION_${index}`, question])) };
 }
 
 function reply(decision = "run", reason = "Classification complete.", usage = undefined) {
@@ -28,6 +28,59 @@ afterEach(() => {
 });
 
 describe("decision gate bounds and sequencing", () => {
+  it("requires a resolved credit budget before an eligible inference call", async () => {
+    const deps = dependencies();
+    delete deps.env.GH_AW_MAX_AI_CREDITS;
+    await expect(evaluateDecision(deps)).rejects.toThrow("ERR_DECISION");
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("debits a conservative reservation and never refunds failed requests", async () => {
+    const deps = dependencies(["Run?", "Run?"]);
+    deps.env.GH_AW_MAX_AI_CREDITS = "1";
+    const request = inferenceRequest(selection, buildPrompt("Run?", deps.context, [selection.token]));
+    const bytes = Buffer.byteLength(JSON.stringify(request.body));
+    deps.resolveModel.mockResolvedValue({ ...selection, pricing: { input: 0.006 / (bytes + 512), output: 0 } });
+    deps.fetchImpl.mockRejectedValue(new Error("unavailable"));
+    const audit = await evaluateDecision(deps);
+    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
+    expect(audit).toMatchObject({ max_ai_credits: 1, remaining_ai_credits: 0, activation_allowed: false });
+    expect(audit.reserved_ai_credits).toBeCloseTo(0.6);
+    expect(audit.questions[1].cause).toBe("credit_budget_exhausted");
+  });
+
+  it.each([
+    ["unpriced", { provider: "test", model: "unpriced" }, "pricing_unavailable"],
+    ["expensive", { pricing: { input: 1, output: 1 } }, "query_credit_limit"],
+  ])("makes no request for %s inference", async (_name, overrides, cause) => {
+    const deps = dependencies();
+    deps.resolveModel.mockResolvedValue({ ...selection, ...overrides });
+    const audit = await evaluateDecision(deps);
+    expect(audit.questions[0].cause).toBe(cause);
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+    expect(audit.remaining_ai_credits).toBe(1000);
+  });
+
+  it("enforces the serialized context byte cap before dispatch", async () => {
+    const deps = dependencies();
+    deps.context = { eventName: "issues", payload: { issue: { body: "\\".repeat(LIMITS.promptBytes) } } };
+    const audit = await evaluateDecision(deps);
+    expect(audit.questions[0].cause).toBe("prompt_limit");
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+    expect(audit.reserved_ai_credits).toBe(0);
+  });
+
+  it("counts JSON escaping in the hard request limit", async () => {
+    const deps = dependencies();
+    deps.context = { eventName: "issues", payload: { issue: { body: "\\".repeat(3200) } } };
+    const prompt = buildPrompt("Should this workflow run?", deps.context);
+    expect(Buffer.byteLength(prompt.system + prompt.user)).toBeLessThanOrEqual(LIMITS.promptBytes);
+    const audit = await evaluateDecision(deps);
+    expect(audit.questions[0].cause).toBe("context_limit");
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+    expect(audit.reserved_ai_credits).toBe(0);
+  });
+
   it.each([undefined, "false", "", "TRUE"])("makes zero model or provider calls when deterministic eligibility is %s", async eligibility => {
     const deps = dependencies();
     deps.env.GH_AW_DECISION_ELIGIBLE = eligibility;
@@ -44,7 +97,7 @@ describe("decision gate bounds and sequencing", () => {
     const [url, options] = deps.fetchImpl.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/chat/completions");
     const body = JSON.parse(options.body);
-    expect(body).toMatchObject({ max_tokens: 256, stream: false });
+    expect(body).toMatchObject({ max_tokens: 64, stream: false });
     expect(body).not.toHaveProperty("tools");
     expect(body).not.toHaveProperty("tool_choice");
     expect(body.messages).toHaveLength(2);
@@ -480,7 +533,7 @@ describe("registry resolution and transport", () => {
     deps.env[credential] = selection.token;
     if (provider === "gemini") {
       deps.env.GH_AW_DECISION_MODEL = "gemini/gemini-2.5-flash";
-      deps.env.GH_AW_DECISION_PROVIDERS = JSON.stringify({ gemini: { models: { "gemini-2.5-flash": { cost: { input: 0.3, output: 2.5 } } } } });
+      deps.env.GH_AW_DECISION_PROVIDERS = JSON.stringify({ gemini: { models: { "gemini-2.5-flash": { cost: { input: 0.0000003, output: 0.0000025 } } } } });
     }
     deps.context = { eventName: "issues", payload: { issue: { title: "Fix the parser", body: "Reject invalid syntax." } } };
     deps.resolveModel = resolveDecisionModel;
@@ -673,7 +726,7 @@ describe("registry resolution and transport", () => {
     const request = inferenceRequest({ ...selection, type }, { system: "trusted", user: "event" });
     expect(JSON.stringify(request.body)).not.toContain(selection.token);
     expect(request.body).not.toHaveProperty("tools");
-    expect(JSON.stringify(request.body)).toContain("256");
+    expect(JSON.stringify(request.body)).toContain("64");
   });
 
   it.each(["https://api.anthropic.com", "https://api.anthropic.com/v1", "https://api.anthropic.com/v1/"])("normalizes the native Anthropic base %s", base => {
@@ -691,7 +744,7 @@ describe("registry resolution and transport", () => {
   it("uses registry-selected Responses wire format and rejects tool output", () => {
     const request = inferenceRequest({ ...selection, type: "responses" }, { system: "trusted", user: "event" });
     expect(request.url).toBe("https://api.openai.com/v1/responses");
-    expect(request.body).toMatchObject({ max_output_tokens: 256, store: false });
+    expect(request.body).toMatchObject({ max_output_tokens: 64, store: false });
     const response = { status: "completed", output: [{ type: "reasoning" }, { type: "message", content: [{ type: "output_text", text: '{"decision":"skip","reason":"Not relevant."}' }] }] };
     expect(parseDecision(response, "responses")).toEqual({ decision: "skip", reason: "Not relevant." });
     expect(() => parseDecision({ ...response, output: [...response.output, { type: "function_call" }] }, "responses")).toThrow();
@@ -846,7 +899,7 @@ describe.skipIf(process.env.GH_AW_DECISION_LIVE_EVAL !== "true")("decision gate 
   it.each(eventFixtures)(
     "$name",
     async fixture => {
-      const audit = await evaluateDecision({ env: { ...process.env, ...environment([fixture.question]) }, context: fixture.context });
+      const audit = await evaluateDecision({ env: { ...process.env, ...environment([fixture.question]), GH_AW_MAX_AI_CREDITS: process.env.GH_AW_MAX_AI_CREDITS || "1000" }, context: fixture.context });
       expect(audit.status).toBe("evaluated");
       expect(audit.decision).toBe(fixture.expected);
     },

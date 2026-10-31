@@ -8055,6 +8055,15 @@
                     "duration_ms": {
                       "type": "integer"
                     },
+                    "max_ai_credits": {
+                      "type": "integer"
+                    },
+                    "reserved_ai_credits": {
+                      "type": "number"
+                    },
+                    "remaining_ai_credits": {
+                      "type": "integer"
+                    },
                     "activation_allowed": {
                       "type": "boolean"
                     },
