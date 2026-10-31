@@ -11,7 +11,7 @@ import (
 const maxDecisionGateArtifactBytes = 64 << 10
 
 // DecisionGateData is the bounded receipt produced before agent activation.
-// Question text and inference inputs are deliberately not included.
+// Question text, inference inputs, and model explanations are deliberately not included.
 type DecisionGateData struct {
 	Version         int    `json:"version"`
 	Decision        string `json:"decision"`
@@ -85,6 +85,10 @@ func extractDecisionGateData(logsPath string) *DecisionGateData {
 			len(data.Questions) > 8 || len(data.UnevaluatedQuestions) > 8 {
 			auditReportLog.Print("Ignoring invalid decision gate receipt")
 			continue
+		}
+		// Older receipts may contain model explanations, which can disclose event data.
+		for i := range data.Questions {
+			data.Questions[i].Reason = ""
 		}
 		return &data
 	}

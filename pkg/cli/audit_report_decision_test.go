@@ -21,7 +21,7 @@ const decisionGateTestReceipt = `{
   "usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12},
   "unevaluated_questions":[{"index":1,"reason":"short_circuit"}],
   "questions":[{"index":0,"decision":"skip","status":"evaluated","cause":"model_skip",
-    "reason":"model_skip","configured_alias":"decision","resolved_model":"test-model",
+    "reason":"Sensitive customer summary and personal information","configured_alias":"decision","resolved_model":"test-model",
     "provider":"test-provider","duration_ms":42,"fail_open":false,"evaluated":true,
     "usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12}},
     {"index":1,"decision":"run","status":"unevaluated","cause":"short_circuit",
@@ -60,16 +60,18 @@ func TestExtractDecisionGateData(t *testing.T) {
 			require.Len(t, data.Questions, 2)
 			assert.Equal(t, 0, data.Questions[0].Index)
 			assert.True(t, data.Questions[0].Evaluated)
-			assert.Equal(t, "model_skip", data.Questions[0].Reason)
+			assert.Empty(t, data.Questions[0].Reason)
 			require.NotNil(t, data.Questions[0].Usage)
 			assert.EqualValues(t, 12, data.Questions[0].Usage.TotalTokens)
 			assert.False(t, data.Questions[1].Evaluated)
+			assert.Empty(t, data.Questions[1].Reason)
 			assert.Equal(t, "short_circuit", data.Questions[1].Cause)
 			assert.Nil(t, data.Questions[1].Usage)
 			encoded, err := json.Marshal(AuditData{DecisionGate: data})
 			require.NoError(t, err)
 			assert.Contains(t, string(encoded), `"decision_gate":`)
 			assert.NotContains(t, string(encoded), "not part of the public receipt")
+			assert.NotContains(t, string(encoded), "Sensitive customer summary")
 		})
 	}
 }
@@ -129,7 +131,7 @@ func TestExtractDecisionGateDataIneligible(t *testing.T) {
 	assert.Equal(t, 2, data.UnevaluatedCount)
 	require.Len(t, data.Questions, 2)
 	assert.Equal(t, "unevaluated", data.Questions[1].Status)
-	assert.Equal(t, "ineligible", data.Questions[1].Reason)
+	assert.Empty(t, data.Questions[1].Reason)
 }
 
 func TestExtractDecisionGateDataRejectsSymlinks(t *testing.T) {

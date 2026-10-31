@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -156,4 +157,95 @@ func TestHarborRegradedRewardCollision(t *testing.T) {
 	record.Results = append(record.Results, json.RawMessage(`{"id":"loops","status":"unavailable","value":null}`))
 	_, _, err = harborRegradedRewards(dir, record, map[string]any{}, nil, nil)
 	require.ErrorContains(t, err, "duplicate additional grader reward identity")
+}
+
+func TestHarborSanitizeSensitiveText(t *testing.T) {
+	githubToken := "ghp_" + strings.Repeat("a", 36)
+	for _, tt := range []struct {
+		name, input, want string
+	}{
+		{"classic PAT", "tool echoed " + githubToken, "tool echoed [REDACTED]"},
+		{"installation token", "ghs_" + strings.Repeat("b", 36), "[REDACTED]"},
+		{"extended installation token", "ghs_" + strings.Repeat("b", 36) + "." + strings.Repeat("a_-", 20) + "x", "[REDACTED]"},
+		{"OAuth token", "gho_" + strings.Repeat("b", 36), "[REDACTED]"},
+		{"user token", "ghu_" + strings.Repeat("b", 36), "[REDACTED]"},
+		{"refresh token", "ghr_" + strings.Repeat("b", 36), "[REDACTED]"},
+		{"fine grained PAT", "github_pat_" + strings.Repeat("a", 82), "[REDACTED]"},
+		{"OpenAI key", "sk-" + strings.Repeat("b", 48), "[REDACTED]"},
+		{"long OpenAI project key", "sk-proj-" + strings.Repeat("b_", 80), "[REDACTED]"},
+		{"Anthropic key", "sk-ant-api03-" + strings.Repeat("b_", 48), "[REDACTED]"},
+		{"Google API key", "AIzaSy" + strings.Repeat("a", 33), "[REDACTED]"},
+		{"AWS access key", "AKIA" + strings.Repeat("A", 16), "[REDACTED]"},
+		{"AWS temporary access key", "ASIA" + strings.Repeat("A", 16), "[REDACTED]"},
+		{"Linear key", "lin_api_" + strings.Repeat("a", 40), "[REDACTED]"},
+		{"Slack token", "xoxb-" + strings.Repeat("1", 12) + "-" + strings.Repeat("2", 12) + "-" + strings.Repeat("a", 24), "[REDACTED]"},
+		{"JWT", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnopqrstuvwx", "[REDACTED]"},
+		{"bearer header", "Authorization: Bearer opaque.token-value+/==; status=401", "Authorization: Bearer [REDACTED]; status=401"},
+		{"basic header", "Authorization: Basic dXNlcjpwYXNzd29yZA==", "Authorization: Basic [REDACTED]"},
+		{"lowercase bearer", "authorization: bearer abcdefghijklmnop", "authorization: bearer [REDACTED]"},
+		{"token assignment", "token=abcdefghijklmnop failed", "token=[REDACTED] failed"},
+		{"API key header", "X-Api-Key: abcdefghijklmnop\nstatus: 401", "X-Api-Key: [REDACTED]\nstatus: 401"},
+		{"environment assignment", "GITHUB_TOKEN=abcdefghijklmnop; retry", "GITHUB_TOKEN=[REDACTED]; retry"},
+		{"JSON in diagnostic", `{"api_key":"abcdefghijklmnop","status":401}`, `{"api_key":[REDACTED],"status":401}`},
+		{"quoted password", `password='long password with spaces' failed`, `password=[REDACTED] failed`},
+		{"client secret", `client_secret: "abcdefghijklmnop"`, `client_secret: [REDACTED]`},
+		{"URL query assignment", "https://example.com/?access_token=abcdefghijklmnop&status=401", "https://example.com/?access_token=[REDACTED]&status=401"},
+		{"multiple credentials and path", "failed at /Users/private/grader.js token=abcdefghijklmnop api_key: 1234567890abcdef", "failed at [local path] token=[REDACTED] api_key: [REDACTED]"},
+		{"windows path", `failed at C:\private\grader.js Bearer abcdefghijklmnop`, "failed at [local path] Bearer [REDACTED]"},
+		{"empty", "", ""},
+		{"harmless diagnostic", "expected failure: status=401, retry after 10 seconds", "expected failure: status=401, retry after 10 seconds"},
+		{"missing credential", "token=missing api_key: unavailable password: unset", "token=missing api_key: unavailable password: unset"},
+		{"token counts", "token_count=1234567890123456 tokens=1234567890123456", "token_count=1234567890123456 tokens=1234567890123456"},
+		{"nonsensitive long assignment", "request_id=abcdefghijklmnop", "request_id=abcdefghijklmnop"},
+		{"token name only", "GITHUB_TOKEN was not configured", "GITHUB_TOKEN was not configured"},
+		{"URL diagnostic", "request failed at https://example.com/grader: 401", "request failed at https://example.com/grader: 401"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, harborSanitizeSensitiveText(tt.input))
+			require.Equal(t, tt.want, harborSanitizeSensitiveText(tt.want), "sanitization must be idempotent")
+		})
+	}
+}
+
+func TestHarborSanitizeErrorJSONPreservesOtherFields(t *testing.T) {
+	raw := json.RawMessage(`{"message":"Bearer abcdefghijklmnop","error":123,"value":9007199254740993,"details":[{"error":"token=abcdefghijklmnop","message":"expected failure","data":"token=abcdefghijklmnop"}],"prompt":"Bearer abcdefghijklmnop"}`)
+	safe := harborSanitizeErrorJSON(raw)
+	require.JSONEq(t, `{"message":"Bearer [REDACTED]","error":123,"value":9007199254740993,"details":[{"error":"token=[REDACTED]","message":"expected failure","data":"token=abcdefghijklmnop"}],"prompt":"Bearer abcdefghijklmnop"}`, string(safe))
+	require.Contains(t, string(safe), `"value":9007199254740993`, "large numeric scores must remain exact")
+	require.Contains(t, string(raw), `"message":"Bearer abcdefghijklmnop"`, "source JSON must remain unchanged")
+}
+
+func TestLogsHarborRegradingExportRedactsCredentials(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "run")
+	writeSessionTestFile(t, source, "usage/aw_session.jsonl", sessionTestHeader+sessionTestAgentEvent)
+	record := &RegradedRun{
+		SourceDirectory: source,
+		SessionError:    "Authorization: Bearer abcdefghijklmnop",
+		OriginalGraders: json.RawMessage(`{"error":"api_key: abcdefghijklmnop"}`),
+		Results:         []json.RawMessage{json.RawMessage(`{"id":"test","status":"error","error":"token=abcdefghijklmnop","details":[{"message":"sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"}]}`)},
+		OriginalEvidence: []RegradeOriginalEvidence{{
+			Error: "password=abcdefghijklmnop",
+			Data:  json.RawMessage(`{"message":"client_secret=abcdefghijklmnop"}`),
+		}},
+	}
+	run := harborTestRun(source)
+	run.Regrading = record
+	output := filepath.Join(root, "export")
+	require.NoError(t, logsExportHarborJob(t.Context(), output, []ProcessedRun{run}))
+	trials := harborTestTrials(t, output)
+	require.Len(t, trials, 1)
+	raw, err := os.ReadFile(filepath.Join(output, harborExportDirectory, trials[0], "gh-aw", "regrading.json"))
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), "abcdefghijklmnop")
+	require.NotContains(t, string(raw), "sk-proj-")
+	require.Contains(t, string(raw), "Bearer [REDACTED]")
+	var safe RegradedRun
+	require.NoError(t, json.Unmarshal(raw, &safe))
+	require.JSONEq(t, `{"error":"api_key: [REDACTED]"}`, string(safe.OriginalGraders))
+	require.JSONEq(t, `{"id":"test","status":"error","error":"token=[REDACTED]","details":[{"message":"[REDACTED]"}]}`, string(safe.Results[0]))
+	require.Equal(t, "password=[REDACTED]", safe.OriginalEvidence[0].Error)
+	require.JSONEq(t, `{"message":"client_secret=[REDACTED]"}`, string(safe.OriginalEvidence[0].Data))
+	require.Equal(t, "Authorization: Bearer abcdefghijklmnop", record.SessionError)
+	require.Contains(t, string(record.Results[0]), "token=abcdefghijklmnop", "original records must not be mutated")
 }
