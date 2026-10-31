@@ -131,6 +131,8 @@ Workflows use strict mode validation by default (unless frontmatter sets strict:
 Strict mode enforces: action pinning to SHAs, explicit network config, safe-outputs for write operations,
 and refuses write permissions and deprecated fields. Use the strict parameter to override frontmatter settings.
 
+MCP dry-run compilation uses locally cached observed model inventory rather than downloading workflow logs during the request. Configured models still require the inventory to be available.
+
 Returns JSON array with validation results for each workflow:
 - workflow: Name of the workflow file
 - valid: Boolean indicating if compilation was successful
