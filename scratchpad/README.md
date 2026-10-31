@@ -10,7 +10,6 @@ This directory contains design specifications and implementation documentation f
 | [Validation Architecture](./validation-architecture.md) | ✅ Documented | `pkg/workflow/validation.go` and domain-specific files |
 | [Go Type Patterns and Best Practices](./go-type-patterns.md) | ✅ Documented | `pkg/constants/constants.go`, `pkg/workflow/permissions_validator.go`, `pkg/parser/frontmatter.go` |
 | [Styles Guide](./styles-guide.md) | ✅ Documented | `pkg/styles/theme.go` - Adaptive color palette and terminal styling |
-| [Campaign Files Architecture](./campaigns-files.md) | 📋 File removed | `pkg/campaign/`, `actions/setup/js/campaign_discovery.cjs` - Campaign discovery, compilation, and execution |
 
 ## Specifications
 
@@ -64,4 +63,4 @@ When adding new specifications:
 
 ---
 
-**Last Updated**: 2026-07-22
+**Last Updated**: 2026-10-31
