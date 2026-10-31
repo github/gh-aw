@@ -15,10 +15,10 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.316"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.312"},
 		{"Copilot CLI", DefaultCopilotVersion, "1.0.103"},
 		{"Copilot SDK", DefaultCopilotSDKVersion, "1.0.16"},
-		{"Codex", DefaultCodexVersion, "0.166.0"},
+		{"Codex", DefaultCodexVersion, "0.165.0"},
 		{"Gemini CLI", DefaultGeminiVersion, "0.64.0"},
 		{"Agy CLI", DefaultAgyVersion, "1.3.6"},
 		{"Pi CLI", DefaultPiVersion, "1.4.0"},
@@ -98,5 +98,40 @@ func TestDefaultPlaywrightCLIVersionOutsideCooldownWindow(t *testing.T) {
 	age := time.Since(publishedAt)
 	if age < minReleaseAge {
 		t.Fatalf("@playwright/cli@%s is only %s old, but Playwright CLI installs enforce a %s npm release-age cooldown", DefaultPlaywrightCLIVersion, age.Round(time.Second), minReleaseAge)
+	}
+}
+
+func TestDefaultCLIVersionsOutsideCooldownWindow(t *testing.T) {
+	t.Parallel()
+
+	const minReleaseAge = 72 * time.Hour
+	tests := []struct {
+		name        string
+		version     Version
+		wantVersion Version
+		publishedAt string
+	}{
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.312", "2026-10-27T18:36:10.160Z"},
+		{"Codex", DefaultCodexVersion, "0.165.0", "2026-10-27T20:14:25.378Z"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if tt.version != tt.wantVersion {
+				t.Fatalf("%s default version = %q, want %q; update this test metadata when changing the pinned default", tt.name, tt.version, tt.wantVersion)
+			}
+
+			publishedAt, err := time.Parse(time.RFC3339Nano, tt.publishedAt)
+			if err != nil {
+				t.Fatalf("parse publishedAt: %v", err)
+			}
+
+			age := time.Since(publishedAt)
+			if age < minReleaseAge {
+				t.Fatalf("%s %s is only %s old, but CLI installs enforce a %s npm release-age cooldown", tt.name, tt.version, age.Round(time.Second), minReleaseAge)
+			}
+		})
 	}
 }

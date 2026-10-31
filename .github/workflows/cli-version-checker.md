@@ -74,6 +74,10 @@ For each CLI/MCP server and threat-detect:
 2. Compare with the current version constant in `./pkg/constants/`
 3. If newer version exists, research changes and prepare update
 
+### 3-Day Cooldown for NPM CLI Updates
+
+Before updating an npm-published CLI version, check the exact target version's publish timestamp with `npm view <package> time --json`. If it is less than 72 hours old, skip the update and retain the current pin. Only update after the full 72-hour cooldown has elapsed, and include the publish timestamp and elapsed age in the update summary.
+
 ### Version Sources
 - **Claude Code**: Use `npm view @anthropic-ai/claude-code version` (faster than web-fetch)
   - No public GitHub repository
