@@ -627,6 +627,9 @@ func fetchDefaultsVariable(target defaultsTarget, name string) (string, error) {
 }
 
 func upsertDefaultsVariable(target defaultsTarget, name, value string) error {
+	if err := validateActionsStorageValue(value); err != nil {
+		return err
+	}
 	patchOut, patchErr := runDefaultsGH("api", "-X", "PATCH", target.variableEndpoint(name), "-f", "name="+name, "-f", "value="+value)
 	if patchErr == nil {
 		return nil

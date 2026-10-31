@@ -213,9 +213,18 @@ func allHealthFailureWorkflowsSaturated(targets map[string]GitHubWorkflow, candi
 }
 
 func listHealthFailureCandidates(opts ListWorkflowRunsOptions, page int, repoOverride string, collection *HealthCollection) ([]workflowRunAPIResponse, time.Time, error) {
+	endpoint := healthFailureCandidatesEndpoint(opts, page, repoOverride, collection.workflows)
+	out, err := healthAPI(collection, endpoint)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	return parseHealthFailureCandidates(out)
+}
+
+func healthFailureCandidatesEndpoint(opts ListWorkflowRunsOptions, page int, repoOverride string, targets []GitHubWorkflow) string {
 	base := path.Join(healthRepositoryEndpoint(repoOverride), "actions/runs")
-	if len(collection.workflows) == 1 {
-		for _, target := range collection.workflows {
+	if len(targets) == 1 {
+		for _, target := range targets {
 			id := path.Base(target.Path)
 			if target.ID > 0 {
 				id = strconv.FormatInt(target.ID, 10)
@@ -223,13 +232,12 @@ func listHealthFailureCandidates(opts ListWorkflowRunsOptions, page int, repoOve
 			base = path.Join(healthRepositoryEndpoint(repoOverride), "actions/workflows", url.PathEscape(id), "runs")
 		}
 	}
-	endpoint := fmt.Sprintf("%s?status=failure&per_page=%d&page=%d&created=%s",
+	return fmt.Sprintf("%s?status=failure&per_page=%d&page=%d&created=%s",
 		base, opts.Limit, page,
 		url.QueryEscape(buildCreatedFilter(opts.StartDate, opts.EndDate, opts.BeforeDate)))
-	out, err := healthAPI(collection, endpoint)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
+}
+
+func parseHealthFailureCandidates(out []byte) ([]workflowRunAPIResponse, time.Time, error) {
 	var data struct {
 		Runs []workflowRunAPIResponse `json:"workflow_runs"`
 	}
