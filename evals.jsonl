@@ -124,3 +124,5 @@
 {"id":"recommendations_produced","question":"Were recommendations produced for prompt, skill, and agent changes to reduce ambient context size?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-29T19:53:33.744Z","runid":"40941866205"}
 {"id":"workflow_runs_sampled","question":"Did the agent sample recent agentic workflow runs and inspect their ambient context?","answer":"YES","model":"evals","timestamp":"2026-10-30T19:54:06.084Z","runid":"41116698892"}
 {"id":"recommendations_produced","question":"Were recommendations produced for prompt, skill, and agent changes to reduce ambient context size?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-30T19:54:06.084Z","runid":"41116698892"}
+{"id":"workflow_runs_sampled","question":"Did the agent sample recent agentic workflow runs and inspect their ambient context?","answer":"YES","model":"evals","timestamp":"2026-10-31T19:54:44.663Z","runid":"41235058977"}
+{"id":"recommendations_produced","question":"Were recommendations produced for prompt, skill, and agent changes to reduce ambient context size?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-31T19:54:44.663Z","runid":"41235058977"}
