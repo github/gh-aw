@@ -33,17 +33,23 @@ set -euo pipefail
 WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
 SRC="/tmp/gh-aw/base"
 
+SNAPSHOT_DIR=$(mktemp -d)
+trap 'rm -rf "${SNAPSHOT_DIR}"' EXIT
+if [ -f "${SRC}/snapshot.tar" ]; then
+  tar -xpf "${SRC}/snapshot.tar" -C "${SNAPSHOT_DIR}"
+fi
+
 # Parse the engine-registry-derived lists from environment variables.
 # These must match the values used in save_base_github_folders.sh.
 IFS=' ' read -ra FOLDERS <<< "${GH_AW_AGENT_FOLDERS:-}"
 IFS=' ' read -ra ROOT_FILES <<< "${GH_AW_AGENT_FILES:-}"
 
 for FOLDER in "${FOLDERS[@]+"${FOLDERS[@]}"}"; do
-  SNAPSHOT="${SRC}/${FOLDER}"
+  SNAPSHOT="${SNAPSHOT_DIR}/${FOLDER}"
   DEST="${WORKSPACE}/${FOLDER}"
   if [ -d "${SNAPSHOT}" ]; then
     rm -rf "${DEST}"
-    cp -r "${SNAPSHOT}" "${DEST}"
+    cp -a "${SNAPSHOT}" "${DEST}"
     echo "Restored ${FOLDER} from base branch snapshot"
   elif [ -d "${DEST}" ]; then
     # PR branch injected this directory but base doesn't have it — remove it
@@ -55,10 +61,11 @@ for FOLDER in "${FOLDERS[@]+"${FOLDERS[@]}"}"; do
 done
 
 for FILE in "${ROOT_FILES[@]+"${ROOT_FILES[@]}"}"; do
-  SNAPSHOT="${SRC}/${FILE}"
+  SNAPSHOT="${SNAPSHOT_DIR}/${FILE}"
   DEST="${WORKSPACE}/${FILE}"
   if [ -f "${SNAPSHOT}" ]; then
-    cp "${SNAPSHOT}" "${DEST}"
+    rm -rf "${DEST}"
+    cp -a "${SNAPSHOT}" "${DEST}"
     echo "Restored ${FILE} from base branch snapshot"
   elif [ -f "${DEST}" ]; then
     # PR branch injected this file but base doesn't have it — remove it

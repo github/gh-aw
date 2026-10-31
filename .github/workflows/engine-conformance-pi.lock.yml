@@ -612,7 +612,7 @@ jobs:
           GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
           printf 'GH_AW_PI_PACKAGE_ROOT=%s\n' "$GH_AW_PI_PACKAGE_ROOT" >> "$GITHUB_ENV"
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github .pi"
           GH_AW_AGENT_FILES: "AGENTS.MD AGENTS.md AGENTS.override.md CLAUDE.MD CLAUDE.md PI.md"

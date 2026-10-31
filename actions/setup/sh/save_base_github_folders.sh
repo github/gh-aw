@@ -4,7 +4,7 @@ set +o histexpand
 #
 # save_base_github_folders.sh - Snapshot agent config folders/files from the workspace
 #
-# Copies agent-specific folders and root instruction files from $GITHUB_WORKSPACE
+# Archives agent-specific folders and root instruction files from $GITHUB_WORKSPACE
 # into /tmp/gh-aw/base/ so that they can be included in the activation artifact
 # and later restored in the agent job after checkout_pr_branch runs.
 #
@@ -27,19 +27,19 @@ set -euo pipefail
 
 WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
 DEST="/tmp/gh-aw/base"
+rm -f "${DEST}/snapshot.tar"
 
 # Parse the engine-registry-derived lists from environment variables.
 # The compiler sets these so this script never needs manual maintenance.
 IFS=' ' read -ra FOLDERS <<< "${GH_AW_AGENT_FOLDERS:-}"
 IFS=' ' read -ra ROOT_FILES <<< "${GH_AW_AGENT_FILES:-}"
+ITEMS=()
 
 for FOLDER in "${FOLDERS[@]+"${FOLDERS[@]}"}"; do
   SRC="${WORKSPACE}/${FOLDER}"
   if [ -d "${SRC}" ]; then
-    mkdir -p "${DEST}"
-    rm -rf "${DEST}/${FOLDER}"
-    cp -r "${SRC}" "${DEST}/${FOLDER}"
-    echo "Saved ${FOLDER} to ${DEST}/${FOLDER}"
+    ITEMS+=("${FOLDER}")
+    echo "Saving ${FOLDER} to base branch snapshot"
   else
     echo "${FOLDER} not found in workspace, skipping"
   fi
@@ -48,10 +48,15 @@ done
 for FILE in "${ROOT_FILES[@]+"${ROOT_FILES[@]}"}"; do
   SRC="${WORKSPACE}/${FILE}"
   if [ -f "${SRC}" ]; then
-    mkdir -p "${DEST}"
-    cp "${SRC}" "${DEST}/${FILE}"
-    echo "Saved ${FILE} to ${DEST}/${FILE}"
+    ITEMS+=("${FILE}")
+    echo "Saving ${FILE} to base branch snapshot"
   else
     echo "${FILE} not found in workspace, skipping"
   fi
 done
+
+if [ "${#ITEMS[@]}" -gt 0 ]; then
+  mkdir -p "${DEST}"
+  # Artifact uploads discard file modes; keep them inside a tar archive.
+  tar -cf "${DEST}/snapshot.tar" -C "${WORKSPACE}" -- "${ITEMS[@]}"
+fi
