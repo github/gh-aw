@@ -403,7 +403,253 @@ EOF
     echo "  PASS"
 )
 
+test_checksum_verification() (
+    local case_name=$1
+    local case_root fixture_bin home install_dir binary_path asset checksums output digest
+    local expected_filename="linux-amd64" expected_error="" succeeds=false
+    local tool command_path checksum_attempts binary_attempts requested_version="v1.2.3"
+    local installer_args=()
+    case_root=$(mktemp -d)
+    trap 'rm -rf -- "$case_root"' EXIT
+    fixture_bin="$case_root/bin"
+    home="$case_root/home with space"
+    install_dir="$home/.local/share/gh/extensions/gh-aw"
+    binary_path="$install_dir/gh-aw"
+    asset="$case_root/candidate"
+    checksums="$case_root/checksums.txt"
+    output="$case_root/output"
+    mkdir -p "$fixture_bin" "$install_dir"
+
+    # An isolated PATH prevents host tools or credentials from affecting these tests.
+    for tool in awk chmod cp head ls mkdir mktemp mv rm sed seq; do
+        command_path=$(command -v "$tool")
+        ln -s "$command_path" "$fixture_bin/$tool"
+    done
+    if [ "$case_name" != no-checksum-tool ] && [ "$case_name" != skip-no-tool ]; then
+        if [ "$case_name" = shasum ] || ! command -v sha256sum >/dev/null 2>&1; then
+            ln -s "$(command -v shasum)" "$fixture_bin/shasum"
+        else
+            ln -s "$(command -v sha256sum)" "$fixture_bin/sha256sum"
+        fi
+    fi
+
+    case "$case_name" in
+        windows-valid|windows-missing)
+            expected_filename="windows-amd64.exe"
+            binary_path="$install_dir/gh-aw.exe"
+            ;;
+    esac
+    cat > "$asset" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$1" >> "$FIXTURE_EXECUTION_LOG"
+case "$1" in
+    --help) echo "gh aw help" ;;
+    version) echo "gh aw version v1.2.3" ;;
+esac
+EOF
+    if command -v sha256sum >/dev/null 2>&1; then
+        digest=$(sha256sum "$asset" | awk '{print $1}')
+    else
+        digest=$(shasum -a 256 "$asset" | awk '{print $1}')
+    fi
+    printf '%s  %s\n' "$digest" "$expected_filename" > "$checksums"
+    printf 'existing binary\n' > "$binary_path"
+    cp "$binary_path" "$case_root/old-bytes"
+    case "$case_name" in
+        valid|shasum|windows-valid) succeeds=true ;;
+        uppercase)
+            printf '%s  %s\n' "$(printf '%s' "$digest" | tr 'a-f' 'A-F')" "$expected_filename" > "$checksums"
+            succeeds=true
+            ;;
+        unavailable|partial-checksum)
+            expected_error="Failed to download checksums file after 3 attempts"
+            ;;
+        empty)
+            : > "$checksums"
+            expected_error="Missing or malformed checksum"
+            ;;
+        missing|windows-missing)
+            printf '%s  not-%s\n' "$digest" "$expected_filename" > "$checksums"
+            expected_error="Missing or malformed checksum"
+            ;;
+        malformed)
+            printf '%064d  %s\n' 0 "$expected_filename" | tr '0' 'z' > "$checksums"
+            expected_error="Missing or malformed checksum"
+            ;;
+        short-digest)
+            printf 'abc123  %s\n' "$expected_filename" > "$checksums"
+            expected_error="Missing or malformed checksum"
+            ;;
+        extra-field)
+            printf '%s  %s  unexpected\n' "$digest" "$expected_filename" > "$checksums"
+            expected_error="Missing or malformed checksum"
+            ;;
+        duplicate)
+            printf '%s  %s\n%s  %s\n' "$digest" "$expected_filename" "$digest" "$expected_filename" > "$checksums"
+            expected_error="Missing or malformed checksum"
+            ;;
+        mismatch)
+            printf '%064d  %s\n' 0 "$expected_filename" > "$checksums"
+            expected_error="Checksum verification failed"
+            ;;
+        no-checksum-tool)
+            expected_error="Neither sha256sum nor shasum is available"
+            ;;
+        checksum-tool-failure)
+            rm -f "$fixture_bin/sha256sum"
+            printf '#!/bin/sh\nexit 1\n' > "$fixture_bin/sha256sum"
+            chmod +x "$fixture_bin/sha256sum"
+            expected_error="Failed to compute binary checksum"
+            ;;
+        checksum-tool-malformed)
+            rm -f "$fixture_bin/sha256sum"
+            printf '#!/bin/sh\necho invalid\n' > "$fixture_bin/sha256sum"
+            chmod +x "$fixture_bin/sha256sum"
+            expected_error="Checksum verification failed"
+            ;;
+        retry|latest-fallback) succeeds=true ;;
+        skip|skip-no-tool)
+            installer_args+=(--skip-checksum)
+            succeeds=true
+            ;;
+        *) fail "unknown checksum case: $case_name" ;;
+    esac
+    [ "$case_name" != latest-fallback ] || requested_version="latest"
+
+    cat > "$fixture_bin/uname" <<'EOF'
+#!/bin/sh
+case "$1" in
+    -s)
+        case "$FIXTURE_CASE" in
+            windows-*) echo MINGW64_NT ;;
+            *) echo Linux ;;
+        esac
+        ;;
+    -m) echo x86_64 ;;
+esac
+EOF
+    cat > "$fixture_bin/sleep" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$1" >> "$FIXTURE_SLEEP_LOG"
+EOF
+    cat > "$fixture_bin/curl" <<'EOF'
+#!/bin/bash
+set -e
+destination=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -o) destination="$2"; shift 2 ;;
+        https://*) url="$1"; shift ;;
+        *) shift ;;
+    esac
+done
+printf '%s\n' "$url" >> "$FIXTURE_DOWNLOAD_LOG"
+case "$url" in
+    https://api.github.com/repos/github/gh-aw/releases/latest)
+        printf '{"tag_name":"v1.2.3"}\n'
+        exit 0
+        ;;
+    https://github.com/github/gh-aw/releases/*/checksums.txt)
+        printf 'attempt\n' >> "$FIXTURE_CHECKSUM_LOG"
+        case "$FIXTURE_CASE" in
+            unavailable) exit 22 ;;
+            partial-checksum)
+                cp "$FIXTURE_CHECKSUMS" "$destination"
+                exit 18
+                ;;
+            retry)
+                if [ ! -f "$FIXTURE_RETRIED" ]; then
+                    : > "$FIXTURE_RETRIED"
+                    exit 22
+                fi
+                ;;
+        esac
+        cp "$FIXTURE_CHECKSUMS" "$destination"
+        ;;
+    https://github.com/github/gh-aw/releases/*/linux-amd64|https://github.com/github/gh-aw/releases/*/windows-amd64.exe)
+        if [ "$FIXTURE_CASE" = latest-fallback ] && [[ "$url" == */latest/download/* ]]; then
+            exit 22
+        fi
+        cp "$FIXTURE_BINARY" "$destination"
+        ;;
+    *) echo "unexpected URL: $url" >&2; exit 1 ;;
+esac
+EOF
+    chmod +x "$fixture_bin/curl" "$fixture_bin/uname" "$fixture_bin/sleep"
+
+    echo "Test: checksum-$case_name"
+    if env -u INPUT_VERSION -u GITHUB_OUTPUT -u ANDROID_ROOT \
+        HOME="$home" PATH="$fixture_bin" FIXTURE_CASE="$case_name" \
+        FIXTURE_BINARY="$asset" FIXTURE_CHECKSUMS="$checksums" \
+        FIXTURE_EXECUTION_LOG="$case_root/executions" \
+        FIXTURE_DOWNLOAD_LOG="$case_root/downloads" \
+        FIXTURE_CHECKSUM_LOG="$case_root/checksum-attempts" \
+        FIXTURE_SLEEP_LOG="$case_root/sleeps" \
+        FIXTURE_RETRIED="$case_root/retried" \
+        /bin/bash "$INSTALLER_PATH" "$requested_version" "${installer_args[@]}" > "$output" 2>&1; then
+        [ "$succeeds" = true ] || fail "$case_name unexpectedly succeeded"
+    else
+        [ "$succeeds" = false ] || { cat "$output" >&2; fail "$case_name failed"; }
+    fi
+
+    checksum_attempts=0
+    [ ! -f "$case_root/checksum-attempts" ] || checksum_attempts=$(wc -l < "$case_root/checksum-attempts" | tr -d ' ')
+    if [ "$succeeds" = true ]; then
+        cmp "$binary_path" "$asset" || fail "$case_name did not install the candidate"
+        [ -x "$binary_path" ] || fail "$case_name installed a non-executable candidate"
+        printf '%s\n' --help version > "$case_root/expected-executions"
+        cmp "$case_root/executions" "$case_root/expected-executions" || fail "$case_name did not verify/run the installed fixture"
+        case "$case_name" in
+            skip|skip-no-tool)
+                [ "$checksum_attempts" -eq 0 ] || fail "explicit skip downloaded checksums"
+                grep -q 'Checksum verification skipped (--skip-checksum flag used)' "$output" || fail "missing explicit skip warning"
+                ;;
+            *)
+                grep -q 'Checksum verification passed' "$output" || fail "verification did not pass"
+                [ "$checksum_attempts" -ge 1 ] || fail "checksums were not downloaded"
+                ;;
+        esac
+    else
+        cmp "$binary_path" "$case_root/old-bytes" || fail "$case_name changed existing binary"
+        [ ! -e "$case_root/executions" ] || fail "$case_name executed an unverified candidate"
+        grep -q "\\[ERROR\\].*$expected_error" "$output" || { cat "$output" >&2; fail "$case_name lacked an actionable error"; }
+        ! grep -q 'Installation complete' "$output" || fail "$case_name reported success"
+    fi
+    case "$case_name" in
+        unavailable|partial-checksum)
+            [ "$checksum_attempts" -eq 3 ] || fail "checksum failures did not exhaust three retries"
+            printf '2\n2\n' > "$case_root/expected-sleeps"
+            cmp "$case_root/sleeps" "$case_root/expected-sleeps" || fail "checksum retry delays changed"
+            ;;
+        retry)
+            [ "$checksum_attempts" -eq 2 ] || fail "transient checksum failure did not retry"
+            [ "$(cat "$case_root/sleeps")" = 2 ] || fail "checksum retry delay changed"
+            ;;
+        latest-fallback)
+            binary_attempts=$(grep -c '/latest/download/linux-amd64$' "$case_root/downloads")
+            [ "$binary_attempts" -eq 3 ] || fail "latest redirect did not retry three times"
+            grep -q '/download/v1.2.3/linux-amd64$' "$case_root/downloads" || fail "missing binary fallback"
+            grep -q '/download/v1.2.3/checksums.txt$' "$case_root/downloads" || fail "checksums did not follow binary fallback"
+            ! grep -q '/latest/download/checksums.txt$' "$case_root/downloads" || fail "checksums used the wrong release"
+            printf '2\n4\n' > "$case_root/expected-sleeps"
+            cmp "$case_root/sleeps" "$case_root/expected-sleeps" || fail "binary retry backoff changed"
+            ;;
+        no-checksum-tool)
+            [ ! -e "$case_root/downloads" ] || fail "missing checksum tool did not fail before downloading"
+            ;;
+    esac
+    assert_no_staging_leftovers "$install_dir"
+    echo "  PASS"
+)
+
 bash -n "$INSTALLER_PATH"
+for case_name in valid unavailable partial-checksum empty missing malformed short-digest extra-field duplicate mismatch no-checksum-tool checksum-tool-failure checksum-tool-malformed retry latest-fallback uppercase shasum skip skip-no-tool windows-valid windows-missing; do
+    if [ "$case_name" = shasum ] && ! command -v shasum >/dev/null 2>&1; then
+        echo "Skipping shasum fallback test: shasum is unavailable on this host."
+        continue
+    fi
+    test_checksum_verification "$case_name"
+done
 if command -v pwsh >/dev/null 2>&1; then
     POWERSHELL_INSTALLER_PATH="$(cd "$(dirname "$INSTALLER_PATH")" && pwd)/$(basename "${INSTALLER_PATH%.sh}.ps1")"
     pwsh -NoProfile -File "$SCRIPT_DIR/test-install-script.ps1" -InstallerPath "$POWERSHELL_INSTALLER_PATH"

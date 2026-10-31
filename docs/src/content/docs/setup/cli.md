@@ -71,6 +71,8 @@ Invoke-WebRequest https://raw.githubusercontent.com/github/gh-aw/main/install-gh
 
 This installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and supports Linux, macOS, FreeBSD, Windows, and Android (Termux), including environments behind corporate firewalls.
 
+The Bash installer requires `sha256sum` or `shasum` and verifies the downloaded binary against the release's `checksums.txt` before executing or installing it. Unavailable, missing, malformed, duplicate, or mismatched checksums abort installation and leave any existing binary unchanged. The explicit `--skip-checksum` option disables this protection; it is never enabled automatically.
+
 ### GitHub Actions Setup Action
 
 In GitHub Actions, use the `setup-cli` action for platform detection and checksum verification:
