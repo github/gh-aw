@@ -82,3 +82,6 @@ latest.json (2026-10-27, partial): 405 runs, 84.4% success. ai-moderator 3/22 ok
 
 ## Run 2026-10-29T12:47Z
 metrics/latest.json now dated 2026-10-29 but collection_status=partial; workflow_runs data unavailable (zero placeholders), 1.5h coverage. Ranking deferred; no discussion/issue filed.
+
+## Run 2026-10-31T12:42Z
+metrics/latest.json now dated 2026-10-31 but collection_status=partial: run counters are zero placeholders, safe-output/engagement null (coverage 2.1h). Ranking still not possible; no discussion/issue filed.
