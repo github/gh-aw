@@ -7,6 +7,7 @@ test.beforeEach(async ({ page }) => {
 test("explains the security boundaries in an ordered flow", async ({ page }) => {
   const section = page.locator("main #security-model");
   await expect(section.getByRole("heading", { level: 3 })).toHaveText(["Trigger", "Agent", "Safe outputs"]);
+  await expect(section.locator(".graph")).toContainText(["Issues", "Pull requests", "Pushes", "Actions"]);
   const jira = section.getByRole("link", { name: /Jira/ });
   await expect(jira).toBeVisible();
   await expect(jira).toContainText("Via authenticated repository dispatch");
