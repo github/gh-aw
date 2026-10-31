@@ -47,7 +47,8 @@ func TestKiroNetworkDefaultsExcludeOptionalVendorServices(t *testing.T) {
 	}
 	domains := domainSet(t, engine.allowedDomains(data))
 	for _, host := range []string{
-		"api.kiro.dev", "prod.download.cli.kiro.dev", "cognito-identity.us-east-1.amazonaws.com",
+		"runtime.us-east-1.kiro.dev", "management.us-east-1.kiro.dev",
+		"prod.download.cli.kiro.dev", "cognito-identity.us-east-1.amazonaws.com",
 		"codewhisperer.us-east-1.amazonaws.com", "q.us-east-1.amazonaws.com",
 	} {
 		assert.Contains(t, domains, host)

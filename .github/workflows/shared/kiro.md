@@ -28,13 +28,14 @@ engine:
         - objects.githubusercontent.com
         # The harness downloads the pinned CLI archive from this host.
         - prod.download.cli.kiro.dev
+        - management.us-east-1.kiro.dev
         - codewhisperer.us-east-1.amazonaws.com
         # Concrete identity endpoint for Kiro authentication:
         # https://kiro.dev/docs/privacy-and-security/firewalls/
         - cognito-identity.us-east-1.amazonaws.com
         - q.us-east-1.amazonaws.com
       provider-domains:
-        kiro: api.kiro.dev
+        kiro: runtime.us-east-1.kiro.dev
     execution:
       command-name: kiro-cli
       args:

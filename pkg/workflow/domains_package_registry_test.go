@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -187,26 +188,28 @@ func TestBehaviorDefinedEngineDefaultsDoNotOverlapEcosystems(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, paths)
 	defaults := make(map[string][]string)
+	checkedBehaviorDefinedEngines := 0
 	for _, path := range paths {
 		content, err := os.ReadFile(path)
 		require.NoError(t, err)
-		if !strings.HasPrefix(string(content), "---\n") {
+		frontmatter, err := parser.ExtractFrontmatterFromContent(strings.TrimPrefix(string(content), "\uFEFF"))
+		require.NoError(t, err, path)
+		if _, ok := frontmatter.Frontmatter["engine"]; !ok {
 			continue
 		}
-		parts := strings.SplitN(string(content), "---", 3)
-		require.Len(t, parts, 3, path)
-		var frontmatter struct {
+		frontmatterYAML, err := yaml.Marshal(frontmatter.Frontmatter)
+		require.NoError(t, err, path)
+		var parsedFrontmatter struct {
 			Engine yaml.Node `yaml:"engine"`
 		}
-		require.NoError(t, yaml.Unmarshal([]byte(parts[1]), &frontmatter), path)
-		if frontmatter.Engine.Kind != yaml.MappingNode {
-			continue
-		}
+		require.NoError(t, yaml.Unmarshal(frontmatterYAML, &parsedFrontmatter), path)
+		require.Equal(t, yaml.MappingNode, parsedFrontmatter.Engine.Kind, path)
 		var definition EngineDefinition
-		require.NoError(t, frontmatter.Engine.Decode(&definition), path)
+		require.NoError(t, parsedFrontmatter.Engine.Decode(&definition), path)
 		if definition.Behaviors == nil || definition.Behaviors.Network == nil {
 			continue
 		}
+		checkedBehaviorDefinedEngines++
 		network := definition.Behaviors.Network
 		defaults[path+"/defaults"] = network.Defaults
 		for provider, domain := range network.ProviderDomains {
@@ -214,6 +217,7 @@ func TestBehaviorDefinedEngineDefaultsDoNotOverlapEcosystems(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, defaults, "shared behavior-defined engines must be checked")
+	require.Equal(t, 8, checkedBehaviorDefinedEngines, "all behavior-defined engines with network policies must be checked")
 	assert.Empty(t, engineDefaultEcosystemOverlaps(getLoadedDomainSets().Ecosystems, defaults),
 		"behavior-defined engine defaults and provider domains require the same package ecosystem opt-in as static engines")
 }
