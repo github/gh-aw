@@ -220,7 +220,9 @@ func buildBytesImportTextEdit(pass *analysis.Pass, file *ast.File, seenImportFil
 // extractByteSliceStringConv checks whether expr is a string-like type conversion
 // where x has underlying type []byte. If so, it returns x, the conversion type, and true.
 func extractByteSliceStringConv(pass *analysis.Pass, expr ast.Expr) (ast.Expr, ast.Expr, bool) {
-	call, ok := expr.(*ast.CallExpr)
+	// astutil.UnwrapParenExpr handles a parenthesized operand, e.g.
+	// string(a) == (string(b)).
+	call, ok := astutil.UnwrapParenExpr(expr).(*ast.CallExpr)
 	if !ok || len(call.Args) != 1 {
 		return nil, nil, false
 	}

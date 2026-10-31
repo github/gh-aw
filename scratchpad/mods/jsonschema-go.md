@@ -2,7 +2,7 @@
 
 ## Overview
 
-**jsonschema-go** is Google's official Go library for working with JSON Schema, supporting schema creation, validation, and type inference per JSON Schema Draft 2020-12 specification. The library fully implements the JSON Schema Draft 2020-12 specification with no external dependencies beyond the Go standard library.
+**jsonschema-go** is Google's official Go library for working with JSON Schema, supporting schema creation, validation, and type inference per JSON Schema Draft 2020-12 specification. The library implements the JSON Schema Draft 2020-12 specification with no external dependencies beyond the Go standard library.
 
 **Key Characteristics:**
 - Zero external dependencies (only Go stdlib)

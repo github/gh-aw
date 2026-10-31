@@ -69,15 +69,6 @@ var bundledProviderModelIDs = sync.OnceValue(func() map[string]map[string]struct
 	return ids
 })
 
-// bundledCopilotModelIDs returns the lower-cased github-copilot model ids of the bundled catalogue.
-func bundledCopilotModelIDs() map[string]struct{} {
-	return bundledProviderModelIDs()[copilotRoutingNamespace]
-}
-
-func isBundledCopilotModelID(model string) bool {
-	return isBundledProviderModelID(copilotRoutingNamespace, model)
-}
-
 func isBundledProviderModelID(provider, model string) bool {
 	_, ok := bundledProviderModelIDs()[provider][strings.ToLower(model)]
 	return ok
