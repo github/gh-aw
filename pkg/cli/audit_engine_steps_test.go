@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -431,5 +432,171 @@ func TestAuditEngineStepFailure_EvalsExecutionStatePerInvocation(t *testing.T) {
 
 		assert.Empty(t, generateEngineStepFailureFindings(processedRun), "conflicting unattributed evidence must not mark clean invocations as failed")
 		assert.Empty(t, readEvalsExecutionState(processedRun.Run, "", false))
+	})
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryStreamsLargeHistory(t *testing.T) {
+	olderRunRow := `{"id":"legacy_question","question":"Removed question with a long explanation of what was asked","answer":"YES","model":"","timestamp":"2026-10-20T10:00:00.000Z","runid":"40000000000"}` + "\n"
+	history := strings.Repeat(olderRunRow, (1024*1024)/len(olderRunRow)+100)
+	require.Greater(t, len(history), 1024*1024, "the history must exceed 1 MiB")
+
+	t.Run("audited run records after the first MiB are counted", func(t *testing.T) {
+		runDir := t.TempDir()
+		writeEngineStepFixture(t, runDir, map[string]string{
+			jobsAPIResponseFileName:     evalsPreflightJobs40955414354,
+			"workflow-logs/3_evals.txt": evalsPreflightJobLog40955414354,
+			// The evals state branch fallback writes the append-only history to the root.
+			"evals.jsonl": history + evalsPreflightResults40955414354,
+		})
+		processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Claude Code User Documentation Review", "success")
+
+		summary := buildEvalsSummary(processedRun.Run)
+
+		require.NotNil(t, summary)
+		assert.Equal(t, EvalsSummary{Questions: 2, Unknown: 2}, *summary)
+		findings := generateEngineStepFailureFindings(processedRun)
+		require.Len(t, findings, 1)
+		assert.Contains(t, findings[0].Description, "all 2 evals answers are UNKNOWN")
+	})
+
+	t.Run("read error makes the summary unavailable", func(t *testing.T) {
+		runDir := t.TempDir()
+		overlongLine := `{"id":"oversized","answer":"YES","runid":"40000000000","question":"` + strings.Repeat("x", evalsResultMaxLineBytes) + `"}` + "\n"
+		writeEngineStepFixture(t, runDir, map[string]string{
+			"evals.jsonl": evalsPreflightResults40955414354 + overlongLine,
+		})
+		processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Claude Code User Documentation Review", "success")
+
+		assert.Nil(t, buildEvalsSummary(processedRun.Run), "a partially read file must not be summarized")
+	})
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryPerInvocation(t *testing.T) {
+	invocationLog := func(prefix string, failed bool) string {
+		exit := "2026-10-29T21:19:40.0000000Z Process exiting with code: 0\n"
+		if failed {
+			exit = "2026-10-29T21:19:40.0000000Z [health-check][ERROR] Cannot connect to Anthropic API proxy at http://host.docker.internal:10002\n" +
+				"2026-10-29T21:19:43.0000000Z ##[error]Process completed with exit code 1.\n"
+		}
+		return "2026-10-29T21:18:59.0334305Z ##[group]Run set -o pipefail\n" + exit +
+			"2026-10-29T21:19:44.1335928Z ##[group]Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9\n" +
+			"2026-10-29T21:19:44.1336376Z with:\n" +
+			"2026-10-29T21:19:44.1336400Z   name: " + prefix + "evals\n"
+	}
+	jobs := `[{"total_count":2,"jobs":[
+{"id":1,"run_id":40955414354,"name":"caller-a / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]},
+{"id":2,"run_id":40955414354,"name":"caller-b / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]}]}]`
+	yesResults := strings.ReplaceAll(evalsPreflightResults40955414354, `"answer":"UNKNOWN"`, `"answer":"YES"`)
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:                jobs,
+		"workflow-logs/3_caller-a _ evals.txt": invocationLog("aaaaaaaa-", true),
+		"workflow-logs/4_caller-b _ evals.txt": invocationLog("bbbbbbbb-", true),
+		"aaaaaaaa-evals/evals.jsonl":           yesResults,
+		"aaaaaaaa-usage/evals.jsonl":           yesResults,
+		"bbbbbbbb-evals/evals.jsonl":           evalsPreflightResults40955414354,
+		"bbbbbbbb-usage/evals.jsonl":           evalsPreflightResults40955414354,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+
+	assert.True(t, runHasEvals(runDir, false), "logs filters still see evals results")
+	summary := buildEvalsSummary(processedRun.Run)
+	require.NotNil(t, summary)
+	assert.Equal(t, EvalsSummary{Questions: 4, Yes: 2, Unknown: 2}, *summary, "each invocation is counted once, from either its evals or usage copy")
+
+	findings := generateEngineStepFailureFindings(processedRun)
+	require.Len(t, findings, 2)
+	assert.Contains(t, findings[0].Description, `Job "caller-a / evals"`)
+	assert.NotContains(t, findings[0].Description, "UNKNOWN", "caller-a answered YES")
+	assert.Contains(t, findings[1].Description, `Job "caller-b / evals"`)
+	assert.Contains(t, findings[1].Description, "all 2 evals answers are UNKNOWN")
+}
+
+func TestAuditEngineStepFailure_JobLogMatchingKeepsJobIdentity(t *testing.T) {
+	cleanLog := strings.NewReplacer(
+		"[health-check][ERROR] Cannot connect", "[health-check] ✓ Connected",
+		"[health-check][ERROR] Proxy may not be running or network is blocked", "[health-check] ✓ All API proxy health checks passed",
+		"2026-10-28T22:28:32.7749904Z ##[error]Process completed with exit code 1.\n", "",
+	).Replace(detectionPreflightJobLog40779352178)
+	stepsJSON := detectionPreflightJobs40779352178[strings.Index(detectionPreflightJobs40779352178, `"steps":[`) : len(detectionPreflightJobs40779352178)-len("}]}]")]
+	jobsJSON := func(names ...string) string {
+		parts := make([]string, 0, len(names))
+		for i, name := range names {
+			parts = append(parts, `{"id":`+strconv.Itoa(i+1)+`,"run_id":40779352178,"name":"`+name+`","status":"completed","conclusion":"success",`+stepsJSON+`}`)
+		}
+		return `[{"total_count":` + strconv.Itoa(len(names)) + `,"jobs":[` + strings.Join(parts, ",") + `]}]`
+	}
+	run := func(t *testing.T, files map[string]string) ProcessedRun {
+		runDir := t.TempDir()
+		writeEngineStepFixture(t, runDir, files)
+		return engineStepFixtureRun(t, runDir, 40779352178, "Reusable Detection", "success")
+	}
+
+	t.Run("qualified log wins over basename log", func(t *testing.T) {
+		processedRun := run(t, map[string]string{
+			jobsAPIResponseFileName:                    jobsJSON("caller-a / detection"),
+			"workflow-logs/3_detection.txt":            detectionPreflightJobLog40779352178,
+			"workflow-logs/4_caller-a _ detection.txt": cleanLog,
+		})
+
+		assert.Empty(t, generateEngineStepFailureFindings(processedRun), "another job's basename log must not be attributed to caller-a")
+		job := processedRun.JobDetails[0]
+		assert.Equal(t, filepath.Join(processedRun.Run.LogsPath, "workflow-logs", "4_caller-a _ detection.txt"), locateJobLogs(filepath.Join(processedRun.Run.LogsPath, "workflow-logs"), job.JobInfo).file)
+	})
+
+	t.Run("unique basename log is the fallback", func(t *testing.T) {
+		processedRun := run(t, map[string]string{
+			jobsAPIResponseFileName:         jobsJSON("caller-a / detection"),
+			"workflow-logs/3_detection.txt": detectionPreflightJobLog40779352178,
+		})
+
+		require.Len(t, generateEngineStepFailureFindings(processedRun), 1)
+	})
+
+	t.Run("ambiguous basename logs are unavailable", func(t *testing.T) {
+		processedRun := run(t, map[string]string{
+			jobsAPIResponseFileName:         jobsJSON("caller-a / detection", "caller-b / detection"),
+			"workflow-logs/3_detection.txt": detectionPreflightJobLog40779352178,
+			"workflow-logs/4_detection.txt": cleanLog,
+		})
+
+		assert.Empty(t, generateEngineStepFailureFindings(processedRun))
+		for _, job := range processedRun.JobDetails {
+			assert.Nil(t, readJobLogLines(filepath.Join(processedRun.Run.LogsPath, "workflow-logs"), job.JobInfo), "job %q", job.Name)
+		}
+	})
+
+	t.Run("caller-a and caller_a are distinct jobs", func(t *testing.T) {
+		processedRun := run(t, map[string]string{
+			jobsAPIResponseFileName:                    jobsJSON("caller-a / detection", "caller_a / detection"),
+			"workflow-logs/3_caller_a _ detection.txt": detectionPreflightJobLog40779352178,
+			"workflow-logs/4_caller-a _ detection.txt": cleanLog,
+		})
+
+		findings := generateEngineStepFailureFindings(processedRun)
+		require.Len(t, findings, 1)
+		assert.Contains(t, findings[0].Description, `Job "caller_a / detection"`)
+	})
+
+	t.Run("upload prefix is read from the job's own log", func(t *testing.T) {
+		uploadLog := func(prefix string) string {
+			return "2026-10-29T21:19:44.1335928Z ##[group]Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9\n" +
+				"2026-10-29T21:19:44.1336400Z   name: " + prefix + "evals\n"
+		}
+		processedRun := run(t, map[string]string{
+			jobsAPIResponseFileName:                jobsJSON("caller-a / evals", "caller_a / evals"),
+			"workflow-logs/3_evals.txt":            uploadLog("cccccccc-"),
+			"workflow-logs/4_caller_a _ evals.txt": uploadLog("bbbbbbbb-"),
+			"workflow-logs/5_caller-a _ evals.txt": uploadLog("aaaaaaaa-"),
+		})
+		workflowLogsDir := filepath.Join(processedRun.Run.LogsPath, "workflow-logs")
+
+		for job, want := range map[int]string{0: "aaaaaaaa-", 1: "bbbbbbbb-"} {
+			prefix, known := evalsArtifactPrefixFromLog(readJobLogLines(workflowLogsDir, processedRun.JobDetails[job].JobInfo))
+			assert.True(t, known)
+			assert.Equal(t, want, prefix, "job %q", processedRun.JobDetails[job].Name)
+		}
 	})
 }

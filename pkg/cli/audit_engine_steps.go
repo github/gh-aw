@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
@@ -24,6 +25,7 @@ const (
 	healthCheckErrorMarker        = "[health-check][ERROR]"
 	ghaErrorMarker                = "##[error]"
 	engineStepErrorMaxLen         = 500
+	evalsResultMaxLineBytes       = 1024 * 1024
 	evalsExecutionStateNotStarted = "not_started"
 )
 
@@ -60,32 +62,120 @@ type engineStepFailure struct {
 	StepNumber     int
 	ErrorLine      string
 	ExecutionState string
+	// EvalsPrefix is the evals artifact prefix of the job's invocation; it is
+	// meaningful only when EvalsPrefixKnown is true.
+	EvalsPrefix      string
+	EvalsPrefixKnown bool
 }
 
-// buildEvalsSummary reads evals.jsonl and the evals execution evidence for a run.
-// It returns nil when the run has no evals results.
+// buildEvalsSummary summarizes the evals answers of every evals invocation of a run
+// and the evals execution evidence. It returns nil when the run has no evals results
+// or when any invocation's results cannot be read.
 func buildEvalsSummary(run WorkflowRun) *EvalsSummary {
+	invocations := buildEvalsInvocationSummaries(run)
+	if len(invocations) == 0 {
+		return nil
+	}
+	summary := &EvalsSummary{}
+	for _, invocation := range invocations {
+		if invocation == nil {
+			return nil
+		}
+		summary.Questions += invocation.Questions
+		summary.Yes += invocation.Yes
+		summary.No += invocation.No
+		summary.Unknown += invocation.Unknown
+	}
+	summary.ExecutionState = readEvalsExecutionState(run, "", false)
+	return summary
+}
+
+// buildEvalsInvocationSummaries returns the evals answers summary of each evals
+// invocation of a run, keyed by artifact prefix ("" or "<hash>-"). A nil summary
+// means that invocation's results are unavailable.
+func buildEvalsInvocationSummaries(run WorkflowRun) map[string]*EvalsSummary {
 	if run.LogsPath == "" {
 		return nil
 	}
-	path := findEvalsResultFile(run.LogsPath)
-	if path == "" {
+	files := findEvalsInvocationResultFiles(run.LogsPath)
+	if len(files) == 0 {
 		return nil
 	}
-	data, err := readFileLimited(path, 1024*1024)
-	if err != nil {
-		auditEngineStepsLog.Printf("Failed to read evals results %s: %v", path, err)
-		return nil
-	}
-	answers := map[string]string{}
-	order := []string{}
 	runID := ""
 	if run.DatabaseID != 0 {
 		runID = strconv.FormatInt(run.DatabaseID, 10)
 	}
-	for _, record := range parseEvalResultRecords(data) {
+	summaries := make(map[string]*EvalsSummary, len(files))
+	for prefix, path := range files {
+		summary, err := summarizeEvalsResultFile(path, runID)
+		if err != nil {
+			auditEngineStepsLog.Printf("Evals results unavailable for invocation %q (%s): %v", prefix, path, err)
+		}
+		summaries[prefix] = summary
+	}
+	return summaries
+}
+
+// findEvalsInvocationResultFiles returns one evals.jsonl path per evals invocation,
+// keyed by artifact prefix. The evals artifact and the compact usage artifact of the
+// same invocation carry copies of the same file, so only the first existing copy is
+// used. The run-root evals.jsonl (a flattened evals artifact or the evals state
+// branch history) belongs to the unprefixed invocation.
+func findEvalsInvocationResultFiles(runDir string) map[string]string {
+	evalsName := constants.EvalsArtifactName.String()
+	usageName := constants.UsageArtifactName.String()
+	resultName := constants.EvalsResultFilename.String()
+	candidates := map[string][]string{
+		"": {
+			filepath.Join(runDir, resultName),
+			filepath.Join(runDir, usageName, resultName),
+			filepath.Join(runDir, evalsName, resultName),
+		},
+	}
+	if entries, err := os.ReadDir(runDir); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			for _, name := range []string{evalsName, usageName} {
+				if hash, ok := strings.CutSuffix(entry.Name(), "-"+name); ok && hash != "" {
+					prefix := hash + "-"
+					candidates[prefix] = append(candidates[prefix], filepath.Join(runDir, entry.Name(), resultName))
+				}
+			}
+		}
+	}
+	files := map[string]string{}
+	for prefix, paths := range candidates {
+		for _, path := range paths {
+			if fileutil.FileExists(path) {
+				files[prefix] = path
+				break
+			}
+		}
+	}
+	return files
+}
+
+// summarizeEvalsResultFile streams an evals.jsonl file line by line and summarizes
+// the answers recorded for runID (every answer when runID is empty). The file can be
+// the evals state branch's append-only history, so it has no total size limit; each
+// line is limited to evalsResultMaxLineBytes. Any read error, including an over-long
+// line, makes the summary unavailable instead of summarizing a partial file.
+func summarizeEvalsResultFile(path, runID string) (*EvalsSummary, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer closeAuditEngineStepFile(file, path)
+	answers := map[string]string{}
+	order := []string{}
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), evalsResultMaxLineBytes)
+	for scanner.Scan() {
+		record, ok := parseEvalResultRecordLine(scanner.Bytes())
 		// evals.jsonl restored from the evals state branch also holds other runs' rows.
-		if runID != "" && record.RunID != "" && strings.TrimSpace(record.RunID) != runID {
+		if !ok || (runID != "" && record.RunID != "" && strings.TrimSpace(record.RunID) != runID) {
 			continue
 		}
 		if _, seen := answers[record.ID]; !seen {
@@ -93,7 +183,10 @@ func buildEvalsSummary(run WorkflowRun) *EvalsSummary {
 		}
 		answers[record.ID] = strings.ToUpper(strings.TrimSpace(record.Answer))
 	}
-	summary := &EvalsSummary{Questions: len(order), ExecutionState: readEvalsExecutionState(run, "", false)}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	summary := &EvalsSummary{Questions: len(order)}
 	for _, id := range order {
 		switch answers[id] {
 		case "YES":
@@ -104,7 +197,7 @@ func buildEvalsSummary(run WorkflowRun) *EvalsSummary {
 			summary.Unknown++
 		}
 	}
-	return summary
+	return summary, nil
 }
 
 func readFileLimited(path string, limit int64) ([]byte, error) {
@@ -222,12 +315,36 @@ func generateEngineStepFailureFindings(processedRun ProcessedRun) []AuditFinding
 	if len(failures) == 0 {
 		return nil
 	}
-	evals := buildEvalsSummary(processedRun.Run)
+	var invocations map[string]*EvalsSummary
+	for _, failure := range failures {
+		if failure.Kind == string(constants.EvalsJobName) {
+			invocations = buildEvalsInvocationSummaries(processedRun.Run)
+			break
+		}
+	}
 	findings := make([]AuditFinding, 0, len(failures))
 	for _, failure := range failures {
-		findings = append(findings, buildEngineStepFailureFinding(failure, evals))
+		findings = append(findings, buildEngineStepFailureFinding(failure, evalsSummaryForFailure(failure, invocations)))
 	}
 	return findings
+}
+
+// evalsSummaryForFailure returns the evals answers of the failed job's own invocation:
+// the invocation identified by the job's upload prefix, or the only invocation when
+// the prefix is unknown. It returns nil when the invocation cannot be attributed.
+func evalsSummaryForFailure(failure engineStepFailure, invocations map[string]*EvalsSummary) *EvalsSummary {
+	if failure.Kind != string(constants.EvalsJobName) {
+		return nil
+	}
+	if failure.EvalsPrefixKnown {
+		return invocations[failure.EvalsPrefix]
+	}
+	if len(invocations) == 1 {
+		for _, summary := range invocations {
+			return summary
+		}
+	}
+	return nil
 }
 
 func buildEngineStepFailureFinding(failure engineStepFailure, evals *EvalsSummary) AuditFinding {
@@ -278,9 +395,9 @@ func findEngineStepFailures(processedRun ProcessedRun) []engineStepFailure {
 			continue
 		}
 		isEvals := kind == string(constants.EvalsJobName)
-		evalsState := ""
+		evalsState, prefix, prefixKnown := "", "", false
 		if isEvals {
-			prefix, prefixKnown := evalsArtifactPrefixFromLog(readJobLogLines(workflowLogsDir, job.JobInfo))
+			prefix, prefixKnown = evalsArtifactPrefixFromLog(readJobLogLines(workflowLogsDir, job.JobInfo))
 			evalsState = readEvalsExecutionState(run, prefix, prefixKnown)
 		}
 		notStarted := isEvals && evalsState == evalsExecutionStateNotStarted
@@ -296,13 +413,13 @@ func findEngineStepFailures(processedRun ProcessedRun) []engineStepFailure {
 			}
 			failure := engineStepFailure{Job: job.Name, Kind: kind, StepName: step.Name, StepNumber: step.Number, ErrorLine: errorLine}
 			if isEvals {
-				failure.ExecutionState = evalsState
+				failure.ExecutionState, failure.EvalsPrefix, failure.EvalsPrefixKnown = evalsState, prefix, prefixKnown
 			}
 			auditEngineStepsLog.Printf("Engine step failed: job=%s step=%d name=%q", job.Name, step.Number, step.Name)
 			failures = append(failures, failure)
 		}
 		if notStarted && !hasEngineStep {
-			failures = append(failures, engineStepFailure{Job: job.Name, Kind: kind, ExecutionState: evalsState})
+			failures = append(failures, engineStepFailure{Job: job.Name, Kind: kind, ExecutionState: evalsState, EvalsPrefix: prefix, EvalsPrefixKnown: prefixKnown})
 		}
 	}
 	return failures
@@ -341,63 +458,97 @@ func loadCachedJobDetails(logsPath string) []JobInfoWithDuration {
 	return jobs
 }
 
-// jobLogMatcher reports whether a downloaded log file or directory name belongs to job.
-// Names are compared on letters and digits only, so reusable workflow jobs
-// ("<caller> / <job>") match however the "/" was written in the log archive.
-func jobLogMatcher(job JobInfo) func(string) bool {
-	jobKey := jobLogKey(job.Name)
-	jobBaseKey := engineStepJobKind(job.Name)
-	return func(name string) bool {
-		key := jobLogKey(name)
-		return key == jobKey || key == jobBaseKey
-	}
+// jobLogFileReplacer maps a job name to the name GitHub gives its logs in the
+// downloaded log archive, where "/" (as in reusable workflow jobs "<caller> / <job>")
+// and other characters invalid in file names are written as "_".
+var jobLogFileReplacer = strings.NewReplacer("/", "_", "\\", "_", ":", "_", "*", "_", "?", "_", `"`, "_", "<", "_", ">", "_", "|", "_")
+
+func jobLogFileName(name string) string {
+	return strings.TrimSpace(jobLogFileReplacer.Replace(name))
 }
 
-func jobLogKey(name string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			return unicode.ToLower(r)
+// jobLogLocation holds the downloaded logs of one job: the nested per-step log
+// directory and the flat per-job log file. Each is empty when absent or ambiguous.
+type jobLogLocation struct {
+	dir  string
+	file string
+}
+
+// locateJobLogs finds a job's logs in workflowLogsDir. Log names must match the full
+// job name exactly. Only when no log matches it does a reusable workflow job
+// ("<caller> / <job>") fall back to logs named after its final segment, and only when
+// exactly one such log exists; ambiguous logs are not attributed to the job.
+func locateJobLogs(workflowLogsDir string, job JobInfo) jobLogLocation {
+	if workflowLogsDir == "" {
+		return jobLogLocation{}
+	}
+	entries, err := os.ReadDir(workflowLogsDir)
+	if err != nil {
+		return jobLogLocation{}
+	}
+	qualified := jobLogFileName(job.Name)
+	base := ""
+	if idx := strings.LastIndex(job.Name, " / "); idx >= 0 {
+		base = jobLogFileName(job.Name[idx+len(" / "):])
+	}
+	var exactDirs, exactFiles, baseDirs, baseFiles []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() {
+			num, jobName := parseStepFilename(name)
+			if num <= 0 || !strings.HasSuffix(name, ".txt") {
+				continue
+			}
+			name = jobName
 		}
-		return -1
-	}, name)
+		path := filepath.Join(workflowLogsDir, entry.Name())
+		switch {
+		case name == qualified && entry.IsDir():
+			exactDirs = append(exactDirs, path)
+		case name == qualified:
+			exactFiles = append(exactFiles, path)
+		case base != "" && name == base && entry.IsDir():
+			baseDirs = append(baseDirs, path)
+		case base != "" && name == base:
+			baseFiles = append(baseFiles, path)
+		}
+	}
+	dirs, files := exactDirs, exactFiles
+	if len(dirs) == 0 && len(files) == 0 {
+		dirs, files = baseDirs, baseFiles
+	}
+	location := jobLogLocation{}
+	if len(dirs) == 1 {
+		location.dir = dirs[0]
+	}
+	if len(files) == 1 {
+		location.file = files[0]
+	}
+	if len(dirs) > 1 || len(files) > 1 {
+		auditEngineStepsLog.Printf("Job logs for %q are ambiguous: %d directories, %d files", job.Name, len(dirs), len(files))
+	}
+	return location
 }
 
 // readJobLogLines returns every log line of a job: the concatenated nested per-step
 // log files when present, otherwise the flat per-job log.
 func readJobLogLines(workflowLogsDir string, job JobInfo) []string {
-	if workflowLogsDir == "" {
-		return nil
-	}
-	entries, err := os.ReadDir(workflowLogsDir)
-	if err != nil {
-		return nil
-	}
-	matchesJob := jobLogMatcher(job)
-	for _, entry := range entries {
-		if !entry.IsDir() || !matchesJob(entry.Name()) {
-			continue
-		}
-		stepFiles, err := os.ReadDir(filepath.Join(workflowLogsDir, entry.Name()))
-		if err != nil {
-			continue
-		}
-		var lines []string
-		for _, stepFile := range stepFiles {
-			if !stepFile.IsDir() && strings.HasSuffix(stepFile.Name(), ".txt") {
-				lines = append(lines, readLogLines(filepath.Join(workflowLogsDir, entry.Name(), stepFile.Name()))...)
+	location := locateJobLogs(workflowLogsDir, job)
+	if location.dir != "" {
+		if stepFiles, err := os.ReadDir(location.dir); err == nil {
+			var lines []string
+			for _, stepFile := range stepFiles {
+				if !stepFile.IsDir() && strings.HasSuffix(stepFile.Name(), ".txt") {
+					lines = append(lines, readLogLines(filepath.Join(location.dir, stepFile.Name()))...)
+				}
+			}
+			if len(lines) > 0 {
+				return lines
 			}
 		}
-		if len(lines) > 0 {
-			return lines
-		}
 	}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
-			continue
-		}
-		if num, name := parseStepFilename(entry.Name()); num > 0 && matchesJob(name) {
-			return readLogLines(filepath.Join(workflowLogsDir, entry.Name()))
-		}
+	if location.file != "" {
+		return readLogLines(location.file)
 	}
 	return nil
 }
@@ -406,45 +557,23 @@ func readJobLogLines(workflowLogsDir string, job JobInfo) []string {
 // files are read whole; flat per-job logs are limited to the step's
 // started_at..completed_at window from the jobs API.
 func readEngineStepLogLines(workflowLogsDir string, job JobInfo, step JobStep) []string {
-	if workflowLogsDir == "" {
-		return nil
-	}
-	entries, err := os.ReadDir(workflowLogsDir)
-	if err != nil {
-		return nil
-	}
-	matchesJob := jobLogMatcher(job)
-	for _, entry := range entries {
-		if !entry.IsDir() || !matchesJob(entry.Name()) {
-			continue
-		}
-		stepFiles, err := os.ReadDir(filepath.Join(workflowLogsDir, entry.Name()))
-		if err != nil {
-			continue
-		}
-		for _, stepFile := range stepFiles {
-			if stepFile.IsDir() || !strings.HasSuffix(stepFile.Name(), ".txt") {
-				continue
-			}
-			if num, _ := parseStepFilename(stepFile.Name()); num == step.Number && num > 0 {
-				return readLogLines(filepath.Join(workflowLogsDir, entry.Name(), stepFile.Name()))
+	location := locateJobLogs(workflowLogsDir, job)
+	if location.dir != "" {
+		if stepFiles, err := os.ReadDir(location.dir); err == nil {
+			for _, stepFile := range stepFiles {
+				if stepFile.IsDir() || !strings.HasSuffix(stepFile.Name(), ".txt") {
+					continue
+				}
+				if num, _ := parseStepFilename(stepFile.Name()); num == step.Number && num > 0 {
+					return readLogLines(filepath.Join(location.dir, stepFile.Name()))
+				}
 			}
 		}
 	}
-	if step.StartedAt.IsZero() || step.CompletedAt.IsZero() {
+	if location.file == "" || step.StartedAt.IsZero() || step.CompletedAt.IsZero() {
 		return nil
 	}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
-			continue
-		}
-		num, name := parseStepFilename(entry.Name())
-		if num <= 0 || !matchesJob(name) {
-			continue
-		}
-		return filterLogLinesByWindow(readLogLines(filepath.Join(workflowLogsDir, entry.Name())), job.Steps, step)
-	}
-	return nil
+	return filterLogLinesByWindow(readLogLines(location.file), job.Steps, step)
 }
 
 func readLogLines(path string) []string {
