@@ -59,10 +59,11 @@ Inventory: [Model availability](#model-availability).
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
-| `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
+| `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy. | Fix access/config; budget/policy denial doesn't warrant rotation. |
+| `ERR_TOKEN_BROKER_AUTHENTICATION` | Broker/OIDC. | Fix auth; no legacy fallback. |
+| `mcp_policy_error` | Blocked MCP server/policy. | Use approved policy correction; no bypass. |
 | `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't establish availability. |
-| `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone doesn't prove model removal. |
+| `http_400_response_error` | Provider diagnostic/endpoint. | Fix unsupported request; 400 alone doesn't prove model removal. |
 | `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch` | Selection vs harness model/API/metadata. | Align selection/API; never invent evidence. |
 | `unsupported_effort` | Effort vs engine/model support. | Use supported effort/mapping; no silent discard. |
 | `missing_model_pricing_error`, `unknown_model_ai_credits` | Proxy pricing table and `missing_model_pricing_model_name`. | Correct supported pricing/version/config; never disable credit accounting. |
