@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 test("explains the security boundaries in an ordered flow", async ({ page }) => {
   const section = page.locator("main #security-model");
   await expect(section.getByRole("heading", { level: 3 })).toHaveText(["Trigger", "Agent", "Safe outputs"]);
-  await expect(section.locator(".graph")).toContainText(["Issues", "Pull requests", "Pushes", "Actions"]);
+  await expect(section.locator(".graph-node")).toHaveText(["Issues", "Pull requests", "Pushes", "Actions"]);
   const jira = section.getByRole("link", { name: /Jira/ });
   await expect(jira).toBeVisible();
   await expect(jira).toContainText("Via authenticated repository dispatch");
@@ -21,15 +21,19 @@ test("explains the security boundaries in an ordered flow", async ({ page }) => 
     await expect(section.getByRole("img", { name, exact: true })).toBeVisible();
   }
   await expect(section).toContainText("0 secrets");
-  await expect(section).toContainText("Credentials stay outside the agent");
-  await expect(section).toContainText("Buffered as artifacts, not applied here");
-  await expect(section).toContainText("Separate job. Scoped write permissions.");
+  await expect(section).toContainText("Read-only GitHub tools");
+  await expect(section).toContainText("Allowlisted network");
+  await expect(section).toContainText("Writes staged as artifacts");
+  await expect(section).toContainText("Separate job with scoped permissions");
+  await expect(section.locator(".description, .boundary")).toHaveCount(0);
+  await expect(section.locator(".agent small")).toHaveCount(0);
+  await expect(section.locator(".output-path small")).toHaveCount(1);
   await expect(section.getByRole("link", { name: /MicroVM/ })).toContainText("optional / preview");
   await expect(section.getByRole("link", { name: /Self-hosted/ })).toBeVisible();
   await expect(section.getByRole("link", { name: /Agent firewall/ })).toBeVisible();
   await expect(section.getByRole("link", { name: "OIDC credential providers supported", exact: true })).toHaveAttribute("href", "/gh-aw/reference/auth/");
   const checks = section.locator(".output-path");
-  await expect(checks).toContainText(/Sanitization.*Threat detection.*Writes applied/s);
+  await expect(checks).toContainText(/Sanitization.*Threat detection.*Declared writes applied/s);
 });
 
 test("fits mobile and desktop in both themes without horizontal overflow", async ({ page }) => {

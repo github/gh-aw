@@ -20,7 +20,6 @@ const engines = [
     <ol class="flow">
       <li class="phase trigger">
         <div class="phase-heading"><span class="step">01</span><h3>Trigger</h3></div>
-        <p class="description">Start from the GitHub graph.</p>
         <div class="graph" aria-hidden="true">
           <span class="graph-node"><Octicon name="issue-opened" size={16} />Issues</span>
           <span class="graph-node"><Octicon name="git-pull-request" size={16} />Pull requests</span>
@@ -33,14 +32,13 @@ const engines = [
           <span><strong>Jira</strong><small>Via authenticated repository dispatch</small></span>
           <Octicon name="arrow-right" size={16} />
         </a>
-        <p class="detail">Repository events, schedules, manual runs and external dispatches activate your workflow.</p>
+        <p class="detail">Also runs on schedules and manual dispatch.</p>
       </li>
       <li class="phase agent">
         <div class="phase-heading"><span class="step">02</span><h3>Agent</h3></div>
-        <p class="description">Read-only access. Room to reason.</p>
         <a class="gate input-gate" href={`${base}/reference/integrity/`}>
           <Octicon name="filter" size={16} />
-          <span><strong>Integrity filtered Inputs</strong><small>GitHub content checked before reasoning</small></span>
+          <strong>Integrity filtered Inputs</strong>
           <Octicon name="arrow-down" size={16} />
         </a>
         <div class="sandbox">
@@ -54,32 +52,28 @@ const engines = [
             ))}
           </div>
           <div class="agent-core"><strong>0 secrets</strong></div>
-          <p>Credentials stay outside the agent.</p>
           <div class="agent-rules"><span>Read-only GitHub tools</span><span>Allowlisted network</span></div>
         </div>
         <div class="staged">
           <Octicon name="stack" size={20} />
-          <span><strong>All GitHub writes are proposed</strong><small>Buffered as artifacts, not applied here</small></span>
+          <strong>Writes staged as artifacts</strong>
         </div>
-        <p class="detail boundary"><Octicon name="lock" size={14} />No direct repository writes</p>
       </li>
       <li class="phase outputs">
         <div class="phase-heading"><span class="step">03</span><h3>Safe outputs</h3></div>
-        <p class="description">Check proposals. Apply scoped writes.</p>
         <div class="output-path">
           <a class="gate" href={`${base}/reference/safe-outputs/`}>
             <Octicon name="filter" size={20} />
-            <span><strong>Sanitization</strong><small>Validate structure, content and limits</small></span>
+            <strong>Sanitization</strong>
           </a>
           <span class="path-arrow" aria-hidden="true"><Octicon name="arrow-down" size={18} /></span>
           <a class="gate" href={`${base}/reference/threat-detection/`}>
             <Octicon name="shield" size={20} />
-            <span><strong>Threat detection</strong><small>Analyze proposed text and code changes</small></span>
+            <strong>Threat detection</strong>
           </a>
           <span class="path-arrow" aria-hidden="true"><Octicon name="arrow-down" size={18} /></span>
-          <div class="applied"><Octicon name="check-circle" size={22} /><span><strong>Writes applied</strong><small>Only declared operations, under policy</small></span></div>
+          <div class="applied"><Octicon name="check-circle" size={22} /><span><strong>Declared writes applied</strong><small>Separate job with scoped permissions</small></span></div>
         </div>
-        <p class="detail boundary"><Octicon name="key" size={14} />Separate job. Scoped write permissions.</p>
       </li>
     </ol>
     <figcaption>
@@ -89,7 +83,7 @@ const engines = [
         <a href={`${base}/introduction/architecture/#agent-workflow-firewall-awf`}><Octicon name="shield" size={14} />Agent firewall</a>
         <a href={`${base}/reference/auth/`}><Octicon name="key" size={14} />OIDC credential providers supported</a>
       </div>
-      <p>Default security model shown. Runtime credentials are proxied outside the sandbox; trusted custom steps and integrations need their own review. Threat findings follow configured block or review policy.</p>
+      <p>Default security model shown. Custom steps and integrations need separate review. Threat findings follow configured block or review policy.</p>
       <a class="architecture-link" href={`${base}/introduction/architecture/`}>Explore the security architecture <Octicon name="arrow-right" size={14} /></a>
     </figcaption>
   </figure>
@@ -99,10 +93,9 @@ const engines = [
   .security-flow { margin: 2.5rem 0 0; }
   .flow { display: grid; grid-template-columns: 1fr; gap: 1.5rem; list-style: none; padding: 0; margin: 0; }
   .phase { position: relative; min-width: 0; margin: 0; padding: 1.5rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-lg); background: var(--aw-color-surface); }
-  .phase-heading { display: flex; align-items: center; gap: 0.75rem; }
+  .phase-heading { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
   .step { font-family: var(--aw-font-mono); font-size: var(--aw-step--1); color: var(--aw-color-text-muted); }
   h3 { margin: 0; font-size: var(--aw-step-2); font-weight: 550; letter-spacing: -0.025em; }
-  .description { margin: 0.5rem 0 1.5rem; font-size: var(--aw-step-0); color: var(--aw-color-text-secondary); }
   .detail { font-size: var(--aw-step--1); line-height: 1.6; color: var(--aw-color-text-secondary); }
   .graph { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4rem 1rem; padding-block: 0.5rem; }
   .graph::before, .graph::after { content: ''; position: absolute; inset: 50% 15%; height: 1px; background: var(--aw-color-border-strong); transform: rotate(32deg); }
@@ -122,11 +115,9 @@ const engines = [
   .agent-engines { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; }
   .agent-core { display: flex; justify-content: center; align-items: center; margin-top: 0.75rem; }
   .agent-core strong { font-size: var(--aw-step-3); font-weight: 550; letter-spacing: -0.035em; }
-  .sandbox p { margin: 0.5rem 0 1.25rem; font-size: var(--aw-step--1); color: var(--aw-color-text-secondary); }
-  .agent-rules { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem; }
+  .agent-rules { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.25rem; }
   .agent-rules span { padding: 0.3rem 0.6rem; border-radius: var(--aw-radius-pill); background: var(--aw-color-bg); font-size: var(--aw-step--1); }
   .staged { display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--aw-color-border); border-radius: var(--aw-radius-md); font-size: var(--aw-step--1); }
-  .boundary { display: flex; align-items: center; justify-content: center; gap: 0.4rem; margin: 1rem 0 0; }
   .output-path { display: flex; flex-direction: column; }
   .path-arrow { display: flex; justify-content: center; padding-block: 0.35rem; color: var(--aw-color-text-muted); }
   .applied { display: flex; align-items: center; gap: 0.75rem; padding: 1rem; border: 1px solid var(--aw-color-border-strong); border-radius: var(--aw-radius-md); font-size: var(--aw-step--1); }
