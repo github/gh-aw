@@ -13,7 +13,7 @@
     "@vitest/ui": "^5.0.5",
     "ajv": "^8.17.1",
     "commonmark": "0.31.2",
-    "minimatch": ">=10.2.6",
+    "minimatch": ">=11.0.1",
     "prettier": "3.9.10",
     "smol-toml": "1.9.1",
     "ts-json-schema-generator": "2.9.0",
