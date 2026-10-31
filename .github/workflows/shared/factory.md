@@ -177,7 +177,7 @@ Import this definition and select an exact provider/model ID:
 ```yaml
 engine:
   id: factory
-model: copilot/gpt-5.6-luna
+model: copilot/gpt-5.2
 imports:
   - shared/factory.md
 ```
