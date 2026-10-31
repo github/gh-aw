@@ -254,6 +254,82 @@ engine:
 	}
 }
 
+func TestCompileDependabotEngineVersionIntegration(t *testing.T) {
+	binDir := testutil.TempDir(t, "npm-bin-*")
+	if err := os.WriteFile(filepath.Join(binDir, "npm"), []byte("#!/bin/sh\nprintf '{\"lockfileVersion\":3}\\n' > package-lock.json\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	tempDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatal(err)
+	}
+	initGitRepo(t, tempDir)
+
+	workflows := map[string]string{
+		"pinned.md": `---
+on: push
+engine:
+  id: codex
+  version: "1.2.3"
+---
+# Pinned engine
+`,
+		"expression.md": `---
+on: push
+engine:
+  id: copilot
+  version: "${{ vars.copilot_version }}"
+---
+# Dynamic engine version
+`,
+	}
+	for name, content := range workflows {
+		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err = CompileWorkflows(context.Background(), CompileConfig{
+		WorkflowDir:    ".github/workflows",
+		Dependabot:     true,
+		ForceOverwrite: false,
+		Strict:         false,
+	})
+	if err != nil {
+		t.Fatalf("compilation failed: %v", err)
+	}
+
+	packageData, err := os.ReadFile(filepath.Join(workflowsDir, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pkgJSON workflow.PackageJSON
+	if err := json.Unmarshal(packageData, &pkgJSON); err != nil {
+		t.Fatal(err)
+	}
+	if got := pkgJSON.Dependencies["@openai/codex"]; got != "1.2.3" {
+		t.Errorf("expected Codex version %q, got %q", "1.2.3", got)
+	}
+	if _, ok := pkgJSON.Dependencies["@github/copilot"]; ok {
+		t.Error("GitHub Actions expression was included as a Copilot dependency version")
+	}
+	if _, err := os.Stat(filepath.Join(workflowsDir, "package-lock.json")); err != nil {
+		t.Errorf("package-lock.json was not created: %v", err)
+	}
+}
+
 func TestCompileDependabotPreserveExisting(t *testing.T) {
 	// Create temp directory for test
 	tempDir := testutil.TempDir(t, "test-*")
