@@ -52,7 +52,7 @@ func (c *Compiler) buildDecisionJob(data *WorkflowData, activation *Job) (*Job, 
 
 func (c *Compiler) connectActivationDecision(activation *Job) {
 	activation.Needs = append(activation.Needs, "decision")
-	condition := "needs.decision.result == 'success' && needs.decision.outputs.decision_result != 'skip' && needs.decision.outputs.remaining-ai-credits != '' && needs.decision.outputs.remaining-ai-credits != '0'"
+	condition := "needs.pre_activation.outputs.decision_eligible == 'true' && needs.decision.result == 'success' && needs.decision.outputs.decision_result != 'skip' && needs.decision.outputs.remaining-ai-credits != '' && needs.decision.outputs.remaining-ai-credits != '0'"
 	activation.If = c.combineJobIfConditions(condition, activation.If)
 	activation.Outputs["decision-remaining-ai-credits"] = "${{ needs.decision.outputs.remaining-ai-credits }}"
 }

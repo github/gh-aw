@@ -260,7 +260,7 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 				Servers: []MCPServerStats{
 					{
 						MCPServerStatsBase: MCPServerStatsBase{ServerName: "github", ToolCallCount: 3, ErrorCount: 0},
-						RequestCount:       3,
+						RequestCount:       4,
 						TotalInputSize:     3000,
 						TotalOutputSize:    15000,
 						AvgDuration:        "100ms",
@@ -293,7 +293,7 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 				Servers: []MCPServerStats{
 					{
 						MCPServerStatsBase: MCPServerStatsBase{ServerName: "github", ToolCallCount: 2, ErrorCount: 1},
-						RequestCount:       2,
+						RequestCount:       1,
 						TotalInputSize:     2000,
 						TotalOutputSize:    10000,
 						AvgDuration:        "150ms",
@@ -325,6 +325,7 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 	assert.Equal(t, 1500, server.MaxInputSize, "Should derive the server maximum from its tools")
 	assert.Equal(t, 8000, server.MaxOutputSize, "Should derive the server maximum from its tools")
 	assert.Equal(t, 1, server.ErrorCount, "Should sum error counts: 0+1=1")
+	assert.Equal(t, "110ms", server.AvgDuration, "Should weight average duration by request count")
 
 	// Check tool summary aggregation
 	tool := summary.Summary[0]
@@ -339,6 +340,7 @@ func TestBuildMCPToolUsageSummaryAggregation(t *testing.T) {
 	assert.Equal(t, 8000, tool.MaxOutputSize, "Should use max of max outputs: max(6000, 8000)=8000")
 	assert.Equal(t, "200ms", tool.MaxDuration, "Should use max of max durations: max(150ms, 200ms)=200ms")
 	assert.Equal(t, 1, tool.ErrorCount, "Should sum error counts: 0+1=1")
+	assert.Equal(t, "120ms", tool.AvgDuration, "Should weight average duration by call count")
 
 	// Check that tool calls are all present
 	assert.Len(t, summary.ToolCalls, 2, "Should have all tool calls from both runs")

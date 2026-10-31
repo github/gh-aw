@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildSafeOutputInputsConfigIncludesMaxLength(t *testing.T) {
+	maxLength := 40000
+	result := buildSafeOutputInputsConfig(map[string]*InputDefinition{
+		"payload": {
+			Type:      "string",
+			MaxLength: &maxLength,
+		},
+		"legacy": {
+			Type: "string",
+		},
+	})
+
+	require.Equal(t, maxLength, result["payload"].(map[string]any)["maxLength"])
+	assert.NotContains(t, result["legacy"].(map[string]any), "maxLength")
+}
+
 // TestGenerateSafeOutputsConfigDispatchWorkflow tests that generateSafeOutputsConfig correctly
 // includes dispatch_workflow configuration with workflow_files mapping.
 func TestGenerateSafeOutputsConfigDispatchWorkflow(t *testing.T) {
@@ -523,6 +539,7 @@ func TestPopulateDispatchWorkflowFilesFindsLockFile(t *testing.T) {
 // TestGenerateCustomJobToolDefinition tests that generateCustomJobToolDefinition produces
 // valid MCP tool definitions from SafeJobConfig input definitions.
 func TestGenerateCustomJobToolDefinition(t *testing.T) {
+	maxLength := 40000
 	tests := []struct {
 		name      string
 		jobName   string
@@ -561,13 +578,49 @@ func TestGenerateCustomJobToolDefinition(t *testing.T) {
 			},
 		},
 		{
+			name:    "string input with explicit max length",
+			jobName: "large_payload_job",
+			jobConfig: &SafeJobConfig{
+				Inputs: map[string]*InputDefinition{
+					"payload": {
+						Type:      "string",
+						MaxLength: &maxLength,
+					},
+				},
+			},
+			check: func(t *testing.T, result map[string]any) {
+				schema := result["inputSchema"].(map[string]any)
+				props := schema["properties"].(map[string]any)
+				payloadProp := props["payload"].(map[string]any)
+				assert.Equal(t, 40000, payloadProp["maxLength"])
+			},
+		},
+		{
+			name:    "unset type with explicit max length",
+			jobName: "default_string_job",
+			jobConfig: &SafeJobConfig{
+				Inputs: map[string]*InputDefinition{
+					"payload": {
+						MaxLength: &maxLength,
+					},
+				},
+			},
+			check: func(t *testing.T, result map[string]any) {
+				schema := result["inputSchema"].(map[string]any)
+				props := schema["properties"].(map[string]any)
+				payloadProp := props["payload"].(map[string]any)
+				assert.Equal(t, 40000, payloadProp["maxLength"])
+			},
+		},
+		{
 			name:    "boolean input",
 			jobName: "bool_job",
 			jobConfig: &SafeJobConfig{
 				Inputs: map[string]*InputDefinition{
 					"flag": {
-						Type:     "boolean",
-						Required: false,
+						Type:      "boolean",
+						Required:  false,
+						MaxLength: &maxLength,
 					},
 				},
 			},
@@ -576,6 +629,7 @@ func TestGenerateCustomJobToolDefinition(t *testing.T) {
 				props := schema["properties"].(map[string]any)
 				flagProp := props["flag"].(map[string]any)
 				assert.Equal(t, "boolean", flagProp["type"], "flag type should be boolean")
+				assert.NotContains(t, flagProp, "maxLength")
 				assert.Nil(t, schema["required"], "required should be absent when no required fields")
 			},
 		},

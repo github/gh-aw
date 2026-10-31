@@ -44,6 +44,24 @@ imports:
       expires: 2d
 features:
   gh-aw-detection: true
+experiments:
+  deterministic_precondition_v1:
+    variants: [control, candidate]
+    description: "Gate the optional redundant 24h-logs re-fetch behind a deterministic summary.json continuation/stale_warning check instead of the agent's own 'coverage incomplete' judgment."
+    hypothesis: "H0: no meaningful difference between control and candidate in average execution-step-count. H1: candidate reduces average execution-step-count by >=0.5 steps relative to control, without reducing eval:episodes_analyzed or eval:feedback_loops_documented pass rate below 0.9."
+    metric: "grader:execution-step-count"
+    guardrail_metrics:
+      - name: "eval:episodes_analyzed"
+        threshold: ">=0.9"
+      - name: "eval:feedback_loops_documented"
+        threshold: ">=0.9"
+    min_samples: 20
+    analysis_type: mann_whitney
+    decision:
+      minimum_effect: 0.5
+      regression_tolerance: 0.5
+      confidence: 0.95
+    tags: ["harness_dimension:tool interaction", "harness_subtype:deterministic_precondition"]
 evals:
   - id: episodes_analyzed
     question: Did the workflow identify and analyze episode-level activity from the last 24 hours?
@@ -90,7 +108,13 @@ Never store secrets or credentials.
 
 ### 1) Build the episode candidate set
 
-Use the pre-downloaded 24h logs first. If coverage is incomplete, run one additional `agentic-workflows logs` call with:
+Use the pre-downloaded 24h logs first.
+
+{{#if experiments.deterministic_precondition_v1 == 'candidate' }}
+Check `/tmp/gh-aw/aw-mcp/logs/summary.json` for a non-null `continuation` field or a `stale_warning` flag — these indicate truncated coverage. Only when one of those fields signals truncation, run one additional `agentic-workflows logs` call with:
+{{#else}}
+If coverage is incomplete, run one additional `agentic-workflows logs` call with:
+{{#endif}}
 
 ```json
 {
