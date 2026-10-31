@@ -9,9 +9,9 @@ For `safeoutputs`, every successful call is a real write-intent declaration - do
 
 Check `command -v safeoutputs` in the agent's shell when permitted; runner setup logs do not establish sandbox availability. If the CLI is missing, use a configured native safe-output function only if it is explicitly exposed in your tool inventory. Report unavailable functionality with `report_missing_tool` when configured and reachable; reserve `report_incomplete` for failed write attempts. If no supported transport is available, stop and report the missing command in the final response; do not claim the action was emitted or use authenticated GitHub commands as a substitute.
 
-Pass the complete JSON object inline as one single-quoted shell argument. Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes as `\\`, and apostrophes as `\u0027` so they do not end the shell quote. Unicode can remain literal. The binary comes first, so a malformed payload still runs the CLI and reports an error:
+Pass the complete JSON object inline as one single-quoted shell argument. Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes as `\\`, and apostrophes as `\u0027` (exactly that 4-digit code — no other `\u00XX` value is an apostrophe) so they do not end the shell quote. This applies to **every** apostrophe in the payload, not just one: ordinary contractions and possessives (`it's`, `doesn't`, `org's`) all need `\u0027` wherever they occur, since a single unescaped apostrophe anywhere in a long body still ends the shell quote early and leaves the rest parsed as literal bash, producing a `syntax error near unexpected token` failure. Unicode can remain literal. The binary comes first, so a malformed payload still runs the CLI and reports an error:
 ```bash
-safeoutputs add_comment '{"item_number":42,"body":"### Result\n\nIt\u0027s ready.\nQuoted text: \"hello\".\nLiteral path: C:\\temp\\file.txt"}'
+safeoutputs add_comment '{"item_number":42,"body":"### Result\n\nIt\u0027s ready, and the org\u0027s review passed.\nQuoted text: \"hello\".\nLiteral path: C:\\temp\\file.txt"}'
 ```
 This preserves multiline content without auxiliary tools, pipelines, temporary files, or shell expansion. Adapt fields to the enabled tool's schema. Raw Markdown and `@filename` references are not JSON payloads.
 
