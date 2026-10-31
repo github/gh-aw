@@ -50,38 +50,44 @@ type SetupRepositoryCheckOptions struct {
 }
 
 type SetupAuthResult struct {
-	Authenticated    bool                         `json:"authenticated"`
-	AgentAssignments []DoctorAgentAssignmentCheck `json:"agent_assignments,omitempty"`
-	TokenValidations []DoctorTokenValidation      `json:"token_validations,omitempty"`
+	Authenticated     bool                          `json:"authenticated"`
+	AgentAssignments  []DoctorAgentAssignmentCheck  `json:"agent_assignments,omitempty"`
+	TokenValidations  []DoctorTokenValidation       `json:"token_validations,omitempty"`
+	Release           *DoctorReleaseCheck           `json:"release,omitempty"`
+	CompiledWorkflows []DoctorCompiledWorkflowCheck `json:"compiled_workflows,omitempty"`
 }
 
 type SetupRepositoryCheckResult struct {
-	Repository        string                       `json:"repository"`
-	Directory         string                       `json:"directory"`
-	Authenticated     bool                         `json:"authenticated"`
-	RepositoryExists  bool                         `json:"repository_exists"`
-	OwnerType         string                       `json:"owner_type"`
-	RequiredOwnerType string                       `json:"required_owner_type"`
-	CheckoutAttached  bool                         `json:"checkout_attached"`
-	CloneNeeded       bool                         `json:"clone_needed"`
-	CleanWorktree     *bool                        `json:"clean_worktree,omitempty"`
-	AgentAssignments  []DoctorAgentAssignmentCheck `json:"agent_assignments,omitempty"`
-	TokenValidations  []DoctorTokenValidation      `json:"token_validations,omitempty"`
+	Repository        string                        `json:"repository"`
+	Directory         string                        `json:"directory"`
+	Authenticated     bool                          `json:"authenticated"`
+	RepositoryExists  bool                          `json:"repository_exists"`
+	OwnerType         string                        `json:"owner_type"`
+	RequiredOwnerType string                        `json:"required_owner_type"`
+	CheckoutAttached  bool                          `json:"checkout_attached"`
+	CloneNeeded       bool                          `json:"clone_needed"`
+	CleanWorktree     *bool                         `json:"clean_worktree,omitempty"`
+	AgentAssignments  []DoctorAgentAssignmentCheck  `json:"agent_assignments,omitempty"`
+	TokenValidations  []DoctorTokenValidation       `json:"token_validations,omitempty"`
+	Release           *DoctorReleaseCheck           `json:"release,omitempty"`
+	CompiledWorkflows []DoctorCompiledWorkflowCheck `json:"compiled_workflows,omitempty"`
 }
 
 // setupRepositoryRuntime holds the reusable repository/auth setup primitives that
 // higher-level setup flows can compose. The helpers are intentionally generic so
 // future auth/setup commands can reuse them.
 type setupRepositoryRuntime struct {
-	checkAuth             func(context.Context) error
-	repoExists            func(context.Context, string) (bool, error)
-	ownerType             func(context.Context, string) (string, error)
-	createRepo            func(context.Context, string, string) error
-	cloneRepo             func(context.Context, string, string) error
-	dirOriginRepo         func(string) (string, error)
-	checkCleanWorktree    func(bool) error
-	checkAgentAssignments func(context.Context, string, string) ([]DoctorAgentAssignmentCheck, error)
-	checkTokens           func(context.Context, string, string) ([]DoctorTokenValidation, error)
+	checkAuth              func(context.Context) error
+	repoExists             func(context.Context, string) (bool, error)
+	ownerType              func(context.Context, string) (string, error)
+	createRepo             func(context.Context, string, string) error
+	cloneRepo              func(context.Context, string, string) error
+	dirOriginRepo          func(string) (string, error)
+	checkCleanWorktree     func(bool) error
+	checkAgentAssignments  func(context.Context, string, string) ([]DoctorAgentAssignmentCheck, error)
+	checkTokens            func(context.Context, string, string) ([]DoctorTokenValidation, error)
+	checkRelease           func(context.Context) *DoctorReleaseCheck
+	checkCompiledWorkflows func(context.Context, string, string) ([]DoctorCompiledWorkflowCheck, error)
 }
 
 func defaultSetupRepositoryRuntime() setupRepositoryRuntime {
@@ -104,9 +110,11 @@ func defaultSetupRepositoryRuntime() setupRepositoryRuntime {
 			}
 			return repo, nil
 		},
-		checkCleanWorktree:    checkCleanWorkingDirectory,
-		checkAgentAssignments: checkDoctorAgentAssignments,
-		checkTokens:           checkDoctorTokens,
+		checkCleanWorktree:     checkCleanWorkingDirectory,
+		checkAgentAssignments:  checkDoctorAgentAssignments,
+		checkTokens:            checkDoctorTokens,
+		checkRelease:           checkDoctorRelease,
+		checkCompiledWorkflows: checkDoctorCompiledWorkflows,
 	}
 }
 
@@ -341,17 +349,22 @@ func runSetupAuthWithRuntime(opts SetupAuthOptions, runtime setupRepositoryRunti
 			if err != nil {
 				return err
 			}
+			applyDoctorAssignmentTokenEvidence(result.TokenValidations, result.AgentAssignments)
+		}
+		result.Release, result.CompiledWorkflows, err = checkDoctorVersions(ctx, ".", true, runtime)
+		if err != nil {
+			return err
 		}
 	}
 	if opts.JSON {
 		if err := renderSetupJSON(result); err != nil {
 			return err
 		}
-		return errors.Join(doctorAgentAssignmentError(result.AgentAssignments), doctorTokenValidationError(result.TokenValidations))
+		return errors.Join(doctorAgentAssignmentError(result.AgentAssignments), doctorTokenValidationError(result.TokenValidations), doctorVersionCheckError(result.Release, result.CompiledWorkflows))
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub CLI authentication verified"))
-	return errors.Join(printDoctorAgentAssignments(result.AgentAssignments), printDoctorTokenValidations(result.TokenValidations))
+	return errors.Join(printDoctorAgentAssignments(result.AgentAssignments), printDoctorTokenValidations(result.TokenValidations), printDoctorVersionChecks(result.Release, result.CompiledWorkflows))
 }
 
 func RunSetupRepositoryCheck(opts SetupRepositoryCheckOptions) error {
@@ -437,6 +450,12 @@ func runSetupRepositoryCheckWithRuntime(opts SetupRepositoryCheckOptions, runtim
 	if err := checkSetupRepositoryCheckout(ctx, opts, runtime, &result); err != nil {
 		return err
 	}
+	if opts.CheckAgentAssignment {
+		result.Release, result.CompiledWorkflows, err = checkDoctorVersions(ctx, result.Directory, result.CheckoutAttached, runtime)
+		if err != nil {
+			return err
+		}
+	}
 	return renderSetupRepositoryCheckResult(result, opts.JSON)
 }
 
@@ -462,6 +481,7 @@ func checkSetupRepositoryCheckout(ctx context.Context, opts SetupRepositoryCheck
 			if err != nil {
 				return err
 			}
+			applyDoctorAssignmentTokenEvidence(result.TokenValidations, result.AgentAssignments)
 		}
 	}
 	return nil
@@ -472,7 +492,7 @@ func renderSetupRepositoryCheckResult(result SetupRepositoryCheckResult, jsonOut
 		if err := renderSetupJSON(result); err != nil {
 			return err
 		}
-		return errors.Join(doctorAgentAssignmentError(result.AgentAssignments), doctorTokenValidationError(result.TokenValidations))
+		return errors.Join(doctorAgentAssignmentError(result.AgentAssignments), doctorTokenValidationError(result.TokenValidations), doctorVersionCheckError(result.Release, result.CompiledWorkflows))
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Setup repository check for "+result.Repository))
@@ -486,7 +506,7 @@ func renderSetupRepositoryCheckResult(result SetupRepositoryCheckResult, jsonOut
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("- no checkout at %s; directory is ready for clone", result.Directory)))
 	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Setup repository checks passed"))
-	return errors.Join(printDoctorAgentAssignments(result.AgentAssignments), printDoctorTokenValidations(result.TokenValidations))
+	return errors.Join(printDoctorAgentAssignments(result.AgentAssignments), printDoctorTokenValidations(result.TokenValidations), printDoctorVersionChecks(result.Release, result.CompiledWorkflows))
 }
 
 func renderSetupJSON(output any) error {

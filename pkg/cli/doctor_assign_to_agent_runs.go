@@ -55,6 +55,7 @@ type doctorAssignmentRunMiner struct {
 	runGH    func(context.Context, string, ...string) ([]byte, error)
 	classify func(string, DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence
 	allJobs  bool
+	limit    int
 }
 
 type doctorAssignmentRunMetadata struct {
@@ -94,12 +95,16 @@ func (m *doctorAssignmentRunMiner) api(endpoint string, extra ...string) ([]byte
 }
 
 func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmentRunHistory {
+	limit := doctorAssignmentRunLimit
+	if m.limit > 0 && m.limit < limit {
+		limit = m.limit
+	}
 	history := &DoctorAssignmentRunHistory{
 		Since: m.now.Add(-doctorAssignmentRunLookback), Until: m.now,
-		Limit: doctorAssignmentRunLimit, Runs: []DoctorAssignmentRunEvidence{},
+		Limit: limit, Runs: []DoctorAssignmentRunEvidence{},
 	}
 	query := url.Values{
-		"status": {"completed"}, "per_page": {strconv.Itoa(doctorAssignmentRunLimit)},
+		"status": {"completed"}, "per_page": {strconv.Itoa(limit)},
 		"created": {history.Since.Format(time.RFC3339) + ".." + history.Until.Format(time.RFC3339)},
 	}
 	filename := strings.TrimSuffix(path.Base(workflowPath), ".md") + ".lock.yml"
@@ -117,7 +122,7 @@ func (m *doctorAssignmentRunMiner) collect(workflowPath string) *DoctorAssignmen
 		return history
 	}
 	for i, run := range response.Runs {
-		if i >= doctorAssignmentRunLimit {
+		if i >= limit {
 			break
 		}
 		history.Runs = append(history.Runs, m.inspect(run, history.Since))

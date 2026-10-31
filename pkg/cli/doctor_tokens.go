@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -69,16 +71,38 @@ func checkDoctorTokens(ctx context.Context, repo, dir string) ([]DoctorTokenVali
 	defer cancel()
 	miner := doctorAssignmentRunMiner{
 		ctx: ctx, repo: repo, host: host, now: time.Now().UTC(), runGH: workflow.RunGHContext,
-		classify: classifyDoctorTokenLog, allJobs: true,
+		classify: classifyDoctorTokenLog, allJobs: true, limit: 1,
 	}
+	var ordered []*DoctorTokenValidation
 	for i := range checks {
 		check := &checks[i]
 		check.SecretsURL = fmt.Sprintf("%s/%s/settings/secrets/actions", host, repo)
 		available, coverageErr := availableDoctorTokenSecrets(ctx, repo, host, names, check.Environments, environments)
-		check.RecentRuns = miner.collect(check.Workflow)
 		diagnoseDoctorTokenValidation(check, available, errors.Join(lookupErr, coverageErr))
+		ordered = append(ordered, check)
 	}
+	collectDoctorTokenRunEvidence(ordered, &miner)
 	return checks, nil
+}
+
+func prioritizeDoctorTokenChecks(checks []*DoctorTokenValidation) {
+	known := constants.GetAllEngineSecretNames()
+	priority := func(check *DoctorTokenValidation) int {
+		for _, name := range check.Available {
+			if !slices.Contains(known, name) {
+				return 0
+			}
+		}
+		if len(check.Available) > 0 {
+			return 1
+		}
+		return 2
+	}
+	// Inspect custom credentials before optional built-in fallbacks. Sampling
+	// one run per workflow avoids spending the shared budget on the first file.
+	slices.SortStableFunc(checks, func(a, b *DoctorTokenValidation) int {
+		return cmp.Compare(priority(a), priority(b))
+	})
 }
 
 func discoverDoctorTokenValidations(root string) ([]DoctorTokenValidation, error) {
@@ -153,6 +177,11 @@ func diagnoseDoctorTokenValidation(check *DoctorTokenValidation, available map[s
 		check.Status = "unknown"
 		check.Message += " Secret metadata coverage is incomplete: " + coverageErr.Error()
 	}
+	applyDoctorTokenRunEvidence(check)
+	check.Message += " " + doctorTokenReplacementGuidance
+}
+
+func applyDoctorTokenRunEvidence(check *DoctorTokenValidation) {
 	if check.RecentRuns != nil {
 		if check.RecentRuns.Error != "" {
 			check.Status = "unknown"
@@ -167,9 +196,29 @@ func diagnoseDoctorTokenValidation(check *DoctorTokenValidation, available map[s
 		check.Status = "credential_error"
 		check.Message += " Existing runs report credential failures; this is historical workflow evidence, not proof that every listed token is invalid."
 	}
-	check.Message += " " + doctorTokenReplacementGuidance
 }
 
+func applyDoctorAssignmentTokenEvidence(checks []DoctorTokenValidation, assignments []DoctorAgentAssignmentCheck) {
+	for i := range checks {
+		check := &checks[i]
+		for _, assignment := range assignments {
+			if assignment.Workflow != check.Workflow || assignment.RecentRuns == nil || !slices.Contains(check.Secrets, assignment.Secret) {
+				continue
+			}
+			for _, run := range assignment.RecentRuns.Runs {
+				if run.Outcome == "credential_error" {
+					check.Status = "credential_error"
+					check.RecentRuns = assignment.RecentRuns
+					var message strings.Builder
+					message.WriteString(check.Message)
+					message.WriteString(" The assignment handler's existing-run sample reports a credential failure; this sample covers assignment, not every operation in the workflow.")
+					check.Message = message.String()
+					break
+				}
+			}
+		}
+	}
+}
 func discoverDoctorTokens(file string, cache *parser.ImportCache) ([]string, []string, error) {
 	content, err := readWorkflowFileContent(file)
 	if err != nil {
@@ -185,7 +234,7 @@ func discoverDoctorTokens(file string, cache *parser.ImportCache) ([]string, []s
 	}
 	names := map[string]struct{}{}
 	environments := map[string]struct{}{}
-	if err := scanDoctorTokenValues(document.Frontmatter, "", names, environments); err != nil {
+	if err := scanDoctorTokenValues(document.Frontmatter, "workflow", names, environments); err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", file, err)
 	}
 	if err := scanDoctorImportedTokens(document, file, cache, names, environments); err != nil {
@@ -221,11 +270,14 @@ func scanDoctorImportedTokens(document *aw.Document, file string, cache *parser.
 		imports.MergedCheckout, imports.MergedServices,
 		imports.MergedObservability, imports.MergedSecretMasking,
 	}, imports.MergedEngines...)
-	sections = append(sections, imports.MergedSafeOutputs...)
-	sections = append(sections, included...)
 	for _, section := range sections {
 		if err := scanDoctorTokenSection(section, names, environments); err != nil {
 			return fmt.Errorf("failed to inspect resolved token configuration in %s: %w", file, err)
+		}
+	}
+	for _, section := range append(imports.MergedSafeOutputs, included...) {
+		if err := scanDoctorTokenSectionWithScope(section, "safe-outputs", names, environments); err != nil {
+			return fmt.Errorf("failed to inspect resolved safe-output token configuration in %s: %w", file, err)
 		}
 	}
 	if imports.MergedActivationGitHubToken != "" {
@@ -237,12 +289,16 @@ func scanDoctorImportedTokens(document *aw.Document, file string, cache *parser.
 }
 
 func scanDoctorTokenSection(section string, names, environments map[string]struct{}) error {
+	return scanDoctorTokenSectionWithScope(section, "", names, environments)
+}
+
+func scanDoctorTokenSectionWithScope(section, scope string, names, environments map[string]struct{}) error {
 	if strings.TrimSpace(section) == "" {
 		return nil
 	}
 	var value any
 	if err := yaml.Unmarshal([]byte(section), &value); err == nil {
-		return scanDoctorTokenValues(value, "", names, environments)
+		return scanDoctorTokenValues(value, scope, names, environments)
 	}
 	// Import processors also return streams of JSON configuration objects.
 	decoder := json.NewDecoder(strings.NewReader(section))
@@ -255,24 +311,13 @@ func scanDoctorTokenSection(section string, names, environments map[string]struc
 		if err != nil {
 			return errors.New("invalid resolved token configuration")
 		}
-		if err := scanDoctorTokenValues(value, "", names, environments); err != nil {
+		if err := scanDoctorTokenValues(value, scope, names, environments); err != nil {
 			return err
 		}
 	}
 }
 
 func scanDoctorTokenValues(value any, field string, names, environments map[string]struct{}) error {
-	if field == "environment" {
-		environment := value
-		if mapping, ok := environment.(map[string]any); ok {
-			environment = mapping["name"]
-		}
-		if name, ok := environment.(string); ok && strings.TrimSpace(name) != "" {
-			environments[name] = struct{}{}
-		} else {
-			return errors.New("token validation environment must have a non-empty name")
-		}
-	}
 	switch node := value.(type) {
 	case map[string]any:
 		if assignment, found := node["assign-to-agent"]; found && assignment != nil && assignment != false {
@@ -283,6 +328,11 @@ func scanDoctorTokenValues(value any, field string, names, environments map[stri
 			}
 		}
 		for key, child := range node {
+			if key == "environment" && (field == "workflow" || field == "safe-outputs" || node["runs-on"] != nil || node["uses"] != nil) {
+				if err := scanDoctorTokenEnvironment(child, environments); err != nil {
+					return err
+				}
+			}
 			if err := scanDoctorTokenValues(child, key, names, environments); err != nil {
 				return err
 			}
@@ -297,6 +347,17 @@ func scanDoctorTokenValues(value any, field string, names, environments map[stri
 		return scanDoctorTokenExpression(node, field, names)
 	}
 	return nil
+}
+
+func scanDoctorTokenEnvironment(value any, environments map[string]struct{}) error {
+	if mapping, ok := value.(map[string]any); ok {
+		value = mapping["name"]
+	}
+	if name, ok := value.(string); ok && strings.TrimSpace(name) != "" {
+		environments[name] = struct{}{}
+		return nil
+	}
+	return errors.New("token validation environment must have a non-empty name")
 }
 
 func scanDoctorTokenExpression(value, field string, names map[string]struct{}) error {

@@ -39,6 +39,8 @@ func TestDoctorTokenASTDiscovery(t *testing.T) {
 		{"explicit assignment", "safe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.ASSIGNMENT }}", []string{"ASSIGNMENT"}, false},
 		{"multiline configuration", "env:\n  GH_TOKEN: >-\n    ${{ secrets.FIRST ||\n        secrets.SECOND }}", []string{"FIRST", "SECOND"}, false},
 		{"JSON stream", "{\"github-token\":\"${{ secrets.FIRST }}\"}\n{\"github-token\":\"${{ secrets.SECOND }}\"}", []string{"FIRST", "SECOND"}, false},
+		{"environment input is not a job environment", "safe-outputs:\n  jobs:\n    custom:\n      runs-on: ubuntu-latest\n      inputs:\n        environment:\n          type: choice\n          options: [staging, production]\n      steps:\n        - env:\n            GH_TOKEN: ${{ secrets.CUSTOM_TOKEN }}", []string{"CUSTOM_TOKEN"}, false},
+		{"imported environment variable is not a job environment", "environment:\n  description: unrelated configuration\n  github-token: ${{ secrets.CUSTOM_TOKEN }}", []string{"CUSTOM_TOKEN"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
