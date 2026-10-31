@@ -9,9 +9,11 @@ require("./shim.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { randomUUID } = require("crypto");
 const { ERR_API, ERR_CONFIG } = require("./error_codes.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
 const { selectBranch } = require("./template_branch.cjs");
+const { applyToNonCodeRegions } = require("./sanitize_content_core.cjs");
 
 // Closing tag: {{#endif}} (primary) or {{/if}} (alternate)
 const BLOCK_CONDITIONAL_REGEX = /(\n?)([ \t]*{{#if\s+([^}]*)}}[ \t]*\n)([\s\S]*?)([ \t]*(?:{{#endif}}|{{\/if}})[ \t]*)(\n?)/;
@@ -27,21 +29,28 @@ const INLINE_BODY_PREVIEW_LENGTH = 40;
  * were on their own lines, the empty lines are cleaned up to avoid
  * leaving excessive blank lines in the output.
  * @param {string} markdown - The markdown content to process
+ * @param {(condition: string) => string} [resolveCondition] - Resolve context values only after directive parsing
  * @returns {string} - The processed markdown content
  */
-function renderMarkdownTemplate(markdown) {
+function renderMarkdownTemplate(markdown, resolveCondition = condition => condition) {
   core.info(`[renderMarkdownTemplate] Starting template rendering`);
   core.info(`[renderMarkdownTemplate] Input length: ${markdown.length} characters`);
 
-  // Preserve fenced code blocks to avoid processing {{#if}} markers inside them
+  // Use the sanitizer's code-region rules so inline and fenced examples stay literal.
   const _codeBlocks = [];
-  const _FENCE_PH = "\x00FENCE\x00";
-  const _stripped = markdown.replace(/`{3,}[^\n]*\n[\s\S]*?\n`{3,}[ \t]*/g, m => {
-    _codeBlocks.push(m);
-    return `${_FENCE_PH}${_codeBlocks.length - 1}${_FENCE_PH}`;
-  });
+  const _FENCE_PH = `\x00CODE_${randomUUID()}\x00`;
+  const codePattern = new RegExp(`${_FENCE_PH}(\\d+)${_FENCE_PH}`, "g");
+  const _stripped = applyToNonCodeRegions(
+    markdown,
+    text => text,
+    code => {
+      const trailingNewline = code.endsWith("\n") ? "\n" : "";
+      _codeBlocks.push(trailingNewline ? code.slice(0, -1) : code);
+      return `${_FENCE_PH}${_codeBlocks.length - 1}${_FENCE_PH}${trailingNewline}`;
+    }
+  );
   if (_codeBlocks.length > 0) {
-    core.info(`[renderMarkdownTemplate] Preserved ${_codeBlocks.length} fenced code block(s) from template processing`);
+    core.info(`[renderMarkdownTemplate] Preserved ${_codeBlocks.length} code region(s) from template processing`);
   }
 
   // Count conditionals before processing
@@ -64,7 +73,7 @@ function renderMarkdownTemplate(markdown) {
     core.info(`[renderMarkdownTemplate] Block ${blockCount}: condition="${condTrimmed}" -> evaluating branches`);
     core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > BLOCK_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
 
-    const selectedContent = selectBranch(cond, body);
+    const selectedContent = selectBranch(cond, body, resolveCondition);
 
     if (selectedContent !== null) {
       keptBlocks++;
@@ -92,7 +101,7 @@ function renderMarkdownTemplate(markdown) {
     inlineCount++;
     const condTrimmed = cond.trim();
     const bodyPreview = body.substring(0, INLINE_BODY_PREVIEW_LENGTH).replace(/\n/g, "\\n");
-    const selectedContent = selectBranch(cond, body);
+    const selectedContent = selectBranch(cond, body, resolveCondition);
 
     core.info(`[renderMarkdownTemplate] Inline ${inlineCount}: condition="${condTrimmed}" -> ${selectedContent !== null ? "KEEP" : "REMOVE"}`);
     core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > INLINE_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
@@ -118,12 +127,12 @@ function renderMarkdownTemplate(markdown) {
   }
 
   // Count which placeholders survived to detect code blocks removed in false conditional branches
-  const _survivedIndices = new Set([...result.matchAll(/\x00FENCE\x00(\d+)\x00FENCE\x00/g)].map(m => +m[1]));
+  const _survivedIndices = new Set([...result.matchAll(codePattern)].map(m => +m[1]));
   const _removedFenceMarkerCount = _codeBlocks.reduce((sum, block, i) => (_survivedIndices.has(i) ? sum : sum + (block.match(/`{3,}/g) || []).length), 0);
 
   // Restore fenced code blocks
   if (_codeBlocks.length > 0) {
-    result = result.replace(/\x00FENCE\x00(\d+)\x00FENCE\x00/g, (_, i) => _codeBlocks[+i]);
+    result = result.replace(codePattern, (_, i) => _codeBlocks[+i]);
   }
 
   // Runtime assertion: number of fence markers must be the same before and after processing,

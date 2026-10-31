@@ -36,6 +36,8 @@ allowed: [github.repository, github.actor, github.workflow, ...]
 
 Include or exclude prompt sections based on boolean expressions using `{{#if ...}} ... {{/if}}` blocks.
 
+Only directives written in workflow templates or imported prompt sources execute. Substituted event content and job outputs remain literal, including template markers inside inline code or fenced code blocks. Template examples written inside code regions are also preserved. Values referenced by author-written conditions still determine which branch is selected.
+
 ### Syntax
 
 ```markdown wrap
@@ -157,8 +159,9 @@ Fetched URLs are cached for 1 hour per workflow run at `/tmp/gh-aw/url-cache/` (
 Runtime imports run before other substitutions:
 
 1. `{{#runtime-import}}` macros for files and URLs
-2. `${GH_AW_EXPR_*}` variable interpolation
-3. `{{#if}}` conditional rendering
+2. Expression and experiment values are replaced with opaque placeholders
+3. Author-written `{{#if}}` conditionals are rendered, resolving placeholder values only when evaluating their conditions
+4. Literal values are restored in the selected content without further template processing
 
 ### Limitations
 

@@ -395,9 +395,10 @@ function getEngineSubAgentTarget(engineId) {
  *   Defaults to `workspaceDir` when omitted (for tests and legacy callers).
  * @param {string} [engineId] - The engine ID (e.g. "claude", "copilot").
  *   Defaults to "copilot" behavior when omitted.
+ * @param {(content: string) => string} [restoreValues] - Restore literal context after extracting author-owned markers
  * @returns {string} Main content with sub-agent sections removed.
  */
-function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId) {
+function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreValues = content => content) {
   const { mainContent, agents } = extractInlineSubAgents(content);
 
   if (agents.length === 0) {
@@ -420,7 +421,7 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId) {
 
   for (const agent of agents) {
     const agentPath = path.join(agentsDir, agent.name + ext);
-    let filteredContent = resolveSubAgentExperimentReferences(agent.name, preserveSubAgentFrontmatter(agent.content));
+    let filteredContent = resolveSubAgentExperimentReferences(agent.name, preserveSubAgentFrontmatter(restoreValues(agent.content)));
     if (normalizedEngineId === "claude") filteredContent = ensureClaudeSubAgentName(agent.name, filteredContent);
     const agentContent = filteredContent.endsWith("\n") ? filteredContent : filteredContent + "\n";
     try {

@@ -40,7 +40,7 @@ function interpolateVariables(content, variables) {
   core.info(`[interpolateVariables] Starting interpolation with ${Object.keys(variables).length} variables`);
   core.info(`[interpolateVariables] Content length: ${content.length} characters`);
 
-  let result = content;
+  const replacements = new Map();
   let totalReplacements = 0;
 
   // Replace each ${VAR_NAME} with its corresponding value
@@ -52,13 +52,16 @@ function interpolateVariables(content, variables) {
     if (matches > 0) {
       core.info(`[interpolateVariables] Replacing ${varName} (${matches} occurrence(s))`);
       core.info(`[interpolateVariables]   Value: ${value.substring(0, 100)}${value.length > 100 ? "..." : ""}`);
-      result = result.replace(pattern, () => value);
+      replacements.set(`\${${varName}}`, value);
       totalReplacements += matches;
     } else {
       core.info(`[interpolateVariables] Variable ${varName} not found in content (unused)`);
     }
   }
 
+  // Replace only author-owned placeholders, never placeholders inside inserted values.
+  const pattern = new RegExp([...replacements.keys()].map(key => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+  const result = replacements.size > 0 ? content.replace(pattern, match => replacements.get(match) ?? match) : content;
   core.info(`[interpolateVariables] Completed: ${totalReplacements} total replacement(s)`);
   core.info(`[interpolateVariables] Result length: ${result.length} characters`);
   return result;
@@ -92,6 +95,22 @@ async function main() {
     core.info(`[main] Reading prompt file...`);
     let content = fs.readFileSync(promptPath, "utf8");
     const originalLength = content.length;
+    // Keep evaluated context opaque until all author-owned directives have run.
+    // The same protection covers values evaluated while expanding runtime imports.
+    const valuePrefix = `\x00VALUE_${randomUUID()}_`;
+    const valuePattern = new RegExp(`${valuePrefix}(\\d+)\x00`, "g");
+    /** @type {string[]} */
+    const literalValues = [];
+    const protectValue = (/** @type {string} */ value) => {
+      literalValues.push(value);
+      return `${valuePrefix}${literalValues.length - 1}\x00`;
+    };
+    const restoreValues = (/** @type {string} */ text) =>
+      text.replace(valuePattern, (_, index) => {
+        const value = literalValues[Number(index)];
+        if (value === undefined) throw new Error(`${ERR_VALIDATION}: Unknown literal prompt value`);
+        return value;
+      });
     core.info(`[main] Original content length: ${originalLength} characters`);
     core.info(`[main] First 200 characters: ${content.substring(0, 200).replace(/\n/g, "\\n")}`);
 
@@ -141,7 +160,7 @@ async function main() {
       });
 
       const beforeImports = content.length;
-      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children);
+      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectValue);
       const afterImports = content.length;
 
       core.info(`Runtime imports processed successfully`);
@@ -154,6 +173,13 @@ async function main() {
     // analyse provenance without re-parsing the rendered prompt.
     const importTreePath = path.join(promptDir, "prompt-import-tree.json");
     core.info(`[main] Writing import tree to: ${importTreePath}`);
+    const restoreImportTree = (/** @type {ImportTreeNode[]} */ nodes) => {
+      for (const node of nodes) {
+        node.rawContent = restoreValues(node.rawContent);
+        restoreImportTree(node.children);
+      }
+    };
+    restoreImportTree(importTree.children);
     fs.writeFileSync(importTreePath, JSON.stringify(importTree, null, 2), "utf8");
 
     // Step 1.5: Extract and write inline sub-agents
@@ -170,7 +196,7 @@ async function main() {
       // activation artifact and available to the downstream agent job.
       const agentsBaseDir = "/tmp/gh-aw";
       const engineId = process.env.GH_AW_ENGINE_ID || "";
-      content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId);
+      content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreValues);
       const afterExtraction = content.length;
       core.info(`Inline sub-agents extracted and written`);
       core.info(`Content length change: ${beforeExtraction} -> ${afterExtraction} (${afterExtraction > beforeExtraction ? "+" : ""}${afterExtraction - beforeExtraction})`);
@@ -189,7 +215,7 @@ async function main() {
       const beforeExtraction = content.length;
       const skillsBaseDir = "/tmp/gh-aw";
       const engineId = process.env.GH_AW_ENGINE_ID || "";
-      content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId);
+      content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId, restoreValues);
       const afterExtraction = content.length;
       core.info(`Inline skills extracted and written`);
       core.info(`Content length change: ${beforeExtraction} -> ${afterExtraction} (${afterExtraction > beforeExtraction ? "+" : ""}${afterExtraction - beforeExtraction})`);
@@ -205,7 +231,7 @@ async function main() {
     const variables = {};
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("GH_AW_EXPR_")) {
-        variables[key] = value || "";
+        variables[key] = protectValue(value || "");
       }
     }
 
@@ -227,38 +253,29 @@ async function main() {
       core.info("No expression variables found, skipping interpolation");
     }
 
-    // Step 2.5: Substitute experiment placeholders BEFORE template rendering.
-    // When the runtime-import step processes {{#if experiments.name}} conditionals,
-    // it converts them to __GH_AW_EXPERIMENTS_NAME__ placeholders. These must be
-    // resolved with the actual variant value before renderMarkdownTemplate() runs,
-    // otherwise the placeholder string is truthy and the block is always kept.
-    // The activation job exposes GH_AW_EXPERIMENTS_* env vars (from the pick-experiment
-    // step output via the step's env: block), so we can substitute them here.
-    // Additionally, {{#if experiments.name == "value"}} conditions use the dot-notation
-    // form directly in the condition expression. We substitute experiments.NAME → actual
-    // value inside {{#if ...}} condition tags so that isTruthy can evaluate the resulting
-    // GitHub Actions script style expression (e.g. concise == "concise").
+    // Step 2.5: Protect experiment values BEFORE template rendering.
+    // Resolve placeholders and dot-notation references to opaque tokens. Actual
+    // values are used only after parsing conditions, or when restoring final content.
     core.info("\n========================================");
     core.info("[main] STEP 2.5: Experiment Placeholder Substitution");
     core.info("========================================");
     let experimentSubCount = 0;
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("GH_AW_EXPERIMENTS_")) {
+        const protectedValue = protectValue(value || "");
         const placeholder = `__${key}__`;
         if (content.includes(placeholder)) {
-          content = content.split(placeholder).join(value || "");
+          content = content.split(placeholder).join(protectedValue);
           experimentSubCount++;
           core.info(`  Substituted ${placeholder} → "${value || ""}"`);
         }
-        // Also substitute experiments.name references inside {{#if ...}} conditions.
-        // This enables GitHub Actions script style comparisons (e.g. prompt_style == "concise")
-        // to resolve correctly — after substitution the condition becomes: concise == "concise".
+        // Comparisons in author-owned if/elseif tags also use experiment values.
         const experimentName = key.substring("GH_AW_EXPERIMENTS_".length).toLowerCase();
         const exprForm = `experiments.${experimentName}`;
-        const conditionPattern = new RegExp(`(\\{\\{#if[^}]*?)${exprForm.replace(".", "\\.")}`, "gi");
+        const conditionPattern = new RegExp(`(\\{\\{#?(?:if|else[-_]?if)\\s+[^}]*?)\\b${exprForm.replace(".", "\\.")}\\b`, "gi");
         if (conditionPattern.test(content)) {
           conditionPattern.lastIndex = 0;
-          content = content.replace(conditionPattern, (_, prefix) => prefix + (value || ""));
+          content = content.replace(conditionPattern, (_, prefix) => prefix + protectedValue);
           core.info(`  Substituted ${exprForm} in conditions → "${value || ""}"`);
         }
       }
@@ -279,7 +296,7 @@ async function main() {
       core.info(`Processing ${conditionalMatches.length} conditional template block(s)`);
 
       const beforeRendering = content.length;
-      content = renderMarkdownTemplate(content);
+      content = renderMarkdownTemplate(content, restoreValues);
       const afterRendering = content.length;
 
       core.info(`Template rendered successfully`);
@@ -287,6 +304,8 @@ async function main() {
     } else {
       core.info("No conditional blocks found in prompt, skipping template rendering");
     }
+
+    content = restoreValues(content);
 
     // Write back to the same file
     core.info("\n========================================");
