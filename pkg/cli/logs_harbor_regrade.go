@@ -161,7 +161,7 @@ func harborSanitizeErrorJSON(raw json.RawMessage) json.RawMessage {
 	if decoder.Decode(&value) != nil {
 		return raw
 	}
-	harborSanitizeErrorFields(value)
+	value = harborSanitizeErrorFields(value)
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return raw
@@ -169,19 +169,18 @@ func harborSanitizeErrorJSON(raw json.RawMessage) json.RawMessage {
 	return encoded
 }
 
-func harborSanitizeErrorFields(value any) {
+func harborSanitizeErrorFields(value any) any {
 	switch typed := value.(type) {
+	case string:
+		return harborSanitizeSensitiveText(typed)
 	case map[string]any:
 		for key, child := range typed {
-			if message, ok := child.(string); ok && (key == "error" || key == "message") {
-				typed[key] = harborSanitizeSensitiveText(message)
-			} else {
-				harborSanitizeErrorFields(child)
-			}
+			typed[key] = harborSanitizeErrorFields(child)
 		}
 	case []any:
-		for _, child := range typed {
-			harborSanitizeErrorFields(child)
+		for index, child := range typed {
+			typed[index] = harborSanitizeErrorFields(child)
 		}
 	}
+	return value
 }

@@ -156,6 +156,11 @@ are exported under `gh-aw.regraded.<grader-id>` and recorded separately in
 existing reward key fails instead of overwriting it. Missing or non-numeric
 results do not become rewards.
 
+Embedded regrading JSON is recursively sanitized for recognized credential
+patterns and local paths, including arbitrary string fields and array elements.
+This pattern-based redaction is not general PII filtering or comprehensive secret
+detection.
+
 ## Compatibility
 
 Harbor export conformance is pinned to Harbor 0.25.0. The conformance test

@@ -210,7 +210,7 @@ func TestHarborSanitizeSensitiveText(t *testing.T) {
 func TestHarborSanitizeErrorJSONPreservesOtherFields(t *testing.T) {
 	raw := json.RawMessage(`{"message":"Bearer abcdefghijklmnop","error":123,"value":9007199254740993,"details":[{"error":"token=abcdefghijklmnop","message":"expected failure","data":"token=abcdefghijklmnop"}],"prompt":"Bearer abcdefghijklmnop"}`)
 	safe := harborSanitizeErrorJSON(raw)
-	require.JSONEq(t, `{"message":"Bearer [REDACTED]","error":123,"value":9007199254740993,"details":[{"error":"token=[REDACTED]","message":"expected failure","data":"token=abcdefghijklmnop"}],"prompt":"Bearer abcdefghijklmnop"}`, string(safe))
+	require.JSONEq(t, `{"message":"Bearer [REDACTED]","error":123,"value":9007199254740993,"details":[{"error":"token=[REDACTED]","message":"expected failure","data":"token=[REDACTED]"}],"prompt":"Bearer [REDACTED]"}`, string(safe))
 	require.Contains(t, string(safe), `"value":9007199254740993`, "large numeric scores must remain exact")
 	require.Contains(t, string(raw), `"message":"Bearer abcdefghijklmnop"`, "source JSON must remain unchanged")
 }
@@ -222,11 +222,11 @@ func TestLogsHarborRegradingExportRedactsCredentials(t *testing.T) {
 	record := &RegradedRun{
 		SourceDirectory: source,
 		SessionError:    "Authorization: Bearer abcdefghijklmnop",
-		OriginalGraders: json.RawMessage(`{"error":"api_key: abcdefghijklmnop"}`),
+		OriginalGraders: json.RawMessage(`{"error":"api_key: abcdefghijklmnop","prompt":"token=abcdefghijklmnop"}`),
 		Results:         []json.RawMessage{json.RawMessage(`{"id":"test","status":"error","error":"token=abcdefghijklmnop","details":[{"message":"sk-proj-abcdefghijklmnopqrstuvwxyz1234567890"}]}`)},
 		OriginalEvidence: []RegradeOriginalEvidence{{
 			Error: "password=abcdefghijklmnop",
-			Data:  json.RawMessage(`{"message":"client_secret=abcdefghijklmnop"}`),
+			Data:  json.RawMessage(`{"message":"client_secret=abcdefghijklmnop","stdout":["token=abcdefghijklmnop"]}`),
 		}},
 	}
 	run := harborTestRun(source)
@@ -242,10 +242,36 @@ func TestLogsHarborRegradingExportRedactsCredentials(t *testing.T) {
 	require.Contains(t, string(raw), "Bearer [REDACTED]")
 	var safe RegradedRun
 	require.NoError(t, json.Unmarshal(raw, &safe))
-	require.JSONEq(t, `{"error":"api_key: [REDACTED]"}`, string(safe.OriginalGraders))
+	require.JSONEq(t, `{"error":"api_key: [REDACTED]","prompt":"token=[REDACTED]"}`, string(safe.OriginalGraders))
 	require.JSONEq(t, `{"id":"test","status":"error","error":"token=[REDACTED]","details":[{"message":"[REDACTED]"}]}`, string(safe.Results[0]))
 	require.Equal(t, "password=[REDACTED]", safe.OriginalEvidence[0].Error)
-	require.JSONEq(t, `{"message":"client_secret=[REDACTED]"}`, string(safe.OriginalEvidence[0].Data))
+	require.JSONEq(t, `{"message":"client_secret=[REDACTED]","stdout":["token=[REDACTED]"]}`, string(safe.OriginalEvidence[0].Data))
 	require.Equal(t, "Authorization: Bearer abcdefghijklmnop", record.SessionError)
 	require.Contains(t, string(record.Results[0]), "token=abcdefghijklmnop", "original records must not be mutated")
+}
+
+func TestHarborSanitizeErrorJSONAllStringValues(t *testing.T) {
+	token := "xoxb-" + strings.Repeat("a", 24)
+	for _, input := range []any{
+		token,
+		[]any{token, []any{token}, map[string]any{"stdout": token}},
+		map[string]any{
+			"prompt": token,
+			"data":   map[string]any{"arbitrary": token},
+			"stdout": []any{token, map[string]any{"output": token}},
+			"value":  json.Number("9007199254740993"),
+			"status": "pass",
+			"bool":   true,
+			"null":   nil,
+		},
+	} {
+		raw, err := json.Marshal(input)
+		require.NoError(t, err)
+		safe := harborSanitizeErrorJSON(raw)
+		require.NotContains(t, string(safe), token)
+		require.Contains(t, string(safe), "[REDACTED]")
+		require.JSONEq(t, strings.ReplaceAll(string(raw), token, "[REDACTED]"), string(safe))
+		require.Contains(t, string(raw), token, "source JSON must remain unchanged")
+		require.JSONEq(t, string(safe), string(harborSanitizeErrorJSON(safe)), "sanitization must be idempotent")
+	}
 }
