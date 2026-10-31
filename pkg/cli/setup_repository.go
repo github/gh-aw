@@ -52,6 +52,7 @@ type SetupRepositoryCheckOptions struct {
 type SetupAuthResult struct {
 	Authenticated    bool                         `json:"authenticated"`
 	AgentAssignments []DoctorAgentAssignmentCheck `json:"agent_assignments,omitempty"`
+	TokenValidations []DoctorTokenValidation      `json:"token_validations,omitempty"`
 }
 
 type SetupRepositoryCheckResult struct {
@@ -65,6 +66,7 @@ type SetupRepositoryCheckResult struct {
 	CloneNeeded       bool                         `json:"clone_needed"`
 	CleanWorktree     *bool                        `json:"clean_worktree,omitempty"`
 	AgentAssignments  []DoctorAgentAssignmentCheck `json:"agent_assignments,omitempty"`
+	TokenValidations  []DoctorTokenValidation      `json:"token_validations,omitempty"`
 }
 
 // setupRepositoryRuntime holds the reusable repository/auth setup primitives that
@@ -79,6 +81,7 @@ type setupRepositoryRuntime struct {
 	dirOriginRepo         func(string) (string, error)
 	checkCleanWorktree    func(bool) error
 	checkAgentAssignments func(context.Context, string, string) ([]DoctorAgentAssignmentCheck, error)
+	checkTokens           func(context.Context, string, string) ([]DoctorTokenValidation, error)
 }
 
 func defaultSetupRepositoryRuntime() setupRepositoryRuntime {
@@ -103,6 +106,7 @@ func defaultSetupRepositoryRuntime() setupRepositoryRuntime {
 		},
 		checkCleanWorktree:    checkCleanWorkingDirectory,
 		checkAgentAssignments: checkDoctorAgentAssignments,
+		checkTokens:           checkDoctorTokens,
 	}
 }
 
@@ -332,16 +336,22 @@ func runSetupAuthWithRuntime(opts SetupAuthOptions, runtime setupRepositoryRunti
 			return err
 		}
 		result.AgentAssignments = checks
+		if runtime.checkTokens != nil {
+			result.TokenValidations, err = runtime.checkTokens(ctx, "", ".")
+			if err != nil {
+				return err
+			}
+		}
 	}
 	if opts.JSON {
 		if err := renderSetupJSON(result); err != nil {
 			return err
 		}
-		return doctorAgentAssignmentError(result.AgentAssignments)
+		return errors.Join(doctorAgentAssignmentError(result.AgentAssignments), doctorTokenValidationError(result.TokenValidations))
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("GitHub CLI authentication verified"))
-	return printDoctorAgentAssignments(result.AgentAssignments)
+	return errors.Join(printDoctorAgentAssignments(result.AgentAssignments), printDoctorTokenValidations(result.TokenValidations))
 }
 
 func RunSetupRepositoryCheck(opts SetupRepositoryCheckOptions) error {
@@ -447,6 +457,12 @@ func checkSetupRepositoryCheckout(ctx context.Context, opts SetupRepositoryCheck
 			return err
 		}
 		result.AgentAssignments = checks
+		if runtime.checkTokens != nil {
+			result.TokenValidations, err = runtime.checkTokens(ctx, opts.Repo, result.Directory)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -456,7 +472,7 @@ func renderSetupRepositoryCheckResult(result SetupRepositoryCheckResult, jsonOut
 		if err := renderSetupJSON(result); err != nil {
 			return err
 		}
-		return doctorAgentAssignmentError(result.AgentAssignments)
+		return errors.Join(doctorAgentAssignmentError(result.AgentAssignments), doctorTokenValidationError(result.TokenValidations))
 	}
 
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Setup repository check for "+result.Repository))
@@ -470,7 +486,7 @@ func renderSetupRepositoryCheckResult(result SetupRepositoryCheckResult, jsonOut
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("- no checkout at %s; directory is ready for clone", result.Directory)))
 	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Setup repository checks passed"))
-	return printDoctorAgentAssignments(result.AgentAssignments)
+	return errors.Join(printDoctorAgentAssignments(result.AgentAssignments), printDoctorTokenValidations(result.TokenValidations))
 }
 
 func renderSetupJSON(output any) error {

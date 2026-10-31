@@ -137,6 +137,9 @@ func organizationSecretSource(visibility string) secretSource {
 
 // addRepositorySecret adds a secret to the repository
 func (c *AddInteractiveConfig) addRepositorySecret(name, value string) error {
+	if err := validateActionsStorageValue(value); err != nil {
+		return err
+	}
 	output, err := workflow.RunGHInputContext(c.Ctx, "Adding repository secret...", bytes.NewBufferString(value), "secret", "set", name, "--repo", c.RepoOverride)
 	if err != nil {
 		return fmt.Errorf("failed to set secret: %w (output: %s)", err, string(output))

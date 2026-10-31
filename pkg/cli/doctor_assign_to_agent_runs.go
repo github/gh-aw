@@ -53,6 +53,8 @@ type doctorAssignmentRunMiner struct {
 	now      time.Time
 	requests int
 	runGH    func(context.Context, string, ...string) ([]byte, error)
+	classify func(string, DoctorAssignmentRunEvidence) DoctorAssignmentRunEvidence
+	allJobs  bool
 }
 
 type doctorAssignmentRunMetadata struct {
@@ -147,10 +149,22 @@ func (m *doctorAssignmentRunMiner) inspect(run doctorAssignmentRunMetadata, sinc
 		return evidence
 	}
 	for _, job := range response.Jobs {
-		if job.Name != "safe_outputs" && job.Name != "assign_to_agent" {
+		if !m.allJobs && job.Name != "safe_outputs" && job.Name != "assign_to_agent" {
 			continue
 		}
-		return m.inspectJob(job, evidence)
+		current := m.inspectJob(job, evidence)
+		if !m.allJobs || current.Outcome == "credential_error" {
+			return current
+		}
+		if current.Outcome == "unknown" {
+			evidence = current
+		}
+	}
+	if m.allJobs {
+		if evidence.Message == "" {
+			evidence.Outcome, evidence.Message = "no_evidence", "No recognized credential failure found; token validity remains unverified."
+		}
+		return evidence
 	}
 	evidence.Outcome, evidence.Message = "no_evidence", "No assignment handler job found in this run attempt."
 	return evidence
@@ -172,6 +186,9 @@ func (m *doctorAssignmentRunMiner) inspectJob(job JobInfo, evidence DoctorAssign
 	}
 	// Logs can contain ANSI sequences, source code, and masked credentials. Never
 	// render or retain raw lines; export only recognized handler outcomes.
+	if m.classify != nil {
+		return m.classify(string(data), evidence)
+	}
 	return classifyDoctorAssignmentLog(string(data), evidence)
 }
 
@@ -246,6 +263,10 @@ func doctorAssignmentRunFailure(history *DoctorAssignmentRunHistory) bool {
 }
 
 func printDoctorAssignmentRunHistory(history *DoctorAssignmentRunHistory) {
+	printDoctorRunHistory(history, "assignment")
+}
+
+func printDoctorRunHistory(history *DoctorAssignmentRunHistory, kind string) {
 	if history == nil {
 		return
 	}
@@ -253,9 +274,12 @@ func printDoctorAssignmentRunHistory(history *DoctorAssignmentRunHistory) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(history.Error))
 		return
 	}
-	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Recent assignment evidence: %d completed run(s) sampled since %s (limit %d).", len(history.Runs), history.Since.Format(time.RFC3339), history.Limit)))
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Recent %s evidence: %d completed run(s) sampled since %s (limit %d).", kind, len(history.Runs), history.Since.Format(time.RFC3339), history.Limit)))
 	for _, run := range history.Runs {
-		message := fmt.Sprintf("Run %d attempt %d: %s; %d assigned, %d already assigned. %s %s", run.RunID, run.Attempt, run.Outcome, run.Assigned, run.AlreadyAssigned, run.Message, run.URL)
+		message := fmt.Sprintf("Run %d attempt %d: %s. %s %s", run.RunID, run.Attempt, run.Outcome, run.Message, run.URL)
+		if kind == "assignment" {
+			message = fmt.Sprintf("Run %d attempt %d: %s; %d assigned, %d already assigned. %s %s", run.RunID, run.Attempt, run.Outcome, run.Assigned, run.AlreadyAssigned, run.Message, run.URL)
+		}
 		if run.Outcome == "credential_error" || run.Outcome == "assignment_failed" || run.Outcome == "unknown" {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 		} else {

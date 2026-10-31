@@ -17,6 +17,13 @@ const doctorCommandDescription = `Run diagnostics to verify CLI authentication a
 Checks GitHub CLI authentication. When --repo is provided, also verifies the
 repository exists, resolves the owner type, and inspects checkout state.
 
+Discovers custom token secret references through AW/Actions expression ASTs,
+including imported configuration, and adds them to the token validation list.
+Checks secret metadata and bounded existing-run evidence, not secret values.
+The agent must elicit the user to replace implicated tokens securely.
+Never use the gh auth login OAuth token as a workflow credential, run
+gh auth token, or copy CLI credentials into Actions secrets.
+
 In a local checkout, also checks workflows using safe-outputs.assign-to-agent
 for an available PAT secret. Reports PAT creation and repository secret setup
 links when configuration is missing. GitHub App installation tokens cannot

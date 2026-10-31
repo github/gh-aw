@@ -588,6 +588,9 @@ func checkOptionalSecret(req SecretRequirement, config EngineSecretConfig) error
 
 // uploadSecretToRepo uploads a secret to the repository and can optionally replace an existing value.
 func uploadSecretToRepo(ctx context.Context, secretName, secretValue, repoSlug string, verbose bool, overwriteExisting bool) error {
+	if err := validateActionsStorageValue(secretValue); err != nil {
+		return err
+	}
 	engineSecretsLog.Printf("Uploading secret %s to %s", secretName, repoSlug)
 
 	// Check if secret already exists
