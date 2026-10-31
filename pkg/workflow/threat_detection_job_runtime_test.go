@@ -250,6 +250,9 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			steps := strings.Join(compiler.buildInstallDetectionEngineForExternalDetectorStep(tt.data), "")
+			if strings.Contains(steps, "install_awf_binary.sh") {
+				t.Errorf("external detection engine steps must filter out AWF installation:\n%s", steps)
+			}
 
 			wantNodeActionRef := tt.wantNodeActionRef
 			if wantNodeActionRef == "" {
@@ -268,8 +271,8 @@ func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t
 			if tt.wantInstallStep != "" {
 				nodeIndex := strings.Index(steps, "- name: Setup Node.js")
 				installIndex := strings.Index(steps, "- name: "+tt.wantInstallStep)
-				if installIndex == -1 {
-					t.Fatalf("expected %q step:\n%s", tt.wantInstallStep, steps)
+				if count := strings.Count(steps, "- name: "+tt.wantInstallStep); count != 1 {
+					t.Fatalf("expected exactly one %q step, got %d:\n%s", tt.wantInstallStep, count, steps)
 				}
 				if nodeIndex > installIndex {
 					t.Errorf("Setup Node.js must precede %q:\n%s", tt.wantInstallStep, steps)
