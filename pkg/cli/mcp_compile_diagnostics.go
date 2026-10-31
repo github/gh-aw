@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 const (
 	maxMCPCompileDiagnosticBytes = 4 << 10
 	maxMCPCompileFallbackBytes   = 48 << 10
+	maxMCPCompileProgressBytes   = 1 << 20
 	compileDiagnosticTruncation  = "\n... (diagnostic truncated)"
 	compileDebugNamespace        = `[[:alnum:]_]+(?:[:./-][[:alnum:]_]+)*`
 )
@@ -383,6 +385,82 @@ func runMCPCompileOutput(ctx context.Context, execCmd execCmdFunc, args ...strin
 		err = &mcpStageError{stage: "compilation", err: ctx.Err()}
 	}
 	return stdout.Bytes(), diagnostics, err
+}
+
+type mcpCompilePartialIssue struct {
+	Type     string `json:"type"`
+	Message  string `json:"message"`
+	Line     int    `json:"line,omitempty"`
+	File     string `json:"file,omitempty"`
+	Severity string `json:"severity,omitempty"`
+}
+
+type mcpCompilePartialResult struct {
+	Scope    string                   `json:"scope,omitempty"`
+	Workflow string                   `json:"workflow"`
+	Valid    bool                     `json:"valid"`
+	Errors   []mcpCompilePartialIssue `json:"errors"`
+	Warnings []mcpCompilePartialIssue `json:"warnings"`
+}
+
+func readMCPCompileProgress(progressPath string) (results []mcpCompilePartialResult) {
+	results = []mcpCompilePartialResult{}
+	if validateMCPCompileProgressPath(progressPath) != nil {
+		return results
+	}
+	info, err := os.Lstat(progressPath)
+	if err != nil || !info.Mode().IsRegular() {
+		return results
+	}
+	file, err := os.Open(progressPath)
+	if err != nil {
+		return results
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			results = []mcpCompilePartialResult{}
+		}
+	}()
+
+	decoder := json.NewDecoder(io.LimitReader(file, maxMCPCompileProgressBytes))
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('[') {
+		return results
+	}
+	for decoder.More() {
+		var result ValidationResult
+		if err := decoder.Decode(&result); err != nil {
+			break
+		}
+		partial := mcpCompilePartialResult{
+			Scope:    sanitizeMCPUntrustedText(result.Scope),
+			Workflow: sanitizeMCPUntrustedText(result.Workflow),
+			Valid:    result.Valid,
+			Errors:   sanitizeMCPCompilePartialIssues(result.Errors),
+			Warnings: sanitizeMCPCompilePartialIssues(result.Warnings),
+		}
+		candidate := append(append([]mcpCompilePartialResult(nil), results...), partial)
+		output, err := json.Marshal(candidate)
+		if err != nil || len(output) > maxMCPCompileFallbackBytes-8*1024 {
+			break
+		}
+		results = candidate
+	}
+	return results
+}
+
+func sanitizeMCPCompilePartialIssues(issues []ValidationIssue) []mcpCompilePartialIssue {
+	sanitized := make([]mcpCompilePartialIssue, 0, len(issues))
+	for _, issue := range issues {
+		sanitized = append(sanitized, mcpCompilePartialIssue{
+			Type:     sanitizeMCPUntrustedText(issue.Type),
+			Message:  boundMCPCompileDiagnostic(issue.Message),
+			Line:     issue.Line,
+			File:     sanitizeMCPUntrustedText(issue.File),
+			Severity: sanitizeMCPUntrustedText(string(issue.Severity)),
+		})
+	}
+	return sanitized
 }
 
 func injectDevelopmentCompilerDiagnostics(outputStr string, diagnostics *mcpCompileDiagnostics) string {

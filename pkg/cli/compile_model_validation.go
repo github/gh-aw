@@ -130,9 +130,10 @@ func PrepareCompileModelValidation(ctx context.Context, config *CompileConfig) {
 	if !config.Models {
 		return
 	}
+	refreshObserved := !config.DryRun || config.MCPProgressFile == ""
 	report := compileBuildModelsReport(ctx, modelsReportOptions{
 		logsDir:         defaultLogsOutputDir,
-		refreshObserved: true,
+		refreshObserved: refreshObserved,
 		refreshCount:    defaultModelsRefreshCount,
 	})
 	config.activeModels = buildActiveModelInventory(report)

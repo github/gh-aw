@@ -38,6 +38,22 @@ func TestDevelopmentModelInventoryRefreshWarnings(t *testing.T) {
 	assert.Equal(t, "model_inventory_warning", results[1].Errors[0].Type)
 }
 
+func TestMCPDevelopmentModelInventoryUsesCachedArtifacts(t *testing.T) {
+	original := compileBuildModelsReport
+	t.Cleanup(func() { compileBuildModelsReport = original })
+	compileBuildModelsReport = func(_ context.Context, opts modelsReportOptions) modelsReport {
+		assert.False(t, opts.refreshObserved)
+		return modelsReport{Observed: []observedModelRow{{Model: "cached-model"}}}
+	}
+
+	config := CompileConfig{DryRun: true, MCPProgressFile: "results.json"}
+	PrepareCompileModelValidation(context.Background(), &config)
+
+	require.NotNil(t, config.activeModels)
+	assert.True(t, config.activeModels.contains("cached-model", nil))
+	assert.Empty(t, config.modelValidationWarnings)
+}
+
 func TestModelInventoryWarningsOrdinaryCompilation(t *testing.T) {
 	config := CompileConfig{Models: true, modelValidationWarnings: []string{"observed-model refresh failed: access denied"}}
 	stats := &CompilationStats{Succeeded: 1}
