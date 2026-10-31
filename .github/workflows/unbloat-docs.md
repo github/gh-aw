@@ -35,10 +35,12 @@ runtimes:
 
 # AI engine configuration
 max-turns: 90  # Reduce from avg 115 turns
-model: copilot/claude-sonnet-5.5
 engine:
   id: pi
   model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 # Shared instructions
 imports:
   - uses: shared/daily-pr-base.md
