@@ -1,0 +1,91 @@
+//go:build !integration
+
+package parser
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestMainWorkflowSchemaSafeJobInputMaxLength(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		input       map[string]any
+		valid       bool
+		errContains []string
+	}{
+		{
+			name:  "string",
+			input: map[string]any{"type": "string", "max-length": 40000},
+			valid: true,
+		},
+		{
+			name:  "unset type",
+			input: map[string]any{"max-length": 40000},
+			valid: true,
+		},
+		{
+			name:  "one character",
+			input: map[string]any{"type": "string", "max-length": 1},
+			valid: true,
+		},
+		{
+			name:  "maximum length",
+			input: map[string]any{"type": "string", "max-length": 1000000},
+			valid: true,
+		},
+		{
+			name:        "zero",
+			input:       map[string]any{"type": "string", "max-length": 0},
+			errContains: []string{"payload", "max-length"},
+		},
+		{
+			name:        "over maximum",
+			input:       map[string]any{"type": "string", "max-length": 1000001},
+			errContains: []string{"payload", "max-length"},
+		},
+		{
+			name:        "boolean",
+			input:       map[string]any{"type": "boolean", "max-length": 40000},
+			errContains: []string{"payload", "max-length"},
+		},
+		{
+			name:        "number",
+			input:       map[string]any{"type": "number", "max-length": 40000},
+			errContains: []string{"payload", "max-length"},
+		},
+		{
+			name:        "choice",
+			input:       map[string]any{"type": "choice", "options": []any{"one"}, "max-length": 40000},
+			errContains: []string{"payload", "max-length"},
+		},
+		{
+			name:        "environment",
+			input:       map[string]any{"type": "environment", "max-length": 40000},
+			errContains: []string{"payload", "max-length"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+				"on": "push",
+				"safe-outputs": map[string]any{
+					"jobs": map[string]any{
+						"publish": map[string]any{
+							"inputs": map[string]any{"payload": tc.input},
+							"steps":  []any{map[string]any{"run": "echo published"}},
+						},
+					},
+				},
+			}, "safe-job-max-length.md")
+			if tc.valid {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			for _, substring := range tc.errContains {
+				require.Contains(t, err.Error(), substring)
+			}
+		})
+	}
+}

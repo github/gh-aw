@@ -392,6 +392,10 @@ func populateCustomJobToolProperties(properties map[string]any, inputs map[strin
 			property["type"] = "string"
 		}
 
+		if inputDef.MaxLength != nil && (inputDef.Type == "" || inputDef.Type == "string") {
+			property["maxLength"] = *inputDef.MaxLength
+		}
+
 		if inputDef.Default != nil {
 			property["default"] = inputDef.Default
 		}

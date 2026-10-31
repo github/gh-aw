@@ -150,6 +150,10 @@ func TestParseInputDefinitions(t *testing.T) {
 			"type":    "number",
 			"default": 10,
 		},
+		"report": map[string]any{
+			"type":       "string",
+			"max-length": 40000,
+		},
 	}
 
 	result := ParseInputDefinitions(inputsMap)
@@ -158,8 +162,8 @@ func TestParseInputDefinitions(t *testing.T) {
 		t.Fatal("Expected result to be non-nil")
 	}
 
-	if len(result) != 3 {
-		t.Fatalf("Expected 3 inputs, got %d", len(result))
+	if len(result) != 4 {
+		t.Fatalf("Expected 4 inputs, got %d", len(result))
 	}
 
 	// Check environment input
@@ -199,6 +203,14 @@ func TestParseInputDefinitions(t *testing.T) {
 	}
 	if count.Type != "number" {
 		t.Errorf("count.Type: got %q, want 'number'", count.Type)
+	}
+
+	report, exists := result["report"]
+	if !exists {
+		t.Fatal("Expected 'report' input to exist")
+	}
+	if report.MaxLength == nil || *report.MaxLength != 40000 {
+		t.Errorf("report.MaxLength: got %v, want 40000", report.MaxLength)
 	}
 }
 
