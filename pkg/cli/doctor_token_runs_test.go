@@ -38,7 +38,7 @@ func TestDoctorTokenFailureFirstBudget(t *testing.T) {
 	}
 	collectDoctorTokenRunEvidence(checks, &miner)
 	assert.Equal(t, "unknown", checks[0].Status)
-	assert.Equal(t, "credential_error", checks[1].Status)
+	assert.Equal(t, "unknown", checks[1].Status)
 	assert.Equal(t, int64(42), checks[1].RecentRuns.Runs[0].RunID)
 	assert.Equal(t, 40, miner.requests)
 }

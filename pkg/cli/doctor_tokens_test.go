@@ -111,14 +111,14 @@ func TestDoctorTokensRepositoryRegression(t *testing.T) {
 func TestDoctorTokenLogEvidence(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct{ log, outcome string }{
-		{"2026-10-31T16:45:12.5445378Z ##[error]Failed to add comment: Bad credentials - token-not-for-output", "credential_error"},
-		{"##[error]Failed to approve workflow run: Resource not accessible by integration", "credential_error"},
-		{"##[warning]Agent assignment credential validation failed: Bad credentials (HTTP 401)", "credential_error"},
-		{"✗ Message: Bad credentials (HTTP 401)", "credential_error"},
-		{"✗ Retry of message failed: Bad credentials", "credential_error"},
-		{"✗ Failed to submit PR review: Bad credentials", "credential_error"},
-		{"✗ Exception while submitting PR review: HTTP 401", "credential_error"},
-		{"Agent assignment failed for copilot on issue #42 due to Bad credentials", "credential_error"},
+		{"2026-10-31T16:45:12.5445378Z ##[error]Failed to add comment: Bad credentials - token-not-for-output", "unknown"},
+		{"##[error]Failed to approve workflow run: Resource not accessible by integration", "unknown"},
+		{"##[warning]Agent assignment credential validation failed: Bad credentials (HTTP 401)", "unknown"},
+		{"✗ Message: Bad credentials (HTTP 401)", "unknown"},
+		{"✗ Retry of message failed: Bad credentials", "unknown"},
+		{"✗ Failed to submit PR review: Bad credentials", "unknown"},
+		{"✗ Exception while submitting PR review: HTTP 401", "unknown"},
+		{"Agent assignment failed for copilot on issue #42 due to Bad credentials", "unknown"},
 		{`core.error("Failed to add comment: Bad credentials");`, "no_evidence"},
 		{"OTLP export authorization failed: HTTP 401 Unauthorized", "no_evidence"},
 		{"##[error]Failed to add comment: invalid issue number", "no_evidence"},
@@ -152,7 +152,7 @@ func TestDoctorTokenRunEvidenceAllJobs(t *testing.T) {
 		}
 	}
 	result := miner.inspect(doctorAssignmentRunMetadata{ID: 42, Attempt: 1, CreatedAt: now, Status: "completed"}, now.Add(-time.Hour))
-	assert.Equal(t, "credential_error", result.Outcome)
+	assert.Equal(t, "unknown", result.Outcome)
 	assert.Equal(t, 3, miner.requests)
 }
 

@@ -427,8 +427,8 @@ func classifyDoctorTokenLog(content string, evidence DoctorAssignmentRunEvidence
 		line = strings.TrimPrefix(strings.TrimPrefix(line, "##[warning]"), "##[error]")
 		if (diagnostic && strings.HasPrefix(line, "Failed ")) || doctorTokenFailureDiagnostic(line) {
 			if doctorAssignmentCredentialFailure(line) || strings.Contains(strings.ToLower(line), "http 403") {
-				evidence.Outcome = "credential_error"
-				evidence.Message = "Workflow logs report an authentication or permission failure. The failing token cannot be identified from secret metadata alone."
+				evidence.Outcome = "unknown"
+				evidence.Message = "Workflow logs contain a credential-like diagnostic, but workflow code can emit log text; token validity is unknown."
 				return evidence
 			}
 		}
