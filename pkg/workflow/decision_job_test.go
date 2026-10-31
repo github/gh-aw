@@ -53,10 +53,19 @@ func TestDecisionJobRunsAfterResolvedAdmission(t *testing.T) {
 			activation := document.Jobs["activation"]
 			needs, err = yaml.Marshal(activation.Needs)
 			require.NoError(t, err)
+			assert.Contains(t, string(needs), "pre_activation")
 			assert.Contains(t, string(needs), "decision")
+			assert.Equal(t, admission, strings.Contains(string(needs), "admission"))
+			assert.Contains(t, activation.If, "needs.pre_activation.outputs.decision_eligible == 'true'")
 			assert.Contains(t, activation.If, "needs.decision.result == 'success'")
+			assert.Contains(t, activation.If, "needs.decision.outputs.decision_result != 'skip'")
+			assert.Contains(t, activation.If, "needs.decision.outputs.remaining-ai-credits != ''")
 			assert.Contains(t, activation.If, "needs.decision.outputs.remaining-ai-credits != '0'")
+			if admission {
+				assert.Contains(t, activation.If, admissionJobResultCondition)
+			}
 			assert.Equal(t, "${{ needs.decision.outputs.remaining-ai-credits }}", activation.Outputs["decision-remaining-ai-credits"])
+			assert.Equal(t, "${{ steps.decision_eligibility.outputs.eligible }}", document.Jobs["pre_activation"].Outputs["decision_eligible"])
 			assert.NotContains(t, document.Jobs["pre_activation"].Outputs["activated"], "decision_gate")
 			require.NoError(t, actionslanguageservice.ValidateWorkflow(file, string(lock)))
 		})

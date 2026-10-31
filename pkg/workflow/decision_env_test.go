@@ -49,6 +49,30 @@ func TestDecisionProviderEnv(t *testing.T) {
 	}
 }
 
+func TestDecisionProviderCredentialsWithoutAdditionalOptIn(t *testing.T) {
+	for _, tt := range []struct {
+		model     string
+		authKey   string
+		authValue string
+	}{
+		{"copilot/custom", "COPILOT_GITHUB_TOKEN", "${{ secrets.COPILOT_GITHUB_TOKEN }}"},
+		{"anthropic/custom", "ANTHROPIC_API_KEY", "${{ secrets.ANTHROPIC_API_KEY }}"},
+		{"openai/custom", "OPENAI_API_KEY", "${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}"},
+		{"google/custom", "GEMINI_API_KEY", "${{ secrets.GEMINI_API_KEY }}"},
+	} {
+		t.Run(tt.model, func(t *testing.T) {
+			data := &WorkflowData{Decision: &DecisionConfig{Model: tt.model}}
+			env := decisionEnv(data)
+			assert.Equal(t, tt.authValue, env[tt.authKey], "on.decision is the explicit provider-forwarding opt-in")
+			for _, key := range []string{"COPILOT_GITHUB_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"} {
+				if key != tt.authKey {
+					assert.NotContains(t, env, key, "unselected provider credentials must not be injected")
+				}
+			}
+		})
+	}
+}
+
 func TestDecisionProviderAliasEnv(t *testing.T) {
 	data := &WorkflowData{
 		Decision:      &DecisionConfig{Model: "custom"},
