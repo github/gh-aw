@@ -76,6 +76,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/strconvparseignorederror"
 	"github.com/github/gh-aw/pkg/linters/stringbytesroundtrip"
 	"github.com/github/gh-aw/pkg/linters/stringreplaceminusone"
+	"github.com/github/gh-aw/pkg/linters/stringscompare"
 	"github.com/github/gh-aw/pkg/linters/stringsconcatloop"
 	"github.com/github/gh-aw/pkg/linters/stringscountcontains"
 	"github.com/github/gh-aw/pkg/linters/stringsindexcontains"
@@ -122,7 +123,7 @@ type docAnalyzer struct {
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
-//	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
+//	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscompare, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
 //	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
 func documentedAnalyzers() []docAnalyzer {
 	return []docAnalyzer{
@@ -192,6 +193,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"stringbytesroundtrip", stringbytesroundtrip.Analyzer},
 		{"stringreplaceminusone", stringreplaceminusone.Analyzer},
 		{"stringsconcatloop", stringsconcatloop.Analyzer},
+		{"stringscompare", stringscompare.Analyzer},
 		{"stringscountcontains", stringscountcontains.Analyzer},
 		{"stringsindexcontains", stringsindexcontains.Analyzer},
 		{"stringsindexhasprefix", stringsindexhasprefix.Analyzer},

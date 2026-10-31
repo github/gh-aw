@@ -24,6 +24,7 @@ var (
 )
 
 var notYetEnforced = map[string]string{
+	"stringscompare":              "existing production strings.Compare calls need migration to cmp.Compare before enforcement; nolint suppression already works",
 	"blankassigncomma":            "existing production violations need remediation before enforcement; nolint suppression already works",
 	"bufferresetbeforereuse":      "new correctness analyzer needs an enforcement-readiness audit before native CI enables it",
 	"bufioscannererunchecked":     "existing scanner loops need Err handling before native CI enables it",

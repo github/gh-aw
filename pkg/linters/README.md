@@ -72,6 +72,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `stringbytesroundtrip` — reports redundant `string([]byte(s))` or `[]byte(string(b))` round-trip conversions that produce a wasteful intermediate copy.
 - `stringreplaceminusone` — reports `strings.Replace` calls whose `n` argument is `-1`, which should use the more readable `strings.ReplaceAll`.
 - `stringsconcatloop` — reports `string +=` concatenation inside `for`/`range` loop bodies, which allocates a new string copy on every iteration (O(n²) memory); use `strings.Builder` instead.
+- `stringscompare` — reports `strings.Compare` calls, which should use the generic `cmp.Compare`.
 - `stringscountcontains` — reports `strings.Count(s, sub)` comparisons with `0` or `1` (e.g. `> 0`, `>= 1`, `== 0`, `!= 0`, `< 1`, `<= 0`) and their yoda-order variants that should use `strings.Contains(s, sub)` or `!strings.Contains(s, sub)` instead.
 - `stringsindexcontains` — reports `strings.Index(s, substr)` comparisons with `-1` or `0` (e.g. `!= -1`, `>= 0`, `> -1`, `== -1`, `< 0`, `<= -1`) and their yoda-order variants that should use `strings.Contains(s, substr)` or `!strings.Contains(s, substr)` instead.
 - `stringsindexhasprefix` — reports `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) and their yoda-order variants that should use `strings.HasPrefix(s, sub)` or `!strings.HasPrefix(s, sub)` instead.
@@ -238,6 +239,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `stringbytesroundtrip` | Custom `go/analysis` analyzer that flags redundant `string([]byte(s))` or `[]byte(string(b))` round-trip conversions that produce a wasteful intermediate copy |
 | `stringreplaceminusone` | Custom `go/analysis` analyzer that flags `strings.Replace` calls with `n=-1` that should use `strings.ReplaceAll` |
 | `stringsconcatloop` | Custom `go/analysis` analyzer that flags `string +=` concatenation inside `for`/`range` loops that should use `strings.Builder` |
+| `stringscompare` | Custom `go/analysis` analyzer that flags `strings.Compare` calls that should use `cmp.Compare` |
 | `stringscountcontains` | Custom `go/analysis` analyzer that flags `strings.Count(s, sub)` comparisons with `0` or `1` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexcontains` | Custom `go/analysis` analyzer that flags `strings.Index(s, substr)` comparisons with `-1` or `0` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexhasprefix` | Custom `go/analysis` analyzer that flags `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) that should use `strings.HasPrefix` or `!strings.HasPrefix` |
@@ -391,6 +393,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/stringscountcontains` — strings-count-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexcontains` — strings-index-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexhasprefix` — strings-index-has-prefix analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/stringscompare` — strings-compare analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsjoinone` — strings-join-one analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timeafterleak` — time-after-leak analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
