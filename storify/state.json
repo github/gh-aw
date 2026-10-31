@@ -1,32 +1,33 @@
 {
-  "last_run_date": "2026-10-30",
+  "last_run_date": "2026-10-31",
   "last_window": {
-    "start": "2026-10-29T07:55:58Z",
-    "end": "2026-10-30T07:55:58Z"
+    "start": "2026-10-30T07:55:51Z",
+    "end": "2026-10-31T07:55:51Z"
   },
   "observed_window": {
-    "coverage": "453 prefetched runs plus 85 continuation runs; continuation returned no cursor. Five representative MCP audits and PR REST reads; causal review not exhaustive.",
+    "coverage": "379 prefetched runs plus 205 continuation runs, disjoint by run-ID cursor; episode lineage remains partial because recorded parents/roots were missing.",
     "representative_audits": [
-      40861774464,
-      40856237978,
-      40859102835,
-      40964645356,
-      40868959457
+      41181097601,
+      41148471766,
+      41126790198,
+      41149779426,
+      41148528160,
+      41072252554
     ]
   },
   "key_themes": [
-    "Publication-boundary failure across reviewer and scheduled workflows",
-    "Activation restore burst before agent work",
-    "PR 72958 ADR and review-driven revision merged"
+    "Native model-routing merge and CI repair followed by successful smokes",
+    "Human refinement of safe-output CLI help merged",
+    "Publication-boundary Bad credentials failures persisted across workflows"
   ],
   "carry_forward_questions": [
-    "What causes Process Safe Outputs failures, and did later PR Sous Chef or reviewer schedules recover?",
-    "Did Restore daily AIC scan observations recur after the observed burst?",
-    "Did PR 72958 merged exclusions behave as intended in subsequent runs?"
+    "Do post-merge PR Sous Chef runs use per-field stdin help and reduce JSON-format retries?",
+    "What repairs the Bad credentials failures in Process Safe Outputs, and do PR Sous Chef and Smoke Project recover?",
+    "Do native routed smokes remain successful over subsequent schedules?"
   ],
   "representative_runs": [
-    40861774464,
-    40856237978,
-    40868959457
+    41181097601,
+    41126790198,
+    41149779426
   ]
 }
