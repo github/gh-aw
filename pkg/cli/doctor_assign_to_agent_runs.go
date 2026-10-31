@@ -349,7 +349,9 @@ func printDoctorRunHistory(history *DoctorAssignmentRunHistory, kind string) {
 	}
 	if history.Error != "" {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(history.Error))
-		return
+		if len(history.Runs) == 0 {
+			return
+		}
 	}
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Recent %s evidence: %d completed run(s) sampled since %s (limit %d).", kind, len(history.Runs), history.Since.Format(time.RFC3339), history.Limit)))
 	for _, run := range history.Runs {

@@ -343,7 +343,7 @@ func scanDoctorTokenSectionWithScope(section, scope string, names, environments 
 func scanDoctorTokenValues(value any, field string, names, environments map[string]struct{}) error {
 	switch node := value.(type) {
 	case map[string]any:
-		if assignment, found := node["assign-to-agent"]; found && assignment != nil && assignment != false {
+		if assignment, found := node["assign-to-agent"]; field == "safe-outputs" && found && assignment != nil && assignment != false {
 			config, mapping := assignment.(map[string]any)
 			if !mapping || (config["github-token"] == nil && config["github-app"] == nil) {
 				names["GH_AW_AGENT_TOKEN"] = struct{}{}

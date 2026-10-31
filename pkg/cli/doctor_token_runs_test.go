@@ -111,3 +111,23 @@ func TestDoctorTokenFailureInventoryBound(t *testing.T) {
 	require.ErrorContains(t, err, "two-page limit")
 	assert.Equal(t, 2, miner.requests)
 }
+
+func TestDoctorTokenPartialHistoryRetainsEvidence(t *testing.T) {
+	history := &DoctorAssignmentRunHistory{
+		Error: "Failure-first inventory is incomplete",
+		Limit: 1,
+		Runs: []DoctorAssignmentRunEvidence{{
+			RunID: 42, Attempt: 1, Outcome: "unknown",
+			Message: "Workflow logs contain a credential-like diagnostic",
+			URL:     "https://github.com/octo/repo/actions/runs/42",
+		}},
+	}
+	_, output := captureOutput(t, func() error {
+		printDoctorRunHistory(history, "token")
+		return nil
+	})
+	assert.Contains(t, output, history.Error)
+	assert.Contains(t, output, "Run 42 attempt 1: unknown")
+	assert.Contains(t, output, history.Runs[0].Message)
+	assert.Contains(t, output, history.Runs[0].URL)
+}

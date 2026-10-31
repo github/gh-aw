@@ -37,6 +37,7 @@ func TestDoctorTokenASTDiscovery(t *testing.T) {
 		{"dynamic reference", "github-token: ${{ secrets[inputs.name] }}", nil, false},
 		{"invalid expression", "github-token: ${{ secrets.PRIVATE_TOKEN + }}", nil, true},
 		{"implicit assignment", "safe-outputs:\n  assign-to-agent:\n    max: 3", []string{"GH_AW_AGENT_TOKEN", "GH_AW_GITHUB_TOKEN"}, false},
+		{"assignment input is not a safe output", "safe-outputs:\n  jobs:\n    custom:\n      runs-on: ubuntu-latest\n      inputs:\n        assign-to-agent:\n          type: string\n      steps:\n        - run: echo ready", nil, false},
 		{"explicit assignment", "safe-outputs:\n  assign-to-agent:\n    github-token: ${{ secrets.ASSIGNMENT }}", []string{"ASSIGNMENT"}, false},
 		{"multiline configuration", "env:\n  GH_TOKEN: >-\n    ${{ secrets.FIRST ||\n        secrets.SECOND }}", []string{"FIRST", "SECOND"}, false},
 		{"JSON stream", "{\"github-token\":\"${{ secrets.FIRST }}\"}\n{\"github-token\":\"${{ secrets.SECOND }}\"}", []string{"FIRST", "SECOND"}, false},
