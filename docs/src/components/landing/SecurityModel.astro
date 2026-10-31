@@ -1,8 +1,14 @@
 ---
 import Octicon from '../Octicon.astro';
 import LandingSection from './LandingSection.astro';
+import { engineLogos } from './HowItWorksEngineLogos';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const engines = [
+  { id: 'copilot', name: 'GitHub Copilot' },
+  { id: 'codex', name: 'Codex' },
+  { id: 'claude', name: 'Claude Code' },
+] as const;
 ---
 
 <LandingSection
@@ -10,7 +16,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   title="Read. Propose. Check. Apply."
   lede="The agent reasons about your repository. It does not hold the authority to change it."
 >
-  <figure class="security-flow" aria-label="Security flow from GitHub triggers through the agent to safe outputs">
+  <figure class="security-flow" aria-label="Security flow from GitHub and Jira triggers through the agent to safe outputs">
     <ol class="flow">
       <li class="phase trigger">
         <div class="phase-heading"><span class="step">01</span><h3>Trigger</h3></div>
@@ -22,7 +28,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <span class="graph-node"><Octicon name="play" size={16} />Actions</span>
           <span class="graph-hub"><Octicon name="mark-github" size={26} /></span>
         </div>
-        <p class="detail">Repository events, schedules and manual runs activate your workflow.</p>
+        <a class="gate external-trigger" href={`${base}/reference/triggers/`}>
+          <Octicon name="issue-opened" size={16} />
+          <span><strong>Jira</strong><small>Via authenticated repository dispatch</small></span>
+          <Octicon name="arrow-right" size={16} />
+        </a>
+        <p class="detail">Repository events, schedules, manual runs and external dispatches activate your workflow.</p>
         <a class="gate input-gate" href={`${base}/reference/integrity/`}>
           <Octicon name="filter" size={16} />
           <span>Sanitized inputs<br /><small>Integrity-filtered GitHub content</small></span>
@@ -34,7 +45,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <p class="description">Read-only access. Room to reason.</p>
         <div class="sandbox">
           <span class="sandbox-label"><Octicon name="container" size={14} />Isolated agent sandbox</span>
-          <div class="agent-core"><Octicon name="copilot" size={32} /><strong>0 secrets</strong></div>
+          <div class="agent-engines">
+            {engines.map(engine => (
+              <svg width="28" height="28" viewBox={engineLogos[engine.id].viewBox} fill="currentColor" role="img" aria-label={engine.name}>
+                <title>{engine.name}</title>
+                {engineLogos[engine.id].paths.map(path => <path d={path} />)}
+              </svg>
+            ))}
+          </div>
+          <div class="agent-core"><strong>0 secrets</strong></div>
           <p>Credentials stay outside the agent.</p>
           <div class="agent-rules"><span>Read-only GitHub tools</span><span>Filtered inputs</span><span>Allowlisted network</span></div>
         </div>
@@ -94,11 +113,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   a:focus-visible { outline: 2px solid var(--aw-color-accent); outline-offset: 4px; }
   .gate > :global(svg), .staged > :global(svg), .applied > :global(svg) { flex-shrink: 0; }
   .input-gate { margin-top: 1rem; }
-  .input-gate > :global(svg:last-child) { margin-left: auto; }
+  .external-trigger { margin-top: 1rem; }
+  .input-gate > :global(svg:last-child), .external-trigger > :global(svg:last-child) { margin-left: auto; }
   small { display: block; margin-top: 0.25rem; font-size: var(--aw-step--1); font-weight: 400; line-height: 1.5; color: var(--aw-color-text-secondary); }
   .sandbox { padding: 1rem; border: 1px dashed var(--aw-color-border-strong); border-radius: var(--aw-radius-md); text-align: center; }
   .sandbox-label { display: flex; justify-content: center; align-items: center; gap: 0.4rem; color: var(--aw-color-text-secondary); font-size: var(--aw-step--1); }
-  .agent-core { display: flex; justify-content: center; align-items: center; gap: 0.75rem; margin-top: 1.25rem; }
+  .agent-engines { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.25rem; }
+  .agent-core { display: flex; justify-content: center; align-items: center; margin-top: 0.75rem; }
   .agent-core strong { font-size: var(--aw-step-3); font-weight: 550; letter-spacing: -0.035em; }
   .sandbox p { margin: 0.5rem 0 1.25rem; font-size: var(--aw-step--1); color: var(--aw-color-text-secondary); }
   .agent-rules { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem; }

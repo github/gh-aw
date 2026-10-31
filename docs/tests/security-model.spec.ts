@@ -7,6 +7,13 @@ test.beforeEach(async ({ page }) => {
 test("explains the security boundaries in an ordered flow", async ({ page }) => {
   const section = page.locator("main #security-model");
   await expect(section.getByRole("heading", { level: 3 })).toHaveText(["Trigger", "Agent", "Safe outputs"]);
+  const jira = section.getByRole("link", { name: /Jira/ });
+  await expect(jira).toBeVisible();
+  await expect(jira).toContainText("Via authenticated repository dispatch");
+  await expect(jira).toHaveAttribute("href", "/gh-aw/reference/triggers/");
+  for (const name of ["GitHub Copilot", "Codex", "Claude Code"]) {
+    await expect(section.getByRole("img", { name, exact: true })).toBeVisible();
+  }
   await expect(section).toContainText("0 secrets");
   await expect(section).toContainText("Credentials stay outside the agent");
   await expect(section).toContainText("Buffered as artifacts, not applied here");
@@ -51,6 +58,9 @@ test("includes the security flow as its own slideshow slide and restores it on e
   for (let step = 0; step < index; step++) await page.keyboard.press("ArrowRight");
   await expect(dialog.getByRole("heading", { name: "Read. Propose. Check. Apply.", exact: true })).toBeVisible();
   await expect(dialog.locator("#security-model .phase")).toHaveCount(3);
+  await expect(dialog.getByRole("link", { name: /Jira/ })).toBeVisible();
+  await expect(dialog.getByRole("img", { name: "Codex", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("img", { name: "Claude Code", exact: true })).toBeVisible();
   for (const size of [
     { width: 1440, height: 900 },
     { width: 1024, height: 600 },
