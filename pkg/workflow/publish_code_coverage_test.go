@@ -106,7 +106,7 @@ func TestParseUploadCodeCoverageConfig(t *testing.T) {
 	}
 }
 
-func TestUploadCodeCoverageExperimentalWarning(t *testing.T) {
+func TestUploadCodeCoverageNoExperimentalWarning(t *testing.T) {
 	data := &WorkflowData{
 		SafeOutputs: &SafeOutputsConfig{
 			UploadCodeCoverage: &UploadCodeCoverageConfig{},
@@ -118,11 +118,11 @@ func TestUploadCodeCoverageExperimentalWarning(t *testing.T) {
 	c.emitExperimentalFeatureWarningsTo(data, &buf)
 
 	expectedMessage := "Using experimental feature: upload-code-coverage"
-	if !strings.Contains(buf.String(), expectedMessage) {
-		t.Fatalf("expected warning containing %q, got stderr:\n%s", expectedMessage, buf.String())
+	if strings.Contains(buf.String(), expectedMessage) {
+		t.Fatalf("did not expect warning %q, got stderr:\n%s", expectedMessage, buf.String())
 	}
-	if c.GetWarningCount() == 0 {
-		t.Fatal("expected warning count > 0")
+	if c.GetExperimentalWarningCount() != 0 {
+		t.Fatal("expected no experimental warnings")
 	}
 }
 

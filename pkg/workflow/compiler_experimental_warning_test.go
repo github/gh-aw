@@ -49,3 +49,26 @@ func TestExperimentalWarningAccounting(t *testing.T) {
 	}
 
 }
+
+func TestStableSafeOutputsNoExperimentalWarning(t *testing.T) {
+	t.Parallel()
+	for _, batch := range []bool{false, true} {
+		compiler := NewCompiler()
+		compiler.SetBatchMode(batch)
+		data := &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{
+				DispatchRepository: &DispatchRepositoryConfig{},
+				MergePullRequest:   &MergePullRequestConfig{},
+				ApproveWorkflowRun: &ApproveWorkflowRunConfig{},
+				ReplaceLabel:       &ReplaceLabelConfig{},
+				UploadCodeCoverage: &UploadCodeCoverageConfig{},
+			},
+		}
+		var output bytes.Buffer
+		compiler.emitExperimentalFeatureWarningsTo(data, &output)
+		assert.Empty(t, output.String(), "batch mode: %t", batch)
+		assert.Zero(t, compiler.GetWarningCount(), "batch mode: %t", batch)
+		assert.Zero(t, compiler.GetExperimentalWarningCount(), "batch mode: %t", batch)
+		assert.Empty(t, compiler.GetExperimentalFeatureUsage(), "batch mode: %t", batch)
+	}
+}

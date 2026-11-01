@@ -1601,7 +1601,7 @@
   },
   {
     "name": "upload_code_coverage",
-    "description": "Experimental. Upload a code coverage report (e.g. a Cobertura XML file) to GitHub's code coverage API via actions/upload-code-coverage. Before calling this tool, write or copy the coverage report file into the upload-code-coverage staging directory at /tmp/gh-aw/safeoutputs/upload-code-coverage/ (or provide an absolute path / workspace-relative path, which will be auto-copied into staging). Shell variable syntax (for example, \"$VAR/...\") must NOT appear in file values because variables are not expanded in JSON strings. Only one coverage report can be uploaded per run.",
+    "description": "Upload a code coverage report (e.g. a Cobertura XML file) to GitHub's code coverage API via actions/upload-code-coverage. Before calling this tool, write or copy the coverage report file into the upload-code-coverage staging directory at /tmp/gh-aw/safeoutputs/upload-code-coverage/ (or provide an absolute path / workspace-relative path, which will be auto-copied into staging). Shell variable syntax (for example, \"$VAR/...\") must NOT appear in file values because variables are not expanded in JSON strings. Only one coverage report can be uploaded per run.",
     "inputSchema": {
       "type": "object",
       "required": ["file", "language", "label"],

@@ -75,7 +75,7 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
   ```
 
   Triggers other agentic workflows using workflow_dispatch. Agent output includes `workflow_name` (without .md extension) and optional `inputs` (key-value pairs). Cross-repo dispatch is supported via `target-repo` plus an `allowed-repos` allowlist; cross-repo targets require a token with `actions: write` on the target repository. For queue workers, load [work-queue.md](work-queue.md) and use `work_queue_dispatch_next` to request a bounded pool prefix. Trusted processing selects Work and the installed worker profile; do not select `work_id` through `dispatch_workflow` or declare reserved assignment/caller inputs.
-- `dispatch-repository:` - Dispatch `repository_dispatch` events to external repositories (experimental)
+- `dispatch-repository:` - Dispatch `repository_dispatch` events to external repositories
 
   ```yaml
   safe-outputs:
