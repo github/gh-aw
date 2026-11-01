@@ -164,7 +164,7 @@ remain unchanged.
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `FormatImportCycleError` | `func(*ImportCycleError) error` | Formats a cycle error with the import chain |
-| `FormatImportError` | `func(*ImportError, yamlContent string) error` | Formats an import error with YAML context |
+| `FormatImportError` | `func(*ImportError, yamlContent string) error` | Formats an import error with YAML context without exposing its underlying error chain |
 | `NewFormattedParserError` | `func(formatted string) *FormattedParserError` | Creates a pre-formatted parser error |
 | `NewValidationError` | `func(field, value, reason, suggestion string) *ValidationError` | Creates a `ValidationError` embedding `validationerror.Payload`, for uniform detection via `errors.As` |
 | `FormatYAMLError` | `func(err error, frontmatterLineOffset int, sourceYAML string) string` | Formats a YAML error with source code context, adjusting line numbers by the frontmatter offset |

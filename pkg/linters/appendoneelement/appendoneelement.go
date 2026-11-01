@@ -95,7 +95,9 @@ func analyzeAppendOneElement(pass *analysis.Pass, n ast.Node, generatedFiles fil
 // matchSingleElementSpread validates that call.Args[1] is a single-element slice
 // literal spread and returns the text representations of slice, element, and literal.
 func matchSingleElementSpread(pass *analysis.Pass, call *ast.CallExpr) (sliceText, elemText, litText string, ok bool) {
-	lit, litOK := call.Args[1].(*ast.CompositeLit)
+	// astutil.UnwrapParenExpr handles a parenthesized literal, e.g.
+	// append(s, ([]int{3})...).
+	lit, litOK := astutil.UnwrapParenExpr(call.Args[1]).(*ast.CompositeLit)
 	if !litOK {
 		return "", "", "", false
 	}
