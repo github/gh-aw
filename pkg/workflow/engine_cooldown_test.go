@@ -86,6 +86,10 @@ func TestEngineCooldownInstalls(t *testing.T) {
 					data := &WorkflowData{
 						Name: "cooldown", EngineConfig: &EngineConfig{ID: engine.GetID(), Version: version, Cooldown: &days},
 						SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{Type: SandboxTypeAWF, Runtime: AgentRuntimeNVX}},
+						Runtimes:      map[string]any{"node": map[string]any{"cooldown": false}},
+					}
+					if days == 3 {
+						data.EngineConfig.Cooldown = nil
 					}
 					steps := engine.GetInstallationSteps(data)
 					var installs int
@@ -106,7 +110,10 @@ func TestEngineCooldownInstalls(t *testing.T) {
 		}
 	}
 	for _, days := range []int{0, 7} {
-		data := &WorkflowData{EngineConfig: &EngineConfig{ID: "copilot", Version: "${{ inputs.engine-version }}", Cooldown: &days, CopilotSDK: true}}
+		data := &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "copilot", Version: "${{ inputs.engine-version }}", Cooldown: &days, CopilotSDK: true},
+			Runtimes:     map[string]any{"node": map[string]any{"cooldown": false}},
+		}
 		content := stepsToString(NewCopilotEngine().GetInstallationSteps(data))
 		assert.Contains(t, content, fmt.Sprintf("--cooldown-days %d", days))
 		assert.Contains(t, content, `"${ENGINE_VERSION}"`)

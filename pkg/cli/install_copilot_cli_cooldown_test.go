@@ -121,7 +121,11 @@ esac
 			logPath := filepath.Join(dir, "curl.log")
 			installDir := filepath.Join(dir, "installed")
 			require.NoError(t, os.MkdirAll(installDir, 0o755))
-			cmd := exec.Command("bash", installerPath, test.version, "--cooldown-days", test.days)
+			args := []string{installerPath, test.version, "--cooldown-days", test.days}
+			if test.cached {
+				args = append(args, "--checksums-sha256", pin, "--prefer-toolcache")
+			}
+			cmd := exec.Command("bash", args...)
 			cmd.Env = append(os.Environ(),
 				"HOME="+dir, "RUNNER_TOOL_CACHE="+cache,
 				"RUNNER_TEMP="+filepath.Join(dir, "runner-temp"),
