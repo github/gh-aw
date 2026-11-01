@@ -14650,11 +14650,13 @@
       }
     },
     "evals": {
-      "description": "\u26a0\ufe0f Experimental. BinEval binary evaluation questions to run after safe-outputs and before the conclusion job. Can be a plain list of questions (shorthand) or an object with questions, model, and runs-on fields.",
+      "description": "\u26a0\ufe0f Experimental. BinEval binary questions evaluated after the agent by one OpenAI-compatible Decisions request, independently of the agentic engine. Choice answers are YES, NO, or UNKNOWN. Supports 1-400 questions, as a plain list or an object with questions, model, and runs-on fields.",
       "oneOf": [
         {
           "type": "array",
           "description": "Shorthand form: plain list of evaluation question objects.",
+          "minItems": 1,
+          "maxItems": 400,
           "items": {
             "type": "object",
             "required": ["id", "question"],
@@ -14667,10 +14669,6 @@
               "question": {
                 "type": "string",
                 "description": "The binary (YES/NO) question to evaluate."
-              },
-              "model": {
-                "type": "string",
-                "description": "Optional model override for this specific question. Overrides the top-level model setting. Use a model alias such as \"small\" or a full model ID."
               }
             }
           }
@@ -14683,6 +14681,8 @@
             "questions": {
               "type": "array",
               "description": "List of binary evaluation question objects.",
+              "minItems": 1,
+              "maxItems": 400,
               "items": {
                 "type": "object",
                 "required": ["id", "question"],
@@ -14695,17 +14695,13 @@
                   "question": {
                     "type": "string",
                     "description": "The binary (YES/NO) question to evaluate."
-                  },
-                  "model": {
-                    "type": "string",
-                    "description": "Optional model override for this specific question. Overrides the top-level model setting. Use a model alias such as \"small\" or a full model ID."
                   }
                 }
               }
             },
             "model": {
               "type": "string",
-              "description": "Default model to use for all evaluation questions. Use a model alias such as \"small\" or a full model ID. Per-question model fields override this setting."
+              "description": "Decisions-compatible model for the entire question batch. Defaults to gpt-6-luna, subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent model. Prefix with openai/ to use OpenAI credentials; unqualified models use Copilot. Per-question model overrides are not supported."
             },
             "runs-on": {
               "$ref": "#/$defs/github_actions_runs_on"

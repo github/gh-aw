@@ -368,6 +368,14 @@ observations count toward `min_samples`, and the same t-test, Mann–Whitney, pr
 Bayesian comparisons available for grader-backed metrics are applied to the YES/NO outcomes.
 `UNKNOWN` answers remain excluded. They are not treated as `NO`.
 
+The evals job batches 1–400 binary questions into a single OpenAI-compatible
+`POST /decisions` request, using `choice` answers (`YES`, `NO`, or `UNKNOWN`).
+It runs independently of the agentic engine and defaults to `gpt-6-luna`.
+Set `evals.model` to another Decisions-compatible model, or
+`openai/gpt-6-luna` to use `CODEX_API_KEY`/`OPENAI_API_KEY` instead of Copilot
+credentials. Per-question model overrides are not supported. Transport failures
+are recorded as `not_evaluated`, not as negative or unknown answers.
+
 ### Deterministic decisions
 
 `gh aw experiments analyze <workflow>` keeps each experiment stage distinct:

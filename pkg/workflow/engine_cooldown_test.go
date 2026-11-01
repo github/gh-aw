@@ -168,7 +168,7 @@ func TestEngineCooldownSecondaryJobInheritance(t *testing.T) {
 	c := NewCompiler()
 	assert.Contains(t, strings.Join(c.buildDetectionEngineExecutionStep(data), ""), "--cooldown-days 7")
 	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 7")
-	assert.Contains(t, strings.Join(c.buildEvalsEngineSteps(data), ""), "--cooldown-days 7")
+	assert.NotContains(t, strings.Join(c.buildEvalsDecisionSteps(data), ""), "--cooldown-days")
 	cloned := cloneThreatDetectionEngineConfig("copilot", &EngineConfig{ID: "pi", Cooldown: &days})
 	assert.Equal(t, &days, cloned.Cooldown, "age policy is not specific to an engine identity")
 	zero := 0

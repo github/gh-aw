@@ -12,23 +12,19 @@ import (
 var evalsConfigLog = logger.New("workflow:evals_config")
 
 // EvalDefinition represents a single binary evaluation question in a BinEval workflow.
-// Each question is evaluated independently and answered with YES or NO.
+// Questions share one Decisions request and receive YES, NO, or UNKNOWN choices.
 type EvalDefinition struct {
 	ID       string
 	Question string
-	// Model is an optional per-question model override. When set, it takes precedence over
-	// EvalsConfig.Model. Use a model alias such as "small" or a full model ID.
-	Model string
 }
 
 // EvalsConfig holds the configuration for BinEval-style evaluations declared in workflow
-// frontmatter. Evaluations run after safe-outputs and before the conclusion job.
+// frontmatter. Evaluations run after the agent, in parallel with safe-outputs.
 type EvalsConfig struct {
 	// Questions is the ordered list of binary evaluation questions.
 	Questions []EvalDefinition
-	// Model is the default LLM model to use for evaluations. Use a model alias such as
-	// "small" or a full model ID. Per-question Model fields override this value.
-	// When empty, the compiler default ("evals") is used.
+	// Model is the Decisions-compatible model for the entire batch.
+	// When empty, gpt-6-luna is used, subject to GH_AW_DEFAULT_EVALS_MODEL.
 	Model string
 	// RunsOn allows overriding the runner for the evals job.
 	RunsOn string
@@ -54,7 +50,7 @@ func (ec *EvalsConfig) HasEvals() bool {
 //	  questions:
 //	    - id: builds
 //	      question: Does the generated code compile?
-//	  model: small
+//	  model: gpt-6-luna
 func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*EvalsConfig, error) {
 	raw, exists := frontmatter["evals"]
 	if !exists || raw == nil {
@@ -90,7 +86,7 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 		if modelRaw, ok := v["model"]; ok {
 			modelStr, ok := modelRaw.(string)
 			if !ok {
-				return nil, fmt.Errorf("evals.model must be a string, got %T. Example:\nevals:\n  model: small", modelRaw)
+				return nil, fmt.Errorf("evals.model must be a string, got %T. Example:\nevals:\n  model: gpt-6-luna", modelRaw)
 			}
 			cfg.Model = strings.TrimSpace(modelStr)
 		}
@@ -108,13 +104,7 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 		return nil, err
 	}
 
-	perQuestionOverrides := 0
-	for _, q := range cfg.Questions {
-		if q.Model != "" {
-			perQuestionOverrides++
-		}
-	}
-	evalsConfigLog.Printf("Parsed %d eval definitions (model: %q, per-question overrides: %d)", len(cfg.Questions), cfg.Model, perQuestionOverrides)
+	evalsConfigLog.Printf("Parsed %d eval definitions (Decisions model: %q)", len(cfg.Questions), cfg.Model)
 	return cfg, nil
 }
 
@@ -162,13 +152,8 @@ func parseEvalDefinition(m map[string]any, idx int) (EvalDefinition, error) {
 		Question: strings.TrimSpace(question),
 	}
 
-	// Optional per-question model override.
-	if modelRaw, ok := m["model"]; ok {
-		modelStr, ok := modelRaw.(string)
-		if !ok {
-			return EvalDefinition{}, fmt.Errorf("evals item %d has a 'model' that must be a string, got %T. Example:\nevals:\n  - id: readme\n    question: Does the README explain setup?\n    model: small", idx, modelRaw)
-		}
-		def.Model = strings.TrimSpace(modelStr)
+	if _, ok := m["model"]; ok {
+		return EvalDefinition{}, fmt.Errorf("evals question %q cannot override the model: all questions share one Decisions request. Set evals.model for the entire batch", id)
 	}
 
 	return def, nil
@@ -181,6 +166,9 @@ func validateEvals(cfg *EvalsConfig) error {
 	}
 	if len(cfg.Questions) == 0 {
 		return errors.New("evals requires at least one question when configured. Example:\nevals:\n  - id: readme\n    question: Does the README explain setup?")
+	}
+	if len(cfg.Questions) > 400 {
+		return errors.New("evals supports at most 400 questions in one Decisions request. Reduce the question list to 400 or fewer")
 	}
 
 	seen := make(map[string]struct{}, len(cfg.Questions))

@@ -24544,9 +24544,10 @@ model: "example-value"
 graders:
   {}
 
-# ⚠️ Experimental. BinEval binary evaluation questions to run after safe-outputs
-# and before the conclusion job. Can be a plain list of questions (shorthand) or
-# an object with questions, model, and runs-on fields.
+# ⚠️ Experimental. BinEval binary questions evaluated after the agent by one
+# OpenAI-compatible Decisions request, independently of the agentic engine. Choice
+# answers are YES, NO, or UNKNOWN. Supports 1-400 questions, as a plain list or an
+# object with questions, model, and runs-on fields.
 # (optional)
 # Accepted formats:
 
@@ -24566,13 +24567,10 @@ evals:
       # The binary (YES/NO) question to evaluate.
       question: "example-value"
 
-      # Optional model override for this specific question. Overrides the top-level
-      # model setting. Use a model alias such as "small" or a full model ID.
-      # (optional)
-      model: "example-value"
-
-  # Default model to use for all evaluation questions. Use a model alias such as
-  # "small" or a full model ID. Per-question model fields override this setting.
+  # Decisions-compatible model for the entire question batch. Defaults to
+  # gpt-6-luna, subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent
+  # model. Prefix with openai/ to use OpenAI credentials; unqualified models use
+  # Copilot. Per-question model overrides are not supported.
   # (optional)
   model: "example-value"
 

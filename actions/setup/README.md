@@ -114,6 +114,22 @@ values; the runner-mask policy does not reduce that redaction.
 
 ## Development
 
+### Decisions client
+
+`js/decisions_client.cjs` exports
+`invokeDecisions({ baseURL, apiKey?, model, input, questions, timeoutMs?, fetchImpl? })`.
+It sends the whole question array in one `POST` to `<baseURL>/decisions` and
+returns the response, including its named answers, model, and token usage.
+The helper supports `predicate`, `choice`, and `score` questions, string or
+boolean choice values, and text/image/JSON question instructions.
+
+The caller supplies a provider API base URL (for example
+`https://api.openai.com/v1`) or a credential-free AWF proxy URL. The default
+timeout is 120 seconds. The client rejects invalid batches, mismatched answers,
+HTTP failures, and redirects without retrying or logging provider bodies.
+Refusals remain typed answers for the caller to handle. It requires no SDK,
+Actions globals, or agentic engine.
+
 ### Synthetic message previews
 
 `js/testdata/messages_preview.md` contains locally rendered previews of shared

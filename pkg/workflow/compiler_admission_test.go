@@ -269,7 +269,7 @@ func TestAdmissionComponentExecutionWiring(t *testing.T) {
 					SafeOutputs:      &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
 				}
 				compiler := NewCompiler()
-				evals := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+				evals := strings.Join(compiler.buildEvalsDecisionSteps(data), "")
 				assert.Equal(t, !dryRun, strings.Contains(evals, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}"))
 				assert.Equal(t, !dryRun, strings.Contains(evals, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"))
 				assert.NotContains(t, evals, "needs.activation.outputs.admission-max-ai-credits-threat-detection")
