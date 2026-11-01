@@ -225,9 +225,6 @@ func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActio
 			"      - name: " + spec.stepName,
 			"        run: |",
 		}
-		if usesNpm && cooldownDays > 0 {
-			step = appendNpmCooldownVersionCheck(step, cooldownDays)
-		}
 		for _, line := range spec.runLines {
 			step = append(step, "          "+line)
 		}
@@ -237,19 +234,6 @@ func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActio
 				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
 			)
 		}
-		return step
-	}
-	if usesNpm && cooldownDays > 0 {
-		step := GitHubActionStep{
-			"      - name: " + spec.stepName,
-			"        run: |",
-		}
-		step = appendNpmCooldownVersionCheck(step, cooldownDays)
-		step = append(step, "          "+spec.command)
-		step = append(step,
-			"        env:",
-			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
-		)
 		return step
 	}
 	step := GitHubActionStep{

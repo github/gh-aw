@@ -24,8 +24,23 @@ func TestCopilotSDKNpmInstallCooldownInMultilineStep(t *testing.T) {
 
 	step := strings.Join(specToInstallStep(spec, 7), "\n")
 	if !strings.Contains(step, "NPM_CONFIG_MIN_RELEASE_AGE: '7'") ||
-		!strings.Contains(step, "npm 11.10.0 or newer is required") {
-		t.Fatalf("Expected multiline npm SDK installs to enforce the configured cooldown, got:\n%s", step)
+		strings.Contains(step, "npm --version") {
+		t.Fatalf("Expected multiline npm SDK installs to use npm's built-in cooldown without a version-check script, got:\n%s", step)
+	}
+}
+
+func TestCopilotSDKNpmInstallCooldownInSingleLineStep(t *testing.T) {
+	spec := copilotSDKInstallSpec{
+		stepName: "Install test SDK",
+		command:  "npm install --ignore-scripts --no-save example-sdk@1.2.3",
+	}
+	for _, days := range []int{0, 3, 7} {
+		step := strings.Join(specToInstallStep(spec, days), "\n")
+		if !strings.Contains(step, "run: "+spec.command) ||
+			!strings.Contains(step, "NPM_CONFIG_MIN_RELEASE_AGE: '"+strconv.Itoa(days)+"'") ||
+			strings.Contains(step, "npm --version") {
+			t.Fatalf("Expected single-line npm SDK install with native cooldown configuration, got:\n%s", step)
+		}
 	}
 }
 

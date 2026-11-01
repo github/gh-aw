@@ -100,7 +100,7 @@ The value must be a nonnegative integer number of days, not a boolean, string, d
 
 Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass this age to npm through `NPM_CONFIG_MIN_RELEASE_AGE`, including compiler-managed microVM staging. Copilot's native installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive, including musl guest binaries. Missing or invalid metadata fails the installation. The cooldown also applies to pinned versions and runtime version expressions; it does not replace checksum verification or version pins.
 
-When a Node.js runtime override is configured, its npm version must be **11.10.0 or later** to enforce `NPM_CONFIG_MIN_RELEASE_AGE`. Compiler-managed npm installs fail before installing the package if npm is older or the version cannot be determined.
+npm enforces the cooldown through its built-in `min-release-age` setting at installation time; no custom version-check script is generated. Node.js runtime overrides must provide npm **11.10.0 or later** to support this setting. Older npm versions may ignore it.
 
 The policy covers compiler-managed npm and Copilot release installs, not arbitrary shell installers, custom `engine.command` executables, pre-agent steps, extensions, or other externally managed installation methods. Runtime dependency cooldowns remain separately configured by `runtimes.<id>.cooldown` (a boolean).
 

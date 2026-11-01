@@ -647,13 +647,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex CLI
-        run: |
-          NPM_VERSION="$(npm --version)" || { echo "ERROR: npm 11.10.0 or newer is required to enforce engine.cooldown; use a compatible Node.js runtime or install a supported npm version." >&2; exit 1; }
-          if ! printf '%s\n' "$NPM_VERSION" | awk -F. '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { supported = ($1 > 11 || ($1 == 11 && $2 >= 10)) } END { exit !supported }'; then
-            echo "ERROR: npm 11.10.0 or newer is required to enforce the configured 3-day engine cooldown." >&2
-            exit 1
-          fi
-          npm install --ignore-scripts -g @openai/codex@0.165.0
+        run: npm install --ignore-scripts -g @openai/codex@0.165.0
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
@@ -1970,13 +1964,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex CLI
-        run: |
-          NPM_VERSION="$(npm --version)" || { echo "ERROR: npm 11.10.0 or newer is required to enforce engine.cooldown; use a compatible Node.js runtime or install a supported npm version." >&2; exit 1; }
-          if ! printf '%s\n' "$NPM_VERSION" | awk -F. '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { supported = ($1 > 11 || ($1 == 11 && $2 >= 10)) } END { exit !supported }'; then
-            echo "ERROR: npm 11.10.0 or newer is required to enforce the configured 3-day engine cooldown." >&2
-            exit 1
-          fi
-          npm install --ignore-scripts -g @openai/codex@0.165.0
+        run: npm install --ignore-scripts -g @openai/codex@0.165.0
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Prepare Codex config for threat-detect
@@ -2305,13 +2293,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex CLI
-        run: |
-          NPM_VERSION="$(npm --version)" || { echo "ERROR: npm 11.10.0 or newer is required to enforce engine.cooldown; use a compatible Node.js runtime or install a supported npm version." >&2; exit 1; }
-          if ! printf '%s\n' "$NPM_VERSION" | awk -F. '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { supported = ($1 > 11 || ($1 == 11 && $2 >= 10)) } END { exit !supported }'; then
-            echo "ERROR: npm 11.10.0 or newer is required to enforce the configured 3-day engine cooldown." >&2
-            exit 1
-          fi
-          npm install --ignore-scripts -g @openai/codex@0.165.0
+        run: npm install --ignore-scripts -g @openai/codex@0.165.0
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary

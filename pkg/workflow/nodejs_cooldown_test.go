@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -26,11 +27,12 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 	if err != nil {
 		t.Skip("npm is required for the local registry installation test")
 	}
-	version, err := exec.Command(npm, "--version").Output()
+	configJSON, err := exec.Command(npm, "config", "list", "--json").Output()
 	require.NoError(t, err)
-	preflight := exec.Command("bash", "-c", strings.Join(appendNpmCooldownVersionCheck(nil, 3), "\n"))
-	if err := preflight.Run(); err != nil {
-		t.Skipf("cooldown-capable npm is required (installed: %s)", strings.TrimSpace(string(version)))
+	var config map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(configJSON, &config))
+	if _, supported := config["min-release-age"]; !supported {
+		t.Skip("npm with built-in min-release-age support is required")
 	}
 
 	var archive bytes.Buffer
@@ -135,61 +137,23 @@ func TestNpmEngineCooldownAtInstallationTime(t *testing.T) {
 	}
 }
 
-func TestNpmCooldownVersionCheckFailsClosedOnUnsupportedNpm(t *testing.T) {
-	tests := []struct {
-		version string
-		valid   bool
-	}{
-		{version: "11.9.0"},
-		{version: "11.10.0", valid: true},
-		{version: "12.0.0", valid: true},
-		{version: "unknown"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.version, func(t *testing.T) {
-			binDir := t.TempDir()
-			npm := filepath.Join(binDir, "npm")
-			require.NoError(t, os.WriteFile(npm, []byte("#!/bin/sh\nprintf '%s\\n' \"$NPM_VERSION_FIXTURE\"\n"), 0o755))
-			lines := appendNpmCooldownVersionCheck(nil, 3)
-			scriptLines := make([]string, len(lines))
-			for i, line := range lines {
-				scriptLines[i] = strings.TrimSpace(line)
-			}
-			cmd := exec.Command("bash", "-c", strings.Join(scriptLines, "\n"))
-			cmd.Env = append(os.Environ(),
-				"NPM_VERSION_FIXTURE="+test.version,
-				"PATH="+binDir+":"+os.Getenv("PATH"),
-			)
-			err := cmd.Run()
-			if test.valid {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
+func TestNpmEngineInstallPathsUseBuiltinCooldown(t *testing.T) {
+	for _, days := range []int{0, 3, 7} {
+		hostSteps := GenerateNpmInstallSteps("example-engine", "1.2.3", "Install", "example", NPMInstallOptions{
+			CooldownDays: &days,
 		})
+		host := strings.Join(hostSteps[0], "\n")
+		assert.Contains(t, host, "run: npm install --ignore-scripts -g example-engine@1.2.3")
+		microVM := strings.Join(GenerateMicroVMNpmCLIInstallStep("example-engine", "1.2.3", "Install microVM", "example", false, true, days), "\n")
+		for name, step := range map[string]string{"host": host, "microVM": microVM} {
+			t.Run(fmt.Sprintf("%s/%d", name, days), func(t *testing.T) {
+				assert.Contains(t, step, fmt.Sprintf("NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days))
+				assert.NotContains(t, step, "npm --version")
+				assert.NotContains(t, step, "NPM_VERSION")
+				assert.NotContains(t, step, "awk")
+			})
+		}
 	}
-}
-
-func TestNpmEngineInstallPathsRequireCooldownCapableNpm(t *testing.T) {
-	hostSteps := GenerateNpmInstallSteps("example-engine", "1.2.3", "Install", "example", NPMInstallOptions{
-		CooldownEnabled: true,
-	})
-	host := strings.Join([]string(hostSteps[0]), "\n")
-	microVM := strings.Join(GenerateMicroVMNpmCLIInstallStep("example-engine", "1.2.3", "Install microVM", "example", false, true, 7), "\n")
-	for name, step := range map[string]string{"host": host, "microVM": microVM} {
-		t.Run(name, func(t *testing.T) {
-			assert.Contains(t, step, "npm 11.10.0 or newer is required")
-			assert.Contains(t, step, "NPM_CONFIG_MIN_RELEASE_AGE")
-		})
-	}
-
-	days := 0
-	disabledSteps := GenerateNpmInstallSteps("example-engine", "1.2.3", "Install", "example", NPMInstallOptions{
-		CooldownDays: &days,
-	})
-	disabled := strings.Join([]string(disabledSteps[0]), "\n")
-	assert.NotContains(t, disabled, "npm 11.10.0 or newer is required")
 }
 
 // TestResolveRuntimeCooldown_NilWorkflowData verifies nil WorkflowData defaults to

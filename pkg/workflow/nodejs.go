@@ -11,10 +11,7 @@ import (
 
 var nodejsLog = logger.New("workflow:nodejs")
 
-const (
-	npmDefaultCooldownDays    = 3
-	npmCooldownMinimumVersion = "11.10.0"
-)
+const npmDefaultCooldownDays = 3
 
 // NPMInstallOptions configures generated npm installation steps.
 type NPMInstallOptions struct {
@@ -396,9 +393,6 @@ func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandNam
 		}
 	}
 
-	if cooldownEnabled && days > 0 {
-		installStep = appendNpmCooldownVersionCheck(installStep, days)
-	}
 	installStep = append(installStep,
 		"          "+installCommand,
 		fmt.Sprintf(`          ln -sf "../node_modules/.bin/%s" "${RUNNER_TEMP}/gh-aw/engine-cli/bin/%s"`, commandName, commandName),
@@ -463,13 +457,9 @@ func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPr
 	} else {
 		installCmd = fmt.Sprintf("npm install %s%s%s@%s", ignoreScriptsFlag, globalFlag, packageName, version)
 	}
-	installStep := GitHubActionStep{"      - name: " + stepName}
-	if cooldownEnabled && days > 0 {
-		installStep = append(installStep, "        run: |")
-		installStep = appendNpmCooldownVersionCheck(installStep, days)
-		installStep = append(installStep, "          "+installCmd)
-	} else {
-		installStep = append(installStep, "        run: "+installCmd)
+	installStep := GitHubActionStep{
+		"      - name: " + stepName,
+		"        run: " + installCmd,
 	}
 	if ExpressionPattern.MatchString(version) || cooldownEnabled {
 		installStep = append(installStep, "        env:")
@@ -483,16 +473,6 @@ func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPr
 	steps = append(steps, installStep)
 
 	return steps
-}
-
-func appendNpmCooldownVersionCheck(step GitHubActionStep, days int) GitHubActionStep {
-	return append(step,
-		fmt.Sprintf(`          NPM_VERSION="$(npm --version)" || { echo "ERROR: npm %s or newer is required to enforce engine.cooldown; use a compatible Node.js runtime or install a supported npm version." >&2; exit 1; }`, npmCooldownMinimumVersion),
-		`          if ! printf '%s\n' "$NPM_VERSION" | awk -F. '$1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { supported = ($1 > 11 || ($1 == 11 && $2 >= 10)) } END { exit !supported }'; then`,
-		fmt.Sprintf(`            echo "ERROR: npm %s or newer is required to enforce the configured %d-day engine cooldown." >&2`, npmCooldownMinimumVersion, days),
-		"            exit 1",
-		"          fi",
-	)
 }
 
 func npmInstallCooldownDays(options NPMInstallOptions) (int, bool) {
