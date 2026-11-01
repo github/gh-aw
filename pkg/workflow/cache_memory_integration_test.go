@@ -43,7 +43,7 @@ tools:
 				"key: memory-none-nopolicy-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}",
 				"path: /tmp/gh-aw/cache-memory",
 				"{\\\"file\\\":\\\"cache_memory_prompt.md\\\"}",
-				"GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'",
+				`GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"`,
 				"GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR",
 			},
 			notExpectedInLock: []string{
