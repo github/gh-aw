@@ -147,7 +147,7 @@ gh aw audit 12345 12346 --json                 # JSON for CI integration
 gh aw audit 12345 12346 --group --json         # Grouped findings as JSON
 ```
 
-**Single-run report sections**: Overview, Comparison, Task/Domain, Behavior Fingerprint, Agentic Assessments, Metrics, Model Routing, Friction, Key Findings, Recommendations, Observability Insights, Performance Metrics, Engine Config, Prompt Analysis, Session Analysis, Safe Output Summary, MCP Server Health, Jobs, Downloaded Files, Missing Tools, Missing Data, Noops, MCP Failures, Gateway Steering Events, Firewall Analysis, Policy Analysis, Redacted Domains, Errors, Warnings, Tool Usage, MCP Tool Usage, Created Items, Graders.
+**Single-run report sections**: Overview, Comparison, Task/Domain, Behavior Fingerprint, Agentic Assessments, Metrics, Model Routing, Friction, Key Findings, Recommendations, Observability Insights, Performance Metrics, Engine Config, Prompt Analysis, Session Analysis, Safe Output Summary, MCP Server Health, Jobs, Downloaded Files, Missing Tools, Missing Data, Noops, MCP Failures, Gateway Steering Events, Firewall Analysis, Policy Analysis, Redacted Domains, Errors, Warnings, Tool Usage, MCP Tool Usage, Created Items, Graders, Evals.
 
 When routing data is available, Model Routing summarizes the classifier and selected route, ranked alternatives, router version and latency, request outcomes and deviations, and classifier/selected/deviated token and AIC costs. Older AWF endpoint-only deviations are attributed to the selected route. The Comparison section identifies changes in selected model, effort, mode, or router version even when overall cost is stable.
 
@@ -193,6 +193,32 @@ Cached reports are refreshed when custom results become available. Missing
 optional artifacts retain built-in results; discovery/download failures are
 reported. Audit reads results as data and never executes custom graders.
 
+### Evals summary
+
+When evals results are available, the Evals section summarizes the recorded
+answers. The top-level `evals` object in JSON includes `questions`, `yes`, `no`,
+and `unknown` counts, plus `execution_state` when execution evidence is available.
+Counts combine the run's evals invocations without counting duplicate artifact
+copies. An unavailable or conflicting execution state is omitted.
+
+For example, a judge that never started can produce:
+
+```json
+{
+  "evals": {
+    "questions": 2,
+    "yes": 0,
+    "no": 0,
+    "unknown": 2,
+    "execution_state": "not_started"
+  }
+}
+```
+
+`UNKNOWN` answers do not establish that judging completed. Review execution
+evidence and findings alongside the answer counts; a successful Actions
+conclusion alone does not establish judge or threat-detection success.
+
 ### Audit finding codes
 
 Every `key_findings` entry includes a stable `code` for downstream automation. Titles and descriptions are human-readable and may change; consumers must use `code` to identify a finding type. Existing codes are not repurposed.
@@ -218,6 +244,7 @@ Parent workflow success does not imply successful delegation. `metrics.error_cou
 | `workflow_succeeded` | The parent workflow completed successfully; the description qualifies any observed delegated failures |
 | `subagent_failed` | One or more invocations of a sub-agent failed, regardless of the parent conclusion |
 | `threat_detection_job_failed` | The `detection` job failed |
+| `engine_step_failed` | An evals judge or threat-detection engine step failed, including failures hidden by `continue-on-error` |
 | `threat_detected` | The detection artifact identified one or more threats |
 | `agentic_resource_heavy_for_domain` | Resource use was high for the inferred task domain |
 | `agentic_overkill_for_agentic` | The task may not require an agentic workflow |
@@ -227,6 +254,14 @@ Parent workflow success does not imply successful delegation. `metrics.error_cou
 | `agentic_delegated_context_present` | Delegated workflow context was preserved |
 
 The audit inspects the `detection` job result and the downloaded `detection` artifact. A failed job emits `threat_detection_job_failed`. A structured verdict in `detection_result.json`, or a legacy `THREAT_DETECTION_RESULT` verdict in `detection.log`, emits `threat_detected` when `prompt_injection`, `secret_leak`, or `malicious_patch` is true. Threat reasons are not copied into the finding description because they may contain sensitive agent output.
+
+`engine_step_failed` is a high-severity finding based on a nonzero process exit
+in the evals or detection engine step's downloaded log, or `not_started` execution
+evidence for an evals job that ran. It includes the job, available step details,
+and a bounded, sanitized diagnostic. The finding can coexist with
+`workflow_succeeded`: it does not change the Actions conclusion, and a detection
+execution failure is distinct from a detected threat. Missing step evidence
+does not establish successful execution.
 
 Audit reads failed `model.resolution` events from `usage/aw_session.jsonl` across
 engines. It attributes a role's resolution failure to startup only when the run
