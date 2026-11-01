@@ -101,7 +101,7 @@ on:
 				require.ErrorAs(t, err, &formattedErr)
 				var pathErr *os.PathError
 				require.ErrorAs(t, err, &pathErr)
-				assert.ErrorIs(t, err, os.ErrNotExist)
+				require.ErrorIs(t, err, os.ErrNotExist)
 				assert.Contains(t, err.Error(), "test.md:4:5: error: import file not found")
 				assert.Contains(t, err.Error(), "hint:")
 				assert.NotContains(t, err.Error(), pathErr.Error())
