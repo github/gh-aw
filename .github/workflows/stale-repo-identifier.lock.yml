@@ -2463,8 +2463,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"repos_analyzed","question":"Did the agent analyze repositories for staleness indicators such as inactivity, archived status, and lack of recent commits?"},{"id":"report_created","question":"Was a report or issue created summarizing the stale repository findings?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'copilot/gpt-5.6-luna'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "copilot/gpt-5.6-luna"
           GH_AW_EVALS_PHASE: setup
@@ -2611,8 +2610,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"repos_analyzed","question":"Did the agent analyze repositories for staleness indicators such as inactivity, archived status, and lack of recent commits?"},{"id":"report_created","question":"Was a report or issue created summarizing the stale repository findings?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "copilot/gpt-5.6-luna"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

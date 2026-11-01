@@ -3943,8 +3943,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"nudge-targeted","question":"Did every Copilot nudge list only unanswered review feedback or concrete blockers, request a branch update, and include its Sous-chef state fingerprint?"},{"id":"dedup-respected","question":"Did the agent avoid nudging PRs classified as unchanged, stale, dependency_bot, opted_out, agent_active, not_idle, approval_required, or nothing_actionable, and entries with nudge_needed false, repeating unchanged work only for behind or conflicting branches?"},{"id":"progress-or-noop","question":"Did the agent either perform a specific forward-progress action on an eligible PR or stop with an explicit no-op when none remained?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'copilot/claude-haiku-4.5'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "copilot/claude-haiku-4.5"
           GH_AW_EVALS_PHASE: setup
@@ -4091,8 +4090,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"nudge-targeted","question":"Did every Copilot nudge list only unanswered review feedback or concrete blockers, request a branch update, and include its Sous-chef state fingerprint?"},{"id":"dedup-respected","question":"Did the agent avoid nudging PRs classified as unchanged, stale, dependency_bot, opted_out, agent_active, not_idle, approval_required, or nothing_actionable, and entries with nudge_needed false, repeating unchanged work only for behind or conflicting branches?"},{"id":"progress-or-noop","question":"Did the agent either perform a specific forward-progress action on an eligible PR or stop with an explicit no-op when none remained?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "copilot/claude-haiku-4.5"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

@@ -2261,8 +2261,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"changes_analyzed","question":"Did the agent analyze all repository changes since the specified commit and produce a comprehensive report?"},{"id":"discussion_created","question":"Was a discussion or report created summarizing the changes since the specified commit?"},{"id":"reviewer_ready","question":"Does the report connect at least one changed file or commit, identified by a repository link, to a concrete developer implication and a specific recommended review action?"},{"id":"detail_variant_visible","question":"Does the report state its assigned detail level and follow that level in Developer Notes: brief uses at most one explanatory sentence per affected functional area, while comprehensive uses two or three?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'copilot/gpt-5.6-luna'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "copilot/gpt-5.6-luna"
           GH_AW_EVALS_PHASE: setup
@@ -2466,8 +2465,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"changes_analyzed","question":"Did the agent analyze all repository changes since the specified commit and produce a comprehensive report?"},{"id":"discussion_created","question":"Was a discussion or report created summarizing the changes since the specified commit?"},{"id":"reviewer_ready","question":"Does the report connect at least one changed file or commit, identified by a repository link, to a concrete developer implication and a specific recommended review action?"},{"id":"detail_variant_visible","question":"Does the report state its assigned detail level and follow that level in Developer Notes: brief uses at most one explanatory sentence per affected functional area, while comprehensive uses two or three?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "copilot/gpt-5.6-luna"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

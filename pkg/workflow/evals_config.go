@@ -24,8 +24,6 @@ type EvalDefinition struct {
 // EvalsConfig holds the configuration for BinEval-style evaluations declared in workflow
 // frontmatter. Evaluations run after safe-outputs and before the conclusion job.
 type EvalsConfig struct {
-	// Backend selects auto (default), llm, or decisions evaluation.
-	Backend string
 	// Questions is the ordered list of binary evaluation questions.
 	Questions []EvalDefinition
 	// Model is the default LLM model to use for evaluations. Use a model alias such as
@@ -63,7 +61,7 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 		return nil, nil
 	}
 
-	cfg := &EvalsConfig{Backend: "auto"}
+	cfg := &EvalsConfig{}
 
 	switch v := raw.(type) {
 	case []any:
@@ -110,16 +108,6 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 }
 
 func parseEvalsOptions(options map[string]any, cfg *EvalsConfig) error {
-	if backendRaw, ok := options["backend"]; ok {
-		backend, ok := backendRaw.(string)
-		if !ok {
-			return fmt.Errorf("evals.backend must be a string, got %T. Use auto, llm, or decisions", backendRaw)
-		}
-		cfg.Backend = strings.TrimSpace(backend)
-		if cfg.Backend == "" {
-			return errors.New("evals.backend must be auto, llm, or decisions")
-		}
-	}
 	if modelRaw, ok := options["model"]; ok {
 		model, ok := modelRaw.(string)
 		if !ok {
@@ -194,28 +182,12 @@ func validateEvals(cfg *EvalsConfig) error {
 	if cfg == nil {
 		return nil
 	}
-	switch cfg.Backend {
-	case "", "auto", "llm", "decisions":
-	default:
-		return errors.New("evals.backend must be auto, llm, or decisions")
-	}
-	if cfg.Backend == "decisions" {
-		if len(cfg.Questions) > 400 {
-			return errors.New("evals.backend decisions supports at most 400 questions. Reduce the questions or use backend: auto or llm")
-		}
-		if cfg.Model != "" && cfg.Model != "gpt-6-luna" {
-			return errors.New("evals.backend decisions requires model gpt-6-luna or no model. Use backend: auto or llm for other models")
-		}
-	}
 	if len(cfg.Questions) == 0 {
 		return errors.New("evals requires at least one question when configured. Example:\nevals:\n  - id: readme\n    question: Does the README explain setup?")
 	}
 
 	seen := make(map[string]struct{}, len(cfg.Questions))
 	for i, q := range cfg.Questions {
-		if cfg.Backend == "decisions" && q.Model != "" && q.Model != "gpt-6-luna" {
-			return fmt.Errorf("evals question %q uses model %q, which is incompatible with backend decisions. Omit the model, use gpt-6-luna, or select backend: auto or llm", q.ID, q.Model)
-		}
 		if _, dup := seen[q.ID]; dup {
 			return fmt.Errorf("evals has a duplicate id %q at index %d. Use a unique 'id' for each question. Example:\nevals:\n  - id: readme\n    question: Does the README explain setup?\n  - id: security\n    question: Are secrets handled safely?", q.ID, i)
 		}

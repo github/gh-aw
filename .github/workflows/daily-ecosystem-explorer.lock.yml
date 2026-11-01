@@ -2335,7 +2335,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"memory_updated","question":"Did the agent update the repo-memory exploration state (backlog, reviewed entries, or run log)?"},{"id":"systematic_exploration","question":"Did the agent explore new ecosystem candidates it had not reviewed before, rather than re-reviewing previously covered ones?"},{"id":"blog_grounded","question":"If a blog post was written, is it grounded in concrete evidence (repository links, README content, workflow files) about the featured extension or tool?"}]'
-          GH_AW_EVALS_BACKEND: auto
           GH_AW_EVALS_DEFAULT_MODEL: ''
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "evals"
@@ -2507,8 +2506,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"memory_updated","question":"Did the agent update the repo-memory exploration state (backlog, reviewed entries, or run log)?"},{"id":"systematic_exploration","question":"Did the agent explore new ecosystem candidates it had not reviewed before, rather than re-reviewing previously covered ones?"},{"id":"blog_grounded","question":"If a blog post was written, is it grounded in concrete evidence (repository links, README content, workflow files) about the featured extension or tool?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

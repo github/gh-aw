@@ -29,8 +29,8 @@ describe("run_evals.cjs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("OPENAI_API_KEY", "");
-    vi.stubEnv("GH_AW_EVALS_BACKEND", "auto");
     vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", "");
+    vi.stubEnv(MODEL_FALLBACK_ENV_VAR, "");
     fs.rmSync(`${EVALS_DIR}/decisions.json`, { force: true });
     fs.rmSync(`${EVALS_DIR}/prompt.txt`, { force: true });
     fs.rmSync(`${EVALS_DIR}/agent-session.jsonl`, { force: true });
@@ -72,7 +72,7 @@ describe("run_evals.cjs", () => {
     }
   });
 
-  describe("Decisions backend", () => {
+  describe("automatic model routing", () => {
     const questions = [
       { id: "builds", question: "Does it compile?" },
       { id: "tests", question: "Did tests pass?" },
@@ -130,10 +130,9 @@ describe("run_evals.cjs", () => {
       expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain("Does it compile?");
     });
 
-    it.each(["llm", "auto"])("preserves explicit LLM backend/model selection (%s)", async backend => {
+    it.each(["small", "claude-sonnet-4.6"])("preserves selected LLM model (%s)", async model => {
       vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
-      vi.stubEnv("GH_AW_EVALS_BACKEND", backend);
-      vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", "small");
+      vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", model);
       vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
       const fetch = successfulFetch();
       vi.stubGlobal("fetch", fetch);
@@ -154,15 +153,38 @@ describe("run_evals.cjs", () => {
       expect(JSON.stringify(mockCore.warning.mock.calls)).not.toContain("private trace");
     });
 
-    it.each(["", "test-only-credential"])("does not silently change an explicit Decisions backend", async key => {
+    it.each(["", "test-only-credential"])("falls back when the selected Decisions model is unavailable (%s)", async key => {
       vi.stubEnv("OPENAI_API_KEY", key);
-      vi.stubEnv("GH_AW_EVALS_BACKEND", "decisions");
+      vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", "gpt-6-luna");
       vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
       vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("private details")));
       await setupMain();
-      expect(mockCore.setFailed).toHaveBeenCalled();
-      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "false");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "true");
       expect(JSON.stringify(mockCore.setFailed.mock.calls)).not.toContain("private details");
+    });
+
+    it.each(["gpt-6-luna", "small"])("routes an empty dynamic selection using the resolved fallback model (%s)", async model => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv(MODEL_FALLBACK_ENV_VAR, model);
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      const fetch = successfulFetch();
+      vi.stubGlobal("fetch", fetch);
+      await setupMain();
+      expect(fetch).toHaveBeenCalledTimes(model === "gpt-6-luna" ? 1 : 0);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", model === "gpt-6-luna" ? "false" : "true");
+    });
+
+    it("lets the selected model override the available fallback model", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", "gpt-6-luna");
+      vi.stubEnv(MODEL_FALLBACK_ENV_VAR, "small");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      const fetch = successfulFetch();
+      vi.stubGlobal("fetch", fetch);
+      await setupMain();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "false");
     });
 
     it("combines eligible Decisions questions with positional LLM answers", async () => {

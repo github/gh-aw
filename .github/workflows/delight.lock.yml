@@ -2327,7 +2327,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"output-produced","question":"Did the agent create an issue or post a message with UX findings?"},{"id":"ux-issues-identified","question":"Does the agent output identify at least one specific UX improvement opportunity?"},{"id":"actionable-findings","question":"Does the agent output include actionable recommendations rather than only generic observations?"}]'
-          GH_AW_EVALS_BACKEND: auto
           GH_AW_EVALS_DEFAULT_MODEL: ''
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "evals"
@@ -2499,8 +2498,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"output-produced","question":"Did the agent create an issue or post a message with UX findings?"},{"id":"ux-issues-identified","question":"Does the agent output identify at least one specific UX improvement opportunity?"},{"id":"actionable-findings","question":"Does the agent output include actionable recommendations rather than only generic observations?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

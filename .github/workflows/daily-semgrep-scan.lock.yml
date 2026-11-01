@@ -2256,8 +2256,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"scan_completed","question":"Did the agent complete a Semgrep security scan and report on the findings?"},{"id":"alert_created_or_noop","question":"Was a code scanning alert created for real security findings, or does the agent output confirm no vulnerabilities were found?"},{"id":"output_format_adherence","question":"Does the findings report match the writing style expected for the assigned semgrep_output_format variant (e.g., short active-voice sentences with one fact per sentence when the variant is \"ste\")?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'openai/gpt-6.1-sol'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "openai/gpt-6.1-sol"
           GH_AW_EVALS_PHASE: setup
@@ -2459,8 +2458,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"scan_completed","question":"Did the agent complete a Semgrep security scan and report on the findings?"},{"id":"alert_created_or_noop","question":"Was a code scanning alert created for real security findings, or does the agent output confirm no vulnerabilities were found?"},{"id":"output_format_adherence","question":"Does the findings report match the writing style expected for the assigned semgrep_output_format variant (e.g., short active-voice sentences with one fact per sentence when the variant is \"ste\")?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "openai/gpt-6.1-sol"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

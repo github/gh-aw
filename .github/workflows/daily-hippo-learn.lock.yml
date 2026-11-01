@@ -2377,8 +2377,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"hippo_learn_executed","question":"Did the agent run hippo-memory''s learn and sleep commands on recent git commits?"},{"id":"improvements_suggested","question":"Were actionable improvement suggestions produced from the consolidated memory store?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'copilot/gpt-5'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "copilot/gpt-5"
           GH_AW_EVALS_PHASE: setup
@@ -2525,8 +2524,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"hippo_learn_executed","question":"Did the agent run hippo-memory''s learn and sleep commands on recent git commits?"},{"id":"improvements_suggested","question":"Were actionable improvement suggestions produced from the consolidated memory store?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "copilot/gpt-5"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

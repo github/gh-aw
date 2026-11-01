@@ -45,81 +45,80 @@ func TestBuildSetupEvalsStepEscapesQuestionData(t *testing.T) {
 	}
 }
 
-func TestEvalsBackendRuntimeContract(t *testing.T) {
-	for _, backend := range []string{"", "auto", "llm", "decisions"} {
-		for _, model := range []string{"", "gpt-6-luna"} {
-			t.Run(backend+"/"+model, func(t *testing.T) {
-				data := &WorkflowData{
-					AI: "copilot", Model: "workflow-model",
-					Evals: &EvalsConfig{Backend: backend, Model: model, Questions: []EvalDefinition{
-						{ID: "q1", Question: "Correct?", Model: "gpt-6-luna"},
-						{ID: "q2", Question: "Safe?"},
-					}},
-				}
-				var steps []struct {
-					Name string            `yaml:"name"`
-					ID   string            `yaml:"id"`
-					If   string            `yaml:"if"`
-					Env  map[string]string `yaml:"env"`
-				}
-				text := strings.Join(NewCompiler().buildEvalsJobSteps(data), "")
-				if err := yaml.Unmarshal([]byte(text), &steps); err != nil {
-					t.Fatalf("invalid generated YAML: %v", err)
-				}
-				setup := -1
-				cleanup := -1
-				for i, step := range steps {
-					if step.Name == "Clean stale firewall files from agent artifact" {
-						cleanup = i
-						if step.If != "" {
-							t.Fatal("downloaded agent firewall cleanup must not depend on backend routing")
-						}
-					}
-					if step.ID == "evals_setup" {
-						setup = i
-						if step.Env["GH_AW_EVALS_BACKEND"] != evalsBackend(data.Evals) ||
-							step.Env["GH_AW_EVALS_DEFAULT_MODEL"] != model {
-							t.Fatalf("incorrect setup routing environment: %#v", step.Env)
-						}
-						if backend == "llm" {
-							if _, exists := step.Env["OPENAI_API_KEY"]; exists {
-								t.Fatal("llm backend must not receive the Decisions credential")
-							}
-						} else if step.Env["OPENAI_API_KEY"] != "${{ secrets.OPENAI_API_KEY }}" {
-							t.Fatal("auto/decisions setup requires the Decisions credential")
-						}
-					}
-					if step.ID != "evals_setup" && step.Env["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}" {
-						t.Fatalf("Decisions credential leaked into %s", step.Name)
-					}
-					if step.Name == "Setup BinEval evaluations" || step.Name == "Parse BinEval results" {
-						var questions []map[string]string
-						if err := json.Unmarshal([]byte(step.Env["GH_AW_EVALS_QUESTIONS"]), &questions); err != nil {
-							t.Fatal(err)
-						}
-						if questions[0]["model"] != "gpt-6-luna" {
-							t.Fatal("per-question model lost in transport")
-						}
-						if _, ok := questions[1]["model"]; ok {
-							t.Fatal("empty model should be omitted")
-						}
-					}
-					if strings.Contains(step.If, "steps.evals_setup.outputs.run_llm") && (setup < 0 || i <= setup) {
-						t.Fatal("LLM step precedes backend routing")
+func TestEvalsModelRuntimeContract(t *testing.T) {
+	for _, model := range []string{"", "gpt-6-luna", "small", "${{ inputs.model }}"} {
+		t.Run(model, func(t *testing.T) {
+			data := &WorkflowData{
+				AI: "copilot", Model: "workflow-model",
+				Evals: &EvalsConfig{Model: model, Questions: []EvalDefinition{
+					{ID: "q1", Question: "Correct?", Model: "gpt-6-luna"},
+					{ID: "q2", Question: "Safe?"},
+				}},
+			}
+			var steps []struct {
+				Name string            `yaml:"name"`
+				ID   string            `yaml:"id"`
+				If   string            `yaml:"if"`
+				Env  map[string]string `yaml:"env"`
+			}
+			text := strings.Join(NewCompiler().buildEvalsJobSteps(data), "")
+			if err := yaml.Unmarshal([]byte(text), &steps); err != nil {
+				t.Fatalf("invalid generated YAML: %v", err)
+			}
+			setup := -1
+			cleanup := -1
+			for i, step := range steps {
+				if step.Name == "Clean stale firewall files from agent artifact" {
+					cleanup = i
+					if step.If != "" {
+						t.Fatal("downloaded agent firewall cleanup must not depend on backend routing")
 					}
 				}
-				if setup < 0 {
-					t.Fatal("missing evals_setup")
+				if step.ID == "evals_setup" {
+					setup = i
+					wantModel := model
+					if wantModel == "" {
+						wantModel = data.Model
+					}
+					if _, exists := step.Env["GH_AW_EVALS_BACKEND"]; exists {
+						t.Fatal("backend selection must not be generated")
+					}
+					if step.Env["GH_AW_EVALS_DEFAULT_MODEL"] != wantModel {
+						t.Fatalf("incorrect setup routing environment: %#v", step.Env)
+					}
+					if step.Env["OPENAI_API_KEY"] != "${{ secrets.OPENAI_API_KEY }}" {
+						t.Fatal("runtime model routing requires the Decisions credential")
+					}
 				}
-				if cleanup < 0 || cleanup >= setup {
-					t.Fatal("agent firewall cleanup must precede backend routing for every backend")
+				if step.ID != "evals_setup" && step.Env["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}" {
+					t.Fatalf("Decisions credential leaked into %s", step.Name)
 				}
-				if backend == "decisions" && (strings.Contains(text, "evals_agentic_execution") ||
-					strings.Contains(text, "Download container images") || strings.Contains(text, "Install AWF binary")) {
-					t.Fatal("explicit decisions must omit LLM installation/execution")
+				if step.Name == "Setup BinEval evaluations" || step.Name == "Parse BinEval results" {
+					var questions []map[string]string
+					if err := json.Unmarshal([]byte(step.Env["GH_AW_EVALS_QUESTIONS"]), &questions); err != nil {
+						t.Fatal(err)
+					}
+					if questions[0]["model"] != "gpt-6-luna" {
+						t.Fatal("per-question model lost in transport")
+					}
+					if _, ok := questions[1]["model"]; ok {
+						t.Fatal("empty model should be omitted")
+					}
 				}
-			})
-		}
+				if strings.Contains(step.If, "steps.evals_setup.outputs.run_llm") && (setup < 0 || i <= setup) {
+					t.Fatal("LLM step precedes backend routing")
+				}
+			}
+			if setup < 0 {
+				t.Fatal("missing evals_setup")
+			}
+			if cleanup < 0 || cleanup >= setup {
+				t.Fatal("agent firewall cleanup must precede backend routing for every backend")
+			}
+			if !strings.Contains(text, "evals_agentic_execution") {
+				t.Fatal("runtime model routing must retain the gated LLM fallback")
+			}
+		})
 	}
 }
 
@@ -177,21 +176,18 @@ func TestPrepareEvalsFilesPreservesExecutionTrace(t *testing.T) {
 
 func TestEvalsMixedRoutingExecutionModel(t *testing.T) {
 	for _, tt := range []struct {
-		name    string
-		backend string
-		model   string
-		want    string
+		name  string
+		model string
+		want  string
 	}{
-		{name: "default auto", want: "small"},
-		{name: "explicit auto", backend: "auto", want: "small"},
-		{name: "decisions default", backend: "auto", model: "gpt-6-luna", want: "small"},
-		{name: "other explicit default preserved", backend: "auto", model: "other-model", want: "other-model"},
-		{name: "llm unchanged", backend: "llm", model: "gpt-6-luna", want: "gpt-6-luna"},
+		{name: "inherited workflow model", want: "workflow-model"},
+		{name: "decisions default", model: "gpt-6-luna", want: "small"},
+		{name: "other explicit default preserved", model: "other-model", want: "other-model"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			data := &WorkflowData{
 				AI: "copilot", Model: "workflow-model",
-				Evals: &EvalsConfig{Backend: tt.backend, Model: tt.model, Questions: []EvalDefinition{
+				Evals: &EvalsConfig{Model: tt.model, Questions: []EvalDefinition{
 					{ID: "decisions", Question: "Correct?", Model: "gpt-6-luna"},
 					{ID: "llm", Question: "Safe?", Model: "small"},
 					{ID: "later", Question: "Focused?", Model: "other-model"},

@@ -9,7 +9,7 @@
  * Phase "setup" (default, runs BEFORE the agentic engine):
  *   - Reads configured eval questions from GH_AW_EVALS_QUESTIONS (JSON array)
  *   - Reads the agent output from /tmp/gh-aw/evals/agent_output.json
- *   - Batches eligible predicates through Decisions when configured/available
+ *   - Selects Decisions for compatible models when available
  *   - Emits run_llm to gate the conventional judge for remaining questions
  *   - Builds a multi-question binary evaluation prompt
  *   - Writes combined and split prompt files under /tmp/gh-aw/aw-prompts
@@ -23,8 +23,7 @@
  *   GH_AW_EVALS_QUESTIONS   JSON array of { id, question } objects
  *   GH_AW_EVALS_PHASE       "setup" (default) or "parse"
  *   GH_AW_EVALS_MODEL       LLM model name recorded in output metadata
- *   GH_AW_EVALS_BACKEND     "auto" (default), "llm", or "decisions"
- *   GH_AW_EVALS_DEFAULT_MODEL  Explicit model selection for eligibility
+ *   GH_AW_EVALS_DEFAULT_MODEL  Selected default model for transport eligibility
  *   OPENAI_API_KEY         Optional Decisions API credential (setup only)
  *
  * Design note: this file is intentionally engine-agnostic. The engine is
@@ -111,13 +110,8 @@ async function setupMain() {
     core.setFailed(`${ERR_VALIDATION}: GH_AW_EVALS_QUESTIONS must be a non-empty JSON array`);
     return;
   }
-  const backend = process.env.GH_AW_EVALS_BACKEND || "auto";
-  if (
-    !["auto", "llm", "decisions"].includes(backend) ||
-    questions.some(q => !q || typeof q.id !== "string" || !q.id.trim() || typeof q.question !== "string" || !q.question.trim()) ||
-    new Set(questions.map(q => q.id)).size !== questions.length
-  ) {
-    core.setFailed(`${ERR_VALIDATION}: Invalid eval backend or questions`);
+  if (questions.some(q => !q || typeof q.id !== "string" || !q.id.trim() || typeof q.question !== "string" || !q.question.trim()) || new Set(questions.map(q => q.id)).size !== questions.length) {
+    core.setFailed(`${ERR_VALIDATION}: Invalid eval questions`);
     return;
   }
 
@@ -149,18 +143,13 @@ async function setupMain() {
   }
 
   let llmQuestions = questions;
-  const eligible = eligibleDecisionQuestions(questions, process.env.GH_AW_EVALS_DEFAULT_MODEL || "");
+  const eligible = eligibleDecisionQuestions(questions, resolveModelWithFallback(process.env, "GH_AW_EVALS_DEFAULT_MODEL"));
   const compatible = eligible.length > 0 && eligible.length <= MAX_DECISION_QUESTIONS;
-  if (backend === "auto" && (!compatible || !process.env.OPENAI_API_KEY)) {
+  if (!compatible || !process.env.OPENAI_API_KEY) {
     const reason = !eligible.length ? "incompatible_models" : eligible.length > MAX_DECISION_QUESTIONS ? "batch_limit" : "missing_credential";
     core.info(`Decisions skipped: ${reason}; using LLM judge`);
   }
-  if (backend === "decisions" && (!compatible || eligible.length !== questions.length || !process.env.OPENAI_API_KEY)) {
-    core.setOutput("run_llm", "false");
-    core.setFailed(`${ERR_VALIDATION}: Decisions requires OPENAI_API_KEY and 1–400 questions using gpt-6-luna or no explicit model`);
-    return;
-  }
-  if (backend !== "llm" && compatible && process.env.OPENAI_API_KEY) {
+  if (compatible && process.env.OPENAI_API_KEY) {
     try {
       let originalPrompt = "";
       const originalPromptPath = path.join(EVALS_DIR, "prompt.txt");
@@ -190,11 +179,6 @@ async function setupMain() {
         fs.rmSync(DECISIONS_RESULTS_PATH, { force: true });
       } catch {
         throw new Error(`${ERR_SYSTEM}: Failed to remove incomplete Decisions results`);
-      }
-      if (backend === "decisions") {
-        core.setOutput("run_llm", "false");
-        core.setFailed(`${ERR_SYSTEM}: Decisions evaluation failed; no request or response content was logged`);
-        return;
       }
       core.warning("Decisions unavailable; falling back to the LLM judge");
     }

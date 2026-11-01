@@ -2233,8 +2233,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"activity_collected","question":"Did the agent collect daily repository activity including commits, PRs, issues, and discussions?"},{"id":"chronicle_created","question":"Was a narrative chronicle discussion or report created summarizing the day''s activity?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'copilot/grok-4.7'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "copilot/grok-4.7"
           GH_AW_EVALS_PHASE: setup
@@ -2381,8 +2380,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"activity_collected","question":"Did the agent collect daily repository activity including commits, PRs, issues, and discussions?"},{"id":"chronicle_created","question":"Was a narrative chronicle discussion or report created summarizing the day''s activity?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "copilot/grok-4.7"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

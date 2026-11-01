@@ -2362,7 +2362,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"mermaid_diagram_generated","question":"Did the agent generate a Mermaid diagram visualizing issue and pull request relationships?"},{"id":"diagram_posted","question":"Was the diagram posted as a response to the /archie command in the issue or PR?"}]'
-          GH_AW_EVALS_BACKEND: auto
           GH_AW_EVALS_DEFAULT_MODEL: ''
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "evals"
@@ -2525,8 +2524,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"mermaid_diagram_generated","question":"Did the agent generate a Mermaid diagram visualizing issue and pull request relationships?"},{"id":"diagram_posted","question":"Was the diagram posted as a response to the /archie command in the issue or PR?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

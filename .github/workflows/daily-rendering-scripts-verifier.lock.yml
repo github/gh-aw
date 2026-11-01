@@ -2567,7 +2567,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"correct_verification_outcome","question":"Did the agent correctly complete the verification cycle — creating a pull request with concrete parser/render fixes when real issues were found, or confirming no issues were found (cache-memory update / noop) without fabricating problems?"}]'
-          GH_AW_EVALS_BACKEND: auto
           GH_AW_EVALS_DEFAULT_MODEL: ''
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "evals"
@@ -2721,8 +2720,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"correct_verification_outcome","question":"Did the agent correctly complete the verification cycle — creating a pull request with concrete parser/render fixes when real issues were found, or confirming no issues were found (cache-memory update / noop) without fabricating problems?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

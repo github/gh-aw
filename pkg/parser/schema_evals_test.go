@@ -8,24 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEvalsBackendSchema(t *testing.T) {
+func TestEvalsModelSchema(t *testing.T) {
 	for _, tt := range []struct {
-		name    string
-		backend any
-		valid   bool
+		name  string
+		model any
+		valid bool
 	}{
-		{name: "auto", backend: "auto", valid: true},
-		{name: "llm", backend: "llm", valid: true},
-		{name: "decisions", backend: "decisions", valid: true},
-		{name: "unknown", backend: "other"},
-		{name: "empty", backend: ""},
-		{name: "non-string", backend: 42},
+		{name: "decisions model", model: "gpt-6-luna", valid: true},
+		{name: "llm model", model: "small", valid: true},
+		{name: "dynamic model", model: "${{ inputs.model }}", valid: true},
+		{name: "non-string", model: 42},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 				"on": "workflow_dispatch",
 				"evals": map[string]any{
-					"backend":   tt.backend,
+					"model":     tt.model,
 					"questions": []any{map[string]any{"id": "q", "question": "Correct?", "model": "gpt-6-luna"}},
 				},
 			}, "evals.md")
@@ -36,4 +34,15 @@ func TestEvalsBackendSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEvalsSchemaRejectsBackend(t *testing.T) {
+	err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": "workflow_dispatch",
+		"evals": map[string]any{
+			"backend":   "auto",
+			"questions": []any{map[string]any{"id": "q", "question": "Correct?"}},
+		},
+	}, "evals.md")
+	require.ErrorContains(t, err, "backend")
 }

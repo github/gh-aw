@@ -42,15 +42,13 @@ func (c *Compiler) buildEvalsJobSteps(data *WorkflowData) []string {
 	steps = append(steps, buildPrepareEvalsFilesStep()...)
 	steps = append(steps, c.buildSetupEvalsStep(data)...)
 
-	if data.Evals.Backend != "decisions" {
-		// Codex MCP setup already includes the container download.
-		if c.getEvalsEngineID(data) != string(constants.CodexEngine) {
-			steps = append(steps, gateEvalsLLMSteps(c.buildPullAWFContainersStep(data))...)
-		}
-		steps = append(steps, gateEvalsLLMSteps(buildEnsureEvalsDirStep())...)
-		steps = append(steps, c.buildEvalsEngineSteps(data)...)
-		steps = append(steps, gateEvalsLLMSteps(c.buildParseMCPGatewayLogStep(data))...)
+	// Codex MCP setup already includes the container download.
+	if c.getEvalsEngineID(data) != string(constants.CodexEngine) {
+		steps = append(steps, gateEvalsLLMSteps(c.buildPullAWFContainersStep(data))...)
 	}
+	steps = append(steps, gateEvalsLLMSteps(buildEnsureEvalsDirStep())...)
+	steps = append(steps, c.buildEvalsEngineSteps(data)...)
+	steps = append(steps, gateEvalsLLMSteps(c.buildParseMCPGatewayLogStep(data))...)
 
 	// Step 9: Parse engine output and write evals.jsonl.
 	steps = append(steps, c.buildParseEvalsResultsStep(data)...)
@@ -130,11 +128,8 @@ await main();`
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EVALS_QUESTIONS: '%s'\n", escapeYAMLSingleQuoted(questionsJSON)),
-		fmt.Sprintf("          GH_AW_EVALS_BACKEND: %s\n", evalsBackend(data.Evals)),
-		fmt.Sprintf("          GH_AW_EVALS_DEFAULT_MODEL: '%s'\n", escapeYAMLSingleQuoted(data.Evals.Model)),
-	}
-	if evalsBackend(data.Evals) != "llm" {
-		steps = append(steps, "          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}\n")
+		fmt.Sprintf("          GH_AW_EVALS_DEFAULT_MODEL: '%s'\n", escapeYAMLSingleQuoted(c.resolveEvalsDefaultModel(data))),
+		"          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}\n",
 	}
 	steps = appendEvalsModelEnvLines(steps, c.getEvalsEngineID(data), model)
 	steps = append(steps,
@@ -151,9 +146,6 @@ await main();`
 //  1. Install the agentic engine (same binary as the agent job)
 //  2. Execute the engine through AWF (network-restricted sandbox) to answer eval questions
 func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint:largefunc
-	if data.Evals != nil && data.Evals.Backend == "decisions" {
-		return nil
-	}
 	// Determine engine ID (same resolution order as detection).
 	engineID := c.getEvalsEngineID(data)
 
@@ -350,8 +342,6 @@ await main();`
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EVALS_QUESTIONS: '%s'\n", escapeYAMLSingleQuoted(questionsJSON)),
-		fmt.Sprintf("          GH_AW_EVALS_BACKEND: %s\n", evalsBackend(data.Evals)),
-		fmt.Sprintf("          GH_AW_EVALS_DEFAULT_MODEL: '%s'\n", escapeYAMLSingleQuoted(data.Evals.Model)),
 	}
 	steps = appendEvalsModelEnvLines(steps, c.getEvalsEngineID(data), model)
 	steps = append(steps,
@@ -482,18 +472,21 @@ func (c *Compiler) getEvalsEngineID(data *WorkflowData) string {
 	return "copilot"
 }
 
-func (c *Compiler) resolveEvalsExecutionModel(data *WorkflowData) string {
-	model := ""
-	if data.Model != "" {
-		model = data.Model
-	}
+func (c *Compiler) resolveEvalsDefaultModel(data *WorkflowData) string {
 	if data.Evals != nil && data.Evals.Model != "" {
-		model = data.Evals.Model
+		return data.Evals.Model
 	}
-	// In auto mode, compatible questions leave the LLM subset. Select its first
+	if data.Model != "" {
+		return data.Model
+	}
+	return compilerenv.ResolveDefaultEvalsModel("")
+}
+
+func (c *Compiler) resolveEvalsExecutionModel(data *WorkflowData) string {
+	model := c.resolveEvalsDefaultModel(data)
+	// Compatible questions leave the LLM subset. Select its first
 	// explicit model rather than inheriting a Decisions-only default.
-	if data.Evals != nil && evalsBackend(data.Evals) == "auto" &&
-		(data.Evals.Model == "" || data.Evals.Model == "gpt-6-luna") {
+	if data.Evals != nil && (model == "" || model == "gpt-6-luna") {
 		for _, question := range data.Evals.Questions {
 			if question.Model != "" && question.Model != "gpt-6-luna" {
 				model = question.Model
@@ -580,13 +573,6 @@ func marshalEvalsQuestions(questions []EvalDefinition) string {
 	}
 	encoded, _ := json.Marshal(serializedQuestions) //nolint:jsonmarshalignoredeerror // marshaling strings cannot fail
 	return string(encoded)
-}
-
-func evalsBackend(config *EvalsConfig) string {
-	if config == nil || config.Backend == "" {
-		return "auto"
-	}
-	return config.Backend
 }
 
 // gateEvalsLLMSteps combines the runtime routing decision with existing step conditions.

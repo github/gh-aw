@@ -2265,8 +2265,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"security_aspect_rotated","question":"Did the agent load and update the cache-memory state to rotate the security focus aspect using the 60/40 rule?"},{"id":"issue_or_noop","question":"Was at least one security issue created with actionable recommendations, or was noop called when no new findings were found?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'opus'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "opus"
           GH_AW_EVALS_PHASE: setup
@@ -2436,8 +2435,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"security_aspect_rotated","question":"Did the agent load and update the cache-memory state to rotate the security focus aspect using the 60/40 rule?"},{"id":"issue_or_noop","question":"Was at least one security issue created with actionable recommendations, or was noop called when no new findings were found?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "opus"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

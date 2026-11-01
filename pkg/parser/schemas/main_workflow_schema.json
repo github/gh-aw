@@ -14680,12 +14680,6 @@
           "description": "Extended form: object with questions list and optional configuration.",
           "additionalProperties": false,
           "properties": {
-            "backend": {
-              "type": "string",
-              "enum": ["auto", "llm", "decisions"],
-              "default": "auto",
-              "description": "Evaluation backend. Auto tries the Decisions API with OPENAI_API_KEY for eligible questions and falls back to the agentic LLM engine. Decisions requires at most 400 questions and no model or gpt-6-luna; llm always uses the engine."
-            },
             "questions": {
               "type": "array",
               "description": "List of binary evaluation question objects.",

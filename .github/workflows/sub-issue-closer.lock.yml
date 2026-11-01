@@ -2197,8 +2197,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"issues_checked","question":"Did the agent check parent issues for the completion status of all their sub-issues?"},{"id":"issues_closed_or_noop","question":"Were completed parent issues closed with a comment, or does the agent output confirm no issues were ready to close?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: 'copilot/gpt-5'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "copilot/gpt-5"
           GH_AW_EVALS_PHASE: setup
@@ -2345,8 +2344,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"issues_checked","question":"Did the agent check parent issues for the completion status of all their sub-issues?"},{"id":"issues_closed_or_noop","question":"Were completed parent issues closed with a comment, or does the agent output confirm no issues were ready to close?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "copilot/gpt-5"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}

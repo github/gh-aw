@@ -2527,8 +2527,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"gaps-confirmed","question":"Did the workflow identify at least one confirmed documentation gap to fix, or correctly conclude that no actionable gap remained?"},{"id":"pr-issue-or-noop","question":"Was a documentation pull request or issue created for confirmed gaps, or was noop used appropriately when nothing required action?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
+          GH_AW_EVALS_DEFAULT_MODEL: '${{ needs.activation.outputs.model_size }}'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: ${{ needs.activation.outputs.model_size }}
           GH_AW_MODEL_FALLBACK: ${{ vars.GH_AW_MODEL_EVALS_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'claude-sonnet-5' }}
@@ -2683,8 +2682,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"gaps-confirmed","question":"Did the workflow identify at least one confirmed documentation gap to fix, or correctly conclude that no actionable gap remained?"},{"id":"pr-issue-or-noop","question":"Was a documentation pull request or issue created for confirmed gaps, or was noop used appropriately when nothing required action?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: ${{ needs.activation.outputs.model_size }}
           GH_AW_MODEL_FALLBACK: ${{ vars.GH_AW_MODEL_EVALS_CLAUDE || vars.GH_AW_DEFAULT_MODEL_CLAUDE || 'claude-sonnet-5' }}
           GH_AW_EVALS_PHASE: parse

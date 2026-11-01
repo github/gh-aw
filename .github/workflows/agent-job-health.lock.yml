@@ -2422,7 +2422,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"fleet_failure_rate_measured","question":"Did the agent measure the fleet-wide agent-job failure rate over the last 24 hours with run counts?"},{"id":"tracked_vs_novel_split","question":"Did the agent separate failures belonging to known chronic-failure workflows from novel failures?"},{"id":"schedule_heartbeat_checked","question":"Did the agent check every schedule-triggered workflow''s most recent run against its expected cadence and report any blind spots?"}]'
-          GH_AW_EVALS_BACKEND: auto
           GH_AW_EVALS_DEFAULT_MODEL: ''
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "evals"
@@ -2575,8 +2574,6 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"fleet_failure_rate_measured","question":"Did the agent measure the fleet-wide agent-job failure rate over the last 24 hours with run counts?"},{"id":"tracked_vs_novel_split","question":"Did the agent separate failures belonging to known chronic-failure workflows from novel failures?"},{"id":"schedule_heartbeat_checked","question":"Did the agent check every schedule-triggered workflow''s most recent run against its expected cadence and report any blind spots?"}]'
-          GH_AW_EVALS_BACKEND: auto
-          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}
