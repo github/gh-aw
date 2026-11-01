@@ -280,14 +280,11 @@ function isPartialClone(cwd) {
  */
 function describeGitFailure(message, cwd) {
   const objectFailure = /(?:^|\n|ERR_SYSTEM: )fatal: (?:bad object \S+|(?:unable to read|could not read) [0-9a-f]{40}(?:[0-9a-f]{24})?\b|missing (?:blob|tree|commit) object\b)/i;
-  if (!/promisor|Authentication failed|Invalid username or token|fetch-pack|object not found/i.test(message) && !objectFailure.test(message)) {
-    return message;
-  }
-  if (!isPartialClone(cwd)) {
-    return message;
-  }
+  const unavailableObject = /promisor|Authentication failed|Invalid username or token|fetch-pack|object not found/i.test(message) || objectFailure.test(message);
+  const safeMessage = "Git operation failed. Ensure the checkout contains the required refs and objects before agent execution.";
+  if (!unavailableObject || !isPartialClone(cwd)) return safeMessage;
   return (
-    `${message} ` +
+    `${safeMessage} ` +
     "This repository is a partial clone (remote.origin.promisor=true) with required objects unavailable locally. " +
     "Artifact generation disables all Git transports, including lazy fetches from the agent-writable checkout. " +
     "Fetch the required objects during checkout (for example checkout.fetch-depth: 0 without a blob filter) to avoid lazy fetches."

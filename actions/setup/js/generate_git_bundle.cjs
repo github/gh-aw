@@ -129,7 +129,11 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
   if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
     const patchResult = await generateGitPatch(branchName, baseBranch, { ...options, token: undefined });
     if (!patchResult.success) {
-      return { success: false, error: patchResult.error || "Failed to generate filtered patch for bundle synthesis", bundlePath };
+      return {
+        success: false,
+        error: `Failed to generate filtered patch for bundle synthesis: ${describeGitFailure(patchResult.error || "", cwd)}`,
+        bundlePath,
+      };
     }
     // Reuse the index-only synthesized commit; checkout/am would execute
     // attribute conversion filters even with hooks disabled.
@@ -151,7 +155,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
       execGitSync(["bundle", "create", bundlePath, `${patchResult.baseCommit}..HEAD`], { cwd, env });
       return { success: true, bundlePath, bundleSize: fs.statSync(bundlePath).size, baseCommit: patchResult.baseCommit };
     } catch (error) {
-      return { success: false, error: `Failed to generate filtered bundle: ${getErrorMessage(error)}`, bundlePath };
+      return { success: false, error: `Failed to generate filtered bundle: ${describeGitFailure(getErrorMessage(error), cwd)}`, bundlePath };
     } finally {
       fs.rmSync(tempGitDir, { recursive: true, force: true });
     }
@@ -219,7 +223,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
               errorMessage =
                 `Cannot generate incremental bundle: explicit PR-head baseline ${candidateBaseRef} is not present in checkout '${cwd}'. ` +
                 `Ensure the PR checkout step completed and fetched refs/pull/<number>/head before calling push_to_pull_request_branch.`;
-              debugLog(`Strategy 1 (incremental): explicit PR-head baseline failed: ${getErrorMessage(baselineError)}`);
+              debugLog(`Strategy 1 (incremental): explicit PR-head baseline failed: ${describeGitFailure(getErrorMessage(baselineError), cwd)}`);
               return {
                 success: false,
                 error: errorMessage,
@@ -436,7 +440,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
                     rangeEnd = branchName;
                     debugLog(`Strategy 2: Created local branch '${branchName}' pointing to HEAD for bundle ref`);
                   } catch (branchErr) {
-                    debugLog(`Strategy 2: Could not create branch '${branchName}': ${getErrorMessage(branchErr)}, using HEAD`);
+                    debugLog(`Strategy 2: Could not create branch '${branchName}': ${describeGitFailure(getErrorMessage(branchErr), cwd)}, using HEAD`);
                   }
                 }
               }
@@ -454,7 +458,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
             if (baseCommitSha) {
               return { success: false, error: `Failed to generate bundle: ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`, bundlePath };
             }
-            debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${getErrorMessage(ancestorErr)}`);
+            debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`);
           }
         }
       }
@@ -514,11 +518,11 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
         if (baseCommitSha) {
           return { success: false, error: `Failed to generate bundle: ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`, bundlePath };
         }
-        debugLog(`Strategy 3: Failed - ${getErrorMessage(strategy3Err)}`);
+        debugLog(`Strategy 3: Failed - ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`);
       }
     }
   } catch (error) {
-    errorMessage = `Failed to generate bundle: ${getErrorMessage(error)}`;
+    errorMessage = `Failed to generate bundle: ${describeGitFailure(getErrorMessage(error), cwd)}`;
   }
 
   // Check if bundle was generated and has content
@@ -529,7 +533,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
     } catch (err) {
       return {
         success: false,
-        error: `Failed to inspect generated bundle ${bundlePath}: ${getErrorMessage(err)}`,
+        error: `Failed to inspect generated bundle. Ensure the output directory is accessible.`,
         bundlePath,
       };
     }

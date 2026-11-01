@@ -487,24 +487,31 @@ describe("describeGitFailure", () => {
     cleanupRepo(repoDir);
   });
 
-  it("leaves the message unchanged when the repo is not a partial clone", () => {
-    const message = "fatal: remote error: Invalid username or token.";
-    expect(describeGitFailure(message, repoDir)).toBe(message);
+  it("does not expose Git error details or credentials for a non-partial clone", () => {
+    const message = "fatal: authentication failed with credential example-secret";
+    const result = describeGitFailure(message, repoDir);
+    expect(result).toContain("Git operation failed");
+    expect(result).not.toContain("example-secret");
+    expect(result).not.toContain("github.com");
   });
 
-  it("leaves the message unchanged when it does not look like an auth/promisor failure", () => {
+  it("does not expose unrelated Git error details on a partial clone", () => {
     execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
     const message = "fatal: invalid option";
-    expect(describeGitFailure(message, repoDir)).toBe(message);
+    const result = describeGitFailure(message, repoDir);
+    expect(result).toContain("Git operation failed");
+    expect(result).not.toContain(message);
   });
 
-  it("appends the partial-clone diagnostic when the repo is a partial clone and the message matches", () => {
+  it("appends safe partial-clone guidance without exposing the Git error", () => {
     execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
-    const message = "remote: Invalid username or token.";
+    const message = "fatal: Invalid username or token: example-secret";
     const result = describeGitFailure(message, repoDir);
-    expect(result).toContain(message);
+    expect(result).toContain("Git operation failed");
     expect(result).toContain("partial clone");
     expect(result).toContain("disables all Git transports");
+    expect(result).not.toContain("example-secret");
+    expect(result).not.toContain("github.com");
   });
 
   it("matches on 'promisor' in the message even without the exact auth wording", () => {
@@ -514,10 +521,13 @@ describe("describeGitFailure", () => {
     expect(result).toContain("partial clone");
   });
 
-  it("does not append the diagnostic for unrelated network errors even on a partial clone", () => {
+  it("does not append partial-clone guidance for unrelated network errors", () => {
     execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
     const message = "fatal: unable to access 'https://example.com/': Could not resolve host";
-    expect(describeGitFailure(message, repoDir)).toBe(message);
+    const result = describeGitFailure(message, repoDir);
+    expect(result).toContain("Git operation failed");
+    expect(result).not.toContain("partial clone");
+    expect(result).not.toContain("example.com");
   });
 
   it.each([
@@ -529,9 +539,11 @@ describe("describeGitFailure", () => {
     "fatal: pathspec 'missing' did not match any files",
     "fatal: invalid argument 'bad object'",
     "commit message: fatal: bad object deadbeef",
-  ])("leaves unrelated error %j unchanged on a partial clone", message => {
+  ])("does not expose unrelated error details %j on a partial clone", message => {
     execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
-    expect(describeGitFailure(message, repoDir)).toBe(message);
+    const result = describeGitFailure(message, repoDir);
+    expect(result).toContain("Git operation failed");
+    if (message) expect(result).not.toContain(message);
   });
 
   it.each(["ERR_SYSTEM: fatal: unable to read " + "a".repeat(40), "fatal: could not read " + "b".repeat(64), "fatal: bad object HEAD", "fatal: missing blob object '" + "c".repeat(40) + "'"])(
