@@ -13,6 +13,76 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPromptImportRereadsRetainResolvedBase(t *testing.T) {
+	for _, ordered := range []bool{false, true} {
+		mode := map[bool]string{false: "legacy", true: "ordered"}[ordered]
+		for _, layout := range []string{"fallback", "leaf", "parent", "nested-github", "nested-agents"} {
+			t.Run(mode+"/"+layout, func(t *testing.T) {
+				repo := t.TempDir()
+				workflows := filepath.Join(repo, ".github", "workflows")
+				require.NoError(t, os.MkdirAll(workflows, 0755))
+				outside := t.TempDir()
+				importSpec := "included.md"
+				importPath := ".github/workflows/included.md"
+				base := workflows
+				link := filepath.Join(base, "included.md")
+				target := filepath.Join(base, "safe.md")
+				if layout == "fallback" {
+					base = repo
+					importPath = "included.md"
+					link = filepath.Join(base, importPath)
+					target = filepath.Join(base, "safe.md")
+				} else if layout != "leaf" {
+					folder := "shared"
+					switch layout {
+					case "nested-github":
+						folder = ".github"
+					case "nested-agents":
+						folder = ".agents"
+					}
+					importSpec = "./bundle/" + folder + "/included.md"
+					importPath = ".github/workflows/bundle/" + folder + "/included.md"
+					link = filepath.Join(base, "bundle")
+					target = filepath.Join(link, folder, "included.md")
+					require.NoError(t, os.MkdirAll(filepath.Dir(target), 0755))
+					require.NoError(t, os.Mkdir(filepath.Join(outside, folder), 0755))
+					require.NoError(t, os.WriteFile(filepath.Join(outside, folder, "included.md"), []byte("external secret"), 0644))
+				}
+				require.NoError(t, os.WriteFile(target, []byte("---\n---\nsafe content"), 0644))
+				if layout == "fallback" || layout == "leaf" {
+					require.NoError(t, os.Symlink(target, link))
+					require.NoError(t, os.WriteFile(filepath.Join(outside, "included.md"), []byte("external secret"), 0644))
+				}
+				resolved, err := parser.ResolveIncludePath(importSpec, base, nil)
+				require.NoError(t, err)
+				require.Equal(t, filepath.Join(repo, importPath), resolved)
+
+				c := NewCompiler()
+				c.markdownPath = filepath.Join(base, "main.md")
+				data := &WorkflowData{InlinedImports: true}
+				if ordered {
+					data.PromptImports = []parser.PromptImportEntry{{ImportPath: importPath}}
+				} else {
+					data.ImportPaths = []string{importPath}
+				}
+				chunks, _ := c.processPromptImportEntries(data)
+				require.Contains(t, strings.Join(chunks, "\n"), "safe content")
+				if layout == "fallback" || layout == "leaf" {
+					require.NoError(t, os.Remove(link))
+					require.NoError(t, os.Symlink(filepath.Join(outside, "included.md"), link))
+				} else {
+					require.NoError(t, os.Rename(link, link+"-original"))
+					require.NoError(t, os.Symlink(outside, link))
+				}
+				chunks, _ = c.processPromptImportEntries(data)
+				require.NotContains(t, strings.Join(chunks, "\n"), "external secret")
+				require.Equal(t, []string{"{{#runtime-import " + importPath + "}}"}, chunks)
+				require.Empty(t, c.collectRuntimeImportMarkdownForCompilerAnalysis(data))
+			})
+		}
+	}
+}
+
 // TestProcessOrderedPromptImports tests the processOrderedPromptImports function.
 func TestProcessOrderedPromptImports(t *testing.T) {
 	tests := []struct {
