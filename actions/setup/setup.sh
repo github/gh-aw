@@ -248,6 +248,7 @@ MCP_SCRIPTS_FILES=(
   "mcp_scripts_mcp_server_http.cjs"
   "mcp_scripts_tool_factory.cjs"
   "mcp_server_core.cjs"
+  "levenshtein_distance.cjs"
   "safe_output_names.cjs"
   "mcp_dependencies_manager.cjs"
   "mcp_logger.cjs"

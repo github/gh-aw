@@ -66,6 +66,7 @@ import "embed"
 //go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs js/work_queue_yaml.cjs js/work_queue_expiration.cjs
 //go:embed js/work_queue_indexes.cjs
 //go:embed js/mcp_server_core.cjs js/mcp_dependencies_manager.cjs js/mcp_enhanced_errors.cjs js/mcp_logger.cjs
+//go:embed js/levenshtein_distance.cjs
 //go:embed js/safe_output_names.cjs
 //go:embed js/mcp_handler_go.cjs js/mcp_handler_javascript.cjs js/mcp_handler_process.cjs
 //go:embed js/mcp_handler_python.cjs js/mcp_handler_shell.cjs

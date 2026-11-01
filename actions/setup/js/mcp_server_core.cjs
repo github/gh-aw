@@ -42,7 +42,8 @@ const encoder = new TextEncoder();
 const PARAMETER_SIMILARITY_DISTANCE_BONUS = 2;
 const UNKNOWN_PARAMETER_LIST_PREVIEW_MAX = 10;
 // Suggestion limits do not restrict valid registered identifiers. Charge all
-// logical matrix cells, including initialization, to one budget per error response.
+// logical matrix cells, including initialization, and one unit per visited
+// candidate (even when pruned) to one budget per error response.
 const SUGGESTION_IDENTIFIER_MAX_LENGTH = 128;
 const SUGGESTION_MATRIX_CELL_BUDGET = 65536;
 
@@ -565,7 +566,9 @@ function findSimilarNames(requested, availableNames, distanceBonus, maxSuggestio
   }
   const maxDistance = Math.floor(normalizedRequested.length / 2) + distanceBonus;
   const suggestions = [];
-  for (const name of availableNames) {
+  for (let i = 0; i < availableNames.length && budget.remainingCells > 0; i++) {
+    budget.remainingCells--;
+    const name = availableNames[i];
     if (name.length > SUGGESTION_IDENTIFIER_MAX_LENGTH) {
       continue;
     }
@@ -594,7 +597,12 @@ function findSimilarNames(requested, availableNames, distanceBonus, maxSuggestio
  */
 function formatUnknownIdentifier(name) {
   if (name.length > SUGGESTION_IDENTIFIER_MAX_LENGTH) {
-    return `${name.slice(0, SUGGESTION_IDENTIFIER_MAX_LENGTH)}... (identifier too long for suggestions: maximum ${SUGGESTION_IDENTIFIER_MAX_LENGTH} UTF-16 code units, got ${name.length})`;
+    let end = SUGGESTION_IDENTIFIER_MAX_LENGTH;
+    const lastCodeUnit = name.charCodeAt(end - 1);
+    if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) {
+      end--;
+    }
+    return `${name.slice(0, end)}... (identifier too long for suggestions: maximum ${SUGGESTION_IDENTIFIER_MAX_LENGTH} UTF-16 code units, got ${name.length})`;
   }
   return name;
 }
@@ -946,7 +954,13 @@ async function handleMessage(server, req, defaultHandler) {
         // Find similar tools to suggest
         const similarTools = findSimilarTools(name, server.tools);
         const displayName = formatUnknownIdentifier(name);
-        let errorMessage = `Tool not found: ${displayName} (${normalizeTool(displayName)})`;
+        let errorMessage = `Tool not found: ${displayName}`;
+        if (name.length <= SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+          const normalizedName = normalizeTool(name);
+          if (normalizedName.length <= SUGGESTION_IDENTIFIER_MAX_LENGTH) {
+            errorMessage += ` (${normalizedName})`;
+          }
+        }
 
         if (similarTools.length > 0) {
           const suggestions = similarTools.map(s => s.name).join(", ");
