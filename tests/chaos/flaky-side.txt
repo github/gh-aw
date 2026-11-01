@@ -1,0 +1,2 @@
+persona=flaky-fixer
+side=reconciliation-peer
