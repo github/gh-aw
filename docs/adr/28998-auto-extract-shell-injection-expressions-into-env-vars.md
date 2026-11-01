@@ -40,7 +40,7 @@ A schema validator could enforce that all `run:` fields contain no `${{ }}` toke
 
 #### Negative
 - The compiled output differs structurally from the source YAML: `env:` entries appear that the author never wrote. This can surprise authors comparing source to compiled output and may complicate debugging.
-- Expressions inside heredoc blocks are intentionally left unsanitized (they are data, not shell code), which means the sanitizer must correctly detect heredoc boundaries; a bug in heredoc detection could either over-sanitize or under-sanitize.
+- Expressions inside quoted heredoc bodies are left unsanitized because quoting suppresses shell expansion. Unquoted bodies undergo command substitution and must be sanitized, including lines beginning with `#`. Heredoc boundaries must match Bash syntax exactly.
 - The sanitizer adds a new code path in the compilation pipeline that must be maintained alongside any future changes to `run:` step rendering.
 
 #### Neutral
@@ -56,9 +56,9 @@ A schema validator could enforce that all `run:` fields contain no `${{ }}` toke
 
 ### Expression Extraction
 
-1. The compiler **MUST** extract every `${{ ... }}` expression found directly in a `run:` field (outside heredoc blocks) into a dedicated entry in the step's `env:` block before the compiled YAML is written.
+1. The compiler **MUST** extract every `${{ ... }}` expression found directly in a `run:` field (outside quoted heredoc bodies and shell comments), including unquoted heredoc bodies, into a dedicated entry in the step's `env:` block before the compiled YAML is written.
 2. The compiler **MUST NOT** modify the source YAML on disk; extraction applies only to the in-memory representation used during compilation.
-3. The compiler **MUST NOT** extract `${{ ... }}` expressions that appear inside heredoc blocks within a `run:` field, as those are treated as data rather than shell code.
+3. The compiler **MUST NOT** extract `${{ ... }}` expressions inside syntactically valid quoted heredoc bodies. The shell parser **MUST** match the complete closing delimiter, apply tab stripping only for `<<-`, and grant no exemption on a parse failure. Opening commands and commands after the closing delimiter **MUST** remain subject to extraction. Quoted heredocs suppress shell expansion, but are not a general-purpose transport for arbitrary untrusted multiline content: Actions interpolation still occurs before Bash parses the script and can introduce a closing delimiter.
 4. The generated environment variable name **MUST** follow the pattern `GH_AW_<NORMALIZED_EXPR>` where `<NORMALIZED_EXPR>` is a deterministic, uppercase, alphanumeric-and-underscore transformation of the expression content.
 5. Implementations **MUST** replace the inline `${{ ... }}` occurrence in the shell script with the corresponding shell variable reference (`$GH_AW_...`) after extraction.
 

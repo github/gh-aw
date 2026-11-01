@@ -12,7 +12,9 @@
 
 ### Decision
 
-We will add heredoc-state tracking to `walkRunBlockLines` so that lines inside heredocs are skipped during expression scanning on Path B. This is implemented by adding `detectHeredocDelimiter` — a heuristic function that extracts the closing delimiter from a heredoc-opening line (handling unquoted, `<<-`, single-quoted, and double-quoted forms) — and threading `inHeredoc` / `heredocDelimiter` state into the walk loop. The heredoc-opening line itself is still visited (for context), but all body lines until the closing delimiter are skipped. This aligns Path B's scanning semantics with Path A's `removeHeredocContent` behavior.
+The original decision skipped all heredoc bodies using delimiter heuristics. Security alert 1057 exposed an unsafe assumption: Bash executes command substitutions in unquoted bodies, so those bodies cannot be exempt from expression scanning.
+
+Both scanning paths now share the existing Bash parser to identify quoted heredoc bodies after masking Actions expressions without changing byte offsets. Path B removes YAML block indentation before parsing. Only quoted bodies are skipped; unquoted bodies are scanned even on lines beginning with `#`. Complete delimiter matching, quoting, multiple redirections, and `<<-` tab stripping follow Bash syntax. Opening commands remain visible. A parse failure grants no heredoc or comment exemption.
 
 ### Alternatives Considered
 
@@ -28,16 +30,14 @@ The expensive `yaml.Unmarshal` call on the `hasDisallowed` fallback path could b
 
 #### Positive
 - `CompileSimpleWorkflow` performance is restored to baseline: ~11ms/op → ~3.8ms/op (below the historical 5.67ms/op average), and allocations drop from 71,945/op to 6,230/op
-- Path B scan semantics now match Path A: both skip heredoc content, eliminating a class of false-positive expression detections for heredoc-embedded `${{ ... }}` in compiler-generated run steps
-- The `detectHeredocDelimiter` function is independently testable and covered by 7 unit test cases
+- Path B scan semantics match Path A: both skip only quoted heredoc bodies and detect expressions in expanding unquoted bodies.
+- Shared regression tests cover sanitization, parsed validators, the raw-YAML scan, exact delimiters, quoted/custom delimiters, mismatches, and tab stripping.
 
 #### Negative
-- `detectHeredocDelimiter` is a heuristic text parser: it detects `<<` as a heredoc opener, which can produce false positives for shell comparison operators (e.g., `if [ $x < 5 ]`). The test suite covers this case and it does not trigger a false `inHeredoc` flag (since `< 5` has a space before the `<`, but `<<` does not match a single `<`), but unusual shell constructs that happen to contain `<<` in non-heredoc positions could theoretically be misidentified
-- The walk loop becomes stateful (two additional variables per invocation), adding modest complexity to a previously stateless function
+- Scripts containing heredoc operators require shell parsing. Unsupported or malformed scripts are scanned conservatively rather than silently exempted.
 
 #### Neutral
-- The fix is localized entirely to `walkRunBlockLines` and `detectHeredocDelimiter` in `template_injection_validation.go`; no changes to the parsed-path validators or the `CompileSimpleWorkflow` API
-- Tests are added for both the heredoc-skipping behavior (`TestScanRunContentExpressionsHeredoc`, 6 cases) and the delimiter extractor (`TestDetectHeredocDelimiter`, 7 cases)
+- The sanitizer and both validator paths share `executableShellContent`; the former delimiter heuristic has been removed.
 
 ---
 

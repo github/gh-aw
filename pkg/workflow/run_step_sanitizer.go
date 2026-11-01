@@ -15,7 +15,7 @@
 // # What this file does
 //
 // sanitizeRunStepExpressions inspects a step map and, for every ${{ ... }}
-// expression that appears directly in the run: field (outside of heredoc blocks),
+// expression that appears directly in the run: field (outside quoted heredoc bodies),
 // it:
 //   1. Generates a deterministic GH_AW_ environment variable name for the expression.
 //   2. Adds the expression as a value under env: for that step.
@@ -37,10 +37,9 @@
 //
 // # Edge cases
 //
-// Heredoc blocks (e.g. << 'EOF' ... EOF) are intentionally excluded from
-// extraction because their content is written to a file or stdin and is not
-// executed by the shell interpreter as code.  The existing removeHeredocContent
-// helper from template_injection_utils.go is reused for this detection.
+// Quoted heredoc bodies (e.g. << 'EOF' ... EOF) suppress shell expansion and
+// are excluded from extraction. Unquoted bodies undergo command substitution,
+// so their expressions must be extracted even on lines beginning with #.
 
 package workflow
 
@@ -71,9 +70,8 @@ type sanitizedExpression struct {
 // sanitizeRunStepExpressions extracts unsafe ${{ ... }} expressions from the
 // run: field of a step map and moves them into the step's env: block.
 //
-// Only expressions that appear in the non-heredoc portion of the run: script are
-// extracted; expressions inside heredoc blocks are left in place because they are
-// written to files rather than executed by the shell interpreter.
+// Expressions in quoted heredoc bodies are left in place; expressions in
+// unquoted bodies are extracted because Bash expands those bodies.
 //
 // The returned step map is a shallow copy of the input with updated run: and env:
 // fields.  The input map is not modified.
@@ -88,10 +86,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 		return step, nil, false
 	}
 
-	// Only scan executable script content:
-	//   - strip heredoc bodies (written to files/stdin, not executed)
-	//   - strip bash line comments (not executed)
-	scanContent := stripShellLineComments(removeHeredocContent(runVal))
+	scanContent := executableShellContent(runVal)
 	if !hasExpressionMarker(scanContent) {
 		return step, nil, false
 	}
@@ -190,7 +185,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	// (e.g. << 'EOF') suppress shell variable expansion, so replacing
 	// ${{ expr }} with $GH_AW_VAR inside them would write the literal variable
 	// name to the output file instead of the expression value.  Expressions
-	// that appear exclusively inside heredocs are never added to `ordered` (see
+	// that appear exclusively inside quoted heredocs are never added to `ordered` (see
 	// the scanContent check above), so they are left intact regardless.
 	newRun := runVal
 	for _, s := range ordered {
