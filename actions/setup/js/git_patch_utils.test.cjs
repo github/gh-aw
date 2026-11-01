@@ -14,6 +14,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
+import { execLocalGitSync } from "./git_helpers.cjs";
 
 import {
   sanitizeForFilename,
@@ -517,5 +518,56 @@ describe("describeGitFailure", () => {
     execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
     const message = "fatal: unable to access 'https://example.com/': Could not resolve host";
     expect(describeGitFailure(message, repoDir)).toBe(message);
+  });
+
+  it.each([
+    "",
+    "fatal: missing file 'README.md'",
+    "fatal: unable to read config file '.git/config': Permission denied",
+    "fatal: operation not allowed: Permission denied",
+    "fatal: transport 'ext' not allowed",
+    "fatal: pathspec 'missing' did not match any files",
+    "fatal: invalid argument 'bad object'",
+    "commit message: fatal: bad object deadbeef",
+  ])("leaves unrelated error %j unchanged on a partial clone", message => {
+    execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
+    expect(describeGitFailure(message, repoDir)).toBe(message);
+  });
+
+  it.each(["ERR_SYSTEM: fatal: unable to read " + "a".repeat(40), "fatal: could not read " + "b".repeat(64), "fatal: bad object HEAD", "fatal: missing blob object '" + "c".repeat(40) + "'"])(
+    "preserves the diagnostic for object-resolution error %j",
+    message => {
+      execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
+      expect(describeGitFailure(message, repoDir)).toContain("partial clone");
+    }
+  );
+
+  it.each(["diff", "format-patch", "bundle"])("diagnoses a real offline %s failure without invoking the promisor remote", command => {
+    const baseSha = execGit(["rev-parse", "HEAD"], { cwd: repoDir }).stdout.trim();
+    fs.writeFileSync(path.join(repoDir, "file.txt"), "new content\n");
+    execGit(["add", "file.txt"], { cwd: repoDir });
+    execGit(["commit", "-q", "-m", "Add file"], { cwd: repoDir });
+    const blobSha = execGit(["rev-parse", "HEAD:file.txt"], { cwd: repoDir }).stdout.trim();
+    fs.unlinkSync(path.join(repoDir, ".git", "objects", blobSha.slice(0, 2), blobSha.slice(2)));
+
+    const marker = path.join(repoDir, "remote-invoked");
+    const helper = path.join(repoDir, "promisor-helper");
+    fs.writeFileSync(helper, `#!/bin/sh\nprintf attempted > "${marker}"\nexit 1\n`, { mode: 0o755 });
+    execGit(["remote", "add", "origin", `ext::${helper}`], { cwd: repoDir });
+    execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
+    execGit(["config", "protocol.ext.allow", "always"], { cwd: repoDir });
+
+    const range = `${baseSha}..HEAD`;
+    const args = command === "bundle" ? ["bundle", "create", path.join(repoDir, "output.bundle"), range] : [command, "--binary", range];
+    let message;
+    try {
+      execLocalGitSync(args, { cwd: repoDir, suppressLogs: true, env: { GIT_ALLOW_PROTOCOL: "ext", GIT_NO_LAZY_FETCH: "0" } });
+    } catch (error) {
+      message = error.message;
+    }
+    expect(message).toBeDefined();
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(describeGitFailure(message, repoDir)).toContain("partial clone");
+    expect(describeGitFailure(message, repoDir)).toContain("disables all Git transports");
   });
 });

@@ -835,12 +835,16 @@ describe("git patch integration tests", () => {
       const restore = setTestEnv(workingRepo);
       try {
         // Legacy token options must not enable a fetch.
+        core.warning.mockClear();
         const result = await generateGitPatch("token-option-test", "main", {
           mode: "incremental",
           token: "ghs_custom_token_for_cross_repo",
         });
 
         expect(result.success).toBe(false);
+        expect(core.warning).toHaveBeenCalledTimes(1);
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("options.token is deprecated and ignored"));
+        expect(JSON.stringify(core.warning.mock.calls)).not.toContain("ghs_custom_token_for_cross_repo");
         expect(result.error).toContain("Artifact generation never fetches");
         expect(execGit(["show-ref", "--verify", "--quiet", "refs/remotes/origin/token-option-test"], { cwd: workingRepo, allowFailure: true }).status).toBe(1);
 

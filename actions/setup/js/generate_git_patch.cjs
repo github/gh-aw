@@ -58,6 +58,8 @@ function embedBaseCommit(patchContent, baseCommitSha) {
  * @param {string} branchName - The branch name to generate patch for
  * @param {string} baseBranch - The base branch to diff against (e.g., "main", "master")
  * @param {Object} [options] - Optional parameters
+ * @param {string} [options.token] - Deprecated compatibility no-op. Emits a warning when supplied;
+ *   artifact generation is local-only and never configures authentication or fetches.
  * @param {string} [options.mode="full"] - Patch generation mode:
  *   - "full": Include all commits since merge-base with default branch (for create_pull_request)
  *   - "incremental": Only include commits since origin/branchName (for push_to_pull_request_branch)
@@ -81,6 +83,11 @@ function embedBaseCommit(patchContent, baseCommitSha) {
  * @returns {Promise<Object>} Object with patch info or error
  */
 async function generateGitPatch(branchName, baseBranch, options = {}) {
+  if (options.token !== undefined) {
+    core.warning(
+      "generateGitPatch: options.token is deprecated and ignored. Artifact generation is local-only and never configures authentication or fetches; prepare refs and history with checkout.fetch and checkout.fetch-depth before agent execution."
+    );
+  }
   const mode = options.mode || "full";
   const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
   let cwd = options.cwd || workspaceRoot;

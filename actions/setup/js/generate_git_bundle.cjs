@@ -94,6 +94,8 @@ function getBundlePathForBranchInRepo(branchName, repoSlug) {
  * @param {string} branchName - The branch name to generate bundle for
  * @param {string} baseBranch - The base branch to diff against (e.g., "main", "master")
  * @param {Object} [options] - Optional parameters
+ * @param {string} [options.token] - Deprecated compatibility no-op. Emits a warning when supplied;
+ *   artifact generation is local-only and never configures authentication or fetches.
  * @param {string} [options.mode="full"] - Bundle generation mode:
  *   - "full": Include all commits since merge-base with default branch (for create_pull_request)
  *   - "incremental": Only include commits since origin/branchName (for push_to_pull_request_branch)
@@ -112,6 +114,11 @@ function getBundlePathForBranchInRepo(branchName, repoSlug) {
  * @returns {Promise<Object>} Object with bundle info or error
  */
 async function generateGitBundle(branchName, baseBranch, options = {}) {
+  if (options.token !== undefined) {
+    core.warning(
+      "generateGitBundle: options.token is deprecated and ignored. Artifact generation is local-only and never configures authentication or fetches; prepare refs and history with checkout.fetch and checkout.fetch-depth before agent execution."
+    );
+  }
   const mode = options.mode || "full";
   // Support custom cwd for multi-repo scenarios
   const cwd = options.cwd || process.env.GITHUB_WORKSPACE || process.cwd();
@@ -121,7 +128,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
   // Filtered patches contain the resolved base-to-tip tree, including merge
   // resolutions, rather than a replay of the branch's non-merge commits.
   if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
-    const patchResult = await generateGitPatch(branchName, baseBranch, options);
+    const patchResult = await generateGitPatch(branchName, baseBranch, { ...options, token: undefined });
     if (!patchResult.success) {
       return { success: false, error: patchResult.error || "Failed to generate filtered patch for bundle synthesis", bundlePath };
     }

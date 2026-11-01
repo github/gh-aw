@@ -279,7 +279,8 @@ function isPartialClone(cwd) {
  * @returns {string}
  */
 function describeGitFailure(message, cwd) {
-  if (!/promisor|Authentication failed|Invalid username or token|fetch-pack|object not found|missing|bad object|unable to read|not allowed/i.test(message)) {
+  const objectFailure = /(?:^|\n|ERR_SYSTEM: )fatal: (?:bad object \S+|(?:unable to read|could not read) [0-9a-f]{40}(?:[0-9a-f]{24})?\b|missing (?:blob|tree|commit) object\b)/i;
+  if (!/promisor|Authentication failed|Invalid username or token|fetch-pack|object not found/i.test(message) && !objectFailure.test(message)) {
     return message;
   }
   if (!isPartialClone(cwd)) {

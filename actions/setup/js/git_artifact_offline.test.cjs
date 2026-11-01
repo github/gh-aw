@@ -28,6 +28,7 @@ describe("local-only safe-output artifacts", () => {
   }
 
   beforeEach(() => {
+    vi.clearAllMocks();
     root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-offline-artifact-"));
     repo = path.join(root, "repo");
     fs.mkdirSync(repo);
@@ -118,12 +119,17 @@ describe("local-only safe-output artifacts", () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain("No local base ref");
       expect(result.error).toContain("checkout.fetch-depth");
+      expect(core.warning).not.toHaveBeenCalled();
       checkOfflineCalls();
     });
 
     for (const mode of ["full", "incremental"]) {
       it(`${kind} ${mode} never invokes a remote helper when tracking refs are missing`, async () => {
         const result = await generate("offline-feature", "main", { cwd: repo, mode, token: "synthetic-explicit-token" });
+        expect(core.warning).toHaveBeenCalledTimes(1);
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("options.token is deprecated and ignored"));
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("never configures authentication or fetches"));
+        expect(JSON.stringify(core.warning.mock.calls)).not.toContain("synthetic-explicit-token");
         artifacts.add(result.patchPath || result.bundlePath);
         if (mode === "incremental") {
           expect(result.success).toBe(false);
@@ -149,6 +155,19 @@ describe("local-only safe-output artifacts", () => {
         artifacts.add(result.patchPath || result.bundlePath);
         expect(result.success).toBe(true);
         expect(result.baseCommit).toBe(base);
+        expect(core.warning).not.toHaveBeenCalled();
+        checkOfflineCalls();
+      });
+
+      it(`${kind} ${mode} warns only once when filtering with a legacy token`, async () => {
+        const options = { cwd: repo, mode, incrementalBaseSha: base, excludedFiles: ["excluded.txt"], token: "synthetic-explicit-token" };
+        const result = await generate("offline-feature", "main", options);
+        artifacts.add(result.patchPath || result.bundlePath);
+        expect(result.success).toBe(true);
+        expect(core.warning).toHaveBeenCalledTimes(1);
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("options.token is deprecated and ignored"));
+        expect(JSON.stringify(core.warning.mock.calls)).not.toContain(options.token);
+        expect(options.token).toBe("synthetic-explicit-token");
         checkOfflineCalls();
       });
 
