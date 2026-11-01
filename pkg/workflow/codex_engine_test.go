@@ -199,8 +199,8 @@ func TestCodexEngine(t *testing.T) {
 		if !strings.Contains(steps[1][0], "Install Codex CLI") {
 			t.Errorf("Expected second step to contain 'Install Codex CLI', got '%s'", steps[1][0])
 		}
-		if strings.Contains(strings.Join([]string(steps[1]), "\n"), "NPM_CONFIG_MIN_RELEASE_AGE") {
-			t.Errorf("Expected no npm release-age cooldown env for Codex install, got '%s'", strings.Join([]string(steps[1]), "\n"))
+		if !strings.Contains(strings.Join([]string(steps[1]), "\n"), "NPM_CONFIG_MIN_RELEASE_AGE: '3'") {
+			t.Errorf("Expected default 3-day npm release-age cooldown for Codex install, got '%s'", strings.Join([]string(steps[1]), "\n"))
 		}
 	}
 
@@ -317,12 +317,12 @@ func TestCodexEngineStableReleaseInstallation(t *testing.T) {
 			require.Len(t, steps, 2)
 			assert.Contains(t, strings.Join(steps[0], "\n"), "Setup Node.js")
 			assert.Contains(t, strings.Join(steps[1], "\n"), "npm install --ignore-scripts -g @openai/codex@"+version)
-			assert.NotContains(t, strings.Join(steps[1], "\n"), "NPM_CONFIG_MIN_RELEASE_AGE")
+			assert.Contains(t, strings.Join(steps[1], "\n"), "NPM_CONFIG_MIN_RELEASE_AGE: '3'")
 
 			microVM := strings.Join(generateCodexMicroVMCLIInstallStep(data), "\n")
 			assert.Contains(t, microVM, `npm install --ignore-scripts --prefix "${RUNNER_TEMP}/gh-aw/engine-cli" @openai/codex@`+version)
 			assert.Contains(t, microVM, `ln -sf "../node_modules/.bin/codex" "${RUNNER_TEMP}/gh-aw/engine-cli/bin/codex"`)
-			assert.NotContains(t, microVM, "NPM_CONFIG_MIN_RELEASE_AGE")
+			assert.Contains(t, microVM, "NPM_CONFIG_MIN_RELEASE_AGE: '3'")
 		})
 	}
 }

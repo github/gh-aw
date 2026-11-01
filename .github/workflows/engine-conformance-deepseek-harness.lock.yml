@@ -644,6 +644,8 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Install DeepSeek Harness
         run: npm install -g @deepseek-ai/dsh@0.2.0-rc.2
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Verify DeepSeek Harness installation
         run: dsh --version
       - name: Determine automatic lockdown mode for GitHub MCP Server

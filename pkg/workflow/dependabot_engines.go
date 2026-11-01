@@ -138,8 +138,14 @@ func extractCopilotSDKPackages(data *WorkflowData, ecosystem string) []string {
 	command := strings.Join(buildCopilotSDKInstallStep(data), "\n")
 	switch ecosystem {
 	case "npm":
+		var installCommands []string
+		for line := range strings.SplitSeq(command, "\n") {
+			if strings.Contains(line, "npm install ") {
+				installCommands = append(installCommands, line)
+			}
+		}
 		extractor := PackageExtractor{CommandNames: []string{"npm"}, RequiredSubcommands: []string{"install"}, TrimSuffixes: "&|;"}
-		return extractor.ExtractPackages(command)
+		return extractor.ExtractPackages(strings.Join(installCommands, "\n"))
 	case "pip":
 		// The SDK command has a --target argument, which the general
 		// pip extractor does not distinguish from a package.

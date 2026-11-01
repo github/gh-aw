@@ -144,7 +144,7 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	if workflowData.EngineConfig != nil {
 		checksumsSHA256 = workflowData.EngineConfig.ChecksumsSHA256
 	}
-	npmSteps := generateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion, string(constants.CopilotSessionIDMinVersion), getNVXGuestLibc(workflowData), checksumsSHA256)
+	npmSteps := generateCopilotInstallerSteps(copilotVersion, "Install GitHub Copilot CLI", rootless, compiledVersion, string(constants.CopilotSessionIDMinVersion), getNVXGuestLibc(workflowData), checksumsSHA256, resolveEngineCooldownDays(workflowData))
 	if len(inlineDriverWriteStep) > 0 {
 		npmSteps = append(npmSteps, inlineDriverWriteStep)
 	}
@@ -197,7 +197,7 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	if inlineRuntimeID := copilotSDKInlineDriverRuntimeID(workflowData); inlineRuntimeID != "" {
 		spec := getInlineCopilotSDKInstallSpec(inlineRuntimeID)
 		copilotInstallLog.Printf("copilot-sdk enabled with inline driver; runtime=%s; install command=%s", spec.runtimeID, spec.command)
-		return specToInstallStep(spec)
+		return specToInstallStep(spec, resolveEngineCooldownDays(workflowData))
 	}
 	// When a custom SDK driver is configured without a custom engine command, use the driver's
 	// file extension to determine which language SDK to install. This ensures the correct SDK
@@ -208,13 +208,18 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 	}
 	spec := getCopilotSDKInstallSpec(command)
 	copilotInstallLog.Printf("copilot-sdk enabled; runtime=%s; install command=%s", spec.runtimeID, spec.command)
-	return specToInstallStep(spec)
+	return specToInstallStep(spec, resolveEngineCooldownDays(workflowData))
 }
 
 // specToInstallStep converts a copilotSDKInstallSpec into a GitHubActionStep.
 // When the spec has runLines set it emits a "run: |" multi-line block; otherwise
 // it emits a single "run: <command>" line.
-func specToInstallStep(spec copilotSDKInstallSpec) GitHubActionStep {
+func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActionStep {
+	installCommand := spec.command
+	if len(spec.runLines) > 0 {
+		installCommand = strings.Join(spec.runLines, "\n")
+	}
+	usesNpm := strings.Contains(installCommand, "npm install ")
 	if len(spec.runLines) > 0 {
 		step := GitHubActionStep{
 			"      - name: " + spec.stepName,
@@ -223,12 +228,22 @@ func specToInstallStep(spec copilotSDKInstallSpec) GitHubActionStep {
 		for _, line := range spec.runLines {
 			step = append(step, "          "+line)
 		}
+		if usesNpm {
+			step = append(step,
+				"        env:",
+				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
+			)
+		}
 		return step
 	}
-	return GitHubActionStep{
+	step := GitHubActionStep{
 		"      - name: " + spec.stepName,
 		"        run: " + spec.command,
 	}
+	if usesNpm {
+		step = append(step, "        env:", fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays))
+	}
+	return step
 }
 
 // sdkDriverInstallCommand returns a synthetic command string for the given driver filename

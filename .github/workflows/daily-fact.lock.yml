@@ -679,11 +679,15 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install Codex CLI in microVM path
         run: |
           mkdir -p "${RUNNER_TEMP}/gh-aw/engine-cli/bin"
           npm install --ignore-scripts --prefix "${RUNNER_TEMP}/gh-aw/engine-cli" @openai/codex@0.165.0
           ln -sf "../node_modules/.bin/codex" "${RUNNER_TEMP}/gh-aw/engine-cli/bin/codex"
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Grant runner access to KVM
         run: bash "${RUNNER_TEMP}/gh-aw/actions/cloud_hypervisor_kvm_access.sh"
       - name: Check host eligibility for cloud-hypervisor
@@ -1981,6 +1985,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Prepare Codex config for threat-detect
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         run: |
@@ -2314,6 +2320,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Download container images
