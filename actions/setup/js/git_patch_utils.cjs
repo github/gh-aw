@@ -15,7 +15,7 @@
 const fs = require("fs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { execGitSync } = require("./git_helpers.cjs");
+const { execLocalGitSync: execGitSync } = require("./git_helpers.cjs");
 const { scopedArtifactFilename } = require("./work_queue_claim_scope.cjs");
 
 /**
@@ -259,8 +259,7 @@ function isAncestorCommit(ancestor, descendant, cwd) {
 
 /**
  * Returns true when the repository is a partial clone (objects are fetched lazily
- * from a promisor remote). In gh-aw checkouts credentials are not persisted, so any
- * lazy fetch is unauthenticated and fails - which surfaces as confusing git errors.
+ * from a promisor remote). Artifact generation requires these objects locally.
  * @param {string|undefined} cwd
  * @returns {boolean}
  */
@@ -274,13 +273,13 @@ function isPartialClone(cwd) {
 
 /**
  * Appends a partial-clone diagnostic to an error message when the failure looks like
- * a failed lazy object hydration from an unauthenticated promisor remote.
+ * unavailable objects in a promisor remote checkout.
  * @param {string} message
  * @param {string|undefined} cwd
  * @returns {string}
  */
 function describeGitFailure(message, cwd) {
-  if (!/promisor|Authentication failed|Invalid username or token|fetch-pack|object not found/i.test(message)) {
+  if (!/promisor|Authentication failed|Invalid username or token|fetch-pack|object not found|missing|bad object|unable to read|not allowed/i.test(message)) {
     return message;
   }
   if (!isPartialClone(cwd)) {
@@ -288,8 +287,8 @@ function describeGitFailure(message, cwd) {
   }
   return (
     `${message} ` +
-    "This repository is a partial clone (remote.origin.promisor=true), so git tried to lazily fetch missing objects from the remote. " +
-    "That fetch is unauthenticated because the checkout used persist-credentials: false. " +
+    "This repository is a partial clone (remote.origin.promisor=true) with required objects unavailable locally. " +
+    "Artifact generation disables all Git transports, including lazy fetches from the agent-writable checkout. " +
     "Fetch the required objects during checkout (for example checkout.fetch-depth: 0 without a blob filter) to avoid lazy fetches."
   );
 }

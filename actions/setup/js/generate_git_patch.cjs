@@ -10,7 +10,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { ensureOriginRemoteTrackingRef, execGitSync } = require("./git_helpers.cjs");
+const { hasLocalOriginRemoteTrackingRef, execLocalGitSync: execGitSync } = require("./git_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 const {
   sanitizeForFilename,
@@ -61,15 +61,13 @@ function embedBaseCommit(patchContent, baseCommitSha) {
  * @param {string} [options.mode="full"] - Patch generation mode:
  *   - "full": Include all commits since merge-base with default branch (for create_pull_request)
  *   - "incremental": Only include commits since origin/branchName (for push_to_pull_request_branch)
- *     In incremental mode, origin/branchName is fetched explicitly and merge-base fallback is disabled.
+ *     In incremental mode, the baseline must exist locally and merge-base fallback is disabled.
  * @param {string} [options.cwd] - Working directory for git commands. Defaults to GITHUB_WORKSPACE or process.cwd().
  *   Use this for multi-repo scenarios where repos are checked out to subdirectories.
  * @param {string} [options.workspacePath] - Path relative to GITHUB_WORKSPACE used as git working directory.
  *   When set, this takes precedence over options.cwd and must resolve to a directory under GITHUB_WORKSPACE.
  * @param {string} [options.repoSlug] - Repository slug (owner/repo) to include in patch filename for disambiguation.
  *   Required for multi-repo scenarios to prevent patch file collisions.
- * @param {string} [options.token] - GitHub token for git authentication. Falls back to GITHUB_TOKEN env var.
- *   Use this for cross-repo scenarios where a custom PAT with access to the target repo is needed.
  * @param {string[]} [options.excludedFiles] - Glob patterns for files to exclude from the patch.
  *   Patterns are applied to the resolved base-to-tip diff as `:(exclude)<pattern>`
  *   pathspecs. The retained tree is emitted as a single commit, preserving merge resolutions.
@@ -285,24 +283,17 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
               };
             }
           } else {
-            // Backward-compatible fallback for same-repository PRs and existing callers:
-            // try origin/branchName locally, then a single network fetch attempt.
-            // The fetch will succeed for public same-repo branches (no credentials
-            // needed) and fail fast when unavailable.
+            // Same-repository fallback: use only the pre-fetched local tracking ref.
             debugLog(`Strategy 1 (incremental): Resolving origin/${branchName}`);
-            const incrementalRefResult = ensureOriginRemoteTrackingRef(branchName, { cwd, token: options.token, suppressLogs: true });
-            if (incrementalRefResult.exists) {
+            if (hasLocalOriginRemoteTrackingRef(branchName, { cwd, suppressLogs: true })) {
               baseRef = `origin/${branchName}`;
-              if (incrementalRefResult.fetched) {
-                debugLog(`Strategy 1 (incremental): Fetched origin/${branchName} from remote, baseRef=${baseRef}`);
-              } else {
-                debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
-              }
+              debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
             } else {
-              debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally and remote fetch failed (${incrementalRefResult.fetchError ? getErrorMessage(incrementalRefResult.fetchError) : "no error"}), failing`);
+              debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally, failing without fetching`);
               errorMessage =
                 `Cannot generate incremental patch: no pre-agent PR-head baseline was available for branch '${branchName}' in checkout '${cwd}'. ` +
-                `Tried refs/remotes/origin/${branchName}, but it is not present and could not be fetched from origin. ` +
+                `refs/remotes/origin/${branchName} is not present locally. Artifact generation never fetches from the agent-writable checkout. ` +
+                `Prepare the required refs and history with checkout.fetch and checkout.fetch-depth before agent execution. ` +
                 `For fork PRs, ensure the workflow PR checkout step ran first so refs/pull/<number>/head is recorded as the patch baseline; checkout.fetch cannot fetch fork branches from the base repository.`;
               return {
                 success: false,
@@ -327,20 +318,11 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           // contains exactly the agent's changes.
           debugLog(`Strategy 1 (full): Computing merge-base with ${defaultBranch} (ignoring any stale origin/${branchName})`);
           // Check if origin/<defaultBranch> already exists locally (e.g., from checkout with fetch-depth: 0).
-          // When missing, try a single network fetch — succeeds for public repos and
-          // fails fast for private repos without credentials.
-          const defaultBranchRefResult = ensureOriginRemoteTrackingRef(defaultBranch, { cwd, token: options.token, suppressLogs: true });
-          const hasLocalDefaultBranch = defaultBranchRefResult.exists;
+          const hasLocalDefaultBranch = hasLocalOriginRemoteTrackingRef(defaultBranch, { cwd, suppressLogs: true });
           if (hasLocalDefaultBranch) {
-            if (defaultBranchRefResult.fetched) {
-              debugLog(`Strategy 1 (full): fetched origin/${defaultBranch} from remote`);
-            } else {
-              debugLog(`Strategy 1 (full): origin/${defaultBranch} exists locally`);
-            }
+            debugLog(`Strategy 1 (full): origin/${defaultBranch} exists locally`);
           } else {
-            debugLog(
-              `Strategy 1 (full): origin/${defaultBranch} not present locally and remote fetch failed (likely private repo without credentials in MCP server). Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this strategy.`
-            );
+            debugLog(`Strategy 1 (full): origin/${defaultBranch} not present locally. Artifact generation never fetches. Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this strategy.`);
           }
 
           // If origin/<defaultBranch> is unavailable (e.g. credentials were cleaned),
@@ -364,8 +346,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           // the merge-base with the default branch is far behind the checked-out
           // commit. Basing the patch there would include the dispatched branch's own
           // commits instead of only the agent's, and on a partial clone it requires
-          // base-side blobs that were never fetched (the lazy fetch is unauthenticated
-          // and fails). GITHUB_SHA is the commit the agent started from and every
+          // base-side blobs that were never fetched (lazy fetches are disabled).
+          // GITHUB_SHA is the commit the agent started from and every
           // object it needs is already present in the checkout.
           const dispatchedSha = normalizeCommitSHA(githubSha);
           const tipSha = execGitSync(["rev-parse", tipRef], { cwd }).trim();
@@ -395,6 +377,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           } else {
             // No remote refs available - fall through to Strategy 2
             debugLog(`Strategy 1 (full): No remote refs available, falling through to Strategy 2`);
+            errorMessage = `No local base ref is available for patch generation in checkout '${cwd}'. Artifact generation never fetches. Prepare ${JSON.stringify(defaultBranch)} with checkout.fetch and sufficient checkout.fetch-depth before agent execution.`;
             throw new Error(`${ERR_SYSTEM}: No remote refs available for merge-base calculation`);
           }
         }
@@ -482,6 +465,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
         if (excludeArgsArr.length > 0 && baseCommitSha) {
           return { success: false, error: `Failed to generate filtered patch: ${branchErrorMessage}`, patchPath };
         }
+        if (baseCommitSha) {
+          return { success: false, error: `Failed to generate patch: ${branchErrorMessage}`, patchPath };
+        }
         if (options.pinnedSha) {
           // SECURITY: When pinnedSha is set, fail closed — do not fall through to
           // other strategies that would resolve a different commit.
@@ -520,7 +506,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
       if (!githubSha) {
         debugLog(`Strategy 2: GITHUB_SHA not set, cannot use this strategy`);
-        errorMessage = "GITHUB_SHA environment variable is not set";
+        errorMessage ||= "GITHUB_SHA environment variable is not set";
       } else if (currentHead === githubSha) {
         // No commits have been made since checkout
         debugLog(`Strategy 2: HEAD equals GITHUB_SHA - no new commits`);
@@ -567,6 +553,9 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           } catch (ancestorErr) {
             if (excludeArgsArr.length > 0 && baseCommitSha) {
               return { success: false, error: `Failed to generate filtered patch: ${getErrorMessage(ancestorErr)}`, patchPath };
+            }
+            if (baseCommitSha) {
+              return { success: false, error: `Failed to generate patch: ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`, patchPath };
             }
             // GITHUB_SHA is not an ancestor of HEAD - repository state has diverged
             debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${getErrorMessage(ancestorErr)}`);
@@ -660,7 +649,10 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
         }
       } catch (strategy3Err) {
         if (excludeArgsArr.length > 0 && baseCommitSha) {
-          return { success: false, error: `Failed to generate filtered patch: ${getErrorMessage(strategy3Err)}`, patchPath };
+          return { success: false, error: `Failed to generate filtered patch: ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`, patchPath };
+        }
+        if (baseCommitSha) {
+          return { success: false, error: `Failed to generate patch: ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`, patchPath };
         }
         debugLog(`Strategy 3: Failed - ${getErrorMessage(strategy3Err)}`);
       }

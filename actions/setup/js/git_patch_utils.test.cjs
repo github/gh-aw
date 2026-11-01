@@ -493,7 +493,7 @@ describe("describeGitFailure", () => {
 
   it("leaves the message unchanged when it does not look like an auth/promisor failure", () => {
     execGit(["config", "remote.origin.promisor", "true"], { cwd: repoDir });
-    const message = "fatal: bad object HEAD";
+    const message = "fatal: invalid option";
     expect(describeGitFailure(message, repoDir)).toBe(message);
   });
 
@@ -503,7 +503,7 @@ describe("describeGitFailure", () => {
     const result = describeGitFailure(message, repoDir);
     expect(result).toContain(message);
     expect(result).toContain("partial clone");
-    expect(result).toContain("persist-credentials: false");
+    expect(result).toContain("disables all Git transports");
   });
 
   it("matches on 'promisor' in the message even without the exact auth wording", () => {

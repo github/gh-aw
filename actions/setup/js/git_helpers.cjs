@@ -277,45 +277,26 @@ async function withGitRetry(operation, options = {}) {
 }
 
 /**
- * Ensure refs/remotes/origin/<branch> is available locally, attempting a
- * single fetch when it is not. Returns whether the ref now exists and
- * whether a fetch was required.
- *
- * Safe to call from the credential-less safe-outputs MCP server: execGitSync
- * runs git with GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/echo and a 60s
- * timeout, so the fetch attempt either succeeds (public repos, or when a
- * token was provided) or fails fast (private repos without credentials).
- * Callers MUST treat exists=false as a recoverable negative result rather
- * than an error condition.
+ * Check refs/remotes/origin/<branch> locally without fetching missing refs.
+ * The checkout is agent-writable, so its remote configuration must never be
+ * used for network operations in the safe-outputs artifact generator.
  *
  * @param {string} branch - Branch name (without origin/ prefix)
  * @param {Object} options
  * @param {string} options.cwd - Working directory for git commands
- * @param {string} [options.token] - Optional auth token used for fetch
  * @param {boolean} [options.suppressLogs=false] - Whether to suppress execGitSync error logs
- * @returns {{ exists: boolean, fetched: boolean, fetchError?: Error }}
- *   fetchError is populated only when exists=false after a failed fetch attempt.
+ * @returns {boolean}
  */
-function ensureOriginRemoteTrackingRef(branch, options) {
+function hasLocalOriginRemoteTrackingRef(branch, options) {
   const ref = `refs/remotes/origin/${branch}`;
   try {
-    execGitSync(["show-ref", "--verify", "--quiet", ref], {
+    execLocalGitSync(["show-ref", "--verify", "--quiet", ref], {
       cwd: options.cwd,
       suppressLogs: options.suppressLogs || false,
     });
-    return { exists: true, fetched: false };
+    return true;
   } catch {
-    try {
-      const fetchEnv = { ...process.env, ...getGitAuthEnv(options.token) };
-      execGitSync(["fetch", "origin", "--", `${branch}:refs/remotes/origin/${branch}`], {
-        cwd: options.cwd,
-        env: fetchEnv,
-        suppressLogs: options.suppressLogs || false,
-      });
-      return { exists: true, fetched: true };
-    } catch (fetchError) {
-      return { exists: false, fetched: false, fetchError: /** @type {Error} */ fetchError };
-    }
+    return false;
   }
 }
 
@@ -364,7 +345,7 @@ function checkImplausibleShallowRange(baseRef, headRef, options = {}) {
 
   let commitCount = 0;
   try {
-    const countOut = execGitSync(["rev-list", "--count", `${baseRef}..${headRef}`], {
+    const countOut = execLocalGitSync(["rev-list", "--count", `${baseRef}..${headRef}`], {
       cwd,
       suppressLogs: true,
     });
@@ -381,7 +362,7 @@ function checkImplausibleShallowRange(baseRef, headRef, options = {}) {
   // actually shallow — a large honest branch in a full clone is fine.
   let isShallow = false;
   try {
-    const shallowOut = execGitSync(["rev-parse", "--is-shallow-repository"], {
+    const shallowOut = execLocalGitSync(["rev-parse", "--is-shallow-repository"], {
       cwd,
       suppressLogs: true,
     });
@@ -436,7 +417,7 @@ function hasMergeCommitsInRange(baseRef, headRef, options = {}) {
   if (implausible) return false;
 
   try {
-    const out = execGitSync(["rev-list", "--merges", "--count", `${baseRef}..${headRef}`], {
+    const out = execLocalGitSync(["rev-list", "--merges", "--count", `${baseRef}..${headRef}`], {
       cwd: options.cwd,
       suppressLogs: true,
     });
@@ -470,6 +451,16 @@ function offlineGitOptions(options = {}) {
     env: { ...process.env, ...options.env, GIT_ALLOW_PROTOCOL: "", GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0" },
     silent: true,
   };
+}
+
+/**
+ * Execute artifact-generation Git commands with every transport denied.
+ * @param {string[]} args
+ * @param {Object} [options]
+ * @returns {string}
+ */
+function execLocalGitSync(args, options = {}) {
+  return execGitSync(args, offlineGitOptions(options));
 }
 
 /**
@@ -888,13 +879,14 @@ module.exports = {
   withGitRetry,
   execGitSync,
   execGitSyncResult,
+  execLocalGitSync,
   backfillCommitObjects,
   checkImplausibleShallowRange,
   ensureFullHistoryForBundle,
   importLocalBundle,
   BUNDLE_HISTORY_ERROR,
   offlineGitOptions,
-  ensureOriginRemoteTrackingRef,
+  hasLocalOriginRemoteTrackingRef,
   extractBundlePrerequisiteCommits,
   getBundlePrerequisites,
   getGitAuthEnv,

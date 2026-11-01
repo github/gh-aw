@@ -891,19 +891,22 @@ describe("generateGitPatch – Strategy 3 picks closest remote merge-base", () =
     execSync("git add . && git commit -m 'agent change'", { cwd: repoDir });
     process.env.GITHUB_SHA = "side-repo-sha-not-in-target-repo";
 
-    const gitHelpers = require("./git_helpers.cjs");
-    const originalExecGitSync = gitHelpers.execGitSync;
-    gitHelpers.execGitSync = (args, options) => {
-      if (args[0] === "write-tree") throw new Error("synthetic tree creation failed");
-      return originalExecGitSync(args, options);
+    const childProcess = require("child_process");
+    const originalSpawnSync = childProcess.spawnSync;
+    childProcess.spawnSync = (command, args, options) => {
+      if (command === "git" && args[0] === "write-tree") {
+        return { status: 1, stdout: "", stderr: "synthetic tree creation failed" };
+      }
+      return originalSpawnSync(command, args, options);
     };
     try {
       const { generateGitPatch } = require("./generate_git_patch.cjs");
       const result = await generateGitPatch("agent-branch", "missing-default", { cwd: repoDir, excludedFiles: ["*.yml"] });
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Failed to generate filtered patch: synthetic tree creation failed");
+      expect(result.error).toContain("Failed to generate filtered patch:");
+      expect(result.error).toContain("synthetic tree creation failed");
     } finally {
-      gitHelpers.execGitSync = originalExecGitSync;
+      childProcess.spawnSync = originalSpawnSync;
     }
   });
 });

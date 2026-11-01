@@ -283,6 +283,16 @@ checkout:
 
 This differs from `checkout: false`, which disables checkout entirely (including any additional configured repositories). With `permissions.contents: none`, only the workflow's own repository is skipped.
 
+Safe-output patch and bundle generation is **local-only**. It never fetches
+missing refs or objects from the agent-writable checkout, even when safe-output
+API credentials are configured. All Git transports, including external remote
+helpers and partial-clone lazy fetches, are disabled during artifact generation.
+Prepare the required refs with `checkout.fetch` and sufficient history with
+`checkout.fetch-depth` before agent execution; partial clones must also have the
+required blobs locally. Incremental updates require the pre-agent PR-head baseline
+recorded by the PR checkout step or an existing `origin/<branch>` tracking ref.
+Missing baselines are reported rather than replaced with a broader diff.
+
 ## `pull_request_target` Checkout
 
 For `pull_request_target` workflows, the "Checkout PR branch" step is auto-disabled when no `checkout:` key is present in frontmatter. This prevents hard failures when the PR head branch is deleted (merged/closed events) or inaccessible (fork PRs).

@@ -15,7 +15,7 @@ const { lookupCheckout } = require("./checkout_manifest.cjs");
 const { generateGitPatch } = require("./generate_git_patch.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { generateGitBundle } = require("./generate_git_bundle.cjs");
-const { hasMergeCommitsInRange, execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
+const { hasMergeCommitsInRange, execLocalGitSync: execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
 const { enforceCommentLimits, MAX_COMMENT_INPUT_LENGTH } = require("./comment_limit_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
@@ -1101,11 +1101,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (repoCwd) {
       transportOptions.cwd = repoCwd;
     }
-    // Pass per-handler token so cross-repo PATs are used for git fetch when configured.
-    // Falls back to GITHUB_TOKEN if not set.
-    if (prConfig["github-token"]) {
-      transportOptions.token = prConfig["github-token"];
-    }
 
     // SECURITY: Pin the branch ref to a SHA before generating any transport artifacts.
     // This prevents TOCTOU races where the agent flips the ref between patch and bundle
@@ -1533,11 +1528,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
     if (repoCwd) {
       pushTransportOptions.cwd = repoCwd;
-    }
-    // Pass per-handler token so cross-repo PATs are used for git fetch when configured.
-    // Falls back to GITHUB_TOKEN if not set.
-    if (pushConfig["github-token"]) {
-      pushTransportOptions.token = pushConfig["github-token"];
     }
 
     // Determine transport format: "bundle" (default) uses git bundle (preserves merge topology),
