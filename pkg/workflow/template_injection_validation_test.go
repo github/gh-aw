@@ -566,7 +566,7 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
 			description: "Multiple heredocs should all be filtered",
 		},
 		{
-			name: "safe - unquoted heredoc delimiter",
+			name: "unsafe - unquoted heredoc delimiter",
 			yaml: `jobs:
   test:
     steps:
@@ -575,8 +575,8 @@ func TestTemplateInjectionHeredocFiltering(t *testing.T) {
           cat > config.json << EOF
           {"issue": "${{ github.event.issue.number }}"}
           EOF`,
-			shouldError: false,
-			description: "Unquoted heredoc delimiters should be recognized",
+			shouldError: true,
+			description: "Expressions in unquoted heredocs are shell-expanded and must be rejected",
 		},
 	}
 
@@ -770,9 +770,9 @@ echo "done"`,
 			content: `cat > file << EOF
 {"value": "${{ github.event.issue.number }}"}
 EOF`,
-			want:     "cat > file # heredoc removed",
-			hasExpr:  false,
-			describe: "Unquoted EOF heredoc should be removed",
+			want:     `cat > file << EOF` + "\n" + `{"value": "${{ github.event.issue.number }}"}` + "\n" + "EOF",
+			hasExpr:  true,
+			describe: "Unquoted EOF heredoc should remain in the scan",
 		},
 		{
 			name: "JSON delimiter",
@@ -855,9 +855,9 @@ GH_AW_WORKFLOW_YAML`,
 			content: `cat > file << GH_AW_TOOLS_EOF
 {"value": "${{ github.event.issue.number }}"}
 GH_AW_TOOLS_EOF`,
-			want:     "cat > file # heredoc removed",
-			hasExpr:  false,
-			describe: "Unquoted prefixed delimiter should be removed",
+			want:     `cat > file << GH_AW_TOOLS_EOF` + "\n" + `{"value": "${{ github.event.issue.number }}"}` + "\n" + "GH_AW_TOOLS_EOF",
+			hasExpr:  true,
+			describe: "Unquoted prefixed heredoc should remain in the scan",
 		},
 		{
 			name: "multiple prefixed delimiters",
@@ -1511,10 +1511,8 @@ func TestScanRunContentExpressions(t *testing.T) {
 	}
 }
 
-// TestScanRunContentExpressionsHeredoc verifies that expressions inside heredocs
-// are not flagged as disallowed – this ensures that ${{ }} expressions inside
-// unquoted heredocs (e.g. heredoc config blocks) are exempt from template-injection
-// checks by our internal validator.
+// TestScanRunContentExpressionsHeredoc verifies that quoted heredoc content is
+// excluded from template-injection checks while unquoted content is scanned.
 func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -1537,7 +1535,7 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
 			wantHasDisallowed: false,
 		},
 		{
-			name: "unsafe expression inside unquoted heredoc is not flagged",
+			name: "unsafe expression inside unquoted heredoc is flagged",
 			yaml: `jobs:
   test:
     steps:
@@ -1545,8 +1543,8 @@ func TestScanRunContentExpressionsHeredoc(t *testing.T) {
           cat << EOF
           title: ${{ github.event.issue.title }}
           EOF`,
-			wantHasUnsafe:     false,
-			wantHasDisallowed: false,
+			wantHasUnsafe:     true,
+			wantHasDisallowed: true,
 		},
 		{
 			name: "disallowed expression OUTSIDE heredoc is still flagged",

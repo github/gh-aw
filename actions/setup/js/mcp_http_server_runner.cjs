@@ -227,10 +227,10 @@ async function runHttpServer(options) {
 
   // Start listening
   logger.debug(`Attempting to bind to port ${port}...`);
-  httpServer.listen(port, () => {
+  httpServer.listen(port, "127.0.0.1", () => {
     logger.debug(`=== ${serverLabel} HTTP Server Started Successfully ===`);
-    logger.debug(`HTTP server listening on http://localhost:${port}`);
-    logger.debug(`MCP endpoint: POST http://localhost:${port}/`);
+    logger.debug(`HTTP server listening on http://127.0.0.1:${port}`);
+    logger.debug(`MCP endpoint: POST http://127.0.0.1:${port}/`);
     logger.debug(`Server is ready to accept requests`);
   });
 

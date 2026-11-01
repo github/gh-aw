@@ -215,6 +215,16 @@ func detectHeredocDelimiter(trimmed string) (string, bool) {
 	return delim, true
 }
 
+func isQuotedHeredocDelimiter(trimmed string) bool {
+	_, after, found := strings.Cut(trimmed, "<<")
+	if !found || (after != "" && after[0] == '<') {
+		return false
+	}
+	after = strings.TrimPrefix(after, "-")
+	rest := strings.TrimSpace(after)
+	return rest != "" && (rest[0] == '\'' || rest[0] == '"')
+}
+
 // isShellIdentifier reports whether s is a valid shell identifier (letters,
 // digits, and underscores; must not start with a digit). Heredoc delimiters
 // must match this pattern; non-matching tokens indicate non-heredoc uses of <<
@@ -238,19 +248,37 @@ func isShellIdentifier(s string) bool {
 	return true
 }
 
+func visitRunBlockContentLine(line string, inHeredoc *bool, delimiter *string, quotedHeredoc *bool, visit func(string) bool) bool {
+	if *inHeredoc {
+		if strings.TrimSpace(line) == *delimiter {
+			*inHeredoc = false
+			*delimiter = ""
+			*quotedHeredoc = false
+			return false
+		}
+		return !*quotedHeredoc && visit(line)
+	}
+
+	if heredocDelimiter, ok := detectHeredocDelimiter(strings.TrimLeft(line, " \t")); ok {
+		*inHeredoc = true
+		*delimiter = heredocDelimiter
+		*quotedHeredoc = isQuotedHeredocDelimiter(strings.TrimLeft(line, " \t"))
+	}
+	return visit(line)
+}
+
 // walkRunBlockLines scans raw YAML text and visits each inline run value or line inside a
 // multiline run block. It recognizes plain run: keys as well as quoted and flow-style forms
 // so Path B stays aligned with the parsed-YAML validators.
 //
-// Heredoc content is skipped so that expressions embedded inside heredocs (which are written
-// to files and never executed directly by the shell) do not trigger false positives in the
-// caller's expression checks. This matches the behaviour of removeHeredocContent, which
-// validateNoGitHubExpressionsInRunScriptsFromParsed uses on the parsed path.
+// Quoted heredoc content is skipped because the shell does not expand it. Unquoted
+// heredoc content is visited because shell expansion can expose injected expressions.
 func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 	inRunBlock := false
 	runBlockIndent := 0
 	inHeredoc := false
 	heredocDelimiter := ""
+	quotedHeredoc := false
 
 	for line := range strings.SplitSeq(yamlContent, "\n") {
 		trimmed := strings.TrimLeft(line, " \t")
@@ -264,28 +292,10 @@ func walkRunBlockLines(yamlContent string, visit func(line string) bool) bool {
 				inRunBlock = false
 				inHeredoc = false
 				heredocDelimiter = ""
+				quotedHeredoc = false
 				// Fall through: check whether this line starts a new run: block.
 			} else {
-				// If we are inside a heredoc, look for the closing delimiter.
-				if inHeredoc {
-					if strings.TrimSpace(line) == heredocDelimiter {
-						inHeredoc = false
-						heredocDelimiter = ""
-					}
-					continue // always skip heredoc content
-				}
-				// Check whether this line opens a heredoc.
-				if delim, ok := detectHeredocDelimiter(trimmed); ok {
-					inHeredoc = true
-					heredocDelimiter = delim
-					// The opening line itself is not heredoc body; visit it so callers
-					// can see the surrounding shell context, but do not recurse.
-					if visit(line) {
-						return true
-					}
-					continue
-				}
-				if visit(line) {
+				if visitRunBlockContentLine(line, &inHeredoc, &heredocDelimiter, &quotedHeredoc, visit) {
 					return true
 				}
 				continue

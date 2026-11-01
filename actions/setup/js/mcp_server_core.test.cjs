@@ -424,6 +424,25 @@ describe("mcp_server_core.cjs", () => {
       expect(results[0].error.message).toContain("Supported parameters for this tool");
     });
 
+    it("should skip suggestions for oversized unknown parameter names", async () => {
+      const { handleMessage } = await import("./mcp_server_core.cjs");
+      const oversizedName = "x".repeat(1024 * 1024);
+
+      await handleMessage(server, {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "test_tool",
+          arguments: { input: "valid", [oversizedName]: "ignored" },
+        },
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].error.message).toContain("unknown parameter");
+      expect(results[0].error.message).not.toContain("closest:");
+    });
+
     it("rejects strict add_labels string arrays synchronously before handler execution", async () => {
       const { registerTool, handleMessage } = await import("./mcp_server_core.cjs");
       const handler = vi.fn(() => ({ content: [{ type: "text", text: "ok" }] }));
@@ -1189,6 +1208,38 @@ process.stdin.on('end', () => {
       fs.rmSync(outsideDir, { recursive: true });
     });
 
+    it("should expose only each tool's configured environment variables", async () => {
+      const { loadToolHandlers } = await import("./mcp_server_core.cjs");
+      const secretNames = ["MCP_TEST_SECRET_A", "MCP_TEST_SECRET_B"];
+      const originalValues = Object.fromEntries(secretNames.map(name => [name, process.env[name]]));
+      process.env.MCP_TEST_SECRET_A = "secret-a";
+      process.env.MCP_TEST_SECRET_B = "secret-b";
+
+      const toolAPath = path.join(tempDir, "tool_a.cjs");
+      const toolBPath = path.join(tempDir, "tool_b.cjs");
+      const handlerSource = `console.log(JSON.stringify({ a: process.env.MCP_TEST_SECRET_A || null, b: process.env.MCP_TEST_SECRET_B || null }));`;
+      fs.writeFileSync(toolAPath, handlerSource);
+      fs.writeFileSync(toolBPath, handlerSource);
+
+      try {
+        const tools = [
+          { name: "tool_a", inputSchema: { type: "object", properties: {} }, handler: toolAPath, env: { MCP_TEST_SECRET_A: "MCP_TEST_SECRET_A" } },
+          { name: "tool_b", inputSchema: { type: "object", properties: {} }, handler: toolBPath, env: { MCP_TEST_SECRET_B: "MCP_TEST_SECRET_B" } },
+        ];
+        loadToolHandlers(server, tools, tempDir);
+
+        const resultA = await tools[0].handler({});
+        const resultB = await tools[1].handler({});
+        expect(JSON.parse(resultA.content[0].text)).toEqual({ a: "secret-a", b: null });
+        expect(JSON.parse(resultB.content[0].text)).toEqual({ a: null, b: "secret-b" });
+      } finally {
+        for (const [name, value] of Object.entries(originalValues)) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+      }
+    });
+
     it("should handle handler returning non-serializable value (circular reference)", async () => {
       const { loadToolHandlers, registerTool, handleMessage } = await import("./mcp_server_core.cjs");
 
@@ -1431,6 +1482,11 @@ echo "result=$INPUT_MY_INPUT" >> "$GITHUB_OUTPUT"
       const { levenshteinDistance } = await import("./mcp_server_core.cjs");
       expect(levenshteinDistance("cat", "dog")).toBe(3);
     });
+
+    it("should return quickly for identifiers beyond the suggestion limit", async () => {
+      const { levenshteinDistance } = await import("./mcp_server_core.cjs");
+      expect(levenshteinDistance("x".repeat(1024 * 1024), "tool")).toBe(1024 * 1024);
+    });
   });
 
   describe("start", () => {
@@ -1538,6 +1594,11 @@ echo "result=$INPUT_MY_INPUT" >> "$GITHUB_OUTPUT"
 
       const similar = findSimilarTools("verylongdifferenttoolname", tools, 3);
       expect(similar.length).toBe(0); // Distance too large
+    });
+
+    it("should skip suggestions for oversized names", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      expect(findSimilarTools("x".repeat(1024 * 1024), { tool: {} })).toEqual([]);
     });
 
     it("should limit results to maxSuggestions", async () => {

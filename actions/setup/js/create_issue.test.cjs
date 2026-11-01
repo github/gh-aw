@@ -1516,7 +1516,7 @@ describe("create_issue", () => {
   describe("blocked-by dependencies", () => {
     it("should add dependencies for same-repository and cross-repository issue references", async () => {
       mockGithub.rest.issues.get = vi.fn().mockImplementation(({ owner, repo, issue_number }) => Promise.resolve({ data: { id: issue_number === 42 ? 9001 : 9002, owner, repo } }));
-      const handler = await main({});
+      const handler = await main({ allowed_repos: "test-owner/test-repo,other-org/other-repo" });
 
       const result = await handler({
         title: "Blocked issue",
@@ -1541,12 +1541,13 @@ describe("create_issue", () => {
 
     it("should resolve temporary IDs before adding dependencies", async () => {
       mockGithub.rest.issues.get = vi.fn().mockResolvedValue({ data: { id: 9001 } });
-      const handler = await main({});
+      const handler = await main({ allowed_repos: "test-owner/test-repo,other-org/other-repo" });
 
       await handler({
         title: "Prerequisite",
         body: "Must finish first.",
         temporary_id: "aw_prereq",
+        repo: "other-org/other-repo",
       });
       const result = await handler({
         title: "Blocked issue",
@@ -1556,11 +1557,24 @@ describe("create_issue", () => {
 
       expect(result.success).toBe(true);
       expect(mockGithub.rest.issues.get).toHaveBeenCalledWith({
-        owner: "test-owner",
-        repo: "test-repo",
+        owner: "other-org",
+        repo: "other-repo",
         issue_number: 123,
       });
       expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by", expect.objectContaining({ issue_id: 9001 }));
+    });
+
+    it("should reject blocked-by references to repositories outside the allowlist before issue creation", async () => {
+      const handler = await main({ allowed_repos: "test-owner/test-repo" });
+      const result = await handler({
+        title: "Blocked issue",
+        body: "Waits for untrusted work.",
+        blocked_by: "other-org/other-repo#7",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not in the allowed-repos list");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
     });
 
     it("should defer creation until blocked-by temporary IDs resolve", async () => {

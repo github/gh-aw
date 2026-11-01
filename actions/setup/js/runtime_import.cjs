@@ -15,6 +15,10 @@ const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agent
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const dns = require("dns").promises;
+const http = require("http");
+const https = require("https");
+const net = require("net");
 
 /**
  * Makes any "## skill:"/"## agent:" block in a runtime-imported chunk of
@@ -596,12 +600,14 @@ function evaluateExpression(expr, resolution) {
  * @param {string} content - The content with potential expressions
  * @param {string} source - The source identifier (file path or URL) for error messages
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values as opaque data during prompt processing
+ * @param {{allowEnvExpressions?: boolean}} [options]
  * @returns {string} - Content with safe expressions rendered
  * @throws {Error} - If unsafe expressions are found
  */
-function processExpressions(content, source, protectValue = value => value) {
+function processExpressions(content, source, protectValue = value => value, options = {}) {
   // Pattern to match GitHub Actions expressions: ${{ ... }}
   const expressionRegex = /\$\{\{([\s\S]*?)\}\}/g;
+  const safeExpressionExamples = options.allowEnvExpressions === false ? "needs.*, steps.*, inputs.*, experiments.*" : "needs.*, steps.*, env.*, inputs.*, experiments.*";
 
   const matches = [...content.matchAll(expressionRegex)];
 
@@ -622,7 +628,7 @@ function processExpressions(content, source, protectValue = value => value) {
           "Safe expressions include:\n" +
           "  - github.actor, github.repository, github.run_id, etc.\n" +
           "  - github.event.issue.number, github.event.pull_request.number, etc.\n" +
-          "  - needs.*, steps.*, env.*, inputs.*, experiments.*\n\n" +
+          `  - ${safeExpressionExamples}\n\n` +
           "See documentation for the complete list of allowed expressions."
       );
     }
@@ -651,7 +657,7 @@ function processExpressions(content, source, protectValue = value => value) {
     const trimmed = expr.trim();
 
     // Check if expression is safe
-    if (!isSafeExpression(trimmed)) {
+    if (!isSafeExpression(trimmed) || (options.allowEnvExpressions === false && /\benv\./.test(trimmed))) {
       unsafeExpressions.push(trimmed);
       continue;
     }
@@ -672,7 +678,7 @@ function processExpressions(content, source, protectValue = value => value) {
       "Safe expressions include:\n" +
       "  - github.actor, github.repository, github.run_id, etc.\n" +
       "  - github.event.issue.number, github.event.pull_request.number, etc.\n" +
-      "  - needs.*, steps.*, env.*, inputs.*, experiments.*\n\n" +
+      `  - ${safeExpressionExamples}\n\n` +
       "See documentation for the complete list of allowed expressions.";
     throw new Error(errorMsg);
   }
@@ -701,6 +707,157 @@ function hasGitHubActionsMacros(content) {
 
 /** @type {number} Timeout in milliseconds for fetching URL content in {@link fetchUrlContent} */
 const FETCH_URL_TIMEOUT_MS = 30_000;
+
+/**
+ * @param {string} address
+ * @returns {boolean}
+ */
+function isPublicImportAddress(address) {
+  if (net.isIPv4(address)) {
+    const value = address.split(".").reduce((result, part) => (result << 8n) | BigInt(part), 0n);
+    /** @type {Array<[string, number]>} */
+    const ranges = [
+      ["0.0.0.0", 8],
+      ["10.0.0.0", 8],
+      ["100.64.0.0", 10],
+      ["127.0.0.0", 8],
+      ["169.254.0.0", 16],
+      ["172.16.0.0", 12],
+      ["192.0.0.0", 24],
+      ["192.0.2.0", 24],
+      ["192.88.99.0", 24],
+      ["192.168.0.0", 16],
+      ["198.18.0.0", 15],
+      ["198.51.100.0", 24],
+      ["203.0.113.0", 24],
+      ["224.0.0.0", 4],
+      ["240.0.0.0", 4],
+    ];
+    return !ranges.some(([network, prefix]) => {
+      const base = network.split(".").reduce((result, part) => (result << 8n) | BigInt(part), 0n);
+      const mask = (0xffffffffn << BigInt(32 - prefix)) & 0xffffffffn;
+      return (value & mask) === (base & mask);
+    });
+  }
+
+  if (!net.isIPv6(address)) return false;
+  const groups = address.toLowerCase().split("%")[0].split(":");
+  const lastGroup = groups.at(-1);
+  if (lastGroup?.includes(".")) {
+    groups.pop();
+    const octets = lastGroup.split(".").map(Number);
+    groups.push(((octets[0] << 8) | octets[1]).toString(16), ((octets[2] << 8) | octets[3]).toString(16));
+  }
+  const compressionIndex = groups.indexOf("");
+  if (compressionIndex !== -1) {
+    const left = groups.slice(0, compressionIndex).filter(Boolean);
+    const right = groups.slice(compressionIndex + 1).filter(Boolean);
+    groups.splice(0, groups.length, ...left, ...Array(8 - left.length - right.length).fill("0"), ...right);
+  }
+  const value = groups.reduce((result, group) => (result << 16n) | BigInt(`0x${group || "0"}`), 0n);
+  const inRange = (network, prefix) => {
+    const base = network.split(":").reduce((result, group) => (result << 16n) | BigInt(`0x${group || "0"}`), 0n);
+    const shift = BigInt(128 - prefix);
+    return value >> shift === base >> shift;
+  };
+  if (value >> 32n === 0xffffn) {
+    const ipv4Value = Number(value & 0xffffffffn);
+    return isPublicImportAddress(`${ipv4Value >>> 24}.${(ipv4Value >>> 16) & 255}.${(ipv4Value >>> 8) & 255}.${ipv4Value & 255}`);
+  }
+  return inRange("2000::", 3) && !inRange("2001::", 23) && !inRange("2001:db8::", 32) && !inRange("2002::", 16);
+}
+
+/**
+ * Resolve a public hostname once so the validated address is also used by the
+ * connection, preventing a second DNS lookup from rebinding to a private IP.
+ * @param {string} url
+ * @param {AbortSignal} signal
+ * @returns {Promise<{url: URL, address: string, family: number}>}
+ */
+async function resolvePublicImportAddress(url, signal) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    throw new Error(`${ERR_VALIDATION}: Invalid runtime import URL: ${getErrorMessage(error)}`, { cause: error });
+  }
+  if (!["http:", "https:"].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+    throw new Error(`${ERR_VALIDATION}: Runtime import URLs must use HTTP(S) and must not contain credentials`);
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "");
+  const ipFamily = net.isIP(hostname);
+  const lookup = ipFamily ? Promise.resolve([{ address: hostname, family: ipFamily }]) : dns.lookup(hostname, { all: true, verbatim: true });
+  let abortHandler;
+  const addresses = await Promise.race([
+    lookup,
+    new Promise((_, reject) => {
+      abortHandler = () => reject(signal.reason || new Error("Runtime import URL fetch aborted"));
+      signal.addEventListener("abort", abortHandler, { once: true });
+    }),
+  ]).finally(() => signal.removeEventListener("abort", abortHandler));
+
+  if (!addresses.length || addresses.some(({ address }) => !isPublicImportAddress(address))) {
+    throw new Error(`${ERR_VALIDATION}: Runtime import URL resolves to a non-public IP address`);
+  }
+  return { url: parsedUrl, address: addresses[0].address, family: addresses[0].family };
+}
+
+/**
+ * Fetch a URL while pinning the socket lookup to its validated public address.
+ * @param {URL} url
+ * @param {string} address
+ * @param {number} family
+ * @param {AbortSignal} signal
+ * @returns {Promise<{statusCode: number, body: string}>}
+ */
+function fetchPinnedImportUrl(url, address, family, signal) {
+  return new Promise((resolve, reject) => {
+    const client = url.protocol === "https:" ? https : http;
+    let responseReceived = false;
+    const request = client.request(
+      url,
+      {
+        method: "GET",
+        lookup: (_hostname, options, callback) => {
+          if (options?.all) {
+            callback(null, [{ address, family }]);
+          } else {
+            callback(null, address, family);
+          }
+        },
+      },
+      response => {
+        responseReceived = true;
+        /** @type {Buffer[]} */
+        const chunks = [];
+        let responseEnded = false;
+        response.on("data", chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        response.once("error", reject);
+        response.once("aborted", () => reject(new Error("Runtime import URL response was aborted")));
+        response.once("close", () => {
+          if (!responseEnded) reject(new Error("Runtime import URL response closed before completing"));
+        });
+        response.once("end", () => {
+          responseEnded = true;
+          resolve({ statusCode: response.statusCode || 0, body: Buffer.concat(chunks).toString("utf8") });
+        });
+      }
+    );
+    const abort = () => request.destroy(signal.reason instanceof Error ? signal.reason : new Error("Runtime import URL fetch aborted"));
+    request.once("error", reject);
+    request.once("close", () => {
+      signal.removeEventListener("abort", abort);
+      if (!responseReceived) reject(new Error("Runtime import URL request closed before receiving a response"));
+    });
+    if (signal.aborted) {
+      abort();
+    } else {
+      signal.addEventListener("abort", abort, { once: true });
+    }
+    request.end();
+  });
+}
 
 /**
  * Fetches content from a URL with caching
@@ -759,15 +916,12 @@ async function fetchUrlContent(url, cacheDir) {
   let response;
   let data;
   try {
-    // Do not follow redirects automatically: a redirect landing on a 200 response would
-    // silently broaden the fetched origin and bypass the non-200 status check below.
-    response = await fetch(url, { signal: timeoutController.signal, redirect: "manual" });
-
-    if (!response.ok) {
-      throw new Error(`${ERR_API}: Failed to fetch URL ${url}: HTTP ${response.status}`);
+    const { url: parsedUrl, address, family } = await resolvePublicImportAddress(url, timeoutController.signal);
+    response = await fetchPinnedImportUrl(parsedUrl, address, family, timeoutController.signal);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw new Error(`${ERR_API}: Failed to fetch URL ${url}: HTTP ${response.statusCode}`);
     }
-
-    data = await response.text();
+    data = response.body;
   } catch (err) {
     if (err instanceof Error && err.message.startsWith(ERR_API)) {
       throw err;
@@ -868,7 +1022,7 @@ async function processUrlImport(url, optional, startLine, endLine, protectValue 
 
   // Process GitHub Actions expressions (validate and render safe ones)
   if (hasGitHubActionsMacros(content)) {
-    content = processExpressions(content, `URL ${url}`, protectValue);
+    content = processExpressions(content, `URL ${url}`, protectValue, { allowEnvExpressions: false });
   }
 
   // Close any unterminated "## skill:"/"## agent:" block so this import

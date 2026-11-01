@@ -277,14 +277,14 @@ const mockCore = {
       const result = await handler(message, resolvedIds);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("must be in the same repository");
+      expect(result.error).toContain("not in the allowed-repos list");
       expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
       expect(mockGithub.graphql).not.toHaveBeenCalled();
     });
 
     it("should reject a cross-repository sub-issue for a fixed parent target", async () => {
       const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
-      const fixedTargetHandler = await main({ max: 5, target: "100" });
+      const fixedTargetHandler = await main({ max: 5, target: "100", "target-repo": "testowner/testrepo" });
       const resolvedIds = {
         aw_456789ab: { repo: "other-org/other-repo", number: 50 },
       };
@@ -292,7 +292,23 @@ const mockCore = {
       const result = await fixedTargetHandler({ type: "link_sub_issue", parent_issue_number: 999, sub_issue_number: "aw_456789ab" }, resolvedIds);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("must be in the same repository");
+      expect(result.error).toContain("not in the allowed-repos list");
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+    });
+
+    it("should reject temporary-ID repositories outside the allowed target before API access", async () => {
+      const { main } = require(path.join(process.cwd(), "link_sub_issue.cjs"));
+      const handlerWithTargetRepo = await main({ max: 5, target: "*", "target-repo": "testowner/testrepo" });
+      const resolvedIds = {
+        aw_12345678: { repo: "other-org/other-repo", number: 100 },
+        aw_456789ab: { repo: "other-org/other-repo", number: 50 },
+      };
+
+      const result = await handlerWithTargetRepo({ type: "link_sub_issue", parent_issue_number: "aw_12345678", sub_issue_number: "aw_456789ab" }, resolvedIds);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not in the allowed-repos list");
       expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
       expect(mockGithub.graphql).not.toHaveBeenCalled();
     });

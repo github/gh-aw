@@ -3,7 +3,10 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
+import dns from "dns";
 import http from "http";
+import { EventEmitter } from "events";
+import { Readable } from "stream";
 const core = { info: vi.fn(), warning: vi.fn(), debug: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 const {
@@ -1514,6 +1517,10 @@ describe("runtime_import", () => {
           const result = processExpressions(content, "test.md");
           expect(result).toBe("No expressions here");
         });
+
+        it("should reject env expressions when processing URL imports", () => {
+          expect(() => processExpressions("Value: ${{ env.SECRET }}", "https://example.com/workflow.md", undefined, { allowEnvExpressions: false })).toThrow("env.SECRET");
+        });
       });
 
       describe("runtime import with expressions", () => {
@@ -2357,67 +2364,77 @@ describe("runtime_import", () => {
   });
 
   describe("fetchUrlContent", () => {
-    /** @type {import("http").Server} */
-    let server;
-    /** @type {string} */
-    let baseUrl;
+    afterEach(() => vi.restoreAllMocks());
 
-    afterEach(async () => {
-      if (server) {
-        await new Promise(resolve => server.close(resolve));
-      }
+    function mockHttpResponse(statusCode, body, responseError) {
+      return vi.spyOn(http, "request").mockImplementation((_url, _options, callback) => {
+        const request = new EventEmitter();
+        request.end = () => {
+          const response = new Readable({ read() {} });
+          response.statusCode = statusCode;
+          callback(response);
+          response.once("end", () => request.emit("close"));
+          if (body) response.push(body);
+          if (responseError) response.destroy(responseError);
+          else response.push(null);
+        };
+        request.destroy = error => request.emit("error", error);
+        return request;
+      });
+    }
+
+    it("should fetch from a vetted public address and pin the connection to it", async () => {
+      vi.spyOn(dns.promises, "lookup").mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+      const request = mockHttpResponse(200, "hello world");
+
+      const content = await fetchUrlContent("http://public.example/file.txt", tempDir);
+
+      expect(content).toBe("hello world");
+      expect(dns.promises.lookup).toHaveBeenCalledWith("public.example", { all: true, verbatim: true });
+      const [url, options] = request.mock.calls[0];
+      expect(url.href).toBe("http://public.example/file.txt");
+      expect(options.lookup).toBeTypeOf("function");
+      await new Promise((resolve, reject) => {
+        options.lookup("public.example", {}, (error, address, family) => {
+          if (error) reject(error);
+          else resolve([address, family]);
+        });
+      }).then(result => expect(result).toEqual(["93.184.216.34", 4]));
     });
 
-    it("should resolve with the body on a successful response", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(200);
-        res.end("hello world");
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/file.txt`;
+    it.each(["127.0.0.1", "169.254.169.254", "[::1]", "[fe80::1]"])("should reject non-public literal address %s", async address => {
+      const request = vi.spyOn(http, "request");
+      await expect(fetchUrlContent(`http://${address}/file.txt`, tempDir)).rejects.toThrow("non-public IP");
+      expect(request).not.toHaveBeenCalled();
+    });
 
-      const content = await fetchUrlContent(baseUrl, tempDir);
-      expect(content).toBe("hello world");
+    it("should reject hostnames resolving to a non-public address", async () => {
+      vi.spyOn(dns.promises, "lookup").mockResolvedValue([{ address: "169.254.169.254", family: 4 }]);
+      const request = vi.spyOn(http, "request");
+
+      await expect(fetchUrlContent("http://metadata.example/latest", tempDir)).rejects.toThrow("non-public IP");
+      expect(request).not.toHaveBeenCalled();
+    });
+
+    it("should reject env expressions in fetched URL imports", async () => {
+      vi.spyOn(dns.promises, "lookup").mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+      mockHttpResponse(200, "Secret: ${{ env.GITHUB_TOKEN }}");
+
+      await expect(processRuntimeImport("http://public.example/workflow.md", false, tempDir)).rejects.toThrow("env.GITHUB_TOKEN");
     });
 
     it("should reject (not crash) when the response socket errors mid-transfer", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(200);
-        res.write("partial-data");
-        // Destroy the underlying socket mid-response to simulate a reset connection.
-        // With builtin fetch(), response.text() rejects when the socket is destroyed mid-transfer.
-        res.socket.destroy(new Error("simulated socket failure"));
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/file.txt`;
+      vi.spyOn(dns.promises, "lookup").mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+      mockHttpResponse(200, "partial-data", new Error("simulated socket failure"));
 
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/Failed to fetch URL/);
+      await expect(fetchUrlContent("http://public.example/file.txt", tempDir)).rejects.toThrow(/Failed to fetch URL/);
     });
 
-    it("should reject when the HTTP status code is not 200", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(404);
-        res.end("not found");
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/missing.txt`;
+    it.each([404, 302])("should reject HTTP status code %s without following redirects", async statusCode => {
+      vi.spyOn(dns.promises, "lookup").mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+      mockHttpResponse(statusCode, "not found");
 
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/ERR_API.*HTTP 404/);
-    });
-
-    it("should reject a redirect response instead of following it", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(302, { Location: "http://127.0.0.1:1/final.txt" });
-        res.end();
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/redirect.txt`;
-
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/ERR_API.*HTTP 302/);
+      await expect(fetchUrlContent("http://public.example/file.txt", tempDir)).rejects.toThrow(new RegExp(`ERR_API.*HTTP ${statusCode}`));
     });
   });
 });

@@ -901,6 +901,14 @@ async function main(config = {}) {
     if (blockedBy.error) {
       return { success: false, error: blockedBy.error };
     }
+    for (const target of blockedBy.targets) {
+      const repoResult = resolveAndValidateRepo({ repo: target.repo }, defaultTargetRepo, allowedRepos, "blocked-by issue");
+      if (!repoResult.success) {
+        core.warning(`Skipping create_issue: ${repoResult.error}`);
+        return { success: false, error: repoResult.error };
+      }
+      target.repo = repoResult.repo;
+    }
 
     // Get or generate the temporary ID for this issue
     const tempIdResult = getOrGenerateTemporaryId(message, "issue");

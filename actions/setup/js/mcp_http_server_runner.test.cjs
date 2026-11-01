@@ -101,6 +101,7 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
 
     // server.listen(0) picks a random port
     await new Promise(r => currentServer.once("listening", r));
+    expect(currentServer.address().address).toBe("127.0.0.1");
 
     const res = await request(currentServer, { method: "POST", path: "/", body: '{"jsonrpc":"2.0","id":1,"method":"ping"}' });
     expect(res.headers["access-control-allow-origin"]).toBe("*");

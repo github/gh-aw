@@ -40,6 +40,7 @@ const { normalizeSafeOutputName } = require("./safe_output_names.cjs");
 const encoder = new TextEncoder();
 const PARAMETER_SIMILARITY_DISTANCE_BONUS = 2;
 const UNKNOWN_PARAMETER_LIST_PREVIEW_MAX = 10;
+const MAX_SIMILARITY_NAME_LENGTH = 256;
 
 /**
  * @typedef {Object} ServerInfo
@@ -56,6 +57,7 @@ const UNKNOWN_PARAMETER_LIST_PREVIEW_MAX = 10;
  * @property {string} [handlerPath] - Optional file path to handler module (original path from config)
  * @property {number} [timeout] - Timeout in seconds for tool execution (default: 60)
  * @property {string[]} [dependencies] - Runtime dependencies to install before first invocation
+ * @property {Record<string, string>} [env] - Environment variable names made available to this tool
  * @property {string} [_rawName] - Original (pre-normalization) tool name, used internally for collision detection
  */
 
@@ -297,6 +299,26 @@ function createWrappedHandler(server, toolName, handlerFn) {
 }
 
 /**
+ * Build a child-process environment that exposes only this tool's configured secrets.
+ * @param {Object} tool
+ * @param {Array<Object>} tools
+ * @returns {NodeJS.ProcessEnv}
+ */
+function createToolEnvironment(tool, tools) {
+  const toolEnvNames = new Set(tools.flatMap(configuredTool => Object.keys(configuredTool.env || {})));
+  const env = { ...process.env };
+  for (const envName of toolEnvNames) {
+    delete env[envName];
+  }
+  for (const envName of Object.keys(tool.env || {})) {
+    if (process.env[envName] !== undefined) {
+      env[envName] = process.env[envName];
+    }
+  }
+  return env;
+}
+
+/**
  * Load handler functions from file paths specified in tools configuration.
  * This function iterates through tools and loads handler modules based on file extension:
  *
@@ -354,6 +376,7 @@ function loadToolHandlers(server, tools, basePath) {
     }
 
     const handlerPath = tool.handler;
+    const toolEnv = createToolEnvironment(tool, tools);
     server.debug(`  [${toolName}] Handler path specified: ${handlerPath}`);
 
     // Resolve the handler path
@@ -413,7 +436,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load shell handler module
         const { createShellHandler } = require("./mcp_handler_shell.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createShellHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createShellHandler(server, toolName, resolvedPath, timeout, toolEnv);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -444,7 +467,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load Python handler module
         const { createPythonHandler } = require("./mcp_handler_python.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createPythonHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createPythonHandler(server, toolName, resolvedPath, timeout, toolEnv);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -460,7 +483,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load Go handler module
         const { createGoHandler } = require("./mcp_handler_go.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createGoHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createGoHandler(server, toolName, resolvedPath, timeout, toolEnv);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -476,7 +499,7 @@ function loadToolHandlers(server, tools, basePath) {
         // Lazy-load JavaScript handler module
         const { createJavaScriptHandler } = require("./mcp_handler_javascript.cjs");
         const timeout = tool.timeout || 60; // Default to 60 seconds if not specified
-        const baseHandler = createJavaScriptHandler(server, toolName, resolvedPath, timeout);
+        const baseHandler = createJavaScriptHandler(server, toolName, resolvedPath, timeout, toolEnv);
         const ensureDependenciesInstalled = createDependencyInstallGate(server, toolName, resolvedPath, tool.dependencies, basePath || process.cwd());
         tool.handler = async args => {
           await ensureDependenciesInstalled();
@@ -526,34 +549,20 @@ function registerTool(server, tool) {
  * @returns {number} Edit distance
  */
 function levenshteinDistance(a, b) {
-  const matrix = [];
-
-  // Initialize first column
-  for (let i = 0; i <= b.length; i++) {
-    matrix[i] = [i];
+  if (a.length > MAX_SIMILARITY_NAME_LENGTH || b.length > MAX_SIMILARITY_NAME_LENGTH) {
+    return Math.max(a.length, b.length);
   }
 
-  // Initialize first row
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j;
-  }
-
-  // Fill in the rest of the matrix
+  let previous = Array.from({ length: a.length + 1 }, (_value, index) => index);
+  let current = new Array(a.length + 1);
   for (let i = 1; i <= b.length; i++) {
+    current[0] = i;
     for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1, // insertion
-          matrix[i - 1][j] + 1 // deletion
-        );
-      }
+      current[j] = b.charAt(i - 1) === a.charAt(j - 1) ? previous[j - 1] : Math.min(previous[j - 1] + 1, current[j - 1] + 1, previous[j] + 1);
     }
+    [previous, current] = [current, previous];
   }
-
-  return matrix[b.length][a.length];
+  return previous[a.length];
 }
 
 /**
@@ -565,6 +574,9 @@ function levenshteinDistance(a, b) {
  */
 function findSimilarTools(requestedTool, availableTools, maxSuggestions = 3) {
   const normalizedRequested = normalizeTool(requestedTool);
+  if (normalizedRequested.length > MAX_SIMILARITY_NAME_LENGTH) {
+    return [];
+  }
   const suggestions = [];
 
   // Calculate distance for each available tool
@@ -591,6 +603,9 @@ function findSimilarTools(requestedTool, availableTools, maxSuggestions = 3) {
  */
 function findSimilarParameters(requestedParameter, availableParameters, maxSuggestions = 3) {
   const normalizedRequested = normalizeTool(requestedParameter);
+  if (normalizedRequested.length > MAX_SIMILARITY_NAME_LENGTH) {
+    return [];
+  }
   const suggestions = availableParameters.map(parameterName => ({
     name: parameterName,
     distance: levenshteinDistance(normalizedRequested, normalizeTool(parameterName)),

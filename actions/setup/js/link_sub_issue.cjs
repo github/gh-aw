@@ -193,6 +193,24 @@ async function main(config = {}) {
     const owner = parentResolved?.resolved?.owner || itemOwner;
     const repo = parentResolved?.resolved?.repo || itemRepo;
 
+    for (const [label, resolvedRepo] of [
+      ["parent", parentResolved?.resolved],
+      ["sub-issue", subResolved.resolved],
+    ]) {
+      if (!resolvedRepo) continue;
+      const resolvedRepoSlug = `${resolvedRepo.owner}/${resolvedRepo.repo}`;
+      const resolvedRepoResult = resolveAndValidateRepo({ repo: resolvedRepoSlug }, defaultTargetRepo, allowedRepos, `sub-issue link ${label}`);
+      if (!resolvedRepoResult.success) {
+        core.warning(`Skipping link_sub_issue: ${resolvedRepoResult.error}`);
+        return {
+          parent_issue_number: item.parent_issue_number,
+          sub_issue_number: item.sub_issue_number,
+          success: false,
+          error: resolvedRepoResult.error,
+        };
+      }
+    }
+
     // Sub-issue linking is only supported within the same repository.
     if (subResolved.resolved) {
       const parentRepoSlug = `${owner}/${repo}`;

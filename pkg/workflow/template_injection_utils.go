@@ -41,8 +41,7 @@ func extractRunBlocks(data any) []string {
 
 // heredocPattern holds pre-compiled regexp patterns for a single heredoc delimiter suffix.
 type heredocPattern struct {
-	quoted   *regexp.Regexp
-	unquoted *regexp.Regexp
+	quoted *regexp.Regexp
 }
 
 // heredocPatterns are compiled once at program start for performance.
@@ -60,23 +59,21 @@ var heredocPatterns = func() []heredocPattern {
 		//nolint:regexpdynamicpattern // Suffixes are fixed internal values and compilation failures are skipped.
 		quoted, quotedErr := regexp.Compile(fmt.Sprintf(`(?ms)<<\s*['"]\w*%s['"].*?\n\s*\w*%s\s*$`, suffix, suffix))
 		//nolint:regexpdynamicpattern // Suffixes are fixed internal values and compilation failures are skipped.
-		unquoted, unquotedErr := regexp.Compile(fmt.Sprintf(`(?ms)<<\s*\w*%s.*?\n\s*\w*%s\s*$`, suffix, suffix))
-		if quotedErr == nil && unquotedErr == nil {
-			patterns = append(patterns, heredocPattern{quoted: quoted, unquoted: unquoted})
+		if quotedErr == nil {
+			patterns = append(patterns, heredocPattern{quoted: quoted})
 		}
 	}
 	return patterns
 }()
 
 // removeHeredocContent removes heredoc sections from shell commands.
-// Heredocs (e.g., cat > file << 'EOF' ... EOF) are safe for template expressions
-// because the content is written to files, not executed in the shell.
+// Only quoted heredocs are safe for template expressions because unquoted
+// heredoc content undergoes shell expansion.
 func removeHeredocContent(content string) string {
 	templateInjectionValidationLog.Printf("Removing heredoc content from shell command: input_size=%d bytes", len(content))
 	result := content
 	for _, p := range heredocPatterns {
 		result = p.quoted.ReplaceAllString(result, "# heredoc removed")
-		result = p.unquoted.ReplaceAllString(result, "# heredoc removed")
 	}
 	if len(result) != len(content) {
 		templateInjectionValidationLog.Printf("Heredoc content removed: output_size=%d bytes (reduced by %d bytes)", len(result), len(content)-len(result))

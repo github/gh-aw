@@ -39,16 +39,17 @@ function cleanupOutputFile(outputFile) {
  * @param {string} toolName - Name of the tool for logging purposes
  * @param {string} scriptPath - Path to the shell script to execute
  * @param {number} [timeoutSeconds=60] - Timeout in seconds for script execution
+ * @param {NodeJS.ProcessEnv} [baseEnv=process.env] - Environment variables for this tool only
  * @returns {Function} Async handler function that executes the shell script
  */
-function createShellHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
+function createShellHandler(server, toolName, scriptPath, timeoutSeconds = 60, baseEnv = process.env) {
   return async args => {
     server.debug(`  [${toolName}] Invoking shell handler: ${scriptPath}`);
     server.debug(`  [${toolName}] Shell handler args: ${JSON.stringify(args)}`);
     server.debug(`  [${toolName}] Timeout: ${timeoutSeconds}s`);
 
     // Create environment variables from args (GitHub Actions convention: INPUT_NAME)
-    const env = { ...process.env };
+    const env = { ...baseEnv };
     for (const [key, value] of Object.entries(args || {})) {
       const envKey = `INPUT_${key.toUpperCase().replace(/-/g, "_")}`;
       env[envKey] = String(value);

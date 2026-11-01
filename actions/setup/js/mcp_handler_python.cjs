@@ -20,9 +20,10 @@ const { executeProcess } = require("./mcp_handler_process.cjs");
  * @param {string} toolName - Name of the tool for logging purposes
  * @param {string} scriptPath - Path to the Python script to execute
  * @param {number} [timeoutSeconds=60] - Timeout in seconds for script execution
+ * @param {NodeJS.ProcessEnv} [env=process.env] - Environment variables for this tool only
  * @returns {Function} Async handler function that executes the Python script
  */
-function createPythonHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
+function createPythonHandler(server, toolName, scriptPath, timeoutSeconds = 60, env = process.env) {
   return async args => {
     server.debug(`  [${toolName}] Invoking Python handler: ${scriptPath}`);
     server.debug(`  [${toolName}] Python handler args: ${JSON.stringify(args)}`);
@@ -38,7 +39,7 @@ function createPythonHandler(server, toolName, scriptPath, timeoutSeconds = 60) 
       languageLabel: "Python",
       command: "python3",
       args: [scriptPath],
-      env: process.env,
+      env,
       inputJson,
       timeoutSeconds,
       scriptPath,
