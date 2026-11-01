@@ -85,6 +85,38 @@ describe("push_evals_state.cjs", () => {
     expect(pushState).toHaveBeenCalledTimes(1);
   });
 
+  describe.each([
+    ["missing reason_code", { status: "not_evaluated", reason: "The judge did not start." }],
+    ["unknown reason_code", { status: "not_evaluated", reason_code: "judge_exploded", reason: "The judge did not start." }],
+    ["non-string reason", { status: "not_evaluated", reason_code: "judge_not_started", reason: 42 }],
+  ])("a malformed not-evaluated marker (%s)", (_description, marker) => {
+    it("is rejected so the answers file is pushed", async () => {
+      const { readEvalsNotEvaluatedStatus } = await import("./evals_status.cjs");
+      const markerPath = path.join(stateDir, "evals_status.json");
+      fs.writeFileSync(markerPath, JSON.stringify(marker) + "\n");
+      const rows = JSON.stringify({ ...RUN_FIXTURES["40955414354"].questions[0], answer: "YES", model: "evals", runid: "40955414354" }) + "\n";
+      fs.writeFileSync(path.join(stateDir, "evals.jsonl"), rows);
+      let pushedRows = null;
+      const pushState = vi.fn(async () => {
+        pushedRows = fs.readFileSync(path.join(stateDir, "evals.jsonl"), "utf8");
+      });
+
+      expect(readEvalsNotEvaluatedStatus(markerPath)).toBeNull();
+      await module.main({ pushState });
+
+      expect(pushState).toHaveBeenCalledTimes(1);
+      expect(pushedRows).toBe(rows);
+    });
+  });
+
+  it("accepts a valid not-evaluated marker", async () => {
+    const { readEvalsNotEvaluatedStatus } = await import("./evals_status.cjs");
+    const markerPath = path.join(stateDir, "evals_status.json");
+    fs.writeFileSync(markerPath, JSON.stringify({ status: "not_evaluated", reason_code: "judge_failed", reason: "The judge failed.", engine: "claude" }) + "\n");
+
+    expect(readEvalsNotEvaluatedStatus(markerPath)).toEqual({ status: "not_evaluated", reason_code: "judge_failed", reason: "The judge failed.", engine: "claude" });
+  });
+
   it("ignores a marker that is not a not-evaluated status", async () => {
     fs.writeFileSync(path.join(stateDir, "evals_status.json"), JSON.stringify({ status: "evaluated" }));
     const pushState = vi.fn(async () => {});

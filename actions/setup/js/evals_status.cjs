@@ -23,6 +23,8 @@ const EVALS_REASON_CODES = Object.freeze({
   EXECUTION_EVIDENCE_UNAVAILABLE: "execution_evidence_unavailable",
 });
 
+const KNOWN_REASON_CODES = new Set(Object.values(EVALS_REASON_CODES));
+
 /**
  * @typedef {object} EvalsNotEvaluatedStatus
  * @property {"not_evaluated"} status
@@ -39,7 +41,8 @@ const EVALS_REASON_CODES = Object.freeze({
 
 /**
  * Reads a not-evaluated marker. Returns null when the file is absent, malformed,
- * or does not describe a not-evaluated run.
+ * or does not describe a not-evaluated run. A marker is malformed unless
+ * reason_code is a known EVALS_REASON_CODES value and reason is a string.
  * @param {string} [filePath]
  * @returns {EvalsNotEvaluatedStatus | null}
  */
@@ -56,11 +59,14 @@ function readEvalsNotEvaluatedStatus(filePath = EVALS_STATUS_PATH) {
   if (!record || typeof record !== "object" || Array.isArray(record) || record.status !== EVALS_NOT_EVALUATED) {
     return null;
   }
+  if (typeof record.reason_code !== "string" || !KNOWN_REASON_CODES.has(record.reason_code) || typeof record.reason !== "string") {
+    return null;
+  }
   /** @type {EvalsNotEvaluatedStatus} */
   const status = {
     status: EVALS_NOT_EVALUATED,
-    reason_code: typeof record.reason_code === "string" ? record.reason_code : "",
-    reason: typeof record.reason === "string" ? record.reason : "",
+    reason_code: record.reason_code,
+    reason: record.reason,
   };
   for (const key of ["engine", "model", "run_id", "run_attempt", "timestamp", "execution_outcome", "execution_state"]) {
     if (typeof record[key] === "string" && record[key]) {

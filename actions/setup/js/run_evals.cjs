@@ -449,13 +449,30 @@ function extractEngineAssistantText(logContent, engine) {
     return "";
   }
   const entries = Array.isArray(parsed?.logEntries) ? parsed.logEntries : [];
+  // Streamed delta fragments (Gemini stream-json) belong to one message: join
+  // consecutive fragments verbatim, keeping whitespace-only fragments, and use
+  // "\n" only between complete messages.
   const texts = [];
+  let previousWasDelta = false;
   for (const event of entries) {
-    if (event?.type === "assistant.message" && typeof event.data?.content === "string" && event.data.content.trim()) {
-      texts.push(event.data.content);
+    if (event?.type !== "assistant.message" || typeof event.data?.content !== "string") {
+      previousWasDelta = false;
+      continue;
+    }
+    const content = event.data.content;
+    if (event.data.delta === true) {
+      if (previousWasDelta) {
+        texts[texts.length - 1] += content;
+      } else {
+        texts.push(content);
+      }
+      previousWasDelta = true;
+    } else {
+      texts.push(content);
+      previousWasDelta = false;
     }
   }
-  return texts.join("\n");
+  return texts.filter(text => text.trim()).join("\n");
 }
 
 /**

@@ -557,6 +557,40 @@ describe("run_evals.cjs", () => {
       ]);
     });
 
+    /**
+     * Builds a Gemini stream-json log whose assistant answer arrives as delta chunks.
+     * @param {string[]} chunks
+     * @returns {string}
+     */
+    function geminiDeltaLog(chunks) {
+      return [
+        { type: "init", session_id: "s", model: "gemini" },
+        ...chunks.map((content, index) => ({ type: "message", role: "assistant", content, delta: true, timestamp: `2026-11-01T00:00:0${index}Z` })),
+        { type: "result", status: "success" },
+      ]
+        .map(record => JSON.stringify(record))
+        .join("\n");
+    }
+
+    it("joins Gemini delta chunks of one message without separators", async () => {
+      const log = geminiDeltaLog(["docs_rev", "iewed: YES\nfeedback_produced:", " NO"]);
+      expect(extractJudgeResponse(log, "gemini")).toBe("docs_reviewed: YES\nfeedback_produced: NO");
+
+      stageRun(DOCS, { outcome: "success", engine: "gemini", log, evidence: { ...DOCS.execution, state: "started" } });
+      await parseMain();
+
+      expect(readAnswers().map(({ id, answer }) => [id, answer])).toEqual([
+        ["docs_reviewed", "YES"],
+        ["feedback_produced", "NO"],
+      ]);
+    });
+
+    it("keeps whitespace-only Gemini delta chunks inside an answer line", () => {
+      const log = geminiDeltaLog(["docs_reviewed: YES\nfeedback_produced:", " ", "NO"]);
+      expect(extractJudgeResponse(log, "gemini")).toBe("docs_reviewed: YES\nfeedback_produced: NO");
+      expect(extractJudgeResponse(geminiDeltaLog(["YES", " ", "NO"]), "gemini")).toBe("YES NO");
+    });
+
     it("never treats AWF diagnostics or stack traces as plain-text response text", () => {
       const diagnostics = fs.readFileSync(new URL(DOCS.log, FIXTURES_DIR), "utf8");
       expect(extractJudgeResponse(diagnostics, "copilot").trim()).toBe("");

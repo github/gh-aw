@@ -216,6 +216,25 @@ describe("render_evals_summary.cjs", () => {
       expect(body).not.toContain("❓ UNKNOWN");
     });
 
+    it.each([
+      ["missing reason_code", { status: "not_evaluated", reason: "The judge did not start." }],
+      ["unknown reason_code", { status: "not_evaluated", reason_code: "judge_exploded", reason: "The judge did not start." }],
+      ["non-string reason", { status: "not_evaluated", reason_code: "judge_not_started", reason: 42 }],
+    ])("falls back to the answers file for a malformed marker (%s)", async (_description, marker) => {
+      fs.writeFileSync(STATUS_PATH, JSON.stringify(marker) + "\n");
+      fs.writeFileSync(OUTPUT_PATH, JSON.stringify({ ...RUN_FIXTURES["40955414354"].questions[0], answer: "YES", model: "evals", runid: "40955414354" }) + "\n");
+
+      expect(module.readEvalsStatus()).toBeNull();
+      await module.main();
+
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("| docs_reviewed |");
+      expect(summary).toContain("✅ YES");
+      expect(summary).toContain("**YES**: 1 | **NO**: 0 | **UNKNOWN**: 0");
+      expect(summary).not.toContain("Evals did not run");
+      expect(summary).not.toContain("Evals were not completed");
+    });
+
     it("still renders a genuine judge UNKNOWN answer as a normal answer table", async () => {
       fs.writeFileSync(OUTPUT_PATH, JSON.stringify({ ...RUN_FIXTURES["40955414354"].questions[0], answer: "UNKNOWN", model: "evals", runid: "40955414354" }) + "\n");
 
