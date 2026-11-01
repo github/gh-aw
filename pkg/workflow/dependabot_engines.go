@@ -7,7 +7,10 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var dependabotEnginesLog = logger.New("workflow:dependabot_engines")
 
 // extractEnginePackages is manifest-only: engine installations must not change the
 // general npx validation surface. Existing command dependencies retain precedence.
@@ -18,6 +21,7 @@ func (c *Compiler) extractEnginePackages(data *WorkflowData, ecosystem string) [
 	packages := c.extractMainEnginePackages(data, ecosystem)
 	if IsDetectionJobEnabled(data.SafeOutputs) && !data.SafeOutputs.ThreatDetection.EngineDisabled {
 		engineID := c.manifestDetectionEngineID(data)
+		dependabotEnginesLog.Printf("Including detection engine packages for manifest: ecosystem=%s engineID=%s", ecosystem, engineID)
 		if isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
 			packages = append(packages, c.extractMainEnginePackages(buildExternalDetectorWorkflowData(data, engineID), ecosystem)...)
 		} else {
@@ -37,6 +41,7 @@ func (c *Compiler) manifestDetectionEngineID(data *WorkflowData) string {
 	}
 	// Imports are scoped to one workflow. Restore only that workflow's metadata
 	// when resolving its detector after another workflow reset the catalog.
+	dependabotEnginesLog.Printf("Restoring engine definition %q in a scoped catalog copy for detection resolution", data.engineDefinition.ID)
 	resolver := *c
 	catalog := *c.engineCatalog
 	catalog.definitions = maps.Clone(catalog.definitions)
@@ -60,6 +65,7 @@ func (c *Compiler) extractMainEnginePackages(data *WorkflowData, ecosystem strin
 	} else if engine, err := c.engineRegistry.GetEngineByPrefix(engineID); err == nil {
 		runtimeID = engine.GetID()
 	}
+	dependabotEnginesLog.Printf("Resolved manifest runtime for engine: engineID=%s runtimeID=%s", engineID, runtimeID)
 	var packages []string
 	if data.EngineConfig == nil || data.EngineConfig.Command == "" {
 		install := c.engineInstallationForManifest(def, runtimeID)

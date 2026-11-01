@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"maps"
 	"slices"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var metricsLog = logger.New("atif:metrics")
 
 const maxSafeInteger int64 = 9007199254740991
 
@@ -66,6 +70,7 @@ func reconcileMetrics(previous, supplied map[string]json.RawMessage) (map[string
 	}
 	raw, present := supplied["usage"]
 	if !present {
+		metricsLog.Print("No usage field in supplied metrics snapshot, skipping usage reconciliation")
 		return merged, nil
 	}
 	var incoming map[string]json.RawMessage
@@ -123,6 +128,7 @@ func count(data map[string]json.RawMessage, names ...string) *int64 {
 func finalMetrics(data map[string]json.RawMessage, steps int) *FinalMetrics {
 	metrics := &FinalMetrics{TotalSteps: steps}
 	if data == nil {
+		metricsLog.Print("No terminal session.result data observed, returning bare final metrics")
 		return metrics
 	}
 	metrics.Extra = map[string]any{"unified_session_result": data}
@@ -165,6 +171,7 @@ func finalMetrics(data map[string]json.RawMessage, steps int) *FinalMetrics {
 	} else if json.Unmarshal(rawIncluded, &included) != nil || !included {
 		// Unknown cache semantics cannot establish ATIF's cache-inclusive total.
 		if supplied(usage, cacheReadFields...) || supplied(usage, cacheWriteFields...) {
+			metricsLog.Print("Cache inclusion semantics unknown but cache fields present, discarding prompt token total")
 			metrics.PromptTokens = nil
 		}
 	}
