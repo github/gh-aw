@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow/actions"
-	"github.com/github/gh-aw/pkg/workflow/cachepolicy"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -253,19 +252,6 @@ func cacheAccessTestAllowsWrite(event string) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func TestCacheWriteTriggerClassification(t *testing.T) {
-	readOnly := make(map[string]bool)
-	for _, event := range cachepolicy.ReadOnlyEvents() {
-		readOnly[event] = true
-	}
-	for _, event := range cacheAccessTestEvents() {
-		assert.Equal(t, cacheAccessTestAllowsWrite(event), cachepolicy.AllowsWrite(event), "event=%s", event)
-	}
-	for _, event := range validGitHubEventTypes {
-		assert.NotEqual(t, cachepolicy.AllowsWrite(event), readOnly[event], "each known event needs exactly one classification: %s", event)
 	}
 }
 

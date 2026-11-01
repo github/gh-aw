@@ -3,7 +3,11 @@ package intent
 import (
 	"errors"
 	"slices"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var governanceLog = logger.New("intent:governance")
 
 // ErrToolDenied is returned by Authorizer.AuthorizeTool when the tool appears in
 // the policy's DeniedTools list. A deny always wins, even if the same tool is
@@ -24,9 +28,11 @@ type Authorizer struct{}
 // calls to the listed tools, so a non-nil empty slice denies every tool.
 func (a Authorizer) AuthorizeTool(policy ExecutionPolicy, tool string) error {
 	if slices.Contains(policy.DeniedTools, tool) {
+		governanceLog.Printf("Tool denied by policy: tool=%s", tool)
 		return ErrToolDenied
 	}
 	if policy.AllowedTools != nil && !slices.Contains(policy.AllowedTools, tool) {
+		governanceLog.Printf("Tool not in restricted allow-list: tool=%s", tool)
 		return ErrToolNotAllowed
 	}
 	return nil
