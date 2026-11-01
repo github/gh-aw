@@ -158,6 +158,14 @@ The MCP `compile` and `audit` tools reserve five seconds before the caller's dea
 
 Audit timeout envelopes include recovery `suggestions`. When available, `partial_results` contains single-run metadata and collected analysis results; it is not a complete audit report and is never stored as a full-audit cache entry. Retry the same audit to reuse downloaded artifacts, or narrow `artifacts`. CLI callers can set a separate duration with `gh aw audit <run-id> --json --timeout 50s`; timeout still exits unsuccessfully while returning available single-run data.
 
+To reduce work within the request deadline, MCP dry-run compilation uses cached
+observed-model inventory instead of downloading workflow logs to refresh it;
+configured models still require that inventory to be available.
+Single-run MCP audits skip optional baseline discovery. Use
+[`gh aw audit <run-id>`](/gh-aw/reference/audit/) from the CLI when a comparison
+with an earlier run is needed; explicit multi-run MCP audits still compare the
+supplied runs.
+
 If `compile` fails before producing JSON, its fallback errors prioritize the actionable cause and remediation rather than debug stderr. Each diagnostic is limited to 4 KiB, and the fallback JSON is limited to 48 KiB. Omitted debug output or oversized diagnostics are marked explicitly. If per-workflow errors exceed that budget, the response contains one invalid `scope: "batch"` compile result with the affected workflow count. Structured compiler and scanner results are not subject to this fallback budget. The deprecated `compile` parameter `max_tokens` remains ignored.
 
 For `checks`, normalized states are `success`, `failed`, `pending`, `no_checks`, and `policy_blocked`. Use `required_state` as the authoritative CI verdict when optional third-party deployments are present.
