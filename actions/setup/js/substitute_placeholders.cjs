@@ -25,7 +25,7 @@ const substitutePlaceholders = async ({ file, substitutions, deferredBindings = 
     throw new Error(`${ERR_VALIDATION}: ` + "substitutions parameter must be an object");
   }
 
-  core.info(`[substitutePlaceholders] ${file} (${Object.keys(substitutions).length} substitution(s))`);
+  core.info(`[substitutePlaceholders] ${Object.keys(substitutions).length} substitution(s)`);
   const state = readLiteralState(file);
   const literals = createLiteralValues(state ?? undefined);
   const replacements = new Map(Object.entries(substitutions).map(([key, value]) => [`__${key}__`, deferredBindings[key] === value ? value : literals.protect(value == null ? "" : value)]));
@@ -107,6 +107,7 @@ const substitutePlaceholders = async ({ file, substitutions, deferredBindings = 
     }
   }
   writeLiteralState(file, literals.state);
+  core.debug(`[substitutePlaceholders] Updated ${files.length} provenance file(s)`);
 
   return `Successfully substituted ${Object.keys(substitutions).length} placeholder(s) in ${file}`;
 };

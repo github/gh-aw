@@ -1,5 +1,7 @@
 // @ts-check
+/// <reference types="@actions/github-script" />
 
+require("./shim.cjs");
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
@@ -17,7 +19,10 @@ function createLiteralValues(state = { version: 1, prefix: `\x00VALUE_${randomUU
   const restore = text =>
     text.replace(pattern, (_, index) => {
       const value = state.values[Number(index)];
-      if (value === undefined) throw new Error(`${ERR_VALIDATION}: Unknown literal prompt value`);
+      if (value === undefined) {
+        core.debug("[promptLiteralValues] Rejected state: unknown_value");
+        throw new Error(`${ERR_VALIDATION}: Unknown literal prompt value`);
+      }
       return value;
     });
   /** @param {string} value */
@@ -112,17 +117,32 @@ function writeLiteralState(file, state) {
   // Do not persist values discarded by author conditionals or metadata filtering.
   state.values = state.values.map((value, index) => (used.has(index) ? value : ""));
   fs.writeFileSync(literalStatePath(file), JSON.stringify(state), "utf8");
+  core.debug(`[promptLiteralValues] Persisted ${Object.keys(state.files).length} file(s), ${used.size} referenced value(s), ${state.values.length - used.size} discarded value slot(s)`);
 }
 
 /** @param {string} file @returns {LiteralState|null} */
 function readLiteralState(file) {
   const statePath = literalStatePath(file);
-  if (!fs.existsSync(statePath)) return null;
+  if (!fs.existsSync(statePath)) {
+    core.debug("[promptLiteralValues] No persisted state");
+    return null;
+  }
   if (fs.lstatSync(statePath).isSymbolicLink() || !fs.lstatSync(statePath).isFile()) {
+    core.debug("[promptLiteralValues] Rejected state: non_regular_file");
     throw new Error(`${ERR_VALIDATION}: Literal prompt state must be a regular file`);
   }
-  const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  const serialized = fs.readFileSync(statePath, "utf8");
+  let state;
+  try {
+    state = JSON.parse(serialized);
+  } catch (error) {
+    core.debug("[promptLiteralValues] Rejected state: invalid_json");
+    // JSON parser messages can quote private state; preserve the cause, not its text.
+    throw new Error(`${ERR_VALIDATION}: Literal prompt state must be valid JSON`, { cause: error });
+  }
   if (
+    !state ||
+    typeof state !== "object" ||
     state.version !== 1 ||
     typeof state.prefix !== "string" ||
     !/^\x00VALUE_[0-9a-f-]+_$/.test(state.prefix) ||
@@ -131,8 +151,10 @@ function readLiteralState(file) {
     !state.files ||
     typeof state.files !== "object"
   ) {
+    core.debug("[promptLiteralValues] Rejected state: invalid_schema");
     throw new Error(`${ERR_VALIDATION}: Invalid literal prompt state`);
   }
+  core.debug(`[promptLiteralValues] Loaded ${Object.keys(state.files).length} file(s), ${state.values.length} value slot(s)`);
   return state;
 }
 
@@ -156,6 +178,7 @@ function readAuthorContent(prompt, target, state) {
   const entry = state?.files[literalFileKey(prompt, target)];
   if (!entry) return { content, metadata: false };
   if (typeof entry.opaque !== "string" || typeof entry.rendered !== "string" || typeof entry.metadata !== "boolean" || entry.rendered !== content) {
+    core.debug("[promptLiteralValues] Rejected state: content_mismatch");
     throw new Error(`${ERR_VALIDATION}: Literal prompt state does not match ${target}`);
   }
   return { content: entry.opaque, metadata: entry.metadata };

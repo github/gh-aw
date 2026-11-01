@@ -66,6 +66,10 @@ This action copies files from `actions/setup/`, including:
   placeholder-like text inside evaluated context stays literal. Inline metadata
   is parsed before context restoration, and evaluated values are serialized as
   YAML scalars rather than YAML structure.
+  Interpolation and renderer diagnostics report counts and branch outcomes, not
+  prompt previews, variable names, values, or opaque tokens. Provenance debug
+  logs report retained/discarded value counts and fixed rejection reasons.
+  Prompt artifacts still contain rendered content and must be treated as sensitive.
 - Utility scripts (sanitize_*, validate_*, generate_*, etc.)
 
 ### Shell Scripts (7 files from `sh/`)

@@ -51,12 +51,11 @@ function interpolateVariables(content, variables) {
     const matches = (content.match(pattern) || []).length;
 
     if (matches > 0) {
-      core.info(`[interpolateVariables] Replacing ${varName} (${matches} occurrence(s))`);
-      core.info(`[interpolateVariables]   Value: ${value.substring(0, 100)}${value.length > 100 ? "..." : ""}`);
+      core.debug(`[interpolateVariables] Replacing variable (${matches} occurrence(s))`);
       replacements.set(`\${${varName}}`, value);
       totalReplacements += matches;
     } else {
-      core.info(`[interpolateVariables] Variable ${varName} not found in content (unused)`);
+      core.debug("[interpolateVariables] Unused variable");
     }
   }
 
@@ -83,7 +82,6 @@ async function main({ deferredBindings = {} } = {}) {
       core.setFailed(`${ERR_CONFIG}: GH_AW_PROMPT environment variable is not set`);
       return;
     }
-    core.info(`[main] Prompt path: ${promptPath}`);
 
     // Get the workspace directory for runtime imports
     const workspaceDir = process.env.GITHUB_WORKSPACE;
@@ -91,7 +89,6 @@ async function main({ deferredBindings = {} } = {}) {
       core.setFailed(`${ERR_CONFIG}: GITHUB_WORKSPACE environment variable is not set`);
       return;
     }
-    core.info(`[main] Workspace directory: ${workspaceDir}`);
 
     // Read the prompt file
     core.info(`[main] Reading prompt file...`);
@@ -113,14 +110,13 @@ async function main({ deferredBindings = {} } = {}) {
     };
     const restoreArtifact = (/** @type {string} */ opaque, /** @type {string|undefined} */ target) => (target ? recordFile(opaque, target, true) : restoreInlineMetadata(opaque, restoreValues));
     core.info(`[main] Original content length: ${originalLength} characters`);
-    core.info(`[main] First 200 characters: ${content.substring(0, 200).replace(/\n/g, "\\n")}`);
 
     // Write the raw template to prompt-template.txt BEFORE any processing.
     // This allows downstream consumers (e.g. threat detection) to diff the
     // template against the fully-rendered prompt to identify interpolation boundaries.
     const promptDir = path.dirname(promptPath);
     const templatePath = path.join(promptDir, "prompt-template.txt");
-    core.info(`[main] Writing raw template to: ${templatePath}`);
+    core.info("[main] Writing raw template artifact");
     fs.writeFileSync(templatePath, content, "utf8");
 
     const systemPath = path.join(promptDir, "system.txt");
@@ -156,9 +152,6 @@ async function main({ deferredBindings = {} } = {}) {
     if (hasRuntimeImports) {
       const importMatches = content.match(/{{#runtime-import\??[ \t]+[^\}]+}}/g) || [];
       core.info(`Processing ${importMatches.length} runtime import macro(s) (files and URLs)`);
-      importMatches.forEach((match, i) => {
-        core.info(`  Import ${i + 1}: ${match.substring(0, 80)}${match.length > 80 ? "..." : ""}`);
-      });
 
       const beforeImports = content.length;
       content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression);
@@ -173,7 +166,7 @@ async function main({ deferredBindings = {} } = {}) {
     // Write the import tree JSON to the artifact directory so threat detection can
     // analyse provenance without re-parsing the rendered prompt.
     const importTreePath = path.join(promptDir, "prompt-import-tree.json");
-    core.info(`[main] Writing import tree to: ${importTreePath}`);
+    core.info("[main] Writing import tree artifact");
     const restoreImportTree = (/** @type {ImportTreeNode[]} */ nodes) => {
       for (const node of nodes) {
         node.rawContent = restoreValues(node.rawContent);
@@ -238,11 +231,7 @@ async function main({ deferredBindings = {} } = {}) {
 
     const varCount = Object.keys(variables).length;
     if (varCount > 0) {
-      core.info(`Found ${varCount} expression variable(s) to interpolate:`);
-      for (const [key, value] of Object.entries(variables)) {
-        const preview = value.substring(0, 60);
-        core.info(`  ${key}: ${preview}${value.length > 60 ? "..." : ""}`);
-      }
+      core.info(`Found ${varCount} expression variable(s) to interpolate`);
 
       const beforeInterpolation = content.length;
       content = interpolateVariables(content, variables);
@@ -268,7 +257,7 @@ async function main({ deferredBindings = {} } = {}) {
         if (content.includes(placeholder)) {
           content = content.split(placeholder).join(protectedValue);
           experimentSubCount++;
-          core.info(`  Substituted ${placeholder} → "${value || ""}"`);
+          core.debug("[main] Substituted experiment placeholder");
         }
         // Comparisons in author-owned if/elseif tags also use experiment values.
         const experimentName = key.substring("GH_AW_EXPERIMENTS_".length).toLowerCase();
@@ -285,7 +274,7 @@ async function main({ deferredBindings = {} } = {}) {
           return prefix + substituted + suffix;
         });
         if (substitutedCondition) {
-          core.info(`  Substituted ${exprForm} in conditions → "${value || ""}"`);
+          core.debug("[main] Substituted experiment condition operand");
         }
       }
     }
@@ -318,7 +307,7 @@ async function main({ deferredBindings = {} } = {}) {
     core.info("\n========================================");
     core.info("[main] STEP 4: Writing Output");
     core.info("========================================");
-    core.info(`Writing processed content back to: ${promptPath}`);
+    core.info("Writing processed prompt");
     core.info(`Final content length: ${content.length} characters`);
     core.info(`Total length change: ${originalLength} -> ${content.length} (${content.length > originalLength ? "+" : ""}${content.length - originalLength})`);
 
@@ -336,7 +325,6 @@ async function main({ deferredBindings = {} } = {}) {
     // Preserve the opaque author-owned view across later activation/deferred passes.
     writeLiteralState(promptPath, literalState);
 
-    core.info(`Last 200 characters: ${content.substring(Math.max(0, content.length - 200)).replace(/\n/g, "\\n")}`);
     core.info("========================================");
     core.info("[main] Processing complete - SUCCESS");
     core.info("========================================");
@@ -344,12 +332,6 @@ async function main({ deferredBindings = {} } = {}) {
     core.info("========================================");
     core.info("[main] Processing failed - ERROR");
     core.info("========================================");
-    const err = error instanceof Error ? error : new Error(String(error));
-    core.info(`[main] Error type: ${err.constructor.name}`);
-    core.info(`[main] Error message: ${err.message}`);
-    if (err.stack) {
-      core.info(`[main] Stack trace:\n${err.stack}`);
-    }
     core.setFailed(`${ERR_API}: ${getErrorMessage(error)}`);
   }
 }

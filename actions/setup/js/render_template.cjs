@@ -19,10 +19,6 @@ const { applyToNonCodeRegions } = require("./sanitize_content_core.cjs");
 const BLOCK_CONDITIONAL_REGEX = /(\n?)([ \t]*{{#if\s+([^}]*)}}[ \t]*\n)([\s\S]*?)([ \t]*(?:{{#endif}}|{{\/if}})[ \t]*)(\n?)/;
 const INLINE_CONDITIONAL_REGEX = /{{#if\s+([^}]*)}}([\s\S]*?)(?:{{#endif}}|{{\/if}})/;
 
-// Max characters shown in body preview log lines
-const BLOCK_BODY_PREVIEW_LENGTH = 60;
-const INLINE_BODY_PREVIEW_LENGTH = 40;
-
 /**
  * Renders a Markdown template by processing {{#if}} conditional blocks.
  * When a conditional block is removed (falsy condition) and the template tags
@@ -70,11 +66,7 @@ function renderMarkdownTemplate(markdown, resolveCondition = condition => condit
   // Captures: (leading newline)(opening tag line)(condition)(body)(closing tag line)(trailing newline)
   let result = _stripped.replace(new RegExp(BLOCK_CONDITIONAL_REGEX.source, "g"), (match, leadNL, openLine, cond, body) => {
     blockCount++;
-    const condTrimmed = cond.trim();
-    const bodyPreview = body.substring(0, BLOCK_BODY_PREVIEW_LENGTH).replace(/\n/g, "\\n");
-
-    core.info(`[renderMarkdownTemplate] Block ${blockCount}: condition="${condTrimmed}" -> evaluating branches`);
-    core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > BLOCK_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
+    core.debug(`[renderMarkdownTemplate] Block ${blockCount}: evaluating branches`);
 
     const selectedContent = selectBranch(cond, body, resolveParsedCondition);
 
@@ -102,12 +94,9 @@ function renderMarkdownTemplate(markdown, resolveCondition = condition => condit
   // Second pass: Handle inline conditionals (tags not on their own lines)
   result = result.replace(new RegExp(INLINE_CONDITIONAL_REGEX.source, "g"), (_, cond, body) => {
     inlineCount++;
-    const condTrimmed = cond.trim();
-    const bodyPreview = body.substring(0, INLINE_BODY_PREVIEW_LENGTH).replace(/\n/g, "\\n");
     const selectedContent = selectBranch(cond, body, resolveParsedCondition);
 
-    core.info(`[renderMarkdownTemplate] Inline ${inlineCount}: condition="${condTrimmed}" -> ${selectedContent !== null ? "KEEP" : "REMOVE"}`);
-    core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > INLINE_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
+    core.debug(`[renderMarkdownTemplate] Inline ${inlineCount}: ${selectedContent !== null ? "KEEP" : "REMOVE"}`);
 
     if (selectedContent !== null) {
       keptInline++;
@@ -164,8 +153,6 @@ function main() {
       process.exit(1);
     }
 
-    core.info(`[render_template] Prompt path: ${promptPath}`);
-
     const markdown = fs.readFileSync(promptPath, "utf8");
     core.info(`[render_template] Read ${markdown.length} characters`);
 
@@ -180,15 +167,11 @@ function main() {
 
     const rendered = renderMarkdownTemplate(markdown);
 
-    core.info(`[render_template] Writing back to ${promptPath} (${rendered.length} characters)`);
+    core.info(`[render_template] Writing rendered prompt (${rendered.length} characters)`);
     fs.writeFileSync(promptPath, rendered, "utf8");
 
     core.info("[render_template] Processing complete");
   } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    if (err.stack) {
-      core.info(`[render_template] Stack trace:\n${err.stack}`);
-    }
     core.setFailed(`${ERR_API}: ${getErrorMessage(error)}`);
   }
 }
