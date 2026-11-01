@@ -292,14 +292,15 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     expect(transport.calls).toHaveLength(0);
   });
 
-  it("accepts a JSON body at the exact byte limit", async () => {
+  it.each([false, true])("accepts a JSON body at the exact byte limit (chunked: %s)", async chunked => {
     const transport = makeMockTransport();
     currentServer = await runHttpServer({ transport, port: 0, getHealthPayload: () => ({}), logger: makeMockLogger(), serverLabel: "Test", apiKey: API_KEY });
     await new Promise(r => currentServer.once("listening", r));
 
+    expect(MAX_REQUEST_BODY_BYTES).toBe(1_048_576);
     const body = JSON.stringify("x".repeat(MAX_REQUEST_BODY_BYTES - 2));
     expect(Buffer.byteLength(body)).toBe(MAX_REQUEST_BODY_BYTES);
-    const res = await request(currentServer, { method: "POST", path: "/", body, headers: { "Content-Length": String(MAX_REQUEST_BODY_BYTES) } });
+    const res = await request(currentServer, { method: "POST", path: "/", body, headers: chunked ? {} : { "Content-Length": String(MAX_REQUEST_BODY_BYTES) } });
     expect(res.statusCode).toBe(200);
     expect(transport.calls).toHaveLength(1);
   });
@@ -313,6 +314,68 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     const res = await request(currentServer, { method: "POST", path: "/", chunks });
     expect(res.statusCode).toBe(413);
     expect(transport.calls).toHaveLength(0);
+    expect((await request(currentServer, { method: "POST", path: "/", body: "{}" })).statusCode).toBe(200);
+  });
+
+  it("closes a chunked upload one byte above the limit without waiting for its end", async () => {
+    const transport = makeMockTransport();
+    currentServer = await runHttpServer({ transport, port: 0, getHealthPayload: () => ({}), logger: makeMockLogger(), serverLabel: "Test", apiKey: API_KEY });
+    await new Promise(r => currentServer.once("listening", r));
+    const incoming = new Promise(resolve => currentServer.once("request", resolve));
+    const response = request(currentServer, { method: "POST", path: "/", body: " ".repeat(MAX_REQUEST_BODY_BYTES + 1), finish: false });
+    const stream = /** @type {http.IncomingMessage} */ await incoming;
+    const closed = new Promise(resolve => stream.socket.once("close", resolve));
+
+    const res = await response;
+    await closed;
+    expect(res.statusCode).toBe(413);
+    expect(JSON.parse(res.body)).toEqual({ error: "Request body too large" });
+    expect(res.headers.connection).toBe("close");
+    expect(stream.socket.destroyed).toBe(true);
+    expect(transport.calls).toHaveLength(0);
+    expect((await request(currentServer, { method: "POST", path: "/", body: "{}" })).statusCode).toBe(200);
+  });
+
+  it("closes a continuously trickled upload at the absolute 30-second deadline", async () => {
+    expect(REQUEST_BODY_TIMEOUT_MS).toBe(30_000);
+    const transport = makeMockTransport();
+    const logger = makeMockLogger();
+    currentServer = await runHttpServer({ transport, port: 0, getHealthPayload: () => ({}), logger, serverLabel: "Test", apiKey: API_KEY });
+    await new Promise(r => currentServer.once("listening", r));
+    const addr = /** @type {import('net').AddressInfo} */ currentServer.address();
+    const socket = net.createConnection({ host: "127.0.0.1", port: addr.port });
+    socket.setEncoding("utf8");
+    let response = "";
+    socket.on("data", chunk => (response += chunk));
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+    const closed = new Promise(resolve => socket.once("close", resolve));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const incoming = new Promise(resolve => currentServer.once("request", resolve));
+    socket.write(`POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: ${API_KEY}\r\nTransfer-Encoding: chunked\r\n\r\n`);
+    const stream = /** @type {http.IncomingMessage} */ await incoming;
+
+    for (const elapsed of [10_000, 10_000, 9_999]) {
+      await vi.advanceTimersByTimeAsync(elapsed);
+      const received = new Promise(resolve => stream.once("data", resolve));
+      socket.write("1\r\n \r\n");
+      await received;
+      expect(response).toBe("");
+      expect(transport.calls).toHaveLength(0);
+    }
+    await vi.advanceTimersByTimeAsync(1);
+    await closed;
+
+    expect(response).toContain("408 Request Timeout");
+    expect(response).toContain('{"error":"Request body timeout"}');
+    expect(response.toLowerCase()).toContain("connection: close");
+    expect(stream.socket.destroyed).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(transport.calls).toHaveLength(0);
+    expect(logger.debugError).toHaveBeenCalled();
+    vi.useRealTimers();
     expect((await request(currentServer, { method: "POST", path: "/", body: "{}" })).statusCode).toBe(200);
   });
 
