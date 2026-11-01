@@ -17,8 +17,10 @@ func TestArtifactExecutionSinks(t *testing.T) {
 		count          int
 	}{
 		{"bash incoming/run.sh", "", 1},
+		{"bash -e incoming/run.sh", "", 1},
 		{"sh 'incoming/run.sh'", "", 1},
 		{`python3 "incoming/run.py"`, "", 1},
+		{`python3 -u "incoming/run.py"`, "", 1},
 		{"node incoming/run.js", "", 1},
 		{"source incoming/env.sh", "", 1},
 		{". incoming/env.sh", "", 1},
