@@ -2,10 +2,6 @@ import { describe, it, expect } from "vitest";
 const { parseDocument } = require("./work_queue_yaml.cjs");
 
 describe("work_queue_yaml", () => {
-  it("exports the expected functions", () => {
-    expect(typeof parseDocument).toBe("function");
-  });
-
   it("parses a simple mapping", () => {
     const doc = parseDocument("a: 1\nb: hello\n");
     expect(doc.errors).toHaveLength(0);
@@ -33,8 +29,49 @@ describe("work_queue_yaml", () => {
   });
 
   it("reports errors for invalid YAML", () => {
-    const doc = parseDocument("a: [1, 2\nb: : :\n");
-    expect(doc.errors.length).toBeGreaterThan(0);
+    const doc = parseDocument("a: [1, 2\n");
+    expect(doc.errors.some(error => error.code === "BAD_INDENT")).toBe(true);
+  });
+
+  it("rejects duplicate keys when uniqueKeys is enabled", () => {
+    const doc = parseDocument("key: first\nkey: second\n", { uniqueKeys: true });
+    expect(doc.errors.some(error => error.code === "DUPLICATE_KEY")).toBe(true);
+  });
+
+  it("merges anchored mappings when merge is enabled", () => {
+    const doc = parseDocument("base: &b\n  x: 1\nover:\n  <<: *b\n  y: 2\n", { merge: true });
+    expect(doc.toJS().over).toEqual({ x: 1, y: 2 });
+  });
+
+  it("uses YAML 1.2 scalar rules when requested", () => {
+    const doc = parseDocument("affirmative: yes\nnumber: 012\n", { version: "1.2" });
+    expect(doc.toJS()).toEqual({ affirmative: "yes", number: 12 });
+  });
+
+  it("supports mapAsMap during JavaScript conversion", () => {
+    const doc = parseDocument("a: 1\nb: 2\n");
+    expect(doc.toJS({ mapAsMap: true })).toEqual(
+      new Map([
+        ["a", 1],
+        ["b", 2],
+      ])
+    );
+  });
+
+  it("enforces maxAliasCount during JavaScript conversion", () => {
+    const doc = parseDocument("base: &x [1]\nreferences: [*x, *x]\n");
+    expect(() => doc.toJS({ maxAliasCount: 1 })).toThrow(/Excessive alias count/);
+  });
+
+  it("exposes raw contents for AST-level consumers", () => {
+    const doc = parseDocument("a: 1\nb: 2\n");
+    expect(Array.isArray(doc.contents.items)).toBe(true);
+    expect(doc.contents.items).toHaveLength(2);
+  });
+
+  it("exposes warnings separately from errors", () => {
+    const doc = parseDocument("a: 1\n");
+    expect(doc.warnings).toEqual([]);
   });
 
   it("reports an error for multiple documents", () => {
