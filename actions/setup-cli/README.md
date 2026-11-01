@@ -10,6 +10,8 @@ This GitHub Action installs the `gh-aw` CLI extension using the latest stable re
 - ✅ **Cross-platform**: Works on Linux, macOS, Windows, and FreeBSD
 - ✅ **Multi-architecture**: Supports amd64, arm64, 386, and arm architectures
 
+The Bash direct-download fallback requires `sha256sum` or `shasum` and exactly one valid SHA256 checksum for the platform asset. Unavailable, missing, malformed, duplicate, or mismatched checksums abort installation before the downloaded binary is executed or replaces an existing installation.
+
 ## Usage
 
 ### Install Latest Stable Release
