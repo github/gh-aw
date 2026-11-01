@@ -222,7 +222,7 @@ function computeIncrementalDiffSize({ baseRef, headRef, cwd, tmpPath, excludedFi
       debugLog(`Computed incremental net diffSize=${diffSize} bytes (baseRef=${baseRef}..${headRef})`);
     }
   } catch (diffErr) {
-    debugLog(`Failed to compute incremental net diffSize - ${getErrorMessage(diffErr)}`);
+    debugLog(`Failed to compute incremental net diffSize - ${describeGitFailure(getErrorMessage(diffErr), cwd)}`);
   } finally {
     // Best-effort cleanup of the temp diff file; we only needed its size.
     try {

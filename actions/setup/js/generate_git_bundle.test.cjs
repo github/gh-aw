@@ -326,8 +326,8 @@ describe("generateGitBundle (incremental)", () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("wrong repository checkout");
+    expect(result.error).toContain("correct repository");
     expect(result.error).toContain("GITHUB_WORKSPACE");
-    expect(result.error).toContain("/tmp/nonexistent-repo");
+    expect(result.error).not.toContain("/tmp/nonexistent-repo");
   });
 });

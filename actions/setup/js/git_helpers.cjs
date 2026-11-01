@@ -2,6 +2,8 @@
 /// <reference types="@actions/github-script" />
 
 const childProcess = require("child_process");
+const fs = require("fs");
+const path = require("path");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isTransientError } = require("./error_recovery.cjs");
@@ -472,7 +474,7 @@ function execLocalGitSync(args, options = {}) {
   if (["status", "add", "hash-object", "diff", "read-tree", "apply", "checkout", "checkout-index", "reset", "am"].includes(commandArgs[0])) {
     // There is no wildcard -c override for attribute filter drivers. Discover
     // their names without reading values or executing worktree conversions.
-    const result = execGitSyncResult([...globalArgs, "config", "--null", "--name-only", "--get-regexp", "^filter\\..*\\.(clean|smudge|process|required)$"], localOptions);
+    const result = execGitSyncResult([...globalArgs, "config", "--null", "--name-only", "--get-regexp", "^filter\\..*\\.(clean|smudge|process|required)$"], { ...localOptions, input: undefined });
     if (result.status !== 0 && result.status !== 1) throw new Error("Unable to inspect Git filter configuration safely");
     const drivers = new Set(
       result.stdout
@@ -517,6 +519,79 @@ function execLocalGitSync(args, options = {}) {
     ],
     localOptions
   );
+}
+
+/**
+ * Stage literal worktree paths as raw blobs without running Git conversions.
+ * Filter discovery cannot secure git add against concurrent config changes;
+ * hash-object --no-filters and update-index --index-info never run drivers.
+ *
+ * @param {string[]} files - Repository-relative literal paths, including deletions.
+ * @param {import("child_process").SpawnSyncOptions & { cwd: string }} options
+ * @returns {void}
+ */
+function stageRawGitFiles(files, options) {
+  const records = [];
+  let zeroOid;
+  for (const file of files) {
+    const segments = file.split("/");
+    if (!file || file.includes("\0") || path.isAbsolute(file) || segments.some(segment => !segment || segment === "." || segment === ".." || segment.toLowerCase() === ".git")) {
+      throw new Error("Unable to stage an unsafe repository-relative path");
+    }
+    let fullPath = options.cwd;
+    let missing = false;
+    for (const segment of segments.slice(0, -1)) {
+      fullPath = path.join(fullPath, segment);
+      try {
+        const parentStats = fs.lstatSync(fullPath);
+        if (parentStats.isSymbolicLink()) throw new Error("Unable to stage a path through a symlink");
+        if (!parentStats.isDirectory()) {
+          missing = true;
+          break;
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        missing = true;
+        break;
+      }
+    }
+    fullPath = path.join(options.cwd, file);
+    let stats;
+    try {
+      if (!missing) stats = fs.lstatSync(fullPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (!stats || stats.isDirectory()) {
+      zeroOid ||= "0".repeat(execLocalGitSync(["hash-object", "--no-filters", "--stdin"], { ...options, input: Buffer.alloc(0) }).trim().length);
+      // Remove old entries before additions for file/directory replacements.
+      records.unshift(`0 ${zeroOid}\t${file}\0`);
+      continue;
+    }
+    let bytes;
+    let mode;
+    if (stats.isSymbolicLink()) {
+      bytes = fs.readlinkSync(fullPath, { encoding: "buffer" });
+      mode = "120000";
+    } else if (stats.isFile()) {
+      const fd = fs.openSync(fullPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+      try {
+        const openedStats = fs.fstatSync(fd);
+        if (!openedStats.isFile()) throw new Error("Unable to stage a non-regular file");
+        bytes = fs.readFileSync(fd);
+        mode = openedStats.mode & 0o111 ? "100755" : "100644";
+      } finally {
+        fs.closeSync(fd);
+      }
+    } else {
+      throw new Error("Unable to stage a non-file path");
+    }
+    const oid = execLocalGitSync(["hash-object", "-w", "--no-filters", "--stdin"], { ...options, input: bytes }).trim();
+    records.push(`${mode} ${oid}\t${file}\0`);
+  }
+  if (records.length > 0) {
+    execLocalGitSync(["update-index", "-z", "--index-info"], { ...options, input: records.join("") });
+  }
 }
 
 /**
@@ -930,6 +1005,7 @@ async function linearizeRangeAsCommit(baseRef, commitMessage, execApi, opts = {}
 }
 
 module.exports = {
+  stageRawGitFiles,
   ensureSafeDirectoryTrust,
   isTransientGitError,
   withGitRetry,

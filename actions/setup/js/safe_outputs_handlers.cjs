@@ -15,7 +15,7 @@ const { lookupCheckout } = require("./checkout_manifest.cjs");
 const { generateGitPatch } = require("./generate_git_patch.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { generateGitBundle } = require("./generate_git_bundle.cjs");
-const { hasMergeCommitsInRange, execLocalGitSync: execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
+const { hasMergeCommitsInRange, execLocalGitSync: execGitSync, ensureSafeDirectoryTrust, stageRawGitFiles } = require("./git_helpers.cjs");
 const { enforceCommentLimits, MAX_COMMENT_INPUT_LENGTH } = require("./comment_limit_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
@@ -1963,17 +1963,17 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         const relPath = relativePath ? path.join(relativePath, entry.name) : entry.name;
         if (entry.isDirectory()) {
           scanDir(fullPath, relPath);
-        } else if (entry.isFile()) {
+        } else if (entry.isFile() || entry.isSymbolicLink()) {
           if (!isEligibleFile(relPath)) {
             continue;
           }
           let stats;
           try {
-            stats = fs.statSync(fullPath);
+            stats = fs.lstatSync(fullPath);
           } catch (err) {
             throw new Error(`${ERR_SYSTEM}: Failed to inspect file ${fullPath}: ${getErrorMessage(err)}`, { cause: err });
           }
-          files.push({ relativePath: relPath.replace(/\\/g, "/"), size: stats.size });
+          files.push({ relativePath: relPath, size: stats.size });
         }
       }
     }
@@ -2043,7 +2043,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const trackedFiles = execGitSync(["ls-files", "-z"], { cwd: memoryDir, stdio: "pipe" }).split("\0").filter(Boolean).filter(isEligibleFile);
       const filesToStage = [...new Set([...files.map(file => file.relativePath), ...trackedFiles])];
       if (filesToStage.length > 0) {
-        execGitSync(["add", "--sparse", "--all", "--", ...filesToStage.map(file => `:(literal)${file}`)], { cwd: memoryDir, stdio: "pipe" });
+        stageRawGitFiles(filesToStage, { cwd: memoryDir, stdio: "pipe" });
       }
       const filesToMeasure = [...new Set([...stagedFiles, ...filesToStage])].map(file => `:(literal)${file}`);
       patchSizeBytes = getStagedPatchDiffSizeBytes({ execGitSyncFn: execGitSync, cwd: memoryDir, pathspecs: filesToMeasure });

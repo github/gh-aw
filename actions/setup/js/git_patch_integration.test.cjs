@@ -682,7 +682,9 @@ describe("git patch integration tests", () => {
         // Should fail with a clear error message
         expect(result.success).toBe(false);
         expect(result.error).toContain("Cannot generate incremental patch");
-        expect(result.error).toContain("origin/local-only-branch");
+        expect(result.error).toContain("PR-head baseline");
+        expect(result.error).toContain("checkout.fetch-depth");
+        expect(result.error).not.toContain("origin/local-only-branch");
       } finally {
         process.env.GITHUB_WORKSPACE = origWorkspace;
         process.env.DEFAULT_BRANCH = origDefaultBranch;

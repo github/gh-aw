@@ -295,6 +295,12 @@ Prepare the required refs with `checkout.fetch` and sufficient history with
 required blobs locally. Incremental updates require the pre-agent PR-head baseline
 recorded by the PR checkout step or an existing `origin/<branch>` tracking ref.
 Missing baselines are reported rather than replaced with a broader diff.
+Full-mode generation can use the local base branch when its `origin` tracking
+ref is absent, including cross-repository checkouts. Filtered bundles preserve
+the checkout's shallow boundaries; deeper history is only needed when the
+required baseline cannot be resolved locally. Failure messages retain fixed
+checkout and workflow-compilation guidance without exposing raw Git stderr,
+checkout paths, or caller-supplied ref names.
 
 ## `pull_request_target` Checkout
 

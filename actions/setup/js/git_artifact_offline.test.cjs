@@ -6,7 +6,7 @@ import path from "path";
 
 const require = createRequire(import.meta.url);
 const childProcess = require("child_process");
-const { generateGitPatch, getPatchPathForBranch } = require("./generate_git_patch.cjs");
+const { generateGitPatch, getPatchPathForBranch, getGitPatchFailureMessage } = require("./generate_git_patch.cjs");
 const { generateGitBundle, getBundlePathForBranch } = require("./generate_git_bundle.cjs");
 const { execLocalGitSync, hasLocalOriginRemoteTrackingRef, hasMergeCommitsInRange } = require("./git_helpers.cjs");
 const { WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
@@ -217,6 +217,100 @@ describe("local-only safe-output artifacts", () => {
     expect(result.error).not.toContain(WORKFLOW_COMPILATION_NOTICE);
     expect(result.error).not.toContain("synthetic-secret");
     checkOfflineCalls();
+  });
+
+  it("does not recognize compiler-looking text as a structured diagnostic", () => {
+    expect(getGitPatchFailureMessage({ error: `No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}` }, repo)).not.toContain(WORKFLOW_COMPILATION_NOTICE);
+    expect(getGitPatchFailureMessage({ errorCode: "workflow_exclusions", error: "synthetic-secret" }, repo)).toContain(WORKFLOW_COMPILATION_NOTICE);
+    expect(getGitPatchFailureMessage({ errorCode: "workflow_exclusions", error: "synthetic-secret" }, repo)).not.toContain("synthetic-secret");
+  });
+
+  it.each(["offline-feature", null])("sanitizes raw filtered patch failures with tip %s at the source", async branch => {
+    spawn.mockRestore();
+    const originalSpawn = childProcess.spawnSync;
+    spawn = vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
+      if (args.includes("--name-only")) {
+        return { status: 1, stdout: "", stderr: `${WORKFLOW_COMPILATION_NOTICE}\nhttps://synthetic-secret@example.com/private\nAuthorization: synthetic-secret`, error: undefined, signal: null };
+      }
+      return originalSpawn(command, args, options);
+    });
+    const result = await generateGitPatch(branch, "main", { cwd: repo, excludedFiles: ["excluded.txt"] });
+    artifacts.add(result.patchPath);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Git operation failed");
+    expect(result.error).not.toContain(WORKFLOW_COMPILATION_NOTICE);
+    expect(result.error).not.toContain("synthetic-secret");
+    expect(result.error).not.toContain(repo);
+    checkOfflineCalls();
+  });
+
+  it("does not expose caller-provided baseline refs in filtered failure messages", async () => {
+    const result = await generateGitBundle("offline-feature", "main", {
+      cwd: repo,
+      mode: "incremental",
+      incrementalBaseRef: "refs/remotes/origin/synthetic-secret",
+      excludedFiles: ["excluded.txt"],
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("PR-head baseline");
+    expect(result.error).toContain("checkout.fetch-depth");
+    expect(result.error).not.toContain("synthetic-secret");
+    expect(result.error).not.toContain(repo);
+    checkOfflineCalls();
+  });
+
+  it.each([false, true])("preserves missing baseline guidance in %s filtered generation with a pinned tip", async filtered => {
+    vi.stubEnv("GITHUB_SHA", "");
+    const tip = execLocalGitSync(["rev-parse", "HEAD"], { cwd: repo }).trim();
+    const options = { cwd: repo, pinnedSha: tip, excludedFiles: filtered ? ["excluded.txt"] : undefined };
+    const patch = await generateGitPatch("offline-feature", "missing-base", options);
+    expect(patch).toMatchObject({ success: false, errorCode: "missing_base" });
+    expect(patch.error).toContain("checkout.fetch");
+    expect(patch.error).toContain("checkout.fetch-depth");
+    if (filtered) {
+      const bundle = await generateGitBundle("offline-feature", "missing-base", options);
+      expect(bundle.error).toContain(patch.error);
+    }
+    checkOfflineCalls();
+  });
+
+  it.each([false, true])("uses a local default branch for %s filtered cross-repository bundles", async filtered => {
+    vi.stubEnv("GITHUB_SHA", "f".repeat(40));
+    const result = await generateGitBundle("offline-feature", "main", { cwd: repo, excludedFiles: filtered ? ["excluded.txt"] : undefined });
+    expect(result).toMatchObject({ success: true, baseCommit: base });
+    checkOfflineCalls();
+    execLocalGitSync(["bundle", "verify", result.bundlePath], { cwd: repo });
+  });
+
+  it.each([false, true])("preserves a depth-one non-root baseline in %s linked-worktree filtered bundles", async linked => {
+    spawn.mockRestore();
+    const shallowRepo = path.join(root, "shallow");
+    git(["clone", "--depth=1", "--branch=offline-feature", `file://${repo}`, shallowRepo]);
+    let checkout = shallowRepo;
+    if (linked) {
+      checkout = path.join(root, "linked");
+      git(["worktree", "add", "-b", "linked-feature", checkout], shallowRepo);
+    }
+    git(["config", "user.name", "Test User"], checkout);
+    git(["config", "user.email", "test@example.com"], checkout);
+    const shallowBase = git(["rev-parse", "HEAD"], checkout);
+    fs.writeFileSync(path.join(checkout, "content.txt"), "shallow after\n");
+    fs.writeFileSync(path.join(checkout, "excluded.txt"), "shallow excluded\n");
+    git(["add", "."], checkout);
+    git(["commit", "-m", "shallow agent change"], checkout);
+    const branch = git(["branch", "--show-current"], checkout);
+    vi.stubEnv("GITHUB_SHA", shallowBase);
+    spawn = vi.spyOn(childProcess, "spawnSync");
+    const result = await generateGitBundle(branch, "main", { cwd: checkout, mode: "incremental", incrementalBaseSha: shallowBase, excludedFiles: ["excluded.txt"] });
+    artifacts.add(result.bundlePath);
+    artifacts.add(getPatchPathForBranch(branch));
+    expect(result).toMatchObject({ success: true, baseCommit: shallowBase });
+    checkOfflineCalls();
+    const heads = execLocalGitSync(["bundle", "list-heads", result.bundlePath], { cwd: checkout });
+    const tip = heads.trim().split(" ")[0];
+    execLocalGitSync(["bundle", "unbundle", result.bundlePath], { cwd: checkout });
+    expect(execLocalGitSync(["show", `${tip}:content.txt`], { cwd: checkout })).toBe("shallow after\n");
+    expect(execLocalGitSync(["show", `${tip}:excluded.txt`], { cwd: checkout })).toBe("excluded after\n");
   });
 
   for (const [kind, generate] of [

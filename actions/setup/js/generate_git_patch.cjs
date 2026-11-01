@@ -30,6 +30,27 @@ const { getExcludedWorkflowFiles, WORKFLOW_COMPILATION_NOTICE } = require("./wor
 // existing callers that imported it from this module.
 void sanitizeForFilename;
 
+/** @type {Readonly<Record<string, string>>} */
+const PATCH_FAILURE_MESSAGES = Object.freeze({
+  missing_base: "No local base ref is available for patch generation. Artifact generation never fetches. Prepare the base branch with checkout.fetch and sufficient checkout.fetch-depth before agent execution.",
+  missing_pr_head:
+    "Cannot generate incremental patch: the pre-agent PR-head baseline is not present locally. Artifact generation never fetches. Prepare the required refs and history with checkout.fetch and checkout.fetch-depth before agent execution. For fork PRs, ensure the PR checkout step fetched refs/pull/<number>/head before calling push_to_pull_request_branch.",
+  shallow_history: "Could not compute merge-base because the repository is a shallow clone. Deepen the clone (checkout.fetch-depth: 0) so the common ancestor is reachable.",
+  workflow_exclusions: `No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}`,
+  no_changes: "No changes to commit - no commits found",
+  no_new_commits: "No new commits to push - your changes may already be on the remote branch",
+});
+
+/** Render only generator-authored diagnostics, never trust error text from Git.
+ * @param {{errorCode?: string, error?: string}} result
+ * @param {string} cwd
+ * @returns {string}
+ */
+function getGitPatchFailureMessage(result, cwd) {
+  const code = result.errorCode || "";
+  return Object.hasOwn(PATCH_FAILURE_MESSAGES, code) ? PATCH_FAILURE_MESSAGES[code] : describeGitFailure(result.error || "", cwd);
+}
+
 /**
  * Debug logging helper - logs to stderr when DEBUG env var matches
  * @param {string} message - Debug message to log
@@ -80,7 +101,8 @@ function embedBaseCommit(patchContent, baseCommitSha) {
  *   PR head in incremental mode (for example refs/remotes/origin/pr-head for fork PR checkouts).
  * @param {string} [options.incrementalBaseSha] - Explicit commit SHA to use as the pre-agent
  *   PR head in incremental mode. Takes precedence over incrementalBaseRef when present.
- * @returns {Promise<Object>} Object with patch info or error
+ * @returns {Promise<Object>} Object with patch info or error. Authored failures
+ *   may include errorCode, rendered as fixed guidance by getGitPatchFailureMessage.
  */
 async function generateGitPatch(branchName, baseBranch, options = {}) {
   if (options.token !== undefined) {
@@ -113,7 +135,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
     const candidate = path.resolve(root, String(options.workspacePath));
     const relative = path.relative(root, candidate);
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      const errorMessage = `Invalid workspacePath '${String(options.workspacePath)}': path must stay under GITHUB_WORKSPACE`;
+      const errorMessage = "Invalid workspacePath: path must stay under GITHUB_WORKSPACE";
       return {
         success: false,
         error: errorMessage,
@@ -123,7 +145,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
     if (!fs.existsSync(candidate)) {
       return {
         success: false,
-        error: `Invalid workspacePath '${String(options.workspacePath)}': directory does not exist`,
+        error: "Invalid workspacePath: directory does not exist",
         patchPath,
       };
     }
@@ -133,14 +155,14 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
     } catch (err) {
       return {
         success: false,
-        error: `Failed to inspect workspacePath '${String(options.workspacePath)}': ${getErrorMessage(err)}`,
+        error: "Failed to inspect workspacePath: ensure the directory is accessible",
         patchPath,
       };
     }
     if (!candidateStat.isDirectory()) {
       return {
         success: false,
-        error: `Invalid workspacePath '${String(options.workspacePath)}': path is not a directory`,
+        error: "Invalid workspacePath: path is not a directory",
         patchPath,
       };
     }
@@ -149,7 +171,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
   // Validate baseBranch early to avoid confusing git errors (e.g., origin/undefined)
   if (typeof baseBranch !== "string" || baseBranch.trim() === "") {
-    const errorMessage = "baseBranch is required and must be a non-empty string (received: " + String(baseBranch) + ")";
+    const errorMessage = "baseBranch is required and must be a non-empty string";
     debugLog(`Invalid baseBranch: ${errorMessage}`);
     return {
       patchPath,
@@ -170,13 +192,15 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
     try {
       fs.mkdirSync(patchDir, { recursive: true });
     } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to create directory ${patchDir}: ${getErrorMessage(err)}`, { cause: err });
+      throw new Error(`${ERR_SYSTEM}: Failed to create patch output directory. Ensure it is accessible.`);
     }
   }
 
   let patchGenerated = false;
   /** @type {any} */
   let errorMessage = null;
+  /** @type {string | undefined} */
+  let errorCode;
   // Track the resolved base commit SHA so consumers (e.g. create_pull_request fallback)
   // can use it directly. The From <sha> header in format-patch output contains the
   // *new* commit SHA which won't exist in the target checkout.
@@ -192,7 +216,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   function noChangesResult() {
     return {
       success: false,
-      error: excludedWorkflowFiles.length > 0 ? `No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}` : "No changes to commit - no commits found",
+      error: excludedWorkflowFiles.length > 0 ? PATCH_FAILURE_MESSAGES.workflow_exclusions : PATCH_FAILURE_MESSAGES.no_changes,
+      errorCode: excludedWorkflowFiles.length > 0 ? "workflow_exclusions" : "no_changes",
       patchPath,
       excludedWorkflowFiles,
     };
@@ -282,13 +307,12 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
             try {
               baseRef = execGitSync(["rev-parse", "--verify", `${candidateBaseRef}^{commit}`], { cwd }).trim();
             } catch (baselineError) {
-              errorMessage =
-                `Cannot generate incremental patch: explicit PR-head baseline ${candidateBaseRef} is not present in checkout '${cwd}'. ` +
-                `Ensure the PR checkout step completed and fetched refs/pull/<number>/head before calling push_to_pull_request_branch.`;
-              debugLog(`Strategy 1 (incremental): explicit PR-head baseline failed: ${getErrorMessage(baselineError)}`);
+              errorMessage = PATCH_FAILURE_MESSAGES.missing_pr_head;
+              debugLog(`Strategy 1 (incremental): explicit PR-head baseline failed: ${describeGitFailure(getErrorMessage(baselineError), cwd)}`);
               return {
                 success: false,
                 error: errorMessage,
+                errorCode: "missing_pr_head",
                 patchPath: patchPath,
               };
             }
@@ -300,14 +324,11 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
               debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
             } else {
               debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally, failing without fetching`);
-              errorMessage =
-                `Cannot generate incremental patch: no pre-agent PR-head baseline was available for branch '${branchName}' in checkout '${cwd}'. ` +
-                `refs/remotes/origin/${branchName} is not present locally. Artifact generation never fetches from the agent-writable checkout. ` +
-                `Prepare the required refs and history with checkout.fetch and checkout.fetch-depth before agent execution. ` +
-                `For fork PRs, ensure the workflow PR checkout step ran first so refs/pull/<number>/head is recorded as the patch baseline; checkout.fetch cannot fetch fork branches from the base repository.`;
+              errorMessage = PATCH_FAILURE_MESSAGES.missing_pr_head;
               return {
                 success: false,
                 error: errorMessage,
+                errorCode: "missing_pr_head",
                 patchPath: patchPath,
               };
             }
@@ -372,12 +393,10 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
               // otherwise complete clone) can make the merge-base unreachable.
               // Surface that explicitly instead of the misleading "branch does not
               // exist locally" message.
-              if (fs.existsSync(path.join(cwd || process.cwd(), ".git", "shallow"))) {
+              const shallowPath = execGitSync(["rev-parse", "--git-path", "shallow"], { cwd }).trim();
+              if (fs.existsSync(path.resolve(cwd, shallowPath))) {
                 /** @type {any} */
-                const shallowCloneError = new Error(
-                  `${ERR_SYSTEM}: Could not compute merge-base between ${defaultBranchRef} and ${tipRef} because the repository is a shallow clone (.git/shallow exists). ` +
-                    "Deepen the clone (checkout.fetch-depth: 0) so the common ancestor is reachable."
-                );
+                const shallowCloneError = new Error(PATCH_FAILURE_MESSAGES.shallow_history);
                 shallowCloneError.isShallowCloneDiagnostic = true;
                 throw shallowCloneError;
               }
@@ -387,7 +406,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           } else {
             // No remote refs available - fall through to Strategy 2
             debugLog(`Strategy 1 (full): No remote refs available, falling through to Strategy 2`);
-            errorMessage = `No local base ref is available for patch generation in checkout '${cwd}'. Artifact generation never fetches. Prepare ${JSON.stringify(defaultBranch)} with checkout.fetch and sufficient checkout.fetch-depth before agent execution.`;
+            errorMessage = PATCH_FAILURE_MESSAGES.missing_base;
+            errorCode = "missing_base";
             throw new Error(`${ERR_SYSTEM}: No remote refs available for merge-base calculation`);
           }
         }
@@ -413,7 +433,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           // In incremental mode, zero commits means nothing new to push
           return {
             success: false,
-            error: "No new commits to push - your changes may already be on the remote branch",
+            error: PATCH_FAILURE_MESSAGES.no_new_commits,
+            errorCode: "no_new_commits",
             patchPath: patchPath,
             patchSize: 0,
             patchLines: 0,
@@ -438,7 +459,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           debugLog(`Strategy 1 (incremental): format-patch produced no output for ${baseRef}..${tipRef} despite ${commitCount} incremental commit(s), refusing to fall through to checkout-base strategies`);
           return {
             success: false,
-            error: `Cannot generate incremental patch: git format-patch produced no output for ${baseRef}..${tipRef} despite ${commitCount} incremental commit(s).`,
+            error: "Cannot generate incremental patch: git format-patch produced no output despite incremental commits.",
             patchPath: patchPath,
           };
         }
@@ -468,7 +489,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
         if (branchError && branchError.isShallowCloneDiagnostic) {
           return {
             success: false,
-            error: getErrorMessage(branchError),
+            error: PATCH_FAILURE_MESSAGES.shallow_history,
+            errorCode: "shallow_history",
             patchPath: patchPath,
           };
         }
@@ -483,7 +505,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           // other strategies that would resolve a different commit.
           return {
             success: false,
-            error: `Pinned SHA ${options.pinnedSha} failed to generate patch: ${branchErrorMessage}`,
+            error: errorMessage || `Pinned commit failed to generate patch: ${branchErrorMessage}`,
+            errorCode,
             patchPath: patchPath,
           };
         }
@@ -491,17 +514,13 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           if (branchExistsLocally) {
             return {
               success: false,
-              error: `Cannot generate incremental patch for branch ${branchName} in checkout '${cwd}': ${branchErrorMessage}`,
+              error: `Cannot generate incremental patch: ${branchErrorMessage}`,
               patchPath: patchPath,
             };
           }
           return {
             success: false,
-            error:
-              `Branch ${branchName} does not exist locally in checkout '${cwd}'. ` +
-              "Cannot generate incremental patch. Possible causes: " +
-              `(1) you have not checked out '${branchName}' yet (for example: git checkout -b ${branchName} --track origin/${branchName}); ` +
-              "(2) the tool is running in the wrong repository checkout. Ensure GITHUB_WORKSPACE points to the repository that contains this pull request branch.",
+            error: "Branch does not exist locally. Cannot generate incremental patch. Ensure the pull request branch was checked out and GITHUB_WORKSPACE points to the correct repository.",
             patchPath: patchPath,
           };
         }
@@ -562,13 +581,13 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
             }
           } catch (ancestorErr) {
             if (excludeArgsArr.length > 0 && baseCommitSha) {
-              return { success: false, error: `Failed to generate filtered patch: ${getErrorMessage(ancestorErr)}`, patchPath };
+              return { success: false, error: `Failed to generate filtered patch: ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`, patchPath };
             }
             if (baseCommitSha) {
               return { success: false, error: `Failed to generate patch: ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`, patchPath };
             }
             // GITHUB_SHA is not an ancestor of HEAD - repository state has diverged
-            debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${getErrorMessage(ancestorErr)}`);
+            debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`);
           }
         }
       }
@@ -664,11 +683,12 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
         if (baseCommitSha) {
           return { success: false, error: `Failed to generate patch: ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`, patchPath };
         }
-        debugLog(`Strategy 3: Failed - ${getErrorMessage(strategy3Err)}`);
+        debugLog(`Strategy 3: Failed - ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`);
       }
     }
   } catch (error) {
-    errorMessage = `Failed to generate patch: ${getErrorMessage(error)}`;
+    errorMessage = `Failed to generate patch: ${describeGitFailure(getErrorMessage(error), cwd)}`;
+    errorCode = undefined;
   }
 
   // Check if patch was generated and has content
@@ -677,7 +697,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
     try {
       patchContent = fs.readFileSync(patchPath, "utf8");
     } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to read file ${patchPath}: ${getErrorMessage(err)}`, { cause: err });
+      throw new Error(`${ERR_SYSTEM}: Failed to read generated patch. Ensure the output directory is accessible.`);
     }
     const patchSize = Buffer.byteLength(patchContent, "utf8");
     const patchLines = patchContent.split("\n").length;
@@ -763,7 +783,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
           }
         }
       } catch (adjustErr) {
-        debugLog(`Strategy 1 (incremental): diff-base adjustment failed (${getErrorMessage(adjustErr)}); using original base`);
+        debugLog(`Strategy 1 (incremental): diff-base adjustment failed (${describeGitFailure(getErrorMessage(adjustErr), cwd)}); using original base`);
       }
     }
 
@@ -798,6 +818,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   return {
     success: false,
     error: excludedWorkflowFiles.length > 0 ? `${errorMessage || "No changes remain after workflow YAML exclusions."}\n\n${WORKFLOW_COMPILATION_NOTICE}` : errorMessage || "No changes to commit - no commits found",
+    errorCode,
     patchPath: patchPath,
     excludedWorkflowFiles,
   };
@@ -805,6 +826,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
 
 module.exports = {
   generateGitPatch,
+  getGitPatchFailureMessage,
   getPatchPathForBranch,
   getPatchPathForBranchInRepo,
   sanitizeBranchNameForPatch,

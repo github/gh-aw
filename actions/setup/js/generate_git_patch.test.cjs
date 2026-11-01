@@ -281,9 +281,9 @@ describe("generateGitPatch - cross-repo checkout scenarios", () => {
     const result = await generateGitPatch("feature-branch", "main", { mode: "incremental" });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("wrong repository checkout");
+    expect(result.error).toContain("correct repository");
     expect(result.error).toContain("GITHUB_WORKSPACE");
-    expect(result.error).toContain("/tmp/nonexistent-repo");
+    expect(result.error).not.toContain("/tmp/nonexistent-repo");
   });
 
   it("should handle SideRepoOps pattern where workflow repo != target repo", async () => {
