@@ -399,6 +399,15 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	}
 }
 
+func sanitizePromptRepoIdentifier(repo string) string {
+	repo = strings.TrimSpace(repo)
+	repo = strings.ReplaceAll(repo, "\r", " ")
+	repo = strings.ReplaceAll(repo, "\n", " ")
+	repo = strings.ReplaceAll(repo, "\t", " ")
+	repo = strings.ReplaceAll(repo, "`", "\\`")
+	return repo
+}
+
 func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 	if !enclavesEnabled(data) {
 		return nil
@@ -412,19 +421,20 @@ func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 			if repo == nil {
 				continue
 			}
+			safeRepo := sanitizePromptRepoIdentifier(repo.Repo)
 			switch repo.Sensitivity {
 			case "public":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`public`) still requires a finite response schema; do not apply the confidential repository's 8-bit budget to this scope.", repo.Repo))
+				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`public`) still requires a finite response schema; do not apply the confidential repository's 8-bit budget to this scope.", safeRepo))
 			case "trusted":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`trusted`) is unmetered and permits free-form strings inside a strict structured schema. Use only for content approved for unrestricted disclosure; never change sensitivity to bypass a confidential budget.", repo.Repo))
+				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`trusted`) is unmetered and permits free-form strings inside a strict structured schema. Use only for content approved for unrestricted disclosure; never change sensitivity to bypass a confidential budget.", safeRepo))
 			case "confidential":
 				payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
 				maxCardinality := 1 << payloadBits
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", repo.Repo, enclaveConfidentialRunBits, maxCardinality))
+				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", safeRepo, enclaveConfidentialRunBits, maxCardinality))
 			case "internal":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", repo.Repo, repo.Sensitivity))
+				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", safeRepo, repo.Sensitivity))
 			case "sealed":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`sealed`) has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for this repository.", repo.Repo))
+				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`sealed`) has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for this repository.", safeRepo))
 			}
 		}
 	}
