@@ -4,7 +4,9 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -119,23 +121,49 @@ func TestRunSyftOnImage_SBOMPersistence(t *testing.T) {
 }
 
 func TestRunSyftOnImage_SafeFilename(t *testing.T) {
-	// Test that image references with special characters produce safe filenames
-	sbomDir := t.TempDir()
-
-	// Manually construct what the expected filename should be for an image like:
-	// "gcr.io/distroless/static:latest@sha256:abc123"
-	safeImageName := "gcr.io_distroless_static_latest_sha256_abc123"
-	expectedPath := filepath.Join(sbomDir, "sbom-"+safeImageName+".json")
-
-	// Create a fake SBOM file with that name to test path construction
-	sbomJSON := []byte(`{"artifacts": [{"name": "test", "version": "1.0", "type": "test"}]}`)
-	if err := os.WriteFile(expectedPath, sbomJSON, constants.FilePermPublic); err != nil {
-		t.Fatalf("Failed to write test SBOM: %v", err)
+	if runtime.GOOS == "windows" {
+		t.Skip("Fake Docker executable uses a POSIX shell")
 	}
+	prependFakeDockerToPath(t, `{"artifacts":[]}`)
+	sbomDir := t.TempDir()
+	imageRef := "gcr.io/distroless/static:latest@sha256:" + strings.Repeat("a", 64)
+	expectedPath := filepath.Join(sbomDir, fmt.Sprintf("sbom-%x.json", sha256.Sum256([]byte(imageRef))))
 
-	// Verify the file exists
-	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Errorf("Expected file at %s to exist", expectedPath)
+	result, err := runSyftOnImage(context.Background(), imageRef, sbomDir, false)
+	require.NoError(t, err)
+	require.Equal(t, expectedPath, result.SBOMPath)
+	require.FileExists(t, expectedPath)
+}
+
+func TestRunSyftOnLockFiles_CollidingImageNames(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Fake Docker executable uses a POSIX shell")
+	}
+	for _, strict := range []bool{true, false} {
+		t.Run(fmt.Sprintf("strict-%t", strict), func(t *testing.T) {
+			tmpDir := t.TempDir()
+			t.Setenv("TMPDIR", tmpDir)
+			sbomJSON := `{"artifacts":[{"name":"test","version":"1.0","type":"test"}]}`
+			prependFakeDockerToPath(t, sbomJSON)
+			images := []string{"ghcr.io/acme/foo_bar:latest", "ghcr.io/acme/foo/bar:latest"}
+			lockFile := filepath.Join(t.TempDir(), "test.lock.yml")
+			manifest := fmt.Sprintf("# gh-aw-manifest: {\"version\":1,\"containers\":[{\"image\":%q},{\"image\":%q}]}\n", images[0], images[1])
+			require.NoError(t, os.WriteFile(lockFile, []byte(manifest), 0o600))
+
+			require.NoError(t, runSyftOnLockFiles([]string{lockFile}, false, strict))
+			directories, err := filepath.Glob(filepath.Join(tmpDir, "gh-aw-syft-sboms-*"))
+			require.NoError(t, err)
+			require.Len(t, directories, 1)
+			entries, err := os.ReadDir(directories[0])
+			require.NoError(t, err)
+			require.Len(t, entries, 2, "both formerly colliding images must retain their SBOM")
+			for _, image := range images {
+				path := filepath.Join(directories[0], fmt.Sprintf("sbom-%x.json", sha256.Sum256([]byte(image))))
+				data, err := os.ReadFile(path)
+				require.NoError(t, err)
+				require.JSONEq(t, sbomJSON, string(data))
+			}
+		})
 	}
 }
 
@@ -269,7 +297,7 @@ func TestRunSyftOnLockFiles_PrivateOutputs(t *testing.T) {
 				info, err := os.Stat(dir)
 				require.NoError(t, err)
 				require.Equal(t, os.FileMode(0o700), info.Mode().Perm())
-				sbom := filepath.Join(dir, "sbom-alpine_latest.json")
+				sbom := filepath.Join(dir, fmt.Sprintf("sbom-%x.json", sha256.Sum256([]byte("alpine:latest"))))
 				info, err = os.Stat(sbom)
 				require.NoError(t, err)
 				require.Equal(t, constants.FilePermSensitive, info.Mode().Perm())
@@ -294,7 +322,7 @@ func TestRunSyftOnImage_RefusesPreexistingOutput(t *testing.T) {
 	for _, precreation := range []string{"file", "symlink"} {
 		t.Run(precreation, func(t *testing.T) {
 			dir := t.TempDir()
-			path := filepath.Join(dir, "sbom-alpine_latest.json")
+			path := filepath.Join(dir, fmt.Sprintf("sbom-%x.json", sha256.Sum256([]byte("alpine:latest"))))
 			victim := path
 			if precreation == "symlink" {
 				victim = filepath.Join(t.TempDir(), "victim")

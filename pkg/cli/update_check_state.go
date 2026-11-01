@@ -35,7 +35,7 @@ func getUpdateCheckFilePathFor(fileName string, log *logger.Logger) string {
 		return ""
 	}
 	if !info.IsDir() || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
-		log.Print("Update check directory must be a private directory, not a symlink")
+		log.Print("Update check directory must be a non-symlink directory (owner-only permissions required on non-Windows systems)")
 		return ""
 	}
 

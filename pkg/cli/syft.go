@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,6 +61,7 @@ func runSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error { /
 	if err != nil {
 		return fmt.Errorf("failed to create SBOM directory: %w", err)
 	}
+	syftLog.Printf("SBOM directory: %s", sbomDir)
 
 	var scanErrors []string
 	var results []SyftScanResult
@@ -164,10 +166,9 @@ func runSyftOnImage(ctx context.Context, imageRef, sbomDir string, verbose bool)
 		return nil, fmt.Errorf("failed to parse syft JSON output for %s: %w", imageRef, err)
 	}
 
-	// Generate a safe filename from the image reference
-	replacer := strings.NewReplacer("/", "_", ":", "_", "@", "_")
-	safeImageName := replacer.Replace(imageRef)
-	sbomPath := filepath.Join(sbomDir, fmt.Sprintf("sbom-%s.json", safeImageName))
+	// Hash the full reference so distinct images cannot collide through sanitization.
+	imageHash := sha256.Sum256([]byte(imageRef))
+	sbomPath := filepath.Join(sbomDir, fmt.Sprintf("sbom-%x.json", imageHash))
 
 	// Persist the SBOM to disk
 	if err := writeSyftSBOM(sbomPath, stdout.Bytes()); err != nil {
