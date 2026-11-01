@@ -159,7 +159,15 @@ async function main() {
 
       // Check if file already exists in the branch
       if (fs.existsSync(targetFileName)) {
-        if (!readGuardedFile(targetFileName, fileContent.length).equals(fileContent)) {
+        let existingContent;
+        try {
+          existingContent = readGuardedFile(targetFileName, fileContent.length);
+        } catch (error) {
+          const errorCode = error && typeof error === "object" && "code" in error && error.code === ERR_VALIDATION ? ERR_VALIDATION : ERR_SYSTEM;
+          core.setFailed(`${errorCode}: Failed to verify existing asset ${targetFileName}: ${getErrorMessage(error)}`);
+          return;
+        }
+        if (!existingContent.equals(fileContent)) {
           core.setFailed(`${ERR_VALIDATION}: Existing asset content differs from staged content: ${targetFileName}`);
           return;
         }

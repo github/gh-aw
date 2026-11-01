@@ -768,6 +768,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     try {
       fileContent = readGuardedFile(absolutePath, maxSizeKB * 1024);
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === ERR_VALIDATION) throw err;
       if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") throw new Error(`${ERR_SYSTEM}: File not found: ${filePath}`, { cause: err });
       throw new Error(`${ERR_SYSTEM}: Failed to read file ${filePath}: ${getErrorMessage(err)}`, { cause: err });
     }
@@ -785,6 +786,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     try {
       writeGuardedFile(targetPath, fileContent);
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === ERR_VALIDATION) throw err;
       throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${targetPath}: ${getErrorMessage(err)}`, { cause: err });
     }
 

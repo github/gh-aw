@@ -544,16 +544,41 @@ describe("safe_outputs_handlers", () => {
     });
   });
 
-  describe("uploadAssetHandler", () => {
+  describe.skipIf(process.platform === "win32")("uploadAssetHandler", () => {
     let testRunnerTemp;
+    let restoreDescriptors;
 
     beforeEach(() => {
       const testId = Math.random().toString(36).substring(7);
       testRunnerTemp = path.join(testScratchRoot, `test-runner-temp-${testId}`);
       process.env.RUNNER_TEMP = testRunnerTemp;
+      if (process.platform !== "linux") {
+        // Exercise the Linux upload path on macOS without an absolute-path
+        // production fallback. These handler tests do not rename directories.
+        const originals = { openSync: fs.openSync, lstatSync: fs.lstatSync, mkdirSync: fs.mkdirSync };
+        const pinned = new Map();
+        const resolve = filename => {
+          if (typeof filename !== "string") return filename;
+          const match = /^\/proc\/self\/fd\/(\d+)(?:\/(.*))?$/.exec(filename);
+          return match ? path.join(pinned.get(Number(match[1])), match[2] || "") : filename;
+        };
+        fs.openSync = (filename, ...args) => {
+          const resolved = resolve(filename);
+          const fd = originals.openSync(resolved, ...args);
+          pinned.set(fd, resolved);
+          return fd;
+        };
+        for (const method of ["lstatSync", "mkdirSync"]) fs[method] = (filename, ...args) => originals[method](resolve(filename), ...args);
+        restoreDescriptors = () => Object.assign(fs, originals);
+        vi.stubGlobal("process", new Proxy(process, { get: (target, key) => (key === "platform" ? "linux" : Reflect.get(target, key)) }));
+      }
     });
 
     afterEach(() => {
+      vi.restoreAllMocks();
+      restoreDescriptors?.();
+      restoreDescriptors = undefined;
+      vi.unstubAllGlobals();
       delete process.env.RUNNER_TEMP;
       try {
         if (fs.existsSync(testRunnerTemp)) {
@@ -658,7 +683,7 @@ describe("safe_outputs_handlers", () => {
       // Use a path in the workspace that doesn't exist
       const args = { path: path.join(testWorkspaceDir, "nonexistent.png") };
 
-      expect(() => handlers.uploadAssetHandler(args)).toThrow("File not found");
+      expect(() => handlers.uploadAssetHandler(args)).toThrow(/^ERR_SYSTEM: File not found/);
     });
 
     it("should throw error if file outside allowed directories", () => {
@@ -669,21 +694,13 @@ describe("safe_outputs_handlers", () => {
       expect(() => handlers.uploadAssetHandler(args)).toThrow("File path must be within workspace directory");
     });
 
-    it("should allow files in /tmp directory", () => {
+    it("should allow /tmp paths through root validation", () => {
       process.env.GH_AW_ASSETS_BRANCH = "test-branch";
-
-      const testFile = `/tmp/test-upload-${Date.now()}.png`;
-      fs.writeFileSync(testFile, "test content");
-
-      try {
-        const args = { path: testFile };
-        const result = handlers.uploadAssetHandler(args);
-
-        expect(mockAppendSafeOutput).toHaveBeenCalled();
-        expect(result.content[0].type).toBe("text");
-      } finally {
-        fs.unlinkSync(testFile);
-      }
+      const args = { path: `/tmp/nonexistent-upload-${crypto.randomUUID()}.png` };
+      // The macOS Linux simulation sees the host's /tmp symlink and rejects
+      // it at the guard, after the lexical allowed-root check has succeeded.
+      expect(() => handlers.uploadAssetHandler(args)).toThrow(/^ERR_SYSTEM: File not found|^ERR_VALIDATION: Asset symlinks are not allowed/);
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
     });
 
     it.each(["file", "dangling", "parent", "hardlink", "directory"])("rejects %s sources without staging sentinel content", kind => {
@@ -700,7 +717,7 @@ describe("safe_outputs_handlers", () => {
       } else if (kind === "hardlink") fs.linkSync(sentinel, source);
       else fs.mkdirSync(source);
 
-      expect(() => handlers.uploadAssetHandler({ path: requestedPath })).toThrow(/symlinks are not allowed|isolated regular file/);
+      expect(() => handlers.uploadAssetHandler({ path: requestedPath })).toThrow(expect.objectContaining({ code: "ERR_VALIDATION", message: expect.stringMatching(/^ERR_VALIDATION:/) }));
       expect(mockAppendSafeOutput).not.toHaveBeenCalled();
       expect(fs.existsSync(path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets"))).toBe(false);
       expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
@@ -729,6 +746,7 @@ describe("safe_outputs_handlers", () => {
       }
 
       expect(() => handlers.uploadAssetHandler({ path: source })).toThrow(/symlinks are not allowed|EEXIST/);
+      if (kind === "parent") expect(() => handlers.uploadAssetHandler({ path: source })).toThrow(expect.objectContaining({ code: "ERR_VALIDATION", message: expect.stringMatching(/^ERR_VALIDATION:/) }));
       expect(mockAppendSafeOutput).not.toHaveBeenCalled();
       expect(fs.readFileSync(sentinel, "utf8")).toBe("unchanged sentinel");
     });
@@ -826,7 +844,27 @@ describe("safe_outputs_handlers", () => {
 
       const args = { path: testFile };
 
-      expect(() => handlers.uploadAssetHandler(args)).toThrow("exceeds maximum allowed size");
+      expect(() => handlers.uploadAssetHandler(args)).toThrow(expect.objectContaining({ code: "ERR_VALIDATION", message: expect.stringMatching(/^ERR_VALIDATION:.*exceeds maximum allowed size/) }));
+    });
+
+    it.each(["read", "write"])("retains true %s I/O errors as ERR_SYSTEM", operation => {
+      process.env.GH_AW_ASSETS_BRANCH = "test-branch";
+      const source = path.join(testWorkspaceDir, "chart.png");
+      fs.writeFileSync(source, "safe");
+      vi.spyOn(fs, operation === "read" ? "readSync" : "writeFileSync").mockImplementation(() => {
+        throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+      });
+      expect(() => handlers.uploadAssetHandler({ path: source })).toThrow(/^ERR_SYSTEM:.*permission denied/);
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["darwin", "win32"])("preserves unsupported %s platform validation errors", platform => {
+      process.env.GH_AW_ASSETS_BRANCH = "test-branch";
+      const source = path.join(testWorkspaceDir, "chart.png");
+      fs.writeFileSync(source, "safe");
+      vi.stubGlobal("process", new Proxy(process, { get: (target, key) => (key === "platform" ? platform : Reflect.get(target, key)) }));
+      expect(() => handlers.uploadAssetHandler({ path: source })).toThrow(expect.objectContaining({ code: "ERR_VALIDATION", message: expect.stringMatching(/^ERR_VALIDATION:.*requires Linux/) }));
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
     });
   });
 

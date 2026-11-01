@@ -22,6 +22,7 @@ describe("upload_assets.cjs", () => {
   let mockExec;
   let tempBase;
   let cwdArtifacts;
+  let restoreDescriptorPaths;
 
   const getAssetsDir = () => path.join(tempBase, "safeoutputs", "assets");
 
@@ -55,6 +56,45 @@ describe("upload_assets.cjs", () => {
 
   const isGitCommand = (command, args, subcommand) => command === "git" && Array.isArray(args) && args[0] === subcommand;
 
+  // Publisher tests use real files, but do not exercise ancestor renames. On
+  // non-Linux hosts emulate only descriptor paths; production stays fail-closed.
+  const simulateDescriptorPaths = () => {
+    if (process.platform === "linux") return () => {};
+    const platform = Object.getOwnPropertyDescriptor(process, "platform");
+    const openedPaths = new Map();
+    const resolve = filename => {
+      if (typeof filename !== "string") return filename;
+      const match = /^\/proc\/self\/fd\/(\d+)(?:\/(.*))?$/.exec(filename);
+      if (!match) return filename;
+      const directory = openedPaths.get(Number(match[1]));
+      if (!directory) throw new Error(`Unknown descriptor path: ${filename}`);
+      return path.join(directory, match[2] || "");
+    };
+    const originalOpen = fs.openSync;
+    const originalClose = fs.closeSync;
+    const originalLstat = fs.lstatSync;
+    const originalMkdir = fs.mkdirSync;
+    const spies = [
+      vi.spyOn(fs, "openSync").mockImplementation((filename, ...args) => {
+        const resolved = resolve(filename);
+        const fd = originalOpen(resolved, ...args);
+        openedPaths.set(fd, resolved);
+        return fd;
+      }),
+      vi.spyOn(fs, "closeSync").mockImplementation(fd => {
+        openedPaths.delete(fd);
+        return originalClose(fd);
+      }),
+      vi.spyOn(fs, "lstatSync").mockImplementation((filename, ...args) => originalLstat(resolve(filename), ...args)),
+      vi.spyOn(fs, "mkdirSync").mockImplementation((filename, ...args) => originalMkdir(resolve(filename), ...args)),
+    ];
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    return () => {
+      for (const spy of spies) spy.mockRestore();
+      Object.defineProperty(process, "platform", platform);
+    };
+  };
+
   /** Configures mockExec so that rev-parse throws (branch missing) and all else succeeds. */
   const mockBranchMissing = onExec => {
     mockExec.exec.mockImplementation(async (command, args) => {
@@ -73,9 +113,11 @@ describe("upload_assets.cjs", () => {
     delete process.env.GITHUB_SERVER_URL;
     delete process.env.GITHUB_REPOSITORY;
 
-    tempBase = fs.mkdtempSync(path.join("/tmp", "test-gh-aw-"));
+    tempBase = path.join(process.cwd(), `.test-upload-assets-${crypto.randomUUID()}`);
+    fs.mkdirSync(tempBase);
     cwdArtifacts = new Set();
     process.env.GH_AW_ASSETS_DIR = getAssetsDir();
+    restoreDescriptorPaths = simulateDescriptorPaths();
 
     uploadAssetsScript = fs.readFileSync(path.join(__dirname, "upload_assets.cjs"), "utf8");
     mockExec = {
@@ -85,6 +127,7 @@ describe("upload_assets.cjs", () => {
   });
 
   afterEach(() => {
+    restoreDescriptorPaths?.();
     if (tempBase && fs.existsSync(tempBase)) {
       fs.rmSync(tempBase, { recursive: true, force: true });
     }
@@ -164,11 +207,86 @@ describe("upload_assets.cjs", () => {
       fs.symlinkSync(sentinel, target);
       setAgentOutput({ items: [{ type: "upload_asset", fileName: "chart.png", sha, size, targetFileName: path.basename(target) }] });
 
-      await executeScript();
+      await expect(executeScript()).resolves.toBeUndefined();
 
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("symlinks are not allowed"));
+      expect(mockCore.setFailed).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(`Failed to verify existing asset ${path.basename(target)}:`));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Asset symlinks are not allowed"));
       expect(fs.readFileSync(sentinel, "utf8")).toBe("unchanged sentinel");
       expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
+    it.each(["longer existing content", "short", "changed chart!"])("fails the whole publication for mismatched existing bytes: %s", async existingContent => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const assets = getAssetsDir();
+      fs.mkdirSync(assets, { recursive: true });
+      const { sha } = makeAsset(assets, "chart.png", "verified chart");
+      const target = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      fs.writeFileSync(target, existingContent);
+      const { sha: firstSha } = makeAsset(assets, "first.png", "first chart");
+      const firstTarget = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      setAgentOutput({
+        items: [
+          { type: "upload_asset", fileName: "first.png", sha: firstSha, targetFileName: path.basename(firstTarget) },
+          { type: "upload_asset", fileName: "chart.png", sha, targetFileName: path.basename(target) },
+        ],
+      });
+
+      await expect(executeScript()).resolves.toBeUndefined();
+
+      expect(mockCore.setFailed).toHaveBeenCalledOnce();
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining(path.basename(target)));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining(existingContent.length > "verified chart".length ? "Failed to verify existing asset" : "Existing asset content differs from staged content"));
+      if (existingContent.length > "verified chart".length) {
+        expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Asset exceeds maximum allowed size"));
+      }
+      expect(fs.readFileSync(target, "utf8")).toBe(existingContent);
+      expect(fs.readFileSync(firstTarget, "utf8")).toBe("first chart");
+      expect(mockExec.exec.mock.calls.some(([command, args]) => isGitCommand(command, args, "commit"))).toBe(false);
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalled();
+      expect(mockCore.summary.write).not.toHaveBeenCalled();
+    });
+
+    it("skips an existing asset only when its bytes match", async () => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const assets = getAssetsDir();
+      fs.mkdirSync(assets, { recursive: true });
+      const { sha } = makeAsset(assets, "chart.png", "verified chart");
+      const target = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      fs.writeFileSync(target, "verified chart");
+      setAgentOutput({ items: [{ type: "upload_asset", fileName: "chart.png", sha, targetFileName: path.basename(target) }] });
+
+      await executeScript();
+
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("upload_count", "0");
+      expect(mockCore.info).toHaveBeenCalledWith(`Asset ${path.basename(target)} already exists, skipping`);
+      expect(mockExec.exec.mock.calls.some(([command, args]) => isGitCommand(command, args, "add") || isGitCommand(command, args, "commit"))).toBe(false);
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
+    it("classifies existing asset I/O failures as ERR_SYSTEM with destination context", async () => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const assets = getAssetsDir();
+      fs.mkdirSync(assets, { recursive: true });
+      const { sha } = makeAsset(assets, "chart.png", "verified chart");
+      const target = trackCwdArtifact(`${crypto.randomUUID()}.png`);
+      fs.writeFileSync(target, "verified chart");
+      setAgentOutput({ items: [{ type: "upload_asset", fileName: "chart.png", sha, targetFileName: path.basename(target) }] });
+      const originalRead = fs.readSync;
+      let reads = 0;
+      const spy = vi.spyOn(fs, "readSync").mockImplementation((...args) => {
+        if (++reads === 2) throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+        return originalRead(...args);
+      });
+      try {
+        await expect(executeScript()).resolves.toBeUndefined();
+      } finally {
+        spy.mockRestore();
+      }
+      expect(mockCore.setFailed).toHaveBeenCalledExactlyOnceWith(`ERR_SYSTEM: Failed to verify existing asset ${path.basename(target)}: permission denied`);
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalled();
     });
   });
 
@@ -537,7 +655,8 @@ describe("upload_assets.cjs", () => {
     it("should read assets from the GH_AW_ASSETS_DIR directory", async () => {
       process.env.GH_AW_ASSETS_BRANCH = "assets/test-workflow";
       process.env.GH_AW_SAFE_OUTPUTS_STAGED = "false";
-      const customAssetsDir = fs.mkdtempSync(path.join("/tmp", "test-gh-aw-assets-"));
+      const customAssetsDir = path.join(tempBase, "custom-assets");
+      fs.mkdirSync(customAssetsDir);
       process.env.GH_AW_ASSETS_DIR = customAssetsDir;
       const { sha, size } = makeAsset(customAssetsDir, "chart.png", "chart content");
       const targetFile = "chart-uploaded.png";

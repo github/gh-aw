@@ -15,6 +15,12 @@
 
 const fs = require("fs");
 const path = require("path");
+const { ERR_VALIDATION } = require("./error_codes.cjs");
+
+/** @param {string} message */
+function assetValidationError(message) {
+  return Object.assign(new Error(`${ERR_VALIDATION}: ${message}`), { code: ERR_VALIDATION });
+}
 
 /**
  * Calls `fs.lstatSync(filePath)` and returns the Stats object unless the path
@@ -53,8 +59,9 @@ function normalizeGuardedPath(filename) {
 /**
  * Pin each directory while walking, rejecting links before opening children.
  * Linux uses descriptor-relative paths so a renamed/replaced ancestor cannot
- * redirect the next open. Other platforms additionally revalidate directory
- * identities around the operation.
+ * redirect the next open. Fail closed elsewhere: absolute-path revalidation
+ * cannot detect an ancestor swapped and restored during the operation, and
+ * POSIX no-follow flags do not provide Windows junction protection.
  * @template T
  * @param {string} directory
  * @param {boolean} create
@@ -62,8 +69,11 @@ function normalizeGuardedPath(filename) {
  * @returns {T}
  */
 function withGuardedDirectory(directory, create, operation) {
+  if (process.platform !== "linux") {
+    throw assetValidationError("Guarded asset access requires Linux descriptor-relative paths; macOS and Windows are unsupported");
+  }
   if (fs.constants.O_NOFOLLOW === undefined || fs.constants.O_DIRECTORY === undefined) {
-    throw new Error("Cannot safely access assets: no-follow directory opens are unavailable");
+    throw assetValidationError("Cannot safely access assets: no-follow directory opens are unavailable");
   }
   const absolute = normalizeGuardedPath(directory);
   const root = path.parse(absolute).root;
@@ -74,7 +84,7 @@ function withGuardedDirectory(directory, create, operation) {
     for (const component of [root, ...absolute.slice(root.length).split(path.sep).filter(Boolean)]) {
       if (component !== root) {
         const parent = directories[directories.length - 1];
-        current = process.platform === "linux" ? `/proc/self/fd/${parent.fd}/${component}` : path.join(current, component);
+        current = `/proc/self/fd/${parent.fd}/${component}`;
       }
       let stat;
       try {
@@ -88,24 +98,29 @@ function withGuardedDirectory(directory, create, operation) {
         }
         stat = lstatGuard(current);
       }
-      if (!stat) throw new Error("Asset symlinks are not allowed, including parent directories");
-      if (!stat.isDirectory()) throw new Error("Asset parent must be a directory");
+      if (!stat) throw assetValidationError("Asset symlinks are not allowed, including parent directories");
+      if (!stat.isDirectory()) throw assetValidationError("Asset parent must be a directory");
       const fd = fs.openSync(current, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_DIRECTORY);
       directories.push({ fd, filename: current, stat });
       const opened = fs.fstatSync(fd);
-      if (opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("Asset directory changed while opening");
+      if (opened.dev !== stat.dev || opened.ino !== stat.ino) throw assetValidationError("Asset directory changed while opening");
     }
     const verify = () => {
       for (const directory of directories) {
         const stat = lstatGuard(directory.filename);
-        if (!stat || stat.dev !== directory.stat.dev || stat.ino !== directory.stat.ino) throw new Error("Asset directory changed during access");
+        if (!stat || stat.dev !== directory.stat.dev || stat.ino !== directory.stat.ino) throw assetValidationError("Asset directory changed during access");
       }
     };
     verify();
     const final = directories[directories.length - 1];
-    const result = operation(process.platform === "linux" ? `/proc/self/fd/${final.fd}` : absolute);
+    const result = operation(`/proc/self/fd/${final.fd}`);
     verify();
     return result;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && (error.code === "ELOOP" || error.code === "ENOTDIR")) {
+      throw assetValidationError("Asset symlinks or non-directory parents are not allowed");
+    }
+    throw error;
   } finally {
     for (const directory of directories.reverse()) fs.closeSync(directory.fd);
   }
@@ -118,28 +133,28 @@ function withGuardedDirectory(directory, create, operation) {
  * @returns {Buffer}
  */
 function readGuardedFile(filename, maximumBytes = 10 * 1024 * 1024) {
-  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw new Error("Invalid asset maximum size");
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw assetValidationError("Invalid asset maximum size");
   return withGuardedDirectory(path.dirname(filename), false, directory => {
     const source = path.join(directory, path.basename(filename));
     const expected = lstatGuard(source);
-    if (!expected) throw new Error("Asset symlinks are not allowed");
-    if (!expected.isFile() || expected.nlink !== 1) throw new Error("Asset must be an isolated regular file");
+    if (!expected) throw assetValidationError("Asset symlinks are not allowed");
+    if (!expected.isFile() || expected.nlink !== 1) throw assetValidationError("Asset must be an isolated regular file");
     const fd = fs.openSync(source, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
     try {
       const opened = fs.fstatSync(fd);
-      if (!opened.isFile() || opened.nlink !== 1 || opened.dev !== expected.dev || opened.ino !== expected.ino) throw new Error("Asset file changed while opening");
+      if (!opened.isFile() || opened.nlink !== 1 || opened.dev !== expected.dev || opened.ino !== expected.ino) throw assetValidationError("Asset file changed while opening");
       const current = lstatGuard(source);
-      if (!current || current.dev !== opened.dev || current.ino !== opened.ino) throw new Error("Asset file changed while opening");
-      if (opened.size > maximumBytes) throw new Error(`Asset exceeds maximum allowed size ${maximumBytes / 1024} KB`);
+      if (!current || current.dev !== opened.dev || current.ino !== opened.ino) throw assetValidationError("Asset file changed while opening");
+      if (opened.size > maximumBytes) throw assetValidationError(`Asset exceeds maximum allowed size ${maximumBytes / 1024} KB`);
       const content = Buffer.alloc(opened.size);
       let offset = 0;
       while (offset < content.length) {
         const count = fs.readSync(fd, content, offset, content.length - offset, offset);
-        if (!count) throw new Error("Asset file changed while reading");
+        if (!count) throw assetValidationError("Asset file changed while reading");
         offset += count;
       }
       const after = fs.fstatSync(fd);
-      if (after.nlink !== 1 || after.size !== opened.size || after.mtimeMs !== opened.mtimeMs || after.ctimeMs !== opened.ctimeMs) throw new Error("Asset file changed while reading");
+      if (after.nlink !== 1 || after.size !== opened.size || after.mtimeMs !== opened.mtimeMs || after.ctimeMs !== opened.ctimeMs) throw assetValidationError("Asset file changed while reading");
       return content;
     } finally {
       fs.closeSync(fd);
