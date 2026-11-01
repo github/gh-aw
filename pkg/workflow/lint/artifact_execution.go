@@ -208,15 +208,14 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 		return ""
 	}
 	command := argument(0)
-	operand := func(start int) string {
+	hasOperand := func(start int) bool {
 		for index := start; index < len(call.Args); index++ {
 			value := argument(index)
-			if value == "" || strings.HasPrefix(value, "-") {
-				continue
+			if value == "" || !strings.HasPrefix(value, "-") {
+				return true
 			}
-			return value
 		}
-		return ""
+		return false
 	}
 	switch command {
 	case "bash", "sh", "python", "python3", "node", "source", ".":
@@ -227,7 +226,7 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 		if len(call.Args) > 1 {
 			switch argument(1) {
 			case "run", "run-script":
-				if script := operand(2); script != "" {
+				if hasOperand(2) {
 					return []string{directory}
 				}
 			case "ci", "install", "i", "test", "start", "exec", "rebuild":
@@ -235,7 +234,7 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 			}
 		}
 	case "npx", "make":
-		if len(call.Args) == 1 || operand(1) != "" {
+		if len(call.Args) == 1 || hasOperand(1) {
 			return []string{directory}
 		}
 	default:
