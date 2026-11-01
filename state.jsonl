@@ -1,1 +1,1 @@
-{"run_id":"41255610296","timestamp":"2026-11-01T00:11:38.890Z","harness_version":"74eeb48d2038a4e7ce9550248b27283d32f276fcf116bf4cfaf3d43e89419838:31ab401e5b7ee4f5eb709116a6c78289f7e52bcd112a17e03ebaff87d069883a","assignments":{"model_size":"claude-sonnet-5"}}
+{"run_id":"41258056120","timestamp":"2026-11-01T00:45:34.679Z","harness_version":"74eeb48d2038a4e7ce9550248b27283d32f276fcf116bf4cfaf3d43e89419838:31ab401e5b7ee4f5eb709116a6c78289f7e52bcd112a17e03ebaff87d069883a","assignments":{"model_size":"claude-haiku-4.5"}}
