@@ -388,7 +388,7 @@ func (state *Projection) installReplayPool(operation Operation, commit QueueComm
 		return err
 	}
 	policy := *state.Policy
-	policy.Pools = make(map[string]PoolPolicy, len(state.Policy.Pools)+1)
+	policy.Pools = make(map[string]PoolPolicy, len(state.Policy.Pools))
 	maps.Copy(policy.Pools, state.Policy.Pools)
 	policy.Pools[install.Pool] = install.Config
 	if err := validatePolicyWithHost(policy, state.resourceHost); err != nil {

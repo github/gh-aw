@@ -3,12 +3,108 @@
 package parser
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestResolveIncludePathMissingSecurityBase(t *testing.T) {
+	for _, folder := range []string{".github", ".agents"} {
+		t.Run(folder, func(t *testing.T) {
+			repo := t.TempDir()
+			workflows := filepath.Join(repo, ".github", "workflows")
+			if folder == ".agents" {
+				require.NoError(t, os.MkdirAll(workflows, 0755))
+			}
+			path := "missing.md"
+			expectedPath := filepath.Join(workflows, path)
+			if folder == ".agents" {
+				path = "/.agents/missing.md"
+				expectedPath = filepath.Join(repo, folder, "missing.md")
+			}
+			resolved, err := ResolveIncludePath(path, workflows, nil)
+			require.Empty(t, resolved)
+			require.ErrorContains(t, err, "file not found: "+expectedPath)
+			require.ErrorIs(t, err, fs.ErrNotExist)
+		})
+	}
+}
+
+func TestResolveIncludePathRelativeBaseAbsoluteSymlink(t *testing.T) {
+	base, _ := setupLocalIncludeSymlinks(t, ".github")
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	workflows, err := filepath.Rel(cwd, filepath.Join(base, "workflows"))
+	require.NoError(t, err)
+	resolved, err := ResolveIncludePath("absolute.md", workflows, nil)
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(workflows, "absolute.md"), resolved)
+	content, err := ReadFile(resolved)
+	require.NoError(t, err)
+	require.Equal(t, "safe", string(content))
+}
+
+func TestLocalIncludeReadRetainsFallbackBase(t *testing.T) {
+	for _, parentLink := range []bool{false, true} {
+		t.Run(map[bool]string{false: "file", true: "parent"}[parentLink], func(t *testing.T) {
+			base := t.TempDir()
+			outside := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(base, "shared"), 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(base, "shared", "safe.md"), []byte("safe"), 0644))
+			require.NoError(t, os.WriteFile(filepath.Join(outside, "safe.md"), []byte("secret"), 0644))
+			path, link, target := "included.md", filepath.Join(base, "included.md"), "shared/safe.md"
+			if parentLink {
+				path, link, target = "parent/safe.md", filepath.Join(base, "parent"), "shared"
+			}
+			require.NoError(t, os.Symlink(target, link))
+			resolved, err := ResolveIncludePath(path, base, nil)
+			require.NoError(t, err)
+			content, err := ReadFile(resolved)
+			require.NoError(t, err)
+			require.Equal(t, "safe", string(content))
+			require.NoError(t, os.Remove(link))
+			target = filepath.Join(outside, "safe.md")
+			if parentLink {
+				target = outside
+			}
+			require.NoError(t, os.Symlink(target, link))
+			content, err = ReadFile(resolved)
+			require.Empty(t, content)
+			require.ErrorContains(t, err, "escapes base directory")
+		})
+	}
+}
+
+func TestLocalIncludeReadRetainsOuterBaseForNestedNamedFolder(t *testing.T) {
+	for _, folder := range []string{".github", ".agents"} {
+		t.Run(folder, func(t *testing.T) {
+			base := filepath.Join(t.TempDir(), ".github")
+			bundle := filepath.Join(base, "bundle")
+			nested := filepath.Join(bundle, folder)
+			outside := t.TempDir()
+			require.NoError(t, os.MkdirAll(nested, 0755))
+			require.NoError(t, os.Mkdir(filepath.Join(outside, folder), 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(nested, "secret.md"), []byte("safe"), 0644))
+			require.NoError(t, os.WriteFile(filepath.Join(outside, folder, "secret.md"), []byte("secret"), 0644))
+			resolved, err := ResolveIncludePath("./bundle/"+folder+"/secret.md", base, nil)
+			require.NoError(t, err)
+			content, err := ReadFile(resolved)
+			require.NoError(t, err)
+			require.Equal(t, "safe", string(content))
+			// A second resolver must not discard the outer caller's boundary.
+			_, err = ResolveIncludePath("secret.md", nested, nil)
+			require.NoError(t, err)
+			require.NoError(t, os.Rename(bundle, bundle+"-original"))
+			require.NoError(t, os.Symlink(outside, bundle))
+			content, err = ReadFile(resolved)
+			require.Empty(t, content)
+			require.ErrorContains(t, err, "escapes base directory")
+		})
+	}
+}
 
 func setupLocalIncludeSymlinks(t *testing.T, folder string) (string, string) {
 	t.Helper()

@@ -69,6 +69,8 @@ The `gh aw logs` and `gh aw audit` commands support `--artifacts` to download on
 | `evals` | `usage` | BinEval evaluation results (only present when `evals` are declared) |
 | `graders` | `usage`, `graders`, legacy agent artifacts | Default built-ins and optional combined custom results |
 | `github-api` | `activation`, `agent` | GitHub API rate limit logs |
+| `outcomes` | `safe-outputs-items`, `agent-output-fallback` | Executed safe-output manifests and compact agent output for recovering references omitted from handler results |
+| `work-queue` | `activation`, `agent` | Queue snapshots, finish intents, and workflow logs for coordinator operation reporting |
 
 ```bash
 # Download agent and firewall artifacts only

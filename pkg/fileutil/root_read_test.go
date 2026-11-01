@@ -81,15 +81,27 @@ func TestReadFileWithinBaseConcurrentParentReplacement(t *testing.T) {
 		done <- replaceReadParentRepeatedly(dir, parked, outside)
 	}()
 	var readErr error
+	successfulReads := 0
 	for range 200 {
 		content, err := ReadFileWithinBase(base, filepath.Join(dir, "safe.md"))
-		if err == nil && string(content) != "safe" {
-			readErr = fmt.Errorf("read content outside base: %q", content)
-			break
+		if err == nil {
+			successfulReads++
+			if string(content) != "safe" {
+				readErr = fmt.Errorf("read content outside base: %q", content)
+				break
+			}
 		}
 	}
 	require.NoError(t, <-done)
 	require.NoError(t, readErr)
+	// The scheduler may allow only rejected reads during replacement.
+	if successfulReads == 0 {
+		content, err := ReadFileWithinBase(base, filepath.Join(dir, "safe.md"))
+		require.NoError(t, err)
+		require.Equal(t, "safe", string(content))
+		successfulReads++
+	}
+	require.Positive(t, successfulReads)
 }
 
 func replaceReadParentRepeatedly(dir, parked, outside string) error {
@@ -132,13 +144,25 @@ func TestReadFileWithinBaseConcurrentBaseReplacement(t *testing.T) {
 		done <- replaceReadParentRepeatedly(base, filepath.Join(parent, "parked"), outside)
 	}()
 	var readErr error
+	successfulReads := 0
 	for range 200 {
 		content, err := ReadFileWithinBase(base, filepath.Join(base, "safe.md"))
-		if err == nil && string(content) != "safe" {
-			readErr = fmt.Errorf("read content from replaced base: %q", content)
-			break
+		if err == nil {
+			successfulReads++
+			if string(content) != "safe" {
+				readErr = fmt.Errorf("read content from replaced base: %q", content)
+				break
+			}
 		}
 	}
 	require.NoError(t, <-done)
 	require.NoError(t, readErr)
+	// The scheduler may allow only rejected reads during replacement.
+	if successfulReads == 0 {
+		content, err := ReadFileWithinBase(base, filepath.Join(base, "safe.md"))
+		require.NoError(t, err)
+		require.Equal(t, "safe", string(content))
+		successfulReads++
+	}
+	require.Positive(t, successfulReads)
 }

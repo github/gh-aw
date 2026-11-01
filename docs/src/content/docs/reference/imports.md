@@ -82,7 +82,7 @@ Use `{{#runtime-import? filepath}}` to silently skip a missing file instead of f
 {{#runtime-import? .github/shared/optional.md}}    # optional — skipped if missing
 ```
 
-Paths are resolved within the `.github` folder. You can specify paths with or without the `.github/` prefix — both `.github/shared/editorial.md` and `shared/editorial.md` refer to the same file. Local compile-time imports may follow symlinks only when the target remains within the allowed folder (`.github`, or `.agents` for `/.agents/` imports). The allowed folder itself must not be a symlink. Dangling symlinks and symlinked parent directories that escape that folder are rejected. File reads remain confined to the allowed folder if symlinks change after path validation. See [Runtime Imports](/gh-aw/reference/templating/#runtime-imports) for URLs, line ranges, and security details.
+Paths are resolved within the `.github` folder. You can specify paths with or without the `.github/` prefix — both `.github/shared/editorial.md` and `shared/editorial.md` refer to the same file. Local compile-time imports may follow symlinks only when the target remains within the allowed folder (`.github`, or `.agents` for `/.agents/` imports). The allowed folder itself must not be a symlink. Dangling symlinks and symlinked parent directories that escape that folder are rejected. File reads retain the allowed folder selected during resolution, including with `inlined-imports: true`, and remain confined to it if symlinks change after path validation. Nested folders named `.github` or `.agents` do not change that boundary. See [Runtime Imports](/gh-aw/reference/templating/#runtime-imports) for URLs, line ranges, and security details.
 
 ## Shared Workflow Components
 

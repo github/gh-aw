@@ -60,9 +60,20 @@ func resolveAndValidateLocalIncludePath(filePath, resolveBase, securityBase stri
 	}
 
 	if err := validateIncludeSecurityBase(normalizedSecurityBase); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("file not found: %s: %w", fullPath, err)
+		}
 		return "", err
 	}
-	if err := fileutil.ValidatePathWithinBase(normalizedSecurityBase, normalizedFullPath); err != nil {
+	absoluteSecurityBase, err := filepath.Abs(normalizedSecurityBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute include base %s: %w", normalizedSecurityBase, err)
+	}
+	absoluteFullPath, err := filepath.Abs(normalizedFullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute local include %s: %w", normalizedFullPath, err)
+	}
+	if err := fileutil.ValidatePathWithinBase(absoluteSecurityBase, absoluteFullPath); err != nil {
 		return "", fmt.Errorf("security: path %s must be within %s folder: %w", filePath, filepath.Base(normalizedSecurityBase), err)
 	}
 	// Strict resolution rejects dangling links and other resolution failures;
@@ -73,6 +84,7 @@ func resolveAndValidateLocalIncludePath(filePath, resolveBase, securityBase stri
 		}
 		return "", fmt.Errorf("failed to resolve local include %s: %w", fullPath, err)
 	}
+	registerLocalIncludeReadBase(absoluteFullPath, absoluteSecurityBase)
 	remoteLog.Printf("Resolved to local file: %s", fullPath)
 	return fullPath, nil
 }

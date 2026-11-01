@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -233,7 +232,7 @@ func (c *Compiler) processOrderedPromptImports(data *WorkflowData) (userPromptCh
 		}
 		importPath := filepath.ToSlash(entry.ImportPath)
 		if workspaceRoot != "" {
-			rawContent, err := os.ReadFile(filepath.Join(workspaceRoot, importPath))
+			rawContent, err := parser.ReadFile(filepath.Join(workspaceRoot, importPath))
 			if err != nil {
 				compilerYamlPromptLog.Printf("Warning: failed to read import file %s (%v), falling back to runtime-import", importPath, err)
 				userPromptChunks = append(userPromptChunks, fmt.Sprintf("{{#runtime-import %s}}", importPath))
@@ -282,7 +281,7 @@ func (c *Compiler) processLegacyPromptImports(data *WorkflowData) (userPromptChu
 		workspaceRoot := resolveWorkspaceRoot(c.markdownPath)
 		for _, importPath := range data.ImportPaths {
 			importPath = filepath.ToSlash(importPath)
-			rawContent, err := os.ReadFile(filepath.Join(workspaceRoot, importPath))
+			rawContent, err := parser.ReadFile(filepath.Join(workspaceRoot, importPath))
 			if err != nil {
 				// Fall back to runtime-import macro if file cannot be read
 				compilerYamlPromptLog.Printf("Warning: failed to read import file %s (%v), falling back to runtime-import", importPath, err)
@@ -425,7 +424,7 @@ func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceR
 		if !runtimeImportAnalysisRealPathAllowed(candidate, workspaceRoot) {
 			continue
 		}
-		rawContent, err := os.ReadFile(candidate)
+		rawContent, err := parser.ReadFile(candidate)
 		if err != nil {
 			continue
 		}

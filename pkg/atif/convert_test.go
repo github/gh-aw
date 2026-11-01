@@ -16,6 +16,57 @@ import (
 
 const header = `{"type":"session.format","data":{"version":1},"provenance":{"component":"collector"}}` + "\n"
 
+func TestReconcileMetricsMapGrowth(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		previous map[string]json.RawMessage
+		incoming map[string]json.RawMessage
+		want     map[string]json.RawMessage
+	}{
+		{name: "nil snapshots", want: map[string]json.RawMessage{}},
+		{
+			name:     "first snapshot",
+			incoming: map[string]json.RawMessage{"turns": json.RawMessage("2")},
+			want:     map[string]json.RawMessage{"turns": json.RawMessage("2")},
+		},
+		{
+			name:     "previous snapshot only",
+			previous: map[string]json.RawMessage{"turns": json.RawMessage("1")},
+			want:     map[string]json.RawMessage{"turns": json.RawMessage("1")},
+		},
+		{
+			name:     "disjoint snapshots",
+			previous: map[string]json.RawMessage{"turns": json.RawMessage("1")},
+			incoming: map[string]json.RawMessage{"diagnostics": json.RawMessage("2")},
+			want: map[string]json.RawMessage{
+				"turns": json.RawMessage("1"), "diagnostics": json.RawMessage("2"),
+			},
+		},
+		{
+			name:     "overlapping snapshots",
+			previous: map[string]json.RawMessage{"turns": json.RawMessage("1")},
+			incoming: map[string]json.RawMessage{"turns": json.RawMessage("2")},
+			want:     map[string]json.RawMessage{"turns": json.RawMessage("2")},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			previous, err := json.Marshal(tc.previous)
+			require.NoError(t, err)
+			incoming, err := json.Marshal(tc.incoming)
+			require.NoError(t, err)
+			merged, err := reconcileMetrics(tc.previous, tc.incoming)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, merged)
+			afterPrevious, err := json.Marshal(tc.previous)
+			require.NoError(t, err)
+			afterIncoming, err := json.Marshal(tc.incoming)
+			require.NoError(t, err)
+			require.Equal(t, previous, afterPrevious)
+			require.Equal(t, incoming, afterIncoming)
+		})
+	}
+}
+
 func convert(t *testing.T, events string) *Trajectory {
 	t.Helper()
 	trajectory, err := Convert(t.Context(), strings.NewReader(header+events))
