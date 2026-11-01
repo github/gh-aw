@@ -80,8 +80,20 @@
       "avg_comments": 13.25,
       "success_rate": 0.625,
       "note": "primary analysis window (2026-10-30T00:00:00Z..2026-10-31T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=8, 1 still open at collection time (#73299 WIP, created 20:50:44Z, open >20h, stopped at user time-limit per PR body); agent_prs_merged_from_created=5 (#73262, #73261, #73258, #73224, #73078), closed_prs=2 (#73271, #73256, both with substantive bodies, no WIP placeholders); agent_success_rate=62.5%, up from 10-29's 40.9% (+21.6pp, +52.8% relative, significant - consistent with the 10-29 note that its rate was understated by 11 then-open PRs, several of which (#73052, #73034, #72970, #72969, #72968, #72941, #72938, #72932) are now confirmed merged in today's live search); avg_duration created->merged over 5 merged PRs=287.43min, down vs 10-29 (398.1->287.43, -27.8%, significant improvement in speed); agent_prs_merged (event-scoped)=14, independently verified via live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged: date range), cross-checked against 31 all-author merged PRs in the same window (14<=31, consistent); avg_comments=13.25 is total issue-comment count per PR via pull_request_read get (not filtered to humans) across all 8 cohort PRs - get_review_comments was blocked by an integrity-policy filter on all 8 PRs this run, so review-thread comments are not included and this figure is not directly comparable to 10-29's human-filtered avg_comments=1.0 (different methodology, not a true trend)"
+    },
+    {
+      "date": "2026-10-31",
+      "agent_prs_total": 17,
+      "agent_prs_merged": 15,
+      "agent_prs_merged_from_created": 16,
+      "closed_prs": 1,
+      "open_prs": 0,
+      "avg_agent_duration_minutes": 155.43,
+      "avg_comments": 0.82,
+      "success_rate": 0.9412,
+      "note": "true UTC calendar-day window (2026-10-31T00:00:00Z..2026-11-01T00:00:00Z); creation cohort from 30-day pre-fetched dataset, author app/copilot-swe-agent only; agent_prs_total=17, all resolved (0 open); agent_prs_merged_from_created=16, closed_prs=1 (#73536, substantive body, no WIP placeholder); agent_success_rate=94.1%, up sharply from 10-30's 62.5% (+31.6pp, +50.6% relative, significant - largely resolution of PRs that were still open at 10-30 collection time); avg_duration created->merged over 16 merged PRs=155.43min, down vs 10-30 (287.43->155.43, -45.9%, significant improvement in speed); agent_prs_merged (event-scoped, mergedAt in window)=15 from local 30-day dataset (one PR, #73556, created late in-window but merged just after window_end, excluded); cross-checked against live paginated GitHub search (is:merged, author:app/copilot-swe-agent, merged in window) which returned only 13 due to search-index lag (#73541 and #73534 confirmed merged via dataset/get_comments calls but missing from live search at collection time, same lag pattern as 10-26/10-27/10-29) - treat live search as lower bound, local dataset count (15) used instead; cross-checked against all-author merged_prs in window (~26-27 via live search, one page-2 result integrity-filtered) - 15<=26 consistent; avg_comments=0.82 is unique human comments per PR via pull_request_read get_comments (filtered out github-actions[bot] and the Copilot agent's own replies) across all 17 cohort PRs, all human engagement from one maintainer (pelikhan) giving short follow-up directives - get_review_comments was blocked by an integrity-policy filter on 3 of 5 directly-checked PRs (#73556, #73541, #73534), so review-thread comments are not included and this figure is not directly comparable to total-issue-comment-count days (10-26, 10-30)"
     }
   ],
-  "last_updated": "2026-10-30",
+  "last_updated": "2026-10-31",
   "note": "prior long-form history (2026-07-06..2026-08-26) lives at copilot-agent-metrics/history.json in this branch but that nested path is NOT matched by the configured repo-memory file-glob (flat *.json only) so it can no longer be updated by this workflow; this root-level history.json is now the live file going forward"
 }
