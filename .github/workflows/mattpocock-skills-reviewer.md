@@ -10,6 +10,9 @@ engine:
   id: copilot
   copilot-sdk: true
   max-continuations: 6
+  model-routing:
+    goal: cost
+    mode: economy
 features:
   gh-aw-detection: true
 
@@ -23,7 +26,6 @@ imports:
 - shared/otlp.md
 - shared/pr-diff-data-fetch.md
 max-daily-ai-credits: 10000
-model: claude-sonnet-5
 "on":
   pull_request:
     paths-ignore:
