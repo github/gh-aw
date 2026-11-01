@@ -221,6 +221,8 @@ func (c *Compiler) generateSummarySteps(yaml *strings.Builder, data *WorkflowDat
 // and step-order validation.
 func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, artifactPaths []string, logFileFull string, checkoutMgr *CheckoutManager) error { //nolint:largefunc // Existing post-agent orchestration preserves generated step order.
 	compilerYamlLog.Print("Generating post-agent collection and upload steps")
+	generateEnclaveDiagnosticsCollect(yaml, data)
+
 	// Generate engine output cleanup step so workspace files are removed after collection.
 	// The engine-declared output paths are gathered by collectArtifactPaths below.
 	if len(getEngineArtifactPaths(engine)) > 0 {

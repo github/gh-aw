@@ -490,6 +490,9 @@ jobs:
           GH_HOST: github.com
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
@@ -1654,6 +1657,9 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Install AWF binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

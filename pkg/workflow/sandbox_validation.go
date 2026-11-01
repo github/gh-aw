@@ -85,6 +85,15 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 	}
 
 	sandboxConfig := workflowData.SandboxConfig
+	if err := validateHostGitHubTokenConfig(workflowData); err != nil {
+		return err
+	}
+	if err := validateEnclaveDiagnostics(workflowData); err != nil {
+		return err
+	}
+	if err := validateDefaultDockerEnclaveImagePins(workflowData); err != nil {
+		return err
+	}
 
 	// Check if sandbox.agent: false was specified
 	// This requires the "dangerously-disable-sandbox-agent" feature to be explicitly enabled.
