@@ -16,6 +16,7 @@ const mockCore = {
   warning: vi.fn(),
   setFailed: vi.fn(),
   exportVariable: vi.fn(),
+  setOutput: vi.fn(),
   summary: {
     addDetails: vi.fn().mockReturnThis(),
     write: vi.fn().mockResolvedValue(),
@@ -27,6 +28,12 @@ global.core = mockCore;
 describe("run_evals.cjs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("GH_AW_EVALS_BACKEND", "auto");
+    vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", "");
+    fs.rmSync(`${EVALS_DIR}/decisions.json`, { force: true });
+    fs.rmSync(`${EVALS_DIR}/prompt.txt`, { force: true });
+    fs.rmSync(`${EVALS_DIR}/agent-session.jsonl`, { force: true });
     fs.mkdirSync(EVALS_DIR, { recursive: true });
     if (fs.existsSync(EVALS_LOG_PATH)) {
       fs.unlinkSync(EVALS_LOG_PATH);
@@ -44,6 +51,10 @@ describe("run_evals.cjs", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    fs.rmSync(`${EVALS_DIR}/decisions.json`, { force: true });
+    fs.rmSync(`${EVALS_DIR}/prompt.txt`, { force: true });
+    fs.rmSync(`${EVALS_DIR}/agent-session.jsonl`, { force: true });
     if (fs.existsSync(EVALS_LOG_PATH)) {
       fs.unlinkSync(EVALS_LOG_PATH);
     }
@@ -59,6 +70,156 @@ describe("run_evals.cjs", () => {
     for (const filename of ["prompt.txt", "user.txt", "system.txt"]) {
       fs.rmSync(`/tmp/gh-aw/aw-prompts/${filename}`, { force: true });
     }
+  });
+
+  describe("Decisions backend", () => {
+    const questions = [
+      { id: "builds", question: "Does it compile?" },
+      { id: "tests", question: "Did tests pass?" },
+    ];
+    const successfulFetch = () =>
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          answers: [
+            { type: "predicate", name: "tests", probability: 0.1 },
+            { type: "predicate", name: "builds", probability: 0.9 },
+          ],
+        }),
+      });
+
+    it("automatically batches all binary evals and shares trace/context once", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      fs.writeFileSync(AGENT_OUTPUT_PATH, "private trace");
+      fs.writeFileSync(`${EVALS_DIR}/agent-session.jsonl`, "private tool calls");
+      fs.writeFileSync(`${EVALS_DIR}/prompt.txt`, "private workflow context");
+      const fetch = successfulFetch();
+      vi.stubGlobal("fetch", fetch);
+      await setupMain();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "false");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(fetch.mock.calls[0][1].body);
+      expect(body.questions.map(q => q.name)).toEqual(["builds", "tests"]);
+      expect(body.input).toEqual([
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_json",
+              data: {
+                execution_trace: "private tool calls",
+                agent_output: "private trace",
+                workflow_context: "private workflow context",
+              },
+            },
+          ],
+        },
+      ]);
+      await parseMain();
+      const records = fs.readFileSync(EVALS_OUTPUT_PATH, "utf8").trim().split("\n").map(JSON.parse);
+      expect(records.map(r => [r.id, r.answer, r.probability, r.model, r.backend])).toEqual([
+        ["builds", "YES", 0.9, "gpt-6-luna", "decisions"],
+        ["tests", "NO", 0.1, "gpt-6-luna", "decisions"],
+      ]);
+      expect(mockCore.summary.addDetails).not.toHaveBeenCalled();
+      expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain("private trace");
+      expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain("private tool calls");
+      expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain("private workflow context");
+      expect(JSON.stringify(mockCore.info.mock.calls)).not.toContain("Does it compile?");
+    });
+
+    it.each(["llm", "auto"])("preserves explicit LLM backend/model selection (%s)", async backend => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv("GH_AW_EVALS_BACKEND", backend);
+      vi.stubEnv("GH_AW_EVALS_DEFAULT_MODEL", "small");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      const fetch = successfulFetch();
+      vi.stubGlobal("fetch", fetch);
+      await setupMain();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "true");
+    });
+
+    it("falls back on API failure without exposing upstream errors", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      const fetch = vi.fn().mockRejectedValue(new Error("private trace and credential"));
+      vi.stubGlobal("fetch", fetch);
+      await setupMain();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "true");
+      expect(fs.existsSync(`${EVALS_DIR}/decisions.json`)).toBe(false);
+      expect(JSON.stringify(mockCore.warning.mock.calls)).not.toContain("private trace");
+    });
+
+    it.each(["", "test-only-credential"])("does not silently change an explicit Decisions backend", async key => {
+      vi.stubEnv("OPENAI_API_KEY", key);
+      vi.stubEnv("GH_AW_EVALS_BACKEND", "decisions");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("private details")));
+      await setupMain();
+      expect(mockCore.setFailed).toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "false");
+      expect(JSON.stringify(mockCore.setFailed.mock.calls)).not.toContain("private details");
+    });
+
+    it("combines eligible Decisions questions with positional LLM answers", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify([questions[0], { ...questions[1], model: "small" }, { id: "uncertain", question: "Is it safe?" }]));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            answers: [
+              { type: "predicate", name: "builds", probability: 1 },
+              { type: "predicate", name: "uncertain", probability: 0.5 },
+            ],
+          }),
+        })
+      );
+      await setupMain();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "true");
+      const prompt = fs.readFileSync("/tmp/gh-aw/aw-prompts/prompt.txt", "utf8");
+      expect(prompt).toContain('id="tests"');
+      expect(prompt).not.toContain('id="builds"');
+      fs.writeFileSync(EVALS_LOG_PATH, "Q1: YES\n");
+      await parseMain();
+      const records = fs.readFileSync(EVALS_OUTPUT_PATH, "utf8").trim().split("\n").map(JSON.parse);
+      expect(records.map(r => r.answer)).toEqual(["YES", "YES", "UNKNOWN"]);
+    });
+
+    it("falls back rather than splitting batches exceeding the API limit", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-only-credential");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(Array.from({ length: 401 }, (_, i) => ({ id: `q${i}`, question: "Did it pass?" }))));
+      const fetch = successfulFetch();
+      vi.stubGlobal("fetch", fetch);
+      await setupMain();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("run_llm", "true");
+    });
+
+    it("removes stale Decisions results before selecting LLM fallback", async () => {
+      fs.writeFileSync(`${EVALS_DIR}/decisions.json`, JSON.stringify([{ name: "builds", probability: 1 }]));
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
+      await setupMain();
+      expect(fs.existsSync(`${EVALS_DIR}/decisions.json`)).toBe(false);
+    });
+
+    it("does not expose corrupted stored response content in errors", async () => {
+      fs.writeFileSync(`${EVALS_DIR}/decisions.json`, '{"private evidence');
+      await expect(parseMain()).rejects.toThrow("Failed to load stored Decisions answers");
+    });
+
+    it("does not log malformed private question payloads", async () => {
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", '{"private question');
+      await setupMain();
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("not valid JSON"));
+      expect(JSON.stringify(mockCore.setFailed.mock.calls)).not.toContain("private question");
+    });
   });
 
   it("stores the workflow run id when writing eval records", async () => {

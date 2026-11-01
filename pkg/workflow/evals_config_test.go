@@ -3,11 +3,80 @@
 package workflow
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestParseEvalsBackend(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		backend any
+		want    string
+		wantErr bool
+	}{
+		{name: "auto", backend: "auto", want: "auto"},
+		{name: "llm", backend: "llm", want: "llm"},
+		{name: "decisions", backend: "decisions", want: "decisions"},
+		{name: "unknown", backend: "unknown", wantErr: true},
+		{name: "empty", backend: "", wantErr: true},
+		{name: "non-string", backend: 42, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := ParseEvalsFromFrontmatter(map[string]any{"evals": map[string]any{
+				"backend": tt.backend, "questions": []any{map[string]any{"id": "q", "question": "Correct?"}},
+			}})
+			if tt.wantErr {
+				require.ErrorContains(t, err, "evals.backend")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, cfg.Backend)
+			}
+		})
+	}
+	for _, raw := range []any{
+		[]any{map[string]any{"id": "q", "question": "Correct?"}},
+		map[string]any{"questions": []any{map[string]any{"id": "q", "question": "Correct?"}}},
+	} {
+		cfg, err := ParseEvalsFromFrontmatter(map[string]any{"evals": raw})
+		require.NoError(t, err)
+		assert.Equal(t, "auto", cfg.Backend)
+	}
+}
+
+func TestValidateEvalsDecisionsCompatibility(t *testing.T) {
+	for _, backend := range []string{"auto", "llm", "decisions"} {
+		for _, model := range []string{"", "gpt-6-luna", "small", "other-model"} {
+			for _, questionModel := range []string{"", "gpt-6-luna", "other-model"} {
+				t.Run(backend+"/"+model+"/"+questionModel, func(t *testing.T) {
+					err := validateEvals(&EvalsConfig{
+						Backend: backend, Model: model,
+						Questions: []EvalDefinition{{ID: "q", Question: "Correct?", Model: questionModel}},
+					})
+					if backend == "decisions" && ((model != "" && model != "gpt-6-luna") || questionModel == "other-model") {
+						require.Error(t, err)
+					} else {
+						require.NoError(t, err)
+					}
+				})
+			}
+		}
+		for _, count := range []int{400, 401} {
+			questions := make([]EvalDefinition, count)
+			for i := range questions {
+				questions[i] = EvalDefinition{ID: fmt.Sprintf("q%d", i), Question: "Correct?"}
+			}
+			err := validateEvals(&EvalsConfig{Backend: backend, Questions: questions})
+			if backend == "decisions" && count > 400 {
+				require.ErrorContains(t, err, "at most 400")
+			} else {
+				require.NoError(t, err)
+			}
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------
 // parseEvalsFromFrontmatter

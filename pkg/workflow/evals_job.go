@@ -62,7 +62,9 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 	}
 
 	evalsAuthData, permissions := c.buildEvalsJobPermissions(data)
-	steps = append(steps, c.buildTokenBrokerInvalidationStep(evalsAuthData)...)
+	if data.Evals.Backend != "decisions" {
+		steps = append(steps, gateEvalsLLMSteps(c.buildTokenBrokerInvalidationStep(evalsAuthData))...)
+	}
 
 	job := &Job{
 		Name:        string(constants.EvalsJobName),
@@ -104,6 +106,13 @@ func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
 }
 
 func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, string) {
+	if data.Evals != nil && data.Evals.Backend == "decisions" {
+		perms := NewPermissionsContentsRead()
+		if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
+			perms.Set(PermissionIdToken, PermissionWrite)
+		}
+		return data, perms.RenderToYAML()
+	}
 	// Determine permissions for the evals job (same rationale as the detection job).
 	evalsAuthData := *data
 	evalsAuthData.SafeOutputs = nil

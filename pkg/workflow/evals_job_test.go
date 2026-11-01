@@ -10,6 +10,25 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+func TestBuildDecisionsEvalsJobDoesNotRequireInference(t *testing.T) {
+	data := &WorkflowData{
+		AI:                 "copilot",
+		EngineConfig:       &EngineConfig{ID: "copilot", Auth: &EngineAuthConfig{Type: "github-oidc"}},
+		TokenBrokerEnabled: true,
+		Evals:              &EvalsConfig{Backend: "decisions", Questions: []EvalDefinition{{ID: "q", Question: "Correct?"}}},
+	}
+	job, err := NewCompiler().buildEvalsJob(data)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	assert.NotContains(t, job.Permissions, "copilot-requests")
+	assert.NotContains(t, job.Permissions, "id-token")
+	assert.Contains(t, job.Permissions, "contents: read")
+	steps := strings.Join(job.Steps, "")
+	assert.NotContains(t, steps, "evals_agentic_execution")
+	assert.NotContains(t, steps, "parse-mcp-gateway")
+	assert.Contains(t, steps, "Parse BinEval results")
+}
+
 func TestBuildEvalsJobNeedsWithoutDetection(t *testing.T) {
 	compiler := NewCompiler()
 

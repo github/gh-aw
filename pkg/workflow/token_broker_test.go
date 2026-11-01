@@ -419,12 +419,16 @@ func TestTokenBrokerSupportsEvalsInference(t *testing.T) {
 	steps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
 	assert.Contains(t, steps, "id: token_broker_copilot_request")
 	assert.Contains(t, steps, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
-	assert.Contains(t, strings.Join(job.Steps, ""), "name: Invalidate brokered Copilot credentials\n        if: always()")
-	assertTokenBrokerInvalidationLast(t, job)
+	assert.Contains(t, strings.Join(job.Steps, ""), "name: Invalidate brokered Copilot credentials\n        if: (always()) && steps.evals_setup.outputs.run_llm == 'true'")
+	assertTokenBrokerInvalidationLast(t, job, "(always()) && steps.evals_setup.outputs.run_llm == 'true'")
 }
 
-func assertTokenBrokerInvalidationLast(t *testing.T, job *Job) {
+func assertTokenBrokerInvalidationLast(t *testing.T, job *Job, conditions ...string) {
 	t.Helper()
+	expectedCondition := "always()"
+	if len(conditions) > 0 {
+		expectedCondition = conditions[0]
+	}
 	var compiled struct {
 		Steps []struct {
 			ID   string `yaml:"id"`
@@ -441,7 +445,7 @@ func assertTokenBrokerInvalidationLast(t *testing.T, job *Job) {
 			requestIndex = index
 		}
 		if step.Name == "Invalidate brokered Copilot credentials" {
-			assert.Equal(t, "always()", step.If)
+			assert.Equal(t, expectedCondition, step.If)
 			invalidationIndex = index
 		}
 	}

@@ -36,33 +36,21 @@ func (c *Compiler) buildEvalsJobSteps(data *WorkflowData) []string {
 
 	steps = append(steps, "      # --- BinEval Evaluations ---\n")
 	steps = append(steps, generateComponentExecutionEvidenceStep("evals", "not_started", evalsExecutionEvidencePath, "always()")...)
-
-	// Step 1: Clean stale firewall files from the agent artifact download so the
-	// AWF squid container does not fail when the evals job pre-pulls images.
 	steps = append(steps, c.buildCleanFirewallDirsStep()...)
 
-	// Step 2: Pre-pull AWF container images for faster engine execution.
-	// For codex, buildEvalsEngineSteps calls generateMCPSetup which already emits
-	// the Docker download step via generateDownloadDockerImagesStep, so skip here
-	// to avoid a duplicate "Download container images" step name.
-	if c.getEvalsEngineID(data) != string(constants.CodexEngine) {
-		steps = append(steps, c.buildPullAWFContainersStep(data)...)
-	}
-
-	// Step 3: Copy agent output files into the evals working directory.
+	// Preserve the original prompt before setup writes the LLM evaluation prompt.
 	steps = append(steps, buildPrepareEvalsFilesStep()...)
-
-	// Step 4: Setup evals – writes the multi-question BinEval prompt via JS.
 	steps = append(steps, c.buildSetupEvalsStep(data)...)
 
-	// Step 5: Ensure the evals directory and log file exist before engine execution.
-	steps = append(steps, buildEnsureEvalsDirStep()...)
-
-	// Steps 6 & 7: Install engine and execute via AWF (network-restricted sandbox).
-	steps = append(steps, c.buildEvalsEngineSteps(data)...)
-
-	// Step 8: Parse MCP gateway logs to capture evals job AIC output.
-	steps = append(steps, c.buildParseMCPGatewayLogStep(data)...)
+	if data.Evals.Backend != "decisions" {
+		// Codex MCP setup already includes the container download.
+		if c.getEvalsEngineID(data) != string(constants.CodexEngine) {
+			steps = append(steps, gateEvalsLLMSteps(c.buildPullAWFContainersStep(data))...)
+		}
+		steps = append(steps, gateEvalsLLMSteps(buildEnsureEvalsDirStep())...)
+		steps = append(steps, c.buildEvalsEngineSteps(data)...)
+		steps = append(steps, gateEvalsLLMSteps(c.buildParseMCPGatewayLogStep(data))...)
+	}
 
 	// Step 9: Parse engine output and write evals.jsonl.
 	steps = append(steps, c.buildParseEvalsResultsStep(data)...)
@@ -103,6 +91,7 @@ func buildPrepareEvalsFilesStep() []string {
 		"        run: |\n",
 		fmt.Sprintf("          mkdir -p %s\n", evalsDir),
 		"          cp /tmp/gh-aw/agent_output.json " + evalsDir + "/agent_output.json 2>/dev/null || true\n",
+		"          cp /tmp/gh-aw/agent-session.jsonl " + evalsDir + "/agent-session.jsonl 2>/dev/null || true\n",
 		"          cp /tmp/gh-aw/aw-prompts/prompt.txt " + evalsDir + "/prompt.txt 2>/dev/null || true\n",
 		fmt.Sprintf("          ls -la %s/ 2>/dev/null || true\n", evalsDir),
 	}
@@ -136,10 +125,16 @@ await main();`
 
 	steps := []string{
 		"      - name: Setup BinEval evaluations\n",
+		"        id: evals_setup\n",
 		"        if: always()\n",
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EVALS_QUESTIONS: '%s'\n", escapeYAMLSingleQuoted(questionsJSON)),
+		fmt.Sprintf("          GH_AW_EVALS_BACKEND: %s\n", evalsBackend(data.Evals)),
+		fmt.Sprintf("          GH_AW_EVALS_DEFAULT_MODEL: '%s'\n", escapeYAMLSingleQuoted(data.Evals.Model)),
+	}
+	if evalsBackend(data.Evals) != "llm" {
+		steps = append(steps, "          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}\n")
 	}
 	steps = appendEvalsModelEnvLines(steps, c.getEvalsEngineID(data), model)
 	steps = append(steps,
@@ -156,6 +151,9 @@ await main();`
 //  1. Install the agentic engine (same binary as the agent job)
 //  2. Execute the engine through AWF (network-restricted sandbox) to answer eval questions
 func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint:largefunc
+	if data.Evals != nil && data.Evals.Backend == "decisions" {
+		return nil
+	}
 	// Determine engine ID (same resolution order as detection).
 	engineID := c.getEvalsEngineID(data)
 
@@ -292,36 +290,15 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 				break
 			}
 		}
-		// injected, skipNextIf and skipNextContinueOnError are intentionally scoped
-		// per-step (declared inside the outer loop) so they reset to false for each new
-		// step, preventing carry-over. skipNextIf/skipNextContinueOnError are set after
-		// injection so that a step's own "if:"/"continue-on-error:" fields (e.g.
-		// behavior-defined log-parser write steps, or our own render-logs step) are
-		// dropped in favour of the injected condition, avoiding YAML duplicate mapping
-		// keys.
+		// Preserve engine conditions while keeping failures from blocking result parsing.
 		injected := false
-		skipNextIf := false
-		skipNextContinueOnError := false
+		hasCondition := false
+		hasContinueOnError := false
 		for _, line := range step {
-			// If the previous line was the name line and we just injected an if: condition,
-			// drop the step's original if: field to avoid a YAML duplicate mapping key.
-			if skipNextIf {
-				skipNextIf = false
-				if strings.HasPrefix(strings.TrimSpace(line), "if:") {
-					skipNextContinueOnError = true
-					continue
-				}
-			}
-			// A step whose own "if:" field was just dropped (above) may also define its
-			// own "continue-on-error:" field immediately after (e.g. our render-logs
-			// step). Drop it too so it isn't duplicated alongside the continue-on-error
-			// injected below.
-			if skipNextContinueOnError {
-				skipNextContinueOnError = false
-				if strings.HasPrefix(strings.TrimSpace(line), "continue-on-error:") {
-					continue
-				}
-			}
+			hasCondition = hasCondition || strings.HasPrefix(strings.TrimSpace(line), "if:")
+			hasContinueOnError = hasContinueOnError || strings.HasPrefix(strings.TrimSpace(line), "continue-on-error:")
+		}
+		for _, line := range step {
 			// Prefix the agentic_execution step ID to avoid collisions with the agent job step
 			// IDs — job managers validate for duplicate step IDs across the compiled YAML.
 			// This mirrors the same pattern used in buildDetectionEngineExecutionStep (see
@@ -337,15 +314,18 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 			// Search for the name field instead of assuming it's always at index 0 to handle
 			// engines that might emit comments or other fields before the name.
 			if !injected && strings.Contains(strings.TrimSpace(line), "- name:") {
-				steps = append(steps, "        if: always()\n")
-				steps = append(steps, "        continue-on-error: true\n")
+				if !hasCondition {
+					steps = append(steps, "        if: always()\n")
+				}
+				if !hasContinueOnError {
+					steps = append(steps, "        continue-on-error: true\n")
+				}
 				injected = true
-				skipNextIf = true
 			}
 		}
 	}
 
-	return steps
+	return gateEvalsLLMSteps(steps)
 }
 
 // buildParseEvalsResultsStep creates the github-script step that reads the engine
@@ -370,6 +350,8 @@ await main();`
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EVALS_QUESTIONS: '%s'\n", escapeYAMLSingleQuoted(questionsJSON)),
+		fmt.Sprintf("          GH_AW_EVALS_BACKEND: %s\n", evalsBackend(data.Evals)),
+		fmt.Sprintf("          GH_AW_EVALS_DEFAULT_MODEL: '%s'\n", escapeYAMLSingleQuoted(data.Evals.Model)),
 	}
 	steps = appendEvalsModelEnvLines(steps, c.getEvalsEngineID(data), model)
 	steps = append(steps,
@@ -452,7 +434,7 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 	}
 	return []string{
 		"      - name: Collect evals token usage\n",
-		"        if: always()\n",
+		"        if: always() && steps.evals_setup.outputs.run_llm == 'true'\n",
 		"        run: |\n",
 		"          if [ -n \"${AWF_TOKEN_USAGE_LOG:-}\" ] && [ -f \"$AWF_TOKEN_USAGE_LOG\" ]; then\n",
 		"            cp \"$AWF_TOKEN_USAGE_LOG\" /tmp/gh-aw/evals_token_usage.jsonl\n",
@@ -507,6 +489,17 @@ func (c *Compiler) resolveEvalsExecutionModel(data *WorkflowData) string {
 	}
 	if data.Evals != nil && data.Evals.Model != "" {
 		model = data.Evals.Model
+	}
+	// In auto mode, compatible questions leave the LLM subset. Select its first
+	// explicit model rather than inheriting a Decisions-only default.
+	if data.Evals != nil && evalsBackend(data.Evals) == "auto" &&
+		(data.Evals.Model == "" || data.Evals.Model == "gpt-6-luna") {
+		for _, question := range data.Evals.Questions {
+			if question.Model != "" && question.Model != "gpt-6-luna" {
+				model = question.Model
+				break
+			}
+		}
 	}
 
 	engineID := c.getEvalsEngineID(data)
@@ -579,11 +572,52 @@ func marshalEvalsQuestions(questions []EvalDefinition) string {
 	type evalQuestion struct {
 		ID       string `json:"id"`
 		Question string `json:"question"`
+		Model    string `json:"model,omitempty"`
 	}
 	serializedQuestions := make([]evalQuestion, 0, len(questions))
 	for _, question := range questions {
-		serializedQuestions = append(serializedQuestions, evalQuestion{ID: question.ID, Question: question.Question})
+		serializedQuestions = append(serializedQuestions, evalQuestion(question))
 	}
 	encoded, _ := json.Marshal(serializedQuestions) //nolint:jsonmarshalignoredeerror // marshaling strings cannot fail
 	return string(encoded)
+}
+
+func evalsBackend(config *EvalsConfig) string {
+	if config == nil || config.Backend == "" {
+		return "auto"
+	}
+	return config.Backend
+}
+
+// gateEvalsLLMSteps combines the runtime routing decision with existing step conditions.
+func gateEvalsLLMSteps(steps []string) []string {
+	const gate = "steps.evals_setup.outputs.run_llm == 'true'"
+	lines := strings.SplitAfter(strings.Join(steps, ""), "\n")
+	var result []string
+	for i, line := range lines {
+		result = append(result, line)
+		if !strings.HasPrefix(line, "      - ") {
+			continue
+		}
+		hasCondition := false
+		for j, candidate := range lines {
+			if j <= i {
+				continue
+			}
+			if strings.HasPrefix(candidate, "      - ") {
+				break
+			}
+			if condition, ok := strings.CutPrefix(candidate, "        if:"); ok {
+				condition = strings.TrimSpace(condition)
+				condition = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(condition, "${{"), "}}"))
+				lines[j] = fmt.Sprintf("        if: (%s) && %s\n", condition, gate)
+				hasCondition = true
+				break
+			}
+		}
+		if !hasCondition {
+			result = append(result, "        if: "+gate+"\n")
+		}
+	}
+	return result
 }

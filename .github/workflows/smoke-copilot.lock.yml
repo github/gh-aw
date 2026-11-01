@@ -3823,19 +3823,22 @@ jobs:
         run: |
           rm -rf /tmp/gh-aw/sandbox/firewall/logs
           rm -rf /tmp/gh-aw/sandbox/firewall/audit
-      - name: Download container images
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.29.0@sha256:b14bd399376180b5649a9324be3b50fbfc82bfe8f0c80045840416b5a4e65b96 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.0@sha256:baff00b856a4bdc93bce134928c70af3d3492f2e518757115042040674d56b0b ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.0@sha256:087a8e4efff8ac62d46e106cd22005c002822b1481fc233097799511be353b5d ghcr.io/github/gh-aw-firewall/squid:0.29.0@sha256:6e0cbf7f980beb78b5461563a8164f6439ca959bc93733d5a6b52972e523ed50
       - name: Prepare evals files
         run: |
           mkdir -p /tmp/gh-aw/evals
           cp /tmp/gh-aw/agent_output.json /tmp/gh-aw/evals/agent_output.json 2>/dev/null || true
+          cp /tmp/gh-aw/agent-session.jsonl /tmp/gh-aw/evals/agent-session.jsonl 2>/dev/null || true
           cp /tmp/gh-aw/aw-prompts/prompt.txt /tmp/gh-aw/evals/prompt.txt 2>/dev/null || true
           ls -la /tmp/gh-aw/evals/ 2>/dev/null || true
       - name: Setup BinEval evaluations
+        id: evals_setup
         if: always()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"smoke-passed","question":"Did all or most smoke tests pass? Look for an overall PASS status or the majority of tests showing ✅ in the agent output."},{"id":"build-succeeded","question":"Did the gh-aw binary build succeed? Look for a successful make build step or explicit mention that compilation succeeded."},{"id":"issue-created","question":"Was a smoke test issue created with test results? Look for a create_issue output containing ''Smoke Test'' in the title."}]'
+          GH_AW_EVALS_BACKEND: auto
+          GH_AW_EVALS_DEFAULT_MODEL: ''
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: setup
         with:
@@ -3846,24 +3849,31 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'run_evals.cjs'));
             await main();
+      - name: Download container images
+        if: steps.evals_setup.outputs.run_llm == 'true'
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/download_docker_images.sh" ghcr.io/github/gh-aw-firewall/agent:0.29.0@sha256:b14bd399376180b5649a9324be3b50fbfc82bfe8f0c80045840416b5a4e65b96 ghcr.io/github/gh-aw-firewall/api-proxy:0.29.0@sha256:baff00b856a4bdc93bce134928c70af3d3492f2e518757115042040674d56b0b ghcr.io/github/gh-aw-firewall/cli-proxy:0.29.0@sha256:087a8e4efff8ac62d46e106cd22005c002822b1481fc233097799511be353b5d ghcr.io/github/gh-aw-firewall/squid:0.29.0@sha256:6e0cbf7f980beb78b5461563a8164f6439ca959bc93733d5a6b52972e523ed50
       - name: Ensure evals directory and log
+        if: steps.evals_setup.outputs.run_llm == 'true'
         run: |
           mkdir -p /tmp/gh-aw/evals
           touch /tmp/gh-aw/evals/evals.log
       - name: Setup Node.js
+        if: steps.evals_setup.outputs.run_llm == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           package-manager-cache: false
       - name: Install GitHub Copilot CLI
+        if: steps.evals_setup.outputs.run_llm == 'true'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache
         env:
           GH_HOST: github.com
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install AWF binary
+        if: steps.evals_setup.outputs.run_llm == 'true'
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Execute GitHub Copilot CLI
-        if: always()
+        if: (always()) && steps.evals_setup.outputs.run_llm == 'true'
         continue-on-error: true
         id: evals_agentic_execution
         # Copilot CLI tool arguments (sorted):
@@ -3957,7 +3967,7 @@ jobs:
           RUNNER_TEMP: ${{ runner.temp }}
           TRACEPARENT: ${{ env.GITHUB_AW_OTEL_TRACE_ID != '' && env.GITHUB_AW_OTEL_PARENT_SPAN_ID != '' && format('00-{0}-{1}-01', env.GITHUB_AW_OTEL_TRACE_ID, env.GITHUB_AW_OTEL_PARENT_SPAN_ID) || '' }}
       - name: Parse MCP Gateway logs for step summary
-        if: always()
+        if: (always()) && steps.evals_setup.outputs.run_llm == 'true'
         id: parse-mcp-gateway
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -3974,6 +3984,8 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_EVALS_QUESTIONS: '[{"id":"smoke-passed","question":"Did all or most smoke tests pass? Look for an overall PASS status or the majority of tests showing ✅ in the agent output."},{"id":"build-succeeded","question":"Did the gh-aw binary build succeed? Look for a successful make build step or explicit mention that compilation succeeded."},{"id":"issue-created","question":"Was a smoke test issue created with test results? Look for a create_issue output containing ''Smoke Test'' in the title."}]'
+          GH_AW_EVALS_BACKEND: auto
+          GH_AW_EVALS_DEFAULT_MODEL: ''
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -4010,7 +4022,7 @@ jobs:
             const { main } = require(path.join(actionsDir, 'render_evals_summary.cjs'));
             await main();
       - name: Collect evals token usage
-        if: always()
+        if: always() && steps.evals_setup.outputs.run_llm == 'true'
         run: |
           if [ -n "${AWF_TOKEN_USAGE_LOG:-}" ] && [ -f "$AWF_TOKEN_USAGE_LOG" ]; then
             cp "$AWF_TOKEN_USAGE_LOG" /tmp/gh-aw/evals_token_usage.jsonl

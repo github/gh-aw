@@ -24556,6 +24556,27 @@ evals: []
 
 # Format 2: Extended form: object with questions list and optional configuration.
 evals:
+  # Evaluation backend: auto (default), llm, or decisions.
+  # Auto tries the Decisions API using the OPENAI_API_KEY environment variable,
+  # populated from secrets.OPENAI_API_KEY only in the setup step, for eligible
+  # questions and falls back to the workflow's LLM engine if unavailable or unsuccessful.
+  # Questions with explicit models other than gpt-6-luna use the LLM engine in auto.
+  # More than 400 eligible questions also fall back to the LLM engine in auto.
+  # Decisions requires OPENAI_API_KEY, at most 400 questions, and no model or
+  # gpt-6-luna at both default and question levels; incompatible models are rejected.
+  # Explicit decisions fails on missing credentials or API failure instead of falling back.
+  # Decisions probabilities above 0.5 produce YES, below 0.5 produce NO, and
+  # exactly 0.5 produces UNKNOWN. Parse combines Decisions and LLM subset results.
+  # Eligible predicates share one POST containing the original prompt, canonical
+  # execution trace, and agent output as context. Results retain backend and probability.
+  # Decisions telemetry records operational metadata without request or response payloads.
+  # Decisions-only evaluations skip LLM prompt creation. Raw prompts, API payloads,
+  # and API errors are not published in summaries or logs.
+  # LLM always uses the workflow's engine. The API key is available only to setup,
+  # not to the LLM evaluation process, and is omitted entirely for backend: llm.
+  # (optional)
+  backend: auto
+
   # List of binary evaluation question objects.
   # (optional)
   questions: []

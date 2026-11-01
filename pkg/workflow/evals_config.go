@@ -24,6 +24,8 @@ type EvalDefinition struct {
 // EvalsConfig holds the configuration for BinEval-style evaluations declared in workflow
 // frontmatter. Evaluations run after safe-outputs and before the conclusion job.
 type EvalsConfig struct {
+	// Backend selects auto (default), llm, or decisions evaluation.
+	Backend string
 	// Questions is the ordered list of binary evaluation questions.
 	Questions []EvalDefinition
 	// Model is the default LLM model to use for evaluations. Use a model alias such as
@@ -61,7 +63,7 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 		return nil, nil
 	}
 
-	cfg := &EvalsConfig{}
+	cfg := &EvalsConfig{Backend: "auto"}
 
 	switch v := raw.(type) {
 	case []any:
@@ -73,6 +75,9 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 		cfg.Questions = questions
 
 	case map[string]any:
+		if err := parseEvalsOptions(v, cfg); err != nil {
+			return nil, err
+		}
 		// Extended form: object with questions and optional model/runs-on
 		if questionsRaw, ok := v["questions"]; ok {
 			questionsList, ok := questionsRaw.([]any)
@@ -84,20 +89,6 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 				return nil, fmt.Errorf("evals.questions: %w", err)
 			}
 			cfg.Questions = questions
-		}
-
-		// Parse optional top-level model (default for all questions)
-		if modelRaw, ok := v["model"]; ok {
-			modelStr, ok := modelRaw.(string)
-			if !ok {
-				return nil, fmt.Errorf("evals.model must be a string, got %T. Example:\nevals:\n  model: small", modelRaw)
-			}
-			cfg.Model = strings.TrimSpace(modelStr)
-		}
-
-		// Parse optional runs-on override
-		if runsOnRaw, ok := v["runs-on"]; ok {
-			cfg.RunsOn = renderRunsOnSnippet(runsOnRaw)
 		}
 
 	default:
@@ -116,6 +107,30 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 	}
 	evalsConfigLog.Printf("Parsed %d eval definitions (model: %q, per-question overrides: %d)", len(cfg.Questions), cfg.Model, perQuestionOverrides)
 	return cfg, nil
+}
+
+func parseEvalsOptions(options map[string]any, cfg *EvalsConfig) error {
+	if backendRaw, ok := options["backend"]; ok {
+		backend, ok := backendRaw.(string)
+		if !ok {
+			return fmt.Errorf("evals.backend must be a string, got %T. Use auto, llm, or decisions", backendRaw)
+		}
+		cfg.Backend = strings.TrimSpace(backend)
+		if cfg.Backend == "" {
+			return errors.New("evals.backend must be auto, llm, or decisions")
+		}
+	}
+	if modelRaw, ok := options["model"]; ok {
+		model, ok := modelRaw.(string)
+		if !ok {
+			return fmt.Errorf("evals.model must be a string, got %T. Example:\nevals:\n  model: small", modelRaw)
+		}
+		cfg.Model = strings.TrimSpace(model)
+	}
+	if runsOnRaw, ok := options["runs-on"]; ok {
+		cfg.RunsOn = renderRunsOnSnippet(runsOnRaw)
+	}
+	return nil
 }
 
 // parseEvalDefinitions converts a []any YAML list into []EvalDefinition.
@@ -179,12 +194,28 @@ func validateEvals(cfg *EvalsConfig) error {
 	if cfg == nil {
 		return nil
 	}
+	switch cfg.Backend {
+	case "", "auto", "llm", "decisions":
+	default:
+		return errors.New("evals.backend must be auto, llm, or decisions")
+	}
+	if cfg.Backend == "decisions" {
+		if len(cfg.Questions) > 400 {
+			return errors.New("evals.backend decisions supports at most 400 questions. Reduce the questions or use backend: auto or llm")
+		}
+		if cfg.Model != "" && cfg.Model != "gpt-6-luna" {
+			return errors.New("evals.backend decisions requires model gpt-6-luna or no model. Use backend: auto or llm for other models")
+		}
+	}
 	if len(cfg.Questions) == 0 {
 		return errors.New("evals requires at least one question when configured. Example:\nevals:\n  - id: readme\n    question: Does the README explain setup?")
 	}
 
 	seen := make(map[string]struct{}, len(cfg.Questions))
 	for i, q := range cfg.Questions {
+		if cfg.Backend == "decisions" && q.Model != "" && q.Model != "gpt-6-luna" {
+			return fmt.Errorf("evals question %q uses model %q, which is incompatible with backend decisions. Omit the model, use gpt-6-luna, or select backend: auto or llm", q.ID, q.Model)
+		}
 		if _, dup := seen[q.ID]; dup {
 			return fmt.Errorf("evals has a duplicate id %q at index %d. Use a unique 'id' for each question. Example:\nevals:\n  - id: readme\n    question: Does the README explain setup?\n  - id: security\n    question: Are secrets handled safely?", q.ID, i)
 		}
