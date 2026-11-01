@@ -1569,6 +1569,159 @@ echo "result=$INPUT_MY_INPUT" >> "$GITHUB_OUTPUT"
     });
   });
 
+  describe("suggestion resource bounds", () => {
+    it.each([127, 128, 129, 1024 * 1024 - 256])("bounds suggestion work for a %i-code-unit tool identifier", async length => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const candidate = "a".repeat(127) + "b";
+      const requested = "a".repeat(length);
+      const minimum = vi.spyOn(Math, "min");
+      let similar;
+      let comparisons;
+      try {
+        similar = findSimilarTools(requested, { [candidate]: {} });
+        comparisons = minimum.mock.calls.length;
+      } finally {
+        minimum.mockRestore();
+      }
+      if (length <= 128) {
+        expect(similar).toEqual([{ name: candidate, distance: 1 }]);
+        expect(comparisons).toBe(length * 128);
+      } else {
+        expect(similar).toEqual([]);
+        expect(comparisons).toBe(0);
+      }
+    });
+
+    it("skips oversized candidates and normalization that expands past the limit", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const minimum = vi.spyOn(Math, "min");
+      let results;
+      let comparisons;
+      try {
+        results = [findSimilarTools("a", { ["a".repeat(129)]: {} }), findSimilarTools("\u0130".repeat(65), { a: {} })];
+        comparisons = minimum.mock.calls.length;
+      } finally {
+        minimum.mockRestore();
+      }
+      expect(results).toEqual([[], []]);
+      expect(comparisons).toBe(0);
+    });
+
+    it("caps total matrix work across a large tool registry", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const tools = Object.fromEntries(Array.from({ length: 200 }, (_, i) => ["a".repeat(125) + String(i).padStart(3, "0"), {}]));
+      const minimum = vi.spyOn(Math, "min");
+      let similar;
+      let comparisons;
+      try {
+        similar = findSimilarTools("a".repeat(128), tools);
+        comparisons = minimum.mock.calls.length;
+      } finally {
+        minimum.mockRestore();
+      }
+      // Each matrix costs 129 * 129 cells; only three fit in 65,536.
+      expect(similar).toHaveLength(3);
+      expect(comparisons).toBe(3 * 128 * 128);
+      expect(comparisons).toBeLessThanOrEqual(65536);
+    });
+
+    describe.each(["HTTP", "stdio"])("%s errors", transport => {
+      async function call(server, params) {
+        const { handleRequest, handleMessage } = await import("./mcp_server_core.cjs");
+        const request = { jsonrpc: "2.0", id: 42, method: "tools/call", params };
+        if (transport === "HTTP") {
+          return handleRequest(server, request);
+        }
+        let response;
+        server.replyError = (id, code, message) => {
+          response = { jsonrpc: "2.0", id, error: { code, message } };
+        };
+        server.replyResult = (id, result) => {
+          response = { jsonrpc: "2.0", id, result };
+        };
+        await handleMessage(server, request);
+        return response;
+      }
+
+      it.each([129, 1024 * 1024 - 256])("returns a bounded explicit error for an oversized tool name of length %i", async length => {
+        const { createServer, registerTool } = await import("./mcp_server_core.cjs");
+        const server = createServer({ name: "test-server", version: "1.0.0" });
+        const handler = vi.fn();
+        registerTool(server, { name: "test_tool", description: "", inputSchema: {}, handler });
+        const response = await call(server, { name: "a".repeat(length) });
+        expect(response.id).toBe(42);
+        expect(response.error.code).toBe(transport === "HTTP" ? -32602 : -32601);
+        expect(response.error.message).toContain("not found");
+        expect(response.error.message).toContain("identifier too long for suggestions");
+        expect(response.error.message.length).toBeLessThan(600);
+        expect(handler).not.toHaveBeenCalled();
+      });
+
+      it.each([127, 128, 129, 1024 * 1024 - 256])("bounds parameter suggestion work at length %i", async length => {
+        const { createServer, registerTool } = await import("./mcp_server_core.cjs");
+        const server = createServer({ name: "test-server", version: "1.0.0" });
+        const candidate = "a".repeat(127) + "b";
+        const handler = vi.fn();
+        registerTool(server, { name: "test_tool", description: "", inputSchema: { properties: { [candidate]: {} }, additionalProperties: false }, handler });
+        const minimum = vi.spyOn(Math, "min");
+        let response;
+        let comparisons;
+        try {
+          response = await call(server, { name: "test_tool", arguments: { ["a".repeat(length)]: true } });
+          comparisons = minimum.mock.calls.length;
+        } finally {
+          minimum.mockRestore();
+        }
+        expect(response.error.code).toBe(-32602);
+        expect(response.error.message).toContain("unknown parameter");
+        expect(handler).not.toHaveBeenCalled();
+        if (length <= 128) {
+          expect(response.error.message).toContain(`closest: '${candidate}'`);
+          expect(comparisons).toBe(length * 128);
+        } else {
+          expect(response.error.message).toContain("identifier too long for suggestions");
+          expect(response.error.message.length).toBeLessThan(600);
+          expect(comparisons).toBe(0);
+        }
+      });
+
+      it("shares one matrix budget across all unknown parameters", async () => {
+        const { createServer, registerTool } = await import("./mcp_server_core.cjs");
+        const server = createServer({ name: "test-server", version: "1.0.0" });
+        const properties = Object.fromEntries(Array.from({ length: 200 }, (_, i) => ["a".repeat(125) + String(i).padStart(3, "0"), {}]));
+        const args = Object.fromEntries(Array.from({ length: 20 }, (_, i) => ["a".repeat(125) + String(i + 200), true]));
+        const handler = vi.fn();
+        registerTool(server, { name: "test_tool", description: "", inputSchema: { properties, additionalProperties: false }, handler });
+        const minimum = vi.spyOn(Math, "min");
+        let response;
+        let comparisons;
+        try {
+          response = await call(server, { name: "test_tool", arguments: args });
+          comparisons = minimum.mock.calls.length;
+        } finally {
+          minimum.mockRestore();
+        }
+        expect(response.error.code).toBe(-32602);
+        expect(response.error.message).toContain("unknown parameters");
+        expect(handler).not.toHaveBeenCalled();
+        expect(comparisons).toBe(3 * 128 * 128);
+        expect(comparisons).toBeLessThanOrEqual(65536);
+      });
+
+      it("preserves valid registered tool and parameter names above the suggestion limit", async () => {
+        const { createServer, registerTool } = await import("./mcp_server_core.cjs");
+        const server = createServer({ name: "test-server", version: "1.0.0" });
+        const name = "a".repeat(129);
+        const handler = vi.fn(() => ({ content: [] }));
+        registerTool(server, { name, description: "", inputSchema: { properties: { [name]: {} }, additionalProperties: false }, handler });
+        const args = { [name]: true };
+        const response = await call(server, { name, arguments: args });
+        expect(response.result).toEqual({ content: [], isError: false });
+        expect(handler).toHaveBeenCalledWith(args);
+      });
+    });
+  });
+
   describe("tool not found error with suggestions", () => {
     it("should suggest similar tools when tool is not found", async () => {
       const { createServer, registerTool, handleMessage } = await import("./mcp_server_core.cjs");
