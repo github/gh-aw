@@ -31,3 +31,4 @@
 2026-10-29: discovery run; topic:gh-aw search returned only already-reviewed repos; no new candidates; no blog; backlog 0.
 2026-10-30: discovery; reviewed 2 new (issue-concierge 7, agentic-factory-v2 4); no blog; backlog 0.
 2026-10-31: discovery run; only demo/unreviewed small repos surfaced, none queued; no blog; backlog 0.
+2026-11-01: discovery run (topic:github-agentic-workflows); only already-reviewed/low-value results; no blog; backlog 0.
