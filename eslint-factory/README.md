@@ -1284,6 +1284,20 @@ const normalized = value.replace("_", "-");
 const normalized = value.replaceAll("_", "-");
 ```
 
+### `no-dynamic-string-replacement`
+
+Disallow dynamic replacement values passed to `String.prototype.replace()` or `replaceAll()`. Replacement strings interpret sequences such as `$&`, `$1`, and `$$`; return dynamic values from a replacer function instead.
+
+**Flagged form:**
+```js
+const message = template.replace(/\{NAME\}/g, process.env.NAME || "Unnamed Workflow");
+```
+
+**Safe alternative:**
+```js
+const message = template.replace(/\{NAME\}/g, () => process.env.NAME || "Unnamed Workflow");
+```
+
 ### `no-unguarded-async-timer-callback`
 
 Disallow async callbacks passed to `setTimeout()`, `setInterval()`, or `setImmediate()` unless the entire callback body is wrapped in `try/catch`. These timer functions discard the callback's returned promise, so uncaught errors become unhandled rejections.
