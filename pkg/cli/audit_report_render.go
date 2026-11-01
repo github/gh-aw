@@ -749,6 +749,18 @@ func renderConsolePolicyAndExperiments(data AuditData) {
 	}
 	renderConsoleExperiments(data.Experiments)
 	renderConsoleGraders(data.Graders)
+	renderConsoleEvals(data.Evals)
+}
+
+func renderConsoleEvals(evals *EvalsSummary) {
+	if evals == nil {
+		return
+	}
+	line := fmt.Sprintf("  evals: questions=%d yes=%d no=%d unknown=%d", evals.Questions, evals.Yes, evals.No, evals.Unknown)
+	if evals.ExecutionState != "" {
+		line += " execution=" + evals.ExecutionState
+	}
+	fmt.Fprintln(os.Stderr, line)
 }
 
 func renderConsoleGraders(graders *GradersData) {

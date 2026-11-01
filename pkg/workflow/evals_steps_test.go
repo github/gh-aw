@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -967,5 +968,140 @@ func TestEvalsClaudeAnthropicProviderHasNoCompilerBaseURL(t *testing.T) {
 `)
 	if strings.Contains(evals, "ANTHROPIC_BASE_URL:") {
 		t.Fatal("Anthropic-provider evals job must not set a compiler ANTHROPIC_BASE_URL")
+	}
+}
+
+// TestEvalsAndDetectionEngineStepNamesFollowAuditContract verifies that the compiler
+// enforces the engine execution step naming contract that gh aw audit uses to find
+// the evals and detection engine steps (the jobs API does not expose step ids):
+// a custom engine step name that already follows it is kept, one that does not
+// is prefixed, and an omitted one falls back to the engine display name.
+func TestEvalsAndDetectionEngineStepNamesFollowAuditContract(t *testing.T) {
+	for _, tc := range []struct{ name, displayName, stepName, want string }{
+		{name: "contract name", stepName: "Execute DeepSeek Harness", want: "Execute DeepSeek Harness"},
+		{name: "other name", stepName: "Run DeepSeek Harness", want: "Execute Run DeepSeek Harness"},
+		{name: "omitted name", want: "Execute Harness Engine"},
+		{name: "omitted name with YAML-special display name", displayName: "Harness: Local #1 it's", want: "Execute Harness: Local #1 it's"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			sharedDir := filepath.Join(tmpDir, "shared")
+			if err := os.MkdirAll(sharedDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			stepNameLine := ""
+			if tc.stepName != "" {
+				stepNameLine = "\n      step-name: " + tc.stepName
+			}
+			displayName := "Harness Engine"
+			if tc.displayName != "" {
+				displayName = strconv.Quote(tc.displayName)
+			}
+			shared := `---
+engine:
+  id: harness-engine
+  display-name: ` + displayName + `
+  behaviors:
+    secret-strategy: universal-llm-consumer
+    execution:
+      command-name: harness-engine` + stepNameLine + `
+---
+
+# Shared Engine Definition
+`
+			if err := os.WriteFile(filepath.Join(sharedDir, "engine.md"), []byte(shared), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			workflowPath := filepath.Join(tmpDir, "test.md")
+			content := `---
+on: push
+engine:
+  id: harness-engine
+  model: copilot/gpt-5
+imports:
+  - shared/engine.md
+safe-outputs:
+  create-issue:
+evals:
+  - id: completed
+    question: Did the agent complete the task?
+---
+
+# Test Workflow
+`
+			if err := os.WriteFile(workflowPath, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := NewCompiler().CompileWorkflow(workflowPath); err != nil {
+				t.Fatal(err)
+			}
+			result, err := os.ReadFile(strings.TrimSuffix(workflowPath, ".md") + ".lock.yml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var lock struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Name string `yaml:"name"`
+						ID   string `yaml:"id"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			if err := yaml.Unmarshal(result, &lock); err != nil {
+				t.Fatal(err)
+			}
+			engineSteps := map[string]string{
+				string(constants.EvalsJobName):     "evals_agentic_execution",
+				string(constants.DetectionJobName): "detection_agentic_execution",
+			}
+			for jobName, engineStepID := range engineSteps {
+				job, ok := lock.Jobs[jobName]
+				if !ok {
+					t.Fatalf("expected %s job in the compiled workflow", jobName)
+				}
+				found := false
+				for _, step := range job.Steps {
+					if step.ID == engineStepID {
+						found = true
+						if !constants.IsEngineExecutionStepName(step.Name) {
+							t.Errorf("%s engine step %q must satisfy constants.IsEngineExecutionStepName", jobName, step.Name)
+						}
+						if jobName == string(constants.EvalsJobName) && step.Name != tc.want {
+							t.Errorf("evals engine step name = %q, want %q", step.Name, tc.want)
+						}
+						continue
+					}
+					if constants.IsEngineExecutionStepName(step.Name) {
+						t.Errorf("%s step %q (id %q) is not the engine step but satisfies constants.IsEngineExecutionStepName", jobName, step.Name, step.ID)
+					}
+				}
+				if !found {
+					t.Errorf("expected %s job to contain step id %s", jobName, engineStepID)
+				}
+			}
+		})
+	}
+}
+
+// TestEnforceEngineExecutionStepNameQuotesFallback verifies that the fallback name for
+// a blank engine step name is emitted as a quoted YAML scalar, so display names
+// containing ": ", "#" or quotes stay valid YAML whether or not the blank name was quoted.
+func TestEnforceEngineExecutionStepNameQuotesFallback(t *testing.T) {
+	engine := NewClaudeEngine()
+	engine.displayName = `Harness: Local #1 "it's"`
+	for _, nameLine := range []string{`      - name: `, `      - name: ""`, `      - name: ''`} {
+		t.Run(nameLine, func(t *testing.T) {
+			step := enforceEngineExecutionStepName(GitHubActionStep{nameLine, "        id: agentic_execution"}, engine)
+			var parsed []struct {
+				Name string `yaml:"name"`
+				ID   string `yaml:"id"`
+			}
+			if err := yaml.Unmarshal([]byte(strings.Join(step, "\n")), &parsed); err != nil {
+				t.Fatalf("rewritten step is not valid YAML: %v\n%s", err, strings.Join(step, "\n"))
+			}
+			if len(parsed) != 1 || parsed[0].Name != `Execute Harness: Local #1 "it's"` || parsed[0].ID != "agentic_execution" {
+				t.Errorf("parsed step = %+v, want name %q", parsed, `Execute Harness: Local #1 "it's"`)
+			}
+		})
 	}
 }
