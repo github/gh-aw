@@ -6,7 +6,7 @@ description: Overview and practical guidance for configuring and using GitHub MC
 
 **Source**: [github/github-mcp-server](https://github.com/github/github-mcp-server/tree/main/pkg/github)
 **Mapping File**: [pkg/workflow/data/github_toolsets_permissions.json](https://github.com/github/gh-aw/blob/main/pkg/workflow/data/github_toolsets_permissions.json)
-**Last Updated**: 2026-08-16
+**Last Updated**: 2026-11-01
 
 ## Overview
 
