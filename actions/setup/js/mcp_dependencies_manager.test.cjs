@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe("mcp_dependencies_manager", () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.resetModules();
   });
@@ -11,6 +12,26 @@ describe("mcp_dependencies_manager", () => {
     expect(inferDependencyManager("/tmp/tool.go")).toBe("go");
     expect(inferDependencyManager("/tmp/tool.sh")).toBe("shell");
     expect(inferDependencyManager("/tmp/tool.cjs")).toBe("npm");
+  });
+
+  it("never forwards server or tool credentials to dependency installers", async () => {
+    vi.stubEnv("GH_AW_MCP_SCRIPTS_API_KEY", "server-secret");
+    vi.stubEnv("GH_AW_MCP_SCRIPTS_ENV_616c706861_4150495f4b4559", "tool-secret");
+    vi.stubEnv("JOB_SECRET", "job-secret");
+    const execRunner = vi.fn().mockReturnValue(Buffer.from(""));
+    const { createDependencyInstallGate, resetDependencyInstallStateForTests, setExecFileSyncRunnerForTests } = await import("./mcp_dependencies_manager.cjs");
+    resetDependencyInstallStateForTests();
+    setExecFileSyncRunnerForTests(execRunner);
+    for (const extension of ["cjs", "py", "go", "sh"]) {
+      await createDependencyInstallGate({ debug: vi.fn() }, extension, `/tmp/probe.${extension}`, ["test-dependency"], "/tmp")();
+    }
+    expect(execRunner.mock.calls.length).toBeGreaterThanOrEqual(5);
+    for (const [, , options] of execRunner.mock.calls) {
+      expect(options.env.PATH).toBe(process.env.PATH);
+      expect(options.env.GH_AW_MCP_SCRIPTS_API_KEY).toBeUndefined();
+      expect(options.env.GH_AW_MCP_SCRIPTS_ENV_616c706861_4150495f4b4559).toBeUndefined();
+      expect(options.env.JOB_SECRET).toBeUndefined();
+    }
   });
 
   it("installs python dependencies before first invocation only", async () => {

@@ -4,6 +4,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { createToolEnvironment } = require("./mcp_handler_process.cjs");
 
 const installedDependencyPromises = new Map();
 const perToolInstallPromises = new Map();
@@ -41,7 +42,7 @@ function resolveShellPackageManager() {
 
   for (const manager of managers) {
     try {
-      execFileSyncRunner("which", [manager.command], { stdio: "pipe" });
+      execFileSyncRunner("which", [manager.command], { stdio: "pipe", env: createToolEnvironment() });
       return manager;
     } catch {
       // Manager not installed — ignored, try next manager.
@@ -67,7 +68,7 @@ function executeInstallWithRetry(logger, toolName, dependency, command, args, cw
       execFileSyncRunner(command, args, {
         cwd,
         stdio: "pipe",
-        env: process.env,
+        env: createToolEnvironment(),
       });
       logWithCore(logger, "info", `  [${toolName}] Installed dependency '${dependency}'`);
       return;
@@ -106,7 +107,7 @@ function installDependency(logger, toolName, dependency, manager, basePath) {
     const goModPath = path.join(basePath, "go.mod");
     if (!fs.existsSync(goModPath)) {
       try {
-        execFileSyncRunner("go", ["mod", "init", "example.com/mcp-scripts"], { cwd: basePath, stdio: "pipe", env: process.env });
+        execFileSyncRunner("go", ["mod", "init", "example.com/mcp-scripts"], { cwd: basePath, stdio: "pipe", env: createToolEnvironment() });
       } catch {
         // go.mod may have been created concurrently — failure is ignored.
       }

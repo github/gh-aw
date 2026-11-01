@@ -658,7 +658,6 @@ func (e *BehaviorDefinedEngine) buildBehaviorDefinedExecutionEnv(exec *EngineExe
 	applyEngineCwdEnv(env, workflowData)
 	applyEngineVersionEnv(env, workflowData)
 	applyEngineAndAgentEnv(env, workflowData, behaviorDefinedEngineLog)
-	applyMCPScriptsSecretEnv(env, workflowData)
 	e.applyBehaviorDefinedModelEnv(exec, workflowData, env)
 	if exec.ProtectedSessionCapture && firewallEnabled {
 		env["RUNNER_TEMP"] = "${{ runner.temp }}"

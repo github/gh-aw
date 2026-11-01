@@ -524,7 +524,6 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 	if isEditToolExplicitlyDisabled(workflowData.Tools) {
 		env["GH_AW_CLAUDE_DISABLE_REPO_EDITS"] = "true"
 	}
-	applyMCPScriptsSecretEnv(env, workflowData)
 	applyModelRoutingEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
 	return env

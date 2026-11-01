@@ -237,6 +237,12 @@ mcp-scripts:
 
 Secrets using `${{ secrets.* }}` are masked in logs.
 
+Each JavaScript, shell, Python, or Go invocation receives only its own declared bindings. Two tools can use the same variable name, such as `API_KEY`, with different secret expressions without overwriting or exposing each other's values. The compiler gives each binding a distinct server-side transport name; handlers receive the original declared names, not those transport names or the server's authentication key. Tool bindings are supplied only to the MCP scripts server startup step, not to the agent or gateway environment.
+
+Handlers also retain ordinary runtime variables: `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TZ`, `GITHUB_WORKSPACE`, `RUNNER_TEMP`, `GOROOT`, `GOPATH`, `GOCACHE`, and `GOMODCACHE`. Other ambient variables, including job-level credentials and interpreter startup options, are not inherited. Declare additional configuration in the tool's `env:` block. Dependency installers receive only the ordinary runtime variables, never tool or server credentials.
+
+Recompile existing workflows to generate the per-tool transport bindings. Environment filtering is not a filesystem or network sandbox: trusted tools still run on the runner host and must not inspect other processes or credential files.
+
 ## Large Output Handling
 
 When output exceeds 500 characters, it's saved to a file. The agent receives the file path, size, and JSON schema preview (if applicable).

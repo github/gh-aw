@@ -187,13 +187,12 @@ func TestGenerateMCPScriptsToolsConfigWithEnv(t *testing.T) {
 		t.Error("Tools config should contain env field")
 	}
 
-	// Verify that env contains environment variable names (not secrets or $ prefixes)
-	// The values should be just the variable names like "GH_TOKEN": "GH_TOKEN"
-	if !strings.Contains(toolsJSON, `"GH_TOKEN": "GH_TOKEN"`) {
+	// The manifest refers to tool-specific transport names, never secret values.
+	if !strings.Contains(toolsJSON, `"GH_TOKEN": "`+mcpScriptEnvBindingName("github-query", "GH_TOKEN")+`"`) {
 		t.Error("Tools config should contain GH_TOKEN env variable name")
 	}
 
-	if !strings.Contains(toolsJSON, `"API_KEY": "API_KEY"`) {
+	if !strings.Contains(toolsJSON, `"API_KEY": "`+mcpScriptEnvBindingName("github-query", "API_KEY")+`"`) {
 		t.Error("Tools config should contain API_KEY env variable name")
 	}
 

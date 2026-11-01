@@ -1009,10 +1009,8 @@ func TestCodexEngineRenderMCPConfigUserAgentWithHyphen(t *testing.T) {
 	}
 }
 
-// TestCodexEngineMCPScriptsSecrets verifies that mcp-scripts secrets are passed to the execution step
+// TestCodexEngineMCPScriptsSecrets verifies that tool secrets stay out of agent execution.
 func TestCodexEngineMCPScriptsSecrets(t *testing.T) {
-	engine := NewCodexEngine()
-
 	// Create workflow data with mcp-scripts that have env secrets
 	workflowData := &WorkflowData{
 		Name: "test-workflow-with-mcp-scripts",
@@ -1041,23 +1039,27 @@ func TestCodexEngineMCPScriptsSecrets(t *testing.T) {
 		},
 	}
 
-	// Get execution steps
-	execSteps := engine.GetExecutionSteps(workflowData, "/tmp/test.log")
-	if len(execSteps) == 0 {
-		t.Fatal("Expected at least one execution step")
-	}
-
-	// Join all step lines to check content
-	stepContent := strings.Join(execSteps[0], "\n")
-
-	// Verify GH_TOKEN is in the env section
-	if !strings.Contains(stepContent, "GH_TOKEN: ${{ github.token }}") {
-		t.Errorf("Expected GH_TOKEN environment variable in step content:\n%s", stepContent)
-	}
-
-	// Verify API_KEY is in the env section
-	if !strings.Contains(stepContent, "API_KEY: ${{ secrets.API_KEY }}") {
-		t.Errorf("Expected API_KEY environment variable in step content:\n%s", stepContent)
+	for _, engine := range []CodingAgentEngine{NewCodexEngine(), NewCopilotEngine(), NewClaudeEngine(), NewAgyEngine()} {
+		t.Run(engine.GetID(), func(t *testing.T) {
+			execSteps := engine.GetExecutionSteps(workflowData, "/tmp/test.log")
+			if len(execSteps) == 0 {
+				t.Fatal("Expected at least one execution step")
+			}
+			for _, step := range execSteps {
+				stepContent := strings.Join(step, "\n")
+				if strings.Contains(stepContent, "GH_TOKEN: ${{ github.token }}") {
+					t.Error("MCP script GH_TOKEN must not reach the agent environment")
+				}
+				if strings.Contains(stepContent, "${{ secrets.API_KEY }}") || strings.Contains(stepContent, "GH_AW_MCP_SCRIPTS_ENV_") {
+					t.Error("MCP script secret bindings must not reach the agent environment")
+				}
+			}
+			for _, secret := range engine.GetRequiredSecretNames(workflowData) {
+				if secret == "API_KEY" || strings.HasPrefix(secret, "GH_AW_MCP_SCRIPTS_ENV_") {
+					t.Error("MCP script secrets must not be authorized for agent forwarding")
+				}
+			}
+		})
 	}
 }
 
