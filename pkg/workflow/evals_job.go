@@ -197,6 +197,9 @@ func (c *Compiler) buildPushEvalsStateJob(data *WorkflowData) (*Job, error) {
 	return job, nil
 }
 
+// buildPushEvalsStateScript builds the step that pushes evals.jsonl to the evals state
+// branch. push_evals_state.cjs skips not-evaluated input (evals_status.json) before the
+// generic state writer runs, so the branch keeps answer history only.
 func buildPushEvalsStateScript(data *WorkflowData) []string {
 	return []string{
 		"      - name: Push evals results to git\n",
@@ -215,7 +218,7 @@ func buildPushEvalsStateScript(data *WorkflowData) []string {
 		"          script: |\n",
 		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
 		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
-		"            const { main } = require('" + SetupActionDestination + "/push_experiment_state.cjs');\n",
+		"            const { main } = require('" + SetupActionDestination + "/push_evals_state.cjs');\n",
 		"            await main();\n",
 	}
 }

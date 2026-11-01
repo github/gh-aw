@@ -329,7 +329,7 @@ jobs:
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
+            await main({ deferredBindings: {"GH_AW_NEEDS_WINDOWS_PROBE_RESULT":"__GH_AW_DEFERRED_8A7273F1E0111802__"} });
       - name: Substitute placeholders
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -360,6 +360,7 @@ jobs:
             // Call the substitution function
             return await substitutePlaceholders({
               file: process.env.GH_AW_PROMPT,
+              deferredBindings: {"GH_AW_NEEDS_WINDOWS_PROBE_RESULT":"__GH_AW_DEFERRED_8A7273F1E0111802__"},
               substitutions: {
                 GH_AW_ALLOWED_EXTENSIONS: process.env.GH_AW_ALLOWED_EXTENSIONS,
                 GH_AW_CACHE_DESCRIPTION: process.env.GH_AW_CACHE_DESCRIPTION,
@@ -426,6 +427,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.codex/agents
@@ -696,7 +698,7 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .codex .github"
           GH_AW_AGENT_FILES: "AGENTS.md"
@@ -1685,6 +1687,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1722,6 +1725,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json

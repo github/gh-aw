@@ -248,6 +248,7 @@ If the pull request is still open, verify that:
     const expectRejectedBeforeCheckout = () => {
       expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
       expect(mockCore.setOutput).not.toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("checked_out", "true");
       expect(mockCore.setFailed).toHaveBeenCalled();
       expect(mockCore.exportVariable).not.toHaveBeenCalled();
       expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
@@ -1609,6 +1610,7 @@ If the pull request is still open, verify that:
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
       expect(mockExec.exec).not.toHaveBeenCalled();
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("checked_out", "true");
     });
 
     it("should skip checkout for push events", async () => {
@@ -1674,6 +1676,7 @@ If the pull request is still open, verify that:
       expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
 
       expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checked_out", "true");
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
@@ -1730,6 +1733,7 @@ If the pull request is still open, verify that:
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
       expect(mockExec.exec).not.toHaveBeenCalled();
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("checked_out", "true");
     });
 
     it("should skip checkout when workflow_dispatch has no aw_context input", async () => {
@@ -1739,6 +1743,7 @@ If the pull request is still open, verify that:
 
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
       expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("checked_out", "true");
     });
 
     it("should skip checkout when workflow_dispatch has no inputs at all", async () => {
@@ -1748,6 +1753,7 @@ If the pull request is still open, verify that:
 
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
       expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).not.toHaveBeenCalledWith("checked_out", "true");
     });
 
     it("should fail checkout when aw_context is invalid JSON", async () => {

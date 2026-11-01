@@ -19,6 +19,12 @@ func badVar() {
 	_ = s
 }
 
+func badParenLiteral() {
+	s := []int{1}
+	s = append(s, ([]int{2})...) // want `append\(s, \[\]int\{2\}\.\.\.\) can be simplified to append\(s, 2\)`
+	_ = s
+}
+
 func badWithComments() {
 	s := []int{1}
 	x := 99

@@ -364,6 +364,9 @@ func TestRestoreEngineConfigFoldersForDynamicWorkflows(t *testing.T) {
 					source := filepath.Join(base, engine.directory, engine.workflows, "review", "support")
 					require.NoError(t, os.MkdirAll(source, 0755))
 					require.NoError(t, os.WriteFile(filepath.Join(source, "data.json"), []byte(`{"trusted":true}`), 0644))
+					cmd := exec.Command("tar", "-cf", filepath.Join(base, "snapshot.tar"), "-C", base, engine.directory)
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, string(output))
 				}
 				data := &WorkflowData{EngineConfig: &EngineConfig{ID: engine.id}}
 				folders, files := resolveAgentManifestPaths(NewEngineRegistry(), data)
@@ -372,7 +375,7 @@ func TestRestoreEngineConfigFoldersForDynamicWorkflows(t *testing.T) {
 				_, script, found := strings.Cut(yaml.String(), "        run: ")
 				require.True(t, found)
 				script = strings.TrimPrefix(script, "|\n")
-				assert.Equal(t, tt.afterPRCheckout, strings.Contains(yaml.String(), "if: steps.checkout-pr.outcome == 'success'"))
+				assert.Equal(t, tt.afterPRCheckout, strings.Contains(yaml.String(), "if: steps.checkout-pr.outputs.checked_out == 'true'"))
 				scriptPath := filepath.Join(root, "restore.sh")
 				isolatedRestoreScript := strings.ReplaceAll(string(restoreScript), `SRC="/tmp/gh-aw/base"`, "SRC="+shellEscapeArg(base))
 				require.NoError(t, os.WriteFile(scriptPath, []byte(isolatedRestoreScript), 0644))
@@ -464,7 +467,7 @@ func TestEngineConfigRestorePrecedesAgentSteps(t *testing.T) {
 				if tt.want {
 					assert.Equal(t, 1, strings.Count(steps, restoreStepName))
 					restoreStep := extractWorkflowStepByName(t, steps, restoreStepName)
-					assert.Equal(t, tt.afterPRCheckout, strings.Contains(restoreStep, "if: steps.checkout-pr.outcome == 'success'"))
+					assert.Equal(t, tt.afterPRCheckout, strings.Contains(restoreStep, "if: steps.checkout-pr.outputs.checked_out == 'true'"))
 					folders, files := resolveAgentManifestPaths(compiler.engineRegistry, tt.data)
 					assert.Contains(t, restoreStep, `GH_AW_AGENT_FOLDERS: "`+strings.Join(folders, " ")+`"`)
 					assert.Contains(t, restoreStep, `GH_AW_AGENT_FILES: "`+strings.Join(files, " ")+`"`)

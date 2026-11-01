@@ -54,6 +54,7 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 		"/tmp/gh-aw/evals_token_usage.jsonl",
 		evalsExecutionEvidencePath,
 		"/tmp/gh-aw/evals.jsonl",
+		"/tmp/gh-aw/evals_status.json",
 		"if: always() && steps.redact_evals_results.outcome == 'success'",
 		"name: Upload evals accounting after failure",
 		"if: always() && steps.redact_evals_results.outcome != 'success'",
@@ -69,6 +70,9 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/execution.json") {
 		t.Fatal("conclusion must publish evals execution evidence")
 	}
+	if !strings.Contains(usage, "/tmp/gh-aw/usage/evals/evals_status.json") {
+		t.Fatal("conclusion must publish the evals not-evaluated marker")
+	}
 	script, err := os.ReadFile("../../actions/setup/sh/collect_usage_artifact_files.sh")
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +82,43 @@ func TestDailyAICEvalsAccountingTransport(t *testing.T) {
 	}
 	if !strings.Contains(string(script), "mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json") {
 		t.Fatal("collector must retain evals execution evidence")
+	}
+	if !strings.Contains(string(script), "cp /tmp/gh-aw/evals/evals_status.json /tmp/gh-aw/usage/evals/evals_status.json") {
+		t.Fatal("collector must retain the evals not-evaluated marker beside execution evidence")
+	}
+	if strings.Contains(string(script), "evals_status.json /tmp/gh-aw/usage/evals.jsonl") {
+		t.Fatal("collector must not publish the marker as an answer file")
+	}
+}
+
+func TestBuildParseEvalsResultsStepPassesJudgeExecutionOutcomeAndEngine(t *testing.T) {
+	compiler := NewCompiler()
+	for _, engineID := range []string{"claude", "copilot", "codex", "pi"} {
+		t.Run(engineID, func(t *testing.T) {
+			data := &WorkflowData{
+				AI:           engineID,
+				EngineConfig: &EngineConfig{ID: engineID},
+				Evals: &EvalsConfig{
+					Questions: []EvalDefinition{{ID: "docs_reviewed", Question: "Were the docs reviewed?"}},
+				},
+			}
+			steps := strings.Join(compiler.buildParseEvalsResultsStep(data), "")
+			if !strings.Contains(steps, fmt.Sprintf("GH_AW_EVALS_ENGINE: %q", engineID)) {
+				t.Errorf("parse step must pass the evals engine identity; got:\n%s", steps)
+			}
+			// The raw outcome is required: continue-on-error rewrites the conclusion to success.
+			if !strings.Contains(steps, "GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}") {
+				t.Errorf("parse step must pass the raw judge execution outcome; got:\n%s", steps)
+			}
+			if strings.Contains(steps, "steps.evals_agentic_execution.conclusion") {
+				t.Errorf("parse step must not classify the judge with the continue-on-error conclusion; got:\n%s", steps)
+			}
+
+			all := strings.Join(compiler.buildEvalsJobSteps(data), "")
+			if !strings.Contains(all, "id: evals_agentic_execution") {
+				t.Fatalf("evals job must expose the renamed judge execution step for the outcome expression:\n%s", all)
+			}
+		})
 	}
 }
 

@@ -19,9 +19,9 @@ network:
   allowed: [defaults]
 checkout:
   fetch-depth: 0
+imports:
+  - shared/tla-plus.md
 env:
-  JAVA_BIN: /tmp/gh-aw/agent/tla-tools/jre/bin/java
-  TLA2TOOLS_JAR: /tmp/gh-aw/agent/tla-tools/tla2tools.jar
   PYTHONDONTWRITEBYTECODE: "1"
 steps:
   - name: Set up Go for the compiled-profile verifier
@@ -29,26 +29,10 @@ steps:
     with:
       go-version-file: go.mod
       cache: true
-  - name: Prepare pinned TLA+ runtime
+  - name: Build compiled-profile verifier
     run: |
       set -euo pipefail
-      tools=/tmp/gh-aw/agent/tla-tools
-      mkdir -p "$tools/jre"
-      curl --fail --location --silent --show-error \
-        --output "$tools/jre.tar.gz" \
-        'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_linux_hotspot_21.0.12.1_1.tar.gz'
-      printf '%s  %s\n' \
-        2413149700df0f7d440500a84a8f764c535f21e5a5e87d38328b64eec2c5b500 \
-        "$tools/jre.tar.gz" | sha256sum --check --strict
-      tar -xzf "$tools/jre.tar.gz" --strip-components=1 -C "$tools/jre"
-      curl --fail --location --silent --show-error \
-        --output "$tools/tla2tools.jar" \
-        'https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar'
-      printf '%s  %s\n' \
-        011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd \
-        "$tools/tla2tools.jar" | sha256sum --check --strict
-      "$tools/jre/bin/java" -version
-      go build -o "$tools/verify-lock" ./cmd/gh-aw-security-model
+      go build -o /tmp/gh-aw/agent/tla-tools/verify-lock ./cmd/gh-aw-security-model
 tools:
   edit:
   bash: ["*"]

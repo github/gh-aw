@@ -19,7 +19,7 @@ function isTruthy(expr) {
   // Note: (.*?) allows an empty LHS — if the experiment variable was not set the substituted
   // condition looks like ' == "concise"', which correctly returns false here rather than
   // falling through to the generic truthy check and incorrectly returning true.
-  const comparison = trimmed.match(/^(.*?)\s*(===?|!==?)\s*(?:"([^"]*)"|'([^']*)')\s*$/);
+  const comparison = trimmed.match(/^(.*?)\s*(===?|!==?)\s*(?:"([^"]*)"|'([^']*)')\s*$/s);
   if (comparison) {
     const equal = comparison[1].trim() === (comparison[3] ?? comparison[4]);
     return comparison[2].startsWith("!") ? !equal : equal;

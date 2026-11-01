@@ -22,6 +22,9 @@ engine:
   copilot-sdk: true
   agent: contribution-checker
   max-continuations: 25
+  model-routing:
+    goal: cost
+    mode: economy
 
 imports:
   - shared/otlp.md

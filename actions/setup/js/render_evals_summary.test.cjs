@@ -3,9 +3,17 @@ import fs from "fs";
 
 const OUTPUT_DIR = "/tmp/gh-aw";
 const OUTPUT_PATH = "/tmp/gh-aw/evals.jsonl";
+const STATUS_PATH = "/tmp/gh-aw/evals_status.json";
+const EVALS_DIR = "/tmp/gh-aw/evals";
+const EXECUTION_PATH = `${EVALS_DIR}/execution.json`;
+const LOG_PATH = `${EVALS_DIR}/evals.log`;
+const FIXTURES_DIR = new URL("./fixtures/evals/", import.meta.url);
+const RUN_FIXTURES = JSON.parse(fs.readFileSync(new URL("runs.json", FIXTURES_DIR), "utf8"));
 
 const mockCore = {
   info: vi.fn(),
+  warning: vi.fn(),
+  setFailed: vi.fn(),
   summary: {
     addRaw: vi.fn().mockReturnThis(),
     write: vi.fn().mockResolvedValue(),
@@ -23,13 +31,18 @@ describe("render_evals_summary.cjs", () => {
     if (fs.existsSync(OUTPUT_PATH)) {
       fs.unlinkSync(OUTPUT_PATH);
     }
+    fs.rmSync(STATUS_PATH, { force: true });
     module = await import("./render_evals_summary.cjs");
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (fs.existsSync(OUTPUT_PATH)) {
       fs.unlinkSync(OUTPUT_PATH);
     }
+    fs.rmSync(STATUS_PATH, { force: true });
+    fs.rmSync(EXECUTION_PATH, { force: true });
+    fs.rmSync(LOG_PATH, { force: true });
   });
 
   describe("readEvalsResults", () => {
@@ -143,6 +156,95 @@ describe("render_evals_summary.cjs", () => {
       expect(mockCore.summary.write).toHaveBeenCalledTimes(1);
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("2 result(s)"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("written to step summary"));
+    });
+  });
+  describe("not-evaluated marker", () => {
+    /**
+     * Produces the marker exactly as the parse step does for an audited run.
+     * @param {string} runID
+     */
+    async function parseFailedRun(runID) {
+      const run = RUN_FIXTURES[runID];
+      const { parseMain } = await import("./run_evals.cjs");
+      vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(run.questions));
+      vi.stubEnv("GH_AW_EVALS_MODEL", run.model);
+      vi.stubEnv("GH_AW_EVALS_ENGINE", run.engine);
+      vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "failure");
+      vi.stubEnv("GITHUB_RUN_ID", runID);
+      vi.stubEnv("GITHUB_RUN_ATTEMPT", run.run_attempt);
+      fs.mkdirSync(EVALS_DIR, { recursive: true });
+      fs.writeFileSync(LOG_PATH, fs.readFileSync(new URL(run.log, FIXTURES_DIR), "utf8"));
+      fs.writeFileSync(EXECUTION_PATH, JSON.stringify(run.execution) + "\n");
+      await parseMain();
+    }
+
+    it("renderEvalsSummary_explains_40955414354_not_evaluated", async () => {
+      await parseFailedRun("40955414354");
+      expect(fs.existsSync(OUTPUT_PATH)).toBe(false);
+
+      // Simulate a secret reaching the marker; the redaction step must scrub it
+      // before the summary is published.
+      const marker = JSON.parse(fs.readFileSync(STATUS_PATH, "utf8"));
+      fs.writeFileSync(STATUS_PATH, JSON.stringify({ ...marker, reason: `${marker.reason} super-secret-value` }) + "\n");
+      vi.stubEnv("GH_AW_SECRET_NAMES", "EVALS_SECRET");
+      vi.stubEnv("SECRET_EVALS_SECRET", "super-secret-value");
+      for (const variable of ["OTEL_EXPORTER_OTLP_HEADERS", "GH_AW_OTLP_ALL_HEADERS", "GH_AW_OTLP_ENDPOINTS"]) vi.stubEnv(variable, "");
+      const { main: redact } = await import("./redact_evals_results.cjs");
+      await redact();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+
+      expect(module.readEvalsResults()).toEqual([]);
+      await module.main();
+
+      expect(mockCore.summary.addRaw).toHaveBeenCalledTimes(1);
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("<summary>BinEval Results</summary>");
+      expect(summary).toContain("**Evals did not run.**");
+      expect(summary).toContain("**Reason** (judge_not_started): The claude evals judge did not start");
+      expect(summary).toContain("**engine**: claude | **model**: evals");
+      expect(summary).not.toContain("super-secret-value");
+      expect(summary).not.toContain("❓ UNKNOWN");
+      expect(summary).not.toContain("| ID | Question | Answer |");
+      expect(summary).not.toContain("**UNKNOWN**:");
+    });
+
+    it("explains a judge that ran but did not complete", () => {
+      const body = module.buildEvalsBody([], { status: "not_evaluated", reason_code: "no_assistant_response", reason: "No <b>response</b> | text", engine: "copilot" });
+
+      expect(body).toContain("**Evals were not completed.**");
+      expect(body).toContain("No &lt;b&gt;response&lt;/b&gt; \\| text");
+      expect(body).not.toContain("❓ UNKNOWN");
+    });
+
+    it.each([
+      ["missing reason_code", { status: "not_evaluated", reason: "The judge did not start." }],
+      ["unknown reason_code", { status: "not_evaluated", reason_code: "judge_exploded", reason: "The judge did not start." }],
+      ["non-string reason", { status: "not_evaluated", reason_code: "judge_not_started", reason: 42 }],
+    ])("falls back to the answers file for a malformed marker (%s)", async (_description, marker) => {
+      fs.writeFileSync(STATUS_PATH, JSON.stringify(marker) + "\n");
+      fs.writeFileSync(OUTPUT_PATH, JSON.stringify({ ...RUN_FIXTURES["40955414354"].questions[0], answer: "YES", model: "evals", runid: "40955414354" }) + "\n");
+
+      expect(module.readEvalsStatus()).toBeNull();
+      await module.main();
+
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("| docs_reviewed |");
+      expect(summary).toContain("✅ YES");
+      expect(summary).toContain("**YES**: 1 | **NO**: 0 | **UNKNOWN**: 0");
+      expect(summary).not.toContain("Evals did not run");
+      expect(summary).not.toContain("Evals were not completed");
+    });
+
+    it("still renders a genuine judge UNKNOWN answer as a normal answer table", async () => {
+      fs.writeFileSync(OUTPUT_PATH, JSON.stringify({ ...RUN_FIXTURES["40955414354"].questions[0], answer: "UNKNOWN", model: "evals", runid: "40955414354" }) + "\n");
+
+      await module.main();
+
+      const summary = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summary).toContain("| docs_reviewed |");
+      expect(summary).toContain("❓ UNKNOWN");
+      expect(summary).toContain("**YES**: 0 | **NO**: 0 | **UNKNOWN**: 1");
+      expect(summary).not.toContain("Evals did not run");
     });
   });
 });

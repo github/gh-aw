@@ -1,0 +1,28 @@
+{
+  "40955414354": {
+    "workflow": "Claude Code User Documentation Review",
+    "engine": "claude",
+    "model": "evals",
+    "run_attempt": "1",
+    "log": "run-40955414354-evals.log",
+    "state_branch_rows": "state-claudecodeuserdocsreview.jsonl",
+    "execution": { "version": 1, "component": "evals", "run_id": 40955414354, "run_attempt": 1, "state": "not_started" },
+    "questions": [
+      { "id": "docs_reviewed", "question": "Did the agent review the project documentation from the perspective of a Claude Code user?" },
+      { "id": "feedback_produced", "question": "Was feedback or a report produced identifying documentation gaps for non-Copilot users?" }
+    ]
+  },
+  "40955410097": {
+    "workflow": "Copilot Session Insights",
+    "engine": "claude",
+    "model": "evals",
+    "run_attempt": "1",
+    "log": "run-40955410097-evals.log",
+    "state_branch_rows": "state-copilotsessioninsights.jsonl",
+    "execution": { "version": 1, "component": "evals", "run_id": 40955410097, "run_attempt": 1, "state": "not_started" },
+    "questions": [
+      { "id": "sessions_analyzed", "question": "Did the agent analyze GitHub Copilot coding agent sessions?" },
+      { "id": "insights_report_produced", "question": "Was a report produced with usage patterns, success rates, and performance metrics?" }
+    ]
+  }
+}

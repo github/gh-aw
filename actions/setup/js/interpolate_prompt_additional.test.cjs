@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url),
   __dirname = path.dirname(__filename),
-  core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
+  core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 const { isTruthy } = require("./is_truthy.cjs"),
   { selectBranch } = require("./template_branch.cjs"),
@@ -14,6 +14,7 @@ describe("renderMarkdownTemplate - Additional Edge Cases", () => {
     (it("should handle inline conditional at start of line", () => {
       const output = renderMarkdownTemplate("{{#if true}}Keep{{/if}}");
       expect(output).toBe("Keep");
+      expect(core.debug).toHaveBeenCalledWith("[renderMarkdownTemplate] Inline 1: KEEP");
     }),
       it("should handle inline conditional in middle of line", () => {
         const output = renderMarkdownTemplate("Before {{#if true}}Middle{{/if}} After");

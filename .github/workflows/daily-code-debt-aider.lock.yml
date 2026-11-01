@@ -440,6 +440,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.aider/agents
@@ -670,7 +671,7 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .aider .github"
           GH_AW_AGENT_FILES: ".aider.conf.yml AGENTS.md CONVENTIONS.md"
@@ -2128,6 +2129,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2165,6 +2167,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
