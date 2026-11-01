@@ -16,6 +16,7 @@ const { hasLocalOriginRemoteTrackingRef, execLocalGitSync: execGitSync } = requi
 const { isAncestorCommit, describeGitFailure, sanitizeBranchNameForPatch } = require("./git_patch_utils.cjs");
 const { normalizeCommitSHA } = require("./commit_sha_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
+const { WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 
 /**
  * Debug logging helper - logs to stderr when DEBUG env var matches
@@ -129,9 +130,11 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
   if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
     const patchResult = await generateGitPatch(branchName, baseBranch, { ...options, token: undefined });
     if (!patchResult.success) {
+      // Preserve only this fixed application diagnostic, never raw Git output.
+      const excludedOnlyMessage = `No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}`;
       return {
         success: false,
-        error: `Failed to generate filtered patch for bundle synthesis: ${describeGitFailure(patchResult.error || "", cwd)}`,
+        error: `Failed to generate filtered patch for bundle synthesis: ${patchResult.error === excludedOnlyMessage ? excludedOnlyMessage : describeGitFailure(patchResult.error || "", cwd)}`,
         bundlePath,
       };
     }

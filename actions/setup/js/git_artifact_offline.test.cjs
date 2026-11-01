@@ -9,6 +9,7 @@ const childProcess = require("child_process");
 const { generateGitPatch, getPatchPathForBranch } = require("./generate_git_patch.cjs");
 const { generateGitBundle, getBundlePathForBranch } = require("./generate_git_bundle.cjs");
 const { execLocalGitSync, hasLocalOriginRemoteTrackingRef, hasMergeCommitsInRange } = require("./git_helpers.cjs");
+const { WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 
 global.core = { debug: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
@@ -198,6 +199,23 @@ describe("local-only safe-output artifacts", () => {
 
   it("keeps pre-generation merge inspection offline", () => {
     expect(hasMergeCommitsInRange(base, "offline-feature", { cwd: repo })).toBe(false);
+    checkOfflineCalls();
+  });
+
+  it("sanitizes filtered bundle Git failures even when stderr includes compiler guidance", async () => {
+    spawn.mockRestore();
+    const originalSpawn = childProcess.spawnSync;
+    spawn = vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
+      if (args.includes("--name-only")) {
+        return { status: 1, stdout: "", stderr: `No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}\nsynthetic-secret`, error: undefined, signal: null };
+      }
+      return originalSpawn(command, args, options);
+    });
+    const result = await generateGitBundle("offline-feature", "main", { cwd: repo, excludedFiles: ["excluded.txt"] });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Failed to generate filtered patch for bundle synthesis: Git operation failed. Ensure the checkout contains the required refs and objects before agent execution.");
+    expect(result.error).not.toContain(WORKFLOW_COMPILATION_NOTICE);
+    expect(result.error).not.toContain("synthetic-secret");
     checkOfflineCalls();
   });
 
