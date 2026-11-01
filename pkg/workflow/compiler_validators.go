@@ -251,7 +251,7 @@ func (c *Compiler) warnLegacyBehaviorInstallationCooldown(workflowData *Workflow
 	}
 
 	message := fmt.Sprintf(
-		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (0 disables cooldown only outside strict mode, where zero is rejected)",
+		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (0 disables cooldown only outside strict mode; strict mode rejects zero)",
 		definition.ID,
 	)
 	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))

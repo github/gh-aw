@@ -215,12 +215,20 @@ func TestWarnLegacyBehaviorInstallationCooldown(t *testing.T) {
 		},
 	}
 
-	compiler.warnLegacyBehaviorInstallationCooldown(data, "workflow.md")
+	output := captureStderrOutput(t, func() {
+		compiler.warnLegacyBehaviorInstallationCooldown(data, "workflow.md")
+	})
+	assert.Contains(t, output, `engine definition "legacy" uses deprecated behaviors.installation.cooldown, which is ignored`)
+	assert.Contains(t, output, "set workflow engine.cooldown instead")
+	assert.Contains(t, output, "0 disables cooldown only outside strict mode; strict mode rejects zero")
 	assert.Equal(t, 1, compiler.GetWarningCount())
 
 	compiler.ResetWarningCount()
 	data.engineDefinition.Behaviors.Installation.Cooldown = nil
-	compiler.warnLegacyBehaviorInstallationCooldown(data, "workflow.md")
+	output = captureStderrOutput(t, func() {
+		compiler.warnLegacyBehaviorInstallationCooldown(data, "workflow.md")
+	})
+	assert.Empty(t, output)
 	assert.Zero(t, compiler.GetWarningCount())
 }
 
