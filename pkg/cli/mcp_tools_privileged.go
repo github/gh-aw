@@ -547,6 +547,9 @@ When two or more runs are provided, the first is the base (reference) run and
 the remaining runs are compared against it (diff mode), showing changes in
 firewall domains, MCP tool usage, and run metrics.
 
+Single-run MCP audits skip automatic previous-run baseline discovery to avoid
+extra API and artifact downloads; use gh aw audit when baseline comparison is needed.
+
 Each run accepts:
 - Numeric run ID: 1234567890
 - Run URL: https://github.com/owner/repo/actions/runs/1234567890
@@ -657,9 +660,13 @@ func runMCPAuditSubprocess(ctx context.Context, responseDeadline time.Time, exec
 	if timeout <= mcpAuditResponseMargin {
 		return nil, &mcpStageError{stage: "subprocess_slot", err: context.DeadlineExceeded}
 	}
-	cmdArgs := buildAuditCommandArgs(args, nil)
-	cmdArgs = append(cmdArgs, "--timeout", (timeout - mcpAuditResponseMargin).String())
-	cmdArgs = appendMCPPositionals(cmdArgs, runItems...)
+	cmdArgs := buildAuditCommandArgs(args, runItems)
+	timeoutArgs := []string{"--timeout", (timeout - mcpAuditResponseMargin).String()}
+	if boundary := slices.Index(cmdArgs, "--"); boundary >= 0 {
+		cmdArgs = slices.Insert(cmdArgs, boundary, timeoutArgs...)
+	} else {
+		cmdArgs = append(cmdArgs, timeoutArgs...)
+	}
 	cmd := execCmd(ctx, cmdArgs...)
 	cmd.WaitDelay = time.Second
 	stdout, err := cmd.Output()
@@ -718,6 +725,9 @@ func resolveAuditRunItems(args auditArgs) ([]string, error) {
 func buildAuditCommandArgs(args auditArgs, runItems []string) []string {
 	cmdArgs := []string{"audit"}
 	cmdArgs = append(cmdArgs, "-o", constants.TmpAwMcpLogsDir, "--json")
+	if len(runItems) == 1 {
+		cmdArgs = append(cmdArgs, "--no-baseline")
+	}
 	if len(args.Artifacts) > 0 {
 		cmdArgs = append(cmdArgs, "--artifacts", strings.Join(args.Artifacts, ","))
 	}
@@ -776,11 +786,15 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 	if partial != nil && partial["partial"] == true && partial["complete"] == false {
 		errorEnvelope["partial"] = true
 		errorEnvelope["complete"] = false
-		errorEnvelope["partial_results"] = map[string]any{"available": true}
+		errorEnvelope["partial_results"] = summarizeMCPAuditPartialResults(partial)
 	}
 	pipeDrainTimeout := mcpErrorStage(err, "") == "pipe_drain"
 	if pipeDrainTimeout {
-		errorEnvelope["partial_results"] = map[string]any{"available": report != nil}
+		if partial != nil {
+			errorEnvelope["partial_results"] = summarizeMCPAuditPartialResults(partial)
+		} else {
+			errorEnvelope["partial_results"] = map[string]any{"available": report != nil}
+		}
 	}
 	setAuditTimeoutEnvelope(errorEnvelope, err, pipeDrainTimeout, partial)
 	jsonBytes, jsonErr := json.Marshal(errorEnvelope)
@@ -791,6 +805,26 @@ func buildAuditErrorResult(err error, outputStr string, runItems []string) (*mcp
 		IsError: errorEnvelope["partial"] == true,
 		Content: []mcp.Content{&mcp.TextContent{Text: string(jsonBytes)}},
 	}, nil, nil
+}
+
+func summarizeMCPAuditPartialResults(partial map[string]any) map[string]any {
+	summary := map[string]any{"available": true}
+	if overview, ok := partial["overview"].(map[string]any); ok {
+		for _, field := range []string{"run_id", "workflow_name", "status", "conclusion", "event"} {
+			if value, ok := overview[field]; ok {
+				if text, ok := value.(string); ok {
+					value = sanitizeMCPUntrustedIdentifier(text)
+				}
+				summary[field] = value
+			}
+		}
+	}
+	for _, field := range []string{"jobs", "missing_tools", "missing_data", "mcp_failures"} {
+		if entries, ok := partial[field].([]any); ok {
+			summary[field+"_count"] = len(entries)
+		}
+	}
+	return summary
 }
 
 func decodeAuditReport(outputStr string) (any, map[string]any) {

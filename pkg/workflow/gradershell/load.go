@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,7 @@ const (
 // A leading ./ selects the declaring workflow's directory; other paths start at
 // the repository root.
 func ValidRunPath(path string) bool {
-	if path == "" || !strings.HasSuffix(path, ".sh") || strings.HasPrefix(path, "/") {
+	if !strings.HasSuffix(path, ".sh") {
 		return false
 	}
 	for _, c := range path {
@@ -36,13 +37,7 @@ func ValidRunPath(path string) bool {
 			return false
 		}
 	}
-	path = strings.TrimPrefix(path, "./")
-	for part := range strings.SplitSeq(path, "/") {
-		if part == "" || part == "." || part == ".." {
-			return false
-		}
-	}
-	return true
+	return fs.ValidPath(strings.TrimPrefix(path, "./"))
 }
 
 // Load reads a regular UTF-8 Bash source file of at most 64 KiB, without

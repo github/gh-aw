@@ -62,8 +62,32 @@ func ParseInputDefinition(inputConfig map[string]any) *InputDefinition {
 		}
 	}
 
+	if maxLength, exists := inputConfig["max-length"]; exists {
+		input.MaxLength = parseInputMaxLength(maxLength)
+	}
+
 	inputsLog.Printf("Parsed input definition: type=%s, required=%t, options=%d", input.Type, input.Required, len(input.Options))
 	return input
+}
+
+func parseInputMaxLength(value any) *int {
+	var maxLength int
+	switch value := value.(type) {
+	case int:
+		maxLength = value
+	case int64:
+		maxLength = int(value)
+	case uint64:
+		maxLength = int(value)
+	case float64:
+		if value == float64(int(value)) {
+			maxLength = int(value)
+		}
+	}
+	if maxLength > 0 {
+		return &maxLength
+	}
+	return nil
 }
 
 // ParseInputDefinitions parses a map of input definitions from a frontmatter map.

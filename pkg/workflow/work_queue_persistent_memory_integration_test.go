@@ -34,7 +34,7 @@ func TestWorkQueueESLintRefinerPersistentSnapshotCompilation(t *testing.T) {
 	directory := testutil.TempDir(t, "work-queue-eslint-memory-")
 	shared, err := filepath.Abs("../../.github/workflows/shared")
 	require.NoError(t, err)
-	require.NoError(t, os.Symlink(shared, filepath.Join(directory, "shared")))
+	require.NoError(t, os.CopyFS(filepath.Join(directory, "shared"), os.DirFS(shared)))
 	filename := filepath.Join(directory, "eslint-refiner.md")
 	require.NoError(t, os.WriteFile(filename, source, 0o600))
 	compiler := NewCompiler(WithVersion("integration"))

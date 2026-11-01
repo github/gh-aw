@@ -426,3 +426,38 @@ func TestGetEngineOption_AllBuiltInEngines(t *testing.T) {
 
 	assert.Nil(t, GetEngineOption("unknown-engine-xyz"))
 }
+
+func TestIsEngineExecutionStepName(t *testing.T) {
+	tests := map[string]bool{
+		"Execute Claude Code CLI":           true,
+		"Execute GitHub Copilot CLI":        true,
+		"Execute threat detection with AWF": true,
+		"Execute DeepSeek Harness":          true,
+		"Execute ":                          false,
+		"Install Claude Code CLI":           false,
+		"Run DeepSeek Harness":              false,
+		"":                                  false,
+	}
+	for name, want := range tests {
+		if got := IsEngineExecutionStepName(name); got != want {
+			t.Errorf("IsEngineExecutionStepName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func TestEngineExecutionStepName(t *testing.T) {
+	tests := map[string]string{
+		"Execute Claude Code CLI":  "Execute Claude Code CLI",
+		"Execute DeepSeek Harness": "Execute DeepSeek Harness",
+		"Run DeepSeek Harness":     "Execute Run DeepSeek Harness",
+	}
+	for name, want := range tests {
+		got := EngineExecutionStepName(name)
+		if got != want {
+			t.Errorf("EngineExecutionStepName(%q) = %q, want %q", name, got, want)
+		}
+		if !IsEngineExecutionStepName(got) {
+			t.Errorf("EngineExecutionStepName(%q) = %q does not satisfy IsEngineExecutionStepName", name, got)
+		}
+	}
+}

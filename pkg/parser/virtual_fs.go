@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -118,15 +121,92 @@ const BuiltinPathPrefix = "@builtin:"
 // readFileFunc is the function used to read file contents throughout the parser.
 // In wasm builds, this is overridden to read from a virtual filesystem
 // populated by the browser via SetVirtualFiles.
-// In native builds, builtin virtual files are checked first, then os.ReadFile.
+// In native builds, builtin virtual files are checked first, then cache-confined
+// reads for import cache paths and rooted reads using the resolver-selected base.
 var readFileFunc = func(path string) ([]byte, error) {
 	builtinVirtualFilesMu.RLock()
-	defer builtinVirtualFilesMu.RUnlock()
 	content, ok := builtinVirtualFiles.files[path]
 	if ok {
-		return bytes.Clone(content), nil
+		content = bytes.Clone(content)
+	}
+	builtinVirtualFilesMu.RUnlock()
+	if ok {
+		return content, nil
+	}
+	return readDiskFile(path)
+}
+
+func readDiskFile(path string) ([]byte, error) {
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	if importCacheMarkerIndex(absolutePath) >= 0 {
+		return readCacheAwareFile(path)
+	}
+	if bases := localIncludeReadBases.load(absolutePath); len(bases) > 0 {
+		var content []byte
+		for i, base := range bases {
+			readContent, err := fileutil.ReadFileWithinBase(base, absolutePath)
+			if err != nil {
+				return nil, err
+			}
+			if i == 0 {
+				content = readContent
+			}
+		}
+		return content, nil
+	}
+	for dir := filepath.Dir(path); ; dir = filepath.Dir(dir) {
+		if name := filepath.Base(dir); name == ".github" || name == ".agents" {
+			return fileutil.ReadFileWithinBase(dir, path)
+		}
+		if parent := filepath.Dir(dir); parent == dir {
+			break
+		}
 	}
 	return os.ReadFile(path)
+}
+
+// Keep resolver-selected boundaries across the string-only ResolveIncludePath /
+// ReadFile API, including reads through repository-relative manifest paths.
+// Snapshots are immutable; resolving the same file from another base must not
+// discard an earlier boundary while its caller is still using that path.
+type includeReadBaseRegistry struct {
+	mu    sync.RWMutex
+	paths map[string][]string
+}
+
+var localIncludeReadBases = includeReadBaseRegistry{paths: make(map[string][]string)}
+
+func (r *includeReadBaseRegistry) load(path string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.paths[path]
+}
+
+func registerLocalIncludeReadBase(path, base string) {
+	localIncludeReadBases.register(path, base)
+}
+
+func (r *includeReadBaseRegistry) register(path, base string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	current := r.paths[path]
+	if !slices.Contains(current, base) {
+		r.paths[path] = append(slices.Clone(current), base)
+	}
+}
+
+func validateIncludeSecurityBase(base string) error {
+	info, err := os.Lstat(base)
+	if err != nil {
+		return fmt.Errorf("failed to inspect include base directory %q: %w", base, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("security: include base directory %q must not be a symlink", base)
+	}
+	return nil
 }
 
 // ReadFile reads a file using the parser's file reading function, which

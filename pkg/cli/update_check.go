@@ -99,7 +99,7 @@ func getLastCheckFilePathImpl() string {
 
 // updateLastCheckTime updates the timestamp of the last update check
 func updateLastCheckTime() {
-	writeUpdateCheckTime(getLastCheckFilePath(), constants.FilePermPublic, "update check", updateCheckLog)
+	writeUpdateCheckTime(getLastCheckFilePath(), constants.FilePermSensitive, "update check", updateCheckLog)
 }
 
 func checkForUpdatesWithContext(ctx context.Context, noCheckUpdate bool, verbose bool) {

@@ -135,6 +135,7 @@ func TestBuildCustomSafeOutputScriptsJSONEmpty(t *testing.T) {
 
 // TestGenerateCustomScriptToolDefinition verifies MCP tool definition for scripts
 func TestGenerateCustomScriptToolDefinition(t *testing.T) {
+	maxLength := 40000
 	scriptConfig := &SafeScriptConfig{
 		Description: "Post a message to Slack",
 		Inputs: map[string]*InputDefinition{
@@ -147,6 +148,7 @@ func TestGenerateCustomScriptToolDefinition(t *testing.T) {
 				Description: "Message text",
 				Required:    true,
 				Type:        "string",
+				MaxLength:   &maxLength,
 			},
 		},
 		Script: "return async (m) => ({ success: true });",
@@ -165,6 +167,7 @@ func TestGenerateCustomScriptToolDefinition(t *testing.T) {
 	properties, ok := inputSchema["properties"].(map[string]any)
 	require.True(t, ok, "Should have properties")
 	assert.Len(t, properties, 2, "Should have 2 properties")
+	assert.Equal(t, maxLength, properties["message"].(map[string]any)["maxLength"])
 
 	required, ok := inputSchema["required"].([]string)
 	require.True(t, ok, "Should have required field")

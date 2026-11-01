@@ -8,6 +8,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUniversalLLMConsumerEngine_GetUniversalRequiredSecretNames_NilWorkflowData(t *testing.T) {
@@ -41,6 +42,89 @@ func TestUniversalLLMConsumerEngine_ApplyUniversalProviderEnv_SetsProvider(t *te
 			assert.Equal(t, tt.provider, env["GH_AW_LLM_PROVIDER"])
 		})
 	}
+}
+
+func TestUniversalLLMConsumerEngine_CopilotCredentialIsolation(t *testing.T) {
+	engine := &UniversalLLMConsumerEngine{}
+	for _, useCopilotRequests := range []bool{false, true} {
+		for _, firewallEnabled := range []bool{false, true} {
+			t.Run(strconv.FormatBool(useCopilotRequests)+"/"+strconv.FormatBool(firewallEnabled), func(t *testing.T) {
+				data := &WorkflowData{Model: "copilot/gpt-5", EngineConfig: &EngineConfig{}}
+				expectedToken := "${{ secrets.COPILOT_GITHUB_TOKEN }}"
+				expectedSecrets := []string{"COPILOT_GITHUB_TOKEN"}
+				if useCopilotRequests {
+					data.Permissions = "copilot-requests: write"
+					expectedToken = "${{ github.token }}"
+					expectedSecrets = []string{}
+				}
+				env := map[string]string{}
+				engine.ApplyUniversalProviderEnv(env, data, firewallEnabled)
+				assert.Equal(t, expectedToken, env["COPILOT_GITHUB_TOKEN"])
+				assert.NotContains(t, env, "OPENAI_API_KEY")
+				assert.NotContains(t, env, "CODEX_API_KEY")
+				assert.ElementsMatch(t, expectedSecrets, engine.GetUniversalRequiredSecretNames(data))
+				if firewallEnabled {
+					assert.Equal(t, env["GITHUB_COPILOT_BASE_URL"], env["OPENAI_BASE_URL"])
+				} else {
+					assert.NotContains(t, env, "OPENAI_BASE_URL")
+				}
+			})
+		}
+	}
+}
+
+func TestUniversalLLMConsumerEngine_NonCopilotCredentials(t *testing.T) {
+	engine := &UniversalLLMConsumerEngine{}
+	for _, model := range []string{"anthropic/claude-sonnet-4.6", "openai/gpt-5", "codex/gpt-5"} {
+		t.Run(model, func(t *testing.T) {
+			env := map[string]string{}
+			engine.ApplyUniversalProviderEnv(env, &WorkflowData{Model: model, EngineConfig: &EngineConfig{}}, true)
+			assert.NotContains(t, env, "COPILOT_GITHUB_TOKEN")
+			if model == "anthropic/claude-sonnet-4.6" {
+				assert.Equal(t, "${{ secrets.ANTHROPIC_API_KEY }}", env["ANTHROPIC_API_KEY"])
+				assert.NotContains(t, env, "OPENAI_API_KEY")
+			} else {
+				assert.Equal(t, "${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}", env["OPENAI_API_KEY"])
+				assert.Equal(t, env["OPENAI_API_KEY"], env["CODEX_API_KEY"])
+			}
+		})
+	}
+}
+
+func TestUniversalLLMConsumerEngine_BackendResolution(t *testing.T) {
+	for _, tc := range []struct {
+		model   string
+		backend UniversalLLMBackend
+	}{
+		{" copilot / org/model ", UniversalLLMBackendCopilot},
+		{"ANTHROPIC/model", UniversalLLMBackendAnthropic},
+		{"openai/org/model", UniversalLLMBackendCodex},
+		{"codex/model", UniversalLLMBackendCodex},
+		{"", ""},
+		{"copilot", ""},
+		{"/model", ""},
+		{"copilot/ ", ""},
+		{"unknown/model", ""},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			backend, err := resolveUniversalLLMBackendFromModel(tc.model)
+			assert.Equal(t, tc.backend, backend)
+			if tc.backend == "" {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+	aliases := map[string]UniversalLLMBackend{"github-copilot": UniversalLLMBackendCopilot}
+	backend, err := resolveBackendWithAliases(" GITHUB-COPILOT / org/model ", aliases)
+	require.NoError(t, err)
+	assert.Equal(t, UniversalLLMBackendCopilot, backend)
+	backend, err = resolveBackendWithAliases("anthropic/model", aliases)
+	require.NoError(t, err)
+	assert.Equal(t, UniversalLLMBackendAnthropic, backend)
+	_, err = resolveBackendWithAliases("github-copilot", aliases)
+	require.Error(t, err)
 }
 
 func TestUniversalLLMConsumerEngine_ProviderURLsFollowNetworkTopology(t *testing.T) {

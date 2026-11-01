@@ -64,10 +64,19 @@ Actions expressions use the native `actionslanguageservice` grammar and quote-aw
 | `ProcessImportsFromFrontmatterWithSource` | `func(frontmatter map[string]any, baseDir string, cache *ImportCache, ...) (*ImportsResult, error)` | Resolves all `@import` directives in frontmatter, merging imported configs |
 | `ParseImportDirective` | `func(line string) *ImportDirectiveMatch` | Parses a single `@import` or `@include` line |
 | `NewImportCache` | `func(repoRoot string) *ImportCache` | Creates a new import cache rooted at the repository |
+| `(*ImportCache).ReadFile` | `func(path string) ([]byte, error)` | Reads a cache path through confined directory handles; rejects symlinks and non-regular files |
 | `ExpandIncludesWithManifest` | `func(content, baseDir string, extractTools bool) (string, []string, error)` | Expands `@include` directives in markdown body and returns included file paths |
 | `ExpandIncludesForEngines` | `func(content, baseDir string) ([]string, error)` | Returns engine names referenced via `@include` |
 | `ExpandIncludesForSafeOutputs` | `func(content, baseDir string) ([]string, error)` | Returns safe output types referenced via `@include` |
 | `ExtractBodyLevelImportPaths` | `func(content, baseDir string) []BodyLevelImport` | Scans markdown body for `{{#runtime-import}}` directives and returns them as workspace-root-relative `BodyLevelImport` entries |
+
+Native import-cache lookups reject symlink entries and symlink parent directories,
+including dangling links. Writes publish complete files atomically without
+truncating existing link targets. Use `ImportCache.ReadFile` or the parser's
+`ReadFile` for cache paths: a path returned by `Get` or `Set` can change after
+lookup and must not be read with an unconfined filesystem reader. On WebAssembly
+and Plan 9, confined disk caching is unavailable; browser virtual-file reads
+remain unchanged.
 
 #### GitHub URL Parsing
 
@@ -155,7 +164,7 @@ Actions expressions use the native `actionslanguageservice` grammar and quote-aw
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `FormatImportCycleError` | `func(*ImportCycleError) error` | Formats a cycle error with the import chain |
-| `FormatImportError` | `func(*ImportError, yamlContent string) error` | Formats an import error with YAML context |
+| `FormatImportError` | `func(*ImportError, yamlContent string) error` | Formats an import error with YAML context without exposing its underlying error chain |
 | `NewFormattedParserError` | `func(formatted string) *FormattedParserError` | Creates a pre-formatted parser error |
 | `NewValidationError` | `func(field, value, reason, suggestion string) *ValidationError` | Creates a `ValidationError` embedding `validationerror.Payload`, for uniform detection via `errors.As` |
 | `FormatYAMLError` | `func(err error, frontmatterLineOffset int, sourceYAML string) string` | Formats a YAML error with source code context, adjusting line numbers by the frontmatter offset |
@@ -223,7 +232,7 @@ Inline skills are secondary skill definitions embedded in the same markdown file
 | `ValidMCPTypes` | `[]string` | Valid MCP transport types: `"stdio"`, `"http"`, `"local"` |
 | `IncludeDirectivePattern` | `*regexp.Regexp` | Matches `@import`, `@include`, and `{{#import ...}}` directives |
 | `LegacyIncludeDirectivePattern` | `*regexp.Regexp` | Matches legacy `@import`/`@include` forms |
-| `DefaultFileReader` | `FileReader` | Default file reader using `os.ReadFile` |
+| `DefaultFileReader` | `FileReader` | Default parser reader, including confined native import-cache reads |
 | `RepoConfigSchema` | `string` | Embedded JSON schema for repo-level configuration |
 
 ## Usage Examples

@@ -149,6 +149,9 @@ const (
 	// contain sensitive files.
 	DirPermSensitive fs.FileMode = 0o750
 
+	// DirPermOwnerOnly excludes group access for private evidence directories.
+	DirPermOwnerOnly fs.FileMode = 0o700
+
 	// DirPermPublic is standard non-sensitive directory access (0o755).
 	DirPermPublic fs.FileMode = 0o755
 )

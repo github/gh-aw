@@ -288,6 +288,7 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 		for _, line := range step {
 			if strings.Contains(line, "id: agentic_execution") {
 				step = injectComponentExecutionStarted(step, "evals", evalsExecutionEvidencePath)
+				step = enforceEngineExecutionStepName(step, engine)
 				break
 			}
 		}

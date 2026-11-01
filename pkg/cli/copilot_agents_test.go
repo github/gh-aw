@@ -451,6 +451,7 @@ func TestBuildAgenticWorkflowsSkillContentFallsBackToEmbeddedFileList(t *testing
 	assert.NotContains(t, content, agenticWorkflowsSkillFileListPlaceholder, "expected generated skill content to replace the file-list placeholder")
 	assert.Contains(t, content, "- `.github/aw/create-agentic-workflow.md`\n", "expected embedded fallback markdown file list to be used")
 	assert.Contains(t, content, "- `.github/aw/designer.md`\n", "expected generated skill content to include designer instruction file")
+	assert.Contains(t, content, "- `.github/aw/doctor.md`\n", "expected doctor guidance to remain discoverable without remote access")
 	assert.Contains(t, content, "- `.github/aw/debug-agentic-workflow.md`\n", "expected unified debugging to remain discoverable without remote access")
 	assert.Contains(t, content, "- `.github/aw/debug-model-engine-misconfiguration.md`\n", "expected model and engine misconfiguration debugging to remain discoverable without remote access")
 	assert.Contains(t, content, "- `.github/aw/analyzing-runs.md`\n", "expected run analysis to remain discoverable without remote access")

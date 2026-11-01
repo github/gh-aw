@@ -192,6 +192,14 @@ Compile the consuming workflow with `gh aw compile <workflow-name> --strict`, th
 
 ## Auth and provider rules
 
+For `universal-llm-consumer` execution with a `copilot/` model, the compiler
+supplies the real credential only as `COPILOT_GITHUB_TOKEN`. OpenAI-compatible
+clients receive a non-secret `OPENAI_API_KEY` placeholder inside the AWF sandbox,
+after provider credential discovery. Keep credential aliases out of the
+runner environment: setting `OPENAI_API_KEY` there enables the OpenAI adapter.
+The `OPENAI_BASE_URL` alias still points to the Copilot gateway. Recompile
+existing workflows after upgrading the compiler to adopt this routing.
+
 - prefer `secret-strategy: universal-llm-consumer` when the engine can reuse shared provider/model routing
 - pair that with `execution.provider-env-mode: universal-llm-consumer` when the CLI expects provider env vars
 - use `engine.auth` only for engine-specific secrets that must be injected directly into the CLI runtime

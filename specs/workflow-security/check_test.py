@@ -115,15 +115,17 @@ class TransportRunnerTest(unittest.TestCase):
 
 class RuntimePinTest(unittest.TestCase):
     def test_release_pin_matches_workflow_and_documentation(self):
-        expected = "d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"
+        expected = "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"
         self.assertEqual(check.JAR_SHA256, expected)
         workflow = (check.ROOT.parents[1] / ".github/workflows/daily-workflow-security-model.md").read_text()
+        self.assertIn("  - shared/tla-plus.md", workflow)
+        runtime = (check.ROOT.parents[1] / ".github/workflows/shared/tla-plus.md").read_text()
         self.assertIn("https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
-                      workflow)
+                      runtime)
         match = re.search(
             r"printf '%s  %s\\n' \\\n\s+([a-f0-9]{64}) \\\n"
             r'\s+"\$tools/tla2tools\.jar" \| sha256sum --check --strict',
-            workflow,
+            runtime,
         )
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), expected)

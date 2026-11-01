@@ -33,6 +33,12 @@ mcp-scripts:
 
 The agent can now call `greet-user` with a `name` parameter.
 
+## HTTP Transport Limits
+
+Generated workflows create a per-run API key and configure the MCP gateway to send it verbatim in the `Authorization` header. The HTTP server requires `GH_AW_MCP_SCRIPTS_API_KEY` at startup and rejects missing or incorrect request credentials with HTTP 401. `GET /health` and `OPTIONS` preflight requests remain unauthenticated.
+
+Request bodies are limited to 1 MiB, including chunked uploads. Oversized requests return HTTP 413; malformed JSON returns HTTP 400. Headers and body uploads each have a 30-second timeout. The upload deadline does not limit tool execution time.
+
 ## Tool Definition
 
 Each mcp-script tool requires a unique name and configuration:

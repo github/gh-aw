@@ -97,19 +97,19 @@ fi
 
 # Check if sha256sum or shasum is available (for checksum verification)
 HAS_CHECKSUM_TOOL=false
-CHECKSUM_CMD=""
+CHECKSUM_CMD=()
 if command -v sha256sum &> /dev/null; then
     HAS_CHECKSUM_TOOL=true
-    CHECKSUM_CMD="sha256sum"
+    CHECKSUM_CMD=(sha256sum)
 elif command -v shasum &> /dev/null; then
     HAS_CHECKSUM_TOOL=true
-    CHECKSUM_CMD="shasum -a 256"
+    CHECKSUM_CMD=(shasum -a 256)
 fi
 
 if [ "$SKIP_CHECKSUM" = false ] && [ "$HAS_CHECKSUM_TOOL" = false ]; then
-    print_warning "Neither sha256sum nor shasum is available. Checksum verification will be skipped."
-    print_warning "To suppress this warning, use --skip-checksum flag."
-    SKIP_CHECKSUM=true
+    print_error "Neither sha256sum nor shasum is available. Cannot verify binary integrity."
+    print_info "Install sha256sum or shasum and retry."
+    exit 1
 fi
 
 # Determine OS and architecture
@@ -527,63 +527,90 @@ fi
 # Download and verify checksums if not skipped
 if [ "$SKIP_CHECKSUM" = false ]; then
     print_info "Downloading checksums file..."
-    CHECKSUMS_DOWNLOADED=false
-    
-    for attempt in $(seq 1 $MAX_RETRIES); do
-        if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$CHECKSUMS_URL" 2>/dev/null; then
-            CHECKSUMS_DOWNLOADED=true
-            print_success "Checksums file downloaded successfully"
-            break
-        else
-            if [ "$attempt" -eq "$MAX_RETRIES" ]; then
-                print_warning "Failed to download checksums file after $MAX_RETRIES attempts"
-                print_warning "Checksum verification will be skipped for this version."
-                print_info "This may occur for older releases that don't include checksums."
-                break
-            else
+    download_checksums_with_retry() {
+        local url="$1"
+        for attempt in $(seq 1 $MAX_RETRIES); do
+            if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$url" 2>/dev/null; then
+                print_success "Checksums file downloaded successfully"
+                return 0
+            fi
+            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
                 print_warning "Checksum download attempt $attempt failed. Retrying in 2s..."
                 sleep 2
             fi
-        fi
-    done
-    
-    # Verify checksum if we downloaded it successfully
-    if [ "$CHECKSUMS_DOWNLOADED" = true ]; then
-        print_info "Verifying binary checksum..."
-        
-        # Determine the expected filename in the checksums file
-        EXPECTED_FILENAME="$PLATFORM"
-        if [ "$OS_NAME" = "windows" ]; then
-            EXPECTED_FILENAME="${PLATFORM}.exe"
-        fi
-        
-        # Extract the expected checksum from the checksums file (exact filename match on field 2)
-        EXPECTED_CHECKSUM=$(awk -v f="$EXPECTED_FILENAME" '$2 == f {print $1}' "$CHECKSUMS_PATH")
-        
-        if [ -z "$EXPECTED_CHECKSUM" ]; then
-            print_warning "Checksum for $EXPECTED_FILENAME not found in checksums file"
-            print_warning "Checksum verification will be skipped."
-        else
-            # Compute the actual checksum of the downloaded binary
-            ACTUAL_CHECKSUM=$($CHECKSUM_CMD "$STAGED_BINARY_PATH" | awk '{print $1}')
-            
-            if [ "$ACTUAL_CHECKSUM" = "$EXPECTED_CHECKSUM" ]; then
-                print_success "Checksum verification passed!"
-                print_info "Expected: $EXPECTED_CHECKSUM"
-                print_info "Actual:   $ACTUAL_CHECKSUM"
+        done
+        return 1
+    }
+
+    if ! download_checksums_with_retry "$CHECKSUMS_URL"; then
+        if [ -n "$FALLBACK_CHECKSUMS_URL" ] && [ "$CHECKSUMS_URL" != "$FALLBACK_CHECKSUMS_URL" ]; then
+            print_warning "Failed to download checksums from latest redirect URL. Retrying with resolved tag URL ($LATEST_TAG)."
+            CHECKSUMS_URL="$FALLBACK_CHECKSUMS_URL"
+            if download_checksums_with_retry "$CHECKSUMS_URL"; then
+                CHECKSUMS_DOWNLOADED=true
             else
-                print_error "Checksum verification failed!"
-                print_error "Expected: $EXPECTED_CHECKSUM"
-                print_error "Actual:   $ACTUAL_CHECKSUM"
-                print_error "The downloaded binary may be corrupted or tampered with."
-                print_info "To skip checksum verification, use: ./install-gh-aw.sh $VERSION --skip-checksum"
-                exit 1
+                CHECKSUMS_DOWNLOADED=false
             fi
+        else
+            CHECKSUMS_DOWNLOADED=false
         fi
-        
-        # Clean up checksums file
-        rm -f "$CHECKSUMS_PATH"
+        if [ "$CHECKSUMS_DOWNLOADED" = false ]; then
+            print_error "Failed to download checksums file after $MAX_RETRIES attempts"
+            print_error "Cannot verify binary integrity. Installation aborted."
+            print_info "Check that $CHECKSUMS_URL is available and retry."
+            print_info "For older releases without checksums.txt, prefer a release with checksums or explicitly use --skip-checksum (disables integrity verification; corrupted or tampered binaries may be executed)."
+            exit 1
+        fi
     fi
+
+    print_info "Verifying binary checksum..."
+
+    EXPECTED_FILENAME="$PLATFORM"
+    if [ "$OS_NAME" = "windows" ]; then
+        EXPECTED_FILENAME="${PLATFORM}.exe"
+    fi
+
+    # Require exactly one well-formed SHA256 entry for the exact release asset.
+    if ! EXPECTED_CHECKSUM=$(awk -v f="$EXPECTED_FILENAME" '
+        $2 == f {
+            count++
+            if (NF != 2 || length($1) != 64 || $1 !~ /^[0-9a-fA-F]+$/) {
+                invalid = 1
+            }
+            checksum = tolower($1)
+        }
+        END {
+            if (count != 1 || invalid) {
+                exit 1
+            }
+            print checksum
+        }
+    ' "$CHECKSUMS_PATH"); then
+        print_error "Missing or malformed checksum for $EXPECTED_FILENAME in checksums file."
+        print_error "Cannot verify binary integrity. Installation aborted."
+        print_info "Use a release with exactly one valid SHA256 checksum for $EXPECTED_FILENAME."
+        exit 1
+    fi
+
+    if ! CHECKSUM_OUTPUT=$("${CHECKSUM_CMD[@]}" "$STAGED_BINARY_PATH"); then
+        print_error "Failed to compute binary checksum. Installation aborted."
+        exit 1
+    fi
+    ACTUAL_CHECKSUM=$(printf '%s\n' "$CHECKSUM_OUTPUT" | awk '{print tolower($1)}')
+
+    if [[ "$ACTUAL_CHECKSUM" =~ ^[0-9a-f]{64}$ ]] && [ "$ACTUAL_CHECKSUM" = "$EXPECTED_CHECKSUM" ]; then
+        print_success "Checksum verification passed!"
+        print_info "Expected: $EXPECTED_CHECKSUM"
+        print_info "Actual:   $ACTUAL_CHECKSUM"
+    else
+        print_error "Checksum verification failed!"
+        print_error "Expected: $EXPECTED_CHECKSUM"
+        print_error "Actual:   $ACTUAL_CHECKSUM"
+        print_error "The downloaded binary may be corrupted or tampered with. Installation aborted."
+        exit 1
+    fi
+
+    rm -f "$CHECKSUMS_PATH"
 else
     print_warning "Checksum verification skipped (--skip-checksum flag used)"
 fi

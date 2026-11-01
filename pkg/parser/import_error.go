@@ -53,7 +53,7 @@ func FormatImportCycleError(err *ImportCycleError) error {
 // helper can detect it via errors.As without creating a circular import.
 type FormattedParserError struct {
 	formatted string // The complete console-formatted error string ready for display.
-	cause     error  // The underlying error (e.g. ImportError.Cause) for errors.Is/As traversal.
+	cause     error  // Optional underlying error for formatters that preserve errors.Is/As traversal.
 }
 
 func (e *FormattedParserError) Error() string { return e.formatted }
@@ -66,7 +66,8 @@ func NewFormattedParserError(formatted string) *FormattedParserError {
 	return &FormattedParserError{formatted: formatted}
 }
 
-// FormatImportError formats an import error as a compilation error with source location
+// FormatImportError formats an import error as a compilation error with source location.
+// The formatted error does not expose the underlying import-resolution error chain.
 func FormatImportError(err *ImportError, yamlContent string) error {
 	importErrorLog.Printf("Formatting import error: path=%s, file=%s, line=%d", err.ImportPath, err.FilePath, err.Line)
 
@@ -116,7 +117,7 @@ func FormatImportError(err *ImportError, yamlContent string) error {
 	formattedErr := console.FormatError(compilerErr)
 	// Return a FormattedParserError so callers can detect that this error is already
 	// console-formatted and must not be re-wrapped with additional location context.
-	return &FormattedParserError{formatted: formattedErr, cause: err.Cause}
+	return NewFormattedParserError(formattedErr)
 }
 
 // buildImportErrorHint returns a tailored fix hint for an import error based on its message and path.

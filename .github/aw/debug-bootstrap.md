@@ -113,6 +113,9 @@ gh aw version
 
 Record failed-run compiler/runtime versions separately from the local CLI.
 Preserve intentional pins; upgrade only when diagnosis requires it.
+For missing, invalid, or insufficiently authorized tokens or apps, use the
+[interactive doctor methodology](doctor.md). Credential repairs require operator
+involvement; CLI authentication must never be copied into workflow credentials.
 `gh extension upgrade aw` selects the latest non-prerelease, possibly lagging
 prereleases. For model/endpoint, `model: auto`, cross-family child or pinned-install failures, follow
 [Model and engine misconfiguration](debug-agentic-workflow.md#model-and-engine-misconfiguration)

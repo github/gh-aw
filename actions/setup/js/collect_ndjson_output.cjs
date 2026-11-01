@@ -76,7 +76,20 @@ async function main() {
               error: `Line ${lineNum}: ${fieldName} must be a string`,
             };
           }
-          normalizedValue = sanitizeContent(value, { allowedAliases: allowedMentions, maxMentions, maxBotMentions, allowedAliasesSeen, deferMentions: deferMentionFiltering });
+          if (typeof inputSchema.maxLength === "number" && Array.from(value).length > inputSchema.maxLength) {
+            return {
+              isValid: false,
+              error: `Line ${lineNum}: ${fieldName} exceeds maximum length of ${inputSchema.maxLength} characters`,
+            };
+          }
+          normalizedValue = sanitizeContent(value, {
+            allowedAliases: allowedMentions,
+            maxMentions,
+            maxBotMentions,
+            allowedAliasesSeen,
+            deferMentions: deferMentionFiltering,
+            ...(typeof inputSchema.maxLength === "number" ? { maxLength: inputSchema.maxLength * 2, maxLines: inputSchema.maxLength + 1 } : {}),
+          });
           break;
         case "boolean":
           if (typeof value !== "boolean") {

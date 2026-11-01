@@ -127,6 +127,16 @@ func TestAWPoolInstallPreservesPolicyEpochAndExistingState(t *testing.T) {
 	if deployment == nil || deployment.CurrentContract != profile.LogicalContract {
 		t.Fatal("PoolInstall did not initialize the new worker deployment")
 	}
+	state := before
+	if err := state.installReplayPool(operation, commits[len(commits)-1]); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := before.Policy.Pools["smoke"]; exists {
+		t.Fatal("PoolInstall mutated the previous policy's pool map")
+	}
+	if !sameJSON(state.Policy.Pools, after.Policy.Pools) {
+		t.Fatal("PoolInstall did not preserve existing pools while growing the copied map")
+	}
 
 	for name, mutate := range map[string]func(*WorkerProfile){
 		"foreign-effect-scope": func(profile *WorkerProfile) { profile.EffectScope = "other/repo" },

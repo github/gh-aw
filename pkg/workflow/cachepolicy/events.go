@@ -1,8 +1,6 @@
 // Package cachepolicy defines the trigger boundary for compiler-managed cache writes.
 package cachepolicy
 
-import "slices"
-
 // WriteEvents returns GitHub's default-branch cache-write allowlist, plus
 // pull_request, whose caches are isolated to the pull request's merge ref.
 // https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#cache-access-for-low-trust-workflow-triggers
@@ -11,12 +9,6 @@ func WriteEvents() []string {
 		"push", "workflow_dispatch", "repository_dispatch", "delete",
 		"registry_package", "page_build", "schedule", "pull_request",
 	}
-}
-
-// AllowsWrite fails closed for unknown events. Reusable workflows use the
-// original caller's runtime event, not workflow_call.
-func AllowsWrite(event string) bool {
-	return slices.Contains(WriteEvents(), event)
 }
 
 // ReadOnlyEvents lists known events outside the write allowlist for authored

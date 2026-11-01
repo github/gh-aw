@@ -28,6 +28,7 @@ func TestPermissionConstantsValues(t *testing.T) {
 		{name: "FilePermPublic", got: FilePermPublic, want: 0o644},
 		{name: "FilePermExecutable", got: FilePermExecutable, want: 0o755},
 		{name: "DirPermSensitive", got: DirPermSensitive, want: 0o750},
+		{name: "DirPermOwnerOnly", got: DirPermOwnerOnly, want: 0o700},
 		{name: "DirPermPublic", got: DirPermPublic, want: 0o755},
 	}
 	for _, tt := range tests {

@@ -509,6 +509,20 @@ describe("collect_ndjson_output.cjs", () => {
       (expect(parsedOutput.errors).toHaveLength(0), expect(parsedOutput.items).toEqual([{ type: "post_to_slack", text: slackText }]));
       expect(parsedOutput.items[0]).not.toHaveProperty("channel");
     }),
+    it("preserves explicitly length-limited large strings in agent_output.json", async () => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      const payload = `${"😀".repeat(100000)}${"x\n".repeat(66000)}${"x".repeat(300000)}`;
+      const item = { type: "publish_report", payload };
+      fs.writeFileSync(testFile, JSON.stringify(item));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ publish_report: { inputs: { payload: { type: "string", maxLength: 600000 } } } }));
+
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+      const output = JSON.parse(fs.readFileSync("/tmp/gh-aw/agent_output.json", "utf8"));
+      expect(output.errors).toHaveLength(0);
+      expect(output.items).toEqual([item]);
+    }),
     it("should preserve zero-valued defaults in custom safe-job inputs", async () => {
       const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
       fs.writeFileSync(testFile, JSON.stringify({ type: "process_batch" }));
