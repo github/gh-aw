@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -13,6 +14,8 @@ import (
 )
 
 var mcpCLIMountLog = logger.New("workflow:mcp_cli_mount")
+
+var promptRepoIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 const (
 	// Keep these aligned with gh-aw-firewall's finite disclosure charge constants.
@@ -401,10 +404,12 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 
 func sanitizePromptRepoIdentifier(repo string) string {
 	repo = strings.TrimSpace(repo)
-	repo = strings.ReplaceAll(repo, "\r", " ")
-	repo = strings.ReplaceAll(repo, "\n", " ")
-	repo = strings.ReplaceAll(repo, "\t", " ")
-	repo = strings.ReplaceAll(repo, "`", "\\`")
+	if repo == "" {
+		return "[invalid-repo]"
+	}
+	if !promptRepoIdentifierPattern.MatchString(repo) {
+		return "[invalid-repo]"
+	}
 	return repo
 }
 
