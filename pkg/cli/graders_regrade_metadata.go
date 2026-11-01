@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -96,12 +97,13 @@ func regradeValidateRecordedIdentity(expected WorkflowRun, raw json.RawMessage) 
 	if err != nil {
 		return err
 	}
-	attempt, err := regradeIdentityInt64(metadata, "run_attempt", "runAttempt", "attempt")
+	recordedAttempt, err := regradeIdentityInt64(metadata, "run_attempt", "runAttempt", "attempt")
 	if err != nil {
 		return err
 	}
-	if int64(int(attempt)) != attempt {
-		return errors.New("recorded run attempt is outside the supported range")
+	attempt, err := regradeRecordedAttempt(recordedAttempt, math.MinInt, math.MaxInt)
+	if err != nil {
+		return err
 	}
 	repository, err := regradeIdentityString(metadata, "repository", "repo")
 	if err != nil {
@@ -117,7 +119,7 @@ func regradeValidateRecordedIdentity(expected WorkflowRun, raw json.RawMessage) 
 	}
 	actual := WorkflowRun{
 		DatabaseID: runID,
-		Attempt:    int(attempt),
+		Attempt:    attempt,
 		Repository: repository,
 		URL:        runURL,
 	}
@@ -143,6 +145,14 @@ func regradeValidateRecordedIdentity(expected WorkflowRun, raw json.RawMessage) 
 		}
 	}
 	return nil
+}
+
+func regradeRecordedAttempt(attempt, minInt, maxInt int64) (int, error) {
+	// Keep native bounds explicit before conversion, even when testing narrower bounds.
+	if attempt < math.MinInt || attempt > math.MaxInt || attempt < minInt || attempt > maxInt {
+		return 0, errors.New("recorded run attempt is outside the supported range")
+	}
+	return int(attempt), nil
 }
 
 func regradeIdentityString(metadata map[string]json.RawMessage, names ...string) (string, error) {
