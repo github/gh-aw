@@ -128,7 +128,9 @@ Analyze issue #${{ github.event.issue.number }}.
 
 ### URL Imports
 
-The macro syntax supports HTTP/HTTPS URLs. URLs are **not restricted to `.github` folder** and content is cached for 1 hour.
+The macro syntax supports unauthenticated HTTP/HTTPS URLs to public destinations. URLs are **not restricted to `.github` folder** and content is cached for 1 hour. Requests run during prompt creation on the runner, outside the agent network sandbox.
+
+Every DNS answer must be a public unicast IPv4 or IPv6 address, and the connection uses those validated addresses without resolving again. Loopback, private, link-local, cloud metadata, special-purpose, and IPv6 translation/tunneling destinations are rejected, including IP literals and mixed public/private DNS answers. Redirects and URL credentials are not supported. Public HTTPS imports retain hostname-based certificate verification.
 
 ```aw wrap
 {{#runtime-import https://raw.githubusercontent.com/org/repo/main/checklist.md}}
@@ -137,7 +139,7 @@ The macro syntax supports HTTP/HTTPS URLs. URLs are **not restricted to `.github
 
 ### Security Features
 
-Runtime imports automatically strip YAML front matter and HTML/XML comments. GitHub Actions expressions (`${{ ... }}`) are rejected to prevent template injection or unintended variable expansion.
+Runtime imports automatically strip YAML front matter and HTML/XML comments. GitHub Actions expressions (`${{ ... }}`) use a restricted set of expression capabilities. `env.*`, `secrets.*`, and `vars.*` are rejected, including inside comparisons and compound expressions; imported text cannot read the runner's ambient environment or action input tokens. Supported job outputs and inputs are read only through their compiler-provided bindings or GitHub event context.
 
 `needs.*.outputs.*` expressions are allowed inside imported markdown and are validated recursively across nested runtime imports. At compile time, gh-aw resolves every referenced runtime-import file under `.github`, checks the imported content for disallowed expressions, and follows any nested `{{#runtime-import ...}}` macros it finds. This lets shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
 

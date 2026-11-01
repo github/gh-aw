@@ -17,6 +17,7 @@ const {
   hasGitHubActionsMacros,
   isSafeExpression,
   evaluateExpression,
+  processExpressions,
   wrapExpressionsInTemplateConditionals,
   extractAndReplacePlaceholders,
   generatePlaceholderName,
@@ -139,6 +140,34 @@ describe("runtime_import", () => {
         }));
     }),
     describe("isSafeExpression", () => {
+      it.each([
+        "env.INPUT_GITHUB-TOKEN",
+        "env.GITHUB_TOKEN",
+        "env.NODE_VERSION",
+        "env.GH_AW_SECRET",
+        "env.INPUT_GITHUB-TOKEN || 'fallback'",
+        "github.actor && env.INPUT_GITHUB-TOKEN",
+        "github.actor == env.INPUT_GITHUB-TOKEN",
+        "inputs.name || env.INPUT_GITHUB-TOKEN",
+        "env['INPUT_GITHUB-TOKEN']",
+      ])("should deny ambient environment capabilities: %s", expression => {
+        expect(isSafeExpression(expression)).toBe(false);
+        expect(() => evaluateExpression(expression)).toThrow(/Unauthorized runtime import expression/);
+        expect(() => processExpressions(`Value: \${{ ${expression} }}`, "remote.md")).toThrow(/unauthorized GitHub Actions expressions/);
+      });
+
+      it("should never insert the github-script token into imported prompt text", async () => {
+        const token = "test-token-not-for-the-prompt";
+        process.env["INPUT_GITHUB-TOKEN"] = token;
+        try {
+          fs.writeFileSync(path.join(workflowsDir, "remote.md"), "${{ github.actor }}: ${{ env.INPUT_GITHUB-TOKEN }}");
+          await expect(processRuntimeImport("remote.md", false, tempDir)).rejects.toThrow(/unauthorized GitHub Actions expressions/);
+          expect(() => processExpressions("${{ github.actor && env.INPUT_GITHUB-TOKEN || 'fallback' }}", "https://example.com/prompt.md")).toThrow(/unauthorized GitHub Actions expressions/);
+        } finally {
+          delete process.env["INPUT_GITHUB-TOKEN"];
+        }
+      });
+
       it("should allow basic safe expressions", () => {
         expect(isSafeExpression("github.actor")).toBe(!0);
         expect(isSafeExpression("github.repository")).toBe(!0);
@@ -150,7 +179,7 @@ describe("runtime_import", () => {
         expect(isSafeExpression("steps.step-id.outputs.value")).toBe(!0);
         expect(isSafeExpression("github.event.inputs.repo")).toBe(!0);
         expect(isSafeExpression("inputs.repository")).toBe(!0);
-        expect(isSafeExpression("env.MY_VAR")).toBe(!0);
+        expect(isSafeExpression("env.MY_VAR")).toBe(!1);
       });
       it("should reject unsafe expressions", () => {
         expect(isSafeExpression("secrets.TOKEN")).toBe(!1);
@@ -167,7 +196,7 @@ describe("runtime_import", () => {
       });
       it("should allow OR with backtick literals", () => {
         expect(isSafeExpression("inputs.config || `default-config`")).toBe(!0);
-        expect(isSafeExpression("env.MODE || `production`")).toBe(!0);
+        expect(isSafeExpression("env.MODE || `production`")).toBe(!1);
       });
       it("should allow OR with number literals", () => {
         expect(isSafeExpression("inputs.count || 42")).toBe(!0);
@@ -431,20 +460,14 @@ describe("runtime_import", () => {
         expect(evaluateExpression("inputs.missing")).toContain("inputs.missing");
       });
       it("should not access prototype chain properties", () => {
-        // These should return undefined (wrapped expression) instead of accessing prototype
-        const result = evaluateExpression("github.constructor");
-        expect(result).toContain("${{");
-        expect(result).toContain("github.constructor");
+        expect(() => evaluateExpression("github.constructor")).toThrow(/Unauthorized runtime import expression/);
       });
       it("should not access __proto__ property", () => {
-        const result = evaluateExpression("github.__proto__");
-        expect(result).toContain("${{");
-        expect(result).toContain("github.__proto__");
+        expect(() => evaluateExpression("github.__proto__")).toThrow(/Unauthorized runtime import expression/);
       });
       it("should safely handle missing properties without prototype pollution", () => {
-        // These properties don't exist in the context object and should be undefined
-        expect(evaluateExpression("github.nonexistent")).toContain("${{");
-        expect(evaluateExpression("inputs.toString")).toContain("${{");
+        expect(evaluateExpression("inputs.nonexistent")).toContain("${{");
+        expect(() => evaluateExpression("inputs.toString")).toThrow(/Unauthorized runtime import expression/);
       });
       it("should handle array access safely with bounds checking", () => {
         // Test with actual array in context
@@ -462,9 +485,9 @@ describe("runtime_import", () => {
         };
         // Valid array access
         expect(evaluateExpression("github.event.release.assets[0].id")).toBe("123");
-        expect(evaluateExpression("github.event.release.assets[1].id")).toBe("456");
-        // Out of bounds - should return undefined
-        const outOfBounds = evaluateExpression("github.event.release.assets[999].id");
+        expect(() => evaluateExpression("github.event.release.assets[1].id")).toThrow(/Unauthorized runtime import expression/);
+        global.context.payload.release.assets = [];
+        const outOfBounds = evaluateExpression("github.event.release.assets[0].id");
         expect(outOfBounds).toContain("${{");
       });
       it("should escape $ and { in extracted string literals", () => {
@@ -1240,7 +1263,7 @@ describe("runtime_import", () => {
           expect(isSafeExpression("steps.checkout.outputs.ref")).toBe(true);
           expect(isSafeExpression("github.event.inputs.branch")).toBe(true);
           expect(isSafeExpression("inputs.version")).toBe(true);
-          expect(isSafeExpression("env.NODE_VERSION")).toBe(true);
+          expect(isSafeExpression("env.NODE_VERSION")).toBe(false);
           expect(isSafeExpression("experiments.prompt_style")).toBe(true);
         });
 
@@ -1390,8 +1413,8 @@ describe("runtime_import", () => {
         });
 
         it("should handle missing properties gracefully", () => {
-          const result = evaluateExpression("github.event.nonexistent.property");
-          expect(result).toContain("github.event.nonexistent.property");
+          const result = evaluateExpression("github.event.discussion.number");
+          expect(result).toContain("github.event.discussion.number");
         });
 
         describe("compound || expressions with deterministic env vars (compiler fix)", () => {
@@ -2368,56 +2391,21 @@ describe("runtime_import", () => {
       }
     });
 
-    it("should resolve with the body on a successful response", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(200);
-        res.end("hello world");
-      });
+    it("should reject loopback without contacting the server", async () => {
+      const handler = vi.fn((_req, res) => res.end("private data"));
+      server = http.createServer(handler);
       await new Promise(resolve => server.listen(0, resolve));
       const { port } = server.address();
       baseUrl = `http://127.0.0.1:${port}/file.txt`;
-
-      const content = await fetchUrlContent(baseUrl, tempDir);
-      expect(content).toBe("hello world");
+      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/public IP address/);
+      expect(handler).not.toHaveBeenCalled();
     });
 
-    it("should reject (not crash) when the response socket errors mid-transfer", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(200);
-        res.write("partial-data");
-        // Destroy the underlying socket mid-response to simulate a reset connection.
-        // With builtin fetch(), response.text() rejects when the socket is destroyed mid-transfer.
-        res.socket.destroy(new Error("simulated socket failure"));
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/file.txt`;
-
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/Failed to fetch URL/);
-    });
-
-    it("should reject when the HTTP status code is not 200", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(404);
-        res.end("not found");
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/missing.txt`;
-
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/ERR_API.*HTTP 404/);
-    });
-
-    it("should reject a redirect response instead of following it", async () => {
-      server = http.createServer((_req, res) => {
-        res.writeHead(302, { Location: "http://127.0.0.1:1/final.txt" });
-        res.end();
-      });
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/redirect.txt`;
-
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/ERR_API.*HTTP 302/);
+    it("should not trust an old URL cache entry", async () => {
+      const url = "http://127.0.0.1/private.txt";
+      const hash = crypto.createHash("sha256").update(url).digest("hex");
+      fs.writeFileSync(path.join(tempDir, `url-${hash}.cache`), "private data");
+      await expect(fetchUrlContent(url, tempDir)).rejects.toThrow(/public IP address/);
     });
   });
 });

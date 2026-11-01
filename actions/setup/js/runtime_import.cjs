@@ -11,6 +11,7 @@ const { ERR_API, ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("
 const { isTruthy } = require("./is_truthy.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
+const { validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
 
 const fs = require("fs");
 const path = require("path");
@@ -232,14 +233,12 @@ function isSafeExpression(expr) {
   // - github.event.inputs.* (workflow_dispatch inputs)
   // - github.aw.inputs.* (shared workflow inputs)
   // - inputs.* (workflow_call inputs)
-  // - env.* (environment variables)
   // Limit nesting depth to max 5 levels to prevent deep traversal attacks
   const dynamicPatterns = [
     /^(needs|steps)\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+){0,2}$/, // Max depth: needs.job.outputs.foo.bar (5 levels)
     /^github\.event\.inputs\.[a-zA-Z0-9_-]+$/,
     /^github\.aw\.inputs\.[a-zA-Z0-9_-]+$/,
     /^inputs\.[a-zA-Z0-9_-]+$/,
-    /^env\.[a-zA-Z0-9_-]+$/,
     /^experiments\.[a-zA-Z0-9_-]+$/,
   ];
 
@@ -418,6 +417,9 @@ function generateHashedExpressionEnvVarName(expr) {
  */
 function evaluateExpression(expr, resolution) {
   const trimmed = expr.trim();
+  if (!isSafeExpression(expr)) {
+    throw new Error(`${ERR_VALIDATION}: Unauthorized runtime import expression`);
+  }
   const resolved = (/** @type {string} */ value) => {
     if (resolution) resolution.resolved = true;
     return value;
@@ -500,7 +502,6 @@ function evaluateExpression(expr, resolution) {
           workspace: process.env.GITHUB_WORKSPACE || "",
           event: context.payload || {},
         },
-        env: process.env,
         inputs: context.payload?.inputs || {},
       };
 
@@ -622,7 +623,7 @@ function processExpressions(content, source, protectValue = value => value) {
           "Safe expressions include:\n" +
           "  - github.actor, github.repository, github.run_id, etc.\n" +
           "  - github.event.issue.number, github.event.pull_request.number, etc.\n" +
-          "  - needs.*, steps.*, env.*, inputs.*, experiments.*\n\n" +
+          "  - needs.*, steps.*, inputs.*, experiments.*\n\n" +
           "See documentation for the complete list of allowed expressions."
       );
     }
@@ -672,7 +673,7 @@ function processExpressions(content, source, protectValue = value => value) {
       "Safe expressions include:\n" +
       "  - github.actor, github.repository, github.run_id, etc.\n" +
       "  - github.event.issue.number, github.event.pull_request.number, etc.\n" +
-      "  - needs.*, steps.*, env.*, inputs.*, experiments.*\n\n" +
+      "  - needs.*, steps.*, inputs.*, experiments.*\n\n" +
       "See documentation for the complete list of allowed expressions.";
     throw new Error(errorMsg);
   }
@@ -710,6 +711,7 @@ const FETCH_URL_TIMEOUT_MS = 30_000;
  * @throws {Error} - If URL fetch fails
  */
 async function fetchUrlContent(url, cacheDir) {
+  const validatedUrl = validateImportUrl(url);
   // Create cache directory if it doesn't exist
   if (!fs.existsSync(cacheDir)) {
     try {
@@ -721,7 +723,11 @@ async function fetchUrlContent(url, cacheDir) {
 
   // Generate cache filename from URL (hash it for safety)
   const crypto = require("crypto");
-  const urlHash = crypto.createHash("sha256").update(url).digest("hex");
+  // Do not reuse content fetched before public-destination enforcement.
+  const urlHash = crypto
+    .createHash("sha256")
+    .update("public-v1:" + url)
+    .digest("hex");
   const cacheFile = path.join(cacheDir, `url-${urlHash}.cache`);
 
   // Check if cached version exists and is recent (less than 1 hour old)
@@ -751,23 +757,13 @@ async function fetchUrlContent(url, cacheDir) {
   // Fetch URL content
   core.info(`Fetching content from URL: ${url}`);
 
-  // Share a single abort signal across both the connection/headers phase and the body-reading
-  // phase, since fetch()'s own timeout signal is only honored until the promise resolves.
+  // Bound DNS resolution, connection establishment, and response body reads together.
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(new Error(`Timed out after ${FETCH_URL_TIMEOUT_MS}ms`)), FETCH_URL_TIMEOUT_MS);
 
-  let response;
   let data;
   try {
-    // Do not follow redirects automatically: a redirect landing on a 200 response would
-    // silently broaden the fetched origin and bypass the non-200 status check below.
-    response = await fetch(url, { signal: timeoutController.signal, redirect: "manual" });
-
-    if (!response.ok) {
-      throw new Error(`${ERR_API}: Failed to fetch URL ${url}: HTTP ${response.status}`);
-    }
-
-    data = await response.text();
+    data = await readPublicImportUrl(validatedUrl, timeoutController.signal);
   } catch (err) {
     if (err instanceof Error && err.message.startsWith(ERR_API)) {
       throw err;
