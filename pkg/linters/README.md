@@ -76,6 +76,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `stringsindexcontains` — reports `strings.Index(s, substr)` comparisons with `-1` or `0` (e.g. `!= -1`, `>= 0`, `> -1`, `== -1`, `< 0`, `<= -1`) and their yoda-order variants that should use `strings.Contains(s, substr)` or `!strings.Contains(s, substr)` instead.
 - `stringsindexhasprefix` — reports `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) and their yoda-order variants that should use `strings.HasPrefix(s, sub)` or `!strings.HasPrefix(s, sub)` instead.
 - `stringsjoinone` — reports `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is never used and the call is equivalent to just `s`.
+- `stringssplitfirst` — reports `strings.Split(s, sep)[0]` expressions with a non-empty constant separator that should use `strings.Cut`.
 - `timeafterleak` — reports `time.After` calls used as the channel-receive expression in a `select` case inside a `for` or `range` loop that leak a timer channel on each iteration when another case fires first.
 - `timesleepnocontext` — reports `time.Sleep` calls inside functions that already receive a `context.Context`, where a context-aware `select` should be used instead.
 - `timenowsub` — reports `time.Now().Sub(t)` calls that should be simplified to `time.Since(t)`.
@@ -149,7 +150,7 @@ returning a channel does not transfer ownership.
 
 Micro-optimizations flagged by allocation/perf linters (e.g. `stringsconcatloop`, `appendoneelement`,
 `appendbytestring`, `bytesbufferstring`, `bytescomparestring`, `lenstringsplit`, `mapclearloop`,
-`readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `stringbytesroundtrip`, `stringsjoinone`, `tolowerequalfold`, and
+`readerstringconv`, `reflectdeepequalusage`, `seenmapbool`, `slicemakezerolength`, `sortslice`, `stringbytesroundtrip`, `stringsjoinone`, `stringssplitfirst`, `tolowerequalfold`, and
 `writebytestring`) only matter on hot paths: applying them to code that tests never execute adds
 churn without a measurable benefit. These linters consult the shared
 `pkg/linters/internal/coverage` package, which loads a Go coverage profile (produced by
@@ -242,6 +243,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `stringsindexcontains` | Custom `go/analysis` analyzer that flags `strings.Index(s, substr)` comparisons with `-1` or `0` that should use `strings.Contains` or `!strings.Contains` |
 | `stringsindexhasprefix` | Custom `go/analysis` analyzer that flags `strings.Index(s, sub)` comparisons with `0` (`== 0`, `!= 0`) that should use `strings.HasPrefix` or `!strings.HasPrefix` |
 | `stringsjoinone` | Custom `go/analysis` analyzer that flags `strings.Join([]string{s}, sep)` calls with a single-element slice literal where the separator is unused and the call is equivalent to just `s` |
+| `stringssplitfirst` | Custom `go/analysis` analyzer that flags `strings.Split(s, sep)[0]` with a non-empty constant separator that should use `strings.Cut` |
 | `timeafterleak` | Custom `go/analysis` analyzer that flags `time.After` in `select` cases inside loops that leak a timer channel on each iteration when another case fires first |
 | `timesleepnocontext` | Custom `go/analysis` analyzer that flags `time.Sleep` calls in context-aware functions |
 | `timenowsub` | Custom `go/analysis` analyzer that flags `time.Now().Sub(t)` calls that should use `time.Since(t)` |
@@ -392,6 +394,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/stringsindexcontains` — strings-index-contains analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsindexhasprefix` — strings-index-has-prefix analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/stringsjoinone` — strings-join-one analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/stringssplitfirst` — strings-split-first analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timeafterleak` — time-after-leak analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage

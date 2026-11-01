@@ -73,6 +73,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/stringsindexcontains"
 	"github.com/github/gh-aw/pkg/linters/stringsindexhasprefix"
 	"github.com/github/gh-aw/pkg/linters/stringsjoinone"
+	"github.com/github/gh-aw/pkg/linters/stringssplitfirst"
 	"github.com/github/gh-aw/pkg/linters/timeafterleak"
 	"github.com/github/gh-aw/pkg/linters/timenowsub"
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
@@ -166,6 +167,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringsindexcontains.Analyzer,
 	stringsindexhasprefix.Analyzer,
 	stringsjoinone.Analyzer,
+	stringssplitfirst.Analyzer,
 	stringscountcontains.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
 	lenstringzero.Analyzer,
