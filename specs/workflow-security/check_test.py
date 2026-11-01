@@ -51,20 +51,30 @@ class TransportRunnerTest(unittest.TestCase):
                 check_transport.main()
             expected = [None, *check_transport.FAULTS.values(), *check_transport.WITNESSES]
             git_cases = list(check_transport.git_cases())
+            generation_cases = list(check_transport.generation_cases())
+            self.assertEqual(len(expected), 17)
+            self.assertEqual(len(git_cases), 24)
+            self.assertEqual(len(generation_cases), 42)
+            self.assertEqual(len(configurations), 100)
             self.assertEqual([call.args[2] for call in result.call_args_list],
-                             expected * 2 + [case[-1] for case in git_cases])
+                             expected * 2 + [case[-1] for case in git_cases]
+                             + [case[-1] for case in generation_cases])
             for transport in ["patch", "bundle"]:
                 self.assertEqual(
                     sum(f'Transport = "{transport}"' in config for config in configurations),
-                    len(expected),
+                    38,
                 )
-            git_configurations = configurations[len(expected) * 2:]
+            git_start = len(expected) * 2
+            generation_start = git_start + len(git_cases)
+            git_configurations = configurations[git_start:generation_start]
+            generation_configurations = configurations[generation_start:]
             secure_profiles = {(allow, shallow) for name, allow, shallow, _, _ in git_cases
                                if name.startswith("secure-")}
             self.assertEqual(secure_profiles, {(False, False), (False, True),
                                                (True, False), (True, True)})
             self.assertEqual(modules, ["SafeOutputTransport.tla"] * (len(expected) * 2)
-                             + ["SafeOutputGit.tla"] * len(git_cases))
+                             + ["SafeOutputGit.tla"] * len(git_cases)
+                             + ["SafeOutputGeneration.tla"] * len(generation_cases))
             for config, (name, allow, shallow, fault, invariant) in zip(git_configurations,
                                                                       git_cases):
                 self.assertIn(f'Fault = "{fault}"', config)
@@ -77,10 +87,61 @@ class TransportRunnerTest(unittest.TestCase):
                     self.assertIn(f"\nINVARIANT {invariant}\n", config)
                 else:
                     self.assertNotIn("\nINVARIANT ", config)
+            secure_generation_profiles = {
+                (transport, mode, allow)
+                for name, transport, mode, allow, _, _ in generation_cases
+                if name.startswith("secure-")
+            }
+            self.assertEqual(secure_generation_profiles, {
+                (transport, mode, allow)
+                for transport in ["patch", "bundle"]
+                for mode in ["full", "incremental"]
+                for allow in [False, True]
+            })
+            for transport in ["patch", "bundle"]:
+                transport_cases = [case for case in generation_cases if case[1] == transport]
+                self.assertEqual(len(transport_cases), 21)
+                self.assertEqual(
+                    {fault: invariant for _, _, _, _, fault, invariant in transport_cases
+                     if fault != "none"},
+                    check_transport.GENERATION_FAULTS,
+                )
+                self.assertEqual(
+                    {invariant for _, _, _, _, fault, invariant in transport_cases
+                     if fault == "none" and invariant is not None},
+                    set(check_transport.GENERATION_WITNESSES),
+                )
+            for config, (name, transport, mode, allow, fault, invariant) in zip(
+                    generation_configurations, generation_cases):
+                self.assertIn(f'Transport = "{transport}"', config)
+                self.assertIn(f'Mode = "{mode}"', config)
+                self.assertIn(f'Fault = "{fault}"', config)
+                self.assertIn(f"AllowFullHistoryFetch = {str(allow).upper()}", config)
+                for configured_invariant in [
+                    "LocalGeneration", "NoRecoveryAuthority", "NoGenerationAuthentication",
+                    "IncrementalBaseline", "StableGenerationRange", "ConfigurationPreserved",
+                    "EnvironmentPreserved", "MissingDataGuidance", "ArtifactPrerequisites",
+                    "RejectedNoArtifact",
+                ]:
+                    self.assertIn(f"    {configured_invariant}\n", config)
+                if invariant in check_transport.GENERATION_WITNESSES:
+                    self.assertIn(f"\nINVARIANT {invariant}\n", config)
+                    self.assertEqual(mode, "full" if invariant == "NoFullFallback"
+                                     else "incremental")
+                else:
+                    self.assertNotIn("\nINVARIANT ", config)
+                if fault != "none":
+                    self.assertEqual(mode, "incremental" if fault == "incremental-fallback"
+                                     else "full")
+                    self.assertEqual(allow, fault == "implicit-recovery")
             self.assertTrue(all(not destination.exists() for destination in destinations))
 
     def test_model_selection(self):
-        for model in ["transport", "git"]:
+        for model, expected, count in [
+            ("transport", "SafeOutputTransport", 34),
+            ("git", "SafeOutputGit", 24),
+            ("generation", "SafeOutputGeneration", 42),
+        ]:
             with self.subTest(model=model), tempfile.TemporaryDirectory() as directory:
                 jar = Path(directory) / "tla2tools.jar"
                 jar.write_bytes(b"local runtime fixture")
@@ -89,8 +150,7 @@ class TransportRunnerTest(unittest.TestCase):
                                   hashlib.sha256(jar.read_bytes()).hexdigest()), \
                      patch.object(check_transport, "run_case") as run:
                     check_transport.main(model)
-                expected = "SafeOutputGit" if model == "git" else "SafeOutputTransport"
-                self.assertGreater(run.call_count, 0)
+                self.assertEqual(run.call_count, count)
                 self.assertTrue(all(call.args[2] == expected for call in run.call_args_list))
 
     def test_git_tool_failure_is_surfaced_and_cleaned_up(self):

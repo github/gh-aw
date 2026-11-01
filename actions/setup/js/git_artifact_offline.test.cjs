@@ -36,12 +36,17 @@ describe("local-only safe-output artifacts", () => {
     git(["init", "--initial-branch=main"]);
     git(["config", "user.name", "Test User"]);
     git(["config", "user.email", "test@example.com"]);
+    fs.writeFileSync(path.join(repo, ".gitattributes"), "*.txt diff=hostile filter=hostile\n");
     fs.writeFileSync(path.join(repo, "content.txt"), "before\n");
+    fs.writeFileSync(path.join(repo, "excluded.txt"), "excluded before\n");
+    fs.writeFileSync(path.join(repo, "binary.dat"), Buffer.from([0, 1, 2]));
     git(["add", "."]);
     git(["commit", "-m", "baseline"]);
     base = git(["rev-parse", "HEAD"]);
     git(["checkout", "-b", "offline-feature"]);
     fs.writeFileSync(path.join(repo, "content.txt"), "after\n");
+    fs.writeFileSync(path.join(repo, "excluded.txt"), "excluded after\n");
+    fs.writeFileSync(path.join(repo, "binary.dat"), Buffer.from([0, 3, 255]));
     git(["add", "."]);
     git(["commit", "-m", "agent change"]);
     const helper = path.join(root, "recorder.sh");
@@ -81,6 +86,93 @@ describe("local-only safe-output artifacts", () => {
     expect(process.env.GIT_NO_LAZY_FETCH).toBe("0");
     expect(fs.readFileSync(path.join(repo, ".git", "config"), "utf8")).toBe(config);
   }
+
+  function configurePrograms() {
+    spawn.mockRestore();
+    const program = path.join(root, "program.sh");
+    fs.writeFileSync(program, `#!/bin/sh\nprintf 'ran\\n' >> '${marker}'\nexit 1\n`, { mode: 0o700 });
+    const hooks = path.join(root, "hooks");
+    fs.mkdirSync(hooks);
+    for (const hook of ["post-checkout", "pre-applypatch", "reference-transaction"]) {
+      fs.copyFileSync(program, path.join(hooks, hook));
+      fs.chmodSync(path.join(hooks, hook), 0o700);
+    }
+    for (const [key, value] of [
+      ["diff.external", program],
+      ["diff.hostile.command", program],
+      ["diff.hostile.textconv", program],
+      ["filter.hostile.clean", program],
+      ["filter.hostile.smudge", program],
+      ["filter.hostile.process", program],
+      ["filter.hostile.required", "true"],
+      ["core.hooksPath", hooks],
+      ["core.fsmonitor", program],
+      ["commit.gpgSign", "true"],
+      ["tag.gpgSign", "true"],
+      ["log.showSignature", "true"],
+      ["gpg.program", program],
+    ]) {
+      git(["config", key, value]);
+    }
+    config = fs.readFileSync(path.join(repo, ".git", "config"), "utf8");
+    spawn = vi.spyOn(childProcess, "spawnSync");
+    return { program, hooks };
+  }
+
+  it.each([
+    ["external diff", ["-c", "diff.hostile.command=", "diff", "--binary", "main..HEAD"]],
+    ["textconv", ["diff", "--no-ext-diff", "--textconv", "main..HEAD"]],
+    ["clean filter", ["hash-object", "-w", "--path=content.txt", "content.txt"]],
+    ["smudge filter", ["checkout-index", "--force", "content.txt"]],
+    ["process filter", ["hash-object", "-w", "--path=content.txt", "content.txt"]],
+    ["signing", ["commit-tree", "-S", "HEAD^{tree}", "-p", "HEAD", "-m", "signing control"]],
+    ["fsmonitor", ["status", "--porcelain"]],
+    ["hooks", ["update-ref", "refs/heads/control", "BASE"]],
+  ])("has a working harmless %s program control without the guard", (_kind, args) => {
+    const command = args.map(arg => (arg === "BASE" ? base : arg));
+    configurePrograms();
+    if (_kind === "clean filter" || _kind === "smudge filter") git(["config", "--unset", "filter.hostile.process"]);
+    childProcess.spawnSync("git", command, { cwd: repo, encoding: "utf8" });
+    expect(fs.readFileSync(marker, "utf8")).toContain("ran\n");
+  });
+
+  it("caller config and environment cannot re-enable local inspection programs", () => {
+    const { program, hooks } = configurePrograms();
+    const callerEnv = {
+      GIT_EXTERNAL_DIFF: program,
+      GIT_CONFIG_COUNT: "5",
+      GIT_CONFIG_KEY_0: "core.fsmonitor",
+      GIT_CONFIG_VALUE_0: program,
+      GIT_CONFIG_KEY_1: "core.hooksPath",
+      GIT_CONFIG_VALUE_1: hooks,
+      GIT_CONFIG_KEY_2: "commit.gpgSign",
+      GIT_CONFIG_VALUE_2: "true",
+      GIT_CONFIG_KEY_3: "filter.caller-only.process",
+      GIT_CONFIG_VALUE_3: program,
+      GIT_CONFIG_KEY_4: "filter.caller-only.required",
+      GIT_CONFIG_VALUE_4: "true",
+    };
+    const originalEnv = { ...callerEnv };
+    expect(execLocalGitSync(["-c", `diff.external=${program}`, "diff", "--ext-diff", "--textconv", "--binary", "main..HEAD"], { cwd: repo, env: callerEnv })).toContain("+after");
+    execLocalGitSync(["-c", `core.fsmonitor=${program}`, "status", "--porcelain"], { cwd: repo, env: callerEnv });
+    fs.appendFileSync(path.join(repo, ".gitattributes"), "content.txt filter=caller-only\n");
+    fs.writeFileSync(path.join(repo, "content.txt"), "raw staged content\n");
+    execLocalGitSync(["-c", `filter.hostile.process=${program}`, "add", "content.txt"], { cwd: repo, env: callerEnv });
+    expect(execLocalGitSync(["show", ":content.txt"], { cwd: repo, env: callerEnv })).toBe("raw staged content\n");
+    execLocalGitSync(["checkout-index", "--force", "content.txt"], { cwd: repo, env: callerEnv });
+    expect(fs.readFileSync(path.join(repo, "content.txt"), "utf8")).toBe("raw staged content\n");
+    execLocalGitSync(["-c", `core.hooksPath=${hooks}`, "update-ref", "refs/heads/guarded", base], { cwd: repo, env: callerEnv });
+    execLocalGitSync(["-c", "commit.gpgSign=true", "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "guarded"], { cwd: repo, env: callerEnv });
+    expect(callerEnv).toEqual(originalEnv);
+    checkOfflineCalls();
+  });
+
+  it("fails closed when a conversion filter name cannot be overridden through -c", () => {
+    const { program } = configurePrograms();
+    const env = { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "filter.a=b.process", GIT_CONFIG_VALUE_0: program };
+    expect(() => execLocalGitSync(["add", "content.txt"], { cwd: repo, env })).toThrow("cannot safely disable");
+    checkOfflineCalls();
+  });
 
   it("uses local tracking refs and never restores missing ones", () => {
     expect(hasLocalOriginRemoteTrackingRef("main", { cwd: repo })).toBe(false);
@@ -124,6 +216,42 @@ describe("local-only safe-output artifacts", () => {
     });
 
     for (const mode of ["full", "incremental"]) {
+      for (const filtered of [false, true]) {
+        it(`${kind} ${mode} ${filtered ? "filtered" : "unfiltered"} disables repository and environment programs`, async () => {
+          const { program } = configurePrograms();
+          vi.stubEnv("GIT_EXTERNAL_DIFF", program);
+          vi.stubEnv("GIT_CONFIG_COUNT", "2");
+          vi.stubEnv("GIT_CONFIG_KEY_0", "core.fsmonitor");
+          vi.stubEnv("GIT_CONFIG_VALUE_0", program);
+          vi.stubEnv("GIT_CONFIG_KEY_1", "commit.gpgSign");
+          vi.stubEnv("GIT_CONFIG_VALUE_1", "true");
+          const result = await generate("offline-feature", "main", { cwd: repo, mode, incrementalBaseSha: base, excludedFiles: filtered ? ["excluded.txt"] : undefined });
+          artifacts.add(result.patchPath || result.bundlePath);
+          expect(result.success).toBe(true);
+          checkOfflineCalls();
+          expect(process.env.GIT_EXTERNAL_DIFF).toBe(program);
+          expect(process.env.GIT_CONFIG_VALUE_0).toBe(program);
+          if (kind === "patch") {
+            const patch = fs.readFileSync(result.patchPath, "utf8");
+            expect(patch).toContain("+after");
+            expect(patch).toContain("GIT binary patch");
+            expect(patch.includes("+excluded after")).toBe(!filtered);
+            if (mode === "incremental") expect(result.diffSize).toBeGreaterThan(0);
+          } else {
+            // Inspect/import objects without checkout so hostile filters remain
+            // configured while verifying the actual bundle tree and metadata.
+            const heads = execLocalGitSync(["bundle", "list-heads", result.bundlePath], { cwd: repo }).trim();
+            const tip = heads.split(" ")[0];
+            expect(heads).toContain(filtered ? "HEAD" : "offline-feature");
+            expect(execLocalGitSync(["show", `${tip}:content.txt`], { cwd: repo })).toBe("after\n");
+            expect(execLocalGitSync(["show", `${tip}:excluded.txt`], { cwd: repo })).toBe(filtered ? "excluded before\n" : "excluded after\n");
+            expect(execLocalGitSync(["rev-parse", `${tip}:binary.dat`], { cwd: repo })).toBe(execLocalGitSync(["rev-parse", "HEAD:binary.dat"], { cwd: repo }));
+            expect(execLocalGitSync(["show", "-s", "--format=%an <%ae>%n%s", tip], { cwd: repo })).toContain("Test User <test@example.com>");
+            expect(fs.existsSync(marker)).toBe(false);
+          }
+        });
+      }
+
       it(`${kind} ${mode} never invokes a remote helper when tracking refs are missing`, async () => {
         const result = await generate("offline-feature", "main", { cwd: repo, mode, token: "synthetic-explicit-token" });
         expect(core.warning).toHaveBeenCalledTimes(1);

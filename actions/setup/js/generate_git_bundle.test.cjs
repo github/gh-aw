@@ -267,7 +267,7 @@ describe("generateGitBundle (incremental)", () => {
 
   it("generates a filtered bundle even when the repository configures failing checkout and apply-patch hooks", async () => {
     // Repository hooks requiring tooling absent from the safe-outputs environment must not
-    // break filtered bundle synthesis, which uses a temporary worktree and git am internally.
+    // break filtered bundle synthesis, which reuses an index-only synthesized commit.
     const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-bundle-hooks-remote-"));
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-bundle-hooks-work-"));
     tempDirs.push(remoteDir, workDir);

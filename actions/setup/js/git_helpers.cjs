@@ -454,13 +454,69 @@ function offlineGitOptions(options = {}) {
 }
 
 /**
- * Execute artifact-generation Git commands with every transport denied.
+ * Execute artifact-generation Git commands with every transport denied and
+ * repository-configured programs disabled. Generation uses index-only
+ * plumbing; other local callers stage/inspect raw files without conversion.
  * @param {string[]} args
  * @param {Object} [options]
  * @returns {string}
  */
 function execLocalGitSync(args, options = {}) {
-  return execGitSync(args, offlineGitOptions(options));
+  // Place command-local overrides after caller global options so neither -c
+  // nor GIT_CONFIG_* can re-enable hooks, fsmonitor, signing, or auto maintenance.
+  const commandIndex = args.findIndex((arg, index) => !arg.startsWith("-") && (index === 0 || !["-c", "-C", "--git-dir", "--work-tree", "--namespace", "--config-env"].includes(args[index - 1])));
+  const globalArgs = args.slice(0, commandIndex);
+  const commandArgs = args.slice(commandIndex);
+  const localOptions = offlineGitOptions(options);
+  const filterArgs = [];
+  if (["status", "add", "hash-object", "diff", "read-tree", "apply", "checkout", "checkout-index", "reset", "am"].includes(commandArgs[0])) {
+    // There is no wildcard -c override for attribute filter drivers. Discover
+    // their names without reading values or executing worktree conversions.
+    const result = execGitSyncResult([...globalArgs, "config", "--null", "--name-only", "--get-regexp", "^filter\\..*\\.(clean|smudge|process|required)$"], localOptions);
+    if (result.status !== 0 && result.status !== 1) throw new Error("Unable to inspect Git filter configuration safely");
+    const drivers = new Set(
+      result.stdout
+        .split("\0")
+        .filter(Boolean)
+        .map(key => key.replace(/\.(clean|smudge|process|required)$/, ""))
+    );
+    for (const driver of drivers) {
+      // -c separates key/value at '='; refuse an unrepresentable override.
+      if (driver.includes("=")) throw new Error("Local Git conversion cannot safely disable a filter driver containing '='");
+      filterArgs.push("-c", `${driver}.clean=`, "-c", `${driver}.smudge=`, "-c", `${driver}.process=`, "-c", `${driver}.required=false`);
+    }
+  }
+  if (["diff", "show", "log", "format-patch"].includes(commandArgs[0])) {
+    const separator = commandArgs.indexOf("--");
+    commandArgs.splice(separator < 0 ? commandArgs.length : separator, 0, "--no-ext-diff", "--no-textconv");
+  }
+  return execGitSync(
+    [
+      ...globalArgs,
+      "--no-pager",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "core.fsmonitor=false",
+      "-c",
+      "commit.gpgSign=false",
+      "-c",
+      "tag.gpgSign=false",
+      "-c",
+      "log.showSignature=false",
+      "-c",
+      "diff.submodule=short",
+      "-c",
+      "status.submoduleSummary=false",
+      "-c",
+      "gc.auto=0",
+      "-c",
+      "maintenance.auto=false",
+      ...filterArgs,
+      ...commandArgs,
+    ],
+    localOptions
+  );
 }
 
 /**

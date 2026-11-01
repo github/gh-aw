@@ -186,6 +186,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   let resolvedTipRef = null;
   /** @type {string[]} */
   let excludedWorkflowFiles = [];
+  /** @type {string | undefined} */
+  let filteredCommit;
 
   function noChangesResult() {
     return {
@@ -235,6 +237,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
       execGitSync(["apply", "--cached", "--binary", "--whitespace=nowarn", "-"], { cwd, env, input: diff });
       const tree = execGitSync(["write-tree"], { cwd, env }).trim();
       const commit = execGitSync(["commit-tree", tree, "-p", base, "-m", "Apply filtered changes"], { cwd, env }).trim();
+      filteredCommit = commit;
       return execGitSync(["format-patch", "-1", commit, "--stdout"], { cwd });
     } finally {
       fs.rmSync(indexDir, { recursive: true, force: true });
@@ -786,6 +789,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
       diffSize: diffSize,
       baseCommit: baseCommitSha,
       excludedWorkflowFiles,
+      filteredCommit,
     };
   }
 

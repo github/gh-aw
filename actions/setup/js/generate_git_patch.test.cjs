@@ -894,7 +894,7 @@ describe("generateGitPatch – Strategy 3 picks closest remote merge-base", () =
     const childProcess = require("child_process");
     const originalSpawnSync = childProcess.spawnSync;
     childProcess.spawnSync = (command, args, options) => {
-      if (command === "git" && args[0] === "write-tree") {
+      if (command === "git" && args.includes("write-tree")) {
         return { status: 1, stdout: "", stderr: "synthetic tree creation failed" };
       }
       return originalSpawnSync(command, args, options);

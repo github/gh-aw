@@ -8,7 +8,6 @@
 
 const fs = require("fs");
 const { scopedArtifactFilename } = require("./work_queue_claim_scope.cjs");
-const os = require("os");
 const path = require("path");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -132,25 +131,29 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
     if (!patchResult.success) {
       return { success: false, error: patchResult.error || "Failed to generate filtered patch for bundle synthesis", bundlePath };
     }
-    const tempWorktree = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-"));
-    // Repository hooks such as Git LFS must not run during internal synthesis.
-    const tempHooksDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-hooks-"));
-    const noHooksArgs = ["-c", `core.hooksPath=${tempHooksDir}`];
+    // Reuse the index-only synthesized commit; checkout/am would execute
+    // attribute conversion filters even with hooks disabled.
+    const tempGitDir = fs.mkdtempSync(path.join(path.dirname(bundlePath), "filtered-bundle-"));
     try {
-      execGitSync([...noHooksArgs, "worktree", "add", "--detach", tempWorktree, patchResult.baseCommit], { cwd });
-      execGitSync([...noHooksArgs, "am", "--3way", patchResult.patchPath], { cwd: tempWorktree });
-      execGitSync([...noHooksArgs, "bundle", "create", bundlePath, `${patchResult.baseCommit}..HEAD`], { cwd: tempWorktree });
+      if (!patchResult.filteredCommit) throw new Error("Filtered patch did not produce a synthesized commit");
+      const objects = execGitSync(["rev-parse", "--git-path", "objects"], { cwd }).trim();
+      const objectFormat = execGitSync(["rev-parse", "--show-object-format"], { cwd }).trim();
+      const env = {
+        ...process.env,
+        GIT_DIR: tempGitDir,
+        GIT_COMMON_DIR: tempGitDir,
+        GIT_OBJECT_DIRECTORY: path.resolve(cwd, objects),
+        GIT_WORK_TREE: undefined,
+        GIT_INDEX_FILE: undefined,
+      };
+      execGitSync(["init", "--bare", "--template=", `--object-format=${objectFormat}`, tempGitDir], { cwd, env });
+      execGitSync(["update-ref", "HEAD", patchResult.filteredCommit], { cwd, env });
+      execGitSync(["bundle", "create", bundlePath, `${patchResult.baseCommit}..HEAD`], { cwd, env });
       return { success: true, bundlePath, bundleSize: fs.statSync(bundlePath).size, baseCommit: patchResult.baseCommit };
     } catch (error) {
       return { success: false, error: `Failed to generate filtered bundle: ${getErrorMessage(error)}`, bundlePath };
     } finally {
-      try {
-        execGitSync([...noHooksArgs, "worktree", "remove", "--force", tempWorktree], { cwd });
-      } catch (error) {
-        core.warning(`Failed to remove temporary filtered-bundle worktree: ${getErrorMessage(error)}`);
-      }
-      fs.rmSync(tempWorktree, { recursive: true, force: true });
-      fs.rmSync(tempHooksDir, { recursive: true, force: true });
+      fs.rmSync(tempGitDir, { recursive: true, force: true });
     }
   }
 

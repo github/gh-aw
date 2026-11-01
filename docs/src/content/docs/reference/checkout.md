@@ -287,6 +287,9 @@ Safe-output patch and bundle generation is **local-only**. It never fetches
 missing refs or objects from the agent-writable checkout, even when safe-output
 API credentials are configured. All Git transports, including external remote
 helpers and partial-clone lazy fetches, are disabled during artifact generation.
+Repository-configured external diffs, text conversion, hooks, fsmonitor, and
+signing are also disabled. Filtered artifacts are synthesized from committed
+objects with index-only plumbing, without checkout or clean/smudge filters.
 Prepare the required refs with `checkout.fetch` and sufficient history with
 `checkout.fetch-depth` before agent execution; partial clones must also have the
 required blobs locally. Incremental updates require the pre-agent PR-head baseline
