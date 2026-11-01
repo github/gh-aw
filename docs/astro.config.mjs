@@ -279,6 +279,7 @@ export default defineConfig({
     mermaid({
       mermaidConfig: {
         layout: "dagre",
+        theme: "default",
         look: "classic",
       },
     }),

@@ -418,6 +418,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.pi/agents
@@ -682,7 +683,7 @@ jobs:
           GH_AW_APPROVAL_LABELS_VAR: ${{ vars.GH_AW_GITHUB_APPROVAL_LABELS || '' }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/parse_guard_list.sh"
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github .pi"
           GH_AW_AGENT_FILES: "AGENTS.MD AGENTS.md AGENTS.override.md CLAUDE.MD CLAUDE.md PI.md"
@@ -3405,6 +3406,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -3442,6 +3444,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -4098,6 +4101,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"nudge-targeted","question":"Did every Copilot nudge list only unanswered review feedback or concrete blockers, request a branch update, and include its Sous-chef state fingerprint?"},{"id":"dedup-respected","question":"Did the agent avoid nudging PRs classified as unchanged, stale, dependency_bot, opted_out, agent_active, not_idle, approval_required, or nothing_actionable, and entries with nudge_needed false, repeating unchanged work only for behind or conflicting branches?"},{"id":"progress-or-noop","question":"Did the agent either perform a specific forward-progress action on an eligible PR or stop with an explicit no-op when none remained?"}]'
           GH_AW_EVALS_MODEL: "copilot/claude-haiku-4.5"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "pi"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -4149,6 +4154,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -4375,7 +4381,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()

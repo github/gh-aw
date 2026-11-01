@@ -486,6 +486,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.pi/agents
@@ -848,7 +849,7 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github .pi"
           GH_AW_AGENT_FILES: "AGENTS.MD AGENTS.md AGENTS.override.md CLAUDE.MD CLAUDE.md PI.md"
@@ -1974,6 +1975,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2011,6 +2013,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2679,6 +2682,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"digest-generated","question":"Did the workflow analyze the prefetched repository activity and generate a coherent daily news digest?"},{"id":"discussion-created","question":"Was a daily-news discussion created or updated successfully with the report output?"}]'
           GH_AW_EVALS_MODEL: "copilot/grok"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "pi"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -2730,6 +2735,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -2829,7 +2835,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()

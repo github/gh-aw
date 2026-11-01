@@ -27,6 +27,7 @@ for file in \
   /tmp/gh-aw/detection_usage.jsonl \
   /tmp/gh-aw/threat-detection/detection_usage.jsonl \
   /tmp/gh-aw/evals/evals.jsonl \
+  /tmp/gh-aw/evals/evals_status.json \
   /tmp/gh-aw/evals/evals_token_usage.jsonl \
   /tmp/gh-aw/evals/execution.json \
   /tmp/gh-aw/evals/evals/execution.json \
@@ -69,6 +70,11 @@ elif [ -f /tmp/gh-aw/evals/execution.json ]; then
   mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/execution.json /tmp/gh-aw/usage/evals/execution.json || true
 fi
 if [ -f /tmp/gh-aw/evals/evals.jsonl ]; then cp /tmp/gh-aw/evals/evals.jsonl /tmp/gh-aw/usage/evals.jsonl || true; fi
+# The not-evaluated marker is run-level diagnostic evidence, kept beside the evals
+# execution evidence rather than as an answer file.
+if [ -f /tmp/gh-aw/evals/evals_status.json ]; then
+  mkdir -p /tmp/gh-aw/usage/evals && cp /tmp/gh-aw/evals/evals_status.json /tmp/gh-aw/usage/evals/evals_status.json || true
+fi
 if [ -f /tmp/gh-aw/evals/evals_token_usage.jsonl ]; then
   mkdir -p /tmp/gh-aw/usage/evals
   cp /tmp/gh-aw/evals/evals_token_usage.jsonl /tmp/gh-aw/usage/evals/token_usage.jsonl

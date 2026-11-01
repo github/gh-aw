@@ -1,0 +1,160 @@
+[INFO] Auto-detected DNS servers from /run/systemd/resolve/resolv.conf: 168.63.129.16
+[INFO] Agent timeout set to 45 minutes
+[WARN] ⚠️  Using --env-all: All host environment variables will be passed to container
+[WARN]    This may expose sensitive credentials if logs or configs are shared
+[INFO] API proxy enabled: OpenAI=false, Anthropic=false, Copilot=true (github-token), Gemini=false, Vertex=false
+[INFO] Allowed domains: 
+[INFO] Network-isolation mode: enforcing egress via Docker network topology (no host iptables, no sudo).
+[INFO] Generating configuration files...
+[INFO] API proxy sidecar enabled - API keys will be held securely in sidecar container
+[INFO] API proxy will route through Squid to respect domain whitelisting
+[INFO] Starting containers...
+ Network awf-net Creating 
+ Network awf-net Created 
+ Network awf-gnnj1p_awf-ext Creating 
+ Network awf-gnnj1p_awf-ext Created 
+ Container awf-squid Creating 
+ Container awf-squid Created 
+ Container awf-api-proxy Creating 
+ Container awf-api-proxy Created 
+ Container awf-agent Creating 
+ Container awf-agent Created 
+ Container awf-squid Starting 
+ Container awf-squid Started 
+ Container awf-squid Waiting 
+ Container awf-squid Healthy 
+ Container awf-api-proxy Starting 
+ Container awf-api-proxy Started 
+ Container awf-squid Waiting 
+ Container awf-api-proxy Waiting 
+ Container awf-squid Healthy 
+ Container awf-api-proxy Healthy 
+ Container awf-agent Starting 
+ Container awf-agent Started 
+[SUCCESS] Containers started successfully
+[INFO] Executing agent command...
+[INFO] Agent timeout: 45 minutes
+[entrypoint] Agentic Workflow Firewall - Agent Container
+[entrypoint] ==================================
+[entrypoint] Configuring DNS...
+[entrypoint] DNS configured with Docker embedded DNS (127.0.0.11) only
+[entrypoint] iptables-init skipped (proxy-based egress): skipping init container wait
+[health-check] API Proxy Pre-flight Check
+[health-check] ==========================================
+[health-check] Checking Anthropic API proxy configuration...
+[health-check] ✓ Anthropic credentials NOT in agent environment (correct)
+[health-check] Testing connectivity to Anthropic API proxy at http://host.docker.internal:10002...
+[health-check][ERROR] Cannot connect to Anthropic API proxy at http://host.docker.internal:10002
+[health-check][ERROR] Proxy may not be running or network is blocked
+[INFO] Stopping containers...
+ Container awf-agent Stopping 
+ Container awf-agent Stopped 
+ Container awf-agent Removing 
+ Container awf-agent Removed 
+ Container awf-api-proxy Stopping 
+ Container awf-api-proxy Stopped 
+ Container awf-api-proxy Removing 
+ Container awf-api-proxy Removed 
+ Container awf-squid Stopping 
+ Container awf-squid Stopped 
+ Container awf-squid Removing 
+ Container awf-squid Removed 
+ Network awf-net Removing 
+ Network awf-gnnj1p_awf-ext Removing 
+ Network awf-net Removed 
+ Network awf-gnnj1p_awf-ext Removed 
+[SUCCESS] Containers stopped successfully
+[INFO] API proxy logs available at: /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs
+[INFO] Token usage log available at: /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
+[INFO] CLI proxy logs available at: /tmp/gh-aw/sandbox/firewall/logs/cli-proxy-logs
+[INFO] Squid logs available at: /tmp/gh-aw/sandbox/firewall/logs
+[INFO] Audit artifacts available at: /tmp/gh-aw/sandbox/firewall/audit
+[WARN] Command completed with exit code: 1
+Process exiting with code: 1
+[INFO] Auto-detected DNS servers from /run/systemd/resolve/resolv.conf: 168.63.129.16
+[INFO] Agent timeout set to 45 minutes
+[WARN] ⚠️  Using --env-all: All host environment variables will be passed to container
+[WARN]    This may expose sensitive credentials if logs or configs are shared
+[INFO] API proxy enabled: OpenAI=false, Anthropic=false, Copilot=true (github-token), Gemini=false, Vertex=false
+[INFO] Allowed domains: 
+[INFO] Network-isolation mode: enforcing egress via Docker network topology (no host iptables, no sudo).
+[INFO] Generating configuration files...
+[INFO] API proxy sidecar enabled - API keys will be held securely in sidecar container
+[INFO] API proxy will route through Squid to respect domain whitelisting
+[INFO] Starting containers...
+ Network awf-net Creating 
+ Network awf-net Created 
+ Network awf-xezevw_awf-ext Creating 
+ Network awf-xezevw_awf-ext Created 
+ Container awf-squid Creating 
+ Container awf-squid Created 
+ Container awf-api-proxy Creating 
+ Container awf-api-proxy Created 
+ Container awf-agent Creating 
+ Container awf-agent Created 
+ Container awf-squid Starting 
+ Container awf-squid Started 
+ Container awf-squid Waiting 
+ Container awf-squid Healthy 
+ Container awf-api-proxy Starting 
+ Container awf-api-proxy Started 
+ Container awf-squid Waiting 
+ Container awf-api-proxy Waiting 
+ Container awf-squid Healthy 
+ Container awf-api-proxy Healthy 
+ Container awf-agent Starting 
+ Container awf-agent Started 
+[SUCCESS] Containers started successfully
+[INFO] Executing agent command...
+[INFO] Agent timeout: 45 minutes
+[entrypoint] Agentic Workflow Firewall - Agent Container
+[entrypoint] ==================================
+[entrypoint] Configuring DNS...
+[entrypoint] DNS configured with Docker embedded DNS (127.0.0.11) only
+[entrypoint] iptables-init skipped (proxy-based egress): skipping init container wait
+[health-check] API Proxy Pre-flight Check
+[health-check] ==========================================
+[health-check] Checking Anthropic API proxy configuration...
+[health-check] ✓ Anthropic credentials NOT in agent environment (correct)
+[health-check] Testing connectivity to Anthropic API proxy at http://host.docker.internal:10002...
+[health-check][ERROR] Cannot connect to Anthropic API proxy at http://host.docker.internal:10002
+[health-check][ERROR] Proxy may not be running or network is blocked
+[INFO] Stopping containers...
+ Container awf-agent Stopping 
+ Container awf-agent Stopped 
+ Container awf-agent Removing 
+ Container awf-agent Removed 
+ Container awf-api-proxy Stopping 
+ Container awf-api-proxy Stopped 
+ Container awf-api-proxy Removing 
+ Container awf-api-proxy Removed 
+ Container awf-squid Stopping 
+ Container awf-squid Stopped 
+ Container awf-squid Removing 
+ Container awf-squid Removed 
+ Network awf-net Removing 
+ Network awf-xezevw_awf-ext Removing 
+ Network awf-net Removed 
+ Network awf-xezevw_awf-ext Removed 
+[SUCCESS] Containers stopped successfully
+[INFO] API proxy logs available at: /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs
+[INFO] Token usage log available at: /tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
+[INFO] CLI proxy logs available at: /tmp/gh-aw/sandbox/firewall/logs/cli-proxy-logs
+[INFO] Squid logs available at: /tmp/gh-aw/sandbox/firewall/logs
+[INFO] Audit artifacts available at: /tmp/gh-aw/sandbox/firewall/audit
+[WARN] Failed to publish finalized resolved config artifact: Error: EEXIST: file already exists, open '/proc/self/fd/22/awf-resolved-config.json'
+    at Object.openSync (node:fs:621:18)
+    at dV (/home/runner/.local/lib/awf/awf-bundle.js:164:8144)
+    at Fue (/home/runner/.local/lib/awf/awf-bundle.js:164:8449)
+    at l3e (/home/runner/.local/lib/awf/awf-bundle.js:1102:2876)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async performCleanup (/home/runner/.local/lib/awf/awf-bundle.js:1102:8367)
+    at async YBe (/home/runner/.local/lib/awf/awf-bundle.js:1053:5324)
+    at async e.<anonymous> (/home/runner/.local/lib/awf/awf-bundle.js:1102:6968) {
+  errno: -17,
+  code: 'EEXIST',
+  syscall: 'open',
+  path: '/proc/self/fd/22/awf-resolved-config.json'
+}
+[WARN] Command completed with exit code: 1
+Process exiting with code: 1
