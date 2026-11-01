@@ -344,12 +344,12 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `agenticworkflows` — run `agenticworkflows --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools"
-          GH_AW_MEMORY_BRANCH_NAME: 'memory/meta-orchestrators'
+          GH_AW_MEMORY_BRANCH_NAME: "memory/meta-orchestrators"
           GH_AW_MEMORY_CONSTRAINTS: "\n\n**Constraints:**\n- **Allowed Files**: Only files matching patterns: metrics/**\n- **Max File Size**: 524288 bytes (0.50 MB) per file\n- **Max File Count**: 100 files per commit\n- **Max Patch Size**: 1048576 bytes (1024 KB) total per push (max: 1024 KB)\n"
-          GH_AW_MEMORY_DESCRIPTION: ''
-          GH_AW_MEMORY_DIR: '/tmp/gh-aw/repo-memory/default/'
-          GH_AW_MEMORY_TARGET_REPO: ' of the current repository'
-          GH_AW_WIKI_NOTE: ''
+          GH_AW_MEMORY_DESCRIPTION: ""
+          GH_AW_MEMORY_DIR: "/tmp/gh-aw/repo-memory/default/"
+          GH_AW_MEMORY_TARGET_REPO: " of the current repository"
+          GH_AW_WIKI_NOTE: ""
         with:
           script: |
             const path = require('path');

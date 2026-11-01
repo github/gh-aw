@@ -336,8 +336,9 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 				// This ensures they're only available in the substitution step, not the prompt creation step
 				if _, exists := expressionMappingsMap[key]; !exists {
 					expressionMappingsMap[key] = &ExpressionMapping{
-						EnvVar:  key,
-						Content: fmt.Sprintf("'%s'", value), // Wrap in quotes for substitution
+						EnvVar:    key,
+						Content:   value,
+						IsLiteral: true,
 					}
 				}
 			}
