@@ -23,6 +23,12 @@ func ensureEvalsResultsFromBranch(ctx context.Context, run WorkflowRun, runDir, 
 	if runHasEvals(runDir, verbose) {
 		return true
 	}
+	// A not-evaluated run publishes no answers to the evals branch; do not look up
+	// branch history that could only belong to other runs.
+	if marker := findEvalsNotEvaluatedStatusFile(runDir); marker != "" {
+		logsOrchestratorLog.Printf("Skipping evals branch fallback for run %d: evals were not evaluated (%s)", run.DatabaseID, marker)
+		return false
+	}
 
 	repoOverride, host := resolveRepoOverrideForRun(run, owner, repo, hostname)
 	if repoOverride == "" {

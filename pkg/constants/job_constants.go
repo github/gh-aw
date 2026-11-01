@@ -180,6 +180,10 @@ const GradersArtifactName ArtifactName = "graders"
 // EvalsResultFilename is the filename of the evaluation results JSONL file.
 const EvalsResultFilename Filename = "evals.jsonl"
 
+// EvalsStatusFilename is the filename of the run-level BinEval marker written instead of
+// evals.jsonl when the evals judge did not start, failed, or produced no assistant response.
+const EvalsStatusFilename Filename = "evals_status.json"
+
 // EvalsBranchPrefix is the branch prefix used for durable eval result storage.
 const EvalsBranchPrefix = "evals"
 

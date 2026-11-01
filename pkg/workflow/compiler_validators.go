@@ -184,6 +184,16 @@ func (c *Compiler) validateFeatureConfig(workflowData *WorkflowData, markdownPat
 // permission requirement, and dispatch/call-workflow configurations.
 // workflowPermissions is the *Permissions value returned by validatePermissions.
 func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdownPath string, workflowPermissions *Permissions) error {
+	strict := c.effectiveStrictMode(workflowData.RawFrontmatter)
+	if err := validateEngineCooldown(workflowData.EngineConfig, strict); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+	c.warnLegacyBehaviorInstallationCooldown(workflowData, markdownPath)
+	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.ThreatDetection != nil {
+		if err := validateEngineCooldown(workflowData.SafeOutputs.ThreatDetection.EngineConfig, strict); err != nil {
+			return formatCompilerError(markdownPath, "error", "safe-outputs.threat-detection: "+err.Error(), err)
+		}
+	}
 	workflowLog.Printf("Validating release checksum pins")
 	if err := c.validateReleaseIntegrityPins(workflowData); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
@@ -225,6 +235,27 @@ func (c *Compiler) validateToolConfiguration(workflowData *WorkflowData, markdow
 		return err
 	}
 	return c.validateResourcesAndDispatches(workflowData, markdownPath)
+}
+
+func (c *Compiler) warnLegacyBehaviorInstallationCooldown(workflowData *WorkflowData, markdownPath string) {
+	if workflowData == nil {
+		return
+	}
+	definition := workflowData.engineDefinition
+	if definition == nil && workflowData.EngineConfig != nil && c.engineCatalog != nil {
+		definition = c.engineCatalog.Get(workflowData.EngineConfig.ID)
+	}
+	if definition == nil || definition.Behaviors == nil || definition.Behaviors.Installation == nil ||
+		definition.Behaviors.Installation.Cooldown == nil {
+		return
+	}
+
+	message := fmt.Sprintf(
+		"engine definition %q uses deprecated behaviors.installation.cooldown, which is ignored; set workflow engine.cooldown instead (0 disables cooldown only outside strict mode; strict mode rejects zero)",
+		definition.ID,
+	)
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+	c.IncrementWarningCount()
 }
 
 func (c *Compiler) validateCoreToolConfiguration(workflowData *WorkflowData, markdownPath string) error {

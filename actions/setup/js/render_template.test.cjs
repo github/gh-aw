@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url),
   __dirname = path.dirname(__filename),
-  core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn(), summary: { addHeading: vi.fn().mockReturnThis(), addRaw: vi.fn().mockReturnThis(), write: vi.fn() } };
+  core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), setFailed: vi.fn(), summary: { addHeading: vi.fn().mockReturnThis(), addRaw: vi.fn().mockReturnThis(), write: vi.fn() } };
 global.core = core;
 const { isTruthy } = require("./is_truthy.cjs"),
   { selectBranch } = require("./template_branch.cjs"),

@@ -443,6 +443,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.codex/agents
@@ -672,6 +673,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Determine automatic lockdown mode for GitHub MCP Server
@@ -687,7 +690,7 @@ jobs:
             const determineAutomaticLockdown = require(path.join(actionsDir, 'determine_automatic_lockdown.cjs'));
             await determineAutomaticLockdown(github, context, core);
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .codex .github"
           GH_AW_AGENT_FILES: "AGENTS.md"
@@ -1750,6 +1753,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1787,6 +1791,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1992,9 +1997,10 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install GitHub Copilot CLI
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache --cooldown-days 3
         env:
           GH_HOST: github.com
+          GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install threat-detect binary
         id: threat_detect_install
@@ -2310,6 +2316,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Download container images
@@ -2486,6 +2494,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"tests_analyzed","question":"Did the agent analyze Go tests to identify a safe candidate for t.Parallel?"},{"id":"pr_created_or_noop","question":"Did the agent create a pull request for a safe test change, or use noop when no safe change was available?"}]'
           GH_AW_EVALS_MODEL: "copilot/gpt-5.6-terra"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "codex"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -2537,6 +2547,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -2703,7 +2714,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()

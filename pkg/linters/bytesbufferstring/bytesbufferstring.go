@@ -104,7 +104,9 @@ func analyzeStringBytesCall(pass *analysis.Pass, n ast.Node, generatedFiles file
 // buf is a bytes.Buffer value (not pointer). Returns the inner call, selector,
 // and ok=true when matched.
 func matchBufBytesArg(pass *analysis.Pass, call *ast.CallExpr) (*ast.CallExpr, *ast.SelectorExpr, bool) {
-	inner, ok := call.Args[0].(*ast.CallExpr)
+	// astutil.UnwrapParenExpr handles a parenthesized call, e.g.
+	// string((buf.Bytes())).
+	inner, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.CallExpr)
 	if !ok {
 		return nil, nil, false
 	}

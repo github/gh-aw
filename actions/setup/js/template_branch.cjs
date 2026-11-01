@@ -22,9 +22,10 @@ const { isTruthy } = require("./is_truthy.cjs");
  *
  * @param {string} ifCondition - The condition from the opening {{#if ...}} tag
  * @param {string} body        - Everything between the opening tag and {{/if}}
+ * @param {(condition: string) => string} [resolveCondition] - Resolve opaque values after parsing author-owned branches
  * @returns {string|null}      - Content of the first truthy branch, or null
  */
-function selectBranch(ifCondition, body) {
+function selectBranch(ifCondition, body, resolveCondition = condition => condition) {
   // Split on all elseif variants.  The capturing group ensures that the condition
   // text appears between the content pieces in the resulting array.
   // Supported: {{#elseif}}, {{#else-if}}, {{#else_if}}, {{elseif}}, {{else-if}}, {{else_if}}
@@ -48,7 +49,7 @@ function selectBranch(ifCondition, body) {
 
   // Return content of the first truthy branch
   for (const branch of branches) {
-    if (branch.condition === null || isTruthy(branch.condition)) {
+    if (branch.condition === null || isTruthy(resolveCondition(branch.condition))) {
       return branch.content;
     }
   }

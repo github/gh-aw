@@ -42,6 +42,7 @@ post-steps:
     run: |
       node <<'NODE'
       const assert = require("node:assert/strict");
+      const { execFileSync } = require("node:child_process");
       const fs = require("node:fs");
       const path = require("node:path");
       const { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, "gh-aw", "actions", "log_parser_shared.cjs"));
@@ -51,7 +52,7 @@ post-steps:
       for (const file of [script, fixture]) {
         assert.deepEqual(
           fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, file)),
-          fs.readFileSync(path.join("/tmp/gh-aw/base", file)),
+          execFileSync("tar", ["-xOf", "/tmp/gh-aw/base/snapshot.tar", "--", file]),
           `${file} must match the trusted activation artifact`
         );
       }

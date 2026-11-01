@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,12 +35,12 @@ func (e *internalHTTPError) Error() string {
 func TestUserFacingErrorsDontLeakInternals(t *testing.T) {
 	tests := []struct {
 		name           string
-		operation      func() error
+		operation      func(*testing.T) error
 		internalErrors []any
 	}{
 		{
 			name: "workflow compilation YAML parse error",
-			operation: func() error {
+			operation: func(t *testing.T) error {
 				// Create a test file with invalid YAML
 				tmpDir := t.TempDir()
 				testFile := filepath.Join(tmpDir, "invalid.md")
@@ -64,7 +65,7 @@ on:
 		},
 		{
 			name: "workflow file read error",
-			operation: func() error {
+			operation: func(t *testing.T) error {
 				// Try to compile a non-existent file
 				compiler := NewCompiler(WithVersion("1.0.0"))
 				err := compiler.CompileWorkflow("/nonexistent/file.md")
@@ -77,7 +78,7 @@ on:
 		},
 		{
 			name: "import resolution error",
-			operation: func() error {
+			operation: func(t *testing.T) error {
 				// Create a test file with invalid import
 				tmpDir := t.TempDir()
 				testFile := filepath.Join(tmpDir, "test.md")
@@ -93,20 +94,31 @@ on:
 				err := os.WriteFile(testFile, []byte(content), 0644)
 				require.NoError(t, err, "Failed to write test file")
 
+				missingFile := filepath.Join(tmpDir, "nonexistent.md")
+				_, missingErr := os.Lstat(missingFile)
+				require.ErrorIs(t, missingErr, os.ErrNotExist)
+
 				// Try to compile with invalid import
 				compiler := NewCompiler(WithVersion("1.0.0"))
 				err = compiler.CompileWorkflow(testFile)
+				var formattedErr *parser.FormattedParserError
+				require.ErrorAs(t, err, &formattedErr)
+				var pathErr *os.PathError
+				require.NotErrorAs(t, err, &pathErr)
+				require.NotErrorIs(t, err, os.ErrNotExist)
+				require.NoError(t, errors.Unwrap(err))
+				assert.Contains(t, err.Error(), "test.md:4:5: error: import file not found")
+				assert.Contains(t, err.Error(), "hint:")
+				assert.NotContains(t, err.Error(), missingErr.Error())
+				assert.NotContains(t, err.Error(), missingFile)
 				return err
-			},
-			internalErrors: []any{
-				&os.PathError{}, // Underlying file errors should be wrapped
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.operation()
+			err := tt.operation(t)
 			require.Error(t, err, "should return an error")
 
 			// Verify that internal error types are not exposed to users

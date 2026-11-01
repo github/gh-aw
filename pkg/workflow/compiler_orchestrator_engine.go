@@ -37,11 +37,11 @@ type engineSetupResult struct {
 // - Strict mode validations
 func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, cleanPath string, content []byte, markdownDir string) (*engineSetupResult, error) {
 	orchestratorEngineLog.Printf("Setting up engine and processing imports")
-	engineSetting, engineConfig, model := c.ExtractEngineConfig(result.Frontmatter)
-	preservedMaxTurns, preservedMaxAICredits, preservedMaxRuns, preservedMaxTurnCacheMisses := extractEngineBudgetLimits(engineConfig)
-	if err := c.validateAndRegisterInlineEngineConfig(engineConfig); err != nil {
+	engineSetting, engineConfig, model, err := c.extractAndValidateEngineConfig(result.Frontmatter)
+	if err != nil {
 		return nil, err
 	}
+	preservedMaxTurns, preservedMaxAICredits, preservedMaxRuns, preservedMaxTurnCacheMisses := extractEngineBudgetLimits(engineConfig)
 	networkPermissions := defaultNetworkPermissions(c.extractNetworkPermissions(result.Frontmatter))
 	sandboxConfig := c.extractSandboxConfig(result.Frontmatter)
 	if err := c.runStrictFrontmatterValidations(result.Frontmatter, networkPermissions); err != nil {
@@ -96,6 +96,19 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		importsResult:      importsResult,
 		configSteps:        configSteps,
 	}, nil
+}
+
+func (c *Compiler) extractAndValidateEngineConfig(frontmatter map[string]any) (string, *EngineConfig, string, error) {
+	setting, config, model := c.ExtractEngineConfig(frontmatter)
+	if err := c.withEffectiveStrictMode(frontmatter, func() error {
+		return validateEngineCooldown(config, c.strictMode)
+	}); err != nil {
+		return "", nil, "", err
+	}
+	if err := c.validateAndRegisterInlineEngineConfig(config); err != nil {
+		return "", nil, "", err
+	}
+	return setting, config, model, nil
 }
 
 func (c *Compiler) formatUnknownEngineError(result *parser.FrontmatterResult, cleanPath string, content []byte, err error) error {
@@ -507,6 +520,9 @@ func applyMainWorkflowEngineOverrides(engineConfig, overrides *EngineConfig) {
 	if engineConfig == nil || overrides == nil {
 		return
 	}
+	if overrides.Cooldown != nil {
+		engineConfig.Cooldown = overrides.Cooldown
+	}
 	if overrides.MaxTurns != "" {
 		engineConfig.MaxTurns = overrides.MaxTurns
 	}
@@ -724,6 +740,9 @@ func (c *Compiler) runPostEngineValidations(
 		return err
 	}
 	return c.withEffectiveStrictMode(frontmatter, func() error {
+		if err := validateEngineCooldown(engineConfig, c.strictMode); err != nil {
+			return err
+		}
 		orchestratorEngineLog.Printf("Validating strict firewall (strict=%v)", c.strictMode)
 		if err := c.validateStrictFirewall(engineSetting, networkPermissions, sandboxConfig); err != nil {
 			orchestratorEngineLog.Printf("Strict firewall validation failed: %v", err)

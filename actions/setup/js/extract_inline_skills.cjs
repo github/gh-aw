@@ -353,9 +353,10 @@ function getEngineSkillTarget(engineId) {
  *   Defaults to `workspaceDir` when omitted (for tests and legacy callers).
  * @param {string} [engineId] - The engine ID (e.g. "claude", "copilot").
  *   Defaults to "copilot" behavior when omitted.
+ * @param {(content: string, target?: string) => string} [restoreValues] - Restore literal context after parsing author-owned metadata
  * @returns {string} Main content with skill sections removed.
  */
-function writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId) {
+function writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId, restoreValues = content => content) {
   const { mainContent, skills } = extractInlineSkills(content);
 
   if (skills.length === 0) {
@@ -381,7 +382,7 @@ function writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId) {
       throw new Error(`Failed to create directory ${path.dirname(skillPath)}: ${String(err)}`, { cause: err });
     }
     const filteredContent = filterInlineSkillFrontmatter(skill.content, skill.name);
-    const skillContent = filteredContent.endsWith("\n") ? filteredContent : filteredContent + "\n";
+    const skillContent = restoreValues(filteredContent.endsWith("\n") ? filteredContent : filteredContent + "\n", skillPath);
     try {
       fs.writeFileSync(skillPath, skillContent, "utf8");
     } catch (err) {

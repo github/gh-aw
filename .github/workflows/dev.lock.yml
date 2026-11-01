@@ -366,6 +366,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.pi/agents
@@ -541,6 +542,8 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.4.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Record Pi package location
         run: |
           GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
@@ -1405,6 +1408,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1442,6 +1446,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1606,6 +1611,8 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@1.4.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Record Pi package location
         run: |
           GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"
@@ -1722,6 +1729,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"auto_inference_completed","question":"Did the agent call noop exactly once with message AUTO_MODEL_OK without performing any other task?"}]'
           GH_AW_EVALS_MODEL: "auto"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "pi"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -1773,6 +1782,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -1872,7 +1882,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()
