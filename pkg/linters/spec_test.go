@@ -14,6 +14,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
 	"github.com/github/gh-aw/pkg/linters/blankassigncomma"
+	"github.com/github/gh-aw/pkg/linters/boolliteralcompare"
 	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
 	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
@@ -196,6 +197,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"stringsindexcontains", stringsindexcontains.Analyzer},
 		{"stringsindexhasprefix", stringsindexhasprefix.Analyzer},
 		{"stringsjoinone", stringsjoinone.Analyzer},
+		{"boolliteralcompare", boolliteralcompare.Analyzer},
 		{"timeafterleak", timeafterleak.Analyzer},
 		{"timesleepnocontext", timesleepnocontext.Analyzer},
 		{"timenowsub", timenowsub.Analyzer},

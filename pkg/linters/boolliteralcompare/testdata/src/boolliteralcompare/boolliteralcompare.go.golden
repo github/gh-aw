@@ -1,0 +1,29 @@
+package boolliteralcompare
+
+type flag bool
+
+func ready() bool { return true }
+
+func flagged(b bool, f flag, m map[string]bool) {
+	_ = b        // want `comparing a bool to true is redundant`
+	_ = b        // want `comparing a bool to false is redundant`
+	_ = !b       // want `comparing a bool to false is redundant`
+	_ = !b       // want `comparing a bool to true is redundant`
+	_ = b        // want `comparing a bool to true is redundant`
+	_ = f        // want `comparing a bool to true is redundant`
+	_ = !ready() // want `comparing a bool to false is redundant`
+	_ = m["a"]   // want `comparing a bool to true is redundant`
+	if b {       // want `comparing a bool to true is redundant`
+		return
+	}
+}
+
+func notFlagged(b bool, a any, m map[string]any) {
+	_ = b
+	_ = !b
+	_ = a == true
+	_ = m["x"] != false
+	_ = b == ready()
+	_ = true == true
+	_ = b == true //nolint:boolliteralcompare
+}

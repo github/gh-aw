@@ -6,6 +6,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/appendbytestring"
 	"github.com/github/gh-aw/pkg/linters/appendoneelement"
 	"github.com/github/gh-aw/pkg/linters/blankassigncomma"
+	"github.com/github/gh-aw/pkg/linters/boolliteralcompare"
 	"github.com/github/gh-aw/pkg/linters/bufferresetbeforereuse"
 	"github.com/github/gh-aw/pkg/linters/bufioscannererunchecked"
 	"github.com/github/gh-aw/pkg/linters/bytesbufferstring"
@@ -166,6 +167,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringsindexcontains.Analyzer,
 	stringsindexhasprefix.Analyzer,
 	stringsjoinone.Analyzer,
+	boolliteralcompare.Analyzer,
 	stringscountcontains.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
 	lenstringzero.Analyzer,
