@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var trajectoryLog = logger.New("atif:trajectory")
 
 const SchemaVersion = "ATIF-v1.8"
 
@@ -68,6 +72,7 @@ type FinalMetrics struct {
 // Validate enforces the emitted ATIF subset, including same-step tool references.
 func (t *Trajectory) Validate() error {
 	if t == nil || t.SchemaVersion != SchemaVersion || t.Agent.Name == "" || t.Agent.Version == "" || len(t.Steps) == 0 {
+		trajectoryLog.Print("Rejecting ATIF trajectory: missing schema version, agent identity, or steps")
 		return errors.New("ATIF requires a supported schema, agent name/version, and at least one step")
 	}
 	for i, step := range t.Steps {
@@ -101,6 +106,7 @@ func (t *Trajectory) Validate() error {
 			}
 		}
 	}
+	trajectoryLog.Printf("Validated ATIF trajectory: steps=%d", len(t.Steps))
 	return nil
 }
 
@@ -109,6 +115,7 @@ func Encode(w io.Writer, trajectory *Trajectory) error {
 	if err := trajectory.Validate(); err != nil {
 		return err
 	}
+	trajectoryLog.Printf("Encoding ATIF trajectory: steps=%d", len(trajectory.Steps))
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	encoder.SetEscapeHTML(false)

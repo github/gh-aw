@@ -10,7 +10,11 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var convertLog = logger.New("atif:convert")
 
 const MaxSessionBytes = 64 * 1024 * 1024
 
@@ -101,6 +105,7 @@ func Convert(ctx context.Context, input io.Reader) (*Trajectory, error) {
 	if err := trajectory.Validate(); err != nil {
 		return nil, err
 	}
+	convertLog.Printf("Converted unified session: steps=%d", len(trajectory.Steps))
 	return trajectory, nil
 }
 
@@ -122,6 +127,7 @@ func (c *converter) consume(raw []byte, line int) error {
 		}
 		c.trajectory.Extra = map[string]any{"unified_header": json.RawMessage(bytes.Clone(raw))}
 		c.headerSeen = true
+		convertLog.Print("Parsed unified session.format header")
 		return nil
 	}
 	if header {
@@ -202,6 +208,7 @@ func (c *converter) mapPrimaryEvent(ev event, step *Step) (bool, error) {
 		if id := text(ev.Data["sessionId"]); id != "" {
 			c.trajectory.SessionID = id
 		}
+		convertLog.Printf("Identified session agent: name=%s version=%s", c.trajectory.Agent.Name, c.trajectory.Agent.Version)
 	case "prompt.system":
 		step.Message = content(ev.Data["content"])
 	case "prompt.user", "user.message":
@@ -249,6 +256,7 @@ func (c *converter) mapToolEvent(ev event, step *Step) bool {
 		})
 		return true
 	}
+	convertLog.Printf("No unambiguous initiating step for tool observation: toolCallId=%s", id)
 	return false
 }
 
