@@ -1,7 +1,9 @@
 package workflow
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -131,6 +133,9 @@ func TestEnclaveDiagnosticsLifecycleAndRetention(t *testing.T) {
 	yaml.WriteString("      - name: Execution\n        id: agentic_execution\n        run: awf\n")
 	generateEnclaveDiagnosticsCollect(&yaml, data)
 	content := yaml.String()
+	assert.Contains(t, content, `DIAGNOSTICS_STAGING="$staging_dir" NODE_OPTIONS= NODE_PATH= node`)
+	assert.Contains(t, content, `install_enclave_diagnostics.py`)
+	assert.Contains(t, content, enclaveDiagnosticsInstallerSHA)
 	require.Less(t, strings.Index(content, "prepare docker"), strings.Index(content, "id: agentic_execution"))
 	require.Less(t, strings.Index(content, "id: agentic_execution"), strings.Index(content, "collect docker"))
 	assert.Contains(t, content, "steps.prepare_enclave_diagnostics.outcome == 'success'")
@@ -155,6 +160,48 @@ func TestEnclaveDiagnosticsLifecycleAndRetention(t *testing.T) {
 	require.NoError(t, generateEnclaveDiagnosticsPrepare(&yaml, data))
 	generateEnclaveDiagnosticsCollect(&yaml, data)
 	assert.Empty(t, yaml.String())
+}
+
+func TestEnclaveDiagnosticsBootstrapDoesNotPassNodeCodeToRoot(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "js", "install_enclave_diagnostics.cjs"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(source), "sudo")
+	assert.NotContains(t, string(source), "TRUSTED_INSTALLER")
+
+	data := publicDiagnosticsWorkflowData()
+	var yaml strings.Builder
+	require.NoError(t, generateEnclaveDiagnosticsPrepare(&yaml, data))
+	step := yaml.String()
+	assert.Contains(t, step, `install_enclave_diagnostics.py" "$installer_path"`)
+	assert.Contains(t, step, `[[ "${installer_sha256%% *}" == "`+enclaveDiagnosticsInstallerSHA+`" ]]`)
+	assert.NotContains(t, step, "<<'PY'")
+	assert.Less(t, strings.Index(step, enclaveDiagnosticsInstallerSHA), strings.Index(step, `"$installer_path" "$staging_dir/node.tar.xz"`))
+	runStart := strings.Index(step, "        run: |\n")
+	require.GreaterOrEqual(t, runStart, 0)
+	runLines := strings.Split(step[runStart+len("        run: |\n"):], "\n")
+	var shell strings.Builder
+	for _, line := range runLines {
+		if !strings.HasPrefix(line, "          ") {
+			break
+		}
+		shell.WriteString(strings.TrimPrefix(line, "          "))
+		shell.WriteByte('\n')
+	}
+	shellCheck := exec.Command("bash", "-n")
+	shellCheck.Stdin = strings.NewReader(shell.String())
+	if output, err := shellCheck.CombinedOutput(); err != nil {
+		t.Fatalf("diagnostic setup shell syntax: %v: %s", err, output)
+	}
+
+	installerPath := filepath.Join("..", "..", "actions", "setup", "sh", "install_enclave_diagnostics.py")
+	installer, err := os.ReadFile(installerPath)
+	require.NoError(t, err)
+	require.Equal(t, enclaveDiagnosticsInstallerSHA, fmt.Sprintf("%x", sha256.Sum256(installer)))
+	pythonCheck := exec.Command("/usr/bin/python3", "-I", "-c", "import ast, sys; ast.parse(sys.stdin.read())")
+	pythonCheck.Stdin = strings.NewReader(string(installer))
+	if output, err := pythonCheck.CombinedOutput(); err != nil {
+		t.Fatalf("diagnostic setup Python syntax: %v: %s", err, output)
+	}
 }
 
 func TestEnclaveDiagnosticsCompile(t *testing.T) {

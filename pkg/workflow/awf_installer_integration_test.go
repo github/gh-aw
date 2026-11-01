@@ -3,7 +3,11 @@
 package workflow
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -45,11 +49,16 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			for _, required := range []string{
 				"GH_TOKEN: ${{ github.token }}", "GH_HOST: github.com",
 				"AWF_HELPER_CHECKSUMS_SHA256: " + pin,
-				"3929c9a15c0f239b772affcaae6e55fec92f41c2/install.sh",
-				"installer_sha256=a6f844a1f1891bc4ddbb4b95c7d5cfd994e4f61aa1210ad655b36e92128b1202",
-				`verify_release_digest "$install_dir/install.sh" "$installer_sha256"`,
 				`verify_release_identity "$install_dir/checksums.txt" "$install_dir/release-identity.txt"`,
-				"sudo -n --preserve-env=GH_TOKEN,GH_HOST /usr/bin/env AWF_FORCE_BINARY=1",
+				`"$AWF_HELPER_VERSION" "$checksums_sha256"`,
+				`$2 == "enclave-storage-helper.py"`,
+				`verify_release_attestation "$install_dir/enclave-storage-helper.py" github/gh-aw-firewall`,
+				`verify_release_digest "$install_dir/enclave-storage-helper.py" "$helper_sha256"`,
+				`/usr/bin/sudo -n /usr/bin/mktemp -d /var/lib/awf-helper-install.XXXXXX`,
+				`/usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- "${RUNNER_TEMP}/gh-aw/actions/install_awf_enclave_helper.py"`,
+				`[[ "${installer_sha256%% *}" == "` + dockerEnclaveHelperInstallerSHA + `" ]]`,
+				`"$install_dir/checksums.txt" "$install_dir/enclave-storage-helper.py" "$checksums_sha256" "$helper_sha256"`,
+				`/var/lib/awf/enclave-storage-helper.py probe`,
 				"/usr/bin/python3 -I /var/lib/awf/enclave-storage-helper.py probe",
 				`"maxBytes": 4 * 1024**3`,
 				`"uid": os.getuid()`,
@@ -66,13 +75,23 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			if !strings.Contains(text, "AWF_HELPER_VERSION: "+expectedVersion) {
 				t.Error("helper must use the orchestrator's pinned release")
 			}
-			for _, forbidden := range []string{"sudo -E", "sudo mount", "sudo chown", "NOPASSWD: ALL", "curl |", "| bash", "--rootless"} {
+			for _, forbidden := range []string{
+				"sudo -E", "sudo mount", "sudo chown", "NOPASSWD: ALL",
+				"curl |", "| bash", "--rootless", "install.sh", "AWF_FORCE_BINARY",
+				"<<'PY'",
+			} {
 				if strings.Contains(text, forbidden) {
 					t.Errorf("helper setup must not grant broad privileges: %s", forbidden)
 				}
 			}
-			if strings.Index(text, "verify_release_identity") > strings.Index(text, "sudo -n --preserve-env") {
-				t.Fatal("release authentication must precede privilege escalation")
+			manifestCheck := strings.Index(text, `"$install_dir/checksums.txt" "$install_dir/release-identity.txt"`)
+			privilegedInstall := strings.Index(text, `"$install_dir/checksums.txt" "$install_dir/enclave-storage-helper.py" "$checksums_sha256" "$helper_sha256"`)
+			protectedDigest := strings.Index(text, `[[ "${installer_sha256%% *}" == "`+dockerEnclaveHelperInstallerSHA+`" ]]`)
+			if manifestCheck < 0 || privilegedInstall < 0 || manifestCheck > privilegedInstall {
+				t.Fatal("the reviewed checksum manifest must be authenticated before privileged installation")
+			}
+			if protectedDigest < 0 || protectedDigest > privilegedInstall {
+				t.Fatal("the root-owned installer copy must be verified before execution")
 			}
 			var run []string
 			for _, line := range step {
@@ -87,6 +106,19 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			cmd.Stdin = strings.NewReader(strings.Join(run, "\n"))
 			if output, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("helper installer shell syntax: %v: %s", err, output)
+			}
+			installerPath := filepath.Join("..", "..", "actions", "setup", "sh", "install_awf_enclave_helper.py")
+			installer, err := os.ReadFile(installerPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := fmt.Sprintf("%x", sha256.Sum256(installer)); got != dockerEnclaveHelperInstallerSHA {
+				t.Fatalf("installer pin = %s, want %s", got, dockerEnclaveHelperInstallerSHA)
+			}
+			pythonCheck := exec.Command("/usr/bin/python3", "-I", "-c", "import ast, sys; ast.parse(sys.stdin.read())")
+			pythonCheck.Stdin = strings.NewReader(string(installer))
+			if output, err := pythonCheck.CombinedOutput(); err != nil {
+				t.Fatalf("helper installer Python syntax: %v: %s", err, output)
 			}
 		})
 	}
