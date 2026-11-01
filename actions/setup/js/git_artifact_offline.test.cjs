@@ -227,7 +227,7 @@ describe("local-only safe-output artifacts", () => {
           vi.stubEnv("GIT_CONFIG_VALUE_1", "true");
           const result = await generate("offline-feature", "main", { cwd: repo, mode, incrementalBaseSha: base, excludedFiles: filtered ? ["excluded.txt"] : undefined });
           artifacts.add(result.patchPath || result.bundlePath);
-          expect(result.success).toBe(true);
+          expect(result).toMatchObject({ success: true });
           checkOfflineCalls();
           expect(process.env.GIT_EXTERNAL_DIFF).toBe(program);
           expect(process.env.GIT_CONFIG_VALUE_0).toBe(program);
@@ -291,7 +291,7 @@ describe("local-only safe-output artifacts", () => {
         const options = { cwd: repo, mode, incrementalBaseSha: base, excludedFiles: ["excluded.txt"], token: "synthetic-explicit-token" };
         const result = await generate("offline-feature", "main", options);
         artifacts.add(result.patchPath || result.bundlePath);
-        expect(result.success).toBe(true);
+        expect(result).toMatchObject({ success: true });
         expect(core.warning).toHaveBeenCalledTimes(1);
         expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("options.token is deprecated and ignored"));
         expect(JSON.stringify(core.warning.mock.calls)).not.toContain(options.token);
