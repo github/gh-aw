@@ -150,11 +150,12 @@ const configPath = path.join(__dirname, "tools.json");
 
 // Get port and API key from environment variables
 const port = parseInt(process.env.GH_AW_MCP_SCRIPTS_PORT || "3000", 10);
-const apiKey = process.env.GH_AW_MCP_SCRIPTS_API_KEY || "";
+const apiKey = process.env.GH_AW_MCP_SCRIPTS_API_KEY;
 
 // Start the HTTP server
 startHttpServer(configPath, {
   port: port,
+  apiKey: apiKey,
   stateless: true,
   logDir: "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
 }).catch(error => {

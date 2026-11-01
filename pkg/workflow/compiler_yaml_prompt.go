@@ -312,11 +312,11 @@ func (c *Compiler) processLegacyPromptImports(data *WorkflowData) (userPromptChu
 // writePromptBashStep writes a YAML step that runs a bash script from the gh-aw actions directory
 // with the GH_AW_PROMPT env var set.
 func writePromptBashStep(yaml *strings.Builder, name, script string) {
-	fmt.Fprintf(yaml, "      - name: %s\n", name)
+	yaml.WriteString("      - name: " + name + "\n")
 	yaml.WriteString("        env:\n")
-	fmt.Fprintf(yaml, "          GH_AW_PROMPT: %s\n", constants.AwPromptsFileExpr)
+	yaml.WriteString("          GH_AW_PROMPT: " + constants.AwPromptsFileExpr + "\n")
 	yaml.WriteString("        run: |\n")
-	fmt.Fprintf(yaml, "          bash \"${RUNNER_TEMP}/gh-aw/actions/%s\"\n", script)
+	yaml.WriteString("          bash \"${RUNNER_TEMP}/gh-aw/actions/" + script + "\"\n")
 }
 
 // extractPromptChunksFromMarkdown applies the standard post-processing pipeline to a markdown body:
@@ -507,12 +507,10 @@ func runtimeImportAnalysisCandidatePaths(importPath, workspaceRoot string) []str
 		return []string{filepath.Join(workspaceRoot, filepath.FromSlash(normalized))}
 	}
 
-	candidates := []string{
-		filepath.Join(workspaceRoot, githubDir, filepath.FromSlash(normalized)),
-		filepath.Join(workspaceRoot, githubDir, "workflows", filepath.FromSlash(normalized)),
+	first := filepath.Join(workspaceRoot, githubDir, filepath.FromSlash(normalized))
+	second := filepath.Join(workspaceRoot, githubDir, "workflows", filepath.FromSlash(normalized))
+	if first == second {
+		return []string{first}
 	}
-	if candidates[0] == candidates[1] {
-		return candidates[:1]
-	}
-	return candidates
+	return []string{first, second}
 }

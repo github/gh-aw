@@ -1,9 +1,19 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import http from "http";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { startHttpServer } from "./mcp_scripts_mcp_server_http.cjs";
+
+describe("MCP scripts HTTP startup credentials", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([undefined, "", "   "])("requires a key before loading configuration (%s)", async apiKey => {
+    vi.stubEnv("GH_AW_MCP_SCRIPTS_API_KEY", apiKey);
+    await expect(startHttpServer("unused-config.json", { port: 0 })).rejects.toThrow("GH_AW_MCP_SCRIPTS_API_KEY must be set");
+  });
+});
 describe("mcp_scripts_mcp_server_http.cjs integration", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "http-mcp-test-"));
   let serverProcess = null,
@@ -14,7 +24,7 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
   async function makeRequest(payload, additionalHeaders = {}) {
     return new Promise((resolve, reject) => {
       const data = JSON.stringify(payload),
-        headers = { "Content-Type": "application/json", Accept: "application/json, text/event-stream", "Content-Length": Buffer.byteLength(data), ...additionalHeaders },
+        headers = { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: "http-integration-test-key", "Content-Length": Buffer.byteLength(data), ...additionalHeaders },
         req = http.request({ hostname: "localhost", port: 4100, path: "/", method: "POST", headers }, res => {
           let responseData = "";
           (res.on("data", chunk => {
@@ -51,7 +61,11 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
       })
     ),
     it("should start HTTP MCP server successfully", { timeout: 15e3 }, async () => {
-      serverProcess = spawn("node", ["mcp_scripts_mcp_server_http.cjs", configPath, "--port", (4100).toString()], { cwd: process.cwd(), env: { ...process.env, DEBUG: "*" }, stdio: ["pipe", "pipe", "pipe"] });
+      serverProcess = spawn("node", ["mcp_scripts_mcp_server_http.cjs", configPath, "--port", (4100).toString()], {
+        cwd: process.cwd(),
+        env: { ...process.env, DEBUG: "*", GH_AW_MCP_SCRIPTS_API_KEY: "http-integration-test-key" },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
       (serverProcess.stderr.on("data", chunk => {
         serverOutput += chunk.toString();
       }),
@@ -69,6 +83,10 @@ describe("mcp_scripts_mcp_server_http.cjs integration", () => {
         return !1;
       })();
       (expect(ready).toBe(!0), expect(serverOutput).toContain("HTTP server listening"));
+    }),
+    it.each(["", "incorrect-key"])("rejects unauthenticated MCP requests (%s)", async authorization => {
+      const response = await makeRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" }, { Authorization: authorization });
+      expect(response.status).toBe(401);
     }),
     it("should initialize with proper MCP protocol response", async () => {
       const response = await makeRequest({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", clientInfo: { name: "test-client", version: "1.0.0" }, capabilities: {} } });

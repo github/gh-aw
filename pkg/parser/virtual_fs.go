@@ -144,10 +144,7 @@ func readDiskFile(path string) ([]byte, error) {
 	if importCacheMarkerIndex(absolutePath) >= 0 {
 		return readCacheAwareFile(path)
 	}
-	localIncludeReadBasesMu.RLock()
-	bases, ok := localIncludeReadBases[absolutePath]
-	localIncludeReadBasesMu.RUnlock()
-	if ok {
+	if bases := localIncludeReadBases.load(absolutePath); len(bases) > 0 {
 		var content []byte
 		for i, base := range bases {
 			readContent, err := fileutil.ReadFileWithinBase(base, absolutePath)
@@ -175,17 +172,29 @@ func readDiskFile(path string) ([]byte, error) {
 // ReadFile API, including reads through repository-relative manifest paths.
 // Snapshots are immutable; resolving the same file from another base must not
 // discard an earlier boundary while its caller is still using that path.
-var (
-	localIncludeReadBasesMu sync.RWMutex
-	localIncludeReadBases   = make(map[string][]string)
-)
+type includeReadBaseRegistry struct {
+	mu    sync.RWMutex
+	paths map[string][]string
+}
+
+var localIncludeReadBases = includeReadBaseRegistry{paths: make(map[string][]string)}
+
+func (r *includeReadBaseRegistry) load(path string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.paths[path]
+}
 
 func registerLocalIncludeReadBase(path, base string) {
-	localIncludeReadBasesMu.Lock()
-	defer localIncludeReadBasesMu.Unlock()
-	current := localIncludeReadBases[path]
+	localIncludeReadBases.register(path, base)
+}
+
+func (r *includeReadBaseRegistry) register(path, base string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	current := r.paths[path]
 	if !slices.Contains(current, base) {
-		localIncludeReadBases[path] = append(slices.Clone(current), base)
+		r.paths[path] = append(slices.Clone(current), base)
 	}
 }
 
