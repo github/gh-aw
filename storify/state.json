@@ -1,33 +1,33 @@
 {
-  "last_run_date": "2026-10-31",
+  "last_run_date": "2026-11-01",
   "last_window": {
-    "start": "2026-10-30T07:55:51Z",
-    "end": "2026-10-31T07:55:51Z"
+    "start": "2026-10-31T07:56:26Z",
+    "end": "2026-11-01T07:56:26Z"
   },
   "observed_window": {
-    "coverage": "379 prefetched runs plus 205 continuation runs, disjoint by run-ID cursor; episode lineage remains partial because recorded parents/roots were missing.",
+    "coverage": "605 distinct prefetched plus continuation runs; continuation returned no further cursor; first observed run in continuation at 08:05:37 UTC",
     "representative_audits": [
-      41181097601,
-      41148471766,
-      41126790198,
-      41149779426,
-      41148528160,
-      41072252554
+      41269711804,
+      41255576901,
+      41189147646,
+      41256886716,
+      41281651199,
+      41262184930
     ]
   },
   "key_themes": [
-    "Native model-routing merge and CI repair followed by successful smokes",
-    "Human refinement of safe-output CLI help merged",
-    "Publication-boundary Bad credentials failures persisted across workflows"
+    "Publication-boundary failures continued across PR Sous Chef, Smoke Project, and ESLint Refiner",
+    "Human review drove revisions on open safe-output Git PR 73672",
+    "Work-queue and Pi smoke runs exposed distinct failure boundaries"
   ],
   "carry_forward_questions": [
-    "Do post-merge PR Sous Chef runs use per-field stdin help and reduce JSON-format retries?",
-    "What repairs the Bad credentials failures in Process Safe Outputs, and do PR Sous Chef and Smoke Project recover?",
-    "Do native routed smokes remain successful over subsequent schedules?"
+    "What causes Process Safe Outputs failures, and do all three workflows recover?",
+    "Does PR 73672 merge, and is its deployed behavior validated?",
+    "Do Pi smoke variants recover after the observed CLI failures?"
   ],
   "representative_runs": [
-    41181097601,
-    41126790198,
-    41149779426
+    41285731195,
+    41269711804,
+    41262184930
   ]
 }
