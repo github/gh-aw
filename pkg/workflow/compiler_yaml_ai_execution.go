@@ -138,8 +138,8 @@ func injectComponentExecutionStarted(step GitHubActionStep, component, filePath 
 // enforceEngineExecutionStepName rewrites the "- name:" line of an evals or detection
 // engine execution step so the name satisfies constants.IsEngineExecutionStepName.
 // gh aw audit relies on that contract to find the step, because the jobs API does
-// not expose step ids.
-func enforceEngineExecutionStepName(step GitHubActionStep) GitHubActionStep {
+// not expose step ids. A blank name falls back to "Execute <engine display name or id>".
+func enforceEngineExecutionStepName(step GitHubActionStep, engine CodingAgentEngine) GitHubActionStep {
 	for i, line := range step {
 		indent, name, found := strings.Cut(line, "- name: ")
 		if !found || strings.TrimSpace(indent) != "" {
@@ -157,12 +157,29 @@ func enforceEngineExecutionStepName(step GitHubActionStep) GitHubActionStep {
 		if constants.IsEngineExecutionStepName(name) {
 			return step
 		}
+		if strings.TrimSpace(name) == "" {
+			name = engineExecutionStepFallbackName(engine)
+		}
 		rewritten := make(GitHubActionStep, 0, len(step))
 		rewritten = append(rewritten, step[:i]...)
 		rewritten = append(rewritten, indent+"- name: "+quote+constants.EngineExecutionStepName(name)+quote)
 		return append(rewritten, step[i+1:]...)
 	}
 	return step
+}
+
+// engineExecutionStepFallbackName returns the engine's display name, else its id,
+// else "engine", for engine execution steps that have no name.
+func engineExecutionStepFallbackName(engine CodingAgentEngine) string {
+	if engine != nil {
+		if name := strings.TrimSpace(engine.GetDisplayName()); name != "" {
+			return name
+		}
+		if id := strings.TrimSpace(engine.GetID()); id != "" {
+			return id
+		}
+	}
+	return "engine"
 }
 
 // generateEngineExecutionSteps generates the GitHub Actions steps for executing the AI engine

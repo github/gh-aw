@@ -180,7 +180,7 @@ func (c *Compiler) buildDetectionEngineExecutionStep(data *WorkflowData) []strin
 			if strings.Contains(line, "id: agentic_execution") {
 				isAWFExecutionStep = true
 				step = injectComponentExecutionStarted(step, "detection", detectionExecutionEvidencePath)
-				step = enforceEngineExecutionStepName(step)
+				step = enforceEngineExecutionStepName(step, engine)
 				break
 			}
 		}

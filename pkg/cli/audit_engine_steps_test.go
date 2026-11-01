@@ -431,6 +431,21 @@ func TestAuditEngineStepFailure_CustomNamedEngineStep(t *testing.T) {
 	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
 }
 
+func TestAuditEngineStepFailure_FallbackNamedEngineStep(t *testing.T) {
+	runDir := t.TempDir()
+	// An engine without behaviors.execution.step-name compiles to "Execute <display name>".
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:     strings.ReplaceAll(evalsPreflightJobs40955414354, "Execute Claude Code CLI", "Execute Harness Engine"),
+		"workflow-logs/3_evals.txt": evalsPreflightJobLog40955414354,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Smoke Harness Engine", "success")
+
+	findings := generateEngineStepFailureFindings(processedRun)
+	require.Len(t, findings, 1, "a fallback-named engine step that exits non-zero must be reported")
+	assert.Contains(t, findings[0].Description, `step 15 "Execute Harness Engine"`)
+	assert.Contains(t, findings[0].Description, "Cannot connect to Anthropic API proxy")
+}
+
 func TestAuditEngineStepFailure_EvalsExecutionStatePerInvocation(t *testing.T) {
 	invocationLog := func(prefix string) string {
 		return `2026-10-29T21:18:59.0334305Z ##[group]Run set -o pipefail

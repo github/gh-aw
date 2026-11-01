@@ -973,18 +973,23 @@ func TestEvalsClaudeAnthropicProviderHasNoCompilerBaseURL(t *testing.T) {
 // TestEvalsAndDetectionEngineStepNamesFollowAuditContract verifies that the compiler
 // enforces the engine execution step naming contract that gh aw audit uses to find
 // the evals and detection engine steps (the jobs API does not expose step ids):
-// a custom engine step name that already follows it is kept, and one that does not
-// is prefixed.
+// a custom engine step name that already follows it is kept, one that does not
+// is prefixed, and an omitted one falls back to the engine display name.
 func TestEvalsAndDetectionEngineStepNamesFollowAuditContract(t *testing.T) {
-	for _, tc := range []struct{ stepName, want string }{
-		{stepName: "Execute DeepSeek Harness", want: "Execute DeepSeek Harness"},
-		{stepName: "Run DeepSeek Harness", want: "Execute Run DeepSeek Harness"},
+	for _, tc := range []struct{ name, stepName, want string }{
+		{name: "contract name", stepName: "Execute DeepSeek Harness", want: "Execute DeepSeek Harness"},
+		{name: "other name", stepName: "Run DeepSeek Harness", want: "Execute Run DeepSeek Harness"},
+		{name: "omitted name", want: "Execute Harness Engine"},
 	} {
-		t.Run(tc.stepName, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			sharedDir := filepath.Join(tmpDir, "shared")
 			if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 				t.Fatal(err)
+			}
+			stepNameLine := ""
+			if tc.stepName != "" {
+				stepNameLine = "\n      step-name: " + tc.stepName
 			}
 			shared := `---
 engine:
@@ -993,8 +998,7 @@ engine:
   behaviors:
     secret-strategy: universal-llm-consumer
     execution:
-      command-name: harness-engine
-      step-name: ` + tc.stepName + `
+      command-name: harness-engine` + stepNameLine + `
 ---
 
 # Shared Engine Definition
