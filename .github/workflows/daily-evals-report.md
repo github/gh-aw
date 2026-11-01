@@ -98,7 +98,7 @@ For each downloaded run directory at `/tmp/gh-aw/aw-mcp/logs/run-<id>/`:
    - `conclusion` (success / failure / cancelled)
    - Whether evals were declared (check for an `evals` key or the presence of the evals job in the run)
 3. Detect **evals job failures** by scanning job conclusions:
-   - runs where the workflow declares evals but `evals.jsonl` is absent
+   - runs where the workflow declares evals but `evals.jsonl` is absent (an `evals_status.json` with `status: not_evaluated` means the evals judge did not run or produced no response; report its `reason_code`, and never count it as `UNKNOWN` answers)
    - runs where job `push_evals_state` exists and has a failed conclusion (`failure`, `timed_out`, or `cancelled`)
    - if both conditions happen in the same run, count it once
 

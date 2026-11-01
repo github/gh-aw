@@ -1759,6 +1759,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1796,6 +1797,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2081,6 +2083,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"single_dimension_hypothesis_selected","question":"Did the agent select exactly one eligible target workflow, exactly one primary_dimension (from the six-dimension harness taxonomy) with exactly one narrow subtype, and write a structured hypothesis contract (observation, mutation, mechanism, primary_metric, expected_direction, minimum_effect, guardrails, evidence, control, candidate) citing at least one — and at least two when independently available — concrete evidence entries from the pre-gathered experiments/logs evidence files, never invented?"},{"id":"candidate_compiled_and_validated","question":"Did the agent add a genuine balanced control/candidate experiments block (with a supported grader:/eval:-referenced primary metric and guardrails, and a decision policy) to the target workflow, then run gh aw compile with --strict (and --validate) on that single target workflow, confirming a clean compile before proposing?"},{"id":"proposal_issue_emitted","question":"Did the agent emit exactly one proposal issue with all required body sections in order (Observation, Hypothesis, Candidate Mutation, Experiment, Guardrails, Expected Economics, Validation, Interpretation, Rollback) plus the exact patch/diff and an application plan — or call noop with a clear reason when no eligible, falsifiable mutation could be justified?"}]'
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "claude"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -2132,6 +2136,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -2298,7 +2303,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()

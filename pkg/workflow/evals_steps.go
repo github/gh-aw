@@ -22,6 +22,10 @@ const (
 
 	// evalsResultsPath is the parsed JSONL results file produced by the parse step.
 	evalsResultsPath = "/tmp/gh-aw/" + string(constants.EvalsResultFilename)
+
+	// evalsStatusPath is the run-level not-evaluated marker the parse step writes instead
+	// of evalsResultsPath when the judge did not start, failed, or produced no response.
+	evalsStatusPath = "/tmp/gh-aw/" + string(constants.EvalsStatusFilename)
 )
 
 // buildEvalsJobSteps builds all steps that run inside the evals job.
@@ -350,6 +354,10 @@ func (c *Compiler) buildEvalsEngineSteps(data *WorkflowData) []string { //nolint
 
 // buildParseEvalsResultsStep creates the github-script step that reads the engine
 // output log and writes structured per-question YES/NO records to evals.jsonl.
+// The raw outcome of the evals_agentic_execution step (not its continue-on-error
+// conclusion) and the engine identity are passed so the parser can classify the
+// judge execution before extracting answers; an unsuccessful or response-less
+// judge yields the evals_status.json not-evaluated marker instead of answers.
 func (c *Compiler) buildParseEvalsResultsStep(data *WorkflowData) []string {
 	if data.Evals == nil {
 		return nil
@@ -371,9 +379,12 @@ await main();`
 		"        env:\n",
 		fmt.Sprintf("          GH_AW_EVALS_QUESTIONS: '%s'\n", escapeYAMLSingleQuoted(questionsJSON)),
 	}
-	steps = appendEvalsModelEnvLines(steps, c.getEvalsEngineID(data), model)
+	engineID := c.getEvalsEngineID(data)
+	steps = appendEvalsModelEnvLines(steps, engineID, model)
 	steps = append(steps,
 		"          GH_AW_EVALS_PHASE: parse\n",
+		fmt.Sprintf("          GH_AW_EVALS_ENGINE: %q\n", engineID),
+		"          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}\n",
 		"          GITHUB_RUN_ID: ${{ github.run_id }}\n",
 		"        with:\n",
 		"          script: |\n",
@@ -440,8 +451,8 @@ await main();`
 	return steps
 }
 
-// buildUploadEvalsArtifactStep creates the step that uploads evals.jsonl as the
-// evals artifact for downstream consumption.
+// buildUploadEvalsArtifactStep creates the step that uploads evals.jsonl (or the
+// evals_status.json not-evaluated marker) as the evals artifact for downstream consumption.
 func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 	evalsArtifactName := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
 	proxyLogsDir := constants.AWFProxyLogsDir.String()
@@ -469,6 +480,7 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 		"          name: " + evalsArtifactName + "\n",
 		"          path: |\n",
 		"            " + evalsResultsPath + "\n",
+		"            " + evalsStatusPath + "\n",
 		"            /tmp/gh-aw/evals_token_usage.jsonl\n",
 		"            " + evalsExecutionEvidencePath + "\n",
 		"          if-no-files-found: ignore\n",

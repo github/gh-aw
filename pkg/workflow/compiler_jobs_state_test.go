@@ -307,7 +307,8 @@ func TestBuildPushEvalsStateJob_WithEvals(t *testing.T) {
 	assert.NotContains(t, stepsYAML, "name: evals", "evals download should not use exact artifact name downloads")
 	assert.Contains(t, stepsYAML, "GH_AW_STATE_FILES: evals.jsonl", "steps should configure evals filename")
 	assert.NotContains(t, stepsYAML, "GH_AW_STATE_APPEND_FILES", "steps should use the state file itself for append-only history")
-	assert.Contains(t, stepsYAML, "push_experiment_state.cjs", "steps should reuse push_experiment_state.cjs helper")
+	assert.Contains(t, stepsYAML, "push_evals_state.cjs", "steps should guard the generic state writer with push_evals_state.cjs")
+	assert.NotContains(t, stepsYAML, "evals_status.json", "the not-evaluated marker must not be pushed as answer history")
 }
 
 func TestBuildPushEvalsStateJob_GHESUsesExactArtifactName(t *testing.T) {

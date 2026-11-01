@@ -198,3 +198,60 @@ func TestWorkflowIDFromRunPath(t *testing.T) {
 		})
 	}
 }
+
+// notEvaluatedMarker40955414354 is the run-level marker parse_evals writes for the
+// audited documentation run whose evals judge failed AWF pre-flight before starting.
+const notEvaluatedMarker40955414354 = `{"status":"not_evaluated","reason_code":"judge_not_started","reason":"The claude evals judge did not start: the sandbox failed before the engine harness started (execution step outcome: failure).","engine":"claude","model":"evals","run_id":"40955414354","run_attempt":"1","timestamp":"2026-10-29T21:19:44.470Z","execution_outcome":"failure","execution_state":"not_started"}`
+
+func TestNotEvaluatedEvalsRunHasNoResults(t *testing.T) {
+	for _, layout := range []string{
+		"evals_status.json",
+		filepath.Join("evals", "evals_status.json"),
+		filepath.Join("a1b2c3-evals", "evals_status.json"),
+		filepath.Join("usage", "evals", "evals_status.json"),
+		filepath.Join("a1b2c3-usage", "evals", "evals_status.json"),
+	} {
+		t.Run(layout, func(t *testing.T) {
+			runDir := t.TempDir()
+			markerPath := filepath.Join(runDir, layout)
+			require.NoError(t, os.MkdirAll(filepath.Dir(markerPath), 0o755))
+			require.NoError(t, os.WriteFile(markerPath, []byte(notEvaluatedMarker40955414354+"\n"), 0o644))
+
+			assert.False(t, runHasEvals(runDir, false), "a not-evaluated run must not satisfy the evals results filter")
+			assert.Empty(t, findEvalsResultFile(runDir), "the marker must never be treated as an answer file")
+			assert.Equal(t, markerPath, findEvalsNotEvaluatedStatusFile(runDir), "the marker should be retained as diagnostic evidence")
+		})
+	}
+}
+
+func TestGenuineUnknownEvalsRunStillHasResults(t *testing.T) {
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "evals"), 0o755))
+	row := `{"id":"docs_reviewed","question":"Did the agent review the project documentation from the perspective of a Claude Code user?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-29T21:19:44.470Z","runid":"40955414354"}`
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "evals", "evals.jsonl"), []byte(row+"\n"), 0o644))
+
+	assert.True(t, runHasEvals(runDir, false), "a judge that answered UNKNOWN still produced results")
+	assert.Empty(t, findEvalsNotEvaluatedStatusFile(runDir))
+}
+
+func TestEnsureEvalsResultsFromBranchSkipsNotEvaluatedRun(t *testing.T) {
+	calls := installHostRoutingTestGH(t, "github.com", "")
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "evals"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "evals", "evals_status.json"), []byte(notEvaluatedMarker40955414354+"\n"), 0o644))
+
+	assert.False(t, ensureEvalsResultsFromBranch(context.Background(), WorkflowRun{DatabaseID: 123}, runDir, "owner", "repo", "github.com", false))
+	_, err := os.Stat(filepath.Join(runDir, "evals.jsonl"))
+	assert.True(t, os.IsNotExist(err), "other runs' branch answers must not be attributed to a not-evaluated run")
+	_, err = os.Stat(calls)
+	assert.True(t, os.IsNotExist(err), "the branch fallback should not query the evals branch for a not-evaluated run")
+}
+
+func TestAuditEvalsSummaryOmitsNotEvaluatedRun(t *testing.T) {
+	runDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(runDir, "usage", "evals"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "usage", "evals", "evals_status.json"), []byte(notEvaluatedMarker40955414354+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, "usage", "evals", "execution.json"), []byte(`{"version":1,"component":"evals","run_id":40955414354,"run_attempt":1,"state":"not_started"}`+"\n"), 0o644))
+
+	assert.Nil(t, buildEvalsSummary(WorkflowRun{DatabaseID: 40955414354, LogsPath: runDir}), "a not-evaluated run has no answers to summarize")
+}
