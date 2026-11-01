@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,14 +102,19 @@ exec "$@"
 set -euo pipefail
 output=""
 url=""
+authorization=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) output="$2"; shift 2 ;;
+    -H)
+      case "$2" in Authorization:*) authorization="$2" ;; esac
+      shift 2
+      ;;
     https://*) url="$1"; shift ;;
     *) shift ;;
   esac
 done
-echo "$url" >> "$CURL_LOG"
+echo "$authorization $url" >> "$CURL_LOG"
 case "$url" in
   https://api.github.com/repos/github/copilot-cli/releases/*)
     [ -s "$MOCK_RELEASE" ] || exit 97
@@ -132,6 +138,7 @@ esac
 				"COPILOT_INSTALL_DIR="+installDir, "GITHUB_PATH="+filepath.Join(dir, "github-path"),
 				"PATH="+binDir+":"+os.Getenv("PATH"), "CURL_LOG="+logPath,
 				"MOCK_RELEASE="+metadataPath, "MOCK_MANIFEST="+manifestPath, "MOCK_ARCHIVE="+archivePath,
+				"GITHUB_TOKEN=test-token",
 			)
 			output, err := cmd.CombinedOutput()
 			if test.wantError != "" {
@@ -145,7 +152,10 @@ esac
 			log, _ := os.ReadFile(logPath)
 			if test.days == "0" {
 				assert.Empty(t, log, "explicit zero must not query release metadata")
-			} else if test.wantError == "" {
+			} else if strings.Contains(string(log), "api.github.com") {
+				assert.Contains(t, string(log), strings.Join([]string{"Authorization:", "Bearer", "test-token"}, " "))
+			}
+			if test.days != "0" && test.wantError == "" {
 				assert.Contains(t, string(log), "https://api.github.com/repos/github/copilot-cli/releases/")
 				if test.version == "latest" {
 					assert.Contains(t, string(log), "/releases/latest")

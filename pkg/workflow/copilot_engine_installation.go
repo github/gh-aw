@@ -214,23 +214,50 @@ func buildCopilotSDKInstallStep(workflowData *WorkflowData) GitHubActionStep {
 // specToInstallStep converts a copilotSDKInstallSpec into a GitHubActionStep.
 // When the spec has runLines set it emits a "run: |" multi-line block; otherwise
 // it emits a single "run: <command>" line.
-func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays ...int) GitHubActionStep {
+func specToInstallStep(spec copilotSDKInstallSpec, cooldownDays int) GitHubActionStep {
+	installCommand := spec.command
+	if len(spec.runLines) > 0 {
+		installCommand = strings.Join(spec.runLines, "\n")
+	}
+	usesNpm := strings.Contains(installCommand, "npm install ")
 	if len(spec.runLines) > 0 {
 		step := GitHubActionStep{
 			"      - name: " + spec.stepName,
 			"        run: |",
 		}
+		if usesNpm && cooldownDays > 0 {
+			step = appendNpmCooldownVersionCheck(step, cooldownDays)
+		}
 		for _, line := range spec.runLines {
 			step = append(step, "          "+line)
 		}
+		if usesNpm {
+			step = append(step,
+				"        env:",
+				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
+			)
+		}
+		return step
+	}
+	if usesNpm && cooldownDays > 0 {
+		step := GitHubActionStep{
+			"      - name: " + spec.stepName,
+			"        run: |",
+		}
+		step = appendNpmCooldownVersionCheck(step, cooldownDays)
+		step = append(step, "          "+spec.command)
+		step = append(step,
+			"        env:",
+			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays),
+		)
 		return step
 	}
 	step := GitHubActionStep{
 		"      - name: " + spec.stepName,
 		"        run: " + spec.command,
 	}
-	if len(cooldownDays) > 0 && strings.Contains(spec.command, "npm install ") {
-		step = append(step, "        env:", fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays[0]))
+	if usesNpm {
+		step = append(step, "        env:", fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", cooldownDays))
 	}
 	return step
 }

@@ -16,6 +16,30 @@ func containsEnvValue(stepContent, key, value string) bool {
 		strings.Contains(stepContent, key+`: "`+value+`"`)
 }
 
+func TestCopilotSDKNpmInstallCooldownInMultilineStep(t *testing.T) {
+	spec := copilotSDKInstallSpec{
+		stepName: "Install test SDK",
+		runLines: []string{"npm install --ignore-scripts --no-save example-sdk@1.2.3"},
+	}
+
+	step := strings.Join(specToInstallStep(spec, 7), "\n")
+	if !strings.Contains(step, "NPM_CONFIG_MIN_RELEASE_AGE: '7'") ||
+		!strings.Contains(step, "npm 11.10.0 or newer is required") {
+		t.Fatalf("Expected multiline npm SDK installs to enforce the configured cooldown, got:\n%s", step)
+	}
+}
+
+func TestCopilotSDKJavaInstallUsesMavenNotNpm(t *testing.T) {
+	spec := getInlineCopilotSDKInstallSpec("java")
+	step := strings.Join(specToInstallStep(spec, 7), "\n")
+	if !strings.Contains(step, "mvn -q dependency:build-classpath") {
+		t.Fatalf("Expected Java SDK installation to use Maven, got:\n%s", step)
+	}
+	if strings.Contains(step, "NPM_CONFIG_MIN_RELEASE_AGE") {
+		t.Fatalf("Java/Maven installation must not receive npm-specific cooldown configuration, got:\n%s", step)
+	}
+}
+
 func TestCopilotEngineExecutionStepsWithCopilotSDK(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{

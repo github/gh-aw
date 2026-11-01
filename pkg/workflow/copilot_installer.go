@@ -53,6 +53,7 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 			`        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" "${ENGINE_VERSION}"` + installerFlags,
 			"        env:",
 			"          GH_HOST: github.com",
+			"          GITHUB_TOKEN: ${{ github.token }}",
 			"          ENGINE_VERSION: " + version,
 		}
 		stepLines = appendCopilotInstallerVersionEnv(stepLines, compiledVersion, copilotMinVersion, guestLibc)
@@ -64,6 +65,7 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 		"        run: bash \"${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh\" " + version + installerFlags,
 		"        env:",
 		"          GH_HOST: github.com",
+		"          GITHUB_TOKEN: ${{ github.token }}",
 	}
 	stepLines = appendCopilotInstallerVersionEnv(stepLines, "", copilotMinVersion, guestLibc)
 

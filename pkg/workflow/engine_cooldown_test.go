@@ -72,7 +72,7 @@ func TestEngineCooldownInstalls(t *testing.T) {
 		Behaviors: &EngineBehaviorDefinition{
 			Installation: &EngineInstallationDefinition{
 				PackageManager: "npm", PackageName: "testcooldown", BinaryName: "testcooldown",
-				StepName: "Install testcooldown", Cooldown: false,
+				StepName: "Install testcooldown",
 			},
 		},
 	}
@@ -162,6 +162,54 @@ func TestEngineCooldownSecondaryJobInheritance(t *testing.T) {
 	zero := 0
 	data.SafeOutputs.ThreatDetection.EngineConfig = &EngineConfig{ID: "copilot", Cooldown: &zero}
 	assert.Contains(t, strings.Join(c.buildInstallDetectionEngineForExternalDetectorStep(data), ""), "--cooldown-days 0")
+}
+
+func TestEngineCooldownInheritedByCrossEngineDetection(t *testing.T) {
+	days := 7
+	data := &WorkflowData{
+		AI: "pi",
+		EngineConfig: &EngineConfig{
+			ID:          "pi",
+			LLMProvider: LLMProviderGitHub,
+			Cooldown:    &days,
+		},
+		SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+	}
+	compiler := NewCompiler()
+	detectionConfig := resolveExternalDetectorEngineConfig(data, "copilot")
+	require.NotNil(t, detectionConfig.Cooldown)
+	assert.Equal(t, days, *detectionConfig.Cooldown)
+
+	for name, build := range map[string]func(*WorkflowData) []string{
+		"inline":   compiler.buildDetectionEngineExecutionStep,
+		"external": compiler.buildInstallDetectionEngineForExternalDetectorStep,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Contains(t, strings.Join(build(data), ""), "--cooldown-days 7")
+		})
+	}
+}
+
+func TestWarnLegacyBehaviorInstallationCooldown(t *testing.T) {
+	disabled := false
+	compiler := NewCompiler()
+	data := &WorkflowData{
+		EngineConfig: &EngineConfig{ID: "legacy"},
+		engineDefinition: &EngineDefinition{
+			ID: "legacy",
+			Behaviors: &EngineBehaviorDefinition{
+				Installation: &EngineInstallationDefinition{Cooldown: &disabled},
+			},
+		},
+	}
+
+	compiler.warnLegacyBehaviorInstallationCooldown(data, "workflow.md")
+	assert.Equal(t, 1, compiler.GetWarningCount())
+
+	compiler.ResetWarningCount()
+	data.engineDefinition.Behaviors.Installation.Cooldown = nil
+	compiler.warnLegacyBehaviorInstallationCooldown(data, "workflow.md")
+	assert.Zero(t, compiler.GetWarningCount())
 }
 
 func TestCompileEngineCooldownDetection(t *testing.T) {

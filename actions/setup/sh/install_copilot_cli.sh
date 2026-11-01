@@ -742,7 +742,17 @@ check_copilot_release_age() {
     printf '%s\n' "$version"
     return 0
   fi
-  local endpoint metadata resolved
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq is required for Copilot release-age validation." >&2
+    echo "ERROR: Install jq from https://jqlang.github.io/jq/download/ before installing Copilot CLI." >&2
+    return 1
+  fi
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "ERROR: GITHUB_TOKEN is required to authenticate Copilot release-age metadata requests." >&2
+    return 1
+  fi
+  local endpoint metadata resolved authorization_header
+  printf -v authorization_header '%s: %s %s' 'Authorization' 'Bearer' "$GITHUB_TOKEN"
   metadata="${TEMP_DIR}/release-age.json"
   if [ -z "$version" ] || [ "$version" = latest ]; then
     endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/latest"
@@ -753,7 +763,8 @@ check_copilot_release_age() {
     fi
     endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/tags/v${version#v}"
   fi
-  if ! curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 10 --max-time 30 \
+  if ! curl --proto '=https' --proto-redir '=https' -H "$authorization_header" \
+    -H "Accept: application/vnd.github+json" -fsSL --connect-timeout 10 --max-time 30 \
     --retry 5 --retry-delay 2 --retry-max-time 60 --retry-all-errors -o "$metadata" "$endpoint"; then
     echo "ERROR: Cannot verify Copilot release age: GitHub release metadata is unavailable" >&2
     return 1
@@ -805,7 +816,7 @@ fi
 if { [ -z "$COPILOT_CHECKSUMS_SHA256" ] || [ "$PREFER_TOOLCACHE" = true ]; } &&
   CACHED_COPILOT_BIN="$(find_cached_copilot_bin "$REQUESTED_VERSION" "${COMPAT_MATCHED_MIN_AGENT}" "${COMPAT_MATCHED_MAX_AGENT}" "${COMPAT_CACHE_TTL_DAYS}")"; then
   CACHED_COPILOT_VERSION="$(basename "$(dirname "$(dirname "$(dirname "$CACHED_COPILOT_BIN")")")")"
-  check_copilot_release_age "$CACHED_COPILOT_VERSION" >/dev/null
+  check_copilot_release_age "$CACHED_COPILOT_VERSION" >/dev/null || exit 1
   echo "Using cached GitHub Copilot CLI from ${CACHED_COPILOT_BIN}"
   activate_cached_copilot_bin "$CACHED_COPILOT_BIN"
 
@@ -845,7 +856,7 @@ if [ "$REQUESTED_VERSION" = "latest" ] && [ -n "$COMPAT_MATCHED_MAX_AGENT" ] &&
   VERSION="$DEFAULT_COPILOT_VERSION"
 fi
 
-VERSION="$(check_copilot_release_age "$VERSION")"
+VERSION="$(check_copilot_release_age "$VERSION")" || exit 1
 
 # Build download URLs
 if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then

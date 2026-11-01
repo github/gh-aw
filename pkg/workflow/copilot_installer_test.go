@@ -9,6 +9,15 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+func TestCopilotInstallerPassesGitHubToken(t *testing.T) {
+	for _, version := range []string{"1.0.0", "${{ inputs.engine-version }}"} {
+		step := strings.Join(generateCopilotInstallerSteps(version, "Install Copilot", false, "v1.0.0", "", "", "", 3)[0], "\n")
+		if !strings.Contains(step, "GITHUB_TOKEN: ${{ github.token }}") {
+			t.Errorf("Expected installer step for version %q to authenticate GitHub metadata requests, got:\n%s", version, step)
+		}
+	}
+}
+
 func TestCopilotEngineWithVersion(t *testing.T) {
 	// engine.version must be honored: when an explicit version is set it should be
 	// passed to the installer and compat.json resolution must be skipped.

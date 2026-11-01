@@ -1,10 +1,72 @@
 package workflow
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNpmCooldownVersionCheckFailsClosedOnUnsupportedNpm(t *testing.T) {
+	tests := []struct {
+		version string
+		valid   bool
+	}{
+		{version: "11.9.0"},
+		{version: "11.10.0", valid: true},
+		{version: "12.0.0", valid: true},
+		{version: "unknown"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.version, func(t *testing.T) {
+			binDir := t.TempDir()
+			npm := filepath.Join(binDir, "npm")
+			require.NoError(t, os.WriteFile(npm, []byte("#!/bin/sh\nprintf '%s\\n' \"$NPM_VERSION_FIXTURE\"\n"), 0o755))
+			lines := appendNpmCooldownVersionCheck(nil, 3)
+			scriptLines := make([]string, len(lines))
+			for i, line := range lines {
+				scriptLines[i] = strings.TrimSpace(line)
+			}
+			cmd := exec.Command("bash", "-c", strings.Join(scriptLines, "\n"))
+			cmd.Env = append(os.Environ(),
+				"NPM_VERSION_FIXTURE="+test.version,
+				"PATH="+binDir+":"+os.Getenv("PATH"),
+			)
+			err := cmd.Run()
+			if test.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestNpmEngineInstallPathsRequireCooldownCapableNpm(t *testing.T) {
+	hostSteps := GenerateNpmInstallSteps("example-engine", "1.2.3", "Install", "example", NPMInstallOptions{
+		CooldownEnabled: true,
+	})
+	host := strings.Join([]string(hostSteps[0]), "\n")
+	microVM := strings.Join(GenerateMicroVMNpmCLIInstallStep("example-engine", "1.2.3", "Install microVM", "example", false, true, 7), "\n")
+	for name, step := range map[string]string{"host": host, "microVM": microVM} {
+		t.Run(name, func(t *testing.T) {
+			assert.Contains(t, step, "npm 11.10.0 or newer is required")
+			assert.Contains(t, step, "NPM_CONFIG_MIN_RELEASE_AGE")
+		})
+	}
+
+	days := 0
+	disabledSteps := GenerateNpmInstallSteps("example-engine", "1.2.3", "Install", "example", NPMInstallOptions{
+		CooldownDays: &days,
+	})
+	disabled := strings.Join([]string(disabledSteps[0]), "\n")
+	assert.NotContains(t, disabled, "npm 11.10.0 or newer is required")
+}
 
 // TestResolveRuntimeCooldown_NilWorkflowData verifies nil WorkflowData defaults to
 // cooldown enabled (true).
