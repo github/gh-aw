@@ -8,12 +8,74 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // workflowsDir is the path to the .github/workflows directory relative to this test file.
 const workflowsDir = "../../.github/workflows"
+
+func TestSmokeAndCoverageFailureContracts(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		required []string
+		rejected []string
+	}{
+		{
+			name: "purelock",
+			required: []string{
+				`> "$GITHUB_WORKSPACE/coverage/purelock-cobertura.xml"`,
+				`file: "coverage/purelock-cobertura.xml"`,
+				"If generation or upload fails, call `report_incomplete`",
+			},
+			rejected: []string{
+				`file: "/tmp/gh-aw/purelock/cobertura.xml"`,
+				`> "$RUNNER_TEMP/gh-aw/safeoutputs/upload-code-coverage/`,
+			},
+		},
+		{
+			name: "smoke-pi",
+			required: []string{
+				"Wait for each tool result",
+				"Only after the file creation and readback succeed",
+				"provided tool-call API",
+				"do not use `require`",
+				"return only their actual file contents and command output",
+			},
+			rejected: []string{"sequentially in a single turn"},
+		},
+		{
+			name: "smoke-pydantic",
+			required: []string{
+				"run: mkdir -p generated_reports",
+				"generated_reports/smoke-pydantic-${{ github.run_id }}.txt",
+				"Wait for success, then use `read_file`",
+				"mark this test as failed and report the concrete error",
+			},
+		},
+		{
+			name: "daily-workflow-security-model",
+			required: []string{
+				"https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar",
+				"011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd",
+				`"$tools/tla2tools.jar" | sha256sum --check --strict`,
+			},
+			rejected: []string{"d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join(workflowsDir, test.name+".md"))
+			require.NoError(t, err)
+			for _, required := range test.required {
+				assert.Contains(t, string(content), required)
+			}
+			for _, rejected := range test.rejected {
+				assert.NotContains(t, string(content), rejected)
+			}
+		})
+	}
+}
 
 // lockFileOutputMapping describes what outputs a compiled lock file must expose, derived from
 // the SafeOutputsConfig parsed from the source .md file.
@@ -522,4 +584,36 @@ func TestCompiledLockFiles_SmokeCallWorkflowForwardsPayload(t *testing.T) {
 		assert.Contains(t, lockContent, "payload: ${{ needs.safe_outputs.outputs.call_workflow_payload }}", "call-workflow job should forward payload from safe_outputs")
 		assert.Contains(t, lockContent, "${{ fromJSON(needs.safe_outputs.outputs.call_workflow_payload)['task-description'] }}", "call-workflow job should forward task-description from the handler payload")
 	})
+}
+
+// TestCompiledLockFiles_EngineExecutionStepNamesMatchAuditConstant verifies that every
+// continue-on-error evals and detection engine step keeps a name that gh aw audit
+// recognizes through constants.IsEngineExecutionStepName.
+func TestCompiledLockFiles_EngineExecutionStepNamesMatchAuditConstant(t *testing.T) {
+	lockFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.lock.yml"))
+	require.NoError(t, err, "should list lock files")
+
+	checked := 0
+	for _, lockFile := range lockFiles {
+		lockBytes, err := os.ReadFile(lockFile)
+		require.NoError(t, err, "should read lock file %s", lockFile)
+		lines := strings.Split(string(lockBytes), "\n")
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "id: evals_agentic_execution" && trimmed != "id: detection_agentic_execution" {
+				continue
+			}
+			stepName := ""
+			for j := i - 1; j >= 0; j-- {
+				if name, ok := strings.CutPrefix(strings.TrimSpace(lines[j]), "- name: "); ok {
+					stepName = name
+					break
+				}
+			}
+			assert.True(t, constants.IsEngineExecutionStepName(stepName),
+				"%s: step %q (%s) must match constants.IsEngineExecutionStepName", filepath.Base(lockFile), stepName, trimmed)
+			checked++
+		}
+	}
+	assert.Positive(t, checked, "should find at least one evals or detection engine execution step")
 }

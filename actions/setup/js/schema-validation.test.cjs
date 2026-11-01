@@ -372,6 +372,32 @@ describe("schema-validation.cjs", () => {
       expect(violations).toHaveLength(1);
       expect(violations[0]).toMatchObject({ field: "body", limit: 65536, unit: "characters" });
     });
+
+    it("should honor maxLength above 10KB for custom safe-job inputs", async () => {
+      const { validateStringInputLengths, buildStringLengthValidationError, MAX_STRING_INPUT_BYTES } = await import("./schema-validation.cjs");
+      const customJobTool = {
+        name: "large_payload_job",
+        inputSchema: {
+          type: "object",
+          properties: {
+            payload: { type: "string", maxLength: 40000 },
+            legacy_payload: { type: "string" },
+          },
+        },
+      };
+
+      const acceptedPayload = "a".repeat(12 * 1024);
+      expect(acceptedPayload.length).toBeGreaterThan(MAX_STRING_INPUT_BYTES);
+      expect(validateStringInputLengths({ payload: acceptedPayload }, customJobTool.inputSchema)).toEqual([]);
+
+      const legacyViolations = validateStringInputLengths({ legacy_payload: acceptedPayload }, customJobTool.inputSchema);
+      expect(legacyViolations).toMatchObject([{ field: "legacy_payload", actualLength: acceptedPayload.length, limit: MAX_STRING_INPUT_BYTES, unit: "bytes" }]);
+
+      const oversizedPayload = "a".repeat(40001);
+      const violations = validateStringInputLengths({ payload: oversizedPayload }, customJobTool.inputSchema);
+      expect(violations).toMatchObject([{ field: "payload", actualLength: 40001, limit: 40000, unit: "characters" }]);
+      expect(buildStringLengthValidationError(customJobTool.name, violations)).toContain("'payload' exceeds maximum length of 40000 characters (got 40001 characters)");
+    });
   });
 
   describe("validateStringMinLengths", () => {

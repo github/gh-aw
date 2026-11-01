@@ -3,7 +3,6 @@
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
 // @safe-outputs-exempt SEC-005 — runtime repository fallbacks are checked by assertClaimAuthorized against authorizeWorkerClaim's profile.effect_scope allowlist (E004); the guarded effect client reauthorizes native writes.
 
-const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const {
@@ -22,6 +21,7 @@ const { resolveRepositoryTarget } = require("./work_queue_effect_resource.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { readGuardedFile } = require("./symlink_guard.cjs");
 
 const receipts = new WeakMap();
 
@@ -58,15 +58,7 @@ async function main(config = {}, suppliedClient) {
     const filename = crypto.createHash("sha256").update(source).digest("hex") + extension;
     const staged = path.join(root, filename);
     assertClaimArtifactFile(staged, root);
-    const fd = fs.openSync(staged, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-    let content;
-    try {
-      const stat = fs.fstatSync(fd);
-      if (!stat.isFile() || stat.nlink !== 1 || !Number.isSafeInteger(maximum) || stat.size > maximum) throw new Error("Queue asset is not a bounded isolated regular file");
-      content = fs.readFileSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
+    const content = readGuardedFile(staged, maximum);
     const sha256 = crypto.createHash("sha256").update(content).digest("hex");
     if (message.sha !== undefined && message.sha !== sha256) throw new Error("Queue asset staged content differs from its declared digest");
     const assetPath = `claims/${namespace}/${sha256}${extension}`;

@@ -8115,6 +8115,36 @@
                   ],
                   "additionalProperties": false
                 },
+                "evals": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "questions": {
+                      "type": "integer"
+                    },
+                    "yes": {
+                      "type": "integer"
+                    },
+                    "no": {
+                      "type": "integer"
+                    },
+                    "unknown": {
+                      "type": "integer"
+                    },
+                    "execution_state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "questions",
+                    "yes",
+                    "no",
+                    "unknown"
+                  ],
+                  "additionalProperties": false
+                },
                 "ledger": {
                   "type": [
                     "null",

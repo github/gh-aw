@@ -159,8 +159,11 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 		if handler.PermissionBuilder == nil {
 			continue
 		}
-		if excludePerHandlerApps && handler.StructField != "" && getHandlerGitHubApp(safeOutputs, handler.StructField) != nil {
-			continue
+		if excludePerHandlerApps && handler.StructField != "" {
+			if getHandlerGitHubApp(safeOutputs, handler.StructField) != nil ||
+				getHandlerGitHubToken(safeOutputs, handler.StructField) != "" {
+				continue
+			}
 		}
 		handlerPermissions := computeSafeOutputHandlerPermissions(safeOutputs, handler)
 		if handlerPermissions == nil {

@@ -61,6 +61,14 @@ func badMixedNamedTypes() {
 	_ = namedAlias([]byte(na)) // want `namedAlias\(\[\]byte\(na\)\) is a redundant round-trip; replace it with namedAlias\(na\)`
 }
 
+func badParenInner() {
+	s := "hello"
+	b := []byte{104, 101, 108, 108, 111}
+
+	_ = string(([]byte(s))) // want `string\(\[\]byte\(s\)\) is a redundant round-trip`
+	_ = []byte((string(b))) // want `\[\]byte\(string\(b\)\) makes two copies to clone b`
+}
+
 // helperString is a regular function, not a type conversion — must not be flagged.
 func helperString(b []byte) string { return string(b) }
 

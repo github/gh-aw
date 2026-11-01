@@ -1230,7 +1230,13 @@ func TestAuditTimeoutErrorSummarizesPartialResults(t *testing.T) {
 		assert.Contains(t, envelope["error"], "timed out")
 		assert.NotEmpty(t, envelope["suggestions"])
 		if json.Valid([]byte(output)) {
-			assert.Equal(t, map[string]any{"available": true}, envelope["partial_results"])
+			partialResults, ok := envelope["partial_results"].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, true, partialResults["available"])
+			if strings.Contains(output, `"run_id":123`) {
+				assert.InDelta(t, 123, partialResults["run_id"], 0)
+				assert.Equal(t, "example", partialResults["workflow_name"])
+			}
 			assert.NotContains(t, content.Text, "overview")
 		} else {
 			assert.NotContains(t, envelope, "partial_results")
@@ -1256,6 +1262,7 @@ func TestAuditToolReturnsIncompleteSubprocessData(t *testing.T) {
 	partial, ok := envelope["partial_results"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, true, partial["available"])
+	assert.InDelta(t, 123, partial["run_id"], 0)
 	assert.Equal(t, "artifacts", envelope["stage"])
 	assert.NotContains(t, content.Text, "overview")
 	assert.Contains(t, envelope["error"], "artifacts")

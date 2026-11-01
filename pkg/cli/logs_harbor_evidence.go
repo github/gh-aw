@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/atif"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // Snapshot only recorded grading/session/provenance inputs, never source code
@@ -87,10 +88,10 @@ func harborSnapshotFile(root *os.Root, path, destination string, entry fs.DirEnt
 		return fmt.Errorf("harbor evidence exceeds the 64 MiB input limit: %s", path)
 	}
 	target := filepath.Join(destination, filepath.FromSlash(path))
-	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), constants.DirPermOwnerOnly); err != nil {
 		return err
 	}
-	return os.WriteFile(target, content, 0o600)
+	return os.WriteFile(target, content, constants.FilePermSensitive)
 }
 
 // Audit summaries normalize boolean values to 1/0. Gate rewards on the original

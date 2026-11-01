@@ -424,9 +424,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ALLOWED_EXTENSIONS: ''
-          GH_AW_CACHE_DESCRIPTION: ''
-          GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'
+          GH_AW_ALLOWED_EXTENSIONS: ""
+          GH_AW_CACHE_DESCRIPTION: ""
+          GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -1374,21 +1374,22 @@ jobs:
             ]
           }
           GH_AW_MCP_SCRIPTS_TOOLS_d5e5299eb3dd425e_EOF
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_e0a10bf70e571677_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF'
             const path = require("path");
             const { startHttpServer } = require("./mcp_scripts_mcp_server_http.cjs");
             const configPath = path.join(__dirname, "tools.json");
             const port = parseInt(process.env.GH_AW_MCP_SCRIPTS_PORT || "3000", 10);
-            const apiKey = process.env.GH_AW_MCP_SCRIPTS_API_KEY || "";
+            const apiKey = process.env.GH_AW_MCP_SCRIPTS_API_KEY;
             startHttpServer(configPath, {
               port: port,
+              apiKey: apiKey,
               stateless: true,
               logDir: "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
             }).catch(error => {
               console.error("Failed to start mcp-scripts HTTP server:", error);
               process.exit(1);
             });
-          GH_AW_MCP_SCRIPTS_SERVER_e0a10bf70e571677_EOF
+          GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF
           chmod +x "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs"
 
       - name: Write MCP Scripts Tool Files

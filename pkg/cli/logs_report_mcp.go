@@ -106,6 +106,16 @@ func mergeRunIntegrityFilterSummary(destination **IntegrityFilterSummary, usage 
 	mergeIntegrityFilterCounts((*destination).FilteredReasonCounts, runIntegrity.FilteredReasonCounts)
 }
 
+func mergeWeightedAvgDuration(existingAvg string, existingWeight int, newAvg string, newWeight, totalWeight int) string {
+	if newAvg == "" || totalWeight <= 0 {
+		return existingAvg
+	}
+	existingDuration := parseDurationString(existingAvg)
+	newDuration := parseDurationString(newAvg)
+	weightedDuration := (existingDuration*time.Duration(existingWeight) + newDuration*time.Duration(newWeight)) / time.Duration(totalWeight)
+	return timeutil.FormatDuration(weightedDuration)
+}
+
 func mergeMCPToolSummaries(destination map[string]*MCPToolSummary, summaries []MCPToolSummary) {
 	for _, summary := range summaries {
 		summary.syncFieldsFromBase()
@@ -139,12 +149,7 @@ func mergeMCPToolSummaries(destination map[string]*MCPToolSummary, summaries []M
 		existing.MaxInputSize = max(existing.MaxInputSize, summary.MaxInputSize)
 		existing.MaxOutputSize = max(existing.MaxOutputSize, summary.MaxOutputSize)
 		existing.ErrorCount += summary.ErrorCount
-		if summary.AvgDuration != "" && existing.CallCount > 0 {
-			existingDuration := parseDurationString(existing.AvgDuration)
-			newDuration := parseDurationString(summary.AvgDuration)
-			weightedDuration := (existingDuration*time.Duration(previousCallCount) + newDuration*time.Duration(summary.CallCount)) / time.Duration(existing.CallCount)
-			existing.AvgDuration = timeutil.FormatDuration(weightedDuration)
-		}
+		existing.AvgDuration = mergeWeightedAvgDuration(existing.AvgDuration, previousCallCount, summary.AvgDuration, summary.CallCount, existing.CallCount)
 		if summary.MaxDuration != "" && parseDurationString(summary.MaxDuration) > parseDurationString(existing.MaxDuration) {
 			existing.MaxDuration = summary.MaxDuration
 		}
@@ -181,12 +186,7 @@ func mergeMCPServerStats(destination map[string]*MCPServerStats, servers []MCPSe
 		existing.MaxInputSize = max(existing.MaxInputSize, server.MaxInputSize)
 		existing.MaxOutputSize = max(existing.MaxOutputSize, server.MaxOutputSize)
 		existing.ErrorCount += server.ErrorCount
-		if server.AvgDuration != "" && existing.RequestCount > 0 {
-			existingDuration := parseDurationString(existing.AvgDuration)
-			newDuration := parseDurationString(server.AvgDuration)
-			weightedDuration := (existingDuration*time.Duration(previousRequestCount) + newDuration*time.Duration(server.RequestCount)) / time.Duration(existing.RequestCount)
-			existing.AvgDuration = timeutil.FormatDuration(weightedDuration)
-		}
+		existing.AvgDuration = mergeWeightedAvgDuration(existing.AvgDuration, previousRequestCount, server.AvgDuration, server.RequestCount, existing.RequestCount)
 	}
 }
 

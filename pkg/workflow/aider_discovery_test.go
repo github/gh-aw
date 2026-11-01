@@ -65,11 +65,11 @@ func TestAiderDailyGoValidationContracts(t *testing.T) {
 			require.Len(t, parts, 3)
 			require.NoError(t, yaml.Unmarshal([]byte(parts[1]), &frontmatter))
 			assert.Equal(t, "1.27.3", frontmatter.Runtimes["go"].Version)
-			assert.Contains(t, parts[2], "|| safeoutputs report_incomplete")
 			assert.NotContains(t, parts[2], "|| safeoutputs noop")
 			assert.NotContains(t, parts[2], "|| true")
 			assert.NotContains(t, parts[2], "GOMODCACHE=/tmp/")
 			if name == "daily-go-test-stubs-aider" {
+				assert.Contains(t, parts[2], "|| safeoutputs report_incomplete")
 				assert.Contains(t, parts[2], "aider_go_test_coverage.py publish")
 				assert.NotContains(t, parts[2], "git add -A")
 				assert.NotContains(t, parts[2], "TestPlaceholder_TODO")
@@ -77,7 +77,15 @@ func TestAiderDailyGoValidationContracts(t *testing.T) {
 				assert.Contains(t, parts[1], `"pkg/**/aider_coverage_test.go"`)
 				assert.NotContains(t, parts[1], "steer: true")
 			} else {
-				assert.Contains(t, parts[2], "make fmt-go && go ")
+				assert.Contains(t, parts[1], `GH_AW_AIDER_MAX_REFLECTIONS: "8"`)
+				assert.Contains(t, parts[2], "make fmt-go\ngo build ./...")
+				assert.Contains(t, parts[2], "concrete stderr and exit code in `--details`")
+				assert.Contains(t, parts[2], "existing tracked file returned by discovery")
+				assert.Contains(t, parts[2], "do not create, rename, or delete files")
+				assert.Contains(t, parts[2], "Do not use an empty SEARCH block")
+				assert.Contains(t, parts[2], "Never assume discovery found a candidate")
+				assert.NotContains(t, parts[2], "git add -A &&")
+				assert.NotContains(t, parts[2], "|| safeoutputs report_incomplete --reason")
 			}
 		})
 	}

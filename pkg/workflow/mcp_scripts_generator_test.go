@@ -92,6 +92,9 @@ func TestGenerateMCPScriptsMCPServerScript(t *testing.T) {
 	if !strings.Contains(script, "GH_AW_MCP_SCRIPTS_API_KEY") {
 		t.Error("Script should reference GH_AW_MCP_SCRIPTS_API_KEY environment variable")
 	}
+	if !strings.Contains(script, "apiKey: apiKey,") {
+		t.Error("Script should pass the API key to the HTTP MCP server")
+	}
 
 	// Test the tools configuration JSON
 	toolsJSON := GenerateMCPScriptsToolsConfig(config)

@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 const harborExportDirectory = "harbor"
@@ -29,7 +31,7 @@ func exportHarborJob(ctx context.Context, outputDir string, runs []ProcessedRun)
 	if err := harborCheckPath(outputDir); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(outputDir, 0o700); err != nil {
+	if err := os.MkdirAll(outputDir, constants.DirPermOwnerOnly); err != nil {
 		return err
 	}
 	destination := filepath.Join(outputDir, harborExportDirectory)
@@ -168,7 +170,7 @@ func harborWriteJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o600)
+	return os.WriteFile(path, append(data, '\n'), constants.FilePermSensitive)
 }
 
 // Reject every existing symlink ancestor, including the selected root itself.

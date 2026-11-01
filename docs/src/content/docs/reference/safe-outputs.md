@@ -29,6 +29,34 @@ safe-outputs:
 
 The agent requests issue creation; a separate job with `issues: write` creates it.
 
+## CLI Payloads
+
+When the runtime exposes safe outputs through the `safeoutputs` CLI, tool names
+use underscores, such as `create_issue`. Run `safeoutputs --help` to list
+available tools and `safeoutputs create_issue --help` for that tool's schema.
+Calls request real actions for downstream processing; they are not previews.
+
+Pass a complete JSON object as one single-quoted shell argument:
+
+```bash
+safeoutputs create_issue '{"title":"Documentation findings","body":"First finding.\nSecond finding."}'
+```
+
+Inside JSON strings, encode newlines as `\n`, double quotes as `\"`, backslashes
+as `\\`, and apostrophes as `\u0027` to preserve the surrounding shell quote.
+For a Markdown report already saved in a file, per-field stdin avoids manually
+escaping its body:
+
+```bash
+cat /tmp/gh-aw/agent/report.md | safeoutputs create_issue --title "Documentation findings" --body .
+```
+
+The `--body .` form supplies the text to one field. The bare
+`safeoutputs create_issue .` form instead requires the entire stdin content to
+be a valid JSON object. Raw Markdown is not valid input for that bare form,
+and `{"body": .}` is not valid JSON. Use only tools and shell operations
+available in the workflow's runtime.
+
 ## Available Safe Output Types
 
 The tables below summarize the built-in safe output handlers. `noop`, `report-missing-tool`, and `report-missing-data` are always available, and `create-issue` is auto-injected only when no non-system safe outputs are configured and it is not explicitly disabled.
@@ -1212,7 +1240,9 @@ safe-outputs:
 git checkout --orphan my-custom-branch && git rm -rf . && git commit --allow-empty -m "Initialize" && git push origin my-custom-branch
 ```
 
-**Security**: File path validation (workspace/`/tmp` only), extension allowlist, size limits, SHA-256 verification, orphaned branch isolation, minimal permissions.
+**Security**: Files must be isolated regular files within the workspace or `/tmp`; symlinks (including parent-directory links), hard links, and special files are rejected. Staging and publication use the same bounded, verified file snapshot for hashing and writing, with no-follow opens and exclusive destination creation. Extension allowlists, size limits, SHA-256 verification, orphaned branch isolation, and minimal permissions also apply.
+
+**Platform support**: Asset staging and publication require Linux with `/proc/self/fd` available for descriptor-relative access. macOS and Windows fail closed with `ERR_VALIDATION` before guarded file access; absolute-path checks cannot prevent concurrent ancestor replacement, and POSIX no-follow flags do not protect against Windows junctions. Policy and size-limit failures use `ERR_VALIDATION`; upload-handler I/O failures use `ERR_SYSTEM`.
 
 **Outputs**: `published_count`, `branch_name`. **Limits**: Same-repo only, max 50MB/file, 100 assets/run.
 

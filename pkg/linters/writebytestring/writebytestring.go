@@ -92,7 +92,9 @@ func analyzeWriteCall(pass *analysis.Pass, n ast.Node, generatedFiles filecheck.
 	}
 
 	// The single argument must be a []byte(s) conversion where s is a string.
-	conv, ok := call.Args[0].(*ast.CallExpr)
+	// astutil.UnwrapParenExpr handles a parenthesized conversion, e.g.
+	// w.Write(([]byte(s))).
+	conv, ok := astutil.UnwrapParenExpr(call.Args[0]).(*ast.CallExpr)
 	if !ok {
 		return
 	}

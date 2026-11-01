@@ -465,7 +465,7 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 	threatDetectionData := buildExternalDetectorWorkflowData(data, engineID)
 
 	installSteps := engine.GetInstallationSteps(threatDetectionData)
-	filteredInstallSteps := make([]GitHubActionStep, 0, len(installSteps)+1)
+	filteredInstallSteps := make([]GitHubActionStep, 0, len(installSteps))
 	for _, step := range installSteps {
 		if isAWFBinaryInstallStep(step) {
 			continue
@@ -660,7 +660,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		executionCondition += " && steps.detection_staging_reset.outcome == 'success'"
 	}
 	steps := []string{
-		"      - name: Execute threat detection with AWF\n",
+		"      - name: " + constants.ThreatDetectionExecutionStepName + "\n",
 		"        id: detection_agentic_execution\n",
 		fmt.Sprintf("        if: %s\n", executionCondition),
 		"        continue-on-error: true\n",

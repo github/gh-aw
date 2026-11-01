@@ -37,6 +37,29 @@ const globalKeys = ["core", "github", "exec", "context", "getOctokit"];
 const roots = [];
 let environment;
 let globals;
+let restoreAssetDescriptors;
+
+function simulateLinuxAssetDescriptors() {
+  if (process.platform !== "darwin") return;
+  // Claim asset parity uses real file I/O with bounded Linux descriptor-path
+  // simulation on macOS; production access remains Linux-only.
+  const originals = { openSync: fs.openSync, lstatSync: fs.lstatSync };
+  const pinned = new Map();
+  const resolve = filename => {
+    if (typeof filename !== "string") return filename;
+    const match = /^\/proc\/self\/fd\/(\d+)(?:\/(.*))?$/.exec(filename);
+    return match ? path.join(pinned.get(Number(match[1])), match[2] || "") : filename;
+  };
+  fs.openSync = (filename, ...args) => {
+    const resolved = resolve(filename);
+    const fd = originals.openSync(resolved, ...args);
+    pinned.set(fd, resolved);
+    return fd;
+  };
+  fs.lstatSync = (filename, ...args) => originals.lstatSync(resolve(filename), ...args);
+  restoreAssetDescriptors = () => Object.assign(fs, originals);
+  vi.stubGlobal("process", new Proxy(process, { get: (target, key) => (key === "platform" ? "linux" : Reflect.get(target, key)) }));
+}
 
 function directory() {
   const root = path.resolve(".queue-git-audit-scratch", crypto.randomUUID());
@@ -79,6 +102,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  restoreAssetDescriptors?.();
+  restoreAssetDescriptors = undefined;
+  vi.unstubAllGlobals();
   for (const [key, value] of Object.entries(environment)) value === undefined ? delete process.env[key] : (process.env[key] = value);
   for (const [key, descriptor] of Object.entries(globals)) descriptor === undefined ? delete global[key] : Object.defineProperty(global, key, descriptor);
   roots.splice(0).forEach(root => fs.rmSync(root, { recursive: true, force: true }));
@@ -320,7 +346,8 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
     expect(new Set(uploadedLabels).size).toBe(count);
   });
 
-  it("publishes independently namespaced assets and verifies only the original private Claim receipt", async () => {
+  it.skipIf(process.platform === "win32")("publishes independently namespaced assets and verifies only the original private Claim receipt", async () => {
+    simulateLinuxAssetDescriptors();
     const original = assignment(count);
     const root = directory();
     const refs = new Map();
@@ -384,6 +411,27 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
 });
 
 describe("standalone adapter rejection before file or native effect access", () => {
+  it.each(["symlink", "dangling", "hardlink"])("rejects %s Claim assets before native publication", async kind => {
+    simulateLinuxAssetDescriptors();
+    const root = directory();
+    const original = assignment();
+    const reportRoot = scope.claimArtifactPath(root, "h1", original);
+    fs.mkdirSync(reportRoot, { recursive: true });
+    const sentinel = path.join(root, "external-sentinel.png");
+    fs.writeFileSync(sentinel, "harmless external sentinel");
+    const staged = path.join(reportRoot, digest("chart.png") + ".png");
+    if (kind === "hardlink") fs.linkSync(sentinel, staged);
+    else fs.symlinkSync(kind === "dangling" ? path.join(root, "missing-sentinel.png") : sentinel, staged);
+    const github = { rest: { repos: { get: vi.fn() }, git: { createBlob: vi.fn() } } };
+    await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize: allow }, async () => {
+      const handler = await assets.main({ "assets-dir": root, "target-repo": "owner/repo" }, github);
+      await expect(handler({ type: "upload_asset", claim_handle: "h1", path: "chart.png" })).rejects.toThrow();
+    });
+    expect(github.rest.repos.get).not.toHaveBeenCalled();
+    expect(github.rest.git.createBlob).not.toHaveBeenCalled();
+    expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
+  });
+
   it.each(["cancelled", "result"])("rejects terminal %s selectors before accessing any standalone upload endpoint", async state => {
     const access = vi.fn(() => {
       throw new Error("terminal Claim cannot access native credentials or endpoints");

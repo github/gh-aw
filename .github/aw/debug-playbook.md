@@ -24,7 +24,7 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
 Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
-Preserve codes/severity; advisory/pending/skipped/policy-denied aren't necessarily bugs.
+Preserve codes/severity; advisory/pending/skipped/policy-denied aren't always bugs.
 Unknown: [unmapped codes](#unmapped-codes).
 
 ## Audit findings
@@ -35,21 +35,21 @@ Unknown: [unmapped codes](#unmapped-codes).
 | `workflow_timeout` | Step/budget/result. | Remove blockers/narrow scope; justify timeout changes. |
 | `multiple_errors` | First error vs cascades. | Fix cause, not repeats. |
 | `mcp_server_failures`, `tools_not_available` | MCP startup, registration, failed calls. | Fix tool/server/config/auth; no blind permission expansion. |
-| `model_unavailable`, `model_endpoint_unsupported` | Complete same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
+| `model_unavailable`, `model_endpoint_unsupported` | Full same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
 | `model_resolution_failed` | Failed `model.resolution`; missing same-role startup-stop evidence. | Advisory: verify pins; unproven cause. |
 | `subagent_model_not_observed` | Spawn, child usage, evidence coverage. | Missing observations don't prove nonexecution. |
 | `subagent_model_unavailable` | Child model, request, provider policy/catalog. | Verify child separately; follow [model/engine guide](debug-model-engine-misconfiguration.md). |
 | `subagent_failed` | Child error; parent dispatch. | Fix child cause; parent success != child success. |
 | `blocked_network_requests` | Destination, caller, denial, necessity. | Fix URL/tool or authorize narrow destination; retain firewall. |
-| `threat_detection_job_failed` | Detector startup/runtime vs verdict. | Repair detector; failure isn't a clean verdict. |
+| `threat_detection_job_failed`, `engine_step_failed` | Detector/evals step, first error, execution state. | Fix engine/proxy startup; failed/green job != clean verdict/evals. |
 | `threat_detected` | Private structured verdict/artifact. | Stop unsafe effects; follow [security guidance](debug-security-review.md). Never publish payloads. |
 | `high_token_usage`, `many_iterations` | Tokens/cache/turns, repeated calls. | [Optimize](optimize-agentic-workflow.md) scope/context/loops before raising caps. |
 | `agentic_resource_heavy_for_domain`, `agentic_overkill_for_agentic` | Assessment, deterministic alternatives. | Script mechanical work; retain necessary judgment. |
 | `agentic_poor_agentic_control`, `agentic_partially_reducible` | Stop rules, tools, reducible stages. | Bound loops; extract deterministic work; preserve outcomes. |
 | `agentic_model_downgrade_available` | Capability/API needs; measured alternatives. | Benchmark; no automatic downgrade. |
-| `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory, not necessarily error. |
-| `workflow_succeeded` | Required downstream effect. | Verify missing effect; conclusion alone is insufficient. |
+| `agentic_delegated_context_present` | Delegation/context. | Deduplicate; advisory, not always error. |
+| `workflow_succeeded` | Required downstream effect. | Verify missing effect; conclusion alone insufficient. |
 
 ## Agent, model, and proxy classifications
 
@@ -61,7 +61,7 @@ Inventory: [Model availability](#model-availability).
 | --- | --- | --- |
 | `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
-| `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't establish availability. |
+| `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't prove availability. |
 | `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone doesn't prove model removal. |
 | `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch` | Selection vs harness model/API/metadata. | Align selection/API; never invent evidence. |
 | `unsupported_effort` | Effort vs engine/model support. | Use supported effort/mapping; no silent discard. |
@@ -78,7 +78,7 @@ Inventory: [Model availability](#model-availability).
 | `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone doesn't establish timeout. |
 | `sandbox_runtime_crash` | Exit/signal, resources, runtime revision. | Fix crash/resources; retain redacted diagnostic/version. |
 | `goal_already_active` | Unfinished goal. | Update/complete existing goal; no duplicate. |
-| `shell_expansion_guard_rejected` | Private denied command; allowed syntax. | Use allowed tools without dangerous expansion; no obfuscation/bypass. |
+| `shell_expansion_guard_rejected` | Private denied command; allowed syntax. | Use allowed tools; no dangerous expansion/obfuscation/bypass. |
 | `ERR_MODEL_PIN_REFLECT_REQUIRED` | Missing `--reflect`. | Supply same-run reflection. |
 
 ## Model availability
@@ -128,7 +128,7 @@ Resolve provider aliases (`github` → `copilot`); inspect `auto`/`opus`
 
 `token-usage.jsonl`: empty file + fatal startup rejection supports no inference;
 missing file proves nothing. Missing/expired/denied artifacts remain unavailable.
-Use targeted `gh run download` for `agent`/`info` only if audit retrieval fails.
+Use targeted `gh run download` for `agent`/`info` only if audit fails.
 
 ### Compare one success
 
@@ -140,7 +140,7 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
 
 First run = reference. Compare model/provider, credential source (names only),
 revision, runtimes, inventory; success doesn't establish model identity.
-Different inventories with same AWF version: not proof of regression/retirement.
+Different inventories, same AWF version: not proof of regression/retirement.
 Require evidence for removal time/cause.
 Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
 
@@ -169,7 +169,7 @@ Nonempty `safeoutputs.jsonl` doesn't prove publication.
 | `E006` | Body/string length. | Shorten; retain required content. |
 | `E008` | URL count/limit. | Reduce links; no concealment. |
 | `ERR_API`, `E007` | GitHub status; operation guard. | Resolve API/target cause; policy skip != failed mutation. |
-| `ERR_CONFIG`, `ERR_ADMISSION` | Config/schema, OIDC permissions, admission decision. | Fix config/service; honor denials/outage policy; recompile; withhold credentials/environment. |
+| `ERR_CONFIG`, `ERR_ADMISSION`, `ERR_TOKEN_BROKER_AUTHENTICATION` | Config/schema, OIDC/auth, admission. | Fix config/auth; honor denials/outage policy; recompile; keep credentials/environment private. |
 | `ERR_COMPILED_WORKFLOW_PROVENANCE_REQUIRED`, `ERR_COMPILE_AGENTIC_VERSION_BLOCKED`, `ERR_COMPILE_AGENTIC_VERSION_OUTDATED` | Compiler version vs provenance/compatibility minimums/blocklist. | Update gh-aw; recompile/publish source+lock; retain enforcement. |
 | `ERR_GRADER_SESSION_INVALID` | Unified event array: type/data/provenance. | Fix producer/caller; never fabricate sessions. |
 | `ERR_SAFE_OUTPUT_TOOL_COPY_FAILED` | Tool deep-copy failure. | Fix definition/loader; retain copy isolation. |
@@ -179,7 +179,7 @@ Nonempty `safeoutputs.jsonl` doesn't prove publication.
 | `ERR_SYSTEM`, `E099` | First file/git/process failure. | Fix I/O/runtime/checkout; wrapper is not cause. |
 | `E009`, `CONFIG_HASH_MISMATCH` | Source vs lock hash. | Recompile/publish source+lock together; no manual hash edit. |
 | `E010`, `RATE_LIMIT_EXCEEDED` | Retry budget; reset headers. | Stop exhausted retries; respect reset/backoff; reduce API work. |
-| `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files and attempted patch. | Respect intentional skip; constrain change, do not disable protection. |
+| `POLICY_FILE_PROTECTION_DENIED` | Allowed/protected files and attempted patch. | Respect intentional skip; constrain change, don't disable protection. |
 | `NO_CONTEXT` | Trigger context; explicit target. | Supply authorized target/context-appropriate output. |
 | `NO_LABELS_PROVIDED` | Requested/existing labels. | Supply valid labels; don't claim mutation. |
 | `REQUIRED_LABELS_MISMATCH`, `REQUIRED_TITLE_PREFIX_MISMATCH` | Labels/title vs guards. | Respect deliberate skip; fix mistaken target/config only. |
@@ -228,7 +228,7 @@ or bypass profiles/effect scopes.
 | `ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED` | Missing trusted readback. | Wire independent verifier; otherwise block delivery. |
 | `unsupported_protocol`, `codec_invalid`, `invalid_json`, `invalid_utf8`, `invalid_unicode`, `duplicate_key`, `noncanonical_number` | Version, canonical bytes, keys, Unicode/numbers. | Align producer/reader; regenerate input, not history. |
 | `ledger_invalid`, `ledger_foreign`, `ledger_nonextending` | Queue identity, DAG, ancestry. | Stop publication; recover trusted queue/tip via protocol. |
-| `queue_missing`, `policy_missing`, `work_queue_pool_not_installed` | Queue/pool; compiled/installed policy. | Bootstrap queue/policy; absent pool: quiesce; administrator-authorized Policy update adds pool. |
+| `queue_missing`, `policy_missing`, `work_queue_pool_not_installed` | Queue/pool; compiled/installed policy. | Bootstrap queue/policy; absent pool: quiesce; admin-authorized Policy update adds pool. |
 | `repository_unavailable`, `repository_scope_invalid`, `branch_invalid`, `git_transport_failed` | Repo/branch, credentials, Git failure. | Restore authorized transport; reread uncertain tip. |
 | `actor_unauthorized`, `admission_unauthorized`, `unauthorized_operation`, `ownership_unauthorized`, `work_unauthorized`, `dependency_unauthorized`, `projection_unauthorized`, `resource_unauthorized` | Principal, role/profile, operation/resource scope. | Use authorized actor/path; no impersonation/scope expansion. |
 | `policy_invalid`, `policy_epoch_invalid`, `policy_proposal_mismatch`, `work_queue_policy_proposal_mismatch`, `profile_invalid`, `pool_invalid`, `dispatcher_invalid` | Schema/revision, epoch, pools/dispatcher. | Correct trusted config via supported deployment/update. |
@@ -256,7 +256,7 @@ or bypass profiles/effect scopes.
 | `ERR_WORK_QUEUE_RECONCILIATION`, `observation_invalid`, `observation_conflict`, `reconciliation_invalid`, `reconciliation_pending`, `inspection_invalid`, `resource_unverified` | Reason, run/Claim binding, provenance/freshness. | Bounded trusted reconciliation; unverified stays blocked; never force release. |
 | `resource_invalid`, `resource_limit`, `assignment_limit`, `evidence_limit`, `graph_limit`, `work_queue_graph_limit`, `ledger_limit`, `observation_limit`, `operation_limit`, `payload_limit`, `pending_limit`, `projection_limit`, `reconciliation_limit` | Named limit; actual count. | Bound/batch/compact through supported operations; retain limits. |
 | `issue_binding_invalid`, `issue_binding_conflict` | Queue-issue binding; ownership. | Correct authorized binding; never adopt another work item's issue. |
-| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, remove uncertain locks or rewrite history. |
+| `projection_invalid`, `projection_journal_invalid`, `projection_journal_conflict`, `projection_scope_changed`, `projection_write_ambiguous` | Journal, native acknowledgement, target, CAS. | Reconcile receipts; never duplicate uncertain writes, drop uncertain locks or rewrite history. |
 | `projection_target_unavailable`, `projection_unavailable` | Actual failure; safe status/request ID. | Diagnose cause; preserve mirrors and locks. |
 | `projection_receipt_pending`, `projection_comment_pending`, `projection_label_pending`, `projection_coordination_pending`, `projection_pagination_pending`, `projection_rate_pending` | Checkpoint, pacing, existing mirrors/receipts. | Reconcile exact request; never recreate mirrors or mistake pending for terminal failure. |
 
@@ -264,9 +264,9 @@ or bypass profiles/effect scopes.
 
 | Codes or signature | Check | Remedy |
 | --- | --- | --- |
-| HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone is insufficient. |
+| HTTP `401`, `403`, `404`, `429`, `5xx` | Operation, response, proxy guard, policy. | Distinguish auth/SSO, hidden resource, quota, outage; status alone insufficient. |
 | JSON-RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32603`, `isError` | Protocol vs tool failure. | Fix parse/request/method/params/client/schema/server; tool errors need not be protocol errors. |
-| `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning does not prove later inference failure. |
+| `EACCES`, `ENOENT`, `ETIMEDOUT`, process exit/signal | Operation/path; fatal vs caught. | Fix boundary; caught `/run/awf-config-audit` warning doesn't prove later inference failure. |
 | Unlisted code, compile/schema/scanner error | Exact identifier at producing revision; emitter/caller. | Trace cause; add regression/code row; report gaps, never guess. |
 
 No run: inspect file/line; follow [compile-only gates](debug-compilation.md).

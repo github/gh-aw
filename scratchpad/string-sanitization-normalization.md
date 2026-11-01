@@ -184,7 +184,7 @@ normalized := normalizeSafeOutputIdentifier(identifier)
 // BAD: Sanitizing a normalized workflow name
 normalized := normalizeWorkflowName("weekly-research.md")
 // normalized = "weekly-research"
-sanitized := SanitizeWorkflowName(normalized) // Unnecessary!
+sanitized := SanitizeWorkflowName(normalized) // Redundant: input is already normalized
 ```
 
 **Why**: Normalization produces valid identifiers. Sanitizing again adds unnecessary processing and may produce unexpected results if the normalize function's output changes.
@@ -194,7 +194,7 @@ sanitized := SanitizeWorkflowName(normalized) // Unnecessary!
 ```go
 // BAD: Using normalize for invalid characters
 userInput := "My Workflow: Test/Build"
-normalized := normalizeWorkflowName(userInput) // Wrong tool!
+normalized := normalizeWorkflowName(userInput) // Incorrect function for this purpose
 // normalized = "My Workflow: Test/Build" (unchanged - invalid chars remain)
 ```
 
