@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const { ERR_CONFIG } = require("./error_codes.cjs");
 const __filename = fileURLToPath(import.meta.url),
   __dirname = path.dirname(__filename),
-  core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
+  core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 const { isTruthy } = require("./is_truthy.cjs"),
   { selectBranch } = require("./template_branch.cjs"),
@@ -331,7 +331,7 @@ describe("interpolate_prompt", () => {
         }),
         it("should fail when GH_AW_PROMPT is not set", () => {
           delete process.env.GH_AW_PROMPT;
-          const mainMatch = interpolatePromptScript.match(/async function main\(\)\s*{[\s\S]*?^}/m);
+          const mainMatch = interpolatePromptScript.match(/async function main\([^\n]*\)\s*{[\s\S]*?^}/m);
           if (!mainMatch) throw new Error("Could not extract main function");
           const main = eval(`(${mainMatch[0]})`);
           (main(), expect(core.setFailed).toHaveBeenCalledWith(`${ERR_CONFIG}: GH_AW_PROMPT environment variable is not set`));

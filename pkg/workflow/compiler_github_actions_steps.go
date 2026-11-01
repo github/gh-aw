@@ -34,7 +34,7 @@ func generateGitHubScriptWithCredentialSource(scriptPath string, withCredentialS
 		setupCall += ", process.env.GH_AW_GITHUB_TOKEN_SOURCE"
 	}
 	script.WriteString(setupCall + ");\n")
-	script.WriteString("            const { main } = require('" + SetupActionDestination + "/" + scriptPath + "');\n")
+	script.WriteString("            const { main } = require('" + path.Join(SetupActionDestination, scriptPath) + "');\n")
 	script.WriteString("            await main();\n")
 
 	return script.String()
@@ -66,6 +66,18 @@ func generatePlaceholderSubstitutionStepForFile(yaml *strings.Builder, expressio
 type inlineArtifactSubstitutionTarget struct {
 	Directory string
 	Extension string
+}
+
+// Only compiler-authored late bindings remain substitutable after interpolation.
+// Runtime values that merely resemble these placeholders stay literal.
+func promptDeferredBindingsJSON(mappings []*ExpressionMapping) string {
+	var bindings []string
+	for _, mapping := range mappings {
+		if mapping.IsLiteral && strings.HasPrefix(mapping.Content, "__GH_AW_DEFERRED_") && strings.HasSuffix(mapping.Content, "__") {
+			bindings = append(bindings, fmt.Sprintf("%q:%q", mapping.EnvVar, mapping.Content))
+		}
+	}
+	return "{" + strings.Join(bindings, ",") + "}"
 }
 
 func (c *Compiler) generateDeferredPromptSubstitutionStep(yaml *strings.Builder, data *WorkflowData) {
@@ -126,15 +138,18 @@ func generatePlaceholderSubstitutionScript(yaml *strings.Builder, expressionMapp
 	yaml.WriteString(indent + "    script: |\n")
 
 	// Use setup_globals helper to make GitHub Actions objects available globally
-	yaml.WriteString(indent + "      const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n")
+	yaml.WriteString(indent + "      const { setupGlobals } = require('" + path.Join(SetupActionDestination, "setup_globals.cjs") + "');\n")
 	yaml.WriteString(indent + "      setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString(indent + "      \n")
 	// Use require() to load script from copied files
-	yaml.WriteString(indent + "      const substitutePlaceholders = require('" + SetupActionDestination + "/substitute_placeholders.cjs');\n")
+	yaml.WriteString(indent + "      const substitutePlaceholders = require('" + path.Join(SetupActionDestination, "substitute_placeholders.cjs") + "');\n")
 	yaml.WriteString(indent + "      \n")
 	yaml.WriteString(indent + "      // Call the substitution function\n")
 	yaml.WriteString(indent + "      return await substitutePlaceholders({\n")
 	yaml.WriteString(indent + "        file: process.env.GH_AW_PROMPT,\n")
+	if bindings := promptDeferredBindingsJSON(expressionMappings); bindings != "{}" {
+		yaml.WriteString(indent + "        deferredBindings: " + bindings + ",\n")
+	}
 	if len(inlineArtifacts) > 0 {
 		targets := make([]string, 0, len(inlineArtifacts))
 		for _, target := range inlineArtifacts {

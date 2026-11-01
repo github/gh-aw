@@ -9,6 +9,9 @@
  */
 
 const substitutePlaceholders = require("./substitute_placeholders.cjs");
+const { interpolateVariables } = require("./interpolate_prompt.cjs");
+const { renderMarkdownTemplate } = require("./render_template.cjs");
+const { createLiteralValues, readLiteralState, readAuthorContent, writeLiteralState, literalFileKey, restoreInlineMetadata } = require("./prompt_literal_values.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
 const fs = require("fs");
 const os = require("os");
@@ -16,53 +19,14 @@ const path = require("path");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
- * Simulates the template rendering logic from interpolate_prompt
- * @param {string} markdown - The markdown content to process
- * @returns {string} - The processed markdown content
- */
-function renderMarkdownTemplate(markdown) {
-  // First pass: Handle blocks where tags are on their own lines
-  let result = markdown.replace(/(\n?)([ \t]*{{#if\s+([^}]*)}}[ \t]*\n)([\s\S]*?)([ \t]*{{\/if}}[ \t]*)(\n?)/g, (match, leadNL, openLine, cond, body, closeLine, trailNL) => {
-    if (isTruthy(cond)) {
-      return leadNL + body;
-    } else {
-      return "";
-    }
-  });
-
-  // Second pass: Handle inline conditionals
-  result = result.replace(/{{#if\s+([^}]*)}}([\s\S]*?){{\/if}}/g, (_, cond, body) => (isTruthy(cond) ? body : ""));
-
-  // Clean up excessive blank lines
-  result = result.replace(/\n{3,}/g, "\n\n");
-
-  return result;
-}
-
-/**
- * Simulates variable interpolation from interpolate_prompt
- * @param {string} content - The prompt content with ${VAR} placeholders
- * @param {Record<string, string>} variables - Map of variable names to their values
- * @returns {string} - The interpolated content
- */
-function interpolateVariables(content, variables) {
-  let result = content;
-  for (const [varName, value] of Object.entries(variables)) {
-    const escapedVarName = varName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`\\$\\{${escapedVarName}\\}`, "g");
-    result = result.replace(pattern, value);
-  }
-  return result;
-}
-
-/**
  * Test the full pipeline: substitution -> interpolation -> template rendering
  * @param {string} template - Template with placeholders and conditionals
  * @param {Record<string, any>} substitutions - Substitution values (can include undefined/null)
  * @param {Record<string, string>} variables - Variable interpolation values
+ * @param {{deferredBindings?: Record<string, string>, lateSubstitutions?: Record<string, string>, metadata?: boolean}} [options]
  * @returns {Promise<{result: string, error: string | null, stages: {afterSubstitution: string, afterInterpolation: string, afterTemplate: string}}>} Test result
  */
-async function testTemplateSubstitution(template, substitutions, variables) {
+async function testTemplateSubstitution(template, substitutions, variables, { deferredBindings = {}, lateSubstitutions = {}, metadata = false } = {}) {
   let tempDir;
   try {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuzz-template-"));
@@ -76,21 +40,29 @@ async function testTemplateSubstitution(template, substitutions, variables) {
     fs.writeFileSync(testFile, template, "utf8");
 
     // Stage 2: Perform placeholder substitution
-    await substitutePlaceholders({ file: testFile, substitutions });
+    await substitutePlaceholders({ file: testFile, substitutions, deferredBindings });
     const afterSubstitution = fs.readFileSync(testFile, "utf8");
 
-    // Stage 3: Interpolate variables
-    const afterInterpolation = interpolateVariables(afterSubstitution, variables);
+    // Follow the production provenance boundary instead of parsing restored values.
+    const literals = createLiteralValues(readLiteralState(testFile) ?? undefined);
+    const authored = readAuthorContent(testFile, testFile, literals.state).content;
+    const protectedVariables = Object.fromEntries(Object.entries(variables).map(([key, value]) => [key, literals.protect(value)]));
+    const interpolated = interpolateVariables(authored, protectedVariables);
+    const afterInterpolation = literals.restore(interpolated);
 
-    // Stage 4: Render template conditionals
-    const afterTemplate = renderMarkdownTemplate(afterInterpolation);
+    const opaque = renderMarkdownTemplate(interpolated, literals.restore);
+    const afterTemplate = metadata ? restoreInlineMetadata(opaque, literals.restore) : literals.restore(opaque);
+    fs.writeFileSync(testFile, afterTemplate, "utf8");
+    literals.state.files[literalFileKey(testFile, testFile)] = { opaque, rendered: afterTemplate, metadata };
+    writeLiteralState(testFile, literals.state);
+    await substitutePlaceholders({ file: testFile, substitutions: lateSubstitutions });
+    const result = fs.readFileSync(testFile, "utf8");
 
     // Clean up
-    fs.unlinkSync(testFile);
-    fs.rmdirSync(tempDir);
+    fs.rmSync(tempDir, { recursive: true, force: true });
 
     return {
-      result: afterTemplate,
+      result,
       error: null,
       stages: {
         afterSubstitution,
@@ -101,8 +73,7 @@ async function testTemplateSubstitution(template, substitutions, variables) {
   } catch (err) {
     // Clean up on error
     try {
-      if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
-      if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
+      fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {
       // Best-effort cleanup after the original error.
     }
@@ -183,8 +154,8 @@ if (require.main === module) {
         result = await testValueState(parsed.value);
       } else {
         // Full pipeline test
-        const { template, substitutions, variables } = parsed;
-        result = await testTemplateSubstitution(template || "", substitutions || {}, variables || {});
+        const { template, substitutions, variables, options } = parsed;
+        result = await testTemplateSubstitution(template || "", substitutions || {}, variables || {}, options);
       }
 
       process.stdout.write(JSON.stringify(result));

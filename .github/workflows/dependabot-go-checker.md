@@ -372,7 +372,7 @@ Before creating issues, determine the actual source repository for each Go modul
 
 ### Example 1: Consolidated Issue for Safe Patches (Category A)
 
-```markdown
+````markdown
 ## Summary
 This issue groups together multiple safe patch updates that can be applied together. All updates are single-version patch increments with bug fixes only and no breaking changes.
 
@@ -407,11 +407,11 @@ go mod tidy
 - Run all tests: `make test`
 - Verify no regression in functionality
 - Check for any deprecation warnings
-```
+````
 
 ### Example 2: Individual Issue for Minor Update (Category B)
 
-```markdown
+````markdown
 ## Summary
 Update `github.com/spf13/cast` dependency from v1.7.0 to v1.8.0
 
@@ -457,11 +457,11 @@ go mod tidy
 - Test type conversion functions
 - Verify time parsing works correctly
 - Check for any behavior changes in existing code
-```
+````
 
 ### Example 3: Individual Issue for Multi-Version Jump (Category B)
 
-```markdown
+````markdown
 ## Summary
 Update `github.com/cli/go-gh` dependency from v2.10.0 to v2.12.0
 
@@ -514,11 +514,11 @@ go mod tidy
 - Verify authentication still works
 - Check API integration points
 - Test error handling
-```
+````
 
 ### Example 4: golang.org/x Package Update (Category B)
 
-```markdown
+````markdown
 ## Summary
 Update `golang.org/x/sys` dependency from v0.15.0 to v0.16.0
 
@@ -566,11 +566,11 @@ go mod tidy
 - Test system-specific functionality
 - Verify cross-platform compatibility
 - Test on Linux, macOS, and Windows if possible
-```
+````
 
 ### Example 5: Playwright NPM Package Update (Category B)
 
-```markdown
+````markdown
 ## Summary
 Update `@playwright/cli` package from 0.1.18 to 0.1.19
 
@@ -621,6 +621,6 @@ make test-unit
 - Test browser automation workflows with playwright tool
 - Check that version is correctly used in compiled workflows
 - Test on multiple browsers if possible
-```
+````
 
 {{#endif}}

@@ -33,7 +33,7 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 			return match
 		}
 
-		expr := strings.TrimSpace(submatches[1])
+		expr := strings.TrimSpace(submatches[1]) //nolint:uncheckedsliceindex // The capture count is checked immediately above.
 
 		// Empty expressions are treated as false and wrapped as such
 		if expr == "" {
@@ -72,10 +72,6 @@ func wrapExpressionsInTemplateConditionals(markdown string) string {
 
 	// Process all elseif variant tags — normalise to canonical {{#elseif ...}} form after wrapping
 	result = elseIfPattern.ReplaceAllStringFunc(result, func(match string) string {
-		submatches := elseIfPattern.FindStringSubmatch(match)
-		if len(submatches) < 2 {
-			return match
-		}
 		wrapped := wrapTagExpr(elseIfPattern, match, "{{#elseif ")
 		// If the original tag used a non-canonical form (else-if / else_if / without #),
 		// the prefix replacement above already normalises it to {{#elseif ...}}.
@@ -125,11 +121,11 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 		len(expressionMappings), hasTemplatePattern, hasGitHubContext, hasInlineSubAgents, hasRuntimeImports)
 
 	yaml.WriteString("      - name: Interpolate variables and render templates\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
+	fmt.Fprintf(yaml, "        uses: %s\n", getCachedActionPin("actions/github-script", data)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	yaml.WriteString("        env:\n")
-	fmt.Fprintf(yaml, "          GH_AW_PROMPT: %s\n", constants.AwPromptsFileExpr)
+	fmt.Fprintf(yaml, "          GH_AW_PROMPT: %s\n", constants.AwPromptsFileExpr) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	if data.EngineConfig != nil && data.EngineConfig.ID != "" {
-		fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: \"%s\"\n", data.EngineConfig.ID)
+		fmt.Fprintf(yaml, "          GH_AW_ENGINE_ID: \"%s\"\n", data.EngineConfig.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	}
 	engineID := resolveActivationEngineID(data)
 	baseDir := engineConfigBaseDirForRegistry(c.engineRegistry, engineID)
@@ -157,5 +153,9 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 	yaml.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/interpolate_prompt.cjs');\n")
-	yaml.WriteString("            await main();\n")
+	if bindings := promptDeferredBindingsJSON(expressionMappings); bindings != "{}" {
+		yaml.WriteString("            await main({ deferredBindings: " + bindings + " });\n")
+	} else {
+		yaml.WriteString("            await main();\n")
+	}
 }
