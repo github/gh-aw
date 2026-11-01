@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,6 +80,17 @@ func TestEngineCooldownInstalls(t *testing.T) {
 	behavior, err := NewBehaviorDefinedEngine(def)
 	require.NoError(t, err)
 	engines := []CodingAgentEngine{NewClaudeEngine(), NewCodexEngine(), NewPiEngine(), NewGeminiEngine(), behavior}
+	for _, name := range []string{"crush", "deepseek-harness", "factory", "opencode"} {
+		content, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "shared", name+".md"))
+		require.NoError(t, err)
+		frontmatter, err := extractMarkdownFrontmatterYAML(content)
+		require.NoError(t, err)
+		var definition engineDefinitionFile
+		require.NoError(t, yaml.Unmarshal(frontmatter, &definition))
+		engine, err := NewBehaviorDefinedEngine(&definition.Engine)
+		require.NoError(t, err)
+		engines = append(engines, engine)
+	}
 	for _, engine := range engines {
 		for _, days := range []int{0, 3, 7} {
 			for _, version := range []string{"1.2.3", "${{ inputs.engine-version }}"} {
