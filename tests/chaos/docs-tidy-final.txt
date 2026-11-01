@@ -1,0 +1,2 @@
+persona=docs-tidy-bot
+scenario=minor-rename
