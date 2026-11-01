@@ -291,9 +291,23 @@ func TestEnclaveHostCredentialRequiresRootlessRuntime(t *testing.T) {
 
 func TestEnclaveFiniteSchemaPromptWithoutGitHubTools(t *testing.T) {
 	data := enclaveWorkflowData(false, true, 0, 30)
-	data.Enclaves[0].Repos = []*EnclaveRepository{{Repo: "example-org/actual-target", Sensitivity: "confidential"}}
+	data.Enclaves[0].Repos = []*EnclaveRepository{
+		{Repo: "example-org/public-target", Sensitivity: "public"},
+		{Repo: "example-org/confidential-target", Sensitivity: "confidential"},
+		{Repo: "example-org/internal-target", Sensitivity: "internal"},
+		{Repo: "example-org/trusted-target", Sensitivity: "trusted"},
+		{Repo: "example-org/sealed-target", Sensitivity: "sealed"},
+	}
 	prompt := strings.Join(staticEnclaveInformationBudgetPromptLines(data), "\n")
-	assert.Contains(t, prompt, "example-org/actual-target")
+	assert.Contains(t, prompt, "example-org/public-target")
+	assert.NotContains(t, prompt, "example-org/confidential-target")
+	assert.NotContains(t, prompt, "example-org/internal-target")
+	assert.NotContains(t, prompt, "example-org/trusted-target")
+	assert.NotContains(t, prompt, "example-org/sealed-target")
+	assert.Contains(t, prompt, "A confidential repository has an 8-bit per-run budget")
+	assert.Contains(t, prompt, "An internal repository has a finite per-run budget")
+	assert.Contains(t, prompt, "A trusted repository is unmetered")
+	assert.Contains(t, prompt, "A sealed repository has a 0-bit per-run budget")
 	assert.Contains(t, prompt, "8-bit per-run budget")
 	assert.Contains(t, prompt, "`minimum`/`maximum`")
 	assert.Contains(t, prompt, "`additionalProperties: false`")

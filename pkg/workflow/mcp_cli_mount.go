@@ -426,20 +426,20 @@ func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 			if repo == nil {
 				continue
 			}
-			safeRepo := sanitizePromptRepoIdentifier(repo.Repo)
 			switch repo.Sensitivity {
 			case "public":
+				safeRepo := sanitizePromptRepoIdentifier(repo.Repo)
 				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`public`) still requires a finite response schema; do not apply the confidential repository's 8-bit budget to this scope.", safeRepo))
 			case "trusted":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`trusted`) is unmetered and permits free-form strings inside a strict structured schema. Use only for content approved for unrestricted disclosure; never change sensitivity to bypass a confidential budget.", safeRepo))
+				repoLines = append(repoLines, "- A trusted repository is unmetered and permits free-form strings inside a strict structured schema. Use only for content approved for unrestricted disclosure; never change sensitivity to bypass a confidential budget.")
 			case "confidential":
 				payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
 				maxCardinality := 1 << payloadBits
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", safeRepo, enclaveConfidentialRunBits, maxCardinality))
+				repoLines = append(repoLines, fmt.Sprintf("- A confidential repository has an %d-bit per-run budget, so response schema cardinality must be at most %d.", enclaveConfidentialRunBits, maxCardinality))
 			case "internal":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", safeRepo, repo.Sensitivity))
+				repoLines = append(repoLines, "- An internal repository has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.")
 			case "sealed":
-				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`sealed`) has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for this repository.", safeRepo))
+				repoLines = append(repoLines, "- A sealed repository has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for it.")
 			}
 		}
 	}
