@@ -157,12 +157,14 @@ func enforceEngineExecutionStepName(step GitHubActionStep, engine CodingAgentEng
 		if constants.IsEngineExecutionStepName(name) {
 			return step
 		}
+		nameLine := indent + "- name: " + quote + constants.EngineExecutionStepName(name) + quote
 		if strings.TrimSpace(name) == "" {
-			name = engineExecutionStepFallbackName(engine)
+			fallback := constants.EngineExecutionStepName(engineExecutionStepFallbackName(engine))
+			nameLine = fmt.Sprintf("%s- name: %q", indent, fallback)
 		}
 		rewritten := make(GitHubActionStep, 0, len(step))
 		rewritten = append(rewritten, step[:i]...)
-		rewritten = append(rewritten, indent+"- name: "+quote+constants.EngineExecutionStepName(name)+quote)
+		rewritten = append(rewritten, nameLine)
 		return append(rewritten, step[i+1:]...)
 	}
 	return step
