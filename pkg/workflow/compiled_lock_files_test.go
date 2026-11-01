@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -583,4 +584,36 @@ func TestCompiledLockFiles_SmokeCallWorkflowForwardsPayload(t *testing.T) {
 		assert.Contains(t, lockContent, "payload: ${{ needs.safe_outputs.outputs.call_workflow_payload }}", "call-workflow job should forward payload from safe_outputs")
 		assert.Contains(t, lockContent, "${{ fromJSON(needs.safe_outputs.outputs.call_workflow_payload)['task-description'] }}", "call-workflow job should forward task-description from the handler payload")
 	})
+}
+
+// TestCompiledLockFiles_EngineExecutionStepNamesMatchAuditConstant verifies that every
+// continue-on-error evals and detection engine step keeps a name that gh aw audit
+// recognizes through constants.IsEngineExecutionStepName.
+func TestCompiledLockFiles_EngineExecutionStepNamesMatchAuditConstant(t *testing.T) {
+	lockFiles, err := filepath.Glob(filepath.Join(workflowsDir, "*.lock.yml"))
+	require.NoError(t, err, "should list lock files")
+
+	checked := 0
+	for _, lockFile := range lockFiles {
+		lockBytes, err := os.ReadFile(lockFile)
+		require.NoError(t, err, "should read lock file %s", lockFile)
+		lines := strings.Split(string(lockBytes), "\n")
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "id: evals_agentic_execution" && trimmed != "id: detection_agentic_execution" {
+				continue
+			}
+			stepName := ""
+			for j := i - 1; j >= 0; j-- {
+				if name, ok := strings.CutPrefix(strings.TrimSpace(lines[j]), "- name: "); ok {
+					stepName = name
+					break
+				}
+			}
+			assert.True(t, constants.IsEngineExecutionStepName(stepName),
+				"%s: step %q (%s) must match constants.IsEngineExecutionStepName", filepath.Base(lockFile), stepName, trimmed)
+			checked++
+		}
+	}
+	assert.Positive(t, checked, "should find at least one evals or detection engine execution step")
 }

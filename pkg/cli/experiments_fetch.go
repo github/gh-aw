@@ -89,20 +89,25 @@ func parseEvalResultRecords(data []byte) []evalResultRecord {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var records []evalResultRecord
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+		if record, ok := parseEvalResultRecordLine(scanner.Bytes()); ok {
+			records = append(records, record)
 		}
-		var record evalResultRecord
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			continue
-		}
-		if record.ID == "" {
-			continue
-		}
-		records = append(records, record)
 	}
 	return records
+}
+
+// parseEvalResultRecordLine parses one evals.jsonl line. It returns false for blank,
+// malformed or ID-less lines.
+func parseEvalResultRecordLine(line []byte) (evalResultRecord, bool) {
+	line = bytes.TrimSpace(line)
+	if len(line) == 0 {
+		return evalResultRecord{}, false
+	}
+	var record evalResultRecord
+	if err := json.Unmarshal(line, &record); err != nil || record.ID == "" {
+		return evalResultRecord{}, false
+	}
+	return record, true
 }
 
 func summarizeMetricEvalResults(records []evalResultRecord) map[string]MetricEvalResults {
