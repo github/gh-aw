@@ -74,6 +74,13 @@ For each CLI/MCP server and threat-detect:
 2. Compare with the current version constant in `./pkg/constants/`
 3. If newer version exists, research changes and prepare update
 
+### 3-Day Cooldown for CLI Releases
+
+Before updating a CLI, MCP server, or threat-detect version, verify that the exact stable version is at least 72 hours old:
+- For NPM packages, use `npm view <package> time --json` and check the publication timestamp for the exact version being considered.
+- For GitHub releases, check the selected release's `published_at` timestamp.
+- If the version is newer than 72 hours or its publication time cannot be verified, skip that tool for this run. Do not install it for help-output analysis, change its pin, or include it in the pull request.
+
 ### Version Sources
 - **Claude Code**: Use `npm view @anthropic-ai/claude-code version` (faster than web-fetch)
   - No public GitHub repository
