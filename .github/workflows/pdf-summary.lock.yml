@@ -735,6 +735,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
         env:
           GH_TOKEN: ${{ github.token }}
@@ -2075,6 +2077,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Prepare Codex config for threat-detect
         if: always() && steps.detection_guard.outputs.run_detection == 'true'
         run: |

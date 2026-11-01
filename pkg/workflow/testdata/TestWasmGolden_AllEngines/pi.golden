@@ -553,6 +553,8 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Install Pi CLI
         run: npm install --ignore-scripts -g @earendil-works/pi-coding-agent@PI_VERSION
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Record Pi package location
         run: |
           GH_AW_PI_PACKAGE_ROOT="$(npm root -g)/@earendil-works/pi-coding-agent"

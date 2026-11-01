@@ -159,7 +159,7 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 		return buildNpmEngineInstallStepsWithAWF(nil, workflowData, false)
 	}
 
-	steps := BuildStandardNpmEngineInstallStepsNoCooldown(
+	steps := BuildStandardNpmEngineInstallSteps(
 		"@openai/codex",
 		string(constants.DefaultCodexVersion),
 		"Install Codex CLI",
@@ -201,7 +201,8 @@ func generateCodexMicroVMCLIInstallStep(workflowData *WorkflowData) GitHubAction
 		"Install Codex CLI in microVM path",
 		"codex",
 		false,
-		false,
+		true,
+		resolveEngineCooldownDays(workflowData),
 	)
 }
 

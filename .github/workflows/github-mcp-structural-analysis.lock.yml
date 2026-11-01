@@ -692,6 +692,8 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.5 --rootless
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.312
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -2325,6 +2327,8 @@ jobs:
           package-manager-cache: false
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code@2.1.312
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install threat-detect binary
         id: threat_detect_install
         if: always() && steps.detection_guard.outputs.run_detection == 'true'

@@ -677,6 +677,8 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@0.165.0
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
         env:
           GH_TOKEN: ${{ github.token }}
@@ -2033,9 +2035,10 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install GitHub Copilot CLI
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache
+        run: bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.103 --checksums-sha256 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2 --prefer-toolcache --cooldown-days 3
         env:
           GH_HOST: github.com
+          GITHUB_TOKEN: ${{ github.token }}
           GH_AW_COPILOT_MIN_VERSION: 1.0.35
       - name: Install threat-detect binary
         id: threat_detect_install

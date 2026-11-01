@@ -3,7 +3,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
 function installEnclaveDiagnostics() {
-  if (process.getuid() === 0) {
+  if (typeof process.getuid !== "function" || process.getuid() === 0) {
     throw new Error("The enclave diagnostic bootstrap must run rootless");
   }
   if (!process.env.RUNNER_TEMP || !process.env.DIAGNOSTICS_STAGING) {
