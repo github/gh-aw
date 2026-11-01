@@ -9,7 +9,7 @@ Agentic workflows support four templating and substitution mechanisms: GitHub Ac
 
 ## GitHub Actions Expressions
 
-Agentic workflows restrict expressions in **markdown content** so prompts cannot expose secrets or environment variables to the LLM.
+Agentic workflows restrict expressions in **markdown content** to an allowlist. Secrets and configuration variables cannot be read directly from prompts; environment expressions have different rules for compiler-bound author prompts and runtime-imported fragments.
 
 > **Note**: These restrictions apply only to markdown content. YAML frontmatter can still use secrets and environment variables for workflow configuration.
 
@@ -23,12 +23,16 @@ Other activation outputs such as `comment_id`, `comment_repo`, and `slash_comman
 
 ### Prohibited Expressions
 
-All other expressions are disallowed, including `secrets.*`, `env.*`, `vars.*`, and complex functions like `toJson()` or `fromJson()`.
+All other expressions are disallowed, including `secrets.*`, `vars.*`, and complex functions like `toJson()` or `fromJson()`.
+
+The main workflow's author-written prompt supports `env.*` expressions (including comparisons and defaults such as `${{ env.LOG_LEVEL || 'info' }}`). The compiler creates explicit expression bindings evaluated by GitHub Actions; this is not access to the runner's entire environment. These values become prompt content, so do not reference environment variables containing secrets.
+
+Runtime-imported fragments do **not** support `env.*`, even if the main prompt binds the same expression. This restriction also applies to nested imports and compound expressions. The compiler-generated self-import of the main workflow retains its author-prompt bindings; it does not grant those capabilities to additional imported fragments.
 
 Expression safety is validated during compilation. Unauthorized expressions produce errors like:
 
 ```text
-error: unauthorized expressions: [secrets.TOKEN, env.MY_VAR]. 
+error: unauthorized expressions: [secrets.TOKEN, vars.MY_VAR].
 allowed: [github.repository, github.actor, github.workflow, ...]
 ```
 
@@ -141,7 +145,7 @@ Every DNS answer must be a public unicast IPv4 or IPv6 address, and the connecti
 
 Runtime imports automatically strip YAML front matter and HTML/XML comments. GitHub Actions expressions (`${{ ... }}`) use a restricted set of expression capabilities. `env.*`, `secrets.*`, and `vars.*` are rejected, including inside comparisons and compound expressions; imported text cannot read the runner's ambient environment or action input tokens. Supported job outputs and inputs are read only through their compiler-provided bindings or GitHub event context.
 
-`needs.*.outputs.*` expressions are allowed inside imported markdown and are validated recursively across nested runtime imports. At compile time, gh-aw resolves every referenced runtime-import file under `.github`, checks the imported content for disallowed expressions, and follows any nested `{{#runtime-import ...}}` macros it finds. This lets shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
+`needs.*.outputs.*` expressions are allowed inside imported markdown and are validated recursively across nested runtime imports. At compile time, gh-aw checks existing referenced runtime-import files under `.github` for disallowed expressions, including `env.*`, and follows any nested `{{#runtime-import ...}}` macros it finds. Missing files and URL content cannot be checked at compilation; runtime validation still applies when content is loaded. This lets shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
 
 Imported prompt content is still evaluated in the activation job context. In practice, that means imported `needs.*` expressions must refer only to outputs that are available before activation runs, such as `needs.pre_activation.outputs.*` or outputs from custom jobs that explicitly run before activation.
 

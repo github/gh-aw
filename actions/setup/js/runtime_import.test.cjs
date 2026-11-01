@@ -469,7 +469,7 @@ describe("runtime_import", () => {
         expect(evaluateExpression("inputs.nonexistent")).toContain("${{");
         expect(() => evaluateExpression("inputs.toString")).toThrow(/Unauthorized runtime import expression/);
       });
-      it("should handle array access safely with bounds checking", () => {
+      it("should enforce the array index allowlist and handle missing allowed indexes", () => {
         // Test with actual array in context
         global.context = {
           actor: "testuser",
@@ -486,6 +486,7 @@ describe("runtime_import", () => {
         // Valid array access
         expect(evaluateExpression("github.event.release.assets[0].id")).toBe("123");
         expect(() => evaluateExpression("github.event.release.assets[1].id")).toThrow(/Unauthorized runtime import expression/);
+        expect(() => evaluateExpression("github.event.release.assets[999].id")).toThrow(/Unauthorized runtime import expression/);
         global.context.payload.release.assets = [];
         const outOfBounds = evaluateExpression("github.event.release.assets[0].id");
         expect(outOfBounds).toContain("${{");

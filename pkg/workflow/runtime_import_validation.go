@@ -54,6 +54,7 @@ func extractRuntimeImportReferences(markdownContent string) []runtimeImportRefer
 
 	for _, match := range matches {
 		if len(match) > 1 {
+			//nolint:uncheckedsliceindex // The preceding guard requires the captured target.
 			pathWithRange := strings.TrimSpace(match[1])
 
 			// Skip macros with empty or whitespace-only targets
@@ -72,7 +73,9 @@ func extractRuntimeImportReferences(markdownContent string) []runtimeImportRefer
 				if lineRangeRe.MatchString(afterColon) {
 					importPath = pathWithRange[:colonIdx]
 					rangeParts := strings.SplitN(afterColon, "-", 2)
+					//nolint:uncheckedsliceindex // The line-range regex requires two numeric parts.
 					fmt.Sscanf(rangeParts[0], "%d", &startLine)
+					//nolint:uncheckedsliceindex // The line-range regex requires two numeric parts.
 					fmt.Sscanf(rangeParts[1], "%d", &endLine)
 				}
 			}
@@ -219,7 +222,7 @@ func runtimeImportValidationBody(content []byte) []byte {
 }
 
 func validateRuntimeImportContent(filePath string, content []byte, result *runtimeImportValidationResult) {
-	if err := validateExpressionSafety(string(content)); err != nil {
+	if err := validateRuntimeImportExpressionSafety(string(content)); err != nil {
 		result.validationErrors = append(result.validationErrors, fmt.Sprintf("%s: %v", filePath, err))
 	} else {
 		expressionValidationLog.Printf("✓ Validated expressions in %s", filePath)

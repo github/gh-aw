@@ -437,7 +437,8 @@ func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceR
 		if extractErr != nil {
 			importedBody = content
 		}
-		if err := validateExpressionSafety(importedBody); err != nil {
+		importedBody = removeXMLComments(importedBody)
+		if err := validateRuntimeImportExpressionSafety(importedBody); err != nil {
 			return "", false, true
 		}
 		return importedBody, true, false

@@ -11,7 +11,7 @@ const { ERR_API, ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("
 const { isTruthy } = require("./is_truthy.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
-const { validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
+const { displayImportUrl, importUrlErrorMessage, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
 
 const fs = require("fs");
 const path = require("path");
@@ -712,6 +712,7 @@ const FETCH_URL_TIMEOUT_MS = 30_000;
  */
 async function fetchUrlContent(url, cacheDir) {
   const validatedUrl = validateImportUrl(url);
+  const displayUrl = displayImportUrl(validatedUrl);
   // Create cache directory if it doesn't exist
   if (!fs.existsSync(cacheDir)) {
     try {
@@ -744,7 +745,7 @@ async function fetchUrlContent(url, cacheDir) {
       const oneHourInMs = 60 * 60 * 1000;
 
       if (ageInMs < oneHourInMs) {
-        core.info(`Using cached content for URL: ${url}`);
+        core.info(`Using cached content for URL: ${displayUrl}`);
         try {
           return fs.readFileSync(cacheFile, "utf8");
         } catch (err) {
@@ -755,7 +756,7 @@ async function fetchUrlContent(url, cacheDir) {
   }
 
   // Fetch URL content
-  core.info(`Fetching content from URL: ${url}`);
+  core.info(`Fetching content from URL: ${displayUrl}`);
 
   // Bound DNS resolution, connection establishment, and response body reads together.
   const timeoutController = new AbortController();
@@ -766,9 +767,9 @@ async function fetchUrlContent(url, cacheDir) {
     data = await readPublicImportUrl(validatedUrl, timeoutController.signal);
   } catch (err) {
     if (err instanceof Error && err.message.startsWith(ERR_API)) {
-      throw err;
+      throw new Error(importUrlErrorMessage(err));
     }
-    throw new Error(`${ERR_API}: Failed to fetch URL ${url}: ${getErrorMessage(err)}`, { cause: err });
+    throw new Error(`${ERR_API}: Failed to fetch URL ${displayUrl}: ${importUrlErrorMessage(err)}`);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -795,6 +796,7 @@ async function fetchUrlContent(url, cacheDir) {
  */
 async function processUrlImport(url, optional, startLine, endLine, protectValue = value => value) {
   const cacheDir = "/tmp/gh-aw/url-cache";
+  const displayUrl = displayImportUrl(url);
 
   // Fetch URL content (with caching)
   let content;
@@ -802,8 +804,8 @@ async function processUrlImport(url, optional, startLine, endLine, protectValue 
     content = await fetchUrlContent(url, cacheDir);
   } catch (error) {
     if (optional) {
-      const errorMessage = getErrorMessage(error);
-      core.warning(`Optional runtime import URL failed: ${url}: ${errorMessage}`);
+      const errorMessage = importUrlErrorMessage(error);
+      core.warning(`Optional runtime import URL failed: ${displayUrl}: ${errorMessage}`);
       return "";
     }
     throw error;
@@ -819,13 +821,13 @@ async function processUrlImport(url, optional, startLine, endLine, protectValue 
     const end = endLine !== undefined ? endLine : totalLines;
 
     if (start < 1 || start > totalLines) {
-      throw new Error(`${ERR_VALIDATION}: Invalid start line ${start} for URL ${url} (total lines: ${totalLines})`);
+      throw new Error(`${ERR_VALIDATION}: Invalid start line ${start} for URL ${displayUrl} (total lines: ${totalLines})`);
     }
     if (end < 1 || end > totalLines) {
-      throw new Error(`${ERR_VALIDATION}: Invalid end line ${end} for URL ${url} (total lines: ${totalLines})`);
+      throw new Error(`${ERR_VALIDATION}: Invalid end line ${end} for URL ${displayUrl} (total lines: ${totalLines})`);
     }
     if (start > end) {
-      throw new Error(`${ERR_VALIDATION}: Start line ${start} cannot be greater than end line ${end} for URL ${url}`);
+      throw new Error(`${ERR_VALIDATION}: Start line ${start} cannot be greater than end line ${end} for URL ${displayUrl}`);
     }
 
     // Extract lines (convert to 0-indexed)
@@ -834,7 +836,7 @@ async function processUrlImport(url, optional, startLine, endLine, protectValue 
 
   // Check for front matter and warn
   if (hasFrontMatter(content)) {
-    core.debug(`URL ${url} contains front matter which will be ignored in runtime import`);
+    core.debug(`URL ${displayUrl} contains front matter which will be ignored in runtime import`);
     // Remove front matter (everything between first --- and second ---)
     const lines = content.split("\n");
     let inFrontMatter = false;
@@ -864,7 +866,7 @@ async function processUrlImport(url, optional, startLine, endLine, protectValue 
 
   // Process GitHub Actions expressions (validate and render safe ones)
   if (hasGitHubActionsMacros(content)) {
-    content = processExpressions(content, `URL ${url}`, protectValue);
+    content = processExpressions(content, `URL ${displayUrl}`, protectValue);
   }
 
   // Close any unterminated "## skill:"/"## agent:" block so this import
@@ -997,7 +999,7 @@ function generatePlaceholderName(expr) {
  */
 function resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir) {
   if (/^https?:\/\//i.test(filepathOrUrl)) {
-    throw new Error(`${ERR_VALIDATION}: Expected file path for runtime import, received URL: ${filepathOrUrl}`);
+    throw new Error(`${ERR_VALIDATION}: Expected file path for runtime import, received URL: ${displayImportUrl(filepathOrUrl)}`);
   }
 
   let filepath = filepathOrUrl;
@@ -1355,12 +1357,13 @@ async function processRuntimeImports(
   const resolvedInThisCall = new Set();
   for (const matchData of matches) {
     const { fullMatch, filepathOrUrl, optional, startLine, endLine, filepathWithRange } = matchData;
+    const displayPath = /^https?:\/\//i.test(filepathOrUrl) ? displayImportUrl(filepathOrUrl) : filepathWithRange;
     let importKey;
     try {
       importKey = resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine);
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${filepathWithRange}: ${errorMessage}`);
+      const errorMessage = importUrlErrorMessage(error);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
     }
 
     // Skip imports already resolved in the parent/sibling context.
@@ -1371,7 +1374,7 @@ async function processRuntimeImports(
       // this branch exists specifically to prevent duplicate prompt blocks when
       // recursively traversing a self-imported workflow body.
       processedContent = processedContent.replace(fullMatch, "");
-      core.info(`Skipping already resolved import for ${filepathWithRange}`);
+      core.info(`Skipping already resolved import for ${displayPath}`);
       continue;
     }
 
@@ -1381,7 +1384,7 @@ async function processRuntimeImports(
       const cachedContent = importCache.get(filepathWithRange);
       if (cachedContent !== undefined) {
         processedContent = processedContent.replace(fullMatch, () => cachedContent);
-        core.info(`Reusing cached content for ${filepathWithRange}`);
+        core.info(`Reusing cached content for ${displayPath}`);
         if (parentTreeChildren !== null) {
           // Use the raw (pre-expansion) content from rawImportCache so that
           // rawContent is consistent between first and subsequent occurrences.
@@ -1403,7 +1406,7 @@ async function processRuntimeImports(
 
     // Check for circular dependencies
     if (importStack.includes(filepathWithRange)) {
-      const cycle = [...importStack, filepathWithRange].join(" -> ");
+      const cycle = [...importStack, filepathWithRange].map(value => (/^https?:\/\//i.test(value) ? displayImportUrl(value) : value)).join(" -> ");
       throw new Error(`${ERR_PARSE}: Circular dependency detected: ${cycle}`);
     }
 
@@ -1439,7 +1442,7 @@ async function processRuntimeImports(
       // imported content. The recursive call to processRuntimeImports will normalize
       // any {{#import}} directives before processing them.
       if (importedContent && /\{\{#(?:runtime-import|import)/.test(importedContent)) {
-        core.info(`Recursively processing imports in ${filepathWithRange}`);
+        core.info(`Recursively processing imports in ${displayPath}`);
         const inheritedResolved = new Set([...resolvedInParent, ...resolvedInThisCall]);
         importedContent = await processRuntimeImports(importedContent, workspaceDir, importedFiles, importCache, [...importStack], parentTreeChildren !== null ? treeNodeChildren : null, rawImportCache, inheritedResolved, protectValue);
       }
@@ -1453,8 +1456,8 @@ async function processRuntimeImports(
       processedContent = processedContent.replace(fullMatch, () => importedContent);
       resolvedInThisCall.add(importKey);
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${filepathWithRange}: ${errorMessage}`);
+      const errorMessage = importUrlErrorMessage(error);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
     } finally {
       // Remove from import stack
       importStack.pop();

@@ -5,6 +5,30 @@ const http = require("node:http");
 const https = require("node:https");
 const { BlockList, isIP } = require("node:net");
 const { ERR_API, ERR_VALIDATION } = require("./error_codes.cjs");
+const { getErrorMessage } = require("./error_helpers.cjs");
+
+/**
+ * Display URL destinations without authentication, query, or fragment data.
+ * @param {string | URL} value
+ * @returns {string}
+ */
+function displayImportUrl(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "(invalid URL)";
+  }
+}
+
+/**
+ * Transport errors can also embed the requested URL in their messages.
+ * @param {unknown} error
+ * @returns {string}
+ */
+function importUrlErrorMessage(error) {
+  return getErrorMessage(error).replace(/https?:\/\/[^\s"'<>]+/gi, displayImportUrl);
+}
 
 const nonPublicIPv4 = new BlockList();
 for (const [address, prefix] of [
@@ -60,8 +84,8 @@ function validateImportUrl(value) {
   let url;
   try {
     url = new URL(value);
-  } catch (error) {
-    throw new Error(`${ERR_VALIDATION}: Runtime import URL must be a valid HTTP or HTTPS URL`, { cause: error });
+  } catch {
+    throw new Error(`${ERR_VALIDATION}: Runtime import URL must be a valid HTTP or HTTPS URL`);
   }
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
     throw new Error(`${ERR_VALIDATION}: Runtime import URL requires unauthenticated HTTP or HTTPS`);
@@ -105,21 +129,28 @@ function lookupPublicImport(hostname, options, callback) {
  * @returns {Promise<string>}
  */
 async function readPublicImportUrl(url, signal) {
-  const transport = url.protocol === "https:" ? https : http;
-  const response = await new Promise((resolve, reject) => {
-    const request = transport.get(url, { agent: false, lookup: lookupPublicImport, signal }, resolve);
-    request.on("error", reject);
-  });
-  const status = response.statusCode || 0;
-  if (status < 200 || status >= 300) {
-    response.destroy();
-    throw new Error(`${ERR_API}: Failed to fetch URL ${url.href}: HTTP ${status}`);
+  try {
+    const transport = url.protocol === "https:" ? https : http;
+    const response = await new Promise((resolve, reject) => {
+      const request = transport.get(url, { agent: false, lookup: lookupPublicImport, signal }, resolve);
+      request.on("error", reject);
+    });
+    const status = response.statusCode || 0;
+    if (status < 200 || status >= 300) {
+      response.destroy();
+      throw new Error(`${ERR_API}: Failed to fetch URL ${displayImportUrl(url)}: HTTP ${status}`);
+    }
+    const chunks = [];
+    for await (const chunk of response) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith(ERR_API)) {
+      throw new Error(importUrlErrorMessage(error));
+    }
+    throw new Error(`${ERR_API}: Failed to fetch URL ${displayImportUrl(url)}: ${importUrlErrorMessage(error)}`);
   }
-  const chunks = [];
-  for await (const chunk of response) {
-    chunks.push(Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks).toString("utf8");
 }
 
-module.exports = { isPublicImportAddress, validateImportUrl, readPublicImportUrl };
+module.exports = { displayImportUrl, importUrlErrorMessage, isPublicImportAddress, validateImportUrl, readPublicImportUrl };

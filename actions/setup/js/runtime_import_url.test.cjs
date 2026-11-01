@@ -6,11 +6,11 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import crypto from "node:crypto";
+import { inspect } from "node:util";
 
-const { isPublicImportAddress, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
-const { fetchUrlContent, processRuntimeImport } = require("./runtime_import.cjs");
+const { displayImportUrl, isPublicImportAddress, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
+const { fetchUrlContent, processRuntimeImport, processRuntimeImports } = require("./runtime_import.cjs");
 
 describe("runtime import URL boundaries", () => {
   let tempDir;
@@ -23,7 +23,11 @@ describe("runtime import URL boundaries", () => {
   beforeEach(() => {
     destination = undefined;
     global.core = { info: vi.fn(), warning: vi.fn(), debug: vi.fn() };
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "public-import-test-"));
+    tempDir = fs.mkdtempSync(path.join(process.cwd(), ".public-import-test-"));
+    const join = path.join;
+    const existsSync = fs.existsSync;
+    vi.spyOn(path, "join").mockImplementation((directory, ...parts) => join(directory === "/tmp/gh-aw/url-cache" ? tempDir : directory, ...parts));
+    vi.spyOn(fs, "existsSync").mockImplementation(file => file === "/tmp/gh-aw/url-cache" || existsSync(file));
     response = new PassThrough();
     response.statusCode = 200;
     request = new EventEmitter();
@@ -232,19 +236,117 @@ describe("runtime import URL boundaries", () => {
     expect(get).toHaveBeenCalledTimes(1);
   });
 
+  function expectSafeDiagnostics(error) {
+    const diagnostics = inspect(error) + JSON.stringify([global.core.info.mock.calls, global.core.warning.mock.calls, global.core.debug.mock.calls]);
+    expect(diagnostics).not.toMatch(/query-secret|fragment-secret|password-secret/);
+    return diagnostics;
+  }
+
+  it("displays only origin and pathname, including for rejected credentials and malformed URLs", () => {
+    expect(displayImportUrl("https://user:password-secret@example.com/file?token=query-secret#fragment-secret")).toBe("https://example.com/file");
+    expect(displayImportUrl("http://[invalid]?token=query-secret#fragment-secret")).toBe("(invalid URL)");
+  });
+
+  it("preserves query-dependent requests and cache keys without logging query or fragment credentials", async () => {
+    const first = "http://example.com/file?token=query-secret#fragment-secret";
+    const second = "http://example.com/file?token=other-query-secret#fragment-secret";
+    response.end("first");
+    expect(await fetchUrlContent(first, tempDir)).toBe("first");
+    response = new PassThrough();
+    response.statusCode = 200;
+    response.end("second");
+    expect(await fetchUrlContent(second, tempDir)).toBe("second");
+    expect(await fetchUrlContent(first, tempDir)).toBe("first");
+    expect(get.mock.calls.map(([url]) => url.href)).toEqual([first, second]);
+    expectSafeDiagnostics();
+    expect(global.core.info).toHaveBeenCalledWith("Using cached content for URL: http://example.com/file");
+  });
+
+  it("redacts HTTP failures in direct and wrapped errors", async () => {
+    response.statusCode = 404;
+    response.end();
+    const url = "http://example.com/file?token=query-secret#fragment-secret";
+    const direct = await readPublicImportUrl(validateImportUrl(url), new AbortController().signal).catch(error => error);
+    expect(expectSafeDiagnostics(direct)).toContain("http://example.com/file: HTTP 404");
+    response = new PassThrough();
+    response.statusCode = 404;
+    response.end();
+    const wrapped = await processRuntimeImports(`{{#runtime-import ${url}}}`, tempDir).catch(error => error);
+    expect(expectSafeDiagnostics(wrapped)).toContain("Failed to process runtime import for http://example.com/file");
+    expect(wrapped).toBeInstanceOf(Error);
+  });
+
+  it("redacts URLs embedded in transport errors without retaining an unsafe cause", async () => {
+    const url = "http://example.com/file?token=query-secret#fragment-secret";
+    get.mockImplementationOnce(() => {
+      throw new Error(`socket failure for ${url}`);
+    });
+    const error = await fetchUrlContent(url, tempDir).catch(error => error);
+    expect(expectSafeDiagnostics(error)).toContain("socket failure for http://example.com/file");
+    expect(error).toBeInstanceOf(Error);
+    expect(error.cause).toBeUndefined();
+  });
+
+  it.each(["http://[invalid]?token=query-secret#fragment-secret", "http://user:password-secret@example.com/file?token=query-secret#fragment-secret", "http://127.0.0.1/file?token=query-secret#fragment-secret"])(
+    "redacts rejected destinations in required errors and optional warnings: %s",
+    async url => {
+      const error = await processRuntimeImports(`{{#runtime-import ${url}}}`, tempDir).catch(error => error);
+      expect(error).toBeInstanceOf(Error);
+      expectSafeDiagnostics(error);
+      expect(await processRuntimeImport(url, true, tempDir)).toBe("");
+      expectSafeDiagnostics();
+      expect(get).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    [0, 1],
+    [1, 4],
+    [2, 1],
+  ])("redacts line range diagnostics for %s-%s", async (start, end) => {
+    response.end("line one\nline two");
+    const url = "http://example.com/file?token=query-secret#fragment-secret";
+    const error = await processRuntimeImport(url, false, tempDir, start, end).catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(expectSafeDiagnostics(error)).toContain("URL http://example.com/file");
+  });
+
+  it("redacts frontmatter and expression parse diagnostics", async () => {
+    response.end("---\nname: example\n---\n${{ secrets.TOKEN }}");
+    const url = "http://example.com/file?token=query-secret#fragment-secret";
+    const error = await processRuntimeImports(`{{#runtime-import ${url}}}`, tempDir).catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(expectSafeDiagnostics(error)).toContain("unauthorized GitHub Actions expressions");
+    expect(global.core.debug).toHaveBeenCalledWith("URL http://example.com/file contains front matter which will be ignored in runtime import");
+  });
+
+  it("redacts recursive imports and circular dependency diagnostics", async () => {
+    const url = "http://example.com/file?token=query-secret#fragment-secret";
+    response.end(`{{#runtime-import ${url}}}`);
+    const error = await processRuntimeImports(`{{#runtime-import ${url}}}`, tempDir).catch(error => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(expectSafeDiagnostics(error)).toContain("Circular dependency detected: http://example.com/file -> http://example.com/file");
+    expect(global.core.info).toHaveBeenCalledWith("Recursively processing imports in http://example.com/file");
+  });
+
+  it("redacts cached and already resolved import diagnostics without changing lookup keys", async () => {
+    const url = "http://example.com/file?token=query-secret#fragment-secret";
+    const content = `{{#runtime-import ${url}}}`;
+    expect(await processRuntimeImports(content, tempDir, new Set(), new Map([[url, "cached"]]))).toBe("cached");
+    expect(await processRuntimeImports(content, tempDir, new Set(), new Map(), [], null, new Map(), new Set([url]))).toBe("");
+    expectSafeDiagnostics();
+    expect(global.core.info).toHaveBeenCalledWith("Reusing cached content for http://example.com/file");
+    expect(global.core.info).toHaveBeenCalledWith("Skipping already resolved import for http://example.com/file");
+  });
+
   it("rejects credential expressions delivered by an actual URL import", async () => {
     process.env["INPUT_GITHUB-TOKEN"] = "not-for-model";
     const url = `http://example.com/${path.basename(tempDir)}.md`;
-    const hash = crypto
-      .createHash("sha256")
-      .update("public-v1:" + url)
-      .digest("hex");
     response.end("${{ github.actor && env.INPUT_GITHUB-TOKEN || 'fallback' }}");
     try {
       await expect(processRuntimeImport(url, false, tempDir)).rejects.toThrow(/unauthorized GitHub Actions expressions/);
     } finally {
       delete process.env["INPUT_GITHUB-TOKEN"];
-      fs.rmSync(path.join("/tmp/gh-aw/url-cache", `url-${hash}.cache`), { force: true });
     }
   });
 });
