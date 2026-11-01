@@ -1,6 +1,7 @@
 // @ts-check
 import { afterEach, describe, it, expect, vi } from "vitest";
 import http from "http";
+import net from "net";
 import { runHttpServer, MAX_REQUEST_BODY_BYTES, REQUEST_BODY_TIMEOUT_MS } from "./mcp_http_server_runner.cjs";
 
 const API_KEY = "runner-test-api-key";
@@ -374,6 +375,39 @@ describe("mcp_http_server_runner.cjs - runHttpServer", () => {
     expect(transport.calls).toHaveLength(0);
     expect(logger.debugError).toHaveBeenCalled();
     expect((await request(currentServer, { method: "POST", path: "/", body: "{}" })).statusCode).toBe(200);
+  });
+
+  it("closes unauthenticated incomplete headers at the header timeout without invoking transport", async () => {
+    const transport = makeMockTransport();
+    currentServer = await runHttpServer({
+      transport,
+      port: 0,
+      getHealthPayload: () => ({}),
+      logger: makeMockLogger(),
+      serverLabel: "Test",
+      apiKey: API_KEY,
+      configureServer: server => {
+        server.connectionsCheckingInterval = 10;
+      },
+    });
+    await new Promise(r => currentServer.once("listening", r));
+    currentServer.headersTimeout = 100;
+
+    const addr = /** @type {import('net').AddressInfo} */ currentServer.address();
+    const socket = net.createConnection({ host: "127.0.0.1", port: addr.port });
+    let response = "";
+    socket.setEncoding("utf8");
+    socket.on("data", chunk => (response += chunk));
+    await new Promise((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+    socket.write("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\nX-");
+    await new Promise(resolve => socket.once("close", resolve));
+    socket.destroy();
+
+    expect(response).toContain("408 Request Timeout");
+    expect(transport.calls).toHaveLength(0);
   });
 });
 

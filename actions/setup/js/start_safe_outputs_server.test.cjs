@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const assert = require("assert");
 const { spawnSync } = require("child_process");
@@ -27,11 +28,17 @@ describe("start_safe_outputs_server.sh", () => {
     const outputBlock = content.match(/\{\n  echo "port=[\s\S]*?\} >> "\$GITHUB_OUTPUT"/);
     assert.ok(outputBlock, "Client configuration output block should exist");
     const apiKey = "test-key-with-'quotes'-and-$literal";
-    const result = spawnSync("bash", ["-c", outputBlock[0]], {
-      env: { ...process.env, [`${prefix}_PORT`]: "3000", [`${prefix}_API_KEY`]: apiKey, GITHUB_OUTPUT: "/dev/stdout" },
-      encoding: "utf8",
-    });
-    assert.strictEqual(result.status, 0, result.stderr);
-    assert.strictEqual(result.stdout, `port=3000\napi_key=${apiKey}\n`);
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-startup-output-"));
+    const outputPath = path.join(outputDir, "github-output");
+    try {
+      const result = spawnSync("bash", ["-c", outputBlock[0]], {
+        env: { ...process.env, [`${prefix}_PORT`]: "3000", [`${prefix}_API_KEY`]: apiKey, GITHUB_OUTPUT: outputPath },
+        encoding: "utf8",
+      });
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.strictEqual(fs.readFileSync(outputPath, "utf8"), `port=3000\napi_key=${apiKey}\n`);
+    } finally {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 });
