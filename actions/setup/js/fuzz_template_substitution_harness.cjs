@@ -86,8 +86,7 @@ async function testTemplateSubstitution(template, substitutions, variables) {
     const afterTemplate = renderMarkdownTemplate(afterInterpolation);
 
     // Clean up
-    fs.unlinkSync(testFile);
-    fs.rmdirSync(tempDir);
+    fs.rmSync(tempDir, { recursive: true, force: true });
 
     return {
       result: afterTemplate,
@@ -101,8 +100,7 @@ async function testTemplateSubstitution(template, substitutions, variables) {
   } catch (err) {
     // Clean up on error
     try {
-      if (fs.existsSync(testFile)) fs.unlinkSync(testFile);
-      if (fs.existsSync(tempDir)) fs.rmdirSync(tempDir);
+      fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {
       // Best-effort cleanup after the original error.
     }

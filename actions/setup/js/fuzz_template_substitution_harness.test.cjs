@@ -1,7 +1,36 @@
 // @ts-check
 const { testTemplateSubstitution, testValueState } = require("./fuzz_template_substitution_harness.cjs");
+const fs = require("fs");
 
 describe("fuzz_template_substitution_harness", () => {
+  describe("cleanup", () => {
+    it.each([false, true])("should remove the prompt and literal sidecar after error=%s", async fail => {
+      const mkdtemp = vi.spyOn(fs, "mkdtempSync");
+      try {
+        const variables = fail
+          ? Object.defineProperty({}, "VALUE", {
+              enumerable: true,
+              get() {
+                throw new Error("interpolation failed");
+              },
+            })
+          : { VALUE: "value" };
+        const result = await testTemplateSubstitution("__TEST__ ${VALUE}", { TEST: "literal" }, variables);
+        expect(mkdtemp).toHaveBeenCalledTimes(1);
+        const directory = mkdtemp.mock.results[0].value;
+        expect(fs.existsSync(directory)).toBe(false);
+        if (fail) {
+          expect(result.error).toBe("interpolation failed");
+        } else {
+          expect(result.error).toBeNull();
+          expect(result.result).toBe("literal value");
+        }
+      } finally {
+        mkdtemp.mockRestore();
+      }
+    });
+  });
+
   describe("testValueState", () => {
     it("should handle undefined values correctly", async () => {
       const result = await testValueState(undefined);
