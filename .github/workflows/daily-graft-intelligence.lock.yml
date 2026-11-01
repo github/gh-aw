@@ -868,7 +868,7 @@ jobs:
 
           mkdir -p "$HOME/.copilot"
           GH_AW_NODE=$(which node 2>/dev/null || command -v node 2>/dev/null || echo node)
-          cat << GH_AW_MCP_CONFIG_05cdc759c41f3ee7_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
+          cat << GH_AW_MCP_CONFIG_307cecd19191fb11_EOF | "$GH_AW_NODE" "${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.cjs"
           {
             "mcpServers": {
               "graft": {
@@ -879,7 +879,7 @@ jobs:
                   "-y",
                   "@nanonets/graft@0.8.0",
                   "mcp",
-                  "${GITHUB_WORKSPACE}"
+                  "\${GH_AW_MCP_ENV_GITHUB_WORKSPACE}"
                 ],
                 "tools": [
                   "graft_ask",
@@ -957,7 +957,7 @@ jobs:
               }
             }
           }
-          GH_AW_MCP_CONFIG_05cdc759c41f3ee7_EOF
+          GH_AW_MCP_CONFIG_307cecd19191fb11_EOF
       - name: Mount MCP servers as CLIs
         id: mount-mcp-clis
         continue-on-error: true

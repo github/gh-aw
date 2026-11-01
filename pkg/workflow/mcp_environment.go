@@ -232,6 +232,7 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 				mcpEnvironmentLog.Printf("Failed to parse MCP config for tool %s: %v", toolName, err)
 				continue
 			}
+			maps.Copy(envVars, collectMCPConfigExpressionBindings(mcpConfig))
 
 			// Extract secrets from headers for HTTP MCP servers
 			if mcpConfig.Type == "http" && len(mcpConfig.Headers) > 0 {

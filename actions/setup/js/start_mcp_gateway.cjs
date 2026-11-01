@@ -568,6 +568,28 @@ function getJSONParseErrorContext(jsonText, parseErrorMessage) {
 }
 
 /**
+ * Resolve compiler-owned expression placeholders only after JSON parsing.
+ * Runtime values are data, never shell source or JSON fragments.
+ * @param {any} value
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {any}
+ */
+function resolveMCPConfigExpressions(value, env = process.env) {
+  if (typeof value === "string") {
+    return value.replace(/\$\{(GH_AW_MCP_EXPR_[A-F0-9]{64}|GH_AW_MCP_ENV_([A-Za-z_][A-Za-z0-9_]*))\}/g, (_match, name, legacyName) => {
+      if (legacyName) return env[legacyName] ?? "";
+      if (env[name] === undefined) throw new Error(`${ERR_CONFIG}: MCP configuration environment variable ${name} is not set`);
+      return env[name];
+    });
+  }
+  if (Array.isArray(value)) return value.map(entry => resolveMCPConfigExpressions(entry, env));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, resolveMCPConfigExpressions(entry, env)]));
+  }
+  return value;
+}
+
+/**
  * Repairs a known double-encoding regression where sink-visibility can be rendered as:
  *   "sink-visibility": ""public""
  * instead of:
@@ -1018,6 +1040,13 @@ async function main() {
       core.error(`Likely offending location: line ${parseContext.line}, column ${parseContext.column}`);
     }
     setFailed(`${ERR_CONFIG}: Configuration is not valid JSON`);
+    return;
+  }
+
+  try {
+    configObj.mcpServers = resolveMCPConfigExpressions(configObj.mcpServers);
+  } catch (err) {
+    setFailed(`${ERR_CONFIG}: Failed to resolve MCP configuration expressions: ${getErrorMessage(err)}`);
     return;
   }
 
@@ -1620,6 +1649,7 @@ function applyAgenticWorkflowsRunnerIdentity(config, uid = process.getuid?.(), g
 }
 
 module.exports = {
+  resolveMCPConfigExpressions,
   applyAgenticWorkflowsRunnerIdentity,
   applyOTLPIgnoreIfMissing,
   clearGatewayStartupMarker,

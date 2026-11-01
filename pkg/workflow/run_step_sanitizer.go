@@ -40,6 +40,8 @@
 // Quoted heredoc bodies (e.g. << 'EOF' ... EOF) suppress shell expansion and
 // are excluded from extraction. Unquoted bodies undergo command substitution,
 // so their expressions must be extracted even on lines beginning with #.
+// Scripts with unproven heredoc boundaries are left intact for validation to
+// reject, rather than risking destructive replacements inside quoted data.
 
 package workflow
 
@@ -83,6 +85,11 @@ type sanitizedExpression struct {
 func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, bool) {
 	runVal, ok := step["run"].(string)
 	if !ok || !hasExpressionMarker(runVal) {
+		return step, nil, false
+	}
+	if _, parsed := shellHeredocRegions(runVal, false); !parsed {
+		// Without reliable boundaries, rewriting could corrupt quoted data.
+		// Leave the script intact for the fail-closed expression validators.
 		return step, nil, false
 	}
 

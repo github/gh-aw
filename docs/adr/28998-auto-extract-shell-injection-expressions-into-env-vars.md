@@ -58,7 +58,7 @@ A schema validator could enforce that all `run:` fields contain no `${{ }}` toke
 
 1. The compiler **MUST** extract every `${{ ... }}` expression found directly in a `run:` field (outside quoted heredoc bodies and shell comments), including unquoted heredoc bodies, into a dedicated entry in the step's `env:` block before the compiled YAML is written.
 2. The compiler **MUST NOT** modify the source YAML on disk; extraction applies only to the in-memory representation used during compilation.
-3. The compiler **MUST NOT** extract `${{ ... }}` expressions inside syntactically valid quoted heredoc bodies. The shell parser **MUST** match the complete closing delimiter, apply tab stripping only for `<<-`, and grant no exemption on a parse failure. Opening commands and commands after the closing delimiter **MUST** remain subject to extraction. Quoted heredocs suppress shell expansion, but are not a general-purpose transport for arbitrary untrusted multiline content: Actions interpolation still occurs before Bash parses the script and can introduce a closing delimiter.
+3. The compiler **MUST NOT** extract `${{ ... }}` expressions inside syntactically valid quoted heredoc bodies, including quoted bodies nested in expanding heredocs. The shell parser **MUST** match the complete closing delimiter, apply tab stripping only for `<<-`, ignore unquoted backslash-newline continuations when determining delimiter quotation, and grant no exemption on a parse failure or a boundary disagreement with Bash. Such unsupported scripts **MUST** remain unchanged by the sanitizer and **MUST** be scanned conservatively by validation. Opening commands and commands after the closing delimiter **MUST** remain subject to extraction. Comment filtering **MUST** preserve full-script quote state. Quoted heredocs suppress shell expansion, but are not a general-purpose transport for arbitrary untrusted multiline content: Actions interpolation still occurs before Bash parses the script and can introduce a closing delimiter.
 4. The generated environment variable name **MUST** follow the pattern `GH_AW_<NORMALIZED_EXPR>` where `<NORMALIZED_EXPR>` is a deterministic, uppercase, alphanumeric-and-underscore transformation of the expression content.
 5. Implementations **MUST** replace the inline `${{ ... }}` occurrence in the shell script with the corresponding shell variable reference (`$GH_AW_...`) after extraction.
 
@@ -67,6 +67,13 @@ A schema validator could enforce that all `run:` fields contain no `${{ }}` toke
 1. The compiler **MUST** emit a human-readable warning to stderr for every expression that is extracted, stating the original expression, the step name, and the generated environment variable name.
 2. The compiler **MUST** increment its internal warning counter for each such extraction so that callers and CI gates that track warning totals reflect the sanitization activity.
 3. Warning messages **MUST** reference "shell injection" so that authors understand the security rationale.
+
+### Generated MCP Configuration
+
+1. Authored expressions in MCP URLs, arguments, environment values and headers **MUST NOT** be interpolated directly into the shell heredoc that writes gateway JSON. Expressions not covered by existing secret/environment passthrough **MUST** use deterministic `GH_AW_MCP_EXPR_<SHA256>` step-environment bindings with the full uppercase SHA-256 digest of the trimmed expression.
+2. The gateway startup script **MUST** resolve these placeholders after JSON parsing and before URL validation. Substitution **MUST** be single-pass, preserve runtime values as data, and fail explicitly when a compiler-owned binding is absent.
+3. Existing unescaped `$NAME` and `${NAME}` references **MUST** retain runner-environment expansion through `GH_AW_MCP_ENV_<NAME>` placeholders; missing legacy values retain their previous empty-string behavior. Escaped gateway references **MUST** remain deferred to the gateway.
+4. JSON strings **MUST** be encoded before escaping expanding-heredoc metacharacters, so quotes, backslashes, newlines, dollar signs and backticks cannot become shell source or corrupt JSON.
 
 ### Error Handling
 

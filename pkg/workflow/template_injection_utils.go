@@ -45,13 +45,7 @@ type shellHeredocRegion struct {
 	quoted     bool
 }
 
-// shellHeredocRegions uses Bash syntax rather than delimiter heuristics. Masking
-// Actions expressions preserves byte offsets while avoiding shell parse errors.
-// A parse failure grants no heredoc exemption.
-func shellHeredocRegions(content string) ([]shellHeredocRegion, bool) {
-	if !strings.Contains(content, "<<") {
-		return nil, true
-	}
+func maskShellActionsExpressions(content string) []byte {
 	masked := []byte(content)
 	for _, loc := range ExpressionPattern.FindAllStringSubmatchIndex(content, -1) {
 		if len(loc) < 2 {
@@ -63,63 +57,135 @@ func shellHeredocRegions(content string) ([]shellHeredocRegion, bool) {
 			}
 		}
 	}
-	file, err := syntax.NewParser().Parse(bytes.NewReader(masked), "")
+	return masked
+}
+
+// shellHeredocRegions uses Bash syntax rather than delimiter heuristics. Masking
+// Actions expressions preserves byte offsets while avoiding shell parse errors.
+// A parse failure grants no heredoc exemption.
+func shellHeredocRegions(content string, includeComments bool) ([]shellHeredocRegion, bool) {
+	if !strings.Contains(content, "<<") {
+		return nil, true
+	}
+	masked := maskShellActionsExpressions(content)
+	file, err := syntax.NewParser(syntax.KeepComments(true)).Parse(bytes.NewReader(masked), "")
 	if err != nil {
-		templateInjectionValidationLog.Printf("Cannot identify safe heredoc regions; scanning entire script: %v", err)
+		templateInjectionValidationLog.Printf("Cannot identify safe heredoc regions; scanning entire script")
 		return nil, false
 	}
 	var regions []shellHeredocRegion
+	valid := true
 	syntax.Walk(file, func(node syntax.Node) bool {
+		if comment, ok := node.(*syntax.Comment); ok && includeComments {
+			regions = append(regions, shellHeredocRegion{
+				start: int(comment.Pos().Offset()), end: int(comment.End().Offset()),
+			})
+		}
 		redirect, ok := node.(*syntax.Redirect)
 		if !ok || redirect.Hdoc == nil || len(redirect.Hdoc.Parts) == 0 {
 			return true
 		}
 		start, end := int(redirect.Hdoc.Pos().Offset()), int(redirect.Hdoc.End().Offset())
 		delimiter := content[redirect.Word.Pos().Offset():redirect.Word.End().Offset()]
-		regions = append(regions, shellHeredocRegion{
-			start: start, end: end, quoted: !mayContainInlineExpression(delimiter) && strings.ContainsAny(delimiter, "'\"\\"),
-		})
-		// Nested substitutions belong to the containing unquoted body.
-		return false
+		quoted := false
+		for _, part := range redirect.Word.Parts {
+			switch part := part.(type) {
+			case *syntax.Lit:
+				// The parser already removes unquoted backslash-newline
+				// continuations; only remaining escapes quote the delimiter.
+				quoted = quoted || strings.Contains(part.Value, "\\")
+			case *syntax.SglQuoted, *syntax.DblQuoted:
+				quoted = true
+			default:
+				valid = false
+			}
+		}
+		if quoted && !mayContainInlineExpression(delimiter) {
+			// mvdan can treat prefix-quoted delimiters as expanding, joining
+			// body lines across continuations. Bash instead stops at the
+			// first literal delimiter line. Never exempt an overlong body.
+			if !quotedHeredocBoundaryMatches(content, start, end, redirect.Op == syntax.DashHdoc) {
+				valid = false
+			}
+			regions = append(regions, shellHeredocRegion{start: start, end: end, quoted: true})
+		}
+		// Walk expanding bodies too: they may contain quoted inner heredocs.
+		return true
 	})
-	slices.SortFunc(regions, func(a, b shellHeredocRegion) int { return a.start - b.start })
-	return regions, true
+	slices.SortFunc(regions, func(a, b shellHeredocRegion) int {
+		if a.start == b.start {
+			return b.end - a.end
+		}
+		return a.start - b.start
+	})
+	return regions, valid
 }
 
-// transformShellContent preserves quoted heredoc bodies, processes unquoted
-// bodies without shell-comment filtering, and filters comments only in commands.
-func transformShellContent(content string, shell, heredoc func(string) string, skipQuoted bool) string {
-	regions, parsed := shellHeredocRegions(content)
+func quotedHeredocBoundaryMatches(content string, start, end int, stripTabs bool) bool {
+	if start < 0 || end < start || end > len(content) {
+		return false
+	}
+	if end < len(content) && !strings.HasPrefix(content[end:], "\n") {
+		return false
+	}
+	// Hdoc.End includes the closing delimiter, but not its newline.
+	closeStart := strings.LastIndex(content[:end], "\n") + 1
+	if closeStart < start {
+		return false
+	}
+	stop := content[closeStart:end]
+	if stripTabs {
+		stop = strings.TrimLeft(stop, "\t")
+	}
+	for line := range strings.SplitSeq(strings.TrimSuffix(content[start:closeStart], "\n"), "\n") {
+		if stripTabs {
+			line = strings.TrimLeft(line, "\t")
+		}
+		if line == stop {
+			return false
+		}
+	}
+	return true
+}
+
+// transformShellContent applies transformations outside parser-identified
+// quoted bodies and comments, retaining nested quoted bodies in expanding ones.
+func transformShellContent(content string, transform func(string) string, skipQuoted, includeComments bool) string {
+	regions, parsed := shellHeredocRegions(content, includeComments)
 	if !parsed {
-		// Invalid shell syntax must not hide expressions behind apparent comments.
-		return heredoc(content)
+		// Scan everything, but do not rewrite bodies whose boundaries are unknown.
+		// The unchanged expressions will be rejected by validation.
+		return content
 	}
 	var result strings.Builder
 	pos := 0
 	for _, region := range regions {
-		result.WriteString(shell(content[pos:region.start]))
-		switch {
-		case region.quoted && skipQuoted:
+		if region.start < pos {
+			continue // A containing protected region already covered this span.
+		}
+		result.WriteString(transform(content[pos:region.start]))
+		if skipQuoted {
 			result.WriteByte('\n')
-		case region.quoted:
+		} else {
 			result.WriteString(content[region.start:region.end])
-		default:
-			result.WriteString(heredoc(content[region.start:region.end]))
 		}
 		pos = region.end
 	}
-	result.WriteString(shell(content[pos:]))
+	result.WriteString(transform(content[pos:]))
 	return result.String()
 }
 
 // removeHeredocContent removes only quoted heredoc bodies. Unquoted bodies
 // undergo command substitution and must remain visible to injection checks.
 func removeHeredocContent(content string) string {
-	return transformShellContent(content, func(s string) string { return s }, func(s string) string { return s }, true)
+	return transformShellContent(content, func(s string) string { return s }, true, false)
 }
 
 func executableShellContent(content string) string {
-	return transformShellContent(content, stripShellLineComments, func(s string) string { return s }, true)
+	if !strings.Contains(content, "<<") {
+		return stripShellLineComments(content)
+	}
+	return transformShellContent(content, func(s string) string { return s }, true, true)
 }
 
 // stripShellLineComments removes bash-style # line comments while preserving text
@@ -195,12 +261,14 @@ func isShellCommentStart(content string, index int) bool {
 // being expanded.  Unquoted heredoc content and regular script lines are
 // processed normally.
 //
-// When there are no quoted heredocs the function is equivalent to
-// strings.ReplaceAll(s, old, new).
+// Unproven heredoc boundaries leave the script unchanged for validation.
+// Shell comments are preserved even when there are no quoted heredocs.
 func replaceOutsideQuotedHeredocs(s, old, new string) string {
+	if !strings.Contains(s, "<<") {
+		return replaceOutsideShellLineComments(s, old, new)
+	}
 	return transformShellContent(s,
-		func(segment string) string { return replaceOutsideShellLineComments(segment, old, new) },
-		func(segment string) string { return strings.ReplaceAll(segment, old, new) }, false)
+		func(segment string) string { return strings.ReplaceAll(segment, old, new) }, false, true)
 }
 
 // replaceOutsideShellLineComments replaces old with new in shell script content
