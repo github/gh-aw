@@ -796,7 +796,7 @@ jobs:
           GH_AW_APPROVAL_LABELS_VAR: ${{ vars.GH_AW_GITHUB_APPROVAL_LABELS || '' }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/parse_guard_list.sh"
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github"
           GH_AW_AGENT_FILES: "AGENTS.md"

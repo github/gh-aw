@@ -782,7 +782,7 @@ jobs:
         continue-on-error: true
         run: bash "${RUNNER_TEMP}/gh-aw/actions/stop_difc_proxy.sh"
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github"
           GH_AW_AGENT_FILES: "AGENTS.md"

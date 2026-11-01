@@ -598,7 +598,7 @@ jobs:
       - name: Install AWF binary
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" v0.29.0 --rootless
       - name: Restore agent config folders from base branch
-        if: steps.checkout-pr.outcome == 'success'
+        if: steps.checkout-pr.outputs.checked_out == 'true'
         env:
           GH_AW_AGENT_FOLDERS: ".agents .github .goose"
           GH_AW_AGENT_FILES: ".goosehints AGENTS.md"

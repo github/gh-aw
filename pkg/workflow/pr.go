@@ -142,7 +142,7 @@ func generateRestoreBaseGitHubFoldersStep(yaml *strings.Builder, folders, files 
 	prLog.Print("Generating step to restore agent config folders from base branch")
 	yaml.WriteString("      - name: Restore agent config folders from base branch\n")
 	if afterPRCheckout {
-		yaml.WriteString("        if: steps.checkout-pr.outcome == 'success'\n")
+		yaml.WriteString("        if: steps.checkout-pr.outputs.checked_out == 'true'\n")
 	}
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_AGENT_FOLDERS: \"" + strings.Join(folders, " ") + "\"\n")
