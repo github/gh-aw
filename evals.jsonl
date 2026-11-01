@@ -102,3 +102,5 @@
 {"id":"report_with_charts_created","question":"Was a report or discussion created with trending charts and quota analysis?","answer":"UNKNOWN","model":"copilot/auto","timestamp":"2026-10-30T10:59:14.918Z","runid":"41042842895"}
 {"id":"api_usage_collected","question":"Did the agent collect GitHub REST API consumption data across agentic workflows?","answer":"UNKNOWN","model":"copilot/auto","timestamp":"2026-10-31T10:56:26.728Z","runid":"41193912965"}
 {"id":"report_with_charts_created","question":"Was a report or discussion created with trending charts and quota analysis?","answer":"UNKNOWN","model":"copilot/auto","timestamp":"2026-10-31T10:56:26.728Z","runid":"41193912965"}
+{"id":"api_usage_collected","question":"Did the agent collect GitHub REST API consumption data across agentic workflows?","answer":"NO","model":"copilot/auto","timestamp":"2026-11-01T10:51:02.086Z","runid":"41298734514"}
+{"id":"report_with_charts_created","question":"Was a report or discussion created with trending charts and quota analysis?","answer":"UNKNOWN","model":"copilot/auto","timestamp":"2026-11-01T10:51:02.086Z","runid":"41298734514"}
