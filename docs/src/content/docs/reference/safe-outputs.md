@@ -328,6 +328,10 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 }
 ```
 
+#### Blocked-By Dependencies
+
+The `create_issue` tool accepts `blocked_by` as an issue reference or an array of references: an issue number (optionally prefixed with `#`), `owner/repo#number`, a GitHub issue URL, or a temporary ID. Numeric references use the new issue's repository. Every resolved blocker repository must satisfy `target-repo` and `allowed-repos`, including configured wildcard patterns, before issue creation or dependency API access. A disallowed blocker rejects the request. Unresolved temporary IDs defer creation and are validated when retried; staged mode previews unresolved IDs but still rejects resolved disallowed repositories.
+
 #### Auto-Expiration
 
 The `expires` field auto-closes issues after a time period. Supports day-string format (`7d`, `2w`, `1m`, `1y`, `2h`) or `false` to disable expiration. Integer values (e.g., `expires: 7`) are also accepted as shorthand for days and can be migrated to string format with `gh aw fix --write`. Generates `agentics-maintenance.yml` workflow that runs at the minimum required frequency based on the shortest expiration time across all workflows:
@@ -717,6 +721,8 @@ safe-outputs:
 Agent output includes `parent_issue_number` and `sub_issue_number`. Validation ensures both issues exist and meet label/prefix requirements before linking.
 
 `target` selects the parent: `"triggering"` (the default) uses the triggering issue, a fixed issue number uses that parent, and `"*"` uses the agent's `parent_issue_number`, including a temporary ID for a newly created parent. Triggering and fixed targets ignore the agent's parent selection. Scheduled and `workflow_dispatch` runs without issue context must configure `"*"` or a fixed parent; the default fails even if the agent supplies `parent_issue_number`.
+
+Both effective issues must belong to the same repository, and that repository must satisfy `target-repo` and `allowed-repos` before any issue read or link mutation. This check applies after temporary IDs resolve, including deferred retries. `target: "*"` permits agent-selected parents, not unrestricted repositories; repository wildcards are controlled separately by `target-repo` and `allowed-repos`.
 
 ### Set Issue Type (`set-issue-type:`)
 
