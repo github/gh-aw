@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,10 +97,16 @@ on:
 				// Try to compile with invalid import
 				compiler := NewCompiler(WithVersion("1.0.0"))
 				err = compiler.CompileWorkflow(testFile)
+				var formattedErr *parser.FormattedParserError
+				require.ErrorAs(t, err, &formattedErr)
+				var pathErr *os.PathError
+				require.ErrorAs(t, err, &pathErr)
+				assert.ErrorIs(t, err, os.ErrNotExist)
+				assert.Contains(t, err.Error(), "test.md:4:5: error: import file not found")
+				assert.Contains(t, err.Error(), "hint:")
+				assert.NotContains(t, err.Error(), pathErr.Error())
+				assert.NotContains(t, err.Error(), filepath.Join(tmpDir, "nonexistent.md"))
 				return err
-			},
-			internalErrors: []any{
-				&os.PathError{}, // Underlying file errors should be wrapped
 			},
 		},
 	}
