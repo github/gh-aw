@@ -68,14 +68,19 @@ type engineStepFailure struct {
 	EvalsPrefixKnown bool
 }
 
-// buildEvalsSummary summarizes the evals answers of every evals invocation of a run
-// and the evals execution evidence. It returns nil when the run has no evals results
-// or when any invocation's results cannot be read.
+// buildEvalsSummary summarizes the evals answers of every evals invocation of the
+// audited run attempt and the evals execution evidence. It returns nil when the run
+// has no evals results, when any invocation's results cannot be read, or when the
+// invocations of the audited attempt cannot be identified.
 func buildEvalsSummary(run WorkflowRun) *EvalsSummary {
-	invocations := buildEvalsInvocationSummaries(run)
-	if len(invocations) == 0 {
+	if run.LogsPath == "" {
 		return nil
 	}
+	files, ok := auditedAttemptEvalsResultFiles(run, findEvalsInvocationResultFiles(run.LogsPath))
+	if !ok || len(files) == 0 {
+		return nil
+	}
+	invocations := summarizeEvalsInvocationFiles(run, files)
 	summary := &EvalsSummary{}
 	for _, invocation := range invocations {
 		if invocation == nil {
@@ -101,6 +106,12 @@ func buildEvalsInvocationSummaries(run WorkflowRun) map[string]*EvalsSummary {
 	if len(files) == 0 {
 		return nil
 	}
+	return summarizeEvalsInvocationFiles(run, files)
+}
+
+// summarizeEvalsInvocationFiles summarizes each invocation's evals.jsonl, keyed by
+// artifact prefix. A nil summary means that invocation's results are unavailable.
+func summarizeEvalsInvocationFiles(run WorkflowRun, files map[string]string) map[string]*EvalsSummary {
 	runID := ""
 	if run.DatabaseID != 0 {
 		runID = strconv.FormatInt(run.DatabaseID, 10)
@@ -155,6 +166,132 @@ func findEvalsInvocationResultFiles(runDir string) map[string]string {
 		}
 	}
 	return files
+}
+
+// auditedAttemptEvalsResultFiles narrows the evals result files found for a run to the
+// invocations of the audited attempt, each counted once. Evals rows carry no attempt,
+// and reruns of reusable-workflow invocations upload under a new artifact prefix, so
+// prefixes are attributed first by the upload prefixes logged by the evals jobs of the
+// cached jobs API response (the audited attempt's jobs), then by the run_attempt in
+// each prefix's evals execution evidence. The second result is false when several
+// invocations are present on a rerun and their attempt cannot be determined.
+func auditedAttemptEvalsResultFiles(run WorkflowRun, files map[string]string) (map[string]string, bool) {
+	if len(files) == 0 {
+		return files, true
+	}
+	logPrefixes, logsComplete := evalsUploadPrefixesFromJobLogs(run.LogsPath)
+	files = assignRootEvalsResultFile(run.LogsPath, files, logPrefixes)
+	selected := make(map[string]string, len(files))
+	for prefix, path := range files {
+		if logPrefixes[prefix] {
+			selected[prefix] = path
+			continue
+		}
+		if logsComplete {
+			auditEngineStepsLog.Printf("Evals invocation %q was not uploaded by the audited attempt's evals jobs", prefix)
+			continue
+		}
+		if attempt, ok := evalsExecutionAttempt(run, prefix); ok {
+			if run.Attempt == 0 || attempt == run.Attempt {
+				selected[prefix] = path
+			} else {
+				auditEngineStepsLog.Printf("Evals invocation %q belongs to attempt %d, not audited attempt %d", prefix, attempt, run.Attempt)
+			}
+			continue
+		}
+		if run.Attempt > 1 && len(files) > 1 {
+			auditEngineStepsLog.Printf("Evals invocation %q cannot be attributed to audited attempt %d", prefix, run.Attempt)
+			return nil, false
+		}
+		selected[prefix] = path
+	}
+	return selected, true
+}
+
+// evalsUploadPrefixesFromJobLogs returns the evals artifact prefixes uploaded by the
+// evals jobs listed in the cached jobs API response. The second result is true only
+// when at least one evals job is listed and every listed evals job logged its prefix.
+func evalsUploadPrefixesFromJobLogs(logsPath string) (map[string]bool, bool) {
+	prefixes := map[string]bool{}
+	if logsPath == "" {
+		return prefixes, false
+	}
+	workflowLogsDir := filepath.Join(logsPath, "workflow-logs")
+	complete := true
+	for _, job := range loadCachedJobDetails(logsPath) {
+		if engineStepJobKind(job.Name) != string(constants.EvalsJobName) || strings.EqualFold(strings.TrimSpace(job.Conclusion), "skipped") {
+			continue
+		}
+		prefix, known := evalsArtifactPrefixFromLog(readJobLogLines(workflowLogsDir, job.JobInfo))
+		if !known {
+			complete = false
+			continue
+		}
+		prefixes[prefix] = true
+	}
+	return prefixes, complete && len(prefixes) > 0
+}
+
+// assignRootEvalsResultFile attributes a run-root evals.jsonl that has no unprefixed
+// artifact copy. A single-file "<hash>-evals" artifact is flattened to the run root, so
+// the root file belongs to the only logged prefix whose evals artifact directory is
+// absent. When it cannot be assigned but prefixed copies exist, those copies are used
+// and the root file is not counted as another invocation.
+func assignRootEvalsResultFile(runDir string, files map[string]string, logPrefixes map[string]bool) map[string]string {
+	resultName := constants.EvalsResultFilename.String()
+	evalsName := constants.EvalsArtifactName.String()
+	rootPath := filepath.Join(runDir, resultName)
+	if files[""] != rootPath || logPrefixes[""] ||
+		fileutil.FileExists(filepath.Join(runDir, constants.UsageArtifactName.String(), resultName)) ||
+		fileutil.FileExists(filepath.Join(runDir, evalsName, resultName)) {
+		return files
+	}
+	owner, owners := "", 0
+	for prefix := range logPrefixes {
+		if prefix != "" && !fileutil.DirExists(filepath.Join(runDir, prefix+evalsName)) {
+			owner = prefix
+			owners++
+		}
+	}
+	if owners != 1 && len(files) == 1 {
+		return files
+	}
+	assigned := make(map[string]string, len(files))
+	for prefix, path := range files {
+		if prefix != "" {
+			assigned[prefix] = path
+		}
+	}
+	if owners == 1 {
+		if _, ok := assigned[owner]; !ok {
+			assigned[owner] = rootPath
+		}
+	}
+	return assigned
+}
+
+// evalsExecutionAttempt returns the run attempt recorded in the evals execution
+// evidence of the invocation with the given artifact prefix.
+func evalsExecutionAttempt(run WorkflowRun, prefix string) (int, bool) {
+	component := string(constants.EvalsJobName)
+	for _, name := range []string{constants.UsageArtifactName.String(), constants.EvalsArtifactName.String()} {
+		data, err := readFileLimited(filepath.Join(run.LogsPath, prefix+name, component, "execution.json"), 1024*1024)
+		if err != nil {
+			continue
+		}
+		var evidence detectionExecutionEvidence
+		if err := json.Unmarshal(data, &evidence); err != nil {
+			continue
+		}
+		if evidence.Version != 1 || evidence.Component != component || evidence.RunAttempt == 0 {
+			continue
+		}
+		if run.DatabaseID != 0 && evidence.RunID != 0 && evidence.RunID != run.DatabaseID {
+			continue
+		}
+		return evidence.RunAttempt, true
+	}
+	return 0, false
 }
 
 // summarizeEvalsResultFile streams an evals.jsonl file line by line and summarizes

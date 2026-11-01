@@ -657,3 +657,110 @@ func TestAuditEngineStepFailure_JobLogMatchingKeepsJobIdentity(t *testing.T) {
 		}
 	})
 }
+
+// evalsUploadJobLog is an evals job log whose upload step logs the evals artifact name.
+func evalsUploadJobLog(prefix string) string {
+	return "2026-10-29T21:18:59.0334305Z ##[group]Run set -o pipefail\n" +
+		"2026-10-29T21:19:40.0000000Z Process exiting with code: 0\n" +
+		"2026-10-29T21:19:44.1335928Z ##[group]Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9\n" +
+		"2026-10-29T21:19:44.1336376Z with:\n" +
+		"2026-10-29T21:19:44.1336400Z   name: " + prefix + "evals\n"
+}
+
+func evalsExecutionEvidence(attempt int, state string) string {
+	return `{"version":1,"component":"evals","run_id":40955414354,"run_attempt":` + strconv.Itoa(attempt) + `,"state":"` + state + `"}` + "\n"
+}
+
+const reusableEvalsJobs40955414354 = `[{"total_count":1,"jobs":[
+{"id":1,"run_id":40955414354,"name":"caller / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]}]}]`
+
+func TestAuditEngineStepFailure_EvalsSummaryRerunCountsAuditedAttempt(t *testing.T) {
+	yesResults := strings.ReplaceAll(evalsPreflightResults40955414354, `"answer":"UNKNOWN"`, `"answer":"YES"`)
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		// jobs.json and the job log come from the audited attempt 2.
+		jobsAPIResponseFileName:               reusableEvalsJobs40955414354,
+		"workflow-logs/3_caller _ evals.txt":  evalsUploadJobLog("a2a2a2a2-"),
+		"a1a1a1a1-evals/evals.jsonl":          evalsPreflightResults40955414354,
+		"a1a1a1a1-evals/evals/execution.json": evalsExecutionEvidence(1, "not_started"),
+		"a1a1a1a1-usage/evals.jsonl":          evalsPreflightResults40955414354,
+		"a1a1a1a1-usage/evals/execution.json": evalsExecutionEvidence(1, "not_started"),
+		"a2a2a2a2-evals/evals.jsonl":          yesResults,
+		"a2a2a2a2-evals/evals/execution.json": evalsExecutionEvidence(2, "started"),
+		"a2a2a2a2-usage/evals.jsonl":          yesResults,
+		"a2a2a2a2-usage/evals/execution.json": evalsExecutionEvidence(2, "started"),
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+	processedRun.Run.Attempt = 2
+
+	summary := buildEvalsSummary(processedRun.Run)
+
+	require.NotNil(t, summary)
+	assert.Equal(t, EvalsSummary{Questions: 2, Yes: 2, ExecutionState: "started"}, *summary, "only attempt 2's invocation is counted")
+
+	t.Run("execution evidence attributes prefixes without job logs", func(t *testing.T) {
+		require.NoError(t, os.RemoveAll(filepath.Join(runDir, "workflow-logs")))
+
+		summary := buildEvalsSummary(processedRun.Run)
+
+		require.NotNil(t, summary)
+		assert.Equal(t, EvalsSummary{Questions: 2, Yes: 2, ExecutionState: "started"}, *summary)
+	})
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryFlattenedPrefixedArtifact(t *testing.T) {
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName:              reusableEvalsJobs40955414354,
+		"workflow-logs/3_caller _ evals.txt": evalsUploadJobLog("aaaaaaaa-"),
+		// The single-file aaaaaaaa-evals artifact was flattened to the run root.
+		"evals.jsonl":                evalsPreflightResults40955414354,
+		"aaaaaaaa-usage/evals.jsonl": evalsPreflightResults40955414354,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+
+	summary := buildEvalsSummary(processedRun.Run)
+
+	require.NotNil(t, summary)
+	assert.Equal(t, EvalsSummary{Questions: 2, Unknown: 2}, *summary, "the flattened root copy is not counted as another invocation")
+
+	t.Run("root copy is used when it is the only copy", func(t *testing.T) {
+		require.NoError(t, os.RemoveAll(filepath.Join(runDir, "aaaaaaaa-usage")))
+
+		summary := buildEvalsSummary(processedRun.Run)
+
+		require.NotNil(t, summary)
+		assert.Equal(t, EvalsSummary{Questions: 2, Unknown: 2}, *summary)
+	})
+}
+
+func writeEvalsInvocationsWithoutAttemptEvidence(t *testing.T, attempt int) ProcessedRun {
+	t.Helper()
+	yesResults := strings.ReplaceAll(evalsPreflightResults40955414354, `"answer":"UNKNOWN"`, `"answer":"YES"`)
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		"aaaaaaaa-evals/evals.jsonl": yesResults,
+		"aaaaaaaa-usage/evals.jsonl": yesResults,
+		"bbbbbbbb-evals/evals.jsonl": evalsPreflightResults40955414354,
+		"bbbbbbbb-usage/evals.jsonl": evalsPreflightResults40955414354,
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+	processedRun.Run.Attempt = attempt
+	return processedRun
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryFirstAttemptWithoutAttemptEvidence(t *testing.T) {
+	processedRun := writeEvalsInvocationsWithoutAttemptEvidence(t, 1)
+
+	summary := buildEvalsSummary(processedRun.Run)
+
+	require.NotNil(t, summary, "a first attempt has no reruns, so every invocation belongs to it")
+	assert.Equal(t, EvalsSummary{Questions: 4, Yes: 2, Unknown: 2}, *summary)
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryRerunWithoutAttemptEvidence(t *testing.T) {
+	processedRun := writeEvalsInvocationsWithoutAttemptEvidence(t, 2)
+
+	assert.Nil(t, buildEvalsSummary(processedRun.Run), "invocations that cannot be attributed to the audited attempt must not be summed")
+}
