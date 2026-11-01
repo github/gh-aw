@@ -71,26 +71,28 @@ const (
 
 // AgentSandboxConfig represents the agent sandbox configuration
 type AgentSandboxConfig struct {
-	ID              string                                `yaml:"id,omitempty"`               // Agent ID: "awf" or "srt" (replaces Type in new object format)
-	Type            SandboxType                           `yaml:"type,omitempty"`             // Sandbox type: "awf" or "srt" (legacy, use ID instead)
-	Version         string                                `yaml:"version,omitempty"`          // AWF version override used to install and run the matching firewall version
-	ChecksumsSHA256 string                                `yaml:"checksums-sha256,omitempty"` // Trusted digest of the AWF release's checksums.txt manifest
-	Platform        string                                `yaml:"platform,omitempty"`         // AWF platform.type override (github.com, ghes, ghec, ghec-self-hosted)
-	Runtime         AgentRuntime                          `yaml:"runtime,omitempty"`          // Sandbox runtime profile for the agent container (see sandbox_runtime_profile.go)
-	NVX             *AgentNVXConfig                       `yaml:"nvx,omitempty"`              // Optional NVX settings; safe defaults apply when omitted
-	AllowHostPorts  []int                                 `yaml:"-"`                          // Additional host TCP ports the agent may connect to (docker-sudo-iptables only).
-	Disabled        bool                                  `yaml:"-"`                          // True when agent is explicitly set to false (disables firewall). This is a runtime flag, not serialized to YAML.
-	Config          *SandboxRuntimeConfig                 `yaml:"config,omitempty"`           // Custom SRT config (optional)
-	Command         string                                `yaml:"command,omitempty"`          // Custom command to replace AWF or SRT installation
-	Args            []string                              `yaml:"args,omitempty"`             // Additional arguments to append to the command
-	Env             map[string]string                     `yaml:"env,omitempty"`              // Environment variables to set on the step
-	Mounts          []string                              `yaml:"mounts,omitempty"`           // Container mounts to add for AWF (format: "source:dest:mode")
-	Memory          string                                `yaml:"memory,omitempty"`           // Memory limit for the AWF container (e.g., "4g", "8g")
-	ModelFallback   *TemplatableBool                      `yaml:"model-fallback,omitempty"`   // AWF API proxy model fallback enable/disable flag (optional)
-	TokenSteering   *bool                                 `yaml:"token-steering,omitempty"`   // AWF API proxy token steering enable/disable flag (optional)
-	Targets         map[string]*AgentAPIProxyTargetConfig `yaml:"targets,omitempty"`          // Per-provider API proxy target overrides keyed by provider name (e.g. "openai", "anthropic")
-	Images          map[string]string                     `yaml:"images,omitempty"`           // Digest-pinned AWF infrastructure images keyed by AWF image role (see sandbox_agent_images.go)
-	CACert          string                                `yaml:"ca-cert,omitempty"`          // Host path to an additional CA certificate for API proxy upstream TLS verification (maps to apiProxy.caCert, AWF v0.28.10+)
+	ID                 string                                `yaml:"id,omitempty"`                   // Agent ID: "awf" or "srt" (replaces Type in new object format)
+	Type               SandboxType                           `yaml:"type,omitempty"`                 // Sandbox type: "awf" or "srt" (legacy, use ID instead)
+	Version            string                                `yaml:"version,omitempty"`              // AWF version override used to install and run the matching firewall version
+	ChecksumsSHA256    string                                `yaml:"checksums-sha256,omitempty"`     // Trusted digest of the AWF release's checksums.txt manifest
+	EnclaveDebugPublic *bool                                 `yaml:"enclave-debug-public,omitempty"` // Opt-in public-only Docker enclave diagnostic lifecycle
+	HostGitHubToken    string                                `yaml:"host-github-token,omitempty"`    // Secret expression for AWF host-only repository staging
+	Platform           string                                `yaml:"platform,omitempty"`             // AWF platform.type override (github.com, ghes, ghec, ghec-self-hosted)
+	Runtime            AgentRuntime                          `yaml:"runtime,omitempty"`              // Sandbox runtime profile for the agent container (see sandbox_runtime_profile.go)
+	NVX                *AgentNVXConfig                       `yaml:"nvx,omitempty"`                  // Optional NVX settings; safe defaults apply when omitted
+	AllowHostPorts     []int                                 `yaml:"-"`                              // Additional host TCP ports the agent may connect to (docker-sudo-iptables only).
+	Disabled           bool                                  `yaml:"-"`                              // True when agent is explicitly set to false (disables firewall). This is a runtime flag, not serialized to YAML.
+	Config             *SandboxRuntimeConfig                 `yaml:"config,omitempty"`               // Custom SRT config (optional)
+	Command            string                                `yaml:"command,omitempty"`              // Custom command to replace AWF or SRT installation
+	Args               []string                              `yaml:"args,omitempty"`                 // Additional arguments to append to the command
+	Env                map[string]string                     `yaml:"env,omitempty"`                  // Environment variables to set on the step
+	Mounts             []string                              `yaml:"mounts,omitempty"`               // Container mounts to add for AWF (format: "source:dest:mode")
+	Memory             string                                `yaml:"memory,omitempty"`               // Memory limit for the AWF container (e.g., "4g", "8g")
+	ModelFallback      *TemplatableBool                      `yaml:"model-fallback,omitempty"`       // AWF API proxy model fallback enable/disable flag (optional)
+	TokenSteering      *bool                                 `yaml:"token-steering,omitempty"`       // AWF API proxy token steering enable/disable flag (optional)
+	Targets            map[string]*AgentAPIProxyTargetConfig `yaml:"targets,omitempty"`              // Per-provider API proxy target overrides keyed by provider name (e.g. "openai", "anthropic")
+	Images             map[string]string                     `yaml:"images,omitempty"`               // Digest-pinned AWF infrastructure images keyed by AWF image role (see sandbox_agent_images.go)
+	CACert             string                                `yaml:"ca-cert,omitempty"`              // Host path to an additional CA certificate for API proxy upstream TLS verification (maps to apiProxy.caCert, AWF v0.28.10+)
 }
 
 // AgentNVXConfig contains optional overrides for AWF's NVX preview runtime defaults.

@@ -132,6 +132,10 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	if enclavesEnabled(workflowData) {
 		addUnique("MCP_GATEWAY_API_KEY")
 		addUnique(enclaveGitHubDelegationEnv)
+		addUnique("GH_TOKEN")
+	}
+	if agent := getAgentConfig(workflowData); agent != nil && agent.HostGitHubToken != "" {
+		addUnique("GH_TOKEN")
 	}
 
 	// GitHub MCP server token is always a secret when the GitHub tool is present.
@@ -169,6 +173,9 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	// agent.env vars that contain a secret reference or a job-output expression.
 	agentConfig := getAgentConfig(workflowData)
 	if agentConfig != nil {
+		if agentConfig.HostGitHubToken != "" {
+			addUnique("GH_TOKEN")
+		}
 		for varName, varValue := range agentConfig.Env {
 			if len(ExtractSecretsFromValue(varValue)) > 0 || ContainsJobOutputExpr(varValue) {
 				addUnique(varName)
@@ -239,5 +246,9 @@ func addCliProxyGHTokenToEnv(env map[string]string, workflowData *WorkflowData) 
 		awfSupportsExcludeEnv(firewallConfig) {
 		env["GH_TOKEN"] = "${{ secrets.GH_AW_GITHUB_TOKEN || github.token }}"
 		awfHelpersLog.Print("Added GH_TOKEN to env for CLI proxy (excluded from agent container)")
+	}
+	if agent := getAgentConfig(workflowData); agent != nil && agent.HostGitHubToken != "" &&
+		workflowData != nil && !workflowData.IsDetectionRun && !workflowData.IsEvalsRun {
+		env["GH_TOKEN"] = agent.HostGitHubToken
 	}
 }

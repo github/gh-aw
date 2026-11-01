@@ -4225,6 +4225,15 @@
                       "pattern": "^[0-9a-f]{64}$",
                       "description": "Literal SHA256 digest of the AWF release's checksums.txt manifest. Requires an explicit semantic release version. Overrides the trusted setup action's built-in manifest pin; obtain the digest through an independently trusted channel."
                     },
+                    "enclave-debug-public": {
+                      "type": "boolean",
+                      "description": "Opt in to the maintained public Docker enclave diagnostic collector for static public-only default-image fixtures. Currently supports the reviewed AWF v0.29.5 release. Capture defaults to disabled; private, dynamic, mixed and image-override scopes are rejected. Validated artifacts have fixed one-day retention."
+                    },
+                    "host-github-token": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Secret expression bound to GH_TOKEN only in the AWF execution host step for repository staging. Never persisted to GITHUB_ENV or forwarded into the agent container or MCP gateway. Requires enclaves and AWF v0.29.5 or newer."
+                    },
                     "platform": {
                       "type": "string",
                       "enum": ["github.com", "ghes", "ghec", "ghec-self-hosted"],
