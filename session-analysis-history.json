@@ -361,8 +361,26 @@
       "orphan_rate_pct": 0.0,
       "escalations": 0,
       "experimental_strategy": null
+    },
+    {
+      "date": "2026-11-01",
+      "run_id": "41281651199",
+      "sessions_analyzed": 50,
+      "completion_rate": 70.0,
+      "average_duration_minutes": 4.667,
+      "median_duration_minutes": 0.75,
+      "successful": 35,
+      "skipped": 7,
+      "failure": 2,
+      "action_required": 6,
+      "transcripts_analyzed": 0,
+      "sessions_with_loops": null,
+      "orphan_rate": 0.0,
+      "orphan_rate_pct": 0.0,
+      "escalations": 0,
+      "experimental_strategy": null
     }
   ],
-  "last_updated": "2026-10-31",
+  "last_updated": "2026-11-01",
   "version": "1.11"
 }
