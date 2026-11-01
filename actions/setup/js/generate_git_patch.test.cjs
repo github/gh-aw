@@ -904,7 +904,8 @@ describe("generateGitPatch – Strategy 3 picks closest remote merge-base", () =
       const result = await generateGitPatch("agent-branch", "missing-default", { cwd: repoDir, excludedFiles: ["*.yml"] });
       expect(result.success).toBe(false);
       expect(result.error).toContain("Failed to generate filtered patch:");
-      expect(result.error).toContain("synthetic tree creation failed");
+      expect(result.error).toContain("Git operation failed");
+      expect(result.error).not.toContain("synthetic tree creation failed");
     } finally {
       childProcess.spawnSync = originalSpawnSync;
     }
