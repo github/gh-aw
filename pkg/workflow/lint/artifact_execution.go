@@ -220,7 +220,7 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 	}
 	switch command {
 	case "bash", "sh", "python", "python3", "node", "source", ".":
-		if file := operand(1); file != "" {
+		if file := artifactInterpreterOperand(command, len(call.Args), argument); file != "" {
 			return []string{artifactResolvePath(directory, file)}
 		}
 	case "npm":
@@ -244,6 +244,97 @@ func artifactCommandFiles(call *syntax.CallExpr, directory, script string) []str
 		}
 	}
 	return nil
+}
+
+// Select only the script operand, not option payloads or arguments passed to it.
+func artifactInterpreterOperand(command string, count int, argument func(int) string) string {
+	for index := 1; index < count; index++ {
+		value := argument(index)
+		if value == "" {
+			return ""
+		}
+		if value == "--" {
+			value = argument(index + 1)
+			if value == "-" && (command == "python" || command == "python3" || command == "node") {
+				return ""
+			}
+			return value
+		}
+		if command == "source" || command == "." {
+			return value
+		}
+		if value == "-" {
+			if command == "bash" || command == "sh" {
+				return argument(index + 1)
+			}
+			return ""
+		}
+		shellOption := strings.HasPrefix(value, "+") && (command == "bash" || command == "sh")
+		if !strings.HasPrefix(value, "-") && !shellOption {
+			return value
+		}
+		takesValue, noScript := artifactInterpreterOption(command, value)
+		if noScript {
+			return ""
+		}
+		if takesValue {
+			index++
+		}
+	}
+	return ""
+}
+
+func artifactInterpreterOption(command, value string) (takesValue, noScript bool) {
+	option, _, attached := strings.Cut(value, "=")
+	switch command {
+	case "bash", "sh":
+		switch option {
+		case "--help", "--version":
+			return false, true
+		case "--rcfile", "--init-file":
+			return !attached, false
+		}
+		stopFlags := "cs"
+		if strings.HasPrefix(value, "+") {
+			stopFlags = ""
+		}
+		return artifactInterpreterShortOption(value, "oO", stopFlags)
+	case "python", "python3":
+		switch option {
+		case "--help", "--help-env", "--help-xoptions", "--help-all", "--version":
+			return false, true
+		case "--check-hash-based-pycs":
+			return !attached, false
+		}
+		return artifactInterpreterShortOption(value, "WX", "cmhV")
+	case "node":
+		switch option {
+		case "-e", "--eval", "-p", "--print", "-pe", "-ep", "--run", "-h", "--help", "-v", "--version":
+			return false, true
+		case "-r", "--require", "--import", "--loader", "--experimental-loader",
+			"-C", "--conditions", "--log-file", "--input-type", "--inspect-port",
+			"--title", "--redirect-warnings", "--env-file", "--env-file-if-exists":
+			return !attached, false
+		}
+		return false, strings.HasPrefix(value, "-e") || strings.HasPrefix(value, "-p")
+	}
+	return false, false
+}
+
+func artifactInterpreterShortOption(value, valueFlags, stopFlags string) (takesValue, noScript bool) {
+	if strings.HasPrefix(value, "--") {
+		return false, false
+	}
+	flags := strings.TrimPrefix(strings.TrimPrefix(value, "-"), "+")
+	for offset, flag := range flags {
+		if strings.ContainsRune(stopFlags, flag) {
+			return false, true
+		}
+		if strings.ContainsRune(valueFlags, flag) {
+			return offset == len(flags)-1, false
+		}
+	}
+	return false, false
 }
 
 func artifactWorkingDirectory(input Input, block aw.ExecutionBlock, step aw.ExecutionStep) string {
