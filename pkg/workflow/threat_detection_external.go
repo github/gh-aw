@@ -465,7 +465,7 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 	threatDetectionData := buildExternalDetectorWorkflowData(data, engineID)
 
 	installSteps := engine.GetInstallationSteps(threatDetectionData)
-	filteredInstallSteps := make([]GitHubActionStep, 0, len(installSteps)+1)
+	filteredInstallSteps := make([]GitHubActionStep, 0, len(installSteps))
 	for _, step := range installSteps {
 		if isAWFBinaryInstallStep(step) {
 			continue

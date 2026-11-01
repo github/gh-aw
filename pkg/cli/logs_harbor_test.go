@@ -5,13 +5,16 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,6 +44,36 @@ func harborTestTrials(t *testing.T, output string) []string {
 		names = append(names, trial.(map[string]any)["trial_name"].(string))
 	}
 	return names
+}
+
+func TestExportHarborOwnerOnlyPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not enforced on Windows")
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	source, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	output := filepath.Join(root, "output")
+	writeSessionTestFile(t, source, "usage/aw_session.jsonl", sessionTestHeader+sessionTestAgentEvent)
+	writeSessionTestFile(t, source, "graders/grader_results.json",
+		`{"version":1,"results":[{"id":"quality","status":"pass","value":42,"passed":true}]}`)
+	require.NoError(t, exportHarborJob(t.Context(), output, []ProcessedRun{harborTestRun(source)}))
+	require.NoError(t, filepath.WalkDir(output, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		want := constants.FilePermSensitive
+		if entry.IsDir() {
+			want = constants.DirPermOwnerOnly
+		}
+		require.Equal(t, want, info.Mode().Perm(), path)
+		return nil
+	}))
 }
 
 func TestExportHarborMissingSessionUnknownRewards(t *testing.T) {

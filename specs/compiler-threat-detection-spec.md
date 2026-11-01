@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.80
+**Version**: 1.0.81
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,8 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
-| `1.0.80` | Unreleased | Specifies local-only safe-output artifact generation for GHSA-4fwp-8v7m-jhhr: no explicit or lazy fetches, no generation-token forwarding, and fail-closed missing incremental baselines. Adds a bounded generation model, exact negative controls, and successful local-path witnesses. Preserves privileged publication recovery; no new `CTR-*` rejection, permission grant, frontmatter setting, or lock-file schema change. |
+| `1.0.81` | Unreleased | Specifies local-only safe-output artifact generation for GHSA-4fwp-8v7m-jhhr: no explicit or lazy fetches, no generation-token forwarding, and fail-closed missing incremental baselines. Adds a bounded generation model, exact negative controls, and successful local-path witnesses. Preserves privileged publication recovery; no new `CTR-*` rejection, permission grant, frontmatter setting, or lock-file schema change. |
+| `1.0.80` | Unreleased | Extends CTR-017 with provider-scoped universal-consumer Copilot credentials and an OpenAI-compatible placeholder introduced only inside the AWF sandbox after credential discovery. Maps generated-YAML and simulated startup/client environment regressions. Existing workflow locks require recompilation; no new threat identifier, permission grant, frontmatter setting, or lock-file schema change. |
 | `1.0.79` | Unreleased | Distinguishes drive-memory persistence from Actions cache event/token policy. Documents admitted issue/slash-command writes, repository/ref/drive scope, cross-event residual trust, explicit acceptance, and dry-run/restore-only/no-detection boundaries. Adds generated-YAML and event/result evidence; no runtime or lock-file compatibility change. |
 | `1.0.78` | Unreleased | Documents the implemented cache-memory restore/edit/artifact/publication lifecycle, integrity namespaces and restore scope, and distinct meanings of read-only policies. Maps lifecycle and mode-validation evidence and separates CTR-019 from the host-side MCP read-only and safe-output lifecycle models. Documentation/evidence clarification only; no new runtime behavior, threat identifier, or lock-file compatibility change. |
 | `1.0.77` | Unreleased | Requires parsed, nonempty dependency-cache entries before omitting the detection-enabled agent's read-only cache policy; `cache: []` retains the restriction. Requires trigger-independent validation of authored cache-mode literals before actionlint compatibility suppression. No new threat identifier, frontmatter setting, or lock-file schema change. |
@@ -191,6 +192,7 @@ Each rule has a stable `CTR-*` ID, threat class, trigger, compiler action, diagn
 - **CTR-015 Allowed Label Glob Scope**: Reject bare `*` safe-output allowed-label patterns.
 - **CTR-016 Compile-Time Manifest Drift**: Reject new restricted secrets or action references absent from an existing manifest.
 - **CTR-017 Secret Leakage via Environment Variables and Telemetry**: Warn, or reject in strict mode, for uncontrolled secret-expression placement. The Actions/AW linter MUST report secret-tainted values configured as OTLP span or resource attributes, including modeled Actions environment flows, without reproducing the values in diagnostics. This lint check is advisory and does not prove the absence of hard-coded credentials or arbitrary runtime disclosures. When OTLP is enabled and the effective AWF version supports `--exclude-env`, generated agent, threat-detection, and evals AWF invocations using `--env-all` MUST exclude `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, and `GH_AW_OTLP_ENDPOINTS`. These values MUST remain available to host-side exporters. Both inline and external threat-detection paths and evals execution MUST preserve the exclusions. Workflows without OTLP MUST NOT gain these OTLP-specific exclusions unless independently required by another exclusion policy.
+  Compiler-generated universal-consumer Copilot credentials MUST remain provider-scoped; OpenAI-compatible client placeholders MUST follow the startup/sandbox boundary in Section 7.6. This is a generated-configuration requirement, not an additional authored-source lint diagnostic.
 - **CTR-018 Version Integrity Bypass**: Warn, or reject in strict mode, for `check-for-updates: false`.
 - **CTR-019 Cache-Memory Integrity Enforcement**: When detection is enabled, separate agent cache access from cache-memory publication and require successful agent and detection jobs plus explicit detector acceptance before publication, subject to the compatibility boundaries in Section 5.1.3.
 - **CTR-020 Conditional Import Security**: Reject `imports` entries containing `if`.
@@ -507,6 +509,44 @@ These supporting runtime controls implement Section 5.2.2; they are not addition
 | Console redaction before publication | `actions/setup/js/redact_cli_proxy_diagnostics.cjs`, `redact_secrets.cjs`, `add_mask_redaction.cjs`, `mask_value_matcher.cjs`, `start_mcp_gateway.cjs` | `actions/setup/js/redact_cli_proxy_diagnostics.test.cjs`, `start_cli_proxy.test.cjs`, `start_mcp_gateway.test.cjs`: raw/escaped values, late registrations, upstream failure, and both overlap directions. |
 | Private capture and fail-closed CLI publication | `actions/setup/sh/start_cli_proxy.sh`, `actions/setup/js/start_mcp_gateway.cjs` | `actions/setup/js/start_cli_proxy.test.cjs`: artifact-root confinement, byte/line limits, capture/sanitizer/cleanup failures, and original startup status; `actions/setup/js/start_mcp_gateway.test.cjs`: owner-only stderr capture and configuration-stdout separation. |
 
+### 7.6 Universal-Consumer Provider Credential Isolation
+
+For `provider-env-mode: universal-llm-consumer` with a `copilot/` model, the
+shared provider profile MUST supply the real credential as
+`COPILOT_GITHUB_TOKEN` and MUST NOT alias it to `OPENAI_API_KEY` or
+`CODEX_API_KEY`. This requirement applies both to
+`secrets.COPILOT_GITHUB_TOKEN` and to `github.token` selected by
+`copilot-requests: write`, independently of strict mode and sandbox enablement.
+Provider destination allowlists do not establish credential audience: a
+credential-shaped startup environment variable can enable an unintended
+upstream adapter even when the client selects a different gateway.
+
+When AWF is enabled, behavior-defined universal-consumer Copilot execution
+MUST introduce the OpenAI-compatible client key as a non-secret placeholder
+inside the sandbox's engine command, after AWF credential discovery. The
+compiler MUST NOT place this placeholder in the runner step's
+`OPENAI_API_KEY`; a non-credential sentinel variable such as
+`COPILOT_DUMMY_BYOK` MAY carry it into the sandbox. Harness and direct-command
+execution, including protected session capture, MUST preserve this boundary.
+Sandbox-disabled execution MUST NOT gain the sandbox-only placeholder.
+The Copilot `OPENAI_BASE_URL` alias MUST continue to select the Copilot
+gateway when AWF is enabled. Anthropic and OpenAI/Codex credential profiles
+and non-universal execution modes MUST retain their existing behavior.
+
+| Boundary | Implementation | Concrete evidence |
+|---|---|---|
+| Provider-scoped credentials and gateway aliases | `pkg/workflow/universal_llm_consumer_engine.go`: `getUniversalLLMBackendProfile`, `ApplyUniversalProviderEnv` | `TestUniversalLLMConsumerEngine_CopilotCredentialIsolation`, `TestUniversalLLMConsumerEngine_NonCopilotCredentials`, `TestUniversalLLMConsumerEngine_ProviderURLsFollowNetworkTopology`: both Copilot credential sources, sandbox enabled/disabled, other providers, and gateway topology. |
+| Sandbox-only client placeholder | `pkg/workflow/behavior_defined_engine.go`: `buildBehaviorDefinedExecutionEnv`, `buildFirewallCommand` | `TestBehaviorDefinedEngine_CopilotClientKey`, `TestBehaviorDefinedEngine_ProtectedCopilotClientKey`, `TestBehaviorDefinedEngine_NonUniversalProviderEnv`: direct/harness execution, protected capture, sandbox disablement, and unrelated modes. |
+| Startup/client environment separation and emitted YAML | `pkg/workflow/behavior_defined_engine_provider_test.go` | `TestBehaviorDefinedEngine_CopilotAWFStartupEnvironment` executes the generated AWF invocation against a fake startup function with synthetic credentials; `TestBehaviorDefinedEngine_CompiledCopilotCredentials` compiles both credential modes and checks the emitted key placement. |
+
+The fake startup test establishes command quoting and placeholder timing; it
+does not execute AWF, prove deployed credential exclusion, or contact upstream
+providers. This mapping adds no claim about partial-key redaction in upstream
+error artifacts. Explicit author-owned credential overrides and external
+engine definitions remain separately reviewable trusted configuration.
+Operators MUST recompile and deploy existing locks with the fixed compiler;
+previous runs and uploaded artifacts are not repaired by regeneration.
+
 ## 8. Compliance Testing
 
 Each active rule MUST have at least one deterministic test that covers its primary trigger and stable diagnostic. Rule additions MUST add tests in the same change set; deprecated-rule tests become `[DEPRECATED]`.
@@ -531,7 +571,7 @@ Each active rule MUST have at least one deterministic test that covers its prima
 | **T-CTR-014** | CTR-014 Supply Chain Attack via Install Scripts | Warn, or reject in strict mode, when Node install scripts are enabled | Warn, or reject in strict mode, when Node install scripts are enabled. | `CTR-014` |
 | **T-CTR-015** | CTR-015 Allowed Label Glob Scope | Reject bare `*` safe-output allowed-label patterns | Reject bare `*` safe-output allowed-label patterns. | `CTR-015` |
 | **T-CTR-016** | CTR-016 Compile-Time Manifest Drift | Reject new restricted secrets or action references absent from an existing manifest | Reject new restricted secrets or action references absent from an existing manifest. | `CTR-016` |
-| **T-CTR-017** | CTR-017 Secret Leakage via Environment Variables and Telemetry | Uncontrolled secret-expression placement, secret-tainted values in OTLP attributes, or OTLP-enabled agent/threat-detection/evals AWF generation with `--exclude-env` support | Warn, or reject in strict mode, for uncontrolled secret-expression placement; report secret-tainted OTLP span/resource attributes with value-free diagnostics; exclude all three host-side OTLP variables from agent, inline/external detection, and evals sandboxes while retaining them for host exporters; preserve behavior without OTLP. | `CTR-017` |
+| **T-CTR-017** | CTR-017 Secret Leakage via Environment Variables and Telemetry | Uncontrolled secret-expression placement, secret-tainted values in OTLP attributes, OTLP-enabled AWF generation with `--exclude-env` support, or universal-consumer Copilot credential routing | Warn, or reject in strict mode, for uncontrolled secret-expression placement; report secret-tainted OTLP attributes with value-free diagnostics; exclude all three host-side OTLP variables from agent, inline/external detection, and evals sandboxes while retaining host exporters and non-OTLP behavior. Keep both Copilot credential sources out of OpenAI/Codex credential aliases; introduce the compatible placeholder only inside enabled AWF execution as mapped in Section 7.6. | `CTR-017` |
 | **T-CTR-018** | CTR-018 Version Integrity Bypass | Warn, or reject in strict mode, for `check-for-updates: false` | Warn, or reject in strict mode, for `check-for-updates: false`. | `CTR-018` |
 | **T-CTR-019** | CTR-019 Cache-Memory Integrity Enforcement | Detection-separated cache access, explicit publication acceptance, and compatibility boundaries | Verify generated cache modes, GHES omission, dry-run precedence, trigger combinations, low-trust write warnings, and failed/missing/rejected detector gates under Section 5.1.3. | `CTR-019` |
 | **T-CTR-020** | CTR-020 Conditional Import Security | Reject `imports` entries containing `if` | Reject `imports` entries containing `if`. | `CTR-020` |

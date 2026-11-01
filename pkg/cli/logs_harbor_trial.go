@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 
 	"github.com/github/gh-aw/pkg/atif"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func harborExportTrial(ctx context.Context, staging, name, jobID, source string, processed ProcessedRun) (map[string]any, error) {
 	dir := filepath.Join(staging, name)
 	evidence := filepath.Join(dir, "gh-aw", "evidence")
-	if err := os.MkdirAll(evidence, 0o700); err != nil {
+	if err := os.MkdirAll(evidence, constants.DirPermOwnerOnly); err != nil {
 		return nil, err
 	}
 	files, err := harborSnapshot(ctx, source, evidence)
@@ -110,10 +111,10 @@ func harborExportTrajectory(ctx context.Context, dir, evidence string) (string, 
 	if err != nil {
 		return "", nil, "", err
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "agent"), constants.DirPermOwnerOnly); err != nil {
 		return "", nil, "", err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent", "trajectory.json"), trajectory, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "agent", "trajectory.json"), trajectory, constants.FilePermSensitive); err != nil {
 		return "", nil, "", err
 	}
 	if err := harborMergeAgentInfo(agentInfo, trajectory); err != nil {
@@ -157,7 +158,7 @@ func harborPublishRewards(dir string, result, metadata map[string]any, rewards m
 	if metadata["regrading"] != nil {
 		metadata["verifier_status"] = "gh-aw-grader-metrics-with-offline-regrading"
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "verifier"), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "verifier"), constants.DirPermOwnerOnly); err != nil {
 		return err
 	}
 	return harborWriteJSON(filepath.Join(dir, "verifier", "reward.json"), rewards)

@@ -29,7 +29,7 @@ const { parseDeduplicateByTitle, normalizeTitleForDedup, findDuplicateByTitle } 
 const { isProbingNoopMessage, validateCreatePullRequestIntent, validatePushToPullRequestBranchIntent, validateCreateIssueIntent, validateAddCommentIntent } = require("./intent_probe.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { resolveInvocationContext } = require("./invocation_context_helpers.cjs");
-const { lstatGuard } = require("./symlink_guard.cjs");
+const { lstatGuard, normalizeGuardedPath, readGuardedFile, writeGuardedFile } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./schema-validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { normalizeBlankOptionalFields } = require("./optional_field_normalizer.cjs");
@@ -719,12 +719,16 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const { path: filePath } = args;
 
     // Validate file path is within allowed directories
-    const absolutePath = path.resolve(filePath);
+    const absolutePath = normalizeGuardedPath(filePath);
     const workspaceDir = process.env.GITHUB_WORKSPACE || process.cwd();
     const tmpDir = "/tmp";
 
-    const isInWorkspace = absolutePath.startsWith(path.resolve(workspaceDir));
-    const isInTmp = absolutePath.startsWith(tmpDir);
+    const isWithin = root => {
+      const relative = path.relative(normalizeGuardedPath(root), absolutePath);
+      return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+    };
+    const isInWorkspace = isWithin(workspaceDir);
+    const isInTmp = isWithin(tmpDir);
 
     if (!isInWorkspace && !isInTmp) {
       throw new Error(`${ERR_CONFIG}: File path must be within workspace directory (${workspaceDir}) or /tmp directory. ` + `Provided path: ${filePath} (resolved to: ${absolutePath})`);
@@ -733,26 +737,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       throw new Error(`${ERR_VALIDATION}: Duplicate upload_asset source path is not allowed: ${filePath}`);
     }
 
-    // Validate file exists
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`${ERR_SYSTEM}: File not found: ${filePath}`);
-    }
-
-    // Get file stats
-    let stats;
-    try {
-      stats = fs.statSync(filePath);
-    } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to inspect file ${filePath}: ${getErrorMessage(err)}`, { cause: err });
-    }
-    const sizeBytes = stats.size;
-    const sizeKB = Math.ceil(sizeBytes / 1024);
-
     // Check file size - read from environment variable if available
-    const maxSizeKB = process.env.GH_AW_ASSETS_MAX_SIZE_KB ? parseInt(process.env.GH_AW_ASSETS_MAX_SIZE_KB, 10) : 10240; // Default 10MB
-    if (sizeKB > maxSizeKB) {
-      throw new Error(`${ERR_VALIDATION}: File size ${sizeKB} KB exceeds maximum allowed size ${maxSizeKB} KB`);
-    }
+    const maxSizeKB = process.env.GH_AW_ASSETS_MAX_SIZE_KB ? Number(process.env.GH_AW_ASSETS_MAX_SIZE_KB) : 10240; // Default 10MB
 
     // Check file extension - read from environment variable if available
     const ext = path.extname(filePath).toLowerCase();
@@ -777,21 +763,16 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // the artifact-upload step), matching the same pattern used by upload_artifact.
     const assetsRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "assets");
     const assetsDir = currentClaimHandle() ? claimArtifactPath(assetsRoot, currentClaimHandle()) : assetsRoot;
-    if (!fs.existsSync(assetsDir)) {
-      try {
-        fs.mkdirSync(assetsDir, { recursive: true });
-      } catch (err) {
-        throw new Error(`${ERR_SYSTEM}: Failed to create directory ${assetsDir}: ${getErrorMessage(err)}`, { cause: err });
-      }
-    }
-
     // Read file and compute hash
     let fileContent;
     try {
-      fileContent = fs.readFileSync(filePath);
+      fileContent = readGuardedFile(absolutePath, maxSizeKB * 1024);
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === ERR_VALIDATION) throw err;
+      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") throw new Error(`${ERR_SYSTEM}: File not found: ${filePath}`, { cause: err });
       throw new Error(`${ERR_SYSTEM}: Failed to read file ${filePath}: ${getErrorMessage(err)}`, { cause: err });
     }
+    const sizeBytes = fileContent.length;
     const sha = crypto.createHash("sha256").update(fileContent).digest("hex");
 
     // Extract filename and extension
@@ -803,8 +784,9 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const stagedFileName = `${crypto.createHash("sha256").update(filePath).digest("hex")}${fileExt}`;
     const targetPath = path.join(assetsDir, stagedFileName);
     try {
-      fs.copyFileSync(filePath, targetPath);
+      writeGuardedFile(targetPath, fileContent);
     } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === ERR_VALIDATION) throw err;
       throw new Error(`${ERR_SYSTEM}: Failed to copy file ${filePath} to ${targetPath}: ${getErrorMessage(err)}`, { cause: err });
     }
 

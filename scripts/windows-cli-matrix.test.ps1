@@ -65,18 +65,35 @@ foreach ($case in @("stalled-reader", "stalled-close", "faulted-reader", "comple
 }
 Write-Output "ConPTY regression checks passed: bounded read/close waits, original timeout and partial output preserved"
 
+$dllInitFailurePattern = '(?i)(-1073741502|0xC0000142|STATUS_DLL_INIT_FAILED)'
+if (-not $workflow.Contains($dllInitFailurePattern)) { throw "ConPTY DLL-init handling differs from the hosted smoke probe" }
+foreach ($message in @("ConPTY child exited with code -1073741502", "0xC0000142", "STATUS_DLL_INIT_FAILED")) {
+  if ($message -notmatch $dllInitFailurePattern) { throw "Unrecognized DLL-init failure: $message" }
+}
+foreach ($message in @("ConPTY child exited with code 1", "ConPTY child timed out after 1000ms", "pipe failure")) {
+  if ($message -match $dllInitFailurePattern) { throw "Unrelated ConPTY failure classified as DLL-init: $message" }
+}
+
 if ($IsWindows) {
   $shell = (Get-Command cmd.exe).Source
   $watch = [System.Diagnostics.Stopwatch]::StartNew()
   $rejected = $false
+  $unavailable = $false
   try {
     [ConPtySmokeRegression]::Run($shell, '/d /q /c "echo native-timeout-marker & for /L %i in (1,1,2147483647) do @rem"', 1000) | Out-Null
   } catch {
     $message = $_.Exception.ToString()
-    if ($message -notmatch "ConPTY child timed out after 1000ms" -or $message -notmatch "native-timeout-marker") { throw }
-    $rejected = $true
+    if ($message -match $dllInitFailurePattern) {
+      $unavailable = $true
+      $warning = "Native ConPTY timeout regression skipped: runner returned STATUS_DLL_INIT_FAILED (0xC0000142); native timeout behavior remains unverified"
+      Write-Warning $warning
+      if ($env:GITHUB_STEP_SUMMARY) { Add-Content $env:GITHUB_STEP_SUMMARY "⚠️ $warning" }
+    } else {
+      if ($message -notmatch "ConPTY child timed out after 1000ms" -or $message -notmatch "native-timeout-marker") { throw }
+      $rejected = $true
+    }
   }
-  if (-not $rejected) { throw "Native ConPTY child timeout was swallowed" }
+  if (-not $unavailable -and -not $rejected) { throw "Native ConPTY child timeout was swallowed" }
   if ($watch.ElapsedMilliseconds -gt 10000) { throw "Native ConPTY timeout cleanup exceeded its budget" }
-  Write-Output "Native ConPTY timeout regression passed"
+  if (-not $unavailable) { Write-Output "Native ConPTY timeout regression passed" }
 }

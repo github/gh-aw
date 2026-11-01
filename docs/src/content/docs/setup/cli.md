@@ -71,6 +71,11 @@ Invoke-WebRequest https://raw.githubusercontent.com/github/gh-aw/main/install-gh
 
 This installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and supports Linux, macOS, FreeBSD, Windows, and Android (Termux), including environments behind corporate firewalls.
 
+The Bash installer requires `sha256sum` or `shasum` and verifies the downloaded binary against the release's `checksums.txt` before executing or installing it. Unavailable, missing, malformed, duplicate, or mismatched checksums abort installation and leave any existing binary unchanged. The explicit `--skip-checksum` option disables this protection; it is never enabled automatically.
+
+> [!WARNING]
+> This breaks compatibility with pinned older releases that do not publish `checksums.txt`. Update the pin to a release with checksums. If an older pin is unavoidable, explicitly pass `--skip-checksum`; this disables integrity verification and may allow a corrupted or tampered binary to be executed and installed.
+
 ### GitHub Actions Setup Action
 
 In GitHub Actions, use the `setup-cli` action for platform detection and checksum verification:
@@ -902,7 +907,7 @@ The `--timeout` flag sets a duration such as `50s` or `5m` (default: `0`, no add
 
 The `--repo` flag accepts `owner/repo` and is required for a bare numeric run ID.
 
-The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
+The `--artifacts` flag selects which artifact sets to download (default: `all`, unlike `gh aw logs`, which defaults to `usage`). Valid sets include `activation`, `agent`, `all`, `detection`, `evals`, `experiment`, `firewall`, `github-api`, `graders`, `info`, `mcp`, `outcomes`, `usage`, and `work-queue`. The `work-queue` set downloads queue snapshots, worker finish intents, and workflow logs for coordinator operation reporting. The `--experiment` flag filters to runs that include the named experiment; `--variant` restricts to a variant value and requires `--experiment`. The `--output/-o` flag overrides the output directory.
 
 Logs are saved to `.github/aw/logs/run-{id}/` with filenames indicating the extraction level. Pre-agent failures (integrity filtering, missing secrets, binary install) surface the actual error in `failure_analysis.error_summary`. Invalid run IDs return a human-readable error.
 
