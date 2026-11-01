@@ -527,23 +527,42 @@ fi
 # Download and verify checksums if not skipped
 if [ "$SKIP_CHECKSUM" = false ]; then
     print_info "Downloading checksums file..."
-    for attempt in $(seq 1 $MAX_RETRIES); do
-        if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$CHECKSUMS_URL" 2>/dev/null; then
-            print_success "Checksums file downloaded successfully"
-            break
-        else
-            if [ "$attempt" -eq "$MAX_RETRIES" ]; then
-                print_error "Failed to download checksums file after $MAX_RETRIES attempts"
-                print_error "Cannot verify binary integrity. Installation aborted."
-                print_info "Check that $CHECKSUMS_URL is available and retry."
-                exit 1
-            else
+    download_checksums_with_retry() {
+        local url="$1"
+        for attempt in $(seq 1 $MAX_RETRIES); do
+            if curl -L -f --connect-timeout 15 --max-time 60 -o "$CHECKSUMS_PATH" "$url" 2>/dev/null; then
+                print_success "Checksums file downloaded successfully"
+                return 0
+            fi
+            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
                 print_warning "Checksum download attempt $attempt failed. Retrying in 2s..."
                 sleep 2
             fi
+        done
+        return 1
+    }
+
+    if ! download_checksums_with_retry "$CHECKSUMS_URL"; then
+        if [ -n "$FALLBACK_CHECKSUMS_URL" ] && [ "$CHECKSUMS_URL" != "$FALLBACK_CHECKSUMS_URL" ]; then
+            print_warning "Failed to download checksums from latest redirect URL. Retrying with resolved tag URL ($LATEST_TAG)."
+            CHECKSUMS_URL="$FALLBACK_CHECKSUMS_URL"
+            if download_checksums_with_retry "$CHECKSUMS_URL"; then
+                CHECKSUMS_DOWNLOADED=true
+            else
+                CHECKSUMS_DOWNLOADED=false
+            fi
+        else
+            CHECKSUMS_DOWNLOADED=false
         fi
-    done
-    
+        if [ "$CHECKSUMS_DOWNLOADED" = false ]; then
+            print_error "Failed to download checksums file after $MAX_RETRIES attempts"
+            print_error "Cannot verify binary integrity. Installation aborted."
+            print_info "Check that $CHECKSUMS_URL is available and retry."
+            print_info "For older releases without checksums.txt, prefer a release with checksums or explicitly use --skip-checksum (disables integrity verification; corrupted or tampered binaries may be executed)."
+            exit 1
+        fi
+    fi
+
     print_info "Verifying binary checksum..."
 
     EXPECTED_FILENAME="$PLATFORM"

@@ -461,7 +461,7 @@ EOF
             printf '%s  %s\n' "$(printf '%s' "$digest" | tr 'a-f' 'A-F')" "$expected_filename" > "$checksums"
             succeeds=true
             ;;
-        unavailable|partial-checksum)
+        unavailable|partial-checksum|latest-checksum-fallback-unavailable)
             expected_error="Failed to download checksums file after 3 attempts"
             ;;
         empty)
@@ -488,7 +488,7 @@ EOF
             printf '%s  %s\n%s  %s\n' "$digest" "$expected_filename" "$digest" "$expected_filename" > "$checksums"
             expected_error="Missing or malformed checksum"
             ;;
-        mismatch)
+        mismatch|latest-checksum-fallback-mismatch)
             printf '%064d  %s\n' 0 "$expected_filename" > "$checksums"
             expected_error="Checksum verification failed"
             ;;
@@ -507,14 +507,16 @@ EOF
             chmod +x "$fixture_bin/sha256sum"
             expected_error="Checksum verification failed"
             ;;
-        retry|latest-fallback) succeeds=true ;;
+        retry|latest-fallback|latest-checksum-fallback) succeeds=true ;;
         skip|skip-no-tool)
             installer_args+=(--skip-checksum)
             succeeds=true
             ;;
         *) fail "unknown checksum case: $case_name" ;;
     esac
-    [ "$case_name" != latest-fallback ] || requested_version="latest"
+    case "$case_name" in
+        latest-*) requested_version="latest" ;;
+    esac
 
     cat > "$fixture_bin/uname" <<'EOF'
 #!/bin/sh
@@ -553,6 +555,10 @@ case "$url" in
         printf 'attempt\n' >> "$FIXTURE_CHECKSUM_LOG"
         case "$FIXTURE_CASE" in
             unavailable) exit 22 ;;
+            latest-checksum-fallback|latest-checksum-fallback-mismatch)
+                [[ "$url" != */latest/download/* ]] || exit 22
+                ;;
+            latest-checksum-fallback-unavailable) exit 22 ;;
             partial-checksum)
                 cp "$FIXTURE_CHECKSUMS" "$destination"
                 exit 18
@@ -620,6 +626,23 @@ EOF
             [ "$checksum_attempts" -eq 3 ] || fail "checksum failures did not exhaust three retries"
             printf '2\n2\n' > "$case_root/expected-sleeps"
             cmp "$case_root/sleeps" "$case_root/expected-sleeps" || fail "checksum retry delays changed"
+            grep -q -- '--skip-checksum.*disables integrity verification' "$output" || fail "missing explicit checksum opt-out and risk"
+            ;;
+        latest-checksum-fallback|latest-checksum-fallback-unavailable|latest-checksum-fallback-mismatch)
+            [ "$(grep -c '/latest/download/linux-amd64$' "$case_root/downloads")" -eq 1 ] || fail "latest binary was not downloaded exactly once"
+            ! grep -q '/download/v1.2.3/linux-amd64$' "$case_root/downloads" || fail "checksum fallback redownloaded the binary"
+            [ "$(grep -c '/latest/download/checksums.txt$' "$case_root/downloads")" -eq 3 ] || fail "latest checksum redirect did not exhaust three retries"
+            if [ "$case_name" = latest-checksum-fallback-unavailable ]; then
+                [ "$checksum_attempts" -eq 6 ] || fail "unavailable checksum fallback did not exhaust three retries"
+                [ "$(grep -c '/download/v1.2.3/checksums.txt$' "$case_root/downloads")" -eq 3 ] || fail "checksum fallback used the wrong release"
+                printf '2\n2\n2\n2\n' > "$case_root/expected-sleeps"
+                grep -q -- '--skip-checksum.*disables integrity verification' "$output" || fail "missing explicit checksum opt-out and risk"
+            else
+                [ "$checksum_attempts" -eq 4 ] || fail "checksum fallback did not succeed on its first download"
+                [ "$(grep -c '/download/v1.2.3/checksums.txt$' "$case_root/downloads")" -eq 1 ] || fail "checksum fallback used the wrong release"
+                printf '2\n2\n' > "$case_root/expected-sleeps"
+            fi
+            cmp "$case_root/sleeps" "$case_root/expected-sleeps" || fail "checksum fallback retry delays changed"
             ;;
         retry)
             [ "$checksum_attempts" -eq 2 ] || fail "transient checksum failure did not retry"
@@ -643,13 +666,20 @@ EOF
 )
 
 bash -n "$INSTALLER_PATH"
-for case_name in valid unavailable partial-checksum empty missing malformed short-digest extra-field duplicate mismatch no-checksum-tool checksum-tool-failure checksum-tool-malformed retry latest-fallback uppercase shasum skip skip-no-tool windows-valid windows-missing; do
-    if [ "$case_name" = shasum ] && ! command -v shasum >/dev/null 2>&1; then
-        echo "Skipping shasum fallback test: shasum is unavailable on this host."
-        continue
-    fi
-    test_checksum_verification "$case_name"
-done
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo "Skipping isolated Bash checksum tests on Windows hosts."
+        ;;
+    *)
+        for case_name in valid unavailable partial-checksum empty missing malformed short-digest extra-field duplicate mismatch no-checksum-tool checksum-tool-failure checksum-tool-malformed retry latest-fallback latest-checksum-fallback latest-checksum-fallback-unavailable latest-checksum-fallback-mismatch uppercase shasum skip skip-no-tool windows-valid windows-missing; do
+            if [ "$case_name" = shasum ] && ! command -v shasum >/dev/null 2>&1; then
+                echo "Skipping shasum fallback test: shasum is unavailable on this host."
+                continue
+            fi
+            test_checksum_verification "$case_name"
+        done
+        ;;
+esac
 if command -v pwsh >/dev/null 2>&1; then
     POWERSHELL_INSTALLER_PATH="$(cd "$(dirname "$INSTALLER_PATH")" && pwd)/$(basename "${INSTALLER_PATH%.sh}.ps1")"
     pwsh -NoProfile -File "$SCRIPT_DIR/test-install-script.ps1" -InstallerPath "$POWERSHELL_INSTALLER_PATH"
