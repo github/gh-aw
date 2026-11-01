@@ -11,7 +11,9 @@
 const { execFile } = require("child_process");
 
 /**
- * Preserve runtime paths/locales, not arbitrary runner or server credentials.
+ * Preserve only runtime paths/locales, not ambient network/registry/TLS
+ * configuration, GitHub metadata, or runner/server credentials.
+ * Additional handler configuration requires explicit per-tool bindings.
  * Resolve only this tool's bindings; transport names never reach the child.
  * @param {Record<string, string>} [bindings]
  * @returns {NodeJS.ProcessEnv}

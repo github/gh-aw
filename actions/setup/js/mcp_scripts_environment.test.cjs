@@ -2,7 +2,6 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { createServer, loadToolHandlers } from "./mcp_server_core.cjs";
 import { createToolEnvironment } from "./mcp_handler_process.cjs";
@@ -41,8 +40,9 @@ json.NewEncoder(os.Stdout).Encode(map[string]interface{}{"key":os.Getenv("API_KE
 describe("MCP scripts per-tool environment isolation", () => {
   for (const [extension, probe] of Object.entries(probes)) {
     it(`${extension}: preserves overlapping bindings and denies sibling/server secrets`, async () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-env-isolation-"));
+      const dir = fs.mkdtempSync(path.join(process.cwd(), ".mcp-env-isolation-"));
       tempDirs.push(dir);
+      vi.stubEnv("TMPDIR", dir);
       vi.stubEnv("GH_AW_MCP_SCRIPTS_API_KEY", "server-credential");
       vi.stubEnv("JOB_SECRET", "undeclared-job-credential");
       vi.stubEnv("API_KEY", "unscoped-credential");
@@ -91,6 +91,33 @@ describe("MCP scripts per-tool environment isolation", () => {
     vi.stubEnv("DECLARED_EMPTY", "");
     vi.stubEnv("LEGACY_TOKEN", "declared-value");
     expect(createToolEnvironment({ EMPTY: "DECLARED_EMPTY", TOKEN: "LEGACY_TOKEN" })).toMatchObject({ EMPTY: "", TOKEN: "declared-value" });
+    expect(() => createToolEnvironment({ TOKEN: "MCP_ISOLATION_MISSING_BINDING" })).toThrow("Missing MCP script environment binding for 'TOKEN'");
+  });
+
+  it("requires explicit bindings for ambient network, TLS, registry and GitHub configuration", () => {
+    const ambient = {
+      HTTPS_PROXY: "https://proxy.example.com:8443",
+      NODE_EXTRA_CA_CERTS: "/etc/company-ca.pem",
+      SSL_CERT_FILE: "/etc/company-ca.pem",
+      REQUESTS_CA_BUNDLE: "/etc/company-ca.pem",
+      PYTHONPATH: "/opt/company-python",
+      PIP_INDEX_URL: "https://packages.example.com/simple",
+      NPM_CONFIG_REGISTRY: "https://packages.example.com/npm",
+      GOPROXY: "https://packages.example.com/go,direct",
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_SERVER_URL: "https://github.example.com",
+      GITHUB_API_URL: "https://github.example.com/api/v3",
+      GITHUB_RUN_ID: "1234",
+      GITHUB_TOKEN: "ambient-token",
+    };
+    for (const [name, value] of Object.entries(ambient)) vi.stubEnv(name, value);
+    const env = createToolEnvironment();
+    expect(env.PATH).toBe(process.env.PATH);
+    for (const name of Object.keys(ambient)) expect(env).not.toHaveProperty(name);
+    expect(createToolEnvironment({ HTTPS_PROXY: "HTTPS_PROXY", NODE_EXTRA_CA_CERTS: "NODE_EXTRA_CA_CERTS" })).toMatchObject({
+      HTTPS_PROXY: ambient.HTTPS_PROXY,
+      NODE_EXTRA_CA_CERTS: ambient.NODE_EXTRA_CA_CERTS,
+    });
     expect(() => createToolEnvironment({ TOKEN: "MCP_ISOLATION_MISSING_BINDING" })).toThrow("Missing MCP script environment binding for 'TOKEN'");
   });
 });
