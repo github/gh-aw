@@ -9,6 +9,7 @@ Use this pattern when a workflow must perform a controlled write action after th
 ## Rules
 
 - Define the tool schema under `safe-outputs.jobs.<job-name>.inputs`.
+- String inputs (type omitted or `string`) may set `max-length` (integer, 1-1,000,000 characters) to raise the default 10,240-byte input limit for large structured values; use `artifacts:` instead when the payload is a file or directory.
 - Read the output file from `GH_AW_AGENT_OUTPUT`.
 - Parse the JSON and iterate over `items`.
 - Filter items by `type`, where the type is the job name with dashes converted to underscores.
