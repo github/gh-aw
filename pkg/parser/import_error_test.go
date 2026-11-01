@@ -4,11 +4,52 @@ package parser_test
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/parser"
+	"github.com/stretchr/testify/require"
 )
+
+func TestFormatImportErrorDoesNotExposeCause(t *testing.T) {
+	pathErr := &fs.PathError{Op: "lstat", Path: "missing.md", Err: fs.ErrNotExist}
+	causes := []struct {
+		name  string
+		cause error
+	}{
+		{name: "direct path error", cause: pathErr},
+		{name: "wrapped path error", cause: fmt.Errorf("file not found: %w", pathErr)},
+		{name: "sentinel error", cause: fs.ErrNotExist},
+		{name: "nil cause"},
+	}
+
+	for _, tt := range causes {
+		t.Run(tt.name, func(t *testing.T) {
+			err := parser.FormatImportError(&parser.ImportError{
+				ImportPath: "missing.md",
+				FilePath:   "workflow.md",
+				Line:       2,
+				Column:     5,
+				Cause:      tt.cause,
+			}, "imports:\n  - missing.md")
+
+			var formattedErr *parser.FormattedParserError
+			require.ErrorAs(t, err, &formattedErr)
+			require.NoError(t, errors.Unwrap(err))
+			var target *fs.PathError
+			require.NotErrorAs(t, err, &target)
+			require.NotErrorIs(t, err, fs.ErrNotExist)
+			if tt.cause != nil {
+				require.NotErrorIs(t, err, tt.cause)
+			}
+			require.ErrorContains(t, err, "workflow.md:2:5:")
+			require.ErrorContains(t, err, "missing.md")
+			require.ErrorContains(t, err, "hint:")
+		})
+	}
+}
 
 func TestFormatImportError(t *testing.T) {
 	tests := []struct {
