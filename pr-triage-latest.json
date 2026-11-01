@@ -1,34 +1,29 @@
 {
-  "run_date": "2026-10-31T18:17:54Z",
-  "run_id": "41228481975",
+  "run_date": "2026-11-01T00:43:56Z",
+  "run_id": "41257867490",
   "source": "pr-triage",
-  "eligible_total": 4,
+  "eligible_total": 5,
   "cooldown_skipped": [
-    73536,
-    73534,
-    73532,
-    73529,
-    73527
+    73556
   ],
-  "open_copilot_prs": 9,
+  "open_copilot_prs": 6,
   "category_counts": {
-    "bug": 1,
-    "feature": 3,
-    "docs": 0
+    "bug": 2,
+    "feature": 3
   },
   "risk_counts": {
     "high": 2,
-    "medium": 2,
+    "medium": 3,
     "low": 0
   },
   "priority_counts": {
     "high": 1,
-    "medium": 3,
+    "medium": 4,
     "low": 0
   },
   "action_counts": {
     "auto_merge": 0,
-    "batch_review": 2,
+    "batch_review": 3,
     "close": 0,
     "defer": 1,
     "fast_track": 1
@@ -36,23 +31,65 @@
   "batches": [],
   "selected_candidates": [
     {
-      "number": 72273,
-      "title": "Support Claude on Vertex AI with GCP WIF",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 74,
+      "number": 73536,
+      "title": "Retry activation artifact downloads after internal retry exhaustion",
+      "category": "bug",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 75,
       "score_breakdown": {
         "impact": 35,
-        "urgency": 21,
+        "urgency": 22,
         "quality": 18
+      },
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 73299,
+      "title": "WIP: Add on.decision semantic event qualification gate",
+      "category": "feature",
+      "risk": "high",
+      "priority": "medium",
+      "action": "defer",
+      "score": 52,
+      "score_breakdown": {
+        "impact": 30,
+        "urgency": 12,
+        "quality": 10
       },
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
+        "pr-priority:medium",
+        "pr-action:defer",
+        "pr-agent:copilot"
+      ]
+    },
+    {
+      "number": 73033,
+      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
+      "category": "feature",
+      "risk": "medium",
+      "priority": "medium",
+      "action": "batch_review",
+      "score": 58,
+      "score_breakdown": {
+        "impact": 28,
+        "urgency": 14,
+        "quality": 16
+      },
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
         "pr-agent:copilot"
       ]
     },
@@ -78,47 +115,26 @@
       ]
     },
     {
-      "number": 73033,
-      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 28,
-        "urgency": 16,
-        "quality": 16
-      },
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot"
-      ]
-    },
-    {
-      "number": 73299,
-      "title": "WIP: Add on.decision semantic event qualification gate",
+      "number": 72273,
+      "title": "Support Claude on Vertex AI with GCP WIF",
       "category": "feature",
       "risk": "high",
-      "priority": "medium",
-      "action": "defer",
-      "score": 56,
+      "priority": "high",
+      "action": "fast_track",
+      "score": 74,
       "score_breakdown": {
-        "impact": 33,
-        "urgency": 12,
-        "quality": 11
+        "impact": 35,
+        "urgency": 21,
+        "quality": 18
       },
       "labels": [
         "pr-type:feature",
         "pr-risk:high",
-        "pr-priority:medium",
-        "pr-action:defer",
+        "pr-priority:high",
+        "pr-action:fast_track",
         "pr-agent:copilot"
       ]
     }
   ],
-  "notes": "The four eligible Copilot PRs are older than the one-hour cooldown window; none meet the 3+ member batching threshold, so the focus is on the highest-value feature and the guarded bug fix."
+  "notes": "Eligible Copilot PRs outside the one-hour cooldown are a mix of medium-risk reliability fixes and feature work. The highest-impact feature is the Vertex AI support change; the WIP semantic gate is intentionally deferred."
 }
