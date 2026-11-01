@@ -330,7 +330,7 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
 
 #### Blocked-By Dependencies
 
-The `create_issue` tool accepts `blocked_by` as an issue reference or an array of references: an issue number (optionally prefixed with `#`), `owner/repo#number`, a GitHub issue URL, or a temporary ID. Numeric references use the new issue's repository. Every resolved blocker repository must satisfy `target-repo` and `allowed-repos`, including configured wildcard patterns, before issue creation or dependency API access. A disallowed blocker rejects the request. Unresolved temporary IDs defer creation and are validated when retried; staged mode previews unresolved IDs but still rejects resolved disallowed repositories.
+The `create_issue` tool accepts `blocked_by` as an issue reference or an array of references: an issue number (optionally prefixed with `#`), `owner/repo#number`, a GitHub issue URL, or a temporary ID. Numeric references use the new issue's repository. Every resolved blocker repository must match `target-repo` or appear in `allowed-repos`, including configured wildcard patterns, before issue creation or dependency API access. A disallowed blocker rejects the request. Unresolved temporary IDs defer creation and are validated when retried; staged mode previews unresolved IDs but still rejects resolved disallowed repositories.
 
 #### Auto-Expiration
 
@@ -722,7 +722,7 @@ Agent output includes `parent_issue_number` and `sub_issue_number`. Validation e
 
 `target` selects the parent: `"triggering"` (the default) uses the triggering issue, a fixed issue number uses that parent, and `"*"` uses the agent's `parent_issue_number`, including a temporary ID for a newly created parent. Triggering and fixed targets ignore the agent's parent selection. Scheduled and `workflow_dispatch` runs without issue context must configure `"*"` or a fixed parent; the default fails even if the agent supplies `parent_issue_number`.
 
-Both effective issues must belong to the same repository, and that repository must satisfy `target-repo` and `allowed-repos` before any issue read or link mutation. This check applies after temporary IDs resolve, including deferred retries. `target: "*"` permits agent-selected parents, not unrestricted repositories; repository wildcards are controlled separately by `target-repo` and `allowed-repos`.
+Both effective issues must belong to the same repository, and that repository must match `target-repo` or appear in `allowed-repos` before any issue read or link mutation. This check applies after temporary IDs resolve, including deferred retries. `target: "*"` permits agent-selected parents, not unrestricted repositories; repository wildcards are controlled separately by `target-repo` and `allowed-repos`.
 
 ### Set Issue Type (`set-issue-type:`)
 
@@ -1720,6 +1720,8 @@ Most safe outputs support cross-repository operations:
 
 - **`target-repo`**: Set a fixed target repository (`owner/repo` format), or use `"*"` as a wildcard to let the agent supply any repository at runtime.
 - **`allowed-repos`**: Allow the agent to dynamically choose from an allowlist of repositories (supports glob patterns, e.g. `org/*`).
+
+Repository matching is case-sensitive for both `target-repo` and `allowed-repos` patterns; repository names must use the same case as the configured values.
 
 Using `target-repo: "*"` enables fully dynamic routing — the agent provides the `repo` field in each tool call. Note that `create-pull-request-review-comment`, `reply-to-pull-request-review-comment`, `submit-pull-request-review`, `create-agent-session`, and `manage-project-items` do not support the wildcard; use an explicit repository or `allowed-repos` for those types.
 

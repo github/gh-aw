@@ -1514,6 +1514,51 @@ describe("create_issue", () => {
   });
 
   describe("blocked-by dependencies", () => {
+    it("should validate blockers before resolving per-item team mentions", async () => {
+      mockGithub.rest.teams = {
+        listMembersInOrg: vi.fn().mockResolvedValue({ data: [{ login: "reviewer", type: "User" }] }),
+      };
+      mockGithub.rest.issues.get = vi.fn().mockResolvedValue({ data: { id: 9001 } });
+      const handler = await main({
+        allowed_repos: ["approved-org/*"],
+        allowedMentionAliases: [],
+        mentions: { allowTeamMembers: false, allowContext: false, allowedTeams: ["reviewers"] },
+      });
+      const message = { title: "Blocked issue", body: "Ask @reviewer.", repo: "approved-org/work", blocked_by: "other-org/other-repo#7" };
+
+      const rejected = await handler(message);
+
+      expect(rejected).toMatchObject({ success: false, error: expect.stringContaining("not in the allowed-repos list") });
+      expect(mockGithub.rest.teams.listMembersInOrg).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+      expect(mockGithub.request).not.toHaveBeenCalled();
+
+      // The same item with an allowed blocker must actually perform the mention lookup.
+      const accepted = await handler({ ...message, blocked_by: "approved-org/work#7" });
+
+      expect(accepted.success).toBe(true);
+      expect(mockGithub.rest.teams.listMembersInOrg).toHaveBeenCalledExactlyOnceWith({ org: "approved-org", team_slug: "reviewers", per_page: 100, page: 1 });
+      expect(mockGithub.rest.issues.create.mock.calls[0][0].body).toContain("Ask @reviewer.");
+    });
+
+    it.each(["other-org/other-repo", "other-org/*"])("should reject mixed-case blocker repositories with case-sensitive allowlist %s", async allowedRepo => {
+      mockGithub.rest.issues.get = vi.fn();
+      const handler = await main({ allowed_repos: [allowedRepo] });
+
+      const result = await handler({ title: "Blocked issue", body: "Waits for other work.", blocked_by: "Other-Org/Other-Repo#7" });
+
+      expect(result).toMatchObject({ success: false, error: expect.stringContaining("not in the allowed-repos list") });
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Other-Org/Other-Repo"));
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+      expect(mockGithub.request).not.toHaveBeenCalled();
+    });
+
     it.each(["other-org/other-repo#7", "https://github.com/other-org/other-repo/issues/7", "aw_prereq", "#aw_prereq"])("should reject disallowed blocker %s before any API calls", async blocked_by => {
       mockGithub.rest.issues.get = vi.fn();
       const handler = await main({ allowed_repos: ["approved-org/*"] });
