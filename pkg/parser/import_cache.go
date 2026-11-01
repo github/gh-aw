@@ -15,7 +15,8 @@ var importCacheLog = logger.New("parser:import_cache")
 
 const (
 	// ImportCacheDir is the directory where cached imports are stored
-	ImportCacheDir = ".github/aw/imports"
+	ImportCacheDir   = ".github/aw/imports"
+	maxCacheFileSize = 10 * 1024 * 1024
 )
 
 // sanitizePath converts a file path to a safe filename by using filepath.Clean
@@ -117,10 +118,9 @@ func (c *ImportCache) Set(owner, repo, path, sha string, content []byte) (string
 	importCacheLog.Printf("Setting cache entry: %s/%s/%s@%s, size=%d bytes", owner, repo, path, sha, len(content))
 
 	// Validate file size (max 10MB)
-	const maxFileSize = 10 * 1024 * 1024
-	if len(content) > maxFileSize {
-		importCacheLog.Printf("Cache set rejected: file size %d exceeds max %d bytes", len(content), maxFileSize)
-		return "", fmt.Errorf("file size (%d bytes) exceeds maximum allowed size (%d bytes)", len(content), maxFileSize)
+	if len(content) > maxCacheFileSize {
+		importCacheLog.Printf("Cache set rejected: file size %d exceeds max %d bytes", len(content), maxCacheFileSize)
+		return "", fmt.Errorf("file size (%d bytes) exceeds maximum allowed size (%d bytes)", len(content), maxCacheFileSize)
 	}
 
 	// Validate path components to prevent path traversal

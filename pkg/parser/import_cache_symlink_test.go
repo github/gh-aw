@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -123,6 +124,21 @@ func TestImportCacheGitAttributesSymlink(t *testing.T) {
 	}
 }
 
+func TestImportCacheGitAttributesRejectsSymlinkParent(t *testing.T) {
+	base := t.TempDir()
+	cache := NewImportCache(base)
+	require.NoError(t, os.MkdirAll(cache.GetCacheDir(), 0o700))
+	redirect := filepath.Join(base, "redirect", "aw", "imports")
+	require.NoError(t, os.MkdirAll(redirect, 0o700))
+	githubDir := filepath.Join(base, ".github")
+	movedGitHubDir := filepath.Join(base, ".github-moved")
+	require.NoError(t, os.Rename(githubDir, movedGitHubDir))
+	requireCacheSymlink(t, filepath.Join(base, "redirect"), githubDir)
+
+	require.Error(t, cache.ensureGitAttributes())
+	require.NoFileExists(t, filepath.Join(redirect, ".gitattributes"))
+}
+
 func TestImportCacheReadAfterLookupRejectsSymlink(t *testing.T) {
 	cache := NewImportCache(t.TempDir())
 	path, err := cache.Set("owner", "repo", "shared.md", "sha", []byte("cached"))
@@ -142,6 +158,67 @@ func TestImportCacheReadAfterLookupRejectsSymlink(t *testing.T) {
 	state := &importBFSState{acc: &importAccumulator{}}
 	err = handleStandardImportItem(importQueueItem{fullPath: resolved}, "", cache, "", "", state)
 	require.ErrorContains(t, err, "failed to read imported file")
+}
+
+func TestDefaultFileReaderConfinesCachedImports(t *testing.T) {
+	cache := NewImportCache(t.TempDir())
+	path, err := cache.Set("owner", "repo", "shared.md", "sha", []byte("---\ndescription: cached\n---\nCached body\n"))
+	require.NoError(t, err)
+
+	withImport, err := ComputeBodyHashFromParsedContent("Workflow body", "imports:\n  - shared.md", filepath.Dir(path), DefaultFileReader)
+	require.NoError(t, err)
+	withoutImport, err := ComputeBodyHashFromParsedContent("Workflow body", "", filepath.Dir(path), DefaultFileReader)
+	require.NoError(t, err)
+	require.NotEqual(t, withImport, withoutImport)
+
+	target := filepath.Join(t.TempDir(), "outside.md")
+	require.NoError(t, os.WriteFile(target, []byte("---\ndescription: outside\n---\nOutside body\n"), 0o600))
+	require.NoError(t, os.Remove(path))
+	requireCacheSymlink(t, target, path)
+
+	hash, err := ComputeBodyHashFromParsedContent("Workflow body", "imports:\n  - shared.md", filepath.Dir(path), DefaultFileReader)
+	require.NoError(t, err)
+	require.Equal(t, withoutImport, hash, "the symlink target must not contribute to the imported body hash")
+}
+
+func TestImportCacheReadRejectsOversizedEntry(t *testing.T) {
+	cache := NewImportCache(t.TempDir())
+	path, err := cache.Set("owner", "repo", "shared.md", "sha", []byte("small"))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte("x"), maxCacheFileSize+1), 0o600))
+
+	content, err := cache.ReadFile(path)
+	require.ErrorContains(t, err, "exceeds maximum allowed size")
+	require.Empty(t, content)
+}
+
+func TestReadFileRejectsMixedCaseCacheSymlink(t *testing.T) {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Skip("case-insensitive paths are only supported on Windows and macOS")
+	}
+
+	cache := NewImportCache(t.TempDir())
+	path, err := cache.Set("owner", "repo", "shared.md", "sha", []byte("cached"))
+	require.NoError(t, err)
+	mixedCasePath := filepath.Join(cache.baseDir, ".GITHUB", "AW", "IMPORTS", "owner", "repo", "sha", "shared.md")
+	info, err := os.Stat(mixedCasePath)
+	if err != nil {
+		t.Skipf("filesystem is case-sensitive: %v", err)
+	}
+	canonicalInfo, err := os.Stat(path)
+	require.NoError(t, err)
+	if !os.SameFile(info, canonicalInfo) {
+		t.Skip("filesystem is case-sensitive")
+	}
+
+	target := filepath.Join(t.TempDir(), "outside.md")
+	require.NoError(t, os.WriteFile(target, []byte("outside secret"), 0o600))
+	require.NoError(t, os.Remove(path))
+	requireCacheSymlink(t, target, path)
+
+	content, err := ReadFile(mixedCasePath)
+	require.Error(t, err)
+	require.Empty(t, content)
 }
 
 func TestImportCachePinnedDirectoryWrite(t *testing.T) {

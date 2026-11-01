@@ -26,6 +26,7 @@ func (c *ImportCache) openCacheDirectory(relativeDir string, create bool) (*os.R
 	if runtime.GOARCH == "wasm" || runtime.GOOS == "plan9" {
 		return nil, errors.New("confined on-disk import cache is unavailable on this platform")
 	}
+	relativeDir = filepath.FromSlash(relativeDir)
 	if !filepath.IsLocal(relativeDir) {
 		return nil, fmt.Errorf("invalid cache directory: %q", relativeDir)
 	}
@@ -116,7 +117,7 @@ func (c *ImportCache) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := dir.Open(name)
+	file, err := openImportCacheFile(dir, name)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +129,17 @@ func (c *ImportCache) ReadFile(path string) ([]byte, error) {
 	if !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
 		return nil, fmt.Errorf("cache file %q changed while opening", name)
 	}
-	return io.ReadAll(file)
+	if opened.Size() > maxCacheFileSize {
+		return nil, fmt.Errorf("cache file %q exceeds maximum allowed size (%d bytes)", name, maxCacheFileSize)
+	}
+	content, err := io.ReadAll(io.LimitReader(file, maxCacheFileSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(content)) > maxCacheFileSize {
+		return nil, fmt.Errorf("cache file %q exceeds maximum allowed size (%d bytes)", name, maxCacheFileSize)
+	}
+	return content, nil
 }
 
 func writeCacheFileAtomic(dir *os.Root, name string, content []byte, perm os.FileMode, replace bool) error {
@@ -176,9 +187,24 @@ func readCacheAwareFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	marker := string(filepath.Separator) + filepath.FromSlash(ImportCacheDir) + string(filepath.Separator)
-	if index := strings.Index(absolutePath, marker); index >= 0 {
+	if index := importCacheMarkerIndex(absolutePath); index >= 0 {
 		return NewImportCache(absolutePath[:index+1]).ReadFile(absolutePath)
 	}
 	return os.ReadFile(path)
+}
+
+func importCacheMarkerIndex(absolutePath string) int {
+	marker := string(filepath.Separator) + filepath.FromSlash(ImportCacheDir) + string(filepath.Separator)
+	if index := strings.Index(absolutePath, marker); index >= 0 {
+		return index
+	}
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		return -1
+	}
+	for index := 0; index+len(marker) <= len(absolutePath); index++ {
+		if strings.EqualFold(absolutePath[index:index+len(marker)], marker) {
+			return index
+		}
+	}
+	return -1
 }

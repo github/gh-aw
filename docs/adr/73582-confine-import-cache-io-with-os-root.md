@@ -1,8 +1,8 @@
 # ADR-73582: Confine Import Cache I/O with `os.Root` Handles and Atomic Publication
 
-**Date**: 2026-05-21
+**Date**: 2026-11-01
 **Status**: Draft
-**Deciders**: pelikhan, [TODO: verify other reviewers]
+**Deciders**: pelikhan
 
 ---
 
@@ -26,7 +26,7 @@ Store the cache outside the repository (e.g., a user cache directory) or always 
 
 #### Alternative 3: Platform-specific `openat`/`O_NOFOLLOW` syscalls
 
-Implement confinement directly with low-level syscalls per OS. This offers fine-grained control but requires per-platform code and duplicates what Go's standard `os.Root` already provides portably. [TODO: verify whether this was considered]
+Implement confinement directly with low-level syscalls per OS. This offers fine-grained control but requires per-platform code and duplicates what Go's standard `os.Root` already provides portably. It was rejected because maintaining separate syscall implementations would add platform-specific complexity without improving the guarantees needed here.
 
 ### Consequences
 

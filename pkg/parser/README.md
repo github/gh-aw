@@ -232,7 +232,7 @@ Inline skills are secondary skill definitions embedded in the same markdown file
 | `ValidMCPTypes` | `[]string` | Valid MCP transport types: `"stdio"`, `"http"`, `"local"` |
 | `IncludeDirectivePattern` | `*regexp.Regexp` | Matches `@import`, `@include`, and `{{#import ...}}` directives |
 | `LegacyIncludeDirectivePattern` | `*regexp.Regexp` | Matches legacy `@import`/`@include` forms |
-| `DefaultFileReader` | `FileReader` | Default file reader using `os.ReadFile` |
+| `DefaultFileReader` | `FileReader` | Default parser reader, including confined native import-cache reads |
 | `RepoConfigSchema` | `string` | Embedded JSON schema for repo-level configuration |
 
 ## Usage Examples

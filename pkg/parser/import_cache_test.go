@@ -416,7 +416,12 @@ func TestImportCacheGetValidatesComponents(t *testing.T) {
 	tempDir := t.TempDir()
 	cache := NewImportCache(tempDir)
 
+	traversalTarget := filepath.Join(tempDir, ".github", "aw", "etc", "repo", "sha", "test.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(traversalTarget), 0700))
+	require.NoError(t, os.WriteFile(traversalTarget, []byte("decoy"), 0600))
+
 	// Should return not-found (not panic or error), even with suspicious inputs.
 	_, found := cache.Get("../etc", "repo", "test.md", "sha")
 	assert.False(t, found, "Get with path traversal input should return not-found, not panic")
+	require.FileExists(t, traversalTarget)
 }

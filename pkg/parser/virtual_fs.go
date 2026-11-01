@@ -121,10 +121,13 @@ const BuiltinPathPrefix = "@builtin:"
 // reads for import cache paths, or os.ReadFile for other paths.
 var readFileFunc = func(path string) ([]byte, error) {
 	builtinVirtualFilesMu.RLock()
-	defer builtinVirtualFilesMu.RUnlock()
 	content, ok := builtinVirtualFiles.files[path]
 	if ok {
-		return bytes.Clone(content), nil
+		content = bytes.Clone(content)
+	}
+	builtinVirtualFilesMu.RUnlock()
+	if ok {
+		return content, nil
 	}
 	return readCacheAwareFile(path)
 }
