@@ -130,5 +130,5 @@ done
 # Output the configuration for the MCP client
 {
   echo "port=$GH_AW_MCP_SCRIPTS_PORT"
-  echo "api_key=${GH_AW_MCP_SCRIPTS_API_KEY@Q}"
+  echo "api_key=$GH_AW_MCP_SCRIPTS_API_KEY"
 } >> "$GITHUB_OUTPUT"

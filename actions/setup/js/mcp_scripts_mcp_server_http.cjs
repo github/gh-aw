@@ -11,6 +11,8 @@
  *
  * Usage:
  *   node mcp_scripts_mcp_server_http.cjs /path/to/tools.json [--port 3000] [--stateless]
+ *   Requires GH_AW_MCP_SCRIPTS_API_KEY; POST requests send it in Authorization.
+ *   Uploads are limited to 1 MiB and 30 seconds; GET /health is unauthenticated.
  *
  * Options:
  *   --port <number>    Port to listen on (default: 3000)
@@ -31,7 +33,7 @@ const { bootstrapMCPScriptsServer, cleanupConfigFile } = require("./mcp_scripts_
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { redactMCPScriptLogMessage } = require("./diagnostic_sanitization.cjs");
 const { ERR_VALIDATION } = require("./error_codes.cjs");
-const { runHttpServer, logStartupError } = require("./mcp_http_server_runner.cjs");
+const { runHttpServer, logStartupError, requireHttpApiKey } = require("./mcp_http_server_runner.cjs");
 
 /**
  * Create and configure the MCP server with tools
@@ -129,10 +131,12 @@ function createMCPServer(configPath, options = {}) {
  * @param {Object} options - Server options
  * @param {number} [options.port] - Port to listen on (default: 3000)
  * @param {boolean} [options.stateless] - Run in stateless mode (default: false)
+ * @param {string} [options.apiKey] - API key (defaults to GH_AW_MCP_SCRIPTS_API_KEY)
  * @param {string} [options.logDir] - Override log directory from config
  */
 async function startHttpServer(configPath, options = {}) {
-  const port = options.port || 3000;
+  const apiKey = requireHttpApiKey(options.apiKey ?? process.env.GH_AW_MCP_SCRIPTS_API_KEY, "GH_AW_MCP_SCRIPTS_API_KEY");
+  const port = options.port ?? 3000;
   const stateless = options.stateless || false;
 
   const logger = createLogger("mcp-scripts-startup");
@@ -171,6 +175,7 @@ async function startHttpServer(configPath, options = {}) {
     return await runHttpServer({
       transport,
       port,
+      apiKey,
       getHealthPayload: () => ({
         status: "ok",
         server: config.serverName || "mcpscripts",
