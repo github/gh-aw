@@ -208,6 +208,8 @@ github get_discussion_comments --owner github --repo gh-aw --discussionNumber <n
 
 Keep only items created within the active window (filter discussions by `createdAt`), follow pagination cursors/pages until the window is covered, and read bodies/comments of promising items before citing them. If a bridge call fails, run `github <tool> --help` and correct the arguments; do not fall back to `gh`.
 
+Read budget (hard limits, including the 30-day fallback): fetch at most 3 pages (of up to 100 items each) per list or search query, and make at most 10 `get_discussion` / `get_discussion_comments` reads in total, choosing the most relevant items from the list results. Count relevant items from the list results, not only from items you read in full. When the budget runs out, stop reading and build candidates from what was read, and say in one sentence outside the JSON block that the read budget was reached.
+
 Look for:
 - Review comments mentioning specific Go constructs (e.g. "forgot defer", "ignored error", "nil check", "context not passed")
 - Bug reports that could have been caught by a linter
@@ -225,7 +227,7 @@ Output a JSON array of candidate linter ideas:
 ]
 ```
 
-Be concise. List at most 5 candidates. Only include candidates backed by items you actually read; never invent candidates. If GitHub data could not be retrieved, output `[]` and state the bridge error.
+Be concise. List at most 5 candidates. Only include candidates backed by items you actually read; never invent candidates. If GitHub data could not be retrieved, output exactly `[]` as the JSON block and put the bridge error in one separate sentence outside the JSON block.
 
 ## agent: `code-pattern-scanner`
 ---
