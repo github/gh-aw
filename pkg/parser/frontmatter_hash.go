@@ -32,8 +32,8 @@ func parseBoolFromFrontmatter(m map[string]any, key string) bool {
 // This abstraction allows for different file reading strategies (disk, GitHub API, in-memory, etc.)
 type FileReader func(filePath string) ([]byte, error)
 
-// DefaultFileReader reads files from disk using os.ReadFile
-var DefaultFileReader FileReader = os.ReadFile
+// DefaultFileReader uses the parser's reader, including confined cache reads.
+var DefaultFileReader FileReader = ReadFile
 
 const maxFrontmatterHashInputBytes = 1 << 20
 

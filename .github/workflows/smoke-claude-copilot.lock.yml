@@ -721,21 +721,22 @@ jobs:
             ]
           }
           GH_AW_MCP_SCRIPTS_TOOLS_309cc761bfc9f284_EOF
-          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_e0a10bf70e571677_EOF'
+          cat > "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs" << 'GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF'
             const path = require("path");
             const { startHttpServer } = require("./mcp_scripts_mcp_server_http.cjs");
             const configPath = path.join(__dirname, "tools.json");
             const port = parseInt(process.env.GH_AW_MCP_SCRIPTS_PORT || "3000", 10);
-            const apiKey = process.env.GH_AW_MCP_SCRIPTS_API_KEY || "";
+            const apiKey = process.env.GH_AW_MCP_SCRIPTS_API_KEY;
             startHttpServer(configPath, {
               port: port,
+              apiKey: apiKey,
               stateless: true,
               logDir: "${RUNNER_TEMP}/gh-aw/mcp-scripts/logs"
             }).catch(error => {
               console.error("Failed to start mcp-scripts HTTP server:", error);
               process.exit(1);
             });
-          GH_AW_MCP_SCRIPTS_SERVER_e0a10bf70e571677_EOF
+          GH_AW_MCP_SCRIPTS_SERVER_7f1d774b71e7cfe7_EOF
           chmod +x "${RUNNER_TEMP}/gh-aw/mcp-scripts/mcp-server.cjs"
 
       - name: Write MCP Scripts Tool Files

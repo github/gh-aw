@@ -50,7 +50,7 @@ func overflowed(data map[string]json.RawMessage, names ...string) bool {
 // Reconcile supplied metrics, not whole snapshots: turns and diagnostics often
 // follow usage. Each caller keeps these snapshots within one source/session.
 func reconcileMetrics(previous, supplied map[string]json.RawMessage) (map[string]json.RawMessage, error) {
-	merged := make(map[string]json.RawMessage, len(previous)+len(supplied))
+	merged := make(map[string]json.RawMessage, len(previous))
 	maps.Copy(merged, previous)
 	for key, value := range supplied {
 		if key != "usage" {

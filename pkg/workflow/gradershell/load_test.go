@@ -40,15 +40,48 @@ func TestValidRunPath(t *testing.T) {
 	}
 }
 
+func TestGraderShellRejectsNonLocalRunPaths(t *testing.T) {
+	for _, test := range []struct{ name, path string }{
+		{"absolute", "/check.sh"},
+		{"network", "//example.com/check.sh"},
+		{"slash backslash", `/\example.com/check.sh`},
+		{"UNC", `\\example.com\check.sh`},
+		{"Windows absolute", `C:\check.sh`},
+		{"Windows drive relative", "C:check.sh"},
+		{"backslash traversal", `nested\..\check.sh`},
+		{"root traversal", "../check.sh"},
+		{"nested traversal", "nested/../check.sh"},
+		{"workflow traversal", "./../check.sh"},
+		{"workflow absolute", ".//check.sh"},
+		{"workflow network", ".///example.com/check.sh"},
+		{"repeated separator", "nested//check.sh"},
+		{"dot segment", "nested/./check.sh"},
+		{"encoded traversal", "%2e%2e/check.sh"},
+		{"URL", "https://example.com/check.sh"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assert.False(t, ValidRunPath(test.path))
+			_, err := Load("", test.path)
+			require.ErrorContains(t, err, "literal relative .sh path")
+		})
+	}
+}
+
 func TestLoadGraderShell(t *testing.T) {
 	root, workflow := shellTestRepository(t)
 	rootSource := "#!/usr/bin/env bash\njq '.events | length' \"$GH_AW_SESSION\"\n"
 	localSource := "#!/bin/bash\nprintf '%s\\n' 1\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "check.sh"), []byte(rootSource), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(workflow), "check.sh"), []byte(localSource), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(root, "nested"), 0o700))
+	require.NoError(t, os.Mkdir(filepath.Join(filepath.Dir(workflow), "nested"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "nested", "check.sh"), []byte(rootSource), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(workflow), "nested", "check.sh"), []byte(localSource), 0o600))
 	for _, test := range []struct{ path, want string }{
 		{"check.sh", rootSource},
 		{"./check.sh", localSource},
+		{"nested/check.sh", rootSource},
+		{"./nested/check.sh", localSource},
 	} {
 		source, err := Load(workflow, test.path)
 		require.NoError(t, err)

@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -54,14 +56,22 @@ func runSyftOnLockFiles(lockFiles []string, verbose bool, strict bool) error { /
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Running syft SBOM scanner on %d container images", len(images))))
 	}
 
-	// Create output directory for SBOM files
-	sbomDir := filepath.Join(os.TempDir(), "gh-aw-syft-sboms")
-	if err := os.MkdirAll(sbomDir, constants.DirPermPublic); err != nil {
+	// Keep successful SBOMs for inspection without sharing predictable output paths.
+	sbomDir, err := os.MkdirTemp("", "gh-aw-syft-sboms-")
+	if err != nil {
 		return fmt.Errorf("failed to create SBOM directory: %w", err)
 	}
+	syftLog.Printf("SBOM directory: %s", sbomDir)
 
 	var scanErrors []string
 	var results []SyftScanResult
+	defer func() {
+		if len(results) == 0 {
+			if err := os.RemoveAll(sbomDir); err != nil {
+				syftLog.Printf("Error removing empty SBOM directory: %v", err)
+			}
+		}
+	}()
 
 	ctx := context.Background()
 	for _, img := range images {
@@ -156,13 +166,12 @@ func runSyftOnImage(ctx context.Context, imageRef, sbomDir string, verbose bool)
 		return nil, fmt.Errorf("failed to parse syft JSON output for %s: %w", imageRef, err)
 	}
 
-	// Generate a safe filename from the image reference
-	replacer := strings.NewReplacer("/", "_", ":", "_", "@", "_")
-	safeImageName := replacer.Replace(imageRef)
-	sbomPath := filepath.Join(sbomDir, fmt.Sprintf("sbom-%s.json", safeImageName))
+	// Hash the full reference so distinct images cannot collide through sanitization.
+	imageHash := sha256.Sum256([]byte(imageRef))
+	sbomPath := filepath.Join(sbomDir, fmt.Sprintf("sbom-%x.json", imageHash))
 
 	// Persist the SBOM to disk
-	if err := os.WriteFile(sbomPath, stdout.Bytes(), constants.FilePermPublic); err != nil {
+	if err := writeSyftSBOM(sbomPath, stdout.Bytes()); err != nil {
 		return nil, fmt.Errorf("failed to write SBOM file for %s: %w", imageRef, err)
 	}
 
@@ -173,4 +182,19 @@ func runSyftOnImage(ctx context.Context, imageRef, sbomDir string, verbose bool)
 		PackageCount: len(output.Artifacts),
 		SBOMPath:     sbomPath,
 	}, nil
+}
+
+func writeSyftSBOM(path string, content []byte) (err error) {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, constants.FilePermSensitive)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, file.Close())
+		if err != nil {
+			err = errors.Join(err, os.Remove(path))
+		}
+	}()
+	_, err = file.Write(content)
+	return err
 }

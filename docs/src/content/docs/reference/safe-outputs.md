@@ -1240,7 +1240,9 @@ safe-outputs:
 git checkout --orphan my-custom-branch && git rm -rf . && git commit --allow-empty -m "Initialize" && git push origin my-custom-branch
 ```
 
-**Security**: File path validation (workspace/`/tmp` only), extension allowlist, size limits, SHA-256 verification, orphaned branch isolation, minimal permissions.
+**Security**: Files must be isolated regular files within the workspace or `/tmp`; symlinks (including parent-directory links), hard links, and special files are rejected. Staging and publication use the same bounded, verified file snapshot for hashing and writing, with no-follow opens and exclusive destination creation. Extension allowlists, size limits, SHA-256 verification, orphaned branch isolation, and minimal permissions also apply.
+
+**Platform support**: Asset staging and publication require Linux with `/proc/self/fd` available for descriptor-relative access. macOS and Windows fail closed with `ERR_VALIDATION` before guarded file access; absolute-path checks cannot prevent concurrent ancestor replacement, and POSIX no-follow flags do not protect against Windows junctions. Policy and size-limit failures use `ERR_VALIDATION`; upload-handler I/O failures use `ERR_SYSTEM`.
 
 **Outputs**: `published_count`, `branch_name`. **Limits**: Same-repo only, max 50MB/file, 100 assets/run.
 

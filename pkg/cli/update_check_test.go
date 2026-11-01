@@ -173,7 +173,7 @@ func TestIsRunningAsMCPServer(t *testing.T) {
 }
 
 func TestGetLastCheckFilePath(t *testing.T) {
-	t.Parallel()
+	isolateUpdateCheckCache(t)
 
 	path := getLastCheckFilePath()
 	if path == "" {

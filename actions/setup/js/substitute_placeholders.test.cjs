@@ -47,6 +47,21 @@ describe("substitutePlaceholders", () => {
     expect(fs.readFileSync(testFile, "utf8")).toBe("Command: $(malicious) `backdoor` ${VAR} | pipe");
   });
 
+  it("preserves single-quoted JSON and shell metacharacters as data", async () => {
+    const canary = path.join(tempDir, "must-not-exist");
+    const value = JSON.stringify({
+      description: `user's cache'; touch "${canary}"; #`,
+      command: `$(touch "${canary}") \`touch "${canary}"\``,
+      multiline: "single ' and double \" quotes\n${PATH}; | & > * \\ backslash",
+    });
+    fs.writeFileSync(testFile, "__GH_AW_STATIC__", "utf8");
+
+    await substitutePlaceholders({ file: testFile, substitutions: { GH_AW_STATIC: value } });
+
+    expect(fs.readFileSync(testFile, "utf8")).toBe(value);
+    expect(fs.existsSync(canary)).toBe(false);
+  });
+
   it("should handle placeholders appearing multiple times", async () => {
     fs.writeFileSync(testFile, "__NAME__ is great. I love __NAME__!", "utf8");
     await substitutePlaceholders({ file: testFile, substitutions: { NAME: "Testing" } });
