@@ -136,6 +136,7 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 
 	// Claude Code requires post-install scripts (native binaries) so --ignore-scripts must
 	// NOT be passed. This is intentionally different from other engine installs.
+	cooldownDays := resolveEngineCooldownDays(workflowData)
 	npmSteps := GenerateNpmInstallSteps(
 		"@anthropic-ai/claude-code",
 		version,
@@ -144,17 +145,18 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 		NPMInstallOptions{
 			IncludeNodeSetup:  true,
 			RunInstallScripts: true,
-			CooldownEnabled:   false,
+			CooldownDays:      &cooldownDays,
 		},
 	)
-	if isCloudHypervisorRuntime(workflowData) {
+	if isCloudHypervisorRuntime(workflowData) || isNVXRuntime(workflowData) {
 		npmSteps = append(npmSteps, GenerateMicroVMNpmCLIInstallStep(
 			"@anthropic-ai/claude-code",
 			version,
 			"Install Claude Code CLI in microVM path",
 			"claude",
 			true,
-			false,
+			true,
+			cooldownDays,
 		))
 	}
 	return BuildNpmEngineInstallStepsWithAWF(npmSteps, workflowData)

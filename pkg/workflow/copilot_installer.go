@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -9,7 +10,7 @@ import (
 
 var copilotInstallerLog = logger.New("workflow:copilot_installer")
 
-func generateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion, copilotMinVersion, guestLibc, checksumsSHA256 string) []GitHubActionStep {
+func generateCopilotInstallerSteps(version, stepName string, rootless bool, compiledVersion, copilotMinVersion, guestLibc, checksumsSHA256 string, cooldownDays ...int) []GitHubActionStep {
 	preferToolcache := false
 	if checksumsSHA256 == "" && (version == "" || strings.TrimPrefix(version, "v") == string(constants.DefaultCopilotVersion)) {
 		if version == "" {
@@ -29,6 +30,9 @@ func generateCopilotInstallerSteps(version, stepName string, rootless bool, comp
 	}
 	if preferToolcache {
 		installerFlags += " --prefer-toolcache"
+	}
+	if len(cooldownDays) > 0 {
+		installerFlags += fmt.Sprintf(" --cooldown-days %d", cooldownDays[0])
 	}
 
 	// Use the install_copilot_cli.sh script from actions/setup/sh

@@ -19,6 +19,7 @@ type NPMInstallOptions struct {
 	IsGlobal          bool
 	RunInstallScripts bool
 	CooldownEnabled   bool
+	CooldownDays      *int // Overrides CooldownEnabled, preserving existing runtime callers.
 }
 
 // GenerateNodeJsSetupStep creates a GitHub Actions step for setting up Node.js
@@ -202,6 +203,11 @@ func BuildStandardNpmEngineInstallStepsNoCooldown(
 	return buildStandardNpmEngineInstallSteps(packageName, defaultVersion, stepName, cacheKeyPrefix, workflowData, false)
 }
 
+// BuildStandardNpmEngineInstallSteps honors engine.cooldown, defaulting to three days.
+func BuildStandardNpmEngineInstallSteps(packageName, defaultVersion, stepName, cacheKeyPrefix string, workflowData *WorkflowData) []GitHubActionStep {
+	return buildStandardNpmEngineInstallSteps(packageName, defaultVersion, stepName, cacheKeyPrefix, workflowData, true)
+}
+
 func buildStandardNpmEngineInstallSteps(
 	packageName string,
 	defaultVersion string,
@@ -211,6 +217,12 @@ func buildStandardNpmEngineInstallSteps(
 	cooldownEnabled bool,
 ) []GitHubActionStep {
 	nodejsLog.Printf("Building npm engine install steps: package=%s, version=%s", packageName, defaultVersion)
+	days := 0
+	var configuredDays *int
+	if cooldownEnabled {
+		days = resolveEngineCooldownDays(workflowData)
+		configuredDays = &days
+	}
 
 	// Use version from engine config if provided, otherwise default to pinned version
 	version := defaultVersion
@@ -232,12 +244,17 @@ func buildStandardNpmEngineInstallSteps(
 			IncludeNodeSetup:  false,
 			RunInstallScripts: false,
 			CooldownEnabled:   cooldownEnabled,
+			CooldownDays:      configuredDays,
 		},
 	)
 	steps = append([]GitHubActionStep{generateNodeJsSetupStep(workflowData)}, steps...)
 	if isNVXRuntime(workflowData) {
+		var microVMCooldownDays []int
+		if configuredDays != nil {
+			microVMCooldownDays = []int{days}
+		}
 		steps = append(steps, GenerateMicroVMNpmCLIInstallStep(
-			packageName, version, stepName+" in microVM path", cacheKeyPrefix, false, cooldownEnabled,
+			packageName, version, stepName+" in microVM path", cacheKeyPrefix, false, cooldownEnabled, microVMCooldownDays...,
 		))
 	}
 	return steps
@@ -356,7 +373,12 @@ func GetNpmBinPathSetup() string {
 // mounted by Cloud Hypervisor or exported through the NVX workspace, then creates a
 // stable bin/ symlink from
 // ${RUNNER_TEMP}/gh-aw/engine-cli/bin/<command> to the package's node_modules/.bin entry.
-func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandName string, runInstallScripts bool, cooldownEnabled bool) GitHubActionStep {
+func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandName string, runInstallScripts bool, cooldownEnabled bool, cooldownDays ...int) GitHubActionStep {
+	days := npmDefaultCooldownDays
+	if len(cooldownDays) > 0 {
+		days = cooldownDays[0]
+		cooldownEnabled = true
+	}
 	ignoreScriptsFlag := "--ignore-scripts "
 	if runInstallScripts {
 		ignoreScriptsFlag = ""
@@ -374,7 +396,7 @@ func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandNam
 			"          ENGINE_VERSION: " + version,
 		}
 		if cooldownEnabled {
-			installStep = append(installStep, fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
+			installStep = append(installStep, fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days))
 		}
 		return installStep
 	}
@@ -389,7 +411,7 @@ func GenerateMicroVMNpmCLIInstallStep(packageName, version, stepName, commandNam
 	if cooldownEnabled {
 		installStep = append(installStep,
 			"        env:",
-			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays),
+			fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days),
 		)
 	}
 	return installStep
@@ -408,6 +430,7 @@ func GetMicroVMNpmCLIPathSetup(workflowData *WorkflowData) string {
 // By default, --ignore-scripts is added to the install command to prevent pre/post install
 // scripts from executing (supply chain security). Pass options.RunInstallScripts=true to allow scripts.
 func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPrefix string, options NPMInstallOptions) []GitHubActionStep {
+	days, cooldownEnabled := npmInstallCooldownDays(options)
 	nodejsLog.Printf("Generating npm install steps: package=%s, version=%s, includeNodeSetup=%v, isGlobal=%v, runInstallScripts=%v", packageName, version, options.IncludeNodeSetup, options.IsGlobal, options.RunInstallScripts)
 
 	var steps []GitHubActionStep
@@ -445,8 +468,8 @@ func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPr
 			"        env:",
 			"          ENGINE_VERSION: " + version,
 		}
-		if options.CooldownEnabled {
-			installStep = append(installStep, fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays))
+		if cooldownEnabled {
+			installStep = append(installStep, fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days))
 		}
 	} else {
 		installCmd := fmt.Sprintf("npm install %s%s%s@%s", ignoreScriptsFlag, globalFlag, packageName, version)
@@ -454,16 +477,23 @@ func GenerateNpmInstallStepsWithScope(packageName, version, stepName, cacheKeyPr
 			"      - name: " + stepName,
 			"        run: " + installCmd,
 		}
-		if options.CooldownEnabled {
+		if cooldownEnabled {
 			installStep = append(installStep,
 				"        env:",
-				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", npmDefaultCooldownDays),
+				fmt.Sprintf("          NPM_CONFIG_MIN_RELEASE_AGE: '%d'", days),
 			)
 		}
 	}
 	steps = append(steps, installStep)
 
 	return steps
+}
+
+func npmInstallCooldownDays(options NPMInstallOptions) (int, bool) {
+	if options.CooldownDays != nil {
+		return *options.CooldownDays, true
+	}
+	return npmDefaultCooldownDays, options.CooldownEnabled
 }
 
 // resolveRuntimeCooldown returns whether runtime-associated dependency installs should apply

@@ -2,7 +2,7 @@
 set +o histexpand
 
 # Install GitHub Copilot CLI with SHA256 checksum verification
-# Usage: install_copilot_cli.sh [VERSION] [--checksums-sha256 DIGEST] [--prefer-toolcache] [--rootless]
+# Usage: install_copilot_cli.sh [VERSION] [--checksums-sha256 DIGEST] [--prefer-toolcache] [--rootless] [--cooldown-days DAYS]
 #
 # This script downloads and installs the GitHub Copilot CLI directly from GitHub
 # releases with SHA256 checksum verification, following the secure pattern from
@@ -20,6 +20,9 @@ set +o histexpand
 #                       --prefer-toolcache is also supplied.
 #   --prefer-toolcache - Prefer a trusted cached VERSION even with a manifest pin.
 #                        The pin authenticates downloads, not the cached host binary.
+#   --cooldown-days - Require the GitHub release to be at least DAYS old, including
+#                     toolcache and musl guest installs. Defaults to 0 for standalone
+#                     checksum-only callers; the workflow compiler supplies 3.
 #
 # Environment overrides (testing):
 #   COPILOT_INSTALL_DIR - Override the install directory (default: /usr/local/bin).
@@ -60,10 +63,21 @@ ROOTLESS=false
 COPILOT_CHECKSUMS_SHA256=""
 SEEN_CHECKSUMS_SHA256=false
 PREFER_TOOLCACHE=false
+COOLDOWN_DAYS=0
+SEEN_COOLDOWN_DAYS=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --rootless) ROOTLESS=true; shift ;;
     --prefer-toolcache) PREFER_TOOLCACHE=true; shift ;;
+    --cooldown-days)
+      if [ "$SEEN_COOLDOWN_DAYS" = true ] || [ "$#" -lt 2 ] || [[ ! "$2" =~ ^(0|[1-9][0-9]*)$ ]]; then
+        echo "ERROR: --cooldown-days requires exactly one nonnegative integer number of days" >&2
+        exit 1
+      fi
+      COOLDOWN_DAYS="$2"
+      SEEN_COOLDOWN_DAYS=true
+      shift 2
+      ;;
     --checksums-sha256)
       if [ "$SEEN_CHECKSUMS_SHA256" = true ] || [ "$#" -lt 2 ]; then
         echo "ERROR: --checksums-sha256 requires exactly one digest" >&2
@@ -720,6 +734,45 @@ TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Version resolution follows this priority order:
+# Check publication time before activating any cached binary or downloading an
+# archive. Metadata failures are fatal; checksum verification remains independent.
+check_copilot_release_age() {
+  local version="$1"
+  if [ "$COOLDOWN_DAYS" = 0 ]; then
+    printf '%s\n' "$version"
+    return 0
+  fi
+  local endpoint metadata resolved
+  metadata="${TEMP_DIR}/release-age.json"
+  if [ -z "$version" ] || [ "$version" = latest ]; then
+    endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/latest"
+  else
+    if [[ ! "$version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      echo "ERROR: Cannot verify Copilot release age for invalid version '${version}'" >&2
+      return 1
+    fi
+    endpoint="https://api.github.com/repos/${COPILOT_REPO}/releases/tags/v${version#v}"
+  fi
+  if ! curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 10 --max-time 30 \
+    --retry 5 --retry-delay 2 --retry-max-time 60 --retry-all-errors -o "$metadata" "$endpoint"; then
+    echo "ERROR: Cannot verify Copilot release age: GitHub release metadata is unavailable" >&2
+    return 1
+  fi
+  if ! resolved="$(jq -ser --arg requested "$version" --argjson days "$COOLDOWN_DAYS" '
+    select(length == 1) | .[0]
+    | select(.draft == false)
+    | select(.tag_name | type == "string" and test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+    | select($requested == "" or $requested == "latest" or .tag_name == ("v" + ($requested | ltrimstr("v"))))
+    | select(.published_at | type == "string")
+    | select((now - (.published_at | fromdateiso8601)) >= ($days * 86400))
+    | .tag_name
+  ' "$metadata")"; then
+    echo "ERROR: Copilot release '${version}' must be at least ${COOLDOWN_DAYS} days old; release metadata is invalid or the release is too recent" >&2
+    return 1
+  fi
+  printf '%s\n' "$resolved"
+}
+
 # 1. Explicit VERSION argument (from engine.version in the workflow)
 # 2. Compat.json toolcache lookup (requires GH_AW_COMPILED_VERSION to select the right window)
 # 3. DEFAULT_COPILOT_VERSION baked into this script
@@ -751,6 +804,8 @@ if [ -n "$COPILOT_CHECKSUMS_SHA256" ] && [ "$PREFER_TOOLCACHE" = false ]; then
 fi
 if { [ -z "$COPILOT_CHECKSUMS_SHA256" ] || [ "$PREFER_TOOLCACHE" = true ]; } &&
   CACHED_COPILOT_BIN="$(find_cached_copilot_bin "$REQUESTED_VERSION" "${COMPAT_MATCHED_MIN_AGENT}" "${COMPAT_MATCHED_MAX_AGENT}" "${COMPAT_CACHE_TTL_DAYS}")"; then
+  CACHED_COPILOT_VERSION="$(basename "$(dirname "$(dirname "$(dirname "$CACHED_COPILOT_BIN")")")")"
+  check_copilot_release_age "$CACHED_COPILOT_VERSION" >/dev/null
   echo "Using cached GitHub Copilot CLI from ${CACHED_COPILOT_BIN}"
   activate_cached_copilot_bin "$CACHED_COPILOT_BIN"
 
@@ -789,6 +844,8 @@ if [ "$REQUESTED_VERSION" = "latest" ] && [ -n "$COMPAT_MATCHED_MAX_AGENT" ] &&
   echo "Compat target ${VERSION} has no reviewed manifest pin; falling back to reviewed default ${DEFAULT_COPILOT_VERSION} within ${COMPAT_MATCHED_MIN_AGENT}..${COMPAT_MATCHED_MAX_AGENT}." >&2
   VERSION="$DEFAULT_COPILOT_VERSION"
 fi
+
+VERSION="$(check_copilot_release_age "$VERSION")"
 
 # Build download URLs
 if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then

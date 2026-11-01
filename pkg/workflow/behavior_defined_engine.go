@@ -243,6 +243,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 		version = workflowData.EngineConfig.Version
 	}
 
+	cooldownDays := resolveEngineCooldownDays(workflowData)
 	npmSteps := GenerateNpmInstallSteps(
 		install.PackageName,
 		version,
@@ -251,7 +252,7 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 		NPMInstallOptions{
 			IncludeNodeSetup:  install.IncludeNodeSetup,
 			RunInstallScripts: install.PostInstallScripts,
-			CooldownEnabled:   install.Cooldown,
+			CooldownDays:      &cooldownDays,
 		},
 	)
 	// MicroVMs cannot rely on the global npm installation. Stage the CLI in
@@ -267,7 +268,8 @@ func (e *BehaviorDefinedEngine) GetInstallationSteps(workflowData *WorkflowData)
 			install.StepName+" in microVM path",
 			binaryName,
 			install.PostInstallScripts,
-			install.Cooldown,
+			true,
+			cooldownDays,
 		))
 	}
 	if install.VerifyCommand != "" {

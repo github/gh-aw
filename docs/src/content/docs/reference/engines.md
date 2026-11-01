@@ -63,6 +63,7 @@ engine:
 | `id` | Built-in ID, or the ID of an [imported definition](/gh-aw/reference/third-party-agent/). |
 | `model` | Exact model ID, alias, or provider-prefixed selection; may also be top-level `model`. |
 | `version` | Override the compiler-pinned CLI version. |
+| `cooldown` | Minimum release age in nonnegative integer days; defaults to `3`. Explicit `0` is rejected in strict mode. |
 | `env` | Runtime environment values; [scope and precedence](/gh-aw/reference/environment-variables/) still apply. |
 | `args` | Ordered arguments passed to the native CLI before its prompt argument. |
 | `command` | Replacement executable; skips the engine installer, not AWF installation. |
@@ -84,6 +85,22 @@ engine:
 <span id="parameterized-versions"></span>
 
 Versions can use GitHub Actions expressions; the runtime passes them through environment variables rather than shell interpolation. Copilot expression values must resolve to trusted cached releases or built-in manifest pins. Other Copilot releases require a literal version and [checksum pin](/gh-aw/reference/engines/copilot/#copilot-release-checksum-pins). Agy accepts only its verified releases.
+
+### Engine release-age cooldown
+
+Compiler-managed engine installs require releases to be at least **3 days** old by default. Configure a different age with `engine.cooldown`:
+
+```aw
+engine:
+  id: copilot
+  cooldown: 7
+```
+
+The value must be a nonnegative integer number of days, not a boolean, string, duration, or expression. `cooldown: 0` disables the age check only when `strict: false`; strict mode rejects explicit zero. Omitting the field retains the default, including string-form and inline engine configurations.
+
+Claude, Codex, Pi, Gemini, and behavior-defined npm installs pass this age to npm through `NPM_CONFIG_MIN_RELEASE_AGE`, including compiler-managed microVM staging. Copilot's native installer checks GitHub release publication metadata before activating a cached CLI or downloading an archive, including musl guest binaries. Missing or invalid metadata fails the installation. The cooldown also applies to pinned versions and runtime version expressions; it does not replace checksum verification or version pins.
+
+The policy covers compiler-managed npm and Copilot release installs, not arbitrary shell installers, custom `engine.command` executables, pre-agent steps, extensions, or other externally managed installation methods. Runtime dependency cooldowns remain separately configured by `runtimes.<id>.cooldown` (a boolean).
 
 ### Engine Environment Variables
 
