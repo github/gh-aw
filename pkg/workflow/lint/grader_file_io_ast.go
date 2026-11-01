@@ -118,13 +118,19 @@ func graderJavaScriptReferenceName(node *taint.JavaScriptNode) string {
 	case "Identifier":
 		return node.Text
 	case "PropertyAccessExpression":
-		if node.Name != nil {
-			return graderJavaScriptReferenceName(node.Expression) + "." + node.Name.Text
+		if node.Name != nil && node.Name.Text != "" {
+			base := graderJavaScriptReferenceName(node.Expression)
+			if base != "" {
+				return base + "." + node.Name.Text
+			}
 		}
 	case "ElementAccessExpression":
 		key := node.ArgumentExpression
-		if key != nil && (key.Kind == "StringLiteral" || key.Kind == "NoSubstitutionTemplateLiteral") {
-			return graderJavaScriptReferenceName(node.Expression) + "." + key.Text
+		if key != nil && key.Text != "" && (key.Kind == "StringLiteral" || key.Kind == "NoSubstitutionTemplateLiteral") {
+			base := graderJavaScriptReferenceName(node.Expression)
+			if base != "" {
+				return base + "." + key.Text
+			}
 		}
 	case "ParenthesizedExpression", "NonNullExpression":
 		return graderJavaScriptReferenceName(node.Expression)

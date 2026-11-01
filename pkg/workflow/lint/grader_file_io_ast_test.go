@@ -37,18 +37,16 @@ func TestGraderJavaScriptReferenceName(t *testing.T) {
 			node: &taint.JavaScriptNode{Kind: "PropertyAccessExpression", Expression: &taint.JavaScriptNode{Kind: "Identifier", Text: "fs"}},
 		},
 		{
-			name: "missing property base retains separator",
+			name: "missing property base has no reference",
 			node: &taint.JavaScriptNode{Kind: "PropertyAccessExpression", Name: &taint.JavaScriptNode{Text: "readFile"}},
-			want: ".readFile",
 		},
 		{
-			name: "empty property name retains separator",
+			name: "empty property name has no reference",
 			node: &taint.JavaScriptNode{
 				Kind:       "PropertyAccessExpression",
 				Expression: &taint.JavaScriptNode{Kind: "Identifier", Text: "fs"},
 				Name:       &taint.JavaScriptNode{},
 			},
-			want: "fs.",
 		},
 		{
 			name: "string element appends its key",
@@ -89,21 +87,19 @@ func TestGraderJavaScriptReferenceName(t *testing.T) {
 			},
 		},
 		{
-			name: "empty element key retains separator",
+			name: "empty element key has no reference",
 			node: &taint.JavaScriptNode{
 				Kind:               "ElementAccessExpression",
 				Expression:         &taint.JavaScriptNode{Kind: "Identifier", Text: "fs"},
 				ArgumentExpression: &taint.JavaScriptNode{Kind: "StringLiteral"},
 			},
-			want: "fs.",
 		},
 		{
-			name: "missing element base retains separator",
+			name: "missing element base has no reference",
 			node: &taint.JavaScriptNode{
 				Kind:               "ElementAccessExpression",
 				ArgumentExpression: &taint.JavaScriptNode{Kind: "StringLiteral", Text: "读取"},
 			},
-			want: ".读取",
 		},
 		{
 			name: "parentheses unwrap their expression",
