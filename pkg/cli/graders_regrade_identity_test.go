@@ -44,7 +44,7 @@ func TestRegradeValidateRecordedIdentityAttemptBounds(t *testing.T) {
 
 	for _, attempt := range []string{"2147483648", "4294967297", "9223372036854775807"} {
 		for _, recorded := range []string{attempt, strconv.Quote(attempt)} {
-			t.Run("32-bit overflow/"+recorded, func(t *testing.T) {
+			t.Run("native wide attempt/"+recorded, func(t *testing.T) {
 				raw := json.RawMessage(`{"run_id":77,"run_attempt":` + recorded + `}`)
 				err := regradeValidateRecordedIdentity(WorkflowRun{DatabaseID: 77, Attempt: 1}, raw)
 				if strconv.IntSize == 32 {
@@ -54,6 +54,36 @@ func TestRegradeValidateRecordedIdentityAttemptBounds(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRegradeRecordedAttemptBounds(t *testing.T) {
+	for _, test := range []struct {
+		name                    string
+		attempt, minInt, maxInt int64
+		outOfRange              bool
+	}{
+		{"missing attempt", 0, math.MinInt32, math.MaxInt32, false},
+		{"one", 1, math.MinInt32, math.MaxInt32, false},
+		{"32-bit minimum", math.MinInt32, math.MinInt32, math.MaxInt32, false},
+		{"32-bit maximum", math.MaxInt32, math.MinInt32, math.MaxInt32, false},
+		{"below 32-bit minimum", math.MinInt32 - 1, math.MinInt32, math.MaxInt32, true},
+		{"above 32-bit maximum", 1 << 31, math.MinInt32, math.MaxInt32, true},
+		{"32-bit wrap to one", 1<<32 + 1, math.MinInt32, math.MaxInt32, true},
+		{"int64 maximum against 32-bit bounds", math.MaxInt64, math.MinInt32, math.MaxInt32, true},
+		{"native minimum", math.MinInt, math.MinInt, math.MaxInt, false},
+		{"native maximum", math.MaxInt, math.MinInt, math.MaxInt, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			attempt, err := regradeRecordedAttempt(test.attempt, test.minInt, test.maxInt)
+			if test.outOfRange {
+				require.EqualError(t, err, "recorded run attempt is outside the supported range")
+				assert.Zero(t, attempt)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.attempt, int64(attempt))
+			}
+		})
 	}
 }
 
