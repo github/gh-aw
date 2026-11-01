@@ -413,10 +413,15 @@ function generateHashedExpressionEnvVarName(expr) {
 /**
  * Evaluates a safe GitHub Actions expression at runtime
  * @param {string} expr - The expression to evaluate (without ${{ }})
+ * @param {{resolved: boolean}} [resolution] - Distinguish evaluated data from an unresolved author expression
  * @returns {string} - The evaluated value or original expression if cannot evaluate
  */
-function evaluateExpression(expr) {
+function evaluateExpression(expr, resolution) {
   const trimmed = expr.trim();
+  const resolved = (/** @type {string} */ value) => {
+    if (resolution) resolution.resolved = true;
+    return value;
+  };
 
   // Check for OR expressions with literals (e.g., "inputs.repository || 'default'")
   const orMatch = trimmed.match(/^(.+?)\s*\|\|\s*(.+)$/);
@@ -425,12 +430,13 @@ function evaluateExpression(expr) {
     const rightExpr = orMatch[2].trim();
 
     // Try to evaluate the left expression
-    const leftValue = evaluateExpression(leftExpr);
+    const leftResolution = { resolved: false };
+    const leftValue = evaluateExpression(leftExpr, leftResolution);
 
     // Check if left value is truthy (not empty, not undefined, not null)
     // If it's wrapped in ${{ }}, it means it couldn't be evaluated
-    if (!leftValue.startsWith("${{")) {
-      return leftValue;
+    if (leftResolution.resolved) {
+      return resolved(leftValue);
     }
 
     // Left value is falsy or couldn't be evaluated, use the right side
@@ -439,16 +445,16 @@ function evaluateExpression(expr) {
     if (stringLiteralMatch) {
       const content = stringLiteralMatch[2];
       // Neutralize any expression markers
-      return content.replace(/\$/g, "\\$").replace(/\{/g, "\\{");
+      return resolved(content.replace(/\$/g, "\\$").replace(/\{/g, "\\{"));
     }
 
     // If right side is a number or boolean literal, return it
     if (/^-?\d+(\.\d+)?$/.test(rightExpr) || rightExpr === "true" || rightExpr === "false") {
-      return rightExpr;
+      return resolved(rightExpr);
     }
 
     // Otherwise try to evaluate the right expression
-    return evaluateExpression(rightExpr);
+    return evaluateExpression(rightExpr, resolution);
   }
 
   // Check if this is a needs.*, steps.*, or inputs.* expression that should be looked up from environment variables
@@ -463,13 +469,13 @@ function evaluateExpression(expr) {
     const envVarName = "GH_AW_" + trimmed.toUpperCase().replace(/\./g, "_");
     const envValue = process.env[envVarName];
     if (envValue !== undefined && envValue !== null) {
-      return envValue;
+      return resolved(envValue);
     }
 
     const hashedEnvVarName = generateHashedExpressionEnvVarName(trimmed);
     const hashedEnvValue = process.env[hashedEnvVarName];
     if (hashedEnvValue !== undefined && hashedEnvValue !== null) {
-      return hashedEnvValue;
+      return resolved(hashedEnvValue);
     }
     // If not found in environment, continue to try other evaluation methods below
   }
@@ -543,7 +549,7 @@ function evaluateExpression(expr) {
 
       // If we successfully resolved the value, return it as a string
       if (value !== undefined && value !== null) {
-        return String(value);
+        return resolved(String(value));
       }
 
       // If the direct context lookup failed, try resolving via aw_context.
@@ -566,7 +572,7 @@ function evaluateExpression(expr) {
           if (resolver) {
             const awValue = resolver();
             if (awValue !== undefined) {
-              return awValue;
+              return resolved(awValue);
             }
           }
         } catch (_parseError) {
@@ -589,7 +595,7 @@ function evaluateExpression(expr) {
  * Validates and renders GitHub Actions expressions in content
  * @param {string} content - The content with potential expressions
  * @param {string} source - The source identifier (file path or URL) for error messages
- * @param {(value: string) => string} [protectValue] - Preserve evaluated values as opaque data during prompt processing
+ * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values as opaque data during prompt processing
  * @returns {string} - Content with safe expressions rendered
  * @throws {Error} - If unsafe expressions are found
  */
@@ -651,8 +657,9 @@ function processExpressions(content, source, protectValue = value => value) {
     }
 
     // Expression is safe - evaluate it
-    const evaluated = evaluateExpression(trimmed);
-    replacements.set(fullMatch, evaluated === fullMatch ? evaluated : protectValue(evaluated));
+    const resolution = { resolved: false };
+    const evaluated = evaluateExpression(trimmed, resolution);
+    replacements.set(fullMatch, resolution.resolved ? protectValue(evaluated, trimmed) : fullMatch);
   }
 
   // If any unsafe expressions found, throw error
@@ -786,7 +793,7 @@ async function fetchUrlContent(url, cacheDir) {
  * @param {boolean} optional - Whether the import is optional
  * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
  * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
- * @param {(value: string) => string} [protectValue] - Preserve evaluated values during prompt processing
+ * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
  * @returns {Promise<string>} - The processed URL content
  * @throws {Error} - If URL fetch fails or content is invalid
  */
@@ -1107,7 +1114,7 @@ function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFol
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
  * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
- * @param {(value: string) => string} [protectValue] - Preserve evaluated values during prompt processing
+ * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
  * @returns {Promise<string>} - The processed file or URL content, or empty string if optional and file not found
  * @throws {Error} - If file/URL is not found and import is not optional, or if GitHub Actions macros are detected
  */
@@ -1264,7 +1271,7 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
  * @param {ImportTreeNode[]|null} [parentTreeChildren] - Array to push import tree nodes into, or null to skip tree building
  * @param {Map<string, string>} [rawImportCache] - Cache of raw (pre-expansion) file contents, used to set rawContent on cached tree nodes
  * @param {Set<string>} [resolvedInParent] - Canonical import keys already resolved in parent/sibling context; skipped during recursion
- * @param {(value: string) => string} [protectValue] - Preserve evaluated values through nested imports and later directive processing
+ * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values through nested imports and later directive processing
  * @returns {Promise<string>} - Content with runtime-import macros replaced by file/URL contents
  */
 async function processRuntimeImports(
@@ -1476,4 +1483,5 @@ module.exports = {
   wrapExpressionsInTemplateConditionals,
   extractAndReplacePlaceholders,
   generatePlaceholderName,
+  generateHashedExpressionEnvVarName,
 };

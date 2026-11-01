@@ -397,7 +397,7 @@ jobs:
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
+            await main({ deferredBindings: {"GH_AW_NEEDS_SPELLCHECK_OUTPUTS_DICTIONARY_PATH":"__GH_AW_DEFERRED_B328D8C5111E544F__","GH_AW_NEEDS_SPELLCHECK_OUTPUTS_FILES_CHECKED":"__GH_AW_DEFERRED_C47247B0C6C914C0__","GH_AW_NEEDS_SPELLCHECK_OUTPUTS_FINDINGS_COUNT":"__GH_AW_DEFERRED_386607E053D03E85__"} });
       - name: Substitute placeholders
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -428,6 +428,7 @@ jobs:
             // Call the substitution function
             return await substitutePlaceholders({
               file: process.env.GH_AW_PROMPT,
+              deferredBindings: {"GH_AW_NEEDS_SPELLCHECK_OUTPUTS_DICTIONARY_PATH":"__GH_AW_DEFERRED_B328D8C5111E544F__","GH_AW_NEEDS_SPELLCHECK_OUTPUTS_FILES_CHECKED":"__GH_AW_DEFERRED_C47247B0C6C914C0__","GH_AW_NEEDS_SPELLCHECK_OUTPUTS_FINDINGS_COUNT":"__GH_AW_DEFERRED_386607E053D03E85__"},
               substitutions: {
                 GH_AW_EXPERIMENTS_PROMPT_STYLE: process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE,
                 GH_AW_EXPR_76DF9333: process.env.GH_AW_EXPR_76DF9333,
@@ -494,6 +495,7 @@ jobs:
             /tmp/gh-aw/aw-prompts/user.txt
             /tmp/gh-aw/aw-prompts/prompt-template.txt
             /tmp/gh-aw/aw-prompts/prompt-import-tree.json
+            /tmp/gh-aw/aw-prompts/prompt-literal-values.json
             /tmp/gh-aw/github_rate_limits.jsonl
             /tmp/gh-aw/base
             /tmp/gh-aw/.claude/agents

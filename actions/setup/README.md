@@ -59,6 +59,13 @@ This action copies files from `actions/setup/`, including:
 - Agent job scripts (compute_text, create_issue, create_pull_request, etc.)
 - Safe output scripts (safe_outputs_*, safe_inputs_*, messages, etc.)
 - Prompt rendering scripts (`create_prompt.cjs`, `interpolate_prompt.cjs`, etc.)
+  retain an opaque author-owned view in `aw-prompts/prompt-literal-values.json`.
+  Placeholder substitution and validation use this provenance across activation
+  and deferred agent-job passes, while prompt and inline instruction files remain
+  fully rendered. Only compiler-declared deferred bindings are interpreted again;
+  placeholder-like text inside evaluated context stays literal. Inline metadata
+  is parsed before context restoration, and evaluated values are serialized as
+  YAML scalars rather than YAML structure.
 - Utility scripts (sanitize_*, validate_*, generate_*, etc.)
 
 ### Shell Scripts (7 files from `sh/`)

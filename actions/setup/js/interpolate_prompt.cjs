@@ -11,12 +11,13 @@
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
-const { processRuntimeImports } = require("./runtime_import.cjs");
+const { processRuntimeImports, generatePlaceholderName, generateHashedExpressionEnvVarName } = require("./runtime_import.cjs");
 const { writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = require("./extract_inline_skills.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
+const { createLiteralValues, restoreInlineMetadata, writeLiteralState, literalFileKey } = require("./prompt_literal_values.cjs");
 
 /**
  * @typedef {Object} ImportTreeNode
@@ -69,8 +70,9 @@ function interpolateVariables(content, variables) {
 
 /**
  * Main function for prompt variable interpolation and template rendering
+ * @param {{deferredBindings?: Record<string, string>}} [options] - Compiler-owned late binding aliases
  */
-async function main() {
+async function main({ deferredBindings = {} } = {}) {
   try {
     core.info("========================================");
     core.info("[main] Starting interpolate_prompt processing");
@@ -97,20 +99,19 @@ async function main() {
     const originalLength = content.length;
     // Keep evaluated context opaque until all author-owned directives have run.
     // The same protection covers values evaluated while expanding runtime imports.
-    const valuePrefix = `\x00VALUE_${randomUUID()}_`;
-    const valuePattern = new RegExp(`${valuePrefix}(\\d+)\x00`, "g");
-    /** @type {string[]} */
-    const literalValues = [];
-    const protectValue = (/** @type {string} */ value) => {
-      literalValues.push(value);
-      return `${valuePrefix}${literalValues.length - 1}\x00`;
-    };
-    const restoreValues = (/** @type {string} */ text) =>
-      text.replace(valuePattern, (_, index) => {
-        const value = literalValues[Number(index)];
-        if (value === undefined) throw new Error(`${ERR_VALIDATION}: Unknown literal prompt value`);
+    const { state: literalState, protect: protectValue, restore: restoreValues } = createLiteralValues();
+    const protectExpression = (/** @type {string} */ value, /** @type {string|undefined} */ expression) => {
+      if (expression && (deferredBindings[generatePlaceholderName(expression)] === value || deferredBindings[generateHashedExpressionEnvVarName(expression)] === value)) {
         return value;
-      });
+      }
+      return protectValue(value);
+    };
+    const recordFile = (/** @type {string} */ opaque, /** @type {string} */ target, metadata = false) => {
+      const rendered = metadata ? restoreInlineMetadata(opaque, restoreValues) : restoreValues(opaque);
+      literalState.files[literalFileKey(promptPath, target)] = { opaque, rendered, metadata };
+      return rendered;
+    };
+    const restoreArtifact = (/** @type {string} */ opaque, /** @type {string|undefined} */ target) => (target ? recordFile(opaque, target, true) : restoreInlineMetadata(opaque, restoreValues));
     core.info(`[main] Original content length: ${originalLength} characters`);
     core.info(`[main] First 200 characters: ${content.substring(0, 200).replace(/\n/g, "\\n")}`);
 
@@ -160,7 +161,7 @@ async function main() {
       });
 
       const beforeImports = content.length;
-      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectValue);
+      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression);
       const afterImports = content.length;
 
       core.info(`Runtime imports processed successfully`);
@@ -196,7 +197,7 @@ async function main() {
       // activation artifact and available to the downstream agent job.
       const agentsBaseDir = "/tmp/gh-aw";
       const engineId = process.env.GH_AW_ENGINE_ID || "";
-      content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreValues);
+      content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreArtifact);
       const afterExtraction = content.length;
       core.info(`Inline sub-agents extracted and written`);
       core.info(`Content length change: ${beforeExtraction} -> ${afterExtraction} (${afterExtraction > beforeExtraction ? "+" : ""}${afterExtraction - beforeExtraction})`);
@@ -215,7 +216,7 @@ async function main() {
       const beforeExtraction = content.length;
       const skillsBaseDir = "/tmp/gh-aw";
       const engineId = process.env.GH_AW_ENGINE_ID || "";
-      content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId, restoreValues);
+      content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId, restoreArtifact);
       const afterExtraction = content.length;
       core.info(`Inline skills extracted and written`);
       core.info(`Content length change: ${beforeExtraction} -> ${afterExtraction} (${afterExtraction > beforeExtraction ? "+" : ""}${afterExtraction - beforeExtraction})`);
@@ -231,7 +232,7 @@ async function main() {
     const variables = {};
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("GH_AW_EXPR_")) {
-        variables[key] = protectValue(value || "");
+        variables[key] = deferredBindings[key] === value ? value : protectValue(value || "");
       }
     }
 
@@ -272,10 +273,18 @@ async function main() {
         // Comparisons in author-owned if/elseif tags also use experiment values.
         const experimentName = key.substring("GH_AW_EXPERIMENTS_".length).toLowerCase();
         const exprForm = `experiments.${experimentName}`;
-        const conditionPattern = new RegExp(`(\\{\\{#?(?:if|else[-_]?if)\\s+[^}]*?)\\b${exprForm.replace(".", "\\.")}\\b`, "gi");
-        if (conditionPattern.test(content)) {
-          conditionPattern.lastIndex = 0;
-          content = content.replace(conditionPattern, (_, prefix) => prefix + protectedValue);
+        const conditionPattern = /(\{\{#?(?:if|else[-_]?if)\s+)([^}]*)(\}\})/gi;
+        const operandPattern = new RegExp(`"[^"]*"|'[^']*'|\\b${exprForm.replace(".", "\\.")}\\b`, "gi");
+        let substitutedCondition = false;
+        content = content.replace(conditionPattern, (_, prefix, condition, suffix) => {
+          const substituted = condition.replace(operandPattern, operand => {
+            if (operand.startsWith('"') || operand.startsWith("'")) return operand;
+            substitutedCondition = true;
+            return protectedValue;
+          });
+          return prefix + substituted + suffix;
+        });
+        if (substitutedCondition) {
           core.info(`  Substituted ${exprForm} in conditions → "${value || ""}"`);
         }
       }
@@ -305,8 +314,6 @@ async function main() {
       core.info("No conditional blocks found in prompt, skipping template rendering");
     }
 
-    content = restoreValues(content);
-
     // Write back to the same file
     core.info("\n========================================");
     core.info("[main] STEP 4: Writing Output");
@@ -320,11 +327,14 @@ async function main() {
       if (parts.length !== 2) {
         throw new Error(`${ERR_VALIDATION}: Prompt split boundary was lost during processing`);
       }
-      fs.writeFileSync(systemPath, parts[0], "utf8");
-      fs.writeFileSync(userPath, parts[1], "utf8");
+      fs.writeFileSync(systemPath, recordFile(parts[0], systemPath), "utf8");
+      fs.writeFileSync(userPath, recordFile(parts[1], userPath), "utf8");
       content = parts.join("");
     }
+    content = recordFile(content, promptPath);
     fs.writeFileSync(promptPath, content, "utf8");
+    // Preserve the opaque author-owned view across later activation/deferred passes.
+    writeLiteralState(promptPath, literalState);
 
     core.info(`Last 200 characters: ${content.substring(Math.max(0, content.length - 200)).replace(/\n/g, "\\n")}`);
     core.info("========================================");

@@ -151,7 +151,7 @@ function ensureClaudeSubAgentName(agentName, content) {
   const frontmatter = match[1] ?? "";
   const start = content.indexOf("\n") + 1;
   /** @type {any} */
-  const document = parseDocument(frontmatter);
+  const document = parseDocument(frontmatter.replace(/\x00VALUE_[0-9a-f-]+_\d+\x00/g, token => token.replace(/\x00/g, "_")));
   if (!document || document.errors.length) return content;
   const map = document.contents;
   if (map === null || map === undefined) return content.slice(0, start) + nameEntry + "\n" + content.slice(start);
@@ -395,7 +395,7 @@ function getEngineSubAgentTarget(engineId) {
  *   Defaults to `workspaceDir` when omitted (for tests and legacy callers).
  * @param {string} [engineId] - The engine ID (e.g. "claude", "copilot").
  *   Defaults to "copilot" behavior when omitted.
- * @param {(content: string) => string} [restoreValues] - Restore literal context after extracting author-owned markers
+ * @param {(content: string, target?: string) => string} [restoreValues] - Restore literal context after parsing author-owned metadata
  * @returns {string} Main content with sub-agent sections removed.
  */
 function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreValues = content => content) {
@@ -421,9 +421,9 @@ function writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, re
 
   for (const agent of agents) {
     const agentPath = path.join(agentsDir, agent.name + ext);
-    let filteredContent = resolveSubAgentExperimentReferences(agent.name, preserveSubAgentFrontmatter(restoreValues(agent.content)));
+    let filteredContent = resolveSubAgentExperimentReferences(agent.name, preserveSubAgentFrontmatter(agent.content));
     if (normalizedEngineId === "claude") filteredContent = ensureClaudeSubAgentName(agent.name, filteredContent);
-    const agentContent = filteredContent.endsWith("\n") ? filteredContent : filteredContent + "\n";
+    const agentContent = restoreValues(filteredContent.endsWith("\n") ? filteredContent : filteredContent + "\n", agentPath);
     try {
       fs.writeFileSync(agentPath, agentContent, "utf8");
     } catch (err) {

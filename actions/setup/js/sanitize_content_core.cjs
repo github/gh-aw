@@ -796,7 +796,9 @@ function applyFnOutsideInlineCode(text, fn, outerBefore = "", outerAfter = "", c
  * @param {(s: string) => string} [codeFn] - Optional transformation for code regions
  * @returns {string} The content with the transformation applied only outside code regions
  */
-function applyToNonCodeRegions(s, fn, codeFn = text => text) {
+function applyToNonCodeRegions(s, fn, codeFn) {
+  const hasCodeFn = codeFn !== undefined;
+  codeFn = codeFn ?? (text => text);
   if (!s || typeof s !== "string") {
     return s || "";
   }
@@ -829,7 +831,7 @@ function applyToNonCodeRegions(s, fn, codeFn = text => text) {
 
     return parts.join("");
   } catch (_e) {
-    if (arguments.length >= 3) throw _e;
+    if (hasCodeFn) throw _e;
     // Fallback: apply fn to the entire string (conservative – redacts more, never less)
     return fn(s, "", "");
   }

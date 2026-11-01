@@ -52,6 +52,9 @@ function renderMarkdownTemplate(markdown, resolveCondition = condition => condit
   if (_codeBlocks.length > 0) {
     core.info(`[renderMarkdownTemplate] Preserved ${_codeBlocks.length} code region(s) from template processing`);
   }
+  // Restore literal operands only after parsing directives, before resolving opaque context values.
+  /** @param {string} condition */
+  const resolveParsedCondition = condition => resolveCondition(condition.replace(codePattern, (_, i) => _codeBlocks[+i]));
 
   // Count conditionals before processing
   const blockConditionals = (_stripped.match(new RegExp(BLOCK_CONDITIONAL_REGEX.source, "g")) || []).length;
@@ -73,7 +76,7 @@ function renderMarkdownTemplate(markdown, resolveCondition = condition => condit
     core.info(`[renderMarkdownTemplate] Block ${blockCount}: condition="${condTrimmed}" -> evaluating branches`);
     core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > BLOCK_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
 
-    const selectedContent = selectBranch(cond, body, resolveCondition);
+    const selectedContent = selectBranch(cond, body, resolveParsedCondition);
 
     if (selectedContent !== null) {
       keptBlocks++;
@@ -101,7 +104,7 @@ function renderMarkdownTemplate(markdown, resolveCondition = condition => condit
     inlineCount++;
     const condTrimmed = cond.trim();
     const bodyPreview = body.substring(0, INLINE_BODY_PREVIEW_LENGTH).replace(/\n/g, "\\n");
-    const selectedContent = selectBranch(cond, body, resolveCondition);
+    const selectedContent = selectBranch(cond, body, resolveParsedCondition);
 
     core.info(`[renderMarkdownTemplate] Inline ${inlineCount}: condition="${condTrimmed}" -> ${selectedContent !== null ? "KEEP" : "REMOVE"}`);
     core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > INLINE_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
