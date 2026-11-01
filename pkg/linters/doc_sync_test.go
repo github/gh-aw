@@ -40,6 +40,7 @@ var notYetEnforced = map[string]string{
 	"lenstringzero":               "requires an enforcement audit after the diagnostic-message fix (#54717)",
 	"manualpathconcat":            "existing production violations need remediation",
 	"osisnotexist":                "existing os error predicates need case-by-case review before CI enforcement",
+	"osremoveuncheckedcleanup":    "new cleanup-error analyzer needs an enforcement-readiness audit before CI enforcement",
 	"packagelevelmutableslicemap": "existing production violations need remediation",
 	"readerstringconv":            "existing reader conversions need an enforcement-readiness audit before CI enables it",
 	"reflectdeepequalusage":       "existing reflect.DeepEqual uses need case-by-case review before CI enforcement",

@@ -54,6 +54,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
 	"github.com/github/gh-aw/pkg/linters/mapdeletecheck"
 	"github.com/github/gh-aw/pkg/linters/nilctxpassed"
+	osremoveuncheckedcleanup "github.com/github/gh-aw/pkg/linters/os-remove-unchecked-cleanup"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
@@ -111,7 +112,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 85 analyzer
+// "Public API > Subpackages" table. The README documents 86 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -120,7 +121,7 @@ type docAnalyzer struct {
 //	appendbytestring, appendoneelement, blankassigncomma, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage,
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
-//	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
+//	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osremoveuncheckedcleanup, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
 //	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
@@ -172,6 +173,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"osexitinlibrary", osexitinlibrary.Analyzer},
 		{"osgetenvlibrary", osgetenvlibrary.Analyzer},
 		{"osisnotexist", osisnotexist.Analyzer},
+		{"osremoveuncheckedcleanup", osremoveuncheckedcleanup.Analyzer},
 		{"ossetenvlibrary", ossetenvlibrary.Analyzer},
 		{"packagelevelmutableslicemap", packagelevelmutableslicemap.Analyzer},
 		{"panic-in-library-code", panicinlibrarycode.Analyzer},

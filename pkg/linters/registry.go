@@ -46,6 +46,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/mapclearloop"
 	"github.com/github/gh-aw/pkg/linters/mapdeletecheck"
 	"github.com/github/gh-aw/pkg/linters/nilctxpassed"
+	osremoveuncheckedcleanup "github.com/github/gh-aw/pkg/linters/os-remove-unchecked-cleanup"
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
@@ -143,6 +144,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	osexitinlibrary.Analyzer,
 	osgetenvlibrary.Analyzer,
 	osisnotexist.Analyzer,
+	osremoveuncheckedcleanup.Analyzer,
 	ossetenvlibrary.Analyzer,
 	packagelevelmutableslicemap.Analyzer,
 	panicinlibrarycode.Analyzer,

@@ -51,6 +51,7 @@ This package currently provides custom Go analyzers in the following subpackages
 - `nilctxpassed` — reports function calls where `nil` is passed as a `context.Context` argument; the correct idioms are `context.Background()` or `context.TODO()`.
 - `osgetenvlibrary` — reports `os.Getenv` calls in library packages (`pkg/*`) where environment access should be injected.
 - `osisnotexist` — reports `os.IsNotExist`, `os.IsExist`, `os.IsPermission`, and `os.IsTimeout`, which do not inspect arbitrary wrapped errors. Immediate checks of fresh, unmodified errors from direct filesystem `os` calls in an adjacent assignment or enclosing `if` initializer are exempt. Use `errors.Is` with `fs.ErrNotExist`, `fs.ErrExist`, or `fs.ErrPermission`. For timeouts, use `errors.As` with `interface{ Timeout() bool }` and check `Timeout()`; `errors.Is(err, os.ErrDeadlineExceeded)` only covers deadline errors, not every timeout.
+- `osremoveuncheckedcleanup` — reports bare `os.Remove` and `os.RemoveAll` statement calls whose returned error is discarded. Handle the error explicitly, e.g. log it or assign to `_`. The analyzer lives in `os-remove-unchecked-cleanup`.
 - `osexitinlibrary` — reports `os.Exit` calls in library packages (`pkg/*`) where process termination should be delegated to `cmd/*` entry points.
 - `ossetenvlibrary` — reports `os.Setenv` calls in library packages (`pkg/*`) where side effects should be isolated.
 - `packagelevelmutableslicemap` — reports package-level (file/package-scope) `var` slice/map declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()`. Mutations inside a top-level `init()` are exempt.
@@ -217,6 +218,7 @@ environment variable and gates findings on the recorded execution hit count for 
 | `nilctxpassed` | Custom `go/analysis` analyzer that flags function calls where `nil` is passed as a `context.Context` argument |
 | `osgetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Getenv` usage in library packages |
 | `osisnotexist` | Custom `go/analysis` analyzer that flags legacy `os` error predicates and recommends wrapped-error-aware checks |
+| `osremoveuncheckedcleanup` | Custom `go/analysis` analyzer that flags bare `os.Remove`/`os.RemoveAll` calls discarding errors |
 | `osexitinlibrary` | Custom `go/analysis` analyzer that flags `os.Exit` usage in library packages |
 | `ossetenvlibrary` | Custom `go/analysis` analyzer that flags `os.Setenv` usage in library packages |
 | `packagelevelmutableslicemap` | Custom `go/analysis` analyzer that flags package-level slice/map `var` declarations mutated from inside a function body via `append()` re-assignment, index assignment, or `delete()` |
@@ -370,6 +372,7 @@ _ = typeassertionnil.Analyzer
 - `github.com/github/gh-aw/pkg/linters/manualpathconcat` — manual-path-concat analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osgetenvlibrary` — os-getenv-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osisnotexist` — os-error-predicate analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/os-remove-unchecked-cleanup` — os-remove-cleanup analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/osexitinlibrary` — os-exit-in-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/ossetenvlibrary` — os-setenv-library analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap` — package-level-mutable-slice-map analyzer subpackage
