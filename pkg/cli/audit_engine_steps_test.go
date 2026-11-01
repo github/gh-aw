@@ -764,3 +764,67 @@ func TestAuditEngineStepFailure_EvalsSummaryRerunWithoutAttemptEvidence(t *testi
 
 	assert.Nil(t, buildEvalsSummary(processedRun.Run), "invocations that cannot be attributed to the audited attempt must not be summed")
 }
+
+func writeEvalsInvocationsWithAttemptEvidence(t *testing.T, attemptA, attemptB int) ProcessedRun {
+	t.Helper()
+	yesResults := strings.ReplaceAll(evalsPreflightResults40955414354, `"answer":"UNKNOWN"`, `"answer":"YES"`)
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		"aaaaaaaa-evals/evals.jsonl":          yesResults,
+		"aaaaaaaa-evals/evals/execution.json": evalsExecutionEvidence(attemptA, "started"),
+		"bbbbbbbb-evals/evals.jsonl":          evalsPreflightResults40955414354,
+		"bbbbbbbb-evals/evals/execution.json": evalsExecutionEvidence(attemptB, "started"),
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+	// Cached artifacts without run metadata leave the audited attempt unknown.
+	processedRun.Run.Attempt = 0
+	return processedRun
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryUnknownAttemptMixedEvidence(t *testing.T) {
+	processedRun := writeEvalsInvocationsWithAttemptEvidence(t, 1, 2)
+
+	assert.Nil(t, buildEvalsSummary(processedRun.Run), "an unknown audited attempt must not sum invocations of different attempts")
+}
+
+func TestAuditEngineStepFailure_EvalsSummaryUnknownAttemptSingleAttemptEvidence(t *testing.T) {
+	processedRun := writeEvalsInvocationsWithAttemptEvidence(t, 1, 1)
+
+	summary := buildEvalsSummary(processedRun.Run)
+
+	require.NotNil(t, summary)
+	assert.Equal(t, 4, summary.Questions)
+	assert.Equal(t, 2, summary.Yes)
+	assert.Equal(t, 2, summary.Unknown)
+}
+
+func TestAuditEngineStepFailure_EvalsSummarySharedJobLogLocation(t *testing.T) {
+	jobs := `[{"total_count":2,"jobs":[
+{"id":1,"run_id":40955414354,"name":"caller-a / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]},
+{"id":2,"run_id":40955414354,"name":"caller-b / evals","status":"completed","conclusion":"success","steps":[
+{"name":"Execute Claude Code CLI","status":"completed","conclusion":"success","number":15,"started_at":"2026-10-29T21:18:59Z","completed_at":"2026-10-29T21:19:44Z"}]}]}]`
+	yesResults := strings.ReplaceAll(evalsPreflightResults40955414354, `"answer":"UNKNOWN"`, `"answer":"YES"`)
+	runDir := t.TempDir()
+	writeEngineStepFixture(t, runDir, map[string]string{
+		jobsAPIResponseFileName: jobs,
+		// Both jobs fall back to the same base-name log.
+		"workflow-logs/3_evals.txt":           evalsUploadJobLog("aaaaaaaa-"),
+		"aaaaaaaa-evals/evals.jsonl":          yesResults,
+		"aaaaaaaa-evals/evals/execution.json": evalsExecutionEvidence(1, "started"),
+		"bbbbbbbb-evals/evals.jsonl":          evalsPreflightResults40955414354,
+		"bbbbbbbb-evals/evals/execution.json": evalsExecutionEvidence(1, "started"),
+	})
+	processedRun := engineStepFixtureRun(t, runDir, 40955414354, "Reusable Evals", "success")
+
+	prefixes, complete := evalsUploadPrefixesFromJobLogs(runDir)
+	assert.False(t, complete, "a log location shared by two evals jobs cannot identify both prefixes")
+	assert.Equal(t, map[string]bool{"aaaaaaaa-": true}, prefixes)
+
+	summary := buildEvalsSummary(processedRun.Run)
+
+	require.NotNil(t, summary)
+	assert.Equal(t, 4, summary.Questions, "execution evidence attributes the other invocation")
+	assert.Equal(t, 2, summary.Yes)
+	assert.Equal(t, 2, summary.Unknown)
+}

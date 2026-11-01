@@ -1,8 +1,8 @@
 # ADR-73886: Scope Evals Summaries to Audited Attempts
 
 **Date**: 2026-11-01
-**Status**: Draft
-**Deciders**: gh-aw maintainers (review pending)
+**Status**: Proposed
+**Deciders**: gh-aw maintainers
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### Decision
 
-We will select eval result files for the audited run attempt before aggregating their summaries, counting each artifact prefix once. The audit will use eval-job upload prefixes from cached job logs when complete, fall back to `run_attempt` in per-invocation execution evidence when necessary, and conservatively return no aggregate when a rerun's multiple invocations cannot be attributed. Root-level flattened `evals.jsonl` files will be assigned to their single missing logged prefix when possible, and otherwise will not be counted as an additional invocation beside prefixed copies.
+We will select eval result files for the audited run attempt before aggregating their summaries, counting each artifact prefix once. Prefixes logged by the upload step of the evals jobs in the cached jobs API response (the audited attempt's jobs) are always selected. When every listed evals job logged its prefix from its own log location, no other prefix is counted; when any evals job's prefix is unknown, or two evals jobs resolve to the same log file or directory (for example both falling back to one base-name log), the job logs are treated as incomplete and the remaining prefixes are attributed by the `run_attempt` in their evals execution evidence. Without evidence, a remaining prefix is counted on the first attempt, while a rerun with several invocations returns no summary. An unknown audited attempt (`0`, as left for cached artifacts without run metadata) is not a wildcard: its prefixes are counted as on a first attempt unless the selected prefixes' execution evidence records more than one distinct `run_attempt`, in which case no summary is returned. Root-level flattened `evals.jsonl` files will be assigned to their single missing logged prefix when possible, and otherwise will not be counted as an additional invocation beside prefixed copies. The audit cache schema version is bumped so cached reports with inflated counts are regenerated.
 
 ### Alternatives Considered
 
@@ -36,15 +36,16 @@ This would provide a direct attempt value and make selection deterministic. It w
 - When attribution is unavailable for a rerun, the audit avoids publishing an inflated summary instead of presenting uncertain data as fact.
 
 #### Negative
+- Cached audit reports from the previous schema version are regenerated once.
 - Audit summary generation now depends on cached job logs and execution-evidence files in addition to `evals.jsonl` contents.
 - Incomplete historical artifacts can produce a missing summary rather than a partial or best-effort aggregate, which may require investigation by operators.
 - The artifact naming and flattening rules must remain aligned with the assignment logic as eval uploads evolve.
 
 #### Neutral
 - The existing per-invocation summarization and findings path are retained; only the set of files passed to the aggregator changes.
-- First attempts without attribution evidence continue to include all discovered invocations because there cannot be a prior rerun to mix in.
+- First attempts, and unknown attempts whose evidence shows at most one attempt, continue to include all discovered invocations.
 - The behavior is covered by fixtures for job-log attribution, execution-evidence fallback, flattened artifacts, and unresolvable reruns.
 
 ---
 
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+*ADR created by [adr-writer agent]. Review and finalize before changing status from Proposed to Accepted.*

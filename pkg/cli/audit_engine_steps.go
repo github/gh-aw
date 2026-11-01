@@ -174,7 +174,9 @@ func findEvalsInvocationResultFiles(runDir string) map[string]string {
 // prefixes are attributed first by the upload prefixes logged by the evals jobs of the
 // cached jobs API response (the audited attempt's jobs), then by the run_attempt in
 // each prefix's evals execution evidence. The second result is false when several
-// invocations are present on a rerun and their attempt cannot be determined.
+// invocations are present on a rerun and their attempt cannot be determined, or when
+// the audited attempt is unknown (0) and the selected invocations' execution evidence
+// records more than one attempt.
 func auditedAttemptEvalsResultFiles(run WorkflowRun, files map[string]string) (map[string]string, bool) {
 	if len(files) == 0 {
 		return files, true
@@ -192,6 +194,8 @@ func auditedAttemptEvalsResultFiles(run WorkflowRun, files map[string]string) (m
 			continue
 		}
 		if attempt, ok := evalsExecutionAttempt(run, prefix); ok {
+			// An unknown audited attempt is checked against the other selected
+			// invocations' evidence below.
 			if run.Attempt == 0 || attempt == run.Attempt {
 				selected[prefix] = path
 			} else {
@@ -205,12 +209,26 @@ func auditedAttemptEvalsResultFiles(run WorkflowRun, files map[string]string) (m
 		}
 		selected[prefix] = path
 	}
+	if run.Attempt == 0 {
+		attempts := map[int]bool{}
+		for prefix := range selected {
+			if attempt, ok := evalsExecutionAttempt(run, prefix); ok {
+				attempts[attempt] = true
+			}
+		}
+		if len(attempts) > 1 {
+			auditEngineStepsLog.Printf("Evals invocations of an unknown audited attempt record %d run attempts", len(attempts))
+			return nil, false
+		}
+	}
 	return selected, true
 }
 
 // evalsUploadPrefixesFromJobLogs returns the evals artifact prefixes uploaded by the
 // evals jobs listed in the cached jobs API response. The second result is true only
-// when at least one evals job is listed and every listed evals job logged its prefix.
+// when at least one evals job is listed and every listed evals job logged its prefix
+// in its own log location; a location shared by several evals jobs (such as one
+// base-name log matched by two callers) leaves the other jobs' prefixes unknown.
 func evalsUploadPrefixesFromJobLogs(logsPath string) (map[string]bool, bool) {
 	prefixes := map[string]bool{}
 	if logsPath == "" {
@@ -218,9 +236,18 @@ func evalsUploadPrefixesFromJobLogs(logsPath string) (map[string]bool, bool) {
 	}
 	workflowLogsDir := filepath.Join(logsPath, "workflow-logs")
 	complete := true
+	seenLocations := map[jobLogLocation]bool{}
 	for _, job := range loadCachedJobDetails(logsPath) {
 		if engineStepJobKind(job.Name) != string(constants.EvalsJobName) || strings.EqualFold(strings.TrimSpace(job.Conclusion), "skipped") {
 			continue
+		}
+		if location := locateJobLogs(workflowLogsDir, job.JobInfo); location != (jobLogLocation{}) {
+			if seenLocations[location] {
+				auditEngineStepsLog.Printf("Evals job %q reuses another evals job's log location", job.Name)
+				complete = false
+				continue
+			}
+			seenLocations[location] = true
 		}
 		prefix, known := evalsArtifactPrefixFromLog(readJobLogLines(workflowLogsDir, job.JobInfo))
 		if !known {
