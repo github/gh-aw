@@ -1820,6 +1820,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1857,6 +1858,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2506,6 +2508,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"tone_style_goal_met","question":"Does the agent output show that the objective for experiment tone_style was successfully completed?"}]'
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "claude"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -2557,6 +2561,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -2656,7 +2661,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()

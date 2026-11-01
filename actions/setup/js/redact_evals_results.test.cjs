@@ -3,6 +3,7 @@ import fs from "fs";
 
 const OUTPUT_DIR = "/tmp/gh-aw";
 const OUTPUT_PATH = "/tmp/gh-aw/evals.jsonl";
+const STATUS_PATH = "/tmp/gh-aw/evals_status.json";
 const MCP_CONFIG_DIR = `${process.env.RUNNER_TEMP || "/tmp"}/gh-aw/mcp-config`;
 const GATEWAY_OUTPUT_PATH = `${MCP_CONFIG_DIR}/gateway-output.json`;
 
@@ -31,6 +32,7 @@ describe("redact_evals_results.cjs", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    fs.rmSync(STATUS_PATH, { force: true });
     if (fs.existsSync(OUTPUT_PATH)) {
       fs.unlinkSync(OUTPUT_PATH);
     }
@@ -76,6 +78,21 @@ describe("redact_evals_results.cjs", () => {
     await module.main();
 
     expect(fs.readFileSync(OUTPUT_PATH, "utf8")).toContain("***REDACTED***");
+    expect(mockCore.setFailed).not.toHaveBeenCalled();
+  });
+
+  it("redacts and verifies the not-evaluated marker", async () => {
+    process.env.GH_AW_SECRET_NAMES = "EVALS_SECRET";
+    process.env.SECRET_EVALS_SECRET = "super-secret-value";
+    const marker = { status: "not_evaluated", reason_code: "judge_failed", reason: "Contains super-secret-value" };
+    fs.writeFileSync(STATUS_PATH, JSON.stringify(marker) + "\n", "utf8");
+
+    module.verifyRedaction();
+    expect(mockCore.setFailed).toHaveBeenCalledWith(`Secret redaction verification failed for ${STATUS_PATH}: unredacted values remain`);
+
+    mockCore.setFailed.mockClear();
+    await module.main();
+    expect(fs.readFileSync(STATUS_PATH, "utf8")).not.toContain("super-secret-value");
     expect(mockCore.setFailed).not.toHaveBeenCalled();
   });
 

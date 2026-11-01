@@ -1843,6 +1843,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1880,6 +1881,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2548,6 +2550,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"container_images_scanned","question":"Did the agent analyze container images for vulnerabilities, updates, and rejected licenses?"},{"id":"findings_reported_or_noop","question":"Did the agent report actionable image findings, or use noop when no findings required action?"},{"id":"critical_burn_down_tracked","question":"Did the agent maintain one burn-down issue per image family and the index in issue 52657, mapping every finding to a fixed version or a documented exception and stating the remediation SLA?"},{"id":"superseded_image_findings_closed","question":"Did the agent close legacy per-tag findings only when their exact image reference was no longer used by the compiler?"},{"id":"cves_mapped_or_excepted","question":"Does every reported CVE identify a fixed package/image version or a documented exception with its reason and review details?"},{"id":"upstream_vendored_triaged","question":"Did the agent classify each finding as vendored (fixable in this repo) or upstream (owned by another repository), and avoid requesting a local code-fix PR for upstream-owned findings?"}]'
           GH_AW_EVALS_MODEL: "evals"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "copilot"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -2599,6 +2603,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -2698,7 +2703,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()

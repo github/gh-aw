@@ -324,7 +324,7 @@ func buildUsageArtifactInputDownloadSteps(prefix string, hasEvals bool, experime
 
 // buildUsageArtifactUploadSteps creates steps that collect and upload a compact usage artifact.
 // The artifact includes aw_info.json, aw-info.jsonl, agent_usage.json, agent_usage.jsonl, detection_usage.jsonl,
-// evals.jsonl, evals token usage and execution evidence, A/B experiment state and assignments,
+// evals.jsonl, evals token usage, execution evidence and not-evaluated marker, A/B experiment state and assignments,
 // grader results, threat-detection outcome/verdict, and agent/detection token usage and
 // model-routing JSONL files
 // (when present), so the audit command can mine these results from the usage artifact alone.
@@ -369,6 +369,7 @@ func buildUsageArtifactUploadStep(prefix string, pinAction func(string) string) 
 		"            /tmp/gh-aw/usage/detection/detection_result.json\n",
 		"            /tmp/gh-aw/usage/evals/token_usage.jsonl\n",
 		"            /tmp/gh-aw/usage/evals/execution.json\n",
+		"            /tmp/gh-aw/usage/evals/evals_status.json\n",
 		"            /tmp/gh-aw/usage/experiment/state.jsonl\n",
 		"            /tmp/gh-aw/usage/experiment/state.json\n",
 		"            /tmp/gh-aw/usage/experiment/assignments.json\n",

@@ -13,14 +13,21 @@
  *   - Writes combined and split prompt files under /tmp/gh-aw/aw-prompts
  *
  * Phase "parse" (runs AFTER the agentic engine):
- *   - Reads the engine output log from /tmp/gh-aw/evals/evals.log
+ *   - Classifies the judge execution from its raw step outcome and the scoped
+ *     /tmp/gh-aw/evals/execution.json evidence
+ *   - Reads the engine output log from /tmp/gh-aw/evals/evals.log and extracts
+ *     the judge's assistant response
  *   - Extracts YES/NO answer for each question by ID or by position
- *   - Writes structured results to /tmp/gh-aw/evals.jsonl
+ *   - Writes structured results to /tmp/gh-aw/evals.jsonl, or, when the judge
+ *     did not start, failed, or produced no response, writes only the run-level
+ *     marker /tmp/gh-aw/evals_status.json (status: not_evaluated)
  *
  * Environment variables:
- *   GH_AW_EVALS_QUESTIONS   JSON array of { id, question } objects
- *   GH_AW_EVALS_PHASE       "setup" (default) or "parse"
- *   GH_AW_EVALS_MODEL       LLM model name recorded in output metadata
+ *   GH_AW_EVALS_QUESTIONS          JSON array of { id, question } objects
+ *   GH_AW_EVALS_PHASE              "setup" (default) or "parse"
+ *   GH_AW_EVALS_MODEL              LLM model name recorded in output metadata
+ *   GH_AW_EVALS_ENGINE             Engine ID that ran the judge (parse phase)
+ *   GH_AW_EVALS_EXECUTION_OUTCOME  Raw outcome of the evals_agentic_execution step (parse phase)
  *
  * Design note: this file is intentionally engine-agnostic. The engine is
  * installed and executed by separate Go-generated GitHub Actions steps that
@@ -36,7 +43,9 @@ const path = require("path");
 
 const { ERR_VALIDATION, ERR_SYSTEM } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { EVALS_OUTPUT_PATH } = require("./evals_constants.cjs");
+const { EVALS_OUTPUT_PATH, EVALS_STATUS_PATH, EVALS_EXECUTION_EVIDENCE_PATH } = require("./evals_constants.cjs");
+const { EVALS_NOT_EVALUATED, EVALS_REASON_CODES } = require("./evals_status.cjs");
+const { parseEngineLog } = require("./engine_log_parser.cjs");
 const { readExperimentAssignments } = require("./experiment_helpers.cjs");
 const { resolveModelWithFallback } = require("./model_fallback.cjs");
 
@@ -146,12 +155,20 @@ async function setupMain() {
 /**
  * Reads the engine log, extracts per-question YES/NO answers, and writes
  * structured JSONL records to the evals output file.
+ *
+ * The judge execution is classified before any answer is extracted. When the
+ * judge did not start, failed, was skipped, or produced no assistant response,
+ * no question records are written; a run-level not-evaluated marker
+ * (evals_status.json) is written instead so infrastructure failures are not
+ * persisted as UNKNOWN answers.
  * @returns {Promise<void>}
  */
 async function parseMain() {
   const questionsRaw = process.env.GH_AW_EVALS_QUESTIONS;
   const model = resolveModelWithFallback(process.env, "GH_AW_EVALS_MODEL") || "";
   const runID = process.env.GITHUB_RUN_ID || "unknown";
+  const runAttempt = process.env.GITHUB_RUN_ATTEMPT || "";
+  const engine = normalizeEngineID(process.env.GH_AW_EVALS_ENGINE);
   const experimentAssignments = readExperimentAssignments();
 
   /** @type {Array<{id: string, question: string}>} */
@@ -164,30 +181,41 @@ async function parseMain() {
     }
   }
 
-  if (!fs.existsSync(EVALS_LOG_PATH)) {
-    core.warning(`Evals log not found at ${EVALS_LOG_PATH}; no results written`);
-    try {
-      fs.writeFileSync(EVALS_OUTPUT_PATH, "");
-    } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to write file ${EVALS_OUTPUT_PATH}: ${getErrorMessage(err)}`, { cause: err });
-    }
+  const identity = { engine, model, runID, runAttempt };
+  const execution = classifyJudgeExecution(process.env.GH_AW_EVALS_EXECUTION_OUTCOME, readEvalsExecutionEvidence(runID, runAttempt), engine);
+  if (execution.reasonCode) {
+    writeNotEvaluatedStatus({ ...identity, ...execution });
     return;
   }
 
-  let logContent;
-  try {
-    logContent = fs.readFileSync(EVALS_LOG_PATH, "utf-8");
-  } catch (err) {
-    throw new Error(`${ERR_SYSTEM}: Failed to read file ${EVALS_LOG_PATH}: ${getErrorMessage(err)}`, { cause: err });
+  let logContent = "";
+  if (fs.existsSync(EVALS_LOG_PATH)) {
+    try {
+      logContent = fs.readFileSync(EVALS_LOG_PATH, "utf-8");
+    } catch (err) {
+      throw new Error(`${ERR_SYSTEM}: Failed to read file ${EVALS_LOG_PATH}: ${getErrorMessage(err)}`, { cause: err });
+    }
+    core.info(`Parsing evals log: ${EVALS_LOG_PATH} (${logContent.length} bytes)`);
+  } else {
+    core.warning(`Evals log not found at ${EVALS_LOG_PATH}`);
   }
-  core.info(`Parsing evals log: ${EVALS_LOG_PATH} (${logContent.length} bytes)`);
 
-  // Prefer assistant text extracted from JSONL so echoed user prompts cannot
-  // override the judge response. Fall back to the raw log for plain-text engines.
-  const extractedText = extractAssistantTextFromJsonlLog(logContent);
-  const searchContent = extractedText || logContent;
+  // Only assistant response text from an identified judge-response channel may
+  // supply answers. Echoed prompts, tool output, reasoning, and AWF diagnostics
+  // are excluded so they cannot be mistaken for a judgment.
+  const searchContent = extractJudgeResponse(logContent, engine);
+  if (!searchContent.trim()) {
+    writeNotEvaluatedStatus({
+      ...identity,
+      ...execution,
+      reasonCode: EVALS_REASON_CODES.NO_ASSISTANT_RESPONSE,
+      reason: `The ${engineLabel(engine)}evals judge completed but produced no assistant response text, so no answers were recorded.`,
+    });
+    return;
+  }
+  removeFile(EVALS_STATUS_PATH);
 
-  // Collect all positional Q1/Q2/... answers from the log for fallback lookup
+  // Collect all positional Q1/Q2/... answers from the response for fallback lookup
   const positionalAnswers = extractAllPositionalAnswers(searchContent);
 
   const timestamp = new Date().toISOString();
@@ -224,6 +252,283 @@ async function parseMain() {
   core.info(`BinEval results written to ${EVALS_OUTPUT_PATH} (${results.length} record(s))`);
   // Step summary rendering is handled by the dedicated render_evals_summary.cjs step
   // that runs after secret redaction, so the published summary is always redacted.
+}
+
+// ---------------------------------------------------------------------------
+// Judge execution classification
+// ---------------------------------------------------------------------------
+
+const KNOWN_EXECUTION_OUTCOMES = new Set(["success", "failure", "cancelled", "skipped"]);
+
+// Engines whose judge output is a structured event stream. A successful run of
+// these engines must contain assistant message events; raw text is never used.
+const STRUCTURED_JUDGE_ENGINES = new Set(["claude", "codex", "pi"]);
+
+/**
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+function normalizeEngineID(value) {
+  const engine = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return /^[a-z][a-z0-9-]{0,63}$/.test(engine) ? engine : "";
+}
+
+/**
+ * @param {string} engine
+ * @returns {string}
+ */
+function engineLabel(engine) {
+  return engine ? `${engine} ` : "";
+}
+
+/**
+ * Reads the evals component execution evidence and returns its state only when
+ * it is scoped to the evals component of the current run and attempt.
+ * @param {string} runID
+ * @param {string} runAttempt
+ * @returns {{state: string} | null}
+ */
+function readEvalsExecutionEvidence(runID, runAttempt) {
+  if (!fs.existsSync(EVALS_EXECUTION_EVIDENCE_PATH)) {
+    return null;
+  }
+  let evidence;
+  try {
+    evidence = JSON.parse(fs.readFileSync(EVALS_EXECUTION_EVIDENCE_PATH, "utf8"));
+  } catch {
+    core.warning(`Evals execution evidence at ${EVALS_EXECUTION_EVIDENCE_PATH} is not valid JSON; ignoring it`);
+    return null;
+  }
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    return null;
+  }
+  const matches = evidence.component === "evals" && runID !== "" && String(evidence.run_id) === runID && runAttempt !== "" && String(evidence.run_attempt) === runAttempt;
+  if (!matches || (evidence.state !== "not_started" && evidence.state !== "started")) {
+    core.warning(`Evals execution evidence at ${EVALS_EXECUTION_EVIDENCE_PATH} does not match this evals run; ignoring it`);
+    return null;
+  }
+  return { state: evidence.state };
+}
+
+/**
+ * Classifies the evals judge execution from the raw GitHub Actions outcome of the
+ * evals_agentic_execution step (not its continue-on-error conclusion) and the
+ * scoped component execution evidence. Returns an empty reasonCode only when the
+ * execution succeeded and its response may be inspected.
+ * @param {string | undefined} rawOutcome
+ * @param {{state: string} | null} evidence
+ * @param {string} engine
+ * @returns {{reasonCode: string, reason: string, executionOutcome: string, executionState: string}}
+ */
+function classifyJudgeExecution(rawOutcome, evidence, engine) {
+  const normalized = String(rawOutcome ?? "")
+    .trim()
+    .toLowerCase();
+  const executionOutcome = KNOWN_EXECUTION_OUTCOMES.has(normalized) ? normalized : "";
+  const executionState = evidence ? evidence.state : "";
+  const judge = `${engineLabel(engine)}evals judge`;
+  const base = { executionOutcome, executionState };
+
+  if (executionOutcome === "success") {
+    return { ...base, reasonCode: "", reason: "" };
+  }
+  if (executionOutcome && executionOutcome !== "skipped" && executionState === "not_started") {
+    return {
+      ...base,
+      reasonCode: EVALS_REASON_CODES.JUDGE_NOT_STARTED,
+      reason: `The ${judge} did not start: the sandbox failed before the engine harness started (execution step outcome: ${executionOutcome}).`,
+    };
+  }
+  if (executionOutcome === "skipped") {
+    return { ...base, reasonCode: EVALS_REASON_CODES.JUDGE_NOT_STARTED, reason: `The ${judge} did not start: its execution step was skipped.` };
+  }
+  if (executionOutcome) {
+    return {
+      ...base,
+      reasonCode: EVALS_REASON_CODES.JUDGE_FAILED,
+      reason: `The ${judge} execution step finished with outcome ${executionOutcome}, so its output was not used for answers.`,
+    };
+  }
+  return {
+    ...base,
+    reasonCode: EVALS_REASON_CODES.EXECUTION_EVIDENCE_UNAVAILABLE,
+    reason: `The ${judge} execution outcome is unavailable, so its output was not used for answers.`,
+  };
+}
+
+/**
+ * Writes the run-level not-evaluated marker and removes any stale answer file.
+ * @param {{engine: string, model: string, runID: string, runAttempt: string, reasonCode: string, reason: string, executionOutcome: string, executionState: string}} details
+ */
+function writeNotEvaluatedStatus(details) {
+  removeFile(EVALS_OUTPUT_PATH);
+  /** @type {Record<string, string>} */
+  const marker = {
+    status: EVALS_NOT_EVALUATED,
+    reason_code: details.reasonCode,
+    reason: details.reason.slice(0, 500),
+    engine: details.engine,
+    model: details.model,
+    run_id: details.runID,
+    run_attempt: details.runAttempt,
+    timestamp: new Date().toISOString(),
+  };
+  if (details.executionOutcome) marker.execution_outcome = details.executionOutcome;
+  if (details.executionState) marker.execution_state = details.executionState;
+  for (const key of Object.keys(marker)) {
+    if (marker[key] === "") delete marker[key];
+  }
+  try {
+    fs.writeFileSync(EVALS_STATUS_PATH, JSON.stringify(marker) + "\n");
+  } catch (err) {
+    throw new Error(`${ERR_SYSTEM}: Failed to write file ${EVALS_STATUS_PATH}: ${getErrorMessage(err)}`, { cause: err });
+  }
+  core.warning(`Evals not evaluated (${details.reasonCode}): ${marker.reason}`);
+  core.info(`BinEval not-evaluated marker written to ${EVALS_STATUS_PATH}; no answer records written`);
+}
+
+/**
+ * @param {string} filePath
+ */
+function removeFile(filePath) {
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch (err) {
+    throw new Error(`${ERR_SYSTEM}: Failed to remove stale file ${filePath}: ${getErrorMessage(err)}`, { cause: err });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Judge response extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the judge's assistant response text, or an empty string when the log
+ * contains no identifiable assistant response.
+ *
+ * Structured engine logs (Claude stream-json, Copilot and Codex JSONL events,
+ * Pi turn events) yield only assistant message text via the engine-aware session
+ * parsers. Plain-text output is accepted only when the log has no structured
+ * records and the engine is not one that always emits structured events; AWF
+ * and harness diagnostic lines are removed from it first.
+ * @param {string} logContent
+ * @param {string} engine
+ * @returns {string}
+ */
+function extractJudgeResponse(logContent, engine) {
+  if (!logContent.trim()) {
+    return "";
+  }
+  const structuredText = extractEngineAssistantText(logContent, engine) || extractAssistantTextFromJsonlLog(logContent);
+  if (structuredText.trim()) {
+    return structuredText;
+  }
+  if (STRUCTURED_JUDGE_ENGINES.has(engine) || hasStructuredRecords(logContent)) {
+    return "";
+  }
+  return extractPlainTextResponse(logContent);
+}
+
+/**
+ * Extracts assistant message text using the engine's session log parser.
+ * @param {string} logContent
+ * @param {string} engine
+ * @returns {string}
+ */
+function extractEngineAssistantText(logContent, engine) {
+  if (!engine || !hasStructuredRecords(logContent)) {
+    return "";
+  }
+  let parsed;
+  try {
+    parsed = parseEngineLog(logContent, engine);
+  } catch (err) {
+    core.warning(`Failed to parse ${engine} evals log for assistant responses: ${getErrorMessage(err)}`);
+    return "";
+  }
+  const entries = Array.isArray(parsed?.logEntries) ? parsed.logEntries : [];
+  // Streamed delta fragments (Gemini stream-json) belong to one message: join
+  // consecutive fragments verbatim, keeping whitespace-only fragments, and use
+  // "\n" only between complete messages.
+  const texts = [];
+  let previousWasDelta = false;
+  for (const event of entries) {
+    if (event?.type !== "assistant.message" || typeof event.data?.content !== "string") {
+      previousWasDelta = false;
+      continue;
+    }
+    const content = event.data.content;
+    if (event.data.delta === true) {
+      if (previousWasDelta) {
+        texts[texts.length - 1] += content;
+      } else {
+        texts.push(content);
+      }
+      previousWasDelta = true;
+    } else {
+      texts.push(content);
+      previousWasDelta = false;
+    }
+  }
+  return texts.filter(text => text.trim()).join("\n");
+}
+
+/**
+ * Reports whether the log contains at least one JSON event record.
+ * @param {string} logContent
+ * @returns {boolean}
+ */
+function hasStructuredRecords(logContent) {
+  for (const record of iterateJsonl(logContent, {
+    lineFilter: line => line.includes("{"),
+    lineTransform: line => line.slice(line.indexOf("{")),
+  })) {
+    if (record && typeof record === "object" && !Array.isArray(record) && typeof record.type === "string") {
+      return true;
+    }
+  }
+  return false;
+}
+
+// AWF, container-runtime, harness, and GitHub Actions diagnostic lines that are
+// never part of a judge response.
+const DIAGNOSTIC_LINE_PATTERNS = [
+  /^\[[^\]\n]{1,64}\]/, // [INFO], [WARN], [entrypoint], [health-check][ERROR], [claude-awf-retry]
+  /^(?:Container|Network|Volume) awf-/,
+  /^Process exiting with code\b/,
+  /^(?:No component admission allowance|Admission allowance applied)\b/,
+  /^(?:##\[|::)/,
+];
+
+/**
+ * Removes diagnostic lines (and their indented continuation lines such as stack
+ * traces) from plain-text engine output, keeping only candidate response text.
+ * @param {string} logContent
+ * @returns {string}
+ */
+function extractPlainTextResponse(logContent) {
+  const kept = [];
+  let inDiagnostic = false;
+  for (const line of iterateLines(logContent)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      inDiagnostic = false;
+      kept.push("");
+      continue;
+    }
+    if (DIAGNOSTIC_LINE_PATTERNS.some(pattern => pattern.test(trimmed))) {
+      inDiagnostic = true;
+      continue;
+    }
+    if (inDiagnostic && (/^\s/.test(line) || /^[}\])]+[,;]?$/.test(trimmed))) {
+      continue;
+    }
+    inDiagnostic = false;
+    kept.push(line);
+  }
+  return kept.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -358,4 +663,4 @@ function extractAssistantTextFromJsonlLog(logContent) {
   return texts.join("\n");
 }
 
-module.exports = { main, setupMain, parseMain, extractAssistantTextFromJsonlLog };
+module.exports = { main, setupMain, parseMain, extractAssistantTextFromJsonlLog, extractJudgeResponse, classifyJudgeExecution };

@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"os"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/workflow"
@@ -138,4 +139,42 @@ func TestParseEvalAnswerValue(t *testing.T) {
 
 	_, ok = parseEvalAnswerValue("UNKNOWN")
 	assert.False(t, ok)
+}
+
+// A run whose evals judge was not evaluated publishes no answer rows, so it follows the
+// missing-eval exclusion path instead of the genuine-UNKNOWN invalid-value path and never
+// enters answer totals.
+func TestNotEvaluatedEvalsRunExcludedAsMissingRecord(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile("../../actions/setup/js/fixtures/evals/state-claudecodeuserdocsreview.jsonl")
+	require.NoError(t, err)
+	// Successful judge rows from the state branch plus a synthetic genuine UNKNOWN judgment.
+	data = append(data, []byte(`{"id":"docs_reviewed","question":"Did the agent review the project documentation from the perspective of a Claude Code user?","answer":"UNKNOWN","model":"evals","timestamp":"2026-10-30T09:00:00.000Z","runid":"41100000001"}`+"\n")...)
+	records := parseEvalResultRecords(data)
+
+	summary := summarizeMetricEvalResults(records)
+	assert.Equal(t, MetricEvalResults{Total: 4, Yes: 3, Unknown: 1, LatestAnswer: "UNKNOWN", LatestRunID: "41100000001"}, summary["docs_reviewed"], "the not-evaluated run must not enter answer totals")
+
+	experiments := []ExperimentVariantStats{{
+		Name:     "prompt",
+		Variants: map[string]int{"control": 3, "candidate": 2},
+		Total:    5,
+	}}
+	runs := []ExperimentRunRecord{
+		{RunID: "40873948419", Assignments: map[string]string{"prompt": "control"}},
+		{RunID: "40955414354", Assignments: map[string]string{"prompt": "control"}},
+		{RunID: "40977340064", Assignments: map[string]string{"prompt": "candidate"}},
+		{RunID: "41055931291", Assignments: map[string]string{"prompt": "control"}},
+		{RunID: "41100000001", Assignments: map[string]string{"prompt": "candidate"}},
+	}
+	set := buildEvalMetricObservationSets(experiments, runs, map[string]string{"prompt": "docs_reviewed"}, records)["prompt"]
+	require.NotNil(t, set)
+	assert.Len(t, set.ByVariant["control"], 2)
+	assert.Len(t, set.ByVariant["candidate"], 1)
+
+	controlExclusions := exclusionsByReason(set.Exclusions["control"])
+	assert.Equal(t, []string{"40955414354"}, controlExclusions[exclusionEvalRecordUnavailable].RunIDs)
+	assert.Zero(t, controlExclusions[exclusionInvalidValue].Count)
+	candidateExclusions := exclusionsByReason(set.Exclusions["candidate"])
+	assert.Equal(t, []string{"41100000001"}, candidateExclusions[exclusionInvalidValue].RunIDs, "a genuine UNKNOWN judgment keeps the invalid-value path")
 }

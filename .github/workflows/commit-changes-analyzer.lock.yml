@@ -1705,6 +1705,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -1742,6 +1743,7 @@ jobs:
             /tmp/gh-aw/usage/detection/detection_result.json
             /tmp/gh-aw/usage/evals/token_usage.jsonl
             /tmp/gh-aw/usage/evals/execution.json
+            /tmp/gh-aw/usage/evals/evals_status.json
             /tmp/gh-aw/usage/experiment/state.jsonl
             /tmp/gh-aw/usage/experiment/state.json
             /tmp/gh-aw/usage/experiment/assignments.json
@@ -2456,6 +2458,8 @@ jobs:
           GH_AW_EVALS_QUESTIONS: '[{"id":"changes_analyzed","question":"Did the agent analyze all repository changes since the specified commit and produce a comprehensive report?"},{"id":"discussion_created","question":"Was a discussion or report created summarizing the changes since the specified commit?"},{"id":"reviewer_ready","question":"Does the report connect at least one changed file or commit, identified by a repository link, to a concrete developer implication and a specific recommended review action?"},{"id":"detail_variant_visible","question":"Does the report state its assigned detail level and follow that level in Developer Notes: brief uses at most one explanatory sentence per affected functional area, while comprehensive uses two or three?"}]'
           GH_AW_EVALS_MODEL: "copilot/gpt-5.6-luna"
           GH_AW_EVALS_PHASE: parse
+          GH_AW_EVALS_ENGINE: "codex"
+          GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_agentic_execution.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
@@ -2507,6 +2511,7 @@ jobs:
           name: evals
           path: |
             /tmp/gh-aw/evals.jsonl
+            /tmp/gh-aw/evals_status.json
             /tmp/gh-aw/evals_token_usage.jsonl
             /tmp/gh-aw/evals/execution.json
           if-no-files-found: ignore
@@ -2606,7 +2611,7 @@ jobs:
             const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'push_experiment_state.cjs'));
+            const { main } = require(path.join(actionsDir, 'push_evals_state.cjs'));
             await main();
       - name: Restore actions folder
         if: always()
