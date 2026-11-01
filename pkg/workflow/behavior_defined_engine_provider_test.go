@@ -36,8 +36,9 @@ func TestBehaviorDefinedEngine_CopilotClientKey(t *testing.T) {
 						SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf", Disabled: disabled}},
 					}
 					firewallEnabled := engine.behaviorDefinedFirewallEnabled(data)
-					env := engine.buildBehaviorDefinedExecutionEnv(def.Behaviors.Execution, data, firewallEnabled)
-					command := engine.buildBehaviorDefinedExecutionCommand(def.Behaviors.Execution, data, "/tmp/test.log", "true", firewallEnabled)
+					backend := engine.resolveBackend(data)
+					env := engine.buildBehaviorDefinedExecutionEnv(def.Behaviors.Execution, data, firewallEnabled, backend)
+					command := engine.buildBehaviorDefinedExecutionCommand(def.Behaviors.Execution, data, "/tmp/test.log", "true", firewallEnabled, backend)
 					keyExport := `export OPENAI_API_KEY="$COPILOT_DUMMY_BYOK"`
 					if model == "copilot/gpt-5" {
 						assert.NotContains(t, env, "OPENAI_API_KEY")
@@ -45,7 +46,7 @@ func TestBehaviorDefinedEngine_CopilotClientKey(t *testing.T) {
 					if model == "copilot/gpt-5" && !disabled {
 						assert.Equal(t, constants.CopilotBYOKDummyAPIKey, env[constants.CopilotBYOKDummyAPIKeyEnvVar])
 						assert.Contains(t, command, "-- /bin/bash -c 'set +o histexpand; "+keyExport)
-						step := strings.Join(engine.buildBehaviorDefinedExecutionStep(def.Behaviors.Execution, data, command, env), "\n")
+						step := strings.Join(engine.buildBehaviorDefinedExecutionStep(def.Behaviors.Execution, data, command, env, backend), "\n")
 						assert.Contains(t, step, "COPILOT_DUMMY_BYOK: "+constants.CopilotBYOKDummyAPIKey)
 						assert.NotContains(t, step, "OPENAI_API_KEY:")
 					} else {
@@ -74,10 +75,11 @@ func TestBehaviorDefinedEngine_CopilotAWFStartupEnvironment(t *testing.T) {
 			if useCopilotRequests {
 				data.Permissions = "copilot-requests: write"
 			}
-			env := engine.buildBehaviorDefinedExecutionEnv(def.Behaviors.Execution, data, true)
+			backend := engine.resolveBackend(data)
+			env := engine.buildBehaviorDefinedExecutionEnv(def.Behaviors.Execution, data, true, backend)
 			require.NotContains(t, env, "OPENAI_API_KEY")
 			childCommand := `test "$OPENAI_API_KEY" = "$COPILOT_DUMMY_BYOK" && test -z "${COPILOT_GITHUB_TOKEN:-}" && printf 'client-placeholder-ok\n'`
-			command := engine.buildFirewallCommand(def.Behaviors.Execution, data, filepath.Join(dir, "agent.log"), childCommand)
+			command := engine.buildFirewallCommand(def.Behaviors.Execution, data, filepath.Join(dir, "agent.log"), childCommand, backend)
 			tree, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 			require.NoError(t, err)
 			var invocation bytes.Buffer
@@ -140,8 +142,8 @@ func TestBehaviorDefinedEngine_NonUniversalProviderEnv(t *testing.T) {
 	engine, err := NewBehaviorDefinedEngine(def)
 	require.NoError(t, err)
 	data := &WorkflowData{Name: "test", Model: "copilot/gpt-5", EngineConfig: &EngineConfig{}}
-	env := engine.buildBehaviorDefinedExecutionEnv(def.Behaviors.Execution, data, true)
-	command := engine.buildFirewallCommand(def.Behaviors.Execution, data, "/tmp/test.log", "true")
+	env := engine.buildBehaviorDefinedExecutionEnv(def.Behaviors.Execution, data, true, "")
+	command := engine.buildFirewallCommand(def.Behaviors.Execution, data, "/tmp/test.log", "true", "")
 	assert.NotContains(t, env, constants.CopilotBYOKDummyAPIKeyEnvVar)
 	assert.NotContains(t, command, "export OPENAI_API_KEY")
 }

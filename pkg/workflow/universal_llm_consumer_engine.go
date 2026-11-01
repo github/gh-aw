@@ -114,7 +114,10 @@ func (e *UniversalLLMConsumerEngine) resolveBackend(workflowData *WorkflowData) 
 }
 
 func (e *UniversalLLMConsumerEngine) GetUniversalRequiredSecretNames(workflowData *WorkflowData) []string {
-	backend := e.resolveBackend(workflowData)
+	return e.getUniversalRequiredSecretNamesForBackend(workflowData, e.resolveBackend(workflowData))
+}
+
+func (e *UniversalLLMConsumerEngine) getUniversalRequiredSecretNamesForBackend(workflowData *WorkflowData, backend UniversalLLMBackend) []string {
 	universalLLMConsumerLog.Printf("Collecting required secret names for backend: %s", backend)
 	profile := getUniversalLLMBackendProfile(backend, hasCopilotRequestsWritePermission(workflowData))
 	secrets := append([]string{}, profile.coreSecretNames...)
@@ -167,7 +170,10 @@ func (e *UniversalLLMConsumerEngine) GetUniversalSecretValidationStep(workflowDa
 }
 
 func (e *UniversalLLMConsumerEngine) ApplyUniversalProviderEnv(env map[string]string, workflowData *WorkflowData, firewallEnabled bool) {
-	backend := e.resolveBackend(workflowData)
+	e.applyUniversalProviderEnvForBackend(env, workflowData, firewallEnabled, e.resolveBackend(workflowData))
+}
+
+func (e *UniversalLLMConsumerEngine) applyUniversalProviderEnvForBackend(env map[string]string, workflowData *WorkflowData, firewallEnabled bool, backend UniversalLLMBackend) {
 	universalLLMConsumerLog.Printf("Applying provider env for backend=%s, firewallEnabled=%t", backend, firewallEnabled)
 	profile := getUniversalLLMBackendProfile(backend, hasCopilotRequestsWritePermission(workflowData))
 	maps.Copy(env, profile.env)
