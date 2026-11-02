@@ -68,8 +68,8 @@ func TestClaudeEngine(t *testing.T) {
 	if strings.Contains(installStep, "--ignore-scripts") {
 		t.Errorf("Expected no --ignore-scripts flag for Claude Code (requires post-install scripts), got: %s", installStep)
 	}
-	if strings.Contains(installStep, "NPM_CONFIG_MIN_RELEASE_AGE") {
-		t.Errorf("Expected no npm release-age cooldown env for Claude install, got: %s", installStep)
+	if !strings.Contains(installStep, "NPM_CONFIG_MIN_RELEASE_AGE: '3'") {
+		t.Errorf("Expected default 3-day npm release-age cooldown for Claude install, got: %s", installStep)
 	}
 
 	// Test execution steps

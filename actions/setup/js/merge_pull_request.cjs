@@ -2,15 +2,16 @@
 /// <reference types="@actions/github-script" />
 
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
+const { isDeepStrictEqual } = require("node:util");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { isStagedMode, resolveTarget } = require("./safe_output_helpers.cjs");
-const { selectLatestRelevantChecks } = require("./check_runs_helpers.cjs");
+const { selectLatestRelevantChecks, isDeploymentCheck } = require("./check_runs_helpers.cjs");
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 const { normalizeBranchName } = require("./normalize_branch_name.cjs");
 const { resolveNumberFromTemporaryId } = require("./temporary_id.cjs");
-const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
 
@@ -81,9 +82,10 @@ async function getPullRequestWithMergeability(githubClient, owner, repo, pullNum
  * @param {string} owner
  * @param {string} repo
  * @param {number} pullNumber
+ * @param {string} headSha
  * @returns {Promise<{reviewDecision: string|null, unresolvedThreadCount: number}>}
  */
-async function getReviewSummary(githubClient, owner, repo, pullNumber) {
+async function getReviewSummary(githubClient, owner, repo, pullNumber, headSha) {
   core.info(`Collecting review summary for PR #${pullNumber}`);
   let unresolvedThreadCount = 0;
   /** @type {any} */
@@ -92,6 +94,7 @@ async function getReviewSummary(githubClient, owner, repo, pullNumber) {
   let cursor = null;
   let hasNextPage = true;
   let page = 0;
+  const seenCursors = new Set();
   while (hasNextPage) {
     page++;
     const result = await withRetry(
@@ -101,6 +104,7 @@ async function getReviewSummary(githubClient, owner, repo, pullNumber) {
             query($owner: String!, $repo: String!, $number: Int!, $after: String) {
               repository(owner: $owner, name: $repo) {
                 pullRequest(number: $number) {
+                  headRefOid
                   reviewDecision
                   reviewThreads(first: 100, after: $after) {
                     pageInfo { hasNextPage endCursor }
@@ -121,20 +125,122 @@ async function getReviewSummary(githubClient, owner, repo, pullNumber) {
     );
 
     const pr = result?.repository?.pullRequest;
-    if (!pr) {
-      core.warning(`No pull request data returned while reading review summary for PR #${pullNumber}`);
-      break;
+    const connection = pr?.reviewThreads;
+    if (
+      !pr ||
+      pr.headRefOid !== headSha ||
+      ![null, "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(pr.reviewDecision) ||
+      !Array.isArray(connection?.nodes) ||
+      connection.nodes.some(t => typeof t?.isResolved !== "boolean") ||
+      typeof connection.pageInfo?.hasNextPage !== "boolean" ||
+      !(connection.pageInfo.endCursor === null || typeof connection.pageInfo.endCursor === "string")
+    ) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Incomplete or stale review evidence for PR #${pullNumber} (page ${page})`);
     }
-    reviewDecision = pr.reviewDecision || null;
-    const threads = pr.reviewThreads?.nodes || [];
+    if (page > 1 && reviewDecision !== pr.reviewDecision) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Review decision changed during pagination for PR #${pullNumber}`);
+    }
+    reviewDecision = pr.reviewDecision;
+    const threads = connection.nodes;
     core.info(`Review page ${page}: ${threads.length} thread(s)`);
     unresolvedThreadCount += threads.filter(t => !t.isResolved).length;
-    hasNextPage = pr.reviewThreads?.pageInfo?.hasNextPage === true;
-    cursor = pr.reviewThreads?.pageInfo?.endCursor || null;
+    hasNextPage = connection.pageInfo.hasNextPage;
+    cursor = connection.pageInfo.endCursor;
+    if (hasNextPage && (threads.length === 0 || typeof cursor !== "string" || !cursor || seenCursors.has(cursor))) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Invalid review thread pagination for PR #${pullNumber} (page ${page})`);
+    }
+    seenCursors.add(cursor);
   }
 
   core.info(`Review summary: decision=${reviewDecision || "null"}, unresolvedThreads=${unresolvedThreadCount}`);
+  core.debug(`merge_pull_request: ${JSON.stringify({ event: "review_evidence", pages: page, unresolved_threads: unresolvedThreadCount, decision_present: reviewDecision !== null })}`);
   return { reviewDecision, unresolvedThreadCount };
+}
+
+/**
+ * @param {any} githubClient
+ * @param {string} owner
+ * @param {string} repo
+ * @param {any} pr
+ * @param {string[]} requiredApprovers
+ */
+async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers) {
+  if (requiredApprovers.length === 0) {
+    return [];
+  }
+  const identity = await githubClient.graphql(`query { viewer { login } }`);
+  if (!identity?.viewer?.login || !pr.user?.login) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Missing merge identity or PR author for independent approval evaluation`);
+  }
+  const reviews = await githubClient.paginate(githubClient.rest.pulls.listReviews, {
+    owner,
+    repo,
+    pull_number: pr.number,
+    per_page: 100,
+  });
+  if (!Array.isArray(reviews) || reviews.some(r => !r?.user?.login || !Number.isInteger(r.id) || !["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"].includes(r.state))) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Incomplete approval evidence for PR #${pr.number}`);
+  }
+  const decisiveReviews = reviews
+    .filter(review => review.state !== "COMMENTED" && review.state !== "PENDING")
+    .map(review => {
+      const submittedAt = Date.parse(review.submitted_at);
+      if (
+        typeof review.submitted_at !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(review.submitted_at) ||
+        !Number.isFinite(submittedAt) ||
+        new Date(submittedAt).toISOString() !== review.submitted_at.replace(/Z$/, ".000Z")
+      ) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Missing or invalid review submission time for PR #${pr.number}`);
+      }
+      return { review, submittedAt };
+    })
+    .sort((a, b) => a.submittedAt - b.submittedAt);
+  const latest = new Map();
+  for (const { review, submittedAt } of decisiveReviews) {
+    const login = review.user.login.toLowerCase();
+    if (latest.has(login) && Date.parse(latest.get(login).submitted_at) === submittedAt) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Ambiguous review submission order for PR #${pr.number}`);
+    }
+    // Review IDs reflect creation, so a pending review can be submitted after a higher-ID review.
+    latest.set(login, review);
+  }
+  if ([...latest.values()].some(review => review.state === "CHANGES_REQUESTED")) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Blocking human review remains active for PR #${pr.number}`);
+  }
+  const allowed = requiredApprovers.map(login => login.toLowerCase());
+  const approvals = [...latest.values()]
+    .filter(
+      review =>
+        review.state === "APPROVED" &&
+        review.commit_id === pr.head.sha &&
+        review.user.type === "User" &&
+        allowed.includes(review.user.login.toLowerCase()) &&
+        review.user.login.toLowerCase() !== pr.user.login.toLowerCase() &&
+        review.user.login.toLowerCase() !== identity.viewer.login.toLowerCase()
+    )
+    .map(review => ({ login: review.user.login, review_id: review.id, commit_id: review.commit_id }));
+  core.debug(`merge_pull_request: ${JSON.stringify({ event: "approval_evidence", reviews: reviews.length, eligible_approvals: approvals.length })}`);
+  return approvals;
+}
+
+/**
+ * Stable merge policy inputs; asynchronous mergeability is checked separately.
+ * @param {any} pr
+ */
+function policySnapshot(pr) {
+  return {
+    state: pr.state,
+    merged: pr.merged,
+    draft: pr.draft,
+    head: [pr.head?.sha, pr.head?.ref, pr.head?.repo?.full_name],
+    base: [pr.base?.sha, pr.base?.ref, pr.base?.repo?.full_name],
+    author: pr.user?.login,
+    title: pr.title,
+    labels: (pr.labels || []).map(label => label.name).sort(),
+    reviewers: (pr.requested_reviewers || []).map(user => user.login).sort(),
+    teams: (pr.requested_teams || []).map(team => team.slug).sort(),
+  };
 }
 
 /**
@@ -167,6 +273,9 @@ async function getOpenPullRequestForBranch(githubClient, owner, repo, branch) {
     core.info(`No open pull request found for head branch "${branch}"`);
     return null;
   }
+  if (!Number.isInteger(prs[0]?.number) || prs[0].number <= 0) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Incomplete upstream pull request evidence for branch "${branch}"`);
+  }
   core.info(`Found open pull request #${prs[0].number} for head branch "${branch}"`);
   return { number: prs[0].number, html_url: prs[0].html_url };
 }
@@ -198,8 +307,14 @@ async function getBranchPolicy(githubClient, owner, repo, baseBranch) {
     }),
   ]);
 
+  if (typeof branch?.protected !== "boolean" || typeof repository?.default_branch !== "string") {
+    throw new Error(`${SAFE_OUTPUT_E007}: Incomplete target branch policy evidence`);
+  }
   const defaultBranchRaw = repository.default_branch;
   const defaultBranchValidation = sanitizeBranchName(defaultBranchRaw, "default");
+  if (!defaultBranchValidation.valid) {
+    throw new Error(`${SAFE_OUTPUT_E007}: Invalid repository default branch in policy evidence`);
+  }
   const defaultBranch = defaultBranchValidation.valid ? defaultBranchValidation.value : defaultBranchRaw;
   const isDefault = defaultBranch !== null && sanitizedBaseBranch === defaultBranch;
   if (isDefault) {
@@ -238,12 +353,12 @@ async function getBranchPolicy(githubClient, owner, repo, baseBranch) {
  * @param {string} repo
  * @param {string} headSha
  * @param {string[]} requiredChecks
- * @returns {Promise<{missing: string[], failing: Array<{name: string, status: string, conclusion: string|null}>}>}
+ * @returns {Promise<{missing: string[], failing: Array<{name: string, status: string, conclusion: string|null}>, passing: Array<{name: string, check_run_id: number, head_sha: string, app_id: number|null}>}>}
  */
 async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requiredChecks) {
   core.info(`Evaluating required checks on ${headSha}: ${requiredChecks.join(", ") || "(none)"}`);
   if (requiredChecks.length === 0) {
-    return { missing: [], failing: [] };
+    return { missing: [], failing: [], passing: [] };
   }
 
   const checkRuns = await githubClient.paginate(githubClient.rest.checks.listForRef, {
@@ -253,11 +368,35 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
     per_page: 100,
   });
 
+  // Names identify checks, not trusted producers; do not choose between competing apps.
+  const producersByName = new Map();
+  for (const run of checkRuns) {
+    if (!requiredChecks.includes(run.name) || isDeploymentCheck(run)) {
+      continue;
+    }
+    if (!Number.isInteger(run.app?.id) || run.app.id <= 0) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check "${run.name}"`);
+    }
+    const appId = producersByName.get(run.name);
+    if (appId !== undefined && appId !== run.app.id) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check "${run.name}"`);
+    }
+    producersByName.set(run.name, run.app.id);
+  }
+
   const { relevant } = selectLatestRelevantChecks(checkRuns, { includeList: requiredChecks });
   core.info(`Fetched ${checkRuns.length} check run(s), ${relevant.length} relevant latest check run(s)`);
   const byName = new Map(relevant.map(run => [run.name, run]));
+  // A queued rerun may have no started_at; it must supersede an older success.
+  for (const run of checkRuns) {
+    const selected = byName.get(run.name);
+    if (selected && run.id > selected.id && !isDeploymentCheck(run)) {
+      byName.set(run.name, run);
+    }
+  }
   const missing = [];
   const failing = [];
+  const passing = [];
 
   for (const checkName of requiredChecks) {
     const run = byName.get(checkName);
@@ -266,13 +405,15 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
       missing.push(checkName);
       continue;
     }
-    if (run.status !== "completed" || run.conclusion !== "success") {
+    if (run.status !== "completed" || run.conclusion !== "success" || run.head_sha !== headSha) {
       core.warning(`Required check not passing: ${checkName} status=${run.status} conclusion=${run.conclusion || "null"}`);
       failing.push({ name: checkName, status: run.status, conclusion: run.conclusion || null });
+    } else {
+      passing.push({ name: checkName, check_run_id: run.id, head_sha: run.head_sha, app_id: run.app?.id || null });
     }
   }
 
-  return { missing, failing };
+  return { missing, failing, passing };
 }
 
 /**
@@ -366,10 +507,15 @@ async function main(config = {}) {
   const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
   const requiredTitlePrefix = config.required_title_prefix || "";
   const allowedBranches = Array.isArray(config.allowed_branches) ? config.allowed_branches : [];
+  const requiredChecks = Array.isArray(config.required_checks) ? config.required_checks : [];
+  const requiredApprovers = Array.isArray(config.required_approvers) ? config.required_approvers : [];
 
   const allowedBranchPatterns = compilePathGlobs(allowedBranches);
   core.info(
     `merge_pull_request handler configured: max=${maxCount}, requiredLabels=${requiredLabels.length}, requiredTitlePrefix=${requiredTitlePrefix ? JSON.stringify(requiredTitlePrefix) : "none"}, allowedBranches=${allowedBranches.length}, staged=${isStaged}`
+  );
+  core.debug(
+    `merge_pull_request: ${JSON.stringify({ event: "configured", staged: isStaged, required_checks: requiredChecks.length, required_approvers: requiredApprovers.length, required_labels: requiredLabels.length, allowed_branches: allowedBranches.length })}`
   );
 
   let processedCount = 0;
@@ -377,15 +523,16 @@ async function main(config = {}) {
   return async function handleMergePullRequest(message, resolvedTemporaryIds) {
     core.info(`Processing merge_pull_request message: ${JSON.stringify({ pull_request_number: message?.pull_request_number, repo: message?.repo, merge_method: message?.merge_method })}`);
     if (processedCount >= maxCount) {
+      core.debug('merge_pull_request: {"event":"limit_reached"}');
       core.warning(`Skipping merge_pull_request: max count of ${maxCount} reached`);
-      return { success: false, error: `Max count of ${maxCount} reached` };
+      return { success: false, data_trust: "untrusted", error: `Max count of ${maxCount} reached` };
     }
     processedCount++;
 
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "merge pull request");
     if (!repoResult.success) {
       core.error(`Repository validation failed: ${repoResult.error}`);
-      return { success: false, error: repoResult.error };
+      return { success: false, data_trust: "untrusted", error: repoResult.error };
     }
     const { owner, repo } = repoResult.repoParts;
     core.info(`Resolved target repository: ${owner}/${repo}`);
@@ -395,7 +542,7 @@ async function main(config = {}) {
       const pullNumberResolution = resolvePullRequestNumber(message, resolvedTemporaryIds);
       if (!pullNumberResolution.success) {
         core.error(pullNumberResolution.error);
-        return { success: false, error: pullNumberResolution.error };
+        return { success: false, data_trust: "untrusted", error: pullNumberResolution.error };
       }
       targetItem = { ...message, pull_request_number: pullNumberResolution.pullNumber };
       if (pullNumberResolution.fromTemporaryId) {
@@ -411,20 +558,25 @@ async function main(config = {}) {
     });
     if (!targetResult.success) {
       core.error(targetResult.error);
-      return { success: false, error: targetResult.error };
+      return { success: false, data_trust: "untrusted", error: targetResult.error };
     }
     const pullNumber = targetResult.number;
     core.info(`Target PR number: ${pullNumber}`);
 
     /** @type {Array<{code: string, message: string, details?: any}>} */
     const failureReasons = [];
+    /** @type {Record<string, any>} */
+    const evidence = { data_trust: "untrusted", repository: `${owner}/${repo}`, pull_request_number: pullNumber, evaluated_at: new Date().toISOString() };
+    let phase = "pull_request";
 
     try {
       const pr = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
       if (!pr) {
-        core.error(`Pull request #${pullNumber} not found`);
-        return { success: false, error: `Pull request #${pullNumber} not found` };
+        throw new Error(`${SAFE_OUTPUT_E007}: Pull request #${pullNumber} not found`);
       }
+      evidence.head_sha = pr.head?.sha;
+      evidence.base_branch = pr.base?.ref;
+      evidence.base_sha = pr.base?.sha;
       const sourceBranchValidation = sanitizeBranchName(pr.head?.ref, "source");
       if (!sourceBranchValidation.valid) {
         failureReasons.push({
@@ -449,9 +601,11 @@ async function main(config = {}) {
         `PR state: merged=${pr.merged}, draft=${pr.draft}, mergeable=${pr.mergeable}, mergeable_state=${pr.mergeable_state || "unknown"}, head=${JSON.stringify(sourceBranch || pr.head?.ref || null)}, base=${JSON.stringify(baseBranch || pr.base?.ref || null)}`
       );
       if (pr.merged) {
+        core.debug('merge_pull_request: {"event":"already_merged"}');
         core.info(`PR #${pullNumber} is already merged, returning idempotent success`);
         return {
           success: true,
+          data_trust: "untrusted",
           merged: true,
           alreadyMerged: true,
           pull_request_number: pr.number,
@@ -459,9 +613,24 @@ async function main(config = {}) {
           checks_evaluated: [],
         };
       }
+      if (typeof pr.head?.sha !== "string" || !pr.head.sha) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Missing evaluated pull request head SHA`);
+      }
+      const evaluatedSnapshot = policySnapshot(pr);
+      evidence.eligibility = {
+        state: pr.state,
+        draft: pr.draft,
+        mergeable: pr.mergeable,
+        mergeable_state: pr.mergeable_state,
+        requested_reviewers: (pr.requested_reviewers || []).map(user => user.login),
+        requested_teams: (pr.requested_teams || []).map(team => team.slug),
+      };
 
       if (pr.draft) {
         failureReasons.push({ code: "pr_is_draft", message: "Pull request is still in draft state" });
+      }
+      if (pr.state !== "open") {
+        failureReasons.push({ code: "pr_not_open", message: "Pull request is not open" });
       }
       if (pr.mergeable === false || pr.mergeable_state === "dirty") {
         failureReasons.push({ code: "merge_conflicts", message: "Pull request has unresolved merge conflicts" });
@@ -471,8 +640,12 @@ async function main(config = {}) {
       }
 
       const labels = (pr.labels || []).map(l => l.name).filter(Boolean);
-      core.info(`PR labels (${labels.length}): ${labels.join(", ") || "(none)"}`);
+      core.info(`PR labels: ${labels.length}`);
       const missingRequiredLabels = findMissingRequiredLabels(labels, requiredLabels);
+      evidence.labels = { required: requiredLabels, present: labels };
+      evidence.source_branch = sourceBranch;
+      evidence.allowed_branches = allowedBranches;
+      evidence.required_title_prefix = requiredTitlePrefix;
       if (missingRequiredLabels.length > 0) {
         failureReasons.push({
           code: "missing_required_labels",
@@ -496,11 +669,12 @@ async function main(config = {}) {
         });
       }
       if (allowedBranchPatterns.length > 0) {
-        core.info(`Allowed branch patterns: ${allowedBranches.join(", ")}`);
+        core.info(`Allowed branch patterns: ${allowedBranches.length}`);
       }
 
       /** @type {{isProtected: boolean, isDefault: boolean, defaultBranch: string|null, requiredChecks: string[]}} */
       let branchPolicy = { isProtected: false, isDefault: false, defaultBranch: null, requiredChecks: [] };
+      phase = "branch_policy";
       if (baseBranch) {
         branchPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
         if (branchPolicy.isProtected) {
@@ -518,6 +692,7 @@ async function main(config = {}) {
         }
         if (!branchPolicy.isProtected && !branchPolicy.isDefault) {
           const upstreamPR = await getOpenPullRequestForBranch(githubClient, owner, repo, baseBranch);
+          evidence.upstream_pull_request = upstreamPR?.number || null;
           if (!upstreamPR) {
             failureReasons.push({
               code: "target_branch_has_no_open_pr",
@@ -527,7 +702,14 @@ async function main(config = {}) {
         }
       }
 
+      branchPolicy.requiredChecks = [...new Set([...branchPolicy.requiredChecks, ...requiredChecks])].sort();
+      evidence.branch_policy = branchPolicy;
+      phase = "required_checks";
       const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks);
+      core.debug(
+        `merge_pull_request: ${JSON.stringify({ event: "check_evidence", required: branchPolicy.requiredChecks.length, passing: checkSummary.passing.length, missing: checkSummary.missing.length, failing: checkSummary.failing.length })}`
+      );
+      evidence.checks = { required: branchPolicy.requiredChecks, ...checkSummary };
       core.info(`Required check summary: missing=${checkSummary.missing.length}, failing=${checkSummary.failing.length}`);
       if (checkSummary.missing.length > 0) {
         failureReasons.push({
@@ -555,7 +737,18 @@ async function main(config = {}) {
         });
       }
 
-      const reviewSummary = await getReviewSummary(githubClient, owner, repo, pullNumber);
+      phase = "review_evidence";
+      const reviewSummary = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
+      evidence.reviews = reviewSummary;
+      phase = "approval_evidence";
+      const approvals = await getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers);
+      evidence.approval_policy = { required_approvers: requiredApprovers, approvals };
+      if (requiredApprovers.length > 0 && approvals.length === 0) {
+        failureReasons.push({
+          code: "required_approval_missing",
+          message: "An independent allowlisted human must approve the evaluated head revision",
+        });
+      }
       if (reviewSummary.reviewDecision === "CHANGES_REQUESTED" || reviewSummary.reviewDecision === "REVIEW_REQUIRED") {
         failureReasons.push({
           code: "blocking_review_state",
@@ -571,61 +764,111 @@ async function main(config = {}) {
       }
 
       if (failureReasons.length > 0) {
+        core.debug(`merge_pull_request: ${JSON.stringify({ event: "gates_blocked", failures: failureReasons.length })}`);
         core.warning(`merge_pull_request blocked with ${failureReasons.length} gate failure(s): ${failureReasons.map(r => r.code).join(", ")}`);
         return {
           success: false,
+          data_trust: "untrusted",
           error: "merge_pull_request gate checks failed",
           failure_reasons: failureReasons,
           checks_evaluated: branchPolicy.requiredChecks,
+          decision_evidence: evidence,
         };
       }
 
+      phase = "revalidation";
+      core.debug('merge_pull_request: {"event":"revalidation_started"}');
+      if (!baseBranch) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Missing target base branch for final policy evaluation`);
+      }
+      const currentPR = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
+      if (!currentPR || !isDeepStrictEqual(policySnapshot(currentPR), evaluatedSnapshot)) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Pull request policy state changed after evaluation; fresh evaluation required`);
+      }
+      if (currentPR.mergeable !== true || currentPR.mergeable_state === "dirty") {
+        throw new Error(`${SAFE_OUTPUT_E007}: Pull request mergeability is not confirmed or has unresolved conflicts after revalidation`);
+      }
+      const currentPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
+      currentPolicy.requiredChecks = [...new Set([...currentPolicy.requiredChecks, ...requiredChecks])].sort();
+      const upstreamPR = await getOpenPullRequestForBranch(githubClient, owner, repo, baseBranch);
+      const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
+      const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
+      const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks);
+      if (
+        !isDeepStrictEqual(currentPolicy, branchPolicy) ||
+        !upstreamPR ||
+        !isDeepStrictEqual(currentReviews, reviewSummary) ||
+        !isDeepStrictEqual(currentApprovals, approvals) ||
+        currentChecks.missing.length > 0 ||
+        currentChecks.failing.length > 0
+      ) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Merge policy evidence changed after evaluation; fresh evaluation required`);
+      }
+      evidence.upstream_pull_request = upstreamPR.number;
+      evidence.checks = { required: branchPolicy.requiredChecks, ...currentChecks };
+      evidence.revalidated_at = new Date().toISOString();
+      core.debug('merge_pull_request: {"event":"revalidation_passed"}');
+
       if (isStaged) {
+        core.debug('merge_pull_request: {"event":"staged_preview"}');
         core.info(`Staged mode: merge for PR #${pullNumber} not executed`);
         return {
           success: true,
+          data_trust: "untrusted",
           staged: true,
           merged: false,
           pull_request_number: pr.number,
           pull_request_url: pr.html_url,
           checks_evaluated: branchPolicy.requiredChecks,
+          decision_evidence: evidence,
         };
       }
 
+      phase = "merge";
+      core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
       const mergeResponse = await githubClient.rest.pulls.merge({
         owner,
         repo,
         pull_number: pullNumber,
+        sha: pr.head.sha,
         merge_method: message.merge_method || "merge",
         commit_title: message.commit_title,
         commit_message: message.commit_message,
       });
+      core.debug(`merge_pull_request: ${JSON.stringify({ event: "merge_completed", merged: mergeResponse.data?.merged === true })}`);
 
       if (mergeResponse.data?.merged !== true) {
-        core.error(`Merge API returned merged=false for PR #${pullNumber}: ${mergeResponse.data?.message || "no message"}`);
+        core.error(`Merge API returned merged=false for PR #${pullNumber}`);
         return {
           success: false,
+          data_trust: "untrusted",
           error: mergeResponse.data?.message || "Merge API returned merged=false",
           failure_reasons: [{ code: "merge_not_completed", message: mergeResponse.data?.message || "Merge was not completed" }],
           checks_evaluated: branchPolicy.requiredChecks,
+          decision_evidence: evidence,
         };
       }
 
       return {
         success: true,
+        data_trust: "untrusted",
         merged: true,
         pull_request_number: pr.number,
         pull_request_url: pr.html_url,
         sha: mergeResponse.data?.sha,
         message: mergeResponse.data?.message,
         checks_evaluated: branchPolicy.requiredChecks,
+        decision_evidence: evidence,
       };
     } catch (error) {
-      core.error(`merge_pull_request failed for PR #${pullNumber}: ${getErrorMessage(error)}`);
+      core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
+      core.error(`merge_pull_request failed for PR #${pullNumber} during ${phase}`);
       return {
         success: false,
+        data_trust: "untrusted",
         error: getErrorMessage(error),
         failure_reasons: [{ code: "merge_operation_error", message: getErrorMessage(error) }],
+        decision_evidence: evidence,
       };
     }
   };

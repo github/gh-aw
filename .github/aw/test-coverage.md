@@ -42,7 +42,7 @@ safe-outputs:
   upload-code-coverage:
 ```
 
-`upload-code-coverage` is experimental and publishes a Cobertura XML coverage report to GitHub's code coverage API via [`actions/upload-code-coverage`](https://github.com/actions/upload-code-coverage). Compilation emits a warning when this feature is used. The compiler automatically grants the dedicated `code-quality: write` (and `pull-requests: read` for push-triggered workflows) permission needed by the upload job — no need to add it to the `permissions:` block above.
+`upload-code-coverage` publishes a Cobertura XML coverage report to GitHub's code coverage API via [`actions/upload-code-coverage`](https://github.com/actions/upload-code-coverage). The compiler automatically grants the dedicated `code-quality: write` (and `pull-requests: read` for push-triggered workflows) permission needed by the upload job — no need to add it to the `permissions:` block above.
 
 ## Fallback: Run Tests
 

@@ -103,6 +103,11 @@ func applyArtifactRetention(content string, config *RepoConfig) (string, error) 
 }
 
 func applyStepArtifactRetention(lines []string, config *RepoConfig) (string, error) {
+	// Only the complete compiler-owned diagnostic upload has a policy ceiling.
+	// An authored ID or name alone cannot bypass the normal retention policy.
+	if strings.TrimSpace(strings.Join(lines, "")) == strings.TrimSpace(enclaveDiagnosticsUploadStep()) {
+		return strings.Join(lines, ""), nil
+	}
 	upload := false
 	for _, line := range lines {
 		if leadingSpaces(line) != 6 && leadingSpaces(line) != 8 {

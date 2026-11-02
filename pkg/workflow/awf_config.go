@@ -89,7 +89,8 @@ type AWFConfigFile struct {
 	APIProxy *AWFAPIProxyConfig `json:"apiProxy,omitempty"`
 
 	// Enclaves configures the unified AWF-owned script and agent enclave subsystem.
-	Enclaves []map[string]any `json:"enclaves,omitempty"`
+	Enclaves           []map[string]any `json:"enclaves,omitempty"`
+	EnclaveDebugPublic *bool            `json:"enclaveDebugPublic,omitempty"`
 
 	// Container contains container execution configuration.
 	Container *AWFContainerConfig `json:"container,omitempty"`

@@ -19,6 +19,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * @property {string} [handler] - Path to handler file (.cjs, .sh, or .py)
  * @property {number} [timeout] - Timeout in seconds for tool execution (default: 60)
  * @property {string[]} [dependencies] - Runtime dependencies installed before first invocation
+ * @property {Record<string, string>} [env] - Tool-local variable names mapped to server environment references
  */
 
 /**

@@ -488,7 +488,10 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 			if !isSafeOutputHandlerEnabledAndUnstaged(safeOutputs, "MergePullRequest") {
 				return nil
 			}
-			return NewPermissionsContentsWritePRWrite()
+			permissions := NewPermissionsContentsWritePRWrite()
+			// Branch-policy check requirements are discovered at runtime.
+			permissions.Set(PermissionChecks, PermissionRead)
+			return permissions
 		},
 	},
 	{

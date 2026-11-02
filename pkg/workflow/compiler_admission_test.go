@@ -160,8 +160,8 @@ func TestAdmissionOutputGatingCompilesWithLint(t *testing.T) {
 						job, exists := compiler.jobManager.GetJob(name)
 						require.True(t, exists, name)
 						steps := strings.Join(job.Steps, "")
-						assert.Equal(t, admission && !dryRun, strings.Contains(steps, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"), name)
-						assert.Equal(t, admission && !dryRun, strings.Contains(steps, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits"), name)
+						assert.Equal(t, admission && !dryRun && name != "evals", strings.Contains(steps, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"), name)
+						assert.Equal(t, admission && !dryRun && name != "evals", strings.Contains(steps, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits"), name)
 					}
 				})
 			}
@@ -269,11 +269,11 @@ func TestAdmissionComponentExecutionWiring(t *testing.T) {
 					SafeOutputs:      &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
 				}
 				compiler := NewCompiler()
-				evals := strings.Join(compiler.buildEvalsEngineSteps(data), "")
-				assert.Equal(t, !dryRun, strings.Contains(evals, "GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits-evals }}"))
-				assert.Equal(t, !dryRun, strings.Contains(evals, "GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}"))
+				evals := strings.Join(compiler.buildEvalsDecisionSteps(data), "")
+				assert.NotContains(t, evals, "GH_AW_ADMISSION_MAX_AI_CREDITS")
+				assert.NotContains(t, evals, "GH_AW_ADMISSION_RESULT")
 				assert.NotContains(t, evals, "needs.activation.outputs.admission-max-ai-credits-threat-detection")
-				assert.Contains(t, evals, `GH_AW_MAX_AI_CREDITS="$GH_AW_ADMISSION_MAX_AI_CREDITS"`)
+				assert.NotContains(t, evals, "GH_AW_MAX_AI_CREDITS")
 				for _, external := range []bool{false, true} {
 					data.Features = map[string]any{string(constants.GHAWDetectionFeatureFlag): external}
 					detection := strings.Join(compiler.buildDetectionJobSteps(data), "")

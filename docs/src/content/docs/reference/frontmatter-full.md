@@ -20721,17 +20721,15 @@ safe-outputs:
   # Format 2: Enable artifact uploads with default configuration
   upload-artifact: null
 
-  # ⚠️ Experimental. Enable AI agents to upload a code coverage report (e.g. a
-  # Cobertura XML file) to GitHub's code coverage API via
-  # actions/upload-code-coverage. Using this field emits a compile-time warning. The
-  # agent stages the report file and calls the tool with file/language/label; a
-  # separate job performs the actual upload with dedicated code-quality: write
-  # permissions.
+  # Enable AI agents to upload a code coverage report (e.g. a Cobertura XML file) to
+  # GitHub's code coverage API via actions/upload-code-coverage. The agent stages the
+  # report file and calls the tool with file/language/label; a separate job performs
+  # the actual upload with dedicated code-quality: write permissions.
   # (optional)
   # Accepted formats:
 
-  # Format 1: ⚠️ Experimental. Configuration for uploading a code coverage report
-  # via actions/upload-code-coverage
+  # Format 1: Configuration for uploading a code coverage report via
+  # actions/upload-code-coverage
   upload-code-coverage:
     # Trusted queue coverage target; independently resolved to the immutable worker
     # revision before upload.
@@ -24544,9 +24542,10 @@ model: "example-value"
 graders:
   {}
 
-# ⚠️ Experimental. BinEval binary evaluation questions to run after safe-outputs
-# and before the conclusion job. Can be a plain list of questions (shorthand) or
-# an object with questions, model, and runs-on fields.
+# ⚠️ Experimental. BinEval binary questions evaluated after the agent by one
+# OpenAI-compatible Decisions request, independently of the agentic engine. Choice
+# answers are YES, NO, or UNKNOWN. Supports 1-400 questions, as a plain list or an
+# object with questions, model, and runs-on fields.
 # (optional)
 # Accepted formats:
 
@@ -24566,13 +24565,11 @@ evals:
       # The binary (YES/NO) question to evaluate.
       question: "example-value"
 
-      # Optional model override for this specific question. Overrides the top-level
-      # model setting. Use a model alias such as "small" or a full model ID.
-      # (optional)
-      model: "example-value"
-
-  # Default model to use for all evaluation questions. Use a model alias such as
-  # "small" or a full model ID. Per-question model fields override this setting.
+  # Decisions-compatible model ID for the entire question batch, sent without
+  # provider-specific name mapping. Defaults to copilot/gpt-6-luna-decisions,
+  # subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent model.
+  # Use openai/gpt-6-luna for OpenAI credentials; unqualified models use
+  # Copilot. Per-question model overrides are not supported.
   # (optional)
   model: "example-value"
 

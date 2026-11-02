@@ -549,7 +549,12 @@ jobs:
           package-manager-cache: false
       - name: Install Codex CLI
         run: npm install --ignore-scripts -g @openai/codex@CODEX_VERSION
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: '3'
       - name: Install AWF binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
         run: bash "${RUNNER_TEMP}/gh-aw/actions/install_awf_binary.sh" vAWF_VERSION --rootless
       - name: Determine automatic lockdown mode for GitHub MCP Server
         id: determine-automatic-lockdown

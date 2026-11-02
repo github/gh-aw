@@ -631,6 +631,14 @@ When evaluating cross-repository operations, implementations MUST apply these ru
 - Exact fallback slugs allow ASCII alphanumerics, hyphens, and underscores in the owner (including Enterprise Managed User logins), and additionally dots in the repository name
 - Each repository MUST be explicitly listed or match an explicit supported allowlist pattern
 
+**Resolved Issue Relationship Repositories**
+
+For `create_issue.blocked_by` and `link_sub_issue`, the runtime handler policy MUST authorize each effective repository by matching the configured default `target-repo` OR a pattern in that handler's `allowed-repos`. The default target falls back to the workflow repository when not configured. Literal and glob comparisons are case-sensitive; `target-repo: "*"` authorizes any valid repository slug, while `target: "*"` selects an issue and MUST NOT widen repository authorization. Token access alone MUST NOT authorize a repository.
+
+Temporary-ID resolution MUST preserve the referenced repository and MUST NOT bypass this policy. After dependency resolution (Stage 6), handlers MUST revalidate effective repositories before Stage 7 or any auxiliary API lookup, including issue reads and per-item mention resolution. Deferred retries MUST repeat resolution and authorization with the resolved IDs. Staged previews MUST reject resolved disallowed repositories without API access; unresolved staged blocker IDs MAY remain display-only references.
+
+Conformance tests MUST assert zero API calls to disallowed repositories for numeric, qualified, URL, and temporary blocker references, including deferred retries, and for temporary parent/sub-issue pairs resolving to the same disallowed repository. Tests MUST preserve permitted explicit and wildcard policies and fixed/triggering parent selection. The bounded [`IssueRelationshipAuthorization.tla`](https://github.com/github/gh-aw/blob/main/specs/workflow-security/IssueRelationshipAuthorization.tla) model checks this boundary with synthetic negative controls; it does not prove refinement of the runtime handlers.
+
 Internal work-queue Claim adapters use the authenticated worker profile's `effect_scope` as a singleton repository allowlist. Declared adapters MUST specify a fixed literal `target-repo`, validated by `work_queue_claim_adapters.cjs`. Every selected repository, including native adapter runtime fallbacks and independently resolved mutation targets, MUST match the profile allowlist through `assertClaimAuthorized` before effects execute. Repository allowlist rejection carries error code E004 while preserving the queue protocol message `work_queue_effect_scope_denied`. This queue-specific authorization does not replace type-specific or global allowlists for user-facing safe-output handlers.
 
 **Security Properties**
@@ -777,6 +785,8 @@ Implementations MUST execute validation steps in this exact sequence for all saf
 - Check: Resolve references to actual GitHub resource numbers
 - On failure: Reject with E005 (MISSING_PARENT)
 - Output: Fully-resolved operation data
+
+Repository identities obtained in this stage MUST pass the resolved issue relationship policy above before any API access. A pre-resolution repository check does not authorize a different repository supplied by a temporary-ID mapping. Unresolved temporary IDs MAY defer an operation for a later retry rather than fail permanently.
 
 **Stage 7: GitHub API Invocation (EXECUTION)**
 
@@ -2513,6 +2523,13 @@ Fields used for privileged transport metadata, including patch anchoring and upl
         }
       },
       "parent": {"type": ["number", "string"], "description": "Parent issue for sub-issues"},
+      "blocked_by": {
+        "oneOf": [
+          {"type": ["number", "string"]},
+          {"type": "array", "items": {"type": ["number", "string"]}}
+        ],
+        "description": "Issue references that block the new issue: numbers, owner/repo#number, GitHub issue URLs, or temporary IDs"
+      },
       "temporary_id": {
         "type": "string",
         "pattern": "^aw_[A-Za-z0-9]{3,8}$",
@@ -2526,13 +2543,16 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 
 **Operational Semantics**:
 
-1. **Atomicity**: Issue creation is atomic. Failure at any step prevents issue creation.
+1. **Atomicity**: Validation failure prevents issue creation. Dependency attachment after creation is best-effort and MUST NOT report the created issue as uncreated.
 2. **Temporary ID Resolution**: References to `#aw_<id>` in bodies replaced with actual numbers post-creation.
 3. **Parent Linking**: When `parent` specified, tasklist entry added to parent issue.
 4. **Label Validation**: Labels must exist in repository; non-existent labels cause failure.
 5. **Issue Field Validation**: Field names/values must match configured repository issue fields; invalid values return actionable errors.
-6. **Cross-Repository**: When `target-repo` configured, created in that repository (must be in `allowed-repos`).
+6. **Cross-Repository**: The effective issue repository MUST match the default `target-repo` or a pattern in `allowed-repos`.
 7. **Temporary ID collision norm**: A temporary ID (`aw_*`) is workflow-run scoped and MUST map to exactly one created object. Reusing the same temporary ID for a different target object in the same run MUST be rejected as ambiguous (`E005`). Reuse that references the same previously-created object is allowed and MUST resolve deterministically to the first mapping.
+8. **Blocked-By Resolution**: `blocked_by` accepts a single reference or an array. Numeric references (optionally prefixed with `#`) use the new issue's repository; qualified references, GitHub issue URLs, and temporary IDs retain the referenced repository. Duplicate references are removed using a case-folded repository/number key; this deduplication MUST NOT change case-sensitive authorization. Unresolved temporary IDs defer creation, except in staged mode where they are preview-only.
+9. **Blocked-By Authorization**: All resolved blocker repositories MUST pass the handler repository policy before per-item mention lookups, issue creation, blocker reads, or dependency mutation. A disallowed blocker MUST reject the entire item without creating an issue or attaching any dependencies, including when mixed with permitted blockers.
+10. **Blocked-By Attachment**: After issue creation, the handler reads each authorized blocker to obtain its issue ID and uses GitHub's native blocked-by dependency API on the newly created issue. Attachment failures MUST produce warnings and `blocked_by_errors` while retaining the successful creation result.
 
 **Configuration Parameters**:
 
@@ -2553,7 +2573,7 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 
 - Title and body undergo full sanitization
 - Label validation before creation
-- Cross-repo validation against allowed-repos
+- Cross-repo validation of the new issue and every resolved blocker against the default target or allowed repository patterns, before API access
 - Expires implemented via scheduled workflow (not client-side)
 
 **Required Permissions**:
@@ -2570,7 +2590,7 @@ Fields used for privileged transport metadata, including patch anchoring and upl
 **Notes**:
 
 - Both permission modes require the same write scopes
-- GitHub App permissions enable cross-repository operations beyond `allowed-repos` when properly configured
+- GitHub App permissions provide access but MUST NOT bypass the handler repository policy
 
 ---
 
@@ -3307,7 +3327,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 #### Type: link_sub_issue
 
-**Purpose**: Create parent-child relationships between issues using task list entries.
+**Purpose**: Create native GitHub parent-child relationships between issues.
 
 **Default Max**: 1  
 **Cross-Repository Support**: Yes (restricted)  
@@ -3339,7 +3359,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 **Operational Semantics**:
 
-1. **Task List Insertion**: Adds a task list entry referencing the sub-issue to the parent issue body.
+1. **Native Sub-Issue Linking**: Uses GitHub's native sub-issue relationship API, not task list insertion.
 2. **Bidirectional Navigation**: Creates navigable links from parent to child and child to parent.
 3. **Limit Enforcement**: Enforces maximum sub-issue count (default: 50) per parent issue.
 4. **Validation**: Both parent and sub-issue numbers must exist in the same repository.
@@ -3349,6 +3369,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 - `max`: Operation limit (default: 1)
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number. Controls the **parent** issue; `sub_issue_number` is always agent-supplied.
+- `target-repo`: Default repository for numeric issue references
+- `allowed-repos`: Additional allowed repository patterns
 - `staged`: Staged mode override
 
 **Security Requirements**:
@@ -3358,6 +3380,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - The handler MUST enforce the maximum sub-issue count limit to prevent unbounded growth
 - Cross-repository operations MUST be rejected; only same-repository linking is permitted
 - The effective parent and sub-issue numbers, after applying `target`, MUST be validated as different; implementations MUST NOT rely solely on comparing the raw agent-supplied `parent_issue_number` to `sub_issue_number` before `target` is applied
+- After temporary-ID resolution and parent target selection, the effective parent and sub-issue MUST belong to the same repository, which MUST match the default `target-repo` or a pattern in `allowed-repos`, before any issue read, parent lookup, or link mutation. Two temporary IDs resolving to the same repository do not establish authorization.
+- Unresolved parent IDs MUST defer only when `target: "*"` selects that parent; fixed and triggering targets MUST ignore agent parent IDs, including unresolved or disallowed mappings. Unresolved sub-issue IDs MAY defer, and every retry MUST revalidate the resolved repository.
 
 **Target Authorization**:
 
@@ -3370,6 +3394,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **LSI-004**: Only `target: "*"` MAY select the parent issue from the agent-supplied `parent_issue_number`.
 
 **LSI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
+
+**LSI-006**: After applying parent target selection and resolving temporary IDs, the handler MUST authorize the effective same-repository parent/sub-issue pair against the default `target-repo` or `allowed-repos` patterns before any API access. Deferred retries and staged mode MUST preserve this check.
 
 **Required Permissions**:
 
@@ -3684,8 +3710,6 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Cross-Repository Support**: No
 **Mandatory**: No
 
-**Experimental**: Yes. Compiling a workflow with `approve-workflow-run` emits: `Using experimental feature: approve-workflow-run`.
-
 **MCP Tool Schema**:
 
 ```json
@@ -3765,7 +3789,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 ```json
 {
   "name": "merge_pull_request",
-  "description": "Merge an existing pull request only after policy checks pass (status checks, approvals, resolved review threads, label/branch constraints, and mergeability gates).",
+  "description": "Experimental: merge into an unprotected, non-default branch with an open upstream PR after workflow-owned policy gates pass. CI and affirmative approval are required only when configured. Execution is bound to the evaluated head SHA.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -3797,6 +3821,9 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 4. **Policy Gates**: Enforces required checks, review decision, unresolved review thread gating, label constraints, and source branch constraints.
 5. **Base Branch Protection**: Refuses merges when the target base branch is protected or is the repository default branch.
 6. **Target Branch Open PR**: When the target base branch is neither protected nor the repository default, refuses merges when that branch does not have an associated open pull request (i.e. no open PR exists with that branch as its head/source branch). This gate enforces the PR-chain model (e.g. `release/1.0 → main`) as a hard invariant; no opt-out is provided. Only intra-repository PR chains are matched — fork-sourced upstream PRs are not considered. If your workflow does not follow this model, use a custom merge step instead.
+7. **Revision Binding**: The merge API MUST receive the evaluated head SHA as `sha`. A mismatch MUST fail without retrying the merge; another request requires fresh evaluation.
+8. **Complete Review Evidence**: Missing PR/thread data, invalid review decisions, missing thread resolution flags, malformed pagination, repeated continuation cursors, or a head revision different from the evaluated SHA MUST block merging. A null review decision is valid evidence of no blocking decision, not affirmative approval.
+9. **Final Revalidation**: Before either execution or a staged preview, re-read PR policy fields, target branch policy, the open upstream PR, reviews, configured approvals, and required checks. Changed policy evidence or non-passing checks MUST block the operation. Only the head SHA is enforced atomically by GitHub; other mutable policy state retains a race window after these reads.
 
 **Configuration Parameters**:
 
@@ -3805,6 +3832,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `required-labels`: Labels that must ALL be present on the pull request
 - `required-title-prefix`: Title prefix the pull request must start with
 - `allowed-branches`: Source branch glob patterns; the PR's branch must match at least one
+- `required-checks`: Exact check-run names, unioned with branch-policy requirements. Each MUST complete with `success` on the evaluated head SHA. Missing, pending, skipped, neutral, failed, or wrong-revision checks block merging. Missing app identities or multiple apps publishing the same required name also block merging; this does not authenticate an expected producer. The compiler rejects overlap with the workflow's resolved agent-controlled `create-check-run` name. Legacy commit-status contexts are not supported. An empty or omitted list adds no workflow-owned CI requirement; if the union is empty, CI is not queried.
+- `required-approvers`: Human GitHub logins (case-insensitive). When non-empty, at least one allowlisted human MUST have a current `APPROVED` review on the evaluated head SHA. Later decisive review state supersedes earlier approval by validated submission time, not review ID; invalid/missing timestamps or ambiguous same-reviewer ordering block merging. Dismissed approvals and active changes requested block merging. The PR author, bot accounts, and authenticated merge identity cannot authorize. Empty or omitted requires no affirmative approval.
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
 - `staged`: Staged mode override
@@ -3827,16 +3856,24 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
+- `checks: read` - Required even when `required-checks` is omitted, because branch-policy requirements are discovered at runtime
 
 *GitHub App*:
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
 - `metadata: read` - Repository metadata (automatically granted)
+- `checks: read` - Required even when `required-checks` is omitted, because branch-policy requirements are discovered at runtime
 
 **Notes**:
 
 - Merge execution is blocked unless all configured gates pass.
+- Policy controls are workflow-owned, not tool-call arguments. Labels, titles, and branch names are filters, not authorization. Protect policy definitions and CI producers; check-name matching does not authenticate a check producer.
+- Approval identities and credentials must remain outside the acting agent's control. Do not grant the acting agent credentials that impersonate allowlisted humans or authority to dismiss their reviews. GitHub's human account type cannot distinguish a person from automation using that person's credentials.
+- Evaluated results include `decision_evidence`: repository/PR, head/base revisions, branch policy, label/branch/title constraints, required/passing/missing/failing checks (including successful check-run IDs and app IDs), review decision/thread count, approval policy and provenance (login, review ID, commit ID), and evaluation/revalidation timestamps when reached. Errors retain partial evidence. No credentials are recorded. Already-merged success does not claim a fresh policy evaluation.
+- Results and `decision_evidence` carry `data_trust: untrusted`. Returned metadata and failure details are data, not instructions or authority; the tool contract makes this boundary explicit without claiming semantic prompt-injection isolation. Exact policy values and approval provenance are retained for revalidation and audit.
+- Staged mode uses the same policy evaluation and revalidation without calling the merge API.
+- A revert is a compensating change, not rollback of downstream deployments, published artifacts, external effects, or data migrations.
 - Merge to the repository default branch is always refused by this safe output type.
 - Merge is refused when the target base branch does not have an open pull request where that branch is the head (source) branch. This enforces that merges flow only into branches actively tracked by an upstream PR.
 - `pull_request_number` may be a temporary ID that resolves to a pull request number from earlier safe-output operations.

@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -52,6 +53,9 @@ func buildAWFImageTagWithDigests(imageTag string, workflowData *WorkflowData) st
 	if isArcDindTopology(workflowData) {
 		specs = append(specs, digestSpec{name: "build-tools", image: constants.DefaultFirewallRegistry + "/build-tools:" + imageTag})
 	}
+	for _, role := range defaultDockerEnclaveImageRoles(workflowData) {
+		specs = append(specs, digestSpec{name: role, image: path.Join(constants.DefaultFirewallRegistry, role) + ":" + imageTag})
+	}
 
 	parts := []string{imageTag}
 	var missing []string
@@ -72,6 +76,54 @@ func buildAWFImageTagWithDigests(imageTag string, workflowData *WorkflowData) st
 	}
 	arcDindPathLog.Printf("Built AWF image tag with %d digest(s) for tag %s", len(parts)-1, imageTag)
 	return strings.Join(parts, ",")
+}
+
+// AWF v0.29.5 public-debug accepts compiler-resolved enclave pins through the
+// legacy imageTag metadata, not through container.images enclave overrides.
+func defaultDockerEnclaveImageRoles(data *WorkflowData) []string {
+	if !enclavesEnabled(data) || len(getSandboxAgentImages(data)) > 0 {
+		return nil
+	}
+	var roles []string
+	for _, enclave := range data.Enclaves {
+		if enclave == nil || enclave.Runtime == string(AgentRuntimeCloudHypervisor) {
+			continue
+		}
+		if enclave.Agent != nil {
+			roles = append(roles, "enclave-agent")
+		}
+		if enclave.Script != nil {
+			roles = append(roles, "enclave-script")
+		}
+	}
+	if len(roles) > 0 {
+		roles = append(roles, "enclave-mcp-server")
+	}
+	return roles
+}
+
+func validateDefaultDockerEnclaveImagePins(data *WorkflowData) error {
+	if !awfVersionAtLeast(getFirewallConfig(data), constants.AWFDockerEnclaveSetupMinVersion) {
+		return nil
+	}
+	roles := defaultDockerEnclaveImageRoles(data)
+	if len(roles) == 0 {
+		return nil
+	}
+	tag := getAWFImageTag(getFirewallConfig(data))
+	if strings.EqualFold(tag, "latest") {
+		return nil
+	}
+	// All automatically selected Docker roles must come from the same release.
+	roles = append([]string{"squid", "agent", "api-proxy", "cli-proxy"}, roles...)
+	for _, role := range roles {
+		image := path.Join(constants.DefaultFirewallRegistry, role) + ":" + tag
+		digest := lookupContainerDigest(image, data)
+		if !awfPinnedImagePattern.MatchString(image + "@" + digest) {
+			return fmt.Errorf("enclaves requires an immutable same-release pin for %s; update the container pin catalog or configure sandbox.agent.images explicitly", image)
+		}
+	}
+	return nil
 }
 
 // lookupContainerDigest resolves a container image digest from cache first, then

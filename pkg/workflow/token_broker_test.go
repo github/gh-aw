@@ -416,9 +416,9 @@ func TestTokenBrokerSupportsEvalsInference(t *testing.T) {
 	require.NotNil(t, job)
 	assert.Contains(t, job.Permissions, "id-token: write")
 	assert.NotContains(t, job.Permissions, "copilot-requests: write")
-	steps := strings.Join(compiler.buildEvalsEngineSteps(data), "")
+	steps := strings.Join(compiler.buildEvalsDecisionSteps(data), "")
 	assert.Contains(t, steps, "id: token_broker_copilot_request")
-	assert.Contains(t, steps, "COPILOT_GITHUB_TOKEN: "+tokenBrokerCopilotRequestOutput)
+	assert.Contains(t, steps, "GH_AW_DECISIONS_API_KEY: "+tokenBrokerCopilotRequestOutput)
 	assert.Contains(t, strings.Join(job.Steps, ""), "name: Invalidate brokered Copilot credentials\n        if: always()")
 	assertTokenBrokerInvalidationLast(t, job)
 }
