@@ -11,6 +11,7 @@ import { noUnsafePromiseCatchErrorPropertyRule } from "./rules/no-unsafe-promise
 import { preferGetErrorMessageRule } from "./rules/prefer-get-error-message";
 import { preferGetErrorMessageOverStringRule } from "./rules/prefer-get-error-message-over-string";
 import { preferNumberIsNanRule } from "./rules/prefer-number-isnan";
+import { noDeprecatedStringSubstrRule } from "./rules/no-deprecated-string-substr";
 import { noMapParseIntCallbackRule } from "./rules/no-map-parseint-callback";
 import { requireAsyncEntrypointCatchRule } from "./rules/require-async-entrypoint-catch";
 import { requireAwaitCoreSummaryWriteRule } from "./rules/require-await-core-summary-write";
@@ -89,6 +90,7 @@ const plugin = {
     "prefer-get-error-message": preferGetErrorMessageRule,
     "prefer-get-error-message-over-string": preferGetErrorMessageOverStringRule,
     "prefer-number-isnan": preferNumberIsNanRule,
+    "no-deprecated-string-substr": noDeprecatedStringSubstrRule,
     "no-map-parseint-callback": noMapParseIntCallbackRule,
     "require-async-entrypoint-catch": requireAsyncEntrypointCatchRule,
     "require-await-core-summary-write": requireAwaitCoreSummaryWriteRule,
