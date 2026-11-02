@@ -155,7 +155,7 @@ For keyless authentication, configure [Google Workload Identity Federation](/gh-
 
 Pi chooses authentication from the provider prefix in `model:`. It uses Copilot authentication by default, `ANTHROPIC_API_KEY` for `anthropic/...`, and `CODEX_API_KEY` or `OPENAI_API_KEY` for `openai/...` and `codex/...`. For example, use `model: copilot/gpt-5.4`, `model: anthropic/claude-sonnet-5`, or `model: openai/gpt-5`.
 
-Pi also requires `tools.github.mode: gh-proxy` and `tools.cli-proxy: true`. Follow [Using Pi with GitHub Agentic Workflows](/gh-aw/engines/pi/) for the complete setup.
+Follow [Using Pi with GitHub Agentic Workflows](/gh-aw/engines/pi/) for the complete setup.
 
 > [!IMPORTANT]
 > Safe-output [threat detection](/gh-aw/reference/threat-detection/) also needs authentication. For Gemini and Pi, it defaults to Copilot even when the investigator uses another provider. Configure Copilot authentication as described above, or explicitly select another supported built-in detection engine with its own credentials. Keep threat detection enabled; selecting an investigator engine does not configure a different detector's credentials.
@@ -183,16 +183,7 @@ tools:
     toolsets: [actions, repos, issues, pull_requests]
 ```
 
-Keep the sample's `actions: read`, `contents: read`, `issues: read`, and `pull-requests: read` permissions and its `create-issue` and `add-comment` safe outputs. Keep the engine and authentication settings chosen in Step 2. For Pi, merge the toolsets into its existing `tools` block rather than replacing it:
-
-```yaml
-checkout: false
-tools:
-  github:
-    mode: gh-proxy
-    toolsets: [actions, repos, issues, pull_requests]
-  cli-proxy: true
-```
+Keep the sample's `actions: read`, `contents: read`, `issues: read`, and `pull-requests: read` permissions and its `create-issue` and `add-comment` safe outputs. Keep the engine and authentication settings chosen in Step 2. The same GitHub toolsets configuration works with all five engines, including Pi's native MCP support.
 
 Do not grant the agent repository write permissions to publish reports.
 

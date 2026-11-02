@@ -81,8 +81,6 @@ class QuickstartTests(unittest.TestCase):
             "branches: [main]",
             "checkout: false",
             "toolsets: [actions, repos, issues, pull_requests]",
-            "mode: gh-proxy",
-            "cli-proxy: true",
             "Keep threat detection enabled",
             "gh aw compile ci-doctor",
             "**default branch**",
@@ -99,6 +97,14 @@ class QuickstartTests(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, self.guide)
         self.assertNotRegex(self.guide, r"```[^\n]*\n(?:gh aw run|gh workflow run|gh run rerun)")
+
+    def test_pi_uses_native_mcp_without_required_proxies(self):
+        gallery = (ROOT / "docs/src/content/docs/gallery/ci-failure-investigation.md").read_text()
+        for text in (self.guide, gallery):
+            with self.subTest(page=text[:80]):
+                self.assertIn("native MCP", text)
+                self.assertNotIn("gh-proxy", text)
+                self.assertNotIn("cli-proxy", text)
 
     def test_structured_data_and_onboarding_use_ci_investigation(self):
         schema = re.search(r"(?m)^      (\{.*?^      \})", self.guide, re.S)

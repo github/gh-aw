@@ -31,7 +31,7 @@ In [github/gh-aw#14295](https://github.com/github/gh-aw/issues/14295), CI Doctor
 
 The agent has read-only access to Actions and repository content. Issue creation and comments are safe outputs, so gh-aw validates them before publishing.
 
-Match `workflows: ["CI"]` to the repository's workflow display names and `branches: [main]` to trusted monitored branches. Set `checkout: false` and enable `tools.github.toolsets: [actions, repos, issues, pull_requests]` so the agent retrieves code and job logs through GitHub tools; retain the sample's read-only permissions and safe outputs. Preserve engine-specific tool settings, including Pi's `gh-proxy` and `cli-proxy` requirements.
+Match `workflows: ["CI"]` to the repository's workflow display names and `branches: [main]` to trusted monitored branches. Set `checkout: false` and enable `tools.github.toolsets: [actions, repos, issues, pull_requests]` so the agent retrieves code and job logs through GitHub tools; retain the sample's read-only permissions and safe outputs. Preserve the selected engine and authentication settings; Pi supports native MCP and uses the same toolsets configuration.
 
 Run `gh aw compile ci-doctor` and commit both the Markdown workflow and its generated lock file to the default branch. The sample investigates subsequent failed `workflow_run` events, not historical runs automatically, and has no manual dispatch trigger. The quickstart covers safely rerunning an existing failed CI run and checking the resulting issue or duplicate comment.
 
