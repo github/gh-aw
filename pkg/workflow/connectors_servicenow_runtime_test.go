@@ -94,12 +94,14 @@ func TestServiceNowMarkdownRuntime(t *testing.T) {
 				_, err := config.Agent.Execute(t.Context(), runtime, "mcp", "get-"+target.name, args)
 				require.Error(t, err)
 			}
-			for _, invalidNote := range []string{"", " \n\t", strings.Repeat("x", 4001)} {
+			for _, invalidNote := range []string{"", " \n\t", strings.Repeat("x", 4001), strings.Repeat("\u00e9", 4001), strings.Repeat("\U0001f600", 4001)} {
 				_, err := config.SafeOutputs.PrepareSafeOutput(effect, map[string]any{"record": target.record, "note": invalidNote})
 				require.Error(t, err)
 			}
-			_, err = config.SafeOutputs.PrepareSafeOutput(effect, map[string]any{"record": target.record, "note": strings.Repeat("x", 4000)})
-			require.NoError(t, err)
+			for _, validNote := range []string{strings.Repeat("x", 4000), strings.Repeat("\u00e9", 4000), strings.Repeat("\U0001f600", 4000)} {
+				_, err = config.SafeOutputs.PrepareSafeOutput(effect, map[string]any{"record": target.record, "note": validNote})
+				require.NoError(t, err)
+			}
 			assert.Equal(t, 1, calls)
 			assert.Equal(t, 1, resolutions, "invalid requests must fail before credentials")
 			runtime.Phase, runtime.AllowWrites = "safe-output", true

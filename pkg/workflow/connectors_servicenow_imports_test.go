@@ -58,6 +58,8 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	require.True(t, found)
 	assert.NotContains(t, comment, "--", "HTML comments cannot contain internal double hyphens, even in CDATA")
 	assert.NotContains(t, comment, "connector_10_", "document the direct provider tool names")
+	assert.Empty(t, scanImportedConnectorMarkdown(string(source), "/repo/.github/aw/connectors/servicenow.md"),
+		"the self-contained XML comment must be accepted by the actual local-import scanner")
 
 	var doc struct {
 		XMLName        xml.Name `xml:"connector-documentation"`
@@ -144,6 +146,22 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	assert.Equal(t, []string{"SERVICENOW_READ_TOKEN"}, config.Agent.Secrets())
 	assert.Equal(t, []string{"SERVICENOW_WRITE_TOKEN"}, config.SafeOutputs.Secrets())
 	assert.True(t, templatableBoolIsTrue(data.SafeOutputs.Staged))
+	for _, operation := range []string{"append-incident-work-note", "append-requested-item-work-note"} {
+		key := "servicenow-" + operation
+		script := data.SafeOutputs.Scripts[key]
+		require.NotNil(t, script)
+		tool := generateCustomScriptToolDefinition(key, script)
+		assert.Equal(t, key, tool["name"])
+	}
+	output, err := compiler.CompileToYAML(data, path)
+	require.NoError(t, err)
+	assert.Contains(t, output, "servicenow_append_incident_work_note")
+	assert.Contains(t, output, "servicenow_append_requested_item_work_note")
+	assert.NotContains(t, output, "${{ secrets.SERVICENOW_WRITE_TOKEN }}", "staging must not inject writer credentials")
+	assert.NotContains(t, output, "connector_10_servicenow_")
+	for _, removed := range []string{"Checkout trusted connector runtime", "Build trusted connector runtime"} {
+		assert.NotContains(t, output, removed)
+	}
 	require.NoError(t, compiler.CompileWorkflow(path), "compile the actual extracted consumer, not a parse-only proxy")
 }
 
@@ -172,6 +190,10 @@ func TestServiceNowMarkdownIndependentSelections(t *testing.T) {
 				if test.read {
 					assert.Equal(t, []string{"APPROVED_SERVICENOW_READER"}, config.Agent.Secrets())
 					assert.Equal(t, []string{"https://example.service-now.com"}, config.Agent.Origins())
+					tool, ok := data.Tools["servicenow"].(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, "node", tool["entrypoint"])
+					assert.Equal(t, []string{"${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs", "serve"}, tool["entrypointArgs"])
 				}
 				if test.write {
 					assert.Equal(t, []string{"APPROVED_SERVICENOW_WRITER"}, config.SafeOutputs.Secrets())
