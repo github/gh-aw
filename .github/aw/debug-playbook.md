@@ -190,18 +190,19 @@ Nonempty `safeoutputs.jsonl` doesn't prove publication.
 
 ## Merge guard codes
 
-Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authorization.
+Check PR state, checks, and reviews; diagnosis is not authorization.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Syntax/patterns; actual head/base. | Fix authorized target/config. |
-| `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default restrictions; required PR. | Use permitted PR path; retain protections. |
-| `pr_is_draft` | Draft state. | Author-authorized readiness only. |
-| `merge_conflicts`, `not_mergeable` | Live mergeability/conflicts; unknown != conflict. | Resolve on reviewed head; bounded wait for known state. |
-| `missing_required_labels`, `title_prefix_mismatch` | Required labels/title. | Authorized correction; retain handler guards. |
-| `required_checks_missing`, `required_checks_failing` | Check identity/SHA/completion/result. | Fix current-head checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `unresolved_review_threads` | Pending/blocked reviews; open threads. | Address feedback; retain reviewer authority/policy. |
-| `merge_not_completed`, `merge_operation_error` | API response; live state. | Reconcile before retry; possibly merged. |
+| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Branch refs. | Fix authorized target. |
+| `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use permitted path. |
+| `pr_is_draft` | Draft. | Confirm authorized readiness. |
+| `merge_conflicts`, `not_mergeable` | Mergeability; unknown != conflict. | Resolve on reviewed head; await certainty. |
+| `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct target; retain guards. |
+| `required_checks_missing`, `required_checks_failing` | Check IDs/SHA/result. | Fix current-head checks; no bypass. |
+| `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous`, `pr_not_open`, `blocking_individual_review`, `required_approval_missing` | Producer/PR/review evidence. | Fix state; retain guards. |
+| `pending_reviewers`, `blocking_review_state`, `unresolved_review_threads` | Reviews/threads. | Address feedback; retain policy. |
+| `merge_not_completed`, `merge_operation_error` | API state. | Reconcile; maybe merged. |
 
 ## Parser and ledger diagnostics
 
