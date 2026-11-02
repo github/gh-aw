@@ -1210,7 +1210,7 @@
       "properties": {
         "issue_number": {
           "type": ["number", "string"],
-          "description": "Issue number to assign users to. This is the numeric ID from the GitHub URL (e.g., 543 in github.com/owner/repo/issues/543). If omitted, assigns to the issue that triggered this workflow.",
+          "description": "Issue number to assign users to. This is the numeric ID from the GitHub URL (e.g., 543 in github.com/owner/repo/issues/543) of an issue that already exists. Unlike add_comment, add_labels, or assign_milestone, this field does NOT accept a temporary_id (e.g. 'aw_xxx') referencing an issue created earlier in the same run — passing one will fail with 'Invalid item_number/issue_number specified'. If omitted, assigns to the issue that triggered this workflow.",
           "x-synonyms": ["issueNumber"]
         },
         "assignees": {
@@ -1258,7 +1258,7 @@
       "properties": {
         "issue_number": {
           "type": ["number", "string"],
-          "description": "Issue number to unassign users from. This is the numeric ID from the GitHub URL (e.g., 543 in github.com/owner/repo/issues/543). If omitted, uses the issue that triggered this workflow.",
+          "description": "Issue number to unassign users from. This is the numeric ID from the GitHub URL (e.g., 543 in github.com/owner/repo/issues/543) of an issue that already exists. Unlike add_comment, add_labels, or assign_milestone, this field does NOT accept a temporary_id (e.g. 'aw_xxx') referencing an issue created earlier in the same run — passing one will fail with 'Invalid item_number/issue_number specified'. If omitted, uses the issue that triggered this workflow.",
           "x-synonyms": ["issueNumber"]
         },
         "assignees": {
