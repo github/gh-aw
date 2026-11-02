@@ -116,6 +116,15 @@ Staged proposals and agent-supplied IDs do not create authority.
 Connector mutations are non-reviewable outputs and are blocked when threat
 detection concludes warning; agent-supplied policy fields cannot override this.
 
+Some operations declare automatic `lookups` for exact shorthand targets. Supply
+the declaration's separate alias and canonical-ID grants; resolution never adds
+authority. Linear accepts `issue-references` such as `ENG-123`, creation
+`team-references` keys/names, and `project-slugs`, with independent UUID grants.
+The same selected-phase credential performs fixed bounded reads and verifies
+identity, boundaries, and declared tuple membership before the operation.
+Staged aliases remain unchanged and appear in `unresolvedInputs`; no canonical
+identity or membership is verified until non-staged authorized execution.
+
 ## Author or extend a declaration
 
 For local development, use `gh aw connector <id> setup` for phase-specific
@@ -194,6 +203,21 @@ MCP transport does not inherit REST operation retry settings.
 
 Do not add automatic pagination, event-URL fetches, or unsupported provider
 functionality.
+
+Use operation-local `lookups` only when automatic alias resolution is necessary.
+The shared contract allows at most four ordered GET/fixed-GraphQL reads on the
+operation endpoint and credential. Each target has one exact alias resource
+collection, one canonical projection already in the final resource grant, and
+response identity checks. Dependencies may use only canonical inputs resolved
+earlier; cycles and duplicate targets are rejected. An untargeted final read can
+verify relationships after resolution. UUID-only calls skip the chain; when a
+chain is needed, all its grants are checked before secret access and the entire
+chain has a 20-second deadline. Lookups cannot mix with trusted-input or
+creation-receipt bindings. `responseLimits` bounds named response arrays to
+1 through 100 elements; require the first result separately when emptiness is
+invalid. `responseAnyInputs` checks an exact string input against one to four
+reviewed identity pointers, for example a team key or name. Always reject
+pagination explicitly, independently of array length.
 
 The compiler freezes selected plans and uses the Node runtime shipped by
 `actions/setup`. Do not add a per-provider checkout, build, CLI installation,

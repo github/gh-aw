@@ -223,10 +223,17 @@ shared title/body sanitization and generated footer conformance:
 
 ```bash
 gh aw connector linear test --phase safe-output --capability add-comment \
-  --input 'issues=["22222222-2222-4222-8222-222222222222"]' \
-  --args '{"issue-id":"22222222-2222-4222-8222-222222222222","body":"Local connector review prepared."}' \
+  --grant 'issues=["22222222-2222-4222-8222-222222222222"]' \
+  --grant 'issue-references=["ENG-123"]' \
+  --grant 'organizations=["11111111-1111-4111-8111-111111111111"]' \
+  --grant 'teams=["33333333-3333-4333-8333-333333333333"]' \
+  --grant 'projects=["44444444-4444-4444-8444-444444444444"]' \
+  --args '{"issue-id":"ENG-123","body":"Local connector review prepared."}' \
   --node-runtime actions/setup/js/connector_runtime.cjs
 ```
+
+Shorthand staging reports unresolved input names without looking up UUIDs.
+Canonical identities and relationships remain unverified until authorized execution.
 
 `--file` selects an explicit repository-owned declaration or normal-import
 wrapper, and `--root` selects its repository. A wrapper can use ordinary remote
@@ -279,7 +286,8 @@ and [MCP setup](https://linear.app/docs/mcp).
 
 Import `.github/workflows/connectors/linear.md`, supply approved resource arrays through
 `with`, and independently select capabilities. Resource inputs are `issues`,
-`organizations`, `teams`, `projects`, `team-keys`, and `project-slugs`; each
+`organizations`, `teams`, `projects`, `team-keys`, `project-slugs`,
+`issue-references`, and `team-references`; each
 defaults to an empty allowlist. Selection fails closed when any required grant
 is missing. Secret-name overrides are `reader-secret`, `mcp-reader-secret`, and
 `writer-secret`.
@@ -290,7 +298,7 @@ and `on.gateway-dispatch.linear-issue` are no longer supported.
 Connector safe-output selections accept null, `{}`, or the per-operation
 `max`/`staged` options above. Their generated tools
 are `linear_create_issue`, `linear_update_issue`, and
-`linear_add_comment`. Targets are typed UUID arguments constrained by
+`linear_add_comment`. Canonical targets are typed UUID arguments constrained by
 the trusted resource arrays, never arbitrary URLs or credential inputs.
 
 Create requires approved team and project UUIDs plus title/body; update requires
@@ -302,9 +310,31 @@ dry-run/staged mode prepares requests without resolving write credentials or
 sending mutations. Connector-only writes do not implicitly enable GitHub issue
 reporting, request GitHub write permissions, or mint a GitHub App token.
 
-There is no automatic conversion of team names, issue shorthand, or old
-environment-variable defaults; use separately selected bounded `resolve-team`
-and `resolve-project` reads and approve the resulting model UUIDs. Broad hosted
+Approved shorthand targets resolve automatically through declaration-owned
+bounded lookup chains. Add exact `issue-references: [ENG-123]` for issue reads,
+updates, or comments; keep the corresponding canonical UUID in `issues` and
+approve its organization, team, and project UUIDs. Issue lookup checks the exact
+identifier and all four boundaries before using the canonical UUID. Shorthand
+issues without project evidence fail closed; direct UUID reads retain support
+for null projects.
+
+For creation, `team-references: [ENG, Engineering]` approves exact keys/names and
+`project-slugs: [abcdef123456]` approves project slugId values. The caller still
+supplies `team-id` and `project-id`, using either aliases or approved UUIDs.
+When either is an alias, the writer resolves only necessary targets and verifies
+the exact team/project membership, with at most three fixed reads in one
+20-second window. Team and project aliases must resolve uniquely to UUIDs
+already in `teams` and `projects`; the organization must be approved too.
+Missing grants fail before credentials or requests. Ambiguity, pagination,
+mismatched identities, absent evidence, and failed tuple membership abort
+before mutation. These lookups require Read on the writer key and never use
+the agent reader, add grants, or follow returned URLs.
+
+Direct approved UUID-only operations skip lookup chains. Staging retains alias
+arguments and lists `unresolvedInputs`; it performs no lookups or credential
+resolution and does not claim verified canonical targets. Separately selected
+`resolve-team` and `resolve-project` reads remain available and grant no authority.
+Old environment-variable defaults are not restored. Broad hosted
 MCP toolsets, optional project creation, and single-field updates remain contract
 gaps, not silently retained legacy paths.
 No custom authenticated ingress or configurable context is installed.
@@ -724,6 +754,78 @@ resolved identifiers against its input constraints and grants only those exact
 resources. Missing, ambiguous, malformed, oversized, mismatched, or redirected
 lookups fail before mutation. Staging resolves no source secrets and makes no
 preflight requests.
+
+### Automatic target lookups
+
+An operation's optional `lookups` list contains at most four ordered, fixed reads.
+It is part of `connectors.<id>.tools.<operation>` or
+`connectors.<id>.safe-outputs.<operation>` frontmatter, not executable provider
+code or a workflow-level target option. For example, this declaration excerpt
+resolves issue shorthand; the enclosing operation declares the canonical
+`issue-id` UUID input, `resources: {issue-id: issues}`, and its mutation request:
+
+```yaml
+connectors:
+  tracker:
+    safe-outputs:
+      add-comment:
+        lookups:
+          - input: issue-id
+            inputs:
+              issue-id:
+                type: string
+                required: true
+                maxLength: 32
+                pattern: ^[A-Z][A-Z0-9]{0,15}-[1-9][0-9]{0,14}$
+            resources: {issue-id: issue-references}
+            request:
+              endpoint: api
+              method: POST
+              path: /graphql
+              graphql: |
+                query Target($id: String!) {
+                  organization { id }
+                  issue(id: $id) { id identifier team { id } project { id } }
+                }
+              query: {id: {input: issue-id}}
+            maxResponseBytes: 16384
+            responseInputs: {/data/issue/identifier: issue-id}
+            responseResources:
+              /data/organization/id: organizations
+              /data/issue/id: issues
+              /data/issue/team/id: teams
+              /data/issue/project/id: projects
+            project: {issue-id: /data/issue/id}
+```
+
+Each item uses the bounded preflight fields plus optional `input`. A targeted
+item accepts a separately granted alias through its own `inputs`/`resources`,
+correlates the response through `responseInputs` or `responseAnyInputs`, and
+projects only that input to a canonical value. The projection pointer must have
+a `responseResources` constraint naming the final input's resource collection.
+It cannot turn a lookup result into a new grant. An item without `input` has no
+projection and verifies relationships among already canonical inputs.
+
+Reads use the operation's endpoint, phase, and credential. Duplicate targets,
+cycles, forward dependencies, mutations, extra projections, and chains longer
+than four items are rejected. Lookup inputs cannot combine with `trustedInputs`,
+`preflight`, or creation-receipt bindings. Each response is byte-bounded and the
+whole chain is time-bounded to 20 seconds. No pagination or inferred endpoints
+are followed. Direct valid canonical inputs never fall back to alias lookup when
+their grants are missing. Fully canonical calls skip the chain; if resolution
+is needed, only unresolved targets and relationship checks execute. All required
+chain grants must exist before credential resolution or requests.
+
+`responseLimits` maps response array pointers to maximum counts from 1 to 100;
+missing/non-array values and excessive results fail. Combine it with
+`responseRequired` for nonempty results and `responseChecks` for pagination flags.
+`responseAnyInputs` maps a required string input to one through four response
+pointers; at least one must equal the exact requested value. This supports a
+single bounded team-key/name query without treating a filter as identity proof.
+
+Staged intents retain aliases and add `unresolvedInputs`, sorted by input name.
+They establish no lookup evidence, authority, or receipts. Actual resolution
+occurs execution-locally against the same frozen plan and original exact grants.
 
 ### Created-resource references
 
