@@ -300,6 +300,8 @@ safe-outputs:
 
 **Staged mode**: Setting `staged: true` runs all gate checks and emits a preview result without calling the GitHub merge API. Use this to validate policy in dry-run scenarios.
 
+**Debug diagnostics**: Enable GitHub Actions step debug logging (`ACTIONS_STEP_DEBUG`) to view `merge_pull_request:` records for evidence collection, blocked gates, final revalidation, staged previews, and merge outcomes. These records contain fixed event/phase names, counts, and booleans only, excluding repository/PR identifiers, revisions, branch/check/label names, reviewer identities, content, credentials, and raw API errors. This privacy boundary applies to these debug records, not existing informational/error logs or `decision_evidence`, which retain operational details.
+
 **Recovery limits**: Stop and reevaluate after any policy or revision change. Reverting a merge creates a compensating change; it does not undo downstream deployments, published artifacts, external effects, or data migrations.
 
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for `target-repo`, `allowed-repos`, and authentication configuration. See the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request) for the complete schema and operational semantics.

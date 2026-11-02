@@ -153,6 +153,7 @@ async function getReviewSummary(githubClient, owner, repo, pullNumber, headSha) 
   }
 
   core.info(`Review summary: decision=${reviewDecision || "null"}, unresolvedThreads=${unresolvedThreadCount}`);
+  core.debug(`merge_pull_request: ${JSON.stringify({ event: "review_evidence", pages: page, unresolved_threads: unresolvedThreadCount, decision_present: reviewDecision !== null })}`);
   return { reviewDecision, unresolvedThreadCount };
 }
 
@@ -190,7 +191,7 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
     throw new Error(`${SAFE_OUTPUT_E007}: Blocking human review remains active for PR #${pr.number}`);
   }
   const allowed = requiredApprovers.map(login => login.toLowerCase());
-  return [...latest.values()]
+  const approvals = [...latest.values()]
     .filter(
       review =>
         review.state === "APPROVED" &&
@@ -201,6 +202,8 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
         review.user.login.toLowerCase() !== identity.viewer.login.toLowerCase()
     )
     .map(review => ({ login: review.user.login, review_id: review.id, commit_id: review.commit_id }));
+  core.debug(`merge_pull_request: ${JSON.stringify({ event: "approval_evidence", reviews: reviews.length, eligible_approvals: approvals.length })}`);
+  return approvals;
 }
 
 /**
@@ -479,12 +482,16 @@ async function main(config = {}) {
   core.info(
     `merge_pull_request handler configured: max=${maxCount}, requiredLabels=${requiredLabels.length}, requiredTitlePrefix=${requiredTitlePrefix ? JSON.stringify(requiredTitlePrefix) : "none"}, allowedBranches=${allowedBranches.length}, staged=${isStaged}`
   );
+  core.debug(
+    `merge_pull_request: ${JSON.stringify({ event: "configured", staged: isStaged, required_checks: requiredChecks.length, required_approvers: requiredApprovers.length, required_labels: requiredLabels.length, allowed_branches: allowedBranches.length })}`
+  );
 
   let processedCount = 0;
 
   return async function handleMergePullRequest(message, resolvedTemporaryIds) {
     core.info(`Processing merge_pull_request message: ${JSON.stringify({ pull_request_number: message?.pull_request_number, repo: message?.repo, merge_method: message?.merge_method })}`);
     if (processedCount >= maxCount) {
+      core.debug('merge_pull_request: {"event":"limit_reached"}');
       core.warning(`Skipping merge_pull_request: max count of ${maxCount} reached`);
       return { success: false, error: `Max count of ${maxCount} reached` };
     }
@@ -528,6 +535,7 @@ async function main(config = {}) {
     const failureReasons = [];
     /** @type {Record<string, any>} */
     const evidence = { repository: `${owner}/${repo}`, pull_request_number: pullNumber, evaluated_at: new Date().toISOString() };
+    let phase = "pull_request";
 
     try {
       const pr = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
@@ -561,6 +569,7 @@ async function main(config = {}) {
         `PR state: merged=${pr.merged}, draft=${pr.draft}, mergeable=${pr.mergeable}, mergeable_state=${pr.mergeable_state || "unknown"}, head=${JSON.stringify(sourceBranch || pr.head?.ref || null)}, base=${JSON.stringify(baseBranch || pr.base?.ref || null)}`
       );
       if (pr.merged) {
+        core.debug('merge_pull_request: {"event":"already_merged"}');
         core.info(`PR #${pullNumber} is already merged, returning idempotent success`);
         return {
           success: true,
@@ -632,6 +641,7 @@ async function main(config = {}) {
 
       /** @type {{isProtected: boolean, isDefault: boolean, defaultBranch: string|null, requiredChecks: string[]}} */
       let branchPolicy = { isProtected: false, isDefault: false, defaultBranch: null, requiredChecks: [] };
+      phase = "branch_policy";
       if (baseBranch) {
         branchPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
         if (branchPolicy.isProtected) {
@@ -661,7 +671,11 @@ async function main(config = {}) {
 
       branchPolicy.requiredChecks = [...new Set([...branchPolicy.requiredChecks, ...requiredChecks])].sort();
       evidence.branch_policy = branchPolicy;
+      phase = "required_checks";
       const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks);
+      core.debug(
+        `merge_pull_request: ${JSON.stringify({ event: "check_evidence", required: branchPolicy.requiredChecks.length, passing: checkSummary.passing.length, missing: checkSummary.missing.length, failing: checkSummary.failing.length })}`
+      );
       evidence.checks = { required: branchPolicy.requiredChecks, ...checkSummary };
       core.info(`Required check summary: missing=${checkSummary.missing.length}, failing=${checkSummary.failing.length}`);
       if (checkSummary.missing.length > 0) {
@@ -690,8 +704,10 @@ async function main(config = {}) {
         });
       }
 
+      phase = "review_evidence";
       const reviewSummary = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
       evidence.reviews = reviewSummary;
+      phase = "approval_evidence";
       const approvals = await getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers);
       evidence.approval_policy = { required_approvers: requiredApprovers, approvals };
       if (requiredApprovers.length > 0 && approvals.length === 0) {
@@ -715,6 +731,7 @@ async function main(config = {}) {
       }
 
       if (failureReasons.length > 0) {
+        core.debug(`merge_pull_request: ${JSON.stringify({ event: "gates_blocked", failures: failureReasons.length })}`);
         core.warning(`merge_pull_request blocked with ${failureReasons.length} gate failure(s): ${failureReasons.map(r => r.code).join(", ")}`);
         return {
           success: false,
@@ -725,6 +742,8 @@ async function main(config = {}) {
         };
       }
 
+      phase = "revalidation";
+      core.debug('merge_pull_request: {"event":"revalidation_started"}');
       if (!baseBranch) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing target base branch for final policy evaluation`);
       }
@@ -751,8 +770,10 @@ async function main(config = {}) {
       evidence.upstream_pull_request = upstreamPR.number;
       evidence.checks = { required: branchPolicy.requiredChecks, ...currentChecks };
       evidence.revalidated_at = new Date().toISOString();
+      core.debug('merge_pull_request: {"event":"revalidation_passed"}');
 
       if (isStaged) {
+        core.debug('merge_pull_request: {"event":"staged_preview"}');
         core.info(`Staged mode: merge for PR #${pullNumber} not executed`);
         return {
           success: true,
@@ -765,6 +786,8 @@ async function main(config = {}) {
         };
       }
 
+      phase = "merge";
+      core.debug('merge_pull_request: {"event":"merge_started","head_bound":true}');
       const mergeResponse = await githubClient.rest.pulls.merge({
         owner,
         repo,
@@ -774,6 +797,7 @@ async function main(config = {}) {
         commit_title: message.commit_title,
         commit_message: message.commit_message,
       });
+      core.debug(`merge_pull_request: ${JSON.stringify({ event: "merge_completed", merged: mergeResponse.data?.merged === true })}`);
 
       if (mergeResponse.data?.merged !== true) {
         core.error(`Merge API returned merged=false for PR #${pullNumber}: ${mergeResponse.data?.message || "no message"}`);
@@ -797,6 +821,7 @@ async function main(config = {}) {
         decision_evidence: evidence,
       };
     } catch (error) {
+      core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
       core.error(`merge_pull_request failed for PR #${pullNumber}: ${getErrorMessage(error)}`);
       return {
         success: false,

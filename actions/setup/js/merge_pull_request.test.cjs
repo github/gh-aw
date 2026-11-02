@@ -6,6 +6,7 @@ describe("merge_pull_request branch validation", () => {
       info: vi.fn(),
       warning: vi.fn(),
       error: vi.fn(),
+      debug: vi.fn(),
     };
   });
 
@@ -311,6 +312,55 @@ describe("merge_pull_request policy hardening", () => {
   function approval(overrides = {}) {
     return { id: 1, state: "APPROVED", commit_id: "abc123", user: { login: "reviewer", type: "User" }, ...overrides };
   }
+
+  function debugRecords() {
+    return global.core.debug.mock.calls
+      .map(([message]) => message)
+      .filter(message => message.startsWith("merge_pull_request: "))
+      .map(message => JSON.parse(message.slice("merge_pull_request: ".length)));
+  }
+
+  it("emits only bounded structural debug metadata for a successful evaluated merge", async () => {
+    client.paginate.mockImplementation(async method => (method === client.rest.pulls.listReviews ? [approval()] : [{ id: 1, name: "private-ci-name", head_sha: "abc123", status: "completed", conclusion: "success" }]));
+    const result = await run({ required_checks: ["private-ci-name"], required_approvers: ["reviewer"], required_labels: ["ready"], required_title_prefix: "Test", allowed_branches: ["feature/*"] });
+    expect(result.success).toBe(true);
+    const records = debugRecords();
+    expect(records).toContainEqual({ event: "check_evidence", required: 1, passing: 1, missing: 0, failing: 0 });
+    expect(records).toContainEqual({ event: "approval_evidence", reviews: 1, eligible_approvals: 1 });
+    expect(records).toContainEqual({ event: "merge_started", head_bound: true });
+    expect(records).toContainEqual({ event: "merge_completed", merged: true });
+    for (const record of records) {
+      for (const [key, value] of Object.entries(record)) {
+        if (key !== "event" && key !== "phase") {
+          expect(["number", "boolean"]).toContain(typeof value);
+        }
+      }
+    }
+    const logs = JSON.stringify(records);
+    for (const sensitive of ["github/gh-aw", "abc123", "base123", "feature/test", "integration", "private-ci-name", "reviewer", "author", "merge-bot", "ready", "Test PR"]) {
+      expect(logs).not.toContain(sensitive);
+    }
+  });
+
+  it("reports failure phase without copying raw API errors or credentials into handler debug records", async () => {
+    const secret = "private-api-error-token-123";
+    client.rest.pulls.merge.mockRejectedValue(new Error(secret));
+    const result = await run();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain(secret);
+    expect(debugRecords()).toContainEqual({ event: "operation_failed", phase: "merge" });
+    expect(JSON.stringify(debugRecords())).not.toContain(secret);
+  });
+
+  it("records staged and blocked decisions without claiming a merge", async () => {
+    expect((await run({ staged: true })).success).toBe(true);
+    expect(debugRecords()).toContainEqual({ event: "staged_preview" });
+    expect(debugRecords().some(record => record.event === "merge_started")).toBe(false);
+    global.core.debug.mockClear();
+    expect((await run({ required_labels: ["missing-private-label"] })).success).toBe(false);
+    expect(debugRecords()).toContainEqual({ event: "gates_blocked", failures: 1 });
+    expect(JSON.stringify(debugRecords())).not.toContain("missing-private-label");
+  });
 
   it("binds the merge to the evaluated head and records no-objection evidence without claiming approval", async () => {
     const result = await run({}, { pull_request_number: 999 });
