@@ -1488,10 +1488,11 @@ This is a test workflow.`
 				t.Fatalf("Failed to read lock file: %v", err)
 			}
 
-			lockContentStr := string(lockContent)
+			lockContentStr := promptRenderPlan(t, string(lockContent))
 
-			// Check that the runtime-import path is correct
-			if !strings.Contains(lockContentStr, tt.expected) {
+			// Author source paths remain distinct from runtime-import fragment paths.
+			expectedAuthor := strings.Replace(tt.expected, "#runtime-import ", "#author-prompt ", 1)
+			if !strings.Contains(lockContentStr, expectedAuthor) {
 				t.Errorf("%s: Expected to find '%s' in lock file", tt.description, tt.expected)
 
 				// Find what runtime-import was actually generated
@@ -1567,8 +1568,8 @@ This is a test workflow.`
 
 	// The runtime-import path must start with ".github/" regardless of whether the
 	// caller passed a relative or absolute markdown path.
-	const expected = "{{#runtime-import .github/workflows/my-workflow.md}}"
-	if !strings.Contains(string(lockContent), expected) {
+	const expected = "{{#author-prompt .github/workflows/my-workflow.md}}"
+	if !strings.Contains(promptRenderPlan(t, string(lockContent)), expected) {
 		t.Errorf("Expected to find %q in lock file but it was not present.\nLock file content excerpt:\n%s",
 			expected, extractRuntimeImportLines(string(lockContent)))
 	}
@@ -2297,9 +2298,9 @@ Do some important work.
 	}
 	lockContent := string(lockBytes)
 
-	// The compiled lock must contain a runtime-import macro (always emitted in normal mode).
-	if !strings.Contains(lockContent, "{{#runtime-import") {
-		t.Error("expected lock file to contain a {{#runtime-import}} macro")
+	// Normal mode loads the compiler-selected author source on the runner.
+	if !strings.Contains(promptRenderPlan(t, lockContent), "{{#author-prompt ") {
+		t.Error("expected lock file to contain an author prompt source")
 	}
 
 	// And it must contain the interpolation step to resolve that macro.
