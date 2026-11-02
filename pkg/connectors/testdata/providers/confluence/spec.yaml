@@ -1,0 +1,214 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: atlassian.com/confluence
+endpoints:
+  api: https://api.atlassian.com
+credentials:
+  reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [read:page:confluence]
+  context-reader:
+    phase: context
+    header: Authorization
+    scheme: bearer
+    scopes: [read:page:confluence]
+  page-writer:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [write:page:confluence]
+  comment-writer:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [write:comment:confluence]
+triggers:
+  page-created:
+    verificationProfile: atlassian.com/forge-invocation-token
+    nativeEvents: [avi:confluence:created:page]
+    match:
+      /eventType: avi:confluence:created:page
+      /content/type: page
+      /content/status: current
+    normalize:
+      subject: /content/id
+      title: /content/title
+      space: /content/space/id
+      version: /content/version/number
+    resources:
+      /content/id: pages
+      /content/space/id: spaces
+    types:
+      /content/id: string
+      /content/space/id: integer
+      /content/version/number: integer
+      /content/title: string
+  page-updated:
+    verificationProfile: atlassian.com/forge-invocation-token
+    nativeEvents: [avi:confluence:updated:page]
+    match:
+      /eventType: avi:confluence:updated:page
+      /content/type: page
+      /content/status: current
+    normalize:
+      subject: /content/id
+      title: /content/title
+      space: /content/space/id
+      version: /content/version/number
+    resources:
+      /content/id: pages
+      /content/space/id: spaces
+    types:
+      /content/id: string
+      /content/space/id: integer
+      /content/version/number: integer
+      /content/title: string
+mcp:
+  get-page:
+    tool: get-confluence-page
+    credential: reader
+    inputs:
+      cloud-id: {type: string, required: true, maxLength: 36}
+      space-id: {type: string, required: true, maxLength: 20}
+      page-id: {type: string, required: true, maxLength: 20}
+    resources:
+      cloud-id: clouds
+      space-id: spaces
+      page-id: pages
+    request:
+      endpoint: api
+      method: GET
+      path: /ex/confluence/{cloud}/wiki/api/v2/pages
+      pathInputs: {cloud: cloud-id}
+      query:
+        id: {input: page-id}
+        space-id: {input: space-id}
+        status: {literal: current}
+        body-format: {literal: storage}
+        limit: {literal: 1}
+    maxResponseBytes: 65536
+    responseChecks:
+      /results/0/status: current
+      /results/0/body/storage/representation: storage
+    responseResources:
+      /results/0/id: pages
+      /results/0/spaceId: spaces
+    responseRequired: [/results/0/version/number, /results/0/body/storage/value]
+    responseInputs:
+      /results/0/id: page-id
+      /results/0/spaceId: space-id
+    responseTypes:
+      /results/0/id: string
+      /results/0/spaceId: string
+      /results/0/title: string
+      /results/0/version/number: integer
+      /results/0/body/storage/value: string
+    project:
+      page: /results/0/id
+      space: /results/0/spaceId
+      title: /results/0/title
+      version: /results/0/version/number
+      representation: /results/0/body/storage/representation
+      content: /results/0/body/storage/value
+safeOutputs:
+  create-runbook:
+    credential: page-writer
+    inputs:
+      cloud-id: {type: string, required: true, maxLength: 36}
+      space-id: {type: string, required: true, maxLength: 20}
+      parent-id: {type: string, required: true, maxLength: 20}
+    resources:
+      cloud-id: clouds
+      space-id: spaces
+      parent-id: pages
+    request:
+      endpoint: api
+      method: POST
+      path: /ex/confluence/{cloud}/wiki/api/v2/pages
+      pathInputs: {cloud: cloud-id}
+      body:
+        spaceId: {input: space-id}
+        parentId: {input: parent-id}
+        status: {literal: current}
+        title: {literal: Agentic workflow runbook}
+        body:
+          literal:
+            representation: storage
+            value: "<p>Review the workflow result before taking action.</p>"
+    maxResponseBytes: 65536
+    responseResources: {/spaceId: spaces}
+    responseInputs: {/spaceId: space-id, /parentId: parent-id}
+    responseTypes: {/id: string, /version/number: integer}
+    responseRequired: [/id, /version/number]
+  add-review-comment:
+    credential: comment-writer
+    inputs:
+      cloud-id: {type: string, required: true, maxLength: 36}
+      page-id: {type: string, required: true, maxLength: 20}
+    resources:
+      cloud-id: clouds
+      page-id: pages
+    request:
+      endpoint: api
+      method: POST
+      path: /ex/confluence/{cloud}/wiki/api/v2/footer-comments
+      pathInputs: {cloud: cloud-id}
+      body:
+        pageId: {input: page-id}
+        body:
+          literal:
+            representation: storage
+            value: "<p>Review the workflow result before taking action.</p>"
+    maxResponseBytes: 65536
+    responseResources: {/pageId: pages}
+    responseInputs: {/pageId: page-id}
+    responseTypes: {/id: string, /version/number: integer}
+    responseRequired: [/id, /version/number]
+context:
+  runbook:
+    credential: context-reader
+    inputs:
+      cloud-id: {type: string, required: true, maxLength: 36}
+      space-id: {type: string, required: true, maxLength: 20}
+      page-id: {type: string, required: true, maxLength: 20}
+    resources:
+      cloud-id: clouds
+      space-id: spaces
+      page-id: pages
+    request:
+      endpoint: api
+      method: GET
+      path: /ex/confluence/{cloud}/wiki/api/v2/pages
+      pathInputs: {cloud: cloud-id}
+      query:
+        id: {input: page-id}
+        space-id: {input: space-id}
+        status: {literal: current}
+        body-format: {literal: storage}
+        limit: {literal: 1}
+    maxResponseBytes: 65536
+    responseChecks:
+      /results/0/status: current
+      /results/0/body/storage/representation: storage
+    responseResources:
+      /results/0/id: pages
+      /results/0/spaceId: spaces
+    responseRequired: [/results/0/version/number, /results/0/body/storage/value]
+    responseInputs:
+      /results/0/id: page-id
+      /results/0/spaceId: space-id
+    responseTypes:
+      /results/0/id: string
+      /results/0/spaceId: string
+      /results/0/title: string
+      /results/0/version/number: integer
+      /results/0/body/storage/value: string
+    project:
+      page: /results/0/id
+      space: /results/0/spaceId
+      title: /results/0/title
+      version: /results/0/version/number
+      representation: /results/0/body/storage/representation
+      content: /results/0/body/storage/value
