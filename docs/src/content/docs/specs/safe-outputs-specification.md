@@ -3839,6 +3839,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Merge is refused when the target base branch does not have an open pull request where that branch is the head (source) branch. This enforces that merges flow only into branches actively tracked by an upstream PR.
 - `pull_request_number` may be a temporary ID that resolves to a pull request number from earlier safe-output operations.
 - GraphQL mergeability and review-summary queries are retried with transient-error retry logic.
+- Compiling a workflow with `merge-pull-request` emits: `Using experimental feature: merge-pull-request`.
 
 ---
 

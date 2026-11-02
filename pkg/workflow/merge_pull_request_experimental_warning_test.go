@@ -13,13 +13,14 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-func TestMergePullRequestNoExperimentalWarning(t *testing.T) {
+func TestMergePullRequestExperimentalWarning(t *testing.T) {
 	tests := []struct {
-		name    string
-		content string
+		name          string
+		content       string
+		expectWarning bool
 	}{
 		{
-			name: "merge-pull-request enabled",
+			name: "merge-pull-request enabled produces experimental warning",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -29,9 +30,10 @@ safe-outputs:
 
 # Test Workflow
 `,
+			expectWarning: true,
 		},
 		{
-			name: "no merge-pull-request",
+			name: "no merge-pull-request does not produce experimental warning",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -39,6 +41,7 @@ engine: copilot
 
 # Test Workflow
 `,
+			expectWarning: false,
 		},
 	}
 
@@ -70,12 +73,19 @@ engine: copilot
 				return
 			}
 
-			unexpectedMessage := "Using experimental feature: merge-pull-request"
-			if strings.Contains(stderrOutput, unexpectedMessage) {
-				t.Errorf("did not expect warning %q, but got stderr:\n%s", unexpectedMessage, stderrOutput)
+			expectedMessage := "Using experimental feature: merge-pull-request"
+			if tt.expectWarning {
+				if !strings.Contains(stderrOutput, expectedMessage) {
+					t.Errorf("expected warning containing %q, got stderr:\n%s", expectedMessage, stderrOutput)
+				}
+				if compiler.GetWarningCount() == 0 {
+					t.Error("expected warning count > 0 but got 0")
+				}
+				return
 			}
-			if compiler.GetExperimentalWarningCount() != 0 {
-				t.Error("expected no experimental warnings")
+
+			if strings.Contains(stderrOutput, expectedMessage) {
+				t.Errorf("did not expect warning %q, but got stderr:\n%s", expectedMessage, stderrOutput)
 			}
 		})
 	}

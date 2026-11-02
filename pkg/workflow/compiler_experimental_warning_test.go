@@ -58,7 +58,6 @@ func TestStableSafeOutputsNoExperimentalWarning(t *testing.T) {
 		data := &WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{
 				DispatchRepository: &DispatchRepositoryConfig{},
-				MergePullRequest:   &MergePullRequestConfig{},
 				ApproveWorkflowRun: &ApproveWorkflowRunConfig{},
 				ReplaceLabel:       &ReplaceLabelConfig{},
 				UploadCodeCoverage: &UploadCodeCoverageConfig{},
@@ -70,5 +69,28 @@ func TestStableSafeOutputsNoExperimentalWarning(t *testing.T) {
 		assert.Zero(t, compiler.GetWarningCount(), "batch mode: %t", batch)
 		assert.Zero(t, compiler.GetExperimentalWarningCount(), "batch mode: %t", batch)
 		assert.Empty(t, compiler.GetExperimentalFeatureUsage(), "batch mode: %t", batch)
+	}
+}
+
+func TestMergePullRequestExperimentalNoticeClassification(t *testing.T) {
+	t.Parallel()
+	for _, batch := range []bool{false, true} {
+		compiler := NewCompiler()
+		compiler.SetBatchMode(batch)
+		data := &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{}},
+		}
+		var output bytes.Buffer
+		compiler.emitExperimentalFeatureWarningsTo(data, &output)
+		assert.Equal(t, 1, compiler.GetWarningCount(), "batch mode: %t", batch)
+		assert.Equal(t, 1, compiler.GetExperimentalWarningCount(), "batch mode: %t", batch)
+		const warning = "Using experimental feature: merge-pull-request"
+		if batch {
+			assert.Empty(t, output.String())
+			assert.Equal(t, 1, compiler.GetExperimentalFeatureUsage()[warning])
+		} else {
+			assert.Contains(t, output.String(), warning)
+			assert.Empty(t, compiler.GetExperimentalFeatureUsage())
+		}
 	}
 }

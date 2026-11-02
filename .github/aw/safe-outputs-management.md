@@ -35,7 +35,7 @@ description: Safe-output reference for update, label, milestone, project, releas
   ```
 
   Operation types: `replace` (default), `append`, `prepend`.
-- `merge-pull-request:` - Merge pull requests under configured policy gates
+- `merge-pull-request:` - Merge pull requests under configured policy gates (experimental)
 
   ```yaml
   safe-outputs:
