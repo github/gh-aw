@@ -1,6 +1,6 @@
 # Experimental connector contract v1
 
-This is a configuration-interface prototype, not a deployed integration.
+This is an experimental compiler-integrated interface, not a deployed integration.
 `ConnectorSpec` in `spec.go` is the authoritative typed schema; `Schema(kind)`
 exports structural JSON Schema for all three document kinds. `LoadSpec` parses
 YAML 1.2 or JSON, rejects unknown fields, and validates security invariants.
@@ -15,7 +15,29 @@ the schema, shared parser, or test harness.
 Run `go test ./pkg/connectors -run 'TestConnectorSpec|TestProviderFixtures' -count=1`.
 To select one provider, use `-run 'TestProviderFixtures/<provider>$'`.
 
-Definition, connection, and workflow selection are separate documents:
+Definition, connection, and workflow selection are separate concerns. An AW
+declares each service once and selects its parts independently:
+
+```yaml
+connectors:
+  tracker:
+    definition: .github/aw/connectors/example.yaml
+    connection: .github/aw/connections/example.yaml
+    tools: [get-issue]
+    context:
+      issue-details: {issue: ISSUE-1}
+    safe-outputs: [add-comment]
+```
+
+`on`, `tools`, `context`, and `safe-outputs` are optional siblings inside the
+service block. Omitted parts are disabled, not inherited or auto-enabled.
+`tools` resolves both REST-backed `mcp` and actual `httpMcp` capability names.
+`on: [issue-created]` selects a native trigger but compilation refuses activation
+until an approved receiver exists. Ordinary GitHub triggers stay at the root
+`on` field. Main-workflow declarations currently cannot be imported from shared
+AWs.
+
+Connection grants remain a separate administrator-owned document:
 
 ```yaml
 apiVersion: github.com/gh-aw/connectors/v1
@@ -134,7 +156,12 @@ replay, tenant enrollment, bot/self filtering or event-bound write authority.
 
 ## Host integration
 
-`Lower(repositoryRoot, binding)` loads confined repository-local files, freezes
+`LoadService(repositoryRoot, definitionPath, connectionPath)` loads one consistent
+service registration without selecting or executing anything. `Service.Select`
+accepts independently optional capability lists. Only selected parts need
+connection credential references and resource grants.
+
+`Lower(repositoryRoot, binding)` remains the standalone binding API. It freezes
 all three documents and returns a content-addressed `Plan`. `Plan.Digest` changes
 when definitions, secret references, resources or selections change. No remote
 definition fetches or credential resolution occur during lowering.
@@ -156,10 +183,25 @@ are bounded, all redirects refused, and results labeled untrusted.
 plan digest and validates arguments again. It does not record staged requests
 as successful mutations.
 
+`Plan.ForPhase` prunes unselected capabilities, endpoints, credentials and grants
+before distribution. `Plan.Encode` and `DecodePlan` carry content-addressed
+snapshots as base64 JSON, limited to 65,536 encoded bytes per phase. Base64 keeps
+definition data out of Actions expression evaluation. A digest is not a
+signature: only the trusted compiler/lock file may supply runtime plans.
+
 `Plan.CallMCP` calls a real remote SDK endpoint under local tool/argument gates.
 `Plan.MCPServer(runtime)` registers selected REST-backed and remote MCP tools
 using the standard MCP SDK, for a trusted host adapter behind the existing
-gateway. This package does not add workflow frontmatter syntax, spawn a server,
-or install a receiver. Existing imports, built-in tools, safe outputs and gateway
-security behavior are unchanged. Compiler job scheduling and operational
-enrollment remain explicit integration work, not implied by a valid declaration.
+gateway. The workflow compiler recognizes the centralized service grammar and
+lowers supported selections to that adapter, pre-agent context reads and existing
+staged safe-output handlers. The CLI's `connectors serve` and `connectors invoke`
+commands host frozen, single-phase plans, never mutable source files.
+Context inputs are literal typed arguments; context responses remain untrusted.
+Safe-output credentials are never distributed to the agent host. Trial and
+staged compilation use credential-free intent validation instead of writes.
+Existing dry-run restrictions on custom MCP hosts and effect scripts still
+apply; a rejected dry-run declaration does not execute.
+Connector effects are not supported for work-queue participants because separate
+effect verification is not implemented. Existing built-in tools, safe outputs
+and gateway security behavior are unchanged. No receiver is installed and custom
+trigger selection fails compilation rather than inventing dispatch provenance.
