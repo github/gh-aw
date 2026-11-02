@@ -1,0 +1,12 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: slack.com/threads
+credentials:
+  reader: {secret: SLACK_READ_TOKEN}
+  context-reader: {secret: SLACK_CONTEXT_TOKEN}
+  writer: {secret: SLACK_WRITE_TOKEN}
+resources:
+  workspaces: [T123ABC456]
+  apps: [A123ABC456]
+  channels: [C123ABC456]
+  threads: ["1515449522.000016"]
