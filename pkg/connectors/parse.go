@@ -22,6 +22,9 @@ func Decode(data []byte, target any) error {
 	if len(data) > MaxDocumentBytes {
 		return fmt.Errorf("connector document exceeds %d bytes", MaxDocumentBytes)
 	}
+	if json.Valid(data) {
+		return decodeStrictJSON(data, target)
+	}
 	var document any
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&document); err != nil {
@@ -35,11 +38,19 @@ func Decode(data []byte, target any) error {
 	if err != nil {
 		return fmt.Errorf("encode connector document: %w", err)
 	}
-	strict := json.NewDecoder(bytes.NewReader(encoded))
+	return decodeStrictJSON(encoded, target)
+}
+
+func decodeStrictJSON(data []byte, target any) error {
+	strict := json.NewDecoder(bytes.NewReader(data))
 	strict.UseNumber()
 	strict.DisallowUnknownFields()
 	if err := strict.Decode(target); err != nil {
 		return fmt.Errorf("decode connector fields: %w", err)
+	}
+	var extra any
+	if err := strict.Decode(&extra); !errors.Is(err, io.EOF) {
+		return errors.New("connector JSON must contain exactly one document")
 	}
 	return nil
 }
