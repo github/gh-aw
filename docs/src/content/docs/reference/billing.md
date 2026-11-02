@@ -35,6 +35,8 @@ There are two billing paths for the Copilot engine (`engine: copilot`, the defau
 
 `gh aw compile` does **not** auto-inject `copilot-requests: write` into arbitrary workflow source. The permission must be declared in the workflow frontmatter. Some authoring flows such as `gh aw add` can insert it when the author explicitly chooses Copilot org billing, but the compiler otherwise only emits an informational tip.
 
+For Claude workflows that use the GitHub Copilot provider (for example `engine: { id: claude, model-provider: github }` or a `copilot/` model), the compiler emits a warning instead of a tip when `copilot-requests: write` is missing, because the `COPILOT_GITHUB_TOKEN` fallback may be rejected when loading the Copilot model catalog. Setting `copilot-requests: none` also silences this warning.
+
 To use individual/seat billing without receiving this tip on future compilations, explicitly disable organization billing:
 
 ```yaml
