@@ -489,9 +489,8 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 				return nil
 			}
 			permissions := NewPermissionsContentsWritePRWrite()
-			if len(safeOutputs.MergePullRequest.RequiredChecks) > 0 {
-				permissions.Set(PermissionChecks, PermissionRead)
-			}
+			// Branch-policy check requirements are discovered at runtime.
+			permissions.Set(PermissionChecks, PermissionRead)
 			return permissions
 		},
 	},

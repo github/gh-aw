@@ -207,7 +207,7 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
 }
 
 /**
- * Only mutable fields used by merge policy; API timestamps and unrelated metadata are excluded.
+ * Stable merge policy inputs; asynchronous mergeability is checked separately.
  * @param {any} pr
  */
 function policySnapshot(pr) {
@@ -215,8 +215,6 @@ function policySnapshot(pr) {
     state: pr.state,
     merged: pr.merged,
     draft: pr.draft,
-    mergeable: pr.mergeable,
-    mergeable_state: pr.mergeable_state,
     head: [pr.head?.sha, pr.head?.ref, pr.head?.repo?.full_name],
     base: [pr.base?.sha, pr.base?.ref, pr.base?.repo?.full_name],
     author: pr.user?.login,
@@ -747,9 +745,12 @@ async function main(config = {}) {
       if (!baseBranch) {
         throw new Error(`${SAFE_OUTPUT_E007}: Missing target base branch for final policy evaluation`);
       }
-      const { data: currentPR } = await githubClient.rest.pulls.get({ owner, repo, pull_number: pullNumber });
+      const currentPR = await getPullRequestWithMergeability(githubClient, owner, repo, pullNumber);
       if (!currentPR || !isDeepStrictEqual(policySnapshot(currentPR), evaluatedSnapshot)) {
         throw new Error(`${SAFE_OUTPUT_E007}: Pull request policy state changed after evaluation; fresh evaluation required`);
+      }
+      if (currentPR.mergeable !== true || currentPR.mergeable_state === "dirty") {
+        throw new Error(`${SAFE_OUTPUT_E007}: Pull request mergeability is not confirmed or has unresolved conflicts after revalidation`);
       }
       const currentPolicy = await getBranchPolicy(githubClient, owner, repo, baseBranch);
       currentPolicy.requiredChecks = [...new Set([...currentPolicy.requiredChecks, ...requiredChecks])].sort();

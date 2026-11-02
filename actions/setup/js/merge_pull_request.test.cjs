@@ -296,6 +296,7 @@ describe("merge_pull_request policy hardening", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.resetModules();
     vi.clearAllMocks();
     delete global.core;
@@ -423,6 +424,59 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])("waits for final mergeability recomputation without treating it as a policy change (staged=%s)", async staged => {
+    await import("./merge_pull_request.cjs");
+    vi.useFakeTimers();
+    client.rest.pulls.get
+      .mockResolvedValueOnce({ data: structuredClone(pr) })
+      .mockResolvedValueOnce({ data: { ...pr, mergeable: null, mergeable_state: "unknown" } })
+      .mockResolvedValue({ data: { ...pr, mergeable_state: "unstable" } });
+    const pending = run({ staged });
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    expect(result).toMatchObject({ success: true, merged: !staged });
+    expect(client.rest.pulls.get).toHaveBeenCalledTimes(3);
+    expect(result.decision_evidence.revalidated_at).toBeDefined();
+    if (staged) {
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    } else {
+      expect(client.rest.pulls.merge).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ sha: "abc123" }));
+    }
+  });
+
+  it.each([
+    ["unmergeable", false, "clean"],
+    ["conflicts", true, "dirty"],
+    ["unknown", null, "unknown"],
+  ])("blocks %s final mergeability in live and staged mode", async (_name, mergeable, mergeableState) => {
+    await import("./merge_pull_request.cjs");
+    vi.useFakeTimers();
+    for (const staged of [false, true]) {
+      client.rest.pulls.get.mockResolvedValueOnce({ data: structuredClone(pr) }).mockResolvedValue({ data: { ...pr, mergeable, mergeable_state: mergeableState } });
+      const pending = run({ staged });
+      await vi.runAllTimersAsync();
+      const result = await pending;
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("E007: Pull request mergeability");
+      expect(result.decision_evidence.revalidated_at).toBeUndefined();
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  });
+
+  it("still blocks policy mutations while final mergeability recomputes", async () => {
+    await import("./merge_pull_request.cjs");
+    vi.useFakeTimers();
+    client.rest.pulls.get
+      .mockResolvedValueOnce({ data: structuredClone(pr) })
+      .mockResolvedValueOnce({ data: { ...pr, mergeable: null, mergeable_state: "unknown" } })
+      .mockResolvedValue({ data: { ...pr, head: { ...pr.head, sha: "new-sha" } } });
+    const pending = run();
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    expect(result.error).toContain("policy state changed");
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
   it("does not retry a SHA-mismatch merge error", async () => {
     client.rest.pulls.merge.mockRejectedValue({ status: 409, message: "Head branch was modified" });
     const result = await run();
@@ -461,6 +515,16 @@ describe("merge_pull_request policy hardening", () => {
     expect(result.checks_evaluated).toEqual(["branch-ci", "workflow-ci"]);
     expect(result.decision_evidence.checks.passing).toHaveLength(2);
     expect(client.paginate).toHaveBeenCalledWith(client.rest.checks.listForRef, expect.objectContaining({ ref: "abc123" }));
+  });
+
+  it("enforces branch-only required checks without configured required_checks", async () => {
+    client.rest.repos.getBranchProtection.mockResolvedValue({ data: { required_status_checks: { contexts: ["branch-ci"] } } });
+    const result = await run();
+    expect(result.success).toBe(false);
+    expect(result.checks_evaluated).toEqual(["branch-ci"]);
+    expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code: "required_checks_missing", details: { missing: ["branch-ci"] } }));
+    expect(client.paginate).toHaveBeenCalledWith(client.rest.checks.listForRef, expect.objectContaining({ ref: "abc123" }));
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
   it("does not accept an older successful check while a newer rerun is queued", async () => {

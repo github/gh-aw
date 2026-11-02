@@ -3858,14 +3858,14 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
-- `checks: read` - Required when `required-checks` is non-empty
+- `checks: read` - Required even when `required-checks` is omitted, because branch-policy requirements are discovered at runtime
 
 *GitHub App*:
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
 - `metadata: read` - Repository metadata (automatically granted)
-- `checks: read` - Required when `required-checks` is non-empty
+- `checks: read` - Required even when `required-checks` is omitted, because branch-policy requirements are discovered at runtime
 
 **Notes**:
 
