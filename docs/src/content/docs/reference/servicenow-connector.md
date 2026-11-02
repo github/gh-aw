@@ -7,6 +7,127 @@ The ServiceNow provider targets explicitly approved incident and request records
 Configuration validation is not deployment: accepting a manifest does not install
 instance automation, activate an MCP server, or authorize record mutations.
 
+## Prototype definition
+
+The definition is `.github/aw/connectors/servicenow.yaml`; its executable fixtures
+are in `pkg/connectors/testdata/providers/servicenow/`. It uses the shared
+`github.com/gh-aw/connectors/v1` parser, not a ServiceNow-specific configuration
+format. The fixed `https://example.service-now.com` origin is a specimen: a
+reviewed definition must pin the actual approved instance before use.
+
+The definition declares two REST-backed agent read tools, two metadata context
+reads, and two work-note appends for `incident` and `sc_req_item`. It deliberately
+does not enable `sc_request`, state transitions, journal-history reads, or native
+remote MCP. Reads request only `sys_id,number,state,sys_mod_count`, capped at 8192
+response bytes; append receipts request only `sys_id`, capped at 1024 bytes.
+Notes have a 4000-character input limit.
+The minimal `sys_id` receipt acknowledges an HTTP response for the record; it
+does not independently prove a durable journal entry was created or that tenant
+business rules accepted the change. Verify write ACLs and journal behavior on
+the instance before operational use; the prototype does not audit journal
+history or record an acknowledged response as a verified business outcome.
+
+The connection fixture contains secret names, not values. Its `incidents` and
+`requested-items` resources are exact `sys_id` allowlists. Record inputs require
+32 lowercase hexadecimal characters as well as an exact allowlist match.
+Read responses must include nonempty `sys_id`, `number`, `state`, and
+`sys_mod_count` strings; response IDs must match the requested record and belong
+to the corresponding table's allowlist. Nested values in metadata fields fail
+type validation rather than being included in context.
+Response projection discards all fields except the declared metadata or receipt.
+This is field exclusion, not semantic redaction of arbitrary allowed values.
+`x_gh_aw.records.read` and `x_gh_aw.records.work-notes` name administrator-defined
+OAuth scopes, not built-in ServiceNow scopes. They must be provisioned and bound
+to appropriate REST/table/field access before tokens are issued.
+
+The event fixtures describe a custom administrator-owned envelope, not a native
+ServiceNow webhook payload. The sender supplies `event`, `instance`, `table`,
+`sys_id`, and `delivery_id`. `gh-aw.local/servicenow-admin-ingress` is an
+unimplemented verification-profile requirement, not an installed verifier or
+a signing algorithm. Trigger projection does not authenticate that envelope.
+The prototype has no receiver, ingress credential field, source enrollment,
+durable replay store, or arbitrary-content redaction pipeline.
+Those are deployment blockers, not implicit fallbacks.
+
+The shared runtime executes these declarations against a host-approved HTTPS
+origin with phase-separated secret resolution, timeouts, response bounds, and
+no redirects or automatic retries. Safe-output staging is credential-free;
+execution requires the same frozen plan digest, argument validation, and explicit
+host write authorization. A prepared work-note append is not a recorded mutation.
+No receiver is installed by these declarations.
+
+The fixture checks use only local TLS mock servers. They exercise incident and
+requested-item hydration, metadata projection, work-note staging/execution,
+credential boundaries, bounded inputs/responses, resource-scoped event
+projection, ACL failures, and non-retryable failed writes. No live instance,
+tenant OAuth exchange, business rules, journal persistence, or MCP Server Console
+configuration is verified by those tests.
+
+## Workflow selection
+
+Select provider capabilities together under `connectors.servicenow`. Definition
+and connection paths are repository-relative. External documents retain their
+v1 names (`triggers`, `mcp`, `httpMcp`, `context`, `safeOutputs`); workflow
+selection uses `on`, `tools`, `context`, and `safe-outputs`.
+
+```aw title="ServiceNow manual review"
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+network:
+  allowed:
+    - example.service-now.com
+connectors:
+  servicenow:
+    definition: .github/aw/connectors/servicenow.yaml
+    connection: pkg/connectors/testdata/providers/servicenow/connection.yaml
+    tools: [get-incident, get-requested-item]
+    context:
+      incident-metadata:
+        record: "0123456789abcdef0123456789abcdef"
+    safe-outputs: [append-incident-work-note]
+```
+
+Each capability is optional and disabled when omitted. `tools` selects exact
+REST-backed tool definitions or configured `httpMcp` registrations; it does not
+enable all provider tools. `context` maps a selected recipe to literal input
+values, not event expressions or agent-supplied URLs. Omitting `on` disables
+ServiceNow event activation without disabling manual execution, reads, context,
+or safe outputs. Do not scatter selections under root `tools.connectors`,
+`on.connectors`, or `safe-outputs.connectors`.
+
+The provider fixture directory contains `workflow.md` for the combined manual
+example and separate tools-only, context-only, and effects-only examples.
+`binding.yaml` is a low-level shared-runtime test fixture, not the workflow
+frontmatter format. Fixture paths outside `.github/workflows` are inert examples,
+not registered workflows. The supplied instance and record IDs are specimens:
+review the fixed origin, table ACLs, identities, scopes, and resource allowlists
+before configuring an actual tenant.
+
+Connector event selection is a separate, deliberately unavailable capability:
+
+```yaml
+connectors:
+  servicenow:
+    definition: .github/aw/connectors/servicenow.yaml
+    connection: pkg/connectors/testdata/providers/servicenow/connection.yaml
+    on: [incident-updated]
+```
+
+`workflow-ingress-unavailable.md` is a negative example: activation must fail
+pending an approved receiver. Root `on: workflow_dispatch` is used in the other
+examples; it does not activate the ServiceNow subscription.
+
+The four manual examples are covered by compiler regression tests using the
+consolidated interface. These verify independent selection, phase-specific
+credential references in generated jobs, and rejection of invalid tools and
+context targets. The ingress fixture must fail with
+`ErrIngressUnavailable`; accepting its external definition is not activation.
+CLI no-emit compilation also reports the new specimen secret references as
+unapproved safe-update changes. That warning does not provision or authorize
+the tokens; tenant configuration still requires review.
+
 ## Instance and record scope
 
 Approve an exact HTTPS instance origin before supplying credentials. Do not derive

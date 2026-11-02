@@ -1,0 +1,12 @@
+[
+  { "name": "missing-record", "args": {} },
+  { "name": "display-number", "args": { "record": "INC0009009" } },
+  { "name": "unallowlisted-record", "args": { "record": "11111111111111111111111111111111" } },
+  { "name": "other-table-record", "args": { "record": "fedcba9876543210fedcba9876543210" } },
+  { "name": "encoded-path", "args": { "record": "%2e%2e" } },
+  { "name": "path-traversal", "args": { "record": "../incident" } },
+  { "name": "numeric-record", "args": { "record": 123 } },
+  { "name": "unapproved-origin", "args": { "record": "0123456789abcdef0123456789abcdef", "instance": "https://evil.example" } },
+  { "name": "unapproved-table", "args": { "record": "0123456789abcdef0123456789abcdef", "table": "sys_user" } },
+  { "name": "extra-write-field", "args": { "record": "0123456789abcdef0123456789abcdef", "state": "7" } }
+]

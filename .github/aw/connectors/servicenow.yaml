@@ -1,0 +1,231 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: servicenow.com/records
+endpoints:
+  instance: https://example.service-now.com
+credentials:
+  reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [x_gh_aw.records.read]
+  context-reader:
+    phase: context
+    header: Authorization
+    scheme: bearer
+    scopes: [x_gh_aw.records.read]
+  writer:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [x_gh_aw.records.work-notes]
+triggers:
+  incident-updated:
+    verificationProfile: gh-aw.local/servicenow-admin-ingress
+    nativeEvents: [record.updated]
+    match:
+      /event: record.updated
+      /instance: https://example.service-now.com
+      /table: incident
+    normalize:
+      subject: /sys_id
+      delivery-id: /delivery_id
+    resources:
+      /sys_id: incidents
+    types:
+      /sys_id: string
+      /delivery_id: string
+  requested-item-updated:
+    verificationProfile: gh-aw.local/servicenow-admin-ingress
+    nativeEvents: [record.updated]
+    match:
+      /event: record.updated
+      /instance: https://example.service-now.com
+      /table: sc_req_item
+    normalize:
+      subject: /sys_id
+      delivery-id: /delivery_id
+    resources:
+      /sys_id: requested-items
+    types:
+      /sys_id: string
+      /delivery_id: string
+mcp:
+  get-incident:
+    tool: get-incident
+    credential: reader
+    inputs:
+      record: {type: string, required: true, maxLength: 32, pattern: "^[0-9a-f]{32}$"}
+    resources: {record: incidents}
+    request:
+      endpoint: instance
+      method: GET
+      path: /api/now/table/incident/{record}
+      pathInputs: {record: record}
+      query:
+        sysparm_fields: {literal: "sys_id,number,state,sys_mod_count"}
+        sysparm_display_value: {literal: "false"}
+        sysparm_exclude_reference_link: {literal: "true"}
+    maxResponseBytes: 8192
+    responseRequired: [/result/sys_id, /result/number, /result/state, /result/sys_mod_count]
+    responseResources:
+      /result/sys_id: incidents
+    responseInputs:
+      /result/sys_id: record
+    responseTypes:
+      /result/sys_id: string
+      /result/number: string
+      /result/state: string
+      /result/sys_mod_count: string
+    project:
+      sys-id: /result/sys_id
+      number: /result/number
+      state: /result/state
+      revision: /result/sys_mod_count
+  get-requested-item:
+    tool: get-requested-item
+    credential: reader
+    inputs:
+      record: {type: string, required: true, maxLength: 32, pattern: "^[0-9a-f]{32}$"}
+    resources: {record: requested-items}
+    request:
+      endpoint: instance
+      method: GET
+      path: /api/now/table/sc_req_item/{record}
+      pathInputs: {record: record}
+      query:
+        sysparm_fields: {literal: "sys_id,number,state,sys_mod_count"}
+        sysparm_display_value: {literal: "false"}
+        sysparm_exclude_reference_link: {literal: "true"}
+    maxResponseBytes: 8192
+    responseRequired: [/result/sys_id, /result/number, /result/state, /result/sys_mod_count]
+    responseResources:
+      /result/sys_id: requested-items
+    responseInputs:
+      /result/sys_id: record
+    responseTypes:
+      /result/sys_id: string
+      /result/number: string
+      /result/state: string
+      /result/sys_mod_count: string
+    project:
+      sys-id: /result/sys_id
+      number: /result/number
+      state: /result/state
+      revision: /result/sys_mod_count
+safeOutputs:
+  append-incident-work-note:
+    credential: writer
+    inputs:
+      record: {type: string, required: true, maxLength: 32, pattern: "^[0-9a-f]{32}$"}
+      note: {type: string, required: true, maxLength: 4000, pattern: '(?s)^.*\S.*$'}
+    resources: {record: incidents}
+    request:
+      endpoint: instance
+      method: PATCH
+      path: /api/now/table/incident/{record}
+      pathInputs: {record: record}
+      query:
+        sysparm_fields: {literal: sys_id}
+        sysparm_display_value: {literal: "false"}
+        sysparm_exclude_reference_link: {literal: "true"}
+      body:
+        work_notes: {input: note}
+    maxResponseBytes: 1024
+    responseRequired: [/result/sys_id]
+    responseResources:
+      /result/sys_id: incidents
+    responseInputs:
+      /result/sys_id: record
+    responseTypes:
+      /result/sys_id: string
+    project:
+      sys-id: /result/sys_id
+  append-requested-item-work-note:
+    credential: writer
+    inputs:
+      record: {type: string, required: true, maxLength: 32, pattern: "^[0-9a-f]{32}$"}
+      note: {type: string, required: true, maxLength: 4000, pattern: '(?s)^.*\S.*$'}
+    resources: {record: requested-items}
+    request:
+      endpoint: instance
+      method: PATCH
+      path: /api/now/table/sc_req_item/{record}
+      pathInputs: {record: record}
+      query:
+        sysparm_fields: {literal: sys_id}
+        sysparm_display_value: {literal: "false"}
+        sysparm_exclude_reference_link: {literal: "true"}
+      body:
+        work_notes: {input: note}
+    maxResponseBytes: 1024
+    responseRequired: [/result/sys_id]
+    responseResources:
+      /result/sys_id: requested-items
+    responseInputs:
+      /result/sys_id: record
+    responseTypes:
+      /result/sys_id: string
+    project:
+      sys-id: /result/sys_id
+context:
+  incident-metadata:
+    credential: context-reader
+    inputs:
+      record: {type: string, required: true, maxLength: 32, pattern: "^[0-9a-f]{32}$"}
+    resources: {record: incidents}
+    request:
+      endpoint: instance
+      method: GET
+      path: /api/now/table/incident/{record}
+      pathInputs: {record: record}
+      query:
+        sysparm_fields: {literal: "sys_id,number,state,sys_mod_count"}
+        sysparm_display_value: {literal: "false"}
+        sysparm_exclude_reference_link: {literal: "true"}
+    maxResponseBytes: 8192
+    responseRequired: [/result/sys_id, /result/number, /result/state, /result/sys_mod_count]
+    responseResources:
+      /result/sys_id: incidents
+    responseInputs:
+      /result/sys_id: record
+    responseTypes:
+      /result/sys_id: string
+      /result/number: string
+      /result/state: string
+      /result/sys_mod_count: string
+    project:
+      sys-id: /result/sys_id
+      number: /result/number
+      state: /result/state
+      revision: /result/sys_mod_count
+  requested-item-metadata:
+    credential: context-reader
+    inputs:
+      record: {type: string, required: true, maxLength: 32, pattern: "^[0-9a-f]{32}$"}
+    resources: {record: requested-items}
+    request:
+      endpoint: instance
+      method: GET
+      path: /api/now/table/sc_req_item/{record}
+      pathInputs: {record: record}
+      query:
+        sysparm_fields: {literal: "sys_id,number,state,sys_mod_count"}
+        sysparm_display_value: {literal: "false"}
+        sysparm_exclude_reference_link: {literal: "true"}
+    maxResponseBytes: 8192
+    responseRequired: [/result/sys_id, /result/number, /result/state, /result/sys_mod_count]
+    responseResources:
+      /result/sys_id: requested-items
+    responseInputs:
+      /result/sys_id: record
+    responseTypes:
+      /result/sys_id: string
+      /result/number: string
+      /result/state: string
+      /result/sys_mod_count: string
+    project:
+      sys-id: /result/sys_id
+      number: /result/number
+      state: /result/state
+      revision: /result/sys_mod_count
