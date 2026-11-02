@@ -21,4 +21,4 @@ Test the jira-create-issue safe output functionality.
 
 Create a Task in the approved APP project summarizing a task discovered in the repository.
 
-Use the `connector_4_jira_create_issue` tool. The trusted write host uses JIRA_REST_BASIC_AUTH.
+Use the `jira_create_issue` tool. The trusted write host uses JIRA_REST_BASIC_AUTH.

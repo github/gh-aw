@@ -20,5 +20,5 @@ Test the linear-update-issue safe output functionality.
 
 Update the title and body of an existing Linear issue.
 
-Use `connector_6_linear_update_issue` with the approved issue UUID, title and
+Use `linear_update_issue` with the approved issue UUID, title and
 body. Replace the specimen UUID before live use.
