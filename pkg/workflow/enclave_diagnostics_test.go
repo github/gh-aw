@@ -274,24 +274,28 @@ func TestEnclaveDiagnosticsTrustedBootstrap(t *testing.T) {
 	require.NoError(t, err)
 	source := string(script)
 	require.NoError(t, exec.Command("node", "--check", "../../actions/setup/js/install_enclave_diagnostics.cjs").Run())
-	for _, required := range []string{
-		"v24.22.1", "6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6",
-		"dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e",
-		"3929c9a15c0f239b772affcaae6e55fec92f41c2", "7722affc5c076d79692d4268a543ef267281424ad4b374eb8f80c24cbec08cae",
-		`"/usr/bin/python3", "-I"`, `PATH: "/usr/bin:/bin"`, "os.O_NOFOLLOW", "os.O_EXCL",
-		"protected_directory(directory)", "member.isfile()", "archive.getmember",
-	} {
+	for _, required := range []string{"v24.22.1", "3929c9a15c0f239b772affcaae6e55fec92f41c2"} {
 		assert.Contains(t, source, required)
 	}
 	assert.NotContains(t, source, "command -v node")
-	assert.NotContains(t, source, "extractall")
+	installer, err := os.ReadFile("../../actions/setup/sh/install_enclave_diagnostics.py")
+	require.NoError(t, err)
+	installerSource := string(installer)
+	for _, required := range []string{
+		"6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6",
+		"dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e",
+		"7722affc5c076d79692d4268a543ef267281424ad4b374eb8f80c24cbec08cae",
+		"os.O_NOFOLLOW", "os.O_EXCL",
+		"protected_directory(directory)", "member.isfile()", "archive.getmember",
+	} {
+		assert.Contains(t, installerSource, required)
+	}
+	assert.NotContains(t, installerSource, "extractall")
 	python, err := exec.LookPath("python3")
 	require.NoError(t, err)
-	_, body, found := strings.Cut(source, "const TRUSTED_INSTALLER = String.raw`\n")
+	library, _, found := strings.Cut(installerSource, "\nif __name__ == \"__main__\":\n")
 	require.True(t, found)
-	body, _, found = strings.Cut(body, "`;")
-	require.True(t, found)
-	definitions, _, found := strings.Cut(body, "\ntry:\n")
+	definitions, _, found := strings.Cut(library, "\ndef main(args):\n")
 	require.True(t, found)
 	dir := testutil.TempDir(t, "trusted-collector-files")
 	target := filepath.Join(dir, "regular")
@@ -324,9 +328,11 @@ except SystemExit as error:
 `
 	output, err := exec.Command(python, "-I", "-c", harness, target).CombinedOutput()
 	require.NoError(t, err, string(output))
-	// Execute the real bootstrap body: corrupt archives must stop before any
+	// Run the real installer entry point with root and architecture checks
+	// stubbed: a corrupt archive must be rejected by checksum before any
 	// protected destination is inspected or created.
-	output, err = exec.Command(python, "-I", "-c", body, target, target).CombinedOutput()
+	prelude := "import os, types\nos.getuid = lambda: 0\nos.geteuid = lambda: 0\nos.uname = lambda: types.SimpleNamespace(machine='x86_64')\n"
+	output, err = exec.Command(python, "-I", "-c", prelude+installerSource, target, target).CombinedOutput()
 	require.Error(t, err)
 	assert.Contains(t, string(output), "archive-checksum")
 }
