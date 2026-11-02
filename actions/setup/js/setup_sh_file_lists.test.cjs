@@ -99,6 +99,21 @@ const safeOutputsFiles = parseSetupShArray("SAFE_OUTPUTS_FILES");
 // Its deps must also be covered by SAFE_OUTPUTS_FILES
 const safeOutputsRoots = [...safeOutputsFiles, "safe-outputs-mcp-server.cjs"];
 
+describe("setup.sh bundled connector execution", () => {
+  it.each([
+    ["MCP_SCRIPTS_FILES", mcpScriptsFiles],
+    ["SAFE_OUTPUTS_FILES", safeOutputsFiles],
+  ])("deploys the connector host and its local dependencies in %s", (_name, files) => {
+    for (const file of ["connector_runtime.cjs", "connector_regex.cjs", "connector_effect_bindings.cjs"]) {
+      expect(files).toContain(file);
+      expect(existsSync(resolve(__dirname, file))).toBe(true);
+    }
+    for (const dependency of collectTransitiveDeps(["connector_runtime.cjs", "connector_effect_bindings.cjs"])) {
+      expect(files).toContain(dependency);
+    }
+  });
+});
+
 describe("work queue pool-install packaging", () => {
   it.each([
     ["MCP_SCRIPTS_FILES", mcpScriptsFiles],

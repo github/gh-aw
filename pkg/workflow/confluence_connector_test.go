@@ -61,7 +61,7 @@ func TestConfluenceConnectorGroupedCompilation(t *testing.T) {
 			if selection == "combined" || selection == "tools" {
 				require.NotNil(t, config.Agent)
 				require.Equal(t, []string{"CONFLUENCE_READ_ACCESS_TOKEN"}, config.Agent.Secrets())
-				tool, err := json.Marshal(data.Tools["connector-confluence"])
+				tool, err := json.Marshal(data.Tools["confluence"])
 				require.NoError(t, err)
 				require.NotContains(t, string(tool), "CONFLUENCE_PAGE_WRITE_ACCESS_TOKEN")
 				require.NotContains(t, string(tool), "CONFLUENCE_COMMENT_WRITE_ACCESS_TOKEN")
@@ -85,7 +85,7 @@ func TestConfluenceConnectorGroupedCompilation(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, output, "workflow_dispatch")
 			if config.Agent != nil {
-				require.Contains(t, output, "connector-confluence")
+				require.Contains(t, output, "confluence")
 			}
 		})
 	}

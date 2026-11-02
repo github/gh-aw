@@ -3,7 +3,6 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"strings"
 )
 
 // ========================================
@@ -29,8 +28,8 @@ func defaultReportIncompleteCreateIssue(config *SafeOutputsConfig) string {
 	withoutConnectors := *config
 	withoutConnectors.Scripts = maps.Clone(config.Scripts)
 	hasConnector := false
-	for name := range withoutConnectors.Scripts {
-		if strings.HasPrefix(name, "connector-") {
+	for name, script := range withoutConnectors.Scripts {
+		if script != nil && script.connectorInputSchema != nil {
 			hasConnector = true
 			delete(withoutConnectors.Scripts, name)
 		}

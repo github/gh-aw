@@ -122,12 +122,26 @@ func TestConnectorLiveProvider(t *testing.T) {
 	if provider == "" {
 		t.Skip("live provider checks require explicit GH_AW_CONNECTOR_PROVIDER opt-in")
 	}
+	var masks []string
+	for _, name := range []string{"LINEAR_READ_API_KEY", "LINEAR_TEAM_ID", "JIRA_USER_EMAIL", "JIRA_API_TOKEN", "AZURE_DEVOPS_MCP_ENTRA_TOKEN"} {
+		masks = append(masks, os.Getenv(name))
+	}
+	if provider == "jira" {
+		basic, err := connectorSmokeSecret(t.Context(), "agent", "JIRA_MCP_PERSONAL_BASIC_AUTH")
+		require.NoError(t, err)
+		masks = append(masks, basic)
+	}
+	diagnostics := newConnectorSmokeDiagnostics(func(line string) { t.Log(line) }, masks, os.Getenv("GH_AW_CONNECTOR_TRACE") == "true")
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		require.NoError(t, diagnostics.addMasks(os.Stdout), "register credential masks before diagnostics")
+	}
+	t.Logf("Starting provider=%s read-only connector check; trace=%t", provider, diagnostics.verbose)
 	target := connectorSmokeTarget{
 		provider: provider, resource: os.Getenv("GH_AW_CONNECTOR_RESOURCE_ID"),
 		scope: os.Getenv("GH_AW_CONNECTOR_SCOPE_ID"), team: os.Getenv("LINEAR_TEAM_ID"),
 		organization: os.Getenv("GH_AW_CONNECTOR_ORGANIZATION"),
 	}
-	client := &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+	client := &http.Client{Transport: diagnostics.transport(http.DefaultTransport), Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
 	target = discoverConnectorSmokeTarget(t, target, client)
@@ -157,7 +171,7 @@ func TestConnectorLiveProvider(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 	}
-	t.Log("Read-only connector request completed; provider content is not logged.")
+	t.Log("Read-only connector request completed; successful provider content is not logged.")
 }
 
 func connectorSmokeJSON(t *testing.T, client *http.Client, request *http.Request, target any) {
