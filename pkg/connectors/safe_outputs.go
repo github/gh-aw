@@ -25,6 +25,9 @@ func (p *Plan) PrepareSafeOutput(name string, args map[string]any) (*SafeOutputR
 	if err := validateArguments(op.Inputs, op.Resources, p.connection.Resources, args); err != nil {
 		return nil, err
 	}
+	if _, err := p.buildRequest(context.Background(), op, args); err != nil {
+		return nil, err
+	}
 	encoded, err := json.Marshal(args)
 	if err != nil {
 		return nil, fmt.Errorf("encode safe-output arguments: %w", err)
