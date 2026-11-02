@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -54,7 +55,7 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 }
 
 // validateMergePullRequestPolicies checks merge filters and workflow-owned evidence requirements.
-func validateMergePullRequestPolicies(config *SafeOutputsConfig) error {
+func validateMergePullRequestPolicies(config *SafeOutputsConfig, workflowName string) error {
 	if err := validateSafeOutputsMergePullRequest(config); err != nil {
 		return err
 	}
@@ -75,6 +76,21 @@ func validateMergePullRequestPolicies(config *SafeOutputsConfig) error {
 	for _, login := range cfg.RequiredApprovers {
 		if !parser.IsValidGitHubIdentifier(login) {
 			return fmt.Errorf("safe-outputs.merge-pull-request.required-approvers contains invalid GitHub username %q. Expected a human account login without @ prefix", login)
+		}
+	}
+	if config.CreateCheckRun != nil {
+		checkName := config.CreateCheckRun.Name
+		if checkName == "" {
+			checkName = workflowName
+		}
+		switch checkName {
+		case "":
+			checkName = "Agent Check"
+		case workflowName:
+			checkName += " (Result)"
+		}
+		if slices.Contains(cfg.RequiredChecks, checkName) {
+			return fmt.Errorf("safe-outputs.merge-pull-request.required-checks contains agent-controlled create-check-run name %q. Use an independent CI check name instead", checkName)
 		}
 	}
 	return nil

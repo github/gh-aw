@@ -14,6 +14,8 @@ This changelog records the version history and the dated mapping audits for `spe
 
 ## Version History
 
+The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers, compiler rejection of agent-controlled check-name overlap, submission-time review ordering, and explicit untrusted-data designation for returned metadata. Approval provenance remains available for audit and final revalidation; neither metadata designation nor check-name matching authenticates an instruction source or expected check producer.
+
 | Version | Change |
 |---|---|
 | 1.0.81 | Maps experimental `merge-pull-request` hardening to the compiler/runtime boundary in Section 7.7: expected-head SHA binding without mutation retry, fail-closed review evidence and pagination, workflow-owned `required-checks` and independent human `required-approvers`, final policy revalidation, staged parity, and partial decision evidence. Maps compiler/schema/permission tests and mocked runtime/manager regressions without claiming live GitHub or deployment verification. Preserves experimental status, existing authority limits, and threat-warning abort behavior. Documents optional-policy defaults, credential and check-producer trust, residual non-atomic policy races, and limits of reverting downstream effects. New policy settings require recompilation; live handlers and their GitHub App tokens require `checks: read` even without configured checks, for runtime branch-policy requirements. No new compiler threat identifier or lock-file schema change. |

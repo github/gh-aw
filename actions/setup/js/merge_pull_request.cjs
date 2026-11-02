@@ -181,11 +181,29 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
   if (!Array.isArray(reviews) || reviews.some(r => !r?.user?.login || !Number.isInteger(r.id) || !["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"].includes(r.state))) {
     throw new Error(`${SAFE_OUTPUT_E007}: Incomplete approval evidence for PR #${pr.number}`);
   }
+  const decisiveReviews = reviews
+    .filter(review => review.state !== "COMMENTED" && review.state !== "PENDING")
+    .map(review => {
+      const submittedAt = Date.parse(review.submitted_at);
+      if (
+        typeof review.submitted_at !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(review.submitted_at) ||
+        !Number.isFinite(submittedAt) ||
+        new Date(submittedAt).toISOString() !== review.submitted_at.replace(/Z$/, ".000Z")
+      ) {
+        throw new Error(`${SAFE_OUTPUT_E007}: Missing or invalid review submission time for PR #${pr.number}`);
+      }
+      return { review, submittedAt };
+    })
+    .sort((a, b) => a.submittedAt - b.submittedAt);
   const latest = new Map();
-  for (const review of [...reviews].sort((a, b) => a.id - b.id)) {
-    if (review.state !== "COMMENTED" && review.state !== "PENDING") {
-      latest.set(review.user.login.toLowerCase(), review);
+  for (const { review, submittedAt } of decisiveReviews) {
+    const login = review.user.login.toLowerCase();
+    if (latest.has(login) && Date.parse(latest.get(login).submitted_at) === submittedAt) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Ambiguous review submission order for PR #${pr.number}`);
     }
+    // Review IDs reflect creation, so a pending review can be submitted after a higher-ID review.
+    latest.set(login, review);
   }
   if ([...latest.values()].some(review => review.state === "CHANGES_REQUESTED")) {
     throw new Error(`${SAFE_OUTPUT_E007}: Blocking human review remains active for PR #${pr.number}`);
@@ -350,6 +368,22 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
     per_page: 100,
   });
 
+  // Names identify checks, not trusted producers; do not choose between competing apps.
+  const producersByName = new Map();
+  for (const run of checkRuns) {
+    if (!requiredChecks.includes(run.name) || isDeploymentCheck(run)) {
+      continue;
+    }
+    if (!Number.isInteger(run.app?.id) || run.app.id <= 0) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check "${run.name}"`);
+    }
+    const appId = producersByName.get(run.name);
+    if (appId !== undefined && appId !== run.app.id) {
+      throw new Error(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check "${run.name}"`);
+    }
+    producersByName.set(run.name, run.app.id);
+  }
+
   const { relevant } = selectLatestRelevantChecks(checkRuns, { includeList: requiredChecks });
   core.info(`Fetched ${checkRuns.length} check run(s), ${relevant.length} relevant latest check run(s)`);
   const byName = new Map(relevant.map(run => [run.name, run]));
@@ -491,14 +525,14 @@ async function main(config = {}) {
     if (processedCount >= maxCount) {
       core.debug('merge_pull_request: {"event":"limit_reached"}');
       core.warning(`Skipping merge_pull_request: max count of ${maxCount} reached`);
-      return { success: false, error: `Max count of ${maxCount} reached` };
+      return { success: false, data_trust: "untrusted", error: `Max count of ${maxCount} reached` };
     }
     processedCount++;
 
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "merge pull request");
     if (!repoResult.success) {
       core.error(`Repository validation failed: ${repoResult.error}`);
-      return { success: false, error: repoResult.error };
+      return { success: false, data_trust: "untrusted", error: repoResult.error };
     }
     const { owner, repo } = repoResult.repoParts;
     core.info(`Resolved target repository: ${owner}/${repo}`);
@@ -508,7 +542,7 @@ async function main(config = {}) {
       const pullNumberResolution = resolvePullRequestNumber(message, resolvedTemporaryIds);
       if (!pullNumberResolution.success) {
         core.error(pullNumberResolution.error);
-        return { success: false, error: pullNumberResolution.error };
+        return { success: false, data_trust: "untrusted", error: pullNumberResolution.error };
       }
       targetItem = { ...message, pull_request_number: pullNumberResolution.pullNumber };
       if (pullNumberResolution.fromTemporaryId) {
@@ -524,7 +558,7 @@ async function main(config = {}) {
     });
     if (!targetResult.success) {
       core.error(targetResult.error);
-      return { success: false, error: targetResult.error };
+      return { success: false, data_trust: "untrusted", error: targetResult.error };
     }
     const pullNumber = targetResult.number;
     core.info(`Target PR number: ${pullNumber}`);
@@ -532,7 +566,7 @@ async function main(config = {}) {
     /** @type {Array<{code: string, message: string, details?: any}>} */
     const failureReasons = [];
     /** @type {Record<string, any>} */
-    const evidence = { repository: `${owner}/${repo}`, pull_request_number: pullNumber, evaluated_at: new Date().toISOString() };
+    const evidence = { data_trust: "untrusted", repository: `${owner}/${repo}`, pull_request_number: pullNumber, evaluated_at: new Date().toISOString() };
     let phase = "pull_request";
 
     try {
@@ -571,6 +605,7 @@ async function main(config = {}) {
         core.info(`PR #${pullNumber} is already merged, returning idempotent success`);
         return {
           success: true,
+          data_trust: "untrusted",
           merged: true,
           alreadyMerged: true,
           pull_request_number: pr.number,
@@ -733,6 +768,7 @@ async function main(config = {}) {
         core.warning(`merge_pull_request blocked with ${failureReasons.length} gate failure(s): ${failureReasons.map(r => r.code).join(", ")}`);
         return {
           success: false,
+          data_trust: "untrusted",
           error: "merge_pull_request gate checks failed",
           failure_reasons: failureReasons,
           checks_evaluated: branchPolicy.requiredChecks,
@@ -778,6 +814,7 @@ async function main(config = {}) {
         core.info(`Staged mode: merge for PR #${pullNumber} not executed`);
         return {
           success: true,
+          data_trust: "untrusted",
           staged: true,
           merged: false,
           pull_request_number: pr.number,
@@ -804,6 +841,7 @@ async function main(config = {}) {
         core.error(`Merge API returned merged=false for PR #${pullNumber}: ${mergeResponse.data?.message || "no message"}`);
         return {
           success: false,
+          data_trust: "untrusted",
           error: mergeResponse.data?.message || "Merge API returned merged=false",
           failure_reasons: [{ code: "merge_not_completed", message: mergeResponse.data?.message || "Merge was not completed" }],
           checks_evaluated: branchPolicy.requiredChecks,
@@ -813,6 +851,7 @@ async function main(config = {}) {
 
       return {
         success: true,
+        data_trust: "untrusted",
         merged: true,
         pull_request_number: pr.number,
         pull_request_url: pr.html_url,
@@ -826,6 +865,7 @@ async function main(config = {}) {
       core.error(`merge_pull_request failed for PR #${pullNumber}: ${getErrorMessage(error)}`);
       return {
         success: false,
+        data_trust: "untrusted",
         error: getErrorMessage(error),
         failure_reasons: [{ code: "merge_operation_error", message: getErrorMessage(error) }],
         decision_evidence: evidence,
