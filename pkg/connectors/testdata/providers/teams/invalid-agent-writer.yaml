@@ -1,0 +1,22 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: microsoft.com/teams
+endpoints:
+  bot: https://smba.trafficmanager.net
+credentials:
+  bot-writer:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [https://api.botframework.com/.default]
+safeOutputs:
+  reply-to-activity:
+    credential: bot-writer
+    request:
+      endpoint: bot
+      method: POST
+      path: /teams/v3/conversations/example/activities/example
+      body:
+        type: {literal: message}
+        text: {literal: Fixture reply}
+    maxResponseBytes: 16384
