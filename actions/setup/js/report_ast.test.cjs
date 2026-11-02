@@ -16,6 +16,27 @@ beforeEach(() => vi.stubEnv("GH_AW_ALLOWED_DOMAINS", "github.com,example.com,exa
 afterEach(() => vi.unstubAllEnvs());
 
 describe("report AST", () => {
+  it("compacts quoted expiration without changing paragraph, alert, or unquoted spacing", () => {
+    const expiresAt = "2099-01-02T00:00:00.000Z";
+    const children = [paragraph("First paragraph"), paragraph("Attribution"), { type: "expiration", expiresAt }];
+    const quoted = renderReport(report([{ type: "quote", children }])).body;
+    expect(quoted).toContain("> First paragraph\n>\n> Attribution\n> - [x] expires <!-- gh-aw-expires:");
+    expect(renderReport(report(parseReportMarkdown(quoted, { allowMetadata: true }))).body).toBe(quoted);
+    expect(renderReport(report(children)).body).toContain("Attribution\n\n- [x] expires");
+    expect(renderReport(report([{ type: "alert", kind: "NOTE", children }])).body).toContain("> Attribution\n>\n> - [x] expires");
+  });
+
+  it("keeps a quoted expiration after a list round-tripping", () => {
+    const children = [
+      { type: "list", ordered: false, items: [[paragraph("Item")]] },
+      { type: "expiration", expiresAt: "2099-01-02T00:00:00.000Z" },
+    ];
+    const quoted = renderReport(report([{ type: "quote", children }])).body;
+    const parsed = parseReportMarkdown(quoted, { allowMetadata: true });
+    expect(parsed[0].children.map(node => node.type)).toEqual(["list", "expiration"]);
+    expect(renderReport(report(parsed)).body).toBe(quoted);
+  });
+
   it.each(["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"])("parses and renders %s as a structured GitHub alert", kind => {
     const source = `> [!${kind}]\n> **Guidance:** safe text.`;
     const children = parseReportMarkdown(source, { agentTainted: false });
