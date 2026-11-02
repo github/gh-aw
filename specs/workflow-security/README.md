@@ -511,12 +511,17 @@ termination, abort signals, and shallow/partial-clone preservation remains in
 fallback independently of offline generation and ordinary bundle application.
 Local artifacts retain their fast path. Missing local data may queue bounded
 offline packaging, followed by preview verification, an isolated authorized
-fetch, complete-object import, and the same publication policy gates.
+filtered fetch, trusted-blob hydration, complete-object import, and the same publication policy gates.
 Incremental fetches require a trusted exact pre-agent baseline.
+The abstraction allows at most three pinned adaptive fetch attempts before
+import, and records filtering, trusted hydration, and hydration-before-import
+invariants. Actual depth steps, tree comparisons, and byte/time limits remain
+implementation properties covered by real-Git regressions, not TLA+ proofs.
 
-The runner checks full/incremental profiles, six negative controls (agent fetch,
+The runner checks full/incremental profiles, nine negative controls (agent fetch,
 copied configuration, unauthorized remote, substituted baseline, hidden preview
-bytes, and bypassed publication policy), and three reachability witnesses:
+bytes, bypassed publication policy, unfiltered requests, untrusted blob hydration,
+and unbounded fetching), and three reachability witnesses:
 
 ```bash
 TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \

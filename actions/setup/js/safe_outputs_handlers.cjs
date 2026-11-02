@@ -1136,7 +1136,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // even when bundle transport is selected for apply-time commit transport.
     server.debug(`Generating patch for create_pull_request with branch: ${entry.branch}${repoCwd ? ` in ${repoCwd} baseBranch: ${baseBranch}` : ""}`);
     /** @type {Record<string, any>} */
-    const patchOptions = { ...transportOptions };
+    const patchOptions = { ...transportOptions, baseBranch };
     if (patchWorkspaceMatchesTargetRepo) {
       patchOptions.workspacePath = patchWorkspacePath;
     }
@@ -1537,7 +1537,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
 
     // Build common options for both patch and bundle generation
-    const pushTransportOptions = { mode: "incremental", repoSlug: repoResult.repo };
+    const pushTransportOptions = { mode: "incremental", repoSlug: repoResult.repo, baseBranch };
     if (prHeadBaseline) {
       if (prHeadBaseline.ref) {
         pushTransportOptions.incrementalBaseRef = prHeadBaseline.ref;

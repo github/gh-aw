@@ -72,6 +72,9 @@ RECOVERY_FAULTS = {
     "moving-baseline": "ExactBaseline",
     "hidden-preview": "ScannedBytes",
     "skip-policy": "PublicationPolicy",
+    "unfiltered-fetch": "BoundedFilteredFetch",
+    "untrusted-blob": "TrustedHydration",
+    "unbounded-fetch": "BoundedFilteredFetch",
 }
 RECOVERY_WITNESSES = ["NoRecoveryPublication", "NoFastPublication", "NoRejection"]
 

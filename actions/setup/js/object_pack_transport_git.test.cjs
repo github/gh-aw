@@ -65,7 +65,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     identity(target);
   }
 
-  function fixture(shape = "missing-ref", { objectFormat = "sha1", dispatch = false } = {}) {
+  function fixture(shape = "missing-ref", { objectFormat = "sha1", dispatch = false, monorepo = false } = {}) {
     fs.mkdirSync(author);
     git(author, ["init", "-q", "-b", "main", `--object-format=${objectFormat}`]);
     identity(author);
@@ -84,6 +84,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     fs.symlinkSync("text.txt", path.join(author, "removed-link"));
     fs.symlinkSync("text.txt", path.join(author, "updated-link"));
     write(author, "ignored.tmp", "original excluded contents\n");
+    if (monorepo) write(author, "static/huge.bin", Buffer.alloc(65 * 1024 * 1024, 71));
     baseline = commit(author, "trusted baseline");
     git(author, ["checkout", "-qb", branch]);
     let checkoutSha;
@@ -171,17 +172,19 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
   }
 
   function packageObjects({ pinned = tip, beforeCapture } = {}) {
-    const paths = createObjectPack(branch, repoSlug, pinned, { cwd: agent });
+    const paths = createObjectPack(branch, repoSlug, pinned, { cwd: agent, incrementalBaseSha: baseline });
     artifacts.add(paths.patchPath);
     artifacts.add(paths.bundlePath);
     if (beforeCapture) beforeCapture(paths);
     return { paths, transport: capture(paths) };
   }
 
-  function redirectRecoveryFetch() {
+  function redirectRecoveryFetch({ afterFetch = undefined, hideAncestry = false } = {}) {
     const spawn = childProcess.spawnSync;
     const fetches = [];
     vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
+      if (hideAncestry && command === "git" && args.includes("rev-list") && args.includes("--all")) return { status: 0, stdout: "", stderr: "" };
+      if (hideAncestry && command === "git" && args.includes("--is-shallow-repository")) return { status: 0, stdout: "true\n", stderr: "" };
       if (command === process.execPath && args[0] === "-e") {
         const request = JSON.parse(options.input);
         const patch = getPatchPathForBranchInRepo(request.branch, request.options.repoSlug);
@@ -191,21 +194,22 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
         expect(JSON.stringify(options.env)).not.toContain("integration-only-token");
       }
       if (command === "git" && args.includes("fetch") && options.cwd !== destination) {
-        const url = `https://github.com/${repoSlug}.git`;
+        const url = `remote.recovery.url=https://github.com/${repoSlug}.git`;
         expect(args).toContain(url);
         expect(options.cwd).not.toBe(agent);
         expect(options.env.GIT_ALLOW_PROTOCOL).toBe("https");
         expect(options.env.GIT_CONFIG_GLOBAL).toBe(os.devNull);
-        expect(git(options.cwd, ["cat-file", "--batch-all-objects", "--batch-check=%(objectname)"])).toBe("");
+        expect(runGit(options.cwd, ["cat-file", "-e", tip]).exitCode).not.toBe(0);
         recoveryDirectories.add(path.dirname(options.cwd));
         fetches.push({ args, options });
         // Only redirect the network boundary; fetching, importing and regeneration run real Git.
         const result = spawn(
           command,
-          args.map(arg => (arg === url ? `file://${remote}` : arg)),
+          args.map(arg => (arg === url ? `remote.recovery.url=file://${remote}` : arg)),
           { ...options, env: { ...options.env, GIT_ALLOW_PROTOCOL: "file" } }
         );
         expect(runGit(options.cwd, ["cat-file", "-e", tip]).exitCode).not.toBe(0);
+        afterFetch?.({ args, options, result, attempt: fetches.length });
         return result;
       }
       return spawn(command, args, options);
@@ -298,7 +302,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     const uploaded = { patch: fs.readFileSync(paths.patchPath), bundle: fs.readFileSync(paths.bundlePath) };
     const request = options(mode);
     expect(await recoverObjectPack(transport, paths, request)).toBe(true);
-    expect(fetches).toHaveLength(1);
+    expect(fetches).toHaveLength(3);
     expect(request.message.base_commit).toBe(baseline);
     expect(request.message.diff_size).toBeGreaterThan(0);
     expect(isObjectPack(transport.read(paths.bundlePath))).toBe(false);
@@ -391,7 +395,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
       ...(policy === "deny" ? { allowed_files: ["not-permitted/**"] } : {}),
     });
     const result = await publish({ branch, title: pr.title, body: "Preserve validated agent changes." }, {});
-    expect(fetches).toHaveLength(1);
+    expect(fetches).toHaveLength(3);
     if (policy !== "allow") {
       expect(result, JSON.stringify(result)).toMatchObject({ success: false });
       expect(result.error).toMatch(policy === "deny" ? /allowed-files|file protection/i : /non-fast-forward|changed while/i);
@@ -408,7 +412,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     else expect(create).not.toHaveBeenCalled();
   });
 
-  it.each(["sha1", "sha256"])("exports deterministic full %s objects from packed, tagged and unreachable history", objectFormat => {
+  it.each(["sha1", "sha256"])("exports deterministic selected %s objects without unrelated tags or unreachable history", objectFormat => {
     fixture("complete", { objectFormat });
     git(author, ["tag", "-a", "annotated", "-m", "annotated object preview", baseline]);
     const hiddenBlob = git(author, ["hash-object", "-w", "--stdin"], { input: "unreachable bytes must be scanned\n" });
@@ -416,20 +420,21 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     const first = packageObjects();
     const preview = first.transport.read(first.paths.patchPath);
     const envelope = first.transport.read(first.paths.bundlePath);
-    expect(preview.toString()).toContain(`Object ${hiddenBlob} blob`);
-    expect(preview.toString()).toContain("annotated object preview");
-    const second = createObjectPack(branch, repoSlug, tip, { cwd: agent });
+    expect(preview.toString()).not.toContain(`Object ${hiddenBlob} blob`);
+    expect(preview.toString()).not.toContain("annotated object preview");
+    const second = createObjectPack(branch, repoSlug, tip, { cwd: agent, incrementalBaseSha: baseline });
     expect(fs.readFileSync(second.patchPath)).toEqual(preview);
     expect(fs.readFileSync(second.bundlePath)).toEqual(envelope);
     const boundary = envelope.indexOf(10, envelope.indexOf(10) + 1);
     const imported = path.join(root, "independent-import.git");
     git(root, ["init", "-q", "--bare", `--object-format=${objectFormat}`, imported]);
+    git(imported, ["fetch", "-q", `file://${remote}`, "main:refs/heads/main"], { online: true });
     const packId = git(imported, ["index-pack", "--strict", "--stdin"], { input: envelope.subarray(boundary + 1) })
       .split(/\s+/)
       .pop();
     git(imported, ["fsck", "--strict", tip]);
     expect(git(imported, ["rev-parse", `${tip}^{tree}`])).toBe(expectedTree);
-    expect(git(imported, ["cat-file", "blob", hiddenBlob])).toBe("unreachable bytes must be scanned");
+    expect(runGit(imported, ["cat-file", "-e", hiddenBlob]).exitCode).not.toBe(0);
     const entries = git(imported, ["verify-pack", "-v", path.join(imported, "objects", "pack", `pack-${packId}.idx`)])
       .split("\n")
       .filter(line => /^[0-9a-f]{40,64} /.test(line));
@@ -527,7 +532,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     await recoverObjectPack(transport, paths, options());
     await apply(transport, paths, format);
     expect(git(destination, ["ls-tree", "HEAD", "deps/submodule"])).toBe(`160000 commit ${submodule}\tdeps/submodule`);
-    expect(fetches).toHaveLength(1);
+    expect(fetches).toHaveLength(3);
     expect(fs.existsSync(path.join(destination, "deps/submodule/.git"))).toBe(false);
   });
 
@@ -550,7 +555,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     const request = options("full", { checkoutSha });
     await recoverObjectPack(transport, paths, request);
     expect(request.message.base_commit).toBe(checkoutSha);
-    expect(fetches[0].args).toContain(`${checkoutSha}:refs/heads/recovery-checkout`);
+    expect(fetches[0].options.input).toContain(`${checkoutSha}:refs/heads/recovery-checkout`);
     expect(transport.read(paths.patchPath).toString()).not.toContain("preexisting feature work");
     await apply(transport, paths, "bundle", { base: checkoutSha });
   });
@@ -565,7 +570,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     const fetches = redirectRecoveryFetch();
     const request = options("incremental", { message: { base_commit: concurrent } });
     await recoverObjectPack(transport, paths, request);
-    expect(fetches[0].args).toContain(`${baseline}:refs/heads/recovery-base`);
+    expect(fetches[0].options.input).toContain(`${baseline}:refs/heads/recovery-base`);
     expect(request.message.base_commit).toBe(baseline);
     await apply(transport, paths, "bundle");
     expect(fs.existsSync(path.join(destination, "concurrent.txt"))).toBe(false);
@@ -615,9 +620,10 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     expect(runGit(destination, ["config", "--get", "filter.marker.clean"]).exitCode).toBe(1);
   });
 
-  it("rejects a real oversized local object inventory before packing or fetching", () => {
+  it("rejects oversized selected changes before packing or fetching", () => {
     fixture("complete");
-    git(author, ["hash-object", "-w", "--stdin"], { input: Buffer.alloc(64 * 1024 * 1024, 65) });
+    write(author, "oversized.bin", Buffer.alloc(64 * 1024 * 1024, 65));
+    tip = commit(author, "oversized agent change");
     const before = state(remote);
     const fetches = redirectRecoveryFetch();
     expect(() => createObjectPack(branch, repoSlug, tip, { cwd: agent })).toThrow("64 MiB");
@@ -626,6 +632,128 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     expect(fs.existsSync(patch)).toBe(false);
     expect(fs.existsSync(patch.replace(/\.patch$/, ".bundle"))).toBe(false);
     expect(state(remote)).toEqual(before);
+  });
+
+  it.each(["bundle", "am"].flatMap(format => [false, true].map(filtered => ({ format, filtered }))))(
+    "recovers a small $format change (filtered=$filtered) without packing or hydrating huge unchanged monorepo blobs",
+    async ({ format, filtered }) => {
+      fixture("complete", { monorepo: true });
+      const huge = git(author, ["rev-parse", `${baseline}:static/huge.bin`]);
+      const unrelated = git(author, ["hash-object", "-w", "--stdin"], { input: Buffer.alloc(65 * 1024 * 1024, 72) });
+      const { paths, transport } = packageObjects();
+      expect(transport.read(paths.bundlePath).length).toBeLessThan(64 * 1024);
+      const preview = transport.read(paths.patchPath).toString();
+      expect(preview).not.toContain(`Object ${huge}`);
+      expect(preview).not.toContain(`Object ${unrelated}`);
+      const oldBlob = git(author, ["rev-parse", `${baseline}:text.txt`]);
+      let hydrated = false;
+      const fetches = redirectRecoveryFetch({
+        afterFetch({ options }) {
+          expect(runGit(options.cwd, ["cat-file", "-e", huge]).exitCode).not.toBe(0);
+          if (runGit(options.cwd, ["cat-file", "-e", oldBlob]).exitCode === 0) hydrated = true;
+        },
+      });
+      await recoverObjectPack(transport, paths, options("full", { config: filtered ? { excluded_files: ["excluded/**"] } : {} }));
+      expect(hydrated).toBe(true);
+      expect(fetches).toHaveLength(3);
+      expect(fetches[0].args).toContain("--filter=tree:0");
+      expect(fetches.slice(1).every(fetch => fetch.args.includes("--filter=blob:none"))).toBe(true);
+      await apply(transport, paths, format);
+    }
+  );
+
+  it("finds required ancestry beyond 1000 commits without following a moving remote branch", async () => {
+    fixture("complete");
+    const stream = [];
+    for (let index = 1; index <= 1100; index++) {
+      const contents = `trusted change ${index}\n`;
+      stream.push(
+        `commit refs/heads/main\nmark :${index}\ncommitter Trusted <trusted@example.com> ${1700000000 + index} +0000\ndata 7\nadvance\nfrom ${index === 1 ? baseline : `:${index - 1}`}\nM 100644 inline churn.txt\ndata ${Buffer.byteLength(contents)}\n${contents}\n`
+      );
+    }
+    git(remote, ["fast-import", "--quiet"], { input: stream.join("") });
+    const pinned = git(remote, ["rev-parse", "refs/heads/main"]);
+    const intermediateTree = git(remote, ["rev-parse", `${pinned}~500^{tree}`]);
+    const unrelatedBlob = git(remote, ["rev-parse", `${pinned}:churn.txt`]);
+    const { paths, transport } = packageObjects();
+    const fetches = redirectRecoveryFetch({
+      afterFetch({ args, options, attempt }) {
+        expect(runGit(options.cwd, ["cat-file", "-e", intermediateTree]).exitCode).not.toBe(0);
+        expect(runGit(options.cwd, ["cat-file", "-e", unrelatedBlob]).exitCode).not.toBe(0);
+        if (args.some(arg => arg.startsWith("--depth="))) {
+          expect(
+            git(options.cwd, ["cat-file", "--batch-all-objects", "--batch-check=%(objecttype)"])
+              .split("\n")
+              .every(type => type === "commit")
+          ).toBe(true);
+        }
+        if (attempt === 1) git(remote, ["update-ref", "refs/heads/main", baseline]);
+      },
+    });
+    const request = options();
+    await recoverObjectPack(transport, paths, request);
+    const history = fetches.filter(fetch => fetch.args.some(arg => arg.startsWith("--depth=")));
+    expect(history.map(fetch => fetch.args.find(arg => arg.startsWith("--depth=")))).toEqual(["--depth=1", "--depth=16", "--depth=64", "--depth=256", "--depth=1024", "--depth=4096"]);
+    expect(history[0].options.input).toBe("refs/heads/main:refs/heads/recovery-base\n");
+    for (const fetch of history.slice(1)) expect(fetch.options.input).toBe(`${pinned}:refs/heads/recovery-base\n`);
+    expect(request.message.base_commit).toBe(baseline);
+    await apply(transport, paths, "bundle");
+  });
+
+  it.each(["authentication", "filtering"])("does not retry or clone unfiltered after a trusted %s failure", async failure => {
+    fixture("complete");
+    const { paths, transport } = packageObjects();
+    const uploaded = transport.read(paths.bundlePath);
+    const spawn = childProcess.spawnSync;
+    const fetches = [];
+    vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, opts) => {
+      if (command === "git" && args.includes("fetch")) {
+        fetches.push(args);
+        return { status: failure === "authentication" ? 128 : 0, stdout: "", stderr: failure === "authentication" ? "authentication failed" : "warning: filtering not recognized by server, ignoring" };
+      }
+      return spawn(command, args, opts);
+    });
+    await expect(recoverObjectPack(transport, paths, options())).rejects.toThrow("no changes were published");
+    expect(fetches).toHaveLength(1);
+    expect(fetches[0]).toContain("--filter=tree:0");
+    expect(transport.read(paths.bundlePath)).toEqual(uploaded);
+  });
+
+  it("bounds adaptive ancestry attempts and never imports on search exhaustion", async () => {
+    fixture("complete");
+    const { paths, transport } = packageObjects();
+    const fetches = redirectRecoveryFetch({ hideAncestry: true });
+    await expect(recoverObjectPack(transport, paths, options())).rejects.toThrow("no changes were published");
+    expect(fetches.map(fetch => fetch.args.find(arg => arg.startsWith("--depth=")))).toEqual(["--depth=1", "--depth=16", "--depth=64", "--depth=256", "--depth=1024", "--depth=4096", "--depth=16384", "--depth=65536"]);
+    expect(childProcess.spawnSync.mock.calls.some(([command, args]) => command === "git" && args.includes("index-pack"))).toBe(false);
+  });
+
+  it("shares a finite deadline across successful network operations", async () => {
+    fixture("complete");
+    const { paths, transport } = packageObjects();
+    const now = Date.now();
+    let elapsed = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => now + elapsed);
+    const fetches = redirectRecoveryFetch({
+      afterFetch() {
+        elapsed = 180001;
+      },
+    });
+    await expect(recoverObjectPack(transport, paths, options())).rejects.toThrow("no changes were published");
+    expect(fetches).toHaveLength(1);
+    expect(childProcess.spawnSync.mock.calls.some(([command, args]) => command === "git" && args.includes("index-pack"))).toBe(false);
+  });
+
+  it("rejects oversized required baseline hydration before importing the agent pack", async () => {
+    fixture("complete", { monorepo: true });
+    write(author, "static/huge.bin", "small replacement\n");
+    tip = commit(author, "replace a huge baseline file");
+    const { paths, transport } = packageObjects();
+    expect(transport.read(paths.bundlePath).length).toBeLessThan(64 * 1024);
+    const fetches = redirectRecoveryFetch();
+    await expect(recoverObjectPack(transport, paths, options())).rejects.toThrow("no changes were published");
+    expect(fetches).toHaveLength(3);
+    expect(childProcess.spawnSync.mock.calls.some(([command, args]) => command === "git" && args.includes("index-pack"))).toBe(false);
   });
 
   it.each(["patch", "bundle"])("cleans staging when the final %s rename fails", failedRename => {
@@ -671,50 +799,58 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     await expect(applyBundleToBranch(paths.bundlePath, publishBranch, publishBranch, execApi(destination, transport))).rejects.toThrow(/prerequisites|history/i);
     expect(state(destination)).toEqual(before);
     expect(git(destination, ["for-each-ref", "--format=%(refname)", "refs/bundles/"])).toBe("");
-    expect(fetches).toHaveLength(1);
+    expect(fetches).toHaveLength(3);
   });
 
-  it.each(["preview", "pack", "forged-preview", "captured-preview", "missing-agent-blob", "missing-baseline", "unrelated-tip"])("rejects %s without applying anything or changing the uploaded artifacts", async failure => {
-    fixture("complete");
-    if (failure === "missing-agent-blob") {
-      const blob = git(author, ["rev-parse", `${tip}:binary.bin`]);
-      fs.unlinkSync(path.join(author, ".git/objects", blob.slice(0, 2), blob.slice(2)));
+  it.each(["preview", "pack", "forged-preview", "captured-preview", "missing-agent-blob", "missing-intermediate-blob", "missing-agent-tree", "missing-baseline", "unrelated-tip"])(
+    "rejects %s without applying anything or changing the uploaded artifacts",
+    async failure => {
+      fixture("complete");
+      if (failure === "missing-agent-blob") {
+        const blob = git(author, ["rev-parse", `${tip}:binary.bin`]);
+        fs.unlinkSync(path.join(author, ".git/objects", blob.slice(0, 2), blob.slice(2)));
+      }
+      if (failure === "missing-intermediate-blob" || failure === "missing-agent-tree") {
+        const oid = git(author, ["rev-parse", failure === "missing-agent-tree" ? `${tip}^{tree}` : `${tip}^:text.txt`]);
+        fs.unlinkSync(path.join(author, ".git/objects", oid.slice(0, 2), oid.slice(2)));
+      }
+      if (failure === "unrelated-tip") {
+        const tree = git(author, ["hash-object", "-t", "tree", "-w", "--stdin"], { input: "" });
+        tip = git(author, ["commit-tree", tree, "-m", "unrelated root"]);
+      }
+      const { paths, transport } = packageObjects({
+        beforeCapture(paths) {
+          if (failure === "preview") fs.appendFileSync(paths.patchPath, "\nredacted\n");
+          if (failure === "pack") {
+            const bytes = fs.readFileSync(paths.bundlePath);
+            bytes[bytes.length - 1] ^= 1;
+            fs.writeFileSync(paths.bundlePath, bytes);
+          }
+          if (failure === "forged-preview") {
+            const bytes = fs.readFileSync(paths.bundlePath);
+            const boundary = bytes.indexOf(10, bytes.indexOf(10) + 1);
+            const metadata = JSON.parse(bytes.subarray(bytes.indexOf(10) + 1, boundary));
+            const preview = Buffer.from("concealed object contents\n");
+            metadata.previewHash = crypto.createHash("sha256").update(preview).digest("hex");
+            fs.writeFileSync(paths.patchPath, preview);
+            fs.writeFileSync(paths.bundlePath, Buffer.concat([bytes.subarray(0, bytes.indexOf(10) + 1), Buffer.from(`${JSON.stringify(metadata)}\n`), bytes.subarray(boundary + 1)]));
+          }
+        },
+      });
+      if (failure === "captured-preview") fs.appendFileSync(paths.patchPath, "\nchanged after capture\n");
+      const before = state(destination);
+      const uploaded = fs.readFileSync(paths.bundlePath);
+      const fetches = redirectRecoveryFetch();
+      const applyRecovered = vi.fn(() => apply(transport, paths, "bundle"));
+      await expect(async () => {
+        await recoverObjectPack(transport, paths, options(failure === "missing-baseline" ? "incremental" : "full", failure === "missing-baseline" ? { baseline: "a".repeat(40) } : {}));
+        await applyRecovered();
+      }).rejects.toThrow();
+      expect(applyRecovered).not.toHaveBeenCalled();
+      if (["preview", "pack", "forged-preview", "captured-preview"].includes(failure)) expect(fetches).toHaveLength(0);
+      else expect(fetches.length).toBeGreaterThanOrEqual(1);
+      expect(state(destination)).toEqual(before);
+      expect(fs.readFileSync(paths.bundlePath)).toEqual(uploaded);
     }
-    if (failure === "unrelated-tip") {
-      const tree = git(author, ["hash-object", "-t", "tree", "-w", "--stdin"], { input: "" });
-      tip = git(author, ["commit-tree", tree, "-m", "unrelated root"]);
-    }
-    const { paths, transport } = packageObjects({
-      beforeCapture(paths) {
-        if (failure === "preview") fs.appendFileSync(paths.patchPath, "\nredacted\n");
-        if (failure === "pack") {
-          const bytes = fs.readFileSync(paths.bundlePath);
-          bytes[bytes.length - 1] ^= 1;
-          fs.writeFileSync(paths.bundlePath, bytes);
-        }
-        if (failure === "forged-preview") {
-          const bytes = fs.readFileSync(paths.bundlePath);
-          const boundary = bytes.indexOf(10, bytes.indexOf(10) + 1);
-          const metadata = JSON.parse(bytes.subarray(bytes.indexOf(10) + 1, boundary));
-          const preview = Buffer.from("concealed object contents\n");
-          metadata.previewHash = crypto.createHash("sha256").update(preview).digest("hex");
-          fs.writeFileSync(paths.patchPath, preview);
-          fs.writeFileSync(paths.bundlePath, Buffer.concat([bytes.subarray(0, bytes.indexOf(10) + 1), Buffer.from(`${JSON.stringify(metadata)}\n`), bytes.subarray(boundary + 1)]));
-        }
-      },
-    });
-    if (failure === "captured-preview") fs.appendFileSync(paths.patchPath, "\nchanged after capture\n");
-    const before = state(destination);
-    const uploaded = fs.readFileSync(paths.bundlePath);
-    const fetches = redirectRecoveryFetch();
-    const applyRecovered = vi.fn(() => apply(transport, paths, "bundle"));
-    await expect(async () => {
-      await recoverObjectPack(transport, paths, options(failure === "missing-baseline" ? "incremental" : "full", failure === "missing-baseline" ? { baseline: "a".repeat(40) } : {}));
-      await applyRecovered();
-    }).rejects.toThrow();
-    expect(applyRecovered).not.toHaveBeenCalled();
-    expect(fetches).toHaveLength(["preview", "pack", "forged-preview", "captured-preview"].includes(failure) ? 0 : 1);
-    expect(state(destination)).toEqual(before);
-    expect(fs.readFileSync(paths.bundlePath)).toEqual(uploaded);
-  });
+  );
 });

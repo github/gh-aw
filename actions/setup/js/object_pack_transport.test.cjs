@@ -39,7 +39,7 @@ describe("offline object-pack recovery", () => {
     vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
       if (command === "git" && args.includes("fetch")) {
         fetches.push({ args, options });
-        const redirected = args.map(arg => (arg === `https://github.com/${repoSlug}.git` ? repo : arg));
+        const redirected = args.map(arg => (arg === `remote.recovery.url=https://github.com/${repoSlug}.git` ? `remote.recovery.url=file://${repo}` : arg));
         return original(command, redirected, { ...options, env: { ...options.env, GIT_ALLOW_PROTOCOL: "file" } });
       }
       return original(command, args, options);
@@ -61,6 +61,8 @@ describe("offline object-pack recovery", () => {
     git(["init", "--initial-branch=main", "--object-format=sha1"]);
     git(["config", "user.name", "Test User"]);
     git(["config", "user.email", "test@example.com"]);
+    git(["config", "uploadpack.allowFilter", "true"]);
+    git(["config", "uploadpack.allowAnySHA1InWant", "true"]);
     fs.writeFileSync(path.join(repo, "file.txt"), "base\n");
     git(["add", "."]);
     git(["commit", "-m", "base"]);
@@ -108,8 +110,8 @@ describe("offline object-pack recovery", () => {
     const fetches = redirectTrustedFetch();
     const message = {};
     expect(await recoverObjectPack(transport, paths, { repo: repoSlug, branch: "agent-change", baseBranch: "main", mode, baseline: base, token: "synthetic-token", config: {}, message })).toBe(true);
-    expect(fetches).toHaveLength(1);
-    expect(fetches[0].args).toContain(`https://github.com/${repoSlug}.git`);
+    expect(fetches).toHaveLength(3);
+    expect(fetches[0].args).toContain(`remote.recovery.url=https://github.com/${repoSlug}.git`);
     expect(fetches[0].args).not.toContain("origin");
     expect(fetches[0].options.env.GIT_ALLOW_PROTOCOL).toBe("https");
     expect(fetches[0].options.env.GIT_CONFIG_GLOBAL).toBe("/dev/null");
@@ -131,6 +133,8 @@ describe("offline object-pack recovery", () => {
   it("recovers a blob missing from a partial agent checkout", async () => {
     const remote = path.join(root, "trusted");
     git(["clone", "--bare", repo, remote]);
+    git(["--git-dir", remote, "config", "uploadpack.allowFilter", "true"]);
+    git(["--git-dir", remote, "config", "uploadpack.allowAnySHA1InWant", "true"]);
     const blob = git(["rev-parse", `${base}:file.txt`]);
     fs.unlinkSync(path.join(repo, ".git", "objects", blob.slice(0, 2), blob.slice(2)));
     git(["config", "remote.origin.promisor", "true"]);
@@ -143,7 +147,7 @@ describe("offline object-pack recovery", () => {
       if (command === "git" && args.includes("fetch")) {
         return original(
           command,
-          args.map(arg => (arg === `https://github.com/${repoSlug}.git` ? remote : arg)),
+          args.map(arg => (arg === `remote.recovery.url=https://github.com/${repoSlug}.git` ? `remote.recovery.url=file://${remote}` : arg)),
           { ...options, env: { ...options.env, GIT_ALLOW_PROTOCOL: "file" } }
         );
       }
@@ -188,7 +192,7 @@ describe("offline object-pack recovery", () => {
     const fetches = redirectTrustedFetch();
     const message = {};
     await recoverObjectPack(transport, paths, { repo: repoSlug, mode: "full", baseBranch: "main", checkoutSha, config: {}, message });
-    expect(fetches[0].args).toContain(`${checkoutSha}:refs/heads/recovery-checkout`);
+    expect(fetches[0].options.input).toContain(`${checkoutSha}:refs/heads/recovery-checkout`);
     expect(message.base_commit).toBe(checkoutSha);
     const patch = transport.read(paths.patchPath).toString();
     expect(patch).toContain("-agent content");
@@ -203,7 +207,7 @@ describe("offline object-pack recovery", () => {
     const fetches = redirectTrustedFetch();
     const message = { base_commit: git(["rev-parse", "HEAD"]) };
     await recoverObjectPack(transport, paths, { repo: repoSlug, mode: "incremental", baseline: base, config: {}, message });
-    expect(fetches[0].args).toContain(`${base}:refs/heads/recovery-base`);
+    expect(fetches[0].options.input).toContain(`${base}:refs/heads/recovery-base`);
     expect(message.base_commit).toBe(base);
     expect(transport.read(paths.patchPath).toString()).not.toContain("later.txt");
   });
@@ -275,7 +279,7 @@ describe("offline object-pack recovery", () => {
   it("enforces the exact 64 MiB uncompressed inventory limit before packing", () => {
     const original = childProcess.spawnSync;
     vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
-      if (args.includes("--batch-all-objects")) return { status: 0, stdout: `${tip} 67108865\n`, stderr: "" };
+      if (args.includes("--batch-check=%(objectname) %(objectsize)")) return { status: 0, stdout: `${tip} 67108865\n`, stderr: "" };
       return original(command, args, options);
     });
     expect(() => createObjectPack("agent-change", repoSlug, tip, { cwd: repo })).toThrow("64 MiB");

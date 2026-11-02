@@ -7,7 +7,7 @@ const os = require("os");
 const path = require("path");
 const zlib = require("zlib");
 const { execLocalGitSync } = require("./git_helpers.cjs");
-const { buildGitAuthEnv } = require("./git_auth_env.cjs");
+const { fetchRecoveryObjects } = require("./object_pack_fetch.cjs");
 const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { currentClaimAssignment, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
@@ -19,11 +19,11 @@ const MAX_BUFFER = MAX_BYTES + 16 * 1024 * 1024;
 const oidPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const hash = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
 
-/** @param {"recovery-empty" | "credential-resolution" | "cleanup-failed" | "offline-result" | "target-resolution" | "head-authorization" | "patch-resolution" | "queue-resolution" | "queued" | "queue-failed" | "export-start" | "inventory-ready" | "export-ready" | "export-failed" | "recovery-start" | "preview-verified" | "fetch-start" | "fetch-ready" | "import-ready" | "baseline-resolved" | "regeneration-ready" | "recovery-ready" | "recovery-rejected"} event
+/** @param {"fetch-trees" | "fetch-step" | "fetch-blobs" | "fetch-hydrated" | "recovery-empty" | "credential-resolution" | "cleanup-failed" | "offline-result" | "target-resolution" | "head-authorization" | "patch-resolution" | "queue-resolution" | "queued" | "queue-failed" | "export-start" | "inventory-ready" | "export-ready" | "export-failed" | "recovery-start" | "preview-verified" | "fetch-start" | "fetch-ready" | "import-ready" | "baseline-resolved" | "regeneration-ready" | "recovery-ready" | "recovery-rejected"} event
  * @param {Record<string, boolean | number>} [fields]
  */
 function traceObjectPack(event, fields = {}) {
-  const allowed = new Set(["configured", "success", "eligible", "pinned", "staged", "incremental", "scoped", "credential", "dispatch", "objects", "bytes", "previewBytes"]);
+  const allowed = new Set(["configured", "success", "eligible", "pinned", "staged", "incremental", "scoped", "credential", "dispatch", "objects", "bytes", "previewBytes", "attempt", "depth"]);
   const details = Object.entries(fields)
     .filter(([key, value]) => allowed.has(key) && (typeof value === "boolean" || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0)))
     .map(([key, value]) => `${key}=${value}`);
@@ -78,8 +78,33 @@ async function recoveryToken(client, configuredToken) {
   }
 }
 
-function localObjects(cwd) {
-  const listing = execLocalGitSync(["--no-replace-objects", "cat-file", "--batch-all-objects", "--batch-check=%(objectname) %(objectsize)"], { cwd, maxBuffer: MAX_BUFFER });
+function localObjects(cwd, tip, options) {
+  // Exclusion refs are untrusted size hints, not publisher baseline authority.
+  // Missing bytes still have to resolve from independently authorized history.
+  const candidates = [options.incrementalBaseSha, options.incrementalBaseRef, process.env.GITHUB_SHA, `refs/remotes/origin/${options.baseBranch || "main"}`, `refs/heads/${options.baseBranch || "main"}`];
+  const excluded = new Set();
+  for (const candidate of candidates) {
+    if (!candidate || !/^[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(candidate)) continue;
+    try {
+      const oid = execLocalGitSync(["rev-parse", "--verify", `${candidate}^{commit}`], { cwd }).trim();
+      if (oidPattern.test(oid) && oid !== tip) excluded.add(oid);
+    } catch {
+      // An absent local size hint is expected in incomplete checkouts.
+      traceObjectPack("inventory-ready", { configured: false });
+    }
+  }
+  const reachable = execLocalGitSync(["--no-replace-objects", "rev-list", "--objects", "--no-object-names", "--missing=print", tip, "--not", ...excluded], { cwd, maxBuffer: MAX_BUFFER });
+  const selected = [
+    ...new Set([
+      tip,
+      ...reachable
+        .trim()
+        .split("\n")
+        .filter(oid => oidPattern.test(oid)),
+    ]),
+  ];
+  if (selected.length > MAX_OBJECTS) throw new Error("Object-pack recovery exceeds the selected object-count limit. Provision checkout history instead.");
+  const listing = execLocalGitSync(["--no-replace-objects", "cat-file", "--batch-check=%(objectname) %(objectsize)"], { cwd, input: `${selected.join("\n")}\n`, maxBuffer: MAX_BUFFER });
   const records = listing.trim().split("\n").filter(Boolean);
   if (records.length > MAX_OBJECTS) throw new Error("Object-pack recovery exceeds the local object-count limit. Provision checkout history instead.");
   let total = 0;
@@ -168,7 +193,7 @@ function createObjectPack(branch, repo, tip, options = {}) {
   try {
     fs.mkdirSync(path.dirname(patchPath), { recursive: true });
     directory = fs.mkdtempSync(path.join(path.dirname(patchPath), "object-pack-"));
-    const ids = localObjects(cwd);
+    const ids = localObjects(cwd, tip, options);
     if (!ids.includes(tip)) throw new Error("Pinned commit is not available locally");
     const packId = execLocalGitSync(["--no-replace-objects", "pack-objects", "--window=0", "--no-reuse-delta", "--no-reuse-object", path.join(directory, "objects")], { cwd, input: `${ids.join("\n")}\n`, maxBuffer: MAX_BUFFER }).trim();
     if (!oidPattern.test(packId)) throw new Error("Invalid local pack identity");
@@ -188,7 +213,7 @@ function createObjectPack(branch, repo, tip, options = {}) {
     return { patchPath, bundlePath, size: envelope.length };
   } catch {
     traceObjectPack("export-failed");
-    throw new Error("Unable to package local objects for safe-outputs recovery. Ensure the pinned commit is local and the checkout fits the 64 MiB / 100000-object recovery limits.");
+    throw new Error("Unable to package local objects for safe-outputs recovery. Ensure the pinned commit and agent-created bytes are local and the selected changes fit the 64 MiB / 100000-object recovery limits.");
   } finally {
     cleanupRecovery(directory);
   }
@@ -259,24 +284,16 @@ async function recoverObjectPackChecked(transport, paths, options) {
   try {
     const remote = trustedRemote(options.repo);
     execLocalGitSync(["init", "--bare", "--template=", `--object-format=${metadata.objectFormat}`, cwd], { cwd: directory, env });
-    // This is the only network-capable command. It operates before importing any
-    // untrusted objects, in a new bare repository with no copied configuration.
+    // All network operations finish before importing untrusted objects.
     const ref = options.mode === "incremental" ? options.baseline : `refs/heads/${options.baseBranch}`;
     const checkoutSha = options.mode === "full" && oidPattern.test(options.checkoutSha || "") ? options.checkoutSha : undefined;
-    const refspecs = [`${ref}:refs/heads/recovery-base`];
-    if (checkoutSha) refspecs.push(`${checkoutSha}:refs/heads/recovery-checkout`);
     if (options.mode !== "incremental" && !/^[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(options.baseBranch)) throw new Error("Invalid authorized recovery base branch");
-    const auth = options.token ? buildGitAuthEnv(options.token) : {};
     traceObjectPack("fetch-start", { incremental: options.mode === "incremental", credential: !!options.token, dispatch: !!checkoutSha });
-    const fetched = childProcess.spawnSync(
-      "git",
-      ["-c", "credential.helper=", "-c", "core.hooksPath=/dev/null", "-c", "http.followRedirects=false", "-c", "fetch.fsckObjects=true", "fetch", "--no-tags", "--no-recurse-submodules", "--depth=1000", "--", remote, ...refspecs],
-      { cwd, env: { ...env, ...auth, GIT_ALLOW_PROTOCOL: "https", GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "/bin/false" }, encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 60000, killSignal: "SIGKILL" }
-    );
-    if (fetched.status !== 0 || fetched.error) throw new Error("Trusted object recovery fetch failed; provision checkout data or verify publisher credentials");
+    fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token: options.token, inspection, tip: metadata.tip, trace: traceObjectPack });
     traceObjectPack("fetch-ready");
-    // index-pack verifies object hashes and links against the trusted base.
-    const imported = execLocalGitSync(["index-pack", "--strict", "--max-input-size=83886080", "--stdin"], { cwd, env, input: pack, maxBuffer: MAX_BUFFER }).trim().split(/\s+/).pop();
+    // Validate object structure on import, then fsck the promised trusted graph.
+    // Pre-import traversal independently rejects untrusted missing graph edges.
+    const imported = execLocalGitSync(["index-pack", "--fsck-objects", "--promisor", "--max-input-size=83886080", "--stdin"], { cwd, env, input: pack, maxBuffer: MAX_BUFFER }).trim().split(/\s+/).pop();
     if (!imported || !oidPattern.test(imported)) throw new Error("Invalid imported object pack");
     execLocalGitSync(["cat-file", "-e", `${metadata.tip}^{commit}`], { cwd, env });
     execLocalGitSync(["fsck", "--strict", "--no-reflogs", metadata.tip], { cwd, env, maxBuffer: MAX_BUFFER });

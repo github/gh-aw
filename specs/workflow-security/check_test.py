@@ -56,8 +56,8 @@ class TransportRunnerTest(unittest.TestCase):
             self.assertEqual(len(expected), 17)
             self.assertEqual(len(git_cases), 24)
             self.assertEqual(len(generation_cases), 42)
-            self.assertEqual(len(recovery_cases), 11)
-            self.assertEqual(len(configurations), 111)
+            self.assertEqual(len(recovery_cases), 14)
+            self.assertEqual(len(configurations), 114)
             self.assertEqual([call.args[2] for call in result.call_args_list],
                              expected * 2 + [case[-1] for case in git_cases]
                              + [case[-1] for case in generation_cases]
@@ -85,6 +85,9 @@ class TransportRunnerTest(unittest.TestCase):
                 self.assertIn(f'Fault = "{fault}"', config)
                 self.assertIn("    ScannedBytes\n", config)
                 self.assertIn("    PublicationPolicy\n", config)
+                self.assertIn("    BoundedFilteredFetch\n", config)
+                self.assertIn("    TrustedHydration\n", config)
+                self.assertIn("    HydrateBeforeImport\n", config)
                 if invariant in check_transport.RECOVERY_WITNESSES:
                     self.assertIn(f"\nINVARIANT {invariant}\n", config)
             for config, (name, allow, shallow, fault, invariant) in zip(git_configurations,
@@ -153,7 +156,7 @@ class TransportRunnerTest(unittest.TestCase):
             ("transport", "SafeOutputTransport", 34),
             ("git", "SafeOutputGit", 24),
             ("generation", "SafeOutputGeneration", 42),
-            ("recovery", "SafeOutputObjectRecovery", 11),
+            ("recovery", "SafeOutputObjectRecovery", 14),
         ]:
             with self.subTest(model=model), tempfile.TemporaryDirectory() as directory:
                 jar = Path(directory) / "tla2tools.jar"

@@ -310,17 +310,36 @@ into a new isolated bare repository, validates the objects, and regenerates the
 patch and bundle before applying the existing file, size, and publication policies.
 Agent repository configuration, remotes, hooks, and alternates are never copied.
 
-The fallback exports all locally available objects, including unreachable
-history, with a limit of 100,000 objects and 64 MiB uncompressed. The existing
-patch artifact carries a conservative preview of every packed object for
-scanning. Recovery rejects redacted or mismatched previews instead of publishing
-the original hidden bytes. Fetching is limited to 1,000 commits of depth and a
-60-second command deadline, not a downloaded-byte budget.
+The fallback selects objects reachable from the pinned tip, using available
+local baseline refs as exclusion hints. It omits unrelated branches, tags,
+unreachable history, and objects already reachable from those hints. Hints
+reduce transfer size but never authorize a publisher baseline or a remote
+request. The 100,000-object and 64 MiB uncompressed limits apply to the selected
+objects, not the entire monorepo. The existing patch artifact previews every
+packed object. Recovery rejects redacted or mismatched previews.
+
+The trusted publisher starts with a depth-one, treeless fetch of the authorized
+baseline. If required commit ancestry is absent, it increases depth geometrically
+through 16, 64, 256, 1,024, 4,096, 16,384, and at most 65,536 commits, keeping the
+first resolved revision pinned. Only the required trusted baseline/boundary tree
+snapshots are then fetched without blobs, rather than downloading every
+intermediate monorepo tree. It compares trees before importing agent objects
+and fetches only required old/new blobs whose identities were independently read
+from trusted fetched trees. Unchanged large files are not hydrated; missing
+agent-created bytes are rejected rather than requested from upload hints.
+Servers without filtering support fail explicitly instead of retrying an
+unfiltered clone. Authentication and other fetch failures are not retried.
+
+All fetching finishes before agent objects are imported. Requests have a
+60-second command deadline and share a 180-second network-operation deadline.
+Tree inspection is limited to one million entries, required baseline blob
+hydration to 64 MiB, and the uploaded pack/import to 80 MiB. Hydration size is
+checked after transfer; these limits are not a downloaded-byte budget.
 
 Incremental recovery requires the triggering PR's exact pre-agent head SHA and
 an authorized head repository; an uploaded baseline or a newer remote head cannot
 replace it. Dynamic PR updates without that trusted event baseline, staged
-outputs, larger object inventories, and missing agent-created content still
+outputs, larger selected changes, exhausted recovery budgets, and missing agent-created content still
 require checkout provisioning. Full recovery uses the authorized base branch and
 preserves the trusted dispatch-SHA baseline for same-repository feature runs.
 Publisher credentials must authorize the fetched repository independently of any

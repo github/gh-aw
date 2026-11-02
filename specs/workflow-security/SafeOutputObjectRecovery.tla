@@ -4,7 +4,8 @@ EXTENDS Naturals
 CONSTANTS Mode, Fault
 ASSUME Mode \in {"full", "incremental"}
 ASSUME Fault \in {"none", "agent-fetch", "copied-config", "untrusted-remote",
-                  "moving-baseline", "hidden-preview", "skip-policy"}
+                  "moving-baseline", "hidden-preview", "skip-policy",
+                  "unfiltered-fetch", "untrusted-blob", "unbounded-fetch"}
 
 \* Object/preview validation and authorization are abstract predicates, not a
 \* proof of Git parsing, detector completeness, or implementation refinement.
@@ -17,6 +18,8 @@ Init ==
              local |-> local, baseline |-> baseline, matches |-> matches,
              complete |-> complete, bounded |-> bounded, allowed |-> allowed,
              packaged |-> FALSE, fetched |-> FALSE, imported |-> FALSE,
+             attempts |-> 0, filtered |-> TRUE, pinned |-> TRUE,
+             hydrated |-> FALSE, trustedBlobs |-> TRUE,
              agentNetwork |-> FALSE, copiedConfig |-> FALSE,
              trustedRemote |-> TRUE, checkedPolicy |-> FALSE,
              published |-> FALSE, rejected |-> FALSE]
@@ -35,11 +38,24 @@ CheckPreview ==
 
 Fetch ==
     /\ s.stage = "fetch"
-    /\ LET accept == Mode = "full" \/ s.baseline \/ Fault = "moving-baseline"
-       IN s' = [s EXCEPT !.stage = IF accept THEN "import" ELSE "done",
-                         !.fetched = accept, !.rejected = ~accept,
+    /\ s.attempts < 3
+    /\ \E enough \in BOOLEAN:
+       LET accept == Mode = "full" \/ s.baseline \/ Fault = "moving-baseline"
+       IN s' = [s EXCEPT !.stage = IF ~accept THEN "done"
+                                   ELSE IF enough THEN "hydrate"
+                                   ELSE IF s.attempts < 2 THEN "fetch"
+                                   ELSE "done",
+                         !.attempts = IF Fault = "unbounded-fetch" THEN 4 ELSE @ + 1,
+                         !.filtered = Fault # "unfiltered-fetch",
+                         !.fetched = accept,
+                         !.rejected = ~accept \/ (~enough /\ s.attempts = 2),
                          !.copiedConfig = accept /\ Fault = "copied-config",
                          !.trustedRemote = Fault # "untrusted-remote"]
+
+Hydrate ==
+    /\ s.stage = "hydrate"
+    /\ s' = [s EXCEPT !.stage = "import", !.hydrated = TRUE,
+                      !.trustedBlobs = Fault # "untrusted-blob"]
 
 Import ==
     /\ s.stage = "import"
@@ -56,17 +72,22 @@ Publish ==
     /\ s.stage = "publish"
     /\ s' = [s EXCEPT !.stage = "done", !.published = TRUE]
 
-Next == Package \/ CheckPreview \/ Fetch \/ Import \/ Policy \/ Publish
+Next == Package \/ CheckPreview \/ Fetch \/ Hydrate \/ Import \/ Policy \/ Publish
 Spec == Init /\ [][Next]_vars
 
 TypeOK ==
-    /\ s.stage \in {"package", "preview", "fetch", "import", "policy",
+    /\ s.stage \in {"package", "preview", "fetch", "hydrate", "import", "policy",
                     "publish", "done"}
     /\ \A field \in {"local", "baseline", "matches", "complete", "bounded",
                      "allowed", "packaged", "fetched", "imported",
                      "agentNetwork", "copiedConfig", "trustedRemote",
-                     "checkedPolicy", "published", "rejected"}:
+                     "checkedPolicy", "published", "rejected", "filtered",
+                     "pinned", "hydrated", "trustedBlobs"}:
            s[field] \in BOOLEAN
+    /\ s.attempts \in 0..4
+BoundedFilteredFetch == s.fetched => s.filtered /\ s.pinned /\ s.attempts \in 1..3
+TrustedHydration == s.hydrated => s.trustedBlobs /\ s.fetched
+HydrateBeforeImport == s.imported => s.hydrated
 NoAgentNetwork == ~s.agentNetwork
 IsolatedRecovery == ~s.copiedConfig
 AuthorizedRemote == s.fetched => s.trustedRemote

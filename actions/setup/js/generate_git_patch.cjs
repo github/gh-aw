@@ -260,7 +260,8 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
       };
       execGitSync(["read-tree", base], { cwd, env });
       execGitSync(["apply", "--cached", "--binary", "--whitespace=nowarn", "-"], { cwd, env, input: diff });
-      const tree = execGitSync(["write-tree"], { cwd, env }).trim();
+      // The diff verified changed bytes; unchanged entries may be promised blobs.
+      const tree = execGitSync(["write-tree", "--missing-ok"], { cwd, env }).trim();
       const commit = execGitSync(["commit-tree", tree, "-p", base, "-m", "Apply filtered changes"], { cwd, env }).trim();
       filteredCommit = commit;
       return execGitSync(["format-patch", "-1", commit, "--stdout"], { cwd });
