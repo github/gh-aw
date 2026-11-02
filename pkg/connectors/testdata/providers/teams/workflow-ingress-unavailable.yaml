@@ -1,0 +1,6 @@
+on: workflow_dispatch
+connectors:
+  teams:
+    definition: .github/aw/connectors/teams.yaml
+    connection: pkg/connectors/testdata/providers/teams/connection.yaml
+    on: [channel-message-created]
