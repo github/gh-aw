@@ -19,7 +19,7 @@ func evalsBranchName(workflowID string) string {
 // buildEvalsJob creates a separate evals job that runs after the agent job (and detection
 // job when enabled), allowing it to run in parallel with safe_outputs.
 // The job downloads the agent artifact to access output files, runs a BinEval
-// multi-question evaluation via an agentic engine, and uploads evals.jsonl as an artifact.
+// multi-question evaluation via the Decisions API, and uploads evals.jsonl as an artifact.
 // Returns nil if evals are not declared in the workflow frontmatter.
 func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 	if !data.Evals.HasEvals() {
@@ -30,7 +30,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 
 	steps := c.buildEvalsPreparationSteps(data)
 
-	// Add all evals steps: engine install, engine execution, parse, redact, upload.
+	// Add the standalone Decisions invocation and result publication steps.
 	steps = append(steps, c.buildEvalsJobSteps(data)...)
 
 	if c.actionMode.IsDev() {
@@ -72,7 +72,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 		Environment: c.indentYAMLLines(data.Environment, "    "),
 		Permissions: permissions,
 		Outputs: map[string]string{
-			"aic": fmt.Sprintf("${{ steps.%s.outputs.aic }}", constants.ParseMCPGatewayStepID),
+			"aic": "${{ steps.parse_evals_token_usage.outputs.aic }}",
 		},
 		Steps: steps,
 	}
@@ -83,7 +83,7 @@ func (c *Compiler) buildEvalsJob(data *WorkflowData) (*Job, error) {
 func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
 	var steps []string
 
-	// Add setup action steps (installs the agentic engine helper scripts).
+	// Add setup action steps for the shared runtime scripts.
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
 	if setupActionRef != "" || c.actionMode.IsScript() {
 		// For dev mode (local action path), checkout the actions folder first.
@@ -94,28 +94,19 @@ func (c *Compiler) buildEvalsPreparationSteps(data *WorkflowData) []string {
 		steps = append(steps, c.generateSetupStepForJob("evals", data, setupActionRef, SetupActionDestination, false, evalsTraceID, evalsParentSpanID, "")...)
 	}
 
-	// Download agent output artifact to access output files (prompt.txt, agent_output.json).
+	// Download agent output for the shared evaluation evidence.
 	// Use activation-derived prefix since this job always depends on activation.
 	agentArtifactPrefix := artifactPrefixExprForDownstreamJob(data)
 	steps = append(steps, buildAgentOutputDownloadSteps(agentArtifactPrefix, c.getActionPin)...)
 
-	// Download experiment artifact so the evals agent can read the current variant assignments.
+	// Download the current experiment variant assignments.
 	return append(steps, buildExperimentArtifactDownloadSteps(data, c.getActionPin)...)
 }
 
 func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, string) {
-	// Determine permissions for the evals job (same rationale as the detection job).
-	evalsAuthData := *data
-	evalsAuthData.SafeOutputs = nil
-	evalsAuthData.AI = c.getEvalsEngineID(data)
-	evalsAuthData.Model = c.resolveEvalsExecutionModel(data)
-	if data.EngineConfig != nil {
-		engineConfig := *data.EngineConfig
-		engineConfig.ID = evalsAuthData.AI
-		evalsAuthData.EngineConfig = &engineConfig
-	}
-	brokeredInference := usesTokenBrokerInference(&evalsAuthData)
-	copilotRequestsEnabled := hasCopilotRequestsWritePermission(data) && !brokeredInference
+	evalsAuthData := c.buildEvalsDecisionData(data)
+	brokeredInference := usesTokenBrokerInference(evalsAuthData)
+	copilotRequestsEnabled := evalsAuthData.AI == "copilot" && hasCopilotRequestsWritePermission(data) && !brokeredInference
 	perms := NewPermissionsContentsRead()
 	if copilotRequestsEnabled {
 		perms.Set(PermissionCopilotRequests, PermissionWrite)
@@ -123,13 +114,10 @@ func (c *Compiler) buildEvalsJobPermissions(data *WorkflowData) (*WorkflowData, 
 	if brokeredInference {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
-	if data.EngineConfig != nil && data.EngineConfig.Auth != nil && data.EngineConfig.Auth.Type == "github-oidc" {
-		perms.Set(PermissionIdToken, PermissionWrite)
-	}
 	if hasOTLPGitHubOIDCAuth(data.ParsedFrontmatter, data.RawFrontmatter) {
 		perms.Set(PermissionIdToken, PermissionWrite)
 	}
-	return &evalsAuthData, perms.RenderToYAML()
+	return evalsAuthData, perms.RenderToYAML()
 }
 
 // buildPushEvalsStateJob creates a job that downloads the evals artifact and commits it to a

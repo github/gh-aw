@@ -114,6 +114,27 @@ values; the runner-mask policy does not reduce that redaction.
 
 ## Development
 
+### Decisions client
+
+`js/decisions_client.cjs` exports
+`invokeDecisions({ baseURL, apiKey?, model, input, questions, timeoutMs?, fetchImpl?, onUsage? })`.
+It sends the whole question array in one `POST` to `<baseURL>/decisions` and
+returns the response, including its named answers, model, and token usage.
+The helper supports `predicate`, `choice`, and `score` questions, string or
+boolean choice values, and text/image/JSON question instructions.
+
+The caller supplies a provider API base URL (for example
+`https://api.openai.com/v1`) and its credential. No proxy or sandbox is required. The default
+timeout is 120 seconds. The client rejects invalid batches, mismatched answers,
+HTTP failures, and redirects without retrying or logging provider bodies.
+Refusals remain typed answers for the caller to handle. It requires no SDK,
+Actions globals, or agentic engine.
+
+The optional `onUsage(usage, model)` callback runs after receiving JSON, before
+answer validation, so callers can collect costs even when the answer batch is
+invalid. Evals use it to save response token usage and catalog-derived AIC and
+USD costs to the accounting artifact.
+
 ### Synthetic message previews
 
 `js/testdata/messages_preview.md` contains locally rendered previews of shared
