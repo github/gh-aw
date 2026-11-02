@@ -50,20 +50,43 @@ allowlists. Required resource inputs must match those allowlists exactly.
 
 Requests have a fixed method, endpoint and path. `{name}` path segments are
 bound through `pathInputs`; `query` and `body` values are `{input: name}` or
-`{literal: <JSON value>}`. There is no shell, JavaScript, Actions expression,
+`{literal: <JSON value>}`. Structured `object: {field: <Value>}` and
+`array: [<Value>]` compose typed bindings recursively, with a maximum depth of
+16 and bounded resolved JSON size. Each Value has exactly one source.
+REST query parameters remain primitive scalars; GraphQL variables, JSON
+bodies and JSON Patch values can be structured. There is no shell, JavaScript, Actions expression,
 remote import or expression language. `graphql` is a fixed document; `query`
 then supplies GraphQL variables, not URL parameters. `patch` is an array of
 `{op: add|replace|test, path: /fixed/pointer, value: {input: name}}` (or
 `value: {literal: ...}`) on safe-output POST/PATCH requests, serialized as
 `application/json-patch+json`. It cannot coexist with another body.
-Multipart, pagination, arbitrary headers, OAuth acquisition, text-to-ADF
-conversion, automatic version preflights and dynamic endpoints are unsupported.
+Multipart, pagination, arbitrary headers, OAuth acquisition, automatic version
+preflights and dynamic endpoints are unsupported.
+
+String input references may use `encoding: jira-adf` or
+`encoding: confluence-storage`. These fixed trusted encoders produce a real ADF
+document with text/hard-break nodes, or escaped storage markup with line breaks,
+respectively. They do not evaluate markup, accept raw HTML, infer rich formatting,
+or run provider-supplied code:
+
+```yaml
+body:
+  fields:
+    object:
+      summary: {input: title}
+      description: {input: text, encoding: jira-adf}
+```
 
 `Input.pattern` accepts bounded RE2 patterns. `Operation.responseChecks` maps
 JSON Pointers to required literal values (e.g. `/ok: true`); `responseRequired`
 lists required non-null/nonempty evidence. `responseResources` maps JSON
 Pointers to connection resource allowlists. `project` maps output field names
-to JSON Pointers and excludes all other response fields. GraphQL `errors` are
+to JSON Pointers and excludes all other response fields. `responseTypes` maps
+pointers to primitive `string`, `integer`, `number`, or `boolean` types;
+use it to reject objects accidentally projected as metadata. `responseInputs`
+maps pointers to required input names and enforces exact returned-resource
+equality with the request, not just membership in a broad connection allowlist.
+GraphQL `errors` are
 always failures, including HTTP 200 responses. The runtime never retries writes.
 
 Each credential has exactly one phase: `agent`, `context`, or `safe-output`.
@@ -103,6 +126,11 @@ ships here, and the existing gateway does not accept custom webhook sources.
 Source enrollment, provenance, admission and replay protection must not be
 bypassed. Validation and fixture projection are not operational activation.
 `Trigger.resources` maps evidence JSON Pointers to connection allowlists.
+Native numeric IDs are compared losslessly to their canonical JSON numeric
+spelling in string allowlists. `Trigger.types` uses the same primitive type
+guards as `responseTypes`; require `string` for string-only native identifiers
+such as Slack timestamps. Neither type guards nor projection replace verifier,
+replay, tenant enrollment, bot/self filtering or event-bound write authority.
 
 ## Host integration
 

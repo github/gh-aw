@@ -33,6 +33,9 @@ func (p *Plan) ProjectEvent(name, nativeEvent string, payload []byte) (*EventPro
 	if err := decodeJSON(payload, &document); err != nil {
 		return nil, fmt.Errorf("decode trigger evidence: %w", err)
 	}
+	if err := checkPrimitiveTypes(document, trigger.Types); err != nil {
+		return nil, err
+	}
 	for pointer, expected := range trigger.Match {
 		actual, ok := lookupPointer(document, pointer)
 		if !ok || actual != expected {
