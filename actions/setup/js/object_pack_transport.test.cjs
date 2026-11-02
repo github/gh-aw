@@ -105,6 +105,22 @@ describe("offline object-pack recovery", () => {
     expect(calls).toHaveBeenCalled();
   });
 
+  it("exports when the artifact directory and Git object database are on different filesystems", () => {
+    const original = childProcess.spawnSync;
+    const packs = [];
+    vi.spyOn(childProcess, "spawnSync").mockImplementation((command, args, options) => {
+      if (command === "git" && args.includes("pack-objects")) {
+        packs.push(args);
+        if (!args.includes("--stdout")) return { status: 128, stdout: "", stderr: "fatal: unable to rename temporary file: Invalid cross-device link" };
+      }
+      return original(command, args, options);
+    });
+    const { artifact } = packageObjects();
+    expect(packs).toHaveLength(1);
+    expect(isObjectPack(fs.readFileSync(artifact.bundlePath))).toBe(true);
+    expect(fs.readFileSync(artifact.patchPath, "utf8")).toContain("agent content");
+  });
+
   it.each(["full", "incremental"])("reconstructs %s output and retains binary files", async mode => {
     const { transport, paths } = packageObjects();
     const fetches = redirectTrustedFetch();

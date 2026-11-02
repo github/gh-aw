@@ -195,9 +195,13 @@ function createObjectPack(branch, repo, tip, options = {}) {
     directory = fs.mkdtempSync(path.join(path.dirname(patchPath), "object-pack-"));
     const ids = localObjects(cwd, tip, options);
     if (!ids.includes(tip)) throw new Error("Pinned commit is not available locally");
-    const packId = execLocalGitSync(["--no-replace-objects", "pack-objects", "--window=0", "--no-reuse-delta", "--no-reuse-object", path.join(directory, "objects")], { cwd, input: `${ids.join("\n")}\n`, maxBuffer: MAX_BUFFER }).trim();
-    if (!oidPattern.test(packId)) throw new Error("Invalid local pack identity");
-    const pack = fs.readFileSync(path.join(directory, `objects-${packId}.pack`));
+    // Git may stage named packs in its object database before renaming them.
+    // Stream instead so artifacts can live on a different filesystem; latin1
+    // preserves binary bytes through the string-returning Git helper.
+    const pack = Buffer.from(
+      execLocalGitSync(["--no-replace-objects", "pack-objects", "--stdout", "--window=0", "--no-reuse-delta", "--no-reuse-object"], { cwd, input: `${ids.join("\n")}\n`, encoding: "latin1", maxBuffer: MAX_BUFFER }),
+      "latin1"
+    );
     if (pack.length > MAX_BUFFER) throw new Error("Object-pack exceeds the transfer limit");
     const objectFormat = execLocalGitSync(["rev-parse", "--show-object-format"], { cwd }).trim();
     const { preview } = inspectObjectPack(pack, objectFormat);
