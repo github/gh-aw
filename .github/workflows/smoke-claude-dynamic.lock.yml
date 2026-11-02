@@ -1098,6 +1098,16 @@ jobs:
           GH_AW_SECRET_NAMES: 'ANTHROPIC_API_KEY,GITHUB_TOKEN'
           SECRET_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -1205,8 +1215,20 @@ jobs:
         name: Verify packaged Claude dynamic workflow evidence
         run: "node <<'NODE'\nconst assert = require(\"node:assert/strict\");\nconst { execFileSync } = require(\"node:child_process\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst { parseLogEntries } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\", \"log_parser_shared.cjs\"));\nconst { normalizeClaudeSession } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw\", \"actions\", \"claude_session.cjs\"));\nconst script = \".claude/workflows/smoke-claude-dynamic.js\";\nconst fixture = \".claude/workflows/references/smoke-claude-dynamic/.context\";\nfor (const file of [script, fixture]) {\n  assert.deepEqual(\n    fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, file)),\n    execFileSync(\"tar\", [\"-xOf\", \"/tmp/gh-aw/base/snapshot.tar\", \"--\", file]),\n    `${file} must match the trusted activation artifact`\n  );\n}\nconst result = JSON.parse(fs.readFileSync(\"/tmp/gh-aw/agent/claude-dynamic-smoke.json\", \"utf8\"));\nassert.deepEqual(result, {\n  status: \"PASS\",\n  workflow: \"smoke-claude-dynamic\",\n  token: \"gh-aw-claude-dynamic-fixture-v1\",\n  runId: process.env.SMOKE_RUN_ID\n}, \"The saved workflow must return the expected fixture and invocation arguments\");\nconst records = parseLogEntries(fs.readFileSync(\"/tmp/gh-aw/agent-stdio.log\", \"utf8\"));\nassert.ok(Array.isArray(records), \"Claude must produce a parseable native session log\");\nconst events = normalizeClaudeSession(records);\nconst launches = events.filter(event =>\n  event.type === \"tool.execution_start\" &&\n  event.data?.toolName === \"Workflow\" &&\n  event.data.input?.name === \"smoke-claude-dynamic\" &&\n  event.data.input.args?.runId === process.env.SMOKE_RUN_ID\n);\nassert.ok(launches.length > 0, \"Claude must invoke the saved script through the native Workflow tool\");\nassert.ok(launches.some(launch => events.some(event =>\n  event.type === \"tool.execution_complete\" &&\n  event.data?.toolCallId === launch.data.toolCallId &&\n  event.data.success === true\n)), \"The native Workflow tool must launch successfully\");\nassert.ok(launches.some(launch => records.some(record =>\n  record.type === \"system\" &&\n  record.subtype === \"task_notification\" &&\n  record.tool_use_id === launch.data.toolCallId &&\n  record.status === \"completed\"\n)), \"The launched dynamic workflow must complete successfully\");\nfs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,\n  \"## Claude dynamic workflow smoke: PASS\\n\\n\" +\n  \"Verified trusted activation packaging, recursive hidden-file restoration, \" +\n  \"native Workflow invocation, fixture contents, and run-ID argument propagation.\\n\");\nNODE"
 
-      - name: Upload agent artifacts
+      - name: Validate recovery envelopes before upload
+        id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/claude-debug.log","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
+      - name: Upload agent artifacts
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

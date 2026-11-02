@@ -535,6 +535,18 @@ or implementation refinement. JavaScript regressions exercise actual object
 bytes, binary bundles, exact baselines, Claim-scoped paths, exclusions, redaction
 rejection, and publisher policy enforcement.
 
+On 2026-11-02 UTC, a real TLC 1.8.0 run with the pinned jar digest and Java 21
+passed all 114 cases: 34 transport, 24 Git operations, 42 offline generation,
+and 14 deferred recovery. Secure profiles exhausted their reachable state graphs;
+negative controls and witnesses produced their exact expected invariants.
+This does not cover descriptor-relative staging races or the post-redaction
+artifact-upload guard, which require implementation regressions.
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
+  python3 specs/workflow-security/check_transport.py --model all
+```
+
 ## Runtime repository-list checkout
 
 [`RuntimeRepositoryCheckout.tla`](RuntimeRepositoryCheckout.tla) refines the

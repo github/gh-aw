@@ -305,6 +305,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 			targetPath: "agent/harness_retry.json",
 		})
 	}
+	generateRecoveryEnvelopeValidationStep(yaml, "validate_final_recovery_envelopes", data, c.getActionPin, recoveryArtifactScanRoots(artifactPaths)...)
 
 	// Generate single unified artifact upload with all collected paths.
 	// In workflow_call context, apply the per-invocation prefix to avoid name clashes.

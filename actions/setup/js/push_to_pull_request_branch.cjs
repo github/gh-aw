@@ -588,6 +588,7 @@ async function main(config = {}) {
     const transportPaths = resolveTransportPaths(message, itemRepo);
     transport.captureOptional(transportPaths.patchPath);
     transport.captureOptional(transportPaths.bundlePath);
+    const objectPackRecovery = {};
     if (transportPaths.bundlePath && isObjectPack(transport.read(transportPaths.bundlePath))) {
       const triggeringPR = context.payload?.pull_request;
       const aw = parseAwContext(context.payload?.inputs?.aw_context);
@@ -617,6 +618,7 @@ async function main(config = {}) {
           ? headGitHubToken || (expectedHeadRepo.toLowerCase() === itemRepo.toLowerCase() ? await recoveryToken(githubClient, config["github-token"]) : undefined)
           : await recoveryToken(githubClient, config["github-token"]),
         staged: isStaged,
+        manualRecovery: objectPackRecovery,
       });
       if (recovered && config.patch_format === "am") transportPaths.bundlePath = undefined;
       if (!compilationNotice) {
@@ -1048,6 +1050,7 @@ async function main(config = {}) {
       const runId = context.runId;
       const artifactFileName = hasBundleFile ? bundleFilePath.replace("/tmp/gh-aw/", "") : patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
       const applyInstructions = buildManualBranchApplyCommands({
+        objectPackRecovery,
         hasBundleFile,
         runId,
         artifactFileName,

@@ -530,27 +530,28 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const staged = isStagedMode({ ...config, ...toolConfig });
     traceObjectPack("queue-resolution", { pinned: !!tip, staged, incremental: options.mode === "incremental", eligible: !!tip && !staged });
     if (!tip || staged) return null;
+    let artifact;
     try {
-      const artifact = createObjectPack(entry.branch, repo, tip, options);
-      appendSafeOutputCounted(entry);
-      traceObjectPack("queued");
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              result: "queued",
-              recovery: "object-pack",
-              size: artifact.size,
-              details: "Local objects were packaged without fetching. The safe-outputs publisher must recover the trusted baseline and validate all policies before publishing; publication is not yet guaranteed.",
-            }),
-          },
-        ],
-      };
-    } catch (error) {
+      artifact = createObjectPack(entry.branch, repo, tip, options);
+    } catch {
       traceObjectPack("queue-failed");
-      return { isError: true, content: [{ type: "text", text: JSON.stringify({ result: "error", error: getErrorMessage(error) }) }] };
+      return null;
     }
+    appendSafeOutputCounted(entry);
+    traceObjectPack("queued");
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            result: "queued",
+            recovery: "object-pack",
+            size: artifact.size,
+            details: "Local objects were packaged without fetching. The safe-outputs publisher must recover the trusted baseline and validate all policies before publishing; publication is not yet guaranteed.",
+          }),
+        },
+      ],
+    };
   };
 
   /**

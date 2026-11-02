@@ -1425,6 +1425,16 @@ jobs:
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -1537,10 +1547,22 @@ jobs:
           if [ ! -f /tmp/gh-aw/agent_output.json ]; then
             echo '{"items":[]}' > /tmp/gh-aw/agent_output.json
           fi
+      - name: Validate recovery envelopes before upload
+        id: validate_final_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/claude-debug.log","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw/work-queue.finish.jsonl","/tmp/gh-aw/work-queue.intents.jsonl","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw/claims","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
       - name: Upload agent output fallback artifact
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1564,7 +1586,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -2910,8 +2932,18 @@ jobs:
           GH_AW_SECRET_NAMES: 'GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Safe Outputs Items
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
+      - name: Upload Safe Outputs Items
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safe-outputs-items
@@ -3058,9 +3090,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-0
@@ -3198,9 +3240,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-1
@@ -3338,9 +3390,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-10
@@ -3478,9 +3540,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-11
@@ -3618,9 +3690,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-12
@@ -3758,9 +3840,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-13
@@ -3898,9 +3990,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-14
@@ -4038,9 +4140,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-15
@@ -4178,9 +4290,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-2
@@ -4318,9 +4440,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-3
@@ -4458,9 +4590,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-4
@@ -4598,9 +4740,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-5
@@ -4738,9 +4890,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-6
@@ -4878,9 +5040,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-7
@@ -5018,9 +5190,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-8
@@ -5158,9 +5340,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload isolated Claim adapter preparation
         id: claim_adapter_artifact
-        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: work-queue-claim-adapter-persist_eslint_memory-9

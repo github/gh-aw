@@ -1334,6 +1334,16 @@ jobs:
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -1489,8 +1499,20 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { validateMemoryStep } = require(path.join(actionsDir, 'validate_memory_step.cjs'));
             validateMemoryStep(core, { kind: 'repo', formatJSON: process.env.FORMAT_JSON === 'true', requireValidationScript: process.env.VALIDATION_SCRIPT_REQUIRED === 'true' });
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_repo_default
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/repo-memory/default"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload repo-memory artifact (default)
-        if: always() && steps.check_repo_memory_baseline_64656661756c74.outputs.skip != 'true' && steps.filter_repo_memory_64656661756c74.outcome == 'success' && steps.validate_repo_memory_64656661756c74.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_recovery_repo_default.outcome == 'success' && steps.check_repo_memory_baseline_64656661756c74.outputs.skip != 'true' && steps.filter_repo_memory_64656661756c74.outcome == 'success' && steps.validate_repo_memory_64656661756c74.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: repo-memory-default
@@ -1500,8 +1522,20 @@ jobs:
       - name: Verify metrics collection produced fresh data
         run: "set -euo pipefail\nmemory_dir=\"/tmp/gh-aw/repo-memory/default\"\nlatest=\"${memory_dir}/metrics/latest.json\"\n\nif [ ! -f \"$latest\" ]; then\n  echo \"ERROR: ${latest} was not written. The agent finished without collecting any metrics.\"\n  exit 1\nfi\n\nif ! jq -e . \"$latest\" >/dev/null 2>&1; then\n  echo \"ERROR: ${latest} does not contain valid JSON.\"\n  exit 1\nfi\n\nnew_timestamp=\"$(jq -r '.timestamp // empty' \"$latest\")\"\nif [ -z \"$new_timestamp\" ]; then\n  echo \"ERROR: ${latest} has no 'timestamp' field.\"\n  exit 1\nfi\n\nbaseline_timestamp=\"\"\nif [ -f /tmp/gh-aw/metrics-collector/baseline-timestamp.txt ]; then\n  baseline_timestamp=\"$(cat /tmp/gh-aw/metrics-collector/baseline-timestamp.txt)\"\nfi\nif [ -n \"$baseline_timestamp\" ] && [ \"$new_timestamp\" = \"$baseline_timestamp\" ]; then\n  echo \"ERROR: metrics/latest.json timestamp is unchanged (${new_timestamp}). No new metrics were collected.\"\n  exit 1\nfi\n\nif ! new_epoch=\"$(date -u -d \"$new_timestamp\" +%s 2>/dev/null)\"; then\n  echo \"ERROR: metrics/latest.json timestamp '${new_timestamp}' is not a parseable ISO 8601 date.\"\n  exit 1\nfi\nnow_epoch=\"$(date -u +%s)\"\nage=$(( now_epoch - new_epoch ))\nmax_age_seconds=86400   # the collection window is 24h\nmax_skew_seconds=3600   # tolerance for clock skew on future-dated timestamps\nif [ \"$age\" -gt \"$max_age_seconds\" ] || [ \"$age\" -lt \"-${max_skew_seconds}\" ]; then\n  echo \"ERROR: metrics/latest.json timestamp '${new_timestamp}' is not from the current collection window.\"\n  exit 1\nfi\n\ndaily_count=\"$( { find \"${memory_dir}/metrics/daily\" -maxdepth 1 -name '*.json' -type f 2>/dev/null || true; } | wc -l)\"\nif [ \"$daily_count\" -eq 0 ]; then\n  echo \"ERROR: no daily metrics file was written under metrics/daily/.\"\n  exit 1\nfi\n\nworkflow_count=\"$(jq '.workflows | length' \"$latest\")\"\nif [ \"$workflow_count\" -eq 0 ]; then\n  echo \"ERROR: metrics/latest.json contains zero workflows. The collection loop did not run.\"\n  exit 1\nfi\n\necho \"Metrics collection verified: timestamp ${new_timestamp}, ${workflow_count} workflow(s), ${daily_count} daily file(s).\""
 
-      - name: Upload agent artifacts
+      - name: Validate recovery envelopes before upload
+        id: validate_final_recovery_envelopes
         if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-config/logs/","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
+      - name: Upload agent artifacts
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -8,6 +8,7 @@ const { ERR_SYSTEM } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isTransientError } = require("./error_recovery.cjs");
 const { buildGitAuthEnv } = require("./git_auth_env.cjs");
+const { withGuardedDirectory } = require("./symlink_guard.cjs");
 
 /**
  * Build GIT_CONFIG_* environment variables that inject an Authorization header
@@ -528,6 +529,8 @@ function execLocalGitSync(args, options = {}) {
  * Stage literal worktree paths as raw blobs without running Git conversions.
  * Filter discovery cannot secure git add against concurrent config changes;
  * hash-object --no-filters and update-index --index-info never run drivers.
+ * Snapshot reads require Linux descriptor-relative traversal and fail closed
+ * on unsupported platforms rather than trusting path revalidation.
  *
  * @param {string[]} files - Repository-relative literal paths, including deletions.
  * @param {import("child_process").SpawnSyncOptions & { cwd: string }} options
@@ -559,38 +562,38 @@ function stageRawGitFiles(files, options) {
       }
     }
     fullPath = path.join(options.cwd, file);
-    let stats;
+    let snapshot;
     try {
-      if (!missing) stats = fs.lstatSync(fullPath);
+      if (!missing) {
+        snapshot = withGuardedDirectory(path.dirname(fullPath), false, directory => {
+          // All ancestor descriptors remain pinned until the snapshot is read
+          // and verified, before any bytes enter the agent-readable object store.
+          const source = path.join(directory, path.basename(fullPath));
+          const stats = fs.lstatSync(source);
+          if (stats.isDirectory()) return;
+          if (stats.isSymbolicLink()) return { bytes: fs.readlinkSync(source, { encoding: "buffer" }), mode: "120000" };
+          if (!stats.isFile()) throw new Error("Unable to stage a non-file path");
+          const fd = fs.openSync(source, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+          try {
+            const openedStats = fs.fstatSync(fd);
+            if (!openedStats.isFile() || openedStats.dev !== stats.dev || openedStats.ino !== stats.ino) throw new Error("Unable to stage a file changed while opening");
+            return { bytes: fs.readFileSync(fd), mode: openedStats.mode & 0o111 ? "100755" : "100644" };
+          } finally {
+            fs.closeSync(fd);
+          }
+        });
+      }
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
-    if (!stats || stats.isDirectory()) {
+    if (!snapshot) {
       zeroOid ||= "0".repeat(execLocalGitSync(["hash-object", "--no-filters", "--stdin"], { ...options, input: Buffer.alloc(0) }).trim().length);
       // Remove old entries before additions for file/directory replacements.
       records.unshift(`0 ${zeroOid}\t${file}\0`);
       continue;
     }
-    let bytes;
-    let mode;
-    if (stats.isSymbolicLink()) {
-      bytes = fs.readlinkSync(fullPath, { encoding: "buffer" });
-      mode = "120000";
-    } else if (stats.isFile()) {
-      const fd = fs.openSync(fullPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-      try {
-        const openedStats = fs.fstatSync(fd);
-        if (!openedStats.isFile()) throw new Error("Unable to stage a non-regular file");
-        bytes = fs.readFileSync(fd);
-        mode = openedStats.mode & 0o111 ? "100755" : "100644";
-      } finally {
-        fs.closeSync(fd);
-      }
-    } else {
-      throw new Error("Unable to stage a non-file path");
-    }
-    const oid = execLocalGitSync(["hash-object", "-w", "--no-filters", "--stdin"], { ...options, input: bytes }).trim();
-    records.push(`${mode} ${oid}\t${file}\0`);
+    const oid = execLocalGitSync(["hash-object", "-w", "--no-filters", "--stdin"], { ...options, input: snapshot.bytes }).trim();
+    records.push(`${snapshot.mode} ${oid}\t${file}\0`);
   }
   if (records.length > 0) {
     execLocalGitSync(["update-index", "-z", "--index-info"], { ...options, input: records.join("") });

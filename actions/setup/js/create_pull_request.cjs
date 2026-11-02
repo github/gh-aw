@@ -961,6 +961,7 @@ async function main(config = {}) {
     // Determine the bundle file path from the message (set when patch-format: bundle is configured)
     const bundleFilePath = transportPaths.bundlePath;
     let recoveryPatchOnly = false;
+    const objectPackRecovery = {};
     if (bundleFilePath) {
       core.info(`Bundle file path: ${bundleFilePath}`);
     }
@@ -1179,6 +1180,7 @@ async function main(config = {}) {
           checkoutSha: itemRepo.toLowerCase() === `${context.repo?.owner}/${context.repo?.repo}`.toLowerCase() ? process.env.GITHUB_SHA : undefined,
           token: await recoveryToken(githubClient, config["github-token"]),
           staged: isStaged,
+          manualRecovery: objectPackRecovery,
         });
         recoveryPatchOnly = recovered && config.patch_format === "am";
       }
@@ -1940,6 +1942,7 @@ async function main(config = {}) {
 
                 const artifactFileName = bundleFilePath ? bundleFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.bundle";
                 const recoveryInstructions = buildManualBranchRecoveryCommands({
+                  objectPackRecovery,
                   hasBundleFile: true,
                   runId,
                   artifactFileName,
@@ -2306,6 +2309,7 @@ async function main(config = {}) {
 
                 const patchFileName = patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
                 const recoveryInstructions = buildManualBranchRecoveryCommands({
+                  objectPackRecovery,
                   hasBundleFile: false,
                   runId,
                   artifactFileName: patchFileName,
@@ -2489,6 +2493,7 @@ async function main(config = {}) {
           const runId = context.runId;
           const artifactFileName = hasBundleFile ? bundleFilePath.replace("/tmp/gh-aw/", "") : patchFilePath ? patchFilePath.replace("/tmp/gh-aw/", "") : "aw-unknown.patch";
           const applyInstructions = buildManualBranchRecoveryCommands({
+            objectPackRecovery,
             hasBundleFile,
             runId,
             artifactFileName,

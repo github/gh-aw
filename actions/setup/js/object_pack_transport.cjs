@@ -371,6 +371,17 @@ async function recoverObjectPackChecked(transport, paths, options) {
     const renamed = header.replace(sourceRef, (_, oid) => `${oid} refs/heads/${publishBranch}`);
     transport.transform(paths.patchPath, () => fs.readFileSync(patch.patchPath));
     transport.transform(paths.bundlePath, () => Buffer.concat([Buffer.from(renamed), bundleBytes.subarray(headerEnd)]));
+    if (options.manualRecovery) {
+      Object.assign(options.manualRecovery, {
+        identity: {
+          tip: metadata.tip,
+          baseline: base,
+          remote,
+          artifactFileName: paths.bundlePath.replace("/tmp/gh-aw/", ""),
+          excludedFiles: generationOptions.excludedFiles,
+        },
+      });
+    }
     options.message.base_commit = patch.baseCommit;
     if (typeof patch.diffSize === "number") options.message.diff_size = patch.diffSize;
     traceObjectPack("recovery-ready");
@@ -382,4 +393,4 @@ async function recoverObjectPackChecked(transport, paths, options) {
   }
 }
 
-module.exports = { createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken, traceObjectPack };
+module.exports = { createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken, traceObjectPack, inspectObjectPack };

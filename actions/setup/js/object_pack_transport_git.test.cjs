@@ -15,6 +15,7 @@ const { generateGitPatch } = require("./generate_git_patch.cjs");
 const { generateGitBundle } = require("./generate_git_bundle.cjs");
 const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { createHandlers } = require("./safe_outputs_handlers.cjs");
+const { buildManualBranchRecoveryCommands, buildManualBranchApplyCommands } = require("./create_pull_request_helpers.cjs");
 
 describe("object-pack packaging and application with real Git", { timeout: 60000 }, () => {
   let root, author, agent, remote, destination, repoSlug, branch, publishBranch, baseline, tip, expectedTree;
@@ -575,6 +576,64 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     await apply(transport, paths, "bundle");
     expect(fs.existsSync(path.join(destination, "concurrent.txt"))).toBe(false);
     expect(git(remote, ["rev-parse", `refs/heads/${branch}`])).toBe(concurrent);
+  });
+
+  it.each(["bundle", "am"])("ignores an unrelated depth-one PR merge when recovering incremental %s output", async format => {
+    fixture();
+    git(author, ["checkout", "-qb", "merge-fixture", baseline]);
+    write(author, "base-side.txt", "not present in trusted PR-head ancestry\n");
+    const baseSide = commit(author, "base-side parent");
+    git(author, ["merge", "--no-ff", "-m", "synthetic PR merge", branch]);
+    const merge = git(author, ["rev-parse", "HEAD"]);
+    agent = path.join(root, "merge-checkout");
+    clone(author, agent, ["--single-branch", "--branch", "merge-fixture", "--depth=1"]);
+    expect(git(agent, ["rev-parse", "HEAD"])).toBe(merge);
+    expect(runGit(agent, ["cat-file", "-e", baseSide]).exitCode).not.toBe(0);
+    expect(runGit(remote, ["cat-file", "-e", baseSide]).exitCode).not.toBe(0);
+    git(agent, ["fetch", "-q", "--depth=2", `file://${author}`, `${branch}:refs/heads/${branch}`], { online: true });
+    git(agent, ["fetch", "-q", "--depth=1", `file://${remote}`, `${baseline}:refs/remotes/origin/pr-head`], { online: true });
+    vi.stubEnv("GITHUB_WORKSPACE", agent);
+    vi.stubEnv("GITHUB_SHA", merge);
+    const before = state(agent);
+    const { paths, transport } = packageObjects();
+    expect(fs.readFileSync(paths.patchPath, "utf8")).not.toContain(`Object ${merge} commit`);
+    const fetches = redirectRecoveryFetch();
+    await recoverObjectPack(transport, paths, options("incremental"));
+    expect(fetches[0].options.input).toContain(`${baseline}:refs/heads/recovery-base`);
+    await apply(transport, paths, format);
+    expect(state(agent)).toEqual(before);
+  });
+
+  it.each(["create", "apply"])("executes %s fallback commands against the original immutable envelope", async operation => {
+    fixture();
+    write(agent, "excluded/private.txt", "not in the configured output\n");
+    tip = commit(agent, "excluded work");
+    const filteredTree = git(author, ["rev-parse", "HEAD^{tree}"]);
+    const { paths, transport } = packageObjects();
+    const originals = { patch: fs.readFileSync(paths.patchPath), bundle: fs.readFileSync(paths.bundlePath) };
+    const objectPackRecovery = {};
+    redirectRecoveryFetch();
+    await recoverObjectPack(transport, paths, options("incremental", { config: { excluded_files: ["excluded/**"] }, manualRecovery: objectPackRecovery }));
+    expect(objectPackRecovery).toMatchObject({ identity: { tip, baseline, excludedFiles: ["excluded/**"] } });
+    const build = operation === "create" ? buildManualBranchRecoveryCommands : buildManualBranchApplyCommands;
+    const commands = build({ hasBundleFile: false, runId: "123", artifactFileName: "wrong-preview.patch", branchName: publishBranch, objectPackRecovery });
+    expect(commands).not.toContain("git am");
+    expect(commands).not.toContain("git bundle list-heads");
+    const downloaded = path.join(destination, ".gh-aw-manual-123", objectPackRecovery.identity.artifactFileName);
+    fs.mkdirSync(path.dirname(downloaded), { recursive: true });
+    fs.writeFileSync(downloaded, originals.bundle);
+    fs.writeFileSync(downloaded.replace(/\.bundle$/, ".patch"), originals.patch);
+    fs.mkdirSync(path.join(destination, ".git/info"), { recursive: true });
+    fs.appendFileSync(path.join(destination, ".git/info/exclude"), "\n.gh-aw-manual-123/\n");
+    git(remote, ["update-ref", `refs/heads/${publishBranch}`, baseline]);
+    vi.restoreAllMocks();
+    const script = commands.replace(/^gh run download .*$/m, ": # already downloaded").replaceAll(objectPackRecovery.identity.remote, `file://${remote}`);
+    const result = childProcess.spawnSync("sh", ["-c", script], { cwd: destination, encoding: "utf8", env: { ...process.env, GIT_ALLOW_PROTOCOL: "file", GIT_NO_LAZY_FETCH: "1" } });
+    expect(result.status, result.stderr).toBe(0);
+    expect(git(destination, ["rev-parse", "HEAD^{tree}"])).toBe(filteredTree);
+    if (operation === "apply") expect(git(remote, ["rev-parse", `refs/heads/${publishBranch}`])).toBe(git(destination, ["rev-parse", "HEAD"]));
+    expect(fs.readFileSync(paths.patchPath)).toEqual(originals.patch);
+    expect(fs.readFileSync(paths.bundlePath)).toEqual(originals.bundle);
   });
 
   it("exports the pinned tip even after the agent moves its named branch", async () => {

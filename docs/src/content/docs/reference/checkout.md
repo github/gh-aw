@@ -290,6 +290,8 @@ helpers and partial-clone lazy fetches, are disabled during artifact generation.
 Repository-configured external diffs, text conversion, hooks, fsmonitor, and
 signing are also disabled. Filtered artifacts are synthesized from committed
 objects with index-only plumbing, without checkout or clean/smudge filters.
+Raw repo-memory staging pins parent-directory descriptors before reading files;
+it requires Linux descriptor-relative paths and fails closed on other platforms.
 Prepare the required refs with `checkout.fetch` and sufficient history with
 `checkout.fetch-depth` before agent execution; partial clones must also have the
 required blobs locally. Incremental updates require the pre-agent PR-head baseline
@@ -317,6 +319,9 @@ reduce transfer size but never authorize a publisher baseline or a remote
 request. The 100,000-object and 64 MiB uncompressed limits apply to the selected
 objects, not the entire monorepo. The existing patch artifact previews every
 packed object. Recovery rejects redacted or mismatched previews.
+After redaction and before upload, the artifact guard also blocks recovery
+envelopes whose paired previews changed or disappeared. Publisher rejection
+alone cannot protect bytes already available in a downloadable artifact.
 
 The trusted publisher starts with a depth-one, treeless fetch of the authorized
 baseline. If required commit ancestry is absent, it increases depth geometrically
@@ -344,6 +349,11 @@ require checkout provisioning. Full recovery uses the authorized base branch and
 preserves the trusted dispatch-SHA baseline for same-repository feature runs.
 Publisher credentials must authorize the fetched repository independently of any
 credentials previously used by `actions/checkout`.
+
+Fallback issues keep the original object-pack uploads immutable. Their recovery
+commands require a clean, complete clone and reconstruct a binary patch from the
+publisher-resolved baseline and tip, retaining configured exclusions. Object-pack
+envelopes and previews cannot be applied directly with `git fetch` or `git am`.
 
 GitHub Actions debug logging includes `[object_pack_transport]` resolution
 stages, decision booleans, and object/byte counts. These traces omit repository

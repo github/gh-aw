@@ -1204,6 +1204,16 @@ jobs:
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -1313,10 +1323,22 @@ jobs:
         with:
           script: "const assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst root = \"/tmp/gh-aw\";\nconst worker = \"marker-worker\";\nconst marker = \"GH-AW-CLAUDE-SUBAGENT-MARKER-7F3A\";\nconst { writeUnifiedSession } = require(path.join(process.env.RUNNER_TEMP, \"gh-aw/actions/unified_session.cjs\"));\nwriteUnifiedSession({ rootDir: root, engine: \"claude\" });\nconst readJsonl = file => fs.readFileSync(file, \"utf8\").split(\"\\n\")\n  .filter(line => line.trim().startsWith(\"{\"))\n  .flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });\nassert.equal(process.env.SMOKE_EXECUTION, \"success\", \"Claude execution failed\");\nconst events = readJsonl(path.join(root, \"usage/aw_session.jsonl\"));\nconst stream = readJsonl(path.join(root, \"agent-stdio.log\"));\n\n// Pre-start resolution of the declared `model: small` worker.\nconst resolution = events.find(event => event.type === \"model.resolution\" && event.data?.engine === \"claude\" && event.data?.role === worker);\nassert.ok(resolution, `${worker} has no model.resolution record`);\nassert.ok([\"resolved\", \"exact\"].includes(resolution.data.status), `${worker} model resolution ${resolution.data.status}`);\nassert.equal(resolution.data.configured_model, \"small\", `${worker} must declare model: small`);\nconst model = resolution.data.resolved_model;\nassert.ok(model && model !== \"small\", `${worker} has no resolved model`);\n\n// The generated definition Claude Code loads carries the identity and the concrete id.\nconst definition = fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, \".claude/agents\", `${worker}.md`), \"utf8\");\nassert.match(definition, new RegExp(`^name:\\\\s*\"?${worker}\"?\\\\s*$`, \"m\"), `${worker} definition has no native name`);\nassert.ok(definition.includes(`model: ${JSON.stringify(model)}`), `${worker} definition does not carry ${model}`);\n\n// Native initialization registered the worker.\nconst init = stream.find(record => record.type === \"system\" && record.subtype === \"init\");\nassert.ok(init?.agents?.includes(worker), `native initialization did not register ${worker}: ${JSON.stringify(init?.agents)}`);\n\n// The first agent action delegates to the worker, and that delegation succeeds.\nconst toolUses = stream.filter(record => record.type === \"assistant\" && !record.parent_tool_use_id)\n  .flatMap(record => record.message?.content || []).filter(item => item.type === \"tool_use\");\nconst first = toolUses[0];\nassert.ok(first && [\"Agent\", \"Task\"].includes(first.name) && first.input?.subagent_type === worker, `first agent action must invoke ${worker}: ${JSON.stringify(first && { name: first.name, input: first.input })}`);\nconst result = stream.filter(record => record.type === \"user\").flatMap(record => record.message?.content || [])\n  .find(item => item.type === \"tool_result\" && item.tool_use_id === first.id);\nassert.ok(result && !result.is_error, `${worker} delegation failed: ${JSON.stringify(result?.content)}`);\nassert.ok(JSON.stringify(result.content).includes(marker), `${worker} did not return the marker`);\n\n// The started sub-agent is the worker on the resolved model, with no built-in fallback.\nconst started = events.filter(event => event.type === \"subagent.started\");\nassert.ok(!started.some(event => event.data?.agentType === \"general-purpose\" || event.data?.agentName === \"general-purpose\"), \"fell back to general-purpose\");\nconst invocation = started.find(event => event.data?.toolCallId === first.id);\nassert.ok(invocation && (invocation.data.agentName === worker || invocation.data.agentType === worker), `subagent.started does not name ${worker}`);\nconst activity = events.filter(event => event.agentId === invocation.agentId);\nconst configured = activity.filter(event => event.type === \"subagent.configured\");\nassert.ok(configured.length > 0 && configured.every(event => event.data?.model === model), `${worker} was not configured on ${model}: ${JSON.stringify(configured.map(event => event.data?.model))}`);\nassert.ok(activity.some(event => event.type === \"subagent.completed\"), `${worker} did not complete`);\nassert.ok(!activity.some(event => event.type === \"subagent.failed\"), `${worker} failed`);\n\n// Served-model evidence comes from the proxy. Claude Code's stream does not include the\n// worker's own assistant messages, only its prompt. Detection and routing are off in this\n// smoke, so a request on the resolved model can only come from the worker, as long as the\n// main agent never used that model.\nconst mainModels = stream.filter(record => record.type === \"assistant\" && !record.parent_tool_use_id).map(record => record.message?.model);\nassert.ok(!mainModels.includes(model), `main agent also used ${model}; served-model evidence is ambiguous`);\nconst proxyPaths = [\n  \"sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl\",\n  \"sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl\",\n  \"sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl\",\n];\nconst proxyFile = proxyPaths.map(file => path.join(root, file)).find(file => fs.existsSync(file));\nassert.ok(proxyFile, \"Missing api-proxy token usage evidence\");\nconst onModel = readJsonl(proxyFile).filter(request => request.model === model);\nassert.ok(onModel.length > 0, `${worker}: the proxy served no request on ${model}`);\n// token-usage.jsonl records only 2xx responses; AWF writes failed requests to the sibling\n// upstream-errors.jsonl, which exists only when a request failed.\nconst errorFile = path.join(path.dirname(proxyFile), \"upstream-errors.jsonl\");\nconst failed = fs.existsSync(errorFile) ? readJsonl(errorFile).filter(record => record.model === model) : [];\nassert.equal(failed.length, 0, `${worker}: a request on ${model} failed: ${JSON.stringify(failed.map(record => record.status))}`);"
 
+      - name: Validate recovery envelopes before upload
+        id: validate_final_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/claude-debug.log","/tmp/gh-aw/redacted-urls.log","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent/model-resolution.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
       - name: Upload agent output fallback artifact
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1340,7 +1362,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

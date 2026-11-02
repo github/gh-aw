@@ -5,12 +5,14 @@ import fs from "fs";
 import path from "path";
 import { execLocalGitSync, stageRawGitFiles } from "./git_helpers.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
+import { simulateLinuxDescriptors } from "./test_linux_descriptors.mjs";
 
 describe("raw local Git staging", () => {
   let root;
   let repo;
   let originalEnv;
   let originalCore;
+  let restoreDescriptors;
 
   function git(args, input) {
     return childProcess.execFileSync("git", args, { cwd: repo, input, encoding: "utf8", stdio: "pipe", maxBuffer: 100 * 1024 * 1024 });
@@ -29,10 +31,13 @@ describe("raw local Git staging", () => {
     git(["config", "user.name", "Test"]);
     git(["config", "user.email", "test@example.com"]);
     git(["commit", "--allow-empty", "-m", "base"]);
+    restoreDescriptors = simulateLinuxDescriptors(vi);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    restoreDescriptors?.();
+    vi.unstubAllGlobals();
     process.env = originalEnv;
     global.core = originalCore;
     fs.rmSync(root, { recursive: true, force: true });
@@ -90,6 +95,80 @@ describe("raw local Git staging", () => {
       expect(() => stageRawGitFiles([file], { cwd: repo })).toThrow();
     }
     expect(git(["ls-files"])).toBe("");
+  });
+
+  it.each(["darwin", "win32"])("fails closed on %s without importing file contents", platform => {
+    fs.writeFileSync(path.join(repo, "notes.md"), "allowed memory");
+    const oid = git(["hash-object", "--no-filters", "--stdin"], "allowed memory").trim();
+    vi.stubGlobal("process", new Proxy(process, { get: (target, key) => (key === "platform" ? platform : Reflect.get(target, key)) }));
+
+    expect(() => stageRawGitFiles(["notes.md"], { cwd: repo })).toThrow("requires Linux descriptor-relative paths");
+
+    expect(git(["ls-files"])).toBe("");
+    expect(() => git(["cat-file", "-e", oid])).toThrow();
+  });
+
+  it("rejects a parent replaced with a symlink after the initial parent check", () => {
+    const parent = path.join(repo, "memory");
+    const outside = path.join(root, "outside");
+    fs.mkdirSync(parent);
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(parent, "notes.md"), "allowed memory");
+    fs.writeFileSync(path.join(outside, "notes.md"), "outside secret");
+    const secretOid = git(["hash-object", "--no-filters", "--stdin"], "outside secret").trim();
+    const lstat = fs.lstatSync;
+    let replaced = false;
+    vi.spyOn(fs, "lstatSync").mockImplementation((filename, ...args) => {
+      const result = lstat(filename, ...args);
+      if (!replaced && filename === parent) {
+        replaced = true;
+        fs.renameSync(parent, `${parent}-original`);
+        fs.symlinkSync(outside, parent);
+      }
+      return result;
+    });
+
+    expect(() => stageRawGitFiles(["memory/notes.md"], { cwd: repo })).toThrow();
+
+    expect(replaced).toBe(true);
+    expect(git(["ls-files"])).toBe("");
+    expect(() => git(["cat-file", "-e", secretOid])).toThrow();
+  });
+
+  it.each([false, true])("pins parents when replaced during file open (restored: %s)", restore => {
+    const parent = path.join(repo, "memory");
+    const outside = path.join(root, "outside");
+    fs.mkdirSync(parent);
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(parent, "notes.md"), "allowed memory");
+    fs.writeFileSync(path.join(outside, "notes.md"), "outside secret");
+    const secretOid = git(["hash-object", "--no-filters", "--stdin"], "outside secret").trim();
+    const open = fs.openSync;
+    let replaced = false;
+    vi.spyOn(fs, "openSync").mockImplementation((filename, ...args) => {
+      if (!replaced && typeof filename === "string" && /^\/proc\/self\/fd\/\d+\/notes\.md$/.test(filename)) {
+        replaced = true;
+        fs.renameSync(parent, `${parent}-original`);
+        fs.symlinkSync(outside, parent);
+        const fd = open(filename, ...args);
+        if (restore) {
+          fs.unlinkSync(parent);
+          fs.renameSync(`${parent}-original`, parent);
+        }
+        return fd;
+      }
+      return open(filename, ...args);
+    });
+
+    if (restore) {
+      stageRawGitFiles(["memory/notes.md"], { cwd: repo });
+      expect(git(["show", ":memory/notes.md"])).toBe("allowed memory");
+    } else {
+      expect(() => stageRawGitFiles(["memory/notes.md"], { cwd: repo })).toThrow();
+      expect(git(["ls-files"])).toBe("");
+    }
+    expect(replaced).toBe(true);
+    expect(() => git(["cat-file", "-e", secretOid])).toThrow();
   });
 
   it("keeps handler staging conversion-free when a new driver appears after every config probe", () => {

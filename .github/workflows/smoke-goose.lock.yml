@@ -1629,6 +1629,16 @@ jobs:
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -1753,9 +1763,21 @@ jobs:
         env:
           GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_cache_memory_git_integrity.sh"
+      - name: Validate recovery envelopes before upload
+        id: validate_recovery_cache_default
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/cache-memory"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       - name: Upload cache-memory data as artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_recovery_cache_default.outcome == 'success'
         with:
           name: cache-memory
           include-hidden-files: true
@@ -1772,10 +1794,22 @@ jobs:
         with:
           script: "const assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst path = require(\"node:path\");\nconst read = file => {\n  const stat = fs.lstatSync(file);\n  assert.ok(stat.isFile() && !stat.isSymbolicLink(), \"Smoke evidence must be a regular file\");\n  assert.ok(stat.size <= 16384, \"Smoke evidence exceeds 16 KiB\");\n  return fs.readFileSync(file, \"utf8\");\n};\nassert.equal(process.env.SMOKE_EXECUTION, \"success\", \"Goose execution failed\");\nconst root = process.env.SMOKE_ROOT;\nconst run = process.env.SMOKE_RUN_ID;\nconst result = JSON.parse(read(path.join(root, `smoke-test-goose-${run}.json`)));\nassert.deepEqual(Object.keys(result).sort(), [\"bash\", \"build\", \"fileWrite\", \"pullRequests\", \"runtime\", \"webFetch\"]);\nfor (const key of [\"bash\", \"build\", \"fileWrite\", \"runtime\", \"webFetch\"]) {\n  assert.equal(result[key], true, `Goose smoke check ${key} did not pass`);\n}\nassert.equal(result.pullRequests.length, 2, \"Exactly two merged PRs are required\");\nassert.equal(new Set(result.pullRequests.map(pr => pr.number)).size, 2, \"PRs must be distinct\");\nfor (const pr of result.pullRequests) {\n  assert.deepEqual(Object.keys(pr).sort(), [\"number\", \"title\"]);\n  assert.ok(Number.isSafeInteger(pr.number) && pr.number > 0);\n  const { data } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });\n  assert.ok(data.merged_at, `PR ${pr.number} is not merged`);\n  assert.equal(pr.title, data.title);\n}\nassert.deepEqual(JSON.parse(read(path.join(process.env.SMOKE_STATE, \"web-fetch.json\"))), { containsGitHub: true });\nassert.match(read(path.join(root, `smoke-test-goose-${run}.txt`)), /^Smoke test passed for Goose at .+\\n?$/);\nconst binary = fs.lstatSync(path.join(process.env.GITHUB_WORKSPACE, \"gh-aw\"));\nassert.ok(binary.isFile() && !binary.isSymbolicLink() && (binary.mode & 0o111) !== 0, \"gh-aw build output is missing\");\nconst log = fs.readFileSync(\"/tmp/gh-aw/agent-stdio.log\", \"utf8\");\nassert.ok(log.includes(\"[goose-harness] verified Goose 1.54.0\"), \"Pinned CLI verification is missing\");\nassert.ok(!log.includes(\"Failed to start extension\"), \"A Goose MCP extension failed to connect\");\nconst events = log.split(\"\\n\").filter(line => line.trim().startsWith(\"{\")).map(line => JSON.parse(line));\nassert.ok(events.some(event => event.type === \"complete\"), \"Goose did not finish a structured run\");\nconst requests = events.flatMap(event => event.message?.content || []).filter(item =>\n  item.type === \"toolRequest\" && item.toolCall?.status === \"success\" && item.toolCall.value.name.startsWith(\"github__\"));\nconst responses = events.flatMap(event => event.message?.content || []).filter(item =>\n  item.type === \"toolResponse\" && item.toolResult?.status === \"success\" && item.toolResult.value.isError !== true);\nassert.ok(requests.some(request => responses.some(response => response.id === request.id)), \"No successful native GitHub MCP round-trip\");\nconst session = fs.readFileSync(\"/tmp/gh-aw/agent-session.jsonl\", \"utf8\").trim().split(\"\\n\").map(line => JSON.parse(line));\nassert.ok(session.every(event => event.type.includes(\".\") && event.data && typeof event.data === \"object\"), \"Goose session contains non-canonical events\");\nassert.ok(session.some(event => event.type === \"session.init\" && event.data.sourceEngine === \"goose\"), \"Goose session initialization is missing\");\nassert.ok(session.some(event => event.type === \"assistant.message\" && typeof event.data.content === \"string\"), \"Goose assistant text is missing\");\nconst starts = session.filter(event => event.type === \"tool.execution_start\");\nconst completions = session.filter(event => event.type === \"tool.execution_complete\");\nassert.ok(starts.length > 0 && completions.length > 0, \"Goose tool events are missing\");\nassert.equal(new Set(starts.map(event => event.data.toolCallId)).size, starts.length, \"Goose tool starts are duplicated\");\nfor (const event of completions) {\n  assert.ok(starts.some(start => start.data.toolCallId === event.data.toolCallId), \"Goose tool completion has no matching start\");\n}\nconst native = events.findLast(event => event.type === \"complete\");\nconst parsed = session.findLast(event => event.type === \"session.result\").data;\nassert.equal(parsed.status, \"completed\", \"Goose session result is not complete\");\nfor (const key of [\"input_tokens\", \"output_tokens\", \"total_tokens\", \"cache_read_input_tokens\"]) {\n  if (native[key] !== undefined) assert.equal(parsed.usage[key], native[key], `Goose session ${key} differs from native usage`);\n}\nif (native.cache_write_input_tokens !== undefined) assert.equal(parsed.usage.cache_creation_input_tokens, native.cache_write_input_tokens);\nassert.equal(parsed.usage.input_tokens_include_cache, true);\nassert.ok(session.some(event => event.type === \"agent.execution\" && event.data.exitCode === 0), \"Goose execution result is missing\");\nawait core.summary.addHeading(\"Goose smoke: PASS\", 2).addRaw(\"All six checks passed with host-verified file, build, web-fetch, PR, native MCP, and canonical unified-session evidence.\\n\").write();"
 
+      - name: Validate recovery envelopes before upload
+        id: validate_final_recovery_envelopes
+        if: always() && steps.redact_secrets.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '["/tmp/gh-aw/aw-prompts/prompt.txt","/tmp/gh-aw/agent_execution.json","/tmp/gh-aw/agent_execution_exit_code.txt","/tmp/gh-aw/agent-session.jsonl","/tmp/gh-aw/agent-errors.jsonl","/tmp/gh-aw/aw-prompts/user.txt","/tmp/gh-aw/aw-prompts/system.txt","/tmp/gh-aw/skill_inventory.json","/tmp/gh-aw/mcp-logs/","/tmp/gh-aw/mcp-scripts/logs/","/tmp/gh-aw/agent_usage.json","/tmp/gh-aw/agent-stdio.log","/tmp/gh-aw/agent/harness_retry.json","/tmp/gh-aw/pre-agent-audit.txt","/tmp/gh-aw/github_rate_limits.jsonl","/tmp/gh-aw/otel.jsonl","/tmp/gh-aw/otlp-export-errors.jsonl","/tmp/gh-aw/safeoutputs.jsonl","/tmp/gh-aw/agent_output.json","/tmp/gh-aw","/tmp/gh-aw","/tmp/gh-aw/awf-config.json","/tmp/gh-aw/awf-resolved-config.json","/tmp/gh-aw/sandbox/firewall/logs/","/tmp/gh-aw/sandbox/firewall/audit/","/tmp/gh-aw/sandbox/firewall/awf-reflect.json"]'
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { main } = require(path.join(actionsDir, 'validate_recovery_envelopes.cjs'));
+            main({ core });
       # Small dedicated copy of the agent output so safe-output processing
       # survives a failed or timed-out upload of the larger agent artifact
       - name: Upload agent output fallback artifact
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -1799,7 +1833,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}
       - name: Upload agent artifacts
-        if: always() && steps.redact_secrets.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
