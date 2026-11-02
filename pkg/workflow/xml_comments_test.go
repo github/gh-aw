@@ -324,7 +324,7 @@ This is a normal-sized workflow that should compile successfully.`
 	}
 
 	// Test that oversized content now compiles successfully with chunking
-	// Note: Add imports to trigger inlining (runtime-import is only used for workflows without imports)
+	// Include a fragment import alongside the oversized author source.
 	longContent := "---\n" +
 		"on:\n" +
 		"  issues:\n" +
@@ -368,7 +368,7 @@ This is a normal-sized workflow that should compile successfully.`
 		t.Fatalf("Failed to read generated normal lock file: %v", err)
 	}
 
-	// Verify that the generated lock file contains multiple prompt steps
+	// Read the lock file for the oversized workflow.
 	lockFile := filepath.Join(tmpDir, "long-workflow.lock.yml")
 	lockContent, err := os.ReadFile(lockFile)
 	if err != nil {
@@ -383,16 +383,20 @@ This is a normal-sized workflow that should compile successfully.`
 		t.Error("Expected 'Create prompt with built-in context' step in generated workflow")
 	}
 
-	// Normal workflow (no imports) should use runtime-import
-	if !strings.Contains(normalLockString, "{{#runtime-import") {
-		t.Error("Normal workflow without imports should use runtime-import")
+	if !strings.Contains(promptRenderPlan(t, normalLockString), "{{#author-prompt normal-workflow.md}}") {
+		t.Error("Normal workflow should load its main source with author capabilities")
+	}
+	if strings.Contains(normalLockString, "{{#runtime-import normal-workflow.md}}") {
+		t.Error("Normal workflow main source must not be loaded as a restricted runtime fragment")
+	}
+	if !strings.Contains(promptRenderPlan(t, lockString), "{{#author-prompt long-workflow.md}}") {
+		t.Error("Long workflow should load its main source with author capabilities")
+	}
+	if !strings.Contains(lockString, "{{#runtime-import shared/dummy.md}}") {
+		t.Error("Long workflow should load its imported fragment with runtime-import restrictions")
 	}
 
-	// Long workflow (with imports) should be inlined into a single consolidated heredoc block.
-	// The compiler groups all user prompt chunks into the same heredoc to minimise the number
-	// of delimiter lines that change in the diff when content changes.
-	// Verify this by checking that the long workflow's run section is larger than the normal
-	// workflow's (which uses a compact runtime-import macro instead of inlining the full text).
+	// The additional fragment import makes the long workflow's render plan larger.
 	if len(lockString) <= len(normalLockString) {
 		t.Errorf("Expected long workflow lock file to be larger than normal (normal=%d bytes, long=%d bytes)", len(normalLockString), len(lockString))
 	}
