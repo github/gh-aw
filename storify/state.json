@@ -1,33 +1,33 @@
 {
-  "last_run_date": "2026-11-01",
+  "last_run_date": "2026-11-02",
   "last_window": {
-    "start": "2026-10-31T07:56:26Z",
-    "end": "2026-11-01T07:56:26Z"
+    "start": "2026-11-01T07:57:15Z",
+    "end": "2026-11-02T07:57:15Z"
   },
   "observed_window": {
-    "coverage": "605 distinct prefetched plus continuation runs; continuation returned no further cursor; first observed run in continuation at 08:05:37 UTC",
+    "coverage": "Partial: saved metadata begins 2026-11-01 19:46:59 UTC; detailed failure synthesis covers 2026-11-02 03:37:59 to 07:52:52 UTC; continuation did not complete",
     "representative_audits": [
-      41269711804,
-      41255576901,
-      41189147646,
-      41256886716,
-      41281651199,
-      41262184930
+      41384361790,
+      41402196393,
+      41390149166,
+      41401497789,
+      41402208964,
+      41407484295
     ]
   },
   "key_themes": [
-    "Publication-boundary failures continued across PR Sous Chef, Smoke Project, and ESLint Refiner",
-    "Human review drove revisions on open safe-output Git PR 73672",
-    "Work-queue and Pi smoke runs exposed distinct failure boundaries"
+    "Publication-boundary failures recurred in PR Sous Chef, ESLint Miner and Daily Container Image Security Scan",
+    "Human review drove further commits on open PR 73672",
+    "Runtime and publisher failures had distinct boundaries"
   ],
   "carry_forward_questions": [
-    "What causes Process Safe Outputs failures, and do all three workflows recover?",
-    "Does PR 73672 merge, and is its deployed behavior validated?",
-    "Do Pi smoke variants recover after the observed CLI failures?"
+    "Do the three Process Safe Outputs workflows recover on main?",
+    "Does PR 73672 merge and pass post-merge validation?",
+    "Do asset upload and essential issue publisher failures recur?"
   ],
   "representative_runs": [
-    41285731195,
-    41269711804,
-    41262184930
+    41384361790,
+    41407484295,
+    41390149166
   ]
 }
