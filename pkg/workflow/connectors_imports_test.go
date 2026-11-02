@@ -135,7 +135,7 @@ func TestConnectorImportWithoutParameters(t *testing.T) {
 
 func TestConnectorSelfContainedMarkdownExample(t *testing.T) {
 	c, root := connectorCompiler(t)
-	wrapper, err := os.ReadFile("../../.github/aw/connectors/example.md")
+	wrapper, err := os.ReadFile("testdata/connector-imports/connector.md")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(root, "connector.md"), wrapper, 0600))
 	require.NoError(t, os.Remove(filepath.Join(root, "spec.yaml")))

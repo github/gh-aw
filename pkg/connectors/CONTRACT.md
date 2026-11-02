@@ -10,14 +10,14 @@ Consumers reuse normal `imports` / `uses` / `with` syntax:
 
 ```yaml
 imports:
-  - uses: .github/aw/connectors/example.md
+  - uses: .github/aw/connectors/linear.md
     with:
-      issue: ISSUE-1
+      reader-secret: APPROVED_LINEAR_READ_KEY
 on: workflow_dispatch
 tools:
-  tracker: [get-issue]
+  linear: [get-issue]
 safe-outputs:
-  tracker-add-comment:
+  linear-add-comment:
 ```
 
 Declarations use AW capability sections and `triggers` for event definitions. Capability maps define APIs;

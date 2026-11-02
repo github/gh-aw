@@ -21,7 +21,7 @@ const awConnectorHeader = "---\non: workflow_dispatch\nengine: copilot\npermissi
 
 func awConnectorSource(t *testing.T) string {
 	t.Helper()
-	data, err := os.ReadFile("../../.github/aw/connectors/example.md")
+	data, err := os.ReadFile("testdata/connector-imports/connector.md")
 	require.NoError(t, err)
 	document, err := parser.ExtractFrontmatterFromContent(string(data))
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestAWConnectorDirectAndImportedDeclarations(t *testing.T) {
 
 func TestAWConnectorUsesExistingWithAndNestedImports(t *testing.T) {
 	c, root := awConnectorCompiler(t)
-	data, err := os.ReadFile("../../.github/aw/connectors/example.md")
+	data, err := os.ReadFile("testdata/connector-imports/connector.md")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(root, "connector.md"), data, 0600))
 	outer := "---\nimports:\n  - uses: connector.md\n    with:\n      issue: OTHER\n      reader-secret: APPROVED_READ_TOKEN\n---\n"
