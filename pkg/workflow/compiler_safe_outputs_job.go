@@ -589,12 +589,6 @@ func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOu
 			if isWorkQueueParticipant(data) {
 				return fmt.Errorf("connectors.%s.safe-outputs is not supported for work-queue participants; independent connector effect verification is required", alias)
 			}
-			var setup strings.Builder
-			if err := c.generateConnectorSetupSteps(&setup, data); err != nil {
-				return err
-			}
-			state.steps = append(state.steps, setup.String())
-			break
 		}
 	}
 	state.steps = append(state.steps, c.connectorGitHubAppSteps(data, "safe-output")...)
