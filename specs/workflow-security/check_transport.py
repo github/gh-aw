@@ -65,6 +65,24 @@ GENERATION_WITNESSES = [
     "NoLocalArtifact", "NoFullFallback", "NoMissingBaselineRejection",
     "NoMissingObjectRejection", "NoHostileConfigSuccess", "NoGenerationFailure",
 ]
+RECOVERY_FAULTS = {
+    "agent-fetch": "NoAgentNetwork",
+    "copied-config": "IsolatedRecovery",
+    "untrusted-remote": "AuthorizedRemote",
+    "moving-baseline": "ExactBaseline",
+    "hidden-preview": "ScannedBytes",
+    "skip-policy": "PublicationPolicy",
+}
+RECOVERY_WITNESSES = ["NoRecoveryPublication", "NoFastPublication", "NoRejection"]
+
+
+def recovery_cases():
+    for mode in ["full", "incremental"]:
+        yield f"secure-{mode}", mode, "none", None
+    for fault, invariant in RECOVERY_FAULTS.items():
+        yield fault, "incremental", fault, invariant
+    for invariant in RECOVERY_WITNESSES:
+        yield invariant, "incremental", "none", invariant
 
 
 def generation_cases():
@@ -156,10 +174,19 @@ def main(model="all"):
                     config += f"\nINVARIANT {invariant}\n"
                 run_case(jar, temporary, "SafeOutputGeneration",
                          f"generation-{name}", config, invariant)
+        if model in {"all", "recovery"}:
+            template = (ROOT / "SafeOutputObjectRecovery.cfg").read_text()
+            for name, mode, fault, invariant in recovery_cases():
+                config = template.replace('Mode = "full"', f'Mode = "{mode}"')
+                config = config.replace('Fault = "none"', f'Fault = "{fault}"')
+                if invariant in RECOVERY_WITNESSES:
+                    config += f"\nINVARIANT {invariant}\n"
+                run_case(jar, temporary, "SafeOutputObjectRecovery",
+                         f"object-recovery-{name}", config, invariant)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", choices=["all", "transport", "git", "generation"],
+    parser.add_argument("--model", choices=["all", "transport", "git", "generation", "recovery"],
                         default="all")
     main(parser.parse_args().model)

@@ -12,6 +12,8 @@ ASSUME Fault \in {"none", "explicit-fetch", "lazy-fetch", "config-override",
 
 \* Generation in an agent-writable checkout, not privileged bundle application.
 \* Local inputs abstract existing commit refs and required object availability.
+\* Rejection may queue offline object packaging, modeled separately by
+\* SafeOutputObjectRecovery; it never grants this generator network authority.
 VARIABLE s
 vars == <<s>>
 Stages == {"resolve", "objects", "generate", "done"}

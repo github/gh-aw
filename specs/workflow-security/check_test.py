@@ -52,13 +52,16 @@ class TransportRunnerTest(unittest.TestCase):
             expected = [None, *check_transport.FAULTS.values(), *check_transport.WITNESSES]
             git_cases = list(check_transport.git_cases())
             generation_cases = list(check_transport.generation_cases())
+            recovery_cases = list(check_transport.recovery_cases())
             self.assertEqual(len(expected), 17)
             self.assertEqual(len(git_cases), 24)
             self.assertEqual(len(generation_cases), 42)
-            self.assertEqual(len(configurations), 100)
+            self.assertEqual(len(recovery_cases), 11)
+            self.assertEqual(len(configurations), 111)
             self.assertEqual([call.args[2] for call in result.call_args_list],
                              expected * 2 + [case[-1] for case in git_cases]
-                             + [case[-1] for case in generation_cases])
+                             + [case[-1] for case in generation_cases]
+                             + [case[-1] for case in recovery_cases])
             for transport in ["patch", "bundle"]:
                 self.assertEqual(
                     sum(f'Transport = "{transport}"' in config for config in configurations),
@@ -67,14 +70,23 @@ class TransportRunnerTest(unittest.TestCase):
             git_start = len(expected) * 2
             generation_start = git_start + len(git_cases)
             git_configurations = configurations[git_start:generation_start]
-            generation_configurations = configurations[generation_start:]
+            generation_configurations = configurations[generation_start:-len(recovery_cases)]
+            recovery_configurations = configurations[-len(recovery_cases):]
             secure_profiles = {(allow, shallow) for name, allow, shallow, _, _ in git_cases
                                if name.startswith("secure-")}
             self.assertEqual(secure_profiles, {(False, False), (False, True),
                                                (True, False), (True, True)})
             self.assertEqual(modules, ["SafeOutputTransport.tla"] * (len(expected) * 2)
                              + ["SafeOutputGit.tla"] * len(git_cases)
-                             + ["SafeOutputGeneration.tla"] * len(generation_cases))
+                             + ["SafeOutputGeneration.tla"] * len(generation_cases)
+                             + ["SafeOutputObjectRecovery.tla"] * len(recovery_cases))
+            for config, (_, mode, fault, invariant) in zip(recovery_configurations, recovery_cases):
+                self.assertIn(f'Mode = "{mode}"', config)
+                self.assertIn(f'Fault = "{fault}"', config)
+                self.assertIn("    ScannedBytes\n", config)
+                self.assertIn("    PublicationPolicy\n", config)
+                if invariant in check_transport.RECOVERY_WITNESSES:
+                    self.assertIn(f"\nINVARIANT {invariant}\n", config)
             for config, (name, allow, shallow, fault, invariant) in zip(git_configurations,
                                                                       git_cases):
                 self.assertIn(f'Fault = "{fault}"', config)
@@ -141,6 +153,7 @@ class TransportRunnerTest(unittest.TestCase):
             ("transport", "SafeOutputTransport", 34),
             ("git", "SafeOutputGit", 24),
             ("generation", "SafeOutputGeneration", 42),
+            ("recovery", "SafeOutputObjectRecovery", 11),
         ]:
             with self.subTest(model=model), tempfile.TemporaryDirectory() as directory:
                 jar = Path(directory) / "tla2tools.jar"

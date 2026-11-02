@@ -505,6 +505,31 @@ termination, abort signals, and shallow/partial-clone preservation remains in
 `push_to_pull_request_branch.integration.test.cjs`, and
 `bundle_transport.integration.test.cjs` under `actions/setup/js/`.
 
+## Deferred safe-output object recovery
+
+[`SafeOutputObjectRecovery.tla`](SafeOutputObjectRecovery.tla) models the AGG-005
+fallback independently of offline generation and ordinary bundle application.
+Local artifacts retain their fast path. Missing local data may queue bounded
+offline packaging, followed by preview verification, an isolated authorized
+fetch, complete-object import, and the same publication policy gates.
+Incremental fetches require a trusted exact pre-agent baseline.
+
+The runner checks full/incremental profiles, six negative controls (agent fetch,
+copied configuration, unauthorized remote, substituted baseline, hidden preview
+bytes, and bypassed publication policy), and three reachability witnesses:
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
+  python3 specs/workflow-security/check_transport.py --model recovery
+```
+
+The model abstracts object completeness, boundedness, byte/preview matching,
+authorization, and policy results as finite predicates. It does not prove Git
+parser safety, detector completeness, native resource limits, credential grants,
+or implementation refinement. JavaScript regressions exercise actual object
+bytes, binary bundles, exact baselines, Claim-scoped paths, exclusions, redaction
+rejection, and publisher policy enforcement.
+
 ## Runtime repository-list checkout
 
 [`RuntimeRepositoryCheckout.tla`](RuntimeRepositoryCheckout.tla) refines the

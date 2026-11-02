@@ -15,6 +15,8 @@ const { lookupCheckout } = require("./checkout_manifest.cjs");
 const { generateGitPatch } = require("./generate_git_patch.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { generateGitBundle } = require("./generate_git_bundle.cjs");
+const { createObjectPack, canRecoverPatch, traceObjectPack } = require("./object_pack_transport.cjs");
+const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { hasMergeCommitsInRange, execLocalGitSync: execGitSync, ensureSafeDirectoryTrust, stageRawGitFiles } = require("./git_helpers.cjs");
 const { enforceCommentLimits, MAX_COMMENT_INPUT_LENGTH } = require("./comment_limit_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -522,6 +524,33 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (type) enforcePerTypeMax(type);
     appendSafeOutput(entry);
     if (type) operationCounts.set(scopedKey(type), (operationCounts.get(scopedKey(type)) || 0) + 1);
+  };
+
+  const queueObjectRecovery = (entry, repo, tip, options, toolConfig) => {
+    const staged = isStagedMode({ ...config, ...toolConfig });
+    traceObjectPack("queue-resolution", { pinned: !!tip, staged, incremental: options.mode === "incremental", eligible: !!tip && !staged });
+    if (!tip || staged) return null;
+    try {
+      const artifact = createObjectPack(entry.branch, repo, tip, options);
+      appendSafeOutputCounted(entry);
+      traceObjectPack("queued");
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              result: "queued",
+              recovery: "object-pack",
+              size: artifact.size,
+              details: "Local objects were packaged without fetching. The safe-outputs publisher must recover the trusted baseline and validate all policies before publishing; publication is not yet guaranteed.",
+            }),
+          },
+        ],
+      };
+    } catch (error) {
+      traceObjectPack("queue-failed");
+      return { isError: true, content: [{ type: "text", text: JSON.stringify({ result: "error", error: getErrorMessage(error) }) }] };
+    }
   };
 
   /**
@@ -1118,8 +1147,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       patchOptions.pinnedSha = pinnedSha;
     }
     const patchResult = await generateGitPatch(entry.branch, baseBranch, patchOptions);
+    traceObjectPack("offline-result", { success: patchResult.success, incremental: false });
 
     if (!patchResult.success) {
+      if (canRecoverPatch(patchResult)) {
+        const queued = queueObjectRecovery(entry, repoResult.repo, pinnedSha, patchOptions, prConfig);
+        if (queued) return queued;
+      }
       // Patch generation failed or patch is empty
       const errorMsg = patchResult.error || "Failed to generate patch";
       server.debug(`Patch generation failed: ${errorMsg}`);
@@ -1165,6 +1199,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const bundleResult = await generateGitBundle(entry.branch, baseBranch, transportOptions);
 
       if (!bundleResult.success) {
+        const queued = queueObjectRecovery(entry, repoResult.repo, pinnedSha, patchOptions, prConfig);
+        if (queued) return queued;
         const errorMsg = bundleResult.error || "Failed to generate bundle";
         server.debug(`Bundle generation failed: ${errorMsg}`);
         return {
@@ -1482,6 +1518,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
 
     const prHeadBaseline = resolvePRHeadBaselineForPush(entry.branch, itemRepo, effectivePushPRNumber, server);
+    const pushRecoveryAllowed = context.payload?.pull_request?.number === effectivePushPRNumber && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(context.payload?.pull_request?.head?.sha || "");
+    traceObjectPack("target-resolution", { eligible: pushRecoveryAllowed, incremental: true });
     const incrementalBaseRef = prHeadBaseline?.sha || prHeadBaseline?.ref || `refs/remotes/origin/${entry.branch}`;
     if (prHeadBaseline?.headRepo && prHeadBaseline.headRepo.toLowerCase() !== itemRepo.toLowerCase() && prHeadBaseline.headRepo.toLowerCase() !== configuredHeadRepo.toLowerCase()) {
       return {
@@ -1655,8 +1693,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       pushPatchOptions.pinnedSha = pushPinnedSha;
     }
     const patchResult = await generateGitPatch(entry.branch, baseBranch, pushPatchOptions);
+    traceObjectPack("offline-result", { success: patchResult.success, incremental: true });
 
     if (!patchResult.success) {
+      if (canRecoverPatch(patchResult) && pushRecoveryAllowed) {
+        const queued = queueObjectRecovery(entry, repoResult.repo, pushPinnedSha, pushPatchOptions, pushConfig);
+        if (queued) return queued;
+      }
       // Patch generation failed or patch is empty
       const errorMsg = patchResult.error || "Failed to generate patch";
       server.debug(`Patch generation failed: ${errorMsg}`);
@@ -1710,6 +1753,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const bundleResult = await generateGitBundle(entry.branch, baseBranch, pushTransportOptions);
 
       if (!bundleResult.success) {
+        const queued = pushRecoveryAllowed ? queueObjectRecovery(entry, repoResult.repo, pushPinnedSha, pushPatchOptions, pushConfig) : null;
+        if (queued) return queued;
         const errorMsg = bundleResult.error || "Failed to generate bundle";
         server.debug(`Bundle generation failed: ${errorMsg}`);
         return {

@@ -120,7 +120,8 @@ function execGitSyncResult(args, options = {}) {
  * GIT_ASKPASS=/bin/echo) and a default 60s timeout (override via options.timeout).
  *
  * @param {string[]} args - Git command arguments
- * @param {Object} options - Spawn options; set suppressLogs: true to avoid core.error annotations for expected failures
+ * @param {Object} options - Spawn options; suppressLogs avoids expected-error annotations,
+ *   while silent suppresses raw subprocess diagnostics entirely.
  * @returns {string} Command output
  * @throws {Error} If command fails
  */
@@ -130,7 +131,9 @@ function execGitSync(args, options = {}) {
   // routes failure details to core.debug instead of core.error, preventing
   // spurious GitHub Actions error annotations for expected failures (e.g., when
   // a branch does not yet exist).
-  const { suppressLogs = false, ...spawnOptions } = options;
+  const { suppressLogs = false, silent = false, ...spawnOptions } = options;
+  // Offline generation must not expose refs, paths, object bytes or raw errors.
+  const log = silent ? { debug() {}, error() {} } : core;
 
   // Log the git command being executed for debugging (but redact credentials)
   const gitCommand = `git ${args
@@ -143,7 +146,7 @@ function execGitSync(args, options = {}) {
     })
     .join(" ")}`;
 
-  core.debug(`Executing git command: ${gitCommand}`);
+  log.debug(`Executing git command: ${gitCommand}`);
 
   // Hard guards against indefinite hangs:
   //  - GIT_TERMINAL_PROMPT=0 / GCM_INTERACTIVE=Never / GIT_ASKPASS make any
@@ -162,19 +165,19 @@ function execGitSync(args, options = {}) {
       /** @type {NodeJS.ErrnoException} */
       const bufferError = new Error(`${ERR_SYSTEM}: Git command output exceeded buffer limit (ENOBUFS). The output from '${args[0]}' is too large for the configured maxBuffer. Consider reducing the diff size or increasing maxBuffer.`);
       bufferError.code = "ENOBUFS";
-      core.error(`Git command buffer overflow: ${gitCommand}`);
+      log.error(`Git command buffer overflow: ${gitCommand}`);
       throw bufferError;
     }
     if (spawnError.code === "ETIMEDOUT") {
       /** @type {NodeJS.ErrnoException} */
       const timeoutError = new Error(`${ERR_SYSTEM}: Git command timed out after ${spawnOptions.timeout || defaultTimeoutMs}ms: ${gitCommand}`);
       timeoutError.code = "ETIMEDOUT";
-      core.error(`Git command timed out: ${gitCommand}`);
+      log.error(`Git command timed out: ${gitCommand}`);
       throw timeoutError;
     }
     // Spawn-level errors (e.g. ENOENT, EACCES) are always unexpected — log
     // via core.error regardless of suppressLogs.
-    core.error(`Git command failed with error: ${result.error.message}`);
+    log.error(`Git command failed with error: ${result.error.message}`);
     throw result.error;
   }
 
@@ -183,32 +186,32 @@ function execGitSync(args, options = {}) {
     /** @type {NodeJS.ErrnoException} */
     const timeoutError = new Error(`${ERR_SYSTEM}: Git command killed (${result.signal}), likely due to timeout (${spawnOptions.timeout || defaultTimeoutMs}ms): ${gitCommand}`);
     timeoutError.code = "ETIMEDOUT";
-    core.error(`Git command killed by signal ${result.signal}: ${gitCommand}`);
+    log.error(`Git command killed by signal ${result.signal}: ${gitCommand}`);
     throw timeoutError;
   }
 
   if (result.status !== 0) {
     const errorMsg = `${ERR_SYSTEM}: ${result.stderr || `Git command failed with status ${result.status}`}`;
     if (suppressLogs) {
-      core.debug(`Git command failed (expected): ${gitCommand}`);
-      core.debug(`Exit status: ${result.status}`);
+      log.debug(`Git command failed (expected): ${gitCommand}`);
+      log.debug(`Exit status: ${result.status}`);
       if (result.stderr) {
-        core.debug(`Stderr: ${result.stderr}`);
+        log.debug(`Stderr: ${result.stderr}`);
       }
     } else {
-      core.error(`Git command failed: ${gitCommand}`);
-      core.error(`Exit status: ${result.status}`);
+      log.error(`Git command failed: ${gitCommand}`);
+      log.error(`Exit status: ${result.status}`);
       if (result.stderr) {
-        core.error(`Stderr: ${result.stderr}`);
+        log.error(`Stderr: ${result.stderr}`);
       }
     }
     throw new Error(errorMsg);
   }
 
   if (result.stdout) {
-    core.debug(`Git command output: ${result.stdout.substring(0, 200)}${result.stdout.length > 200 ? "..." : ""}`);
+    log.debug(`Git command output: ${result.stdout.substring(0, 200)}${result.stdout.length > 200 ? "..." : ""}`);
   } else {
-    core.debug("Git command completed successfully with no output");
+    log.debug("Git command completed successfully with no output");
   }
 
   return result.stdout;
