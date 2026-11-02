@@ -1,5 +1,6 @@
 {
-  "total_runs": 115,
+  "total_runs": 116,
+  "last_blocker": "R116 2026-11-02 run 41543179737: ALL Bash denied (even single trivial commands) -> no serena CLI, no safeoutputs CLI, no git/gh. Zero findings, zero outputs emitted. avg_success_score not recomputed (blocked run excluded). See strategies.jsonl R116.",
   "total_findings": 616,
   "total_tasks": 189,
   "avg_success_score": 8.64,
