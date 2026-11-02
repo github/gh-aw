@@ -41,12 +41,6 @@ type BaseSafeOutputConfig struct {
 type SafeOutputsConfig struct {
 	Steer                                  bool                                   `yaml:"steer,omitempty"` // Experimental. Create an issue and steer the agent from issue comments.
 	CreateIssues                           *CreateIssuesConfig                    `yaml:"create-issue,omitempty"`
-	CreateWorkItems                        *CreateWorkItemConfig                  `yaml:"ado-create-work-item,omitempty"`
-	UpdateWorkItems                        *UpdateWorkItemConfig                  `yaml:"ado-update-work-item,omitempty"`
-	CommentOnWorkItems                     *CommentOnWorkItemConfig               `yaml:"ado-comment-on-work-item,omitempty"`
-	AssignWorkItems                        *AssignWorkItemConfig                  `yaml:"ado-assign-work-item,omitempty"`
-	LinkWorkItems                          *LinkWorkItemsConfig                   `yaml:"ado-link-work-items,omitempty"`
-	UploadWorkItemAttachments              *UploadWorkItemAttachmentConfig        `yaml:"ado-upload-workitem-attachment,omitempty"`
 	LinearCreateIssue                      *LinearCreateIssueConfig               `yaml:"linear-create-issue,omitempty"`
 	LinearAddComment                       *LinearTargetConfig                    `yaml:"linear-add-comment,omitempty"`
 	LinearUpdateIssue                      *LinearUpdateIssueConfig               `yaml:"linear-update-issue,omitempty"`

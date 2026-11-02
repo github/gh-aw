@@ -15,13 +15,13 @@ import (
 )
 
 func TestCompileProviderIssueJSONContract(t *testing.T) {
-	for _, alias := range []string{"jira-issue", "linear-issue", "azure-devops-issue"} {
+	for _, alias := range []string{"jira-issue", "linear-issue"} {
 		t.Run(alias, func(t *testing.T) {
 			root := t.TempDir()
 			enableWebhookTriggers(t, root)
 			path := filepath.Join(root, alias+".md")
 			scope := map[string]string{
-				"jira-issue": "project: APP", "linear-issue": "organization-id: organization-uuid\n      team-id: team-uuid", "azure-devops-issue": "project_id: project-uuid",
+				"jira-issue": "project: APP", "linear-issue": "organization-id: organization-uuid\n      team-id: team-uuid",
 			}[alias]
 			source := "---\non:\n  gateway-dispatch:\n    " + alias + ":\n      " + scope + "\n      types: [opened, labeled]\npermissions:\n  contents: read\nengine: copilot\n---\nInspect every issue in github.aw.context.items.\n"
 			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
@@ -53,7 +53,7 @@ func TestCompileProviderIssueJSONContract(t *testing.T) {
 
 func TestCompileProviderIssueRequiresScope(t *testing.T) {
 	for alias, field := range map[string]string{
-		"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id",
+		"jira-issue": "project", "linear-issue": "organization-id",
 	} {
 		for _, wrapped := range []bool{false, true} {
 			name := "missing"

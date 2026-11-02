@@ -38,9 +38,9 @@ Quick-reference mapping tables for `.github/aw/designer.md`. Load this file duri
 | "create a Linear issue" | `linear-create-issue` (experimental) |
 | "update Linear issue" | `linear-update-issue` (experimental) |
 | "comment on Linear issue" | `linear-add-comment` (experimental) |
-| "create an Azure DevOps work item" | `ado-create-work-item` (experimental) |
-| "update an Azure DevOps work item" | `ado-update-work-item` (experimental) |
-| "comment/assign/link Azure DevOps work items" | `ado-comment-on-work-item`, `ado-assign-work-item`, `ado-link-work-items` (experimental) |
+| "create an Azure DevOps work item" | `azure-devops-create-work-item` via `"@builtin:connectors/azure-devops.md"` |
+| "update an Azure DevOps work item" | `azure-devops-update-work-item` (title only; embedded connector) |
+| "comment/assign/link Azure DevOps work items" | `azure-devops-comment-on-work-item`, `azure-devops-assign-work-item`, `azure-devops-link-work-items` (embedded connector) |
 | "close the issue" | `close-issue` |
 | "assign someone", "remove assignment" | `assign-to-user`, `unassign-from-user` |
 | "set issue type/field/milestone" | `set-issue-type`, `set-issue-field`, `assign-milestone` |

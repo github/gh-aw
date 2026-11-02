@@ -5,7 +5,6 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 const PROVIDER_ISSUE_EVENTS = {
   jira_issue: ["jira:issue_created", "jira:issue_updated", "jira:issue_deleted"],
   linear_issue: ["create", "update", "remove"],
-  azure_devops_issue: ["workitem.created", "workitem.updated", "workitem.deleted", "workitem.restored"],
 };
 const PROVIDER_ISSUE_ACTIVITIES = ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"];
 
@@ -48,7 +47,7 @@ function isProviderIssueEvent(event) {
 }
 
 function nativeIssueEvent(event, payload) {
-  const native = event === "jira_issue" ? payload.webhookEvent : event === "linear_issue" ? payload.action : payload.eventType;
+  const native = event === "jira_issue" ? payload.webhookEvent : payload.action;
   if (!PROVIDER_ISSUE_EVENTS[event]?.includes(native) || (event === "linear_issue" && payload.type !== "Issue")) {
     reject("provider issue payload must contain a supported native issue event");
   }
@@ -75,26 +74,13 @@ function resolveProviderIssueItem(event, payload) {
     }
     return { item_type: event, item_number: payload.data.id, repo: "", source: payload.organizationId };
   }
-  const resource = payload.resource;
-  const snapshot = native !== "workitem.updated" || (payload.resourceVersion === "1.0" && !resource?.revision);
-  const id = resource?.workItemId ?? (snapshot ? resource?.id : undefined);
-  const collection = payload.resourceContainers?.collection?.id;
-  if (!isObject(resource) || !Number.isSafeInteger(id) || id <= 0 || !isString(collection)) {
-    reject("Azure DevOps issue payload requires a positive work item ID and collection identity");
-  }
-  return { item_type: event, item_number: String(id), repo: "", source: collection };
+  reject("unsupported provider issue event");
 }
 
 function addLabelActivities(activities, before, after) {
   if (!isStringArray(before) || !isStringArray(after)) return;
   if (after.some(label => !before.includes(label))) activities.push("labeled");
   if (before.some(label => !after.includes(label))) activities.push("unlabeled");
-}
-
-function addClosedActivities(activities, before, after, closedStates) {
-  if (!isString(before) || !isString(after)) return;
-  if (!closedStates.includes(before) && closedStates.includes(after)) activities.push("closed");
-  if (closedStates.includes(before) && !closedStates.includes(after)) activities.push("reopened");
 }
 
 function jiraActivities(payload, native) {
@@ -142,32 +128,11 @@ function linearActivities(payload, native) {
   return activities;
 }
 
-function azureActivities(payload, native, closedStates) {
-  if (native === "workitem.created") return ["opened"];
-  if (native === "workitem.deleted") return ["deleted"];
-  if (native === "workitem.restored") return ["restored"];
-  const activities = ["edited"];
-  const fields = payload.resource?.fields;
-  if (!isObject(fields)) return activities;
-  const state = fields["System.State"];
-  if (isObject(state)) addClosedActivities(activities, state.oldValue, state.newValue, closedStates);
-  const tags = fields["System.Tags"];
-  if (isObject(tags) && typeof tags.oldValue === "string" && typeof tags.newValue === "string") {
-    const split = value =>
-      value
-        .split(";")
-        .map(tag => tag.trim())
-        .filter(Boolean);
-    addLabelActivities(activities, split(tags.oldValue), split(tags.newValue));
-  }
-  return activities;
-}
-
-function providerIssueActivities(event, payload, normalization) {
+function providerIssueActivities(event, payload) {
   const native = nativeIssueEvent(event, payload);
   if (event === "jira_issue") return jiraActivities(payload, native);
   if (event === "linear_issue") return linearActivities(payload, native);
-  return azureActivities(payload, native, normalization?.closed_states ?? []);
+  reject("unsupported provider issue event");
 }
 
 function validProviderIssueSubscription(subscription) {
@@ -176,14 +141,13 @@ function validProviderIssueSubscription(subscription) {
   return (
     subscription.provider === provider &&
     subscription.types.length > 0 &&
-    subscription.types.every(type => PROVIDER_ISSUE_ACTIVITIES.includes(type) || (subscription.event === "azure_devops_issue" && type === "restored")) &&
+    subscription.types.every(type => PROVIDER_ISSUE_ACTIVITIES.includes(type)) &&
     isObject(normalization) &&
     normalization.policy === `${provider}-issue/v1` &&
     Array.isArray(subscription.native_events) &&
     subscription.native_events.length > 0 &&
-    subscription.native_events.every(event => PROVIDER_ISSUE_EVENTS[subscription.event].includes(event)) &&
-    (normalization.closed_states === undefined || (subscription.event === "azure_devops_issue" && isStringArray(normalization.closed_states) && normalization.closed_states.length > 0)) &&
-    (!subscription.types.some(type => ["closed", "reopened"].includes(type)) || subscription.event !== "azure_devops_issue" || normalization.closed_states?.length > 0)
+    subscription.native_events.every(event => PROVIDER_ISSUE_EVENTS[subscription.event]?.includes(event)) &&
+    normalization.closed_states === undefined
   );
 }
 

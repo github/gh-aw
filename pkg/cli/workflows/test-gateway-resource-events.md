@@ -19,10 +19,6 @@ on:
       organization-id: organization-uuid
       team-id: team-uuid
       types: [opened, closed]
-    azure-devops-issue:
-      project_id: project-uuid
-      types: [closed, reopened]
-      closed-states: [Done, Closed]
 permissions:
   contents: read
 engine: copilot

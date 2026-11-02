@@ -1,6 +1,6 @@
 ---
 title: Provider Issue Triggers
-description: Experimental Jira, Linear, and Azure DevOps issue subscriptions and evidence-backed lifecycle activities.
+description: Experimental Jira and Linear issue subscriptions and evidence-backed lifecycle activities.
 sidebar:
   order: 402
 ---
@@ -9,9 +9,9 @@ import providerIssueEvents from "../../../../../pkg/workflow/data/provider_issue
 
 The [Webhook Gateway Specification](/gh-aw/specs/webhook-gateway-specification/) defines the complete experimental trigger inventory and expected per-delivery data, including GitHub Projects and security alerts.
 
-`on.gateway-dispatch.jira-issue`, `on.gateway-dispatch.linear-issue`, and `on.gateway-dispatch.azure-devops-issue` declare experimental external issue subscriptions using GitHub-style `types` and flat source selectors. They require repository `.github/workflows/aw.json` with `{"gateway-dispatch":true}` and retain the write-minimum role declaration policy. The compiler enforces the [webhook dispatch contract](/gh-aw/reference/webhook-triggers/) through a mandatory `gateway_provenance` job; roles and bots cannot substitute for the centrally approved CAO App identity. Every other job depends on successful provenance, including custom prerequisite jobs. The integration must remain nonactivating until the receiver token flow and approved destination revision conform. No other trigger can coexist with `gateway-dispatch`; supported non-trigger settings such as `roles` and `bots` remain allowed.
+`on.gateway-dispatch.jira-issue` and `on.gateway-dispatch.linear-issue` declare experimental external issue subscriptions using GitHub-style `types` and flat source selectors. They require repository `.github/workflows/aw.json` with `{"gateway-dispatch":true}` and retain the write-minimum role declaration policy. The compiler enforces the [webhook dispatch contract](/gh-aw/reference/webhook-triggers/) through a mandatory `gateway_provenance` job; roles and bots cannot substitute for the centrally approved CAO App identity. Every other job depends on successful provenance, including custom prerequisite jobs. The integration must remain nonactivating until the receiver token flow and approved destination revision conform. No other trigger can coexist with `gateway-dispatch`; supported non-trigger settings such as `roles` and `bots` remain allowed.
 
-Shared `gateway-dispatch.orgs` selects GitHub organizations, not Jira projects, Linear organizations, or Azure projects; external providers ignore it and retain their mandatory provider-specific scopes.
+Shared `gateway-dispatch.orgs` selects GitHub organizations, not Jira projects or Linear organizations; external providers ignore it and retain their mandatory provider-specific scopes.
 
 > [!WARNING]
 > These are experimental compiler declarations, not native GitHub Actions triggers. gh-aw does not register provider webhooks, verify their signatures, deploy a receiver, grant source access, or establish hosted CAO compatibility. An approved provider bridge must authenticate the source, implement the normalization policy, evaluate selectors, and dispatch the batch.
@@ -29,10 +29,6 @@ on:
       organization-id: organization-uuid
       team-id: team-uuid
       types: [opened, closed, labeled]
-    azure-devops-issue:
-      project_id: project-uuid
-      types: [opened, closed, labeled]
-      closed-states: [Done, Closed]
 ---
 
 Inspect every unique issue in github.aw.context.items.
@@ -45,13 +41,10 @@ Each trigger is a child of `on.gateway-dispatch` and accepts an object with a ma
 | --- | --- | --- |
 | `jira-issue` | `project` | `issue.fields.project.key` |
 | `linear-issue` | `organization-id` | `organizationId` |
-| `azure-devops-issue` | `project_id` | `resourceContainers.project.id` |
 
 Linear additionally accepts optional root `team-id`, matched literally against delivered `data.teamId`. `organization-id` and `team-id` are identifier selectors, not organization/team keys or names resolved through an API. The underscore spellings `organization_id` and `team_id` are not supported frontmatter keys. Required selectors cannot be omitted; their corresponding source data must be present for a delivery to match. Selectors restrict deliveries, not provider access or source enrollment.
 
-Only Azure DevOps accepts `closed-states`, a nonempty literal state name or list of names. It is required when explicitly selecting `closed` or `reopened`. There are no assumed terminal state names: Azure processes and work item types have different [state categories and mappings](https://learn.microsoft.com/en-us/azure/devops/boards/work-items/workflow-and-state-categories?view=azure-devops).
-
-Omitting `types` selects all cataloged activities, except Azure `closed`/`reopened` are omitted unless `closed-states` is supplied. `types` is a nonempty list. Selector values are scalars or nonempty lists of the documented scalar type. Conditions are ANDed; values within a selector are ORed. Missing fields do not match. Selectors inspect only the delivered native payload, without API lookups or cached history. `repos`, arbitrary JQL, regular expressions, expressions, and GitHub-only issue activities are not supported.
+Omitting `types` selects all cataloged activities. `types` is a nonempty list. Selector values are scalars or nonempty lists of the documented scalar type. Conditions are ANDed; values within a selector are ORed. Missing fields do not match. Selectors inspect only the delivered native payload, without API lookups or cached history. `repos`, arbitrary JQL, regular expressions, expressions, and GitHub-only issue activities are not supported.
 
 ## Native events and normalized activities
 
@@ -61,7 +54,6 @@ Omitting `types` selects all cataloged activities, except Azure `closed`/`reopen
 | --- | --- | --- |
 | Jira Cloud | `jira:issue_created`, `jira:issue_updated`, `jira:issue_deleted` | Created → `opened`; deleted → `deleted`; updated → `edited`, with additional evidence-based lifecycle/label activities below. |
 | Linear | Entity `Issue`, actions `create`, `update`, `remove` | Create → `opened`; remove → `deleted`; update → `edited`, with additional evidence-based activities below. `IssueLabel` events change label definitions, not issue assignments. |
-| Azure DevOps | `workitem.created`, `workitem.updated`, `workitem.deleted`, `workitem.restored` | Created → `opened`; deleted → `deleted`; restored → `restored`; updated → `edited`, with additional evidence-based activities below. |
 
 An update may satisfy several normalized activities, such as `edited`, `closed`, and `labeled`. Matching any selected activity admits that delivery once. Deletion is never treated as closure; restoration is not reopening. Comments, issue links, Jira properties, Linear SLA events, and unrelated service-hook events are not registered by these triggers.
 
@@ -80,14 +72,6 @@ Label normalization is deliberately conservative. A system `labels` changelog wi
 For updates, an explicitly changed `completedAt` or `canceledAt` from `null` to a timestamp adds `closed` only when the other terminal timestamp was also known to be `null`. An explicit timestamp → `null` adds `reopened` only when both current terminal timestamps are `null`. Transitions between completed and canceled do not close or reopen again. Missing terminal evidence is not filled in from a workflow-state name or an API request.
 
 When `updatedFrom.labelIds` and `data.labelIds` are both arrays, set additions add `labeled` and removals add `unlabeled`; replacements may add both. Array order and duplicate IDs do not constitute changes. Root `labels` contains label **IDs**, not names. An unchanged issue carrying labels is not a labeling event.
-
-### Azure DevOps
-
-[Azure DevOps service-hook events](https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops#work-item) expose work item creation, updates, deletion, and restoration. Closure requires a delivered `resource.fields["System.State"]` delta containing nonempty `oldValue` and `newValue`. Entering the configured `closed-states` set adds `closed`; leaving it adds `reopened`; moving between two configured terminal states does neither.
-
-For `System.Tags`, both old and new strings must be present. Semicolon-separated tag sets are trimmed and compared for `labeled`/`unlabeled`; additions and removals may occur in the same update. See [work item update deltas](https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/updates/list?view=azure-devops-rest-7.1) and [Azure tag semantics](https://learn.microsoft.com/en-us/azure/devops/boards/queries/add-tags-to-work-items?view=azure-devops). Root selectors `tags.from` and `tags.to` compare the **entire native string**, not individual tags.
-
-[Resource details may be All, Minimal, or None](https://learn.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops#resource-details-to-send). Snapshot-only updates and deliveries without old/new deltas remain `edited`; no history is fetched to manufacture closure or labeling. Deliveries without a resource identity are rejected. The `azure-devops-issue` name covers work item lifecycle events, not only the Basic process's work item type named “Issue.”
 
 ## Supported selectors
 
@@ -123,27 +107,24 @@ Provider subscriptions use the existing numeric `schema_version: 2` declaration 
 
 | Field                                  | Meaning                                                                                                                     |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `event`                                | Normalized issue family: `jira_issue`, `linear_issue`, or `azure_devops_issue`. Not a GitHub webhook event.                 |
-| `provider`                             | `jira`, `linear`, or `azure-devops`. No GitHub source-webhook or source-read permissions are inferred; the destination App-token contract still applies. |
+| `event`                                | Normalized issue family: `jira_issue`, `linear_issue`. Not a GitHub webhook event.                 |
+| `provider`                             | `jira`, `linear`. No GitHub source-webhook or source-read permissions are inferred; the destination App-token contract still applies. |
 | `native_events`                        | Sorted, deduplicated native events needed by the selected activities. For Linear these are `Issue` entity action names.     |
-| `activity_normalization.policy`        | Versioned policy: `jira-issue/v1`, `linear-issue/v1`, or `azure-devops-issue/v1`, with the evidence rules above.            |
-| `activity_normalization.closed_states` | Azure-only explicit terminal state names, when configured.                                                                  |
-| `dispatch.payload_projection.policy` | Required `resource-url-types-filters/v2`: only the canonical resource URL and declared matching types, filter literals, and applicable Azure terminal name are forwarded. |
+| `activity_normalization.policy`        | Versioned policy: `jira-issue/v1`, `linear-issue/v1`, with the evidence rules above.            |
+| `dispatch.payload_projection.policy` | Required `resource-url-types-filters/v2`: only the canonical resource URL and declared matching types, filter literals are forwarded. |
 
-Each batch contains one normalized issue family. Every `deliveries[].payload` requires `url`, `type`, and a flat `filters` map for the declared selectors, with no other fields. For example, a Jira project selector produces `{"url":"https://example.atlassian.net/rest/api/3/issue/10001","type":["opened"],"filters":{"project":["APP"]}}`. Keys are compiled filter names; values are nonempty homogeneous arrays containing only actual matching literals accepted by the conditions. Unselected text/labels, nested source objects, and changelog objects are excluded. Azure `tags.from`/`tags.to` may include an entire native scalar string only when that exact string is a configured matching literal, never as arbitrary old/new evidence. The runner rejects missing/extra keys and nonmatching values; original-source provenance remains a receiver responsibility.
+Each batch contains one normalized issue family. Every `deliveries[].payload` requires `url`, `type`, and a flat `filters` map for the declared selectors, with no other fields. For example, a Jira project selector produces `{"url":"https://example.atlassian.net/rest/api/3/issue/10001","type":["opened"],"filters":{"project":["APP"]}}`. Keys are compiled filter names; values are nonempty homogeneous arrays containing only actual matching literals accepted by the conditions. Unselected text/labels, nested source objects, and changelog objects are excluded. The runner rejects missing/extra keys and nonmatching values; original-source provenance remains a receiver responsibility.
 
 An update can contain several types, such as `["closed","edited","labeled"]`, only when each activity is selected. The receiver intersects evidence-backed activities with `subscription.types`: `types: [closed]` forwards only `["closed"]`, never an additional `edited` or `labeled`. The runner rejects any unselected activity, even when another activity matches.
 
-For Azure `closed`/`reopened`, `filters["closed-states"]` additionally requires exactly one matching configured terminal name: the entered name for closure or the departed name for reopening. For `closed-states: [Done, Closed]`, a delivered transition into `Done` forwards `["Done"]`, never both configured names or the unselected nonterminal side. Omit the key when no selected lifecycle transition is forwarded, including `types: [edited]`; other providers cannot use it. Full state deltas and objects remain excluded.
+The receiver authenticates, classifies, and filters the original native delivery before projection. Linear's native `type: "Issue"` and `action: create/update/remove` do not appear in the forwarded object. All details beyond references and declared matching filters, types, severity must be retrieved through provider-authenticated access inside the workflow.
 
-The receiver authenticates, classifies, and filters the original native delivery before projection. Linear's native `type: "Issue"` and `action: create/update/remove` do not appear in the forwarded object. All details beyond references and declared matching filters, types, severity, or closed-state literals must be retrieved through provider-authenticated access inside the workflow.
+Repeated delivery IDs collapse, conflicting duplicates fail, and affected references are independently deduplicated by provider family and URL-derived source/resource identity. Updates to one reference remain distinct deliveries. Normalized items have `item_type`, string `item_number`, `url`, `source`, and `repo: ""`. `source` is the Jira REST origin, Linear workspace URL; `item_number` is the decimal issue ID or Linear issue identifier from that URL. IDs beyond declared matching filter literals and cross-alias/moved-identifier reconciliation require authenticated workflow reads. These identities are never implicit GitHub issue numbers or safe-output targets.
 
-Repeated delivery IDs collapse, conflicting duplicates fail, and affected references are independently deduplicated by provider family and URL-derived source/resource identity. Updates to one reference remain distinct deliveries. Normalized items have `item_type`, string `item_number`, `url`, `source`, and `repo: ""`. `source` is the Jira REST origin, Linear workspace URL, or Azure collection URL; `item_number` is the decimal issue/work item ID or Linear issue identifier from that URL. IDs beyond declared matching filter literals and cross-alias/moved-identifier reconciliation require authenticated workflow reads. These identities are never implicit GitHub issue numbers or safe-output targets.
+The [gateway specification](/gh-aw/specs/webhook-gateway-specification/#expected-per-delivery-payloads) defines accepted canonical URL forms and every supported family payload. Unqualified Linear issue links are rejected because identifiers can collide between workspaces. Native-body payloads and missing/unknown projection policies are rejected. The batch envelope uses numeric schema version 2.
 
-The [gateway specification](/gh-aw/specs/webhook-gateway-specification/#expected-per-delivery-payloads) defines accepted canonical URL forms and every supported family payload. Unqualified Linear issue links are rejected because identifiers can collide between workspaces; Azure links must identify work items rather than updates/revisions. Native-body payloads and missing/unknown projection policies are rejected. The batch envelope uses numeric schema version 2.
+Linear's top-level `url`, or a consistent delivered `data.url` fallback, must agree with original `data.identifier`, immutable Issue identity, and the protected workspace/organization binding.
 
-Linear's top-level `url`, or a consistent delivered `data.url` fallback, must agree with original `data.identifier`, immutable Issue identity, and the protected workspace/organization binding. Azure references may use a validated delivered item link or the documented item path constructed only from an enrolled canonical collection/project API base and the authenticated original item ID. Stripping an update URL, trusting a payload origin, or ignoring contradictory item/revision identities is not an alternative source of evidence.
-
-Provider authentication and source authorization belong to the receiver: for example, [Jira signed admin webhooks](https://developer.atlassian.com/cloud/jira/platform/webhooks/#secure-admin-webhooks), [Linear signature and timestamp verification](https://linear.app/developers/webhooks#securing-webhooks), and [Azure HTTPS service-hook configuration](https://learn.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops). The separate [CAO App-token provenance contract](/gh-aw/specs/webhook-gateway-specification/#github-app-token-provenance) authenticates the GitHub dispatch hop; neither provider signatures nor standard role/bot checks prove CAO origin.
+Provider authentication and source authorization belong to the receiver: for example, [Jira signed admin webhooks](https://developer.atlassian.com/cloud/jira/platform/webhooks/#secure-admin-webhooks), [Linear signature and timestamp verification](https://linear.app/developers/webhooks#securing-webhooks). The separate [CAO App-token provenance contract](/gh-aw/specs/webhook-gateway-specification/#github-app-token-provenance) authenticates the GitHub dispatch hop; neither provider signatures nor standard role/bot checks prove CAO origin.
 
 **All additional resource data must be resolved inside the workflow using provider-authenticated clients so the provider enforces access.** Beyond the declared matching literals, this includes titles, descriptions, labels, actors, current state, and provider UUIDs. A delivered match does not establish current state or continuing access. GitHub credentials do not authorize Jira, Linear, or Azure DevOps access. Use configured trusted API endpoints; do not send credentials to arbitrary notification URLs or redirects. Denied or deleted resources do not permit fallback to cached native webhook bodies.

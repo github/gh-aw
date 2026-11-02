@@ -288,7 +288,7 @@ function extractCreatedItemFromResult(type, result) {
   const url = result.url || result.projectUrl || result.html_url || result.pull_request_url || result.review_url || result.issue_url;
   const number = result.number ?? result.pull_request_number ?? result.prNumber ?? result.issue_number ?? result.itemNumber;
   const repo = result.repo || result._repo;
-  const provider = result.provider || result.metadata?.provider || (type.startsWith("jira_") ? "jira" : type.startsWith("linear_") ? "linear" : type.startsWith("ado_") ? "azure-devops" : "github");
+  const provider = result.provider || result.metadata?.provider || (type.startsWith("jira_") ? "jira" : type.startsWith("linear_") ? "linear" : "github");
   const id = result.id ?? result.commentId ?? result.comment_id ?? result.review_id ?? result.issue_id;
   const identifier = result.identifier ?? result.issue_key;
   // result.target may be a scalar provider-specific identifier (e.g. Linear issue key "ENG-123")

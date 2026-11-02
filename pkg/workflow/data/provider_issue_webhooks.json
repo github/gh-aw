@@ -46,45 +46,5 @@
       "labels": { "path": ["data", "labelIds", "*"], "type": "string", "description": "A current label ID, not its name and not necessarily the changed label." },
       "sender": { "path": ["actor", "id"], "type": "string", "description": "Actor ID, when present; not dispatch authorization." }
     }
-  },
-  "azure_devops_issue": {
-    "provider": "azure-devops",
-    "actions": ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted", "restored"],
-    "native_events": {
-      "opened": "workitem.created",
-      "edited": "workitem.updated",
-      "closed": "workitem.updated",
-      "reopened": "workitem.updated",
-      "labeled": "workitem.updated",
-      "unlabeled": "workitem.updated",
-      "deleted": "workitem.deleted",
-      "restored": "workitem.restored"
-    },
-    "description": "Experimental. Azure DevOps work item events. Closed/reopened requires explicitly configured closed-states and native old/new state values; label changes are old/new System.Tags set differences.",
-    "source": "https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops#work-item",
-    "availability": ["Azure DevOps project"],
-    "filters": {
-      "collection_id": { "path": ["resourceContainers", "collection", "id"], "type": "string", "description": "Immutable source collection ID." },
-      "project_id": { "path": ["resourceContainers", "project", "id"], "type": "string", "description": "Immutable source project ID." },
-      "state.from": {
-        "path": ["resource", "fields", "System.State", "oldValue"],
-        "type": "string",
-        "description": "Previous state in a delivered work item update delta.",
-        "actions": ["edited", "closed", "reopened", "labeled", "unlabeled"]
-      },
-      "state.to": { "path": ["resource", "fields", "System.State", "newValue"], "type": "string", "description": "New state in a delivered work item update delta.", "actions": ["edited", "closed", "reopened", "labeled", "unlabeled"] },
-      "tags.from": {
-        "path": ["resource", "fields", "System.Tags", "oldValue"],
-        "type": "string",
-        "description": "Entire previous semicolon-separated tag string, not a single tag.",
-        "actions": ["edited", "closed", "reopened", "labeled", "unlabeled"]
-      },
-      "tags.to": {
-        "path": ["resource", "fields", "System.Tags", "newValue"],
-        "type": "string",
-        "description": "Entire new semicolon-separated tag string, not a single tag.",
-        "actions": ["edited", "closed", "reopened", "labeled", "unlabeled"]
-      }
-    }
   }
 }

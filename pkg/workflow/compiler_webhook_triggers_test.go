@@ -47,7 +47,6 @@ func TestGatewayDispatchRejectsExpressions(t *testing.T) {
 		{"transitions", `{projects-items: {project_id: PVT_example, status-transitions: [{from: Todo, to: "${{ vars.STATUS }}"}]}}`, ".projects-items.status-transitions[0].to"},
 		{"Jira scope", `{jira-issue: {project: "${{ vars.PROJECT }}"}}`, ".jira-issue.project"},
 		{"Linear scope", `{linear-issue: {organization-id: "${{ vars.ORGANIZATION }}"}}`, ".linear-issue.organization-id"},
-		{"Azure states", `{azure-devops-issue: {project_id: project-uuid, closed-states: [Done, "${{ vars.STATUS }}"]}}`, ".azure-devops-issue.closed-states[1]"},
 		{"slash shorthand", `{slash-command: "${{ vars.COMMAND }}"}`, ".slash-command"},
 		{"label names", `{label-command: {names: [review, "${{ vars.LABEL }}"]}}`, ".label-command.names[1]"},
 		{"command events", `{slash-command: {events: ["${{ vars.EVENT }}"]}}`, ".slash-command.events[0]"},
@@ -312,7 +311,6 @@ func TestWebhookExperimentalNotices(t *testing.T) {
 		"both":     {"projects_v2_item", "code_scanning_alert"},
 		"jira":     {"jira_issue"},
 		"linear":   {"linear_issue"},
-		"azure":    {"azure_devops_issue"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			data := &WorkflowData{}

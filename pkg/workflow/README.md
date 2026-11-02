@@ -1623,7 +1623,6 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `AgentEnclaveConfig`, `AgentEnclaveGitHubConfig`, `AgentEnclaveGitHubToolConfig`, `AgentEnclaveToolsConfig`, `ScriptEnclaveConfig`, `EnclaveConfig`, `EnclaveRepository`, `DynamicEnclavePolicy`, `DynamicEnclaveQuotas` | struct | Enclave configuration |
 | `EnclavesConfig` | alias (`[]*EnclaveConfig`) | List of enclave configurations |
 | `ApproveWorkflowRunConfig`, `UploadCodeCoverageConfig` | struct | Safe-output job configurations |
-| `AssignWorkItemConfig`, `AzureDevOpsArtifactLinkConfig`, `CommentOnWorkItemConfig`, `CreateWorkItemConfig`, `LinkWorkItemsConfig`, `UpdateWorkItemConfig`, `UploadWorkItemAttachmentConfig` | struct | Azure DevOps work-item safe outputs |
 | `JiraSafeOutputConfig`, `LinearCreateIssueConfig`, `LinearTargetConfig`, `LinearUpdateIssueConfig` | struct | Jira and Linear safe outputs |
 | `CloseOlderConfig`, `SafeUpdateOptions`, `ThreatDetectionSuppression` | struct | Safe-output behavior options |
 | `SafeOutputsURLsPolicy` | alias (`string`) | URL policy for safe outputs |

@@ -63,26 +63,7 @@ func getSafeOutputSecretRequirements(data *WorkflowData) []safeOutputSecretRequi
 			},
 		})
 	}
-	if hasAzureDevOpsSafeOutputs(config) &&
-		strings.TrimSpace(config.Env["SYSTEM_ACCESSTOKEN"]) == "" &&
-		strings.TrimSpace(config.Env["AZURE_DEVOPS_EXT_PAT"]) == "" {
-		requirements = append(requirements, safeOutputSecretRequirement{
-			secretNames: []string{"AZURE_DEVOPS_EXT_PAT"},
-			name:        "Azure DevOps safe outputs",
-			docsAnchor:  "#azure-devops-work-items",
-		})
-	}
 	return requirements
-}
-
-func hasAzureDevOpsSafeOutputs(config *SafeOutputsConfig) bool {
-	return config != nil &&
-		(config.CreateWorkItems != nil ||
-			config.UpdateWorkItems != nil ||
-			config.CommentOnWorkItems != nil ||
-			config.AssignWorkItems != nil ||
-			config.LinkWorkItems != nil ||
-			config.UploadWorkItemAttachments != nil)
 }
 
 func buildSafeOutputSecretValidationSteps(data *WorkflowData) []GitHubActionStep {

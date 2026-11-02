@@ -2527,36 +2527,6 @@
           "desc": "Enable AI agents to create autofixes for code scanning alerts using the GitHub REST API.",
           "leaf": true
         },
-        "ado-create-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-update-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-comment-on-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-assign-work-item": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-link-work-items": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
-        "ado-upload-workitem-attachment": {
-          "type": "object|null",
-          "desc": "Experimental.",
-          "leaf": true
-        },
         "create-check-run": {
           "type": "object|null",
           "desc": "Enable AI agents to create GitHub Check Runs that surface analysis results in the PR checks UI.",

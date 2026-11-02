@@ -2263,90 +2263,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     };
   };
 
-  const createWorkItemHandler = args => {
-    const temporaryId = `#${generateTemporaryId()}`;
-    const entry = { ...(args || {}), type: "ado_create_work_item", temporary_id: temporaryId };
-    appendSafeOutputCounted(entry);
-    const output = { result: "success", temporary_id: temporaryId };
-    return {
-      content: [{ type: "text", text: JSON.stringify(output) }],
-      structuredContent: output,
-    };
-  };
-
-  const createAzureDevOpsWorkItemHandler = type => args => {
-    const entry = { ...(args || {}), type };
-    appendSafeOutputCounted(entry);
-    return {
-      content: [{ type: "text", text: JSON.stringify({ result: "success" }) }],
-    };
-  };
-
-  const uploadWorkItemAttachmentHandler = args => {
-    const entry = { ...(args || {}), type: "ado_upload_workitem_attachment" };
-    const rawPath = typeof entry.file_path === "string" ? entry.file_path.trim() : "";
-    if (!rawPath || path.isAbsolute(rawPath) || rawPath.includes(":")) {
-      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path must be a workspace-relative path without ':'");
-    }
-
-    const segments = rawPath.split(/[\\/]+/);
-    if (segments.some(segment => !segment || segment === "." || segment === "..")) {
-      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path must not contain empty, '.' or '..' path segments");
-    }
-
-    const workspace = path.resolve(process.env.GITHUB_WORKSPACE || process.cwd());
-    const sourcePath = path.resolve(workspace, ...segments);
-    if (sourcePath !== workspace && !sourcePath.startsWith(workspace + path.sep)) {
-      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path resolves outside the workspace");
-    }
-
-    let current = workspace;
-    let sourceStat;
-    try {
-      for (const segment of segments) {
-        current = path.join(current, segment);
-        sourceStat = lstatGuard(current);
-        if (!sourceStat) {
-          return buildIntentErrorResponse("ado_upload_workitem_attachment does not accept symbolic links");
-        }
-      }
-    } catch (error) {
-      return buildIntentErrorResponse(`ado_upload_workitem_attachment could not read file_path: ${getErrorMessage(error)}`);
-    }
-    if (!sourceStat?.isFile()) {
-      return buildIntentErrorResponse("ado_upload_workitem_attachment file_path must identify one regular file");
-    }
-
-    const attachmentConfig = getSafeOutputsToolConfig(config, "ado_upload_workitem_attachment");
-    const maxFileSize = Number(attachmentConfig.max_file_size || 5 * 1024 * 1024);
-    if (!Number.isSafeInteger(maxFileSize) || maxFileSize < 1 || sourceStat.size > maxFileSize) {
-      return buildIntentErrorResponse(`ado_upload_workitem_attachment file exceeds the configured max-file-size of ${maxFileSize} bytes`);
-    }
-    const allowedExtensions = Array.isArray(attachmentConfig.allowed_extensions) ? attachmentConfig.allowed_extensions : [];
-    if (allowedExtensions.length > 0 && !allowedExtensions.some(extension => rawPath.toLowerCase().endsWith(String(extension).toLowerCase()))) {
-      return buildIntentErrorResponse("ado_upload_workitem_attachment file extension is not allowed by the workflow configuration");
-    }
-
-    try {
-      const stagingRoot = path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw", "safeoutputs", "upload-artifacts");
-      const stagingDirectory = path.join(stagingRoot, "azure-devops-work-items");
-      fs.mkdirSync(stagingDirectory, { recursive: true, mode: 0o700 });
-      const stagedName = `${crypto.randomUUID()}-${segments[segments.length - 1]}`;
-      const stagedPath = path.join(stagingDirectory, stagedName);
-      fs.copyFileSync(sourcePath, stagedPath, fs.constants.COPYFILE_EXCL);
-      fs.chmodSync(stagedPath, 0o600);
-      entry.staged_file = path.posix.join("azure-devops-work-items", stagedName);
-    } catch (error) {
-      throw new Error(`${ERR_SYSTEM}: Failed to stage Azure DevOps work-item attachment: ${getErrorMessage(error)}`, { cause: error });
-    }
-
-    entry.file_path = rawPath;
-    appendSafeOutputCounted(entry);
-    return {
-      content: [{ type: "text", text: JSON.stringify({ result: "success", file_path: rawPath }) }],
-    };
-  };
-
   /**
    * Handler for create_project tool
    * Spec cross-reference: not part of the numbered outcome types in Safe Output Outcome Evaluation v1.0.0.
@@ -3412,12 +3328,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     pushToPullRequestBranchHandler,
     pushRepoMemoryHandler,
     createIssueHandler,
-    createWorkItemHandler,
-    updateWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_update_work_item"),
-    commentOnWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_comment_on_work_item"),
-    assignWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_assign_work_item"),
-    linkWorkItemsHandler: createAzureDevOpsWorkItemHandler("ado_link_work_items"),
-    uploadWorkItemAttachmentHandler,
     jiraCreateIssueHandler,
     jiraUpdateIssueHandler,
     jiraAddCommentHandler,

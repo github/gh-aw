@@ -15,7 +15,6 @@ func TestGetSafeOutputSecretRequirements(t *testing.T) {
 			SafeOutputs: &SafeOutputsConfig{
 				JiraCreateIssue:   &JiraSafeOutputConfig{},
 				LinearCreateIssue: &LinearCreateIssueConfig{},
-				CreateWorkItems:   &CreateWorkItemConfig{},
 			},
 		})
 
@@ -31,7 +30,6 @@ func TestGetSafeOutputSecretRequirements(t *testing.T) {
 					"LINEAR_TEAM_ID": "${{ secrets.LINEAR_TEAM_ID }}",
 				},
 			},
-			{secretNames: []string{"AZURE_DEVOPS_EXT_PAT"}, name: "Azure DevOps safe outputs", docsAnchor: "#azure-devops-work-items"},
 		}, requirements)
 	})
 
@@ -40,12 +38,10 @@ func TestGetSafeOutputSecretRequirements(t *testing.T) {
 			SafeOutputs: &SafeOutputsConfig{
 				JiraAddComment:   &JiraSafeOutputConfig{},
 				LinearAddComment: &LinearTargetConfig{},
-				UpdateWorkItems:  &UpdateWorkItemConfig{},
 				LinearToken:      "${{ secrets.CUSTOM_LINEAR_TOKEN }}",
 				Env: map[string]string{
-					"JIRA_USER_EMAIL":      "${{ secrets.CUSTOM_JIRA_EMAIL }}",
-					"JIRA_API_TOKEN":       "${{ secrets.CUSTOM_JIRA_TOKEN }}",
-					"AZURE_DEVOPS_EXT_PAT": "${{ secrets.CUSTOM_ADO_PAT }}",
+					"JIRA_USER_EMAIL": "${{ secrets.CUSTOM_JIRA_EMAIL }}",
+					"JIRA_API_TOKEN":  "${{ secrets.CUSTOM_JIRA_TOKEN }}",
 				},
 			},
 		})
@@ -87,19 +83,6 @@ func TestGetSafeOutputSecretRequirements(t *testing.T) {
 			SafeOutputs: &SafeOutputsConfig{
 				JiraCreateIssue: &JiraSafeOutputConfig{},
 				Environment:     "production",
-			},
-		})
-
-		assert.Empty(t, requirements)
-	})
-
-	t.Run("accepts Azure Pipelines system access token override", func(t *testing.T) {
-		requirements := getSafeOutputSecretRequirements(&WorkflowData{
-			SafeOutputs: &SafeOutputsConfig{
-				CommentOnWorkItems: &CommentOnWorkItemConfig{},
-				Env: map[string]string{
-					"SYSTEM_ACCESSTOKEN": "${{ secrets.CUSTOM_SYSTEM_TOKEN }}",
-				},
 			},
 		})
 

@@ -19,7 +19,8 @@ they never fall back to a checkout file or implicitly enable capabilities.
 > These declarations are experimental. Custom connector triggers currently fail
 > closed: importing a connector does not install a receiver, authenticate events,
 > enroll a gateway source, or activate a workflow. Use `workflow_dispatch` until
-> approved ingress is available. The separate built-in integrations are unchanged.
+> approved ingress is available. Azure DevOps uses only this connector path;
+> its former built-in integration has been removed.
 
 ## Configuration
 
@@ -137,7 +138,41 @@ endpoint **and path** change, not just substituting a hostname.
 
 ## Azure DevOps
 
-Declaration: `.github/aw/connectors/azure-devops.md`.
+Embedded import: `"@builtin:connectors/azure-devops.md"`.
+Source: `.github/aw/connectors/azure-devops.md`.
+
+The compiler embeds this Markdown declaration. A consuming repository needs only
+its workflow, not a local connector file. Override the reviewed specimen bindings
+with trusted literal `with` inputs; imports register capabilities but grant none:
+
+```aw wrap
+---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+imports:
+  - uses: "@builtin:connectors/azure-devops.md"
+    with:
+      organization: fabrikam
+      project: 22222222-2222-4222-8222-222222222222
+      project-name: Fabrikam
+      work-item: "123"
+tools:
+  azure-devops: [azure-devops]
+safe-outputs:
+  azure-devops-comment-on-work-item:
+---
+
+Inspect project metadata only. Request a comment only on the approved work item.
+```
+
+Inputs `collection`, `related-work-item`, and `assignee` bind the nonoperational
+trigger collection, fixed Related-link target, and exact allowed assignment
+identity. Defaults are specimens, not discovered resources. `agent-reader-secret`
+and `writer-secret` override secret names, never values. The agent supplies
+`organization`, project UUID, and string `work-item` IDs to the selected write
+operation; they must match its exact approved resource lists.
 
 ### Secrets
 
@@ -154,9 +189,32 @@ bearer access token. Token renewal is not implemented by the declaration.
 | Surface | Current declaration |
 | --- | --- |
 | Triggers | `azure-devops-work-item-created`, `azure-devops-work-item-updated`, `azure-devops-work-item-deleted`, `azure-devops-work-item-restored`. Service hooks require configured authenticated HTTPS ingress and exact collection/project identity; there is no native HMAC header to invent. |
-| MCPs/read tools | Select `azure-devops` at `https://mcp.dev.azure.com/fabrikam`, with `X-MCP-Readonly: true` and only `core_list_projects`. No work-item body reader is declared. |
+| MCPs/read tools | Select `azure-devops` at `https://mcp.dev.azure.com/{organization}`, with `X-MCP-Readonly: true` and only `core_list_projects`. This lists project metadata visible to the identity in that organization; the write project allowlist does not filter remote MCP results. No work-item body reader is declared. |
 | Safe outputs | `azure-devops-create-work-item`, `azure-devops-update-work-item`, `azure-devops-comment-on-work-item`, `azure-devops-assign-work-item`, `azure-devops-link-work-items`. Fixed JSON Patch fields, assignee allowlists, and a reviewed link target. No attachment upload/chaining. |
 | Context | Project metadata only. A work-item ID is a reference, not work-item content; do not claim description/comment hydration. Snapshot and update event IDs differ, and deletion/restoration do not imply closure/reopening. |
+
+### Migration limits
+
+The former `ado-*` safe outputs, `on.gateway-dispatch.azure-devops-issue`, and
+wildcard `shared/mcp/azure-devops.md` import are removed, not aliases.
+`AZURE_DEVOPS_EXT_PAT`, `SYSTEM_ACCESSTOKEN`, and Azure environment variables are
+not automatically consumed. Read MCP and safe-output writes use their own
+explicit Entra token references; selecting only writes never exposes a reader
+credential to the agent.
+
+The current declaration creates fixed Task work items with a title, updates
+titles, posts Markdown `text` comments, assigns an allowlisted identity, and
+adds a fixed Related link. Legacy description/body/state/tag/area/iteration
+updates, custom fields, artifact links, arbitrary link types/targets, attachment
+uploads, temporary-ID chaining, wildcard/area-prefix targeting, and per-output
+legacy options have no drop-in replacement. They fail rather than falling back
+to the removed runtime. Broader operations require separately reviewed
+declarative capabilities and any missing shared-contract support.
+
+Custom trigger selections still fail closed: a verification-profile declaration
+does not deploy authenticated HTTPS ingress. No live Azure request is established
+by offline conformance tests; a separately provisioned Entra credential and
+explicit read-only smoke-test opt-in are required.
 
 ## Slack
 

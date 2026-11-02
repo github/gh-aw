@@ -21,7 +21,7 @@ func providerIssueOn(alias string, config any) map[string]any {
 	if settings, ok := config.(map[string]any); ok {
 		settings = maps.Clone(settings)
 		scope := map[string]string{
-			"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id",
+			"jira-issue": "project", "linear-issue": "organization-id",
 		}[alias]
 		if _, exists := settings[scope]; !exists {
 			settings[scope] = "source-scope"
@@ -33,9 +33,8 @@ func providerIssueOn(alias string, config any) map[string]any {
 
 func providerIssueScopeYAML(alias string) string {
 	return map[string]string{
-		"jira-issue":         "      project: APP\n",
-		"linear-issue":       "      organization-id: organization-uuid\n",
-		"azure-devops-issue": "      project_id: project-uuid\n",
+		"jira-issue":   "      project: APP\n",
+		"linear-issue": "      organization-id: organization-uuid\n",
 	}[alias]
 }
 
@@ -73,7 +72,6 @@ func TestProviderIssueMixedGatewayRequirements(t *testing.T) {
 	on := providerIssueOn("jira-issue", map[string]any{})
 	gateway := on["gateway-dispatch"].(map[string]any)
 	gateway["linear-issue"] = map[string]any{"organization-id": "organization-uuid"}
-	gateway["azure-devops-issue"] = map[string]any{"project_id": "project-uuid"}
 	gateway["issue"] = map[string]any{"types": []any{"opened"}}
 	gateway["dependabot-alerts"] = map[string]any{}
 	gateway["projects-items"] = map[string]any{"project_id": "PVT_example"}
@@ -136,43 +134,14 @@ func TestProviderIssueValidation(t *testing.T) {
 	}
 }
 
-func TestAzureIssueClosedStates(t *testing.T) {
-	for name, states := range map[string]any{
-		"missing": nil, "empty": []any{}, "blank": " ", "numeric": 1, "expression": "${{ github.actor }}",
-	} {
-		t.Run(name, func(t *testing.T) {
-			config := map[string]any{"types": []any{"closed"}, "closed-states": states}
-			_, err := ParseWebhookSubscriptions(providerIssueOn("azure-devops-issue", config), "azure")
-			require.ErrorContains(t, err, "closed-states")
-		})
-	}
-	config := map[string]any{"types": []any{"closed", "reopened"}, "closed-states": []any{"Done", "Closed", "Done"}}
-	subscriptions, err := ParseWebhookSubscriptions(providerIssueOn("azure-devops-issue", config), "azure")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"Closed", "Done"}, subscriptions[0].ActivityNormalization.ClosedStates)
-	assert.Equal(t, []string{"workitem.updated"}, subscriptions[0].NativeEvents)
-
-	subscriptions, err = ParseWebhookSubscriptions(providerIssueOn("azure-devops-issue", map[string]any{}), "azure")
-	require.NoError(t, err)
-	assert.NotContains(t, subscriptions[0].Types, "closed")
-	assert.NotContains(t, subscriptions[0].Types, "reopened")
-	assert.Contains(t, subscriptions[0].Types, "labeled")
-	assert.Contains(t, subscriptions[0].Types, "restored")
-	for _, alias := range []string{"jira-issue", "linear-issue"} {
-		_, err := ParseWebhookSubscriptions(providerIssueOn(alias, map[string]any{"closed-states": "Done"}), "invalid")
-		require.Error(t, err)
-	}
-}
-
 func TestProviderIssuePayloadFilters(t *testing.T) {
 	for alias, test := range map[string]struct {
 		filters map[string]any
 		field   string
 		path    []string
 	}{
-		"jira-issue":         {map[string]any{"labels": []any{"bug", "urgent"}}, "labels", []string{"issue", "fields", "labels", "*"}},
-		"linear-issue":       {map[string]any{"labels": "label-uuid"}, "labels", []string{"data", "labelIds", "*"}},
-		"azure-devops-issue": {map[string]any{"state": map[string]any{"to": "Done"}}, "state.to", []string{"resource", "fields", "System.State", "newValue"}},
+		"jira-issue":   {map[string]any{"labels": []any{"bug", "urgent"}}, "labels", []string{"issue", "fields", "labels", "*"}},
+		"linear-issue": {map[string]any{"labels": "label-uuid"}, "labels", []string{"data", "labelIds", "*"}},
 	} {
 		t.Run(alias, func(t *testing.T) {
 			config := maps.Clone(test.filters)
@@ -258,9 +227,8 @@ func TestProviderIssueRequiredScopes(t *testing.T) {
 		field string
 		path  []string
 	}{
-		"jira-issue":         {"project", []string{"issue", "fields", "project", "key"}},
-		"linear-issue":       {"organization-id", []string{"organizationId"}},
-		"azure-devops-issue": {"project_id", []string{"resourceContainers", "project", "id"}},
+		"jira-issue":   {"project", []string{"issue", "fields", "project", "key"}},
+		"linear-issue": {"organization-id", []string{"organizationId"}},
 	} {
 		t.Run(alias, func(t *testing.T) {
 			_, err := ParseWebhookSubscriptions(map[string]any{"gateway-dispatch": map[string]any{alias: map[string]any{}}}, "missing")

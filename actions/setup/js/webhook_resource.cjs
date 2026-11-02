@@ -12,7 +12,6 @@ const WEBHOOK_TYPES = {
   dependabot_alert: ["assignees_changed", "auto_dismissed", "auto_reopened", "created", "dismissed", "fixed", "reintroduced", "reopened", "withdrawn"],
   jira_issue: ISSUE_TYPES,
   linear_issue: ISSUE_TYPES,
-  azure_devops_issue: [...ISSUE_TYPES, "restored"],
   slash_command: ["opened", "edited", "reopened", "created"],
   label_command: ["labeled"],
   ...Object.fromEntries(Object.entries(GITHUB_NOTIFICATION_EVENTS).map(([event, definition]) => [event, definition.actions])),
@@ -86,13 +85,7 @@ function resolveProviderResource(event, url) {
     }
     return { item_type: event, item_number: match[2], repo: "", source: `${url.origin}/${match[1]}`, url: url.href };
   }
-  // Work item IDs are collection-scoped, not update/revision IDs. The optional
-  // project segment does not change that identity.
-  const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)(?:\/(?:[a-zA-Z0-9_.-]|%[0-9a-fA-F]{2})+)?\/_apis\/wit\/work[Ii]tems\/([1-9][0-9]*)$/);
-  if (!match || (url.hostname !== "dev.azure.com" && !/^[a-zA-Z0-9-]+\.visualstudio\.com$/.test(url.hostname))) {
-    reject("Azure DevOps payload requires a canonical collection work item API URL");
-  }
-  return { item_type: event, item_number: match[2], repo: "", source: `${url.origin}/${match[1]}`, url: url.href };
+  reject("unsupported provider resource");
 }
 
 function resolveWebhookResource(event, payload, env = process.env) {

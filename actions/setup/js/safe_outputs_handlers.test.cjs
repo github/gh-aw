@@ -82,17 +82,6 @@ describe("safe_outputs_handlers", () => {
     handlers = createHandlers(mockServer, mockAppendSafeOutput);
   });
 
-  it("collects Azure DevOps proposals using namespaced message types", () => {
-    handlers.createWorkItemHandler({ temporary_id: "item", title: "Create item" });
-    handlers.updateWorkItemHandler({ id: "#item", title: "Update item" });
-    handlers.commentOnWorkItemHandler({ work_item_id: "#item", body: "Comment" });
-    handlers.assignWorkItemHandler({ work_item_id: "#item", assignee: "user@example.com" });
-    handlers.linkWorkItemsHandler({ source_id: "#item", target_id: 42, type: "related" });
-
-    expect(mockAppendSafeOutput.mock.calls.map(call => call[0].type)).toEqual(["ado_create_work_item", "ado_update_work_item", "ado_comment_on_work_item", "ado_assign_work_item", "ado_link_work_items"]);
-    expect(mockAppendSafeOutput.mock.calls[0][0].temporary_id).toMatch(/^#aw_/);
-  });
-
   it("converts built-in map calls into ledger_append entries", () => {
     const configured = createHandlers(mockServer, mockAppendSafeOutput, {
       ledger_append: {

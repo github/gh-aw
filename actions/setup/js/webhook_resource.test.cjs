@@ -15,7 +15,6 @@ const examples = [
   ["dependabot_alert", "https://api.github.com/repos/org/repo/dependabot/alerts/123", ["created"], "123", undefined],
   ["jira_issue", "https://tenant.atlassian.net/rest/api/3/issue/123", ["edited", "closed", "labeled"], "123", "https://tenant.atlassian.net"],
   ["linear_issue", "https://linear.app/workspace/issue/APP-123/example-title", ["edited", "closed"], "APP-123", "https://linear.app/workspace"],
-  ["azure_devops_issue", "https://dev.azure.com/organization/project/_apis/wit/workItems/123", ["edited", "closed"], "123", "https://dev.azure.com/organization"],
 ];
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,15 +50,13 @@ describe("minimal resource notification contract", () => {
         schema_version: 2,
         event,
         types: payload.type,
-        conditions: Object.entries(isGatewayCommand(event) ? {} : (payload.filters ?? {}))
-          .filter(([filter]) => !(event === "azure_devops_issue" && filter === "closed-states"))
-          .map(([filter, values]) => ({
-            filter,
-            path: definition.filters[filter].path,
-            operator: "equals",
-            value_type: definition.filters[filter].type,
-            values,
-          })),
+        conditions: Object.entries(isGatewayCommand(event) ? {} : (payload.filters ?? {})).map(([filter, values]) => ({
+          filter,
+          path: definition.filters[filter].path,
+          operator: "equals",
+          value_type: definition.filters[filter].type,
+          values,
+        })),
         dispatch: { event_type: "specification", payload_projection: { policy: WEBHOOK_PAYLOAD_POLICY } },
         ...(definition?.native_event ? { native_events: [definition.native_event] } : {}),
         ...(isGatewayCommand(event)
@@ -78,7 +75,7 @@ describe("minimal resource notification contract", () => {
           ? {
               provider: definition.provider,
               native_events: [...new Set(Object.values(definition.native_events))],
-              activity_normalization: { policy: `${definition.provider}-issue/v1`, ...(event === "azure_devops_issue" ? { closed_states: ["Done"] } : {}) },
+              activity_normalization: { policy: `${definition.provider}-issue/v1` },
             }
           : {}),
       };
@@ -94,8 +91,6 @@ describe("minimal resource notification contract", () => {
   it.each([
     ["projects_v2_item", "body.from"],
     ["projects_v2_item", "body.to"],
-    ["azure_devops_issue", "tags.from"],
-    ["azure_devops_issue", "tags.to"],
   ])("allows only exact configured scalar literals for %s %s", (event, filter) => {
     const definition = githubCatalog[event] ?? providerCatalog[event];
     const selected = "reviewed literal";
@@ -112,7 +107,6 @@ describe("minimal resource notification contract", () => {
         values,
       })),
       dispatch: { event_type: "literal-projection", payload_projection: { policy: WEBHOOK_PAYLOAD_POLICY } },
-      ...(event === "azure_devops_issue" ? { provider: "azure-devops", native_events: ["workitem.updated"], activity_normalization: { policy: "azure-devops-issue/v1" } } : {}),
     };
     const payload = { url: examples.find(([family]) => family === event)[1], type: ["edited"], filters };
     const envelope = { action: "literal-projection", client_payload: { schema_version: 2, aw_context: { webhook: { event, deliveries: [{ delivery_id: "literal", payload }] } } } };
@@ -208,23 +202,16 @@ describe("minimal resource notification contract", () => {
     expect(() => resolveWebhookResource("linear_issue", { url, type: ["opened"] })).toThrow(/canonical/);
   });
 
-  it("derives legacy Azure collection identities without treating project or update IDs as resource identity", () => {
-    const url = "https://organization.visualstudio.com/DefaultCollection/project/_apis/wit/workItems/123";
-    expect(resolveWebhookResource("azure_devops_issue", { url, type: ["restored"] })).toMatchObject({ item_number: "123", source: "https://organization.visualstudio.com/DefaultCollection" });
-    expect(() => resolveWebhookResource("azure_devops_issue", { url: `${url}/updates/5`, type: ["edited"] })).toThrow(/canonical/);
-  });
-
-  it.each([
-    ["linear_issue", "https://linear.app/workspace/issue/APP-123/%E6%BC%A2%E5%AD%97", "APP-123", "https://linear.app/workspace"],
-    ["azure_devops_issue", "https://dev.azure.com/organization/My%20Project/_apis/wit/workItems/123", "123", "https://dev.azure.com/organization"],
-  ])("accepts canonical percent-encoded %s URL segments without changing identity", (event, url, number, source) => {
-    expect(resolveWebhookResource(event, { url, type: ["edited"] })).toMatchObject({ item_number: number, source, url });
-  });
+  it.each([["linear_issue", "https://linear.app/workspace/issue/APP-123/%E6%BC%A2%E5%AD%97", "APP-123", "https://linear.app/workspace"]])(
+    "accepts canonical percent-encoded %s URL segments without changing identity",
+    (event, url, number, source) => {
+      expect(resolveWebhookResource(event, { url, type: ["edited"] })).toMatchObject({ item_number: number, source, url });
+    }
+  );
 
   it.each([
     ["linear_issue", "https://linear.app/workspace/issue/APP-123/title%"],
     ["linear_issue", "https://linear.app/workspace/issue/APP-123/title%GG"],
-    ["azure_devops_issue", "https://dev.azure.com/organization/My%Project/_apis/wit/workItems/123"],
   ])("rejects malformed escapes in %s URL segments", (event, url) => {
     expect(() => resolveWebhookResource(event, { url, type: ["edited"] })).toThrow(/canonical/);
   });
@@ -249,17 +236,6 @@ describe("minimal resource notification contract", () => {
       webhook: {
         event: "linear_issue",
         deliveries: ["before", "after"].map(slug => ({ delivery_id: slug, payload: { url: `https://linear.app/workspace/issue/APP-123/${slug}`, type: ["edited"] } })),
-      },
-    });
-    expect(result.items).toHaveLength(1);
-    expect(result.webhook.deliveries).toHaveLength(2);
-  });
-
-  it("deduplicates Azure collection-scoped work items across optional project URL segments", () => {
-    const result = normalizeWebhookContext({
-      webhook: {
-        event: "azure_devops_issue",
-        deliveries: ["", "project/"].map((project, index) => ({ delivery_id: String(index), payload: { url: `https://dev.azure.com/organization/${project}_apis/wit/workItems/123`, type: ["edited"] } })),
       },
     });
     expect(result.items).toHaveLength(1);

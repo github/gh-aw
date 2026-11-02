@@ -125,14 +125,8 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 
 ### Azure DevOps Work Items
 
-| Output | Key | Description |
-|--------|-----|-------------|
-| [Create Work Item](#azure-devops-work-items) | `ado-create-work-item` | Create an Azure DevOps work item (max: 1, experimental) |
-| [Update Work Item](#azure-devops-work-items) | `ado-update-work-item` | Update explicitly enabled fields on a scoped work item (max: 1, experimental) |
-| [Comment on Work Item](#azure-devops-work-items) | `ado-comment-on-work-item` | Add a comment to a scoped work item (max: 1, experimental) |
-| [Assign Work Item](#azure-devops-work-items) | `ado-assign-work-item` | Assign an allowed identity to a scoped work item (max: 1, experimental) |
-| [Link Work Items](#azure-devops-work-items) | `ado-link-work-items` | Link two scoped work items (max: 5, experimental) |
-| [Upload Work Item Attachment](#azure-devops-work-items) | `ado-upload-workitem-attachment` | Attach a staged workspace file to a work item (max: 1, experimental) |
+[Azure DevOps connector safe outputs](/gh-aw/reference/connectors/#azure-devops)
+replace the former built-in work-item handlers.
 
 ### Security & Agent Tasks
 
@@ -1248,45 +1242,10 @@ git checkout --orphan my-custom-branch && git rm -rf . && git commit --allow-emp
 
 ### Azure DevOps Work Items
 
-Azure DevOps work-item safe outputs use the same public tool names as [`ado-aw`](https://githubnext.github.io/ado-aw/reference/safe-outputs/). The agent remains read-only; the safe-output job performs trusted Azure DevOps REST requests.
-
-Provide the organization, project, and credential only to the safe-output job:
-
-> These safe outputs are experimental. Compiling a workflow emits an experimental feature warning for each configured Azure DevOps work-item output.
-
-```yaml wrap
-safe-outputs:
-  env:
-    AZURE_DEVOPS_ORG_URL: ${{ vars.AZURE_DEVOPS_ORG_URL }}
-    SYSTEM_TEAMPROJECT: ${{ vars.AZURE_DEVOPS_PROJECT }}
-    AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
-  ado-create-work-item:
-    work-item-type: Task
-    area-path: MyProject\Platform
-    allowed-tags: [agent-*]
-  ado-update-work-item:
-    target: MyProject\Platform
-    title: true
-    status: true
-  ado-comment-on-work-item:
-    target: MyProject\Platform
-  ado-assign-work-item:
-    target: "*"
-    allowed: [owner@example.com]
-  ado-link-work-items:
-    target: MyProject\Platform
-    allowed-link-types: [parent, child, related]
-  ado-upload-workitem-attachment:
-    target: MyProject\Platform
-    allowed-extensions: [.txt, .log, .pdf]
-    max-file-size: 5242880
-```
-
-Authentication uses `SYSTEM_ACCESSTOKEN` when present, otherwise `AZURE_DEVOPS_EXT_PAT`. `AZURE_DEVOPS_ORG_URL` must use `https://dev.azure.com/{organization}` or `https://{organization}.visualstudio.com`; redirects and embedded credentials are rejected.
-
-`ado_create_work_item` returns a run-scoped `#aw_...` temporary ID. The other work-item tools accept that ID, and same-run IDs bypass their consuming `target` policy because creation was already scoped by trusted configuration. Numeric IDs are checked against `target`, which accepts `"*"`, a single ID, a list of IDs, or an area-path prefix.
-
-For `ado-update-work-item`, each mutable field must be explicitly enabled. Assignment always rejects the reserved `Agency` and `GitHub Copilot` identities. Attachments must be regular workspace files and are checked for traversal, symbolic links, size, extension, and Azure Pipelines command sequences before upload.
+Azure DevOps mutations use independently selected `azure-devops-*` capabilities
+from the embedded Markdown connector, not built-in `ado-*` handlers. See
+[Connectors](/gh-aw/reference/connectors/#azure-devops) for configuration,
+credential boundaries, and migration limitations.
 
 ### No-Op Logging (`noop:`)
 

@@ -526,12 +526,6 @@ type safeOutputsHandlerOutputsAndActionState struct {
 func hasHandlerManagerTypes(data *WorkflowData) bool {
 	return isWorkQueueParticipant(data) ||
 		data.SafeOutputs.CreateIssues != nil ||
-		data.SafeOutputs.CreateWorkItems != nil ||
-		data.SafeOutputs.UpdateWorkItems != nil ||
-		data.SafeOutputs.CommentOnWorkItems != nil ||
-		data.SafeOutputs.AssignWorkItems != nil ||
-		data.SafeOutputs.LinkWorkItems != nil ||
-		data.SafeOutputs.UploadWorkItemAttachments != nil ||
 		data.SafeOutputs.LinearCreateIssue != nil ||
 		data.SafeOutputs.LinearAddComment != nil ||
 		data.SafeOutputs.LinearUpdateIssue != nil ||
@@ -646,7 +640,6 @@ func (c *Compiler) appendHandlerManagerStep(data *WorkflowData, state *safeOutpu
 		}
 		handlerManagerSteps = injectLinearCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		handlerManagerSteps = injectJiraCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
-		handlerManagerSteps = injectAzureDevOpsCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		state.steps = append(state.steps, handlerManagerSteps...)
 		state.safeOutputStepNames = append(state.safeOutputStepNames, "process_safe_outputs")
 		addHandlerManagerOutputs(data, state.outputs)

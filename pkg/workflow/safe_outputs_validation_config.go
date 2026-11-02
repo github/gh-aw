@@ -68,61 +68,6 @@ const (
 // ValidationConfig contains all safe output type validation rules
 // This is the single source of truth for validation rules
 var ValidationConfig = map[string]TypeValidationConfig{
-	"ado_create_work_item": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"title":        {Required: true, Type: "string", Sanitize: true, MinLength: 6, MaxLength: 255},
-			"description":  {Required: true, Type: "string", Sanitize: true, MinLength: 31, MaxLength: MaxBodyLength},
-			"tags":         {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: 256},
-			"temporary_id": {Required: true, Type: "string", Pattern: "^#aw_[A-Za-z0-9_]{3,12}$", TemporaryID: true},
-		},
-	},
-	"ado_update_work_item": {
-		DefaultMax:       1,
-		CustomValidation: "requiresOneOf:title,body,state,area_path,iteration_path,assignee,tags",
-		Fields: map[string]FieldValidation{
-			"id":             {Required: true, IssueNumberOrTemporaryID: true},
-			"title":          {Type: "string", Sanitize: true, MinLength: 1, MaxLength: 255},
-			"body":           {Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
-			"state":          {Type: "string", Sanitize: true, MaxLength: 128},
-			"area_path":      {Type: "string", Sanitize: true, MaxLength: 512},
-			"iteration_path": {Type: "string", Sanitize: true, MaxLength: 512},
-			"assignee":       {Type: "string", Sanitize: true, MaxLength: 256},
-			"tags":           {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: 256},
-		},
-	},
-	"ado_comment_on_work_item": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"work_item_id": {Required: true, IssueNumberOrTemporaryID: true},
-			"body":         {Required: true, Type: "string", Sanitize: true, MinLength: 10, MaxLength: MaxBodyLength},
-		},
-	},
-	"ado_assign_work_item": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"work_item_id": {Required: true, IssueNumberOrTemporaryID: true},
-			"assignee":     {Required: true, Type: "string", Sanitize: true, MinLength: 1, MaxLength: 256},
-		},
-	},
-	"ado_link_work_items": {
-		DefaultMax: 5,
-		Fields: map[string]FieldValidation{
-			"source_id": {Required: true, IssueNumberOrTemporaryID: true},
-			"target_id": {Required: true, IssueNumberOrTemporaryID: true},
-			"link_type": {Required: true, Type: "string", Enum: []string{"parent", "child", "related", "predecessor", "successor", "duplicate", "duplicate-of"}},
-			"comment":   {Type: "string", Sanitize: true, MinLength: 5, MaxLength: 1024},
-		},
-	},
-	"ado_upload_workitem_attachment": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"work_item_id": {Required: true, IssueNumberOrTemporaryID: true},
-			"file_path":    {Required: true, Type: "string", MaxLength: 1024},
-			"staged_file":  {Required: true, Type: "string", Pattern: "^[A-Za-z0-9._/-]+$"},
-			"comment":      {Type: "string", Sanitize: true, MinLength: 3, MaxLength: 1024},
-		},
-	},
 	"linear_create_issue": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

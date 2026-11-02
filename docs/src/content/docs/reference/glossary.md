@@ -482,7 +482,7 @@ See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#text-sanitization-al
 
 ### Temporary ID
 
-A workflow-scoped identifier (format: `aw_` followed by 3–8 alphanumeric characters, e.g. `aw_abc1`) that lets an AI agent reference a resource before it is created. Safe output tools that support temporary IDs — including `create_issue`, `create_discussion`, and `add_comment` — accept a `temporary_id` field. References like `#aw_abc1` in subsequent operations are automatically resolved to actual resource numbers during execution. Useful for creating interlinked resources in a single workflow run. Azure DevOps work-item safe outputs use the same pattern: `ado_create_work_item` returns a run-scoped `#aw_...` ID that other work-item tools accept, bypassing the consuming tool's `target` policy because creation was already scoped by trusted configuration. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/).
+A workflow-scoped identifier (format: `aw_` followed by 3–8 alphanumeric characters, e.g. `aw_abc1`) that lets an AI agent reference a resource before it is created. Safe output tools that support temporary IDs — including `create_issue`, `create_discussion`, and `add_comment` — accept a `temporary_id` field. References like `#aw_abc1` in subsequent operations are automatically resolved to actual resource numbers during execution. Useful for creating interlinked resources in a single workflow run. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/).
 
 ### Jira Safe Outputs (`jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`)
 
@@ -496,21 +496,12 @@ Linear Safe Outputs are experimental. Compiling a workflow that enables any Line
 
 A set of safe outputs that call Linear's public GraphQL API from the isolated safe-output job, using a personal API key configured via `safe-outputs.linear-token` (a secret expression not available to the agent). `linear-create-issue` requires a `team-id`, which accepts a Linear team model UUID, team key such as `ENG`, or team name; comment and update targets accept either a Linear issue model UUID or a shorthand identifier such as `ENG-123`, and are fixed trusted configuration. `linear-update-issue` replaces only the enabled `title` and `body` fields. See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#linear-safe-outputs).
 
-### Azure DevOps Work Items (`ado-create-work-item`, `ado-update-work-item`, `ado-comment-on-work-item`, `ado-assign-work-item`, `ado-link-work-items`, `ado-upload-workitem-attachment`)
+### Azure DevOps Connector
 
-:::caution[Experimental]
-Azure DevOps work-item safe outputs are experimental. Compiling a workflow emits an experimental feature warning for each configured output.
-:::
-
-A set of safe outputs, using the same public tool names as [`ado-aw`](https://githubnext.github.io/ado-aw/reference/safe-outputs/), that perform trusted Azure DevOps REST requests from the privileged safe-output job while the agent remains read-only. The organization (`AZURE_DEVOPS_ORG_URL`), project (`SYSTEM_TEAMPROJECT`), and credential (`SYSTEM_ACCESSTOKEN` or `AZURE_DEVOPS_EXT_PAT`) are provided only to the safe-output job. Work items are scoped and targeted using [Area Path](#area-path) and [Iteration Path](#iteration-path) values; `ado-update-work-item` requires each mutable field to be explicitly enabled, `ado-assign-work-item` always rejects the reserved `Agency` and `GitHub Copilot` identities, and attachments are checked for traversal, symbolic links, size, extension, and Azure Pipelines command sequences before upload. See [Azure DevOps Work Items](/gh-aw/reference/safe-outputs/#azure-devops-work-items).
-
-### Area Path
-
-An Azure DevOps work-item field that organizes items in a hierarchical, backslash-separated path (e.g., `MyProject\Platform\Auth`). Used in Azure DevOps safe outputs to scope work-item creation (`area-path` on `ado-create-work-item`) and to target existing work items for updates, comments, assignments, and links. See [Azure DevOps Work Items](#azure-devops-work-items-ado-create-work-item-ado-update-work-item-ado-comment-on-work-item-ado-assign-work-item-ado-link-work-items-ado-upload-workitem-attachment).
-
-### Iteration Path
-
-An Azure DevOps work-item field that assigns items to a sprint or release cycle using a backslash-separated hierarchical path (e.g., `MyProject\Sprint 42`). Used alongside [Area Path](#area-path) to scope and validate Azure DevOps safe-output targets. See [Azure DevOps Work Items](#azure-devops-work-items-ado-create-work-item-ado-update-work-item-ado-comment-on-work-item-ado-assign-work-item-ado-link-work-items-ado-upload-workitem-attachment).
+An embedded Markdown declaration with independently selected project-metadata
+reads and scoped work-item safe outputs. It has no PAT fallback, automatic
+work-item hydration, temporary-ID chaining, or operational ingress. See
+[Connectors](/gh-aw/reference/connectors/#azure-devops).
 
 ### Approve Workflow Run (`approve-workflow-run:`)
 

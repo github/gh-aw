@@ -41,12 +41,6 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 
 	// Direct nil checks — no reflection, no heap allocation.
 	return safeOutputs.CreateIssues != nil ||
-		safeOutputs.CreateWorkItems != nil ||
-		safeOutputs.UpdateWorkItems != nil ||
-		safeOutputs.CommentOnWorkItems != nil ||
-		safeOutputs.AssignWorkItems != nil ||
-		safeOutputs.LinkWorkItems != nil ||
-		safeOutputs.UploadWorkItemAttachments != nil ||
 		hasAnyJiraSafeOutputEnabled(safeOutputs) ||
 		safeOutputs.CreateAgentSessions != nil ||
 		safeOutputs.CreateDiscussions != nil ||
@@ -116,12 +110,6 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 
 	// Direct nil checks for non-builtin pointer fields.
 	return safeOutputs.CreateIssues != nil ||
-		safeOutputs.CreateWorkItems != nil ||
-		safeOutputs.UpdateWorkItems != nil ||
-		safeOutputs.CommentOnWorkItems != nil ||
-		safeOutputs.AssignWorkItems != nil ||
-		safeOutputs.LinkWorkItems != nil ||
-		safeOutputs.UploadWorkItemAttachments != nil ||
 		hasAnyJiraSafeOutputEnabled(safeOutputs) ||
 		safeOutputs.CreateAgentSessions != nil ||
 		safeOutputs.CreateDiscussions != nil ||

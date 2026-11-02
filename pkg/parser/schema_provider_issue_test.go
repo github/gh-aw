@@ -8,7 +8,7 @@ import (
 )
 
 func TestProviderIssueSchema(t *testing.T) {
-	for _, alias := range []string{"jira-issue", "linear-issue", "azure-devops-issue"} {
+	for _, alias := range []string{"jira-issue", "linear-issue"} {
 		for name, test := range map[string]struct {
 			config any
 			valid  bool
@@ -30,15 +30,9 @@ func TestProviderIssueSchema(t *testing.T) {
 				valid := test.valid
 				if settings, ok := config.(map[string]any); ok {
 					settings = maps.Clone(settings)
-					field := map[string]string{"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id"}[alias]
+					field := map[string]string{"jira-issue": "project", "linear-issue": "organization-id"}[alias]
 					settings[field] = "source-scope"
-					if alias == "azure-devops-issue" && name == "activities" {
-						settings["closed-states"] = []any{"Done"}
-					}
 					config = settings
-				}
-				if alias == "azure-devops-issue" && name == "labels" {
-					valid = false
 				}
 				err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 					"on": map[string]any{"gateway-dispatch": map[string]any{alias: config}},
@@ -53,28 +47,9 @@ func TestProviderIssueSchema(t *testing.T) {
 	}
 }
 
-func TestAzureIssueClosedStatesSchema(t *testing.T) {
-	for name, states := range map[string]any{
-		"null": nil, "empty": []any{}, "blank": " ", "number": 123, "mixed": []any{"Done", false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": map[string]any{"gateway-dispatch": map[string]any{"azure-devops-issue": map[string]any{"project_id": "project-uuid", "types": []any{"closed"}, "closed-states": states}}}}, "azure.md")
-			require.Error(t, err)
-		})
-	}
-	for _, alias := range []string{"jira-issue", "linear-issue"} {
-		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": map[string]any{"gateway-dispatch": map[string]any{alias: map[string]any{"closed-states": []any{"Done"}}}}}, "provider.md")
-		require.Error(t, err)
-	}
-	for _, activity := range []string{"closed", "reopened"} {
-		err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{"on": map[string]any{"gateway-dispatch": map[string]any{"azure-devops-issue": map[string]any{"project_id": "project-uuid", "types": []any{activity}}}}}, "azure.md")
-		require.ErrorContains(t, err, "closed-states")
-	}
-}
-
 func TestProviderIssueRequiredScopesSchema(t *testing.T) {
 	for alias, field := range map[string]string{
-		"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id",
+		"jira-issue": "project", "linear-issue": "organization-id",
 	} {
 		t.Run(alias, func(t *testing.T) {
 			on := map[string]any{"gateway-dispatch": map[string]any{alias: map[string]any{}}}

@@ -233,7 +233,6 @@ func TestGatewayDispatchSchema(t *testing.T) {
 		"dependabot-alerts":   map[string]any{},
 		"jira-issue":          map[string]any{"project": "APP"},
 		"linear-issue":        map[string]any{"organization-id": "org"},
-		"azure-devops-issue":  map[string]any{"project_id": "project"},
 	} {
 		t.Run(trigger, func(t *testing.T) {
 			on := map[string]any{"gateway-dispatch": map[string]any{trigger: config, "repos": []any{"owner/*"}}, "roles": []any{"write"}, "bots": []any{"cao-gateway"}}

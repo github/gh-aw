@@ -342,8 +342,8 @@ describe("safe_output_manifest", () => {
       expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);
     });
 
-    it("should infer the azure-devops provider (hyphenated) from the metadata provider, matching ADO handler naming", () => {
-      const item = extractCreatedItemFromResult("ado_add_comment", {
+    it("should preserve an explicitly reported external provider without inferring it from a tool prefix", () => {
+      const item = extractCreatedItemFromResult("connector_12_azure_devops_comment_on_work_item", {
         success: true,
         number: 123,
         metadata: { provider: "azure-devops", project: "my-project", comment_id: 5 },

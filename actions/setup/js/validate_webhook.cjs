@@ -114,11 +114,8 @@ function matchesProjectedFilters(subscription, payload) {
   if (isGatewayCommand(subscription.event)) return matchesGatewayCommandSubscription(subscription, payload);
   const projected = payload.filters ?? {};
   const groups = subscription.any_of ?? [[]];
-  const terminal = subscription.event === "azure_devops_issue" && payload.type.some(type => ["closed", "reopened"].includes(type));
-  if (terminal && (projected["closed-states"]?.length !== 1 || !Array.isArray(subscription.activity_normalization.closed_states))) return false;
   return groups.some(group => {
     const conditions = [...subscription.conditions, ...group];
-    if (terminal) conditions.push({ filter: "closed-states", values: subscription.activity_normalization.closed_states });
     const names = new Set(conditions.map(condition => condition.filter));
     return (
       Object.keys(projected).length === names.size &&

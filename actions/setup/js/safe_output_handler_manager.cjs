@@ -130,12 +130,6 @@ const HANDLER_MAP = {
   report_incomplete: "./report_incomplete_handler.cjs",
   create_report_incomplete_issue: "./create_report_incomplete_issue.cjs",
   create_project: "./create_project.cjs",
-  ado_create_work_item: "./create_work_item.cjs",
-  ado_update_work_item: "./update_work_item.cjs",
-  ado_comment_on_work_item: "./comment_on_work_item.cjs",
-  ado_assign_work_item: "./assign_work_item.cjs",
-  ado_link_work_items: "./link_work_items.cjs",
-  ado_upload_workitem_attachment: "./upload_workitem_attachment.cjs",
   create_project_status_update: "./create_project_status_update.cjs",
   update_project: "./update_project.cjs",
   upload_artifact: "./upload_artifact.cjs",
@@ -208,8 +202,6 @@ const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "ledger_mutation",
   "create_report_incomplete_issue",
   "report_incomplete",
-  "ado_create_work_item",
-  "ado_comment_on_work_item",
 ]);
 
 /**
@@ -262,10 +254,6 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "call_workflow",
   "autofix_code_scanning_alert",
   "create_agent_session",
-  "ado_update_work_item",
-  "ado_assign_work_item",
-  "ado_link_work_items",
-  "ado_upload_workitem_attachment",
 ]);
 
 /**

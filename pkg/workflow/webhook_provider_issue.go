@@ -7,16 +7,14 @@ import (
 	"maps"
 	"slices"
 	"sort"
-	"strings"
 )
 
 //go:embed data/provider_issue_webhooks.json
 var providerIssueCatalogJSON []byte
 
 var providerIssueTriggers = map[string]string{
-	"jira-issue":         "jira_issue",
-	"linear-issue":       "linear_issue",
-	"azure-devops-issue": "azure_devops_issue",
+	"jira-issue":   "jira_issue",
+	"linear-issue": "linear_issue",
 }
 
 func isWebhookTrigger(name string) bool {
@@ -30,8 +28,7 @@ func isWebhookTrigger(name string) bool {
 // WebhookActivityNormalization identifies the documented, payload-only policy
 // that maps native provider updates to GitHub-style issue activity names.
 type WebhookActivityNormalization struct {
-	Policy       string   `json:"policy"`
-	ClosedStates []string `json:"closed_states,omitempty"`
+	Policy string `json:"policy"`
 }
 
 func addProviderIssueCatalog(catalog map[string]WebhookEvent) error {
@@ -52,42 +49,16 @@ func addProviderIssueConfigs(on, events map[string]any, paths map[string]string)
 	}
 }
 
-func providerIssueConfig(config map[string]any, path, event string, definition WebhookEvent) (map[string]any, []string, error) {
-	var err error
+func providerIssueConfig(config map[string]any, path, event string, definition WebhookEvent) (map[string]any, error) {
 	if definition.Provider != "" {
-		config, err = providerIssueSelectors(config, path, event)
-		if err != nil {
-			return nil, nil, err
-		}
+		return providerIssueSelectors(config, path, event)
 	}
-	if event != "azure_devops_issue" {
-		return config, nil, nil
-	}
-	var closedStates []string
-	if raw, exists := config["closed-states"]; exists {
-		var err error
-		closedStates, err = webhookStringValues(raw, path+".closed-states")
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, state := range closedStates {
-			if strings.Contains(state, "${{") {
-				return nil, nil, fmt.Errorf("%s.closed-states must contain literal state names, not GitHub Actions expressions", path)
-			}
-		}
-	}
-	if _, specified := config["types"]; !specified && len(closedStates) == 0 {
-		config = maps.Clone(config)
-		config["types"] = slices.DeleteFunc(slices.Clone(definition.Actions), func(activity string) bool {
-			return activity == "closed" || activity == "reopened"
-		})
-	}
-	return config, closedStates, nil
+	return config, nil
 }
 
 func providerIssueSelectors(config map[string]any, path, event string) (map[string]any, error) {
 	scope := map[string]string{
-		"jira_issue": "project", "linear_issue": "organization-id", "azure_devops_issue": "project_id",
+		"jira_issue": "project", "linear_issue": "organization-id",
 	}[event]
 	if _, exists := config["filters"]; exists {
 		return nil, fmt.Errorf("%s.filters is not supported; put selectors directly under %s, including required %s", path, path, scope)
@@ -115,26 +86,16 @@ func providerIssueSelectors(config map[string]any, path, event string) (map[stri
 		normalized["types"] = raw
 		delete(selectors, "types")
 	}
-	if event == "azure_devops_issue" {
-		if raw, exists := config["closed-states"]; exists {
-			normalized["closed-states"] = raw
-			delete(selectors, "closed-states")
-		}
-	}
 	return normalized, nil
 }
 
-func applyProviderIssueNormalization(subscription *WebhookSubscription, definition WebhookEvent, closedStates []string, path string) error {
+func applyProviderIssueNormalization(subscription *WebhookSubscription, definition WebhookEvent, path string) error {
 	if definition.Provider == "" {
 		return nil
 	}
-	if definition.Provider == "azure-devops" && len(closedStates) == 0 &&
-		slices.ContainsFunc(subscription.Types, func(activity string) bool { return activity == "closed" || activity == "reopened" }) {
-		return fmt.Errorf("%s.closed-states is required for closed or reopened activities; use the terminal state names configured for the Azure DevOps project", path)
-	}
 	subscription.Provider = definition.Provider
 	subscription.ActivityNormalization = &WebhookActivityNormalization{
-		Policy: definition.Provider + "-issue/v1", ClosedStates: closedStates,
+		Policy: definition.Provider + "-issue/v1",
 	}
 	for _, activity := range subscription.Types {
 		native, exists := definition.NativeEvents[activity]

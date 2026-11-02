@@ -185,7 +185,6 @@ func TestWebhookRepositoriesAreSharedOnlyWithRepositoryAwareEvents(t *testing.T)
 		"dependabot-alerts":   map[string]any{},
 		"jira-issue":          map[string]any{"project": "APP"},
 		"linear-issue":        map[string]any{"organization-id": "org"},
-		"azure-devops-issue":  map[string]any{"project_id": "project"},
 	}}
 	before, err := json.Marshal(on)
 	require.NoError(t, err)
