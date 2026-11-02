@@ -37,9 +37,10 @@ func applyEngineCooldownField(config *EngineConfig, obj map[string]any) {
 			days, valid = int(value), true
 		}
 	case json.Number:
-		parsed, err := strconv.ParseInt(string(value), 10, 64)
-		days = int(parsed)
-		valid = err == nil && int64(days) == parsed
+		parsed, err := strconv.ParseInt(string(value), 10, 0)
+		if err == nil {
+			days, valid = int(parsed), true
+		}
 	}
 	if !valid || days < 0 {
 		config.cooldownError = NewValidationError("engine.cooldown", fmt.Sprint(raw),
