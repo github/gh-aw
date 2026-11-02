@@ -102,6 +102,7 @@ func (source *workflowSource) emitWithValidation(lowered string, validate func(s
 	if err != nil {
 		return "", err
 	}
+	preserveSourceLiteralNewlines(body.Body, false)
 	content := file.String()
 	if !strings.HasSuffix(source.text, "\n") {
 		content = strings.TrimSuffix(content, "\n")

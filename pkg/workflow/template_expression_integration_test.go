@@ -104,11 +104,11 @@ ${{ steps.sanitized.outputs.text }}
 		t.Error("Compiled workflow should contain PR number conditional with aw_context fallback in GitHub context")
 	}
 
-	// Verify that the main workflow content is loaded via runtime-import
+	// Verify that the main workflow content is loaded as an author file.
 	// Template conditionals in the user's markdown (like steps.sanitized.outputs.text)
 	// are processed at runtime by the JavaScript runtime_import helper
-	if !strings.Contains(compiledStr, "{{#runtime-import") {
-		t.Error("Compiled workflow should contain runtime-import macro for main workflow content")
+	if !strings.Contains(promptRenderPlan(t, compiledStr), "{{#author-prompt analyzer.md}}") {
+		t.Error("Compiled workflow should load the main workflow through the author prompt config")
 	}
 
 	// Verify that expressions OUTSIDE template conditionals are NOT double-wrapped
@@ -271,11 +271,11 @@ Steps expression - will be wrapped.
 		t.Error("GitHub context should contain issue number conditional with aw_context fallback")
 	}
 
-	// Verify that the main workflow content is loaded via runtime-import
+	// Verify that the main workflow content is loaded as an author file.
 	// Template conditionals in the user's markdown (like steps, true/false literals, etc.)
 	// are processed at runtime by the JavaScript runtime_import helper
-	if !strings.Contains(compiledStr, "{{#runtime-import") {
-		t.Error("Compiled workflow should contain runtime-import macro for main workflow content")
+	if !strings.Contains(promptRenderPlan(t, compiledStr), "{{#author-prompt mixed.md}}") {
+		t.Error("Compiled workflow should load the main workflow through the author prompt config")
 	}
 
 	// Make sure we didn't create invalid double-wrapping

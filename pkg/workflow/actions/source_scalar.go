@@ -39,19 +39,7 @@ func (shift sourceLiteralIndentVisitor) Visit(node ast.Node) ast.Visitor {
 				lines[index] = line[min(indent, -int(shift)):]
 			}
 		}
-		origin := strings.Join(lines, "\n")
-		if strings.Contains(literal.Start.Value, "+") {
-			trimmed := strings.TrimRight(origin, " ")
-			end := strings.TrimRight(trimmed, "\n")
-			newlines := len(trimmed) - len(end)
-			if newlines > 1 {
-				// LiteralNode.String trims terminal newlines. Indented empty
-				// lines retain keep-chomping semantics through that renderer.
-				blank := "\n" + strings.Repeat(" ", sourceLiteralIndent(trimmed))
-				origin = end + strings.Repeat(blank, newlines-1) + "\n"
-			}
-		}
-		literal.Value.Token.Origin = origin
+		literal.Value.Token.Origin = strings.Join(lines, "\n")
 	}
 	return shift
 }
@@ -61,6 +49,65 @@ func shiftSourceNode(node ast.Node, column int) {
 	// Move that body with the syntax node so nested replacements stay valid.
 	ast.Walk(sourceLiteralIndentVisitor(column), node)
 	node.AddColumn(column)
+}
+
+func preserveSourceLiteralNewlines(node ast.Node, followingBlankLine bool) {
+	switch value := node.(type) {
+	case *ast.MappingNode:
+		for index, field := range value.Values {
+			blank := followingBlankLine
+			next := index + 1
+			if next >= 0 && next < len(value.Values) {
+				blank = strings.HasPrefix(value.Values[next].String(), "\n")
+			}
+			preserveSourceLiteralNewlines(field, blank)
+		}
+	case *ast.MappingValueNode:
+		preserveSourceLiteralNewlines(value.Value, followingBlankLine && value.FootComment == nil)
+	case *ast.SequenceNode:
+		for index, child := range value.Values {
+			blank := followingBlankLine && value.FootComment == nil
+			next := index + 1
+			if next >= 0 && next < len(value.Values) {
+				blank = strings.HasPrefix(value.Values[next].String(), "\n")
+			}
+			preserveSourceLiteralNewlines(child, blank)
+		}
+	case *ast.AnchorNode:
+		preserveSourceLiteralNewlines(value.Value, followingBlankLine)
+	case *ast.TagNode:
+		preserveSourceLiteralNewlines(value.Value, followingBlankLine)
+	case *ast.LiteralNode:
+		preserveSourceLiteralSuffix(value, followingBlankLine)
+	}
+}
+
+func preserveSourceLiteralSuffix(literal *ast.LiteralNode, followingBlankLine bool) {
+	if !strings.Contains(literal.Start.Value, "+") {
+		return
+	}
+	text := literal.Value.Value
+	newlines := len(text) - len(strings.TrimRight(text, "\n"))
+	if newlines <= 1 {
+		return
+	}
+	origin := literal.Value.Token.Origin
+	lines := strings.Split(origin, "\n")
+	end := 0
+	for index, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			end = index + 1
+		}
+	}
+	lines = lines[:end]
+	// LiteralNode.String trims terminal newlines, while the next mapping key
+	// can retain one blank line through its token positions. Account for both
+	// only after merging, when the actual following syntax is known.
+	if followingBlankLine {
+		newlines--
+	}
+	blank := "\n" + strings.Repeat(" ", sourceLiteralIndent(origin))
+	literal.Value.Token.Origin = strings.Join(lines, "\n") + strings.Repeat(blank, newlines-1) + "\n"
 }
 
 func sourceScalarReplacement(source, replacement ast.Node) (ast.Node, error) {

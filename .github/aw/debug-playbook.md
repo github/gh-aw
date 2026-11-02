@@ -1,5 +1,5 @@
 ---
-description: Diagnose gh-aw diagnostic codes using cached audits, targeted evidence, and code-specific remedies. No dispatch.
+description: Diagnose gh-aw codes without dispatch.
 disable-model-invocation: true
 ---
 
@@ -10,8 +10,7 @@ Do not dispatch workflows or execute artifacts. Keep secrets/prompts/configurati
 
 ## Start here
 
-Keep supplied URL in `RUN_URL`, including its fragment.
-Derive `REPO` (`HOST/OWNER/REPO`) and `RUN_ID` from it; qualify bare IDs first.
+Preserve `RUN_URL`, including its fragment; derive `REPO` (`HOST/OWNER/REPO`)/`RUN_ID`. Qualify bare IDs.
 
 ```bash
 : "${RUN_URL:?Set URL}"
@@ -24,7 +23,7 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
 Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
-Preserve codes/severity; advisory/pending/skipped/policy-denied aren't always bugs.
+Preserve codes/severity; advisory/pending/skipped/policy-denied aren't necessarily bugs.
 Unknown: [unmapped codes](#unmapped-codes).
 
 ## Audit findings
@@ -53,9 +52,8 @@ Unknown: [unmapped codes](#unmapped-codes).
 
 ## Agent, model, and proxy classifications
 
-Inspect `agent-stdio.log`, `agent_execution.json`, native errors/reflection/proxy events.
+Inspect `agent-stdio.log`, `agent_execution.json`, native errors/reflection/proxy events, and [model inventory](#model-availability).
 Assistant/tool prose isn't native error.
-Inventory: [Model availability](#model-availability).
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
@@ -97,8 +95,8 @@ gh aw models --json --refresh-observed=false --logs-dir "$EVIDENCE"
 gh aw models --repo "$REPO" --logs-dir "$EVIDENCE" --refresh-count 5
 ```
 
-Keep `catalog`, `aliases`, `observed` distinct; aggregates don't prove same-run access.
-Prefer cache; refresh downloads artifacts.
+`catalog`/`aliases`/`observed` differ; aggregates don't prove same-run access.
+Refresh downloads artifacts.
 
 ### Verify exact same-run inventory
 
@@ -127,8 +125,8 @@ Resolve provider aliases (`github` → `copilot`); inspect `auto`/`opus`
 | ID present; inference rejected | Inspect request model/API/status/policy/auth error. |
 
 `token-usage.jsonl`: empty file + fatal startup rejection supports no inference;
-missing file proves nothing. Missing/expired/denied artifacts remain unavailable.
-Use targeted `gh run download` for `agent`/`info` only if audit fails.
+missing file proves nothing. Missing/expired/denied artifacts: unavailable.
+If audit fails, target `gh run download` at `agent`/`info`.
 
 ### Compare one success
 
@@ -138,15 +136,14 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
   --output "$EVIDENCE" --json
 ```
 
-First run = reference. Compare model/provider, credential source (names only),
-revision, runtimes, inventory; success doesn't establish model identity.
+Reference = first run. Compare model/provider, credential source (names only),
+revision/runtimes/inventory; success doesn't establish identity.
 Different inventories, same AWF version: not proof of regression/retirement.
 Require evidence for removal time/cause.
 Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
 
 Absent pin: verify same-provider API/capabilities/policy.
 Authorized patch: edit source/recompile; compilation cannot test inference.
-Runtime defect: [model/engine guide](debug-model-engine-misconfiguration.md).
 
 ## Completion and safe-output errors
 
@@ -190,18 +187,18 @@ Nonempty `safeoutputs.jsonl` doesn't prove publication.
 
 ## Merge guard codes
 
-Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authorization.
+Diagnosis isn't merge authorization.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Syntax/patterns; actual head/base. | Fix authorized target/config. |
-| `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default restrictions; required PR. | Use permitted PR path; retain protections. |
-| `pr_is_draft` | Draft state. | Author-authorized readiness only. |
-| `merge_conflicts`, `not_mergeable` | Live mergeability/conflicts; unknown != conflict. | Resolve on reviewed head; bounded wait for known state. |
-| `missing_required_labels`, `title_prefix_mismatch` | Required labels/title. | Authorized correction; retain handler guards. |
-| `required_checks_missing`, `required_checks_failing` | Check identity/SHA/completion/result. | Fix current-head checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `unresolved_review_threads` | Pending/blocked reviews; open threads. | Address feedback; retain reviewer authority/policy. |
-| `merge_not_completed`, `merge_operation_error` | API response; live state. | Reconcile before retry; possibly merged. |
+| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
+| `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR restrictions. | Use permitted PRs; retain protections. |
+| `pr_is_draft`, `pr_not_open` | Draft/open state. | Respect author readiness; stop closed/merged targets. |
+| `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
+| `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
+| `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Fix current-head checks; require complete, unambiguous configured-producer evidence; no bypass. |
+| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Pending/blocked reviews; vetoes; open threads; current-head allowlisted human approval. | Address feedback; retain reviewer authority and independent-human approval. |
+| `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
 
