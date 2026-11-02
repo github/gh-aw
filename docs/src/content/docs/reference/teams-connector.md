@@ -55,8 +55,15 @@ The connection path references the repository's synthetic fixture, not a
 production connection. Replace it with a reviewed repository-relative
 connection before deployment. Both paths resolve from the repository root.
 The YAML frontmatter is also preserved in the provider's `workflow.yaml`
-fixture. New-grammar compilation awaits the matching shared compiler revision;
-provider-local structural checks are not a compilation or deployment claim.
+fixture. The `.yaml` fixtures contain configuration only; they are not directly
+compilable agentic workflow files. Compilation tests wrap them in Markdown
+frontmatter and a prompt, as shown above. Do not pass the raw YAML fixture to
+`gh aw compile`.
+
+Provider compilation tests exercise this combined selection and the
+context-only selection through the shared compiler. They verify phase-specific
+plans and credential placement in the generated jobs. These are offline
+compilation checks, not a deployment or provider-authorization claim.
 
 Each of `on`, `tools`, `context`, and `safe-outputs` inside the connector block
 is independently optional. Omission selects no capability of that kind.
