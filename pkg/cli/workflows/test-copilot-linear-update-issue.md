@@ -5,13 +5,12 @@ permissions:
   contents: read
   actions: read
 engine: copilot
+imports:
+  - uses: "@builtin:connectors/linear.md"
+    with:
+      issues: [22222222-2222-4222-8222-222222222222]
 safe-outputs:
-  linear-token: ${{ secrets.LINEAR_API_KEY }}
   linear-update-issue:
-    target: "ENG-123"
-    title: true
-    body: true
-    max: 1
 timeout-minutes: 5
 ---
 
@@ -21,4 +20,5 @@ Test the linear-update-issue safe output functionality.
 
 Update the title and body of an existing Linear issue.
 
-Output as JSONL format using the `linear_update_issue` tool.
+Use `connector_6_linear_update_issue` with the approved issue UUID, title and
+body. Replace the specimen UUID before live use.

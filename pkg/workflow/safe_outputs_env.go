@@ -255,37 +255,9 @@ func (c *Compiler) addSafeOutputEnvVars(steps *[]string, data *WorkflowData, inc
 			if key == "GH_AW_CI_TRIGGER_TOKEN" && ciTriggerTokenDisabled {
 				continue
 			}
-			if hasAnyJiraSafeOutputEnabled(data.SafeOutputs) && jiraSafeOutputDefaultEnv[key] != "" {
-				continue
-			}
-			if data.SafeOutputs.LinearCreateIssue != nil && (key == "LINEAR_TEAM_ID" || key == "LINEAR_PROJECT_ID") {
-				continue
-			}
 			*steps = append(*steps, fmt.Sprintf("          %s: %s\n", key, data.SafeOutputs.Env[key]))
 		}
 	}
-}
-
-func injectProcessorStepEnv(steps []string, env map[string]string) []string {
-	if len(env) == 0 {
-		return steps
-	}
-	processStepFound := false
-	for index, step := range steps {
-		if step == "      - name: Process Safe Outputs\n" {
-			processStepFound = true
-			continue
-		}
-		if processStepFound && step == "        env:\n" {
-			var inserted []string
-			for _, name := range sliceutil.SortedKeys(env) {
-				inserted = append(inserted, fmt.Sprintf("          %s: %s\n", name, env[name]))
-			}
-			tail := append([]string(nil), steps[index+1:]...)
-			return append(append(steps[:index+1], inserted...), tail...)
-		}
-	}
-	return steps
 }
 
 func (c *Compiler) addResolvedSafeOutputGitHubTokenForConfig(steps *[]string, data *WorkflowData, configToken string, resolver func(string) string, allowGitHubApp bool) {

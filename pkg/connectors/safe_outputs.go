@@ -22,6 +22,9 @@ func (p *Plan) PrepareSafeOutput(name string, args map[string]any) (*SafeOutputR
 		return nil, errors.New("connector safe-output operation is not selected")
 	}
 	op := p.spec.SafeOutputs[name]
+	if len(op.TrustedInputs) > 0 && p.trustedOperation != name {
+		return nil, errors.New("trusted connector inputs must be resolved by the safe-output host")
+	}
 	if err := validateArguments(op.Inputs, op.Resources, p.connection.Resources, args); err != nil {
 		return nil, err
 	}

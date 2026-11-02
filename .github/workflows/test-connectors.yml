@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/aw/connectors/**'
       - '.github/workflows/test-connectors.yml'
+      - 'resources.go'
       - 'pkg/connectors/**'
       - 'pkg/workflow/*connector*'
       - 'pkg/parser/*connector*'
@@ -15,6 +16,7 @@ on:
     paths:
       - '.github/aw/connectors/**'
       - '.github/workflows/test-connectors.yml'
+      - 'resources.go'
       - 'pkg/connectors/**'
       - 'pkg/workflow/*connector*'
       - 'pkg/parser/*connector*'

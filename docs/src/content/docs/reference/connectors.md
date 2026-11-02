@@ -8,11 +8,20 @@ They declare endpoints, credential secret names, exact resource grants, and
 capabilities under `connectors.<id>`; no separate YAML definition or connection
 file is required. Review the specimen hosts and resource IDs before use.
 
+The compiler embeds these declarations. Import `"@builtin:connectors/<provider>.md"`
+to use the declaration shipped with that compiler, without copying files into the
+consumer repository. Local `.github/aw/connectors/` imports and pinned remote
+imports remain available for reviewed endpoint and resource customizations.
+Embedded imports use the same `uses`/`with` inputs and validation as other imports;
+they never fall back to a checkout file or implicitly enable capabilities.
+
 > [!IMPORTANT]
 > These declarations are experimental. Custom connector triggers currently fail
 > closed: importing a connector does not install a receiver, authenticate events,
 > enroll a gateway source, or activate a workflow. Use `workflow_dispatch` until
-> approved ingress is available. The separate built-in integrations are unchanged.
+> approved ingress is available. Azure DevOps, Jira, and Linear use only this shared
+> connector path; their former built-in integrations, toolsets, and
+> provider-specific handlers have been removed.
 
 ## Configuration
 
@@ -25,9 +34,11 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: .github/aw/connectors/linear.md
+  - uses: "@builtin:connectors/linear.md"
     with:
-      reader-secret: LINEAR_API_KEY
+      issues: [22222222-2222-4222-8222-222222222222]
+      organizations: [11111111-1111-4111-8111-111111111111]
+      teams: [33333333-3333-4333-8333-333333333333]
 tools:
   linear: [get-issue]
 safe-outputs:
@@ -39,7 +50,11 @@ Request a comment only when useful; never call a write API directly.
 ```
 
 `with` overrides secret **names**, not values, through ordinary `import-schema`
-inputs. Cross-repository imports use pinned `owner/repo/path@ref` references.
+inputs. Linear also accepts exact resource arrays through `with`; replace the
+specimen UUIDs above with approved resources. The `@builtin:connectors/linear.md`
+import is embedded in the compiler and requires no connector file in the
+consumer checkout. Local declarations and pinned cross-repository
+`owner/repo/path@ref` imports remain available.
 Importing grants nothing: omit `tools` or `safe-outputs` to disable that phase.
 Root triggers and safe outputs use `<id>-<capability>`; unqualified GitHub
 safe outputs retain their existing meaning.
@@ -142,7 +157,7 @@ Declaration: `.github/aw/connectors/linear.md`.
 Create separate personal API keys in Linear **Settings > Security & access**,
 restricted to the required read or write permissions and teams. Store the raw
 keys as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`; GraphQL personal keys
-do not use a `Bearer ` prefix. For hosted MCP, obtain an authorized bearer token
+use raw Authorization rather than a bearer prefix. For hosted MCP, obtain an authorized bearer token
 through the supported Linear MCP authorization flow and store it separately as
 `LINEAR_READ_MCP_TOKEN`. Personal-key GraphQL access does not prove hosted MCP
 compatibility. See [Linear API authentication](https://linear.app/developers/graphql)
@@ -152,12 +167,83 @@ and [MCP setup](https://linear.app/docs/mcp).
 | --- | --- |
 | Triggers | `linear-issue-created`, `linear-issue-updated`, `linear-issue-removed` for native Issue create/update/remove. Requires raw-body HMAC and timestamp verification with the webhook signing secret, separate from API keys. No inferred closure or label transitions. |
 | MCPs/read tools | Hosted `read-only` at `https://mcp.linear.app/mcp/readonly`, allowing only `get_issue`. REST/GraphQL selections: `get-issue`, `resolve-team`, `resolve-project`. |
-| Safe outputs | `linear-create-issue`, `linear-update-issue`, `linear-add-comment`. Fixed GraphQL operations and approved organization/team/project/issue targets. |
+| Safe outputs | `linear-create-issue`, `linear-create-issue-in-project`, `linear-update-issue`, `linear-add-comment`. Fixed GraphQL operations and approved organization/team/project/issue targets. |
 | Context | Fetch the approved issue with `get-issue`; validate organization and team. Resolution is bounded and rejects ambiguity. No automatic resolution chain or paginated hydration. |
+
+### Migration from built-in Linear
+
+Import `@builtin:connectors/linear.md`, supply approved resource arrays through
+`with`, and independently select capabilities. Resource inputs are `issues`,
+`organizations`, `teams`, `projects`, `team-keys`, and `project-slugs`; each
+defaults to an empty allowlist. Selection fails closed when any required grant
+is missing. Secret-name overrides are `reader-secret`, `mcp-reader-secret`, and
+`writer-secret`.
+
+The former `tools.linear: {token, toolsets, allowed, required}` shorthand,
+`safe-outputs.linear-token`, output options such as `target`, `team-id`, `max`,
+and `staged`, and `on.gateway-dispatch.linear-issue` are no longer supported.
+Connector safe-output selections accept only null or `{}`. Their generated tools
+are `connector_6_linear_create_issue`, `connector_6_linear_update_issue`, and
+`connector_6_linear_add_comment`. Targets are typed UUID arguments constrained by
+the trusted resource arrays, never arbitrary URLs or credential inputs.
+
+Create requires approved team and project UUIDs plus title/body; update requires
+an approved issue UUID and both title/body; comment requires issue UUID and body.
+Titles are bounded to 128 characters and bodies to 65,000. The shared runtime
+validates inputs and provider responses without retries. Whole-workflow
+dry-run/staged mode prepares requests without resolving write credentials or
+sending mutations. Connector-only writes do not implicitly enable GitHub issue
+reporting, request GitHub write permissions, or mint a GitHub App token.
+
+There is no automatic conversion of team names, issue shorthand, or old
+environment-variable defaults; use separately selected bounded `resolve-team`
+and `resolve-project` reads and approve the resulting model UUIDs. Broad hosted
+MCP toolsets, optional project creation, single-field updates, and per-operation
+budget/staging options are contract gaps, not silently retained legacy paths.
+No custom authenticated ingress or configurable context is installed.
+
+For an author-owned team UUID secret and a project URL slug, select
+`linear-create-issue-in-project` instead of supplying agent-controlled targets.
+`with.create-team-secret` names the trusted team UUID secret (default
+`LINEAR_TEAM_ID`), and `with.create-project-slug` pins the exact project slug
+(default specimen `abcdef123456`; replace it before live use). The generated
+`connector_6_linear_create_issue_in_project` tool accepts only title and body.
+The same safe-output credential performs a bounded read preflight: resolve one
+exact project slug, verify the team UUID and project/team membership, and reject
+pagination, ambiguity, or malformed responses before creating an issue. The
+resolved UUIDs remain execution-local grants, never agent input or artifacts.
+Dry-run/staged mode does not resolve these secrets or perform the preflight.
 
 ## Jira
 
 Declaration: `.github/aw/connectors/jira.md`.
+
+Import `"@builtin:connectors/jira.md"` with `site` set to the approved HTTPS
+site origin for writes. `cloud-ids`, `issues`, `projects`, `queries`, and
+`issue-ids` are exact string-array grants, empty by default. Importing alone
+grants nothing. Each MCP profile requires `cloud-ids`, `issues`, and `queries`
+because it registers both read methods. Issue mutations require `issues`
+unless a selected creator establishes an authenticated temporary reference;
+creation requires `projects`. `site` defaults to `https://example.atlassian.net`
+only as a specimen, not tenant discovery.
+
+```aw wrap
+---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+imports:
+  - uses: "@builtin:connectors/jira.md"
+    with:
+      site: https://example.atlassian.net
+      issues: [APP-1]
+safe-outputs:
+  jira-add-comment:
+---
+
+Request a factual comment only for the approved issue.
+```
 
 ### Secrets
 
@@ -180,12 +266,72 @@ endpoint **and path** change, not just substituting a hostname.
 | --- | --- |
 | Triggers | `jira-issue-created`, `jira-issue-updated`, `jira-issue-deleted`. Signed admin webhooks require the configured raw-body HMAC verifier and replay policy; this is not Connect JWT authentication. No inferred closure/reopening/label events. |
 | MCPs/read tools | `service-account` or `personal` at `https://mcp.atlassian.com/v2/mcp`; only `getJiraIssue` and `searchJiraIssuesUsingJql`. Cloud ID, issue keys, exact JQL, and result counts are constrained. |
-| Safe outputs | `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`. ADF text encoding; additive labels. Update requires both summary and description. No temporary-ID resolution. |
+| Safe outputs | `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`. ADF text encoding; additive labels. Update requires both summary and description. Explicit trusted temporary-reference chaining is supported when the creator and consumers are selected together. |
 | Context | Fetch approved issue content through the selected MCP profile. Validate tenant/project authority independently; issue keys can change projects. No public REST context recipe or raw-event fallback. |
+
+### Migration limits
+
+The former `tools.jira.auth`/`allowed`, native `jira_*` tools, automatic
+`JIRA_USER_EMAIL`/`JIRA_API_TOKEN` environment injection, and
+`on.gateway-dispatch.jira-issue` implementation are removed. A missing import or
+resource grant is a compilation error, not a fallback to the old integration.
+Selected effect tools are named `connector_4_jira_<operation_with_underscores>`.
+
+Effect arguments are `project`, `issue-type`, `summary`, and optional
+`description` for creation; `issue`, `summary`, and `description` for updates;
+`issue` and `text` for comments; `issue` and `label` for additive labels.
+Only the declared `Task` issue type is enabled. The current connector cannot
+express the old update requirement of *at least one* of summary or description:
+both are required. Creation accepts an optional explicit `temporary_id` such
+as `aw_jira_haiku`; selected follow-ups can use `#aw_jira_haiku` only after a
+validated creation in the same execution. Native automatic temporary-ID
+assignment and the other seven former read methods are unavailable.
+Use a reviewed declaration for additional
+capabilities rather than removing resource constraints.
+
+Effect selection accepts only null or `{}`. Use workflow-wide
+`safe-outputs.staged: true` or compiler dry-run mode for credential-free
+preparation; per-effect legacy `max`/`staged` options are rejected. No mutation
+is retried after an ambiguous failure. Declaration acceptance and MCP
+initialization alone do not establish live tool-call compatibility.
 
 ## Azure DevOps
 
+Embedded import: `"@builtin:connectors/azure-devops.md"`.
 Declaration: `.github/aw/connectors/azure-devops.md`.
+
+The compiler embeds this Markdown declaration. A consuming repository needs only
+its workflow, not a local connector file. Override the reviewed specimen bindings
+with trusted literal `with` inputs; imports register capabilities but grant none:
+
+```aw wrap
+---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+imports:
+  - uses: "@builtin:connectors/azure-devops.md"
+    with:
+      organization: fabrikam
+      project: 22222222-2222-4222-8222-222222222222
+      project-name: Fabrikam
+      work-item: "123"
+tools:
+  azure-devops: [azure-devops]
+safe-outputs:
+  azure-devops-comment-on-work-item:
+---
+
+Inspect project metadata only. Request a comment only on the approved work item.
+```
+
+Inputs `collection`, `related-work-item`, and `assignee` bind the nonoperational
+trigger collection, fixed Related-link target, and exact allowed assignment
+identity. Defaults are specimens, not discovered resources. `agent-reader-secret`
+and `writer-secret` override secret names, never values. The agent supplies
+`organization`, project UUID, and string `work-item` IDs to the selected write
+operation; they must match its exact approved resource lists.
 
 ### Secrets
 
@@ -202,9 +348,32 @@ bearer access token. Token renewal is not implemented by the declaration.
 | Surface | Current declaration |
 | --- | --- |
 | Triggers | `azure-devops-work-item-created`, `azure-devops-work-item-updated`, `azure-devops-work-item-deleted`, `azure-devops-work-item-restored`. Service hooks require configured authenticated HTTPS ingress and exact collection/project identity; there is no native HMAC header to invent. |
-| MCPs/read tools | Select `azure-devops` at `https://mcp.dev.azure.com/fabrikam`, with `X-MCP-Readonly: true` and only `core_list_projects`. No work-item body reader is declared. |
+| MCPs/read tools | Select `azure-devops` at `https://mcp.dev.azure.com/{organization}`, with `X-MCP-Readonly: true` and only `core_list_projects`. This lists project metadata visible to the identity in that organization; the write project allowlist does not filter remote MCP results. No work-item body reader is declared. |
 | Safe outputs | `azure-devops-create-work-item`, `azure-devops-update-work-item`, `azure-devops-comment-on-work-item`, `azure-devops-assign-work-item`, `azure-devops-link-work-items`. Fixed JSON Patch fields, assignee allowlists, and a reviewed link target. No attachment upload/chaining. |
 | Context | Project metadata only. A work-item ID is a reference, not work-item content; do not claim description/comment hydration. Snapshot and update event IDs differ, and deletion/restoration do not imply closure/reopening. |
+
+### Migration limits
+
+The former `ado-*` safe outputs, `on.gateway-dispatch.azure-devops-issue`, and
+wildcard `shared/mcp/azure-devops.md` import are removed, not aliases.
+`AZURE_DEVOPS_EXT_PAT`, `SYSTEM_ACCESSTOKEN`, and Azure environment variables are
+not automatically consumed. Read MCP and safe-output writes use their own
+explicit Entra token references; selecting only writes never exposes a reader
+credential to the agent.
+
+The current declaration creates fixed Task work items with a title, updates
+titles, posts Markdown `text` comments, assigns an allowlisted identity, and
+adds a fixed Related link. Legacy description/body/state/tag/area/iteration
+updates, custom fields, artifact links, arbitrary link types/targets, attachment
+uploads, temporary-ID chaining, wildcard/area-prefix targeting, and per-output
+legacy options have no drop-in replacement. They fail rather than falling back
+to the removed runtime. Broader operations require separately reviewed
+declarative capabilities and any missing shared-contract support.
+
+Custom trigger selections still fail closed: a verification-profile declaration
+does not deploy authenticated HTTPS ingress. No live Azure request is established
+by offline conformance tests; a separately provisioned Entra credential and
+explicit read-only smoke-test opt-in are required.
 
 ## Slack
 
@@ -337,6 +506,10 @@ resource grants, and phase-specific secret references into content-addressed
 plans; runtime hosts do not reload mutable configuration. Each encoded phase
 plan is limited to 65,536 bytes.
 
+Development builds stamp the immutable runtime/build-input revision into the
+compiler. Generated connector hosts check out that revision; subsequent
+lock-file-only commits do not move the runtime pin.
+
 Agent reads use constrained MCP adapters. Write credentials exist only in the
 safe-output phase; staging validates intents without resolving them or making
 requests. Work-queue connector effects remain unsupported. The runtime refuses
@@ -344,6 +517,47 @@ redirects, bounds responses, and does not automatically retry writes.
 
 Versioned specs/connections and context-phase fixtures under `testdata` are
 legacy runtime compatibility tests, not the public authoring interface.
+
+### Trusted resource bindings
+
+Safe-output declarations can bind inputs through `trustedInputs`, mapping each
+resource-constrained input to exactly one author-owned `secret` name or literal
+`value`. These inputs are absent from agent tool schemas; agent-supplied values
+are rejected, even when they equal the trusted value. Selected source secrets
+exist only in the safe-output phase. They do not become general read grants.
+
+An optional `preflight` performs one fixed, bounded GET or GraphQL query on the
+same endpoint and with the same safe-output credential before mutation. It
+consumes only the declared trusted inputs. `responseInputs` verifies exact
+request/response identities; `responseContains` verifies an exact input value
+among elements of an explicitly named response array; `responseChecks` verifies
+fixed evidence such as a false pagination flag. Its `project` maps approved
+response pointers back to trusted input names. The final mutation validates the
+resolved identifiers against its input constraints and grants only those exact
+resources. Missing, ambiguous, malformed, oversized, mismatched, or redirected
+lookups fail before mutation. Staging resolves no source secrets and makes no
+preflight requests.
+
+### Created-resource references
+
+A safe-output operation can declare `creates` with a resource collection,
+projected response `value` pointer, required creation `scope` input, and optional
+temporary-reference input named by `temporaryId`. An optional `scopePrefix`
+requires the created identifier to begin with the exact scope value followed
+by that literal separator. Consumers opt in independently through
+`createdResources`, mapping their resource-constrained input to the selected
+creator operation on the same endpoint and collection.
+
+Only a successful validated create can produce an authenticated receipt. The
+trusted host holds the signing key and receipts in private, execution-local
+memory; neither agent arguments, temporary-ID map contents, nor artifacts create
+authority. Receipts bind the execution nonce, frozen plan, connector, endpoint,
+collection, creation scope, temporary reference, and returned identifier.
+Forgery, cross-execution or cross-connector reuse, duplicate bindings, missing
+receipts, and mismatched creation scopes are rejected before credentials or
+network access. A returned real identifier does not become an agent-selectable
+resource: without a static grant, consumers must use the authenticated temporary
+reference. Staged intents never mint receipts and cannot authorize execution.
 
 ### Direct CI checks
 

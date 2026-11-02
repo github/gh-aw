@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) ([]byte, error) {
 	if len(data) == 0 {
-		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.Project) != 0 || op.Request.GraphQL != "" {
+		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseContains)+len(op.Project) != 0 || op.Request.GraphQL != "" {
 			return nil, errors.New("connector response is empty; required evidence is missing")
 		}
 		return []byte("null"), nil
@@ -38,6 +39,21 @@ func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) 
 	}
 	if err := checkResponseBindings(document, op, args); err != nil {
 		return nil, err
+	}
+	for pointer, input := range op.ResponseContains {
+		prefix, suffix, _ := strings.Cut(pointer, "/*")
+		value, present := lookupPointer(document, prefix)
+		items, array := value.([]any)
+		matched := false
+		for _, item := range items {
+			actual, exists := lookupPointer(item, suffix)
+			if exists && actual == args[input] {
+				matched = true
+			}
+		}
+		if !present || !array || !matched {
+			return nil, errors.New("connector response does not establish the required resource relationship")
+		}
 	}
 	if len(op.Project) != 0 {
 		fields, err := projectFields(document, op.Project)

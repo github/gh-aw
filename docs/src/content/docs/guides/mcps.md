@@ -217,14 +217,13 @@ Pre-configured MCP server specifications are available in [`.github/workflows/sh
 | **Jupyter** | `shared/mcp/jupyter.md` | Execute code, manage notebooks, visualize data |
 | **AgentDB** | `shared/mcp/agentdb.md` | Semantic and hybrid retrieval over agent-collected corpora (e.g. discussions, issues), backed by a runtime store at `AGENTDB_PATH` |
 | **Azure Auth (OIDC bridge)** | `shared/azure-auth.md` | Re-authenticate Azure CLI inside the agent sandbox using GitHub OIDC |
-| **Azure DevOps MCP** *(experimental)* | `shared/mcp/azure-devops.md` | Azure DevOps MCP endpoint with org-scoped URL, auth header, and required domains |
+| **Azure DevOps connector** *(experimental)* | `"@builtin:connectors/azure-devops.md"` | Explicit project-metadata reads; see [Connectors](/gh-aw/reference/connectors/#azure-devops) |
 | **Azure MCP** | `shared/mcp/azure.md` | Azure MCP server in read-only mode with an explicit tool allowlist |
 | **Others** | `shared/mcp/*.md` | AST-Grep, Azure, Brave Search, Context7, DataDog, DeepWiki, Fabric RTI, MarkItDown, Microsoft Docs, Notion, Sentry, Serena, Server Memory, Slack, Tavily |
 
 ### Azure shared imports (OIDC, Azure DevOps, Azure MCP)
 
-Use these shared imports together when your workflow needs Azure CLI auth plus
-Azure DevOps and Azure MCP tools:
+Use `shared/azure-auth.md` when Azure MCP needs Azure CLI authentication:
 
 ```aw wrap
 ---
@@ -237,9 +236,6 @@ imports:
     with:
       azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
       azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
-  - uses: shared/mcp/azure-devops.md
-    with:
-      organization: YOUR_ORG
 
 mcp-servers:
   azure:
@@ -262,9 +258,9 @@ mcp-servers:
 
 `shared/azure-auth.md` sets `AZURE_CONFIG_DIR=/tmp/gh-aw/agent/.azure` and runs `az login` in a pre-agent step so `DefaultAzureCredential` can resolve `AzureCliCredential` inside the sandbox.
 
-Azure DevOps MCP support (`shared/mcp/azure-devops.md`) is still experimental, and its interfaces and required configuration may change. Set `ADO_MCP_AUTH_TOKEN` to the full `Authorization` header value, such as a bearer token string. In diagnostics and inspect output, the header is masked as `Authorization: ******`; this is expected.
-
-This shared Azure DevOps configuration also requires `*.dev.azure.com`, `*.visualstudio.com`, and `*.microsoftonline.com` in the network allowlist.
+Azure DevOps uses the separate [embedded connector](/gh-aw/reference/connectors/#azure-devops).
+Azure CLI authentication does not provision its Entra MCP credential. The old
+`shared/mcp/azure-devops.md` wildcard configuration is removed.
 
 Keep the command-based Azure MCP variant read-only with an explicit `allowed` list; do not switch to `allowed: ["*"]`.
 

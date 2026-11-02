@@ -424,28 +424,11 @@ network:
 
 Consumers import it with `imports: [shared/mcp/tavily.md]`.
 
-For Azure-based integrations, combine `shared/azure-auth.md` with Azure MCP
-imports to preserve OIDC-backed Azure CLI auth inside the agent sandbox.
-Azure DevOps MCP support (`shared/mcp/azure-devops.md`) is still experimental:
-
-```aw wrap
----
-imports:
-  - uses: shared/azure-auth.md
-    with:
-      azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
-      azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
-  - uses: shared/mcp/azure-devops.md
-    with:
-      organization: YOUR_ORG
----
-```
-
-`shared/azure-auth.md` sets `AZURE_CONFIG_DIR` to an agent-accessible path and
-re-authenticates `az` in `pre-agent-steps`, which bridges auth across the
-runner-to-sandbox process boundary. See
-[Using MCPs](/gh-aw/guides/mcps/#azure-shared-imports-oidc-azure-devops-azure-mcp)
-for network domains and read-only Azure MCP tool allowlist guidance.
+For Azure CLI authentication inside the sandbox, use `shared/azure-auth.md`
+with the Azure MCP import. Azure DevOps instead uses the embedded
+`"@builtin:connectors/azure-devops.md"` import; see
+[Connectors](/gh-aw/reference/connectors/#azure-devops). Importing it alone grants
+no tools or safe outputs and does not acquire an Entra token.
 
 ### Importing MCP Gateway Settings
 

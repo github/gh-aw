@@ -1064,26 +1064,23 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[1].success).toBe(true);
     });
 
-    it.each(["set_issue_type", "set_issue_field", "jira_add_label", "add_labels", "remove_labels", "replace_label", "dispatch_repository", "call_workflow", "upload_artifact"])(
-      "should abort %s in detection warning mode",
-      async messageType => {
-        process.env.GH_AW_DETECTION_CONCLUSION = "warning";
-        const handler = vi.fn().mockResolvedValue({ success: true });
-        const handlers = new Map([[messageType, handler]]);
-        const messages = [{ type: messageType }];
+    it.each(["set_issue_type", "set_issue_field", "add_labels", "remove_labels", "replace_label", "dispatch_repository", "call_workflow", "upload_artifact"])("should abort %s in detection warning mode", async messageType => {
+      process.env.GH_AW_DETECTION_CONCLUSION = "warning";
+      const handler = vi.fn().mockResolvedValue({ success: true });
+      const handlers = new Map([[messageType, handler]]);
+      const messages = [{ type: messageType }];
 
-        const result = await processMessages(handlers, messages);
+      const result = await processMessages(handlers, messages);
 
-        expect(handler).not.toHaveBeenCalled();
-        expect(result.results[0]).toMatchObject({
-          type: messageType,
-          success: false,
-          cancelled: true,
-          threatDetected: true,
-          errorCode: "threat_detected_abort_policy",
-        });
-      }
-    );
+      expect(handler).not.toHaveBeenCalled();
+      expect(result.results[0]).toMatchObject({
+        type: messageType,
+        success: false,
+        cancelled: true,
+        threatDetected: true,
+        errorCode: "threat_detected_abort_policy",
+      });
+    });
 
     it("should log conversion requirement for push_to_pull_request_branch in detection warning mode", async () => {
       process.env.GH_AW_DETECTION_CONCLUSION = "warning";

@@ -5,11 +5,13 @@ permissions:
   contents: read
   actions: read
 engine: copilot
+imports:
+  - uses: "@builtin:connectors/linear.md"
+    with:
+      teams: [33333333-3333-4333-8333-333333333333]
+      projects: [44444444-4444-4444-8444-444444444444]
 safe-outputs:
-  linear-token: ${{ secrets.LINEAR_API_KEY }}
   linear-create-issue:
-    team-id: "9cfb482a-81e3-4154-b5b9-2c805e70a02d"
-    max: 1
 timeout-minutes: 5
 ---
 
@@ -19,4 +21,5 @@ Test the linear-create-issue safe output functionality.
 
 Create a Linear issue summarizing a task discovered in the repository.
 
-Output as JSONL format using the `linear_create_issue` tool.
+Use `connector_6_linear_create_issue` with the approved team/project UUIDs,
+title and body. Replace the specimen UUIDs before live use.

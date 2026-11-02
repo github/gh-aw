@@ -329,20 +329,20 @@ describe("generate_safe_outputs_tools", () => {
       JSON.stringify([
         ...sampleSourceTools,
         {
-          name: "ado_create_work_item",
-          description: "Creates an Azure DevOps work item.",
+          name: "external_create_record",
+          description: "Creates a provider-neutral external record.",
           inputSchema: { type: "object", properties: {} },
         },
       ])
     );
-    fs.writeFileSync(configPath, JSON.stringify({ ado_create_work_item: { max: 1 } }));
+    fs.writeFileSync(configPath, JSON.stringify({ external_create_record: { max: 1 } }));
     fs.writeFileSync(toolsMetaPath, JSON.stringify({ description_suffixes: {}, repo_params: {}, dynamic_tools: [] }));
 
     runScript();
 
     const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("ado_create_work_item");
+    expect(result[0].name).toBe("external_create_record");
   });
 
   it("applies description suffix from tools_meta", () => {

@@ -88,18 +88,12 @@ connectors:
           /organizationId: organizations
         verificationProfile: linear.app/hmac-sha256-timestamp
     resources:
-      issues:
-        - 22222222-2222-4222-8222-222222222222
-      organizations:
-        - 11111111-1111-4111-8111-111111111111
-      project-slugs:
-        - abcdef123456
-      projects:
-        - 44444444-4444-4444-8444-444444444444
-      team-keys:
-        - ENG
-      teams:
-        - 33333333-3333-4333-8333-333333333333
+      issues: ${{ github.aw.import-inputs.issues }}
+      organizations: ${{ github.aw.import-inputs.organizations }}
+      project-slugs: ${{ github.aw.import-inputs.project-slugs }}
+      projects: ${{ github.aw.import-inputs.projects }}
+      team-keys: ${{ github.aw.import-inputs.team-keys }}
+      teams: ${{ github.aw.import-inputs.teams }}
     safe-outputs:
       add-comment:
         credential: writer
@@ -194,6 +188,116 @@ connectors:
         responseResources:
           /data/issueCreate/issue/project/id: projects
           /data/issueCreate/issue/team/id: teams
+      create-issue-in-project:
+        credential: writer
+        inputs:
+          body:
+            maxLength: 65000
+            pattern: \S
+            required: true
+            type: string
+          project-id:
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            required: true
+            type: string
+          team-id:
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            required: true
+            type: string
+          title:
+            maxLength: 128
+            pattern: \S
+            required: true
+            type: string
+        trustedInputs:
+          team-id:
+            secret: ${{ github.aw.import-inputs.create-team-secret }}
+          project-id:
+            value: ${{ github.aw.import-inputs.create-project-slug }}
+        preflight:
+          inputs:
+            team-id:
+              type: string
+              required: true
+              maxLength: 36
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            project-id:
+              type: string
+              required: true
+              maxLength: 12
+              pattern: ^[0-9a-f]{12}$
+          maxResponseBytes: 16384
+          request:
+            endpoint: api
+            graphql: |
+              query ConnectorLinearCreateScope($team: String!, $project: String!) {
+                team(id: $team) { id }
+                projects(first: 1, filter: { slugId: { eq: $project } }) {
+                  nodes {
+                    id slugId
+                    teams(first: 100) {
+                      nodes { id }
+                      pageInfo { hasNextPage }
+                    }
+                  }
+                  pageInfo { hasNextPage }
+                }
+              }
+            method: POST
+            path: /graphql
+            query:
+              team:
+                input: team-id
+              project:
+                input: project-id
+          responseRequired:
+            - /data/team/id
+            - /data/projects/nodes/0/id
+            - /data/projects/nodes/0/slugId
+          responseInputs:
+            /data/team/id: team-id
+            /data/projects/nodes/0/slugId: project-id
+          responseChecks:
+            /data/projects/pageInfo/hasNextPage: false
+            /data/projects/nodes/0/teams/pageInfo/hasNextPage: false
+          responseContains:
+            /data/projects/nodes/0/teams/nodes/*/id: team-id
+          project:
+            project-id: /data/projects/nodes/0/id
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          graphql: |
+            mutation ConnectorLinearCreateInProject($team: String!, $project: String!, $title: String!, $body: String!) {
+              issueCreate(input: { teamId: $team, projectId: $project, title: $title, description: $body }) {
+                success
+                issue { id identifier title team { id } project { id } }
+              }
+            }
+          method: POST
+          path: /graphql
+          query:
+            body:
+              input: body
+            project:
+              input: project-id
+            team:
+              input: team-id
+            title:
+              input: title
+        resources:
+          project-id: projects
+          team-id: teams
+        responseChecks:
+          /data/issueCreate/success: true
+        responseRequired:
+          - /data/issueCreate/issue/id
+          - /data/issueCreate/issue/identifier
+        responseInputs:
+          /data/issueCreate/issue/project/id: project-id
+          /data/issueCreate/issue/team/id: team-id
       update-issue:
         credential: writer
         inputs:
@@ -350,6 +454,42 @@ connectors:
           /data/teams/nodes/0/id: teams
         tool: resolve-team
 import-schema:
+  create-team-secret:
+    type: string
+    default: LINEAR_TEAM_ID
+  create-project-slug:
+    type: string
+    default: abcdef123456
+  issues:
+    type: array
+    items:
+      type: string
+    default: []
+  organizations:
+    type: array
+    items:
+      type: string
+    default: []
+  project-slugs:
+    type: array
+    items:
+      type: string
+    default: []
+  projects:
+    type: array
+    items:
+      type: string
+    default: []
+  team-keys:
+    type: array
+    items:
+      type: string
+    default: []
+  teams:
+    type: array
+    items:
+      type: string
+    default: []
   mcp-reader-secret:
     default: LINEAR_READ_MCP_TOKEN
     type: string
@@ -361,4 +501,8 @@ import-schema:
     type: string
 ---
 
-Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.
+Import `@builtin:connectors/linear.md` and explicitly select read tools and
+hyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;
+the defaults grant no resources. Personal API keys use raw Authorization;
+hosted MCP requires a separate bearer credential. Event envelopes contain
+references, not resource content. Native ingress is not operational.

@@ -336,14 +336,14 @@ describe("safe_output_manifest", () => {
 
     it.each([
       ["add_comment", { commentId: 123, itemNumber: 7, repo: "owner/repo" }, { provider: "github", id: 123 }],
-      ["jira_create_issue", { issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
-      ["linear_create_issue", { id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
+      ["connector_4_jira_create_issue", { provider: "jira", issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
+      ["connector_6_linear_create_issue", { provider: "linear", id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
     ])("should preserve identity for %s", (type, result, expected) => {
       expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);
     });
 
-    it("should infer the azure-devops provider (hyphenated) from the metadata provider, matching ADO handler naming", () => {
-      const item = extractCreatedItemFromResult("ado_add_comment", {
+    it("should preserve an explicitly reported external provider without inferring it from a tool prefix", () => {
+      const item = extractCreatedItemFromResult("connector_12_azure_devops_comment_on_work_item", {
         success: true,
         number: 123,
         metadata: { provider: "azure-devops", project: "my-project", comment_id: 5 },
@@ -353,7 +353,8 @@ describe("safe_output_manifest", () => {
     });
 
     it("should convert a scalar target (e.g. Linear issue key) into a provider-neutral object", () => {
-      const item = extractCreatedItemFromResult("linear_add_comment", {
+      const item = extractCreatedItemFromResult("connector_6_linear_add_comment", {
+        provider: "linear",
         success: true,
         id: "comment-1",
         target: "ENG-123",

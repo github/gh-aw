@@ -172,10 +172,7 @@ func validateQualifiedConnectorNames(frontmatter map[string]any, aliases []strin
 			if section == "on" && (slices.Contains(validGitHubEventTypes, name) || ghAwOnSectionKeys[name]) {
 				return fmt.Errorf("connector %q cannot shadow built-in trigger field %q", owner, name)
 			}
-			// Existing Linear/Jira/ADO operations target third-party APIs, not GitHub.
-			_, registeredOperation := safeOutputHandlersByKey[name]
-			legacyProvider := slices.Contains([]string{"linear", "jira", "ado"}, owner) && registeredOperation
-			if section == "safe-outputs" && slices.Contains(builtins, name) && !legacyProvider {
+			if section == "safe-outputs" && slices.Contains(builtins, name) {
 				return fmt.Errorf("connector %q cannot shadow built-in GitHub safe output %q", owner, name)
 			}
 		}

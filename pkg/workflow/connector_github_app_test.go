@@ -4,6 +4,8 @@ package workflow
 
 import (
 	"encoding/base64"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -48,6 +50,7 @@ func TestConnectorGitHubAppPhaseTokens(t *testing.T) {
 		{"combined", "tools:\n  tracker: [get-issue]\nsafe-outputs:\n  tracker-add-comment:\n", true, true},
 		{"staged", "safe-outputs:\n  staged: true\n  tracker-add-comment:\n", false, false},
 		{"dynamic-staging", "safe-outputs:\n  staged: ${{ inputs.stage }}\n  tracker-add-comment:\n", false, true},
+		{"secret-staging", "safe-outputs:\n  staged: ${{ secrets.STAGE }}\n  tracker-add-comment:\n", false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			c, root := awConnectorCompiler(t)
@@ -64,8 +67,8 @@ func TestConnectorGitHubAppPhaseTokens(t *testing.T) {
 				assert.Contains(t, output, "repositories: issues")
 				assert.Contains(t, output, "actions/create-github-app-token@")
 			}
-			if test.name == "dynamic-staging" {
-				assert.Contains(t, output, "if: ${{ format('{0}', inputs.stage) != 'true' }}")
+			if test.name == "dynamic-staging" || test.name == "secret-staging" {
+				assert.Contains(t, output, "if: ${{ env.GH_AW_CONNECTOR_STAGED != 'true' }}")
 			}
 			if test.read {
 				encoded, err := data.Connectors["tracker"].Agent.Encode()
@@ -98,4 +101,28 @@ func TestConnectorGitHubAppRejectsUnboundedCredentials(t *testing.T) {
 			require.ErrorContains(t, err, test.message)
 		})
 	}
+}
+
+func TestConnectorGitHubAppImportedCredentials(t *testing.T) {
+	c, root := awConnectorCompiler(t)
+	source := strings.ReplaceAll(connectorAppSource(t), "${{ secrets.CONNECTOR_APP_KEY }}", "${{ github.aw.import-inputs.private-key }}")
+	source += "import-schema:\n  private-key:\n    type: string\n    required: true\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "connector.md"), []byte("---\n"+source+"---\n"), 0600))
+	content := awConnectorHeader + `imports:
+  - uses: connector.md
+    with:
+      private-key: ${{ secrets.APPROVED_CONNECTOR_APP_KEY }}
+tools:
+  tracker: [get-issue]
+---
+Read approved evidence.
+`
+	data, err := c.ParseWorkflowString(content, filepath.Join(root, "proof.md"))
+	require.NoError(t, err)
+	output, err := c.CompileToYAML(data, filepath.Join(root, "proof.md"))
+	require.NoError(t, err)
+	assert.Contains(t, output, "${{ secrets.APPROVED_CONNECTOR_APP_KEY }}")
+	assert.Contains(t, output, "Mint connector GitHub App token tracker/reader")
+	assert.NotContains(t, output, "Mint connector GitHub App token tracker/writer")
+	assert.NotContains(t, output, "github.aw.import-inputs.private-key")
 }

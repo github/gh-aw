@@ -13,7 +13,7 @@ The dedicated [Webhook Gateway Specification](/gh-aw/specs/webhook-gateway-speci
 
 Native triggers such as `issues`, `pull_request`, and `push` remain unchanged in workflows without `gateway-dispatch`.
 
-External issue subscriptions use `on.gateway-dispatch.jira-issue`, `on.gateway-dispatch.linear-issue`, or `on.gateway-dispatch.azure-devops-issue` with the same repository opt-in and dispatch authorization. Their normalized activities, provider authentication requirements, and transition-evidence limitations are documented in [Provider Issue Triggers](/gh-aw/reference/provider-issue-triggers/).
+External issue subscriptions use `on.gateway-dispatch.jira-issue` or `on.gateway-dispatch.linear-issue` with the same repository opt-in and dispatch authorization. Their normalized activities, provider authentication requirements, and transition-evidence limitations are documented in [Provider Issue Triggers](/gh-aw/reference/provider-issue-triggers/). Azure DevOps uses the separate [connector declaration](/gh-aw/reference/connectors/#azure-devops), whose custom ingress remains unavailable.
 
 > [!WARNING]
 > Webhook gateway triggers and their options are experimental. Their syntax and behavior may change. They are synthetic events requiring a hosted CAO server, not native GitHub Actions triggers.

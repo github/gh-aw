@@ -31,7 +31,6 @@ var mcpValidationLog = logger.New("workflow:mcp_config_validation")
 // Custom MCP servers must be placed under mcp-servers: instead.
 var builtInToolNames = map[string]bool{
 	"github":            true,
-	"jira":              true,
 	"playwright":        true,
 	"agentic-workflows": true,
 	"cache-memory":      true,
@@ -44,7 +43,6 @@ var builtInToolNames = map[string]bool{
 	"edit":              true,
 	"web-fetch":         true,
 	"web-search":        true,
-	"linear":            true,
 	"safety-prompt":     true,
 	"timeout":           true,
 	"startup-timeout":   true,
@@ -71,7 +69,7 @@ func ValidateMCPConfigs(tools map[string]any) error {
 		toolConfig := tools[toolName]
 
 		// Skip built-in tools - they have their own schema validation
-		if builtInToolNames[toolName] && toolName != "linear" {
+		if builtInToolNames[toolName] {
 			mcpValidationLog.Printf("Skipping MCP validation for built-in tool: %s", toolName)
 			continue
 		}

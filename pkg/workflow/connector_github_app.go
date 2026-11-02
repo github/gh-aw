@@ -145,6 +145,9 @@ func (c *Compiler) connectorGitHubAppSteps(data *WorkflowData, phase string) []s
 				fmt.Sprintf("Mint connector GitHub App token %s/%s", alias, name), connectorAppStepID(secret))
 			if condition != "" {
 				mint = slices.Insert(mint, 2, condition)
+				mint = appendStepEnvAssignments(mint, []stepEnvAssignment{{
+					Name: "GH_AW_CONNECTOR_STAGED", Value: data.SafeOutputs.Staged.String(),
+				}})
 			}
 			steps = append(steps, mint...)
 		}

@@ -92,12 +92,6 @@ func (c *Compiler) extractGlobalConfigFields(outputMap map[string]any, config *S
 		}
 	}
 
-	if linearToken, exists := outputMap["linear-token"]; exists {
-		if linearTokenStr, ok := linearToken.(string); ok {
-			config.LinearToken = linearTokenStr
-		}
-	}
-
 	// Handle max-patch-size configuration
 	config.MaximumPatchSize = parseBoundedIntFieldOrDefault(outputMap, "max-patch-size", 4096, safeOutputsConfigLog)
 

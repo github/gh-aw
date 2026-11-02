@@ -65,17 +65,51 @@ type Patch struct {
 }
 
 type Operation struct {
-	Credential        string            `json:"credential"`
-	Inputs            map[string]Input  `json:"inputs,omitempty"`
-	Resources         map[string]string `json:"resources,omitempty"`
-	Request           Request           `json:"request"`
-	MaxResponseBytes  int               `json:"maxResponseBytes"`
-	ResponseChecks    map[string]any    `json:"responseChecks,omitempty"`
-	ResponseResources map[string]string `json:"responseResources,omitempty"`
-	ResponseRequired  []string          `json:"responseRequired,omitempty"`
-	ResponseTypes     map[string]string `json:"responseTypes,omitempty"`
-	ResponseInputs    map[string]string `json:"responseInputs,omitempty"`
-	Project           map[string]string `json:"project,omitempty"`
+	Credential        string                  `json:"credential"`
+	Inputs            map[string]Input        `json:"inputs,omitempty"`
+	Resources         map[string]string       `json:"resources,omitempty"`
+	Request           Request                 `json:"request"`
+	MaxResponseBytes  int                     `json:"maxResponseBytes"`
+	ResponseChecks    map[string]any          `json:"responseChecks,omitempty"`
+	ResponseResources map[string]string       `json:"responseResources,omitempty"`
+	ResponseRequired  []string                `json:"responseRequired,omitempty"`
+	ResponseTypes     map[string]string       `json:"responseTypes,omitempty"`
+	ResponseInputs    map[string]string       `json:"responseInputs,omitempty"`
+	Project           map[string]string       `json:"project,omitempty"`
+	Creates           *CreatedResource        `json:"creates,omitempty"`
+	CreatedResources  map[string]string       `json:"createdResources,omitempty"`
+	TrustedInputs     map[string]TrustedInput `json:"trustedInputs,omitempty"`
+	Preflight         *TrustedPreflight       `json:"preflight,omitempty"`
+	ResponseContains  map[string]string       `json:"responseContains,omitempty"`
+}
+
+type TrustedInput struct {
+	Secret string `json:"secret,omitempty"`
+	Value  string `json:"value,omitempty"`
+}
+
+// TrustedPreflight is a fixed read in the safe-output credential phase. Its
+// arguments come exclusively from authored trusted inputs, never agent input.
+type TrustedPreflight struct {
+	Inputs           map[string]Input  `json:"inputs"`
+	Request          Request           `json:"request"`
+	MaxResponseBytes int               `json:"maxResponseBytes"`
+	ResponseRequired []string          `json:"responseRequired,omitempty"`
+	ResponseTypes    map[string]string `json:"responseTypes,omitempty"`
+	ResponseInputs   map[string]string `json:"responseInputs,omitempty"`
+	ResponseContains map[string]string `json:"responseContains,omitempty"`
+	ResponseChecks   map[string]any    `json:"responseChecks,omitempty"`
+	Project          map[string]string `json:"project"`
+}
+
+// CreatedResource explicitly authorizes binding a validated create response to
+// a temporary reference within one trusted safe-output execution.
+type CreatedResource struct {
+	Resource    string `json:"resource"`
+	Value       string `json:"value"`
+	Scope       string `json:"scope"`
+	TemporaryID string `json:"temporaryId"`
+	ScopePrefix string `json:"scopePrefix,omitempty"`
 }
 
 type ReadTool struct {

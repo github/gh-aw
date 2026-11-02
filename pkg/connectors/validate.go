@@ -104,6 +104,9 @@ func (s *ConnectorSpec) validateOperations() error {
 	if err := s.validateHTTPMCP(); err != nil {
 		return err
 	}
+	if err := s.validateCreatedResources(); err != nil {
+		return err
+	}
 	if len(s.Triggers)+len(s.MCP)+len(s.HTTPMCP)+len(s.SafeOutputs)+len(s.Context) == 0 {
 		return errors.New("connector must declare at least one capability")
 	}
@@ -147,6 +150,15 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	}
 	if err := validateInputs(op.Inputs); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
+	}
+	if err := s.validateTrustedInputs(name, op, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
+	}
+	for pointer, input := range op.ResponseContains {
+		field, exists := op.Inputs[input]
+		if strings.Count(pointer, "/*/") != 1 || !validPointer(pointer) || !exists || !field.Required || field.Type != "string" {
+			return errors.New("responseContains requires an array-element pointer and a required string input")
+		}
 	}
 	return validateRequestBindings(name, op, path)
 }

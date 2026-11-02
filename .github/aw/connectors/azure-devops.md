@@ -29,13 +29,13 @@ connectors:
         tools:
           core_list_projects:
             inputs: {}
-        url: https://mcp.dev.azure.com/fabrikam
+        url: https://mcp.dev.azure.com/${{ github.aw.import-inputs.organization }}
     triggers:
       work-item-created:
         match:
           /eventType: workitem.created
-          /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
-          /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.created
         normalize:
@@ -50,8 +50,8 @@ connectors:
       work-item-deleted:
         match:
           /eventType: workitem.deleted
-          /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
-          /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.deleted
         normalize:
@@ -66,8 +66,8 @@ connectors:
       work-item-restored:
         match:
           /eventType: workitem.restored
-          /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
-          /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.restored
         normalize:
@@ -82,8 +82,8 @@ connectors:
       work-item-updated:
         match:
           /eventType: workitem.updated
-          /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
-          /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+          /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
+          /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.updated
         normalize:
@@ -97,18 +97,18 @@ connectors:
         verificationProfile: dev.azure.com/configured-https-auth
     resources:
       assignees:
-        - reviewer@example.invalid
+        - ${{ github.aw.import-inputs.assignee }}
       collections:
-        - 11111111-1111-4111-8111-111111111111
+        - ${{ github.aw.import-inputs.collection }}
       organizations:
-        - fabrikam
+        - ${{ github.aw.import-inputs.organization }}
       project-names:
-        - Fabrikam
+        - ${{ github.aw.import-inputs.project-name }}
       projects:
-        - 22222222-2222-4222-8222-222222222222
+        - ${{ github.aw.import-inputs.project }}
       work-items:
-        - "123"
-        - "124"
+        - "${{ github.aw.import-inputs.work-item }}"
+        - "${{ github.aw.import-inputs.related-work-item }}"
     safe-outputs:
       assign-work-item:
         credential: writer
@@ -254,19 +254,19 @@ connectors:
         inputs:
           organization:
             enum:
-              - fabrikam
+              - ${{ github.aw.import-inputs.organization }}
             maxLength: 64
             required: true
             type: string
           project:
             enum:
-              - 22222222-2222-4222-8222-222222222222
+              - ${{ github.aw.import-inputs.project }}
             maxLength: 36
             required: true
             type: string
           work-item:
             enum:
-              - "123"
+              - "${{ github.aw.import-inputs.work-item }}"
             maxLength: 10
             required: true
             type: string
@@ -280,7 +280,7 @@ connectors:
               value:
                 literal:
                   rel: System.LinkTypes.Related
-                  url: https://dev.azure.com/fabrikam/22222222-2222-4222-8222-222222222222/_apis/wit/workItems/124
+                  url: https://dev.azure.com/${{ github.aw.import-inputs.organization }}/${{ github.aw.import-inputs.project }}/_apis/wit/workItems/${{ github.aw.import-inputs.related-work-item }}
           path: /{organization}/{project}/_apis/wit/workitems/{work-item}
           pathInputs:
             organization: organization
@@ -347,6 +347,34 @@ connectors:
         responseResources:
           /fields/System.TeamProject: project-names
 import-schema:
+  organization:
+    default: fabrikam
+    type: string
+    description: Approved Azure DevOps organization name, not a URL.
+  collection:
+    default: 11111111-1111-4111-8111-111111111111
+    type: string
+    description: Approved collection ID for nonoperational trigger declarations.
+  project:
+    default: 22222222-2222-4222-8222-222222222222
+    type: string
+    description: Approved project UUID for write targets.
+  project-name:
+    default: Fabrikam
+    type: string
+    description: Exact project name required in write responses.
+  work-item:
+    default: "123"
+    type: string
+    description: Exact approved existing work item ID; no wildcard or temporary ID.
+  related-work-item:
+    default: "124"
+    type: string
+    description: Exact approved target ID for the fixed Related link.
+  assignee:
+    default: reviewer@example.invalid
+    type: string
+    description: Exact approved assignee identity.
   agent-reader-secret:
     default: AZURE_DEVOPS_MCP_ENTRA_TOKEN
     type: string
@@ -355,4 +383,8 @@ import-schema:
     type: string
 ---
 
-Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.
+Select capabilities explicitly after importing "@builtin:connectors/azure-devops.md".
+Review the specimen organization, collection, project, work item, and assignee
+defaults; override them with trusted literal import inputs before use.
+Read MCP exposes only core_list_projects with an Entra access token, not work item
+bodies or a PAT fallback. Native ingress is not operational.

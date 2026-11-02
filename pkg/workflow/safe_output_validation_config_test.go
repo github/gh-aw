@@ -115,15 +115,6 @@ func TestApproveWorkflowRunValidationConfig(t *testing.T) {
 	}
 }
 
-func TestJiraCreateIssueValidationPreservesTemporaryID(t *testing.T) {
-	config := ValidationConfig["jira_create_issue"]
-	temporaryID := config.Fields["temporary_id"]
-
-	if !temporaryID.Required || !temporaryID.TemporaryID || temporaryID.Pattern != "^#aw_[A-Za-z0-9_]{3,12}$" {
-		t.Errorf("jira_create_issue temporary_id = %+v, want required temporary ID", temporaryID)
-	}
-}
-
 // TestCallWorkflowValidationConfigPreservesWorkflowName is a regression test for
 // samples-mode call-workflow replay dropping the workflow name (github/gh-aw#55176):
 // without a "call_workflow" entry in ValidationConfig, collect_ndjson_output.cjs

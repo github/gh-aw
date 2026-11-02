@@ -52,8 +52,8 @@ func connectorMintCondition(c *Compiler, data *WorkflowData, phase string) (stri
 	if c.dryRun || c.trialMode || c.forceStaged || templatableBoolIsTrue(data.SafeOutputs.Staged) {
 		return "", false
 	}
-	if staged := templatableBoolEnvVarValue(data.SafeOutputs.Staged); staged != nil {
-		return "        if: ${{ format('{0}', " + stripExpressionWrapper(*staged) + ") != 'true' }}\n", true
+	if templatableBoolEnvVarValue(data.SafeOutputs.Staged) != nil {
+		return "        if: ${{ env.GH_AW_CONNECTOR_STAGED != 'true' }}\n", true
 	}
 	return "", true
 }
@@ -88,7 +88,11 @@ func (c *Compiler) connectorOIDCSteps(data *WorkflowData, phase string) []string
 			steps = append(steps,
 				"        uses: "+c.getActionPin("actions/github-script")+"\n",
 				"        env:\n",
-				formatYAMLEnv("          ", "GH_AW_CONNECTOR_OIDC_AUDIENCE", oidc.Audience),
+				formatYAMLEnv("          ", "GH_AW_CONNECTOR_OIDC_AUDIENCE", oidc.Audience))
+			if condition != "" {
+				steps = append(steps, formatYAMLEnv("          ", "GH_AW_CONNECTOR_STAGED", data.SafeOutputs.Staged.String()))
+			}
+			steps = append(steps,
 				"        with:\n",
 				"          script: |\n",
 				"            const token = await core.getIDToken(process.env.GH_AW_CONNECTOR_OIDC_AUDIENCE);\n",

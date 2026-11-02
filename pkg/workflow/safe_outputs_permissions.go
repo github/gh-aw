@@ -112,7 +112,7 @@ func ComputePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig) *Permissio
 // safeOutputsGlobalAppTokenMinted reports whether the consolidated safe_outputs job
 // mints the global "safe-outputs-app-token" step. The step is skipped when no enabled
 // handler consumes GitHub permissions from the global app (for example when staged
-// handlers need no reads, or in a Linear-only configuration), so token expressions that
+// handlers need no reads, or in a connector-only configuration), so token expressions that
 // reference the step must fall back to a regular token in that case.
 //
 // This must stay in sync with buildPreambleTokenSteps, which uses the same condition

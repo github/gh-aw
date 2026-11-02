@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/connectors"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
 )
@@ -28,55 +27,60 @@ type connectorSmokeTarget struct {
 
 func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.Plan {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/" + target.provider + ".md")
-	require.NoError(t, err)
-	document, err := parser.ExtractFrontmatterFromContent(string(source))
-	require.NoError(t, err)
-	declarations, ok := document.Frontmatter["connectors"].(map[string]any)
-	require.True(t, ok)
-	declaration, ok := declarations[target.provider].(map[string]any)
-	require.True(t, ok)
-	resources, ok := declaration["resources"].(map[string]any)
-	require.True(t, ok)
+	if target.provider == "azure-devops" {
+		require.Regexp(t, `^[A-Za-z0-9][A-Za-z0-9-]{0,49}$`, target.organization, "organization must be an Azure DevOps organization name, not a URL")
+		content, err := yaml.Marshal(map[string]any{
+			"on": "workflow_dispatch", "engine": "copilot",
+			"permissions": map[string]string{"contents": "read"},
+			"imports": []any{map[string]any{
+				"uses": "@builtin:connectors/azure-devops.md",
+				"with": map[string]string{"organization": target.organization},
+			}},
+			"tools": map[string][]string{"azure-devops": {"azure-devops"}},
+		})
+		require.NoError(t, err)
+		return connectorSmokeParsePlan(t, t.TempDir(), target.provider, content)
+	}
+	var imported map[string]any
 	var tool string
 	switch target.provider {
 	case "linear":
 		require.NotEmpty(t, target.resource, "resource_id must be an approved Linear issue UUID")
 		require.NotEmpty(t, target.scope, "scope_id must be the approved Linear organization UUID")
 		require.NotEmpty(t, target.team, "LINEAR_TEAM_ID is required")
-		resources["issues"], resources["organizations"], resources["teams"] = []string{target.resource}, []string{target.scope}, []string{target.team}
+		imported = map[string]any{
+			"uses": "@builtin:connectors/linear.md",
+			"with": map[string]any{"issues": []string{target.resource}, "organizations": []string{target.scope}, "teams": []string{target.team}},
+		}
 		tool = "get-issue"
 	case "jira":
 		require.NotEmpty(t, target.resource, "resource_id must be an approved Jira issue key")
 		require.NotEmpty(t, target.scope, "scope_id must be the approved Jira cloud ID")
-		resources["issues"], resources["cloud-ids"] = []string{target.resource}, []string{target.scope}
+		imported = map[string]any{
+			"uses": "@builtin:connectors/jira.md",
+			"with": map[string]any{
+				"issues": []string{target.resource}, "cloud-ids": []string{target.scope},
+				"queries": []string{"key = " + target.resource},
+			},
+		}
 		tool = "personal"
-	case "azure-devops":
-		require.Regexp(t, `^[A-Za-z0-9][A-Za-z0-9-]{0,49}$`, target.organization, "organization must be an Azure DevOps organization name, not a URL")
-		servers, ok := declaration["mcp-servers"].(map[string]any)
-		require.True(t, ok)
-		server, ok := servers["azure-devops"].(map[string]any)
-		require.True(t, ok)
-		server["url"] = "https://mcp.dev.azure.com/" + target.organization
-		resources["organizations"] = []string{target.organization}
-		tool = "azure-devops"
 	default:
 		t.Fatalf("unsupported live connector %q", target.provider)
 	}
 	root := t.TempDir()
-	dir := filepath.Join(root, ".github/aw/connectors")
-	require.NoError(t, os.MkdirAll(dir, 0700))
-	config, err := yaml.Marshal(document.Frontmatter)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, target.provider+".md"), []byte("---\n"+string(config)+"---\n"), 0600))
 	content, err := yaml.Marshal(map[string]any{
 		"on": "workflow_dispatch", "engine": "copilot",
 		"permissions": map[string]string{"contents": "read"},
-		"imports":     []string{".github/aw/connectors/" + target.provider + ".md"},
+		"imports":     []any{imported},
 		"tools":       map[string][]string{target.provider: {tool}},
 	})
 	require.NoError(t, err)
-	dir = filepath.Join(root, ".github/workflows")
+	return connectorSmokeParsePlan(t, root, target.provider, content)
+}
+
+func connectorSmokeParsePlan(t *testing.T, root, provider string, content []byte) *connectors.Plan {
+	t.Helper()
+	dir := filepath.Join(root, ".github/workflows")
 	require.NoError(t, os.MkdirAll(dir, 0700))
 	path := filepath.Join(dir, "connector-smoke.md")
 	require.NoError(t, os.WriteFile(path, []byte("---\n"+string(content)+"---\nRead approved references only.\n"), 0600))
@@ -84,7 +88,7 @@ func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.P
 	compiler.gitRoot = root
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
-	selected := data.Connectors[target.provider]
+	selected := data.Connectors[provider]
 	require.NotNil(t, selected)
 	require.Nil(t, selected.Context)
 	require.Nil(t, selected.SafeOutputs)

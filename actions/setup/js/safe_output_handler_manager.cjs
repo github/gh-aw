@@ -72,14 +72,7 @@ const GITHUB_TOKEN_CONFIG_KEY = "github-token";
  * Maps safe output types to their handler module file paths
  */
 const HANDLER_MAP = {
-  linear_create_issue: "./linear_create_issue.cjs",
-  linear_add_comment: "./linear_add_comment.cjs",
-  linear_update_issue: "./linear_update_issue.cjs",
   create_issue: "./create_issue.cjs",
-  jira_create_issue: "./jira_create_issue.cjs",
-  jira_update_issue: "./jira_update_issue.cjs",
-  jira_add_comment: "./jira_add_comment.cjs",
-  jira_add_label: "./jira_add_label.cjs",
   add_comment: "./add_comment.cjs",
   comment_memory: "./comment_memory.cjs",
   create_discussion: "./create_discussion.cjs",
@@ -130,12 +123,6 @@ const HANDLER_MAP = {
   report_incomplete: "./report_incomplete_handler.cjs",
   create_report_incomplete_issue: "./create_report_incomplete_issue.cjs",
   create_project: "./create_project.cjs",
-  ado_create_work_item: "./create_work_item.cjs",
-  ado_update_work_item: "./update_work_item.cjs",
-  ado_comment_on_work_item: "./comment_on_work_item.cjs",
-  ado_assign_work_item: "./assign_work_item.cjs",
-  ado_link_work_items: "./link_work_items.cjs",
-  ado_upload_workitem_attachment: "./upload_workitem_attachment.cjs",
   create_project_status_update: "./create_project_status_update.cjs",
   update_project: "./update_project.cjs",
   upload_artifact: "./upload_artifact.cjs",
@@ -179,12 +166,7 @@ const WTD3_REQUIREMENT_ID = "WTD3";
  * @type {Set<string>}
  */
 const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
-  "linear_create_issue",
-  "linear_add_comment",
   "create_issue",
-  "jira_create_issue",
-  "jira_update_issue",
-  "jira_add_comment",
   "add_comment",
   "create_pull_request",
   "comment_memory",
@@ -208,8 +190,6 @@ const THREAT_WARNING_REVIEWABLE_TYPES = new Set([
   "ledger_mutation",
   "create_report_incomplete_issue",
   "report_incomplete",
-  "ado_create_work_item",
-  "ado_comment_on_work_item",
 ]);
 
 /**
@@ -228,7 +208,6 @@ const THREAT_WARNING_CONVERTIBLE_TYPES = new Map([["push_to_pull_request_branch"
  * @type {Set<string>}
  */
 const THREAT_WARNING_ABORT_TYPES = new Set([
-  "linear_update_issue",
   "noop",
   "close_issue",
   "link_sub_issue",
@@ -240,7 +219,6 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "resolve_pull_request_review_thread",
   "dismiss_pull_request_review",
   "add_labels",
-  "jira_add_label",
   "remove_labels",
   "replace_label",
   "add_reviewer",
@@ -262,10 +240,6 @@ const THREAT_WARNING_ABORT_TYPES = new Set([
   "call_workflow",
   "autofix_code_scanning_alert",
   "create_agent_session",
-  "ado_update_work_item",
-  "ado_assign_work_item",
-  "ado_link_work_items",
-  "ado_upload_workitem_attachment",
 ]);
 
 /**

@@ -99,12 +99,42 @@ func TestConnectorTokenRouteAndOIDCValidation(t *testing.T) {
 				require.ErrorContains(t, err, test.message)
 				return
 			}
+
 			require.NoError(t, err)
 			assert.Equal(t, []string{"EXAMPLE_READ_TOKEN"}, data.Connectors["tracker"].Agent.Secrets())
 			output, err := c.CompileToYAML(data, root+"/proof.md")
 			require.NoError(t, err)
 			assert.Contains(t, output, "${{ secrets.EXAMPLE_READ_TOKEN }}")
 			assert.NotContains(t, output, "Mint connector GitHub")
+		})
+	}
+}
+
+func TestConnectorOIDCAudienceBounds(t *testing.T) {
+	for _, test := range []struct {
+		name, audience string
+		valid          bool
+	}{
+		{"maximum", strings.Repeat("a", 2048), true},
+		{"too-long", strings.Repeat("a", 2049), false},
+		{"empty", "", false},
+		{"nul", "audience\x00value", false},
+		{"control", "audience\x1fvalue", false},
+		{"newline", "audience\nvalue", false},
+		{"expression", "${{ github.actor }}", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			encoded, err := json.Marshal(test.audience)
+			require.NoError(t, err)
+			source := strings.Replace(awConnectorSource(t), "secret: EXAMPLE_READ_TOKEN",
+				"github-oidc:\n                    audience: "+string(encoded), 1)
+			c, root := awConnectorCompiler(t)
+			_, err = c.ParseWorkflowString(awConnectorHeader+source+"tools:\n  tracker: [get-issue]\n---\nReview.\n", root+"/proof.md")
+			if test.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "audience")
+			}
 		})
 	}
 }

@@ -5,11 +5,12 @@ permissions:
   contents: read
   actions: read
 engine: copilot
+imports:
+  - uses: "@builtin:connectors/linear.md"
+    with:
+      issues: [22222222-2222-4222-8222-222222222222]
 safe-outputs:
-  linear-token: ${{ secrets.LINEAR_API_KEY }}
   linear-add-comment:
-    target: "ENG-123"
-    max: 1
 timeout-minutes: 5
 ---
 
@@ -19,4 +20,5 @@ Test the linear-add-comment safe output functionality.
 
 Add a comment to an existing Linear issue with findings from the repository.
 
-Output as JSONL format using the `linear_add_comment` tool.
+Use `connector_6_linear_add_comment` with the approved issue UUID and body.
+Replace the specimen UUID before live use.

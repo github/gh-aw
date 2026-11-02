@@ -145,9 +145,8 @@ to reuse its rendered content for publication and retries. Changing its title or
 body, or copying the object, requires validation and rendering again.
 Changing a prepared request's owner, repo, or headers is rejected before any API
 write; build and render a fresh complete report for the intended target instead.
-Linear uses the Markdown renderer. Jira uses text-preserving normalization before
-converting its literal description to ADF, without replacing ordinary language
-characters with visually similar Latin letters.
+Linear uses the Markdown renderer. Jira requests use the shared Go connector
+runtime's literal text-to-ADF encoder, not JavaScript provider handlers.
 
 `js/report_ast.cjs` defines the typed inline and block nodes, normalization, and
 GitHub Markdown renderer. The renderer owns escaping, HTTPS link validation,

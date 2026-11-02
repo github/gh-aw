@@ -30,11 +30,12 @@ type Runtime struct {
 }
 
 type Result struct {
-	Connector  string          `json:"connector"`
-	Capability string          `json:"capability"`
-	Untrusted  bool            `json:"untrusted"`
-	StatusCode int             `json:"statusCode"`
-	Data       json.RawMessage `json:"data"`
+	Connector       string          `json:"connector"`
+	Capability      string          `json:"capability"`
+	Untrusted       bool            `json:"untrusted"`
+	StatusCode      int             `json:"statusCode"`
+	Data            json.RawMessage `json:"data"`
+	CreatedResource string          `json:"createdResource,omitempty"`
 }
 
 // Execute revalidates the typed request at the execution boundary. No operation
@@ -42,6 +43,13 @@ type Result struct {
 func (p *Plan) Execute(ctx context.Context, runtime Runtime, capability, name string, args map[string]any) (*Result, error) {
 	op, err := p.authorizeOperation(runtime, capability, name, args)
 	if err != nil {
+		return nil, err
+	}
+	return p.executeOperation(ctx, runtime, capability, name, op, args)
+}
+
+func (p *Plan) executeOperation(ctx context.Context, runtime Runtime, capability, name string, op Operation, args map[string]any) (*Result, error) {
+	if err := runtime.checkOrigin(p.spec.Endpoints[op.Request.Endpoint]); err != nil {
 		return nil, err
 	}
 	request, err := p.buildRequest(ctx, op, args)
@@ -97,6 +105,9 @@ func (p *Plan) authorizeOperation(runtime Runtime, capability, name string, args
 	op, ok := selectedOperation(p.spec, capability, name)
 	if !ok {
 		return Operation{}, errors.New("unknown connector operation")
+	}
+	if len(op.TrustedInputs) > 0 && p.trustedOperation != name {
+		return Operation{}, errors.New("trusted connector inputs must be resolved by the safe-output host")
 	}
 	if err := runtime.checkOrigin(p.spec.Endpoints[op.Request.Endpoint]); err != nil {
 		return Operation{}, err

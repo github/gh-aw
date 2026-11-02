@@ -1,0 +1,44 @@
+---
+"gh-aw": major
+---
+
+Replace the native Jira, Linear, and Azure DevOps tools, safe-output handlers,
+and gateway issue triggers with the shared declarative connector runtime.
+Provider Markdown declarations are
+embedded in the compiler and available through ordinary quoted
+`@builtin:connectors/<provider>.md` imports.
+
+Jira workflows must import the declaration, explicitly grant cloud IDs, issue
+keys, projects, and exact queries as needed, and select read profiles and write
+effects independently. Store separate encoded Basic credentials for personal MCP
+reads and REST writes, or use the declared service-account read credential.
+Legacy `auth`/`allowed`, automatic email/token environment injection, and
+per-effect `max`/`staged` options are rejected.
+
+The connector preserves issue creation, issue updates, ADF comments, and additive
+labels. Updates currently require both summary and description. Explicit
+temporary references support create-to-update/comment/label chaining through
+execution-local authenticated receipts, without granting arbitrary real issue
+keys. Seven formerly exposed read methods remain unavailable; no parallel
+native implementation remains. Generic safe-output trusted inputs and bounded
+preflights can resolve author-owned resource identifiers without exposing them
+to the agent. Custom Jira ingress remains unavailable and fails closed. See the
+Connectors reference for migration inputs, boundaries, and limitations.
+
+Linear consumers must replace native toolsets and safe outputs with explicit
+connector imports and selections. Trusted resource preflights preserve the
+smoke workflow's secret-derived team and project-slug destination without
+granting those inputs to the agent. Broad native MCP toolsets, friendly-name
+chaining, and per-operation legacy options are not implicit compatibility paths.
+
+Azure DevOps consumers must use the embedded connector and separate read/write
+Entra credentials; automatic PAT/system-token wiring is removed. Hosted MCP
+currently exposes project metadata, while the declared mutations remain bounded
+to title changes, comments, assignment, and fixed related links. Other legacy
+work-item fields, attachments, and temporary-ID options are not drop-in
+replacements. Custom ingress for all three providers remains fail-closed.
+
+Connector credentials now select explicit stored-token, GitHub App installation
+token, or GitHub OIDC identity-token routes. Minting is job- and phase-local;
+App permissions and OIDC audiences are explicit, and staged writes do not mint.
+There is no automatic provider token exchange or credential fallback.

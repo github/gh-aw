@@ -2485,10 +2485,7 @@ Run a task.
 	assert.Contains(t, needs, "shared_job", "safe_outputs needs should include dependency from import")
 }
 
-// TestSafeOutputsImportLinearTokenFromOnlyImport ensures that a Linear handler and its
-// linear-token supplied purely by an imported shared workflow retain the credential after
-// merge, mirroring the equivalent GitHubToken merge behavior.
-func TestSafeOutputsImportLinearTokenFromOnlyImport(t *testing.T) {
+func TestSafeOutputsImportLinearConnectorCredential(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 
 	tmpDir := t.TempDir()
@@ -2497,10 +2494,11 @@ func TestSafeOutputsImportLinearTokenFromOnlyImport(t *testing.T) {
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	sharedWorkflow := `---
-safe-outputs:
-  linear-token: "${{ secrets.IMPORT_LINEAR_TOKEN }}"
-  linear-add-comment:
-    target: "ENG-123"
+imports:
+  - uses: "@builtin:connectors/linear.md"
+    with:
+      writer-secret: IMPORT_LINEAR_TOKEN
+      issues: [22222222-2222-4222-8222-222222222222]
 ---
 
 # Shared Linear Configuration
@@ -2516,6 +2514,8 @@ permissions:
   contents: read
 imports:
   - ./shared-linear.md
+safe-outputs:
+  linear-add-comment:
 ---
 
 # Main Workflow
@@ -2537,9 +2537,8 @@ This workflow uses only the imported Linear safe-outputs configuration.
 	require.NoError(t, err, "Failed to parse workflow")
 	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
 
-	require.NotNil(t, workflowData.SafeOutputs.LinearAddComment, "LinearAddComment should be imported")
-	assert.Equal(t, "ENG-123", workflowData.SafeOutputs.LinearAddComment.Target)
-	assert.Equal(t, "${{ secrets.IMPORT_LINEAR_TOKEN }}", workflowData.SafeOutputs.LinearToken, "LinearToken should be merged from the import")
+	require.Contains(t, workflowData.SafeOutputs.Scripts, connectorSafeOutputName("linear", "add-comment"))
+	assert.Contains(t, workflowData.SafeOutputs.Env, "GH_AW_CONNECTOR_6_LINEAR_SECRET_IMPORT_LINEAR_TOKEN")
 
 	// The Linear-only configuration must not implicitly enable GitHub issue creation
 	// for incomplete-run reporting.
@@ -2548,13 +2547,7 @@ This workflow uses only the imported Linear safe-outputs configuration.
 	assert.Equal(t, "false", *workflowData.SafeOutputs.ReportIncomplete.CreateIssue, "ReportIncomplete.CreateIssue should default to false for a Linear-only merged configuration")
 }
 
-// TestSafeOutputsImportLinearOnlyDoesNotEnableGitHubIssueReporting is a regression test for
-// the implicit report-incomplete default being computed before imported Linear handlers are
-// merged in. Previously, a main workflow declaring only meta safe-outputs fields (like
-// linear-token) would get an implicit "create-issue: true" default before the import's Linear
-// handler was merged in, and that implicit true value would then be preserved by the merge
-// because the import did not explicitly set report-incomplete.
-func TestSafeOutputsImportLinearOnlyDoesNotEnableGitHubIssueReporting(t *testing.T) {
+func TestSafeOutputsImportLinearConnectorDoesNotEnableGitHubIssueReporting(t *testing.T) {
 	compiler := NewCompiler(WithVersion("1.0.0"))
 
 	tmpDir := t.TempDir()
@@ -2563,9 +2556,11 @@ func TestSafeOutputsImportLinearOnlyDoesNotEnableGitHubIssueReporting(t *testing
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	sharedWorkflow := `---
-safe-outputs:
-  linear-create-issue:
-    team-id: "9cfb482a-81e3-4154-b5b9-2c805e70a02d"
+imports:
+  - uses: "@builtin:connectors/linear.md"
+    with:
+      teams: [33333333-3333-4333-8333-333333333333]
+      projects: [44444444-4444-4444-8444-444444444444]
 ---
 
 # Shared Linear Configuration
@@ -2584,7 +2579,9 @@ permissions:
 imports:
   - ./shared-linear.md
 safe-outputs:
-  linear-token: "${{ secrets.LINEAR_API_KEY }}"
+  linear-create-issue:
+  env:
+    CUSTOM_SETTING: literal
 ---
 
 # Main Workflow
@@ -2604,7 +2601,7 @@ safe-outputs:
 	require.NoError(t, err, "Failed to parse workflow")
 	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
 
-	require.NotNil(t, workflowData.SafeOutputs.LinearCreateIssue, "LinearCreateIssue should be imported")
+	require.Contains(t, workflowData.SafeOutputs.Scripts, connectorSafeOutputName("linear", "create-issue"))
 	require.Nil(t, workflowData.SafeOutputs.CreateIssues, "CreateIssues (GitHub) must not be implicitly enabled")
 	require.NotNil(t, workflowData.SafeOutputs.ReportIncomplete)
 	require.NotNil(t, workflowData.SafeOutputs.ReportIncomplete.CreateIssue)

@@ -1,26 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const fixtures = require("./fixtures/connectors/linear-events.json");
-const { providerIssueActivities, resolveProviderIssueItem } = require("./provider_issue_webhook.cjs");
+const { isProviderIssueEvent, resolveProviderIssueItem } = require("./provider_issue_webhook.cjs");
+const { resolveWebhookResource } = require("./webhook_resource.cjs");
+const { loadHandlers } = require("./safe_output_handler_manager.cjs");
+const tools = require("./safe_outputs_tools.json");
 
-function nativePayload(patch) {
-  return { ...fixtures.base, ...patch, data: { ...fixtures.base.data, ...patch.data } };
-}
-
-describe("Linear connector native evidence fixtures", () => {
-  it.each(fixtures.cases)("$name", fixture => {
-    const payload = nativePayload(fixture.patch);
-    if (fixture.reject) {
-      expect(() => resolveProviderIssueItem("linear_issue", payload)).toThrow(/Webhook validation failed/);
-      return;
+describe("Linear uses only the shared connector runtime", () => {
+  it("does not register legacy provider mutation handlers or tool schemas", async () => {
+    vi.stubGlobal("core", { info: vi.fn(), debug: vi.fn() });
+    try {
+      for (const operation of ["linear_create_issue", "linear_add_comment", "linear_update_issue"]) {
+        const handlers = await loadHandlers({ [operation]: {} });
+        expect(handlers.has(operation)).toBe(false);
+        expect(tools.some(tool => tool.name === operation)).toBe(false);
+      }
+    } finally {
+      vi.unstubAllGlobals();
     }
-    expect(resolveProviderIssueItem("linear_issue", payload)).toMatchObject({
-      item_type: "linear_issue",
-      item_number: fixtures.base.data.id,
-      source: fixtures.base.organizationId,
-    });
-    expect(providerIssueActivities("linear_issue", payload)).toEqual(fixture.activities);
+  });
+
+  it("fails closed for the removed built-in ingress family", () => {
+    expect(isProviderIssueEvent("linear_issue")).toBe(false);
+    expect(() => resolveProviderIssueItem("linear_issue", { type: "Issue", action: "create", data: { id: "issue" }, organizationId: "org" })).toThrow(/Webhook validation failed/);
+    expect(() => resolveWebhookResource("linear_issue", { url: "https://linear.app/workspace/issue/ENG-123", type: ["opened"] })).toThrow();
   });
 });

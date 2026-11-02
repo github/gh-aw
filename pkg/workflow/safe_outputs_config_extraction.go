@@ -57,15 +57,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			if adapters, supplied := outputMap["claim-adapters"]; supplied {
 				config.ClaimAdapters, config.claimAdaptersParseError = parseWorkQueueClaimAdapters(adapters)
 			}
-			config.CreateWorkItems = c.parseCreateWorkItemConfig(outputMap)
-			config.UpdateWorkItems = c.parseUpdateWorkItemConfig(outputMap)
-			config.CommentOnWorkItems = c.parseCommentOnWorkItemConfig(outputMap)
-			config.AssignWorkItems = c.parseAssignWorkItemConfig(outputMap)
-			config.LinkWorkItems = c.parseLinkWorkItemsConfig(outputMap)
-			config.UploadWorkItemAttachments = c.parseUploadWorkItemAttachmentConfig(outputMap)
-			config.LinearCreateIssue = c.parseLinearCreateIssueConfig(outputMap)
-			config.LinearAddComment = c.parseLinearAddCommentConfig(outputMap)
-			config.LinearUpdateIssue = c.parseLinearUpdateIssueConfig(outputMap)
 
 			// Handle create-issue
 			if enabled, ok := outputMap["create-issue"].(bool); ok {
@@ -76,8 +67,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				safeOutputsConfigLog.Print("Configured create-issue output handler")
 				config.CreateIssues = issuesConfig
 			}
-
-			c.extractJiraSafeOutputConfigs(outputMap, config)
 
 			// Handle create-agent-session
 			agentSessionConfig := c.parseAgentSessionConfig(outputMap)
@@ -395,6 +384,8 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				}
 			}
 
+			c.extractGlobalConfigFields(outputMap, config)
+
 			// Handle report-incomplete (parse configuration if present, or enable by default)
 			reportIncompleteConfig := c.parseReportIncompleteConfig(outputMap)
 			if reportIncompleteConfig != nil {
@@ -413,7 +404,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				}
 			}
 
-			c.extractGlobalConfigFields(outputMap, config)
 		}
 	}
 
