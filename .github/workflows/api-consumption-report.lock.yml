@@ -291,12 +291,61 @@ jobs:
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_EXPR_76DF9333="${GH_AW_EXPR_76DF9333-}" \
+            GH_AW_EXPR_77C1A4D2="${GH_AW_EXPR_77C1A4D2-}" \
+            GH_AW_EXPR_7C248226="${GH_AW_EXPR_7C248226-}" \
+            GH_AW_EXPR_C19C384F="${GH_AW_EXPR_C19C384F-}" \
+            GH_AW_GITHUB_ACTOR="${GH_AW_GITHUB_ACTOR-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_SERVER_URL="${GH_AW_GITHUB_SERVER_URL-}" \
+            GH_AW_GITHUB_WORKSPACE="${GH_AW_GITHUB_WORKSPACE-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GH_AW_PROMPT_CONFIG="${GH_AW_PROMPT_CONFIG-}" \
+            GH_AW_PROMPT_CONTENT_0000="${GH_AW_PROMPT_CONTENT_0000-}" \
+            GH_AW_PROMPT_CONTENT_0001="${GH_AW_PROMPT_CONTENT_0001-}" \
+            GH_AW_PROMPT_CONTENT_0002="${GH_AW_PROMPT_CONTENT_0002-}" \
+            GH_AW_PROMPT_CONTENT_0003="${GH_AW_PROMPT_CONTENT_0003-}" \
+            GH_AW_PROMPT_CONTENT_0004="${GH_AW_PROMPT_CONTENT_0004-}" \
+            GH_AW_PROMPT_CONTENT_0005="${GH_AW_PROMPT_CONTENT_0005-}" \
+            GH_AW_PROMPT_CONTENT_0006="${GH_AW_PROMPT_CONTENT_0006-}" \
+            GH_AW_PROMPT_CONTENT_0007="${GH_AW_PROMPT_CONTENT_0007-}" \
+            GH_AW_PROMPT_CONTENT_0008="${GH_AW_PROMPT_CONTENT_0008-}" \
+            GH_AW_PROMPT_CONTENT_0009="${GH_AW_PROMPT_CONTENT_0009-}" \
+            GH_AW_PROMPT_CONTENT_0010="${GH_AW_PROMPT_CONTENT_0010-}" \
+            GH_AW_PROMPT_CONTENT_0011="${GH_AW_PROMPT_CONTENT_0011-}" \
+            GH_AW_PROMPT_CONTENT_0012="${GH_AW_PROMPT_CONTENT_0012-}" \
+            GH_AW_PROMPT_CONTENT_0013="${GH_AW_PROMPT_CONTENT_0013-}" \
+            GH_AW_PROMPT_CONTENT_0014="${GH_AW_PROMPT_CONTENT_0014-}" \
+            GH_AW_SAFE_OUTPUTS="${GH_AW_SAFE_OUTPUTS-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"author_file\":\".github/workflows/api-consumption-report.md\"}],\"system_item_count\":14,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.server_url\":\"GH_AW_GITHUB_SERVER_URL\"}}"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -306,54 +355,423 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_discussion, upload_asset(max:5), report_missing_tool, report_missing_data, noop(max:2)\n"
-          GH_AW_PROMPT_CONTENT_0002: "\nupload_asset: provide a file path; returns a URL; assets are published after the workflow completes (safeoutputs).\n"
-          GH_AW_PROMPT_CONTENT_0003: "</safe-output-tools>\n"
-          GH_AW_PROMPT_CONTENT_0004: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
-          GH_AW_PROMPT_CONTENT_0005: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0006: "## Cache-Memory Trending — Standard Pattern\n\nUse this section to manage the rolling JSONL history and calculate trends.\n\n### File Conventions\n\n| Path | Purpose |\n|------|---------|\n| `/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl` | One JSON object per line, each with a `date` field (YYYY-MM-DD) |\n| `/tmp/gh-aw/cache-memory/trending/api-consumption/metadata.json` | Tracking metadata (entry count, date range, retention policy) |\n\nEvery history entry **must** include a `date` field in `YYYY-MM-DD` format. Use `recorded_at` (filesystem-safe, no colons: `YYYY-MM-DD-HH-MM-SS`) for traceability.\n\n### Step T1 — Inspect Cache State and Choose Collection Window\n\nBefore collecting data, check how many history entries already exist so you can choose between a full backfill and an incremental update:\n\n```bash\nhistory_file=\"/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl\"\nentry_count=0\nif [ -f \"$history_file\" ]; then\n  if ! entry_count=$(wc -l < \"$history_file\"); then\n    echo \"warning: unable to count existing history entries; defaulting to 0\"\n    entry_count=0\n  fi\nfi\necho \"Existing history entries: $entry_count\"\n```\n\nChoose the collection window based on `entry_count`. After the merge in Step T3 there is one deduplicated row per calendar day, so `entry_count` is a reliable proxy for the number of days of history. 30 days is the minimum needed for stable 7-day and 30-day trend calculations:\n\n- **If `entry_count >= 30`** (history is already rich): collect only incremental data — target the last 1–2 days.\n- **If `entry_count < 30`** (first run, cache miss, or sparse history): run a one-time backfill — look back `90` days.\n\nRecord which mode you used (`incremental` vs `backfill`) and include it in the report's cache status block.\n\n### Step T2 — Validate Restored Cache\n\nAfter data collection, verify the cache state before updating the history:\n\n```bash\nhistory_file=\"/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl\"\nif [ -f \"$history_file\" ] && [ -s \"$history_file\" ]; then\n  entry_count=$(wc -l < \"$history_file\")\n  echo \"Cache restored from previous run: yes ($entry_count existing entries)\"\nelse\n  echo \"Cache restored from previous run: no (first run or empty cache)\"\nfi\n```\n\n### Step T3 — Merge and Deduplicate History\n\nApply last-write-wins deduplication by `date` key, sort ascending, then prune to the retention window.\n\n**Recommended Python implementation:**\n\n```python\nimport json\nfrom datetime import datetime, timedelta\nfrom pathlib import Path\n\nHISTORY_FILE = Path(\"/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl\")\nRETENTION_DAYS = 90\n\ndef load_history(path: Path) -> list[dict]:\n    \"\"\"Load existing JSONL history, returning an empty list if file is absent.\n\n    Lines that cannot be parsed as JSON (e.g. from an interrupted prior write)\n    are skipped with a warning so subsequent runs can self-heal.\n    \"\"\"\n    entries = []\n    if path.exists():\n        with open(path) as f:\n            for row_index, raw in enumerate(f, start=1):\n                line = raw.strip()\n                if not line:\n                    continue\n                try:\n                    entries.append(json.loads(line))\n                except json.JSONDecodeError as exc:\n                    print(f\"warning: skipped malformed JSON at row_index={row_index}: {exc}\")\n    return entries\n\ndef upsert_by_date(entries: list[dict]) -> list[dict]:\n    \"\"\"Deduplicate by date (last-write-wins), then sort ascending by date.\"\"\"\n    by_date: dict[str, dict] = {}\n    for row_index, row in enumerate(entries, start=1):\n        day = row.get(\"date\")\n        if day:\n            by_date[day] = row\n        else:\n            print(f\"warning: skipped history row without 'date' at row_index={row_index}\")\n    return [by_date[d] for d in sorted(by_date.keys())]\n\ndef apply_retention(entries: list[dict], retention_days: int) -> list[dict]:\n    \"\"\"Remove entries older than retention_days, keeping exactly retention_days calendar days.\n\n    The cutoff is inclusive: entries whose date equals today minus (retention_days - 1) are kept,\n    so a retention_days=90 policy retains exactly 90 days (today through 89 days ago).\n    \"\"\"\n    cutoff = (datetime.utcnow().date() - timedelta(days=retention_days - 1)).isoformat()\n    return [e for e in entries if e.get(\"date\", \"\") >= cutoff]\n\ndef save_history(path: Path, entries: list[dict]) -> None:\n    \"\"\"Write entries back as JSONL using an atomic rename to prevent corruption.\n\n    Writes to a sibling `.tmp` file first, then replaces the target via os.replace()\n    so an interrupted write never leaves a truncated history file.\n    \"\"\"\n    import os\n    path.parent.mkdir(parents=True, exist_ok=True)\n    tmp_path = path.with_suffix(\".tmp\")\n    with open(tmp_path, \"w\") as f:\n        for entry in entries:\n            f.write(json.dumps(entry) + \"\\n\")\n    os.replace(tmp_path, path)\n\n# --- Merge logic ---\nexisting = load_history(HISTORY_FILE)\n\nmerged = list(existing)\nif mode == \"backfill\":\n    merged.extend(backfill_entries)  # backfill_entries: list of per-day dicts\n# Append today last so today's data always wins on same-date collisions.\nmerged.append(today_summary)        # today_summary: dict with \"date\" field\n\nmerged = upsert_by_date(merged)\nmerged = apply_retention(merged, RETENTION_DAYS)\nsave_history(HISTORY_FILE, merged)\n\nprint(f\"History updated: {len(merged)} entries retained\")\n```\n\n### Step T4 — Write Metadata File\n\nAfter saving the merged history, update the companion metadata file:\n\n```python\nimport json\nfrom pathlib import Path\n\nMETADATA_FILE = Path(\"/tmp/gh-aw/cache-memory/trending/api-consumption/metadata.json\")\n\nmetadata = {\n    \"workflow\": \"api-consumption\",\n    \"started_tracking\": merged[0][\"date\"] if merged else today_summary[\"date\"],\n    \"last_updated\": today_summary[\"date\"],\n    \"data_points\": len(merged),\n    \"retention_days\": 90,\n}\nMETADATA_FILE.parent.mkdir(parents=True, exist_ok=True)\nMETADATA_FILE.write_text(json.dumps(metadata, indent=2) + \"\\n\")\n```\n\n### Trend Calculation Helpers\n\nUse these helpers after loading the merged history into a Pandas DataFrame:\n\n```python\nimport pandas as pd\nimport numpy as np\n\ndf = pd.DataFrame(merged)\ndf[\"date\"] = pd.to_datetime(df[\"date\"])\ndf = df.sort_values(\"date\").reset_index(drop=True)\n\ndef rolling_avg(series: pd.Series, window: int) -> pd.Series:\n    \"\"\"Rolling mean with a minimum of 1 observation so early rows are never NaN.\"\"\"\n    return series.rolling(window=window, min_periods=1).mean()\n\ndef pct_change_period(series: pd.Series, window: int) -> float | None:\n    \"\"\"Percent change between the last `window` days and the prior `window` days.\n    Returns None when there is insufficient data.\"\"\"\n    if len(series) < window * 2:\n        return None\n    recent = series.iloc[-window:].mean()\n    prior = series.iloc[-(window * 2):-window].mean()\n    if prior == 0:\n        return None\n    return round((recent - prior) / prior * 100, 1)\n\ndef detect_anomalies(series: pd.Series, z_threshold: float = 2.0) -> pd.Series:\n    \"\"\"Return a boolean Series marking entries more than z_threshold std devs from the mean.\"\"\"\n    mean = series.mean()\n    std = series.std()\n    if std == 0:\n        return pd.Series([False] * len(series), index=series.index)\n    return ((series - mean) / std).abs() > z_threshold\n\n# Example: compute 7-day and 30-day rolling averages for a \"value\" column\ndf[\"rolling_7d\"] = rolling_avg(df[\"value\"], 7)\ndf[\"rolling_30d\"] = rolling_avg(df[\"value\"], 30)\n\n# Percent change vs. prior period\ntrend_7d = pct_change_period(df[\"value\"], 7)\ntrend_30d = pct_change_period(df[\"value\"], 30)\n\n# Anomaly flags\ndf[\"is_anomaly\"] = detect_anomalies(df[\"value\"])\n\n# Trend direction label helper\n# Changes of more than ±5% are considered significant trends (↑/↓);\n# changes within ±5% are considered stable (→).\ndef trend_label(pct: float | None) -> str:\n    \"\"\"Return an arrow-prefixed label for a percent-change value.\n\n    Args:\n        pct: Percent change, or None when there is insufficient data.\n    Returns:\n        A human-readable string such as '↑ +12.3%', '↓ -8.0%', or '→ +1.2%'.\n    \"\"\"\n    if pct is None:\n        return \"→ (insufficient data)\"\n    if pct > 5:\n        return f\"↑ {pct:+.1f}%\"\n    if pct < -5:\n        return f\"↓ {pct:+.1f}%\"\n    return f\"→ {pct:+.1f}%\"\n```\n\n### Cache Status Block\n\nInclude this block in your report's output (discussion, issue, or step summary) to aid debugging and transparency:\n\n```markdown\n<details>\n<summary>📦 Cache Memory Status</summary>\n\n- **Location**: `/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl`\n- **Cache restored from previous run**: {yes (N entries) / no (first run)}\n- **Collection mode**: {incremental / backfill}\n- **Data points stored**: {data_points}\n- **Earliest entry**: {earliest_date}\n- **Retention policy**: 90 days\n\n</details>\n```\n"
-          GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import .github/skills/jqschema/SKILL.md}}\n"
-          GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/shared/reporting.md}}\n"
-          GH_AW_PROMPT_CONTENT_0009: "{{#runtime-import .github/workflows/shared/otlp.md}}\n"
-          GH_AW_PROMPT_CONTENT_0010: "{{#runtime-import .github/workflows/shared/graders.md}}\n"
-          GH_AW_PROMPT_CONTENT_0011: "{{#runtime-import .github/workflows/shared/trending-charts-simple.md}}\n"
-          GH_AW_PROMPT_CONTENT_0012: "{{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}\n"
-          GH_AW_PROMPT_CONTENT_0013: "{{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}\n"
-          GH_AW_PROMPT_CONTENT_0014: "{{#runtime-import .github/workflows/shared/graders/recurrence-laminarity.md}}\n"
-        with:
-          script: |
-            const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"author_file\":\".github/workflows/api-consumption-report.md\"}],\"system_item_count\":14,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.server_url\":\"GH_AW_GITHUB_SERVER_URL\"}}"
+          GH_AW_PROMPT_CONTENT_0000: |
+            <system>
+          GH_AW_PROMPT_CONTENT_0001: |
+            <safe-output-tools>
+            Tools: create_discussion, upload_asset(max:5), report_missing_tool, report_missing_data, noop(max:2)
+          GH_AW_PROMPT_CONTENT_0002: |
+
+            upload_asset: provide a file path; returns a URL; assets are published after the workflow completes (safeoutputs).
+          GH_AW_PROMPT_CONTENT_0003: |
+            </safe-output-tools>
+          GH_AW_PROMPT_CONTENT_0004: |+
+            <github-context>
+            The following GitHub context information is available for this workflow:
+            {{#if github.actor}}
+            - **actor**: __GH_AW_GITHUB_ACTOR__
+            {{/if}}
+            {{#if github.repository}}
+            - **repository**: __GH_AW_GITHUB_REPOSITORY__
+            {{/if}}
+            {{#if github.workspace}}
+            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
+            {{/if}}
+            {{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}
+            - **issue-number**: #__GH_AW_EXPR_7C248226__
+            {{/if}}
+            {{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}
+            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
+            {{/if}}
+            {{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}
+            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
+            {{/if}}
+            {{#if github.event.comment.id || github.aw.context.comment_id}}
+            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
+            {{/if}}
+            {{#if github.run_id}}
+            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
+            {{/if}}
+            </github-context>
+
+          GH_AW_PROMPT_CONTENT_0005: |
+            </system>
+          GH_AW_PROMPT_CONTENT_0006: |
+            ## Cache-Memory Trending — Standard Pattern
+
+            Use this section to manage the rolling JSONL history and calculate trends.
+
+            ### File Conventions
+
+            | Path | Purpose |
+            |------|---------|
+            | `/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl` | One JSON object per line, each with a `date` field (YYYY-MM-DD) |
+            | `/tmp/gh-aw/cache-memory/trending/api-consumption/metadata.json` | Tracking metadata (entry count, date range, retention policy) |
+
+            Every history entry **must** include a `date` field in `YYYY-MM-DD` format. Use `recorded_at` (filesystem-safe, no colons: `YYYY-MM-DD-HH-MM-SS`) for traceability.
+
+            ### Step T1 — Inspect Cache State and Choose Collection Window
+
+            Before collecting data, check how many history entries already exist so you can choose between a full backfill and an incremental update:
+
+            ```bash
+            history_file="/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl"
+            entry_count=0
+            if [ -f "$history_file" ]; then
+              if ! entry_count=$(wc -l < "$history_file"); then
+                echo "warning: unable to count existing history entries; defaulting to 0"
+                entry_count=0
+              fi
+            fi
+            echo "Existing history entries: $entry_count"
+            ```
+
+            Choose the collection window based on `entry_count`. After the merge in Step T3 there is one deduplicated row per calendar day, so `entry_count` is a reliable proxy for the number of days of history. 30 days is the minimum needed for stable 7-day and 30-day trend calculations:
+
+            - **If `entry_count >= 30`** (history is already rich): collect only incremental data — target the last 1–2 days.
+            - **If `entry_count < 30`** (first run, cache miss, or sparse history): run a one-time backfill — look back `90` days.
+
+            Record which mode you used (`incremental` vs `backfill`) and include it in the report's cache status block.
+
+            ### Step T2 — Validate Restored Cache
+
+            After data collection, verify the cache state before updating the history:
+
+            ```bash
+            history_file="/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl"
+            if [ -f "$history_file" ] && [ -s "$history_file" ]; then
+              entry_count=$(wc -l < "$history_file")
+              echo "Cache restored from previous run: yes ($entry_count existing entries)"
+            else
+              echo "Cache restored from previous run: no (first run or empty cache)"
+            fi
+            ```
+
+            ### Step T3 — Merge and Deduplicate History
+
+            Apply last-write-wins deduplication by `date` key, sort ascending, then prune to the retention window.
+
+            **Recommended Python implementation:**
+
+            ```python
+            import json
+            from datetime import datetime, timedelta
+            from pathlib import Path
+
+            HISTORY_FILE = Path("/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl")
+            RETENTION_DAYS = 90
+
+            def load_history(path: Path) -> list[dict]:
+                """Load existing JSONL history, returning an empty list if file is absent.
+
+                Lines that cannot be parsed as JSON (e.g. from an interrupted prior write)
+                are skipped with a warning so subsequent runs can self-heal.
+                """
+                entries = []
+                if path.exists():
+                    with open(path) as f:
+                        for row_index, raw in enumerate(f, start=1):
+                            line = raw.strip()
+                            if not line:
+                                continue
+                            try:
+                                entries.append(json.loads(line))
+                            except json.JSONDecodeError as exc:
+                                print(f"warning: skipped malformed JSON at row_index={row_index}: {exc}")
+                return entries
+
+            def upsert_by_date(entries: list[dict]) -> list[dict]:
+                """Deduplicate by date (last-write-wins), then sort ascending by date."""
+                by_date: dict[str, dict] = {}
+                for row_index, row in enumerate(entries, start=1):
+                    day = row.get("date")
+                    if day:
+                        by_date[day] = row
+                    else:
+                        print(f"warning: skipped history row without 'date' at row_index={row_index}")
+                return [by_date[d] for d in sorted(by_date.keys())]
+
+            def apply_retention(entries: list[dict], retention_days: int) -> list[dict]:
+                """Remove entries older than retention_days, keeping exactly retention_days calendar days.
+
+                The cutoff is inclusive: entries whose date equals today minus (retention_days - 1) are kept,
+                so a retention_days=90 policy retains exactly 90 days (today through 89 days ago).
+                """
+                cutoff = (datetime.utcnow().date() - timedelta(days=retention_days - 1)).isoformat()
+                return [e for e in entries if e.get("date", "") >= cutoff]
+
+            def save_history(path: Path, entries: list[dict]) -> None:
+                """Write entries back as JSONL using an atomic rename to prevent corruption.
+
+                Writes to a sibling `.tmp` file first, then replaces the target via os.replace()
+                so an interrupted write never leaves a truncated history file.
+                """
+                import os
+                path.parent.mkdir(parents=True, exist_ok=True)
+                tmp_path = path.with_suffix(".tmp")
+                with open(tmp_path, "w") as f:
+                    for entry in entries:
+                        f.write(json.dumps(entry) + "\n")
+                os.replace(tmp_path, path)
+
+            # --- Merge logic ---
+            existing = load_history(HISTORY_FILE)
+
+            merged = list(existing)
+            if mode == "backfill":
+                merged.extend(backfill_entries)  # backfill_entries: list of per-day dicts
+            # Append today last so today's data always wins on same-date collisions.
+            merged.append(today_summary)        # today_summary: dict with "date" field
+
+            merged = upsert_by_date(merged)
+            merged = apply_retention(merged, RETENTION_DAYS)
+            save_history(HISTORY_FILE, merged)
+
+            print(f"History updated: {len(merged)} entries retained")
+            ```
+
+            ### Step T4 — Write Metadata File
+
+            After saving the merged history, update the companion metadata file:
+
+            ```python
+            import json
+            from pathlib import Path
+
+            METADATA_FILE = Path("/tmp/gh-aw/cache-memory/trending/api-consumption/metadata.json")
+
+            metadata = {
+                "workflow": "api-consumption",
+                "started_tracking": merged[0]["date"] if merged else today_summary["date"],
+                "last_updated": today_summary["date"],
+                "data_points": len(merged),
+                "retention_days": 90,
+            }
+            METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+            METADATA_FILE.write_text(json.dumps(metadata, indent=2) + "\n")
+            ```
+
+            ### Trend Calculation Helpers
+
+            Use these helpers after loading the merged history into a Pandas DataFrame:
+
+            ```python
+            import pandas as pd
+            import numpy as np
+
+            df = pd.DataFrame(merged)
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.sort_values("date").reset_index(drop=True)
+
+            def rolling_avg(series: pd.Series, window: int) -> pd.Series:
+                """Rolling mean with a minimum of 1 observation so early rows are never NaN."""
+                return series.rolling(window=window, min_periods=1).mean()
+
+            def pct_change_period(series: pd.Series, window: int) -> float | None:
+                """Percent change between the last `window` days and the prior `window` days.
+                Returns None when there is insufficient data."""
+                if len(series) < window * 2:
+                    return None
+                recent = series.iloc[-window:].mean()
+                prior = series.iloc[-(window * 2):-window].mean()
+                if prior == 0:
+                    return None
+                return round((recent - prior) / prior * 100, 1)
+
+            def detect_anomalies(series: pd.Series, z_threshold: float = 2.0) -> pd.Series:
+                """Return a boolean Series marking entries more than z_threshold std devs from the mean."""
+                mean = series.mean()
+                std = series.std()
+                if std == 0:
+                    return pd.Series([False] * len(series), index=series.index)
+                return ((series - mean) / std).abs() > z_threshold
+
+            # Example: compute 7-day and 30-day rolling averages for a "value" column
+            df["rolling_7d"] = rolling_avg(df["value"], 7)
+            df["rolling_30d"] = rolling_avg(df["value"], 30)
+
+            # Percent change vs. prior period
+            trend_7d = pct_change_period(df["value"], 7)
+            trend_30d = pct_change_period(df["value"], 30)
+
+            # Anomaly flags
+            df["is_anomaly"] = detect_anomalies(df["value"])
+
+            # Trend direction label helper
+            # Changes of more than ±5% are considered significant trends (↑/↓);
+            # changes within ±5% are considered stable (→).
+            def trend_label(pct: float | None) -> str:
+                """Return an arrow-prefixed label for a percent-change value.
+
+                Args:
+                    pct: Percent change, or None when there is insufficient data.
+                Returns:
+                    A human-readable string such as '↑ +12.3%', '↓ -8.0%', or '→ +1.2%'.
+                """
+                if pct is None:
+                    return "→ (insufficient data)"
+                if pct > 5:
+                    return f"↑ {pct:+.1f}%"
+                if pct < -5:
+                    return f"↓ {pct:+.1f}%"
+                return f"→ {pct:+.1f}%"
+            ```
+
+            ### Cache Status Block
+
+            Include this block in your report's output (discussion, issue, or step summary) to aid debugging and transparency:
+
+            ```markdown
+            <details>
+            <summary>📦 Cache Memory Status</summary>
+
+            - **Location**: `/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl`
+            - **Cache restored from previous run**: {yes (N entries) / no (first run)}
+            - **Collection mode**: {incremental / backfill}
+            - **Data points stored**: {data_points}
+            - **Earliest entry**: {earliest_date}
+            - **Retention policy**: 90 days
+
+            </details>
+            ```
+          GH_AW_PROMPT_CONTENT_0007: |
+            {{#runtime-import .github/skills/jqschema/SKILL.md}}
+          GH_AW_PROMPT_CONTENT_0008: |
+            {{#runtime-import .github/workflows/shared/reporting.md}}
+          GH_AW_PROMPT_CONTENT_0009: |
+            {{#runtime-import .github/workflows/shared/otlp.md}}
+          GH_AW_PROMPT_CONTENT_0010: |
+            {{#runtime-import .github/workflows/shared/graders.md}}
+          GH_AW_PROMPT_CONTENT_0011: |
+            {{#runtime-import .github/workflows/shared/trending-charts-simple.md}}
+          GH_AW_PROMPT_CONTENT_0012: |
+            {{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}
+          GH_AW_PROMPT_CONTENT_0013: |
+            {{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}
+          GH_AW_PROMPT_CONTENT_0014: |
+            {{#runtime-import .github/workflows/shared/graders/recurrence-laminarity.md}}
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_ENGINE_ID="${GH_AW_ENGINE_ID-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_SERVER_URL="${GH_AW_GITHUB_SERVER_URL-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GH_AW_SKILL_DIR="${GH_AW_SKILL_DIR-}" \
+            GH_AW_SKILL_EXT="${GH_AW_SKILL_EXT-}" \
+            GH_AW_SUB_AGENT_DIR="${GH_AW_SUB_AGENT_DIR-}" \
+            GH_AW_SUB_AGENT_EXT="${GH_AW_SUB_AGENT_EXT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
         env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ENGINE_ID: "codex"
-          GH_AW_SUB_AGENT_DIR: ".codex/agents"
-          GH_AW_SUB_AGENT_EXT: ".md"
-          GH_AW_SKILL_DIR: ".codex/skills"
-          GH_AW_SKILL_EXT: "/SKILL.md"
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ENGINE_ID: codex
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
-      - name: Substitute placeholders
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
+            const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
+            await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","github.run_id":"GH_AW_GITHUB_RUN_ID","github.server_url":"GH_AW_GITHUB_SERVER_URL"} });
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          GH_AW_SKILL_DIR: .codex/skills
+          GH_AW_SKILL_EXT: /SKILL.md
+          GH_AW_SUB_AGENT_DIR: .codex/agents
+          GH_AW_SUB_AGENT_EXT: .md
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Substitute placeholders
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_ALLOWED_EXTENSIONS="${GH_AW_ALLOWED_EXTENSIONS-}" \
+            GH_AW_CACHE_DESCRIPTION="${GH_AW_CACHE_DESCRIPTION-}" \
+            GH_AW_CACHE_DIR="${GH_AW_CACHE_DIR-}" \
+            GH_AW_EXPR_76DF9333="${GH_AW_EXPR_76DF9333-}" \
+            GH_AW_EXPR_77C1A4D2="${GH_AW_EXPR_77C1A4D2-}" \
+            GH_AW_EXPR_7C248226="${GH_AW_EXPR_7C248226-}" \
+            GH_AW_EXPR_C19C384F="${GH_AW_EXPR_C19C384F-}" \
+            GH_AW_GITHUB_ACTOR="${GH_AW_GITHUB_ACTOR-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_SERVER_URL="${GH_AW_GITHUB_SERVER_URL-}" \
+            GH_AW_GITHUB_WORKSPACE="${GH_AW_GITHUB_WORKSPACE-}" \
+            GH_AW_MCP_CLI_SERVERS_LIST="${GH_AW_MCP_CLI_SERVERS_LIST-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"
+          GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory/
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -363,15 +781,17 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_MCP_CLI_SERVERS_LIST: "- `agenticworkflows` — run `agenticworkflows --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools"
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_MCP_CLI_SERVERS_LIST: |-
+            - `agenticworkflows` — run `agenticworkflows --help` to see available tools
+            - `safeoutputs` — run `safeoutputs --help` to see available tools
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
 
-            const substitutePlaceholders = require(path.join(actionsDir, 'substitute_placeholders.cjs'));
+            const substitutePlaceholders = require(process.env.GH_AW_ACTIONS_DIR + '/substitute_placeholders.cjs');
 
             // Call the substitution function
             return await substitutePlaceholders({
@@ -392,16 +812,86 @@ jobs:
                 GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST
               }
             });
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+          /usr/bin/env -i \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            bash --noprofile --norc -e -c "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Print prompt
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+          /usr/bin/env -i \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            bash --noprofile --norc -e -c "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
         if: success() || failure()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

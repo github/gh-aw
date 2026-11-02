@@ -375,6 +375,8 @@ safe-outputs:
 
 **Available Artifacts:** Custom steps have access to `/tmp/gh-aw/threat-detection/prompt.txt` (workflow prompt), `agent_output.json` (safe output items), and `aw.patch` (git patch file). gh-aw also stages `/tmp/gh-aw/threat-detection/aw-prompts/prompt-template.txt`, `/tmp/gh-aw/threat-detection/aw-prompts/prompt-import-tree.json`, `/tmp/gh-aw/threat-detection/aw_info.json`, and any restored `/tmp/gh-aw/threat-detection/comment-memory/*.md` files so detectors can analyze prompt structure, activation context, and persisted comment memory.
 
+The prompt import tree records `trust` on its root and every import node, including nested and cached imports. `"author"` identifies the locally assembled prompt and repository-local author files; `"untrusted"` identifies external HTTPS content, which is processed only as static text. The runtime assigns these labels from source provenance, not imported content. A label describes the source's authoring capabilities, not the safety of every interpolated value or descendant. Treat missing labels in older artifacts as unknown, not as author trust.
+
 **Execution Order:** Download artifacts → Stage detection inputs → Execute pre-steps (`steps:`) → Run AI analysis (if enabled) → Execute post-steps (`post-steps:`) → Upload detection log.
 
 ## Example: LlamaGuard Integration

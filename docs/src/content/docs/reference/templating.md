@@ -9,7 +9,7 @@ Agentic workflows support four templating and substitution mechanisms: GitHub Ac
 
 ## GitHub Actions Expressions
 
-Agentic workflows restrict expressions in **markdown content** to an allowlist. Secrets and configuration variables cannot be read directly from prompts; environment expressions have different rules for compiler-bound author prompts and runtime-imported fragments.
+Agentic workflows restrict expressions in **markdown content** to an allowlist. Repository-local workflow and runtime-import files are author sources. Downloaded HTTPS content is static text.
 
 > **Note**: These restrictions apply only to markdown content. YAML frontmatter can still use secrets and environment variables for workflow configuration.
 
@@ -25,9 +25,11 @@ Other activation outputs such as `comment_id`, `comment_repo`, and `slash_comman
 
 All other expressions are disallowed, including `secrets.*`, `vars.*`, and complex functions like `toJson()` or `fromJson()`.
 
-The main workflow's author-written prompt supports `env.*` expressions (including comparisons and defaults such as `${{ env.LOG_LEVEL || 'info' }}`). The compiler creates explicit expression bindings evaluated by GitHub Actions; this is not access to the runner's entire environment. These values become prompt content, so do not reference environment variables containing secrets.
+The main workflow and local runtime-import files support `env.*` expressions, including comparisons and defaults such as `${{ env.LOG_LEVEL || 'info' }}`. The compiler creates explicit bindings evaluated by GitHub Actions; this is not access to the runner's entire environment. Secret-backed environment variables and known credential variables cannot be bound into prompts, including in non-strict mode.
 
-Runtime-imported fragments do **not** support `env.*`, even if the main prompt binds the same expression. This restriction also applies to nested imports and compound expressions. The compiler loads the main workflow as an author prompt source, separately from runtime-imported fragments, and retains its explicit bindings. Locally assembled system and user prompts can contain imports; local fragments can nest imports within the permitted folders, while downloaded HTTPS content remains static and cannot trigger imports or expressions.
+Local runtime imports have the same author expression capabilities as the main workflow, including nested local imports within the permitted folders. Evaluated values remain literal data and cannot introduce additional imports or directives. Downloaded HTTPS content has no expression, template, or import capabilities, even when an importing local file has author bindings.
+
+Activation-job prompt creation, interpolation, substitution, validation, and printing run in credential-free child processes with explicitly selected environment variables. They do not use `actions/github-script` or receive its default GitHub token, authenticated API client, inherited action inputs, runtime tokens, OIDC credentials, or Node startup options. This is environment isolation, not filesystem or runner isolation; authors must not place credentials in prompt files, inputs, or custom job outputs.
 
 Expression safety is validated during compilation. Unauthorized expressions produce errors like:
 
@@ -151,11 +153,11 @@ URL disk caches are not used; repeated imports may reuse validated content withi
 
 ### Security Features
 
-Runtime imports automatically strip YAML front matter and HTML/XML comments. Local imported GitHub Actions expressions (`${{ ... }}`) use a restricted set of expression capabilities. `env.*`, `secrets.*`, and `vars.*` are rejected, including inside comparisons and compound expressions; imported text cannot read the runner's ambient environment or action input tokens. Supported job outputs and inputs are read only through their compiler-provided bindings or GitHub event context. Remote content has no expression capabilities.
+Runtime imports automatically strip YAML front matter and HTML/XML comments. Local files use the author expression allowlist, including compiler-selected non-secret `env.*` bindings. Direct `secrets.*` and `vars.*` expressions remain prohibited. The runtime evaluator cannot read the runner's ambient environment or action input tokens. Remote content has no expression capabilities.
 
-Wrapped fragment conditions are checked before conversion to internal placeholders, including inside code fences or unmatched conditionals. They cannot acquire an author-only environment binding through later substitution.
+Local authored conditions are bound before placeholder conversion, including inside code fences and unmatched conditionals. Unbound environment expressions fail rather than acquiring ambient capabilities; raw binding-like text and evaluated values remain literal.
 
-`needs.*.outputs.*` expressions are allowed inside local imported markdown and are validated recursively across nested local runtime imports. At compile time, gh-aw checks existing referenced runtime-import files under the permitted folders for disallowed expressions, including `env.*`, and follows any nested `{{#runtime-import ...}}` macros it finds. Missing files and remote content cannot be checked at compilation; runtime validation still applies when content is loaded. This lets local shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
+`needs.*.outputs.*` expressions are allowed inside local imported markdown and are validated recursively across nested local runtime imports. The compiler follows local imports, validates their expressions, and selects bindings for their expressions and conditions. Missing files and remote content cannot be checked at compilation; runtime validation still applies when content is loaded. Recompile locks when adding expressions that require new bindings, and deploy the matching compiler and setup runtime together.
 
 Imported prompt content is still evaluated in the activation job context. In practice, that means imported `needs.*` expressions must refer only to outputs that are available before activation runs, such as `needs.pre_activation.outputs.*` or outputs from custom jobs that explicitly run before activation.
 

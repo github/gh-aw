@@ -27,10 +27,9 @@ func validateExpressionSafety(markdownContent string) error {
 	return validateMarkdownExpressionSafety(markdownContent, true)
 }
 
-// Imported content cannot read env, even when a main prompt expression has a
-// compiler-provided binding for the same environment variable.
+// Local imported files are author sources and use the main prompt's allowlist.
 func validateRuntimeImportExpressionSafety(markdownContent string) error {
-	return validateMarkdownExpressionSafety(removeXMLComments(markdownContent), false)
+	return validateExpressionSafety(removeXMLComments(markdownContent))
 }
 
 func validateMarkdownExpressionSafety(markdownContent string, allowEnv bool) error {

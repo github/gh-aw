@@ -23,6 +23,7 @@ const { createLiteralValues, readLiteralState, restoreInlineMetadata, writeLiter
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
  * @property {string} src - The resolved local file path or static HTTPS URL
+ * @property {"author"|"untrusted"} trust - Author-capable local source or untrusted static external content
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -69,9 +70,9 @@ function interpolateVariables(content, variables) {
 
 /**
  * Main function for prompt variable interpolation and template rendering
- * @param {{deferredBindings?: Record<string, string>}} [options] - Compiler-owned late binding aliases
+ * @param {{deferredBindings?: Record<string, string>, authorExpressions?: Record<string, string>}} [options] - Compiler-owned expression bindings
  */
-async function main({ deferredBindings = {} } = {}) {
+async function main({ deferredBindings = {}, authorExpressions = {} } = {}) {
   try {
     core.info("========================================");
     core.info("[main] Starting interpolate_prompt processing");
@@ -145,6 +146,7 @@ async function main({ deferredBindings = {} } = {}) {
     // can identify which parts of the rendered prompt originated from which source files.
     const importTree = {
       version: 1,
+      trust: "author",
       template: splitMarker ? content.replace(splitMarker, "") : content,
       children: /** @type {ImportTreeNode[]} */ [],
     };
@@ -154,7 +156,7 @@ async function main({ deferredBindings = {} } = {}) {
       core.info(`Processing ${importMatches.length} runtime import macro(s) (local files or static public HTTPS)`);
 
       const beforeImports = content.length;
-      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression);
+      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression, authorExpressions);
       const afterImports = content.length;
 
       core.info(`Runtime imports processed successfully`);

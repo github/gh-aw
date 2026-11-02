@@ -44,7 +44,8 @@ func splitContentIntoChunks(content string) []string {
 	return chunks
 }
 
-func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData, preActivationJobCreated bool, beforeActivationJobs []string) {
+func (c *Compiler) generatePrompt(output *strings.Builder, data *WorkflowData, preActivationJobCreated bool, beforeActivationJobs []string) error {
+	yaml := &strings.Builder{}
 	compilerYamlPromptLog.Printf("Generating prompt for workflow: %s (markdown size: %d bytes)", data.Name, len(data.MarkdownContent))
 
 	builtinSections := c.collectPromptSections(data)
@@ -96,6 +97,7 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData, pre
 		writePromptBashStep(yaml, "Validate prompt placeholders", "validate_prompt_placeholders.sh")
 	}
 	writePromptBashStep(yaml, "Print prompt", "print_prompt_summary.sh")
+	return writeCredentialFreePromptSteps(output, yaml.String(), data)
 }
 
 // enrichExpressionMappings extracts expressions from the main workflow markdown
@@ -112,7 +114,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 	}
 	if runtimeImportMarkdown := c.collectRuntimeImportMarkdownForCompilerAnalysis(data); runtimeImportMarkdown != "" {
 		runtimeImportExtractor := NewExpressionExtractor()
-		runtimeImportExprMappings, err := runtimeImportExtractor.ExtractExpressions(runtimeImportMarkdown)
+		runtimeImportExprMappings, err := runtimeImportExtractor.ExtractExpressions(wrapExpressionsInTemplateConditionals(runtimeImportMarkdown))
 		if err == nil && len(runtimeImportExprMappings) > 0 {
 			compilerYamlPromptLog.Printf("Extracted %d expressions from runtime-import markdown", len(runtimeImportExprMappings))
 			expressionMappings = append(expressionMappings, runtimeImportExprMappings...)

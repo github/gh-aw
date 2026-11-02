@@ -12,6 +12,7 @@ const { isTruthy } = require("./is_truthy.cjs");
 const { hasTemplateDirectives } = require("./template_branch.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
+const { bindAuthorExpressions } = require("./author_prompt.cjs");
 
 const fs = require("fs");
 const path = require("path");
@@ -1008,17 +1009,18 @@ function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFol
 }
 
 /**
- * Reads a local file with restricted expressions or expression-free public HTTPS content.
+ * Reads a local author file or expression-free public HTTPS content.
  * @param {string} filepathOrUrl - The local file path or literal public HTTPS URL to import
  * @param {boolean} optional - Whether the import is optional (true for {{#runtime-import? filepath}})
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
  * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
+ * @param {Record<string, string>} [authorExpressions] - Compiler-selected author bindings
  * @returns {Promise<string>} - The processed content, or empty string for a missing optional import
  * @throws {Error} - If the target, content, or required import is invalid
  */
-async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue = value => value) {
+async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue = value => value, authorExpressions = {}) {
   assertSupportedRuntimeImport(filepathOrUrl);
   if (/^https:/i.test(filepathOrUrl)) {
     return processUrlImport(filepathOrUrl, optional, startLine, endLine);
@@ -1100,11 +1102,9 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Remove XML comments
   content = removeXMLComments(content);
 
-  // Neutralize AI-model control tags to prevent prompt injection via runtime-imported files
-  content = neutralizeSystemTags(content);
-
-  // Raw fragment text cannot mint the compiler's author-expression bindings.
+  // Raw placeholders are literal; only explicit author expressions select bindings.
   content = content.replace(/\$\{GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+\}|__GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+__/g, value => protectValue(value));
+  content = bindAuthorExpressions(content, authorExpressions, process.env, protectValue);
 
   // Wrap expressions in template conditionals
   // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
@@ -1151,6 +1151,7 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
  * @property {string} src - The resolved local file path or static HTTPS URL
+ * @property {"author"|"untrusted"} trust - Author-capable local source or untrusted static external content
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -1173,6 +1174,7 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
  * @param {Map<string, string>} [rawImportCache] - Cache of raw (pre-expansion) file contents, used to set rawContent on cached tree nodes
  * @param {Set<string>} [resolvedInParent] - Canonical import keys already resolved in parent/sibling context; skipped during recursion
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values through nested imports and later directive processing
+ * @param {Record<string, string>} [authorExpressions] - Compiler-selected bindings shared by local author files
  * @returns {Promise<string>} - Content with runtime-import macros replaced by validated content
  */
 async function processRuntimeImports(
@@ -1184,7 +1186,8 @@ async function processRuntimeImports(
   parentTreeChildren = null,
   rawImportCache = new Map(),
   resolvedInParent = new Set(),
-  protectValue = value => value
+  protectValue = value => value,
+  authorExpressions = {}
 ) {
   // Normalize body-level {{#import}} directives to {{#runtime-import}} equivalents.
   // {{#import}} is deprecated — use {{#runtime-import}} or the 'imports:' frontmatter field instead.
@@ -1298,6 +1301,7 @@ async function processRuntimeImports(
           parentTreeChildren.push({
             macro: fullMatch,
             src: filepathOrUrl,
+            trust: remote ? "untrusted" : "author",
             optional,
             startLine: startLine ?? null,
             endLine: endLine ?? null,
@@ -1321,7 +1325,7 @@ async function processRuntimeImports(
 
     try {
       // Import the file content
-      let importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue);
+      let importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue, authorExpressions);
 
       // Capture raw content before any nested expansion so tree nodes always
       // record the pre-recursion state (consistent with first-occurrence behaviour).
@@ -1336,6 +1340,7 @@ async function processRuntimeImports(
         parentTreeChildren.push({
           macro: fullMatch,
           src: filepathOrUrl,
+          trust: remote ? "untrusted" : "author",
           optional,
           startLine: startLine ?? null,
           endLine: endLine ?? null,
@@ -1350,7 +1355,18 @@ async function processRuntimeImports(
       if (importedContent && /\{\{#(?:runtime-import|import)/.test(importedContent)) {
         core.info(`Recursively processing imports in ${displayPath}`);
         const inheritedResolved = new Set([...resolvedInParent, ...resolvedInThisCall]);
-        importedContent = await processRuntimeImports(importedContent, workspaceDir, importedFiles, importCache, [...importStack], parentTreeChildren !== null ? treeNodeChildren : null, rawImportCache, inheritedResolved, protectValue);
+        importedContent = await processRuntimeImports(
+          importedContent,
+          workspaceDir,
+          importedFiles,
+          importCache,
+          [...importStack],
+          parentTreeChildren !== null ? treeNodeChildren : null,
+          rawImportCache,
+          inheritedResolved,
+          protectValue,
+          authorExpressions
+        );
       }
 
       // Cache the fully processed content and the raw pre-expansion content

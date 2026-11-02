@@ -8,6 +8,7 @@ const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM } = require("./error_codes.cjs");
 const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const { resolveRuntimeImportFilePath, assertRuntimeImportRealPathWithinBase, resolveRuntimeImportKey, removeXMLComments } = require("./runtime_import.cjs");
 const { createLiteralValues, literalFileKey, writeLiteralState } = require("./prompt_literal_values.cjs");
+const { bindAuthorExpressions } = require("./author_prompt.cjs");
 const LEDGER_REPLAY_PROMPT = "/tmp/gh-aw/ledgers/replay-prompt.txt";
 
 /**
@@ -129,17 +130,7 @@ function readAuthorPrompt(filename, env, bindings, protectValue, priorContent) {
   };
   const priorImports = new Set([...priorContent.matchAll(importPattern)].map(match => importKey(match[1])));
   content = content.replace(importPattern, (match, target) => (priorImports.has(importKey(target)) ? "" : match));
-  content = content.replace(/\{\{#?(if|else[-_]?if)\s+([^{}]+)\}\}/g, (match, tag, expression) => {
-    const trimmed = expression.trim();
-    return Object.prototype.hasOwnProperty.call(bindings, trimmed) ? `{{#${tag === "if" ? "if" : "elseif"} \${{ ${trimmed} }} }}` : match;
-  });
-  content = content.replace(/\$\{\{([\s\S]*?)\}\}/g, (match, expression) => {
-    const key = expression.trim();
-    if (!Object.prototype.hasOwnProperty.call(bindings, key)) return match;
-    const binding = bindings[key];
-    if (/^__GH_AW_[A-Z0-9_]+__$/.test(binding)) return binding;
-    return Object.prototype.hasOwnProperty.call(env, binding) ? protectValue(env[binding] || "") : `__${binding}__`;
-  });
+  content = bindAuthorExpressions(content, bindings, env, protectValue);
   return content.endsWith("\n") ? content : content + "\n";
 }
 

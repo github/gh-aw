@@ -377,16 +377,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 
 	renderConfig := promptRenderConfig{}
 	if data.MainWorkflowPromptPath != "" {
-		renderConfig.AuthorExpressions = make(map[string]string)
-		for _, mapping := range expressionMappings {
-			if mapping.Original != "" {
-				binding := mapping.EnvVar
-				if mapping.IsLiteral {
-					binding = "__" + binding + "__"
-				}
-				renderConfig.AuthorExpressions[stripExpressionWrapper(mapping.Original)] = binding
-			}
-		}
+		renderConfig.AuthorExpressions = promptAuthorExpressions(expressionMappings)
 	}
 	renderContent := make(map[string]string)
 	contentIndex := 0

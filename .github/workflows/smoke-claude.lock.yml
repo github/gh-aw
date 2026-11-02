@@ -366,12 +366,62 @@ jobs:
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_EXPR_76DF9333="${GH_AW_EXPR_76DF9333-}" \
+            GH_AW_EXPR_77C1A4D2="${GH_AW_EXPR_77C1A4D2-}" \
+            GH_AW_EXPR_7C248226="${GH_AW_EXPR_7C248226-}" \
+            GH_AW_EXPR_C19C384F="${GH_AW_EXPR_C19C384F-}" \
+            GH_AW_GITHUB_ACTOR="${GH_AW_GITHUB_ACTOR-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_SERVER_URL="${GH_AW_GITHUB_SERVER_URL-}" \
+            GH_AW_GITHUB_WORKSPACE="${GH_AW_GITHUB_WORKSPACE-}" \
+            GH_AW_INCLUDE_PR_CONTEXT="${GH_AW_INCLUDE_PR_CONTEXT-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GH_AW_PROMPT_CONFIG="${GH_AW_PROMPT_CONFIG-}" \
+            GH_AW_PROMPT_CONTENT_0000="${GH_AW_PROMPT_CONTENT_0000-}" \
+            GH_AW_PROMPT_CONTENT_0001="${GH_AW_PROMPT_CONTENT_0001-}" \
+            GH_AW_PROMPT_CONTENT_0002="${GH_AW_PROMPT_CONTENT_0002-}" \
+            GH_AW_PROMPT_CONTENT_0003="${GH_AW_PROMPT_CONTENT_0003-}" \
+            GH_AW_PROMPT_CONTENT_0004="${GH_AW_PROMPT_CONTENT_0004-}" \
+            GH_AW_PROMPT_CONTENT_0005="${GH_AW_PROMPT_CONTENT_0005-}" \
+            GH_AW_PROMPT_CONTENT_0006="${GH_AW_PROMPT_CONTENT_0006-}" \
+            GH_AW_PROMPT_CONTENT_0007="${GH_AW_PROMPT_CONTENT_0007-}" \
+            GH_AW_PROMPT_CONTENT_0008="${GH_AW_PROMPT_CONTENT_0008-}" \
+            GH_AW_PROMPT_CONTENT_0009="${GH_AW_PROMPT_CONTENT_0009-}" \
+            GH_AW_PROMPT_CONTENT_0010="${GH_AW_PROMPT_CONTENT_0010-}" \
+            GH_AW_PROMPT_CONTENT_0011="${GH_AW_PROMPT_CONTENT_0011-}" \
+            GH_AW_PROMPT_CONTENT_0012="${GH_AW_PROMPT_CONTENT_0012-}" \
+            GH_AW_PROMPT_CONTENT_0013="${GH_AW_PROMPT_CONTENT_0013-}" \
+            GH_AW_PROMPT_CONTENT_0014="${GH_AW_PROMPT_CONTENT_0014-}" \
+            GH_AW_SAFE_OUTPUTS="${GH_AW_SAFE_OUTPUTS-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_push_to_pr_branch.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"file\":\"pr_context_prompt.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"file\":\"pr_context_push_to_pr_branch_guidance.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"}],\"system_item_count\":18}"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -382,54 +432,366 @@ jobs:
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
-          GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: add_comment(max:2), create_issue, close_pull_request, update_pull_request, create_pull_request_review_comment(max:5), submit_pull_request_review, resolve_pull_request_review_thread(max:5), add_labels, add_reviewer(max:2), push_to_pull_request_branch, create_code_scanning_alert, create_check_run, report_missing_tool, report_missing_data, noop(max:2), post_slack_message\n"
-          GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
-          GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n- **checkouts**: The following repositories have been checked out and are available in the workspace:\n  - repo `__GH_AW_GITHUB_REPOSITORY__` → `__GH_AW_GITHUB_WORKSPACE__` (cwd) [full history, all branches available as remote-tracking refs] [additional refs fetched: *]\n  - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. If the branch is required and not available, exit with an error and ask the user to add it to the `fetch:` option of the `checkout:` configuration (e.g., `fetch: [\"refs/pulls/open/*\"]` for all open PR refs, or `fetch: [\"main\", \"feature/my-branch\"]` for specific branches).\n  - **Warning: No git credentials are available to the agent.** Credentials are\n    intentionally removed after the checkout step for security. This means any git\n    operation that needs to authenticate to the remote will fail. In private repositories, that includes:\n    - `git fetch`, `git pull`, `git clone`, and `git push` (direct push, not via safe-output tools)\n    - Checking out or switching to a remote branch that is not already fetched\n    - Deepening a shallow clone (`git fetch --unshallow`)\n    - On-demand blob fetches in partial/blobless clones (operations on files not in the initial checkout)\n    Do NOT attempt to configure credentials, run `git credential fill`, or modify `.gitconfig` —\n    authentication will not succeed. If you encounter credential prompts or authentication errors,\n    stop immediately and report the limitation rather than spending turns trying to work around it.\n</github-context>\n\n"
-          GH_AW_PROMPT_CONTENT_0004: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0005: "\n"
-          GH_AW_PROMPT_CONTENT_0006: "\n"
-          GH_AW_PROMPT_CONTENT_0007: "Both tools require `args` as an array of strings, not a command string.\nFor example, pass `[\"test\", \"./...\"]` or\n`[\"build\", \"-o\", \"path with spaces/output\"]`. Each element is passed unchanged,\nincluding spaces, quotes, backslashes, and empty strings. Do not add shell\nquoting or escaping. Globs, variables, command substitutions, and shell\noperators are not expanded or executed. The JavaScript wrappers use Node's\n`execFile` without a shell or Python, return stdout and stderr, and report\ncommand failures with their exit status and output.\n\n**IMPORTANT — bash vs. MCP for validation:**\n\n- **Use `mcpscripts-go` / `mcpscripts-make` early in a session** (within the first few minutes) for consistent, logged execution of Go and Make commands.\n- **Use direct bash commands for end-of-session validation** (i.e., after any file-exploration or analysis phase that may have taken more than ~5 minutes). MCP connections time out after ~5 minutes of inactivity; calling `mcpscripts-*` at the end of a long session fails with `MCP error -32003: context canceled`.\n\n**Validation via bash (preferred at end of session or after long exploration):**\n```bash\nmake build\nmake test-unit\nmake recompile\n```\n\n**MCP tools (use early in session, before long exploration phases):**\n```\nUse the mcpscripts-go tool with args: [\"test\", \"./...\"]\nUse the mcpscripts-make tool with args: [\"build\"]\nUse the mcpscripts-make tool with args: [\"lint\"]\nUse the mcpscripts-make tool with args: [\"test-unit\"]\n```\n\n**Incorrect**:\n```\nUse the go mcp-script tool with args: [\"test\", \"./...\"]  ❌ (Wrong tool name - use mcpscripts-go)\nUse the mcpscripts-make tool with args: [\"build\"]        ❌ (after a long exploration phase — use bash instead)\nUse the mcpscripts-go tool with args: \"test ./...\"       ❌ (Use an array of argument strings)\n```\n\n\n"
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"playwright_prompt.md\"},{\"file\":\"playwright_awf_prompt.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_push_to_pr_branch.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"cli_proxy_with_safeoutputs_prompt.md\"},{\"file\":\"pr_context_prompt.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"file\":\"pr_context_push_to_pr_branch_guidance.md\",\"condition_env\":\"GH_AW_INCLUDE_PR_CONTEXT\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"}],\"system_item_count\":18}"
+          GH_AW_PROMPT_CONTENT_0000: |
+            <system>
+          GH_AW_PROMPT_CONTENT_0001: |
+            <safe-output-tools>
+            Tools: add_comment(max:2), create_issue, close_pull_request, update_pull_request, create_pull_request_review_comment(max:5), submit_pull_request_review, resolve_pull_request_review_thread(max:5), add_labels, add_reviewer(max:2), push_to_pull_request_branch, create_code_scanning_alert, create_check_run, report_missing_tool, report_missing_data, noop(max:2), post_slack_message
+          GH_AW_PROMPT_CONTENT_0002: |
+            </safe-output-tools>
+          GH_AW_PROMPT_CONTENT_0003: |+
+            <github-context>
+            The following GitHub context information is available for this workflow:
+            {{#if github.actor}}
+            - **actor**: __GH_AW_GITHUB_ACTOR__
+            {{/if}}
+            {{#if github.repository}}
+            - **repository**: __GH_AW_GITHUB_REPOSITORY__
+            {{/if}}
+            {{#if github.workspace}}
+            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
+            {{/if}}
+            {{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}
+            - **issue-number**: #__GH_AW_EXPR_7C248226__
+            {{/if}}
+            {{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}
+            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
+            {{/if}}
+            {{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}
+            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
+            {{/if}}
+            {{#if github.event.comment.id || github.aw.context.comment_id}}
+            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
+            {{/if}}
+            {{#if github.run_id}}
+            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
+            {{/if}}
+            - **checkouts**: The following repositories have been checked out and are available in the workspace:
+              - repo `__GH_AW_GITHUB_REPOSITORY__` → `__GH_AW_GITHUB_WORKSPACE__` (cwd) [full history, all branches available as remote-tracking refs] [additional refs fetched: *]
+              - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. If the branch is required and not available, exit with an error and ask the user to add it to the `fetch:` option of the `checkout:` configuration (e.g., `fetch: ["refs/pulls/open/*"]` for all open PR refs, or `fetch: ["main", "feature/my-branch"]` for specific branches).
+              - **Warning: No git credentials are available to the agent.** Credentials are
+                intentionally removed after the checkout step for security. This means any git
+                operation that needs to authenticate to the remote will fail. In private repositories, that includes:
+                - `git fetch`, `git pull`, `git clone`, and `git push` (direct push, not via safe-output tools)
+                - Checking out or switching to a remote branch that is not already fetched
+                - Deepening a shallow clone (`git fetch --unshallow`)
+                - On-demand blob fetches in partial/blobless clones (operations on files not in the initial checkout)
+                Do NOT attempt to configure credentials, run `git credential fill`, or modify `.gitconfig` —
+                authentication will not succeed. If you encounter credential prompts or authentication errors,
+                stop immediately and report the limitation rather than spending turns trying to work around it.
+            </github-context>
+
+          GH_AW_PROMPT_CONTENT_0004: |
+            </system>
+          GH_AW_PROMPT_CONTENT_0005: |
+
+          GH_AW_PROMPT_CONTENT_0006: |
+
+          GH_AW_PROMPT_CONTENT_0007: |+
+            Both tools require `args` as an array of strings, not a command string.
+            For example, pass `["test", "./..."]` or
+            `["build", "-o", "path with spaces/output"]`. Each element is passed unchanged,
+            including spaces, quotes, backslashes, and empty strings. Do not add shell
+            quoting or escaping. Globs, variables, command substitutions, and shell
+            operators are not expanded or executed. The JavaScript wrappers use Node's
+            `execFile` without a shell or Python, return stdout and stderr, and report
+            command failures with their exit status and output.
+
+            **IMPORTANT — bash vs. MCP for validation:**
+
+            - **Use `mcpscripts-go` / `mcpscripts-make` early in a session** (within the first few minutes) for consistent, logged execution of Go and Make commands.
+            - **Use direct bash commands for end-of-session validation** (i.e., after any file-exploration or analysis phase that may have taken more than ~5 minutes). MCP connections time out after ~5 minutes of inactivity; calling `mcpscripts-*` at the end of a long session fails with `MCP error -32003: context canceled`.
+
+            **Validation via bash (preferred at end of session or after long exploration):**
+            ```bash
+            make build
+            make test-unit
+            make recompile
+            ```
+
+            **MCP tools (use early in session, before long exploration phases):**
+            ```
+            Use the mcpscripts-go tool with args: ["test", "./..."]
+            Use the mcpscripts-make tool with args: ["build"]
+            Use the mcpscripts-make tool with args: ["lint"]
+            Use the mcpscripts-make tool with args: ["test-unit"]
+            ```
+
+            **Incorrect**:
+            ```
+            Use the go mcp-script tool with args: ["test", "./..."]  ❌ (Wrong tool name - use mcpscripts-go)
+            Use the mcpscripts-make tool with args: ["build"]        ❌ (after a long exploration phase — use bash instead)
+            Use the mcpscripts-go tool with args: "test ./..."       ❌ (Use an array of argument strings)
+            ```
+
+
           GH_AW_PROMPT_CONTENT_0008: ""
           GH_AW_PROMPT_CONTENT_0009: ""
           GH_AW_PROMPT_CONTENT_0010: ""
-          GH_AW_PROMPT_CONTENT_0011: "## Smoke Test Brevity\n\n**CRITICAL EFFICIENCY REQUIREMENTS:**\n- Keep ALL outputs extremely short and concise. Use single-line responses where possible.\n- NO verbose explanations or unnecessary context.\n- Minimize file reading - only read what is absolutely necessary for the task.\n- Use targeted, specific queries - avoid broad searches or large data retrievals.\n\n"
-          GH_AW_PROMPT_CONTENT_0012: "## Playwright title validation\n\nUse Playwright CLI to open `http://host.docker.internal:4173/` and read the page title after\nJavaScript runs. Read the expected value from\n`/tmp/gh-aw/agent/playwright-title-test-expected.txt`, compare the two values for\nexact equality, and report whether the test passed. Do not use curl or another\nHTTP client to discover the title. Always close the browser when finished.\n"
-          GH_AW_PROMPT_CONTENT_0013: "Use the `reporting` skill when producing a report, issue, or PR comment to follow the formatting guidelines below.\n\n## skill: `reporting`\n---\ndescription: Report formatting guidelines for gh-aw workflows (header levels, collapsible details, run-ID links)\n---\n\n- Use `###` (or lower) headers only.\n- Keep summary and critical actions visible; move long detail into `<details>` blocks.\n- Structure reports as: overview → key metrics/issues → collapsible detail → next actions.\n- Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`.\n- Include up to 3 most relevant run URLs at end under `**References:**`.\n- Do NOT add footer attribution (system adds automatically).\n\n## end skill: `reporting`\n"
-          GH_AW_PROMPT_CONTENT_0014: "# Smoke Test: Claude Engine Validation.\n\n## Test Requirements\n\nFor tests below, mark a test as passed only if the required tool call succeeds.\n\n1. **GitHub MCP Testing**: Review the last 2 merged pull requests in __GH_AW_GITHUB_REPOSITORY__\n2. **GH CLI Testing (via `gh-proxy`)**: Use `bash` to run `gh pr list --repo __GH_AW_GITHUB_REPOSITORY__ --limit 2 --json number,title,author`\n3. **Make Build Testing**: Use the `mcpscripts-make` tool to build the project (use args: [\"build\"]) and verify it succeeds\n4. **Playwright Testing**: Use playwright-cli to navigate to https://github.com and verify the page title contains \"GitHub\": run `playwright-cli browser_navigate --url https://github.com` then `playwright-cli browser_snapshot` in bash\n5. **Tavily Web Search Testing**: Use the Tavily MCP server to perform a web search for \"GitHub Agentic Workflows\" and verify that results are returned with at least one item\n6. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-claude-__GH_AW_GITHUB_RUN_ID__.txt` with content \"Smoke test passed for Claude at $(date)\" (create the directory if it doesn't exist)\n7. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)\n8. **Discussion Interaction Testing**:\n   - Use `gh api repos/__GH_AW_GITHUB_REPOSITORY__/discussions?per_page=1` to get the latest discussion from __GH_AW_GITHUB_REPOSITORY__\n   - Extract the discussion number from the result (e.g., if the result is `{\"number\": 123, \"title\": \"...\", ...}`, extract 123)\n   - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, comic-book style comment stating that the smoke test agent was here\n9. **Agentic Workflows MCP Testing**:\n   - Call the `agentic-workflows` MCP tool using the `status` method with workflow name `smoke-claude` to query workflow status\n   - If the tool returns an error or no results, mark this test as ❌ and note \"Tool unavailable or workflow not found\" but continue to the Output section\n   - If the tool succeeds, extract key information from the response: total runs, success/failure counts, last run timestamp\n   - Write a summary of the results to `/tmp/gh-aw/agent/smoke-claude-status-__GH_AW_GITHUB_RUN_ID__.txt` (create directory if needed)\n   - Use bash to verify the file was created and display its contents\n\n10. **Slack Script Safe Output Testing**: Use the `post_slack_message` safe-output tool to post a fictitious Slack message:\n   - Use `channel: \"#smoke-tests\"` and `message: \"💥 Smoke test __GH_AW_GITHUB_RUN_ID__ passed — Claude engine nominal!\"`\n\n11. **Code Scanning Alert Safe Output Testing**: Use the `create_code_scanning_alert` safe-output tool to post a dummy warning code scanning alert:\n   - Use `level: \"warning\"`, `message: \"Smoke test dummy warning — Run __GH_AW_GITHUB_RUN_ID__\"`, `file: \"README.md\"`, `line: 1`\n   - This tests the SARIF artifact upload/download pipeline\n\n12. **Check Run Safe Output Testing**: Use the `create_check_run` safe-output tool to create a check run on the current commit:\n   - Use `conclusion: \"success\"`, `title: \"Smoke Claude - Run __GH_AW_GITHUB_RUN_ID__\"`, `summary: \"All smoke tests completed.\"`, and `text: \"Detailed results attached.\"`\n\n## PR Review Safe Outputs Testing\n\n**IMPORTANT**: The following tests require an open pull request. First, use the GitHub MCP tool to find an open PR in __GH_AW_GITHUB_REPOSITORY__ (or use the triggering PR if this is a pull_request event). Store the PR number for use in subsequent tests.\n\n13. **Update PR Testing**: Use the `update_pull_request` tool to update the PR's body by appending a test message: \"✨ PR Review Safe Output Test - Run __GH_AW_GITHUB_RUN_ID__\"\n    - Use `pr_number: <pr_number>` to target the open PR\n    - Use `operation: \"append\"` and `body: \"\\n\\n---\\n✨ PR Review Safe Output Test - Run __GH_AW_GITHUB_RUN_ID__\"`\n    - Verify the tool call succeeds\n\n14. **PR Review Comment Testing**: Use the `create_pull_request_review_comment` tool to add review comments on the PR\n    - Find a file in the PR's diff (use GitHub MCP to get PR files)\n    - Add at least 2 review comments on different lines with constructive feedback\n    - Use `pr_number: <pr_number>`, `path: \"<file_path>\"`, `line: <line_number>`, and `body: \"<comment_text>\"`\n    - Verify the tool calls succeed\n\n15. **Submit PR Review Testing**: Use the `submit_pull_request_review` tool to submit a consolidated review\n    - Use `pr_number: <pr_number>`, `event: \"COMMENT\"`, and `body: \"💥 Automated smoke test review - all systems nominal!\"`\n    - Verify the review is submitted successfully\n    - Note: This will bundle all review comments from test #14\n    - After submitting, use the GitHub MCP tool to list review threads on the PR and note the thread IDs from review comments you created in test #14 — these will be used in test #16\n\n16. **Resolve Review Thread Testing**:\n    - Use the GitHub MCP tool to list review threads on the PR and filter for threads that are **not yet resolved** (`isResolved: false`)\n    - Prefer resolving a thread created by your own review comments from test #14 in this run\n    - Use `thread_id: \"<thread_id>\"` from one of those unresolved threads\n    - **IMPORTANT: Only resolve threads that are currently unresolved — attempting to resolve an already-resolved thread will cause an API error**\n    - If no unresolved threads exist, mark this test as ⚠️ (skipped - no unresolved threads to resolve)\n\n17. **Add Reviewer Testing**: Use the `add_reviewer` tool to add a reviewer to the PR\n    - Use `pr_number: <pr_number>` and `reviewers: [\"copilot\"]` (or another valid reviewer)\n    - Verify the tool call succeeds\n    - Note: May fail if reviewer is already assigned or doesn't have access\n\n18. **Push to PR Branch Testing**:\n    - Create a test file at `smoke-test-files/smoke-claude-push-test.md` in the repository workspace with content \"Smoke test push — Run __GH_AW_GITHUB_RUN_ID__\"\n    - Use the `push_to_pull_request_branch` tool to push this change\n    - Use `pr_number: <pr_number>` and `commit_message: \"test: Add smoke test file\"`\n    - Verify the push succeeds\n    - Note: This test may be skipped if not on a PR branch or if the PR is from a fork\n\n19. **Close PR Testing** (CONDITIONAL - only if a test PR exists):\n    - If you can identify a test/bot PR that can be safely closed, use the `close_pull_request` tool\n    - Use `pr_number: <test_pr_number>` and `comment: \"Closing as part of smoke test - Run __GH_AW_GITHUB_RUN_ID__\"`\n    - If no suitable test PR exists, mark this test as ⚠️ (skipped - no safe PR to close)\n    - **DO NOT close the triggering PR or any important PRs**\n\n## Output\n\n**CRITICAL: You MUST create an issue regardless of test results - this is a required safe output.**\n\n1. **ALWAYS create an issue** with a summary of the smoke test run:\n   - Title: \"Smoke Test: Claude - __GH_AW_GITHUB_RUN_ID__\"\n   - Body should include:\n     - Test results (✅ for pass, ❌ for fail, ⚠️ for skipped) for each test (including PR review tests #13-19)\n     - Overall status: PASS (all passed), PARTIAL (some skipped), or FAIL (any failed)\n     - Run URL: __GH_AW_GITHUB_SERVER_URL__/__GH_AW_GITHUB_REPOSITORY__/actions/runs/__GH_AW_GITHUB_RUN_ID__\n     - Timestamp\n     - Note which PR was used for PR review testing (if applicable)\n   - If ANY test fails, include error details in the issue body\n   - This issue MUST be created before any other safe output operations\n\n2. **Only if this workflow was triggered by a pull_request event**: Use the `add_comment` tool to add a **very brief** comment (max 5-10 lines) to the triggering pull request (omit the `item_number` parameter to auto-target the triggering PR) with:\n   - Test results for core tests #1-12 (✅ or ❌)\n   - Test results for PR review tests #13-19 (✅, ❌, or ⚠️)\n   - Overall status: PASS, PARTIAL, or FAIL\n\n3. Use the `add_comment` tool with `item_number` set to the discussion number you extracted in step 8 to add a **fun comic-book style comment** to that discussion - be playful and use comic-book language like \"💥 WHOOSH!\"\n   - If step 8 failed to extract a discussion number, skip this step\n\nIf all non-skipped tests pass, use the `add_labels` tool to add the label `smoke-claude` to the pull request (omit the `item_number` parameter to auto-target the triggering PR if this workflow was triggered by a pull_request event).\n\n"
-        with:
-          script: |
-            const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_PROMPT_CONTENT_0011: |+
+            ## Smoke Test Brevity
+
+            **CRITICAL EFFICIENCY REQUIREMENTS:**
+            - Keep ALL outputs extremely short and concise. Use single-line responses where possible.
+            - NO verbose explanations or unnecessary context.
+            - Minimize file reading - only read what is absolutely necessary for the task.
+            - Use targeted, specific queries - avoid broad searches or large data retrievals.
+
+          GH_AW_PROMPT_CONTENT_0012: |
+            ## Playwright title validation
+
+            Use Playwright CLI to open `http://host.docker.internal:4173/` and read the page title after
+            JavaScript runs. Read the expected value from
+            `/tmp/gh-aw/agent/playwright-title-test-expected.txt`, compare the two values for
+            exact equality, and report whether the test passed. Do not use curl or another
+            HTTP client to discover the title. Always close the browser when finished.
+          GH_AW_PROMPT_CONTENT_0013: |
+            Use the `reporting` skill when producing a report, issue, or PR comment to follow the formatting guidelines below.
+
+            ## skill: `reporting`
+            ---
+            description: Report formatting guidelines for gh-aw workflows (header levels, collapsible details, run-ID links)
+            ---
+
+            - Use `###` (or lower) headers only.
+            - Keep summary and critical actions visible; move long detail into `<details>` blocks.
+            - Structure reports as: overview → key metrics/issues → collapsible detail → next actions.
+            - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`.
+            - Include up to 3 most relevant run URLs at end under `**References:**`.
+            - Do NOT add footer attribution (system adds automatically).
+
+            ## end skill: `reporting`
+          GH_AW_PROMPT_CONTENT_0014: |+
+            # Smoke Test: Claude Engine Validation.
+
+            ## Test Requirements
+
+            For tests below, mark a test as passed only if the required tool call succeeds.
+
+            1. **GitHub MCP Testing**: Review the last 2 merged pull requests in __GH_AW_GITHUB_REPOSITORY__
+            2. **GH CLI Testing (via `gh-proxy`)**: Use `bash` to run `gh pr list --repo __GH_AW_GITHUB_REPOSITORY__ --limit 2 --json number,title,author`
+            3. **Make Build Testing**: Use the `mcpscripts-make` tool to build the project (use args: ["build"]) and verify it succeeds
+            4. **Playwright Testing**: Use playwright-cli to navigate to https://github.com and verify the page title contains "GitHub": run `playwright-cli browser_navigate --url https://github.com` then `playwright-cli browser_snapshot` in bash
+            5. **Tavily Web Search Testing**: Use the Tavily MCP server to perform a web search for "GitHub Agentic Workflows" and verify that results are returned with at least one item
+            6. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-claude-__GH_AW_GITHUB_RUN_ID__.txt` with content "Smoke test passed for Claude at $(date)" (create the directory if it doesn't exist)
+            7. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
+            8. **Discussion Interaction Testing**:
+               - Use `gh api repos/__GH_AW_GITHUB_REPOSITORY__/discussions?per_page=1` to get the latest discussion from __GH_AW_GITHUB_REPOSITORY__
+               - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
+               - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, comic-book style comment stating that the smoke test agent was here
+            9. **Agentic Workflows MCP Testing**:
+               - Call the `agentic-workflows` MCP tool using the `status` method with workflow name `smoke-claude` to query workflow status
+               - If the tool returns an error or no results, mark this test as ❌ and note "Tool unavailable or workflow not found" but continue to the Output section
+               - If the tool succeeds, extract key information from the response: total runs, success/failure counts, last run timestamp
+               - Write a summary of the results to `/tmp/gh-aw/agent/smoke-claude-status-__GH_AW_GITHUB_RUN_ID__.txt` (create directory if needed)
+               - Use bash to verify the file was created and display its contents
+
+            10. **Slack Script Safe Output Testing**: Use the `post_slack_message` safe-output tool to post a fictitious Slack message:
+               - Use `channel: "#smoke-tests"` and `message: "💥 Smoke test __GH_AW_GITHUB_RUN_ID__ passed — Claude engine nominal!"`
+
+            11. **Code Scanning Alert Safe Output Testing**: Use the `create_code_scanning_alert` safe-output tool to post a dummy warning code scanning alert:
+               - Use `level: "warning"`, `message: "Smoke test dummy warning — Run __GH_AW_GITHUB_RUN_ID__"`, `file: "README.md"`, `line: 1`
+               - This tests the SARIF artifact upload/download pipeline
+
+            12. **Check Run Safe Output Testing**: Use the `create_check_run` safe-output tool to create a check run on the current commit:
+               - Use `conclusion: "success"`, `title: "Smoke Claude - Run __GH_AW_GITHUB_RUN_ID__"`, `summary: "All smoke tests completed."`, and `text: "Detailed results attached."`
+
+            ## PR Review Safe Outputs Testing
+
+            **IMPORTANT**: The following tests require an open pull request. First, use the GitHub MCP tool to find an open PR in __GH_AW_GITHUB_REPOSITORY__ (or use the triggering PR if this is a pull_request event). Store the PR number for use in subsequent tests.
+
+            13. **Update PR Testing**: Use the `update_pull_request` tool to update the PR's body by appending a test message: "✨ PR Review Safe Output Test - Run __GH_AW_GITHUB_RUN_ID__"
+                - Use `pr_number: <pr_number>` to target the open PR
+                - Use `operation: "append"` and `body: "\n\n---\n✨ PR Review Safe Output Test - Run __GH_AW_GITHUB_RUN_ID__"`
+                - Verify the tool call succeeds
+
+            14. **PR Review Comment Testing**: Use the `create_pull_request_review_comment` tool to add review comments on the PR
+                - Find a file in the PR's diff (use GitHub MCP to get PR files)
+                - Add at least 2 review comments on different lines with constructive feedback
+                - Use `pr_number: <pr_number>`, `path: "<file_path>"`, `line: <line_number>`, and `body: "<comment_text>"`
+                - Verify the tool calls succeed
+
+            15. **Submit PR Review Testing**: Use the `submit_pull_request_review` tool to submit a consolidated review
+                - Use `pr_number: <pr_number>`, `event: "COMMENT"`, and `body: "💥 Automated smoke test review - all systems nominal!"`
+                - Verify the review is submitted successfully
+                - Note: This will bundle all review comments from test #14
+                - After submitting, use the GitHub MCP tool to list review threads on the PR and note the thread IDs from review comments you created in test #14 — these will be used in test #16
+
+            16. **Resolve Review Thread Testing**:
+                - Use the GitHub MCP tool to list review threads on the PR and filter for threads that are **not yet resolved** (`isResolved: false`)
+                - Prefer resolving a thread created by your own review comments from test #14 in this run
+                - Use `thread_id: "<thread_id>"` from one of those unresolved threads
+                - **IMPORTANT: Only resolve threads that are currently unresolved — attempting to resolve an already-resolved thread will cause an API error**
+                - If no unresolved threads exist, mark this test as ⚠️ (skipped - no unresolved threads to resolve)
+
+            17. **Add Reviewer Testing**: Use the `add_reviewer` tool to add a reviewer to the PR
+                - Use `pr_number: <pr_number>` and `reviewers: ["copilot"]` (or another valid reviewer)
+                - Verify the tool call succeeds
+                - Note: May fail if reviewer is already assigned or doesn't have access
+
+            18. **Push to PR Branch Testing**:
+                - Create a test file at `smoke-test-files/smoke-claude-push-test.md` in the repository workspace with content "Smoke test push — Run __GH_AW_GITHUB_RUN_ID__"
+                - Use the `push_to_pull_request_branch` tool to push this change
+                - Use `pr_number: <pr_number>` and `commit_message: "test: Add smoke test file"`
+                - Verify the push succeeds
+                - Note: This test may be skipped if not on a PR branch or if the PR is from a fork
+
+            19. **Close PR Testing** (CONDITIONAL - only if a test PR exists):
+                - If you can identify a test/bot PR that can be safely closed, use the `close_pull_request` tool
+                - Use `pr_number: <test_pr_number>` and `comment: "Closing as part of smoke test - Run __GH_AW_GITHUB_RUN_ID__"`
+                - If no suitable test PR exists, mark this test as ⚠️ (skipped - no safe PR to close)
+                - **DO NOT close the triggering PR or any important PRs**
+
+            ## Output
+
+            **CRITICAL: You MUST create an issue regardless of test results - this is a required safe output.**
+
+            1. **ALWAYS create an issue** with a summary of the smoke test run:
+               - Title: "Smoke Test: Claude - __GH_AW_GITHUB_RUN_ID__"
+               - Body should include:
+                 - Test results (✅ for pass, ❌ for fail, ⚠️ for skipped) for each test (including PR review tests #13-19)
+                 - Overall status: PASS (all passed), PARTIAL (some skipped), or FAIL (any failed)
+                 - Run URL: __GH_AW_GITHUB_SERVER_URL__/__GH_AW_GITHUB_REPOSITORY__/actions/runs/__GH_AW_GITHUB_RUN_ID__
+                 - Timestamp
+                 - Note which PR was used for PR review testing (if applicable)
+               - If ANY test fails, include error details in the issue body
+               - This issue MUST be created before any other safe output operations
+
+            2. **Only if this workflow was triggered by a pull_request event**: Use the `add_comment` tool to add a **very brief** comment (max 5-10 lines) to the triggering pull request (omit the `item_number` parameter to auto-target the triggering PR) with:
+               - Test results for core tests #1-12 (✅ or ❌)
+               - Test results for PR review tests #13-19 (✅, ❌, or ⚠️)
+               - Overall status: PASS, PARTIAL, or FAIL
+
+            3. Use the `add_comment` tool with `item_number` set to the discussion number you extracted in step 8 to add a **fun comic-book style comment** to that discussion - be playful and use comic-book language like "💥 WHOOSH!"
+               - If step 8 failed to extract a discussion number, skip this step
+
+            If all non-skipped tests pass, use the `add_labels` tool to add the label `smoke-claude` to the pull request (omit the `item_number` parameter to auto-target the triggering PR if this workflow was triggered by a pull_request event).
+
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_ENGINE_ID="${GH_AW_ENGINE_ID-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_SERVER_URL="${GH_AW_GITHUB_SERVER_URL-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GH_AW_SKILL_DIR="${GH_AW_SKILL_DIR-}" \
+            GH_AW_SKILL_EXT="${GH_AW_SKILL_EXT-}" \
+            GH_AW_SUB_AGENT_DIR="${GH_AW_SUB_AGENT_DIR-}" \
+            GH_AW_SUB_AGENT_EXT="${GH_AW_SUB_AGENT_EXT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
         env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ENGINE_ID: "claude"
-          GH_AW_SUB_AGENT_DIR: ".claude/agents"
-          GH_AW_SUB_AGENT_EXT: ".md"
-          GH_AW_SKILL_DIR: ".claude/skills"
-          GH_AW_SKILL_EXT: ".md"
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ENGINE_ID: claude
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
-      - name: Substitute placeholders
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
+            const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
+            await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","github.run_id":"GH_AW_GITHUB_RUN_ID","github.server_url":"GH_AW_GITHUB_SERVER_URL"} });
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          GH_AW_SKILL_DIR: .claude/skills
+          GH_AW_SKILL_EXT: .md
+          GH_AW_SUB_AGENT_DIR: .claude/agents
+          GH_AW_SUB_AGENT_EXT: .md
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Substitute placeholders
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_ALLOWED_EXTENSIONS="${GH_AW_ALLOWED_EXTENSIONS-}" \
+            GH_AW_CACHE_DESCRIPTION="${GH_AW_CACHE_DESCRIPTION-}" \
+            GH_AW_CACHE_DIR="${GH_AW_CACHE_DIR-}" \
+            GH_AW_EXPR_76DF9333="${GH_AW_EXPR_76DF9333-}" \
+            GH_AW_EXPR_77C1A4D2="${GH_AW_EXPR_77C1A4D2-}" \
+            GH_AW_EXPR_7C248226="${GH_AW_EXPR_7C248226-}" \
+            GH_AW_EXPR_C19C384F="${GH_AW_EXPR_C19C384F-}" \
+            GH_AW_GITHUB_ACTOR="${GH_AW_GITHUB_ACTOR-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_SERVER_URL="${GH_AW_GITHUB_SERVER_URL-}" \
+            GH_AW_GITHUB_WORKSPACE="${GH_AW_GITHUB_WORKSPACE-}" \
+            GH_AW_INCLUDE_PR_CONTEXT="${GH_AW_INCLUDE_PR_CONTEXT-}" \
+            GH_AW_MCP_CLI_SERVERS_LIST="${GH_AW_MCP_CLI_SERVERS_LIST-}" \
+            GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED="${GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED-}" \
+            GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND="${GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"
+          GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory/
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -440,17 +802,21 @@ jobs:
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_INCLUDE_PR_CONTEXT: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review' }}
-          GH_AW_MCP_CLI_SERVERS_LIST: "- `agenticworkflows` — run `agenticworkflows --help` to see available tools\n- `mcpscripts` — run `mcpscripts --help` to see available tools\n- `safeoutputs` — run `safeoutputs --help` to see available tools\n- `tavily` — run `tavily --help` to see available tools"
+          GH_AW_MCP_CLI_SERVERS_LIST: |-
+            - `agenticworkflows` — run `agenticworkflows --help` to see available tools
+            - `mcpscripts` — run `mcpscripts --help` to see available tools
+            - `safeoutputs` — run `safeoutputs --help` to see available tools
+            - `tavily` — run `tavily --help` to see available tools
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_ACTIVATED: ${{ needs.pre_activation.outputs.activated }}
           GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: ${{ needs.pre_activation.outputs.matched_command }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
 
-            const substitutePlaceholders = require(path.join(actionsDir, 'substitute_placeholders.cjs'));
+            const substitutePlaceholders = require(process.env.GH_AW_ACTIONS_DIR + '/substitute_placeholders.cjs');
 
             // Call the substitution function
             return await substitutePlaceholders({
@@ -474,16 +840,86 @@ jobs:
                 GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND: process.env.GH_AW_NEEDS_PRE_ACTIVATION_OUTPUTS_MATCHED_COMMAND
               }
             });
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+          /usr/bin/env -i \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            bash --noprofile --norc -e -c "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Print prompt
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+          /usr/bin/env -i \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            bash --noprofile --norc -e -c "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
         if: success() || failure()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

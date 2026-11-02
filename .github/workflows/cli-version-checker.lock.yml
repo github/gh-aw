@@ -287,12 +287,58 @@ jobs:
         if: ${{ contains(toJSON(vars), '"GH_AW_RUNTIME_FEATURES":') }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_EXPR_76DF9333="${GH_AW_EXPR_76DF9333-}" \
+            GH_AW_EXPR_77C1A4D2="${GH_AW_EXPR_77C1A4D2-}" \
+            GH_AW_EXPR_7C248226="${GH_AW_EXPR_7C248226-}" \
+            GH_AW_EXPR_C19C384F="${GH_AW_EXPR_C19C384F-}" \
+            GH_AW_GITHUB_ACTOR="${GH_AW_GITHUB_ACTOR-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_WORKSPACE="${GH_AW_GITHUB_WORKSPACE-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GH_AW_PROMPT_CONFIG="${GH_AW_PROMPT_CONFIG-}" \
+            GH_AW_PROMPT_CONTENT_0000="${GH_AW_PROMPT_CONTENT_0000-}" \
+            GH_AW_PROMPT_CONTENT_0001="${GH_AW_PROMPT_CONTENT_0001-}" \
+            GH_AW_PROMPT_CONTENT_0002="${GH_AW_PROMPT_CONTENT_0002-}" \
+            GH_AW_PROMPT_CONTENT_0003="${GH_AW_PROMPT_CONTENT_0003-}" \
+            GH_AW_PROMPT_CONTENT_0004="${GH_AW_PROMPT_CONTENT_0004-}" \
+            GH_AW_PROMPT_CONTENT_0005="${GH_AW_PROMPT_CONTENT_0005-}" \
+            GH_AW_PROMPT_CONTENT_0006="${GH_AW_PROMPT_CONTENT_0006-}" \
+            GH_AW_PROMPT_CONTENT_0007="${GH_AW_PROMPT_CONTENT_0007-}" \
+            GH_AW_PROMPT_CONTENT_0008="${GH_AW_PROMPT_CONTENT_0008-}" \
+            GH_AW_PROMPT_CONTENT_0009="${GH_AW_PROMPT_CONTENT_0009-}" \
+            GH_AW_PROMPT_CONTENT_0010="${GH_AW_PROMPT_CONTENT_0010-}" \
+            GH_AW_PROMPT_CONTENT_0011="${GH_AW_PROMPT_CONTENT_0011-}" \
+            GH_AW_PROMPT_CONTENT_0012="${GH_AW_PROMPT_CONTENT_0012-}" \
+            GH_AW_SAFE_OUTPUTS="${GH_AW_SAFE_OUTPUTS-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"author_file\":\".github/workflows/cli-version-checker.md\"}],\"system_item_count\":14,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\"}}"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -301,51 +347,179 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_pull_request, report_missing_tool, report_missing_data, noop(max:2)\n"
-          GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
-          GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
-          GH_AW_PROMPT_CONTENT_0004: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0005: "{{#runtime-import .github/workflows/shared/lock-safe-pull-request.md}}\n"
-          GH_AW_PROMPT_CONTENT_0006: "{{#runtime-import .github/skills/jqschema/SKILL.md}}\n"
-          GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import .github/workflows/shared/reporting.md}}\n"
-          GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/shared/otlp.md}}\n"
-          GH_AW_PROMPT_CONTENT_0009: "{{#runtime-import .github/workflows/shared/graders.md}}\n"
-          GH_AW_PROMPT_CONTENT_0010: "{{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}\n"
-          GH_AW_PROMPT_CONTENT_0011: "{{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}\n"
-          GH_AW_PROMPT_CONTENT_0012: "{{#runtime-import .github/workflows/shared/graders/recurrence-laminarity.md}}\n"
-        with:
-          script: |
-            const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_create_pull_request.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"author_file\":\".github/workflows/cli-version-checker.md\"}],\"system_item_count\":14,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\"}}"
+          GH_AW_PROMPT_CONTENT_0000: |
+            <system>
+          GH_AW_PROMPT_CONTENT_0001: |
+            <safe-output-tools>
+            Tools: create_pull_request, report_missing_tool, report_missing_data, noop(max:2)
+          GH_AW_PROMPT_CONTENT_0002: |
+            </safe-output-tools>
+          GH_AW_PROMPT_CONTENT_0003: |+
+            <github-context>
+            The following GitHub context information is available for this workflow:
+            {{#if github.actor}}
+            - **actor**: __GH_AW_GITHUB_ACTOR__
+            {{/if}}
+            {{#if github.repository}}
+            - **repository**: __GH_AW_GITHUB_REPOSITORY__
+            {{/if}}
+            {{#if github.workspace}}
+            - **workspace**: __GH_AW_GITHUB_WORKSPACE__
+            {{/if}}
+            {{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}
+            - **issue-number**: #__GH_AW_EXPR_7C248226__
+            {{/if}}
+            {{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}
+            - **discussion-number**: #__GH_AW_EXPR_C19C384F__
+            {{/if}}
+            {{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}
+            - **pull-request-number**: #__GH_AW_EXPR_76DF9333__
+            {{/if}}
+            {{#if github.event.comment.id || github.aw.context.comment_id}}
+            - **comment-id**: __GH_AW_EXPR_77C1A4D2__
+            {{/if}}
+            {{#if github.run_id}}
+            - **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__
+            {{/if}}
+            </github-context>
+
+          GH_AW_PROMPT_CONTENT_0004: |
+            </system>
+          GH_AW_PROMPT_CONTENT_0005: |
+            {{#runtime-import .github/workflows/shared/lock-safe-pull-request.md}}
+          GH_AW_PROMPT_CONTENT_0006: |
+            {{#runtime-import .github/skills/jqschema/SKILL.md}}
+          GH_AW_PROMPT_CONTENT_0007: |
+            {{#runtime-import .github/workflows/shared/reporting.md}}
+          GH_AW_PROMPT_CONTENT_0008: |
+            {{#runtime-import .github/workflows/shared/otlp.md}}
+          GH_AW_PROMPT_CONTENT_0009: |
+            {{#runtime-import .github/workflows/shared/graders.md}}
+          GH_AW_PROMPT_CONTENT_0010: |
+            {{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}
+          GH_AW_PROMPT_CONTENT_0011: |
+            {{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}
+          GH_AW_PROMPT_CONTENT_0012: |
+            {{#runtime-import .github/workflows/shared/graders/recurrence-laminarity.md}}
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_ENGINE_ID="${GH_AW_ENGINE_ID-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GH_AW_SKILL_DIR="${GH_AW_SKILL_DIR-}" \
+            GH_AW_SKILL_EXT="${GH_AW_SKILL_EXT-}" \
+            GH_AW_SUB_AGENT_DIR="${GH_AW_SUB_AGENT_DIR-}" \
+            GH_AW_SUB_AGENT_EXT="${GH_AW_SUB_AGENT_EXT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
         env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ENGINE_ID: "pi"
-          GH_AW_SUB_AGENT_DIR: ".pi/agents"
-          GH_AW_SUB_AGENT_EXT: ".md"
-          GH_AW_SKILL_DIR: ".pi/skills"
-          GH_AW_SKILL_EXT: "/SKILL.md"
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ENGINE_ID: pi
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
-            await main();
-      - name: Substitute placeholders
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
+            const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
+            await main({ authorExpressions: {"github.repository":"GH_AW_GITHUB_REPOSITORY","github.run_id":"GH_AW_GITHUB_RUN_ID"} });
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          GH_AW_SKILL_DIR: .pi/skills
+          GH_AW_SKILL_EXT: /SKILL.md
+          GH_AW_SUB_AGENT_DIR: .pi/agents
+          GH_AW_SUB_AGENT_EXT: .md
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Substitute placeholders
+        run: |
+          /usr/bin/env -i \
+            GH_AW_ACTIONS_DIR="${GH_AW_ACTIONS_DIR-}" \
+            GH_AW_ALLOWED_EXTENSIONS="${GH_AW_ALLOWED_EXTENSIONS-}" \
+            GH_AW_CACHE_DESCRIPTION="${GH_AW_CACHE_DESCRIPTION-}" \
+            GH_AW_CACHE_DIR="${GH_AW_CACHE_DIR-}" \
+            GH_AW_EXPR_76DF9333="${GH_AW_EXPR_76DF9333-}" \
+            GH_AW_EXPR_77C1A4D2="${GH_AW_EXPR_77C1A4D2-}" \
+            GH_AW_EXPR_7C248226="${GH_AW_EXPR_7C248226-}" \
+            GH_AW_EXPR_C19C384F="${GH_AW_EXPR_C19C384F-}" \
+            GH_AW_GITHUB_ACTOR="${GH_AW_GITHUB_ACTOR-}" \
+            GH_AW_GITHUB_REPOSITORY="${GH_AW_GITHUB_REPOSITORY-}" \
+            GH_AW_GITHUB_RUN_ID="${GH_AW_GITHUB_RUN_ID-}" \
+            GH_AW_GITHUB_WORKSPACE="${GH_AW_GITHUB_WORKSPACE-}" \
+            GH_AW_MCP_CLI_SERVERS_LIST="${GH_AW_MCP_CLI_SERVERS_LIST-}" \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            node -e "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ALLOWED_EXTENSIONS: ""
           GH_AW_CACHE_DESCRIPTION: ""
-          GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"
+          GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory/
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -355,14 +529,14 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_MCP_CLI_SERVERS_LIST: "- `safeoutputs` — run `safeoutputs --help` to see available tools"
-        with:
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            require(process.env.GH_AW_ACTIONS_DIR + '/shim.cjs');
+            (async () => {
 
-            const substitutePlaceholders = require(path.join(actionsDir, 'substitute_placeholders.cjs'));
+            const substitutePlaceholders = require(process.env.GH_AW_ACTIONS_DIR + '/substitute_placeholders.cjs');
 
             // Call the substitution function
             return await substitutePlaceholders({
@@ -382,16 +556,86 @@ jobs:
                 GH_AW_MCP_CLI_SERVERS_LIST: process.env.GH_AW_MCP_CLI_SERVERS_LIST
               }
             });
+
+            })().catch(error => { console.error(error); process.exitCode = 1; });
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Validate prompt placeholders
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+          /usr/bin/env -i \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            bash --noprofile --norc -e -c "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Print prompt
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
         run: |
-          bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+          /usr/bin/env -i \
+            GH_AW_PROMPT="${GH_AW_PROMPT-}" \
+            GITHUB_ACTION="${GITHUB_ACTION-}" \
+            GITHUB_ACTOR="${GITHUB_ACTOR-}" \
+            GITHUB_API_URL="${GITHUB_API_URL-}" \
+            GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-}" \
+            GITHUB_EVENT_PATH="${GITHUB_EVENT_PATH-}" \
+            GITHUB_GRAPHQL_URL="${GITHUB_GRAPHQL_URL-}" \
+            GITHUB_JOB="${GITHUB_JOB-}" \
+            GITHUB_REF="${GITHUB_REF-}" \
+            GITHUB_REPOSITORY="${GITHUB_REPOSITORY-}" \
+            GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT-}" \
+            GITHUB_RUN_ID="${GITHUB_RUN_ID-}" \
+            GITHUB_RUN_NUMBER="${GITHUB_RUN_NUMBER-}" \
+            GITHUB_SERVER_URL="${GITHUB_SERVER_URL-}" \
+            GITHUB_SHA="${GITHUB_SHA-}" \
+            GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY-}" \
+            GITHUB_WORKFLOW="${GITHUB_WORKFLOW-}" \
+            GITHUB_WORKSPACE="${GITHUB_WORKSPACE-}" \
+            PATH="${PATH-}" \
+            RUNNER_ARCH="${RUNNER_ARCH-}" \
+            RUNNER_OS="${RUNNER_OS-}" \
+            RUNNER_TEMP="${RUNNER_TEMP-}" \
+            bash --noprofile --norc -e -c "$GH_AW_PROMPT_SCRIPT"
+        shell: bash
+        env:
+          GH_AW_OTLP_ALL_HEADERS: ""
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_SCRIPT: |
+            bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
         if: success() || failure()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

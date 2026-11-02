@@ -28,9 +28,7 @@ func TestRuntimeImportExpressionSafetyScope(t *testing.T) {
 		t.Run(expression, func(t *testing.T) {
 			content := "${{ " + expression + " }}"
 			require.NoError(t, validateExpressionSafety(content), "main prompt compatibility")
-			err := validateRuntimeImportExpressionSafety(content)
-			require.ErrorContains(t, err, "env")
-			assert.NotContains(t, err.Error(), "  - env.*\n", "import diagnostics must not recommend env")
+			require.NoError(t, validateRuntimeImportExpressionSafety(content), "local files share author capabilities")
 		})
 	}
 
@@ -58,7 +56,7 @@ func TestRuntimeImportExpressionSafetyScope(t *testing.T) {
 	}
 }
 
-func TestCompilerRuntimeImportRejectsNestedEnv(t *testing.T) {
+func TestCompilerRuntimeImportBindsNestedEnv(t *testing.T) {
 	for _, expression := range []string{"env.MY_VAR", "env.MY_VAR || 'default'", "github.actor == 'bot' && env.MY_VAR"} {
 		t.Run(expression, func(t *testing.T) {
 			root := t.TempDir()
@@ -71,10 +69,11 @@ func TestCompilerRuntimeImportRejectsNestedEnv(t *testing.T) {
 			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
 			compiler := NewCompiler()
 			compiler.SetQuiet(true)
-			err := compiler.CompileWorkflow(path)
-			require.ErrorContains(t, err, "runtime-import validation failed")
-			require.ErrorContains(t, err, "inner.md")
-			require.ErrorContains(t, err, "env.MY_VAR")
+			require.NoError(t, compiler.CompileWorkflow(path))
+			content, err := os.ReadFile(filepath.Join(workflowsDir, "test.lock.yml"))
+			require.NoError(t, err)
+			assert.Contains(t, string(content), "authorExpressions:")
+			assert.Contains(t, string(content), expression)
 		})
 	}
 }
@@ -154,7 +153,7 @@ process.stdout.write(renderPrompt(config, env, process.argv[3]));
 	}
 }
 
-func TestRuntimeImportAnalysisDoesNotBindEnv(t *testing.T) {
+func TestRuntimeImportAnalysisBindsAuthorEnv(t *testing.T) {
 	root := t.TempDir()
 	workflowsDir := filepath.Join(root, ".github", "workflows")
 	require.NoError(t, os.MkdirAll(workflowsDir, 0o700))
@@ -162,8 +161,8 @@ func TestRuntimeImportAnalysisDoesNotBindEnv(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.markdownPath = filepath.Join(workflowsDir, "test.md")
 	data := &WorkflowData{MarkdownContent: "{{#runtime-import fragment.md}}"}
-	assert.Empty(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data))
-	assert.Empty(t, compiler.enrichExpressionMappings(data, nil, nil))
+	assert.Contains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), "env.MY_VAR")
+	assert.NotEmpty(t, compiler.enrichExpressionMappings(data, nil, nil))
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".github", "fragment.md"), []byte("Visible\n<!-- ${{ env.MY_VAR }} -->"), 0o600))
 	assert.Contains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), "Visible")
 	assert.NotContains(t, compiler.collectRuntimeImportMarkdownForCompilerAnalysis(data), "env.MY_VAR")

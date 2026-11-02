@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/goccy/go-yaml"
+	"github.com/stretchr/testify/require"
 
 	"github.com/github/gh-aw/pkg/testutil"
 )
@@ -77,11 +79,7 @@ Normal content here.
 		t.Error("Compiled workflow should contain interpolation and template rendering step")
 	}
 
-	if !strings.Contains(compiledStr, "uses: actions/github-script@") { // SHA varies
-		t.Error("Interpolation and template rendering step should use github-script action")
-	}
-
-	// The author source is loaded separately from restricted imported fragments.
+	// The main author source is loaded separately from additional imports.
 	if !strings.Contains(promptRenderPlan(t, compiledStr), "{{#author-prompt ") {
 		t.Error("Compiled workflow should contain an author prompt source")
 	}
@@ -117,23 +115,27 @@ Normal content here.
 		t.Error("Workflow file should contain conditional for literal false")
 	}
 
-	// Verify the setupGlobals helper is used
-	if !strings.Contains(compiledStr, "const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'))") {
-		t.Error("Template rendering step should use setupGlobals helper")
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name, Uses, Run string
+				Env             map[string]string
+			}
+		}
 	}
-
-	if !strings.Contains(compiledStr, "setupGlobals(core, github, context, exec, io, getOctokit)") {
-		t.Error("Template rendering step should call setupGlobals function")
+	require.NoError(t, yaml.Unmarshal(compiledYAML, &workflow))
+	found := false
+	for _, step := range workflow.Jobs["activation"].Steps {
+		if step.Name == "Interpolate variables and render templates" {
+			found = true
+			require.Empty(t, step.Uses)
+			require.Contains(t, step.Run, `node -e "$GH_AW_PROMPT_SCRIPT"`)
+			require.Contains(t, step.Env["GH_AW_PROMPT_SCRIPT"], "require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs')")
+			require.Contains(t, step.Env["GH_AW_PROMPT_SCRIPT"], "await main(")
+			require.NotContains(t, step.Env["GH_AW_PROMPT_SCRIPT"], "setupGlobals")
+		}
 	}
-
-	// Verify the interpolate_prompt script is loaded via require
-	if !strings.Contains(compiledStr, "const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'))") {
-		t.Error("Template rendering step should require interpolate_prompt.cjs")
-	}
-
-	if !strings.Contains(compiledStr, "await main()") {
-		t.Error("Template rendering step should call main() function")
-	}
+	require.True(t, found)
 }
 
 func TestTemplateRenderingStepSkipped(t *testing.T) {
