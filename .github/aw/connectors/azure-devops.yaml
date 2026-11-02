@@ -1,0 +1,271 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: dev.azure.com/work-items
+endpoints:
+  api: https://dev.azure.com
+credentials:
+  agent-reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [vso.project]
+  writer:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [vso.work_write]
+  context-reader:
+    phase: context
+    header: Authorization
+    scheme: bearer
+    scopes: [vso.work]
+triggers:
+  work-item-created:
+    verificationProfile: dev.azure.com/configured-https-auth
+    nativeEvents: [workitem.created]
+    resources:
+      /resource/id: work-items
+      /resourceContainers/collection/id: collections
+      /resourceContainers/project/id: projects
+    match:
+      /eventType: workitem.created
+      /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
+      /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+    normalize:
+      subject: /resource/id
+      collection: /resourceContainers/collection/id
+      project: /resourceContainers/project/id
+  work-item-updated:
+    verificationProfile: dev.azure.com/configured-https-auth
+    nativeEvents: [workitem.updated]
+    resources:
+      /resource/workItemId: work-items
+      /resourceContainers/collection/id: collections
+      /resourceContainers/project/id: projects
+    match:
+      /eventType: workitem.updated
+      /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
+      /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+    normalize:
+      subject: /resource/workItemId
+      collection: /resourceContainers/collection/id
+      project: /resourceContainers/project/id
+  work-item-deleted:
+    verificationProfile: dev.azure.com/configured-https-auth
+    nativeEvents: [workitem.deleted]
+    resources:
+      /resource/id: work-items
+      /resourceContainers/collection/id: collections
+      /resourceContainers/project/id: projects
+    match:
+      /eventType: workitem.deleted
+      /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
+      /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+    normalize:
+      subject: /resource/id
+      collection: /resourceContainers/collection/id
+      project: /resourceContainers/project/id
+  work-item-restored:
+    verificationProfile: dev.azure.com/configured-https-auth
+    nativeEvents: [workitem.restored]
+    resources:
+      /resource/id: work-items
+      /resourceContainers/collection/id: collections
+      /resourceContainers/project/id: projects
+    match:
+      /eventType: workitem.restored
+      /resourceContainers/collection/id: 11111111-1111-4111-8111-111111111111
+      /resourceContainers/project/id: 22222222-2222-4222-8222-222222222222
+    normalize:
+      subject: /resource/id
+      collection: /resourceContainers/collection/id
+      project: /resourceContainers/project/id
+safeOutputs:
+  create-work-item:
+    credential: writer
+    inputs:
+      organization: {type: string, required: true, maxLength: 64, pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"}
+      project: {type: string, required: true, maxLength: 36, pattern: "^[0-9a-f-]{36}$"}
+      title: {type: string, required: true, maxLength: 256}
+    resources:
+      organization: organizations
+      project: projects
+    request:
+      endpoint: api
+      method: POST
+      path: /{organization}/{project}/_apis/wit/workitems/$Task
+      pathInputs:
+        organization: organization
+        project: project
+      query:
+        api-version: {literal: "7.1"}
+      patch:
+        - op: add
+          path: /fields/System.Title
+          value: {input: title}
+    maxResponseBytes: 65536
+    responseRequired: [/id, /fields/System.TeamProject]
+    responseResources:
+      /fields/System.TeamProject: project-names
+    project:
+      work-item: /id
+  update-work-item:
+    credential: writer
+    inputs:
+      organization: {type: string, required: true, maxLength: 64, pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"}
+      project: {type: string, required: true, maxLength: 36, pattern: "^[0-9a-f-]{36}$"}
+      work-item: {type: string, required: true, maxLength: 10, pattern: "^[1-9][0-9]*$"}
+      title: {type: string, required: true, maxLength: 256}
+    resources:
+      organization: organizations
+      project: projects
+      work-item: work-items
+    request:
+      endpoint: api
+      method: PATCH
+      path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+      pathInputs:
+        organization: organization
+        project: project
+        work-item: work-item
+      query:
+        api-version: {literal: "7.1"}
+      patch:
+        - op: add
+          path: /fields/System.Title
+          value: {input: title}
+    maxResponseBytes: 65536
+    responseRequired: [/id, /fields/System.TeamProject]
+    responseResources:
+      /fields/System.TeamProject: project-names
+  assign-work-item:
+    credential: writer
+    inputs:
+      organization: {type: string, required: true, maxLength: 64, pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"}
+      project: {type: string, required: true, maxLength: 36, pattern: "^[0-9a-f-]{36}$"}
+      work-item: {type: string, required: true, maxLength: 10, pattern: "^[1-9][0-9]*$"}
+      assignee: {type: string, required: true, maxLength: 256}
+    resources:
+      organization: organizations
+      project: projects
+      work-item: work-items
+      assignee: assignees
+    request:
+      endpoint: api
+      method: PATCH
+      path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+      pathInputs:
+        organization: organization
+        project: project
+        work-item: work-item
+      query:
+        api-version: {literal: "7.1"}
+      patch:
+        - op: add
+          path: /fields/System.AssignedTo
+          value: {input: assignee}
+    maxResponseBytes: 65536
+    responseRequired: [/id, /fields/System.TeamProject]
+    responseResources:
+      /fields/System.TeamProject: project-names
+  link-work-items:
+    credential: writer
+    inputs:
+      organization: {type: string, required: true, maxLength: 64, enum: [fabrikam]}
+      project: {type: string, required: true, maxLength: 36, enum: [22222222-2222-4222-8222-222222222222]}
+      work-item: {type: string, required: true, maxLength: 10, enum: ["123"]}
+    resources:
+      organization: organizations
+      project: projects
+      work-item: work-items
+    request:
+      endpoint: api
+      method: PATCH
+      path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+      pathInputs:
+        organization: organization
+        project: project
+        work-item: work-item
+      query:
+        api-version: {literal: "7.1"}
+      patch:
+        - op: add
+          path: /relations/-
+          value:
+            literal:
+              rel: System.LinkTypes.Related
+              url: https://dev.azure.com/fabrikam/22222222-2222-4222-8222-222222222222/_apis/wit/workItems/124
+    maxResponseBytes: 65536
+    responseRequired: [/id, /fields/System.TeamProject]
+    responseResources:
+      /fields/System.TeamProject: project-names
+  comment-on-work-item:
+    credential: writer
+    inputs:
+      organization: {type: string, required: true, maxLength: 64, pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"}
+      project: {type: string, required: true, maxLength: 36, pattern: "^[0-9a-f-]{36}$"}
+      work-item: {type: string, required: true, maxLength: 10, pattern: "^[1-9][0-9]*$"}
+      text: {type: string, required: true, maxLength: 4000}
+    resources:
+      organization: organizations
+      project: projects
+      work-item: work-items
+    request:
+      endpoint: api
+      method: POST
+      path: /{organization}/{project}/_apis/wit/workItems/{work-item}/comments
+      pathInputs:
+        organization: organization
+        project: project
+        work-item: work-item
+      query:
+        api-version: {literal: 7.1-preview.4}
+        format: {literal: Markdown}
+      body:
+        text: {input: text}
+    maxResponseBytes: 65536
+    responseRequired: [/workItemId]
+    project:
+      work-item: /workItemId
+context:
+  work-item-details:
+    credential: context-reader
+    inputs:
+      organization: {type: string, required: true, maxLength: 64, pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"}
+      project: {type: string, required: true, maxLength: 36, pattern: "^[0-9a-f-]{36}$"}
+      work-item: {type: string, required: true, maxLength: 10, pattern: "^[1-9][0-9]*$"}
+    resources:
+      organization: organizations
+      project: projects
+      work-item: work-items
+    request:
+      endpoint: api
+      method: GET
+      path: /{organization}/{project}/_apis/wit/workitems/{work-item}
+      pathInputs:
+        organization: organization
+        project: project
+        work-item: work-item
+      query:
+        api-version: {literal: "7.1"}
+        fields: {literal: "System.Id,System.TeamProject,System.Title,System.State,System.Description,System.Tags"}
+    maxResponseBytes: 65536
+    responseRequired: [/id, /fields/System.TeamProject, /fields/System.Title, /fields/System.State]
+    responseResources:
+      /fields/System.TeamProject: project-names
+    project:
+      work-item: /id
+      title: /fields/System.Title
+      state: /fields/System.State
+httpMcp:
+  azure-devops:
+    url: https://mcp.dev.azure.com/fabrikam
+    credential: agent-reader
+    headers:
+      X-MCP-Readonly: "true"
+      X-MCP-Tools: core_list_projects
+    readOnly: true
+    tools:
+      core_list_projects:
+        inputs: {}
+    maxResponseBytes: 65536
