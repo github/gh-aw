@@ -89,6 +89,13 @@ func newWorkflowBuildContext(parseResult *frontmatterParseResult) *workflowBuild
 
 // setupWorkflowBuildContext initializes engine/tools processing and builds base workflow data.
 func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
+	connectorConfigs, err := c.resolveWorkflowConnectors(ctx.frontmatter.Frontmatter)
+	if err != nil {
+		return c.formatToolsProcessingError(ctx.cleanPath, err)
+	}
+	if err := c.expandWorkflowConnectors(ctx.frontmatter.Frontmatter, connectorConfigs); err != nil {
+		return c.formatToolsProcessingError(ctx.cleanPath, err)
+	}
 	engineSetup, err := c.setupEngineAndImports(ctx.frontmatter, ctx.cleanPath, ctx.content, ctx.markdownDir)
 	if err != nil {
 		return c.formatEngineSetupError(ctx, err)
@@ -114,6 +121,7 @@ func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
 	}
 	ctx.workflowData.WorkflowID = GetWorkflowIDFromPath(ctx.cleanPath)
+	ctx.workflowData.Connectors = connectorConfigs
 	ctx.workflowData.engineDefinition = c.engineCatalog.Get(engineSetup.engineSetting)
 	ctx.workflowData.SourceDocument = ctx.document
 	if config := ctx.workflowData.ParsedFrontmatter; config != nil && config.TokenBroker != nil {
@@ -659,6 +667,9 @@ func (c *Compiler) extractAdditionalConfigurations( //nolint:largefunc // Existi
 		return fmt.Errorf("failed to merge safe-outputs from imports: %w", err)
 	}
 	workflowData.SafeOutputs = mergedSafeOutputs
+	if err := attachConnectorInputSchemas(workflowData); err != nil {
+		return err
+	}
 	if workflowData.SafeOutputs == nil && workflowData.LedgerConfig != nil && workflowData.LedgerConfig.Enabled() {
 		workflowData.SafeOutputs = &SafeOutputsConfig{}
 	}
