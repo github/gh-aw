@@ -1,0 +1,8 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorBinding
+definition: .github/aw/connectors/jira.yaml
+connection: pkg/connectors/testdata/providers/jira/connection.yaml
+triggers: [issue-created, issue-updated, issue-deleted]
+httpMcp: [service-account]
+safeOutputs: [create-issue, update-issue, add-comment, add-label]
+context: [issue-details]
