@@ -8,9 +8,9 @@ import (
 	"slices"
 )
 
-func (p *Plan) validateResponse(op Operation, data []byte) ([]byte, error) {
+func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) ([]byte, error) {
 	if len(data) == 0 {
-		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.Project) != 0 || op.Request.GraphQL != "" {
+		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.Project) != 0 || op.Request.GraphQL != "" {
 			return nil, errors.New("connector response is empty; required evidence is missing")
 		}
 		return []byte("null"), nil
@@ -36,6 +36,9 @@ func (p *Plan) validateResponse(op Operation, data []byte) ([]byte, error) {
 	if err := checkResponseResources(document, op.ResponseResources, p.connection.Resources); err != nil {
 		return nil, err
 	}
+	if err := checkResponseBindings(document, op, args); err != nil {
+		return nil, err
+	}
 	if len(op.Project) != 0 {
 		fields, err := projectFields(document, op.Project)
 		if err != nil {
@@ -44,6 +47,33 @@ func (p *Plan) validateResponse(op Operation, data []byte) ([]byte, error) {
 		return json.Marshal(fields)
 	}
 	return data, nil
+}
+
+func checkResponseBindings(document any, op Operation, args map[string]any) error {
+	if err := checkPrimitiveTypes(document, op.ResponseTypes); err != nil {
+		return err
+	}
+	for pointer, input := range op.ResponseInputs {
+		actual, present := lookupPointer(document, pointer)
+		expected, supplied := args[input]
+		actualJSON, actualErr := json.Marshal(actual)
+		expectedJSON, expectedErr := json.Marshal(expected)
+		if !present || !supplied || actualErr != nil || expectedErr != nil || !bytes.Equal(actualJSON, expectedJSON) {
+			return fmt.Errorf("connector response does not match request input at %q", pointer)
+		}
+	}
+	return nil
+}
+
+func checkPrimitiveTypes(document any, types map[string]string) error {
+	for pointer, kind := range types {
+		value, ok := lookupPointer(document, pointer)
+		// Primitive outputs use the same type validator as primitive inputs.
+		if !ok || validateArgument(Input{Type: kind, MaxLength: MaxDocumentBytes}, value) != nil {
+			return fmt.Errorf("connector response has unexpected type at %q", pointer)
+		}
+	}
+	return nil
 }
 
 func checkResponseEvidence(document any, op Operation) error {

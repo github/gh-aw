@@ -37,11 +37,14 @@ type Input struct {
 	Pattern   string   `json:"pattern,omitempty"`
 }
 
-// Value is exactly one literal JSON value or a reference to a declared input.
+// Value is exactly one literal, input reference, structured object or array.
 // Input references are data, not textual template expansion.
 type Value struct {
-	Input   string `json:"input,omitempty"`
-	Literal any    `json:"literal,omitempty"`
+	Input    string           `json:"input,omitempty"`
+	Literal  any              `json:"literal,omitempty"`
+	Object   map[string]Value `json:"object,omitzero"`
+	Array    []Value          `json:"array,omitzero"`
+	Encoding string           `json:"encoding,omitempty"`
 }
 
 type Request struct {
@@ -70,6 +73,8 @@ type Operation struct {
 	ResponseChecks    map[string]any    `json:"responseChecks,omitempty"`
 	ResponseResources map[string]string `json:"responseResources,omitempty"`
 	ResponseRequired  []string          `json:"responseRequired,omitempty"`
+	ResponseTypes     map[string]string `json:"responseTypes,omitempty"`
+	ResponseInputs    map[string]string `json:"responseInputs,omitempty"`
 	Project           map[string]string `json:"project,omitempty"`
 }
 
@@ -103,6 +108,7 @@ type Trigger struct {
 	Match               map[string]string `json:"match"`
 	Normalize           map[string]string `json:"normalize"`
 	Resources           map[string]string `json:"resources,omitempty"`
+	Types               map[string]string `json:"types,omitempty"`
 }
 
 type SecretRef struct {
