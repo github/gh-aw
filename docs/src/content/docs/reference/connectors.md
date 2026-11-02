@@ -227,6 +227,10 @@ gateway path; they are not native GitHub Actions listeners.
 Each trigger supplies a verification profile, native-event names, fixed match
 predicates, normalization pointers, exact resource constraints, and
 `resourceOrigins`: reviewed HTTPS origins for canonical resource references.
+Optional `when` predicates express bounded transitions; `filters` declares
+typed narrowing selectors; `variants` discriminates supported payload shapes
+without changing resource authority. The [provider trigger reference](/gh-aw/reference/provider-issue-triggers/)
+lists lifecycle names, filter mappings, evidence limits and offline projection.
 The compiler emits a declaration-digest-bound subscription without credentials,
 a workflow-scoped `repository_dispatch` event, and the same mandatory
 `gateway_provenance` and `gateway_admission` gates as existing gateway families.

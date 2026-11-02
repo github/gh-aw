@@ -215,8 +215,13 @@ func consumeQualifiedConnectorSection(frontmatter, config map[string]any, sectio
 			operationOptions[operation] = normalized
 		} else {
 			options, object := values[key].(map[string]any)
-			if values[key] != nil && (!object || len(options) != 0) {
-				return fmt.Errorf("%s.%s accepts null or {}; connector behavior is declared in its spec", section, key)
+			if values[key] != nil && !object {
+				return fmt.Errorf("%s.%s accepts null or a mapping of declared trigger filters", section, key)
+			}
+			if len(options) != 0 {
+				if _, err := connectorGatewayTriggerNames(map[string]any{operation: options}, config); err != nil {
+					return fmt.Errorf("%s.%s: %w", section, key, err)
+				}
 			}
 		}
 		names = append(names, operation)

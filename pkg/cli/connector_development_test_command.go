@@ -39,6 +39,29 @@ func testDevelopmentConnector(ctx context.Context, output io.Writer, declaration
 	if err != nil {
 		return fmt.Errorf("go connector plan conformance: %w", err)
 	}
+	if options.phase == "trigger" {
+		if options.nativeEvent == "" {
+			return errors.New("offline trigger testing requires --native-event; example: --phase trigger --capability issue-updated --native-event update --args '{\"action\":\"update\"}'")
+		}
+		if options.nodeRuntime != "" {
+			return errors.New("offline trigger projection uses Go fixture validation; omit --node-runtime (shared predicate conformance is covered by the Go/Node fixture suite)")
+		}
+		payload, err := json.Marshal(args)
+		if err != nil {
+			return fmt.Errorf("encode trigger fixture: %w", err)
+		}
+		projection, err := plan.ProjectEvent(options.capability, options.nativeEvent, payload)
+		if err != nil {
+			return fmt.Errorf("trigger fixture did not match: %w; check native event, required transition evidence, variants and exact grants", err)
+		}
+		if err := json.NewEncoder(output).Encode(projection); err != nil {
+			return fmt.Errorf("write offline trigger projection: %w", err)
+		}
+		return nil
+	}
+	if options.nativeEvent != "" {
+		return errors.New("--native-event applies only to offline --phase trigger; omit it for provider reads or staged writes")
+	}
 	ctx, cancel := context.WithTimeout(ctx, options.timeout)
 	defer cancel()
 	contentRequired := developmentConnectorContentRequired(declaration, options)
@@ -170,8 +193,10 @@ func selectDevelopmentConnector(declaration *workflow.DevelopmentConnector, opti
 		selection.Context = []string{options.capability}
 	case "safe-output":
 		selection.SafeOutputs = []string{options.capability}
+	case "trigger":
+		selection.Triggers = []string{options.capability}
 	default:
-		return nil, "", errors.New("test requires --phase agent, context, or safe-output; trigger enrollment is not supported")
+		return nil, "", errors.New("test requires --phase agent, context, safe-output, or trigger; trigger tests are offline and never enroll a receiver")
 	}
 	if options.remoteTool != "" && capability != "httpMcp" {
 		return nil, "", errors.New("--remote-tool applies only to HTTP MCP capabilities")
@@ -179,6 +204,9 @@ func selectDevelopmentConnector(declaration *workflow.DevelopmentConnector, opti
 	plan, err := declaration.Service.Select(selection)
 	if err != nil {
 		return nil, "", err
+	}
+	if options.phase == "trigger" {
+		return plan, capability, nil
 	}
 	plan, err = plan.ForPhase(options.phase)
 	return plan, capability, err

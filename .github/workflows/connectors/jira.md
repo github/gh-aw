@@ -114,11 +114,19 @@ connectors:
         url: https://mcp.atlassian.com/v2/mcp
     triggers:
       issue-created:
+        urlIdentity: /issue/id
+        urlPathPrefix: /rest/api/3/issue/
+        filters: &jira-event-filters
+          issue-id: {path: /issue/id, type: string}
+          issue-key: {path: /issue/key, type: string}
+          project: {path: /issue/fields/project/key, type: string}
+          labels: {path: "/issue/fields/labels/*", type: string}
+          status: {path: /issue/fields/status/name, type: string}
+          resolution: {path: /issue/fields/resolution/id, type: string}
+          sender: {path: /user/accountId, type: string}
         resourceOrigins:
           - ${{ github.aw.import-inputs.site }}
         match:
-          /issue/fields/project/key: APP
-          /issue/self: https://example.atlassian.net/rest/api/3/issue/10001
           /webhookEvent: jira:issue_created
         nativeEvents:
           - jira:issue_created
@@ -138,11 +146,12 @@ connectors:
           /webhookEvent: string
         verificationProfile: atlassian.com/jira-admin-hmac-sha256
       issue-deleted:
+        urlIdentity: /issue/id
+        urlPathPrefix: /rest/api/3/issue/
+        filters: *jira-event-filters
         resourceOrigins:
           - ${{ github.aw.import-inputs.site }}
         match:
-          /issue/fields/project/key: APP
-          /issue/self: https://example.atlassian.net/rest/api/3/issue/10001
           /webhookEvent: jira:issue_deleted
         nativeEvents:
           - jira:issue_deleted
@@ -161,12 +170,13 @@ connectors:
           /issue/self: string
           /webhookEvent: string
         verificationProfile: atlassian.com/jira-admin-hmac-sha256
-      issue-updated:
+      issue-updated: &jira-issue-updated
+        urlIdentity: /issue/id
+        urlPathPrefix: /rest/api/3/issue/
+        filters: *jira-event-filters
         resourceOrigins:
           - ${{ github.aw.import-inputs.site }}
         match:
-          /issue/fields/project/key: APP
-          /issue/self: https://example.atlassian.net/rest/api/3/issue/10001
           /webhookEvent: jira:issue_updated
         nativeEvents:
           - jira:issue_updated
@@ -185,10 +195,58 @@ connectors:
           /issue/self: string
           /webhookEvent: string
         verificationProfile: atlassian.com/jira-admin-hmac-sha256
+      issue-closed:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - {path: /fieldtype, op: equals, value: jira}
+              - {path: /field, op: equals, value: resolution}
+              - {path: /from, op: "null"}
+              - {path: /to, op: text}
+      issue-reopened:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - {path: /fieldtype, op: equals, value: jira}
+              - {path: /field, op: equals, value: resolution}
+              - {path: /from, op: text}
+              - {path: /to, op: "null"}
+      issue-labeled:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - {path: /fieldtype, op: equals, value: jira}
+              - {path: /field, op: equals, value: labels}
+              - {path: /fromString, op: "null"}
+              - {path: /toString, op: text}
+              - {path: /toString, op: equals, other: /issue/fields/labels/0}
+              - {path: /issue/fields/labels, root: true, op: length, value: 1}
+      issue-unlabeled:
+        <<: *jira-issue-updated
+        when:
+          path: /changelog/items
+          op: any-item
+          items:
+            all:
+              - {path: /fieldtype, op: equals, value: jira}
+              - {path: /field, op: equals, value: labels}
+              - {path: /fromString, op: text}
+              - {path: /toString, op: "null"}
+              - {path: /issue/fields/labels, root: true, op: length, value: 0}
     resources:
       cloud-ids: ${{ github.aw.import-inputs.cloud-ids }}
       issue-ids: ${{ github.aw.import-inputs.issue-ids }}
       issues: ${{ github.aw.import-inputs.issues }}
+      issue-types: ${{ github.aw.import-inputs.issue-types }}
       projects: ${{ github.aw.import-inputs.projects }}
       queries: ${{ github.aw.import-inputs.queries }}
     safe-outputs:
@@ -280,9 +338,9 @@ connectors:
             pattern: \S
             type: string
           issue-type:
-            enum:
-              - Task
             maxLength: 80
+            minLength: 1
+            pattern: \S
             required: true
             type: string
           project:
@@ -323,6 +381,7 @@ connectors:
           path: /rest/api/3/issue
         resources:
           project: projects
+          issue-type: issue-types
         responseRequired:
           - /id
           - /key
@@ -332,23 +391,23 @@ connectors:
           /key: string
           /self: string
       update-issue:
-        createdResources:
+        createdResources: &jira-created-issue
           issue: create-issue
         credential: rest-writer
         inputs:
-          description:
+          description: &jira-description
             sanitize: body
             minLength: 1
             maxLength: 32767
             pattern: \S
             required: true
             type: string
-          issue:
+          issue: &jira-issue-key
             maxLength: 80
             pattern: ^[A-Z][A-Z0-9_]*-[1-9][0-9]*$
             required: true
             type: string
-          summary:
+          summary: &jira-summary
             sanitize: title
             minLength: 20
             maxLength: 255
@@ -372,6 +431,47 @@ connectors:
             issue: issue
         resources:
           issue: issues
+      update-issue-summary:
+        createdResources: *jira-created-issue
+        credential: rest-writer
+        inputs:
+          issue: *jira-issue-key
+          summary: *jira-summary
+        maxResponseBytes: 16384
+        request:
+          body:
+            fields:
+              object:
+                summary:
+                  input: summary
+          endpoint: site
+          method: PUT
+          path: /rest/api/3/issue/{issue}
+          pathInputs:
+            issue: issue
+        resources:
+          issue: issues
+      update-issue-description:
+        createdResources: *jira-created-issue
+        credential: rest-writer
+        inputs:
+          issue: *jira-issue-key
+          description: *jira-description
+        maxResponseBytes: 16384
+        request:
+          body:
+            fields:
+              object:
+                description:
+                  encoding: jira-adf
+                  input: description
+          endpoint: site
+          method: PUT
+          path: /rest/api/3/issue/{issue}
+          pathInputs:
+            issue: issue
+        resources:
+          issue: issues
 import-schema:
   site:
     default: https://example.atlassian.net
@@ -385,6 +485,11 @@ import-schema:
   issues:
     default: []
     type: array
+  issue-types:
+    default: [Task]
+    type: array
+    items:
+      type: string
   projects:
     default: []
     type: array
@@ -434,7 +539,9 @@ import-schema:
     issue creation, update, comment, and additive label writes. Import the ordinary Markdown
     declaration with .github/workflows/connectors/jira.md; importing alone enables no capability.
     Explicit tools.jira selections and root jira-prefixed safe-output selections are independent.
-    Generated write tools are jira_create_issue, jira_update_issue, jira_add_comment, and jira_add_label.
+    Generated write tools are jira_create_issue, jira_update_issue,
+    jira_update_issue_summary, jira_update_issue_description, jira_add_comment,
+    and jira_add_label.
   </purpose>
   <credentials>
     <storage>
@@ -493,15 +600,23 @@ import-schema:
       only APP-1; search results are not filtered against the issues grant.
     </input>
     <input name="projects" type="array" default="[]">Exact project keys for creation and declared event constraints.</input>
+    <input name="issue-types" type="array" default="[Task]">
+      Exact author-approved issue type names for creation, such as Task or Bug.
+      Defaults conservatively to Task only; importing does not discover or grant
+      project/type membership. The chosen type must exist on the project's create
+      screen and the writer must have permission to create it.
+    </input>
     <input name="issue-ids" type="array" default="[]">Exact numeric-string issue IDs for declared event constraints, not read-tool issue keys.</input>
     <inputs>
-      All five resource arrays default empty, without wildcards. A selected MCP profile requires
+      The five original resource arrays default empty, without wildcards. The
+      additional issue-types array defaults to Task only. A selected MCP profile requires
       nonempty cloud-ids, issues, and queries because it registers both methods. Creation requires
-      projects. Existing-issue writes require issues, except authenticated same-execution temporary
+      projects and issue-types. Existing-issue writes require issues, except authenticated same-execution temporary
       references when the creator is also selected. Remaining inputs are mcp-personal-secret,
       mcp-service-account-secret, and rest-writer-secret, with defaults listed above.
       Select one read profile with tools: {jira: [personal]} or tools: {jira: [service-account]}.
-      Select writes as jira-create-issue, jira-update-issue, jira-add-comment, or jira-add-label
+      Select writes as jira-create-issue, jira-update-issue, jira-update-issue-summary,
+      jira-update-issue-description, jira-add-comment, or jira-add-label
       under root safe-outputs, with null, empty-object, or max/staged option values.
     </inputs>
   </configuration>
@@ -509,10 +624,15 @@ import-schema:
     <trigger selection="jira-issue-created" native-event="jira:issue_created"/>
     <trigger selection="jira-issue-updated" native-event="jira:issue_updated"/>
     <trigger selection="jira-issue-deleted" native-event="jira:issue_deleted"/>
+    <trigger selection="jira-issue-closed" native-event="jira:issue_updated"/>
+    <trigger selection="jira-issue-reopened" native-event="jira:issue_updated"/>
+    <trigger selection="jira-issue-labeled" native-event="jira:issue_updated"/>
+    <trigger selection="jira-issue-unlabeled" native-event="jira:issue_updated"/>
     <ingress>
-      Selecting any of these custom root on events fails closed: no receiver, authenticated gateway
-      enrollment, or provider subscription is installed. Use workflow_dispatch. The verificationProfile
-      atlassian.com/jira-admin-hmac-sha256 describes a future admin-webhook verifier, not implemented
+      These selections compile through the protected gateway, but no receiver,
+      authenticated enrollment or provider subscription is installed. Use
+      workflow_dispatch until approval. The verificationProfile
+      atlassian.com/jira-admin-hmac-sha256 names an external admin-webhook verifier, not implemented
       authentication. Admin webhook signing secrets are distinct from API credentials; verify
       X-Hub-Signature with sha256 and the secret over the raw body before any future activation.
       OAuth and Connect webhook
@@ -521,10 +641,14 @@ import-schema:
     <envelope>
       Declared projection contains issue-id, issue-key, project, and url only, from issue.id,
       issue.key, issue.fields.project.key, and issue.self. It does not contain issue bodies or
-      infer closed, resolution, status, comment, or label-transition events. The current declaration
-      additionally pins specimen project APP and issue.self
-      https://example.atlassian.net/rest/api/3/issue/10001; changing site or arrays does not rewrite
-      those matches or make ingress operational.
+      expose comment events. Closed/reopened means resolution set/cleared from
+      explicit changelog entries, not a guessed status. Label activities require
+      an unambiguous single-label changelog and corroborating current label set.
+      Missing or lossy deltas never match. Narrowing filters are issue-id,
+      issue-key, project, labels, status, resolution, and sender. No specimen
+      project or URL is pinned: projects and issue-ids supply independent grants;
+      the approved receiver binds issue.self to the site and exact source issue.
+      Rules require receiver support for gh-aw/event-predicates/v1.
     </envelope>
   </triggers>
   <reads>
@@ -547,17 +671,33 @@ import-schema:
   </reads>
   <safe-outputs max-response-bytes="16384">
     <operation selection="jira-create-issue" tool="jira_create_issue" method="POST" path="/rest/api/3/issue">
-      Required inputs: approved project key (string, at most 80 characters), issue-type exactly
-      Task, and nonblank summary (20 to 255 Unicode characters). Optional nonblank description is at
+      Required inputs: approved project key (string, at most 80 characters), an
+      exact issue-type name from issue-types (nonblank, at most 80 characters),
+      and nonblank summary (20 to 255 Unicode characters). Optional nonblank description is at
       most 32767 characters. Optional temporary_id matches ^#?aw_[A-Za-z0-9_]{3,12}$ and is at most
-      80 characters. Task must exist on the project's create screen; projects requiring unsupported
+      80 characters. The type must exist on the project's create screen; projects requiring unsupported
       mandatory fields cannot use this operation. Projects and issue types are not auto-resolved.
       Projects the response strings id, key, self to issue-id, issue-key, url, and requires all three.
     </operation>
     <operation selection="jira-update-issue" tool="jira_update_issue" method="PUT" path="/rest/api/3/issue/{issue}">
       Required inputs: issue, nonblank summary (20 to 255 Unicode characters), and nonblank description
-      (at most 32767 characters). Both fields are replaced; single-field update and clearing either
-      field are unavailable. A successful response may be empty (HTTP 204).
+      (at most 32767 characters). Both fields are replaced. Use the sparse operations
+      below to preserve an untouched field without reading and rewriting it.
+      Clearing either field is unavailable. A successful response may be empty (HTTP 204).
+    </operation>
+    <operation selection="jira-update-issue-summary" tool="jira_update_issue_summary" method="PUT" path="/rest/api/3/issue/{issue}">
+      Required inputs: issue and nonblank summary (20 to 255 Unicode characters).
+      Sends fields.summary only; description is absent. Retains title sanitization,
+      exact issue grants and authenticated created-resource references.
+      A successful response may be empty (HTTP 204).
+    </operation>
+    <operation selection="jira-update-issue-description" tool="jira_update_issue_description" method="PUT" path="/rest/api/3/issue/{issue}">
+      Required inputs: issue and nonblank description (at most 32767 characters).
+      Sends fields.description only, encoded as ADF v1 after trusted body publication;
+      summary is absent. Retains body sanitization, generated/configured attribution,
+      exact issue grants and authenticated created-resource references. An empty
+      description is rejected, not a clear operation. A successful response may be
+      empty (HTTP 204).
     </operation>
     <operation selection="jira-add-comment" tool="jira_add_comment" method="POST" path="/rest/api/3/issue/{issue}/comment">
       Required inputs: issue and nonblank text (at most 32767 characters). Creates a new comment,
@@ -583,7 +723,8 @@ import-schema:
     </semantics>
     <created-resources>
       Select the creator and desired follow-up writes together. Submit temporary_id aw_created
-      on create, then use issue "#aw_created" or "aw_created" for update, comment, and label.
+      on create, then use issue "#aw_created" or "aw_created" for full or sparse
+      updates, comment, and label.
       Only a successful real creation with a validated response key prefixed by the approved
       project plus "-" establishes an authenticated host receipt. It is bound to the connector
       plan, endpoint, project scope, producer, and current execution. Missing, forged, duplicated,
@@ -601,7 +742,7 @@ import-schema:
   </context>
   <limitations>
     Jira Cloud only; no Jira Server or Data Center compatibility is claimed. No transitions,
-    deletion, custom fields, arbitrary issue types, account lookup, attachment fetching, or
+    deletion, custom fields, unapproved issue types, account lookup, attachment fetching, or
     tenant discovery are exposed. These declarations are experimental. Local fixture and
     compilation success or HTTP 200 MCP initialization does not establish read authorization.
     A tool-level error saying "You don't have permission to connect via API token. Please ask

@@ -114,6 +114,20 @@ supports and is approved for the exact generated subscription. Use
 [the gateway specification](../../docs/src/content/docs/specs/webhook-gateway-specification.md)
 for the receiver and destination responsibilities.
 
+Lifecycle selections add closed/reopened/labeled/unlabeled only from complete
+declared source evidence. Linear uses timestamps and label-ID sets; Jira uses
+resolution and unambiguous label changelogs; Azure uses explicitly configured
+`closed-states` and old/new state/tag values. Missing evidence is a nonmatch,
+not permission to hydrate or infer a transition. A mapping such as
+`on.gateway-dispatch.linear: {issue-closed: {labels: [approved-label-id]}}`
+narrows a declared filter; it never widens resource grants. The receiver must
+support the frozen `gh-aw/event-predicates/v1` evaluation contract.
+
+Use `gh aw connector <id> test --phase trigger --capability <name>
+--native-event <event> --args '<native JSON>'` for offline projection. It uses
+ordinary import inputs/grants, reads no credentials and reports
+`operational: false`; it never installs a webhook or dispatches a workflow.
+
 ## Preserve credential and authority boundaries
 
 Provision distinct least-privilege reader and writer identities. Declared scopes

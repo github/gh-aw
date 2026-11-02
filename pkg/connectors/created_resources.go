@@ -37,7 +37,8 @@ func (s *ConnectorSpec) validateCreatedResources() error {
 			if op.Request.Method != http.MethodPost || !namePattern.MatchString(created.Resource) || !validPointer(created.Value) ||
 				!exists || !scope.Required || scope.Type != "string" || op.Resources[created.Scope] == "" ||
 				!declared || temporary.Type != "string" || temporary.MaxLength > 80 || temporary.Pattern != temporaryResourcePattern.String() ||
-				len(created.ScopePrefix) > 16 || strings.Contains(created.ScopePrefix, "${") {
+				len(created.ScopePrefix) > 16 || strings.Contains(created.ScopePrefix, "${") ||
+				(created.ValueType != "" && created.ValueType != "string" && created.ValueType != "integer") {
 				return fmt.Errorf("safe-output %q creates requires a POST, projected value pointer, exact scoped string input, and bounded temporary-ID input", name)
 			}
 		}
@@ -211,7 +212,7 @@ func (p *Plan) ExecuteCreatedSafeOutput(ctx context.Context, runtime Runtime, ho
 		return nil, errors.New("created-resource response is not valid JSON")
 	}
 	value, present := lookupPointer(document, op.Creates.Value)
-	text, isString := value.(string)
+	text, isString := createdResourceIdentifier(op.Creates, value)
 	if !present || !isString || text == "" || len(text) > 256 {
 		return nil, errors.New("created-resource response is missing its bounded resource identifier; no binding established")
 	}
@@ -237,6 +238,16 @@ func (p *Plan) ExecuteCreatedSafeOutput(ctx context.Context, runtime Runtime, ho
 		Scope: op.Creates.Scope, ScopeValue: scope, TemporaryID: strings.TrimPrefix(temporary, "#"), Value: text,
 	})
 	return result, err
+}
+
+func createdResourceIdentifier(created *CreatedResource, value any) (string, bool) {
+	if created.ValueType == "integer" {
+		number, numeric := value.(json.Number)
+		text, valid := responseResourceIdentity(number)
+		return text, valid && numeric && text != "0"
+	}
+	text, valid := value.(string)
+	return text, valid
 }
 
 // PrepareSafeOutputIntent supports temporary references in credential-free

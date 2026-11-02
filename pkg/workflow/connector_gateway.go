@@ -18,15 +18,21 @@ import (
 
 // ConnectorWebhookSource is receiver-owned source policy, not sender evidence.
 type ConnectorWebhookSource struct {
-	ID                  string            `json:"id"`
-	Alias               string            `json:"alias"`
-	Trigger             string            `json:"trigger"`
-	Digest              string            `json:"digest"`
-	VerificationProfile string            `json:"verification_profile"`
-	NativeEvents        []string          `json:"native_events"`
-	Normalize           map[string]string `json:"normalize"`
-	Types               map[string]string `json:"types,omitempty"`
-	Origins             []string          `json:"origins"`
+	ID                  string                            `json:"id"`
+	Alias               string                            `json:"alias"`
+	Trigger             string                            `json:"trigger"`
+	Digest              string                            `json:"digest"`
+	VerificationProfile string                            `json:"verification_profile"`
+	NativeEvents        []string                          `json:"native_events"`
+	Normalize           map[string]string                 `json:"normalize"`
+	Types               map[string]string                 `json:"types,omitempty"`
+	Origins             []string                          `json:"origins"`
+	EvaluationVersion   string                            `json:"evaluation_version,omitempty"`
+	When                *connectors.EventPredicate        `json:"when,omitempty"`
+	Filters             map[string]connectors.EventFilter `json:"filters,omitempty"`
+	Variants            []connectors.EventVariant         `json:"variants,omitempty"`
+	URLIdentity         string                            `json:"url_identity,omitempty"`
+	URLPathPrefix       string                            `json:"url_path_prefix,omitempty"`
 }
 
 func connectorGatewaySelections(frontmatter map[string]any, registrations map[string]any) error {
@@ -52,9 +58,12 @@ func connectorGatewaySelections(frontmatter map[string]any, registrations map[st
 		if !ok {
 			return fmt.Errorf("gateway connector %q requires an imported declaration", alias)
 		}
-		names, err := webhookStringList(gateway[alias])
-		if err != nil || len(names) == 0 {
-			return fmt.Errorf("on.gateway-dispatch.%s requires a nonempty trigger list", alias)
+		names, err := connectorGatewayTriggerNames(gateway[alias], registration)
+		if err != nil {
+			return fmt.Errorf("on.gateway-dispatch.%s: %w", alias, err)
+		}
+		if len(names) == 0 {
+			return fmt.Errorf("on.gateway-dispatch.%s requires a nonempty trigger list or filter mapping", alias)
 		}
 		if registration["on"] != nil {
 			return fmt.Errorf("connector %q trigger selection is duplicated", alias)
@@ -62,6 +71,60 @@ func connectorGatewaySelections(frontmatter map[string]any, registrations map[st
 		registration["on"] = names
 	}
 	return nil
+}
+
+func connectorGatewayTriggerNames(raw any, registration map[string]any) ([]string, error) {
+	selections, mapping := raw.(map[string]any)
+	if !mapping {
+		return webhookStringList(raw)
+	}
+	data, err := json.Marshal(registration["spec"])
+	if err != nil {
+		return nil, err
+	}
+	var spec connectors.ConnectorSpec
+	if err := connectors.Decode(data, &spec); err != nil {
+		return nil, err
+	}
+	for _, name := range sliceutil.SortedKeys(selections) {
+		trigger, exists := spec.Triggers[name]
+		if !exists {
+			return nil, fmt.Errorf("unknown connector trigger %q", name)
+		}
+		if selections[name] == nil {
+			continue
+		}
+		filters, ok := selections[name].(map[string]any)
+		if !ok {
+			return nil, errors.New("connector trigger selections require null or a mapping of declared filters")
+		}
+		for filterName, raw := range filters {
+			filter, exists := trigger.Filters[filterName]
+			if !exists {
+				return nil, fmt.Errorf("trigger %q has no filter %q", name, filterName)
+			}
+			values, ok := raw.([]any)
+			if !ok || len(values) == 0 {
+				return nil, fmt.Errorf("trigger filter %q requires a nonempty array of typed literals", filterName)
+			}
+			filter.Values = values
+			trigger.Filters[filterName] = filter
+		}
+		spec.Triggers[name] = trigger
+	}
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	data, err = json.Marshal(spec)
+	if err != nil {
+		return nil, err
+	}
+	var normalized map[string]any
+	if err := json.Unmarshal(data, &normalized); err != nil {
+		return nil, err
+	}
+	registration["spec"] = normalized
+	return sliceutil.SortedKeys(selections), nil
 }
 
 func reservedConnectorGatewayName(name string) bool {
@@ -159,6 +222,11 @@ func connectorWebhookSubscription(alias, name, workflowID, digest string, spec c
 		VerificationProfile: trigger.VerificationProfile, NativeEvents: slices.Clone(trigger.NativeEvents),
 		Normalize: trigger.Normalize, Types: trigger.Types,
 	}
+	if trigger.When != nil || len(trigger.Filters)+len(trigger.Variants) != 0 || trigger.URLIdentity != "" {
+		source.EvaluationVersion = connectors.EventEvaluationVersion
+		source.When, source.Filters, source.Variants = trigger.When, trigger.Filters, trigger.Variants
+		source.URLIdentity, source.URLPathPrefix = trigger.URLIdentity, trigger.URLPathPrefix
+	}
 	for _, origin := range trigger.ResourceOrigins {
 		parsed, err := url.Parse(origin)
 		if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil ||
@@ -175,6 +243,19 @@ func connectorWebhookSubscription(alias, name, workflowID, digest string, spec c
 	event := sha256.Sum256([]byte(alias + "\x00" + name + "\x00" + digest))
 	subscription := newWebhookSubscription(workflowID, fmt.Sprintf("connector_%x", event[:12]), []string{name}, conditions)
 	subscription.Connector = source
+	for _, variant := range trigger.Variants {
+		conditions, err := connectorWebhookConditions(connectors.Trigger{Resources: variant.Resources, Types: variant.Types}, connection.Resources)
+		if err != nil {
+			return WebhookSubscription{}, err
+		}
+		subscription.AnyOf = append(subscription.AnyOf, conditions)
+	}
+	if len(trigger.Variants) != 0 {
+		// Each explicit variant supplies the complete resource evidence group.
+		subscription.Conditions = slices.DeleteFunc(subscription.Conditions, func(condition WebhookCondition) bool {
+			return strings.HasPrefix(condition.Filter, "connector_scope_")
+		})
+	}
 	return subscription, nil
 }
 
@@ -202,6 +283,12 @@ func connectorWebhookConditions(trigger connectors.Trigger, grants map[string][]
 		values := grants[trigger.Resources[pointer]]
 		if len(values) == 0 {
 			return nil, errors.New("connector gateway resource constraints require explicit nonempty grants")
+		}
+		for _, name := range sliceutil.SortedKeys(trigger.Filters) {
+			filter := trigger.Filters[name]
+			if len(filter.Values) != 0 {
+				conditions = append(conditions, connectorWebhookCondition(filter.Path, "connector_filter_"+strings.ReplaceAll(name, "-", "_"), filter.Type, filter.Values))
+			}
 		}
 		var literals []any
 		valueType := "string"

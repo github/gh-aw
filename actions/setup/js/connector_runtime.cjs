@@ -430,7 +430,8 @@ function validateOperation(spec, op, phase, readTool = false) {
   }
   if (op.creates) {
     const created = op.creates;
-    fields(created, ["resource", "value", "scope", "temporaryId", "scopePrefix"], ["resource", "value", "scope", "temporaryId"]);
+    fields(created, ["resource", "value", "scope", "temporaryId", "scopePrefix", "valueType"], ["resource", "value", "scope", "temporaryId"]);
+    assert(created.valueType === undefined || ["string", "integer"].includes(created.valueType));
     assert(op.request.method === "POST" && fixedPattern(namePattern, created.resource) && pointerValid(created.value));
     assert(op.inputs?.[created.scope]?.required && op.inputs[created.scope].type === "string" && op.resources?.[created.scope]);
     const temporary = op.inputs?.[created.temporaryId];
@@ -481,7 +482,26 @@ function validatePlan(plan) {
     }
     for (const group of ["httpMcp", "triggers"]) assert(spec[group] === undefined || spec[group] === null || object(spec[group]));
     for (const [name, trigger] of entries(spec.triggers)) {
-      fields(trigger, ["verificationProfile", "nativeEvents", "match", "normalize", "resources", "types", "resourceOrigins"], ["verificationProfile", "nativeEvents", "match", "normalize"]);
+      fields(
+        trigger,
+        ["verificationProfile", "nativeEvents", "match", "normalize", "resources", "types", "resourceOrigins", "when", "filters", "variants", "urlIdentity", "urlPathPrefix"],
+        ["verificationProfile", "nativeEvents", "match", "normalize"]
+      );
+      const { validEventPredicate, validEventFilters, validEventURLBinding } = require("./event_predicate.cjs");
+      assert(validEventURLBinding(trigger.urlIdentity, trigger.urlPathPrefix, trigger.normalize), "Invalid connector event URL binding");
+      if (trigger.when !== undefined) assert(validEventPredicate(trigger.when), "Invalid connector event predicate");
+      if (trigger.filters !== undefined) assert(validEventFilters(trigger.filters), "Invalid connector event filters");
+      if (trigger.variants !== undefined) {
+        assert(Array.isArray(trigger.variants) && trigger.variants.length <= 4);
+        for (const variant of trigger.variants) {
+          fields(variant, ["when", "normalize", "resources", "types"], ["when", "normalize", "resources"]);
+          assert(validEventPredicate(variant.when));
+          assert(object(variant.normalize) && count(variant.normalize) === count(trigger.normalize) && names(variant.normalize).every(key => own(trigger.normalize, key) && pointerValid(variant.normalize[key])));
+          assert(object(variant.resources) && JSON.stringify(Object.values(variant.resources).sort()) === JSON.stringify(Object.values(trigger.resources || {}).sort()));
+          for (const pointer of names(variant.resources)) assert(pointerValid(pointer));
+          for (const [pointer, type] of entries(variant.types)) assert(pointerValid(pointer) && ["string", "boolean", "number", "integer"].includes(type));
+        }
+      }
       if (trigger.resourceOrigins !== undefined)
         assert(Array.isArray(trigger.resourceOrigins) && trigger.resourceOrigins.length <= 16 && trigger.resourceOrigins.every(value => typeof value === "string" && !value.includes("*") && origin(value)));
       assert(fixedPattern(namePattern, name) && fixedPattern(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+\/[a-z][a-z0-9-]*$/, trigger.verificationProfile));
@@ -522,7 +542,13 @@ function validatePlan(plan) {
     for (const name of selection) {
       assert(typeof name === "string" && own(spec[group] || {}, name), "Connector capability is not selected");
       selected++;
-      if (group === "triggers") continue;
+      if (group === "triggers") {
+        const trigger = spec.triggers[name];
+        const { eventPredicateConfigured } = require("./event_predicate.cjs");
+        assert(eventPredicateConfigured(trigger.when) && (trigger.variants || []).every(variant => eventPredicateConfigured(variant.when)), "Selected transition trigger requires explicit terminal values");
+        for (const resource of Object.values(trigger.resources || {})) assert(connection.resources[resource]?.length, "Connector trigger resource grant is missing");
+        continue;
+      }
       const op = spec[group][name];
       assert(own(connection.credentials, op.credential), "Connector selected credential reference is missing");
       for (const [input, resource] of entries(op.resources)) {
@@ -1156,7 +1182,12 @@ async function resolveSafeOutput(plan, name, op, args, env, fetchImpl) {
 async function createdReceipt(plan, name, op, args, resolved, host, result) {
   if (!op.creates || !own(args, op.creates.temporaryId)) return;
   assert(host, "Created-resource bindings require authenticated trusted execution state");
-  const value = lookup(result.data, op.creates.value);
+  let value = lookup(result.data, op.creates.value);
+  if (op.creates.valueType === "integer") {
+    const token = numericToken(result.data, op.creates.value);
+    assert(typeof value === "number" && Number.isSafeInteger(value) && value > 0 && fixedPattern(/^[1-9][0-9]*$/, token), "Created-resource response is missing its canonical positive integer identifier");
+    value = token;
+  }
   assert(boundedString(value, 256, 1), "Created-resource response is missing its bounded identifier; no binding established");
   for (const consumer of Object.values(plan.spec.safeOutputs)) for (const [input, producer] of entries(consumer.createdResources)) if (producer === name) await validateArgument(consumer.inputs[input], value);
   const scope = resolved[op.creates.scope];
