@@ -636,7 +636,10 @@ describe("safe_outputs_handlers", () => {
       const entry = mockAppendSafeOutput.mock.calls[0][0];
       expect(entry.type).toBe("upload_asset");
       expect(entry.fileName).toBe("test.png");
-      expect(entry.sha).toBeDefined();
+      expect(entry.sha).toBe(crypto.createHash("sha256").update("test content").digest("hex"));
+      expect(entry.size).toBe(Buffer.byteLength("test content"));
+      const stagedFile = path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets", `${crypto.createHash("sha256").update(testFile).digest("hex")}.png`);
+      expect(fs.readFileSync(stagedFile)).toEqual(Buffer.from("test content"));
       expect(entry.url).toContain("test-branch");
 
       expect(result.content[0].type).toBe("text");
@@ -721,6 +724,58 @@ describe("safe_outputs_handlers", () => {
       expect(mockAppendSafeOutput).not.toHaveBeenCalled();
       expect(fs.existsSync(path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets"))).toBe(false);
       expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
+    });
+
+    it.each(["file", "parent"])("rejects the alert 1039 %s link to /proc/self/environ before reading any bytes", kind => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const source = path.join(testWorkspaceDir, "leak.png");
+      if (kind === "file") fs.symlinkSync("/proc/self/environ", source);
+      else {
+        const external = fs.mkdtempSync(path.join(testScratchRoot, "external-proc-"));
+        fs.symlinkSync("/proc/self/environ", path.join(external, "leak.png"));
+        fs.symlinkSync(external, source, "dir");
+      }
+      const requestedPath = kind === "file" ? source : path.join(source, "leak.png");
+      const opened = vi.spyOn(fs, "openSync");
+      const read = vi.spyOn(fs, "readSync");
+      const copied = vi.spyOn(fs, "copyFileSync");
+
+      expect(() => handlers.uploadAssetHandler({ path: requestedPath })).toThrow(expect.objectContaining({ code: "ERR_VALIDATION", message: expect.stringMatching(/^ERR_VALIDATION:.*symlinks/) }));
+      expect(opened.mock.calls.every(([, flags]) => (flags & fs.constants.O_DIRECTORY) !== 0)).toBe(true);
+      expect(read).not.toHaveBeenCalled();
+      expect(copied).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets"))).toBe(false);
+    });
+
+    it.each(["file", "parent"])("rejects a %s swapped to a symlink between inspection and open without reading bytes", kind => {
+      process.env.GH_AW_ASSETS_BRANCH = "assets/test";
+      const parent = path.join(testWorkspaceDir, "nested");
+      fs.mkdirSync(parent);
+      const source = path.join(parent, "chart.png");
+      fs.writeFileSync(source, "safe chart");
+      const originalOpen = fs.openSync;
+      let swapped = false;
+      vi.spyOn(fs, "openSync").mockImplementation((filename, ...args) => {
+        if (path.basename(String(filename)) === (kind === "file" ? "chart.png" : "nested")) {
+          swapped = true;
+          if (kind === "file") {
+            fs.unlinkSync(source);
+            fs.symlinkSync("/proc/self/environ", source);
+          } else {
+            fs.renameSync(parent, `${parent}-original`);
+            fs.symlinkSync("/proc/self", parent, "dir");
+          }
+        }
+        return originalOpen(filename, ...args);
+      });
+      const read = vi.spyOn(fs, "readSync");
+
+      expect(() => handlers.uploadAssetHandler({ path: source })).toThrow(expect.objectContaining({ code: "ERR_VALIDATION" }));
+      expect(swapped).toBe(true);
+      expect(read).not.toHaveBeenCalled();
+      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(testRunnerTemp, "gh-aw", "safeoutputs", "assets"))).toBe(false);
     });
 
     it("rejects workspace and tmp prefix lookalikes", () => {

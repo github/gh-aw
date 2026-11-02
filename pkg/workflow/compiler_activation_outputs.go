@@ -190,6 +190,7 @@ func (c *Compiler) addActivationArtifactUploadStep(ctx *activationJobBuildContex
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/user.txt\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/prompt-template.txt\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/prompt-import-tree.json\n")
+	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/aw-prompts/prompt-literal-values.json\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/"+constants.GithubRateLimitsFilename.String()+"\n")
 	ctx.steps = append(ctx.steps, "            /tmp/gh-aw/base\n")
 	if len(ctx.data.AmbientFolders) > 0 {

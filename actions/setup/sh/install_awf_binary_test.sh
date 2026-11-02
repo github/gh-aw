@@ -10,6 +10,9 @@ source "${SCRIPT_DIR}/release_integrity.sh"
 
 TESTS_PASSED=0
 TESTS_FAILED=0
+TEST_ROOT="${PWD}/.awf-installer-test-$$-${RANDOM}"
+mkdir -m 700 "$TEST_ROOT"
+trap 'rm -rf "$TEST_ROOT"' EXIT
 
 pass() { echo "PASS: $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
 fail() { echo "FAIL: $1"; echo "  $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
@@ -78,7 +81,8 @@ fi
 
 # Test 5: GITHUB_PATH export — install dir is written when GITHUB_PATH is set
 echo "Test 5: AWF_INSTALL_DIR is appended to GITHUB_PATH in rootless mode..."
-FAKE_GITHUB_PATH=$(mktemp)
+FAKE_GITHUB_PATH="${TEST_ROOT}/github-path"
+: > "$FAKE_GITHUB_PATH"
 bash -c '
   AWF_INSTALL_DIR="${HOME}/.local/bin"
   ROOTLESS=true
@@ -108,13 +112,17 @@ test_curl_retry_all_errors() {
   local curl_help="${4:-${curl_help_all}}"
   local node_version="${5:-v18.0.0}"
   local platform="${6:-Linux}"
+  local release_version="${7:-v0.28.62}"
+  local attestation_failure="${8:-}"
+  local identity_version="${9:-$release_version}"
   local test_dir
   local option_index
   local -a actual_options
   local -a common_options=(-fsSL --proto '=https' --proto-redir '=https' --retry 8 --retry-max-time 180 --connect-timeout 15)
   local -a expected_options
   TEST_FAILURE_REASON=""
-  test_dir=$(mktemp -d)
+  test_dir="${TEST_ROOT}/case-${RANDOM}"
+  mkdir -m 700 "$test_dir"
   mkdir -p "${test_dir}/bin" "${test_dir}/home"
   cat > "${test_dir}/bin/curl" <<'EOF'
 #!/usr/bin/env bash
@@ -143,9 +151,22 @@ while [ "$#" -gt 0 ]; do
 done
 if [[ "${output}" == *checksums.txt ]]; then
   printf '%064d awf-linux-x64\n%064d awf-darwin-x64\n%064d awf-bundle.js\n' 0 0 0 > "${output}"
+elif [[ "${output}" == *release-identity.txt ]]; then
+  printf '%s  refs/tags/%s\n' "$AWF_TEST_MANIFEST_SHA256" "$AWF_TEST_IDENTITY_VERSION" > "$output"
 else
   printf '#!/usr/bin/env bash\nexit 0\n' > "${output}"
 fi
+EOF
+  cat > "${test_dir}/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$AWF_TEST_ATTESTATION_LOG"
+test "$1" = attestation && test "$2" = verify || exit 91
+test "$4" = --hostname && test "$5" = github.com || exit 92
+test "$6" = --repo && test "$7" = github/gh-aw-firewall || exit 93
+test "$8" = --signer-workflow && test "$9" = github/gh-aw-firewall/.github/workflows/release.yml || exit 94
+test "${10}" = --cert-oidc-issuer && test "${11}" = https://token.actions.githubusercontent.com || exit 95
+test "${12}" = --deny-self-hosted-runners || exit 96
+test "${3##*/}" != "${AWF_TEST_ATTESTATION_FAILURE:-}"
 EOF
   cat > "${test_dir}/bin/node" <<'EOF'
 #!/usr/bin/env bash
@@ -169,11 +190,35 @@ EOF
   printf '#!/usr/bin/env bash\nexit 0\n' >"${test_dir}/bin/sudo"
   printf '#!/usr/bin/env bash\nexit 0\n' >"${test_dir}/bin/find"
   chmod +x "${test_dir}/bin/"*
-  if ! AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall v0.28.62 checksums.txt)" \
+  local installer_exit=0
+  AWF_TEST_MANIFEST_SHA256="$(release_artifact_sha256 github/gh-aw-firewall "$release_version" checksums.txt)" \
     CURL_HELP_ALL_OUTPUT="${curl_help_all}" CURL_HELP_OUTPUT="${curl_help}" CURL_HELP_ALL_FAILS="${help_all_fails}" CURL_ARGS_FILE="${test_dir}/curl-args" \
+    AWF_TEST_ATTESTATION_LOG="${test_dir}/attestations" AWF_TEST_ATTESTATION_FAILURE="$attestation_failure" AWF_TEST_IDENTITY_VERSION="$identity_version" \
     AWF_TEST_NODE_VERSION="$node_version" AWF_TEST_OS="$platform" HOME="${test_dir}/home" GITHUB_PATH="${test_dir}/github-path" \
-    PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" v0.28.62 --rootless >/dev/null; then
+    RUNNER_TEMP="$test_dir" PATH="${test_dir}/bin:${PATH}" bash "${SCRIPT_DIR}/install_awf_binary.sh" "$release_version" --rootless >"${test_dir}/output" 2>&1 || installer_exit=$?
+  if [ -n "$attestation_failure" ] || [ "$identity_version" != "$release_version" ]; then
+    if [ "$installer_exit" -eq 0 ] || [ -e "${test_dir}/home/.local/bin/awf" ]; then
+      TEST_FAILURE_REASON="unattested or version-mismatched release was installed"
+      rm -rf "$test_dir"
+      return 1
+    fi
+    if [ "$attestation_failure" = awf-bundle.js ] && grep -q '/awf-linux-' "${test_dir}"/curl-args.[0-9]*; then
+      TEST_FAILURE_REASON="bundle attestation failure attempted a platform fallback"
+      rm -rf "$test_dir"
+      return 1
+    fi
+    if { [ "$attestation_failure" = checksums.txt ] || [ "$attestation_failure" = release-identity.txt ] || [ "$identity_version" != "$release_version" ]; } &&
+      grep -qE '/awf-(bundle|linux|darwin)' "${test_dir}"/curl-args.[0-9]*; then
+      TEST_FAILURE_REASON="payload was downloaded before authenticating release metadata"
+      rm -rf "$test_dir"
+      return 1
+    fi
+    rm -rf "$test_dir"
+    return 0
+  fi
+  if [ "$installer_exit" -ne 0 ]; then
     TEST_FAILURE_REASON="installer exited unsuccessfully"
+    cat "${test_dir}/output"
     rm -rf "${test_dir}"
     return 1
   fi
@@ -182,8 +227,23 @@ EOF
   shopt -s nullglob
   curl_args_files=("${test_dir}"/curl-args.[0-9]*)
   shopt -u nullglob
-  if [ "${#curl_args_files[@]}" -ne 2 ]; then
-    TEST_FAILURE_REASON="expected checksum and platform binary downloads, got ${#curl_args_files[@]}"
+  local expected_downloads=2
+  if [ "$release_version" = v0.29.5 ]; then
+    expected_downloads=3
+    if [ "$(wc -l < "${test_dir}/attestations")" -ne 3 ]; then
+      TEST_FAILURE_REASON="expected identity, checksums, and payload attestations"
+      rm -rf "$test_dir"
+      return 1
+    fi
+    if ! head -n 1 "${test_dir}/attestations" | grep -q release-identity.txt ||
+      ! sed -n '2p' "${test_dir}/attestations" | grep -q checksums.txt; then
+      TEST_FAILURE_REASON="release identity and manifest must be authenticated before the payload"
+      rm -rf "$test_dir"
+      return 1
+    fi
+  fi
+  if [ "${#curl_args_files[@]}" -ne "$expected_downloads" ]; then
+    TEST_FAILURE_REASON="expected $expected_downloads downloads, got ${#curl_args_files[@]}"
     rm -rf "${test_dir}"
     return 1
   fi
@@ -250,6 +310,30 @@ if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-error
   pass "macOS binary uses a stall timeout without a total transfer limit"
 else
   fail "macOS binary timeout options were incorrect" "${TEST_FAILURE_REASON}"
+fi
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5; then
+  pass "helper-capable bundle authenticates release identity, checksums, and payload"
+else
+  fail "modern release bundle verification failed" "$TEST_FAILURE_REASON"
+fi
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v18.0.0 Linux v0.29.5; then
+  pass "helper-capable binary authenticates release identity, checksums, and payload"
+else
+  fail "modern release binary verification failed" "$TEST_FAILURE_REASON"
+fi
+for rejected_asset in checksums.txt release-identity.txt awf-bundle.js awf-linux-x64; do
+  node_version=v24.0.0
+  if [ "$rejected_asset" = awf-linux-x64 ]; then node_version=v18.0.0; fi
+  if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' "$node_version" Linux v0.29.5 "$rejected_asset"; then
+    pass "failed $rejected_asset attestation prevents installation"
+  else
+    fail "unattested $rejected_asset was accepted" "$TEST_FAILURE_REASON"
+  fi
+done
+if test_curl_retry_all_errors '--retry-all-errors' true false '--retry-all-errors' v24.0.0 Linux v0.29.5 '' v0.29.4; then
+  pass "attested identity for another tag prevents installation"
+else
+  fail "mismatched release identity was accepted" "$TEST_FAILURE_REASON"
 fi
 
 # Test 7: warning emitted when GITHUB_PATH is unset in rootless mode

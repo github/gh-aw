@@ -80,7 +80,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Create PR](/gh-aw/reference/safe-outputs-pull-requests/#pull-request-creation-create-pull-request) | `create-pull-request` | Create pull requests with code changes (default max: 1, configurable) |
 | [Update PR](/gh-aw/reference/safe-outputs-pull-requests/#pull-request-updates-update-pull-request) | `update-pull-request` | Update PR title or body (max: 1) |
 | [Close PR](/gh-aw/reference/safe-outputs-pull-requests/#close-pull-request-close-pull-request) | `close-pull-request` | Close pull requests without merging (max: 10) |
-| [Approve Workflow Run](/gh-aw/reference/safe-outputs-pull-requests/#approve-workflow-run-approve-workflow-run) | `approve-workflow-run` | Approve a pending workflow run in the "action required" state (max: 1, experimental) |
+| [Approve Workflow Run](/gh-aw/reference/safe-outputs-pull-requests/#approve-workflow-run-approve-workflow-run) | `approve-workflow-run` | Approve a pending workflow run in the "action required" state (max: 1) |
 | [Merge PR](/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request) | `merge-pull-request` | Merge pull requests after policy gates pass (max: 1, experimental) |
 | [PR Review Comments](/gh-aw/reference/safe-outputs-pull-requests/#pr-review-comments-create-pull-request-review-comment) | `create-pull-request-review-comment` | Create review comments on code lines (max: 10) |
 | [Reply to PR Review Comment](/gh-aw/reference/safe-outputs-pull-requests/#reply-to-pr-review-comment-reply-to-pull-request-review-comment) | `reply-to-pull-request-review-comment` | Reply to existing review comments (max: 10) |
@@ -140,7 +140,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 |--------|-----|-------------|
 | [Dispatch Workflow](#workflow-dispatch-dispatch-workflow) | `dispatch-workflow` | Trigger other workflows with inputs (max: 3, same-repo only) |
 | [Call Workflow](#workflow-call-call-workflow) | `call-workflow` | Call reusable workflows via compile-time fan-out (max: 1, same-repo only) |
-| [Dispatch Repository Event](#repository-dispatch-dispatch-repository) | `dispatch-repository` | Trigger `repository_dispatch` events in external repositories, experimental (cross-repo) |
+| [Dispatch Repository Event](#repository-dispatch-dispatch-repository) | `dispatch-repository` | Trigger `repository_dispatch` events in external repositories (cross-repo) |
 | [Code Scanning Alerts](#code-scanning-alerts-create-code-scanning-alert) | `create-code-scanning-alert` | Generate SARIF security advisories (max: unlimited, same-repo only) |
 | [Autofix Code Scanning Alerts](#autofix-code-scanning-alerts-autofix-code-scanning-alert) | `autofix-code-scanning-alert` | Create automated fixes for code scanning alerts (max: 10, same-repo only) |
 | [Create Check Run](#check-run-creation-create-check-run) | `create-check-run` | Create GitHub Check Runs to surface analysis results in the PR checks UI (default max: 1, same-repo only) |
@@ -327,6 +327,10 @@ See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for compre
   ]
 }
 ```
+
+#### Blocked-By Dependencies
+
+The `create_issue` tool accepts `blocked_by` as an issue reference or an array of references: an issue number (optionally prefixed with `#`), `owner/repo#number`, a GitHub issue URL, or a temporary ID. Numeric references use the new issue's repository. Every resolved blocker repository must match `target-repo` or appear in `allowed-repos`, including configured wildcard patterns, before issue creation or dependency API access. A disallowed blocker rejects the request. Unresolved temporary IDs defer creation and are validated when retried; staged mode previews unresolved IDs but still rejects resolved disallowed repositories.
 
 #### Auto-Expiration
 
@@ -717,6 +721,8 @@ safe-outputs:
 Agent output includes `parent_issue_number` and `sub_issue_number`. Validation ensures both issues exist and meet label/prefix requirements before linking.
 
 `target` selects the parent: `"triggering"` (the default) uses the triggering issue, a fixed issue number uses that parent, and `"*"` uses the agent's `parent_issue_number`, including a temporary ID for a newly created parent. Triggering and fixed targets ignore the agent's parent selection. Scheduled and `workflow_dispatch` runs without issue context must configure `"*"` or a fixed parent; the default fails even if the agent supplies `parent_issue_number`.
+
+Both effective issues must belong to the same repository, and that repository must match `target-repo` or appear in `allowed-repos` before any issue read or link mutation. This check applies after temporary IDs resolve, including deferred retries. `target: "*"` permits agent-selected parents, not unrestricted repositories; repository wildcards are controlled separately by `target-repo` and `allowed-repos`.
 
 ### Set Issue Type (`set-issue-type:`)
 
@@ -1579,9 +1585,6 @@ Use `call-workflow` for deterministic fan-out where actor attribution and zero A
 
 ### Repository Dispatch (`dispatch-repository`)
 
-> [!CAUTION]
-> This is an experimental feature. Compiling a workflow with `dispatch-repository` emits a warning: `Using experimental feature: dispatch-repository`. The API may change in future releases.
-
 Triggers [`repository_dispatch`](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#repository_dispatch) events in external repositories. Unlike `dispatch-workflow` (same-repo only), `dispatch-repository` is designed for cross-repository orchestration.
 
 Each key under `dispatch-repository:` defines a named tool exposed to the agent:
@@ -1714,6 +1717,8 @@ Most safe outputs support cross-repository operations:
 
 - **`target-repo`**: Set a fixed target repository (`owner/repo` format), or use `"*"` as a wildcard to let the agent supply any repository at runtime.
 - **`allowed-repos`**: Allow the agent to dynamically choose from an allowlist of repositories (supports glob patterns, e.g. `org/*`).
+
+Repository matching is case-sensitive for both `target-repo` and `allowed-repos` patterns; repository names must use the same case as the configured values.
 
 Using `target-repo: "*"` enables fully dynamic routing — the agent provides the `repo` field in each tool call. Note that `create-pull-request-review-comment`, `reply-to-pull-request-review-comment`, `submit-pull-request-review`, `create-agent-session`, and `manage-project-items` do not support the wildcard; use an explicit repository or `allowed-repos` for those types.
 

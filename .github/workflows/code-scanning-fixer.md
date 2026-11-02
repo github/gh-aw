@@ -21,6 +21,9 @@ network:
 engine:
   id: copilot
   copilot-sdk: true
+  model-routing:
+    goal: cost
+    mode: balanced
 max-tool-denials: 3
 imports:
   - shared/mcp-pagination.md

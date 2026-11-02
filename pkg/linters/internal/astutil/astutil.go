@@ -195,7 +195,7 @@ func packageFunctionAliasInitializer(pass *analysis.Pass, node ast.Node, obj typ
 	case *ast.AssignStmt:
 		for i, lhs := range node.Lhs {
 			ident, ok := lhs.(*ast.Ident)
-			if ok && pass.TypesInfo.Defs[ident] == obj {
+			if ok && (pass.TypesInfo.Uses[ident] == obj || pass.TypesInfo.Defs[ident] == obj) {
 				value, _ := RhsExprForIndex(node.Rhs, i)
 				return value
 			}

@@ -14,7 +14,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parent
-JAR_SHA256 = "d15655eeaff4b3f7b3d65c46b838bc0f35d131b2ef4b1e473689b62c98d4726f"
+JAR_SHA256 = "011267fca25d0752cf18894dd585cd28b96960c112ea8a20b823ea770e7e10cd"
 MUTATIONS = {
     "agent-write": "JobIsolation",
     "persist-credentials": "NoCredentialPersistence",
@@ -421,6 +421,27 @@ def check_mcp_compile(java, jar, results):
     return cases
 
 
+def check_issue_relationships(java, jar, results):
+    model = "IssueRelationshipAuthorization"
+    cases = [run_case(java, jar, results, "secure-issue-relationships", model=model)]
+    for fault, invariant in {
+        "resolved-policy-bypass": "RepositoryContainment",
+        "early-mentions": "PreflightBeforeCalls",
+        "parent-override": "TrustedParent",
+        "staged-write": "StagedNoWrites",
+    }.items():
+        cases.append(run_case(java, jar, results, f"issue-relationships-{fault}",
+                              fault, invariant=invariant, model=model))
+    for name, invariant in {
+        "allowed-write": "NoSuccessfulWrite",
+        "denied-reference": "NoRejectedReference",
+        "deferred-retry": "NoDeferredRetry",
+    }.items():
+        cases.append(run_case(java, jar, results, f"issue-relationships-{name}",
+                              invariant=invariant, witness=True, model=model))
+    return cases
+
+
 def check_activation_admission(java, jar, results):
     cases = []
     for policy in ["ignore", "block"]:
@@ -546,8 +567,8 @@ def check_workflow_models(java, jar, results):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", choices=["all", "admission", "conclusion"], default="all",
-                        help="Check all models, admission and conclusion, or only conclusion")
+    parser.add_argument("--model", choices=["all", "admission", "conclusion", "issue-relationships"], default="all",
+                        help="Check all models, admission and conclusion, only conclusion, or issue relationships")
     parser.add_argument("--results", type=Path, help="New directory for all reports and traces")
     parser.add_argument("--compiler", type=Path, help="Local gh-aw binary for source acceptance/rejection checks")
     parser.add_argument("--write-examples", action="store_true", help="Regenerate checked-in representative traces")
@@ -574,7 +595,10 @@ def main():
     cases = check_workflow_models(java, jar, results) if args.model == "all" else []
     if args.model in {"all", "admission"}:
         cases.extend(check_activation_admission(java, jar, results))
-    cases.extend(check_admission_conclusion(java, jar, results))
+    if args.model in {"all", "admission", "conclusion"}:
+        cases.extend(check_admission_conclusion(java, jar, results))
+    if args.model in {"all", "issue-relationships"}:
+        cases.extend(check_issue_relationships(java, jar, results))
     current_hashes = {model: hashlib.sha256((ROOT / f"{model}.tla").read_bytes()).hexdigest()
                       for model in {case["model"] for case in cases}}
     if any(case["model_sha256"] != current_hashes[case["model"]] for case in cases):

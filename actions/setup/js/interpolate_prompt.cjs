@@ -11,12 +11,13 @@
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
-const { processRuntimeImports } = require("./runtime_import.cjs");
+const { processRuntimeImports, generatePlaceholderName, generateHashedExpressionEnvVarName } = require("./runtime_import.cjs");
 const { writeInlineSubAgents } = require("./extract_inline_sub_agents.cjs");
 const { writeInlineSkills } = require("./extract_inline_skills.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
+const { createLiteralValues, restoreInlineMetadata, writeLiteralState, literalFileKey } = require("./prompt_literal_values.cjs");
 
 /**
  * @typedef {Object} ImportTreeNode
@@ -40,7 +41,7 @@ function interpolateVariables(content, variables) {
   core.info(`[interpolateVariables] Starting interpolation with ${Object.keys(variables).length} variables`);
   core.info(`[interpolateVariables] Content length: ${content.length} characters`);
 
-  let result = content;
+  const replacements = new Map();
   let totalReplacements = 0;
 
   // Replace each ${VAR_NAME} with its corresponding value
@@ -50,15 +51,17 @@ function interpolateVariables(content, variables) {
     const matches = (content.match(pattern) || []).length;
 
     if (matches > 0) {
-      core.info(`[interpolateVariables] Replacing ${varName} (${matches} occurrence(s))`);
-      core.info(`[interpolateVariables]   Value: ${value.substring(0, 100)}${value.length > 100 ? "..." : ""}`);
-      result = result.replace(pattern, () => value);
+      core.debug(`[interpolateVariables] Replacing variable (${matches} occurrence(s))`);
+      replacements.set(`\${${varName}}`, value);
       totalReplacements += matches;
     } else {
-      core.info(`[interpolateVariables] Variable ${varName} not found in content (unused)`);
+      core.debug("[interpolateVariables] Unused variable");
     }
   }
 
+  // Replace only author-owned placeholders, never placeholders inside inserted values.
+  const pattern = new RegExp([...replacements.keys()].map(key => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+  const result = replacements.size > 0 ? content.replace(pattern, match => replacements.get(match) ?? match) : content;
   core.info(`[interpolateVariables] Completed: ${totalReplacements} total replacement(s)`);
   core.info(`[interpolateVariables] Result length: ${result.length} characters`);
   return result;
@@ -66,8 +69,9 @@ function interpolateVariables(content, variables) {
 
 /**
  * Main function for prompt variable interpolation and template rendering
+ * @param {{deferredBindings?: Record<string, string>}} [options] - Compiler-owned late binding aliases
  */
-async function main() {
+async function main({ deferredBindings = {} } = {}) {
   try {
     core.info("========================================");
     core.info("[main] Starting interpolate_prompt processing");
@@ -78,7 +82,6 @@ async function main() {
       core.setFailed(`${ERR_CONFIG}: GH_AW_PROMPT environment variable is not set`);
       return;
     }
-    core.info(`[main] Prompt path: ${promptPath}`);
 
     // Get the workspace directory for runtime imports
     const workspaceDir = process.env.GITHUB_WORKSPACE;
@@ -86,21 +89,34 @@ async function main() {
       core.setFailed(`${ERR_CONFIG}: GITHUB_WORKSPACE environment variable is not set`);
       return;
     }
-    core.info(`[main] Workspace directory: ${workspaceDir}`);
 
     // Read the prompt file
     core.info(`[main] Reading prompt file...`);
     let content = fs.readFileSync(promptPath, "utf8");
     const originalLength = content.length;
+    // Keep evaluated context opaque until all author-owned directives have run.
+    // The same protection covers values evaluated while expanding runtime imports.
+    const { state: literalState, protect: protectValue, restore: restoreValues } = createLiteralValues();
+    const protectExpression = (/** @type {string} */ value, /** @type {string|undefined} */ expression) => {
+      if (expression && (deferredBindings[generatePlaceholderName(expression)] === value || deferredBindings[generateHashedExpressionEnvVarName(expression)] === value)) {
+        return value;
+      }
+      return protectValue(value);
+    };
+    const recordFile = (/** @type {string} */ opaque, /** @type {string} */ target, metadata = false) => {
+      const rendered = metadata ? restoreInlineMetadata(opaque, restoreValues) : restoreValues(opaque);
+      literalState.files[literalFileKey(promptPath, target)] = { opaque, rendered, metadata };
+      return rendered;
+    };
+    const restoreArtifact = (/** @type {string} */ opaque, /** @type {string|undefined} */ target) => (target ? recordFile(opaque, target, true) : restoreInlineMetadata(opaque, restoreValues));
     core.info(`[main] Original content length: ${originalLength} characters`);
-    core.info(`[main] First 200 characters: ${content.substring(0, 200).replace(/\n/g, "\\n")}`);
 
     // Write the raw template to prompt-template.txt BEFORE any processing.
     // This allows downstream consumers (e.g. threat detection) to diff the
     // template against the fully-rendered prompt to identify interpolation boundaries.
     const promptDir = path.dirname(promptPath);
     const templatePath = path.join(promptDir, "prompt-template.txt");
-    core.info(`[main] Writing raw template to: ${templatePath}`);
+    core.info("[main] Writing raw template artifact");
     fs.writeFileSync(templatePath, content, "utf8");
 
     const systemPath = path.join(promptDir, "system.txt");
@@ -136,12 +152,9 @@ async function main() {
     if (hasRuntimeImports) {
       const importMatches = content.match(/{{#runtime-import\??[ \t]+[^\}]+}}/g) || [];
       core.info(`Processing ${importMatches.length} runtime import macro(s) (files and URLs)`);
-      importMatches.forEach((match, i) => {
-        core.info(`  Import ${i + 1}: ${match.substring(0, 80)}${match.length > 80 ? "..." : ""}`);
-      });
 
       const beforeImports = content.length;
-      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children);
+      content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression);
       const afterImports = content.length;
 
       core.info(`Runtime imports processed successfully`);
@@ -153,7 +166,14 @@ async function main() {
     // Write the import tree JSON to the artifact directory so threat detection can
     // analyse provenance without re-parsing the rendered prompt.
     const importTreePath = path.join(promptDir, "prompt-import-tree.json");
-    core.info(`[main] Writing import tree to: ${importTreePath}`);
+    core.info("[main] Writing import tree artifact");
+    const restoreImportTree = (/** @type {ImportTreeNode[]} */ nodes) => {
+      for (const node of nodes) {
+        node.rawContent = restoreValues(node.rawContent);
+        restoreImportTree(node.children);
+      }
+    };
+    restoreImportTree(importTree.children);
     fs.writeFileSync(importTreePath, JSON.stringify(importTree, null, 2), "utf8");
 
     // Step 1.5: Extract and write inline sub-agents
@@ -170,7 +190,7 @@ async function main() {
       // activation artifact and available to the downstream agent job.
       const agentsBaseDir = "/tmp/gh-aw";
       const engineId = process.env.GH_AW_ENGINE_ID || "";
-      content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId);
+      content = writeInlineSubAgents(content, workspaceDir, agentsBaseDir, engineId, restoreArtifact);
       const afterExtraction = content.length;
       core.info(`Inline sub-agents extracted and written`);
       core.info(`Content length change: ${beforeExtraction} -> ${afterExtraction} (${afterExtraction > beforeExtraction ? "+" : ""}${afterExtraction - beforeExtraction})`);
@@ -189,7 +209,7 @@ async function main() {
       const beforeExtraction = content.length;
       const skillsBaseDir = "/tmp/gh-aw";
       const engineId = process.env.GH_AW_ENGINE_ID || "";
-      content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId);
+      content = writeInlineSkills(content, workspaceDir, skillsBaseDir, engineId, restoreArtifact);
       const afterExtraction = content.length;
       core.info(`Inline skills extracted and written`);
       core.info(`Content length change: ${beforeExtraction} -> ${afterExtraction} (${afterExtraction > beforeExtraction ? "+" : ""}${afterExtraction - beforeExtraction})`);
@@ -205,17 +225,13 @@ async function main() {
     const variables = {};
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("GH_AW_EXPR_")) {
-        variables[key] = value || "";
+        variables[key] = deferredBindings[key] === value ? value : protectValue(value || "");
       }
     }
 
     const varCount = Object.keys(variables).length;
     if (varCount > 0) {
-      core.info(`Found ${varCount} expression variable(s) to interpolate:`);
-      for (const [key, value] of Object.entries(variables)) {
-        const preview = value.substring(0, 60);
-        core.info(`  ${key}: ${preview}${value.length > 60 ? "..." : ""}`);
-      }
+      core.info(`Found ${varCount} expression variable(s) to interpolate`);
 
       const beforeInterpolation = content.length;
       content = interpolateVariables(content, variables);
@@ -227,39 +243,38 @@ async function main() {
       core.info("No expression variables found, skipping interpolation");
     }
 
-    // Step 2.5: Substitute experiment placeholders BEFORE template rendering.
-    // When the runtime-import step processes {{#if experiments.name}} conditionals,
-    // it converts them to __GH_AW_EXPERIMENTS_NAME__ placeholders. These must be
-    // resolved with the actual variant value before renderMarkdownTemplate() runs,
-    // otherwise the placeholder string is truthy and the block is always kept.
-    // The activation job exposes GH_AW_EXPERIMENTS_* env vars (from the pick-experiment
-    // step output via the step's env: block), so we can substitute them here.
-    // Additionally, {{#if experiments.name == "value"}} conditions use the dot-notation
-    // form directly in the condition expression. We substitute experiments.NAME → actual
-    // value inside {{#if ...}} condition tags so that isTruthy can evaluate the resulting
-    // GitHub Actions script style expression (e.g. concise == "concise").
+    // Step 2.5: Protect experiment values BEFORE template rendering.
+    // Resolve placeholders and dot-notation references to opaque tokens. Actual
+    // values are used only after parsing conditions, or when restoring final content.
     core.info("\n========================================");
     core.info("[main] STEP 2.5: Experiment Placeholder Substitution");
     core.info("========================================");
     let experimentSubCount = 0;
     for (const [key, value] of Object.entries(process.env)) {
       if (key.startsWith("GH_AW_EXPERIMENTS_")) {
+        const protectedValue = protectValue(value || "");
         const placeholder = `__${key}__`;
         if (content.includes(placeholder)) {
-          content = content.split(placeholder).join(value || "");
+          content = content.split(placeholder).join(protectedValue);
           experimentSubCount++;
-          core.info(`  Substituted ${placeholder} → "${value || ""}"`);
+          core.debug("[main] Substituted experiment placeholder");
         }
-        // Also substitute experiments.name references inside {{#if ...}} conditions.
-        // This enables GitHub Actions script style comparisons (e.g. prompt_style == "concise")
-        // to resolve correctly — after substitution the condition becomes: concise == "concise".
+        // Comparisons in author-owned if/elseif tags also use experiment values.
         const experimentName = key.substring("GH_AW_EXPERIMENTS_".length).toLowerCase();
         const exprForm = `experiments.${experimentName}`;
-        const conditionPattern = new RegExp(`(\\{\\{#if[^}]*?)${exprForm.replace(".", "\\.")}`, "gi");
-        if (conditionPattern.test(content)) {
-          conditionPattern.lastIndex = 0;
-          content = content.replace(conditionPattern, (_, prefix) => prefix + (value || ""));
-          core.info(`  Substituted ${exprForm} in conditions → "${value || ""}"`);
+        const conditionPattern = /(\{\{#?(?:if|else[-_]?if)\s+)([^}]*)(\}\})/gi;
+        const operandPattern = new RegExp(`"[^"]*"|'[^']*'|\\b${exprForm.replace(".", "\\.")}\\b`, "gi");
+        let substitutedCondition = false;
+        content = content.replace(conditionPattern, (_, prefix, condition, suffix) => {
+          const substituted = condition.replace(operandPattern, operand => {
+            if (operand.startsWith('"') || operand.startsWith("'")) return operand;
+            substitutedCondition = true;
+            return protectedValue;
+          });
+          return prefix + substituted + suffix;
+        });
+        if (substitutedCondition) {
+          core.debug("[main] Substituted experiment condition operand");
         }
       }
     }
@@ -279,7 +294,7 @@ async function main() {
       core.info(`Processing ${conditionalMatches.length} conditional template block(s)`);
 
       const beforeRendering = content.length;
-      content = renderMarkdownTemplate(content);
+      content = renderMarkdownTemplate(content, restoreValues);
       const afterRendering = content.length;
 
       core.info(`Template rendered successfully`);
@@ -292,7 +307,7 @@ async function main() {
     core.info("\n========================================");
     core.info("[main] STEP 4: Writing Output");
     core.info("========================================");
-    core.info(`Writing processed content back to: ${promptPath}`);
+    core.info("Writing processed prompt");
     core.info(`Final content length: ${content.length} characters`);
     core.info(`Total length change: ${originalLength} -> ${content.length} (${content.length > originalLength ? "+" : ""}${content.length - originalLength})`);
 
@@ -301,13 +316,15 @@ async function main() {
       if (parts.length !== 2) {
         throw new Error(`${ERR_VALIDATION}: Prompt split boundary was lost during processing`);
       }
-      fs.writeFileSync(systemPath, parts[0], "utf8");
-      fs.writeFileSync(userPath, parts[1], "utf8");
+      fs.writeFileSync(systemPath, recordFile(parts[0], systemPath), "utf8");
+      fs.writeFileSync(userPath, recordFile(parts[1], userPath), "utf8");
       content = parts.join("");
     }
+    content = recordFile(content, promptPath);
     fs.writeFileSync(promptPath, content, "utf8");
+    // Preserve the opaque author-owned view across later activation/deferred passes.
+    writeLiteralState(promptPath, literalState);
 
-    core.info(`Last 200 characters: ${content.substring(Math.max(0, content.length - 200)).replace(/\n/g, "\\n")}`);
     core.info("========================================");
     core.info("[main] Processing complete - SUCCESS");
     core.info("========================================");
@@ -315,12 +332,6 @@ async function main() {
     core.info("========================================");
     core.info("[main] Processing failed - ERROR");
     core.info("========================================");
-    const err = error instanceof Error ? error : new Error(String(error));
-    core.info(`[main] Error type: ${err.constructor.name}`);
-    core.info(`[main] Error message: ${err.message}`);
-    if (err.stack) {
-      core.info(`[main] Stack trace:\n${err.stack}`);
-    }
     core.setFailed(`${ERR_API}: ${getErrorMessage(error)}`);
   }
 }

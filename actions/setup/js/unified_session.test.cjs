@@ -663,6 +663,49 @@ describe("Unified conclusion session", () => {
     expect(writeUnifiedSession({ rootDir: root, dailyAIC: { GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "2" } })).toEqual(events);
   });
 
+  it.each(["conclusion", "usage-only"])("never synthesizes eval.result from the 40955414354 not-evaluated marker in the %s layout", layout => {
+    const { buildGraderOutput, createSessionLookups } = req("./trace_graders.cjs");
+    process.env.GITHUB_RUN_ID = "40955414354";
+    process.env.GITHUB_RUN_ATTEMPT = "1";
+    const evidence = { version: 1, component: "evals", run_id: 40955414354, run_attempt: 1, state: "not_started" };
+    const marker = {
+      status: "not_evaluated",
+      reason_code: "judge_not_started",
+      reason: "The claude evals judge did not start: the sandbox failed before the engine harness started (execution step outcome: failure).",
+      engine: "claude",
+      model: "evals",
+      run_id: "40955414354",
+      run_attempt: "1",
+      timestamp: "2026-10-29T21:19:44.470Z",
+      execution_outcome: "failure",
+      execution_state: "not_started",
+    };
+    write(layout === "conclusion" ? "evals/evals/execution.json" : "usage/evals/execution.json", evidence);
+    write(layout === "conclusion" ? "evals/evals_status.json" : "usage/evals/evals_status.json", marker);
+
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "eval.result")).toEqual([]);
+    expect(events.filter(event => event.type === "execution.result" && event.provenance.phase === "evals")).toHaveLength(1);
+    expect(JSON.stringify(events)).not.toContain("UNKNOWN");
+    expect(buildGraderOutput([], createSessionLookups(events)).context.evals).toBeUndefined();
+  });
+
+  it("keeps a genuine judge UNKNOWN answer as an eval.result counted by graders", () => {
+    const { buildGraderOutput, createSessionLookups } = req("./trace_graders.cjs");
+    process.env.GITHUB_RUN_ID = "40955414354";
+    process.env.GITHUB_RUN_ATTEMPT = "1";
+    write("evals/evals.jsonl", [
+      { id: "docs_reviewed", question: "Did the agent review the project documentation from the perspective of a Claude Code user?", answer: "UNKNOWN", model: "evals", timestamp: "2026-10-29T21:19:44.470Z", runid: "40955414354" },
+      { id: "feedback_produced", question: "Was feedback or a report produced identifying documentation gaps for non-Copilot users?", answer: "NO", model: "evals", timestamp: "2026-10-29T21:19:44.470Z", runid: "40955414354" },
+    ]);
+    const { events } = collectUnifiedSession({ rootDir: root });
+    expect(events.filter(event => event.type === "eval.result").map(event => [event.data.id, event.data.answer])).toEqual([
+      ["docs_reviewed", "UNKNOWN"],
+      ["feedback_produced", "NO"],
+    ]);
+    expect(buildGraderOutput([], createSessionLookups(events)).context.evals).toMatchObject({ total: 2, yes: 0, no: 1, unknown: 1 });
+  });
+
   it.each(["evals/evals.jsonl", "evals.jsonl", "usage/evals.jsonl"])("imports only current-run evals from mixed history in %s", evalsPath => {
     const history = [
       { id: "previous", runid: "122", answer: "YES" },

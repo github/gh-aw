@@ -20,6 +20,7 @@ github/copilot-cli v1.0.21 SHA256SUMS.txt fd9b2fb92a39aeb2a41815a6aa0bf3853307c8
 github/gh-aw-firewall v0.28.70 checksums.txt 9a35879a2f405fa7a1aa275a67b96d01eb0d0c6c8fd850637a1ad8ad55b500da
 github/copilot-cli v1.0.101 SHA256SUMS.txt 018625eac68670d66ede904b9b82cdcd6ab8f87ba20e6e1fbdf0b62c8295d5be
 github/gh-aw-firewall v0.29.0 checksums.txt 2d49727b3b65630b5d0ba5375168687a852afac319d05c911d4769c43fa2ed61
+github/gh-aw-firewall v0.29.5 checksums.txt df77f6dd216030f6c604839136ccfed07b922690594db518a83ff3bcc555e788
 github/copilot-cli v1.0.103 SHA256SUMS.txt 26cd3e4b32cde498e4961fb4d48e7b85d7859fc69af1a645a19201fdd577bdb2
 PINS
     ) || {
@@ -60,4 +61,24 @@ verify_release_digest() {
     echo "ERROR: Trusted SHA256 verification failed for $(basename "$file"); refusing installation" >&2
     return 1
   fi
+}
+
+verify_release_attestation() {
+  local file="$1" repository="$2"
+  gh attestation verify "$file" --hostname github.com \
+    --repo "$repository" \
+    --signer-workflow "${repository}/.github/workflows/release.yml" \
+    --cert-oidc-issuer https://token.actions.githubusercontent.com \
+    --deny-self-hosted-runners
+}
+
+verify_release_identity() {
+  local checksums_file="$1" identity_file="$2" repository="$3" version="$4" digest="$5"
+  verify_release_digest "$checksums_file" "$digest" || return 1
+  verify_release_attestation "$identity_file" "$repository" || return 1
+  if [ "$(cat "$identity_file")" != "${digest}  refs/tags/v${version#v}" ]; then
+    echo "ERROR: Release identity does not bind checksums.txt to refs/tags/v${version#v}" >&2
+    return 1
+  fi
+  verify_release_attestation "$checksums_file" "$repository"
 }

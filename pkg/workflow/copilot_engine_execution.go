@@ -704,7 +704,6 @@ func (e *CopilotEngine) addCopilotFinalStepEnv(env map[string]string, workflowDa
 			env[varName] = secretExpr
 		}
 	}
-	applyMCPScriptsSecretEnv(env, workflowData)
 }
 
 func (e *CopilotEngine) addCopilotSandboxEnv(env map[string]string, sandboxEnabled bool) {

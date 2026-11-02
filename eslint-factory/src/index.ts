@@ -63,6 +63,7 @@ import { preferActionsExecOverChildProcessRule } from "./rules/prefer-actions-ex
 import { noMisplacedErrorCodeDefinitionRule } from "./rules/no-misplaced-error-code-definition";
 import { requireFsChmodTryCatchRule } from "./rules/require-fs-chmod-try-catch";
 
+import { noDynamicStringReplacementRule } from "./rules/no-dynamic-string-replacement";
 import { noSingleCharStringReplaceRule } from "./rules/no-single-char-string-replace";
 import { noAsyncForEachCallbackRule } from "./rules/no-async-foreach-callback";
 import { noUnguardedAsyncTimerCallbackRule } from "./rules/no-unguarded-async-timer-callback";
@@ -140,6 +141,7 @@ const plugin = {
     "no-misplaced-error-code-definition": noMisplacedErrorCodeDefinitionRule,
     "require-fs-chmod-try-catch": requireFsChmodTryCatchRule,
     "no-single-char-string-replace": noSingleCharStringReplaceRule,
+    "no-dynamic-string-replacement": noDynamicStringReplacementRule,
     "no-unguarded-async-timer-callback": noUnguardedAsyncTimerCallbackRule,
     "no-async-foreach-callback": noAsyncForEachCallbackRule,
     "no-split-filter-trim-without-trim-map": noSplitFilterTrimWithoutTrimMapRule,

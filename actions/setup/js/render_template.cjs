@@ -9,17 +9,15 @@ require("./shim.cjs");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const fs = require("fs");
+const { randomUUID } = require("crypto");
 const { ERR_API, ERR_CONFIG } = require("./error_codes.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
 const { selectBranch } = require("./template_branch.cjs");
+const { applyToNonCodeRegions } = require("./sanitize_content_core.cjs");
 
 // Closing tag: {{#endif}} (primary) or {{/if}} (alternate)
 const BLOCK_CONDITIONAL_REGEX = /(\n?)([ \t]*{{#if\s+([^}]*)}}[ \t]*\n)([\s\S]*?)([ \t]*(?:{{#endif}}|{{\/if}})[ \t]*)(\n?)/;
 const INLINE_CONDITIONAL_REGEX = /{{#if\s+([^}]*)}}([\s\S]*?)(?:{{#endif}}|{{\/if}})/;
-
-// Max characters shown in body preview log lines
-const BLOCK_BODY_PREVIEW_LENGTH = 60;
-const INLINE_BODY_PREVIEW_LENGTH = 40;
 
 /**
  * Renders a Markdown template by processing {{#if}} conditional blocks.
@@ -27,22 +25,32 @@ const INLINE_BODY_PREVIEW_LENGTH = 40;
  * were on their own lines, the empty lines are cleaned up to avoid
  * leaving excessive blank lines in the output.
  * @param {string} markdown - The markdown content to process
+ * @param {(condition: string) => string} [resolveCondition] - Resolve context values only after directive parsing
  * @returns {string} - The processed markdown content
  */
-function renderMarkdownTemplate(markdown) {
+function renderMarkdownTemplate(markdown, resolveCondition = condition => condition) {
   core.info(`[renderMarkdownTemplate] Starting template rendering`);
   core.info(`[renderMarkdownTemplate] Input length: ${markdown.length} characters`);
 
-  // Preserve fenced code blocks to avoid processing {{#if}} markers inside them
+  // Use the sanitizer's code-region rules so inline and fenced examples stay literal.
   const _codeBlocks = [];
-  const _FENCE_PH = "\x00FENCE\x00";
-  const _stripped = markdown.replace(/`{3,}[^\n]*\n[\s\S]*?\n`{3,}[ \t]*/g, m => {
-    _codeBlocks.push(m);
-    return `${_FENCE_PH}${_codeBlocks.length - 1}${_FENCE_PH}`;
-  });
+  const _FENCE_PH = `\x00CODE_${randomUUID()}\x00`;
+  const codePattern = new RegExp(`${_FENCE_PH}(\\d+)${_FENCE_PH}`, "g");
+  const _stripped = applyToNonCodeRegions(
+    markdown,
+    text => text,
+    code => {
+      const trailingNewline = code.endsWith("\n") ? "\n" : "";
+      _codeBlocks.push(trailingNewline ? code.slice(0, -1) : code);
+      return `${_FENCE_PH}${_codeBlocks.length - 1}${_FENCE_PH}${trailingNewline}`;
+    }
+  );
   if (_codeBlocks.length > 0) {
-    core.info(`[renderMarkdownTemplate] Preserved ${_codeBlocks.length} fenced code block(s) from template processing`);
+    core.info(`[renderMarkdownTemplate] Preserved ${_codeBlocks.length} code region(s) from template processing`);
   }
+  // Restore literal operands only after parsing directives, before resolving opaque context values.
+  /** @param {string} condition */
+  const resolveParsedCondition = condition => resolveCondition(condition.replace(codePattern, (_, i) => _codeBlocks[+i]));
 
   // Count conditionals before processing
   const blockConditionals = (_stripped.match(new RegExp(BLOCK_CONDITIONAL_REGEX.source, "g")) || []).length;
@@ -58,13 +66,9 @@ function renderMarkdownTemplate(markdown) {
   // Captures: (leading newline)(opening tag line)(condition)(body)(closing tag line)(trailing newline)
   let result = _stripped.replace(new RegExp(BLOCK_CONDITIONAL_REGEX.source, "g"), (match, leadNL, openLine, cond, body) => {
     blockCount++;
-    const condTrimmed = cond.trim();
-    const bodyPreview = body.substring(0, BLOCK_BODY_PREVIEW_LENGTH).replace(/\n/g, "\\n");
+    core.debug(`[renderMarkdownTemplate] Block ${blockCount}: evaluating branches`);
 
-    core.info(`[renderMarkdownTemplate] Block ${blockCount}: condition="${condTrimmed}" -> evaluating branches`);
-    core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > BLOCK_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
-
-    const selectedContent = selectBranch(cond, body);
+    const selectedContent = selectBranch(cond, body, resolveParsedCondition);
 
     if (selectedContent !== null) {
       keptBlocks++;
@@ -90,12 +94,9 @@ function renderMarkdownTemplate(markdown) {
   // Second pass: Handle inline conditionals (tags not on their own lines)
   result = result.replace(new RegExp(INLINE_CONDITIONAL_REGEX.source, "g"), (_, cond, body) => {
     inlineCount++;
-    const condTrimmed = cond.trim();
-    const bodyPreview = body.substring(0, INLINE_BODY_PREVIEW_LENGTH).replace(/\n/g, "\\n");
-    const selectedContent = selectBranch(cond, body);
+    const selectedContent = selectBranch(cond, body, resolveParsedCondition);
 
-    core.info(`[renderMarkdownTemplate] Inline ${inlineCount}: condition="${condTrimmed}" -> ${selectedContent !== null ? "KEEP" : "REMOVE"}`);
-    core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > INLINE_BODY_PREVIEW_LENGTH ? "..." : ""}"`);
+    core.debug(`[renderMarkdownTemplate] Inline ${inlineCount}: ${selectedContent !== null ? "KEEP" : "REMOVE"}`);
 
     if (selectedContent !== null) {
       keptInline++;
@@ -118,12 +119,12 @@ function renderMarkdownTemplate(markdown) {
   }
 
   // Count which placeholders survived to detect code blocks removed in false conditional branches
-  const _survivedIndices = new Set([...result.matchAll(/\x00FENCE\x00(\d+)\x00FENCE\x00/g)].map(m => +m[1]));
+  const _survivedIndices = new Set([...result.matchAll(codePattern)].map(m => +m[1]));
   const _removedFenceMarkerCount = _codeBlocks.reduce((sum, block, i) => (_survivedIndices.has(i) ? sum : sum + (block.match(/`{3,}/g) || []).length), 0);
 
   // Restore fenced code blocks
   if (_codeBlocks.length > 0) {
-    result = result.replace(/\x00FENCE\x00(\d+)\x00FENCE\x00/g, (_, i) => _codeBlocks[+i]);
+    result = result.replace(codePattern, (_, i) => _codeBlocks[+i]);
   }
 
   // Runtime assertion: number of fence markers must be the same before and after processing,
@@ -152,8 +153,6 @@ function main() {
       process.exit(1);
     }
 
-    core.info(`[render_template] Prompt path: ${promptPath}`);
-
     const markdown = fs.readFileSync(promptPath, "utf8");
     core.info(`[render_template] Read ${markdown.length} characters`);
 
@@ -168,15 +167,11 @@ function main() {
 
     const rendered = renderMarkdownTemplate(markdown);
 
-    core.info(`[render_template] Writing back to ${promptPath} (${rendered.length} characters)`);
+    core.info(`[render_template] Writing rendered prompt (${rendered.length} characters)`);
     fs.writeFileSync(promptPath, rendered, "utf8");
 
     core.info("[render_template] Processing complete");
   } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    if (err.stack) {
-      core.info(`[render_template] Stack trace:\n${err.stack}`);
-    }
     core.setFailed(`${ERR_API}: ${getErrorMessage(error)}`);
   }
 }

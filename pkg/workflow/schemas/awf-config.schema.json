@@ -6,6 +6,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "enclaveDebugPublic": {
+      "type": "boolean",
+      "description": "Retain bounded redacted host-only diagnostics for verified static public-only Docker or Cloud Hypervisor enclaves. False disables automatic capture."
+    },
     "$schema": {
       "type": "string",
       "description": "JSON Schema URL for IDE validation and autocomplete."

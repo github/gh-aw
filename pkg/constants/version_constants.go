@@ -78,7 +78,11 @@ const DefaultGitHubMCPServerVersion Version = "v2.0.3"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultFirewallVersion Version = "v0.29.0"
+const DefaultFirewallVersion Version = "v0.29.5"
+
+// AWFDockerEnclaveSetupMinVersion includes the sealed Copilot native runtime and
+// the maintained public Docker enclave diagnostic collector.
+const AWFDockerEnclaveSetupMinVersion Version = "v0.29.5"
 
 // AWFProtectedCommandOutputMinVersion supports native, isolated command output capture.
 const AWFProtectedCommandOutputMinVersion Version = "v0.28.67"

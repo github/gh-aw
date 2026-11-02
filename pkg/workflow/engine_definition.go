@@ -202,10 +202,11 @@ type EngineInstallationDefinition struct {
 	BinaryName         string `yaml:"binary-name,omitempty"`
 	IncludeNodeSetup   bool   `yaml:"include-node-setup,omitempty"`
 	PostInstallScripts bool   `yaml:"post-install-scripts,omitempty"`
-	Cooldown           bool   `yaml:"cooldown,omitempty"`
-	VerifyCommand      string `yaml:"verify-command,omitempty"`
-	VerifyStepName     string `yaml:"verify-step-name,omitempty"`
-	DocumentationURL   string `yaml:"docs-url,omitempty"`
+	// Deprecated: workflow engine.cooldown replaces this compiler-ignored metadata.
+	Cooldown         *bool  `yaml:"cooldown,omitempty"`
+	VerifyCommand    string `yaml:"verify-command,omitempty"`
+	VerifyStepName   string `yaml:"verify-step-name,omitempty"`
+	DocumentationURL string `yaml:"docs-url,omitempty"`
 }
 
 // EngineConfigFileDefinition describes a configuration file that should be written

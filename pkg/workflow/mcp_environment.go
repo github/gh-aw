@@ -200,9 +200,6 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GH_AW_MCP_SCRIPTS_PORT"] = "${{ steps.mcp-scripts-start.outputs.port }}"
 		envVars["GH_AW_MCP_SCRIPTS_API_KEY"] = "${{ steps.mcp-scripts-start.outputs.api_key }}"
 
-		// Add tool-specific env vars (secrets passthrough)
-		mcpScriptsSecrets := collectMCPScriptsSecrets(workflowData.MCPScripts)
-		maps.Copy(envVars, mcpScriptsSecrets)
 	}
 
 	// Check for agentic-workflows GITHUB_TOKEN

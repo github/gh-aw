@@ -75,7 +75,7 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
   ```
 
   Triggers other agentic workflows using workflow_dispatch. Agent output includes `workflow_name` (without .md extension) and optional `inputs` (key-value pairs). Cross-repo dispatch is supported via `target-repo` plus an `allowed-repos` allowlist; cross-repo targets require a token with `actions: write` on the target repository. For queue workers, load [work-queue.md](work-queue.md) and use `work_queue_dispatch_next` to request a bounded pool prefix. Trusted processing selects Work and the installed worker profile; do not select `work_id` through `dispatch_workflow` or declare reserved assignment/caller inputs.
-- `dispatch-repository:` - Dispatch `repository_dispatch` events to external repositories (experimental)
+- `dispatch-repository:` - Dispatch `repository_dispatch` events to external repositories
 
   ```yaml
   safe-outputs:
@@ -100,7 +100,6 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
 
   Accepts both `dispatch-repository` (dash, canonical) and `dispatch_repository` (underscore, deprecated alias). Each key in the config defines a named MCP tool. Requires a token with `repo` scope since `GITHUB_TOKEN` cannot trigger `repository_dispatch` in external repositories. Use `github-token` or set a PAT as `GH_AW_SAFE_OUTPUTS_TOKEN`.
 
-  **⚠️ Experimental**: Compilation emits a warning when this feature is used.
 - `call-workflow:` - Call reusable workflows via workflow_call fan-out (orchestrator pattern)
 
   ```yaml

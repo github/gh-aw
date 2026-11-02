@@ -76,6 +76,7 @@ var essentialLogsCacheFiles = map[string]struct{}{
 	constants.TokenUsageFilename.String():       {},
 	"aw_info.json":                              {},
 	constants.EvalsResultFilename.String():      {},
+	constants.EvalsStatusFilename.String():      {},
 	constants.GithubRateLimitsFilename.String(): {},
 	constants.GraderManifestFilename.String():   {},
 	constants.GraderResultsFilename.String():    {},

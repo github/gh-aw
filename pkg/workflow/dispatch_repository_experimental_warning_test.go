@@ -13,16 +13,13 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-// TestDispatchRepositoryExperimentalWarning tests that the dispatch_repository feature
-// emits an experimental warning when enabled.
-func TestDispatchRepositoryExperimentalWarning(t *testing.T) {
+func TestDispatchRepositoryNoExperimentalWarning(t *testing.T) {
 	tests := []struct {
-		name          string
-		content       string
-		expectWarning bool
+		name    string
+		content string
 	}{
 		{
-			name: "dispatch_repository enabled produces experimental warning",
+			name: "dispatch_repository enabled",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -39,10 +36,9 @@ safe-outputs:
 
 # Test Workflow
 `,
-			expectWarning: true,
 		},
 		{
-			name: "no dispatch_repository does not produce experimental warning",
+			name: "no dispatch_repository",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -52,10 +48,9 @@ permissions:
 
 # Test Workflow
 `,
-			expectWarning: false,
 		},
 		{
-			name: "dispatch_repository with allowed_repositories produces experimental warning",
+			name: "dispatch_repository with allowed_repositories",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -73,7 +68,6 @@ safe-outputs:
 
 # Test Workflow
 `,
-			expectWarning: true,
 		},
 	}
 
@@ -107,24 +101,12 @@ safe-outputs:
 				return
 			}
 
-			expectedMessage := "Using experimental feature: dispatch-repository"
-
-			if tt.expectWarning {
-				if !strings.Contains(stderrOutput, expectedMessage) {
-					t.Errorf("Expected warning containing '%s', got stderr:\n%s", expectedMessage, stderrOutput)
-				}
-			} else {
-				if strings.Contains(stderrOutput, expectedMessage) {
-					t.Errorf("Did not expect warning '%s', but got stderr:\n%s", expectedMessage, stderrOutput)
-				}
+			unexpectedMessage := "Using experimental feature: dispatch-repository"
+			if strings.Contains(stderrOutput, unexpectedMessage) {
+				t.Errorf("Did not expect warning '%s', but got stderr:\n%s", unexpectedMessage, stderrOutput)
 			}
-
-			// Verify warning count includes dispatch_repository warning
-			if tt.expectWarning {
-				warningCount := compiler.GetWarningCount()
-				if warningCount == 0 {
-					t.Error("Expected warning count > 0 but got 0")
-				}
+			if compiler.GetExperimentalWarningCount() != 0 {
+				t.Error("Expected no experimental warnings")
 			}
 		})
 	}

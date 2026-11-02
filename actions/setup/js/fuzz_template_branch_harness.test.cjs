@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, it, expect, vi } from "vitest";
-global.core = { info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
+global.core = { debug: vi.fn(), info: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 
 const { selectBranch, renderMarkdownTemplate } = require("./fuzz_template_branch_harness.cjs");
 
