@@ -1,0 +1,10 @@
+{
+  "id": 12345678,
+  "name": "Build latency",
+  "type": "metric alert",
+  "overall_state": "Alert",
+  "query": "synthetic-private-query",
+  "message": "synthetic-private-message",
+  "creator": { "handle": "synthetic-private-handle" },
+  "tags": ["synthetic-private-tag"]
+}
