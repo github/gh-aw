@@ -3,7 +3,8 @@ set +o histexpand
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMP_DIR="$(mktemp -d)"
+TEMP_DIR="${PWD}/.release-integrity-test-$$-${RANDOM}"
+mkdir -m 700 "$TEMP_DIR"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 # shellcheck source=actions/setup/sh/release_integrity.sh
 source "$SCRIPT_DIR/release_integrity.sh"
@@ -67,6 +68,11 @@ fi
 case "$url" in
   */compat.json) cp "$TEST_ROOT/compat.json" "$out" ;;
   */checksums.txt) cp "$TEST_ROOT/checksums.txt" "$out" ;;
+  */release-identity.txt)
+    version="${url%/*}"
+    version="${version##*/}"
+    digest=$(shasum -a 256 "$TEST_ROOT/checksums.txt" | awk '{print $1}')
+    printf '%s  refs/tags/%s\n' "$digest" "$version" > "$out" ;;
   */SHA256SUMS.txt) cp "$TEST_ROOT/SHA256SUMS.txt" "$out" ;;
   */awf-bundle.js|*/awf-linux-*|*/awf-darwin-*) cp "$TEST_ROOT/payload" "$out" ;;
   */copilot-linux-x64.tar.gz) cp "$TEST_ROOT/copilot-linux-x64.tar.gz" "$out" ;;
@@ -74,6 +80,21 @@ case "$url" in
   *) echo "unexpected download: $url" >&2; exit 97 ;;
 esac
 if [ -n "$write_out" ]; then printf '200'; fi
+EOF
+cat >"$TEMP_DIR/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+test "$1" = attestation
+test "$2" = verify
+test "$4" = --hostname
+test "$5" = github.com
+test "$6" = --repo
+test "$7" = github/gh-aw-firewall
+test "$8" = --signer-workflow
+test "$9" = github/gh-aw-firewall/.github/workflows/release.yml
+test "${10}" = --cert-oidc-issuer
+test "${11}" = https://token.actions.githubusercontent.com
+test "${12}" = --deny-self-hosted-runners
 EOF
 cat >"$TEMP_DIR/bin/node" <<'EOF'
 #!/usr/bin/env bash

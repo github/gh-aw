@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -13,6 +14,8 @@ import (
 )
 
 var mcpCLIMountLog = logger.New("workflow:mcp_cli_mount")
+
+var promptRepoIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 const (
 	// Keep these aligned with gh-aw-firewall's finite disclosure charge constants.
@@ -399,25 +402,45 @@ func buildMCPCLIPromptSection(data *WorkflowData) *PromptSection {
 	}
 }
 
+func sanitizePromptRepoIdentifier(repo string) string {
+	repo = strings.TrimSpace(repo)
+	if repo == "" {
+		return "[invalid-repo]"
+	}
+	if !promptRepoIdentifierPattern.MatchString(repo) {
+		return "[invalid-repo]"
+	}
+	return repo
+}
+
 func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
-	enclave := enclaveStaticGitHubAgentConfig(data)
-	if enclave == nil {
+	if !enclavesEnabled(data) {
 		return nil
 	}
-	repoLines := make([]string, 0, len(enclave.Repos))
-	for _, repo := range enclave.Repos {
-		if repo == nil {
+	var repoLines []string
+	for _, enclave := range data.Enclaves {
+		if enclave == nil || enclave.Agent == nil {
 			continue
 		}
-		switch repo.Sensitivity {
-		case "confidential":
-			payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
-			maxCardinality := 1 << payloadBits
-			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`confidential`) has an %d-bit per-run budget, so response schema cardinality must be at most %d.", repo.Repo, enclaveConfidentialRunBits, maxCardinality))
-		case "internal":
-			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`%s`) has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.", repo.Repo, repo.Sensitivity))
-		case "sealed":
-			repoLines = append(repoLines, fmt.Sprintf("- `%s` (`sealed`) has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for this repository.", repo.Repo))
+		for _, repo := range enclave.Repos {
+			if repo == nil {
+				continue
+			}
+			switch repo.Sensitivity {
+			case "public":
+				safeRepo := sanitizePromptRepoIdentifier(repo.Repo)
+				repoLines = append(repoLines, fmt.Sprintf("- `%s` (`public`) still requires a finite response schema; do not apply the confidential repository's 8-bit budget to this scope.", safeRepo))
+			case "trusted":
+				repoLines = append(repoLines, "- A trusted repository is unmetered and permits free-form strings inside a strict structured schema. Use only for content approved for unrestricted disclosure; never change sensitivity to bypass a confidential budget.")
+			case "confidential":
+				payloadBits := enclaveConfidentialRunBits - enclaveResultStatusBitCost - enclaveTimingBucketBits
+				maxCardinality := 1 << payloadBits
+				repoLines = append(repoLines, fmt.Sprintf("- A confidential repository has an %d-bit per-run budget, so response schema cardinality must be at most %d.", enclaveConfidentialRunBits, maxCardinality))
+			case "internal":
+				repoLines = append(repoLines, "- An internal repository has a finite per-run budget; keep response schema cardinality within the budget reported by `awf-enclave --help`.")
+			case "sealed":
+				repoLines = append(repoLines, "- A sealed repository has a 0-bit per-run budget and never launches an enclave; do not invoke `awf-enclave enclave_run_agent` for it.")
+			}
 		}
 	}
 	if len(repoLines) == 0 {
@@ -425,13 +448,17 @@ func staticEnclaveInformationBudgetPromptLines(data *WorkflowData) []string {
 	}
 	lines := []string{
 		"",
-		"For `awf-enclave enclave_run_agent`, response schemas are constrained by finite-disclosure information budgets, not just `max-output-bytes`.",
+		"For `awf-enclave enclave_run_agent`, non-trusted response schemas are constrained by finite-disclosure information budgets, not just `max-output-bytes`.",
 		// Keep these constants aligned with gh-aw-firewall's finite disclosure charge:
 		// RESULT_STATUS_BIT_COST=1, TIMING_BUCKET_BITS=4, and
 		// ENCLAVE_SENSITIVITY_RUN_BITS.confidential=8.
-		"The charge is 1 status bit + ceil(log2(response schema cardinality)) + 4 timing bits.",
+		"The finite-disclosure charge is 1 status bit + ceil(log2(response schema cardinality)) + 4 timing bits.",
 	}
 	lines = append(lines, repoLines...)
-	lines = append(lines, "Use small enums and booleans for finite schemas; a response can be under `max-output-bytes` and still fail with `bit-budget-exhausted` if its schema cardinality is too high.")
+	lines = append(lines,
+		"Use small enums and booleans for finite schemas; bound integers with `minimum`/`maximum`, strings with finite `enum` values, and arrays with `maxItems` and finite item schemas. For objects, use `additionalProperties: false`; the combined field cardinalities must fit the budget.",
+		"For non-trusted scopes, do not return repository text through unrestricted strings or retry with a wider schema after `bit-budget-exhausted`. A response can be under `max-output-bytes` and still exceed its information budget.",
+		"Respect the configured enclave timeout, task-byte limit, model request/token limits, invocation limit, and output-byte limit; the schema budget is an additional bound, not a replacement.",
+	)
 	return lines
 }

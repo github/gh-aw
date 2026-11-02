@@ -50,6 +50,9 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 	var configFileSetup string
 	awfConfigJSON, err := BuildAWFConfigJSON(config)
 	if err != nil {
+		if enclavesEnabled(config.WorkflowData) {
+			return "echo " + shellEscapeArg(err.Error()) + " >&2; exit 1"
+		}
 		awfHelpersLog.Printf("Warning: failed to build AWF config JSON: %v", err)
 	} else {
 		configFileSetup = buildAWFConfigFileSetup(config, awfConfigJSON)
@@ -90,10 +93,13 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 	})
 
 	awfHelpersLog.Print("Successfully built AWF command")
-	return command
+	return prependHostGitHubTokenCheck(command, config.WorkflowData)
 }
 
 func validateAWFCommandConfig(config AWFCommandConfig) error {
+	if err := validateHostGitHubTokenConfig(config.WorkflowData); err != nil {
+		return err
+	}
 	if isNVXRuntime(config.WorkflowData) {
 		if err := validateNVXRuntimeConfig(config.WorkflowData, getAgentConfig(config.WorkflowData)); err != nil {
 			return fmt.Errorf("NVX configuration is invalid: %w", err)
@@ -609,6 +615,10 @@ func appendEnvAndMountArgs(config AWFCommandConfig, firewallConfig *FirewallConf
 	awfArgs = append(awfArgs, "--env-all")
 	if awfSupportsExcludeEnv(firewallConfig) {
 		sortedExclude := append([]string(nil), config.ExcludeEnvVarNames...)
+		if (enclavesEnabled(config.WorkflowData) || (agentConfig != nil && agentConfig.HostGitHubToken != "")) &&
+			!slices.Contains(sortedExclude, "GH_TOKEN") {
+			sortedExclude = append(sortedExclude, "GH_TOKEN")
+		}
 		if isOTLPEnabled(config.WorkflowData) {
 			for _, name := range otlpSandboxExcludedEnvVarNames {
 				if !slices.Contains(sortedExclude, name) {

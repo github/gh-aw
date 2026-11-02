@@ -226,7 +226,12 @@ func resolveExternalDetectorEngineConfig(data *WorkflowData, engineID string) *E
 		return config
 	}
 
-	return &EngineConfig{ID: engineID}
+	config := &EngineConfig{ID: engineID}
+	if data.EngineConfig != nil && data.EngineConfig.Cooldown != nil {
+		cooldown := *data.EngineConfig.Cooldown
+		config.Cooldown = &cooldown
+	}
+	return config
 }
 
 func resetDetectionEngineTaskSettings(config *EngineConfig) {

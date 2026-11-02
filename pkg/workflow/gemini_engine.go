@@ -129,7 +129,7 @@ func (e *GeminiEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 		geminiLog.Printf("No engine.version specified, using default Gemini CLI version: %s", workflowData.EngineConfig.Version)
 	}
 
-	npmSteps := BuildStandardNpmEngineInstallStepsNoCooldown(
+	npmSteps := BuildStandardNpmEngineInstallSteps(
 		"@google/gemini-cli",
 		string(constants.DefaultGeminiVersion),
 		"Install Gemini CLI",
