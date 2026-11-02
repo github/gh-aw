@@ -16,6 +16,9 @@ permissions:
 engine:
   id: copilot
   copilot-sdk: true
+  model-routing:
+    goal: cost
+    mode: balanced
 strict: true
 timeout-minutes: 45
 network:
@@ -60,6 +63,17 @@ safe-outputs:
     max-uploads: 1
     retention-days: 14
   noop:
+evals:
+  - id: spec_rotation
+    question: Did the agent select exactly one tracked TLA+ module using cached path-based rotation and update the cursor before checking it, or call noop when no modules exist?
+  - id: bounded_tlc_evidence
+    question: Did the agent report bounded checks for the selected module and distinguish expected results from violations or inconclusive searches?
+  - id: real_implementation_tests
+    question: If tests were proposed, do they exercise the real implementation and map specification behavior to source symbols and tests? Return UNKNOWN when no test change was proposed.
+  - id: test_only_draft_pr
+    question: If a meaningful uncovered test change was validated, did the agent propose only a nonduplicate, test-only draft PR? Return UNKNOWN when this scenario did not apply.
+  - id: noop_when_unneeded
+    question: If the tests were already covered, the run was blocked, or a duplicate existed, did the agent call noop and explain why? Return UNKNOWN when this scenario did not apply.
 features:
   gh-aw-detection: true
 ---
