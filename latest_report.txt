@@ -1,14 +1,15 @@
 ### Performance Summary
 
-**Date:** 2026-11-01  
+**Date:** 2026-11-02  
 **Analysis status:** Likely environment noise; no regression PR created.
 
 ### Key Metrics
 
 - Benchmarks: 10
-- Regressions (>10%): 6
-- Warnings (>5%): 3
-- Stable: 1
+- Regressions (>10%): 7
+- Warnings (>5%): 1
+- Stable: 2
+- Improvements: 0
 - Likely environment noise: true
 
 <details>
@@ -16,21 +17,21 @@
 
 | Benchmark | Current | Historical median | Change | Status |
 |---|---:|---:|---:|---|
-| CompileComplexWorkflow | 17.29 ms | 14.65 ms | +18.03% | regression |
-| CompileMCPWorkflow | 11.82 ms | 10.79 ms | +9.47% | warning |
-| CompileMemoryUsage | 15.61 ms | 14.54 ms | +7.40% | warning |
-| CompileSimpleWorkflow | 12.06 ms | 10.25 ms | +17.65% | regression |
-| ExtractWorkflowNameFromFile | 6.96 µs | 6.68 µs | +4.27% | stable |
-| FastParseTitleFromReader | 144.3 ns | 129 ns | +11.86% | regression |
-| FindIncludesInContent | 169.3 ns | 146 ns | +15.80% | regression |
-| ParseWorkflow | 1.43 ms | 1.28 ms | +11.87% | regression |
-| Validation | 248.05 µs | 206.80 µs | +19.95% | regression |
-| YAMLGeneration | 11.33 ms | 10.36 ms | +9.39% | warning |
+| CompileComplexWorkflow | 20.66 ms | 16.42 ms | +25.8% | regression |
+| CompileMCPWorkflow | 15.47 ms | 11.82 ms | +30.9% | regression |
+| CompileMemoryUsage | 18.74 ms | 15.61 ms | +20.0% | regression |
+| CompileSimpleWorkflow | 15.73 ms | 11.69 ms | +34.6% | regression |
+| ExtractWorkflowNameFromFile | 7.16 µs | 6.71 µs | +6.8% | warning |
+| FastParseTitleFromReader | 149.9 ns | 133 ns | +12.4% | regression |
+| FindIncludesInContent | 158.3 ns | 153 ns | +3.1% | stable |
+| ParseWorkflow | 1.49 ms | 1.43 ms | +4.8% | stable |
+| Validation | 310.15 µs | 243.13 µs | +27.6% | regression |
+| YAMLGeneration | 14.39 ms | 11.33 ms | +26.9% | regression |
 
 </details>
 
 ### Recommendation
 
-Nine benchmarks across workflow compilation, parsing, validation, and CLI helpers were slower together. Treat this run as runner noise and rerun benchmarks before investigating a code regression.
+Eight benchmarks across workflow compilation, validation, and CLI helpers were slower together. Treat this run as runner noise and rerun benchmarks before investigating a code regression.
 
-Run: [§41318110680](https://github.com/github/gh-aw/actions/runs/41318110680)
+Run: [§41465665388](https://github.com/github/gh-aw/actions/runs/41465665388)
