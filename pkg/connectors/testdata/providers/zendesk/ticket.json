@@ -1,0 +1,12 @@
+{
+  "ticket": {
+    "id": 35436,
+    "status": "open",
+    "subject": "Actions triage fixture",
+    "updated_at": "2026-11-02T06:00:00Z",
+    "url": "https://example.zendesk.com/api/v2/tickets/35436",
+    "description": "Unprojected customer content",
+    "requester_id": 12345,
+    "custom_fields": [{ "id": 1, "value": "not agent context" }]
+  }
+}
