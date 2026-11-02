@@ -48,6 +48,13 @@ imports:
 features:
   gh-aw-detection: true
 
+evals:
+  - id: five-scenarios
+    question: When safe test changes can be produced, does the agent request exactly five scenario pull requests? Return UNKNOWN when a concrete blocker prevents safe test changes.
+  - id: chaos-branches
+    question: Do all requested test pull requests use branch names beginning with chaos/? Return UNKNOWN when no pull requests are requested.
+  - id: sandboxed-edits
+    question: Are all proposed edits confined to tmp/chaos, scratchpad/chaos, or tests/chaos?
 ---
 
 # Chaos PR Bundle Fuzzer

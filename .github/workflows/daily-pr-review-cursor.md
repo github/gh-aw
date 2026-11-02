@@ -49,6 +49,11 @@ imports:
   - shared/reporting.md
 features:
   gh-aw-detection: true
+evals:
+  - id: accurate-review-coverage
+    question: In a proposed report, does each selected PR's coverage status match its observed diff-read outcome, including Not attempted after the first integrity denial? Return UNKNOWN when no report is proposed.
+  - id: unreviewed-quality-unknown
+    question: When a report includes PRs not fully reviewed, are their quality signals marked N/A rather than assessed as clean? Return UNKNOWN when no such PRs are reported.
 ---
 
 # Daily PR Code Quality Review

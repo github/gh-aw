@@ -51,6 +51,13 @@ safe-outputs:
 sandbox:
   agent:
     id: awf
+evals:
+  - id: all-editors-checked
+    question: Does the agent output record an availability result for every editor discovered in editors.mdx?
+  - id: reachable-preview-updates
+    question: When a documentation patch is proposed, are new preview images limited to editors whose URLs returned HTTP 200? Return UNKNOWN when no patch is proposed.
+  - id: no-screenshots-noop
+    question: When no screenshots could be taken, does the agent request noop instead of a pull request? Return UNKNOWN when screenshots were taken.
 ---
 
 # Weekly Editors Health Check

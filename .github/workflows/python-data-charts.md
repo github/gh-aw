@@ -30,6 +30,13 @@ safe-outputs:
     category: "artifacts"
     max: 1
 timeout-minutes: 15
+evals:
+  - id: chart-images-embedded
+    question: Does the proposed discussion embed the generated chart images using their uploaded asset URLs?
+  - id: data-source-disclosed
+    question: Does the proposed report distinguish generated sample data from collected repository metrics?
+  - id: historical-trends
+    question: When historical data is available, do the charts show progression over that history? Return UNKNOWN when no historical data is available.
 ---
 
 # Python Data Visualization Generator

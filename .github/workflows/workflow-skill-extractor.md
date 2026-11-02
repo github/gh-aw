@@ -103,6 +103,13 @@ tools:
   - python3 *
   - cat > /tmp/gh-aw/agent/*.py
   cli-proxy: true
+evals:
+  - id: reuse-evidence
+    question: When shared-component recommendations are proposed, does each cite concrete reuse across existing workflows? Return UNKNOWN when no recommendations are proposed.
+  - id: migration-actionability
+    question: When a recommendation issue is proposed, does it describe a migration to a named shared-component path? Return UNKNOWN when no issue is proposed.
+  - id: no-opportunity-noop
+    question: When analysis finds no actionable extraction opportunity, does the agent request noop? Return UNKNOWN when an actionable opportunity is identified.
 ---
 # Workflow Skill Extractor
 

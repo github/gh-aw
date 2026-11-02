@@ -47,6 +47,13 @@ safe-outputs:
     max: 1
     allowed-events: [COMMENT]
 timeout-minutes: 10
+evals:
+  - id: complexity-only-findings
+    question: Are proposed inline findings limited to unnecessary complexity on changed, non-generated lines? Return UNKNOWN when no inline findings are proposed.
+  - id: existing-comments-respected
+    question: Do proposed findings avoid duplicating the pre-fetched review comments? Return UNKNOWN when no findings are proposed or prior comments are unavailable.
+  - id: lean-noop
+    question: When the review finds nothing to cut, does the agent request noop with 'Lean already. Ship.'? Return UNKNOWN when simplification findings exist.
 ---
 
 # Ponytail Reviewer
