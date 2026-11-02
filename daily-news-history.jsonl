@@ -10,3 +10,4 @@
 {"date": "2026-10-19", "open_issues": 100, "open_prs": 11, "issues_opened_30d": 200, "issues_closed_30d": 100, "prs_opened_30d": 90, "prs_merged_30d": 50, "commits_30d": 100, "discussions": 50, "changesets": 838, "latest_release": "v0.92.5"}
 {"date":"2026-10-29","commits_30d":1270,"commits_today":1,"open_prs":13,"merged_prs_sample":50,"latest_release":"v1.0.1","human_open_issues":10,"discussions_today":9,"changesets":889}
 {"date":"2026-10-30","commits_30d":1282,"commits_today_partial":1,"commits_yesterday":27,"open_prs":22,"human_open_issues":22,"merged_yesterday":27,"latest_release":"v1.0.1","changesets":891}
+{"date":"2026-11-02","commits_30d":1261,"commits_today_partial":12,"commits_yesterday":43,"commits_oct31":28,"open_prs":12,"merged_since_oct30":45,"merged_nov1":33,"merged_nov2":12,"human_open_issues":1,"latest_release":"v1.0.1","changesets":902,"discussions_nov1":24,"discussions_nov2":9}
