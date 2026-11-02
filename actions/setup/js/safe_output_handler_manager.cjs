@@ -1094,6 +1094,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
   /** @type {Array<{type: string, error: string}>} */
   const codePushFailures = [];
 
+  /** @type {{type: string, error: string, skipped: boolean}|null} */
+  let codePushSkip = null;
+
   // Track when a code-push operation falls back to creating an issue or pull request instead.
   // When set, subsequent add_comment messages will receive a correction note prepended
   // to their body so the posted comment accurately reflects the actual fallback target.
@@ -1300,11 +1303,10 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           };
           core.info(`Prepending fallback correction note to add_comment body (fallback ${codePushFallbackInfo.fallbackTargetType}: #${codePushFallbackInfo.number})`);
         }
-        // If a previous code-push operation failed outright (e.g. patch application error),
-        // prepend a failure warning so the status comment accurately reflects that the
-        // code changes were not applied.
-        if (codePushFailures.length > 0) {
-          const failure = codePushFailures[0];
+        // Failed and skipped publications both need a correction, but skips remain
+        // non-fatal and must not inflate the code-push failure count.
+        const failure = codePushFailures[0] || codePushSkip;
+        if (failure) {
           effectiveMessage = {
             ...effectiveMessage,
             [COMMENT_PREAMBLE]: [
@@ -1320,7 +1322,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
                     children: [
                       { type: "text", value: "The ", agentTainted: false },
                       { type: "code", value: failure.type, agentTainted: false },
-                      { type: "text", value: " operation failed: ", agentTainted: false },
+                      { type: "text", value: "skipped" in failure ? " operation was skipped: " : " operation failed: ", agentTainted: false },
                       { type: "text", value: `${failure.error}. The code changes were not applied.`, agentTainted: true },
                     ],
                   },
@@ -1362,6 +1364,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
         core.info(`⏭ Message ${i + 1} (${messageType}) skipped — ${msg}`);
         results.push(buildSkippedResult(messageType, i, result));
+        if (CODE_PUSH_TYPES.has(messageType) && !codePushSkip) {
+          codePushSkip = { type: messageType, error: msg, skipped: true };
+        }
         continue;
       }
 
