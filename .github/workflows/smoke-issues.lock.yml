@@ -594,7 +594,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: github/gh-aw
-          ref: "a1d0a8b16e76ae8d0e61a19c608fd2ec24d4b07e"
+          ref: "418aad2896e015c4976acac803caa0b63e59327d"
           path: .gh-aw-connector-runtime
           fetch-depth: 1
           persist-credentials: false
@@ -2324,7 +2324,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: github/gh-aw
-          ref: "a1d0a8b16e76ae8d0e61a19c608fd2ec24d4b07e"
+          ref: "418aad2896e015c4976acac803caa0b63e59327d"
           path: .gh-aw-connector-runtime
           fetch-depth: 1
           persist-credentials: false
