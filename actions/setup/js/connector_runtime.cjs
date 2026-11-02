@@ -514,7 +514,7 @@ function restrictPhase(plan, phase) {
 }
 async function validateArgument(input, value) {
   if (input.type === "string") {
-    assert(typeof value === "string" && Buffer.byteLength(value) <= input.maxLength, "Connector argument must be a bounded UTF-8 string");
+    assert(typeof value === "string" && Array.from(value).length <= input.maxLength, "Connector argument must be a bounded Unicode string");
     assert(!input.enum?.length || input.enum.includes(value), "Connector argument is outside its declared enum");
     if (input.pattern) {
       let matched = false;
