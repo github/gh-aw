@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import childProcess from "child_process";
 import crypto from "crypto";
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { main, validateEnvelope } from "./validate_recovery_envelopes.cjs";
 import { processFile } from "./redact_secrets.cjs";
@@ -174,27 +173,90 @@ describe("final recovery envelope upload boundary", () => {
     fs.copyFileSync(original.patch, path.join(arc, "aw-change.patch"));
     expect(main({ roots: [root] }).removed).toBe(3);
   });
-  it("checks explicit memory roots outside the primary scan roots", () => {
+  it("rejects external drive roots even within the workspace or runner temp", () => {
     const artifact = envelope(path.join(root, "mounted-drive"));
     fs.unlinkSync(artifact.patch);
     vi.stubEnv("GITHUB_WORKSPACE", root);
+    vi.stubEnv("RUNNER_TEMP", root);
+    expect(() => main({ roots: [path.join(root, "runner")], additionalRoots: [path.dirname(artifact.bundle)] })).toThrow("Invalid additional recovery artifact roots");
+    expect(fs.readFileSync(artifact.bundle)).toEqual(artifact.bytes);
+  });
+  it("does not accept additional roots from the inherited environment", () => {
+    const artifact = envelope(path.join(root, "outside"));
+    fs.unlinkSync(artifact.patch);
     vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([path.dirname(artifact.bundle)]));
-    expect(main({ roots: [path.join(root, "runner")] }).removed).toBe(1);
+    expect(main({ roots: [path.join(root, "runner")] }).removed).toBe(0);
+    expect(fs.readFileSync(artifact.bundle)).toEqual(artifact.bytes);
+  });
+  it.each([[null], ["outside"], [[null]], [[1]]])("rejects malformed compiler-supplied roots: %j", additionalRoots => {
+    expect(() => main({ roots: [root], additionalRoots })).toThrow("Invalid additional recovery artifact roots");
+  });
+  it.each(["directory", "bundle"])("rejects a %s symlink escaping an approved root", kind => {
+    const approved = path.join(root, "approved");
+    const outside = path.join(root, "approved-sibling");
+    fs.mkdirSync(approved);
+    const artifact = envelope(outside);
+    fs.unlinkSync(artifact.patch);
+    fs.symlinkSync(kind === "directory" ? outside : artifact.bundle, path.join(approved, kind === "directory" ? "escape" : "escape.bundle"));
+    expect(() => main({ roots: [approved] })).toThrow("escapes trusted roots");
+    expect(fs.readFileSync(artifact.bundle)).toEqual(artifact.bytes);
+  });
+  it("scans aliases inside approved roots once", () => {
+    const approved = path.join(root, "approved");
+    const artifact = envelope(path.join(approved, "nested"));
+    fs.unlinkSync(artifact.patch);
+    fs.symlinkSync(path.dirname(artifact.bundle), path.join(approved, "alias"));
+    expect(main({ roots: [approved, approved] }).removed).toBe(1);
+  });
+  it("does not let a nested artifact root authorize a symlink escape", () => {
+    const approved = path.join(root, "approved");
+    const artifact = envelope(path.join(root, "outside"));
+    fs.mkdirSync(approved);
+    fs.unlinkSync(artifact.patch);
+    const alias = path.join(approved, "alias");
+    fs.symlinkSync(path.dirname(artifact.bundle), alias);
+    expect(() => main({ roots: [approved], additionalRoots: [alias] })).toThrow("Invalid additional recovery artifact roots");
+    expect(fs.readFileSync(artifact.bundle)).toEqual(artifact.bytes);
+  });
+  it("does not allow explicit drive roots to authorize external symlinks", () => {
+    const approved = path.join(root, "approved");
+    const mounted = path.join(root, "mounted-drive");
+    const artifact = envelope(mounted);
+    fs.mkdirSync(approved);
+    vi.stubEnv("GITHUB_WORKSPACE", root);
+    fs.unlinkSync(artifact.patch);
+    fs.symlinkSync(mounted, path.join(approved, "drive-alias"));
+    expect(() => main({ roots: [approved], additionalRoots: [mounted] })).toThrow("Invalid additional recovery artifact roots");
+    expect(fs.readFileSync(artifact.bundle)).toEqual(artifact.bytes);
+  });
+  it("ignores missing approved roots", () => {
+    expect(main({ roots: [path.join(root, "missing")], additionalRoots: [path.join(root, "missing", "nested")] })).toEqual({ removed: 0 });
   });
   it.each([["relative/path"], ["/"]])("rejects unsafe additional root %s", unsafe => {
-    vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([unsafe]));
-    expect(() => main({ roots: [root] })).toThrow("Invalid additional recovery artifact roots");
+    expect(() => main({ roots: [root], additionalRoots: [unsafe] })).toThrow("Invalid additional recovery artifact roots");
   });
   it("rejects additional roots outside approved bases, including via symlink", () => {
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "outside-"));
+    const outside = path.join(root, "outside");
+    fs.mkdirSync(outside);
     const link = path.join(root, "link");
     fs.symlinkSync(outside, link);
     vi.stubEnv("RUNNER_TEMP", path.join(root, "runner-temp"));
     vi.stubEnv("GITHUB_WORKSPACE", path.join(root, "workspace"));
     for (const candidate of [outside, link]) {
-      vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([candidate]));
-      expect(() => main({ roots: [path.join(root, "runner")] })).toThrow("Invalid additional recovery artifact roots");
+      expect(() => main({ roots: [path.join(root, "runner")], additionalRoots: [candidate] })).toThrow("Invalid additional recovery artifact roots");
     }
+  });
+  it("rejects an artifact root replaced with an external symlink", () => {
+    const artifact = envelope(path.join(root, "external"));
+    const alias = path.join(root, "artifact-root");
+    fs.symlinkSync(path.dirname(artifact.bundle), alias);
+    expect(() => main({ roots: [alias] })).toThrow("must not be a symbolic link");
+    expect(fs.readFileSync(artifact.bundle)).toEqual(artifact.bytes);
+  });
+  it("allows explicit additional subdirectories without expanding the boundary", () => {
+    const artifact = envelope(path.join(root, "nested"));
+    fs.unlinkSync(artifact.patch);
+    expect(main({ roots: [root], additionalRoots: [path.dirname(artifact.bundle)] })).toEqual({ removed: 1 });
   });
   it("removes a pack changed or appended after its preview was created", () => {
     const artifact = envelope();

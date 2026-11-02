@@ -2900,6 +2900,13 @@ the `.bundle` artifact MAY contain the versioned envelope. Before artifact uploa
 a post-redaction guard MUST independently parse the bounded pack, reconstruct its
 complete preview, and remove any envelope whose paired preview is missing,
 redacted, forged, or mismatched. Removal or scanning failures MUST prevent upload.
+Scan roots MUST stay within the established artifact roots, not inherit
+agent-written environment values or authorize external memory mounts.
+The guard MUST reject traversal through symlinks outside the canonical approved
+roots. Generated validation steps MUST pin additional roots, including an empty
+list when none are configured.
+Experimental drive mounts outside those roots MUST fail validation before upload;
+an unchanged but unredacted preview MUST NOT authorize its binary envelope.
 Before network access or import, the publisher MUST repeat bounded pack and
 complete-preview validation. Agent-supplied checksums alone MUST NOT establish
 preview completeness or authorization.

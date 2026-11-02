@@ -84,14 +84,16 @@ func generateRecoveryEnvelopeValidationStep(yaml *strings.Builder, id string, da
 	for _, name := range objectPackLimitEnvNames {
 		yaml.WriteString("          " + name + ": ${{ vars." + name + " }}\n")
 	}
-	if len(additionalRoots) > 0 {
-		encoded, _ := json.Marshal(additionalRoots) //nolint:jsonmarshalignoredeerror // A slice of strings is always JSON-serializable.
-		yaml.WriteString("          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '" + strings.ReplaceAll(string(encoded), "'", "''") + "'\n")
+	if additionalRoots == nil {
+		additionalRoots = []string{}
 	}
+	encoded, _ := json.Marshal(additionalRoots) //nolint:jsonmarshalignoredeerror // A slice of strings is always JSON-serializable.
+	// Pin even an empty list: inherited GITHUB_ENV values must not authorize roots.
+	yaml.WriteString("          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '" + strings.ReplaceAll(string(encoded), "'", "''") + "'\n")
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/validate_recovery_envelopes.cjs');\n")
-	yaml.WriteString("            main({ core });\n")
+	yaml.WriteString("            main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });\n")
 }
 
 // Scan the directory before any glob, including compiler-approved environment paths.

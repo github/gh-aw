@@ -84,41 +84,53 @@ function validateEnvelope(filename, limits = getObjectPackLimits()) {
   return true;
 }
 
+/** @param {string} candidate @param {string} base */
+function isWithin(candidate, base) {
+  return candidate === base || candidate.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
+}
+
+/** @param {string} filename */
+function canonicalize(filename) {
+  try {
+    return fs.realpathSync(path.resolve(filename));
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
+    throw new Error("Unable to inspect recovery artifacts", { cause: error });
+  }
+}
+
 /**
  * Run after every masking step, and again after artifact consolidation/copies.
- * Directory aliases (including drive-memory mounts) are scanned once by identity.
- * @param {{ roots?: string[], core?: {info?: (message: string) => void} }} [options]
+ * Additional roots select subtrees, never expand the trusted artifact boundary.
+ * @param {{ roots?: string[], additionalRoots?: string[], core?: {info?: (message: string) => void} }} [options]
  */
-function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw")], core = globalThis.core } = {}) {
+function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw")], additionalRoots = [], core = globalThis.core } = {}) {
   const limits = getObjectPackLimits();
-  const additionalRoots = JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS || "[]");
   if (!Array.isArray(additionalRoots) || additionalRoots.some(root => typeof root !== "string")) throw new Error("Invalid additional recovery artifact roots");
-  // Compiler-emitted roots may lie outside the primary roots (memory mounts), but must be absolute and never the filesystem root.
+  const baseRoots = roots.filter(Boolean).map(root => path.resolve(root));
+  const trustedRoots = baseRoots
+    .map(root => {
+      const canonical = canonicalize(root);
+      if (canonical !== null && fs.lstatSync(root).isSymbolicLink()) throw new Error("Recovery artifact root must not be a symbolic link");
+      return canonical;
+    })
+    .filter(root => root !== null);
   for (const root of additionalRoots) {
-    if (!path.isAbsolute(root) || path.resolve(root) === path.parse(path.resolve(root)).root) throw new Error("Invalid additional recovery artifact roots");
+    if (!path.isAbsolute(root) || !baseRoots.some(base => isWithin(path.resolve(root), base))) throw new Error("Invalid additional recovery artifact roots");
+    const real = canonicalize(root);
+    if (real !== null && !trustedRoots.some(base => isWithin(real, base))) throw new Error("Invalid additional recovery artifact roots");
   }
-  // Env-provided roots are untrusted: canonicalize (resolving symlinks) and require them to sit under an approved base.
-  const canonical = (/** @type {string} */ target) => {
-    try {
-      return fs.realpathSync(path.resolve(target));
-    } catch (error) {
-      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
-      throw new Error("Invalid additional recovery artifact roots", { cause: error });
-    }
-  };
-  const bases = [...roots, process.env.RUNNER_TEMP, process.env.GITHUB_WORKSPACE].map(base => (base ? canonical(base) : null));
-  const approvedAdditionalRoots = [];
-  for (const root of additionalRoots) {
-    const real = canonical(root);
-    if (real === null) continue;
-    if (!bases.some(base => base && (real === base || real.startsWith(base + path.sep)))) throw new Error("Invalid additional recovery artifact roots");
-    approvedAdditionalRoots.push(real);
-  }
+  const scanRoots = [...baseRoots, ...additionalRoots.map(root => path.resolve(root))];
   const visited = new Set();
   let removed = 0;
   let entries = 0;
   /** @param {string} filename */
   function visit(filename) {
+    const canonical = canonicalize(filename);
+    if (canonical === null) return;
+    if (!trustedRoots.some(root => isWithin(canonical, root))) {
+      throw new Error("Recovery artifact path escapes trusted roots");
+    }
     let stat;
     try {
       stat = fs.statSync(filename);
@@ -136,9 +148,7 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
       if (validateEnvelope(filename, limits)) removed++;
     }
   }
-  for (const root of [...roots, ...approvedAdditionalRoots]) {
-    if (root) visit(path.resolve(root));
-  }
+  for (const root of scanRoots) visit(root);
   core?.info?.(`Removed ${removed} recovery envelope(s) without unchanged previews`);
   return { removed };
 }

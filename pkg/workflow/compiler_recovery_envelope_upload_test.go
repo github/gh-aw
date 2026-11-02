@@ -3,10 +3,13 @@
 package workflow
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRecoveryEnvelopeValidationFollowsAllSecretMasks(t *testing.T) {
@@ -22,6 +25,8 @@ func TestRecoveryEnvelopeValidationFollowsAllSecretMasks(t *testing.T) {
 	assert.Less(t, strings.Index(content, "id: redact_secrets_custom_1"), strings.Index(content, "id: validate_recovery_envelopes"))
 	assert.Contains(t, content, "if: always() && "+secretMaskingSuccessCondition(data))
 	assert.Contains(t, content, "validate_recovery_envelopes.cjs")
+	assert.Contains(t, content, "GH_AW_RECOVERY_ADDITIONAL_ROOTS: '[]'")
+	assert.Contains(t, content, "main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });")
 	assert.Contains(t, secretRedactionSuccessCondition(data), "steps.validate_recovery_envelopes.outcome == 'success'")
 }
 
@@ -78,10 +83,34 @@ func TestRecoveryEnvelopeValidationGatesMemoryUploads(t *testing.T) {
 			content := output.String()
 			assert.Contains(t, content, "id: "+test.id+"\n")
 			assert.Contains(t, content, "steps."+test.id+".outcome == 'success'")
-			assert.Contains(t, content, "GH_AW_RECOVERY_ADDITIONAL_ROOTS: '[\""+test.root+"\"]'")
+			var parsed struct {
+				Steps []struct {
+					ID  string            `yaml:"id"`
+					Env map[string]string `yaml:"env"`
+				} `yaml:"steps"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte("steps:\n"+content), &parsed))
+			var roots []string
+			for _, step := range parsed.Steps {
+				if step.ID == test.id {
+					require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_RECOVERY_ADDITIONAL_ROOTS"]), &roots))
+				}
+			}
+			assert.Contains(t, roots, test.root)
+			assert.Contains(t, content, "main({ core, additionalRoots: JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS) });")
 			assert.Contains(t, content, secretRedactionSuccessCondition(data))
 		})
 	}
+}
+
+func TestRecoveryEnvelopeValidationDoesNotApproveConfiguredDriveAliases(t *testing.T) {
+	data := &WorkflowData{
+		DriveMemoryConfig: &DriveMemoryConfig{Drives: []DriveMemoryEntry{{ID: "notes", RestoreOnly: true}}},
+	}
+	var output strings.Builder
+	generateRecoveryEnvelopeValidationStep(&output, "test_guard", data, func(name string) string { return name + "@pin" })
+	assert.Contains(t, output.String(), "GH_AW_RECOVERY_ADDITIONAL_ROOTS: '[]'")
+	assert.NotContains(t, output.String(), driveMemoryMountPathFor("notes"))
 }
 
 func TestRecoveryArtifactScanRoots(t *testing.T) {
