@@ -46,6 +46,21 @@ func writeJSONStringMapEntriesRaw(yaml *strings.Builder, values map[string]strin
 	}
 }
 
+func marshalMCPHeredocString(value string) string {
+	// Existing renderers mark gateway placeholders with a backslash. JSON owns
+	// escaping first; then protect every shell metacharacter in the heredoc.
+	value = strings.ReplaceAll(value, `\${`, `${`)
+	encoded := mustMarshalJSONString(value)
+	return strings.NewReplacer(`\`, `\\`, "$", `\$`, "`", "\\`").Replace(encoded)
+}
+
+func writeMCPHeredocStringMapEntries(yaml *strings.Builder, values map[string]string, indent string) {
+	keys := sliceutil.SortedKeys(values)
+	for i, key := range keys {
+		fmt.Fprintf(yaml, "%s%s: %s%s\n", indent, marshalMCPHeredocString(key), marshalMCPHeredocString(normalizeMCPShellReferences(values[key])), renderMCPComma(i == len(keys)-1)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	}
+}
+
 // writeJSONStringMapSectionWithEntries writes a JSON object section, delegating
 // per-entry serialisation to writeEntries.  writeEntries receives the builder,
 // the values map, and the child indent string (indent+"  ").

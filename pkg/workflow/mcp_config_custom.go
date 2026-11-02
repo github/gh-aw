@@ -76,7 +76,7 @@ func renderCustomMCPEnvVars(env map[string]string, tomlFormat bool) map[string]s
 			// expressions with \${VAR} passthrough syntax. This keeps raw secret values
 			// out of the heredoc (RGS-008) and produces valid JSON regardless of the
 			// characters contained in the secret at runtime.
-			envValue = ReplaceTemplateExpressionsWithEnvVars(envValue)
+			envValue, _ = replaceMCPExpressions(envValue, true)
 		}
 		renderedEnv[envKey] = envValue
 	}
@@ -252,13 +252,14 @@ func renderMCPScalarProperty(yaml *strings.Builder, property string, isLast bool
 		if renderer.RewriteLocalhostToDocker {
 			urlValue = rewriteLocalhostToDockerHost(urlValue)
 		}
+		if renderer.Format == "json" {
+			urlValue, _ = replaceMCPExpressions(urlValue, false)
+		}
 		renderMCPStringScalar(yaml, renderer, "url", urlValue, isLast)
 	case "registry":
 		renderMCPStringScalar(yaml, renderer, "registry", mcpConfig.Registry, isLast)
 	case "caCertFile", "ca_cert_file":
-		value := mcpConfig.CACertFile
-		value = strings.ReplaceAll(value, "${{ github.workspace }}", `\${GITHUB_WORKSPACE}`)
-		value = strings.ReplaceAll(value, "${{ runner.temp }}", `\${RUNNER_TEMP}`)
+		value := replaceMCPCACertFileExpressions(mcpConfig.CACertFile)
 		renderMCPStringScalar(yaml, renderer, property, value, isLast)
 	case "required":
 		if renderer.Format == "json" && mcpConfig.Required != nil && !*mcpConfig.Required {
@@ -276,7 +277,7 @@ func renderMCPStringScalar(yaml *strings.Builder, renderer MCPConfigRenderer, ke
 }
 
 func renderMCPJSONScalar(yaml *strings.Builder, renderer MCPConfigRenderer, key, value string, isLast bool) {
-	fmt.Fprintf(yaml, "%s\"%s\": \"%s\"%s\n", renderer.IndentLevel, key, value, renderMCPComma(isLast))
+	fmt.Fprintf(yaml, "%s\"%s\": %s%s\n", renderer.IndentLevel, key, marshalMCPHeredocString(normalizeMCPShellReferences(value)), renderMCPComma(isLast))
 }
 
 func renderMCPArrayProperty(yaml *strings.Builder, property string, isLast bool, mcpConfig *parser.RegistryMCPServerConfig, renderer MCPConfigRenderer) {
@@ -288,11 +289,11 @@ func renderMCPArrayProperty(yaml *strings.Builder, property string, isLast bool,
 		}
 		renderMCPArray(yaml, renderer, "tools", values, isLast, false)
 	case "entrypointArgs":
-		renderMCPArray(yaml, renderer, "entrypointArgs", mcpConfig.EntrypointArgs, isLast, renderer.RequiresCopilotFields)
+		renderMCPArray(yaml, renderer, "entrypointArgs", mcpConfig.EntrypointArgs, isLast, true)
 	case "mounts":
-		renderMCPArray(yaml, renderer, "mounts", mcpConfig.Mounts, isLast, renderer.RequiresCopilotFields)
+		renderMCPArray(yaml, renderer, "mounts", mcpConfig.Mounts, isLast, true)
 	case "args":
-		renderMCPArray(yaml, renderer, "args", mcpConfig.Args, isLast, false)
+		renderMCPArray(yaml, renderer, "args", mcpConfig.Args, isLast, true)
 	case "proxy-args":
 		renderMCPArray(yaml, renderer, "proxy-args", mcpConfig.ProxyArgs, isLast, false)
 	}
@@ -310,9 +311,9 @@ func renderMCPArray(yaml *strings.Builder, renderer MCPConfigRenderer, key strin
 	fmt.Fprintf(yaml, "%s\"%s\": [\n", renderer.IndentLevel, jsonKey)
 	for i, value := range values {
 		if replaceTemplates {
-			value = ReplaceTemplateExpressionsWithEnvVars(value)
+			value, _ = replaceMCPExpressions(value, false)
 		}
-		fmt.Fprintf(yaml, "%s  \"%s\"%s\n", renderer.IndentLevel, value, renderMCPComma(i == len(values)-1))
+		fmt.Fprintf(yaml, "%s  %s%s\n", renderer.IndentLevel, marshalMCPHeredocString(normalizeMCPShellReferences(value)), renderMCPComma(i == len(values)-1))
 	}
 	fmt.Fprintf(yaml, "%s]%s\n", renderer.IndentLevel, renderMCPComma(isLast))
 }
@@ -376,15 +377,15 @@ func renderMCPEnvMap(yaml *strings.Builder, isLast bool, mcpConfig *parser.Regis
 			renderedEnv[varName] = "\\${" + varName + "}"
 		}
 	}
-	writeJSONStringMapSectionRaw(yaml, renderer.IndentLevel, "env", renderedEnv, !isLast)
+	writeJSONStringMapSectionWithEntries(yaml, renderer.IndentLevel, "env", renderedEnv, !isLast, writeMCPHeredocStringMapEntries)
 }
 
 func renderMCPHeadersMap(yaml *strings.Builder, isLast bool, mcpConfig *parser.RegistryMCPServerConfig, renderer MCPConfigRenderer, headerSecrets map[string]string) {
 	renderedHeaders := make(map[string]string, len(mcpConfig.Headers))
 	for headerKey, headerValue := range mcpConfig.Headers {
-		renderedHeaders[headerKey] = ReplaceTemplateExpressionsWithEnvVars(headerValue)
+		renderedHeaders[headerKey], _ = replaceMCPExpressions(headerValue, true)
 	}
-	writeJSONStringMapSectionRaw(yaml, renderer.IndentLevel, "headers", renderedHeaders, !isLast)
+	writeJSONStringMapSectionWithEntries(yaml, renderer.IndentLevel, "headers", renderedHeaders, !isLast, writeMCPHeredocStringMapEntries)
 }
 
 func renderMCPAuthProperty(yaml *strings.Builder, isLast bool, mcpConfig *parser.RegistryMCPServerConfig, renderer MCPConfigRenderer) {

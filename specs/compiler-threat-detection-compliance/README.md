@@ -46,6 +46,22 @@ Note: `CTR-025`–`CTR-030` map to `T-CTR-039` and `T-CTR-041`–`T-CTR-045` bec
 
 The test triggers, expected compiler actions, and stable diagnostics are defined in [Section 8.1](../compiler-threat-detection-spec.md#81-test-id-catalog). The implementation and concrete test-file mappings are defined in [Section 7.1](../compiler-threat-detection-spec.md#71-baseline-rule-mapping).
 
+## CTR-006 Heredoc and MCP Expression Evidence
+
+`T-CTR-006` includes the [heredoc and MCP boundary contract](../compiler-threat-detection-spec.md#514-heredoc-and-mcp-expression-boundaries-ctr-006). These regressions refine the existing test ID; they do not add a threat identifier or claim formal verification of Bash parsing.
+
+| Boundary | Concrete evidence |
+|---|---|
+| Expanding bodies, exact delimiters, quoting, continuations and tab stripping | `TestHeredocInjectionControls`, `TestHeredocDelimiterSemanticsMatchBash` in `pkg/workflow/template_injection_heredoc_test.go` exercise sanitizer, parsed validators and raw-YAML validation. Escaped quoted delimiters must not hide commands between Bash's decoded close and a later raw close. `compiler_template_injection_both_paths_test.go` covers compiler entry paths. |
+| Quoted-copy compatibility, nested bodies and full-script comments | `TestHeredocSanitizerPreservesQuotedCopy`, `TestHeredocSanitizerPreservesNestedQuotedCopy`, `TestHeredocCommentsPreserveFullScriptContext` in `pkg/workflow/template_injection_heredoc_test.go`. |
+| Conservative failure and diagnostic privacy | `TestHeredocMalformedExpressionFailsValidation`, `TestHeredocUnknownBoundariesPreserveScript`, `TestHeredocParserFailureDoesNotLogScript` in `pkg/workflow/template_injection_heredoc_test.go`. |
+| Command substitution becomes literal environment data | `TestUnquotedHeredocSanitizerPreventsCommandSubstitution` in `pkg/workflow/template_injection_heredoc_test.go` executes a harmless Bash reproduction before and after sanitization. |
+| MCP compiler transport and legacy compatibility | `TestMCPAuthoredExpressionsCompile` covers Copilot, Claude, Codex, Gemini and Agy, including mount transport; `TestMCPExpressionBindingsUseFullDigest`, `TestMCPNormalizeLegacyShellReferences`, `TestMCPExistingAgyConformanceShellURLCompile`, `TestMCPHeredocStringPreservesJSONBytes` in `pkg/workflow/mcp_expression_transport_test.go` cover bindings, legacy references and serialization. Whitespace-equivalent expressions must produce canonical binding values, and mixed-value compatibility must preserve the runtime credential-expansion guard. |
+| Compile-time compatibility diagnostics and source migration | `mcp_expression_diagnostics_test.go` covers mixed-value rejection before emission, counted shell-computation warnings, diagnostic privacy and ordering, imported configurations and file/string compilation. `codemod_steps_run_heredoc_test.go` covers expanding/hash-prefixed bodies, quoted/nested/custom/tab-stripped delimiters, idempotence, preservation and atomic guided failures, plus a harmless Bash data-only reproduction. |
+| Parsed-data runtime resolution | `actions/setup/js/mcp_expression_transport.test.cjs` covers JSON byte preservation, URL ports, legacy references, missing-binding errors, rejection of downstream credential references and boundary-assembled placeholders, and a simulation of the pinned gateway's raw-JSON and parsed-header expansion stages with dummy credentials; `start_mcp_gateway.test.cjs` covers startup integration. |
+
+Quoted-body preservation is a compatibility boundary, not a guarantee for arbitrary multiline Actions interpolation. These tests do not attest live MCP endpoint authorization, previous-run remediation, or later explicit execution of data as code.
+
 ## Section 5.4 Deprecation Policy Annotations
 
 So that the [§5.4 Deprecation Policy](../compiler-threat-detection-spec.md#54-deprecation-policy) obligations are mechanically verifiable, a deprecated rule is annotated as follows:

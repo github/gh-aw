@@ -142,7 +142,11 @@ func writeMCPGatewayStepEnvWithCustomGatewayEnvNames(yaml *strings.Builder, mcpE
 		if isReservedMCPGatewayEnvVar(envVarName) {
 			continue
 		}
-		fmt.Fprintf(yaml, "          %s: %s\n", envVarName, mcpEnvVars[envVarName])
+		if strings.HasPrefix(envVarName, mcpExpressionEnvPrefix) {
+			writeYAMLEnv(yaml, "          ", envVarName, mcpEnvVars[envVarName])
+		} else {
+			fmt.Fprintf(yaml, "          %s: %s\n", envVarName, mcpEnvVars[envVarName])
+		}
 	}
 	// Write safe-outputs input env vars (sorted); these must also be present in the
 	// runner step environment so the docker -e flag can forward them to the container.
@@ -639,6 +643,9 @@ func buildMCPGatewayAllowedMountRoots(tools map[string]any, gatewayConfig *MCPGa
 	}
 
 	for _, mount := range collectMCPServerConfiguredMounts(tools) {
+		// Reuse the config's step environment bindings rather than interpolating
+		// authored Actions expressions into the allowlist export's shell source.
+		mount, _ = replaceMCPExpressions(mount, false)
 		addMount(mount)
 	}
 
