@@ -18,7 +18,7 @@ Run `preserveSourceLiteralNewlines` in `emitWithValidation` after `mergeSourceNo
 
 The post-merge pass visits scalars through mappings, sequences, anchors, and tags. It reconstructs keep-chomping token origins using the scalar value and final surrounding syntax, accounting for blank lines already rendered by a following sibling and for intervening foot comments. Reconstruction must preserve the complete scalar value, including significant whitespace on suffix lines such as excess indentation on whitespace-only lines, not merely its terminal line-feed count.
 
-Preserve the original suffix data rather than rebuilding every whitespace-only line with one fixed indent. Use lossless JSON snapshots for `EditSource` inputs as well as native workflow snapshots: the YAML block-style encoder can independently discard suffix whitespace before source merging or validation.
+Preserve the original suffix data rather than rebuilding every whitespace-only line with one fixed indent. Use lossless JSON snapshots for semantic validation and native workflow snapshots: the YAML block-style encoder can independently discard suffix whitespace before source merging or validation. For `EditSource` merge inputs, retain YAML block mappings and plain keys while JSON-quoting multiline scalar values. Whole-document JSON snapshots would otherwise introduce quoted keys and flow mappings into newly inserted YAML syntax.
 
 Retain `validateSourceEmission`: parse the emitted workflow and compare its serialized Actions AST with the requested AST. Return an error on mismatch rather than accept a semantically changed edit. This validation is a source-editing correctness check, not authorization or a runtime safety verdict.
 
