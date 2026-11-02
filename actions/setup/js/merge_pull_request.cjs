@@ -382,7 +382,7 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
       continue;
     }
     if (!Number.isSafeInteger(run.app?.id) || run.app.id <= 0) {
-      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check "${run.name}"`, {
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check`, {
         code: "required_check_producer_missing",
         name: run.name,
         check_run_id: run.id,
@@ -390,7 +390,7 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
       });
     }
     if (Object.hasOwn(requiredCheckApps, run.name) && run.app.id !== requiredCheckApps[run.name]) {
-      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Unexpected check producer for required check "${run.name}"`, {
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Unexpected check producer for required check`, {
         code: "required_check_producer_mismatch",
         name: run.name,
         check_run_id: run.id,
@@ -400,7 +400,7 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
     }
     const appId = producersByName.get(run.name);
     if (appId !== undefined && appId !== run.app.id) {
-      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check "${run.name}"`, {
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check`, {
         code: "required_check_producer_ambiguous",
         name: run.name,
         check_run_id: run.id,
