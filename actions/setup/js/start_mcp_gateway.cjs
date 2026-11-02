@@ -1066,7 +1066,7 @@ async function main() {
     setFailed(`${ERR_CONFIG}: Configuration is missing required 'gateway' section`);
     return;
   }
-  applyAgenticWorkflowsRunnerIdentity(configObj);
+  applyBuiltinMCPRunnerIdentity(configObj);
   applyGatewayRuntimeTimeouts(configObj, process.env);
   const caMountArgs = prepareMCPServerCAs(configObj);
   mcpConfig = JSON.stringify(configObj);
@@ -1626,39 +1626,41 @@ if (require.main === module) {
 
 /**
  * Backend containers do not inherit the gateway container's Docker user.
- * Keep private downloaded logs runner-owned so artifact redaction can read them.
+ * Keep private logs and staged assets runner-owned for redaction and upload.
  * @param {Record<string, unknown>} config
  * @param {number | undefined} [uid]
  * @param {number | undefined} [gid]
  */
-function applyAgenticWorkflowsRunnerIdentity(config, uid = process.getuid?.(), gid = process.getgid?.()) {
+function applyBuiltinMCPRunnerIdentity(config, uid = process.getuid?.(), gid = process.getgid?.()) {
   const servers = config.mcpServers;
-  if (!servers || typeof servers !== "object" || !("agenticworkflows" in servers)) return;
-  const server = servers.agenticworkflows;
-  if (!server || typeof server !== "object" || !("container" in server) || typeof server.container !== "string" || !server.container) return;
-  const args = "args" in server ? server.args : [];
-  if (!Array.isArray(args) || !args.every(arg => typeof arg === "string")) {
-    throw codedError("Invalid agenticworkflows container arguments", ERR_CONFIG);
+  if (!servers || typeof servers !== "object") return;
+  for (const [name, server] of Object.entries(servers)) {
+    if (name !== "agenticworkflows" && name !== "safeoutputs") continue;
+    if (!server || typeof server !== "object" || !("container" in server) || typeof server.container !== "string" || !server.container) continue;
+    const args = "args" in server ? server.args : [];
+    if (!Array.isArray(args) || !args.every(arg => typeof arg === "string")) {
+      throw codedError(`Invalid ${name} container arguments`, ERR_CONFIG);
+    }
+    // Docker parses any suffix after -u as a username or UID, including -uroot.
+    if (args.some(arg => arg === "--user" || arg === "-u" || arg.startsWith("--user=") || (arg.startsWith("-u") && !arg.startsWith("--")))) continue;
+    if (!Number.isSafeInteger(uid) || !Number.isSafeInteger(gid) || uid === undefined || gid === undefined || uid < 0 || gid < 0) {
+      throw codedError(`Runner identity is required for the ${name} container`, ERR_CONFIG);
+    }
+    const env = "env" in server ? server.env : {};
+    if (!env || typeof env !== "object" || Array.isArray(env)) {
+      throw codedError(`Invalid ${name} container environment`, ERR_CONFIG);
+    }
+    Object.assign(server, {
+      args: [...args, "--user", `${uid}:${gid}`],
+      // /tmp is private to this backend container; /root is not writable as the runner.
+      env: { HOME: "/tmp", ...env },
+    });
   }
-  // Docker parses any suffix after -u as a username or UID, including -uroot.
-  if (args.some(arg => arg === "--user" || arg === "-u" || arg.startsWith("--user=") || (arg.startsWith("-u") && !arg.startsWith("--")))) return;
-  if (!Number.isSafeInteger(uid) || !Number.isSafeInteger(gid) || uid === undefined || gid === undefined || uid < 0 || gid < 0) {
-    throw codedError("Runner identity is required for the agenticworkflows container", ERR_CONFIG);
-  }
-  const env = "env" in server ? server.env : {};
-  if (!env || typeof env !== "object" || Array.isArray(env)) {
-    throw codedError("Invalid agenticworkflows container environment", ERR_CONFIG);
-  }
-  Object.assign(server, {
-    args: [...args, "--user", `${uid}:${gid}`],
-    // /tmp is private to this backend container; /root is not writable as the runner.
-    env: { HOME: "/tmp", ...env },
-  });
 }
 
 module.exports = {
   resolveMCPConfigExpressions,
-  applyAgenticWorkflowsRunnerIdentity,
+  applyBuiltinMCPRunnerIdentity,
   applyOTLPIgnoreIfMissing,
   clearGatewayStartupMarker,
   createGatewayStderrPath,
