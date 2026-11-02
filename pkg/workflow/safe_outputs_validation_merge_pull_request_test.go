@@ -98,3 +98,69 @@ func TestValidateSafeOutputsMergePullRequestAllowedBranchesValidation(t *testing
 		})
 	}
 }
+
+func TestMergePullRequestExplicitPolicies(t *testing.T) {
+	compiler := NewCompiler()
+	cfg := compiler.parseMergePullRequestConfig(map[string]any{
+		"merge-pull-request": map[string]any{
+			"required-checks":    []any{"ci/test", "ci/lint"},
+			"required-approvers": []any{"maintainer"},
+		},
+	})
+	require.NotNil(t, cfg)
+	assert.Equal(t, []string{"ci/test", "ci/lint"}, cfg.RequiredChecks)
+	assert.Equal(t, []string{"maintainer"}, cfg.RequiredApprovers)
+	config := &SafeOutputsConfig{MergePullRequest: cfg}
+	require.NoError(t, validateSafeOutputsMergePullRequest(config))
+	require.NoError(t, validateMergePullRequestPolicies(config, "Test Workflow"))
+	handler := pullRequestHandlerRegistry["merge_pull_request"](config)
+	assert.Equal(t, []string{"ci/test", "ci/lint"}, handler["required_checks"])
+	assert.Equal(t, []string{"maintainer"}, handler["required_approvers"])
+	checkPermission, ok := ComputePermissionsForSafeOutputs(config).Get(PermissionChecks)
+	require.True(t, ok)
+	assert.Equal(t, PermissionRead, checkPermission)
+
+	for _, field := range []string{"required-checks", "required-approvers"} {
+		t.Run(field, func(t *testing.T) {
+			invalid := compiler.parseMergePullRequestConfig(map[string]any{
+				"merge-pull-request": map[string]any{field: []any{"   "}},
+			})
+			err := validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: invalid}, "Test Workflow")
+			require.ErrorContains(t, err, field+"[0] cannot be empty")
+		})
+	}
+	cfg.RequiredApprovers = []string{"@maintainer"}
+	require.ErrorContains(t, validateMergePullRequestPolicies(config, "Test Workflow"), "invalid GitHub username")
+}
+
+func TestMergePullRequestRejectsAgentControlledChecks(t *testing.T) {
+	tests := []struct {
+		name         string
+		workflowName string
+		checkName    string
+		requiredName string
+		wantErr      bool
+	}{
+		{"explicit overlap", "Workflow", "ci/test", "ci/test", true},
+		{"default workflow name overlap", "Workflow", "", "Workflow (Result)", true},
+		{"explicit workflow name deduplicated", "Workflow", "Workflow", "Workflow (Result)", true},
+		{"fallback name overlap", "", "", "Agent Check", true},
+		{"independent check", "Workflow", "agent-result", "ci/test", false},
+		{"exact names only", "Workflow", "ci/test", "CI/Test", false},
+		{"workflow check distinct from result", "Workflow", "", "Workflow", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &SafeOutputsConfig{
+				MergePullRequest: &MergePullRequestConfig{RequiredChecks: []string{tt.requiredName}},
+				CreateCheckRun:   &CreateCheckRunConfig{Name: tt.checkName},
+			}
+			err := validateMergePullRequestPolicies(config, tt.workflowName)
+			if tt.wantErr {
+				require.ErrorContains(t, err, "agent-controlled create-check-run name")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

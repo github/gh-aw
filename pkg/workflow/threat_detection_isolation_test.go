@@ -123,7 +123,7 @@ Test workflow
 				if !strings.Contains(compiled, name+":") {
 					t.Errorf("host-side OTLP environment must retain %s", name)
 				}
-				for _, job := range []string{"agent", "detection", "evals"} {
+				for _, job := range []string{"agent", "detection"} {
 					section := extractJobSection(compiled, job)
 					if section == "" {
 						t.Fatalf("%s job missing", job)
@@ -1224,9 +1224,11 @@ func TestDetectionAndEvalsSidecarOutputUnchanged(t *testing.T) {
 	// Compiled jobs shaped like the affected locks must carry no sidecar topology.
 	_, evalsJob := compileClaudeEvalsWorkflow(t, "engine:\n  id: claude\n  model-provider: github\n")
 	compiledJobs := map[string]string{
-		"evals":              evalsJob,
 		"inline detection":   compileClaudeOnCopilotDetectionWorkflow(t, false),
 		"external detection": compileClaudeOnCopilotDetectionWorkflow(t, true),
+	}
+	if strings.Contains(evalsJob, "awf-config.json") || strings.Contains(evalsJob, "api-proxy") {
+		t.Error("evals must call the controlled endpoint directly without AWF")
 	}
 	for name, job := range compiledJobs {
 		if !strings.Contains(job, `awf-config.json`) {
