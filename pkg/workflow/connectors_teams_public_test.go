@@ -120,6 +120,21 @@ func TestTeamsConnectorPublicDocumentationSample(t *testing.T) {
 			require.NotContains(t, string(lock), "connectors invoke context")
 			require.NotContains(t, string(lock), "id-token: write")
 			require.NotContains(t, string(lock), "${{ secrets.TEAMS_BOT_ACCESS_TOKEN }}", "staged writes must not resolve the Bot token")
+			require.Contains(t, string(lock), "connector_runtime.cjs")
+			require.Contains(t, string(lock), "teams_reply_to_activity")
+			require.Contains(t, string(lock), "teams_reply_with_review_card")
+			require.NotContains(t, string(lock), "connector_5_teams")
+			require.NotContains(t, string(lock), "Checkout trusted connector runtime")
+			require.NotContains(t, string(lock), "Build trusted connector runtime")
+			require.NotContains(t, string(lock), ".gh-aw-connector-runtime")
+			require.Contains(t, data.Tools, "teams")
+			require.NotContains(t, data.Tools, "connector-teams")
+			for _, name := range []string{"teams-reply-to-activity", "teams-reply-with-review-card"} {
+				script := data.SafeOutputs.Scripts[name]
+				require.NotNil(t, script)
+				require.Contains(t, script.Script, "spawnSync(process.execPath")
+				require.Contains(t, script.Script, "'actions', 'connector_runtime.cjs'")
+			}
 			if !local {
 				_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github/aw/connectors"))
 				require.ErrorIs(t, err, os.ErrNotExist, "embedded imports must work without checkout connector files")
