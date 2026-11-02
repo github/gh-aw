@@ -624,8 +624,11 @@ function escapeURLDestination(url) {
   return url.replace(/[()<>"'`]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
-/** @param {ReportBlock[]} nodes */
-function renderBlocks(nodes) {
+/**
+ * @param {ReportBlock[]} nodes
+ * @param {boolean} [compactExpiration]
+ */
+function renderBlocks(nodes, compactExpiration = false) {
   return nodes
     .map(node => {
       switch (node.type) {
@@ -663,7 +666,7 @@ function renderBlocks(nodes) {
             .join("\n");
         case "quote":
         case "alert":
-          return (node.type === "alert" ? `[!${node.kind}]\n` : "") + renderBlocks(node.children);
+          return (node.type === "alert" ? `[!${node.kind}]\n` : "") + renderBlocks(node.children, node.type === "quote");
         case "details":
           return `<details>\n<summary>${typeof node.summary === "string" ? escapeSummaryText(node.summary) : renderInlines(node.summary, true)}</summary>\n\n${renderBlocks(node.children)}\n\n</details>`;
         case "table": {
@@ -682,7 +685,8 @@ function renderBlocks(nodes) {
             .join("\n")
         : value
     )
-    .join("\n\n");
+    .map((value, index) => (index ? (compactExpiration && nodes[index].type === "expiration" ? "\n" : "\n\n") : "") + value)
+    .join("");
 }
 
 /** @param {ReportXMLMarker} marker */
