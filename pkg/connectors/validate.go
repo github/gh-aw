@@ -24,7 +24,7 @@ func (s *ConnectorSpec) Validate() error {
 	}
 	for name, endpoint := range s.Endpoints {
 		u, err := url.Parse(endpoint)
-		if !namePattern.MatchString(name) || err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+		if !namePattern.MatchString(name) || err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || strings.ContainsAny(endpoint, "?#") || (u.Path != "" && u.Path != "/") {
 			return fmt.Errorf("endpoint %q must be a named HTTPS origin without credentials, path, query or fragment", name)
 		}
 	}
@@ -68,6 +68,14 @@ func (s *ConnectorSpec) validateTriggers() error {
 		for field, pointer := range trigger.Normalize {
 			if !namePattern.MatchString(field) || !validPointer(pointer) {
 				return fmt.Errorf("trigger %q has invalid normalization field or JSON Pointer", name)
+			}
+			for pointer, resource := range trigger.Resources {
+				if !validPointer(pointer) || !namePattern.MatchString(resource) {
+					return fmt.Errorf("trigger %q resource constraints require JSON Pointers and resource names", name)
+				}
+				if err := validatePrimitiveTypes(trigger.Types); err != nil {
+					return fmt.Errorf("trigger %q: %w", name, err)
+				}
 			}
 		}
 	}
@@ -198,19 +206,24 @@ func validateRequestBindings(name string, op Operation, path string) error {
 	}
 	for _, values := range []map[string]Value{op.Request.Query, op.Request.Body} {
 		for key, value := range values {
-			if key == "" || (value.Input == "") == (value.Literal == nil) {
-				return fmt.Errorf("operation %q request values require exactly one input or non-null literal", name)
+			if key == "" {
+				return fmt.Errorf("operation %q request keys must not be empty", name)
 			}
-			if value.Input != "" {
-				if _, ok := op.Inputs[value.Input]; !ok {
-					return fmt.Errorf("operation %q references unknown input %q", name, value.Input)
-				}
+			if err := validateValue(value, op.Inputs); err != nil {
+				return fmt.Errorf("operation %q: %w", name, err)
 			}
 		}
 	}
 	for _, patch := range op.Request.Patch {
 		if err := validateValue(patch.Value, op.Inputs); err != nil {
 			return fmt.Errorf("operation %q patch: %w", name, err)
+		}
+	}
+	if op.Request.GraphQL == "" {
+		for _, value := range op.Request.Query {
+			if value.Object != nil || value.Array != nil || value.Encoding != "" || !primitiveLiteral(value.Literal) {
+				return fmt.Errorf("operation %q REST query values must be primitive scalars", name)
+			}
 		}
 	}
 	return nil
