@@ -71,3 +71,7 @@ func countSplitAfter(s string) int {
 func countParenSplit(s string) int {
 	return strings.Count(s, ",")+1 // want `len\(strings\.Split\(\.\.\.`
 }
+
+func countParenCallees(s string) int {
+	return strings.Count(s, ",")+1 // want `len\(strings\.Split\(\.\.\.`
+}
