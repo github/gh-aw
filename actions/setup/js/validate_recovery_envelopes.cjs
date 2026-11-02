@@ -106,7 +106,7 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
       throw new Error("Invalid additional recovery artifact roots", { cause: error });
     }
   };
-  const bases = [...roots, process.env.RUNNER_TEMP, process.env.GITHUB_WORKSPACE].filter(Boolean).map(base => canonical(/** @type {string} */ base));
+  const bases = [...roots, process.env.RUNNER_TEMP, process.env.GITHUB_WORKSPACE].map(base => (base ? canonical(base) : null));
   const approvedAdditionalRoots = [];
   for (const root of additionalRoots) {
     const real = canonical(root);
