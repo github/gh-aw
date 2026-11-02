@@ -239,6 +239,10 @@ func ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter map[string
 	// Filter out ignored fields before validation
 	filtered := filterIgnoredFields(frontmatter)
 
+	if err := validateSharedConnectorFields(filtered); err != nil {
+		return err
+	}
+
 	// First check for forbidden fields in shared workflows
 	if err := validateSharedWorkflowFields(filtered); err != nil {
 		return err
