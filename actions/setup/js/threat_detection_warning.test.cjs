@@ -43,12 +43,14 @@ describe("threat_detection_warning", () => {
     });
 
     it("returns a centralized warning presentation for tooling failures and threats", () => {
-      expect(getThreatWarningPresentation("agent_failure")).toEqual({
-        admonition: "WARNING",
-        title: "threat detection engine error",
-        summary: "The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.",
-        marker: "<!-- gh-aw-threat-engine-error -->",
-      });
+      for (const reason of ["agent_failure", "parse_error"]) {
+        expect(getThreatWarningPresentation(reason)).toEqual({
+          admonition: "WARNING",
+          title: "Threat detection engine error",
+          summary: "Threat detection could not complete its analysis due to a tooling error. This is not a security finding.",
+          marker: "<!-- gh-aw-threat-engine-error -->",
+        });
+      }
       expect(getThreatWarningPresentation("threat_detected")).toEqual({
         admonition: "CAUTION",
         title: "agentic threat detected",
