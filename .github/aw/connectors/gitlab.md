@@ -85,6 +85,9 @@ connectors:
         responseResources:
           /project_id: projects
           /iid: merge-requests
+        responseResourceInputs:
+          /project_id: project
+          /iid: merge-request
         project:
           id: /id
           project: /project_id
@@ -128,6 +131,9 @@ connectors:
         responseResources:
           /project_id: projects
           /id: pipelines
+        responseResourceInputs:
+          /project_id: project
+          /id: pipeline
         project:
           pipeline: /id
           project: /project_id
@@ -179,6 +185,9 @@ connectors:
         responseResources:
           /project_id: projects
           /noteable_iid: merge-requests
+        responseResourceInputs:
+          /project_id: project
+          /noteable_iid: merge-request
         project:
           note: /id
           project: /project_id
@@ -288,7 +297,8 @@ import-schema:
       numeric project and MR or pipeline identifiers. Lists authorize all
       combinations within one origin, not project-to-child pair mappings;
       use one project per consumer unless every combination is approved.
-      Response membership is checked, not numeric-to-string request equality.
+      Response identifiers must match the exact requested project and child,
+      comparing canonical safe integer JSON identifiers with the input strings.
       Pipeline metadata does not establish that a pipeline belongs to an MR.
     </resources>
   </configuration>
@@ -304,13 +314,14 @@ import-schema:
       sha, ref, and source. No jobs, traces, artifacts, variables, tests,
       repository files, or secret-bearing configuration are fetched.
     </read>
-    <effect selection="safe-outputs.gitlab-add-merge-request-note" method="POST" path="/api/v4/projects/{project}/merge_requests/{merge-request}/notes">
+    <effect selection="safe-outputs.gitlab-add-merge-request-note" tool="gitlab_add_merge_request_note" method="POST" path="/api/v4/projects/{project}/merge_requests/{merge-request}/notes">
       Inputs: project, merge-request, and body. Body is 1 to 2000 ASCII
       characters, begins with a letter or digit, and otherwise permits only
       letters, digits, spaces, and these punctuation characters: . , ! ? _ : ; ( )
       The exact pattern is ^[A-Za-z0-9][A-Za-z0-9 .,!?_:;()]*$.
-      Slashes, line breaks, carriage returns, tabs, mentions, markup, links,
-      emoji-only reactions, and GitLab quick actions are rejected, not cleaned.
+      Slashes, line breaks, carriage returns, tabs, mentions, markup, explicit
+      Markdown link syntax, emoji-only reactions, and GitLab quick actions are
+      rejected, not cleaned. GitLab may still auto-link plain domain-like text.
       GitLab executes quick actions in notes, so arbitrary Markdown is unsafe.
       This creates a top-level MR note, not a diff discussion or internal note.
       JSON body contains only body; internal, created_at, and merge head SHA

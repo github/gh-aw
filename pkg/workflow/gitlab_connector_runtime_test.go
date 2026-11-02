@@ -191,8 +191,13 @@ func TestGitLabConnectorRejectsArgumentsAndAuthorityBeforeCredentials(t *testing
 }
 
 func TestGitLabConnectorProviderErrorsAreNotRetried(t *testing.T) {
-	_, data, _, err := parseGitLabConsumer(t, gitLabConsumerSource(t,
+	source := strings.NewReplacer(
+		`projects: ["42"]`, `projects: ["42", "43"]`,
+		`merge-requests: ["7"]`, `merge-requests: ["7", "8"]`,
+		`pipelines: ["900"]`, `pipelines: ["900", "901"]`,
+	).Replace(gitLabConsumerSource(t,
 		"tools:\n  gitlab: [get-merge-request, get-pipeline]\nsafe-outputs:\n  gitlab-add-merge-request-note:\n"))
+	_, data, _, err := parseGitLabConsumer(t, source)
 	require.NoError(t, err)
 	for _, operation := range []struct {
 		name, fixture, capability, phase string
