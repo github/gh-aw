@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import childProcess from "child_process";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { main, validateEnvelope } from "./validate_recovery_envelopes.cjs";
 import { processFile } from "./redact_secrets.cjs";
@@ -176,12 +177,24 @@ describe("final recovery envelope upload boundary", () => {
   it("checks explicit memory roots outside the primary scan roots", () => {
     const artifact = envelope(path.join(root, "mounted-drive"));
     fs.unlinkSync(artifact.patch);
+    vi.stubEnv("GITHUB_WORKSPACE", root);
     vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([path.dirname(artifact.bundle)]));
     expect(main({ roots: [path.join(root, "runner")] }).removed).toBe(1);
   });
   it.each([["relative/path"], ["/"]])("rejects unsafe additional root %s", unsafe => {
     vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([unsafe]));
     expect(() => main({ roots: [root] })).toThrow("Invalid additional recovery artifact roots");
+  });
+  it("rejects additional roots outside approved bases, including via symlink", () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "outside-"));
+    const link = path.join(root, "link");
+    fs.symlinkSync(outside, link);
+    vi.stubEnv("RUNNER_TEMP", path.join(root, "runner-temp"));
+    vi.stubEnv("GITHUB_WORKSPACE", path.join(root, "workspace"));
+    for (const candidate of [outside, link]) {
+      vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([candidate]));
+      expect(() => main({ roots: [path.join(root, "runner")] })).toThrow("Invalid additional recovery artifact roots");
+    }
   });
   it("removes a pack changed or appended after its preview was created", () => {
     const artifact = envelope();

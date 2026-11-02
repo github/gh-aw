@@ -97,6 +97,23 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
   for (const root of additionalRoots) {
     if (!path.isAbsolute(root) || path.resolve(root) === path.parse(path.resolve(root)).root) throw new Error("Invalid additional recovery artifact roots");
   }
+  // Env-provided roots are untrusted: canonicalize (resolving symlinks) and require them to sit under an approved base.
+  const canonical = (/** @type {string} */ target) => {
+    try {
+      return fs.realpathSync(path.resolve(target));
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
+      throw new Error("Invalid additional recovery artifact roots", { cause: error });
+    }
+  };
+  const bases = [...roots, process.env.RUNNER_TEMP, process.env.GITHUB_WORKSPACE].filter(Boolean).map(base => canonical(/** @type {string} */ (base)));
+  const approvedAdditionalRoots = [];
+  for (const root of additionalRoots) {
+    const real = canonical(root);
+    if (real === null) continue;
+    if (!bases.some(base => base && (real === base || real.startsWith(base + path.sep)))) throw new Error("Invalid additional recovery artifact roots");
+    approvedAdditionalRoots.push(real);
+  }
   const visited = new Set();
   let removed = 0;
   let entries = 0;
@@ -119,7 +136,7 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
       if (validateEnvelope(filename, limits)) removed++;
     }
   }
-  for (const root of [...roots, ...additionalRoots]) {
+  for (const root of [...roots, ...approvedAdditionalRoots]) {
     if (root) visit(path.resolve(root));
   }
   core?.info?.(`Removed ${removed} recovery envelope(s) without unchanged previews`);
