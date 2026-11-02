@@ -207,6 +207,18 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GITHUB_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
 	}
 
+	// The mount allowlist scans built-in tools as well as custom servers.
+	for _, mount := range collectMCPServerConfiguredMounts(tools) {
+		_, bindings := replaceMCPExpressions(mount, false)
+		maps.Copy(envVars, bindings)
+	}
+	if githubTool, ok := tools["github"].(map[string]any); ok {
+		for _, arg := range getGitHubCustomArgs(githubTool) {
+			_, bindings := replaceMCPExpressions(arg, false)
+			maps.Copy(envVars, bindings)
+		}
+	}
+
 	// Check for HTTP MCP servers with secrets in headers (e.g., Tavily)
 	// These need to be available as environment variables when the MCP gateway starts
 	for toolName, toolValue := range tools {
@@ -229,6 +241,7 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 				mcpEnvironmentLog.Printf("Failed to parse MCP config for tool %s: %v", toolName, err)
 				continue
 			}
+			maps.Copy(envVars, collectMCPConfigExpressionBindings(mcpConfig))
 
 			// Extract secrets from headers for HTTP MCP servers
 			if mcpConfig.Type == "http" && len(mcpConfig.Headers) > 0 {

@@ -298,6 +298,54 @@ describe("MCP gateway CA launcher arguments", () => {
   });
 });
 
+describe("MCP transported-data startup rejection", () => {
+  it("fails before publishing configuration or spawning the gateway without disclosing the payload", async () => {
+    const require = createRequire(import.meta.url);
+    const expression = `GH_AW_MCP_EXPR_${"A".repeat(64)}`;
+    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const spawn = vi.fn();
+    const writeMcpConfiguration = vi.fn();
+    const config = {
+      gateway: { port: 8080, domain: "localhost", agentId: "test-agent" },
+      mcpServers: { remote: { type: "http", url: "https://example.invalid/mcp", headers: { "X-Value": `\${${expression}}` } } },
+    };
+    const mocks = {
+      fs: {
+        readFileSync: vi.fn(() => Buffer.from(JSON.stringify(config))),
+        mkdirSync: vi.fn(),
+        chmodSync: vi.fn(),
+      },
+      child_process: { spawn, execSync: vi.fn() },
+      "./shim.cjs": {},
+      "./symlink_guard.cjs": { lstatGuard: vi.fn(() => ({})) },
+      "./mcp_configuration.cjs": { writeMcpConfiguration },
+    };
+    const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
+    await vm.runInNewContext(`${source}\nmain().catch(err => core.setFailed(err.message));`, {
+      require: id => mocks[id] || require(id),
+      module: { exports: {} },
+      process: {
+        env: {
+          RUNNER_TEMP: "/tmp/test-runner",
+          MCP_GATEWAY_DOCKER_COMMAND: "docker run --rm -i --network host gateway:latest --config-stdin",
+          [expression]: "private-title-${GITHUB_TOKEN}",
+          GITHUB_TOKEN: "dummy-private-credential",
+        },
+        umask: vi.fn(),
+        on: vi.fn(),
+      },
+      core,
+    });
+    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("ERR_CONFIG: Failed to resolve MCP configuration expressions: ERR_CONFIG: Transported MCP configuration data must not contain gateway environment references");
+    expect(spawn).not.toHaveBeenCalled();
+    expect(writeMcpConfiguration).not.toHaveBeenCalled();
+    const diagnostics = JSON.stringify([core.info.mock.calls, core.warning.mock.calls, core.error.mock.calls, core.setFailed.mock.calls]);
+    expect(diagnostics).not.toContain("private-title");
+    expect(diagnostics).not.toContain("GITHUB_TOKEN");
+    expect(diagnostics).not.toContain("dummy-private-credential");
+  });
+});
+
 describe("agenticworkflows backend ownership", () => {
   it.each(["localhost/gh-aw:dev", "alpine:3.24"])("uses the runner identity without widening private artifact modes (%s)", container => {
     const env = { GITHUB_TOKEN: "${GITHUB_TOKEN}", GITHUB_ACTOR: "${GITHUB_ACTOR}" };

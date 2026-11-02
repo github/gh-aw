@@ -248,9 +248,14 @@ func (c *Compiler) resolveToolsConfiguration(
 		return nil, err
 	}
 	c.warnDeprecatedAPMImports(result.Frontmatter)
-	if err := ValidateMCPConfigs(tools); err != nil {
+	mcpWarnings, err := validateMCPConfigsWithWarnings(tools)
+	if err != nil {
 		orchestratorToolsLog.Printf("MCP configuration validation failed: %v", err)
 		return nil, err
+	}
+	for _, warning := range mcpWarnings {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warning))
+		c.IncrementWarningCount()
 	}
 	tools, err = enforceMCPProxyTools(agenticEngine, tools)
 	if err != nil {
