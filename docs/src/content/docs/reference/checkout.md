@@ -283,6 +283,54 @@ checkout:
 
 This differs from `checkout: false`, which disables checkout entirely (including any additional configured repositories). With `permissions.contents: none`, only the workflow's own repository is skipped.
 
+Safe-output patch and bundle generation is **local-only**. It never fetches
+missing refs or objects from the agent-writable checkout, even when safe-output
+API credentials are configured. All Git transports, including external remote
+helpers and partial-clone lazy fetches, are disabled during artifact generation.
+Repository-configured external diffs, text conversion, hooks, fsmonitor, and
+signing are also disabled. Filtered artifacts are synthesized from committed
+objects with index-only plumbing, without checkout or clean/smudge filters.
+Prepare the required refs with `checkout.fetch` and sufficient history with
+`checkout.fetch-depth` before agent execution; partial clones must also have the
+required blobs locally. Incremental updates require the pre-agent PR-head baseline
+recorded by the PR checkout step or an existing `origin/<branch>` tracking ref.
+Missing baselines are reported rather than replaced with a broader diff.
+Full-mode generation can use the local base branch when its `origin` tracking
+ref is absent, including cross-repository checkouts. Filtered bundles preserve
+the checkout's shallow boundaries; deeper history is only needed when the
+required baseline cannot be resolved locally. Failure messages retain fixed
+checkout and workflow-compilation guidance without exposing raw Git stderr,
+checkout paths, or caller-supplied ref names.
+
+When local generation cannot resolve required refs or objects, non-staged PR
+outputs can instead return `result: "queued"` with `recovery: "object-pack"`.
+This is not publication success. The agent packages available local objects
+without fetching; the trusted safe-outputs job fetches the authorized baseline
+into a new isolated bare repository, validates the objects, and regenerates the
+patch and bundle before applying the existing file, size, and publication policies.
+Agent repository configuration, remotes, hooks, and alternates are never copied.
+
+The fallback exports all locally available objects, including unreachable
+history, with a limit of 100,000 objects and 64 MiB uncompressed. The existing
+patch artifact carries a conservative preview of every packed object for
+scanning. Recovery rejects redacted or mismatched previews instead of publishing
+the original hidden bytes. Fetching is limited to 1,000 commits of depth and a
+60-second command deadline, not a downloaded-byte budget.
+
+Incremental recovery requires the triggering PR's exact pre-agent head SHA and
+an authorized head repository; an uploaded baseline or a newer remote head cannot
+replace it. Dynamic PR updates without that trusted event baseline, staged
+outputs, larger object inventories, and missing agent-created content still
+require checkout provisioning. Full recovery uses the authorized base branch and
+preserves the trusted dispatch-SHA baseline for same-repository feature runs.
+Publisher credentials must authorize the fetched repository independently of any
+credentials previously used by `actions/checkout`.
+
+GitHub Actions debug logging includes `[object_pack_transport]` resolution
+stages, decision booleans, and object/byte counts. These traces omit repository
+identities, refs, commit IDs, filesystem paths, credentials, object contents, and
+raw subprocess diagnostics.
+
 ## `pull_request_target` Checkout
 
 For `pull_request_target` workflows, the "Checkout PR branch" step is auto-disabled when no `checkout:` key is present in frontmatter. This prevents hard failures when the PR head branch is deleted (merged/closed events) or inaccessible (fork PRs).

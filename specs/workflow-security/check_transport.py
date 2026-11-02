@@ -48,6 +48,56 @@ GIT_WITNESSES = [
     "NoConservativeFallback", "NoSafePublication", "NoProtectedRejection",
     "NoMissingParentContinuation",
 ]
+GENERATION_FAULTS = {
+    "explicit-fetch": "LocalGeneration",
+    "lazy-fetch": "LocalGeneration",
+    "config-override": "LocalGeneration",
+    "caller-override": "LocalGeneration",
+    "token-forwarding": "NoGenerationAuthentication",
+    "implicit-recovery": "LocalGeneration",
+    "incremental-fallback": "IncrementalBaseline",
+    "generation-fallback": "StableGenerationRange",
+    "config-mutation": "ConfigurationPreserved",
+    "environment-mutation": "EnvironmentPreserved",
+    "hidden-missing": "MissingDataGuidance",
+}
+GENERATION_WITNESSES = [
+    "NoLocalArtifact", "NoFullFallback", "NoMissingBaselineRejection",
+    "NoMissingObjectRejection", "NoHostileConfigSuccess", "NoGenerationFailure",
+]
+RECOVERY_FAULTS = {
+    "agent-fetch": "NoAgentNetwork",
+    "copied-config": "IsolatedRecovery",
+    "untrusted-remote": "AuthorizedRemote",
+    "moving-baseline": "ExactBaseline",
+    "hidden-preview": "ScannedBytes",
+    "skip-policy": "PublicationPolicy",
+}
+RECOVERY_WITNESSES = ["NoRecoveryPublication", "NoFastPublication", "NoRejection"]
+
+
+def recovery_cases():
+    for mode in ["full", "incremental"]:
+        yield f"secure-{mode}", mode, "none", None
+    for fault, invariant in RECOVERY_FAULTS.items():
+        yield fault, "incremental", fault, invariant
+    for invariant in RECOVERY_WITNESSES:
+        yield invariant, "incremental", "none", invariant
+
+
+def generation_cases():
+    for transport in ["patch", "bundle"]:
+        for mode in ["full", "incremental"]:
+            for allow in [False, True]:
+                yield (f"secure-{transport}-{mode}-recovery-{allow}",
+                       transport, mode, allow, "none", None)
+        for fault, invariant in GENERATION_FAULTS.items():
+            mode = "incremental" if fault == "incremental-fallback" else "full"
+            yield (f"{transport}-{fault}", transport, mode,
+                   fault == "implicit-recovery", fault, invariant)
+        for invariant in GENERATION_WITNESSES:
+            mode = "full" if invariant == "NoFullFallback" else "incremental"
+            yield (f"{transport}-{invariant}", transport, mode, True, "none", invariant)
 
 
 def git_cases():
@@ -112,9 +162,31 @@ def main(model="all"):
                 if name in GIT_WITNESSES:
                     config += f"\nINVARIANT {name}\n"
                 run_case(jar, temporary, "SafeOutputGit", f"git-{name}", config, invariant)
+        if model in {"all", "generation"}:
+            template = (ROOT / "SafeOutputGeneration.cfg").read_text()
+            for name, transport, mode, allow, fault, invariant in generation_cases():
+                config = template.replace('Fault = "none"', f'Fault = "{fault}"')
+                config = config.replace('Transport = "patch"', f'Transport = "{transport}"')
+                config = config.replace('Mode = "full"', f'Mode = "{mode}"')
+                config = config.replace("AllowFullHistoryFetch = FALSE",
+                                        f"AllowFullHistoryFetch = {str(allow).upper()}")
+                if invariant in GENERATION_WITNESSES:
+                    config += f"\nINVARIANT {invariant}\n"
+                run_case(jar, temporary, "SafeOutputGeneration",
+                         f"generation-{name}", config, invariant)
+        if model in {"all", "recovery"}:
+            template = (ROOT / "SafeOutputObjectRecovery.cfg").read_text()
+            for name, mode, fault, invariant in recovery_cases():
+                config = template.replace('Mode = "full"', f'Mode = "{mode}"')
+                config = config.replace('Fault = "none"', f'Fault = "{fault}"')
+                if invariant in RECOVERY_WITNESSES:
+                    config += f"\nINVARIANT {invariant}\n"
+                run_case(jar, temporary, "SafeOutputObjectRecovery",
+                         f"object-recovery-{name}", config, invariant)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", choices=["all", "transport", "git"], default="all")
+    parser.add_argument("--model", choices=["all", "transport", "git", "generation", "recovery"],
+                        default="all")
     main(parser.parse_args().model)

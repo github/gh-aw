@@ -15,7 +15,9 @@ const { lookupCheckout } = require("./checkout_manifest.cjs");
 const { generateGitPatch } = require("./generate_git_patch.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { generateGitBundle } = require("./generate_git_bundle.cjs");
-const { hasMergeCommitsInRange, execGitSync, ensureSafeDirectoryTrust } = require("./git_helpers.cjs");
+const { createObjectPack, canRecoverPatch, traceObjectPack } = require("./object_pack_transport.cjs");
+const { isStagedMode } = require("./safe_output_helpers.cjs");
+const { hasMergeCommitsInRange, execLocalGitSync: execGitSync, ensureSafeDirectoryTrust, stageRawGitFiles } = require("./git_helpers.cjs");
 const { enforceCommentLimits, MAX_COMMENT_INPUT_LENGTH } = require("./comment_limit_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
@@ -522,6 +524,33 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (type) enforcePerTypeMax(type);
     appendSafeOutput(entry);
     if (type) operationCounts.set(scopedKey(type), (operationCounts.get(scopedKey(type)) || 0) + 1);
+  };
+
+  const queueObjectRecovery = (entry, repo, tip, options, toolConfig) => {
+    const staged = isStagedMode({ ...config, ...toolConfig });
+    traceObjectPack("queue-resolution", { pinned: !!tip, staged, incremental: options.mode === "incremental", eligible: !!tip && !staged });
+    if (!tip || staged) return null;
+    try {
+      const artifact = createObjectPack(entry.branch, repo, tip, options);
+      appendSafeOutputCounted(entry);
+      traceObjectPack("queued");
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              result: "queued",
+              recovery: "object-pack",
+              size: artifact.size,
+              details: "Local objects were packaged without fetching. The safe-outputs publisher must recover the trusted baseline and validate all policies before publishing; publication is not yet guaranteed.",
+            }),
+          },
+        ],
+      };
+    } catch (error) {
+      traceObjectPack("queue-failed");
+      return { isError: true, content: [{ type: "text", text: JSON.stringify({ result: "error", error: getErrorMessage(error) }) }] };
+    }
   };
 
   /**
@@ -1083,11 +1112,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     if (repoCwd) {
       transportOptions.cwd = repoCwd;
     }
-    // Pass per-handler token so cross-repo PATs are used for git fetch when configured.
-    // Falls back to GITHUB_TOKEN if not set.
-    if (prConfig["github-token"]) {
-      transportOptions.token = prConfig["github-token"];
-    }
 
     // SECURITY: Pin the branch ref to a SHA before generating any transport artifacts.
     // This prevents TOCTOU races where the agent flips the ref between patch and bundle
@@ -1123,8 +1147,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       patchOptions.pinnedSha = pinnedSha;
     }
     const patchResult = await generateGitPatch(entry.branch, baseBranch, patchOptions);
+    traceObjectPack("offline-result", { success: patchResult.success, incremental: false });
 
     if (!patchResult.success) {
+      if (canRecoverPatch(patchResult)) {
+        const queued = queueObjectRecovery(entry, repoResult.repo, pinnedSha, patchOptions, prConfig);
+        if (queued) return queued;
+      }
       // Patch generation failed or patch is empty
       const errorMsg = patchResult.error || "Failed to generate patch";
       server.debug(`Patch generation failed: ${errorMsg}`);
@@ -1170,6 +1199,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const bundleResult = await generateGitBundle(entry.branch, baseBranch, transportOptions);
 
       if (!bundleResult.success) {
+        const queued = queueObjectRecovery(entry, repoResult.repo, pinnedSha, patchOptions, prConfig);
+        if (queued) return queued;
         const errorMsg = bundleResult.error || "Failed to generate bundle";
         server.debug(`Bundle generation failed: ${errorMsg}`);
         return {
@@ -1487,6 +1518,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
 
     const prHeadBaseline = resolvePRHeadBaselineForPush(entry.branch, itemRepo, effectivePushPRNumber, server);
+    const pushRecoveryAllowed = context.payload?.pull_request?.number === effectivePushPRNumber && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(context.payload?.pull_request?.head?.sha || "");
+    traceObjectPack("target-resolution", { eligible: pushRecoveryAllowed, incremental: true });
     const incrementalBaseRef = prHeadBaseline?.sha || prHeadBaseline?.ref || `refs/remotes/origin/${entry.branch}`;
     if (prHeadBaseline?.headRepo && prHeadBaseline.headRepo.toLowerCase() !== itemRepo.toLowerCase() && prHeadBaseline.headRepo.toLowerCase() !== configuredHeadRepo.toLowerCase()) {
       return {
@@ -1515,11 +1548,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     }
     if (repoCwd) {
       pushTransportOptions.cwd = repoCwd;
-    }
-    // Pass per-handler token so cross-repo PATs are used for git fetch when configured.
-    // Falls back to GITHUB_TOKEN if not set.
-    if (pushConfig["github-token"]) {
-      pushTransportOptions.token = pushConfig["github-token"];
     }
 
     // Determine transport format: "bundle" (default) uses git bundle (preserves merge topology),
@@ -1665,8 +1693,13 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       pushPatchOptions.pinnedSha = pushPinnedSha;
     }
     const patchResult = await generateGitPatch(entry.branch, baseBranch, pushPatchOptions);
+    traceObjectPack("offline-result", { success: patchResult.success, incremental: true });
 
     if (!patchResult.success) {
+      if (canRecoverPatch(patchResult) && pushRecoveryAllowed) {
+        const queued = queueObjectRecovery(entry, repoResult.repo, pushPinnedSha, pushPatchOptions, pushConfig);
+        if (queued) return queued;
+      }
       // Patch generation failed or patch is empty
       const errorMsg = patchResult.error || "Failed to generate patch";
       server.debug(`Patch generation failed: ${errorMsg}`);
@@ -1720,6 +1753,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const bundleResult = await generateGitBundle(entry.branch, baseBranch, pushTransportOptions);
 
       if (!bundleResult.success) {
+        const queued = pushRecoveryAllowed ? queueObjectRecovery(entry, repoResult.repo, pushPinnedSha, pushPatchOptions, pushConfig) : null;
+        if (queued) return queued;
         const errorMsg = bundleResult.error || "Failed to generate bundle";
         server.debug(`Bundle generation failed: ${errorMsg}`);
         return {
@@ -1973,17 +2008,17 @@ function createHandlers(server, appendSafeOutput, config = {}) {
         const relPath = relativePath ? path.join(relativePath, entry.name) : entry.name;
         if (entry.isDirectory()) {
           scanDir(fullPath, relPath);
-        } else if (entry.isFile()) {
+        } else if (entry.isFile() || entry.isSymbolicLink()) {
           if (!isEligibleFile(relPath)) {
             continue;
           }
           let stats;
           try {
-            stats = fs.statSync(fullPath);
+            stats = fs.lstatSync(fullPath);
           } catch (err) {
             throw new Error(`${ERR_SYSTEM}: Failed to inspect file ${fullPath}: ${getErrorMessage(err)}`, { cause: err });
           }
-          files.push({ relativePath: relPath.replace(/\\/g, "/"), size: stats.size });
+          files.push({ relativePath: relPath, size: stats.size });
         }
       }
     }
@@ -2053,7 +2088,7 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       const trackedFiles = execGitSync(["ls-files", "-z"], { cwd: memoryDir, stdio: "pipe" }).split("\0").filter(Boolean).filter(isEligibleFile);
       const filesToStage = [...new Set([...files.map(file => file.relativePath), ...trackedFiles])];
       if (filesToStage.length > 0) {
-        execGitSync(["add", "--sparse", "--all", "--", ...filesToStage.map(file => `:(literal)${file}`)], { cwd: memoryDir, stdio: "pipe" });
+        stageRawGitFiles(filesToStage, { cwd: memoryDir, stdio: "pipe" });
       }
       const filesToMeasure = [...new Set([...stagedFiles, ...filesToStage])].map(file => `:(literal)${file}`);
       patchSizeBytes = getStagedPatchDiffSizeBytes({ execGitSyncFn: execGitSync, cwd: memoryDir, pathspecs: filesToMeasure });

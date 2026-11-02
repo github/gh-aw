@@ -8,12 +8,11 @@
 
 const fs = require("fs");
 const { scopedArtifactFilename } = require("./work_queue_claim_scope.cjs");
-const os = require("os");
 const path = require("path");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { generateGitPatch } = require("./generate_git_patch.cjs");
-const { ensureOriginRemoteTrackingRef, execGitSync } = require("./git_helpers.cjs");
+const { generateGitPatch, getGitPatchFailureMessage } = require("./generate_git_patch.cjs");
+const { hasLocalOriginRemoteTrackingRef, execLocalGitSync: execGitSync } = require("./git_helpers.cjs");
 const { isAncestorCommit, describeGitFailure, sanitizeBranchNameForPatch } = require("./git_patch_utils.cjs");
 const { normalizeCommitSHA } = require("./commit_sha_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
@@ -94,16 +93,16 @@ function getBundlePathForBranchInRepo(branchName, repoSlug) {
  * @param {string} branchName - The branch name to generate bundle for
  * @param {string} baseBranch - The base branch to diff against (e.g., "main", "master")
  * @param {Object} [options] - Optional parameters
+ * @param {string} [options.token] - Deprecated compatibility no-op. Emits a warning when supplied;
+ *   artifact generation is local-only and never configures authentication or fetches.
  * @param {string} [options.mode="full"] - Bundle generation mode:
  *   - "full": Include all commits since merge-base with default branch (for create_pull_request)
  *   - "incremental": Only include commits since origin/branchName (for push_to_pull_request_branch)
- *     In incremental mode, origin/branchName is fetched explicitly and merge-base fallback is disabled.
+ *     In incremental mode, the baseline must exist locally and merge-base fallback is disabled.
  * @param {string} [options.cwd] - Working directory for git commands. Defaults to GITHUB_WORKSPACE or process.cwd().
  *   Use this for multi-repo scenarios where repos are checked out to subdirectories.
  * @param {string} [options.repoSlug] - Repository slug (owner/repo) to include in bundle filename for disambiguation.
  *   Required for multi-repo scenarios to prevent bundle file collisions.
- * @param {string} [options.token] - GitHub token for git authentication. Falls back to GITHUB_TOKEN env var.
- *   Use this for cross-repo scenarios where a custom PAT with access to the target repo is needed.
  * @param {string[]} [options.excludedFiles] - Glob patterns for files to exclude from the pushed commit set.
  *   When set, the bundle is synthesized from the same filtered patch used for validation so the pushed files
  *   match the validated patch file set.
@@ -114,6 +113,11 @@ function getBundlePathForBranchInRepo(branchName, repoSlug) {
  * @returns {Promise<Object>} Object with bundle info or error
  */
 async function generateGitBundle(branchName, baseBranch, options = {}) {
+  if (options.token !== undefined) {
+    core.warning(
+      "generateGitBundle: options.token is deprecated and ignored. Artifact generation is local-only and never configures authentication or fetches; prepare refs and history with checkout.fetch and checkout.fetch-depth before agent execution."
+    );
+  }
   const mode = options.mode || "full";
   // Support custom cwd for multi-repo scenarios
   const cwd = options.cwd || process.env.GITHUB_WORKSPACE || process.cwd();
@@ -123,35 +127,49 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
   // Filtered patches contain the resolved base-to-tip tree, including merge
   // resolutions, rather than a replay of the branch's non-merge commits.
   if (Array.isArray(options.excludedFiles) && options.excludedFiles.length > 0) {
-    const patchResult = await generateGitPatch(branchName, baseBranch, options);
+    const patchResult = await generateGitPatch(branchName, baseBranch, { ...options, token: undefined });
     if (!patchResult.success) {
-      return { success: false, error: patchResult.error || "Failed to generate filtered patch for bundle synthesis", bundlePath };
+      return {
+        success: false,
+        error: `Failed to generate filtered patch for bundle synthesis: ${getGitPatchFailureMessage(patchResult, cwd)}`,
+        bundlePath,
+      };
     }
-    const tempWorktree = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-"));
-    // Repository hooks such as Git LFS must not run during internal synthesis.
-    const tempHooksDir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-filtered-bundle-hooks-"));
-    const noHooksArgs = ["-c", `core.hooksPath=${tempHooksDir}`];
+    // Reuse the index-only synthesized commit; checkout/am would execute
+    // attribute conversion filters even with hooks disabled.
+    const tempGitDir = fs.mkdtempSync(path.join(path.dirname(bundlePath), "filtered-bundle-"));
     try {
-      execGitSync([...noHooksArgs, "worktree", "add", "--detach", tempWorktree, patchResult.baseCommit], { cwd });
-      execGitSync([...noHooksArgs, "am", "--3way", patchResult.patchPath], { cwd: tempWorktree });
-      execGitSync([...noHooksArgs, "bundle", "create", bundlePath, `${patchResult.baseCommit}..HEAD`], { cwd: tempWorktree });
+      if (!patchResult.filteredCommit) throw new Error("Filtered patch did not produce a synthesized commit");
+      const objects = execGitSync(["rev-parse", "--git-path", "objects"], { cwd }).trim();
+      const objectFormat = execGitSync(["rev-parse", "--show-object-format"], { cwd }).trim();
+      const env = {
+        ...process.env,
+        GIT_DIR: tempGitDir,
+        GIT_COMMON_DIR: tempGitDir,
+        GIT_OBJECT_DIRECTORY: path.resolve(cwd, objects),
+        GIT_WORK_TREE: undefined,
+        GIT_INDEX_FILE: undefined,
+      };
+      execGitSync(["init", "--bare", "--template=", `--object-format=${objectFormat}`, tempGitDir], { cwd, env });
+      // Reused objects may stop at shallow boundaries in the source checkout,
+      // including a linked worktree whose metadata lives outside its .git file.
+      const shallowPath = execGitSync(["rev-parse", "--git-path", "shallow"], { cwd }).trim();
+      if (fs.existsSync(path.resolve(cwd, shallowPath))) {
+        fs.copyFileSync(path.resolve(cwd, shallowPath), path.join(tempGitDir, "shallow"));
+      }
+      execGitSync(["update-ref", "HEAD", patchResult.filteredCommit], { cwd, env });
+      execGitSync(["bundle", "create", bundlePath, `${patchResult.baseCommit}..HEAD`], { cwd, env });
       return { success: true, bundlePath, bundleSize: fs.statSync(bundlePath).size, baseCommit: patchResult.baseCommit };
     } catch (error) {
-      return { success: false, error: `Failed to generate filtered bundle: ${getErrorMessage(error)}`, bundlePath };
+      return { success: false, error: `Failed to generate filtered bundle: ${describeGitFailure(getErrorMessage(error), cwd)}`, bundlePath };
     } finally {
-      try {
-        execGitSync([...noHooksArgs, "worktree", "remove", "--force", tempWorktree], { cwd });
-      } catch (error) {
-        core.warning(`Failed to remove temporary filtered-bundle worktree: ${getErrorMessage(error)}`);
-      }
-      fs.rmSync(tempWorktree, { recursive: true, force: true });
-      fs.rmSync(tempHooksDir, { recursive: true, force: true });
+      fs.rmSync(tempGitDir, { recursive: true, force: true });
     }
   }
 
   // Validate baseBranch early to avoid confusing git errors (e.g., origin/undefined)
   if (typeof baseBranch !== "string" || baseBranch.trim() === "") {
-    const errorMessage = "baseBranch is required and must be a non-empty string (received: " + String(baseBranch) + ")";
+    const errorMessage = "baseBranch is required and must be a non-empty string";
     debugLog(`Invalid baseBranch: ${errorMessage}`);
     return {
       success: false,
@@ -172,7 +190,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
     try {
       fs.mkdirSync(bundleDir, { recursive: true });
     } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to create directory ${bundleDir}: ${getErrorMessage(err)}`, { cause: err });
+      throw new Error(`${ERR_SYSTEM}: Failed to create bundle output directory. Ensure it is accessible.`);
     }
   }
 
@@ -209,9 +227,8 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
               baseRef = execGitSync(["rev-parse", "--verify", `${candidateBaseRef}^{commit}`], { cwd }).trim();
             } catch (baselineError) {
               errorMessage =
-                `Cannot generate incremental bundle: explicit PR-head baseline ${candidateBaseRef} is not present in checkout '${cwd}'. ` +
-                `Ensure the PR checkout step completed and fetched refs/pull/<number>/head before calling push_to_pull_request_branch.`;
-              debugLog(`Strategy 1 (incremental): explicit PR-head baseline failed: ${getErrorMessage(baselineError)}`);
+                "Cannot generate incremental bundle: the explicit PR-head baseline is not present locally. " + `Ensure the PR checkout step completed and fetched refs/pull/<number>/head before calling push_to_pull_request_branch.`;
+              debugLog(`Strategy 1 (incremental): explicit PR-head baseline failed: ${describeGitFailure(getErrorMessage(baselineError), cwd)}`);
               return {
                 success: false,
                 error: errorMessage,
@@ -219,22 +236,17 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
               };
             }
           } else {
-            // Backward-compatible fallback for same-repository PRs and existing callers:
-            // try origin/branchName locally, then a single network fetch attempt.
+            // Same-repository fallback: use only the pre-fetched local tracking ref.
             debugLog(`Strategy 1 (incremental): Resolving origin/${branchName}`);
-            const incrementalRefResult = ensureOriginRemoteTrackingRef(branchName, { cwd, token: options.token, suppressLogs: true });
-            if (incrementalRefResult.exists) {
+            if (hasLocalOriginRemoteTrackingRef(branchName, { cwd, suppressLogs: true })) {
               baseRef = `origin/${branchName}`;
-              if (incrementalRefResult.fetched) {
-                debugLog(`Strategy 1 (incremental): Fetched origin/${branchName} from remote, baseRef=${baseRef}`);
-              } else {
-                debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
-              }
+              debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
             } else {
-              debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally and remote fetch failed (${incrementalRefResult.fetchError ? getErrorMessage(incrementalRefResult.fetchError) : "no error"}), failing`);
+              debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally, failing without fetching`);
               errorMessage =
-                `Cannot generate incremental bundle: no pre-agent PR-head baseline was available for branch '${branchName}' in checkout '${cwd}'. ` +
-                `Tried refs/remotes/origin/${branchName}, but it is not present and could not be fetched from origin. ` +
+                "Cannot generate incremental bundle: no pre-agent PR-head baseline was available for the branch. " +
+                "The remote tracking ref is not present locally. Artifact generation never fetches from the agent-writable checkout. " +
+                `Prepare the required refs and history with checkout.fetch and checkout.fetch-depth before agent execution. ` +
                 `For fork PRs, ensure the workflow PR checkout step ran first so refs/pull/<number>/head is recorded as the bundle baseline; checkout.fetch cannot fetch fork branches from the base repository.`;
               return {
                 success: false,
@@ -253,18 +265,20 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
             debugLog(`Strategy 1 (full): Using existing origin/${branchName} as baseRef`);
           } catch {
             debugLog(`Strategy 1 (full): origin/${branchName} not found, trying merge-base with ${defaultBranch}`);
-            const defaultBranchRefResult = ensureOriginRemoteTrackingRef(defaultBranch, { cwd, token: options.token, suppressLogs: true });
-            const hasLocalDefaultBranch = defaultBranchRefResult.exists;
-            if (hasLocalDefaultBranch) {
-              if (defaultBranchRefResult.fetched) {
-                debugLog(`Strategy 1 (full): fetched origin/${defaultBranch} from remote`);
-              } else {
-                debugLog(`Strategy 1 (full): origin/${defaultBranch} exists locally`);
+            const hasLocalDefaultBranch = hasLocalOriginRemoteTrackingRef(defaultBranch, { cwd, suppressLogs: true });
+            let defaultBranchRef = hasLocalDefaultBranch ? `origin/${defaultBranch}` : null;
+            if (!defaultBranchRef) {
+              try {
+                execGitSync(["show-ref", "--verify", "--quiet", `refs/heads/${defaultBranch}`], { cwd });
+                defaultBranchRef = `refs/heads/${defaultBranch}`;
+              } catch {
+                // Neither a remote-tracking nor a local default branch is available.
               }
+            }
+            if (hasLocalDefaultBranch) {
+              debugLog(`Strategy 1 (full): origin/${defaultBranch} exists locally`);
             } else {
-              debugLog(
-                `Strategy 1 (full): origin/${defaultBranch} not present locally and remote fetch failed (likely private repo without credentials in MCP server). Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this strategy. Falling through to Strategy 2.`
-              );
+              debugLog(`Strategy 1 (full): origin/${defaultBranch} not present locally. Artifact generation never fetches. Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this strategy. Falling through to Strategy 2.`);
             }
 
             // When the workflow runs from a ref that is not contained in the default
@@ -275,14 +289,15 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
             // GITHUB_SHA is the commit the agent started from and is fully local.
             const dispatchedSha = normalizeCommitSHA(githubSha);
             const branchTipSha = execGitSync(["rev-parse", branchName], { cwd }).trim();
-            if (hasLocalDefaultBranch && dispatchedSha && dispatchedSha !== branchTipSha && isAncestorCommit(dispatchedSha, branchName, cwd) && !isAncestorCommit(dispatchedSha, `origin/${defaultBranch}`, cwd)) {
+            if (defaultBranchRef && dispatchedSha && dispatchedSha !== branchTipSha && isAncestorCommit(dispatchedSha, branchName, cwd) && !isAncestorCommit(dispatchedSha, defaultBranchRef, cwd)) {
               baseRef = dispatchedSha;
               debugLog(`Strategy 1 (full): GITHUB_SHA ${dispatchedSha} is not contained in origin/${defaultBranch} (non-default-branch run); using it as the bundle base instead of the merge-base`);
-            } else if (hasLocalDefaultBranch) {
-              baseRef = execGitSync(["merge-base", "--", `origin/${defaultBranch}`, branchName], { cwd }).trim();
+            } else if (defaultBranchRef) {
+              baseRef = execGitSync(["merge-base", "--", defaultBranchRef, branchName], { cwd }).trim();
               debugLog(`Strategy 1 (full): Computed merge-base: ${baseRef}`);
             } else {
               debugLog(`Strategy 1 (full): No remote refs available, falling through to Strategy 2`);
+              errorMessage = "No local base ref is available for bundle generation. Artifact generation never fetches. Prepare the base branch with checkout.fetch and sufficient checkout.fetch-depth before agent execution.";
               throw new Error(`${ERR_SYSTEM}: No remote refs available for merge-base calculation`);
             }
           }
@@ -304,16 +319,15 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
           // commits that the remote already has.
           const bundleCreateArgs = ["bundle", "create", bundlePath, `${baseRef}..${branchName}`];
           if (mode === "incremental") {
-            const defaultBranchRefResult = ensureOriginRemoteTrackingRef(defaultBranch, {
+            const hasLocalDefaultBranch = hasLocalOriginRemoteTrackingRef(defaultBranch, {
               cwd,
-              token: options.token,
               suppressLogs: true,
             });
-            if (defaultBranchRefResult.exists) {
+            if (hasLocalDefaultBranch) {
               bundleCreateArgs.push(`^origin/${defaultBranch}`);
               debugLog(`Strategy 1 (incremental): excluding origin/${defaultBranch} from bundle prerequisites`);
             } else {
-              const warningMessage = `Strategy 1 (incremental): origin/${defaultBranch} not present locally and remote fetch failed (likely private repo without credentials in MCP server); bundle will include base-branch history. Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this optimisation.`;
+              const warningMessage = `Strategy 1 (incremental): origin/${defaultBranch} not present locally; bundle will include base-branch history without fetching. Add ${JSON.stringify(defaultBranch)} to checkout.fetch to enable this optimisation.`;
               debugLog(warningMessage);
               core.warning(warningMessage);
             }
@@ -348,6 +362,9 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
           // Branch really is absent from the local refs — probe failure is ignored.
         }
         const branchErrorMessage = describeGitFailure(getErrorMessage(branchError), cwd);
+        if (baseCommitSha) {
+          return { success: false, error: `Failed to generate bundle: ${branchErrorMessage}`, bundlePath };
+        }
         if (branchExistsLocally) {
           debugLog(`Strategy 1: Failed to generate bundle for branch '${branchName}' (branch exists locally) - ${branchErrorMessage}`);
         } else {
@@ -357,17 +374,13 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
           if (branchExistsLocally) {
             return {
               success: false,
-              error: `Cannot generate incremental bundle for branch ${branchName} in checkout '${cwd}': ${branchErrorMessage}`,
+              error: `Cannot generate incremental bundle: ${branchErrorMessage}`,
               bundlePath,
             };
           }
           return {
             success: false,
-            error:
-              `Branch ${branchName} does not exist locally in checkout '${cwd}'. ` +
-              "Cannot generate incremental bundle. Possible causes: " +
-              `(1) you have not checked out '${branchName}' yet (for example: git checkout -b ${branchName} --track origin/${branchName}); ` +
-              "(2) the tool is running in the wrong repository checkout. Ensure GITHUB_WORKSPACE points to the repository that contains this pull request branch.",
+            error: "Branch does not exist locally. Cannot generate incremental bundle. Ensure the pull request branch was checked out and GITHUB_WORKSPACE points to the correct repository.",
             bundlePath,
           };
         }
@@ -382,7 +395,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
 
       if (!githubSha) {
         debugLog(`Strategy 2: GITHUB_SHA not set, cannot use this strategy`);
-        errorMessage = "GITHUB_SHA environment variable is not set";
+        errorMessage ||= "GITHUB_SHA environment variable is not set";
       } else if (currentHead === githubSha) {
         debugLog(`Strategy 2: HEAD equals GITHUB_SHA - no new commits`);
       } else {
@@ -437,7 +450,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
                     rangeEnd = branchName;
                     debugLog(`Strategy 2: Created local branch '${branchName}' pointing to HEAD for bundle ref`);
                   } catch (branchErr) {
-                    debugLog(`Strategy 2: Could not create branch '${branchName}': ${getErrorMessage(branchErr)}, using HEAD`);
+                    debugLog(`Strategy 2: Could not create branch '${branchName}': ${describeGitFailure(getErrorMessage(branchErr), cwd)}, using HEAD`);
                   }
                 }
               }
@@ -452,7 +465,10 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
               }
             }
           } catch (ancestorErr) {
-            debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${getErrorMessage(ancestorErr)}`);
+            if (baseCommitSha) {
+              return { success: false, error: `Failed to generate bundle: ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`, bundlePath };
+            }
+            debugLog(`Strategy 2: GITHUB_SHA is not an ancestor of HEAD - ${describeGitFailure(getErrorMessage(ancestorErr), cwd)}`);
           }
         }
       }
@@ -509,11 +525,14 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
           debugLog(`Strategy 3: No remote refs found`);
         }
       } catch (strategy3Err) {
-        debugLog(`Strategy 3: Failed - ${getErrorMessage(strategy3Err)}`);
+        if (baseCommitSha) {
+          return { success: false, error: `Failed to generate bundle: ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`, bundlePath };
+        }
+        debugLog(`Strategy 3: Failed - ${describeGitFailure(getErrorMessage(strategy3Err), cwd)}`);
       }
     }
   } catch (error) {
-    errorMessage = `Failed to generate bundle: ${getErrorMessage(error)}`;
+    errorMessage = `Failed to generate bundle: ${describeGitFailure(getErrorMessage(error), cwd)}`;
   }
 
   // Check if bundle was generated and has content
@@ -524,7 +543,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
     } catch (err) {
       return {
         success: false,
-        error: `Failed to inspect generated bundle ${bundlePath}: ${getErrorMessage(err)}`,
+        error: `Failed to inspect generated bundle. Ensure the output directory is accessible.`,
         bundlePath,
       };
     }

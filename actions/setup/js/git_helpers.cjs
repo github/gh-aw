@@ -2,6 +2,8 @@
 /// <reference types="@actions/github-script" />
 
 const childProcess = require("child_process");
+const fs = require("fs");
+const path = require("path");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { isTransientError } = require("./error_recovery.cjs");
@@ -118,7 +120,8 @@ function execGitSyncResult(args, options = {}) {
  * GIT_ASKPASS=/bin/echo) and a default 60s timeout (override via options.timeout).
  *
  * @param {string[]} args - Git command arguments
- * @param {Object} options - Spawn options; set suppressLogs: true to avoid core.error annotations for expected failures
+ * @param {Object} options - Spawn options; suppressLogs avoids expected-error annotations,
+ *   while silent suppresses raw subprocess diagnostics entirely.
  * @returns {string} Command output
  * @throws {Error} If command fails
  */
@@ -128,7 +131,9 @@ function execGitSync(args, options = {}) {
   // routes failure details to core.debug instead of core.error, preventing
   // spurious GitHub Actions error annotations for expected failures (e.g., when
   // a branch does not yet exist).
-  const { suppressLogs = false, ...spawnOptions } = options;
+  const { suppressLogs = false, silent = false, ...spawnOptions } = options;
+  // Offline generation must not expose refs, paths, object bytes or raw errors.
+  const log = silent ? { debug() {}, error() {} } : core;
 
   // Log the git command being executed for debugging (but redact credentials)
   const gitCommand = `git ${args
@@ -141,7 +146,7 @@ function execGitSync(args, options = {}) {
     })
     .join(" ")}`;
 
-  core.debug(`Executing git command: ${gitCommand}`);
+  log.debug(`Executing git command: ${gitCommand}`);
 
   // Hard guards against indefinite hangs:
   //  - GIT_TERMINAL_PROMPT=0 / GCM_INTERACTIVE=Never / GIT_ASKPASS make any
@@ -160,19 +165,19 @@ function execGitSync(args, options = {}) {
       /** @type {NodeJS.ErrnoException} */
       const bufferError = new Error(`${ERR_SYSTEM}: Git command output exceeded buffer limit (ENOBUFS). The output from '${args[0]}' is too large for the configured maxBuffer. Consider reducing the diff size or increasing maxBuffer.`);
       bufferError.code = "ENOBUFS";
-      core.error(`Git command buffer overflow: ${gitCommand}`);
+      log.error(`Git command buffer overflow: ${gitCommand}`);
       throw bufferError;
     }
     if (spawnError.code === "ETIMEDOUT") {
       /** @type {NodeJS.ErrnoException} */
       const timeoutError = new Error(`${ERR_SYSTEM}: Git command timed out after ${spawnOptions.timeout || defaultTimeoutMs}ms: ${gitCommand}`);
       timeoutError.code = "ETIMEDOUT";
-      core.error(`Git command timed out: ${gitCommand}`);
+      log.error(`Git command timed out: ${gitCommand}`);
       throw timeoutError;
     }
     // Spawn-level errors (e.g. ENOENT, EACCES) are always unexpected — log
     // via core.error regardless of suppressLogs.
-    core.error(`Git command failed with error: ${result.error.message}`);
+    log.error(`Git command failed with error: ${result.error.message}`);
     throw result.error;
   }
 
@@ -181,32 +186,32 @@ function execGitSync(args, options = {}) {
     /** @type {NodeJS.ErrnoException} */
     const timeoutError = new Error(`${ERR_SYSTEM}: Git command killed (${result.signal}), likely due to timeout (${spawnOptions.timeout || defaultTimeoutMs}ms): ${gitCommand}`);
     timeoutError.code = "ETIMEDOUT";
-    core.error(`Git command killed by signal ${result.signal}: ${gitCommand}`);
+    log.error(`Git command killed by signal ${result.signal}: ${gitCommand}`);
     throw timeoutError;
   }
 
   if (result.status !== 0) {
     const errorMsg = `${ERR_SYSTEM}: ${result.stderr || `Git command failed with status ${result.status}`}`;
     if (suppressLogs) {
-      core.debug(`Git command failed (expected): ${gitCommand}`);
-      core.debug(`Exit status: ${result.status}`);
+      log.debug(`Git command failed (expected): ${gitCommand}`);
+      log.debug(`Exit status: ${result.status}`);
       if (result.stderr) {
-        core.debug(`Stderr: ${result.stderr}`);
+        log.debug(`Stderr: ${result.stderr}`);
       }
     } else {
-      core.error(`Git command failed: ${gitCommand}`);
-      core.error(`Exit status: ${result.status}`);
+      log.error(`Git command failed: ${gitCommand}`);
+      log.error(`Exit status: ${result.status}`);
       if (result.stderr) {
-        core.error(`Stderr: ${result.stderr}`);
+        log.error(`Stderr: ${result.stderr}`);
       }
     }
     throw new Error(errorMsg);
   }
 
   if (result.stdout) {
-    core.debug(`Git command output: ${result.stdout.substring(0, 200)}${result.stdout.length > 200 ? "..." : ""}`);
+    log.debug(`Git command output: ${result.stdout.substring(0, 200)}${result.stdout.length > 200 ? "..." : ""}`);
   } else {
-    core.debug("Git command completed successfully with no output");
+    log.debug("Git command completed successfully with no output");
   }
 
   return result.stdout;
@@ -277,45 +282,26 @@ async function withGitRetry(operation, options = {}) {
 }
 
 /**
- * Ensure refs/remotes/origin/<branch> is available locally, attempting a
- * single fetch when it is not. Returns whether the ref now exists and
- * whether a fetch was required.
- *
- * Safe to call from the credential-less safe-outputs MCP server: execGitSync
- * runs git with GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/echo and a 60s
- * timeout, so the fetch attempt either succeeds (public repos, or when a
- * token was provided) or fails fast (private repos without credentials).
- * Callers MUST treat exists=false as a recoverable negative result rather
- * than an error condition.
+ * Check refs/remotes/origin/<branch> locally without fetching missing refs.
+ * The checkout is agent-writable, so its remote configuration must never be
+ * used for network operations in the safe-outputs artifact generator.
  *
  * @param {string} branch - Branch name (without origin/ prefix)
  * @param {Object} options
  * @param {string} options.cwd - Working directory for git commands
- * @param {string} [options.token] - Optional auth token used for fetch
  * @param {boolean} [options.suppressLogs=false] - Whether to suppress execGitSync error logs
- * @returns {{ exists: boolean, fetched: boolean, fetchError?: Error }}
- *   fetchError is populated only when exists=false after a failed fetch attempt.
+ * @returns {boolean}
  */
-function ensureOriginRemoteTrackingRef(branch, options) {
+function hasLocalOriginRemoteTrackingRef(branch, options) {
   const ref = `refs/remotes/origin/${branch}`;
   try {
-    execGitSync(["show-ref", "--verify", "--quiet", ref], {
+    execLocalGitSync(["show-ref", "--verify", "--quiet", ref], {
       cwd: options.cwd,
       suppressLogs: options.suppressLogs || false,
     });
-    return { exists: true, fetched: false };
+    return true;
   } catch {
-    try {
-      const fetchEnv = { ...process.env, ...getGitAuthEnv(options.token) };
-      execGitSync(["fetch", "origin", "--", `${branch}:refs/remotes/origin/${branch}`], {
-        cwd: options.cwd,
-        env: fetchEnv,
-        suppressLogs: options.suppressLogs || false,
-      });
-      return { exists: true, fetched: true };
-    } catch (fetchError) {
-      return { exists: false, fetched: false, fetchError: /** @type {Error} */ fetchError };
-    }
+    return false;
   }
 }
 
@@ -364,7 +350,7 @@ function checkImplausibleShallowRange(baseRef, headRef, options = {}) {
 
   let commitCount = 0;
   try {
-    const countOut = execGitSync(["rev-list", "--count", `${baseRef}..${headRef}`], {
+    const countOut = execLocalGitSync(["rev-list", "--count", `${baseRef}..${headRef}`], {
       cwd,
       suppressLogs: true,
     });
@@ -381,7 +367,7 @@ function checkImplausibleShallowRange(baseRef, headRef, options = {}) {
   // actually shallow — a large honest branch in a full clone is fine.
   let isShallow = false;
   try {
-    const shallowOut = execGitSync(["rev-parse", "--is-shallow-repository"], {
+    const shallowOut = execLocalGitSync(["rev-parse", "--is-shallow-repository"], {
       cwd,
       suppressLogs: true,
     });
@@ -436,7 +422,7 @@ function hasMergeCommitsInRange(baseRef, headRef, options = {}) {
   if (implausible) return false;
 
   try {
-    const out = execGitSync(["rev-list", "--merges", "--count", `${baseRef}..${headRef}`], {
+    const out = execLocalGitSync(["rev-list", "--merges", "--count", `${baseRef}..${headRef}`], {
       cwd: options.cwd,
       suppressLogs: true,
     });
@@ -470,6 +456,145 @@ function offlineGitOptions(options = {}) {
     env: { ...process.env, ...options.env, GIT_ALLOW_PROTOCOL: "", GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0" },
     silent: true,
   };
+}
+
+/**
+ * Execute artifact-generation Git commands with every transport denied and
+ * repository-configured programs disabled. Generation uses index-only
+ * plumbing; other local callers stage/inspect raw files without conversion.
+ * @param {string[]} args
+ * @param {Object} [options]
+ * @returns {string}
+ */
+function execLocalGitSync(args, options = {}) {
+  // Place command-local overrides after caller global options so neither -c
+  // nor GIT_CONFIG_* can re-enable hooks, fsmonitor, signing, or auto maintenance.
+  const commandIndex = args.findIndex((arg, index) => !arg.startsWith("-") && (index === 0 || !["-c", "-C", "--git-dir", "--work-tree", "--namespace", "--config-env"].includes(args[index - 1])));
+  const globalArgs = args.slice(0, commandIndex);
+  const commandArgs = args.slice(commandIndex);
+  const localOptions = offlineGitOptions(options);
+  const filterArgs = [];
+  if (["status", "add", "hash-object", "diff", "read-tree", "apply", "checkout", "checkout-index", "reset", "am"].includes(commandArgs[0])) {
+    // There is no wildcard -c override for attribute filter drivers. Discover
+    // their names without reading values or executing worktree conversions.
+    const result = execGitSyncResult([...globalArgs, "config", "--null", "--name-only", "--get-regexp", "^filter\\..*\\.(clean|smudge|process|required)$"], { ...localOptions, input: undefined });
+    if (result.status !== 0 && result.status !== 1) throw new Error("Unable to inspect Git filter configuration safely");
+    const drivers = new Set(
+      result.stdout
+        .split("\0")
+        .filter(Boolean)
+        .map(key => key.replace(/\.(clean|smudge|process|required)$/, ""))
+    );
+    for (const driver of drivers) {
+      // -c separates key/value at '='; refuse an unrepresentable override.
+      if (driver.includes("=")) throw new Error("Local Git conversion cannot safely disable a filter driver containing '='");
+      filterArgs.push("-c", `${driver}.clean=`, "-c", `${driver}.smudge=`, "-c", `${driver}.process=`, "-c", `${driver}.required=false`);
+    }
+  }
+  if (["diff", "show", "log", "format-patch"].includes(commandArgs[0])) {
+    const separator = commandArgs.indexOf("--");
+    commandArgs.splice(separator < 0 ? commandArgs.length : separator, 0, "--no-ext-diff", "--no-textconv");
+  }
+  return execGitSync(
+    [
+      ...globalArgs,
+      "--no-pager",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "core.fsmonitor=false",
+      "-c",
+      "commit.gpgSign=false",
+      "-c",
+      "tag.gpgSign=false",
+      "-c",
+      "log.showSignature=false",
+      "-c",
+      "diff.submodule=short",
+      "-c",
+      "status.submoduleSummary=false",
+      "-c",
+      "gc.auto=0",
+      "-c",
+      "maintenance.auto=false",
+      ...filterArgs,
+      ...commandArgs,
+    ],
+    localOptions
+  );
+}
+
+/**
+ * Stage literal worktree paths as raw blobs without running Git conversions.
+ * Filter discovery cannot secure git add against concurrent config changes;
+ * hash-object --no-filters and update-index --index-info never run drivers.
+ *
+ * @param {string[]} files - Repository-relative literal paths, including deletions.
+ * @param {import("child_process").SpawnSyncOptions & { cwd: string }} options
+ * @returns {void}
+ */
+function stageRawGitFiles(files, options) {
+  const records = [];
+  let zeroOid;
+  for (const file of files) {
+    const segments = file.split("/");
+    if (!file || file.includes("\0") || path.isAbsolute(file) || segments.some(segment => !segment || segment === "." || segment === ".." || segment.toLowerCase() === ".git")) {
+      throw new Error("Unable to stage an unsafe repository-relative path");
+    }
+    let fullPath = options.cwd;
+    let missing = false;
+    for (const segment of segments.slice(0, -1)) {
+      fullPath = path.join(fullPath, segment);
+      try {
+        const parentStats = fs.lstatSync(fullPath);
+        if (parentStats.isSymbolicLink()) throw new Error("Unable to stage a path through a symlink");
+        if (!parentStats.isDirectory()) {
+          missing = true;
+          break;
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        missing = true;
+        break;
+      }
+    }
+    fullPath = path.join(options.cwd, file);
+    let stats;
+    try {
+      if (!missing) stats = fs.lstatSync(fullPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (!stats || stats.isDirectory()) {
+      zeroOid ||= "0".repeat(execLocalGitSync(["hash-object", "--no-filters", "--stdin"], { ...options, input: Buffer.alloc(0) }).trim().length);
+      // Remove old entries before additions for file/directory replacements.
+      records.unshift(`0 ${zeroOid}\t${file}\0`);
+      continue;
+    }
+    let bytes;
+    let mode;
+    if (stats.isSymbolicLink()) {
+      bytes = fs.readlinkSync(fullPath, { encoding: "buffer" });
+      mode = "120000";
+    } else if (stats.isFile()) {
+      const fd = fs.openSync(fullPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+      try {
+        const openedStats = fs.fstatSync(fd);
+        if (!openedStats.isFile()) throw new Error("Unable to stage a non-regular file");
+        bytes = fs.readFileSync(fd);
+        mode = openedStats.mode & 0o111 ? "100755" : "100644";
+      } finally {
+        fs.closeSync(fd);
+      }
+    } else {
+      throw new Error("Unable to stage a non-file path");
+    }
+    const oid = execLocalGitSync(["hash-object", "-w", "--no-filters", "--stdin"], { ...options, input: bytes }).trim();
+    records.push(`${mode} ${oid}\t${file}\0`);
+  }
+  if (records.length > 0) {
+    execLocalGitSync(["update-index", "-z", "--index-info"], { ...options, input: records.join("") });
+  }
 }
 
 /**
@@ -883,18 +1008,20 @@ async function linearizeRangeAsCommit(baseRef, commitMessage, execApi, opts = {}
 }
 
 module.exports = {
+  stageRawGitFiles,
   ensureSafeDirectoryTrust,
   isTransientGitError,
   withGitRetry,
   execGitSync,
   execGitSyncResult,
+  execLocalGitSync,
   backfillCommitObjects,
   checkImplausibleShallowRange,
   ensureFullHistoryForBundle,
   importLocalBundle,
   BUNDLE_HISTORY_ERROR,
   offlineGitOptions,
-  ensureOriginRemoteTrackingRef,
+  hasLocalOriginRemoteTrackingRef,
   extractBundlePrerequisiteCommits,
   getBundlePrerequisites,
   getGitAuthEnv,
