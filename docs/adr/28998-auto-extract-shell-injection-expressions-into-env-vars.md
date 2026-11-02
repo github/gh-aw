@@ -74,6 +74,7 @@ A schema validator could enforce that all `run:` fields contain no `${{ }}` toke
 2. The gateway startup script **MUST** resolve these placeholders after JSON parsing and before URL validation. Substitution **MUST** be single-pass, preserve runtime values as data, and fail explicitly when a compiler-owned binding is absent.
 3. Existing unescaped `$NAME` and `${NAME}` references **MUST** retain runner-environment expansion through `GH_AW_MCP_ENV_<NAME>` placeholders; missing legacy values retain their previous empty-string behavior. Escaped gateway references **MUST** remain deferred to the gateway.
 4. JSON strings **MUST** be encoded before escaping expanding-heredoc metacharacters, so quotes, backslashes, newlines, dollar signs and backticks cannot become shell source or corrupt JSON.
+5. Because the pinned gateway expands environment references again, startup **MUST** reject any string containing `${NAME}` after compiler-expression or legacy runner-reference substitution, including references assembled across a substitution boundary. The error **MUST NOT** include the runtime value or credential name. Literal placeholder data cannot safely pass through this gateway version; strings combining transported data and remaining authored gateway references are also rejected. Authored gateway passthrough without transported substitutions retains its existing behavior.
 
 ### Error Handling
 

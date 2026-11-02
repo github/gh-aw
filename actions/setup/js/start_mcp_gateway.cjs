@@ -576,11 +576,19 @@ function getJSONParseErrorContext(jsonText, parseErrorMessage) {
  */
 function resolveMCPConfigExpressions(value, env = process.env) {
   if (typeof value === "string") {
-    return value.replace(/\$\{(GH_AW_MCP_EXPR_[A-F0-9]{64}|GH_AW_MCP_ENV_([A-Za-z_][A-Za-z0-9_]*))\}/g, (_match, name, legacyName) => {
+    let transported = false;
+    const resolved = value.replace(/\$\{(GH_AW_MCP_EXPR_[A-F0-9]{64}|GH_AW_MCP_ENV_([A-Za-z_][A-Za-z0-9_]*))\}/g, (_match, name, legacyName) => {
+      transported = true;
       if (legacyName) return env[legacyName] ?? "";
       if (env[name] === undefined) throw new Error(`${ERR_CONFIG}: MCP configuration environment variable ${name} is not set`);
       return env[name];
     });
+    // The pinned gateway expands placeholders again, including in parsed headers
+    // and env values. It cannot safely accept literal placeholders from data.
+    if (transported && /\$\{[A-Za-z_][A-Za-z0-9_]*\}/.test(resolved)) {
+      throw new Error(`${ERR_CONFIG}: Transported MCP configuration data must not contain gateway environment references`);
+    }
+    return resolved;
   }
   if (Array.isArray(value)) return value.map(entry => resolveMCPConfigExpressions(entry, env));
   if (value && typeof value === "object") {

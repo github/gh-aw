@@ -6,7 +6,7 @@ describe("MCP configuration expression transport", () => {
   const expressionB = `GH_AW_MCP_EXPR_${"B".repeat(64)}`;
 
   it("resolves parsed URLs, headers and arguments without corrupting JSON bytes", () => {
-    const runtimeValue = '"\\\n\r\t`$(touch marker)` ' + `\${${expressionB}}`;
+    const runtimeValue = '"\\\n\r\t`$(touch marker)` $literal';
     const config = {
       http: {
         url: `http://localhost:\${${expressionA}}/mcp`,
@@ -27,7 +27,7 @@ describe("MCP configuration expression transport", () => {
   });
 
   it("resolves normalized legacy shell references without expanding inserted values again", () => {
-    const runtimeValue = '"\\\n`$(literal)` ${GH_AW_MCP_ENV_OTHER}';
+    const runtimeValue = '"\\\n`$(literal)` $literal';
     const resolved = resolveMCPConfigExpressions(
       {
         url: "http://host.docker.internal:${GH_AW_MCP_ENV_GH_AW_MCP_SCRIPTS_PORT}",
@@ -47,5 +47,40 @@ describe("MCP configuration expression transport", () => {
 
   it("rejects missing compiler bindings without revealing runtime values", () => {
     expect(() => resolveMCPConfigExpressions(`\${${expressionA}}`, {})).toThrow(`MCP configuration environment variable ${expressionA} is not set`);
+  });
+
+  it.each(["${GITHUB_TOKEN}", "${UNSET_CREDENTIAL}", `\${${expressionB}}`])("rejects downstream expansion in transported data: %s", payload => {
+    for (const reference of [`\${${expressionA}}`, "${GH_AW_MCP_ENV_VALUE}"]) {
+      for (const config of [{ remote: { url: `https://example.invalid/${reference}` } }, { remote: { headers: { "X-Value": reference } } }, { local: { args: [reference], env: { VALUE: reference } } }]) {
+        expect(() => resolveMCPConfigExpressions(config, { [expressionA]: payload, VALUE: payload, GITHUB_TOKEN: "dummy-private-credential" })).toThrow("Transported MCP configuration data must not contain gateway environment references");
+      }
+    }
+  });
+
+  it.each([
+    ["$", "{GITHUB_TOKEN}"],
+    ["${GITHUB_", "TOKEN}"],
+  ])("rejects references assembled across a substitution boundary", (payload, suffix) => {
+    expect(() => resolveMCPConfigExpressions(`\${${expressionA}}${suffix}`, { [expressionA]: payload })).toThrow("Transported MCP configuration data must not contain gateway environment references");
+  });
+
+  it("rejects references assembled from authored prefixes or adjacent substitutions", () => {
+    expect(() => resolveMCPConfigExpressions("${GITHUB_" + `\${${expressionA}}`, { [expressionA]: "TOKEN}" })).toThrow("Transported MCP configuration data must not contain gateway environment references");
+    expect(() => resolveMCPConfigExpressions(`\${${expressionA}}\${${expressionB}}`, { [expressionA]: "${GITHUB_", [expressionB]: "TOKEN}" })).toThrow("Transported MCP configuration data must not contain gateway environment references");
+  });
+
+  it("rejects mixed transported data and gateway passthrough while retaining standalone passthrough", () => {
+    expect(() => resolveMCPConfigExpressions(`\${${expressionA}} \${GITHUB_TOKEN}`, { [expressionA]: "safe" })).toThrow("Transported MCP configuration data must not contain gateway environment references");
+    expect(resolveMCPConfigExpressions({ headers: { "X-Key": "${GITHUB_TOKEN}" } }, {})).toEqual({ headers: { "X-Key": "${GITHUB_TOKEN}" } });
+  });
+
+  it("keeps a harmless transported value literal through downstream gateway expansion", () => {
+    const config = resolveMCPConfigExpressions({ remote: { headers: { "X-Value": `\${${expressionA}}` } } }, { [expressionA]: '"\\\n`$(literal)` $literal' });
+    const gatewayEnvironment = { GITHUB_TOKEN: "dummy-private-credential" };
+    const expand = text => text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name) => gatewayEnvironment[name] ?? "");
+    // Gateway v0.5.0 expands raw JSON first and parsed header/env maps again.
+    const parsed = JSON.parse(expand(JSON.stringify(config)));
+    expect(expand(parsed.remote.headers["X-Value"])).toBe(config.remote.headers["X-Value"]);
+    expect(JSON.stringify(parsed)).not.toContain(gatewayEnvironment.GITHUB_TOKEN);
   });
 });
