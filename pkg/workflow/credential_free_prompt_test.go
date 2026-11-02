@@ -93,6 +93,88 @@ func TestPromptRejectsSecretBackedAuthorBindings(t *testing.T) {
 	require.ErrorContains(t, validatePromptSecretBindings(&WorkflowData{MarkdownContent: "${{ env.GITHUB_TOKEN }}"}, ""), "credential")
 }
 
+func TestPromptValueUsesCredentials(t *testing.T) {
+	for _, test := range []struct {
+		value      string
+		credential bool
+	}{
+		{value: "${{ vars.LOG_LEVEL || 'info' }}"},
+		{value: "${{ vars['LOG_LEVEL'] }}"},
+		{value: "${{ github.actor == 'bot' && vars.LOG_LEVEL }}"},
+		{value: "${{ vars.LOG_LEVEL || secrets.PRIVATE }}", credential: true},
+		{value: "${{ vars['LOG_LEVEL'] || secrets['PRIVATE'] }}", credential: true},
+		{value: "${{ vars.LOG_LEVEL || github.token }}", credential: true},
+		{value: "${{ vars.LOG_LEVEL || github['token'] }}", credential: true},
+	} {
+		t.Run(test.value, func(t *testing.T) {
+			assert.Equal(t, test.credential, promptValueUsesCredentials(test.value))
+		})
+	}
+}
+
+func TestCompilerPromptConfigurationVariableBoundary(t *testing.T) {
+	for _, strict := range []string{"true", "false"} {
+		for _, location := range []string{"main", "local-import"} {
+			t.Run("strict="+strict+"/"+location, func(t *testing.T) {
+				workflows := filepath.Join(t.TempDir(), ".github", "workflows")
+				require.NoError(t, os.MkdirAll(workflows, 0700))
+				for _, test := range []struct {
+					name       string
+					value      string
+					expression string
+					errorText  string
+				}{
+					{
+						name:       "explicit non-secret alias",
+						value:      "${{ vars.LOG_LEVEL || 'info' }}",
+						expression: "env.LOG_LEVEL || 'info'",
+					},
+					{
+						name:       "direct vars access",
+						value:      "${{ vars.LOG_LEVEL }}",
+						expression: "vars.LOG_LEVEL || 'info'",
+						errorText:  "unauthorized expressions",
+					},
+					{
+						name:       "alias with secret fallback",
+						value:      "${{ vars.LOG_LEVEL || secrets.PRIVATE }}",
+						expression: "env.LOG_LEVEL || 'info'",
+						errorText:  "prompt creation has no secrets",
+					},
+				} {
+					t.Run(test.name, func(t *testing.T) {
+						body := "Level: ${{ " + test.expression + " }}\n"
+						if location == "local-import" {
+							require.NoError(t, os.WriteFile(filepath.Join(workflows, "inner.md"), []byte(body), 0600))
+							require.NoError(t, os.WriteFile(filepath.Join(workflows, "outer.md"), []byte("{{#runtime-import inner.md}}"), 0600))
+							body = "{{#runtime-import outer.md}}\n"
+						}
+						filename := filepath.Join(workflows, "test.md")
+						source := "---\non: workflow_dispatch\nstrict: " + strict + "\nengine: copilot\nenv:\n  LOG_LEVEL: " + test.value + "\n---\n" + body
+						require.NoError(t, os.WriteFile(filename, []byte(source), 0600))
+						compiler := NewCompiler()
+						compiler.SetQuiet(true)
+						err := compiler.CompileWorkflow(filename)
+						if test.errorText != "" {
+							errorText := test.errorText
+							if strict == "true" && test.name == "alias with secret fallback" {
+								errorText = "strict mode: secrets detected in 'env' section"
+							}
+							require.ErrorContains(t, err, errorText)
+							return
+						}
+						require.NoError(t, err)
+						compiled, err := os.ReadFile(filepath.Join(workflows, "test.lock.yml"))
+						require.NoError(t, err)
+						assert.Contains(t, string(compiled), "LOG_LEVEL: "+test.value)
+						assert.Contains(t, string(compiled), ": ${{ "+test.expression+" }}")
+					})
+				}
+			})
+		}
+	}
+}
+
 func TestCompilerRejectsSecretBackedLocalAuthorBinding(t *testing.T) {
 	root := t.TempDir()
 	workflows := filepath.Join(root, ".github", "workflows")

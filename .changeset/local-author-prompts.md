@@ -10,4 +10,6 @@ Prompt generation keeps pinned `actions/github-script` with a non-secret token p
 
 Prompt import trees include a `trust: author` label on the root and every local import node, including nested and cached imports. Older `untrusted` labels remain historical metadata, not permission to load remote content.
 
+Event-derived work-queue assignments retain their JSON framing, gain explicit data-only guidance, and remain literal through prompt directives and deferred substitution. Non-secret `vars`-backed environment aliases remain supported; direct `vars` prompt expressions and credential-backed bindings remain prohibited.
+
 Upgrade the compiler and setup runtime together and recompile workflow locks. Older runtimes cannot consume `author_file` plans, and older locks do not supply the new local author bindings. Move credential use to authenticated steps outside prompt generation, and migrate every remote runtime import to a permitted local file or agent-side retrieval.

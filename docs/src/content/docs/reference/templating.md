@@ -29,6 +29,8 @@ All other expressions are disallowed, including `secrets.*`, `vars.*`, and compl
 
 The main workflow and local runtime-import files support `env.*` expressions, including comparisons and defaults such as `${{ env.LOG_LEVEL || 'info' }}`. The compiler creates explicit bindings evaluated by GitHub Actions; this is not access to the runner's entire environment. Secret-backed environment variables and known credential variables cannot be bound into prompts, including in non-strict mode.
 
+An explicitly selected non-secret environment variable may be configured from `vars.*` in YAML frontmatter, for example `LOG_LEVEL: ${{ vars.LOG_LEVEL || 'info' }}`, then referenced as `${{ env.LOG_LEVEL }}` in an author source. The direct `vars.*` prompt restriction does not prohibit this configuration alias. Authors must not store credentials in configuration variables or select credential-bearing values as prompt bindings.
+
 Local runtime imports have the same author expression capabilities as the main workflow, including nested local imports within the permitted folders. Evaluated values remain literal data and cannot introduce additional imports or directives. Remote runtime imports are rejected, even when optional or nested in local files.
 
 ### Prompt Execution and Credentials
@@ -49,6 +51,8 @@ allowed: [github.repository, github.actor, github.workflow, ...]
 Include or exclude prompt sections based on boolean expressions using `{{#if ...}} ... {{/if}}` blocks.
 
 Only directives written in workflow templates or imported prompt sources execute. Substituted event content and job outputs remain literal, including template markers inside inline code or fenced code blocks. Template examples written inside code regions are also preserved. Values referenced by author-written conditions still determine which branch is selected.
+
+Work-queue assignments selected from event payloads are JSON-encoded with explicit data-only guidance. Their rendered work-claim envelopes remain literal through directive processing and deferred substitution, preserving claim-completion guidance. The data-only instruction is model guidance, not a guarantee against semantic prompt injection.
 
 ### Syntax
 
