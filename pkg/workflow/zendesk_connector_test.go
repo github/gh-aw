@@ -167,8 +167,10 @@ func TestZendeskConnectorDocumentation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, data.SafeOutputs.Staged)
 	require.Equal(t, "true", string(*data.SafeOutputs.Staged))
-	_, err = compiler.CompileToYAML(data, path)
+	output, err := compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
+	require.NotContains(t, output, "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}", "staging must omit writer credential bindings")
+	require.Contains(t, output, "zendesk_add_internal_note")
 }
 
 func TestZendeskConnectorIndependentSelections(t *testing.T) {
@@ -198,6 +200,10 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 			require.Equal(t, test.write, config.SafeOutputs != nil)
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
+			require.NotContains(t, output, "Checkout trusted connector runtime")
+			require.NotContains(t, output, "Build trusted connector runtime")
+			require.NotContains(t, output, "connector_7_zendesk_")
+			require.NotContains(t, data.Tools, "connector-zendesk")
 			var workflow map[string]any
 			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
 			jobs := workflow["jobs"].(map[string]any)
@@ -205,6 +211,10 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 			require.NoError(t, err)
 			require.NotContains(t, string(agent), "${{ secrets.ZENDESK_WRITE_OAUTH_TOKEN }}")
 			if test.read {
+				tool, ok := data.Tools["zendesk"].(map[string]any)
+				require.True(t, ok)
+				require.Equal(t, "node", tool["entrypoint"])
+				require.Equal(t, []string{"${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs", "serve"}, tool["entrypointArgs"])
 				require.Equal(t, []string{"ZENDESK_READ_OAUTH_TOKEN"}, config.Agent.Secrets())
 				require.Equal(t, []string{"get_ticket"}, config.Agent.ToolNames())
 				require.Contains(t, string(agent), "${{ secrets.ZENDESK_READ_OAUTH_TOKEN }}")
@@ -218,6 +228,9 @@ func TestZendeskConnectorIndependentSelections(t *testing.T) {
 				require.NotContains(t, output, "${{ secrets.ZENDESK_READ_OAUTH_TOKEN }}")
 			}
 			if test.write {
+				require.Contains(t, data.SafeOutputs.Scripts, "zendesk-add-internal-note")
+				require.Contains(t, output, "zendesk_add_internal_note")
+				require.Contains(t, output, "process.execPath")
 				require.Equal(t, []string{"ZENDESK_WRITE_OAUTH_TOKEN"}, config.SafeOutputs.Secrets())
 				require.Equal(t, []string{"add-internal-note"}, config.SafeOutputs.SafeOutputNames())
 				effects, err := json.Marshal(jobs["safe_outputs"])

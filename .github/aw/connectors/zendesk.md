@@ -237,6 +237,9 @@ import-schema:
       ticket despite string path inputs. No wildcard or multi-ticket grant,
       arbitrary URL, query, pagination, search, custom domain or field selection
       is exposed.
+      The read bridge and effect host run the Node connector runtime bundled by
+      the trusted AW setup action. No consumer Go CLI installation, runtime
+      repository checkout or build is required.
     </endpoints>
   </configuration>
   <capabilities>

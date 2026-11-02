@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -114,16 +115,24 @@ func TestZendeskConnectorGrantBoundaries(t *testing.T) {
 }
 
 func TestZendeskConnectorStagedHostDoesNotReadSecrets(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is required for the staged safe-output host")
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("Node.js is required for the staged safe-output host")
+	}
+	runnerTemp := t.TempDir()
+	actions := filepath.Join(runnerTemp, "gh-aw", "actions")
+	require.NoError(t, os.MkdirAll(actions, 0700))
+	for _, name := range []string{"connector_runtime.cjs", "connector_regex.cjs", "error_codes.cjs"} {
+		asset, err := os.ReadFile(filepath.Join("../../actions/setup/js", name))
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(actions, name), asset, 0600))
 	}
 	_, data, _, err := parseZendeskWorkflow(t, zendeskFixture(t, "workflow.md"))
 	require.NoError(t, err)
 	require.Len(t, data.SafeOutputs.Scripts, 1)
-	var script string
-	for _, effect := range data.SafeOutputs.Scripts {
-		script = effect.Script
-	}
+	effect := data.SafeOutputs.Scripts["zendesk-add-internal-note"]
+	require.NotNil(t, effect)
+	script := effect.Script
 	source, err := json.Marshal(script)
 	require.NoError(t, err)
 	plan := data.Connectors["zendesk"].SafeOutputs
@@ -139,14 +148,16 @@ func TestZendeskConnectorStagedHostDoesNotReadSecrets(t *testing.T) {
 const assert = require('node:assert/strict');
 let calls = 0;
 const proposal = %s;
+const runnerTemp = %q;
 const adaptedRequire = name => {
   if (name === 'node:child_process') return {spawnSync: (binary, args, options) => {
     calls++;
-    assert.deepEqual(args, ['connectors','invoke','safe-output','add-internal-note','--stage']);
+    assert.equal(binary, process.execPath);
+    assert.deepEqual(args, [require('node:path').join(runnerTemp,'gh-aw','actions','connector_runtime.cjs'),'invoke','safe-output','add-internal-note','--stage']);
     assert.deepEqual(options.env, {GH_AW_CONNECTOR_PLAN: %s});
     assert.deepEqual(JSON.parse(options.input), proposal.arguments);
     assert.equal(options.shell, undefined);
-    return {status: 0, stdout: JSON.stringify({staged:true,request:proposal})};
+    return require('node:child_process').spawnSync(binary, args, options);
   }};
   if (name === './safe_output_helpers.cjs') return {isStagedMode: () => true};
   if (name === './connector_effect_bindings.cjs') return {connectorEffectBindings: () => ({
@@ -156,16 +167,18 @@ const adaptedRequire = name => {
   return require(name);
 };
 const env = new Proxy({}, {get: (_, key) => {
-  if (key === 'RUNNER_TEMP') return '/trusted';
+  if (key === 'RUNNER_TEMP') return runnerTemp;
   throw new Error('staging must not read provider credentials: ' + key);
 }});
 const result = new Function('item','require','process','temporaryIdMap', %s)(
   {type:'zendesk_add_internal_note', ...proposal.arguments},
-  adaptedRequire, {env}, new Map()
+  adaptedRequire, {execPath:process.execPath, env}, new Map()
 );
 assert.deepEqual(result, {staged:true,request:proposal});
 assert.equal(calls, 1);
-`, proposalJSON, encodedJSON, source)
-	output, err := exec.CommandContext(t.Context(), "node", "-e", driver).CombinedOutput()
+`, proposalJSON, runnerTemp, encodedJSON, source)
+	command := exec.CommandContext(t.Context(), node, "-e", driver)
+	command.Env = []string{}
+	output, err := command.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 }
