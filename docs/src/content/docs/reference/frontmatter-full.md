@@ -20721,17 +20721,15 @@ safe-outputs:
   # Format 2: Enable artifact uploads with default configuration
   upload-artifact: null
 
-  # ⚠️ Experimental. Enable AI agents to upload a code coverage report (e.g. a
-  # Cobertura XML file) to GitHub's code coverage API via
-  # actions/upload-code-coverage. Using this field emits a compile-time warning. The
-  # agent stages the report file and calls the tool with file/language/label; a
-  # separate job performs the actual upload with dedicated code-quality: write
-  # permissions.
+  # Enable AI agents to upload a code coverage report (e.g. a Cobertura XML file) to
+  # GitHub's code coverage API via actions/upload-code-coverage. The agent stages the
+  # report file and calls the tool with file/language/label; a separate job performs
+  # the actual upload with dedicated code-quality: write permissions.
   # (optional)
   # Accepted formats:
 
-  # Format 1: ⚠️ Experimental. Configuration for uploading a code coverage report
-  # via actions/upload-code-coverage
+  # Format 1: Configuration for uploading a code coverage report via
+  # actions/upload-code-coverage
   upload-code-coverage:
     # Trusted queue coverage target; independently resolved to the immutable worker
     # revision before upload.

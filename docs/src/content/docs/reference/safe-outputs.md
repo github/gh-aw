@@ -80,7 +80,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Create PR](/gh-aw/reference/safe-outputs-pull-requests/#pull-request-creation-create-pull-request) | `create-pull-request` | Create pull requests with code changes (default max: 1, configurable) |
 | [Update PR](/gh-aw/reference/safe-outputs-pull-requests/#pull-request-updates-update-pull-request) | `update-pull-request` | Update PR title or body (max: 1) |
 | [Close PR](/gh-aw/reference/safe-outputs-pull-requests/#close-pull-request-close-pull-request) | `close-pull-request` | Close pull requests without merging (max: 10) |
-| [Approve Workflow Run](/gh-aw/reference/safe-outputs-pull-requests/#approve-workflow-run-approve-workflow-run) | `approve-workflow-run` | Approve a pending workflow run in the "action required" state (max: 1, experimental) |
+| [Approve Workflow Run](/gh-aw/reference/safe-outputs-pull-requests/#approve-workflow-run-approve-workflow-run) | `approve-workflow-run` | Approve a pending workflow run in the "action required" state (max: 1) |
 | [Merge PR](/gh-aw/reference/safe-outputs-pull-requests/#merge-pull-request-merge-pull-request) | `merge-pull-request` | Merge pull requests after policy gates pass (max: 1, experimental) |
 | [PR Review Comments](/gh-aw/reference/safe-outputs-pull-requests/#pr-review-comments-create-pull-request-review-comment) | `create-pull-request-review-comment` | Create review comments on code lines (max: 10) |
 | [Reply to PR Review Comment](/gh-aw/reference/safe-outputs-pull-requests/#reply-to-pr-review-comment-reply-to-pull-request-review-comment) | `reply-to-pull-request-review-comment` | Reply to existing review comments (max: 10) |
@@ -140,7 +140,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 |--------|-----|-------------|
 | [Dispatch Workflow](#workflow-dispatch-dispatch-workflow) | `dispatch-workflow` | Trigger other workflows with inputs (max: 3, same-repo only) |
 | [Call Workflow](#workflow-call-call-workflow) | `call-workflow` | Call reusable workflows via compile-time fan-out (max: 1, same-repo only) |
-| [Dispatch Repository Event](#repository-dispatch-dispatch-repository) | `dispatch-repository` | Trigger `repository_dispatch` events in external repositories, experimental (cross-repo) |
+| [Dispatch Repository Event](#repository-dispatch-dispatch-repository) | `dispatch-repository` | Trigger `repository_dispatch` events in external repositories (cross-repo) |
 | [Code Scanning Alerts](#code-scanning-alerts-create-code-scanning-alert) | `create-code-scanning-alert` | Generate SARIF security advisories (max: unlimited, same-repo only) |
 | [Autofix Code Scanning Alerts](#autofix-code-scanning-alerts-autofix-code-scanning-alert) | `autofix-code-scanning-alert` | Create automated fixes for code scanning alerts (max: 10, same-repo only) |
 | [Create Check Run](#check-run-creation-create-check-run) | `create-check-run` | Create GitHub Check Runs to surface analysis results in the PR checks UI (default max: 1, same-repo only) |
@@ -1584,9 +1584,6 @@ Use `call-workflow` for deterministic fan-out where actor attribution and zero A
 **Security**: Same-repo only; only allowlisted workflows can be called; compile-time validation catches misconfiguration early.
 
 ### Repository Dispatch (`dispatch-repository`)
-
-> [!CAUTION]
-> This is an experimental feature. Compiling a workflow with `dispatch-repository` emits a warning: `Using experimental feature: dispatch-repository`. The API may change in future releases.
 
 Triggers [`repository_dispatch`](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#repository_dispatch) events in external repositories. Unlike `dispatch-workflow` (same-repo only), `dispatch-repository` is designed for cross-repository orchestration.
 
