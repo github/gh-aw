@@ -1,7 +1,8 @@
 # Experimental connector contract v1
 
 This is a configuration-interface prototype, not a deployed integration.
-`ConnectorSpec` in `spec.go` is the authoritative typed schema; `LoadSpec` parses
+`ConnectorSpec` in `spec.go` is the authoritative typed schema; `Schema(kind)`
+exports structural JSON Schema for all three document kinds. `LoadSpec` parses
 YAML 1.2 or JSON, rejects unknown fields, and validates security invariants.
 The version string is `github.com/gh-aw/connectors/v1`.
 
@@ -42,7 +43,8 @@ context: [issue-details]
 Definition/connection paths are relative to the repository root, not the binding
 file. Connections contain secret **names**, never values. Endpoints are fixed
 HTTPS origins in the definition and cannot be overridden by connections or
-agent inputs. Input names use lowercase kebab-case; string inputs require an
+agent inputs. Input names accept identifiers including native MCP camelCase
+and snake_case; string inputs require an
 explicit `maxLength`. `resources` maps input names to connection resource
 allowlists. Required resource inputs must match those allowlists exactly.
 
@@ -50,13 +52,46 @@ Requests have a fixed method, endpoint and path. `{name}` path segments are
 bound through `pathInputs`; `query` and `body` values are `{input: name}` or
 `{literal: <JSON value>}`. There is no shell, JavaScript, Actions expression,
 remote import or expression language. `graphql` is a fixed document; `query`
-then supplies GraphQL variables, not URL parameters. JSON Patch, multipart,
-pagination, arbitrary headers, OAuth acquisition and dynamic endpoints are
-unsupported in v1.
+then supplies GraphQL variables, not URL parameters. `patch` is an array of
+`{op: add|replace|test, path: /fixed/pointer, value: {input: name}}` (or
+`value: {literal: ...}`) on safe-output POST/PATCH requests, serialized as
+`application/json-patch+json`. It cannot coexist with another body.
+Multipart, pagination, arbitrary headers, OAuth acquisition, text-to-ADF
+conversion, automatic version preflights and dynamic endpoints are unsupported.
+
+`Input.pattern` accepts bounded RE2 patterns. `Operation.responseChecks` maps
+JSON Pointers to required literal values (e.g. `/ok: true`); `responseRequired`
+lists required non-null/nonempty evidence. `responseResources` maps JSON
+Pointers to connection resource allowlists. `project` maps output field names
+to JSON Pointers and excludes all other response fields. GraphQL `errors` are
+always failures, including HTTP 200 responses. The runtime never retries writes.
 
 Each credential has exactly one phase: `agent`, `context`, or `safe-output`.
-MCP entries are exact allowlisted tool names backed by bounded read requests,
-not arbitrary remote MCP server access. GraphQL read documents must be queries,
+`mcp` entries are exact allowlisted REST-backed read tools. `httpMcp` entries
+register real streamable-HTTP MCP servers:
+
+```yaml
+httpMcp:
+  provider:
+    url: https://mcp.example.com/mcp
+    credential: reader
+    readOnly: true
+    headers: {X-MCP-Readonly: "true"}
+    maxResponseBytes: 65536
+    tools:
+      get_issue:
+        inputs:
+          issueId: {type: string, required: true, maxLength: 80}
+        resources: {issueId: issues}
+```
+
+Select them with `ConnectorBinding.httpMcp: [provider]`. The adapter exposes
+`provider__get_issue` and validates exact tools, primitive argument schemas and
+resource constraints before forwarding. Only fixed `X-MCP-*` headers are
+supported; credentials use the phase-specific reference. `readOnly` is an
+operator declaration, not proof: approve tools and provision read-scoped
+credentials. Never pass registrations directly to engines: that bypasses the
+adapter's argument checks. GraphQL read documents must be queries,
 never mutations. Context results must be labeled untrusted. Safe outputs are
 typed requests to be validated again outside the agent credential boundary;
 declaring an operation never authorizes or records a mutation.
@@ -67,3 +102,36 @@ normalization. A profile string does **not** approve a verifier. No receiver
 ships here, and the existing gateway does not accept custom webhook sources.
 Source enrollment, provenance, admission and replay protection must not be
 bypassed. Validation and fixture projection are not operational activation.
+`Trigger.resources` maps evidence JSON Pointers to connection allowlists.
+
+## Host integration
+
+`Lower(repositoryRoot, binding)` loads confined repository-local files, freezes
+all three documents and returns a content-addressed `Plan`. `Plan.Digest` changes
+when definitions, secret references, resources or selections change. No remote
+definition fetches or credential resolution occur during lowering.
+
+`Plan.ProjectEvent(name, nativeEvent, payload)` exercises matching, resource
+constraints and projection, explicitly returning `operational: false` and
+`untrusted: true`. `Plan.ActivateTriggers()` fails with `ErrIngressUnavailable`.
+It cannot be used to bypass existing gateway admission/provenance checks.
+
+`Plan.Execute(ctx, runtime, capability, name, args)` accepts `mcp`, `context` or
+`safe-output`. `Runtime` requires a matching phase (`agent` for MCP), an
+operator-owned `AllowedOrigins`, and `ResolveSecret(ctx, phase, secretName)`.
+Safe-output writes additionally require `AllowWrites: true`. All HTTP responses
+are bounded, all redirects refused, and results labeled untrusted.
+
+`Plan.PrepareSafeOutput(name, args)` returns a credential-free
+`SafeOutputRequest`, not an effect. Host safe-output handling passes it to
+`Plan.ExecuteSafeOutput` in the separate safe-output phase, which checks the
+plan digest and validates arguments again. It does not record staged requests
+as successful mutations.
+
+`Plan.CallMCP` calls a real remote SDK endpoint under local tool/argument gates.
+`Plan.MCPServer(runtime)` registers selected REST-backed and remote MCP tools
+using the standard MCP SDK, for a trusted host adapter behind the existing
+gateway. This package does not add workflow frontmatter syntax, spawn a server,
+or install a receiver. Existing imports, built-in tools, safe outputs and gateway
+security behavior are unchanged. Compiler job scheduling and operational
+enrollment remain explicit integration work, not implied by a valid declaration.

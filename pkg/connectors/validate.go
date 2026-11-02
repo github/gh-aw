@@ -76,7 +76,7 @@ func (s *ConnectorSpec) validateTriggers() error {
 
 func (s *ConnectorSpec) validateOperations() error {
 	for name, tool := range s.MCP {
-		if !namePattern.MatchString(tool.Tool) {
+		if !toolPattern.MatchString(tool.Tool) {
 			return fmt.Errorf("MCP %q requires an exact tool name (no wildcards)", name)
 		}
 		if err := s.validateOperation(name, tool.Operation, "agent"); err != nil {
@@ -93,7 +93,10 @@ func (s *ConnectorSpec) validateOperations() error {
 			return err
 		}
 	}
-	if len(s.Triggers)+len(s.MCP)+len(s.SafeOutputs)+len(s.Context) == 0 {
+	if err := s.validateHTTPMCP(); err != nil {
+		return err
+	}
+	if len(s.Triggers)+len(s.MCP)+len(s.HTTPMCP)+len(s.SafeOutputs)+len(s.Context) == 0 {
 		return errors.New("connector must declare at least one capability")
 	}
 	return nil
@@ -127,6 +130,9 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if op.Request.GraphQL != "" && (method != "POST" || len(op.Request.Body) != 0) {
 		return fmt.Errorf("operation %q GraphQL requires POST and no body (query contains variable declarations; body inputs use query)", name)
 	}
+	if err := validatePayload(op, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
+	}
 	path := op.Request.Path
 	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.ContainsAny(path, "?#\\%") || strings.Contains(path, "..") || strings.Contains(path, "${") {
 		return fmt.Errorf("operation %q requires a fixed absolute path without query, escaping or expressions", name)
@@ -139,7 +145,7 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 
 func validateInputs(inputs map[string]Input) error {
 	for key, input := range inputs {
-		if !namePattern.MatchString(key) {
+		if !argumentPattern.MatchString(key) {
 			return fmt.Errorf("invalid input name %q", key)
 		}
 		if input.Type != "string" && input.Type != "integer" && input.Type != "number" && input.Type != "boolean" {
@@ -150,6 +156,18 @@ func validateInputs(inputs map[string]Input) error {
 		}
 		if input.Type != "string" && (input.MaxLength != 0 || len(input.Enum) != 0) {
 			return fmt.Errorf("input %q string constraints require type string", key)
+		}
+		if input.Type != "number" && input.Type != "integer" && (input.Minimum != nil || input.Maximum != nil) {
+			return fmt.Errorf("input %q numeric bounds require number or integer type", key)
+		}
+		if input.Pattern != "" {
+			if input.Type != "string" || len(input.Pattern) > 1024 {
+				return fmt.Errorf("input %q pattern requires a string and at most 1024 bytes", key)
+			}
+			//nolint:regexpdynamicpattern // RE2 pattern is bounded to 1024 bytes and compilation errors are returned.
+			if _, err := regexp.Compile(input.Pattern); err != nil {
+				return fmt.Errorf("input %q has invalid pattern: %w", key, err)
+			}
 		}
 		if input.Minimum != nil && input.Maximum != nil && *input.Minimum > *input.Maximum {
 			return fmt.Errorf("input %q minimum exceeds maximum", key)
@@ -188,6 +206,11 @@ func validateRequestBindings(name string, op Operation, path string) error {
 					return fmt.Errorf("operation %q references unknown input %q", name, value.Input)
 				}
 			}
+		}
+	}
+	for _, patch := range op.Request.Patch {
+		if err := validateValue(patch.Value, op.Inputs); err != nil {
+			return fmt.Errorf("operation %q patch: %w", name, err)
 		}
 	}
 	return nil
