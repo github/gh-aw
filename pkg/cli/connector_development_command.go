@@ -17,6 +17,7 @@ import (
 
 type connectorDevelopmentOptions struct {
 	root, file, phase, capability, arguments, remoteTool, nodeRuntime string
+	nativeEvent                                                       string
 	inputs, grants                                                    []string
 	timeout                                                           time.Duration
 }
@@ -28,6 +29,7 @@ Use setup for credential provisioning guidance; it never reads or writes secret 
 Use test for one explicitly selected capability and exact resource grants. Read tests
 contact the declared provider using only that phase's named environment secrets.
 Safe-output tests are always staged: no credentials, requests, or live writes.
+Trigger tests project native fixture JSON offline; they never enroll a receiver.
 
 Declarations are discovered from .github/workflows/connectors/<id>.md, or an explicit
 --file within the repository. There is no built-in provider catalog or source fallback.
@@ -85,7 +87,8 @@ func NewConnectorCommand() *cobra.Command {
 	cmd.Flags().StringVar(&options.file, "file", "", "Explicit repository-owned AW Markdown declaration or normal-import wrapper within --root")
 	cmd.Flags().StringArrayVar(&options.inputs, "input", nil, "Import-schema binding name=JSON, e.g. 'reader-secret=\"DEV_READ_TOKEN\"' (repeatable)")
 	cmd.Flags().StringArrayVar(&options.grants, "grant", nil, "Exact resource allowlist resource=JSON-array, e.g. 'issues=[\"ISSUE-1\"]' (repeatable)")
-	cmd.Flags().StringVar(&options.phase, "phase", "", "Credential phase: agent, context, or safe-output (required for test; optional setup filter)")
+	cmd.Flags().StringVar(&options.phase, "phase", "", "Test phase: agent, context, safe-output, or offline trigger (required for test; credential phase for setup)")
+	cmd.Flags().StringVar(&options.nativeEvent, "native-event", "", "Native event discriminator for offline --phase trigger; --args is the native fixture payload")
 	cmd.Flags().StringVar(&options.capability, "capability", "", "Exact declared capability name to test (required for test)")
 	cmd.Flags().StringVar(&options.arguments, "args", "{}", "Typed capability arguments as a JSON object; never contains credentials")
 	cmd.Flags().StringVar(&options.remoteTool, "remote-tool", "", "Exact allowlisted tools/call name, required only for an HTTP MCP capability")
@@ -121,7 +124,7 @@ func runDevelopmentConnector(cmd *cobra.Command, args []string, options *connect
 		return fmt.Errorf("load connector: %w", err)
 	}
 	if action == "setup" {
-		for _, flag := range []string{"capability", "args", "remote-tool", "node-runtime", "timeout"} {
+		for _, flag := range []string{"capability", "args", "remote-tool", "node-runtime", "native-event", "timeout"} {
 			if cmd.Flags().Changed(flag) {
 				return fmt.Errorf("--%s applies only to connector test", flag)
 			}

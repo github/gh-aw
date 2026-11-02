@@ -50,6 +50,24 @@ function fixture() {
 }
 
 describe("connector webhook routing", () => {
+  it("requires the exact source evaluator version and closed bounded rules", () => {
+    const { subscription, dispatch, env } = fixture();
+    const source = subscription.connector;
+    source.evaluation_version = "gh-aw/event-predicates/v1";
+    source.when = { path: "/state/new", other: "/state/old", op: "enters", values: ["Done"] };
+    source.filters = { sender: { path: "/actor/id", type: "string", values: ["approved"] } };
+    subscription.conditions.push({ filter: "connector_filter_sender", path: ["actor", "id"], operator: "equals", value_type: "string", values: ["approved"] });
+    dispatch.client_payload.aw_context.webhook.deliveries[0].payload.filters.connector_filter_sender = ["approved"];
+    expect(validateWebhook(dispatch, env([subscription])).skipped).toBe(false);
+    for (const version of ["", "gh-aw/event-predicates/v2", undefined]) {
+      source.evaluation_version = version;
+      expect(() => validateWebhook(dispatch, env([subscription]))).toThrow();
+    }
+    source.evaluation_version = "gh-aw/event-predicates/v1";
+    source.when.op = "execute";
+    expect(() => validateWebhook(dispatch, env([subscription]))).toThrow();
+  });
+
   it("uses the existing closed envelope and yields reference-only, non-GitHub identities", () => {
     const { subscription, dispatch, env } = fixture();
     expect(validateWebhook(dispatch, env([subscription]))).toMatchObject({ skipped: false, delivery_ids: ["verified-native-delivery"] });

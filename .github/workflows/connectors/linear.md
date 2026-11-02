@@ -67,7 +67,14 @@ connectors:
           /data/teamId: teams
           /organizationId: organizations
         verificationProfile: linear.app/hmac-sha256-timestamp
+        filters: &linear-event-filters
+          issue-id: {path: /data/id, type: string}
+          organization-id: {path: /organizationId, type: string}
+          team-id: {path: /data/teamId, type: string}
+          labels: {path: "/data/labelIds/*", type: string}
+          sender: {path: /actor/id, type: string}
       issue-removed:
+        filters: *linear-event-filters
         resourceOrigins:
           - https://linear.app
         match:
@@ -84,7 +91,8 @@ connectors:
           /data/teamId: teams
           /organizationId: organizations
         verificationProfile: linear.app/hmac-sha256-timestamp
-      issue-updated:
+      issue-updated: &linear-issue-updated
+        filters: *linear-event-filters
         resourceOrigins:
           - https://linear.app
         match:
@@ -101,6 +109,36 @@ connectors:
           /data/teamId: teams
           /organizationId: organizations
         verificationProfile: linear.app/hmac-sha256-timestamp
+      issue-closed:
+        <<: *linear-issue-updated
+        when:
+          all:
+            - any:
+                - {path: /updatedFrom/completedAt, op: present}
+                - {path: /updatedFrom/canceledAt, op: present}
+            - {path: /updatedFrom/completedAt, fallback: /data/completedAt, op: "null"}
+            - {path: /updatedFrom/canceledAt, fallback: /data/canceledAt, op: "null"}
+            - any:
+                - {path: /data/completedAt, op: timestamp}
+                - {path: /data/canceledAt, op: timestamp}
+      issue-reopened:
+        <<: *linear-issue-updated
+        when:
+          all:
+            - any:
+                - {path: /updatedFrom/completedAt, op: present}
+                - {path: /updatedFrom/canceledAt, op: present}
+            - any:
+                - {path: /updatedFrom/completedAt, fallback: /data/completedAt, op: timestamp}
+                - {path: /updatedFrom/canceledAt, fallback: /data/canceledAt, op: timestamp}
+            - {path: /data/completedAt, op: "null"}
+            - {path: /data/canceledAt, op: "null"}
+      issue-labeled:
+        <<: *linear-issue-updated
+        when: {path: /data/labelIds, other: /updatedFrom/labelIds, op: set-added}
+      issue-unlabeled:
+        <<: *linear-issue-updated
+        when: {path: /data/labelIds, other: /updatedFrom/labelIds, op: set-removed}
     resources:
       issues: ${{ github.aw.import-inputs.issues }}
       issue-references: ${{ github.aw.import-inputs.issue-references }}
@@ -188,7 +226,8 @@ connectors:
       create-issue:
         credential: writer
         lookups:
-          - input: team-id
+          - &linear-team-lookup
+            input: team-id
             inputs:
               team-id:
                 type: string
@@ -308,7 +347,7 @@ connectors:
             responseContains:
               /data/project/teams/nodes/*/id: team-id
         inputs:
-          body:
+          body: &linear-body
             sanitize: body
             minLength: 1
             maxLength: 65000
@@ -320,12 +359,12 @@ connectors:
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
             required: true
             type: string
-          team-id:
+          team-id: &linear-team-id
             maxLength: 36
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
             required: true
             type: string
-          title:
+          title: &linear-title
             sanitize: title
             minLength: 20
             maxLength: 128
@@ -495,7 +534,7 @@ connectors:
             pattern: \S
             required: true
             type: string
-          issue-id:
+          issue-id: &linear-issue-id
             maxLength: 36
             pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
             required: true
@@ -528,15 +567,137 @@ connectors:
               input: title
         resources:
           issue-id: issues
-        responseChecks:
+        responseChecks: &linear-update-checks
           /data/issueUpdate/success: true
-        responseRequired:
+        responseRequired: &linear-update-required
           - /data/issueUpdate/issue/id
           - /data/issueUpdate/issue/identifier
-        responseResources:
+        responseResources: &linear-update-resources
           /data/issueUpdate/issue/id: issues
-        responseInputs:
+        responseInputs: &linear-update-inputs
           /data/issueUpdate/issue/id: issue-id
+      update-issue-title:
+        credential: writer
+        lookups: *linear-issue-lookups
+        inputs:
+          issue-id: *linear-issue-id
+          title: *linear-title
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          graphql: |
+            mutation ConnectorLinearUpdateTitle($id: String!, $title: String!) {
+              issueUpdate(id: $id, input: { title: $title }) {
+                success
+                issue { id identifier title }
+              }
+            }
+          method: POST
+          path: /graphql
+          query:
+            id:
+              input: issue-id
+            title:
+              input: title
+        resources:
+          issue-id: issues
+        responseChecks: *linear-update-checks
+        responseRequired: *linear-update-required
+        responseResources: *linear-update-resources
+        responseInputs: *linear-update-inputs
+      update-issue-body:
+        credential: writer
+        lookups: *linear-issue-lookups
+        inputs:
+          issue-id: *linear-issue-id
+          body: *linear-body
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          graphql: |
+            mutation ConnectorLinearUpdateBody($id: String!, $body: String!) {
+              issueUpdate(id: $id, input: { description: $body }) {
+                success
+                issue { id identifier title }
+              }
+            }
+          method: POST
+          path: /graphql
+          query:
+            id:
+              input: issue-id
+            body:
+              input: body
+        resources:
+          issue-id: issues
+        responseChecks: *linear-update-checks
+        responseRequired: *linear-update-required
+        responseResources: *linear-update-resources
+        responseInputs: *linear-update-inputs
+      clear-issue-body:
+        credential: writer
+        lookups: *linear-issue-lookups
+        inputs:
+          issue-id: *linear-issue-id
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          graphql: |
+            mutation ConnectorLinearClearBody($id: String!) {
+              issueUpdate(id: $id, input: { description: "" }) {
+                success
+                issue { id identifier title }
+              }
+            }
+          method: POST
+          path: /graphql
+          query:
+            id:
+              input: issue-id
+        resources:
+          issue-id: issues
+        responseChecks: *linear-update-checks
+        responseRequired: *linear-update-required
+        responseResources: *linear-update-resources
+        responseInputs: *linear-update-inputs
+      create-issue-in-team:
+        credential: writer
+        lookups:
+          - *linear-team-lookup
+        inputs:
+          team-id: *linear-team-id
+          title: *linear-title
+          body: *linear-body
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          graphql: |
+            mutation ConnectorLinearCreateInTeam($team: String!, $title: String!, $body: String!) {
+              issueCreate(input: { teamId: $team, title: $title, description: $body }) {
+                success
+                issue { id identifier title team { id } }
+              }
+            }
+          method: POST
+          path: /graphql
+          query:
+            team:
+              input: team-id
+            title:
+              input: title
+            body:
+              input: body
+        resources:
+          team-id: teams
+        responseChecks:
+          /data/issueCreate/success: true
+        responseRequired:
+          - /data/issueCreate/issue/id
+          - /data/issueCreate/issue/identifier
+        responseResources:
+          /data/issueCreate/issue/team/id: teams
+        responseInputs:
+          /data/issueCreate/issue/team/id: team-id
     tools:
       get-issue:
         credential: reader
@@ -862,6 +1023,20 @@ import-schema:
     <trigger selection="linear-issue-created" type="Issue" action="create"/>
     <trigger selection="linear-issue-updated" type="Issue" action="update"/>
     <trigger selection="linear-issue-removed" type="Issue" action="remove"/>
+    <trigger selection="linear-issue-closed" type="Issue" action="update"/>
+    <trigger selection="linear-issue-reopened" type="Issue" action="update"/>
+    <trigger selection="linear-issue-labeled" type="Issue" action="update"/>
+    <trigger selection="linear-issue-unlabeled" type="Issue" action="update"/>
+    <semantics>
+      Closed/reopened uses complete prior/current completedAt and canceledAt
+      evidence; missing updatedFrom fields mean unchanged only when another
+      explicit timestamp change establishes the transition. Label activities
+      compare complete prior/current labelIds sets, ignoring order and duplicates.
+      Declared narrowing filters are issue-id, organization-id, team-id, labels,
+      and sender. Current labels are not necessarily the labels changed.
+      Missing evidence never invents an activity. Rules use
+      gh-aw/event-predicates/v1; receiver support is required before enrollment.
+    </semantics>
     <verification profile="linear.app/hmac-sha256-timestamp">
       Linear signs the raw request body with HMAC-SHA256 in Linear-Signature.
       A trusted receiver would need a separate webhook signing secret, constant
@@ -873,8 +1048,8 @@ import-schema:
     <availability>
       Trigger selections require the protected gateway route and approved
       receiver support. Importing installs no receiver, verification service, webhook
-      subscription, or gateway enrollment. Use workflow_dispatch. There are no
-      inferred closed, reopened, or label-transition events. Native webhook
+      subscription, or gateway enrollment. Use workflow_dispatch until approved.
+      The lifecycle rules do not hydrate missing evidence. Native webhook
       bodies can contain resource content; an event envelope must carry only
       references and metadata, not trust or hydrate those bodies.
     </availability>
@@ -918,8 +1093,8 @@ import-schema:
   </read-tools>
   <safe-outputs selection-field="safe-outputs">
     <validation>
-      Select each linear-prefixed output as null or an empty mapping. All listed
-      arguments are required strings. Sanitized titles contain non-whitespace and
+      Select each linear-prefixed output as null, an empty mapping, or bounded
+      max/staged options. All listed arguments are required strings. Sanitized titles contain non-whitespace and
       20 to 128 Unicode characters; bodies contain non-whitespace and at most
       65000 characters including generated footers.
       Canonical issue, project and team IDs are lowercase hyphenated UUIDs.
@@ -957,8 +1132,44 @@ import-schema:
       before mutation; the resulting UUID must already be in issues, with exact
       identifier and organization/team/project grant evidence. Require success
       true, issue id/identifier, and the exact resolved issue in the response.
-      Partial single-field updates, state, labels, and assignees are not exposed.
+      For a single field use the additional operations below instead of reading
+      and rewriting the untouched field. State, labels, and assignees are not exposed.
     </operation>
+    <additional-operations>
+      <operation selection="linear-update-issue-title" tool="linear_update_issue_title" arguments="issue-id title" grants="issues" credential="writer" max-response-bytes="16384">
+        Replace only title; description is absent from the fixed issueUpdate input.
+        Title sanitization and the 20-character minimum are unchanged.
+      </operation>
+      <operation selection="linear-update-issue-body" tool="linear_update_issue_body" arguments="issue-id body" grants="issues" credential="writer" max-response-bytes="16384">
+        Replace only description; title is absent from the fixed issueUpdate input.
+        Body must be nonblank and uses trusted sanitization plus protected generated
+        attribution and configured footers. Empty text is not a clearing request.
+      </operation>
+      <operation selection="linear-clear-issue-body" tool="linear_clear_issue_body" arguments="issue-id" grants="issues" credential="writer" max-response-bytes="16384">
+        Clear description with the authored GraphQL literal empty string, leaving
+        title untouched. There is deliberately no body input: the trusted body
+        formatter would otherwise append attribution even to an empty string.
+        This fixed clear action inserts neither generated nor configured footers
+        and accepts no agent text or footer override.
+      </operation>
+      <operation selection="linear-create-issue-in-team" tool="linear_create_issue_in_team" arguments="team-id title body" grants="teams" credential="writer" max-response-bytes="16384">
+        Create with an approved team UUID and no projectId field. No project grant
+        or project lookup is required. An approved team-references key/name first
+        uses the existing bounded same-writer team lookup, requiring independent
+        organizations and teams grants and rejecting ambiguous or paginated results.
+        Require success true, issue id/identifier, and exactly the requested team.
+        Direct UUID creation needs only teams. This agent-selected destination does
+        not replace the author-bound create-issue-in-project operation.
+      </operation>
+      <update-evidence>
+        All three partial/clear operations retain update-issue's exact issue grant,
+        success and id/identifier checks, response identity correlation, writer
+        credential, and bounded issue-references lookup. A shorthand still requires
+        independent organization, team, project and canonical issue grants; a
+        projectless issue must use its directly approved UUID. No read-and-rewrite
+        of content, event-derived authority, or creation receipts are added.
+      </update-evidence>
+    </additional-operations>
     <operation selection="linear-add-comment" tool="linear_add_comment" arguments="issue-id body" grants="issues" credential="writer" max-response-bytes="131072">
       commentCreate appends a comment to an approved issue. Require success true,
       a comment id, and the exact requested issue in the response. Shorthand

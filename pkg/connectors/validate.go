@@ -74,6 +74,9 @@ func (s *ConnectorSpec) validateTriggers() error {
 			if !validPointer(pointer) {
 				return fmt.Errorf("trigger %q has invalid match JSON Pointer", name)
 			}
+			if err := validateTriggerRules(trigger); err != nil {
+				return fmt.Errorf("trigger %q: %w", name, err)
+			}
 		}
 		for field, pointer := range trigger.Normalize {
 			if !namePattern.MatchString(field) || !validPointer(pointer) {

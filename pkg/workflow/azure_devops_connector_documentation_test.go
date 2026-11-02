@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,9 +113,17 @@ func TestAzureDevOpsConnectorDocumentationContract(t *testing.T) {
 		require.False(t, seen[input.Name], "duplicate input documentation")
 		seen[input.Name] = true
 		require.Contains(t, schema, input.Name)
-		require.Equal(t, schema[input.Name].(map[string]any)["default"], input.Default)
+		value := schema[input.Name].(map[string]any)["default"]
+		if text, ok := value.(string); ok {
+			require.Equal(t, text, input.Default)
+		} else {
+			encoded, err := json.Marshal(value)
+			require.NoError(t, err)
+			require.Equal(t, string(encoded), input.Default)
+		}
 	}
-	require.Len(t, docs.Credentials.Items, 2)
+	provider := frontmatter["connectors"].(map[string]any)["azure-devops"].(map[string]any)
+	require.Len(t, docs.Credentials.Items, len(provider["credentials"].(map[string]any)))
 	require.Contains(t, docs.Credentials.Items[0].Text, "2a72489c-aab2-4b65-b93a-a91edccf33b8")
 	require.Contains(t, docs.Credentials.Items[1].Text, "499b84ac-1321-427f-aa17-267ca6975798")
 	require.Contains(t, docs.Credentials.Items[1].Text, "https://app.vssps.visualstudio.com/.default")
@@ -123,21 +132,20 @@ func TestAzureDevOpsConnectorDocumentationContract(t *testing.T) {
 		require.True(t, strings.HasPrefix(source.Href, "https://learn.microsoft.com/"))
 	}
 	require.Equal(t, "false", docs.Triggers.Operational)
-	require.Len(t, docs.Triggers.Items, 4)
+	triggers := provider["triggers"].(map[string]any)
+	require.Len(t, docs.Triggers.Items, len(triggers))
 	for _, trigger := range docs.Triggers.Items {
 		name := strings.TrimPrefix(trigger.ID, "azure-devops-")
-		subject := "/resource/id"
-		if name == "work-item-updated" {
-			subject = "/resource/workItemId"
-		}
+		declaration := triggers[name].(map[string]any)
+		subject := declaration["normalize"].(map[string]any)["subject"]
 		require.Equal(t, subject, trigger.Subject)
-		require.Equal(t, "workitem."+strings.TrimPrefix(name, "work-item-"), trigger.Event)
+		require.Contains(t, declaration["nativeEvents"], trigger.Event)
 	}
 }
 
 func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 	t.Parallel()
-	docs, _ := loadAzureDevOpsDocumentation(t)
+	docs, declaration := loadAzureDevOpsDocumentation(t)
 	require.Equal(t, "yaml-frontmatter", docs.Example.Format)
 	require.Equal(t, ".github/workflows/azure-devops-review.md", docs.Example.Path)
 	root := t.TempDir()
@@ -170,15 +178,20 @@ func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, data.Connectors["azure-devops"].Context)
 	require.Equal(t, []string{"azure-devops__core_list_projects"}, data.Connectors["azure-devops"].Agent.ToolNames())
-	require.Len(t, docs.Effects.Items, 5)
+	effects := declaration["connectors"].(map[string]any)["azure-devops"].(map[string]any)["safe-outputs"].(map[string]any)
+	require.Len(t, docs.Effects.Items, len(effects))
 	names := data.Connectors["azure-devops"].SafeOutputs.SafeOutputNames()
 	var manifest map[string]string
 	require.NoError(t, json.Unmarshal([]byte(buildCustomSafeOutputScriptsJSON(data)), &manifest))
-	require.Len(t, names, len(docs.Effects.Items))
+	require.Len(t, names, 5, "the original example retains its five selected effects")
+	require.Len(t, manifest, len(names))
 	for _, effect := range docs.Effects.Items {
-		require.Contains(t, names, strings.TrimPrefix(effect.ID, "azure-devops-"))
+		name := strings.TrimPrefix(effect.ID, "azure-devops-")
+		require.Contains(t, effects, name)
 		require.Equal(t, strings.ReplaceAll(effect.ID, "-", "_"), effect.Tool)
-		require.Equal(t, "safe_output_script_"+effect.Tool+".cjs", manifest[effect.Tool])
+		if slices.Contains(names, name) {
+			require.Equal(t, "safe_output_script_"+effect.Tool+".cjs", manifest[effect.Tool])
+		}
 		require.NotEmpty(t, effect.Inputs)
 		require.NotEmpty(t, strings.TrimSpace(effect.Text))
 	}

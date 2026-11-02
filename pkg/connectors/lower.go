@@ -197,6 +197,14 @@ func validateSelection(spec ConnectorSpec, binding Binding, connection Connectio
 				if err := requireResources(spec.Triggers[name].Resources, connection.Resources); err != nil {
 					return err
 				}
+				if err := requireEventTransitionValues(spec.Triggers[name].When); err != nil {
+					return fmt.Errorf("trigger %q: %w", name, err)
+				}
+				for _, variant := range spec.Triggers[name].Variants {
+					if err := requireEventTransitionValues(&variant.When); err != nil {
+						return fmt.Errorf("trigger %q variant: %w", name, err)
+					}
+				}
 				continue
 			}
 			if _, ok := connection.Credentials[op.Credential]; !ok {

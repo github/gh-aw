@@ -140,6 +140,7 @@ type CreatedResource struct {
 	Scope       string `json:"scope"`
 	TemporaryID string `json:"temporaryId"`
 	ScopePrefix string `json:"scopePrefix,omitempty"`
+	ValueType   string `json:"valueType,omitempty"`
 }
 
 type ReadTool struct {
@@ -167,13 +168,49 @@ type MCPTool struct {
 // Verification profiles are identifiers for a future approved receiver, not
 // executable verification code and not evidence of operational enrollment.
 type Trigger struct {
-	ResourceOrigins     []string          `json:"resourceOrigins,omitempty"`
-	VerificationProfile string            `json:"verificationProfile"`
-	NativeEvents        []string          `json:"nativeEvents"`
-	Match               map[string]string `json:"match"`
-	Normalize           map[string]string `json:"normalize"`
-	Resources           map[string]string `json:"resources,omitempty"`
-	Types               map[string]string `json:"types,omitempty"`
+	ResourceOrigins     []string               `json:"resourceOrigins,omitempty"`
+	VerificationProfile string                 `json:"verificationProfile"`
+	NativeEvents        []string               `json:"nativeEvents"`
+	Match               map[string]string      `json:"match"`
+	Normalize           map[string]string      `json:"normalize"`
+	Resources           map[string]string      `json:"resources,omitempty"`
+	Types               map[string]string      `json:"types,omitempty"`
+	When                *EventPredicate        `json:"when,omitempty"`
+	Filters             map[string]EventFilter `json:"filters,omitempty"`
+	Variants            []EventVariant         `json:"variants,omitempty"`
+	URLIdentity         string                 `json:"urlIdentity,omitempty"`
+	URLPathPrefix       string                 `json:"urlPathPrefix,omitempty"`
+}
+
+// EventPredicate is a bounded, data-only rule evaluated on authenticated source
+// evidence. Other always references the root; array items use relative Path.
+type EventPredicate struct {
+	All       []EventPredicate `json:"all,omitempty"`
+	Any       []EventPredicate `json:"any,omitempty"`
+	Path      string           `json:"path,omitempty"`
+	Op        string           `json:"op,omitempty"`
+	Value     any              `json:"value,omitempty"`
+	Other     string           `json:"other,omitempty"`
+	Fallback  string           `json:"fallback,omitempty"`
+	Values    []string         `json:"values,omitempty"`
+	Separator string           `json:"separator,omitempty"`
+	Root      bool             `json:"root,omitempty"`
+	Items     *EventPredicate  `json:"items,omitempty"`
+}
+
+type EventFilter struct {
+	Path   string `json:"path"`
+	Type   string `json:"type"`
+	Values []any  `json:"values,omitempty"`
+}
+
+// Variants replace evidence pointers only after an explicit discriminator
+// matches. They never add resource authority.
+type EventVariant struct {
+	When      EventPredicate    `json:"when"`
+	Normalize map[string]string `json:"normalize"`
+	Resources map[string]string `json:"resources"`
+	Types     map[string]string `json:"types,omitempty"`
 }
 
 type SecretRef struct {

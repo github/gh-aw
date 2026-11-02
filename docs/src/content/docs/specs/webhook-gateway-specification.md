@@ -69,6 +69,9 @@ Azure DevOps, Jira, and Linear use the [connector contract](/gh-aw/reference/con
 A connector subscription extends the compiler metadata with `connector`, containing
 `id`, `alias`, `trigger`, `digest`, `verification_profile`, `native_events`,
 `normalize`, optional primitive `types`, and approved HTTPS `origins`.
+Rich source rules additionally carry `evaluation_version:
+"gh-aw/event-predicates/v1"`, optional `when`, declared `filters`, and `variants`.
+The receiver MUST reject unknown evaluation versions/operators before enrollment.
 Its internal event name is `connector_` followed by the first 24 lowercase hex
 digits of SHA-256 over alias, NUL, trigger name, NUL, and the frozen plan digest.
 The public selector remains the connector ID and declared trigger name.
@@ -96,6 +99,48 @@ approved canonicalization; accepting a generic version-2 envelope alone does
 not establish connector support. Provider authentication, enrollment, canonical
 URL construction when no `normalize.url` is declared, and durable replay handling
 remain external receiver responsibilities. Compilation is not receiver deployment.
+
+#### Bounded source-evidence evaluation
+
+The evaluation contract is data-only: at most 64 predicate nodes and depth 6,
+100 array items or membership values, 16 named filters, and four payload
+variants. Equality uses typed primitive values; integer comparisons are bounded
+to safe integers. `all`/`any` groups combine presence/absence, explicit null,
+nonblank text, RFC3339 timestamps, changed values, terminal-set entry/exit,
+array/string-set addition/removal, array length, and bounded `any-item` rules.
+Unknown operators, option combinations, oversized evidence, and malformed
+pointer/schema data MUST NOT be executed. Scripts and provider requests are
+not part of evaluation.
+
+`path` is relative to the current item inside `any-item`; `root: true`,
+`other`, and `fallback` refer to the original root document. Fallback applies
+only when a pointer is absent, never when explicitly null. Missing/malformed
+change evidence is unknown and MUST NOT establish a derived activity.
+Known false dominates `all`; known true dominates `any`. Set comparison ignores
+order/duplicates; a declared single-character separator trims string tokens.
+No cached state or guessed status names may substitute for evidence.
+
+The receiver MUST evaluate `when` against authenticated original evidence.
+Optional `url_identity` and `url_path_prefix` bind the canonical URL path to
+one exact primitive source ID; the origin remains independently approved.
+For Jira the path is `/rest/api/3/issue/` plus the exact issue database ID,
+not any same-origin URL. Offline projection enforces the same relationship.
+Exactly one declared variant must match; its normalization, types and complete
+resource constraints replace the base evidence pointers without granting new
+resources. No matching variant, multiple matches or unsupported versions reject.
+The compiler emits complete alternative resource-condition groups, never a
+flattened union. Active named filters are ANDed with scope; values and array
+elements are ORed. `connector_filter_*` carries one matched literal per active
+filter alongside existing match/scope witnesses.
+
+Lifecycle semantics and payload fixtures are normative in the editable provider
+declaration and shared conformance tests. A receiver MUST establish compatibility
+with that exact frozen contract, not infer support from the version-2 envelope.
+One delivery may match raw update and several semantic subscriptions; durable
+dispatch identity MUST include the subscription/trigger as well as approved
+source/destination and stable native delivery identity. A resource URL hash is
+not a replay key. Existing provenance, workflow admission and reference-only
+projection requirements remain unchanged.
 
 ### Provider webhook configuration
 

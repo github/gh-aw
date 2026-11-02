@@ -14528,7 +14528,7 @@
           }
         },
         "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
-        "triggers": { "$ref": "#/$defs/connectorDefinitions" },
+        "triggers": { "$ref": "#/$defs/connectorTriggers" },
         "tools": { "$ref": "#/$defs/connectorDefinitions" },
         "mcp-servers": { "$ref": "#/$defs/connectorDefinitions" },
         "safe-outputs": { "$ref": "#/$defs/connectorDefinitions" }
@@ -14559,6 +14559,82 @@
       "required": ["audience"],
       "additionalProperties": false,
       "properties": { "audience": { "type": "string", "minLength": 1, "maxLength": 2048 } }
+    },
+    "connectorEventPredicate": {
+      "description": "Bounded source-evidence rule; missing transition evidence never matches. Semantic validation enforces 64 nodes, depth 6, operator-specific options and array bounds.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "all": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/connectorEventPredicate" } },
+        "any": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/connectorEventPredicate" } },
+        "path": { "type": "string", "pattern": "^/", "maxLength": 1024 },
+        "op": { "enum": ["equals", "present", "absent", "null", "timestamp", "text", "changed", "set-added", "set-removed", "enters", "leaves", "length", "any-item"] },
+        "value": { "type": ["string", "integer", "boolean"] },
+        "other": { "type": "string", "pattern": "^/", "maxLength": 1024 },
+        "fallback": { "type": "string", "pattern": "^/", "maxLength": 1024 },
+        "values": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } },
+        "separator": { "type": "string", "minLength": 1, "maxLength": 1 },
+        "root": { "type": "boolean" },
+        "items": { "$ref": "#/$defs/connectorEventPredicate" }
+      },
+      "oneOf": [
+        { "required": ["all"], "maxProperties": 1 },
+        { "required": ["any"], "maxProperties": 1 },
+        { "required": ["path", "op"], "not": { "anyOf": [{ "required": ["all"] }, { "required": ["any"] }] } }
+      ]
+    },
+    "connectorEventFilters": {
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": { "$ref": "#/$defs/connectorName" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["path", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "pattern": "^/", "maxLength": 1024 },
+          "type": { "enum": ["string", "integer", "boolean"] },
+          "values": { "type": "array", "maxItems": 100, "items": { "type": ["string", "integer", "boolean"] } }
+        }
+      }
+    },
+    "connectorTriggers": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/connectorName" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["verificationProfile", "nativeEvents", "match", "normalize"],
+        "additionalProperties": false,
+        "properties": {
+          "resourceOrigins": { "type": "array", "maxItems": 16, "items": { "type": "string" } },
+          "verificationProfile": { "type": "string" },
+          "nativeEvents": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "match": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+          "normalize": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+          "resources": { "type": "object", "additionalProperties": { "type": "string" } },
+          "types": { "type": "object", "additionalProperties": { "enum": ["string", "integer", "number", "boolean"] } },
+          "when": { "$ref": "#/$defs/connectorEventPredicate" },
+          "filters": { "$ref": "#/$defs/connectorEventFilters" },
+          "urlIdentity": { "type": "string", "pattern": "^/" },
+          "urlPathPrefix": { "type": "string", "pattern": "^/" },
+          "variants": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "required": ["when", "normalize", "resources"],
+              "additionalProperties": false,
+              "properties": {
+                "when": { "$ref": "#/$defs/connectorEventPredicate" },
+                "normalize": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+                "resources": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+                "types": { "type": "object", "additionalProperties": { "enum": ["string", "integer", "number", "boolean"] } }
+              }
+            }
+          }
+        }
+      }
     },
     "connectorDefinitions": {
       "type": "object",

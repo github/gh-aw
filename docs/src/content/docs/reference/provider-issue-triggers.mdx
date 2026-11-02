@@ -1,6 +1,6 @@
 ---
 title: Provider Issue Triggers
-description: Migrate removed native issue triggers to embedded provider connectors.
+description: Migrate native provider issue triggers to declarative lifecycle and filter rules.
 sidebar:
   order: 402
 ---
@@ -11,16 +11,69 @@ Their former `on.gateway-dispatch.azure-devops-issue`, `jira-issue`, and
 
 ## Migration
 
-Import the compiler-embedded declaration with
-`"@builtin:connectors/azure-devops.md"`, `"@builtin:connectors/jira.md"`, or
-`"@builtin:connectors/linear.md"`. Supply exact approved resources through the
+Import an editable `.github/workflows/connectors/<provider>.md` declaration
+or a reviewed pinned remote import. There is no embedded provider catalog.
+Supply exact approved resources through the
 documented `with` inputs, then independently select read tools and safe outputs.
 Imports do not grant capabilities or provider access.
 
-Custom connector ingress is unavailable and fails closed. Use
-`workflow_dispatch` until an approved receiver authenticates the provider,
+Connector trigger compilation is supported. Live ingress remains inactive until
+an approved receiver authenticates the provider,
 enforces source and resource grants, and implements the reviewed connector
-event contract. Imports do not register webhooks or deploy a receiver.
+event contract. Use `workflow_dispatch` until that integration is approved.
+Imports do not register webhooks or deploy a receiver.
+
+## Lifecycle and filter mapping
+
+| Provider | Lifecycle selections | Available narrowing filters |
+| --- | --- | --- |
+| Linear | `issue-created`, `issue-updated`, `issue-removed`, `issue-closed`, `issue-reopened`, `issue-labeled`, `issue-unlabeled` | `issue-id`, `organization-id`, `team-id`, `labels`, `sender` |
+| Jira | `issue-created`, `issue-updated`, `issue-deleted`, `issue-closed`, `issue-reopened`, `issue-labeled`, `issue-unlabeled` | `issue-id`, `issue-key`, `project`, `labels`, `status`, `resolution`, `sender` |
+| Azure DevOps | `work-item-created`, `work-item-updated`, `work-item-deleted`, `work-item-restored`, `work-item-closed`, `work-item-reopened`, `work-item-labeled`, `work-item-unlabeled` | `collection-id`, `project-id`, `state-from`, `state-to`, `tags-from`, `tags-to` |
+
+Existing list selections remain supported. A mapping supplies typed literal
+arrays for declared filters, ANDed with exact resource grants:
+
+```yaml
+on:
+  gateway-dispatch:
+    linear:
+      issue-closed:
+        labels: [approved-label-uuid]
+      issue-reopened:
+```
+
+Current-label filters describe the delivered label set, not necessarily the
+label that changed. Sender filters never authorize dispatch or grant resources.
+Qualified root selections accept the same filter mapping.
+
+Linear closure/reopening requires complete prior/current terminal timestamp
+evidence; label activities require complete before/after label-ID arrays.
+Jira closure/reopening means resolution set/cleared, not a guessed status name.
+Jira label activities retain only unambiguous single-label changelog cases.
+Azure closure/reopening requires explicit `with.closed-states` and old/new state
+evidence; tag changes compare normalized semicolon-separated sets.
+Restored does not mean reopened.
+
+Azure update evidence supports an explicit workItemId delta shape (unversioned
+or `resourceVersion: "1.0"`) and a version-1.0 snapshot shape with resource.id
+and no workItemId/revision. Unknown versions and ambiguous variants reject.
+Snapshots lacking prior values cannot establish a lifecycle transition.
+
+Missing change evidence never synthesizes a transition. A raw update can still
+match independently; one delivery may match several subscriptions. The receiver
+must preserve subscription-specific delivery/replay identity, not deduplicate
+all updates by resource URL.
+
+## Offline projection
+
+`gh aw connector <id> test --phase trigger --capability <trigger> --native-event
+<event> --args '<native JSON>'` validates a native fixture against the declaration,
+typed evidence, exact grants, transition rules and supported variants.
+Import bindings use the usual `--input name=JSON` flags. A successful projection
+contains only declared references and reports `operational: false`. A nonmatch
+or insufficient evidence returns an actionable error. No credentials, provider
+requests, subscriptions or receiver enrollment are performed.
 
 The [Webhook Gateway Specification](/gh-aw/specs/webhook-gateway-specification/)
 defines the remaining GitHub trigger inventory and the separate CAO App-token
