@@ -1,6 +1,9 @@
 ---
 imports:
-  - .github/aw/connectors/servicenow.md
+  - uses: .github/aw/connectors/servicenow.md
+    with:
+      instance: https://example.service-now.com
+      incidents: ["0123456789abcdef0123456789abcdef"]
 network:
   allowed:
     - example.service-now.com
