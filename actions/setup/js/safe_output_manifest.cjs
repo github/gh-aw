@@ -13,6 +13,41 @@ const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentit
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
 const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
 const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
+const MERGE_FAILURE_CODES = new Set([
+  "source_branch_invalid",
+  "target_base_branch_invalid",
+  "pr_is_draft",
+  "pr_not_open",
+  "merge_conflicts",
+  "not_mergeable",
+  "missing_required_labels",
+  "title_prefix_mismatch",
+  "branch_not_allowed",
+  "target_branch_protected",
+  "target_branch_default",
+  "target_branch_has_no_open_pr",
+  "required_checks_missing",
+  "required_checks_failing",
+  "pending_reviewers",
+  "blocking_individual_review",
+  "required_approval_missing",
+  "blocking_review_state",
+  "unresolved_review_threads",
+  "merge_not_completed",
+  "merge_operation_error",
+]);
+
+/** @param {unknown} value @param {(value: any) => boolean} valid @param {string} field */
+function mergeAuditIdentity(value, valid, field) {
+  if (value === undefined) return undefined;
+  if ((typeof value === "string" && value.trim() !== value) || !valid(value)) throw new Error(`${ERR_SYSTEM}: Invalid merge decision audit field: ${field}`);
+  return value;
+}
+
+/** @param {unknown} value */
+function isAuditTimestamp(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
 
 /**
  * @param {Record<string, any>} result
@@ -20,44 +55,40 @@ const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
  * @param {string} [filePath]
  */
 function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), MERGE_DECISIONS_FILE_NAME)) {
-  const entry = {
-    timestamp: new Date().toISOString(),
-    data_trust: "untrusted",
-    run_id: process.env.GITHUB_RUN_ID,
-    run_attempt: process.env.GITHUB_RUN_ATTEMPT,
-    messageIndex,
-    success: result.success === true,
-    merged: result.merged === true,
-    staged: result.staged === true,
-    already_merged: result.alreadyMerged === true,
-    failure_codes: (result.failure_reasons || []).map(reason => reason.code),
-    decision_evidence: result.decision_evidence,
-  };
   try {
-    const secretValues = collectArtifactSecretValues();
-    let content = JSON.stringify(redactManifestValue(entry, secretValues));
-    if (Buffer.byteLength(content, "utf8") > 65536) {
-      const evidence = result.decision_evidence || {};
-      content = JSON.stringify(
-        redactManifestValue(
-          {
-            ...entry,
-            failure_codes: entry.failure_codes.slice(0, 100),
-            decision_evidence: {
-              repository: evidence.repository,
-              pull_request_number: evidence.pull_request_number,
-              head_sha: evidence.head_sha,
-              base_sha: evidence.base_sha,
-              evaluated_at: evidence.evaluated_at,
-              revalidated_at: evidence.revalidated_at,
-            },
-            evidence_truncated: true,
-          },
-          secretValues
-        )
-      );
-      core.warning("Merge decision evidence exceeded 64 KiB; only revision identity and failure codes were retained");
+    const evidence = result.decision_evidence === undefined ? {} : result.decision_evidence;
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+      throw new Error(`${ERR_SYSTEM}: Invalid merge decision audit evidence`);
     }
+    const failureReasons = result.failure_reasons === undefined ? [] : result.failure_reasons;
+    if (!Array.isArray(failureReasons) || failureReasons.length > 100 || failureReasons.some(reason => !reason || typeof reason.code !== "string" || !MERGE_FAILURE_CODES.has(reason.code))) {
+      throw new Error(`${ERR_SYSTEM}: Invalid merge decision audit failure codes`);
+    }
+    const isPositiveInteger = value => Number.isSafeInteger(value) && value > 0;
+    const isRunIdentity = value => typeof value === "string" && /^[1-9]\d{0,19}$/.test(value);
+    const isCommitSHA = value => typeof value === "string" && /^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(value);
+    const entry = {
+      timestamp: new Date().toISOString(),
+      data_trust: "untrusted",
+      run_id: mergeAuditIdentity(process.env.GITHUB_RUN_ID, isRunIdentity, "run_id"),
+      run_attempt: mergeAuditIdentity(process.env.GITHUB_RUN_ATTEMPT, isRunIdentity, "run_attempt"),
+      messageIndex: mergeAuditIdentity(messageIndex, value => Number.isSafeInteger(value) && value >= 0, "messageIndex"),
+      success: result.success === true,
+      merged: result.merged === true,
+      staged: result.staged === true,
+      already_merged: result.alreadyMerged === true,
+      failure_codes: failureReasons.map(reason => reason.code),
+      decision_evidence: {
+        repository: mergeAuditIdentity(evidence.repository, value => typeof value === "string" && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?\/[a-zA-Z0-9_.-]{1,100}$/.test(value), "repository"),
+        pull_request_number: mergeAuditIdentity(evidence.pull_request_number, isPositiveInteger, "pull_request_number"),
+        head_sha: mergeAuditIdentity(evidence.head_sha, isCommitSHA, "head_sha"),
+        base_sha: mergeAuditIdentity(evidence.base_sha, isCommitSHA, "base_sha"),
+        evaluated_at: mergeAuditIdentity(evidence.evaluated_at, isAuditTimestamp, "evaluated_at"),
+        revalidated_at: mergeAuditIdentity(evidence.revalidated_at, isAuditTimestamp, "revalidated_at"),
+      },
+    };
+    const secretValues = collectArtifactSecretValues();
+    const content = JSON.stringify(redactManifestValue(entry, secretValues));
     if (Buffer.byteLength(content, "utf8") > 65536) {
       throw new Error(`${ERR_SYSTEM}: Merge decision identity exceeds the 64 KiB audit limit`);
     }

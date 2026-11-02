@@ -868,6 +868,7 @@ describe("safe_output_summary", () => {
       success: false,
       error: "merge_pull_request gate checks failed",
       result: {
+        audit_recorded: true,
         decision_evidence: { labels: ["private-instruction-like-label"] },
         failure_reasons: [{ code: "required_approval_missing" }, { code: "unsafe\n@someone" }],
       },
@@ -876,6 +877,40 @@ describe("safe_output_summary", () => {
     expect(summary).toContain("merge-pull-request-decisions.jsonl");
     expect(summary).not.toContain("private-instruction-like-label");
     expect(summary).not.toContain("@someone");
+  });
+
+  it("renders gate-only blocked results without requiring raw decision evidence", () => {
+    const summary = generateSafeOutputSummary({
+      type: "merge_pull_request",
+      messageIndex: 1,
+      success: false,
+      result: { audit_recorded: true, failure_reasons: [{ code: "required_approval_missing" }] },
+    });
+    expect(summary).toContain("`required_approval_missing`");
+    expect(summary).toContain("merge-pull-request-decisions.jsonl");
+  });
+
+  it.each([true, false])("reports an audit failure separately from the merge outcome (success: %s)", success => {
+    const summary = generateSafeOutputSummary({
+      type: "merge_pull_request",
+      messageIndex: 1,
+      success,
+      result: {
+        success,
+        merged: success,
+        pull_request_url: "https://github.com/owner/repo/pull/42",
+        audit_failed: true,
+        audit_error: "private-error-details",
+        decision_evidence: { labels: ["private-pr-metadata"] },
+      },
+    });
+    expect(summary).toContain("audit persistence failed; the operation outcome is unchanged");
+    expect(summary).not.toContain("merge-pull-request-decisions.jsonl");
+    expect(summary).not.toContain("private-");
+    if (success) {
+      expect(summary).toContain("Success");
+      expect(summary).toContain("https://github.com/owner/repo/pull/42");
+    }
   });
 
   describe("writeSafeOutputSummaries", () => {

@@ -387,12 +387,16 @@ function generateSafeOutputSummary(options) {
     summary += formatOutcomeDiagnostics(result, message, error, outcome);
   }
 
-  if (type === "merge_pull_request" && result?.decision_evidence) {
+  if (type === "merge_pull_request" && result) {
     const codes = (result.failure_reasons || []).map(reason => reason.code).filter(code => typeof code === "string" && /^[a-z_]{1,80}$/.test(code));
     if (codes.length > 0) {
       summary += `**Blocked Gates:** ${codes.map(code => `\`${code}\``).join(", ")}\n\n`;
     }
-    summary += "Decision evidence is recorded in `merge-pull-request-decisions.jsonl` in the safe-outputs-items artifact.\n\n";
+    if (result.audit_failed) {
+      summary += "> ⚠️ Merge decision audit persistence failed; the operation outcome is unchanged.\n\n";
+    } else if (result.audit_recorded) {
+      summary += "Decision evidence is recorded in `merge-pull-request-decisions.jsonl` in the safe-outputs-items artifact.\n\n";
+    }
   }
 
   // Display secrecy and integrity security metadata fields if present in the message.

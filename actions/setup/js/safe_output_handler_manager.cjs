@@ -13,7 +13,7 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { normalizeSafeOutputConfig } = require("./safe_output_names.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getStalePullRequestReason } = require("./pr_lifecycle.cjs");
-const { ERR_CONFIG, ERR_PARSE, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
+const { ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION, SAFE_OUTPUT_E099 } = require("./error_codes.cjs");
 const { classifySafeOutputResult, computeSafeOutputsStatus, isFailedProcessingResult } = require("./safe_outputs_status.cjs");
 const { finalizeBufferedReviewOutcomes } = require("./safe_output_outcomes.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, replaceArtifactUrlReferences, normalizeTemporaryId, extractTemporaryIdReferences, getCreatedTemporaryId } = require("./temporary_id.cjs");
@@ -935,6 +935,29 @@ function buildSkippedResult(type, messageIndex, result) {
   };
 }
 
+/** @param {string} type @param {any} result @param {number} messageIndex */
+function recordMergeDecision(type, result, messageIndex) {
+  if (type !== "merge_pull_request" || !result || result.deferred) return result;
+  try {
+    writeMergePullRequestDecision(result, messageIndex);
+    return { ...result, audit_recorded: true };
+  } catch {
+    const auditError = `${ERR_SYSTEM}: Failed to persist merge pull request decision`;
+    core.warning(auditError);
+    return { ...result, audit_failed: true, audit_error: auditError };
+  }
+}
+
+/** @param {any} result */
+function projectMergeFailure(result) {
+  return {
+    failure_reasons: (result.failure_reasons || []).filter(reason => typeof reason.code === "string" && /^[a-z_]{1,80}$/.test(reason.code)).map(reason => ({ code: reason.code })),
+    ...(result.audit_recorded ? { audit_recorded: true } : {}),
+    ...(result.audit_failed ? { audit_failed: true, audit_error: result.audit_error } : {}),
+    ...(typeof result.staged === "boolean" ? { staged: result.staged } : {}),
+  };
+}
+
 /**
  * Compute the processing order (original message indices) so that temporary-ID
  * producers run before consumers while preserving the original order for
@@ -1329,10 +1352,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         results.push(buildSkippedResult(messageType, i, { skipped: true, reason: stalePRReason }));
         continue;
       }
-      const result = await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap);
-      if (messageType === "merge_pull_request" && result) {
-        writeMergePullRequestDecision(result, i);
-      }
+      const result = recordMergeDecision(messageType, await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap), i);
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
       // no-op warnings, or if_no_changes: warn/ignore). Skipped results should NOT
@@ -1354,7 +1374,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           messageIndex: i,
           success: false,
           error: errorMsg,
-          ...(messageType === "merge_pull_request" ? { result } : {}),
+          ...(messageType === "merge_pull_request" ? { result: projectMergeFailure(result) } : {}),
         });
         // Track code-push failures for fail-fast behaviour
         if (CODE_PUSH_TYPES.has(messageType)) {
@@ -1530,7 +1550,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         // Call the handler again with updated temp ID map
         await assertClaimAuthorized(deferred.message);
         const stalePRReason = await getStalePullRequestReason(global.github, global.context);
-        const result = stalePRReason ? { skipped: true, reason: stalePRReason } : await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap);
+        const result = stalePRReason ? { skipped: true, reason: stalePRReason } : recordMergeDecision(deferred.type, await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap), deferred.messageIndex);
 
         if (result && result.skipped === true && !result.deferred) {
           const msg = result.reason || result.warning || result.error || "Handler returned skipped: true";
@@ -1555,7 +1575,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
               success: false,
               deferred: false,
               error: errorMsg,
-              result: { ...result, success: false, deferred: false, error: errorMsg },
+              result: deferred.type === "merge_pull_request" ? projectMergeFailure(result) : { ...result, success: false, deferred: false, error: errorMsg },
             };
           }
           continue;

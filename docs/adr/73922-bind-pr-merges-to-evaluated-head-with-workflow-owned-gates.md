@@ -18,7 +18,9 @@ Compare stable authorization inputs separately from asynchronously computed merg
 
 When configured, each required check must have a successful, completed check run on the evaluated SHA. `required-check-apps` can bind named checks to workflow-owned GitHub App IDs. Effective changes-requested reviews always block, even without an approver allowlist or aggregate blocking review decision. The approval gate requires at least one allowlisted GitHub `User` account's latest effective approval on that SHA, excluding both the PR author and the acting identity; it does not require every allowlisted account to approve. CI and affirmative approval remain opt-in gates. Existing draft, mergeability, requested-reviewer, unresolved-thread, label, title, source-branch, and integration-branch constraints remain in force.
 
-The handler manager preserves structured merge failures and persists bounded, secret-redacted decision evidence for successful, blocked, and staged decisions in the safe-output items artifact. Oversized evidence is explicitly marked as truncated; persistence failures are surfaced and do not undo a merge that already executed.
+The handler manager exposes only summary-safe gate codes and minimized evidence for blocked decisions. Audit artifacts for successful, blocked, and staged decisions retain run identity, outcome, fixed failure codes, and an allowlisted repository/PR identity, head/base revisions, and evaluation timestamps, not titles, labels, branches, reviewer identities, or approval details. Known secrets are redacted and records remain bounded.
+
+Audit persistence is separate from the operation outcome. If writing the audit fails after a completed merge, preserve the successful merge result, revision, URL, and internal decision evidence while surfacing an explicit audit-failure warning. Do not retry the merge or report that the merge failed merely because its audit could not be written.
 
 ### Alternatives Considered
 

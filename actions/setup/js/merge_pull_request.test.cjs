@@ -411,6 +411,7 @@ describe("merge_pull_request policy hardening", () => {
       data_trust: "untrusted",
       error: raw,
       failure_reasons: [{ code: "merge_not_completed", message: raw }],
+      staged: false,
     });
     expect(global.core.error).toHaveBeenCalledWith("Merge API returned merged=false for PR #100");
     expect(global.core.error.mock.calls.some(([message]) => message.includes(raw))).toBe(false);

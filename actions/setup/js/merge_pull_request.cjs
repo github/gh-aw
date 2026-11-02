@@ -857,6 +857,7 @@ async function main(config = {}) {
         return {
           success: false,
           data_trust: "untrusted",
+          staged: isStaged,
           error: mergeResponse.data?.message || "Merge API returned merged=false",
           failure_reasons: [{ code: "merge_not_completed", message: mergeResponse.data?.message || "Merge was not completed" }],
           checks_evaluated: branchPolicy.requiredChecks,
