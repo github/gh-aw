@@ -183,8 +183,8 @@ The former `tools.linear: {token, toolsets, allowed, required}` shorthand,
 `safe-outputs.linear-token`, output options such as `target`, `team-id`, `max`,
 and `staged`, and `on.gateway-dispatch.linear-issue` are no longer supported.
 Connector safe-output selections accept only null or `{}`. Their generated tools
-are `connector_6_linear_create_issue`, `connector_6_linear_update_issue`, and
-`connector_6_linear_add_comment`. Targets are typed UUID arguments constrained by
+are `linear_create_issue`, `linear_update_issue`, and
+`linear_add_comment`. Targets are typed UUID arguments constrained by
 the trusted resource arrays, never arbitrary URLs or credential inputs.
 
 Create requires approved team and project UUIDs plus title/body; update requires
@@ -207,7 +207,7 @@ For an author-owned team UUID secret and a project URL slug, select
 `with.create-team-secret` names the trusted team UUID secret (default
 `LINEAR_TEAM_ID`), and `with.create-project-slug` pins the exact project slug
 (default specimen `abcdef123456`; replace it before live use). The generated
-`connector_6_linear_create_issue_in_project` tool accepts only title and body.
+`linear_create_issue_in_project` tool accepts only title and body.
 The same safe-output credential performs a bounded read preflight: resolve one
 exact project slug, verify the team UUID and project/team membership, and reject
 pagination, ambiguity, or malformed responses before creating an issue. The
@@ -275,7 +275,7 @@ The former `tools.jira.auth`/`allowed`, native `jira_*` tools, automatic
 `JIRA_USER_EMAIL`/`JIRA_API_TOKEN` environment injection, and
 `on.gateway-dispatch.jira-issue` implementation are removed. A missing import or
 resource grant is a compilation error, not a fallback to the old integration.
-Selected effect tools are named `connector_4_jira_<operation_with_underscores>`.
+Selected effect tools are named `jira_<operation_with_underscores>`.
 
 Effect arguments are `project`, `issue-type`, `summary`, and optional
 `description` for creation; `issue`, `summary`, and `description` for updates;
@@ -506,9 +506,10 @@ resource grants, and phase-specific secret references into content-addressed
 plans; runtime hosts do not reload mutable configuration. Each encoded phase
 plan is limited to 65,536 bytes.
 
-Development builds stamp the immutable runtime/build-input revision into the
-compiler. Generated connector hosts check out that revision; subsequent
-lock-file-only commits do not move the runtime pin.
+Connector hosts execute the shared Node runtime shipped by `actions/setup`.
+Setup copies its runtime, pattern worker, and invocation-local binding helper
+alongside the normal MCP and safe-output files. No connector-specific source
+checkout, Go build, or CLI installation is needed.
 
 Agent reads use constrained MCP adapters. Write credentials exist only in the
 safe-output phase; staging validates intents without resolving them or making
@@ -582,4 +583,11 @@ Selecting `none` runs offline checks only.
 
 Selected live checks fail on missing credentials, denied access, invalid scope,
 or provider errors; they do not silently skip or switch authentication schemes.
-They never exercise live safe outputs or log returned provider content.
+They never exercise live safe outputs or log successful provider response bodies.
+
+The live jobs enable `GH_AW_CONNECTOR_TRACE=true` to log HTTP status, timing,
+content type, MCP method/tool names, and bounded failure messages (including
+JSON and SSE MCP errors). Authorization headers, request arguments, and opaque
+interactive-request state are withheld. Before any HTTP request, raw and derived
+credentials are registered with escaped `::add-mask::` commands; diagnostics
+also redact them in-process and escape control characters and command markers.

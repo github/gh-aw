@@ -195,6 +195,9 @@ func (p *Plan) buildRequest(ctx context.Context, op Operation, args map[string]a
 	if len(body) != 0 {
 		request.Header.Set("Content-Type", contentType)
 	}
+	for name, value := range op.Request.Headers {
+		request.Header.Set(name, value)
+	}
 	return request, nil
 }
 

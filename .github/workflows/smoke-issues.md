@@ -35,13 +35,13 @@ Generate one original haiku about code, automation, or workflows using a 5-7-5 s
 
 Create exactly two issues containing the same haiku and the workflow run URL:
 
-1. Use `connector_6_linear_create_issue_in_project` to create one issue in the configured Linear project. The trusted connector resolves and verifies its team and project; provide only the title and body.
-2. Use `connector_4_jira_create_issue` to create one `Task` in Jira project `KAN`,
+1. Use `linear_create_issue_in_project` to create one issue in the configured Linear project. The trusted connector resolves and verifies its team and project; provide only the title and body.
+2. Use `jira_create_issue` to create one `Task` in Jira project `KAN`,
    setting `temporary_id` to `aw_jira_haiku`. Reference `#aw_jira_haiku` as `issue`
    for each follow-up:
-   - use `connector_4_jira_update_issue` to set the same summary and update the description,
-   - use `connector_4_jira_add_comment` to add a comment containing the workflow run URL, and
-   - use `connector_4_jira_add_label` to add the `gh-aw-smoke-test` label.
+   - use `jira_update_issue` to set the same summary and update the description,
+   - use `jira_add_comment` to add a comment containing the workflow run URL, and
+   - use `jira_add_label` to add the `gh-aw-smoke-test` label.
 
 Use `Smoke Issues — ${{ github.run_id }}` as both issue titles. Include this run URL in both issue bodies:
 `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`.

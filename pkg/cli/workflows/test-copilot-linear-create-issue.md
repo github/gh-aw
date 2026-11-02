@@ -21,5 +21,5 @@ Test the linear-create-issue safe output functionality.
 
 Create a Linear issue summarizing a task discovered in the repository.
 
-Use `connector_6_linear_create_issue` with the approved team/project UUIDs,
+Use `linear_create_issue` with the approved team/project UUIDs,
 title and body. Replace the specimen UUIDs before live use.
