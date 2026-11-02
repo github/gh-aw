@@ -36,6 +36,11 @@ safe-outputs:
     allowed: [copilot]    # Only allow copilot agent
 timeout-minutes: 5
 
+evals:
+  - id: requirements-preserved
+    question: Does the requested issue-body update preserve the user's original workflow requirements when appending the design instructions?
+  - id: triggering-issue-handoff
+    question: Does the agent request assignment of the triggering issue to the Copilot coding agent?
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}

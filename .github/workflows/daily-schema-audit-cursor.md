@@ -48,6 +48,11 @@ timeout-minutes: 20
 imports:
   - shared/otlp.md
   - shared/reporting.md
+evals:
+  - id: genuinely-unreferenced-defs
+    question: For reported unreferenced $defs entries, does the schema evidence show that each lacks a reference in the schema body? Return UNKNOWN when no such findings are reported.
+  - id: missing-required-accuracy
+    question: For reported objects missing required, does each cited object define properties without a required field? Return UNKNOWN when no such findings are reported.
 ---
 
 # Daily Schema Consistency Audit

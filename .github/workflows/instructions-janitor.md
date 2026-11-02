@@ -51,6 +51,11 @@ tools:
     mode: local
     toolsets:
     - default
+evals:
+  - id: edited-files-within-targets
+    question: For a proposed instruction-cleanup PR, do the resulting edited instruction files meet their applicable file-layout line targets? Return UNKNOWN when no PR is proposed.
+  - id: duplication-consolidated
+    question: When a patch addresses duplicated guidance, does it replace repeated rules with references to a single focused canonical location? Return UNKNOWN when no duplication cleanup is proposed.
 ---
 
 # Instructions Janitor

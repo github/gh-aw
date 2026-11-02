@@ -70,7 +70,11 @@ strict: true
 tools:
   cli-proxy: true
 
-
+evals:
+  - id: contextual-tag-defect
+    question: For a proposed issue, does each flagged json:"-" occurrence have source-context evidence that ignoring the field causes the described problem? Return UNKNOWN when no issue is proposed.
+  - id: valid-uses-not-reported
+    question: When inspected matches are established as intentional valid exclusions, does the proposed output refrain from reporting those matches as defects? Return UNKNOWN when no such valid matches are established.
 ---
 
 # Go Code Pattern Detector

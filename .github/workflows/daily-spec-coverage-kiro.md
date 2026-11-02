@@ -46,6 +46,11 @@ imports:
   - shared/reporting.md
 features:
   gh-aw-detection: true
+evals:
+  - id: scanner-faithful-findings
+    question: In a proposed findings report, do reported broken local links match the complete audit_spec_coverage.cjs scan results? Return UNKNOWN when no report is proposed or complete scanner evidence is unavailable.
+  - id: filtered-check-not-clean
+    question: When integrity filtering prevents the required related-issue check, does the final output preserve that check as unavailable rather than claim a clean audit? Return UNKNOWN when this filtering scenario is not established.
 ---
 
 # Daily Spec Coverage Review

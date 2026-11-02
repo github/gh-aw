@@ -36,6 +36,13 @@ safe-outputs:
 
 timeout-minutes: 15
 strict: true
+evals:
+  - id: source-video-bound
+    question: Does the proposed analysis report identify the video URL supplied by the triggering input?
+  - id: scene-analysis
+    question: When video decoding succeeds, does the proposed report describe the detected scene-change timestamps? Return UNKNOWN when the video cannot be decoded.
+  - id: audio-analysis
+    question: When an audio stream is present, does the proposed report describe its measured audio properties? Return UNKNOWN when no audio stream is available.
 ---
 
 # Video Analysis Agent

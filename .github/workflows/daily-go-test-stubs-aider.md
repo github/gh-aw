@@ -44,6 +44,11 @@ imports:
   - shared/reporting.md
 features:
   gh-aw-detection: true
+evals:
+  - id: measured-coverage-gain
+    question: For a proposed test PR, does the publication evidence demonstrate a strict increase in covered production statements in the selected package? Return UNKNOWN when no PR is proposed.
+  - id: behavioral-mutation-witness
+    question: For a proposed test PR, does the mutation evidence show that a newly covered literal-return mutation failed an assertion in the new tests? Return UNKNOWN when no PR is proposed.
 ---
 
 # Daily Go Test Stubs — Aider

@@ -33,6 +33,11 @@ safe-outputs:
     replace-older-comments: true
   noop:
 model: copilot/gpt-5.6-terra
+evals:
+  - id: question-per-protected-file
+    question: When protected-file changes are observed, does the proposed comment ask at least one explicit confirmation question for each changed protected file? Return UNKNOWN when neither protected file changed.
+  - id: protected-copy-scope
+    question: When a copy-review comment is proposed, are its findings confined to README.md and docs/src/content/docs/index.mdx? Return UNKNOWN when no comment is proposed.
 ---
 
 # Front Page Copy Guard
