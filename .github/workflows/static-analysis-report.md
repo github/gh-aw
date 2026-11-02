@@ -11,7 +11,12 @@ permissions:
   actions: read
   issues: read
   pull-requests: read
-engine: claude
+engine:
+  id: claude
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: balanced
 network:
   allowed: [defaults, go]
 tools:
