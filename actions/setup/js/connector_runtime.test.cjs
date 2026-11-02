@@ -142,10 +142,13 @@ describe("typed authority and credential-free staging", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("validates UTF-8 byte lengths and normalizes lone surrogates like Go JSON", async () => {
+  it("validates Unicode code-point lengths and normalizes lone surrogates like Go JSON", async () => {
     const doc = document("safe-output", { inputs: { text: { type: "string", required: true, maxLength: 4 } }, resources: {}, request: { endpoint: "api", method: "POST", path: "/", body: { text: { input: "text" } } } }, {});
     await expect(execute(doc, { text: "éé" }, { staged: true })).resolves.toMatchObject({ staged: true });
-    await expect(execute(doc, { text: "ééé" }, { staged: true })).rejects.toThrow(/bounded UTF-8/);
+    await expect(execute(doc, { text: "éééé" }, { staged: true })).resolves.toMatchObject({ staged: true });
+    await expect(execute(doc, { text: "😀".repeat(4) }, { staged: true })).resolves.toMatchObject({ staged: true });
+    await expect(execute(doc, { text: "é".repeat(5) }, { staged: true })).rejects.toThrow(/bounded Unicode/);
+    await expect(execute(doc, { text: "😀".repeat(5) }, { staged: true })).rejects.toThrow(/bounded Unicode/);
     const result = await execute(doc, { text: "\ud800" }, { staged: true });
     expect(result.request.arguments.text).toBe("\uFFFD");
   });

@@ -19,6 +19,8 @@ describe("bundled connector pattern validation", () => {
 
   it("normalizes invalid Unicode like the Go JSON decoder", async () => {
     expect(await matchesConnectorPattern("^\ufffd$", "\ud800")).toBe(true);
+    expect(await matchesConnectorPattern("^\\S+$", "é".repeat(65000))).toBe(true);
+    expect(await matchesConnectorPattern("^\\S+$", "😀".repeat(65000))).toBe(true);
   });
 
   it("fails closed on unsupported syntax and oversized inputs", async () => {
