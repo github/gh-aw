@@ -18,6 +18,7 @@ import (
 // BFS import traversal. It accumulates results from all imported files and provides
 // a method to convert the accumulated state into the final ImportsResult.
 type importAccumulator struct {
+	connectors               []ConnectorImport
 	toolsBuilder             strings.Builder
 	mcpServersBuilder        strings.Builder
 	markdownBuilder          strings.Builder // imports with substituted inputs or schema defaults (compile-time substitution)
@@ -146,6 +147,12 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 		if err := validateWithImportSchema(item.inputs, origFm, item.importPath); err != nil {
 			return err
 		}
+	}
+	if registrations, ok := fm["connectors"].(map[string]any); ok {
+		if err := validateSharedConnectorFields(fm); err != nil {
+			return fmt.Errorf("import %q: %w", item.importPath, err)
+		}
+		acc.connectors = append(acc.connectors, ConnectorImport{Source: item.importPath, Registrations: registrations})
 	}
 
 	// Phase 3: Extract engine configuration (id, runtime, mcp timeouts, model preference).
@@ -1061,6 +1068,7 @@ func (acc *importAccumulator) toImportsResult(topologicalOrder []string) *Import
 // ImportedFiles which is populated separately from the topological sort order.
 func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 	result := &ImportsResult{
+		Connectors:                    acc.connectors,
 		MergedTools:                   acc.toolsBuilder.String(),
 		MergedMCPServers:              acc.mcpServersBuilder.String(),
 		MergedEngines:                 acc.engines,

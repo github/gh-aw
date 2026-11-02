@@ -25,10 +25,20 @@
       "propertyNames": { "$ref": "#/$defs/connectorName" },
       "additionalProperties": {
         "type": "object",
-        "required": ["definition", "connection"],
+        "required": ["connection"],
+        "oneOf": [
+          { "required": ["definition"], "not": { "required": ["spec"] } },
+          { "required": ["spec"], "not": { "required": ["definition"] } }
+        ],
         "additionalProperties": false,
         "properties": {
           "definition": { "type": "string", "minLength": 1 },
+          "spec": {
+            "description": "Inline versioned ConnectorSpec for a self-contained Markdown import. The compiler strictly validates the complete connector contract.",
+            "type": "object",
+            "required": ["apiVersion", "kind", "id", "endpoints", "credentials"],
+            "additionalProperties": true
+          },
           "connection": { "type": "string", "minLength": 1 },
           "on": {
             "$ref": "#/$defs/connectorCapabilities",

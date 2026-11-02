@@ -5,9 +5,84 @@ description: Declarative third-party services with independently selected trigge
 
 ## Workflow configuration
 
-The experimental `connectors` frontmatter field declares each service once.
-Its `on`, `tools`, `context`, and `safe-outputs` parts are independently optional;
-omitting a part disables it. Registration alone enables nothing.
+Import a connector Markdown file using the existing `imports` / `uses` / `with`
+syntax, then select its APIs in the normal workflow sections:
+
+```aw wrap
+---
+imports:
+  - uses: .github/aw/connectors/example.md
+    with:
+      connection: .github/aw/connections/example.yaml
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+tools:
+  tracker: [get-issue]
+context:
+  tracker:
+    issue-details: {issue: ISSUE-1}
+safe-outputs:
+  tracker-add-comment:
+---
+
+Investigate the approved issue and request a comment with the findings.
+```
+
+`with` is validated and substituted by the ordinary `import-schema` machinery;
+there is no separate connector import or parameter system. Nested imports,
+defaults, and `imports.aw` use the same existing rules. The connection path
+remains relative to the consuming repository root and contains approved resource
+grants and secret names, not credentials.
+
+The connector Markdown declares registration only:
+
+```aw wrap
+---
+import-schema:
+  connection:
+    type: string
+    required: true
+connectors:
+  tracker:
+    definition: .github/aw/connectors/example.yaml
+    connection: ${{ github.aw.import-inputs.connection }}
+---
+
+Use only the explicitly selected tracker capabilities.
+```
+
+For a self-contained, cross-repository Markdown import, replace `definition` with
+`spec`, containing the complete versioned `ConnectorSpec` object. The shipped
+`.github/aw/connectors/example.md` demonstrates all four capability types inline.
+It needs no companion definition file. Path-based definitions, including the
+eight provider wrappers, require their referenced YAML in the consuming
+repository. Cross-repository Markdown imports use the normal pinned
+`owner/repo/path@ref` import syntax.
+
+Importing alone enables nothing. `tools`, `context`, and `safe-outputs` are
+independently optional. Built-in APIs can coexist in the same sections.
+Connector triggers and safe outputs are always prefixed with their registered
+connector id and a hyphen, for example `tracker-issue-created` and
+`tracker-add-comment`. The id is the registration key (`tracker`), not the
+provider's authority identifier (`spec.id`). Ambiguous prefixes across imported
+ids and collisions with built-in GitHub names are rejected. Unqualified
+`safe-outputs.add-comment` remains the built-in GitHub operation, even when the
+connector declares an operation with the same local name. Qualified entries
+accept null or `{}`; behavior and input schemas come from the connector spec.
+
+`on: {tracker-issue-created: null}` selects a declared connector trigger, but
+compilation currently fails closed because authenticated custom ingress is not
+operational. Use an ordinary GitHub trigger for the working examples.
+Unknown capabilities, duplicate registrations, out-of-scope context, and
+selection inside an imported registration are rejected. Only the main workflow
+selects authority.
+
+## Direct registration
+
+The lower-level `connectors` form remains available for direct registration
+without an import. Its capability parts are independently optional:
 
 ```aw wrap
 ---
@@ -49,7 +124,8 @@ resources:
 
 | Field under `connectors.<name>` | Meaning |
 | --- | --- |
-| `definition` | Required repository-relative `ConnectorSpec` YAML or JSON file. |
+| `definition` | Repository-relative `ConnectorSpec` YAML or JSON file; mutually exclusive with `spec`. |
+| `spec` | Complete inline `ConnectorSpec`; makes a Markdown import self-contained. |
 | `connection` | Required repository-relative `ConnectorConnection` file with approved resource grants and secret names. |
 | `on` | Optional list of declared native trigger names. Compilation currently rejects activation because no approved custom receiver ships with this prototype. |
 | `tools` | Optional list of declared `mcp` read tools or `httpMcp` registrations. Ambiguous names are rejected. |
@@ -59,8 +135,9 @@ resources:
 For tools-only use, retain `definition`, `connection`, and `tools`; no context or
 write credential is required. Context-only and safe-output-only configurations
 work the same way. Built-in `on`, `tools`, and `safe-outputs` settings remain
-available alongside connectors; connector selections stay inside their service
-block, not scattered across those built-in sections.
+available alongside connectors. Imported registrations instead use
+`tools.<alias>`, `context.<alias>`, and qualified
+`safe-outputs["<alias>-<operation>"]` as shown above.
 
 The compiler validates selected names against the external definition and freezes
 the selected content into phase-restricted, content-addressed runtime plans.
@@ -79,7 +156,7 @@ Generated effect tool names include the alias length to avoid normalized name
 collisions; for example, `tracker/add-comment` becomes
 `connector_7_tracker_add_comment`.
 
-Connector declarations currently belong in the main AW, not shared AW imports.
+Shared AW imports may register connectors but cannot select their capabilities.
 Custom webhook activation and connector effects for work-queue participants
 remain unsupported and fail compilation rather than silently dropping behavior.
 No receiver, OAuth broker, subscription renewal, or provider deployment is

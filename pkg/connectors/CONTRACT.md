@@ -15,8 +15,34 @@ the schema, shared parser, or test harness.
 Run `go test ./pkg/connectors -run 'TestConnectorSpec|TestProviderFixtures' -count=1`.
 To select one provider, use `-run 'TestProviderFixtures/<provider>$'`.
 
-Definition, connection, and workflow selection are separate concerns. An AW
-declares each service once and selects its parts independently:
+Definition, connection, and workflow selection are separate concerns. Consumers
+reuse normal `imports` / `uses` / `with` syntax and select APIs in native sections:
+
+```yaml
+imports:
+  - uses: .github/aw/connectors/example.md
+    with:
+      connection: .github/aw/connections/example.yaml
+on: workflow_dispatch
+tools:
+  tracker: [get-issue]
+context:
+  tracker:
+    issue-details: {issue: ISSUE-1}
+safe-outputs:
+  tracker-add-comment:
+```
+
+The Markdown import uses ordinary `import-schema` parameters and declares
+`connectors.tracker.connection: ${{ github.aw.import-inputs.connection }}`.
+Its `definition` is a repository-relative YAML/JSON file, or `spec` contains the
+full inline `ConnectorSpec` for a self-contained remote Markdown import.
+Exactly one is required. There is no separate import resolver or parameter
+language. Imported registrations grant nothing; capability selections inside
+them and duplicate aliases are rejected. Connection paths remain confined to
+the consuming repository.
+
+Direct registrations remain supported:
 
 ```yaml
 connectors:
@@ -34,8 +60,11 @@ service block. Omitted parts are disabled, not inherited or auto-enabled.
 `tools` resolves both REST-backed `mcp` and actual `httpMcp` capability names.
 `on: [issue-created]` selects a native trigger but compilation refuses activation
 until an approved receiver exists. Ordinary GitHub triggers stay at the root
-`on` field. Main-workflow declarations currently cannot be imported from shared
-AWs.
+`on` field. Imported registrations expose `tools.<alias>`, `context.<alias>`,
+and qualified `on["<alias>-<trigger>"]` and
+`safe-outputs["<alias>-<operation>"]` selections. Trigger and effect entries
+accept null or `{}`. Ambiguous prefixes and built-in GitHub name collisions
+are rejected; unqualified built-ins are never redirected to a connector.
 
 Connection grants remain a separate administrator-owned document:
 

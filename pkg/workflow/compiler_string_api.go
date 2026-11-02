@@ -112,6 +112,9 @@ func (c *Compiler) parseStringFrontmatter(content, cleanPath string) (*frontmatt
 	if err := c.preprocessScheduleFields(result.Frontmatter, cleanPath, content); err != nil {
 		return nil, err
 	}
+	if err := c.normalizeImportedConnectors(result.Frontmatter, cleanPath, content); err != nil {
+		return nil, err
+	}
 
 	frontmatterForValidation := c.copyFrontmatterWithoutInternalMarkers(result.Frontmatter)
 

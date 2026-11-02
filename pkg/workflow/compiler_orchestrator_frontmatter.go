@@ -103,6 +103,9 @@ func (c *Compiler) parseFrontmatterSection(markdownPath string) (*frontmatterPar
 		orchestratorFrontmatterLog.Printf("Schedule preprocessing failed: %v", err)
 		return nil, err
 	}
+	if err := c.normalizeImportedConnectors(result.Frontmatter, cleanPath, contentString); err != nil {
+		return nil, err
+	}
 
 	// Create a copy of frontmatter without internal markers for schema validation
 	// Keep the original frontmatter with markers for YAML generation

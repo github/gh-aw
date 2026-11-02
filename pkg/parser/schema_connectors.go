@@ -1,6 +1,10 @@
 package parser
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"sort"
+)
 
 // HasConnectorTriggers distinguishes a main workflow with connector triggers
 // from a shared workflow that intentionally omits an on section.
@@ -19,11 +23,40 @@ func HasConnectorTriggers(frontmatter map[string]any) bool {
 	return false
 }
 
-// Connector authority is rooted in the main workflow's repository. Shared AW
-// imports must not silently lose declarations or widen that authority.
+// GetSafeOutputFieldKeys includes operation and configuration names reserved by
+// the built-in safe-output grammar.
+func GetSafeOutputFieldKeys() ([]string, error) {
+	keys, err := GetSafeOutputTypeKeys()
+	if err != nil {
+		return nil, err
+	}
+	for field := range safeOutputMetaFields {
+		keys = append(keys, field)
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
+// Imports register services but cannot select capabilities on the consumer's behalf.
 func validateSharedConnectorFields(frontmatter map[string]any) error {
-	if _, exists := frontmatter["connectors"]; exists {
-		return errors.New("connectors must be registered in the main workflow, not a shared AW import; reference an external ConnectorSpec with connectors.<name>.definition")
+	value, present := frontmatter["connectors"]
+	if !present {
+		return nil
+	}
+	registrations, ok := value.(map[string]any)
+	if !ok {
+		return errors.New("connectors must be an object")
+	}
+	for alias, value := range registrations {
+		config, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("connector %q must be an object", alias)
+		}
+		for _, field := range []string{"on", "tools", "context", "safe-outputs"} {
+			if _, selected := config[field]; selected {
+				return fmt.Errorf("connector %q: select %s in the main workflow; shared imports may only register definition and connection", alias, field)
+			}
+		}
 	}
 	return nil
 }

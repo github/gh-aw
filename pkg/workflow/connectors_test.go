@@ -264,5 +264,7 @@ func TestConnectorFileAndStringCompilationAgree(t *testing.T) {
 func TestConnectorImportAuthorityIsExplicit(t *testing.T) {
 	t.Parallel()
 	frontmatter := map[string]any{"connectors": map[string]any{"tracker": map[string]any{"definition": "spec.yaml", "connection": "connection.yaml"}}}
+	require.NoError(t, parser.ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter, "shared.md"))
+	frontmatter["connectors"].(map[string]any)["tracker"].(map[string]any)["tools"] = []any{"get-issue"}
 	require.ErrorContains(t, parser.ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter, "shared.md"), "main workflow")
 }

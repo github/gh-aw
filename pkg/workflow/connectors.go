@@ -13,7 +13,8 @@ import (
 var connectorNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
 
 type ConnectorRegistration struct {
-	Definition  string                    `json:"definition"`
+	Definition  string                    `json:"definition,omitempty"`
+	Spec        *connectors.ConnectorSpec `json:"spec,omitempty"`
 	Connection  string                    `json:"connection"`
 	On          []string                  `json:"on,omitempty"`
 	Tools       []string                  `json:"tools,omitempty"`
@@ -127,7 +128,7 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		if err := connectors.Decode(data, &registration); err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
-		service, err := connectors.LoadService(c.gitRoot, registration.Definition, registration.Connection)
+		service, err := loadWorkflowConnectorService(c.gitRoot, registration)
 		if err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
@@ -145,4 +146,14 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		resolved[alias] = config
 	}
 	return resolved, nil
+}
+
+func loadWorkflowConnectorService(root string, registration ConnectorRegistration) (*connectors.Service, error) {
+	if registration.Spec != nil {
+		if registration.Definition != "" {
+			return nil, errors.New("connector registration requires exactly one definition or spec")
+		}
+		return connectors.LoadServiceSpec(root, *registration.Spec, registration.Connection)
+	}
+	return connectors.LoadService(root, registration.Definition, registration.Connection)
 }
