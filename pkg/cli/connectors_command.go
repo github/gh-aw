@@ -18,15 +18,15 @@ type connectorValidationResult struct {
 	Error string `json:"error,omitempty"`
 }
 
-// NewConnectorsCommand creates offline commands for the experimental connector contract.
+// NewConnectorsCommand creates inspection and trusted-host connector commands.
 func NewConnectorsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "connectors",
 		Short:         "Inspect and validate experimental connector definitions",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Long: "Validate external connector definitions without contacting providers, resolving secrets, " +
-			"registering webhook sources, or executing operations.",
+		Long: "Validate and inspect external connector definitions offline. " +
+			"The serve and invoke subcommands execute compiler-frozen capabilities in trusted hosts.",
 		Example: string(constants.CLIExtensionPrefix) + " connectors validate .github/aw/connectors/linear.yaml",
 	}
 	cmd.SetOut(os.Stdout)
@@ -48,7 +48,7 @@ func NewConnectorsCommand() *cobra.Command {
 		},
 	}
 	addJSONFlag(validate)
-	cmd.AddCommand(validate)
+	cmd.AddCommand(validate, newConnectorPlanCommand(), newConnectorSchemaCommand(), newConnectorServeCommand(), newConnectorInvokeCommand())
 	return cmd
 }
 

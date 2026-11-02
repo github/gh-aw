@@ -31,6 +31,36 @@ func Lower(root string, binding Binding) (*Plan, error) {
 	if binding.APIVersion != APIVersion || binding.Kind != "ConnectorBinding" {
 		return nil, errors.New("expected versioned ConnectorBinding")
 	}
+	service, err := LoadService(root, binding.Definition, binding.Connection)
+	if err != nil {
+		return nil, err
+	}
+	return service.Select(Selection{
+		Triggers: binding.Triggers, MCP: binding.MCP, HTTPMCP: binding.HTTPMCP,
+		SafeOutputs: binding.SafeOutputs, Context: binding.Context,
+	})
+}
+
+// Service is one validated third-party service registration. Loading it grants
+// no capabilities; callers explicitly select the independently usable parts.
+type Service struct {
+	spec       ConnectorSpec
+	connection Connection
+	definition string
+	path       string
+}
+
+type Selection struct {
+	Triggers    []string
+	MCP         []string
+	HTTPMCP     []string
+	SafeOutputs []string
+	Context     []string
+}
+
+// LoadService validates a repository-local definition and connection without
+// requiring, activating, or resolving credentials for any capability.
+func LoadService(root, definition, connectionPath string) (*Service, error) {
 	dir, err := os.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("open connector repository root: %w", err)
@@ -41,11 +71,11 @@ func Lower(root string, binding Binding) (*Plan, error) {
 		}
 	}()
 	var spec ConnectorSpec
-	if err := readLocal(dir, binding.Definition, &spec); err != nil {
+	if err := readLocal(dir, definition, &spec); err != nil {
 		return nil, err
 	}
 	var connection Connection
-	if err := readLocal(dir, binding.Connection, &connection); err != nil {
+	if err := readLocal(dir, connectionPath, &connection); err != nil {
 		return nil, err
 	}
 	if err := spec.Validate(); err != nil {
@@ -54,10 +84,34 @@ func Lower(root string, binding Binding) (*Plan, error) {
 	if err := validateConnection(spec, connection); err != nil {
 		return nil, err
 	}
-	if err := validateSelection(spec, binding, connection); err != nil {
+	return &Service{spec: spec, connection: connection, definition: definition, path: connectionPath}, nil
+}
+
+func (s *Service) Select(selection Selection) (*Plan, error) {
+	binding := Binding{
+		APIVersion: APIVersion, Kind: "ConnectorBinding",
+		Definition: s.definition, Connection: s.path,
+		Triggers: selection.Triggers, MCP: selection.MCP, HTTPMCP: selection.HTTPMCP,
+		SafeOutputs: selection.SafeOutputs, Context: selection.Context,
+	}
+	if err := validateSelection(s.spec, binding, s.connection); err != nil {
 		return nil, err
 	}
-	return freezePlan(spec, connection, binding)
+	return freezePlan(s.spec, s.connection, binding)
+}
+
+// ToolCapability resolves a declared read capability without guessing whether
+// it is a REST-backed tool or an actual remote MCP registration.
+func (s *Service) ToolCapability(name string) (string, error) {
+	_, local := s.spec.MCP[name]
+	_, remote := s.spec.HTTPMCP[name]
+	if local == remote {
+		return "", fmt.Errorf("MCP capability %q must name exactly one mcp or httpMcp declaration", name)
+	}
+	if local {
+		return "mcp", nil
+	}
+	return "httpMcp", nil
 }
 
 func readLocal(root *os.Root, path string, target any) error {

@@ -83,6 +83,7 @@ type WorkflowData struct {
 	TokenBrokerCopilotRequest      bool // Use the broker for Copilot inference authentication in supported jobs
 	TokenBrokerCopilotTask         bool // Use the broker for Copilot task creation and assignment
 	WebhookSubscriptions           []WebhookSubscription
+	Connectors                     map[string]*WorkflowConnector
 	Permissions                    string
 	Network                        string // top-level network permissions configuration
 	Concurrency                    string // workflow-level concurrency configuration
