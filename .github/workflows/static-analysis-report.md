@@ -11,6 +11,7 @@ permissions:
   actions: read
   issues: read
   pull-requests: read
+  copilot-requests: write
 engine:
   id: claude
   model-provider: github
