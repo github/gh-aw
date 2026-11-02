@@ -111,7 +111,7 @@ and [MCP setup](https://linear.app/docs/mcp).
 | --- | --- |
 | Triggers | `linear-issue-created`, `linear-issue-updated`, `linear-issue-removed` for native Issue create/update/remove. Requires raw-body HMAC and timestamp verification with the webhook signing secret, separate from API keys. No inferred closure or label transitions. |
 | MCPs/read tools | Hosted `read-only` at `https://mcp.linear.app/mcp/readonly`, allowing only `get_issue`. REST/GraphQL selections: `get-issue`, `resolve-team`, `resolve-project`. |
-| Safe outputs | `linear-create-issue`, `linear-update-issue`, `linear-add-comment`. Fixed GraphQL operations and approved organization/team/project/issue targets. |
+| Safe outputs | `linear-create-issue`, `linear-create-issue-in-project`, `linear-update-issue`, `linear-add-comment`. Fixed GraphQL operations and approved organization/team/project/issue targets. |
 | Context | Fetch the approved issue with `get-issue`; validate organization and team. Resolution is bounded and rejects ambiguity. No automatic resolution chain or paginated hydration. |
 
 ### Migration from built-in Linear
@@ -145,6 +145,18 @@ and `resolve-project` reads and approve the resulting model UUIDs. Broad hosted
 MCP toolsets, optional project creation, single-field updates, and per-operation
 budget/staging options are contract gaps, not silently retained legacy paths.
 No custom authenticated ingress or configurable context is installed.
+
+For an author-owned team UUID secret and a project URL slug, select
+`linear-create-issue-in-project` instead of supplying agent-controlled targets.
+`with.create-team-secret` names the trusted team UUID secret (default
+`LINEAR_TEAM_ID`), and `with.create-project-slug` pins the exact project slug
+(default specimen `abcdef123456`; replace it before live use). The generated
+`connector_6_linear_create_issue_in_project` tool accepts only title and body.
+The same safe-output credential performs a bounded read preflight: resolve one
+exact project slug, verify the team UUID and project/team membership, and reject
+pagination, ambiguity, or malformed responses before creating an issue. The
+resolved UUIDs remain execution-local grants, never agent input or artifacts.
+Dry-run/staged mode does not resolve these secrets or perform the preflight.
 
 ## Jira
 

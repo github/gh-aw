@@ -188,6 +188,116 @@ connectors:
         responseResources:
           /data/issueCreate/issue/project/id: projects
           /data/issueCreate/issue/team/id: teams
+      create-issue-in-project:
+        credential: writer
+        inputs:
+          body:
+            maxLength: 65000
+            pattern: \S
+            required: true
+            type: string
+          project-id:
+            maxLength: 36
+            pattern: ^([0-9a-f]{12}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$
+            required: true
+            type: string
+          team-id:
+            maxLength: 36
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            required: true
+            type: string
+          title:
+            maxLength: 128
+            pattern: \S
+            required: true
+            type: string
+        trustedInputs:
+          team-id:
+            secret: ${{ github.aw.import-inputs.create-team-secret }}
+          project-id:
+            value: ${{ github.aw.import-inputs.create-project-slug }}
+        preflight:
+          inputs:
+            team-id:
+              type: string
+              required: true
+              maxLength: 36
+              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            project-id:
+              type: string
+              required: true
+              maxLength: 12
+              pattern: ^[0-9a-f]{12}$
+          maxResponseBytes: 16384
+          request:
+            endpoint: api
+            graphql: |
+              query ConnectorLinearCreateScope($team: String!, $project: String!) {
+                team(id: $team) { id }
+                projects(first: 1, filter: { slugId: { eq: $project } }) {
+                  nodes {
+                    id slugId
+                    teams(first: 100) {
+                      nodes { id }
+                      pageInfo { hasNextPage }
+                    }
+                  }
+                  pageInfo { hasNextPage }
+                }
+              }
+            method: POST
+            path: /graphql
+            query:
+              team:
+                input: team-id
+              project:
+                input: project-id
+          responseRequired:
+            - /data/team/id
+            - /data/projects/nodes/0/id
+            - /data/projects/nodes/0/slugId
+          responseInputs:
+            /data/team/id: team-id
+            /data/projects/nodes/0/slugId: project-id
+          responseChecks:
+            /data/projects/pageInfo/hasNextPage: false
+            /data/projects/nodes/0/teams/pageInfo/hasNextPage: false
+          responseContains:
+            /data/projects/nodes/0/teams/nodes/*/id: team-id
+          project:
+            project-id: /data/projects/nodes/0/id
+        maxResponseBytes: 16384
+        request:
+          endpoint: api
+          graphql: |
+            mutation ConnectorLinearCreateInProject($team: String!, $project: String!, $title: String!, $body: String!) {
+              issueCreate(input: { teamId: $team, projectId: $project, title: $title, description: $body }) {
+                success
+                issue { id identifier title team { id } project { id } }
+              }
+            }
+          method: POST
+          path: /graphql
+          query:
+            body:
+              input: body
+            project:
+              input: project-id
+            team:
+              input: team-id
+            title:
+              input: title
+        resources:
+          project-id: projects
+          team-id: teams
+        responseChecks:
+          /data/issueCreate/success: true
+        responseRequired:
+          - /data/issueCreate/issue/id
+          - /data/issueCreate/issue/identifier
+        responseInputs:
+          /data/issueCreate/issue/project/id: project-id
+          /data/issueCreate/issue/team/id: team-id
       update-issue:
         credential: writer
         inputs:
@@ -344,6 +454,12 @@ connectors:
           /data/teams/nodes/0/id: teams
         tool: resolve-team
 import-schema:
+  create-team-secret:
+    type: string
+    default: LINEAR_TEAM_ID
+  create-project-slug:
+    type: string
+    default: abcdef123456
   issues:
     type: array
     items:

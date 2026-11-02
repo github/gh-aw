@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"24a3b1c683c35b16b6a24554ebc87931e8287450dd3df8b941a7f62ace193a30","body_hash":"ee05f09c19465268270f956d56f69afb7915d287bb4052a478e4c4018bc6eed7","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103"}}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN","JIRA_API_TOKEN","JIRA_USER_EMAIL","LINEAR_API_KEY","LINEAR_TEAM_ID"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.0","digest":"sha256:b14bd399376180b5649a9324be3b50fbfc82bfe8f0c80045840416b5a4e65b96","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.0@sha256:b14bd399376180b5649a9324be3b50fbfc82bfe8f0c80045840416b5a4e65b96"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.0","digest":"sha256:baff00b856a4bdc93bce134928c70af3d3492f2e518757115042040674d56b0b","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.0@sha256:baff00b856a4bdc93bce134928c70af3d3492f2e518757115042040674d56b0b"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.0","digest":"sha256:6e0cbf7f980beb78b5461563a8164f6439ca959bc93733d5a6b52972e523ed50","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.0@sha256:6e0cbf7f980beb78b5461563a8164f6439ca959bc93733d5a6b52972e523ed50"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.0","digest":"sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.0@sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.0.3","digest":"sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132","pinned_image":"ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["jira_add_comment","jira_add_label","jira_create_issue","jira_update_issue","linear_create_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"e65bc4b0990d3939506a2dc566433ae2f24e3506b1a7d429d052b9c39dc31aa0","body_hash":"f2efb63ad4840de359854cd97622480c673a7cd415fa6fade673ca39d92b8df0","strict":true,"agent_id":"copilot","engine_versions":{"copilot":"1.0.103"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_GITHUB_TOKEN","GH_AW_DEFAULT_OTLP_ENDPOINT","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN","JIRA_API_TOKEN","JIRA_USER_EMAIL","LINEAR_API_KEY","LINEAR_TEAM_ID"],"actions":[{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.0","digest":"sha256:b14bd399376180b5649a9324be3b50fbfc82bfe8f0c80045840416b5a4e65b96","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.0@sha256:b14bd399376180b5649a9324be3b50fbfc82bfe8f0c80045840416b5a4e65b96"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.0","digest":"sha256:baff00b856a4bdc93bce134928c70af3d3492f2e518757115042040674d56b0b","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.0@sha256:baff00b856a4bdc93bce134928c70af3d3492f2e518757115042040674d56b0b"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.0","digest":"sha256:6e0cbf7f980beb78b5461563a8164f6439ca959bc93733d5a6b52972e523ed50","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.0@sha256:6e0cbf7f980beb78b5461563a8164f6439ca959bc93733d5a6b52972e523ed50"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.0","digest":"sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.0@sha256:d3544a4222e7efeeeb38669d8a1af0c72691c55b8f6506b15aa5920f7f31b7bc"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f","pinned_image":"ghcr.io/github/gh-aw-node@sha256:2c2ea524e648b91c8333ce246e3838fcf5b19ac70e45baac1a51b9207299749f"},{"image":"ghcr.io/github/github-mcp-server:v2.0.3","digest":"sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132","pinned_image":"ghcr.io/github/github-mcp-server:v2.0.3@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"}],"mcp_servers":[{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["connector_6_linear_create_issue_in_project","jira_add_comment","jira_add_label","jira_create_issue","jira_update_issue","noop","report_incomplete","report_missing_data","report_missing_tool"]}],"threat_detection":{"mode":"enabled"},"admission":true}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -113,7 +113,7 @@ jobs:
       lockdown_check_failed: ${{ steps.generate_aw_info.outputs.lockdown_check_failed == 'true' }}
       model: ${{ steps.generate_aw_info.outputs.model }}
       oauth_token_check_failed: ${{ steps.check-oauth-tokens.outputs.oauth_token_check_failed == 'true' }}
-      secret_verification_result: ${{ (steps.validate-secret.outcome == 'failure' || steps.validate-safe-output-secret-1.outcome == 'failure' || steps.validate-safe-output-secret-2.outcome == 'failure' || steps.validate-safe-output-secret-3.outcome == 'failure' || steps.validate-safe-output-secret-4.outcome == 'failure') && 'failed' || 'success' }}
+      secret_verification_result: ${{ (steps.validate-secret.outcome == 'failure' || steps.validate-safe-output-secret-1.outcome == 'failure' || steps.validate-safe-output-secret-2.outcome == 'failure') && 'failed' || 'success' }}
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
@@ -242,16 +242,6 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" JIRA_API_TOKEN 'Jira safe outputs' https://github.github.com/gh-aw/reference/safe-outputs/#jira-safe-outputs
         env:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-      - name: Validate LINEAR_API_KEY secret
-        id: validate-safe-output-secret-3
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" LINEAR_API_KEY 'Linear safe outputs' https://github.github.com/gh-aw/reference/safe-outputs/#linear-safe-outputs
-        env:
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-      - name: Validate LINEAR_TEAM_ID secret
-        id: validate-safe-output-secret-4
-        run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_multi_secret.sh" LINEAR_TEAM_ID 'Linear safe outputs' https://github.github.com/gh-aw/reference/safe-outputs/#linear-safe-outputs
-        env:
-          LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
       - name: Check for OAuth tokens
         id: check-oauth-tokens
         run: bash "${RUNNER_TEMP}/gh-aw/actions/check_oauth_tokens.sh"
@@ -302,7 +292,7 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"}],\"system_item_count\":12}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"}],\"system_item_count\":12}"
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -313,11 +303,12 @@ jobs:
           GH_AW_GITHUB_SERVER_URL: ${{ github.server_url }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: linear_create_issue, jira_create_issue, jira_update_issue, jira_add_comment, jira_add_label, report_missing_tool, report_missing_data, noop(max:2)\n"
+          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: jira_create_issue, jira_update_issue, jira_add_comment, jira_add_label, report_missing_tool, report_missing_data, noop(max:2), connector_6_linear_create_issue_in_project\n"
           GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0005: "{{#runtime-import .github/workflows/smoke-issues.md}}\n"
+          GH_AW_PROMPT_CONTENT_0005: "Import `@builtin:connectors/linear.md` and explicitly select read tools and\nhyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;\nthe defaults grant no resources. Personal API keys use raw Authorization;\nhosted MCP requires a separate bearer credential. Event envelopes contain\nreferences, not resource content. Native ingress is not operational.\n"
+          GH_AW_PROMPT_CONTENT_0006: "{{#runtime-import .github/workflows/smoke-issues.md}}\n"
         with:
           script: |
             const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
@@ -482,7 +473,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "24a3b1c683c35b16b6a24554ebc87931e8287450dd3df8b941a7f62ace193a30:ee05f09c19465268270f956d56f69afb7915d287bb4052a478e4c4018bc6eed7"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "e65bc4b0990d3939506a2dc566433ae2f24e3506b1a7d429d052b9c39dc31aa0:f2efb63ad4840de359854cd97622480c673a7cd415fa6fade673ca39d92b8df0"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -609,6 +600,20 @@ jobs:
         with:
           name: activation
           path: /tmp/gh-aw
+      - name: Checkout trusted connector runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: github/gh-aw
+          ref: "20e47d5ff9"
+          path: .gh-aw-connector-runtime
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Build trusted connector runtime
+        working-directory: ${{ github.workspace }}/.gh-aw-connector-runtime
+        run: |
+          CGO_ENABLED=0 make build
+          mkdir -p "${RUNNER_TEMP}/gh-aw"
+          install -m 755 gh-aw "${RUNNER_TEMP}/gh-aw/gh-aw"
       - name: Configure Git credentials
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -678,8 +683,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"create_report_incomplete_issue\":{},\"jira_add_comment\":{\"max\":1},\"jira_add_label\":{\"max\":1},\"jira_create_issue\":{\"max\":1},\"jira_update_issue\":{\"max\":1},\"linear_create_issue\":{\"max\":1,\"project_id\":\"810f57a7e383\",\"team_id\":\"${GH_AW_SECRET_LINEAR_TEAM_ID}\"},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
-          GH_AW_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"connector_6_linear_create_issue_in_project\":{\"description\":\"Request linear/create-issue-in-project; validated and executed outside the agent credential boundary.\",\"inputs\":{\"body\":{\"default\":null,\"description\":\"\",\"maxLength\":65000,\"required\":true,\"type\":\"string\"},\"title\":{\"default\":null,\"description\":\"\",\"maxLength\":128,\"required\":true,\"type\":\"string\"}}},\"create_report_incomplete_issue\":{},\"jira_add_comment\":{\"max\":1},\"jira_add_label\":{\"max\":1},\"jira_create_issue\":{\"max\":1},\"jira_update_issue\":{\"max\":1},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
         with:
           script: |
             const path = require('path');
@@ -694,7 +698,32 @@ jobs:
             {
               "description_suffixes": {},
               "repo_params": {},
-              "dynamic_tools": []
+              "dynamic_tools": [
+                {
+                  "description": "Request linear/create-issue-in-project; validated and executed outside the agent credential boundary.",
+                  "inputSchema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "body": {
+                        "maxLength": 65000,
+                        "pattern": "\\S",
+                        "type": "string"
+                      },
+                      "title": {
+                        "maxLength": 128,
+                        "pattern": "\\S",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "body",
+                      "title"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "connector_6_linear_create_issue_in_project"
+                }
+              ]
             }
           GH_AW_VALIDATION_JSON: |
             {
@@ -809,26 +838,6 @@ jobs:
                   }
                 },
                 "customValidation": "requiresOneOf:summary,description"
-              },
-              "linear_create_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000,
-                    "minLength": 20,
-                    "rejectIfOversized": true
-                  },
-                  "title": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128,
-                    "rejectIfOversized": true
-                  }
-                }
               },
               "noop": {
                 "defaultMax": 2,
@@ -1248,12 +1257,11 @@ jobs:
             const { main } = require(path.join(actionsDir, 'redact_secrets.cjs'));
             await main();
         env:
-          GH_AW_SECRET_NAMES: 'COPILOT_GITHUB_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN,LINEAR_TEAM_ID'
+          GH_AW_SECRET_NAMES: 'COPILOT_GITHUB_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
           SECRET_COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
       - name: Append agent step summary
         if: always()
         run: bash "${RUNNER_TEMP}/gh-aw/actions/append_agent_step_summary.sh"
@@ -1542,6 +1550,8 @@ jobs:
           GH_AW_THREAT_DETECTION_AIC: ${{ needs.detection.outputs.aic }}
           GH_AW_AMBIENT_CONTEXT: ${{ needs.agent.outputs.ambient_context }}
           GH_AW_WORKFLOW_ID: "smoke-issues"
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1561,6 +1571,8 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.outputs.detection_conclusion }}
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1580,6 +1592,8 @@ jobs:
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/smoke-issues.md"
           GH_AW_ENGINE_ID: "copilot"
           GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1599,6 +1613,8 @@ jobs:
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/smoke-issues.md"
           GH_AW_ENGINE_ID: "copilot"
           GH_AW_ENGINE_MODEL: ${{ needs.agent.outputs.model }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1658,6 +1674,8 @@ jobs:
           GH_AW_MISSING_TOOL_REPORT_AS_FAILURE: "true"
           GH_AW_MISSING_DATA_REPORT_AS_FAILURE: "true"
           GH_AW_TIMEOUT_MINUTES: "5"
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1677,6 +1695,8 @@ jobs:
           GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/smoke-issues.md"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_REPORT_FAILED_JOBS: "true"
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1843,7 +1863,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "24a3b1c683c35b16b6a24554ebc87931e8287450dd3df8b941a7f62ace193a30:ee05f09c19465268270f956d56f69afb7915d287bb4052a478e4c4018bc6eed7"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "e65bc4b0990d3939506a2dc566433ae2f24e3506b1a7d429d052b9c39dc31aa0:f2efb63ad4840de359854cd97622480c673a7cd415fa6fade673ca39d92b8df0"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -2316,6 +2336,55 @@ jobs:
           GH_HOST="${GITHUB_SERVER_URL#https://}"
           GH_HOST="${GH_HOST#http://}"
           echo "GH_HOST=${GH_HOST}" >> "$GITHUB_ENV"
+      - name: Checkout trusted connector runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: github/gh-aw
+          ref: "20e47d5ff9"
+          path: .gh-aw-connector-runtime
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Build trusted connector runtime
+        working-directory: ${{ github.workspace }}/.gh-aw-connector-runtime
+        run: |
+          CGO_ENABLED=0 make build
+          mkdir -p "${RUNNER_TEMP}/gh-aw"
+          install -m 755 gh-aw "${RUNNER_TEMP}/gh-aw/gh-aw"
+      - name: Configure Safe Output Scripts
+        run: |
+          cat > "${RUNNER_TEMP}/gh-aw/actions/safe_output_script_connector_6_linear_create_issue_in_project.cjs" << 'GH_AW_SAFE_OUTPUT_SCRIPT_CONNECTOR_6_LINEAR_CREATE_ISSUE_IN_PROJECT_64f9c9d086ca202d_EOF'
+          // @ts-check
+          /// <reference types="./safe-output-script" />
+          // Auto-generated safe-output script handler: connector-6-linear-create-issue-in-project
+
+          const { sanitizeContent } = require("./sanitize_content.cjs");
+
+          /** @type {import('./types/safe-output-script').SafeOutputScriptMain} */
+          async function main(config = {}) {
+            const { body, title } = config;
+            return async function handleConnector6LinearCreateIssueInProject(item, resolvedTemporaryIds, temporaryIdMap) {
+              const { spawnSync } = require('node:child_process');
+              const { join } = require('node:path');
+              const { isStagedMode } = require('./safe_output_helpers.cjs');
+              const { connectorEffectBindings } = require('./connector_effect_bindings.cjs');
+              const staged = false || isStagedMode();
+              const args = { ...item }; delete args.type;
+              const env = { GH_AW_CONNECTOR_PLAN: "eyJkaWdlc3QiOiIyNmU5NTFhNmNhZTc0ZDA2ODdiZTU4YmM5N2E0OTQ1ODYwMzUxYjYyMjgxYmU2Njk4YjQzNTA0ZWMwOTg0MTMxIiwic3BlYyI6eyJhcGlWZXJzaW9uIjoiZ2l0aHViLmNvbS9naC1hdy9jb25uZWN0b3JzL3YxIiwia2luZCI6IkNvbm5lY3RvclNwZWMiLCJpZCI6ImF3LmdpdGh1Yi5jb20vbGluZWFyIiwiZW5kcG9pbnRzIjp7ImFwaSI6Imh0dHBzOi8vYXBpLmxpbmVhci5hcHAifSwiY3JlZGVudGlhbHMiOnsid3JpdGVyIjp7InBoYXNlIjoic2FmZS1vdXRwdXQiLCJoZWFkZXIiOiJBdXRob3JpemF0aW9uIiwic2NoZW1lIjoicmF3Iiwic2NvcGVzIjpbIndyaXRlIl19fSwic2FmZU91dHB1dHMiOnsiY3JlYXRlLWlzc3VlLWluLXByb2plY3QiOnsiY3JlZGVudGlhbCI6IndyaXRlciIsImlucHV0cyI6eyJib2R5Ijp7InR5cGUiOiJzdHJpbmciLCJyZXF1aXJlZCI6dHJ1ZSwibWF4TGVuZ3RoIjo2NTAwMCwicGF0dGVybiI6IlxcUyJ9LCJwcm9qZWN0LWlkIjp7InR5cGUiOiJzdHJpbmciLCJyZXF1aXJlZCI6dHJ1ZSwibWF4TGVuZ3RoIjozNiwicGF0dGVybiI6Il4oWzAtOWEtZl17MTJ9fFswLTlhLWZdezh9LVswLTlhLWZdezR9LVswLTlhLWZdezR9LVswLTlhLWZdezR9LVswLTlhLWZdezEyfSkkIn0sInRlYW0taWQiOnsidHlwZSI6InN0cmluZyIsInJlcXVpcmVkIjp0cnVlLCJtYXhMZW5ndGgiOjM2LCJwYXR0ZXJuIjoiXlswLTlhLWZdezh9LVswLTlhLWZdezR9LVswLTlhLWZdezR9LVswLTlhLWZdezR9LVswLTlhLWZdezEyfSQifSwidGl0bGUiOnsidHlwZSI6InN0cmluZyIsInJlcXVpcmVkIjp0cnVlLCJtYXhMZW5ndGgiOjEyOCwicGF0dGVybiI6IlxcUyJ9fSwicmVzb3VyY2VzIjp7InByb2plY3QtaWQiOiJwcm9qZWN0cyIsInRlYW0taWQiOiJ0ZWFtcyJ9LCJyZXF1ZXN0Ijp7ImVuZHBvaW50IjoiYXBpIiwibWV0aG9kIjoiUE9TVCIsInBhdGgiOiIvZ3JhcGhxbCIsInF1ZXJ5Ijp7ImJvZHkiOnsiaW5wdXQiOiJib2R5In0sInByb2plY3QiOnsiaW5wdXQiOiJwcm9qZWN0LWlkIn0sInRlYW0iOnsiaW5wdXQiOiJ0ZWFtLWlkIn0sInRpdGxlIjp7ImlucHV0IjoidGl0bGUifX0sImdyYXBocWwiOiJtdXRhdGlvbiBDb25uZWN0b3JMaW5lYXJDcmVhdGVJblByb2plY3QoJHRlYW06IFN0cmluZyEsICRwcm9qZWN0OiBTdHJpbmchLCAkdGl0bGU6IFN0cmluZyEsICRib2R5OiBTdHJpbmchKSB7XG4gIGlzc3VlQ3JlYXRlKGlucHV0OiB7IHRlYW1JZDogJHRlYW0sIHByb2plY3RJZDogJHByb2plY3QsIHRpdGxlOiAkdGl0bGUsIGRlc2NyaXB0aW9uOiAkYm9keSB9KSB7XG4gICAgc3VjY2Vzc1xuICAgIGlzc3VlIHsgaWQgaWRlbnRpZmllciB0aXRsZSB0ZWFtIHsgaWQgfSBwcm9qZWN0IHsgaWQgfSB9XG4gIH1cbn1cbiJ9LCJtYXhSZXNwb25zZUJ5dGVzIjoxNjM4NCwicmVzcG9uc2VDaGVja3MiOnsiL2RhdGEvaXNzdWVDcmVhdGUvc3VjY2VzcyI6dHJ1ZX0sInJlc3BvbnNlUmVxdWlyZWQiOlsiL2RhdGEvaXNzdWVDcmVhdGUvaXNzdWUvaWQiLCIvZGF0YS9pc3N1ZUNyZWF0ZS9pc3N1ZS9pZGVudGlmaWVyIl0sInJlc3BvbnNlSW5wdXRzIjp7Ii9kYXRhL2lzc3VlQ3JlYXRlL2lzc3VlL3Byb2plY3QvaWQiOiJwcm9qZWN0LWlkIiwiL2RhdGEvaXNzdWVDcmVhdGUvaXNzdWUvdGVhbS9pZCI6InRlYW0taWQifSwidHJ1c3RlZElucHV0cyI6eyJwcm9qZWN0LWlkIjp7InZhbHVlIjoiODEwZjU3YTdlMzgzIn0sInRlYW0taWQiOnsic2VjcmV0IjoiTElORUFSX1RFQU1fSUQifX0sInByZWZsaWdodCI6eyJpbnB1dHMiOnsicHJvamVjdC1pZCI6eyJ0eXBlIjoic3RyaW5nIiwicmVxdWlyZWQiOnRydWUsIm1heExlbmd0aCI6MTIsInBhdHRlcm4iOiJeWzAtOWEtZl17MTJ9JCJ9LCJ0ZWFtLWlkIjp7InR5cGUiOiJzdHJpbmciLCJyZXF1aXJlZCI6dHJ1ZSwibWF4TGVuZ3RoIjozNiwicGF0dGVybiI6Il5bMC05YS1mXXs4fS1bMC05YS1mXXs0fS1bMC05YS1mXXs0fS1bMC05YS1mXXs0fS1bMC05YS1mXXsxMn0kIn19LCJyZXF1ZXN0Ijp7ImVuZHBvaW50IjoiYXBpIiwibWV0aG9kIjoiUE9TVCIsInBhdGgiOiIvZ3JhcGhxbCIsInF1ZXJ5Ijp7InByb2plY3QiOnsiaW5wdXQiOiJwcm9qZWN0LWlkIn0sInRlYW0iOnsiaW5wdXQiOiJ0ZWFtLWlkIn19LCJncmFwaHFsIjoicXVlcnkgQ29ubmVjdG9yTGluZWFyQ3JlYXRlU2NvcGUoJHRlYW06IFN0cmluZyEsICRwcm9qZWN0OiBTdHJpbmchKSB7XG4gIHRlYW0oaWQ6ICR0ZWFtKSB7IGlkIH1cbiAgcHJvamVjdHMoZmlyc3Q6IDEsIGZpbHRlcjogeyBzbHVnSWQ6IHsgZXE6ICRwcm9qZWN0IH0gfSkge1xuICAgIG5vZGVzIHtcbiAgICAgIGlkIHNsdWdJZFxuICAgICAgdGVhbXMoZmlyc3Q6IDEwMCkge1xuICAgICAgICBub2RlcyB7IGlkIH1cbiAgICAgICAgcGFnZUluZm8geyBoYXNOZXh0UGFnZSB9XG4gICAgICB9XG4gICAgfVxuICAgIHBhZ2VJbmZvIHsgaGFzTmV4dFBhZ2UgfVxuICB9XG59XG4ifSwibWF4UmVzcG9uc2VCeXRlcyI6MTYzODQsInJlc3BvbnNlUmVxdWlyZWQiOlsiL2RhdGEvdGVhbS9pZCIsIi9kYXRhL3Byb2plY3RzL25vZGVzLzAvaWQiLCIvZGF0YS9wcm9qZWN0cy9ub2Rlcy8wL3NsdWdJZCJdLCJyZXNwb25zZUlucHV0cyI6eyIvZGF0YS9wcm9qZWN0cy9ub2Rlcy8wL3NsdWdJZCI6InByb2plY3QtaWQiLCIvZGF0YS90ZWFtL2lkIjoidGVhbS1pZCJ9LCJyZXNwb25zZUNvbnRhaW5zIjp7Ii9kYXRhL3Byb2plY3RzL25vZGVzLzAvdGVhbXMvbm9kZXMvKi9pZCI6InRlYW0taWQifSwicmVzcG9uc2VDaGVja3MiOnsiL2RhdGEvcHJvamVjdHMvbm9kZXMvMC90ZWFtcy9wYWdlSW5mby9oYXNOZXh0UGFnZSI6ZmFsc2UsIi9kYXRhL3Byb2plY3RzL3BhZ2VJbmZvL2hhc05leHRQYWdlIjpmYWxzZX0sInByb2plY3QiOnsicHJvamVjdC1pZCI6Ii9kYXRhL3Byb2plY3RzL25vZGVzLzAvaWQifX19fX0sImNvbm5lY3Rpb24iOnsiYXBpVmVyc2lvbiI6ImdpdGh1Yi5jb20vZ2gtYXcvY29ubmVjdG9ycy92MSIsImtpbmQiOiJDb25uZWN0b3JDb25uZWN0aW9uIiwiY29ubmVjdG9yIjoiYXcuZ2l0aHViLmNvbS9saW5lYXIiLCJjcmVkZW50aWFscyI6eyJ3cml0ZXIiOnsic2VjcmV0IjoiTElORUFSX0FQSV9LRVkifX0sInJlc291cmNlcyI6e319LCJiaW5kaW5nIjp7ImFwaVZlcnNpb24iOiJnaXRodWIuY29tL2doLWF3L2Nvbm5lY3RvcnMvdjEiLCJraW5kIjoiQ29ubmVjdG9yQmluZGluZyIsImRlZmluaXRpb24iOiJhdzphdy5naXRodWIuY29tL2xpbmVhciIsImNvbm5lY3Rpb24iOiJhdzphdy5naXRodWIuY29tL2xpbmVhciIsInNhZmVPdXRwdXRzIjpbImNyZWF0ZS1pc3N1ZS1pbi1wcm9qZWN0Il19fQ==" };
+              const bindings = connectorEffectBindings(temporaryIdMap, env.GH_AW_CONNECTOR_PLAN);
+              if (!staged) Object.assign(env, bindings.env);
+              if (!staged) env["GH_AW_CONNECTOR_SECRET_LINEAR_API_KEY"] = process.env["GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY"];
+              if (!staged) env["GH_AW_CONNECTOR_SECRET_LINEAR_TEAM_ID"] = process.env["GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID"];
+              const result = spawnSync(join(process.env.RUNNER_TEMP, 'gh-aw', 'gh-aw'), ['connectors', 'invoke', 'safe-output', "create-issue-in-project", staged ? '--stage' : '--allow-writes'], { input: JSON.stringify(args), encoding: 'utf8', env, timeout: 25000, maxBuffer: 2097152 });
+              if (result.error || result.status !== 0) throw new Error('Connector effect failed; no retry performed: ' + (result.error?.message || result.stderr));
+              const output = JSON.parse(result.stdout);
+              if (!staged) bindings.record(output);
+              return output;
+
+            };
+          }
+          module.exports = { main };
+
+          GH_AW_SAFE_OUTPUT_SCRIPT_CONNECTOR_6_LINEAR_CREATE_ISSUE_IN_PROJECT_64f9c9d086ca202d_EOF
       - name: Process Safe Outputs
         id: process_safe_outputs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -2323,9 +2392,6 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           JIRA_BASE_URL: https://pelidehalleux.atlassian.net
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-          GH_AW_LINEAR_TOKEN: ${{ secrets.LINEAR_API_KEY }}
-          LINEAR_PROJECT_ID: ${{ vars.LINEAR_PROJECT_ID }}
-          LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
           GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
           GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
@@ -2333,7 +2399,10 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"jira_add_comment\":{\"max\":1},\"jira_add_label\":{\"max\":1},\"jira_create_issue\":{\"max\":1},\"jira_update_issue\":{\"max\":1},\"linear_create_issue\":{\"max\":1,\"project_id\":\"810f57a7e383\",\"team_id\":\"${{ secrets.LINEAR_TEAM_ID }}\"},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUT_SCRIPTS: "{\"connector_6_linear_create_issue_in_project\":\"safe_output_script_connector_6_linear_create_issue_in_project.cjs\"}"
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_AW_CONNECTOR_6_LINEAR_SECRET_LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_report_incomplete_issue\":{},\"jira_add_comment\":{\"max\":1},\"jira_add_label\":{\"max\":1},\"jira_create_issue\":{\"max\":1},\"jira_update_issue\":{\"max\":1},\"noop\":{\"max\":2,\"report-as-issue\":\"false\"},\"report_incomplete\":{},\"report_missing_data\":{},\"report_missing_tool\":{}}"
           GH_AW_GITHUB_TOKEN_SOURCE: ${{ secrets.GH_AW_GITHUB_TOKEN != '' && 'pat' || 'github_actions' }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
