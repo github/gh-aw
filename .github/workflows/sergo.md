@@ -5,6 +5,7 @@ on:
   workflow_dispatch: null
 permissions:
   contents: read
+  copilot-requests: write
   discussions: read
   issues: read
   pull-requests: read
