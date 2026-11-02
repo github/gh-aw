@@ -213,22 +213,6 @@ func applyPlaywrightBrowserEnv(env map[string]string, workflowData *WorkflowData
 	}
 }
 
-// applyMCPScriptsSecretEnv appends mcp-scripts secrets unless already present.
-func applyMCPScriptsSecretEnv(env map[string]string, workflowData *WorkflowData) {
-	if workflowData == nil {
-		return
-	}
-	if !IsMCPScriptsEnabled(workflowData.MCPScripts) {
-		return
-	}
-	mcpScriptsSecrets := collectMCPScriptsSecrets(workflowData.MCPScripts)
-	for varName, secretExpr := range mcpScriptsSecrets {
-		if _, exists := env[varName]; !exists {
-			env[varName] = secretExpr
-		}
-	}
-}
-
 // GenerateMultiSecretValidationStep creates a GitHub Actions step that validates at least one
 // of multiple secrets is available.
 // secretNames: slice of secret names to validate (e.g., []string{"CODEX_API_KEY", "OPENAI_API_KEY"})
@@ -330,7 +314,6 @@ func BuildDefaultSecretValidationStep(workflowData *WorkflowData, secrets []stri
 
 // collectCommonMCPSecrets returns the MCP-related secret names shared across all engines:
 //   - MCP_GATEWAY_AGENT_ID (when MCP servers are present)
-//   - mcp-scripts secrets (when mcp-scripts feature is enabled)
 //
 // Parameters:
 //   - workflowData: The workflow data used to check MCP server and mcp-scripts configuration
@@ -342,13 +325,6 @@ func collectCommonMCPSecrets(workflowData *WorkflowData) []string {
 
 	if HasMCPServers(workflowData) {
 		secrets = append(secrets, "MCP_GATEWAY_AGENT_ID")
-	}
-
-	if IsMCPScriptsEnabled(workflowData.MCPScripts) {
-		mcpScriptsSecrets := collectMCPScriptsSecrets(workflowData.MCPScripts)
-		for varName := range mcpScriptsSecrets {
-			secrets = append(secrets, varName)
-		}
 	}
 
 	return secrets

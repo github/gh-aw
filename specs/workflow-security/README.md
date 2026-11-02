@@ -46,6 +46,7 @@ sandboxed agent principal, even when GitHub Actions runs both in the same job.
 | `pull_request_target` checkout policy | [`PullRequestTargetCheckout.tla`](PullRequestTargetCheckout.tla) | Strict warning acknowledgment, explicit checkout disablement, trusted base checkout, exact allowlisted external checkout, and fail-closed `fetch` handling. |
 | PR checkout authorization | [`CommentTriggeredPRCheckout.tla`](CommentTriggeredPRCheckout.tla) | Same-repository Bot branch-event authorization for supported PR actions, including allow-listed `edited` events only when `changes` contains a non-null object-valued `body` field and no other fields; other edits and actions retain the collaborator permission floor, as does the stricter allow-listed comment/review exception. |
 | Patch/bundle application | [`SafeOutputTransport.tla`](SafeOutputTransport.tla) | Captured bytes, trusted transformations, private snapshots, publication retries, sticky failures, bounded local checking cost, and finally cleanup. |
+| Issue relationships | [`IssueRelationshipAuthorization.tla`](IssueRelationshipAuthorization.tla) | Resolved repository authorization before reads, writes, or per-item mention lookups; fixed/triggering parents, staged isolation, and deferred revalidation. |
 | Bundle Git operations | [`SafeOutputGit.tla`](SafeOutputGit.tla) | Explicit prerequisite recovery, offline optional discovery, bounded comparison/history work, credential roles, and separate size/protection provenance. |
 | Host-side MCP compilation | [`MCPCompile.tla`](MCPCompile.tla) | Startup write capability, actor authorization, early option rejection, filesystem isolation, cached-only imports, repository-root cache selection, validation, and write-enabled emission. |
 | Cooperative activation admission | [`ActivationAdmission.tla`](ActivationAdmission.tla) | Optional endpoint, isolated admission/conclusion OIDC capabilities, verified identity, retry/outage classification, independently resolved runtime allowances, privacy, and caller-owned trace correlation. |
@@ -63,6 +64,44 @@ must succeed. Failure before request publication causes origin validation to
 fail. Agent failures revoke the modeled engine credential. A minted installation
 token remains live until the `actions/create-github-app-token` post step, which
 revokes it after either safe-output success or failure.
+
+## Issue relationship authorization
+
+`IssueRelationshipAuthorization.tla` models the runtime boundary in
+`actions/setup/js/create_issue.cjs` (`handleCreateIssue`, `resolveBlockedByReferences`)
+and `actions/setup/js/link_sub_issue.cjs` (`handleLinkSubIssue`), using
+`repo_helpers.cjs` (`resolveAndValidateRepo`) policy. It checks that token
+access cannot widen the authorized default-target/allowlist union and that
+temporary IDs cannot replace a validated repository with an unauthorized one.
+Fixed and triggering parents ignore model-selected parent repositories.
+
+The finite model explores two handlers, six policy classes (default, fixed
+repository, exact allowlist, organization glob, global allowlist wildcard,
+and target-repository wildcard), four symbolic repositories including a
+case-mismatched allowed name, staged/live execution, parent target modes,
+numeric/temporary references for links, and numeric/qualified/URL/temporary
+blockers. A temporary reference may defer once before resolution. Issue numbers,
+parsers, actual glob evaluation, credential minting, mixed blocker arrays,
+API failures, and GitHub services are not modeled; runtime tests cover these
+concrete handler surfaces. Staged unresolved blockers are display-only.
+No fairness or liveness claim is made.
+
+The secure profile checks repository containment, whole-item preflight before
+API calls, zero calls on rejection, same-repository links, trusted parent
+selection, staged write isolation, and deferred isolation. Four synthetic
+faults remove resolved-policy enforcement, move mentions before preflight,
+override a trusted parent, or execute staged writes. Three reachability
+witnesses demonstrate authorized writes, denied references, and deferred retries.
+These are bounded checks, not a proof of implementation refinement.
+
+```bash
+TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
+  python3 specs/workflow-security/check.py --model issue-relationships \
+  --results /tmp/issue-relationship-results
+```
+
+The checksum-pinned wrapper retains model/config hashes, state counts, logs,
+and counterexample traces, and rejects tooling failures as evidence.
 
 ## Cache lifecycle and read-only boundaries
 

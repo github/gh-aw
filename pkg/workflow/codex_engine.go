@@ -525,7 +525,6 @@ func (e *CodexEngine) buildCodexExecutionEnv(workflowData *WorkflowData, firewal
 	if !firewallEnabled && provider == LLMProviderOpenAI && workflowData.EngineConfig != nil && workflowData.EngineConfig.APITarget != "" {
 		env["OPENAI_BASE_URL"] = "https://" + path.Join(workflowData.EngineConfig.APITarget, "v1")
 	}
-	applyMCPScriptsSecretEnv(env, workflowData)
 	applyModelRoutingEnv(env, workflowData)
 	applyModelAliasesEnv(env, workflowData)
 	return env
