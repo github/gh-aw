@@ -275,6 +275,8 @@ safe-outputs:
     required-labels: [ready-to-merge] # ALL listed labels must be present on the PR
     required-title-prefix: "[bot] "   # only merge PRs whose title starts with this prefix
     allowed-branches: ["feature/*"]   # glob patterns for the PR's source branch
+    required-checks: ["ci/test"]      # exact check-run names; success required on the evaluated head
+    required-approvers: [maintainer]  # at least one independent human approval on that head
     target: "triggering"              # "triggering" (default, current PR) or "*" (any PR with pull_request_number)
     target-repo: "owner/repo"         # cross-repository target
     allowed-repos: ["org/other-repo"] # additional repositories the agent can merge into
@@ -288,7 +290,17 @@ safe-outputs:
 
 **Gate semantics**: The handler validates mergeability (not draft, no conflicts), required status checks, the GitHub review decision, unresolved review thread gating, `required-labels`, `required-title-prefix`, and `allowed-branches`. If any gate fails, the merge is skipped and the reason is reported. Idempotent: already-merged PRs return success.
 
+**CI policy**: `required-checks` adds workflow-owned, exact check-run names to any branch-policy requirements. Every named check must be completed with `success` on the evaluated head SHA; missing, pending, skipped, neutral, failed, or stale-revision checks block merging. These are check runs, not legacy commit-status contexts. With no configured or branch-required checks, CI is not queried or required. Protected branches remain refused regardless of CI results. Check names do not authenticate the check producer: restrict who can publish checks and protect workflow definitions.
+
+**Approval policy**: Without `required-approvers`, a null review decision with no pending reviewers or unresolved threads is accepted as *no blocking decision reported*, not affirmative human approval. For higher-impact use, configure `required-approvers` as an allowlist of human GitHub logins. At least one must have an `APPROVED` review on the evaluated head SHA; later dismissal or changes requested invalidate it. PR authors, bot accounts, and the authenticated merge identity cannot supply this approval. Matching is case-insensitive. Missing or malformed review evidence blocks merging.
+
+**Authorization boundary**: Labels, titles, and branch names are filters, not human authorization. Keep approval accounts and their credentials outside the acting agent's control. Do not give the agent credentials that impersonate allowlisted humans or power to dismiss their reviews. A review reported as a human account is not proof that a person, rather than automation using that account, authored it. Workflow-owned policies must be protected from agent edits; safe-output configuration alone does not isolate credentials or revoke other tools' powers.
+
+**Revision and traceability**: The merge API receives the evaluated head SHA. A mismatch fails without retrying the merge; a new request must evaluate policy again. Before execution (and staged previews), the handler rechecks PR policy fields, branch restrictions, the open upstream PR, review evidence, approvals, and required checks. Results include `decision_evidence` with the evaluated head/base revision, configured gates, check-run IDs, review decision, approval logins/review IDs, and evaluation/revalidation timestamps. Already-merged results are idempotent and do not claim a new evaluation. GitHub only atomically enforces the head SHA: branch policy, reviews, checks, and base state can still change after the final reads.
+
 **Staged mode**: Setting `staged: true` runs all gate checks and emits a preview result without calling the GitHub merge API. Use this to validate policy in dry-run scenarios.
+
+**Recovery limits**: Stop and reevaluate after any policy or revision change. Reverting a merge creates a compensating change; it does not undo downstream deployments, published artifacts, external effects, or data migrations.
 
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for `target-repo`, `allowed-repos`, and authentication configuration. See the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request) for the complete schema and operational semantics.
 

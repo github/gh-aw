@@ -3791,7 +3791,7 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 ```json
 {
   "name": "merge_pull_request",
-  "description": "Merge an existing pull request only after policy checks pass (status checks, approvals, resolved review threads, label/branch constraints, and mergeability gates).",
+  "description": "Experimental: merge into an unprotected, non-default branch with an open upstream PR after workflow-owned policy gates pass. CI and affirmative approval are required only when configured. Execution is bound to the evaluated head SHA.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -3823,6 +3823,9 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 4. **Policy Gates**: Enforces required checks, review decision, unresolved review thread gating, label constraints, and source branch constraints.
 5. **Base Branch Protection**: Refuses merges when the target base branch is protected or is the repository default branch.
 6. **Target Branch Open PR**: When the target base branch is neither protected nor the repository default, refuses merges when that branch does not have an associated open pull request (i.e. no open PR exists with that branch as its head/source branch). This gate enforces the PR-chain model (e.g. `release/1.0 → main`) as a hard invariant; no opt-out is provided. Only intra-repository PR chains are matched — fork-sourced upstream PRs are not considered. If your workflow does not follow this model, use a custom merge step instead.
+7. **Revision Binding**: The merge API MUST receive the evaluated head SHA as `sha`. A mismatch MUST fail without retrying the merge; another request requires fresh evaluation.
+8. **Complete Review Evidence**: Missing PR/thread data, invalid review decisions, missing thread resolution flags, malformed pagination, repeated continuation cursors, or a head revision different from the evaluated SHA MUST block merging. A null review decision is valid evidence of no blocking decision, not affirmative approval.
+9. **Final Revalidation**: Before either execution or a staged preview, re-read PR policy fields, target branch policy, the open upstream PR, reviews, configured approvals, and required checks. Changed policy evidence or non-passing checks MUST block the operation. Only the head SHA is enforced atomically by GitHub; other mutable policy state retains a race window after these reads.
 
 **Configuration Parameters**:
 
@@ -3831,6 +3834,8 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - `required-labels`: Labels that must ALL be present on the pull request
 - `required-title-prefix`: Title prefix the pull request must start with
 - `allowed-branches`: Source branch glob patterns; the PR's branch must match at least one
+- `required-checks`: Exact check-run names, unioned with branch-policy requirements. Each MUST complete with `success` on the evaluated head SHA. Missing, pending, skipped, neutral, failed, or wrong-revision checks block merging. Legacy commit-status contexts are not supported. An empty or omitted list adds no workflow-owned CI requirement; if the union is empty, CI is not queried.
+- `required-approvers`: Human GitHub logins (case-insensitive). When non-empty, at least one allowlisted human MUST have a current `APPROVED` review on the evaluated head SHA. Later non-comment review state supersedes earlier approval; dismissed approvals and active changes requested block merging. The PR author, bot accounts, and authenticated merge identity cannot authorize. Empty or omitted requires no affirmative approval.
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
 - `staged`: Staged mode override
@@ -3853,16 +3858,23 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
+- `checks: read` - Required when `required-checks` is non-empty
 
 *GitHub App*:
 
 - `contents: write` - Merge operation execution
 - `pull-requests: write` - Pull request metadata and merge operations
 - `metadata: read` - Repository metadata (automatically granted)
+- `checks: read` - Required when `required-checks` is non-empty
 
 **Notes**:
 
 - Merge execution is blocked unless all configured gates pass.
+- Policy controls are workflow-owned, not tool-call arguments. Labels, titles, and branch names are filters, not authorization. Protect policy definitions and CI producers; check-name matching does not authenticate a check producer.
+- Approval identities and credentials must remain outside the acting agent's control. Do not grant the acting agent credentials that impersonate allowlisted humans or authority to dismiss their reviews. GitHub's human account type cannot distinguish a person from automation using that person's credentials.
+- Evaluated results include `decision_evidence`: repository/PR, head/base revisions, branch policy, label/branch/title constraints, required/passing/missing/failing checks (including successful check-run IDs and app IDs), review decision/thread count, approval policy and provenance (login, review ID, commit ID), and evaluation/revalidation timestamps when reached. Errors retain partial evidence. No credentials are recorded. Already-merged success does not claim a fresh policy evaluation.
+- Staged mode uses the same policy evaluation and revalidation without calling the merge API.
+- A revert is a compensating change, not rollback of downstream deployments, published artifacts, external effects, or data migrations.
 - Merge to the repository default branch is always refused by this safe output type.
 - Merge is refused when the target base branch does not have an open pull request where that branch is the head (source) branch. This enforces that merges flow only into branches actively tracked by an upstream PR.
 - `pull_request_number` may be a temporary ID that resolves to a pull request number from earlier safe-output operations.

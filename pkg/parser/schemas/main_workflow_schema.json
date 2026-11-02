@@ -11125,7 +11125,7 @@
             },
             {
               "type": "object",
-              "description": "Configuration for controlled pull request merges. The merge is blocked unless all configured gates pass.",
+              "description": "Experimental configuration for controlled pull request merges. The merge is blocked unless all configured gates pass.",
               "properties": {
                 "max": {
                   "description": "Maximum number of pull request merges to perform per run (default: 1). Supports integer or GitHub Actions expression (e.g. '${{ inputs.max }}').",
@@ -11149,6 +11149,18 @@
                     "type": "string"
                   },
                   "description": "List of labels that must ALL be present on the pull request before merge is allowed."
+                },
+                "required-checks": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "uniqueItems": true,
+                  "description": "Exact check-run names that must complete successfully on the evaluated PR head SHA, in addition to branch-policy checks. Empty or omitted adds no workflow-owned CI requirement."
+                },
+                "required-approvers": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "uniqueItems": true,
+                  "description": "Human GitHub logins. At least one must have a current, non-dismissed approval for the evaluated head SHA, independent of the PR author and authenticated merge identity. Empty or omitted requires no affirmative approval."
                 },
                 "allowed-labels": {
                   "type": "array",

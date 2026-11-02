@@ -1,6 +1,12 @@
 package workflow
 
-import "github.com/github/gh-aw/pkg/logger"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
+)
 
 var mergePullRequestLog = logger.New("workflow:merge_pull_request")
 
@@ -12,6 +18,8 @@ type MergePullRequestConfig struct {
 	RequiredLabels                []string         `yaml:"required-labels,omitempty"`       // Labels that must ALL be present on the PR
 	AllowedBranches               []string         `yaml:"allowed-branches,omitempty"`      // Glob patterns for source branch names; PR branch must match one
 	RequiredTitlePrefix           string           `yaml:"required-title-prefix,omitempty"` // Title prefix the PR must have
+	RequiredChecks                []string         `yaml:"required-checks,omitempty"`       // Exact check-run names required on the evaluated head
+	RequiredApprovers             []string         `yaml:"required-approvers,omitempty"`    // At least one independent human from this allowlist must approve the head
 }
 
 // parseMergePullRequestConfig handles merge-pull-request configuration.
@@ -33,6 +41,8 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 		cfg.SafeOutputTargetConfig = targetConfig
 		cfg.AllowedBranches = ParseStringArrayFromConfig(configMap, "allowed-branches", mergePullRequestLog)
 		cfg.RequiredTitlePrefix = extractStringFromMap(configMap, "required-title-prefix", mergePullRequestLog)
+		cfg.RequiredChecks = ParseStringArrayFromConfig(configMap, "required-checks", mergePullRequestLog)
+		cfg.RequiredApprovers = ParseStringArrayFromConfig(configMap, "required-approvers", mergePullRequestLog)
 		c.parseBaseSafeOutputConfig(configMap, &cfg.BaseSafeOutputConfig, 1)
 		mergePullRequestLog.Printf("Parsed merge-pull-request config: requiredLabels=%v, allowedBranches=%v, requiredTitlePrefix=%q", cfg.RequiredLabels, cfg.AllowedBranches, cfg.RequiredTitlePrefix)
 		return cfg
@@ -41,4 +51,31 @@ func (c *Compiler) parseMergePullRequestConfig(outputMap map[string]any) *MergeP
 	// merge-pull-request: null enables defaults
 	cfg.Max = defaultIntStr(1)
 	return cfg
+}
+
+// validateMergePullRequestPolicies checks merge filters and workflow-owned evidence requirements.
+func validateMergePullRequestPolicies(config *SafeOutputsConfig) error {
+	if err := validateSafeOutputsMergePullRequest(config); err != nil {
+		return err
+	}
+	if config == nil || config.MergePullRequest == nil {
+		return nil
+	}
+	cfg := config.MergePullRequest
+	for field, values := range map[string][]string{
+		"required-checks":    cfg.RequiredChecks,
+		"required-approvers": cfg.RequiredApprovers,
+	} {
+		for i, value := range values {
+			if strings.TrimSpace(value) == "" {
+				return fmt.Errorf("safe-outputs.merge-pull-request.%s[%d] cannot be empty. Expected a non-empty string value", field, i)
+			}
+		}
+	}
+	for _, login := range cfg.RequiredApprovers {
+		if !parser.IsValidGitHubIdentifier(login) {
+			return fmt.Errorf("safe-outputs.merge-pull-request.required-approvers contains invalid GitHub username %q. Expected a human account login without @ prefix", login)
+		}
+	}
+	return nil
 }

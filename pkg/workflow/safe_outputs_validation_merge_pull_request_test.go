@@ -98,3 +98,37 @@ func TestValidateSafeOutputsMergePullRequestAllowedBranchesValidation(t *testing
 		})
 	}
 }
+
+func TestMergePullRequestExplicitPolicies(t *testing.T) {
+	compiler := NewCompiler()
+	cfg := compiler.parseMergePullRequestConfig(map[string]any{
+		"merge-pull-request": map[string]any{
+			"required-checks":    []any{"ci/test", "ci/lint"},
+			"required-approvers": []any{"maintainer"},
+		},
+	})
+	require.NotNil(t, cfg)
+	assert.Equal(t, []string{"ci/test", "ci/lint"}, cfg.RequiredChecks)
+	assert.Equal(t, []string{"maintainer"}, cfg.RequiredApprovers)
+	config := &SafeOutputsConfig{MergePullRequest: cfg}
+	require.NoError(t, validateSafeOutputsMergePullRequest(config))
+	require.NoError(t, validateMergePullRequestPolicies(config))
+	handler := pullRequestHandlerRegistry["merge_pull_request"](config)
+	assert.Equal(t, []string{"ci/test", "ci/lint"}, handler["required_checks"])
+	assert.Equal(t, []string{"maintainer"}, handler["required_approvers"])
+	checkPermission, ok := ComputePermissionsForSafeOutputs(config).Get(PermissionChecks)
+	require.True(t, ok)
+	assert.Equal(t, PermissionRead, checkPermission)
+
+	for _, field := range []string{"required-checks", "required-approvers"} {
+		t.Run(field, func(t *testing.T) {
+			invalid := compiler.parseMergePullRequestConfig(map[string]any{
+				"merge-pull-request": map[string]any{field: []any{"   "}},
+			})
+			err := validateMergePullRequestPolicies(&SafeOutputsConfig{MergePullRequest: invalid})
+			require.ErrorContains(t, err, field+"[0] cannot be empty")
+		})
+	}
+	cfg.RequiredApprovers = []string{"@maintainer"}
+	require.ErrorContains(t, validateMergePullRequestPolicies(config), "invalid GitHub username")
+}

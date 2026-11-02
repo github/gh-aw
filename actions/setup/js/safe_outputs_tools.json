@@ -1440,7 +1440,7 @@
   },
   {
     "name": "merge_pull_request",
-    "description": "Merge an existing pull request only after policy checks pass (status checks, approvals, resolved review threads, label/branch constraints, and mergeability gates). Use this when workflows require controlled merges instead of direct merge operations.",
+    "description": "Experimental: merge an existing pull request into an unprotected, non-default branch with an open upstream PR, only after policy gates pass. Execution is bound to the evaluated head SHA. CI and independent human approval are required only when configured by the workflow (required-checks and required-approvers); labels are not authorization. Missing review evidence blocks merging. Policy cannot be overridden through this tool.",
     "inputSchema": {
       "type": "object",
       "properties": {
