@@ -1,0 +1,22 @@
+{
+  "id": "1234567890",
+  "shortId": "EXAMPLE-1",
+  "issueCategory": "error",
+  "status": "unresolved",
+  "substatus": "regressed",
+  "project": {
+    "id": "4500000000000001",
+    "slug": "example-project"
+  },
+  "assignedTo": {
+    "email": "synthetic@example.invalid"
+  },
+  "title": "Synthetic potentially private error text",
+  "activity": [
+    {
+      "data": {
+        "text": "synthetic-private-comment"
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: sentry.io/issues
+credentials:
+  reader: {secret: SENTRY_READ_TOKEN}
+  writer: {secret: SENTRY_STATUS_TOKEN}
+  context-reader: {secret: SENTRY_CONTEXT_TOKEN}
+  hosted-reader: {secret: SENTRY_MCP_OAUTH_TOKEN}
+resources:
+  organizations: [example-org]
+  projects: ["4500000000000001"]
+  installations: [11111111-2222-4333-8444-555555555555]
+  issues: ["1234567890"]
+  events: [0123456789abcdef0123456789abcdef]

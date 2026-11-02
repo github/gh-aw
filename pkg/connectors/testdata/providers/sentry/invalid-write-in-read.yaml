@@ -1,0 +1,22 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: sentry.io/issues
+endpoints:
+  api: https://sentry.io
+credentials:
+  reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [event:read]
+mcp:
+  unsafe-status:
+    tool: unsafe-status
+    credential: reader
+    request:
+      endpoint: api
+      method: PUT
+      path: /api/0/organizations/example-org/issues/1234567890/
+      body:
+        status: {literal: resolved}
+    maxResponseBytes: 65536
