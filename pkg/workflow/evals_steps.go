@@ -13,7 +13,7 @@ const (
 	evalsDir              = "/tmp/gh-aw/evals"
 	evalsResultsPath      = "/tmp/gh-aw/" + string(constants.EvalsResultFilename)
 	evalsStatusPath       = "/tmp/gh-aw/" + string(constants.EvalsStatusFilename)
-	defaultDecisionsModel = "gpt-6-luna"
+	defaultDecisionsModel = "copilot/gpt-6-luna-decisions"
 )
 
 // Evals use a standalone Decisions client, not an agent engine or MCP tools.

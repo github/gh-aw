@@ -24,7 +24,7 @@ type EvalsConfig struct {
 	// Questions is the ordered list of binary evaluation questions.
 	Questions []EvalDefinition
 	// Model is the Decisions-compatible model for the entire batch.
-	// When empty, gpt-6-luna is used, subject to GH_AW_DEFAULT_EVALS_MODEL.
+	// When empty, copilot/gpt-6-luna-decisions is used, subject to GH_AW_DEFAULT_EVALS_MODEL.
 	Model string
 	// RunsOn allows overriding the runner for the evals job.
 	RunsOn string
@@ -50,7 +50,7 @@ func (ec *EvalsConfig) HasEvals() bool {
 //	  questions:
 //	    - id: builds
 //	      question: Does the generated code compile?
-//	  model: gpt-6-luna
+//	  model: copilot/gpt-6-luna-decisions
 func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*EvalsConfig, error) {
 	raw, exists := frontmatter["evals"]
 	if !exists || raw == nil {
@@ -86,7 +86,7 @@ func (c *Compiler) parseEvalsFromFrontmatter(frontmatter map[string]any) (*Evals
 		if modelRaw, ok := v["model"]; ok {
 			modelStr, ok := modelRaw.(string)
 			if !ok {
-				return nil, fmt.Errorf("evals.model must be a string, got %T. Example:\nevals:\n  model: gpt-6-luna", modelRaw)
+				return nil, fmt.Errorf("evals.model must be a string, got %T. Example:\nevals:\n  model: copilot/gpt-6-luna-decisions", modelRaw)
 			}
 			cfg.Model = strings.TrimSpace(modelStr)
 		}

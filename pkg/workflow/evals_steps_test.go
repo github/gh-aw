@@ -32,7 +32,7 @@ func TestEvalsDecisionsIndependentOfAgentEngine(t *testing.T) {
 			steps := strings.Join(NewCompiler().buildEvalsJobSteps(data), "")
 			assert.Contains(t, steps, "name: Execute BinEval Decisions")
 			assert.Contains(t, steps, "id: evals_decisions_execution")
-			assert.Contains(t, steps, `GH_AW_EVALS_MODEL: "gpt-6-luna"`)
+			assert.Contains(t, steps, `GH_AW_EVALS_MODEL: "copilot/gpt-6-luna-decisions"`)
 			assert.Contains(t, steps, "GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1\n")
 			assert.Contains(t, steps, "GH_AW_DECISIONS_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
 			assert.Contains(t, steps, "await executeMain();")
@@ -63,13 +63,14 @@ func TestEvalsDecisionsModelAndProvider(t *testing.T) {
 	compiler := NewCompiler()
 	data := evalsTestData()
 	data.Model = "claude-sonnet-4.6"
-	assert.Equal(t, "gpt-6-luna", compiler.resolveEvalsExecutionModel(data))
+	assert.Equal(t, "copilot/gpt-6-luna-decisions", compiler.resolveEvalsExecutionModel(data))
 	t.Setenv(compilerenv.DefaultEvalsModel, "copilot/decision-model")
 	assert.Equal(t, "copilot/decision-model", compiler.resolveEvalsExecutionModel(data))
 	data.Evals.Model = "openai/gpt-6-luna"
 	steps := strings.Join(compiler.buildEvalsDecisionSteps(data), "")
 	assert.Contains(t, steps, "GH_AW_DECISIONS_BASE_URL: https://api.openai.com/v1")
 	assert.Contains(t, steps, "GH_AW_DECISIONS_PROVIDER: openai")
+	assert.Contains(t, steps, `GH_AW_EVALS_MODEL: "openai/gpt-6-luna"`)
 	assert.Contains(t, steps, "GH_AW_DECISIONS_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}")
 	assert.NotContains(t, steps, "COPILOT_GITHUB_TOKEN")
 }
@@ -88,7 +89,7 @@ func TestEvalsDecisionsFailureAndPublicationContract(t *testing.T) {
 	data.Evals.Model = "${{ inputs.model }}"
 	steps := strings.Join(NewCompiler().buildEvalsJobSteps(data), "")
 	assert.Contains(t, steps, "GH_AW_EVALS_MODEL: ${{ inputs.model }}")
-	assert.Contains(t, steps, "GH_AW_MODEL_FALLBACK: ${{ vars.GH_AW_DEFAULT_EVALS_MODEL || 'gpt-6-luna' }}")
+	assert.Contains(t, steps, "GH_AW_MODEL_FALLBACK: ${{ vars.GH_AW_DEFAULT_EVALS_MODEL || 'copilot/gpt-6-luna-decisions' }}")
 	assert.Contains(t, steps, "GH_AW_EVALS_EXECUTION_OUTCOME: ${{ steps.evals_decisions_execution.outcome }}")
 	assert.NotContains(t, steps, "steps.evals_decisions_execution.conclusion")
 	require.Greater(t, strings.Index(steps, "id: evals_decisions_execution"), strings.Index(steps, "name: Initialize evals execution evidence"))
@@ -143,7 +144,7 @@ func TestEvalsDecisionsCompiledJob(t *testing.T) {
 	assert.Contains(t, agent, "claude_harness.cjs")
 	assert.Contains(t, evals, "Execute BinEval Decisions")
 	assert.Contains(t, evals, "run_evals.cjs")
-	assert.Contains(t, evals, `GH_AW_EVALS_MODEL: "gpt-6-luna"`)
+	assert.Contains(t, evals, `GH_AW_EVALS_MODEL: "copilot/gpt-6-luna-decisions"`)
 	for _, excluded := range []string{"claude_harness.cjs", "copilot_harness.cjs", "Install AWF", "Parse MCP Gateway logs", "firewall", "api-proxy"} {
 		assert.NotContains(t, evals, excluded)
 	}

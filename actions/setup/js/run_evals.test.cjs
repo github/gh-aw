@@ -24,7 +24,7 @@ describe("Decisions BinEval harness", () => {
     fs.mkdirSync(dir, { recursive: true });
     for (const file of files) fs.rmSync(file, { force: true });
     vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
-    vi.stubEnv("GH_AW_EVALS_MODEL", "gpt-6-luna");
+    vi.stubEnv("GH_AW_EVALS_MODEL", "copilot/gpt-6-luna-decisions");
     vi.stubEnv("GH_AW_DECISIONS_BASE_URL", "https://api.githubcopilot.com/v1");
     vi.stubEnv("GH_AW_DECISIONS_API_KEY", "test-token");
     vi.stubEnv("GH_AW_DECISIONS_PROVIDER", "github-copilot");
@@ -231,11 +231,14 @@ describe("Decisions BinEval harness", () => {
 
   it.each([
     ["evals", "github-copilot", "gpt-6-luna-decisions"],
-    ["openai/evals", "openai", "gpt-6-luna"],
+    ["openai/evals", "openai", "gpt-6-luna-decisions"],
     ["copilot/evals", "github-copilot", "gpt-6-luna-decisions"],
     ["gpt-6-luna", "openai", "gpt-6-luna"],
+    ["gpt-6-luna", "github-copilot", "gpt-6-luna"],
+    ["copilot/gpt-6-luna-decisions", "github-copilot", "gpt-6-luna-decisions"],
+    ["openai/gpt-6-luna", "openai", "gpt-6-luna"],
     ["gpt-6-luna-decisions", "github-copilot", "gpt-6-luna-decisions"],
-  ])("selects the provider's Decisions model without a proxy (%s, %s)", async (model, provider, expected) => {
+  ])("passes through the configured model or resolves its alias without provider mapping (%s, %s)", async (model, provider, expected) => {
     vi.stubEnv("GH_AW_EVALS_MODEL", model);
     vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
     await executeMain();

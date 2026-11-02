@@ -15,8 +15,9 @@ is saved with catalog-derived AIC and USD costs for summaries and daily accounti
 Missing usage or pricing is reported as unavailable, not zero. AWF per-request
 credit limits and sandbox target overrides do not apply to evals.
 Request failures produce a `not_evaluated` marker, not `UNKNOWN` question results.
-Copilot uses `/v1/decisions` and maps `gpt-6-luna` to its advertised
-`gpt-6-luna-decisions` model ID. OpenAI uses `/v1/decisions` with `gpt-6-luna`.
+Both providers use `/v1/decisions`. Configure the actual provider model ID:
+`copilot/gpt-6-luna-decisions` for Copilot or `openai/gpt-6-luna` for OpenAI.
+Model IDs are sent without provider-specific name mapping.
 
 ---
 
@@ -60,14 +61,14 @@ evals:
       question: Do all existing tests still pass according to the agent output?
     - id: scoped_change
       question: Does the agent output show that only the expected files were modified?
-  model: gpt-6-luna    # Decisions-compatible model for all questions
+  model: copilot/gpt-6-luna-decisions    # Decisions-compatible model for all questions
   runs-on: ubuntu-latest
 ```
 
 **Fields:**
 
 - `questions:` — list of question objects (required in extended form, 1–400 entries).
-- `model:` — Decisions-compatible model for the entire batch, default `gpt-6-luna`, independent of the main agent model. `GH_AW_DEFAULT_EVALS_MODEL` overrides the default. Use `openai/gpt-6-luna` for the OpenAI provider; unqualified IDs use Copilot. The `evals` alias also resolves to `gpt-6-luna`.
+- `model:` — Actual Decisions-compatible model ID for the entire batch, default `copilot/gpt-6-luna-decisions`, independent of the main agent model. `GH_AW_DEFAULT_EVALS_MODEL` overrides the default. Use `openai/gpt-6-luna` for the OpenAI provider; unqualified IDs use Copilot. The `evals` alias also resolves to `gpt-6-luna-decisions`.
 - `runs-on:` — optional runner override.
 
 Copilot requests use `COPILOT_GITHUB_TOKEN` or the workflow's
@@ -122,7 +123,7 @@ evals:
       question: Does the agent output confirm that CHANGELOG was updated?
     - id: design_sound
       question: Is the agent's proposed design consistent with established patterns described in the agent output?
-  model: gpt-6-luna
+  model: copilot/gpt-6-luna-decisions
 ```
 
 ### PromptPex intent and counter-intent scenarios

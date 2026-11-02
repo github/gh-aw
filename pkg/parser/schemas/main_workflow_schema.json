@@ -14710,7 +14710,7 @@
             },
             "model": {
               "type": "string",
-              "description": "Decisions-compatible model for the entire question batch. Defaults to gpt-6-luna, subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent model. Prefix with openai/ to use OpenAI credentials; unqualified models use Copilot. Per-question model overrides are not supported."
+              "description": "Decisions-compatible model ID for the entire question batch, sent without provider-specific name mapping. Defaults to copilot/gpt-6-luna-decisions, subject to GH_AW_DEFAULT_EVALS_MODEL, independently of the agent model. Use openai/gpt-6-luna for OpenAI credentials; unqualified models use Copilot. Per-question model overrides are not supported."
             },
             "runs-on": {
               "$ref": "#/$defs/github_actions_runs_on"
