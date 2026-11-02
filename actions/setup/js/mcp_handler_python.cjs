@@ -7,7 +7,7 @@
  * It uses a Pythonic approach for passing inputs via JSON on stdin.
  */
 
-const { executeProcess } = require("./mcp_handler_process.cjs");
+const { executeProcess, createToolEnvironment } = require("./mcp_handler_process.cjs");
 
 /**
  * Create a Python script handler function that executes a .py file.
@@ -20,9 +20,10 @@ const { executeProcess } = require("./mcp_handler_process.cjs");
  * @param {string} toolName - Name of the tool for logging purposes
  * @param {string} scriptPath - Path to the Python script to execute
  * @param {number} [timeoutSeconds=60] - Timeout in seconds for script execution
+ * @param {Record<string, string>} [envBindings] - Tool-local environment references
  * @returns {Function} Async handler function that executes the Python script
  */
-function createPythonHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
+function createPythonHandler(server, toolName, scriptPath, timeoutSeconds = 60, envBindings = {}) {
   return async args => {
     server.debug(`  [${toolName}] Invoking Python handler: ${scriptPath}`);
     server.debug(`  [${toolName}] Python handler args: ${JSON.stringify(args)}`);
@@ -38,7 +39,7 @@ function createPythonHandler(server, toolName, scriptPath, timeoutSeconds = 60) 
       languageLabel: "Python",
       command: "python3",
       args: [scriptPath],
-      env: process.env,
+      env: createToolEnvironment(envBindings),
       inputJson,
       timeoutSeconds,
       scriptPath,

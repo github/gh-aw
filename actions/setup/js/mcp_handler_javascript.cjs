@@ -7,7 +7,7 @@
  * It executes JavaScript handlers in a separate Node.js process for isolation.
  */
 
-const { executeProcess } = require("./mcp_handler_process.cjs");
+const { executeProcess, createToolEnvironment } = require("./mcp_handler_process.cjs");
 
 /**
  * Create a JavaScript handler function that executes a .cjs file in a separate Node.js process.
@@ -20,9 +20,10 @@ const { executeProcess } = require("./mcp_handler_process.cjs");
  * @param {string} toolName - Name of the tool for logging purposes
  * @param {string} scriptPath - Path to the JavaScript script to execute
  * @param {number} [timeoutSeconds=60] - Timeout in seconds for script execution
+ * @param {Record<string, string>} [envBindings] - Tool-local environment references
  * @returns {Function} Async handler function that executes the JavaScript script
  */
-function createJavaScriptHandler(server, toolName, scriptPath, timeoutSeconds = 60) {
+function createJavaScriptHandler(server, toolName, scriptPath, timeoutSeconds = 60, envBindings = {}) {
   return async args => {
     server.debug(`  [${toolName}] Invoking JavaScript handler: ${scriptPath}`);
     server.debug(`  [${toolName}] JavaScript handler args: ${JSON.stringify(args)}`);
@@ -38,7 +39,7 @@ function createJavaScriptHandler(server, toolName, scriptPath, timeoutSeconds = 
       languageLabel: "JavaScript",
       command: process.execPath, // Use the same Node.js binary as the current process
       args: [scriptPath],
-      env: process.env,
+      env: createToolEnvironment(envBindings),
       inputJson,
       timeoutSeconds,
       scriptPath,
