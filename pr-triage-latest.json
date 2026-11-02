@@ -1,116 +1,15 @@
 {
-  "run_date": "2026-11-01T18:17:30Z",
-  "run_id": "41335642849",
+  "run_date": "2026-11-02T00:39:50.279+00:00",
+  "run_id": "41368131357",
   "source": "pr-triage",
-  "eligible_total": 7,
-  "cooldown_skipped": [73840, 73839, 73838, 73837, 73836],
-  "open_copilot_prs": 19,
-  "category_counts": {
-    "bug": 2,
-    "feature": 5
-  },
-  "risk_counts": {
-    "low": 0,
-    "medium": 4,
-    "high": 3
-  },
-  "priority_counts": {
-    "low": 0,
-    "medium": 5,
-    "high": 2
-  },
-  "action_counts": {
-    "auto_merge": 0,
-    "batch_review": 4,
-    "close": 0,
-    "defer": 2,
-    "fast_track": 1
-  },
-  "batches": [
-    {
-      "id": "review-2026-11-01",
-      "members": [73704, 73033, 72940],
-      "reason": "three medium-risk reliability and routing fixes"
-    }
-  ],
-  "selected_candidates": [
-    {
-      "number": 72273,
-      "title": "Support Claude on Vertex AI with GCP WIF",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 74,
-      "score_breakdown": {"impact": 35, "urgency": 21, "quality": 18},
-      "labels": ["pr-type:feature", "pr-risk:high", "pr-priority:high", "pr-action:fast_track", "pr-agent:copilot"]
-    },
-    {
-      "number": 72940,
-      "title": "Preserve agent config permissions and restore only after PR checkout",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 66,
-      "score_breakdown": {"impact": 33, "urgency": 20, "quality": 13},
-      "labels": ["pr-type:bug", "pr-risk:medium", "pr-priority:medium", "pr-action:batch_review", "pr-agent:copilot", "pr-batch:review-2026-11-01"]
-    },
-    {
-      "number": 73033,
-      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
-      "score_breakdown": {"impact": 28, "urgency": 14, "quality": 18},
-      "labels": ["pr-type:feature", "pr-risk:medium", "pr-priority:medium", "pr-action:batch_review", "pr-agent:copilot", "pr-batch:review-2026-11-01"]
-    },
-    {
-      "number": 73704,
-      "title": "Record a not-evaluated evals marker instead of UNKNOWN answers when the judge never ran or failed",
-      "category": "bug",
-      "risk": "high",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 64,
-      "score_breakdown": {"impact": 32, "urgency": 19, "quality": 13},
-      "labels": ["pr-type:bug", "pr-risk:high", "pr-priority:medium", "pr-action:batch_review", "pr-agent:copilot", "pr-batch:review-2026-11-01"]
-    },
-    {
-      "number": 73829,
-      "title": "Add configurable three-day engine installation cooldown",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 56,
-      "score_breakdown": {"impact": 25, "urgency": 14, "quality": 17},
-      "labels": ["pr-type:feature", "pr-risk:medium", "pr-priority:medium", "pr-action:batch_review", "pr-agent:copilot"]
-    },
-    {
-      "number": 73831,
-      "title": "Add batched Decisions API judging for GH-AW evals",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "defer",
-      "score": 51,
-      "score_breakdown": {"impact": 28, "urgency": 13, "quality": 10},
-      "labels": ["pr-type:feature", "pr-risk:medium", "pr-priority:medium", "pr-action:defer", "pr-agent:copilot"]
-    },
-    {
-      "number": 73819,
-      "title": "Upgrade AWF to v0.29.5 and generate Docker enclave integration",
-      "category": "feature",
-      "risk": "high",
-      "priority": "medium",
-      "action": "defer",
-      "score": 53,
-      "score_breakdown": {"impact": 30, "urgency": 12, "quality": 11},
-      "labels": ["pr-type:feature", "pr-risk:high", "pr-priority:medium", "pr-action:defer", "pr-agent:copilot"]
-    }
-  ],
-  "notes": "Open Copilot PRs are concentrated in model-routing and evals work, with one urgent fast-track item and a three-PR batch of reliability fixes. The draft PRs remain deferred until they are ready to merge."
+  "eligible_total": 0,
+  "cooldown_skipped": [],
+  "open_copilot_prs": 0,
+  "category_counts": {},
+  "risk_counts": {},
+  "priority_counts": {},
+  "action_counts": {},
+  "batches": [],
+  "selected_candidates": [],
+  "notes": "No open pull requests in this repository snapshot were authored by app/github-copilot; current open PRs are attributed to pelikhan, Copilot, or dependabot and are excluded by policy."
 }
