@@ -375,9 +375,21 @@ safe-outputs:
 
 **Available Artifacts:** Custom steps have access to `/tmp/gh-aw/threat-detection/prompt.txt` (workflow prompt), `agent_output.json` (safe output items), and `aw.patch` (git patch file). gh-aw also stages `/tmp/gh-aw/threat-detection/aw-prompts/prompt-template.txt`, `/tmp/gh-aw/threat-detection/aw-prompts/prompt-import-tree.json`, `/tmp/gh-aw/threat-detection/aw_info.json`, and any restored `/tmp/gh-aw/threat-detection/comment-memory/*.md` files so detectors can analyze prompt structure, activation context, and persisted comment memory.
 
-The prompt import tree records `trust` on its root and every import node, including nested and cached imports. `"author"` identifies the locally assembled prompt and repository-local author files; `"untrusted"` identifies external HTTPS content, which is processed only as static text. The runtime assigns these labels from source provenance, not imported content. A label describes the source's authoring capabilities, not the safety of every interpolated value or descendant. Treat missing labels in older artifacts as unknown, not as author trust.
-
 **Execution Order:** Download artifacts → Stage detection inputs → Execute pre-steps (`steps:`) → Run AI analysis (if enabled) → Execute post-steps (`post-steps:`) → Upload detection log.
+
+### Prompt Provenance Artifacts
+
+`prompt-import-tree.json` retains `version: 1` and adds `trust` to its root and every import node, including nested and cached imports.
+
+| `trust` | Source and capabilities |
+|---|---|
+| `author` | Locally assembled system/user prompt or repository-local author file; imports and compiler-selected non-secret expression bindings are supported |
+| `untrusted` | External HTTPS content; static text without expressions, directives, or inline agent/skill definitions |
+| Missing | Older artifact with unknown trust; do not infer author capabilities |
+
+The runtime assigns labels from provenance, not imported text. A node's label does not apply to its interpolated values or descendants: an `author` node can contain an `untrusted` HTTPS child. Cached nodes retain their own label and pre-expansion `rawContent`, even when `children` is empty because expansion already occurred. Labels are inspection metadata, not permission grants or proof that static text is free of prompt injection.
+
+`prompt-template.txt` records the assembled template before interpolation-stage processing. The main author source is part of that assembled prompt rather than a separate runtime-import child. Keep the template and import tree alongside the final prompt when analyzing provenance.
 
 ## Example: LlamaGuard Integration
 

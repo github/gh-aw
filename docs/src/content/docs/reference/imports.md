@@ -59,7 +59,7 @@ An imported workflow can only be imported once per workflow.
 
 In markdown, use `{{#runtime-import filepath}}` to inject the content of another file directly into the body at that position. This is useful for sharing reusable prompt snippets, tone instructions, or reference material across workflows.
 
-Imported markdown can include safe GitHub Actions expressions such as `${{ needs.pre_activation.outputs.activated }}` or `${{ needs.build.outputs.version }}`. gh-aw validates those expressions across the full nested runtime-import tree at compile time, so shared prompt files can reuse job outputs without weakening expression-safety checks.
+Repository-local imported markdown is an author source: it shares the main workflow's compiler-selected non-secret bindings, including `env.*`, compound expressions, and conditions. gh-aw validates available files across the nested local runtime-import tree at compile time. Job-output references must be available before activation, such as `${{ needs.pre_activation.outputs.activated }}`. External HTTPS imports are static text and have none of these author capabilities; the importing file cannot grant them to a response.
 
 ```aw wrap
 ---
@@ -135,7 +135,7 @@ import-schema:
     type: object
     description: Configuration object
     properties:
-      apiKey:
+      project:
         type: string
         required: true
       timeout:
@@ -149,7 +149,7 @@ mcp-servers:
 ---
 
 Deploy ${{ github.aw.import-inputs.count }} items to ${{ github.aw.import-inputs.region }}.
-API key: ${{ github.aw.import-inputs.config.apiKey }}.
+Project: ${{ github.aw.import-inputs.config.project }}.
 Languages: ${{ github.aw.import-inputs.languages }}.
 ```
 
@@ -168,7 +168,7 @@ Each field supports `required: true` and an optional `default` value.
 
 ### Accessing inputs in shared workflows
 
-Use `${{ github.aw.import-inputs.<key> }}` to substitute a top-level value; use dotted notation for object sub-fields (e.g. `${{ github.aw.import-inputs.config.apiKey }}`). Substitution applies to both frontmatter and body, so inputs can drive any field such as `mcp-servers` or `runtimes`.
+Use `${{ github.aw.import-inputs.<key> }}` to substitute a top-level value; use dotted notation for object sub-fields (e.g. `${{ github.aw.import-inputs.config.project }}`). Substitution applies to both frontmatter and body, so inputs can drive any field such as `mcp-servers` or `runtimes`. Values used in prompt bodies must be non-secret; environment filtering cannot identify credentials deliberately supplied as input text.
 
 ### Calling a parameterized shared workflow
 
@@ -186,7 +186,7 @@ imports:
       count: 5
       languages: ["go", "typescript"]
       config:
-        apiKey: my-secret-key
+        project: release-dashboard
         timeout: 60
 ---
 ```

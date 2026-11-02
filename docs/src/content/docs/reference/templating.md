@@ -11,7 +11,7 @@ Agentic workflows support four templating and substitution mechanisms: GitHub Ac
 
 Agentic workflows restrict expressions in **markdown content** to an allowlist. Repository-local workflow and runtime-import files are author sources. Downloaded HTTPS content is static text.
 
-> **Note**: These restrictions apply only to markdown content. YAML frontmatter can still use secrets and environment variables for workflow configuration.
+> **Note**: These restrictions apply to markdown content. YAML frontmatter can still use secrets for workflow configuration, but secret-backed environment variables cannot be selected as prompt bindings.
 
 Markdown allows event properties (`github.event.*`), repository context (`github.actor`, `github.owner`, `github.repository`, `github.server_url`, `github.workspace`), run metadata (`github.run_id`, `github.run_number`, `github.job`, `github.workflow`), and pattern expressions such as `needs.*`, `steps.*`, and `github.event.inputs.*`.
 
@@ -25,9 +25,13 @@ Other activation outputs such as `comment_id`, `comment_repo`, and `slash_comman
 
 All other expressions are disallowed, including `secrets.*`, `vars.*`, and complex functions like `toJson()` or `fromJson()`.
 
+### Author Expression Bindings
+
 The main workflow and local runtime-import files support `env.*` expressions, including comparisons and defaults such as `${{ env.LOG_LEVEL || 'info' }}`. The compiler creates explicit bindings evaluated by GitHub Actions; this is not access to the runner's entire environment. Secret-backed environment variables and known credential variables cannot be bound into prompts, including in non-strict mode.
 
 Local runtime imports have the same author expression capabilities as the main workflow, including nested local imports within the permitted folders. Evaluated values remain literal data and cannot introduce additional imports or directives. Downloaded HTTPS content has no expression, template, or import capabilities, even when an importing local file has author bindings.
+
+### Prompt Execution and Credentials
 
 Activation-job prompt creation, interpolation, and substitution use pinned `actions/github-script` actions. Their default GitHub token is replaced with the non-secret `no-authentication` placeholder because the action requires a nonempty token. Before loading prompt modules, the compiler-owned script removes environment variables outside its explicit bindings and non-secret runner/context allowlist, including inherited tokens and Node startup options. Prompt modules receive `core` and `context`, not an authenticated API client. Existing shell validation and printing steps remain shell steps.
 
@@ -85,11 +89,21 @@ You are analyzing PR #${{ github.event.pull_request.number }}.
 
 ### Limitations
 
-The template system supports only basic conditionals - no nesting, `else` clauses, variables, loops, or complex evaluation.
+Conditions support allowlisted expressions, including comparisons and defaults. Alternative branches use `{{#elseif expression}}` and `{{#else}}`. Nested conditional blocks, variable assignments, and loops are not supported.
 
 ## Runtime Imports
 
 Runtime imports include content in workflow prompts **at runtime** (unlike [compile-time imports](/gh-aw/reference/imports/)). Local file paths are restricted to `.github` or explicit `.agents/` paths. Remote imports accept literal public HTTPS URLs with expression-free content. Use `{{#runtime-import target}}` or `{{#runtime-import? target}}` for optional imports.
+
+### Source Capabilities
+
+| Source | Processing capabilities | Prompt-tree `trust` |
+|---|---|---|
+| Locally assembled system and user prompts | Imports, author-written directives, and compiler-selected expression bindings | `author` |
+| Repository-local runtime-import files | Same author capabilities, including nested imports within permitted folders | `author` |
+| External public HTTPS content | Static text only; no expressions, directives, nested imports, or inline agent/skill markers | `untrusted` |
+
+These labels describe source capabilities, not the safety of every interpolated value or descendant. See [prompt provenance artifacts](/gh-aw/reference/threat-detection/#prompt-provenance-artifacts) for the tree format.
 
 ### Macro Syntax
 
@@ -140,7 +154,7 @@ Remote imports accept only literal, unauthenticated HTTPS URLs. Both the URL and
 
 Directive rejection includes bare branch aliases such as `{{elseif true}}`, `{{else-if true}}`, and `{{else_if true}}`; remote text cannot use them to change a surrounding author-written conditional.
 
-Inline agent/skill control markers, such as `## agent:` and `## skill:`, are also rejected, including closing markers that could change surrounding definitions. Author-owned and local-fragment definitions remain supported.
+Inline agent/skill control markers, such as `## agent:` and `## skill:`, are also rejected, including closing markers that could change surrounding definitions. Author-owned and local-file definitions remain supported.
 
 ```aw wrap
 {{#runtime-import https://raw.githubusercontent.com/org/repo/main/checklist.md}}
@@ -172,12 +186,11 @@ File paths are restricted to `.github` or explicit `.agents/` paths to prevent a
 
 ### Processing Order
 
-Runtime imports run before other substitutions:
+The main author source is assembled with the local system/user prompt before interpolation-stage processing. Runtime imports are then expanded; local author bindings are applied before conditional-to-placeholder conversion, while HTTPS content is validated as static text.
 
-1. `{{#runtime-import}}` macros for local files or static public HTTPS content
-2. Expression and experiment values are replaced with opaque placeholders
-3. Author-written `{{#if}}` conditionals are rendered, resolving placeholder values only when evaluating their conditions
-4. Literal values are restored in the selected content without further template processing
+Evaluated expression and experiment values remain opaque while imports and directives are processed. Author-written conditions resolve values only after their directive syntax is parsed. Literal values are restored in selected content without another round of import or template processing.
+
+An import inside a condition is still resolved and validated before the condition is rendered. A false branch does not bypass HTTPS destination or content checks.
 
 ### Limitations
 
@@ -194,9 +207,13 @@ Runtime imports accept local files within permitted folders or expression-free p
 | File not found | `Runtime import file not found: missing.txt` |
 | Invalid line range | `Invalid start line 100 for file docs/main.go (total lines: 50)` |
 | Path traversal | `Security: Path ../src/main.go must be within .github folder` |
-| GitHub Actions macros | `File template.md contains GitHub Actions macros (${{ ... }}) which are not allowed in runtime imports` |
+| Unauthorized local expression or missing author binding | `Runtime import contains unauthorized GitHub Actions expressions` |
 | Unsupported target | `Runtime imports require local files or literal public HTTPS URLs` |
 | Remote expression or directive | `URL runtime imports must not contain expressions or template directives` |
+
+### Compiler and Runtime Compatibility
+
+Deploy matching compiler and setup-runtime versions and regenerate workflow locks with `gh aw compile`. Older setup runtimes cannot consume the compiler's `author_file` render plans, and older locks do not supply the current local-author bindings. A runtime-only upgrade does not add those bindings. HTTP or expressive remote imports must migrate to permitted local files or static public HTTPS content; recompilation does not rewrite previous prompts, artifacts, or logs.
 
 ## Learn More
 
