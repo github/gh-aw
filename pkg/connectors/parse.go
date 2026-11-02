@@ -36,6 +36,7 @@ func Decode(data []byte, target any) error {
 		return fmt.Errorf("encode connector document: %w", err)
 	}
 	strict := json.NewDecoder(bytes.NewReader(encoded))
+	strict.UseNumber()
 	strict.DisallowUnknownFields()
 	if err := strict.Decode(target); err != nil {
 		return fmt.Errorf("decode connector fields: %w", err)
