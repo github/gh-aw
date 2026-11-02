@@ -747,6 +747,12 @@ class GuidanceTests(unittest.TestCase):
                 self.assertIn("A draft PR is recommended, not required,", text)
                 self.assertIn("and a merge is not required.", text)
 
+    def test_merge_guard_rechecks_current_pr_state(self):
+        guide = (ROOT / ".github/aw/debug-playbook.md").read_text()
+        section = guide.split("## Merge guard codes\n", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("Check current PR head/base/checks/reviews/guards", section)
+        self.assertIn("diagnosis isn't merge authorization", section.lower())
+
     def test_debug_playbook_agent_consumption_budget(self):
         guide = (ROOT / ".github/aw/debug-playbook.md").read_text()
         self.assertLessEqual(len(guide.split()), 2800)

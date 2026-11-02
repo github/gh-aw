@@ -51,63 +51,115 @@ func shiftSourceNode(node ast.Node, column int) {
 	node.AddColumn(column)
 }
 
-func preserveSourceLiteralNewlines(node ast.Node, followingBlankLine bool) {
+func preserveSourceLiteralNewlines(node ast.Node, following ast.Node) {
 	switch value := node.(type) {
 	case *ast.MappingNode:
 		for index, field := range value.Values {
-			blank := followingBlankLine
+			nextNode := following
 			next := index + 1
 			if next >= 0 && next < len(value.Values) {
-				blank = strings.HasPrefix(value.Values[next].String(), "\n")
+				nextNode = value.Values[next]
 			}
-			preserveSourceLiteralNewlines(field, blank)
+			preserveSourceLiteralNewlines(field, nextNode)
 		}
 	case *ast.MappingValueNode:
-		preserveSourceLiteralNewlines(value.Value, followingBlankLine && value.FootComment == nil)
+		if value.FootComment != nil {
+			following = value.FootComment
+		}
+		preserveSourceLiteralNewlines(value.Value, following)
 	case *ast.SequenceNode:
 		for index, child := range value.Values {
-			blank := followingBlankLine && value.FootComment == nil
+			nextNode := following
+			if value.FootComment != nil {
+				nextNode = value.FootComment
+			}
 			next := index + 1
 			if next >= 0 && next < len(value.Values) {
-				blank = strings.HasPrefix(value.Values[next].String(), "\n")
+				nextNode = value.Values[next]
 			}
-			preserveSourceLiteralNewlines(child, blank)
+			if literal, ok := child.(*ast.LiteralNode); ok && strings.Contains(literal.Start.Value, "+") {
+				// SequenceNode.String reindents short whitespace-only lines.
+				// Pad syntax indentation first so it cannot become scalar data.
+				origin := strings.ReplaceAll(literal.Value.Token.Origin, "\r\n", "\n")
+				indent := sourceLiteralIndent(origin)
+				if indent == 0 && strings.Trim(literal.Value.Value, "\n") == "" {
+					// Keep an empty body indented after the sequence renderer
+					// removes one block indent from every literal line.
+					indent = 2 * (value.Start.Position.Column + 1)
+				}
+				lines := strings.Split(origin, "\n")
+				for index, line := range lines {
+					if strings.TrimSpace(line) == "" && len(line) < indent {
+						lines[index] = strings.Repeat(" ", indent)
+					}
+				}
+				literal.Value.Token.Origin = strings.Join(lines, "\n")
+			}
+			preserveSourceLiteralNewlines(child, nextNode)
 		}
 	case *ast.AnchorNode:
-		preserveSourceLiteralNewlines(value.Value, followingBlankLine)
+		preserveSourceLiteralNewlines(value.Value, following)
 	case *ast.TagNode:
-		preserveSourceLiteralNewlines(value.Value, followingBlankLine)
+		preserveSourceLiteralNewlines(value.Value, following)
 	case *ast.LiteralNode:
-		preserveSourceLiteralSuffix(value, followingBlankLine)
+		preserveSourceLiteralSuffix(value, following)
 	}
 }
 
-func preserveSourceLiteralSuffix(literal *ast.LiteralNode, followingBlankLine bool) {
+func clearSourceLeadingBlankLine(node ast.Node) {
+	if comment := node.GetComment(); comment != nil && len(comment.Comments) > 0 {
+		comment.Comments[0].Token.Prev = nil
+		return
+	}
+	switch value := node.(type) {
+	case *ast.MappingNode:
+		if len(value.Values) > 0 {
+			clearSourceLeadingBlankLine(value.Values[0])
+		}
+	case *ast.MappingValueNode:
+		value.Key.GetToken().Prev = nil
+	case *ast.CommentGroupNode:
+		if len(value.Comments) > 0 {
+			value.Comments[0].Token.Prev = nil
+		}
+	}
+}
+
+func preserveSourceLiteralSuffix(literal *ast.LiteralNode, following ast.Node) {
 	if !strings.Contains(literal.Start.Value, "+") {
 		return
 	}
-	text := literal.Value.Value
-	newlines := len(text) - len(strings.TrimRight(text, "\n"))
-	if newlines <= 1 {
-		return
-	}
-	origin := literal.Value.Token.Origin
-	lines := strings.Split(origin, "\n")
-	end := 0
-	for index, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			end = index + 1
+	origin := strings.ReplaceAll(literal.Value.Token.Origin, "\r\n", "\n")
+	if strings.HasSuffix(literal.Value.Value, "\n") {
+		// The lexer can include indentation belonging to the following syntax.
+		if end := strings.LastIndexByte(origin, '\n'); end >= 0 && end < len(origin) {
+			origin = origin[:end+1]
 		}
 	}
-	lines = lines[:end]
-	// LiteralNode.String trims terminal newlines, while the next mapping key
-	// can retain one blank line through its token positions. Account for both
-	// only after merging, when the actual following syntax is known.
-	if followingBlankLine {
-		newlines--
+	body := strings.TrimSuffix(origin, "\n")
+	followingText := ""
+	if following != nil {
+		followingText = following.String()
+		if comment, ok := following.(*ast.CommentGroupNode); ok {
+			followingText = comment.StringWithSpace(0)
+		}
 	}
-	blank := "\n" + strings.Repeat(" ", sourceLiteralIndent(origin))
-	literal.Value.Token.Origin = strings.Join(lines, "\n") + strings.Repeat(blank, newlines-1) + "\n"
+	if strings.HasPrefix(followingText, "\n") {
+		// The scalar body already includes its trailing blank lines. Do not
+		// duplicate one from the following key's original token positions.
+		if shortened, ok := strings.CutSuffix(body, "\n"); ok {
+			body = shortened
+		} else {
+			clearSourceLeadingBlankLine(following)
+		}
+	}
+	// LiteralNode.String trims terminal spaces, then terminal newlines.
+	// Retain the original suffix, including excess indentation as scalar data,
+	// and pad only a terminal empty line so those trims cannot remove it.
+	if strings.HasSuffix(body, "\n") {
+		body += strings.Repeat(" ", max(sourceLiteralIndent(origin), 1))
+	}
+	literal.Value.Token.Origin = body + "\n"
 }
 
 func sourceScalarReplacement(source, replacement ast.Node) (ast.Node, error) {

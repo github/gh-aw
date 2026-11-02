@@ -10,16 +10,18 @@ import (
 // EditSource applies semantic YAML changes using the same source-preserving
 // syntax merger as the Actions AST. It also supports AW frontmatter mappings.
 func EditSource(content string, before, after any) (string, error) {
-	oldYAML, err := yaml.Marshal(before)
+	// YAML's block-style encoder can discard trailing whitespace-only data.
+	// Snapshot values as JSON so both merging and validation remain lossless.
+	oldYAML, err := snapshotYAMLValue(before)
 	if err != nil {
 		return "", err
 	}
-	newYAML, err := yaml.Marshal(after)
+	newYAML, err := snapshotYAMLValue(after)
 	if err != nil {
 		return "", err
 	}
-	source := &workflowSource{text: content, lowered: string(oldYAML)}
-	return source.emitWithValidation(string(newYAML), func(content, expected string) error {
+	source := &workflowSource{text: content, lowered: oldYAML}
+	return source.emitWithValidation(newYAML, func(content, expected string) error {
 		actual, err := snapshotYAMLSource(content)
 		if err != nil {
 			return err

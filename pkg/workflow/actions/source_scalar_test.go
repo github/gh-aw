@@ -105,6 +105,125 @@ func TestEditSourcePreservesKeepChompingScalars(t *testing.T) {
 	}
 }
 
+func TestEditSourcePreservesKeepChompingWhitespace(t *testing.T) {
+	t.Parallel()
+	for _, style := range []string{"|+", ">+"} {
+		for _, suffix := range []struct {
+			name, text string
+		}{
+			{"excess", "    \n"},
+			{"excess-empty", "    \n\n"},
+			{"varied", "    \n  \n      \n\n"},
+			{"varied-short-indent", "\n    \n \n  \n\n"},
+		} {
+			for _, ending := range []struct {
+				name, text string
+			}{{"LF", "\n"}, {"CRLF", "\r\n"}} {
+				for _, layout := range []struct {
+					name, prefix, following string
+					indent                  int
+				}{
+					{"mapping-first", "value: ", "other: next\n", 2},
+					{"mapping-comment", "value: ", "# next field\nother: next\n", 2},
+					{"mapping-last", "other: next\nvalue: ", "", 2},
+					{"nested-mapping-first", "env:\n  value: ", "  other: next\n", 4},
+					{"nested-mapping-last", "env:\n  value: ", "other: next\n", 4},
+					{"sequence-mapping-first", "items:\n  - value: ", "  - value: next\n", 6},
+					{"sequence-mapping-last", "items:\n  - value: next\n  - value: ", "", 6},
+					{"sequence-first", "items:\n  - ", "  - next\n", 4},
+					{"sequence-last", "items:\n  - next\n  - ", "", 4},
+				} {
+					t.Run(style+"/"+suffix.name+"/"+ending.name+"/"+layout.name, func(t *testing.T) {
+						t.Parallel()
+						spacing := strings.Split(suffix.text, "\n")
+						for index, line := range spacing {
+							if line != "" {
+								spacing[index] = strings.Repeat(" ", layout.indent-2) + line
+							}
+						}
+						body := strings.Repeat(" ", layout.indent) + "first\n" + strings.Join(spacing, "\n")
+						content := "name: Original\n" + layout.prefix + style + " # value\n" + body + layout.following
+						content = strings.ReplaceAll(content, "\n", ending.text)
+						var before, after map[string]any
+						require.NoError(t, yaml.Unmarshal([]byte(content), &before))
+						require.NoError(t, yaml.Unmarshal([]byte(content), &after))
+						after["name"] = "Edited"
+						emitted, err := EditSource(content, before, after)
+						require.NoError(t, err)
+						var actual map[string]any
+						require.NoError(t, yaml.Unmarshal([]byte(emitted), &actual))
+						assert.Equal(t, after, actual)
+						assert.Contains(t, emitted, style+" # value")
+						if layout.name == "mapping-first" {
+							assert.Contains(t, emitted, strings.ReplaceAll(body, "\n", ending.text))
+						}
+						assert.Equal(t, sourceComments(t, content), sourceComments(t, emitted))
+						unchanged, err := EditSource(content, before, before)
+						require.NoError(t, err)
+						assert.Equal(t, content, unchanged)
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestSourceNameEditPreservesKeepChompingWhitespace(t *testing.T) {
+	t.Parallel()
+	for _, style := range []string{"|+", ">+"} {
+		for _, suffix := range []string{"      \n", "      \n    \n        \n\n"} {
+			t.Run(style+suffix, func(t *testing.T) {
+				t.Parallel()
+				content := "name: Original\nenv:\n  VALUE: " + style + " # prompt\n    first\n" + suffix +
+					"jobs: {build: {runs-on: ubuntu-latest, steps: [{run: echo}]}}\n"
+				input, err := Parse([]byte(content))
+				require.NoError(t, err)
+				expected := input.Env["VALUE"]
+				input.Name = "Edited"
+				for range 2 {
+					emitted, err := Emit(input)
+					require.NoError(t, err)
+					actual, err := Parse([]byte(emitted))
+					require.NoError(t, err)
+					assert.Equal(t, "Edited", actual.Name)
+					assert.Equal(t, expected, actual.Env["VALUE"])
+					assert.Equal(t, sourceComments(t, content), sourceComments(t, emitted))
+				}
+			})
+		}
+	}
+}
+
+func TestEditSourcePreservesKeepChompingWhitespaceEdges(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, scalar string
+	}{
+		{"empty", "value: |+\n  \n  \nother: next\n"},
+		{"empty-varied", "value: |+\n  \n    \n\nother: next\n"},
+		{"empty-sequence", "items:\n  - |+\n    \n    \n  - next\n"},
+		{"indented-content", "value: |+\n  first\n    indented\n  last\n    \n  \n      \n\nother: next\n"},
+		{"no-final-newline", "value: |+\n  first\n    "},
+		{"mapping-footer", "value: |+\n  first\n    \n\n# footer\n"},
+		{"sequence-footer", "items:\n  - value: |+\n      first\n        \n\n# footer\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			content := "name: Original\n" + tt.scalar
+			var before, after map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(content), &before))
+			require.NoError(t, yaml.Unmarshal([]byte(content), &after))
+			after["name"] = "Edited"
+			emitted, err := EditSource(content, before, after)
+			require.NoError(t, err)
+			var actual map[string]any
+			require.NoError(t, yaml.Unmarshal([]byte(emitted), &actual))
+			assert.Equal(t, after, actual)
+			assert.Equal(t, sourceComments(t, content), sourceComments(t, emitted))
+		})
+	}
+}
+
 func TestEditSourceFlowScalars(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {

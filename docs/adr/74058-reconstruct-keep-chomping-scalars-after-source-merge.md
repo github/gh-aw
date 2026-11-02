@@ -1,47 +1,45 @@
 # ADR-74058: Rebuild Keep-Chomping Scalar Newlines After Source Merging
 
-**Date**: 2026-05-14
-**Status**: Draft
-**Deciders**: pelikhan, [TODO: verify other reviewers]
+**Date**: 2026-11-02
+**Status**: Proposed (pending maintainer review)
+**Deciders**: Pending maintainer review; no approval recorded
 
 ---
 
 ### Context
 
-`pkg/workflow/actions` edits workflow YAML at the source level so comments, quoting, and layout stay intact. The source editor uses the `goccy/go-yaml` AST, and `LiteralNode.String` drops terminal newlines from block scalars. A keep-chomping (`|+` / `>+`) value like `"first\n\n"` therefore loses trailing blank lines unless they are re-encoded in the token origin. Previously, that re-encoding happened inside `sourceLiteralIndentVisitor`, during indentation shifts. At that point the editor cannot tell whether the next sibling key will contribute its own blank line through its token positions. As a result, edits such as renaming a workflow changed the parsed value of keep-chomping scalars, and CI round-trip checks failed.
+`pkg/workflow/actions` edits workflow YAML while retaining comments, quoting, and layout. Its `goccy/go-yaml` AST renderer trims terminal line feeds from block-scalar output. Keep-chomping scalars (`|+` and `>+`) retain those line feeds as part of their parsed value, so source edits must reconstruct the missing suffix rather than silently change that value.
+
+Previously, `sourceLiteralIndentVisitor` reconstructed trailing newlines during indentation shifts. That phase does not have the final merged syntax needed to determine whether a following sibling contributes a blank line. Repository workflow round-trip checks exposed scalar-value changes, including failures in two generated workflows during an attempted zero-indent-shift workaround.
 
 ### Decision
 
-We will remove trailing-newline reconstruction from the indentation-shift visitor. Instead, a dedicated post-merge pass, `preserveSourceLiteralNewlines`, will run in `emitWithValidation` after syntax merging. The pass walks mappings, mapping values, sequences, anchors, and tags. For each keep-chomping literal, it works out whether the following sibling already supplies a leading blank line (and whether a foot comment intervenes). It then rebuilds the literal's origin with exactly the number of indented blank lines still needed. The main reason is correctness: the right number of newlines depends on the surrounding syntax, which is only known once merging is complete.
+Run `preserveSourceLiteralNewlines` in `emitWithValidation` after `mergeSourceNode` and before rendering. Keep indentation shifting separate from trailing-newline reconstruction.
+
+The post-merge pass visits scalars through mappings, sequences, anchors, and tags. It reconstructs keep-chomping token origins using the scalar value and final surrounding syntax, accounting for blank lines already rendered by a following sibling and for intervening foot comments. Reconstruction must preserve the complete scalar value, including significant whitespace on suffix lines such as excess indentation on whitespace-only lines, not merely its terminal line-feed count.
+
+Preserve the original suffix data rather than rebuilding every whitespace-only line with one fixed indent. Use lossless JSON snapshots for `EditSource` inputs as well as native workflow snapshots: the YAML block-style encoder can independently discard suffix whitespace before source merging or validation.
+
+Retain `validateSourceEmission`: parse the emitted workflow and compare its serialized Actions AST with the requested AST. Return an error on mismatch rather than accept a semantically changed edit. This validation is a source-editing correctness check, not authorization or a runtime safety verdict.
 
 ### Alternatives Considered
 
-#### Alternative 1: Keep the fix inside the indentation-shift visitor
+#### Retain reconstruction in the indentation-shift visitor
 
-Patch the existing logic in `sourceLiteralIndentVisitor` to adjust the newline count. This would have been a smaller change, but the visitor runs before the final neighbouring nodes are settled. It cannot reliably tell whether the next key carries a blank line, so it would keep over- or under-counting newlines in some layouts (nested mappings, sequences, trailing comments).
+This was the previous implementation. It couples newline repair to indentation changes before the final neighbouring syntax is settled, even though a sibling's rendered blank lines affect the required suffix.
 
-#### Alternative 2: Re-emit keep-chomping scalars in another style
+#### Skip indentation handling when the column shift is zero
 
-Convert affected `|+`/`>+` scalars to quoted or explicit-escape strings on edit, which avoids the renderer's newline trimming entirely. This was rejected because it rewrites author-owned formatting, which defeats the purpose of source-preserving edits. It would also produce noisy diffs across repository workflows.
+This smaller workaround was tried, but failed round-trip checks for two actual generated workflows and some edited cases. A zero column shift does not establish that the renderer will preserve the scalar value.
 
-#### Alternative 3: Patch or replace the upstream YAML renderer
+#### Reconstruct after merging with rendered-neighbour accounting (selected)
 
-Change or fork `goccy/go-yaml` so `LiteralNode.String` keeps terminal newlines. This would fix the problem at its root, but it adds the maintenance cost of a forked dependency (or waiting on upstream). The CI failure needed a local fix.
+Moving reconstruction after the source merge makes the final sibling context available. Accounting for already-rendered blank lines avoids duplicating those newlines, while semantic validation rejects remaining mismatches. This keeps the correction within the existing source editor and preserves author-owned scalar styles.
 
 ### Consequences
 
-#### Positive
-- Keep-chomping literal and folded scalars keep their parsed value across source edits, including nested mappings, sequences, comments, and CRLF input.
-- Newline handling lives in one AST pass that runs after merging, so indentation shifting and newline preservation are now separate concerns.
+The source editor has one post-merge reconstruction phase instead of repairing scalar suffixes during indentation shifts. Keep-chomping scalar styles can remain intact, and semantic validation continues to reject emitted values that differ from the requested workflow.
 
-#### Negative
-- The source emitter gains another full AST traversal, and it depends on how `goccy/go-yaml` renders literals and token positions internally. An upstream change to that behaviour could break this logic without any compile error.
-- The sibling blank-line detection (`strings.HasPrefix(next.String(), "\n")`) is a heuristic. Node types the pass does not visit could still mishandle edge cases.
+The emitter gains another AST traversal and remains coupled to `goccy/go-yaml` rendering and token-position behaviour. Rendered-neighbour detection is not a general YAML formatting model; changes to upstream rendering or unsupported layouts can still cause source editing to fail validation.
 
-#### Neutral
-- Regression tests in `source_scalar_test.go` and the repository-wide round-trip tests now set the expected behaviour, so future changes to the source editor must keep them passing.
-- The change is limited to `pkg/workflow/actions` and does not change the source-editing API.
-
----
-
-*ADR created by [adr-writer agent]. Review and finalize before changing status from Draft to Accepted.*
+Scalar regression tests and repository workflow round-trip checks must cover edits as well as unchanged input, including whitespace-only suffixes, nesting, sibling blank lines, comments, and line endings. These tests are evidence for their covered cases, not a claim that every YAML layout is supported. The source-editing API is unchanged.
