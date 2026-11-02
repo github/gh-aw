@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
 func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) ([]byte, error) {
 	if len(data) == 0 {
-		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseContains)+len(op.Project) != 0 || op.Request.GraphQL != "" {
+		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseResourceInputs)+len(op.ResponseOptionalEmpty)+len(op.ResponseContains)+len(op.Project) != 0 || op.Request.GraphQL != "" {
 			return nil, errors.New("connector response is empty; required evidence is missing")
 		}
 		return []byte("null"), nil
@@ -78,7 +79,39 @@ func checkResponseBindings(document any, op Operation, args map[string]any) erro
 			return fmt.Errorf("connector response does not match request input at %q", pointer)
 		}
 	}
+	for pointer, input := range op.ResponseResourceInputs {
+		actual, present := lookupPointer(document, pointer)
+		expected, supplied := args[input]
+		actualID, valid := responseResourceIdentity(actual)
+		expectedID, expectedString := expected.(string)
+		if !present || !supplied || !valid || !expectedString || actualID != expectedID {
+			return fmt.Errorf("connector response resource identity does not match request input at %q", pointer)
+		}
+	}
 	return nil
+}
+
+func responseResourceIdentity(value any) (string, bool) {
+	if text, ok := value.(string); ok {
+		return text, text != ""
+	}
+	number, ok := value.(json.Number)
+	if !ok {
+		return "", false
+	}
+	text := number.String()
+	if text == "" || (len(text) > 1 && strings.HasPrefix(text, "0")) {
+		return "", false
+	}
+	for _, character := range text {
+		if character < '0' || character > '9' {
+			return "", false
+		}
+	}
+	if _, err := strconv.ParseUint(text, 10, 53); err != nil {
+		return "", false
+	}
+	return text, true
 }
 
 func checkPrimitiveTypes(document any, types map[string]string) error {
@@ -93,6 +126,12 @@ func checkPrimitiveTypes(document any, types map[string]string) error {
 }
 
 func checkResponseEvidence(document any, op Operation) error {
+	for _, pointer := range op.ResponseOptionalEmpty {
+		value, present := lookupPointer(document, pointer)
+		if present && value != nil && value != "" {
+			return fmt.Errorf("connector response requires absent, null, or empty textual metadata at %q", pointer)
+		}
+	}
 	for pointer, expected := range op.ResponseChecks {
 		actual, ok := lookupPointer(document, pointer)
 		actualJSON, actualErr := json.Marshal(actual)

@@ -20,5 +20,5 @@ Test the linear-add-comment safe output functionality.
 
 Add a comment to an existing Linear issue with findings from the repository.
 
-Use `connector_6_linear_add_comment` with the approved issue UUID and body.
+Use `linear_add_comment` with the approved issue UUID and body.
 Replace the specimen UUID before live use.
