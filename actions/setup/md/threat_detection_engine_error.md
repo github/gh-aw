@@ -1,6 +1,7 @@
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding.
 > {threat_detected_marker}
 >
 > <details>
@@ -8,5 +9,5 @@
 >
 > {reason_text}
 >
-> Review the [workflow run logs]({run_url}) for details.
+> Review the [workflow run logs]({run_url}) to troubleshoot the error.
 > </details>

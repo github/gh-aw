@@ -1659,8 +1659,8 @@ function removeExplicitPromptOptions(args) {
 /**
  * Resolve --prompt-file arguments for the Copilot CLI.
  * Small files are inlined as -p prompt text for compatibility with older Copilot CLIs.
- * Larger files are removed from the argument list and returned as stdin data so the full
- * prompt reaches Copilot without being constrained by the operating system's argv limit.
+ * Larger files and files containing NUL bytes are returned as stdin data so the full
+ * prompt reaches Copilot without being constrained by the operating system's argv limits.
  * @param {string[]} args
  * @returns {{args: string[], stdin?: Buffer}}
  */
@@ -1692,8 +1692,13 @@ function resolvePromptFileInput(args) {
         log(`prompt file exceeds ${PROMPT_FILE_INLINE_THRESHOLD_LABEL}; streaming prompt via stdin`);
         promptStdin = fs.readFileSync(promptFile);
       } else {
-        const promptText = fs.readFileSync(promptFile, "utf8");
-        resolvedArgs.push("-p", promptText);
+        const prompt = fs.readFileSync(promptFile);
+        if (prompt.includes(0)) {
+          log("prompt file contains NUL bytes; streaming prompt via stdin");
+          promptStdin = prompt;
+        } else {
+          resolvedArgs.push("-p", prompt.toString("utf8"));
+        }
       }
       i++; // Skip the prompt-file path argument
     } catch (error) {

@@ -16,10 +16,12 @@ permissions:
   contents: read
   issues: read
   copilot-requests: write
-model: openai/gpt-6-astra
 engine:
   id: codex
-  model-provider: openai
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 strict: true
 network:
   allowed:

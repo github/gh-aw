@@ -242,6 +242,10 @@ func customSecretMaskingStepIDs(data *WorkflowData) []string {
 }
 
 func secretRedactionSuccessCondition(data *WorkflowData) string {
+	return secretMaskingSuccessCondition(data) + " && steps.validate_recovery_envelopes.outcome == 'success'"
+}
+
+func secretMaskingSuccessCondition(data *WorkflowData) string {
 	var condition strings.Builder
 	condition.WriteString("steps.redact_secrets.outcome == 'success'")
 	for _, id := range customSecretMaskingStepIDs(data) {

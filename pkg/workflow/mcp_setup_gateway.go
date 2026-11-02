@@ -556,6 +556,9 @@ func appendMCPGatewayBaseEnvFlags(containerCmd *strings.Builder, payloadPathPref
 		containerCmd.WriteString(" -e " + envVar)
 	}
 	containerCmd.WriteString(" -e " + compilerenv.PolicyAllowCreatePullRequest)
+	for _, name := range objectPackLimitEnvNames {
+		containerCmd.WriteString(" -e " + name)
+	}
 	containerCmd.WriteString(" -e GH_AW_ASSETS_BRANCH")
 	containerCmd.WriteString(" -e GH_AW_ASSETS_MAX_SIZE_KB")
 	containerCmd.WriteString(" -e GH_AW_ASSETS_ALLOWED_EXTS")
@@ -863,6 +866,9 @@ func buildAddedGatewayEnvVarSet(workflowData *WorkflowData, customGatewayEnvName
 		"GITHUB_REF", "GITHUB_REF_NAME", "GITHUB_REF_TYPE", "GITHUB_HEAD_REF", "GITHUB_BASE_REF",
 	}
 	for _, envVar := range standardEnvVars {
+		addedEnvVars[envVar] = struct{}{}
+	}
+	for _, envVar := range objectPackLimitEnvNames {
 		addedEnvVars[envVar] = struct{}{}
 	}
 	for _, envVar := range optionalPRHeadEnvVars {

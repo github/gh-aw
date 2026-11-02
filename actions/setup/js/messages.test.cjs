@@ -1533,7 +1533,9 @@ describe("messages.cjs", () => {
       const result = getDetectionCautionAlert("Test Workflow", "https://github.com/test/repo/actions/runs/123");
 
       expect(result).toContain("> [!WARNING]");
-      expect(result).toContain("> threat detection engine error");
+      expect(result).toContain("> **Threat detection engine error**\n>\n> Threat detection could not complete its analysis");
+      expect(result).toContain("This is not a security finding.");
+      expect(result).toContain("[workflow run logs](https://github.com/test/repo/actions/runs/123) to troubleshoot the error.");
       expect(result).toContain("What happened");
       expect(result).toContain("<!-- gh-aw-threat-engine-error -->");
       expect(result).not.toContain("<!-- gh-aw-threat-detected -->");
@@ -1562,7 +1564,7 @@ describe("messages.cjs", () => {
       const result = getDetectionCautionAlert("Test Workflow", "https://github.com/test/repo/actions/runs/123");
 
       expect(result).toContain("> [!WARNING]");
-      expect(result).toContain("threat detection engine error");
+      expect(result).toContain("**Threat detection engine error**");
       expect(result).toContain("<!-- gh-aw-threat-engine-error -->");
       expect(result).not.toContain("> [!CAUTION]");
     });
