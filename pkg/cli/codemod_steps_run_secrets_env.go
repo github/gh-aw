@@ -8,6 +8,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/github/gh-aw/pkg/workflow/actionslanguageservice"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/github/gh-aw/pkg/workflow/codemod"
@@ -20,8 +21,9 @@ func getStepsRunSecretsToEnvCodemod() Codemod {
 	return Codemod{
 		ID:           "steps-run-secrets-to-env",
 		Name:         "Move step run expressions to env bindings",
-		Description:  "Rewrites all ${{ ... }} expressions interpolated directly in run commands to $VARS (or $env:VARS for PowerShell steps) and adds step-level env bindings for strict-mode compatibility. Note: expressions inside single-quoted strings are rewritten too; since single quotes suppress shell variable expansion, those sections should be double-quoted if the substituted value is required.",
+		Description:  "Moves executable run expressions into step env bindings, using the compiler's Bash heredoc boundaries. Preserves quoted heredoc bodies and shell comments; unproven heredoc boundaries require manual migration. Note: ordinary single-quoted shell strings still require double quotes to expand the generated variables.",
 		IntroducedIn: "0.26.0",
+		Guided:       true,
 		Apply: func(content string, frontmatter map[string]any) (string, bool, error) {
 			sections := []string{"pre-steps", "steps", "post-steps", "pre-agent-steps"}
 			if !hasTopLevelSection(frontmatter, sections) {
@@ -34,12 +36,14 @@ func getStepsRunSecretsToEnvCodemod() Codemod {
 						if !ok {
 							continue
 						}
-						for _, value := range steps {
+						for index, value := range steps {
 							step, ok := value.(map[string]any)
 							if !ok {
 								continue
 							}
-							hoistStepRunExpressions(step)
+							if err := hoistStepRunExpressions(step); err != nil {
+								return fmt.Errorf("%s[%d].run: %w; no changes to this workflow are written until manual blockers are resolved", section, index, err)
+							}
 						}
 					}
 					return nil
@@ -49,46 +53,53 @@ func getStepsRunSecretsToEnvCodemod() Codemod {
 	}
 }
 
-func hoistStepRunExpressions(step map[string]any) {
+func hoistStepRunExpressions(step map[string]any) error {
 	run, ok := step["run"].(string)
-	if !ok {
-		return
+	if !ok || !strings.Contains(run, "${{") {
+		return nil
 	}
 	env, ok := step["env"].(map[string]any)
 	if !ok {
 		if value, exists := step["env"]; exists && value != nil {
-			return
+			return nil
 		}
 		env = map[string]any{}
 	}
 	shell, shellIsString := step["shell"].(string)
 	powershell := shellIsString && (strings.EqualFold(shell, "pwsh") || strings.EqualFold(shell, "powershell"))
 	bindings := map[string]string{}
-	lines := strings.Split(run, "\n")
 	changed := false
-	for i, line := range lines {
-		// As before, comment-only shell lines (including heredoc comments) stay untouched.
-		if strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		code, comment := splitRunShellComment(line)
-		updated, added := replaceStepExpressionRefs(code, powershell, bindings)
-		if len(added) == 0 {
-			continue
-		}
-		lines[i] = updated + comment
-		changed = true
+	transform := func(segment string) string {
+		updated, added := replaceStepExpressionRefs(segment, powershell, bindings)
+		changed = changed || len(added) > 0
 		for _, binding := range added {
 			bindings[binding.Name] = binding.Expression
 			if _, exists := env[binding.Name]; !exists {
 				env[binding.Name] = binding.Expression
 			}
 		}
+		return updated
+	}
+	var updatedRun string
+	if powershell {
+		lines := strings.Split(run, "\n")
+		for i, line := range lines {
+			code, comment := splitRunShellComment(line)
+			lines[i] = transform(code) + comment
+		}
+		updatedRun = strings.Join(lines, "\n")
+	} else {
+		var err error
+		updatedRun, err = workflow.TransformExecutableShellContent(run, transform)
+		if err != nil {
+			return err
+		}
 	}
 	if changed {
-		step["run"] = strings.Join(lines, "\n")
+		step["run"] = updatedRun
 		step["env"] = env
 	}
+	return nil
 }
 
 // Folded YAML joins authored shell-comment lines onto the preceding command.

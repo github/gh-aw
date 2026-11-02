@@ -172,6 +172,10 @@ func transformShellContent(content string, transform func(string) string, skipQu
 		// The unchanged expressions will be rejected by validation.
 		return content
 	}
+	return transformShellRegions(content, regions, transform, skipQuoted)
+}
+
+func transformShellRegions(content string, regions []shellHeredocRegion, transform func(string) string, skipQuoted bool) string {
 	var result strings.Builder
 	pos := 0
 	for _, region := range regions {
@@ -188,6 +192,20 @@ func transformShellContent(content string, transform func(string) string, skipQu
 	}
 	result.WriteString(transform(content[pos:]))
 	return result.String()
+}
+
+// TransformExecutableShellContent shares the compiler's Bash heredoc and comment
+// boundaries with source migrations. Unproven boundaries return the original
+// script and an actionable, value-free error before invoking transform.
+func TransformExecutableShellContent(content string, transform func(string) string) (string, error) {
+	regions, parsed := shellHeredocRegions(content, true)
+	if !parsed {
+		return content, errors.New("cannot prove Bash heredoc boundaries; manually use a literal, simply quoted delimiter with an exact closing line, or move dynamic data into env bindings")
+	}
+	if !strings.Contains(content, "<<") {
+		return transformOutsideShellLineComments(content, transform), nil
+	}
+	return transformShellRegions(content, regions, transform, false), nil
 }
 
 // removeHeredocContent removes only quoted heredoc bodies. Unquoted bodies
@@ -289,6 +307,12 @@ func replaceOutsideQuotedHeredocs(s, old, new string) string {
 // replaceOutsideShellLineComments replaces old with new in shell script content
 // while preserving text inside bash-style # line comments.
 func replaceOutsideShellLineComments(content, old, new string) string {
+	return transformOutsideShellLineComments(content, func(segment string) string {
+		return strings.ReplaceAll(segment, old, new)
+	})
+}
+
+func transformOutsideShellLineComments(content string, transform func(string) string) string {
 	var result strings.Builder
 	result.Grow(len(content))
 
@@ -331,19 +355,13 @@ func replaceOutsideShellLineComments(content, old, new string) string {
 		}
 
 		if ch == '#' && !inSingleQuote && !inDoubleQuote && isShellCommentStart(content, i) {
-			result.WriteString(strings.ReplaceAll(content[segmentStart:i], old, new))
+			result.WriteString(transform(content[segmentStart:i]))
 
 			commentEnd := i
 			for commentEnd < len(content) && content[commentEnd] != '\n' {
 				commentEnd++
 			}
 			result.WriteString(content[i:commentEnd])
-			if commentEnd < len(content) {
-				result.WriteByte('\n')
-				commentEnd++
-			}
-
-			escaped = false
 			segmentStart = commentEnd
 			i = commentEnd
 			continue
@@ -352,7 +370,7 @@ func replaceOutsideShellLineComments(content, old, new string) string {
 		i++
 	}
 
-	result.WriteString(strings.ReplaceAll(content[segmentStart:], old, new))
+	result.WriteString(transform(content[segmentStart:]))
 	return result.String()
 }
 

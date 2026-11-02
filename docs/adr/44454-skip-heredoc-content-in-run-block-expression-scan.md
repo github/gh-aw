@@ -18,6 +18,8 @@ Both scanning paths now share the existing Bash parser to identify quoted heredo
 
 Quoted inner heredocs remain protected inside expanding outer bodies. Comment spans come from the full-script parse so enclosing quote state is preserved. Delimiter quotation excludes unquoted backslash-newline continuations. Quoted-body exemptions also require agreement with the first literal closing delimiter line; parser boundary disagreements are treated as unsupported syntax. Escapes in ANSI-C-quoted or double-quoted delimiter parts are also unsupported because Bash may decode them differently from the parser; ordinary single-quoted literal backslashes remain supported. For malformed or unsupported heredoc syntax, sanitization leaves the script unchanged and validation scans all expressions. Parser failure logs never include script tokens.
 
+The `steps-run-secrets-to-env` source codemod shares these Bash region decisions instead of applying line-based comment rules inside heredocs. It preserves quoted bodies, migrates hash-prefixed expanding-body expressions, and reports unproven boundaries as guided errors without writing partial workflow changes.
+
 ### Alternatives Considered
 
 #### Alternative 1: Expand `allowedRunScriptExpressionRegex` to include `toJSON(...)` patterns

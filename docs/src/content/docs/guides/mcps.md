@@ -101,6 +101,29 @@ mcp-servers:
 
 Custom MCP servers should be **read-only**. Write operations must go through [safe outputs](/gh-aw/reference/safe-outputs/) or [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/). Ensure your MCP server implements authentication and authorization to prevent unauthorized write access.
 
+### Migrate dynamic configuration values
+
+Treat MCP URLs, arguments, mounts, headers and environment values as data, not shell scripts. Actions expressions such as `${{ steps.setup.outputs.port }}` are transported through environment bindings and resolved after JSON parsing. Simple runner `$NAME` and `${NAME}` references remain supported.
+
+Replace shell computations such as `$(...)`, backticks and `${NAME:-default}` with a setup-step output or an equivalent Actions expression. For example, when `WORKSPACE_FALLBACK` is available in the Actions `env` context, replace `${WORKSPACE_FALLBACK:-/tmp}` with:
+
+```yaml wrap
+mcp-servers:
+  service:
+    url: https://example.com/mcp
+    headers:
+      X-Workspace: "${{ env.WORKSPACE_FALLBACK || '/tmp' }}"
+```
+
+Compilation warns at configuration paths containing unsupported shell computations. It rejects a value that combines transported expressions or runner variables with an explicitly deferred gateway reference such as `\${TOKEN}`. When all inputs are available to the runner, combine them in a single Actions expression; otherwise keep gateway-only references in a separate configuration value. Do not assume a gateway variable is available in the runner's environment.
+
+> [!CAUTION]
+> Startup also rejects transported runtime values containing `${NAME}`, even when intended as literal template text. The pinned gateway expands that syntax again and cannot distinguish literal data from credential references. These runtime failures cannot all be predicted at compilation, and adding a backslash is not a supported escape for literal placeholder data.
+
+For inline expressions in shell steps, preview source migrations with `gh aw fix <workflow>`, review the diff after applying `--write`, and recompile. The codemod migrates expanding heredoc bodies, including hash-prefixed lines, but preserves proven quoted bodies and shell comments. An unproven heredoc boundary requires a manual fix before any changes to that workflow are written. Ordinary single-quoted shell strings still require manual quote review; quoted heredocs are not a safe transport for arbitrary multiline Actions values.
+
+Deploy regenerated locks with the matching setup runtime. Recompilation does not repair earlier runs, and compiler-owned `GH_AW_MCP_*` placeholders are not authored configuration.
+
 ## Custom MCP Server Types
 
 Choose the transport that matches how the server runs:

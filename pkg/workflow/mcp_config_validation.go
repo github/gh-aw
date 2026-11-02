@@ -62,7 +62,13 @@ var builtInToolNamesForError = func() string {
 // It validates MCP server entries (from mcp-servers, merged into tools) but does not check
 // for unknown tool names — that is done earlier by ValidateToolsSection.
 func ValidateMCPConfigs(tools map[string]any) error {
+	_, err := validateMCPConfigsWithWarnings(tools)
+	return err
+}
+
+func validateMCPConfigsWithWarnings(tools map[string]any) ([]string, error) {
 	mcpValidationLog.Printf("Validating MCP configurations for %d tools", len(tools))
+	var warnings []string
 
 	// Collect and sort tool names for deterministic error messages
 	toolNames := sliceutil.SortedKeys(tools)
@@ -86,7 +92,7 @@ func ValidateMCPConfigs(tools map[string]any) error {
 		mcpConfig, err := getRawMCPConfig(config)
 		if err != nil {
 			mcpValidationLog.Printf("Invalid MCP configuration for tool %s: %v", toolName, err)
-			return fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
+			return nil, fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
 		}
 
 		// Skip validation if no MCP configuration found
@@ -100,7 +106,7 @@ func ValidateMCPConfigs(tools map[string]any) error {
 		// Custom validation runs before schema validation to provide better error messages
 		// for the most common mistakes (matching the pattern in ValidateMainWorkflowFrontmatterWithSchemaAndLocation).
 		if err := validateMCPRequirements(toolName, mcpConfig, config); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Run JSON schema validation as a catch-all after custom validation. Build a
@@ -109,12 +115,17 @@ func ValidateMCPConfigs(tools map[string]any) error {
 		// excluded because the schema uses additionalProperties: false.
 		if err := parser.ValidateMCPConfigWithSchema(buildSchemaMCPConfig(config)); err != nil {
 			mcpValidationLog.Printf("JSON schema validation failed for tool %s: %v", toolName, err)
-			return fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
+			return nil, fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
 		}
+		compatibilityWarnings, err := mcpConfigExpressionDiagnostics(toolName, config)
+		if err != nil {
+			return nil, err
+		}
+		warnings = append(warnings, compatibilityWarnings...)
 	}
 
 	mcpValidationLog.Print("MCP configuration validation completed successfully")
-	return nil
+	return warnings, nil
 }
 
 // ValidateToolsSection validates that all entries in the user-facing tools: frontmatter section

@@ -259,9 +259,7 @@ func renderMCPScalarProperty(yaml *strings.Builder, property string, isLast bool
 	case "registry":
 		renderMCPStringScalar(yaml, renderer, "registry", mcpConfig.Registry, isLast)
 	case "caCertFile", "ca_cert_file":
-		value := mcpConfig.CACertFile
-		value = strings.ReplaceAll(value, "${{ github.workspace }}", `\${GITHUB_WORKSPACE}`)
-		value = strings.ReplaceAll(value, "${{ runner.temp }}", `\${RUNNER_TEMP}`)
+		value := replaceMCPCACertFileExpressions(mcpConfig.CACertFile)
 		renderMCPStringScalar(yaml, renderer, property, value, isLast)
 	case "required":
 		if renderer.Format == "json" && mcpConfig.Required != nil && !*mcpConfig.Required {

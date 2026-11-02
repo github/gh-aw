@@ -75,6 +75,13 @@ A schema validator could enforce that all `run:` fields contain no `${{ }}` toke
 3. Existing unescaped `$NAME` and `${NAME}` references **MUST** retain runner-environment expansion through `GH_AW_MCP_ENV_<NAME>` placeholders; missing legacy values retain their previous empty-string behavior. Escaped unbraced `\$NAME` **MUST** become literal `$NAME` data, while escaped braced gateway references remain deferred. Values combining Actions secret/environment expressions with transported expressions or runner references **MUST** transport all their Actions expressions as data, without weakening the runtime reference check.
 4. JSON strings **MUST** be encoded before escaping expanding-heredoc metacharacters, so quotes, backslashes, newlines, dollar signs and backticks cannot become shell source or corrupt JSON.
 5. Because the pinned gateway expands environment references again, startup **MUST** reject any string containing `${NAME}` after compiler-expression or legacy runner-reference substitution, including references assembled across a substitution boundary. The error **MUST NOT** include the runtime value or credential name. Literal placeholder data cannot safely pass through this gateway version; strings combining transported data and remaining authored gateway references are also rejected. Authored gateway passthrough without transported substitutions retains its existing behavior.
+6. Compilation **MUST** reject statically visible combinations of transported data and remaining gateway references before emitting a lock. It **MUST** warn at configuration paths containing unsupported shell computations or parameter operators, without echoing configuration values. These diagnostics **MUST NOT** weaken runtime rejection of references introduced by dynamic values.
+
+### Source Migration
+
+`gh aw fix` **MUST** share the compiler's Bash heredoc and comment boundaries when migrating shell expressions. It **MUST** migrate executable expressions in expanding bodies, including hash-prefixed lines, preserve proven quoted bodies and ordinary comments, and fail atomically with a guided manual-fix diagnostic when heredoc boundaries cannot be proven. PowerShell variable syntax retains its existing migration behavior. General single-quoted shell strings still require manual quote review.
+
+MCP shell computations **SHOULD** be replaced with setup-step outputs or Actions expressions whose inputs are available on the runner. A source codemod **MUST NOT** infer that a deferred gateway variable is a runner variable, or promise that arbitrary runtime values cannot contain gateway placeholder syntax. Regenerated locks **MUST** be deployed with the matching setup runtime.
 
 ### Error Handling
 

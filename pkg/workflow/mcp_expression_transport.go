@@ -15,6 +15,11 @@ const mcpExpressionEnvPrefix = "GH_AW_MCP_EXPR_"
 
 var mcpShellReferencePattern = regexp.MustCompile(`\\?\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))`)
 
+func replaceMCPCACertFileExpressions(value string) string {
+	value = strings.ReplaceAll(value, "${{ github.workspace }}", `\${GITHUB_WORKSPACE}`)
+	return strings.ReplaceAll(value, "${{ runner.temp }}", `\${RUNNER_TEMP}`)
+}
+
 // Unescaped shell references used to expand in the heredoc. Resolve them from
 // the runner environment after JSON parsing instead; escaped gateway references
 // remain deferred to the gateway.
