@@ -9,7 +9,7 @@ import (
 
 // These fixture-shape checks are not compiler acceptance tests.
 func TestSlackWorkflowServiceFixtures(t *testing.T) {
-	for _, name := range []string{"workflow.md", "workflow-trigger-rejected.md"} {
+	for _, name := range []string{"legacy/workflow.md", "legacy/workflow-trigger-rejected.md"} {
 		t.Run(name, func(t *testing.T) {
 			workflow := slackWorkflowFrontmatter(t, name)
 			if workflow["on"] != "workflow_dispatch" {
@@ -21,10 +21,10 @@ func TestSlackWorkflowServiceFixtures(t *testing.T) {
 				}
 			}
 			service := workflow["connectors"].(map[string]any)["slack"].(map[string]any)
-			if service["definition"] != ".github/aw/connectors/slack.yaml" || service["connection"] != "pkg/connectors/testdata/providers/slack/connection.yaml" {
+			if service["definition"] != "pkg/connectors/testdata/providers/slack/spec.yaml" || service["connection"] != "pkg/connectors/testdata/providers/slack/connection.yaml" {
 				t.Fatal("Slack workflow must refer to the real provider and connection fixtures")
 			}
-			if name == "workflow-trigger-rejected.md" {
+			if name == "legacy/workflow-trigger-rejected.md" {
 				if !reflect.DeepEqual(service["on"], []any{"threaded-app-mention"}) || len(service) != 3 {
 					t.Fatal("negative fixture must select only unsupported ingress")
 				}

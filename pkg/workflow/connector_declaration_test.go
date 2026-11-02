@@ -141,6 +141,7 @@ func TestAWConnectorDeclarationRejectsInvalidAuthority(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct{ name, old, replacement, selection, message string }{
 		{"unknown-field", "endpoints:", "unknown-field: true\n        endpoints:", "", "unknown field"},
+		{"old-trigger-definition-key", "triggers:", "\"on\":", "", "unknown field \"on\""},
 		{"removed-context-definition", "endpoints:", "context: {}\n        endpoints:", "", "unknown field"},
 		{"removed-context-credential", "phase: agent", "phase: context", "", "phase"},
 		{"reserved-secret", "EXAMPLE_READ_TOKEN", "GITHUB_TOKEN", "tools:\n  tracker: [get-issue]\n", "non-reserved secret name"},

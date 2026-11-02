@@ -9,16 +9,9 @@ import (
 )
 
 func TestSentryProviderDefinition(t *testing.T) {
-	fixture, err := LoadSpec("testdata/providers/sentry/spec.yaml")
+	definition, err := LoadSpec("testdata/providers/sentry/spec.yaml")
 	if err != nil {
 		t.Fatal(err)
-	}
-	definition, err := LoadSpec("../../.github/aw/connectors/sentry.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(fixture, definition) {
-		t.Fatal("Sentry fixture must match the shipped provider definition")
 	}
 	if definition.ID != "sentry.io/issues" || len(definition.Triggers) != 3 || len(definition.MCP) != 1 || len(definition.HTTPMCP) != 1 || len(definition.SafeOutputs) != 1 || len(definition.Context) != 1 {
 		t.Fatal("Sentry must exercise the four declared capability surfaces")

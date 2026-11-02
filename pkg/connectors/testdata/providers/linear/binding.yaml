@@ -1,6 +1,6 @@
 apiVersion: github.com/gh-aw/connectors/v1
 kind: ConnectorBinding
-definition: .github/aw/connectors/linear.yaml
+definition: pkg/connectors/testdata/providers/linear/spec.yaml
 connection: pkg/connectors/testdata/providers/linear/connection.yaml
 triggers: [issue-created, issue-updated, issue-removed]
 mcp: [get-issue, resolve-team, resolve-project]

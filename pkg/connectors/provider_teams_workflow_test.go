@@ -17,9 +17,9 @@ func TestTeamsWorkflowBlockFixtures(t *testing.T) {
 		file string
 		keys []string
 	}{
-		{"workflow.yaml", []string{"definition", "connection", "tools", "context", "safe-outputs"}},
-		{"workflow-context-only.yaml", []string{"definition", "connection", "context"}},
-		{"workflow-ingress-unavailable.yaml", []string{"definition", "connection", "on"}},
+		{"legacy/workflow.yaml", []string{"definition", "connection", "tools", "context", "safe-outputs"}},
+		{"legacy/workflow-context-only.yaml", []string{"definition", "connection", "context"}},
+		{"legacy/workflow-ingress-unavailable.yaml", []string{"definition", "connection", "on"}},
 	}
 	for _, test := range tests {
 		t.Run(test.file, func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestTeamsWorkflowBlockFixtures(t *testing.T) {
 					t.Fatalf("unexpected selector %q", key)
 				}
 			}
-			if block["definition"] != ".github/aw/connectors/teams.yaml" ||
+			if block["definition"] != "pkg/connectors/testdata/providers/teams/spec.yaml" ||
 				block["connection"] != "pkg/connectors/testdata/providers/teams/connection.yaml" {
 				t.Fatal("definition and connection must use the existing repository-relative files")
 			}
@@ -65,7 +65,7 @@ func TestTeamsWorkflowDeclaredCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, block := teamsWorkflowBlock(t, "workflow.yaml")
+	_, block := teamsWorkflowBlock(t, "legacy/workflow.yaml")
 	for _, value := range block["tools"].([]any) {
 		name := value.(string)
 		if _, ok := spec.MCP[name]; !ok {
@@ -77,7 +77,7 @@ func TestTeamsWorkflowDeclaredCapabilities(t *testing.T) {
 			t.Fatalf("effect %q is not declared in external safeOutputs", value)
 		}
 	}
-	_, ingress := teamsWorkflowBlock(t, "workflow-ingress-unavailable.yaml")
+	_, ingress := teamsWorkflowBlock(t, "legacy/workflow-ingress-unavailable.yaml")
 	for _, value := range ingress["on"].([]any) {
 		if _, ok := spec.Triggers[value.(string)]; !ok {
 			t.Fatalf("native trigger %q is not declared in external triggers", value)
@@ -87,7 +87,7 @@ func TestTeamsWorkflowDeclaredCapabilities(t *testing.T) {
 
 func TestTeamsWorkflowLiteralContext(t *testing.T) {
 	plan := teamsPlan(t)
-	for _, file := range []string{"workflow.yaml", "workflow-context-only.yaml"} {
+	for _, file := range []string{"legacy/workflow.yaml", "legacy/workflow-context-only.yaml"} {
 		t.Run(file, func(t *testing.T) {
 			_, block := teamsWorkflowBlock(t, file)
 			recipes := block["context"].(map[string]any)
@@ -111,12 +111,12 @@ func TestTeamsWorkflowLiteralContext(t *testing.T) {
 	}
 }
 
-func TestTeamsWorkflowDocsMatchFixture(t *testing.T) {
-	doc, err := os.ReadFile("../../docs/src/content/docs/reference/teams-connector.md")
+func TestTeamsMarkdownWorkflowMatchesLegacySelections(t *testing.T) {
+	doc, err := os.ReadFile(teamsFixture + "workflow.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, snippet, ok := strings.Cut(string(doc), "```aw wrap\n---\n")
+	_, snippet, ok := strings.Cut(string(doc), "---\n")
 	if !ok {
 		t.Fatal("missing manual workflow example")
 	}
@@ -128,7 +128,7 @@ func TestTeamsWorkflowDocsMatchFixture(t *testing.T) {
 	if err := connectors.Decode([]byte(frontmatter), &documented); err != nil {
 		t.Fatal(err)
 	}
-	_, fixture := teamsWorkflowBlock(t, "workflow.yaml")
+	_, fixture := teamsWorkflowBlock(t, "legacy/workflow.yaml")
 	if !reflect.DeepEqual(documented["imports"], []any{".github/aw/connectors/teams.md"}) {
 		t.Fatal("documented workflow must import the self-contained Teams Markdown")
 	}

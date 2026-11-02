@@ -2,19 +2,12 @@ package connectors
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestConfluenceConnectorDefinition(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/providers/confluence/spec.yaml")
-	require.NoError(t, err)
-	definition, err := os.ReadFile("../../.github/aw/connectors/confluence.yaml")
-	require.NoError(t, err)
-	require.Equal(t, string(definition), string(fixture), "fixture must exercise the published definition")
-
 	spec, err := LoadSpec("testdata/providers/confluence/spec.yaml")
 	require.NoError(t, err)
 	require.Equal(t, "atlassian.com/confluence", spec.ID)

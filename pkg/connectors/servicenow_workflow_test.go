@@ -12,11 +12,11 @@ func TestServiceNowWorkflowFixtureShape(t *testing.T) {
 		file         string
 		capabilities []string
 	}{
-		{"workflow.md", []string{"tools", "context", "safe-outputs"}},
-		{"workflow-tools-only.md", []string{"tools"}},
-		{"workflow-context-only.md", []string{"context"}},
-		{"workflow-effects-only.md", []string{"safe-outputs"}},
-		{"workflow-ingress-unavailable.md", []string{"on"}},
+		{"legacy/workflow.md", []string{"tools", "context", "safe-outputs"}},
+		{"legacy/workflow-tools-only.md", []string{"tools"}},
+		{"legacy/workflow-context-only.md", []string{"context"}},
+		{"legacy/workflow-effects-only.md", []string{"safe-outputs"}},
+		{"legacy/workflow-ingress-unavailable.md", []string{"on"}},
 	}
 	for _, test := range tests {
 		t.Run(test.file, func(t *testing.T) {
@@ -48,7 +48,7 @@ func TestServiceNowWorkflowFixtureShape(t *testing.T) {
 			if !ok || len(selection) != len(test.capabilities)+2 {
 				t.Fatal("unexpected ServiceNow selectors; omitted capabilities must stay omitted")
 			}
-			if selection["definition"] != ".github/aw/connectors/servicenow.yaml" || selection["connection"] != "pkg/connectors/testdata/providers/servicenow/connection.yaml" {
+			if selection["definition"] != "pkg/connectors/testdata/providers/servicenow/spec.yaml" || selection["connection"] != "pkg/connectors/testdata/providers/servicenow/connection.yaml" {
 				t.Fatal("provider paths must remain repository-relative")
 			}
 			for _, name := range test.capabilities {
@@ -58,7 +58,7 @@ func TestServiceNowWorkflowFixtureShape(t *testing.T) {
 			}
 			if value, ok := selection["context"]; ok {
 				expected := map[string]any{"incident-metadata": map[string]any{"record": serviceNowIncidentID}}
-				if test.file == "workflow-context-only.md" {
+				if test.file == "legacy/workflow-context-only.md" {
 					expected = map[string]any{"requested-item-metadata": map[string]any{"record": serviceNowRequestedItemID}}
 				}
 				if !reflect.DeepEqual(value, expected) {

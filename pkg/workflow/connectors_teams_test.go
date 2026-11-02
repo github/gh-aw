@@ -4,7 +4,6 @@ package workflow
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +18,7 @@ func teamsConnectorCompiler(t *testing.T) (*Compiler, string) {
 	t.Helper()
 	root := t.TempDir()
 	for _, path := range []string{
-		".github/aw/connectors/teams.yaml",
+		"pkg/connectors/testdata/providers/teams/spec.yaml",
 		"pkg/connectors/testdata/providers/teams/connection.yaml",
 	} {
 		data, err := os.ReadFile(filepath.Join("../..", path))
@@ -44,7 +43,7 @@ func teamsConnectorWorkflow(t *testing.T, fixture string) string {
 }
 
 func TestTeamsConnectorWorkflowCompilation(t *testing.T) {
-	for _, fixture := range []string{"workflow.yaml", "workflow-context-only.yaml"} {
+	for _, fixture := range []string{"legacy/workflow.yaml", "legacy/workflow-context-only.yaml"} {
 		t.Run(fixture, func(t *testing.T) {
 			compiler, root := teamsConnectorCompiler(t)
 			path := filepath.Join(root, "teams-proof.md")
@@ -54,7 +53,7 @@ func TestTeamsConnectorWorkflowCompilation(t *testing.T) {
 			require.NotNil(t, config)
 			require.NotNil(t, config.Context)
 			require.Equal(t, []string{"TEAMS_GRAPH_CONTEXT_ACCESS_TOKEN"}, config.Context.Secrets())
-			combined := fixture == "workflow.yaml"
+			combined := fixture == "legacy/workflow.yaml"
 			require.Equal(t, combined, config.Agent != nil)
 			require.Equal(t, combined, config.SafeOutputs != nil)
 			if combined {
@@ -96,14 +95,14 @@ func assertTeamsConnectorJobs(t *testing.T, output string, combined bool) {
 
 func TestTeamsConnectorNativeIngressFailsCompilation(t *testing.T) {
 	compiler, root := teamsConnectorCompiler(t)
-	_, err := compiler.ParseWorkflowString(teamsConnectorWorkflow(t, "workflow-ingress-unavailable.yaml"), filepath.Join(root, "teams-proof.md"))
-	require.True(t, errors.Is(err, connectors.ErrIngressUnavailable), "expected authenticated ingress rejection, got %v", err)
+	_, err := compiler.ParseWorkflowString(teamsConnectorWorkflow(t, "legacy/workflow-ingress-unavailable.yaml"), filepath.Join(root, "teams-proof.md"))
+	require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
 	require.ErrorContains(t, err, "connectors.teams: on:")
 }
 
 func TestTeamsConnectorContextScopeFailsCompilation(t *testing.T) {
 	compiler, root := teamsConnectorCompiler(t)
-	content := strings.Replace(teamsConnectorWorkflow(t, "workflow-context-only.yaml"), "approved-channel", "other-channel", 1)
+	content := strings.Replace(teamsConnectorWorkflow(t, "legacy/workflow-context-only.yaml"), "approved-channel", "other-channel", 1)
 	_, err := compiler.ParseWorkflowString(content, filepath.Join(root, "teams-proof.md"))
 	require.ErrorContains(t, err, "outside approved resources")
 }

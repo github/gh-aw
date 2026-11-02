@@ -38,10 +38,10 @@ func TestServiceNowWorkflowCompilation(t *testing.T) {
 		file                  string
 		tools, context, write bool
 	}{
-		{"workflow.md", true, true, true},
-		{"workflow-tools-only.md", true, false, false},
-		{"workflow-context-only.md", false, true, false},
-		{"workflow-effects-only.md", false, false, true},
+		{"legacy/workflow.md", true, true, true},
+		{"legacy/workflow-tools-only.md", true, false, false},
+		{"legacy/workflow-context-only.md", false, true, false},
+		{"legacy/workflow-effects-only.md", false, false, true},
 	}
 	for _, test := range tests {
 		t.Run(test.file, func(t *testing.T) {
@@ -110,7 +110,7 @@ func assertServiceNowCompiledJobs(t *testing.T, output string, tools, context, w
 }
 
 func TestServiceNowWorkflowIngressRejected(t *testing.T) {
-	compiler, path, content := serviceNowCompilerFixture(t, "workflow-ingress-unavailable.md")
+	compiler, path, content := serviceNowCompilerFixture(t, "legacy/workflow-ingress-unavailable.md")
 	_, err := compiler.ParseWorkflowString(content, path)
 	if !errors.Is(err, connectors.ErrIngressUnavailable) {
 		t.Fatalf("connector subscription must fail closed pending approved ingress: %v", err)
@@ -128,7 +128,7 @@ func TestServiceNowWorkflowInvalidSelections(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			compiler, path, content := serviceNowCompilerFixture(t, "workflow-tools-only.md")
+			compiler, path, content := serviceNowCompilerFixture(t, "legacy/workflow-tools-only.md")
 			content = strings.Replace(content, test.original, test.replacement, 1)
 			if _, err := compiler.ParseWorkflowString(content, path); err == nil {
 				t.Fatal("invalid provider selector accepted")
@@ -137,7 +137,7 @@ func TestServiceNowWorkflowInvalidSelections(t *testing.T) {
 	}
 	for _, replacement := range []string{"INC0009009", serviceNowOtherRecordID} {
 		t.Run("context-record-"+replacement, func(t *testing.T) {
-			compiler, path, content := serviceNowCompilerFixture(t, "workflow-context-only.md")
+			compiler, path, content := serviceNowCompilerFixture(t, "legacy/workflow-context-only.md")
 			content = strings.Replace(content, "fedcba9876543210fedcba9876543210", replacement, 1)
 			if _, err := compiler.ParseWorkflowString(content, path); err == nil {
 				t.Fatal("invalid context target accepted")

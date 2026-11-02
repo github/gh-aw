@@ -19,13 +19,6 @@ func loadSlackSpec(t *testing.T) *ConnectorSpec {
 
 func TestSlackConnectorSpec(t *testing.T) {
 	spec := loadSlackSpec(t)
-	provider, err := LoadSpec("../../.github/aw/connectors/slack.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(spec, provider) {
-		t.Fatal("Slack fixture must match the shipped provider definition")
-	}
 	if spec.ID != "slack.com/threads" || len(spec.Triggers) != 1 || len(spec.MCP) != 1 || len(spec.SafeOutputs) != 1 || len(spec.Context) != 1 {
 		t.Fatal("Slack must exercise all four shared declaration capabilities")
 	}

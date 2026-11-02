@@ -18,7 +18,7 @@ connectors:
         secret: ${{ github.aw.import-inputs.writer-secret }}
     endpoints:
       api: https://api.example.com
-    "on":
+    triggers:
       issue-created:
         match:
           /event: issue.created

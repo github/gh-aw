@@ -56,7 +56,7 @@ func validateSharedConnectorFields(frontmatter map[string]any) error {
 			return fmt.Errorf("connector %q must be an object", alias)
 		}
 		if _, declaration := config["endpoints"]; declaration {
-			for _, field := range []string{"on", "tools", "safe-outputs", "mcp-servers"} {
+			for _, field := range []string{"triggers", "tools", "safe-outputs", "mcp-servers"} {
 				if value, present := config[field]; present {
 					if _, definitions := value.(map[string]any); !definitions {
 						return fmt.Errorf("connector %q: %s must declare capabilities as an object; select capabilities in the main workflow", alias, field)

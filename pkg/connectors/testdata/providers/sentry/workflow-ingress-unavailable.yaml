@@ -1,9 +1,0 @@
-on: workflow_dispatch
-engine: copilot
-permissions:
-  contents: read
-connectors:
-  sentry:
-    definition: .github/aw/connectors/sentry.yaml
-    connection: pkg/connectors/testdata/providers/sentry/connection.yaml
-    on: [error-created, error-regressed]

@@ -14896,7 +14896,7 @@
           }
         },
         "resources": { "type": "object", "additionalProperties": { "type": "array", "minItems": 1, "items": { "type": "string" } } },
-        "on": { "$ref": "#/$defs/connectorDefinitions" },
+        "triggers": { "$ref": "#/$defs/connectorDefinitions" },
         "tools": { "$ref": "#/$defs/connectorDefinitions" },
         "mcp-servers": { "$ref": "#/$defs/connectorDefinitions" },
         "safe-outputs": { "$ref": "#/$defs/connectorDefinitions" }

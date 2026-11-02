@@ -41,7 +41,7 @@ connectors:
             resources:
               id: issues
         url: https://mcp.linear.app/mcp/readonly
-    "on":
+    triggers:
       issue-created:
         match:
           /action: create

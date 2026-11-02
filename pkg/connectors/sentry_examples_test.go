@@ -8,7 +8,7 @@ import (
 
 // These artifact checks do not replace compilation with the new shared compiler.
 func TestSentryWorkflowSelectionArtifacts(t *testing.T) {
-	for _, file := range []string{"workflow.yaml", "workflow-tools-only.yaml", "workflow-ingress-unavailable.yaml"} {
+	for _, file := range []string{"legacy/workflow.yaml", "legacy/workflow-tools-only.yaml", "legacy/workflow-ingress-unavailable.yaml"} {
 		t.Run(file, func(t *testing.T) {
 			data, err := os.ReadFile("testdata/providers/sentry/" + file)
 			if err != nil {
@@ -35,7 +35,7 @@ func TestSentryWorkflowSelectionArtifacts(t *testing.T) {
 			if !ok {
 				t.Fatal("expected Sentry instance")
 			}
-			if selection["definition"] != ".github/aw/connectors/sentry.yaml" || selection["connection"] != "pkg/connectors/testdata/providers/sentry/connection.yaml" {
+			if selection["definition"] != "pkg/connectors/testdata/providers/sentry/spec.yaml" || selection["connection"] != "pkg/connectors/testdata/providers/sentry/connection.yaml" {
 				t.Fatal("connector paths must remain repository-relative")
 			}
 			assertSentryArtifactSelection(t, file, selection)
@@ -45,7 +45,7 @@ func TestSentryWorkflowSelectionArtifacts(t *testing.T) {
 
 func assertSentryArtifactSelection(t *testing.T, file string, selection map[string]any) {
 	t.Helper()
-	if file == "workflow-ingress-unavailable.yaml" {
+	if file == "legacy/workflow-ingress-unavailable.yaml" {
 		if !reflect.DeepEqual(selection["on"], []any{"error-created", "error-regressed"}) || len(selection) != 3 {
 			t.Fatal("negative ingress example must select only native triggers")
 		}
@@ -54,7 +54,7 @@ func assertSentryArtifactSelection(t *testing.T, file string, selection map[stri
 	if !reflect.DeepEqual(selection["tools"], []any{"get-issue"}) {
 		t.Fatal("manual examples must select the declared REST read")
 	}
-	if file == "workflow-tools-only.yaml" {
+	if file == "legacy/workflow-tools-only.yaml" {
 		if len(selection) != 3 {
 			t.Fatal("omitted capabilities must not gain implicit selections")
 		}

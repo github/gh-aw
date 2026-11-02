@@ -18,7 +18,7 @@ connectors:
         secret: ${{ github.aw.import-inputs.writer-secret }}
     endpoints:
       instance: https://example.service-now.com
-    "on":
+    triggers:
       incident-updated:
         match:
           /event: record.updated

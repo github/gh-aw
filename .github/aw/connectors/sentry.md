@@ -48,7 +48,7 @@ connectors:
               issueId: issues
               organizationSlug: organizations
         url: https://mcp.sentry.dev/mcp/example-org/example-project
-    "on":
+    triggers:
       error-created:
         match:
           /action: created

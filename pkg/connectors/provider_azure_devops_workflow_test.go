@@ -25,7 +25,7 @@ func azureDevOpsWorkflowFrontmatter(t *testing.T, name string) map[string]any {
 }
 
 func TestAzureDevOpsProviderUnifiedWorkflowFixture(t *testing.T) {
-	document := azureDevOpsWorkflowFrontmatter(t, "workflow.md")
+	document := azureDevOpsWorkflowFrontmatter(t, "legacy/workflow.md")
 	if document["on"] != "workflow_dispatch" {
 		t.Fatal("runnable fixture must use ordinary manual dispatch, not connector ingress")
 	}
@@ -42,7 +42,7 @@ func TestAzureDevOpsProviderUnifiedWorkflowFixture(t *testing.T) {
 	if !ok || len(entry) != 5 {
 		t.Fatal("fixture requires definition, connection, tools, context and safe-outputs")
 	}
-	if entry["definition"] != ".github/aw/connectors/azure-devops.yaml" || entry["connection"] != "pkg/connectors/testdata/providers/azure-devops/connection.yaml" {
+	if entry["definition"] != "pkg/connectors/testdata/providers/azure-devops/spec.yaml" || entry["connection"] != "pkg/connectors/testdata/providers/azure-devops/connection.yaml" {
 		t.Fatal("workflow must reference repository-relative external v1 documents")
 	}
 	if _, exists := entry["on"]; exists {
@@ -58,7 +58,7 @@ func TestAzureDevOpsProviderUnifiedWorkflowFixture(t *testing.T) {
 }
 
 func TestAzureDevOpsProviderIngressOnlyWorkflowFixture(t *testing.T) {
-	document := azureDevOpsWorkflowFrontmatter(t, "ingress-unavailable.md")
+	document := azureDevOpsWorkflowFrontmatter(t, "legacy/ingress-unavailable.md")
 	connectors, ok := document["connectors"].(map[string]any)
 	if !ok || len(document) != 1 {
 		t.Fatal("negative fixture must select connector ingress only")

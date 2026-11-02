@@ -18,7 +18,7 @@ connectors:
         secret: ${{ github.aw.import-inputs.writer-secret }}
     endpoints:
       api: https://slack.com
-    "on":
+    triggers:
       threaded-app-mention:
         match:
           /api_app_id: A123ABC456

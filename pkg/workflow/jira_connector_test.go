@@ -20,7 +20,7 @@ func jiraConnectorCompiler(t *testing.T, fixture string) (*Compiler, string, str
 	root := t.TempDir()
 	provider := filepath.Join("..", "connectors", "testdata", "providers", "jira")
 	for source, target := range map[string]string{
-		filepath.Join(provider, "spec.yaml"):       ".github/aw/connectors/jira.yaml",
+		filepath.Join(provider, "spec.yaml"):       "pkg/connectors/testdata/providers/jira/spec.yaml",
 		filepath.Join(provider, "connection.yaml"): "pkg/connectors/testdata/providers/jira/connection.yaml",
 	} {
 		data, err := os.ReadFile(source)
@@ -39,7 +39,7 @@ func jiraConnectorCompiler(t *testing.T, fixture string) (*Compiler, string, str
 }
 
 func TestJiraConnectorWorkflowCompilation(t *testing.T) {
-	c, root, content := jiraConnectorCompiler(t, "workflow.md")
+	c, root, content := jiraConnectorCompiler(t, "legacy/workflow.md")
 	data, err := c.ParseWorkflowString(content, filepath.Join(root, "jira.md"))
 	require.NoError(t, err)
 	require.Contains(t, data.Connectors, "jira")
@@ -85,7 +85,7 @@ func TestJiraConnectorIndependentSelections(t *testing.T) {
 		{"safe-outputs", "    safe-outputs: [create-issue, update-issue, add-comment, add-label]\n", false, false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			c, root, content := jiraConnectorCompiler(t, "workflow.md")
+			c, root, content := jiraConnectorCompiler(t, "legacy/workflow.md")
 			require.Contains(t, content, jiraWorkflowSelections)
 			content = strings.Replace(content, jiraWorkflowSelections, test.selection, 1)
 			data, err := c.ParseWorkflowString(content, filepath.Join(root, "jira.md"))
@@ -129,7 +129,7 @@ func TestJiraConnectorCompilationRejections(t *testing.T) {
 		{"undeclared-effect", "    safe-outputs: [transition-issue]\n", "unknown safe-output"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			c, root, content := jiraConnectorCompiler(t, "workflow.md")
+			c, root, content := jiraConnectorCompiler(t, "legacy/workflow.md")
 			content = strings.Replace(content, jiraWorkflowSelections, test.selection, 1)
 			_, err := c.ParseWorkflowString(content, filepath.Join(root, "jira.md"))
 			require.Error(t, err)
@@ -139,7 +139,7 @@ func TestJiraConnectorCompilationRejections(t *testing.T) {
 		})
 	}
 	t.Run("authenticated-ingress-required", func(t *testing.T) {
-		c, root, content := jiraConnectorCompiler(t, "workflow-trigger-unavailable.md")
+		c, root, content := jiraConnectorCompiler(t, "legacy/workflow-trigger-unavailable.md")
 		_, err := c.ParseWorkflowString(content, filepath.Join(root, "jira.md"))
 		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
 		assert.ErrorContains(t, err, "connectors.jira: on:")
@@ -150,7 +150,7 @@ func TestJiraConnectorCompilationRejections(t *testing.T) {
 		"on:\n  connectors: [jira]\n",
 	} {
 		t.Run("scattered-"+strings.Split(root, ":")[0], func(t *testing.T) {
-			c, directory, content := jiraConnectorCompiler(t, "workflow.md")
+			c, directory, content := jiraConnectorCompiler(t, "legacy/workflow.md")
 			content = strings.Replace(content, jiraWorkflowSelections, "", 1)
 			content = strings.Replace(content, "on: workflow_dispatch\n", root, 1)
 			if !strings.HasPrefix(root, "on:") {

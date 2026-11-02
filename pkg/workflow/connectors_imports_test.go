@@ -11,7 +11,6 @@ import (
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v3"
 )
 
 const connectorImportHeader = `---
@@ -205,89 +204,119 @@ func TestConnectorPrefixesRejectAmbiguousAndReservedNames(t *testing.T) {
 
 func TestConnectorImportAllProviderWrappers(t *testing.T) {
 	t.Parallel()
+	doc, err := os.ReadFile("../../docs/src/content/docs/reference/connectors.md")
+	require.NoError(t, err)
+	_, snippet, found := strings.Cut(string(doc), "```aw wrap\n")
+	require.True(t, found)
+	snippet, _, found = strings.Cut(snippet, "```")
+	require.True(t, found)
 	for _, provider := range []string{"linear", "jira", "azure-devops", "slack", "teams", "confluence", "sentry", "servicenow"} {
 		t.Run(provider, func(t *testing.T) {
 			root := t.TempDir()
-			fixture := filepath.Join("../connectors/testdata/providers", provider)
-			require.NoError(t, os.CopyFS(root, os.DirFS(fixture)))
 			dir := filepath.Join(root, ".github/aw/connectors")
 			require.NoError(t, os.MkdirAll(dir, 0700))
 			wrapper, err := os.ReadFile(filepath.Join("../../.github/aw/connectors", provider+".md"))
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, provider+".md"), wrapper, 0600))
-			content := providerNativeImportWorkflow(t, root, provider)
-			require.NoError(t, os.Remove(filepath.Join(root, "spec.yaml")))
-			require.NoError(t, os.Remove(filepath.Join(root, "connection.yaml")))
-			c := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
-			c.gitRoot = root
-			c.SetActionMode(ActionModeDev)
-			c.version = "v0.0.0-1-g683ddf9617"
-			path := filepath.Join(root, "proof.md")
-			data, err := c.ParseWorkflowString(content, path)
+			fixtureDir := filepath.Join("../connectors/testdata/providers", provider)
+			fixture, err := os.ReadFile(filepath.Join(fixtureDir, "workflow.md"))
 			require.NoError(t, err)
-			require.Contains(t, data.Connectors, provider)
-			_, err = c.CompileToYAML(data, path)
+			negative, err := os.ReadFile(filepath.Join(fixtureDir, "workflow-ingress-unavailable.md"))
 			require.NoError(t, err)
-
-			doc, err := os.ReadFile(filepath.Join("../../docs/src/content/docs/reference", provider+"-connector.md"))
-			require.NoError(t, err)
-			_, snippet, found := strings.Cut(string(doc), "```aw wrap\n")
-			require.True(t, found)
-			snippet, _, found = strings.Cut(snippet, "```")
-			require.True(t, found)
-			documented, err := c.ParseWorkflowString(snippet, path)
-			require.NoError(t, err, "documented workflow must compile without external definition or connection files")
-			require.NotNil(t, documented.Connectors[provider])
-			assert.Nil(t, documented.Connectors[provider].Context)
-			_, err = c.CompileToYAML(documented, path)
-			require.NoError(t, err)
+			workflows := filepath.Join(root, ".github/workflows")
+			require.NoError(t, os.MkdirAll(workflows, 0700))
+			sources := []struct {
+				name, content string
+				reject        bool
+			}{
+				{"fixture", string(fixture), false},
+				{"unavailable-ingress", string(negative), true},
+			}
+			if provider == "linear" {
+				sources = append(sources, struct {
+					name, content string
+					reject        bool
+				}{"documentation", snippet, false})
+			}
+			for _, source := range sources {
+				t.Run(source.name, func(t *testing.T) {
+					c := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
+					c.gitRoot = root
+					c.SetActionMode(ActionModeDev)
+					c.version = "v0.0.0-1-g683ddf9617"
+					path := filepath.Join(workflows, source.name+".md")
+					require.NoError(t, os.WriteFile(path, []byte(source.content), 0600))
+					data, err := c.ParseWorkflowFile(path)
+					if source.reject {
+						require.ErrorContains(t, err, "ingress is not operational")
+						return
+					}
+					require.NoError(t, err, "ordinary Markdown imports must compile without external definition or connection files")
+					require.NotNil(t, data.Connectors[provider])
+					assert.Nil(t, data.Connectors[provider].Context)
+					_, err = c.CompileToYAML(data, path)
+					require.NoError(t, err)
+				})
+			}
 		})
 	}
 }
 
-func providerNativeImportWorkflow(t *testing.T, root, provider string) string {
-	t.Helper()
-	content, err := os.ReadFile(filepath.Join(root, "workflow.md"))
-	if os.IsNotExist(err) {
-		content, err = os.ReadFile(filepath.Join(root, "workflow.yaml"))
-	}
+func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
+	t.Parallel()
+	doc, err := os.ReadFile("../../docs/src/content/docs/reference/connectors.md")
 	require.NoError(t, err)
-	var frontmatter map[string]any
-	if strings.HasPrefix(string(content), "---") {
-		parsed, err := parser.ExtractFrontmatterFromContent(string(content))
-		require.NoError(t, err)
-		frontmatter = parsed.Frontmatter
-	} else {
-		require.NoError(t, yaml.Unmarshal(content, &frontmatter))
-	}
-	registrations, ok := frontmatter["connectors"].(map[string]any)
-	require.True(t, ok)
-	require.Len(t, registrations, 1)
-	var selected map[string]any
-	for _, config := range registrations {
-		selected, ok = config.(map[string]any)
-		require.True(t, ok)
-	}
-	native := map[string]any{
-		"on": "workflow_dispatch", "engine": "copilot",
-		"permissions": map[string]any{"contents": "read"},
-		"imports": []any{map[string]any{
-			"uses": ".github/aw/connectors/" + provider + ".md",
-		}},
-	}
-	if tools, exists := selected["tools"]; exists {
-		native["tools"] = map[string]any{provider: tools}
-	}
-	if effects, ok := selected["safe-outputs"].([]any); ok {
-		qualified := map[string]any{}
-		for _, effect := range effects {
-			name, ok := effect.(string)
-			require.True(t, ok)
-			qualified[provider+"-"+name] = nil
+	files, err := filepath.Glob("../../.github/aw/connectors/*.md")
+	require.NoError(t, err)
+	for _, file := range files {
+		provider := strings.TrimSuffix(filepath.Base(file), ".md")
+		if provider == "example" {
+			continue
 		}
-		native["safe-outputs"] = qualified
+		t.Run(provider, func(t *testing.T) {
+			_, section, found := strings.Cut(string(doc), "Declaration: `.github/aw/connectors/"+provider+".md`.")
+			require.True(t, found, "the consolidated reference must document every provider")
+			section, _, _ = strings.Cut(section, "\n## ")
+			for _, surface := range []string{"### Secrets", "| Triggers |", "| MCPs/read tools |", "| Safe outputs |", "| Context |"} {
+				assert.Contains(t, section, surface)
+			}
+			data, err := os.ReadFile(file)
+			require.NoError(t, err)
+			frontmatter, err := parser.ExtractFrontmatterFromContent(string(data))
+			require.NoError(t, err)
+			declarations, ok := frontmatter.Frontmatter["connectors"].(map[string]any)
+			require.True(t, ok)
+			declaration, ok := declarations[provider].(map[string]any)
+			require.True(t, ok)
+			for field, prefix := range map[string]string{"triggers": provider + "-", "tools": "", "mcp-servers": "", "safe-outputs": provider + "-"} {
+				value, present := declaration[field]
+				if !present {
+					continue
+				}
+				capabilities, ok := value.(map[string]any)
+				require.True(t, ok)
+				for name := range capabilities {
+					assert.Contains(t, section, "`"+prefix+name+"`")
+				}
+			}
+			inputs, ok := frontmatter.Frontmatter["import-schema"].(map[string]any)
+			require.True(t, ok)
+			for _, value := range inputs {
+				input, ok := value.(map[string]any)
+				require.True(t, ok)
+				name, ok := input["default"].(string)
+				require.True(t, ok)
+				assert.Contains(t, section, "`"+name+"`", "document the credential defaults actually shipped")
+			}
+		})
 	}
-	encoded, err := yaml.Marshal(native)
-	require.NoError(t, err)
-	return "---\n" + string(encoded) + "---\nUse only explicitly selected provider capabilities.\n"
+}
+
+func TestConnectorAuthoringUsesOnlyMarkdown(t *testing.T) {
+	t.Parallel()
+	for _, extension := range []string{"yaml", "yml"} {
+		files, err := filepath.Glob("../../.github/aw/connectors/*." + extension)
+		require.NoError(t, err)
+		assert.Empty(t, files, "author connectors in AW Markdown; keep versioned runtime documents under testdata")
+	}
 }

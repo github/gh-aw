@@ -1,25 +1,12 @@
 package connectors
 
 import (
-	"bytes"
 	"net/http"
-	"os"
 	"reflect"
 	"testing"
 )
 
 func TestServiceNowDefinition(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/providers/servicenow/spec.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	definition, err := os.ReadFile("../../.github/aw/connectors/servicenow.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(fixture, definition) {
-		t.Fatal("provider fixture must match the published definition")
-	}
 	spec, err := LoadSpec("testdata/providers/servicenow/spec.yaml")
 	if err != nil {
 		t.Fatal(err)

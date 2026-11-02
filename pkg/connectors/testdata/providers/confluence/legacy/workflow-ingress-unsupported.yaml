@@ -1,0 +1,8 @@
+on: workflow_dispatch
+permissions:
+  contents: read
+connectors:
+  confluence:
+    definition: pkg/connectors/testdata/providers/confluence/spec.yaml
+    connection: pkg/connectors/testdata/providers/confluence/connection.yaml
+    on: [page-created]

@@ -5,7 +5,7 @@ package workflow
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +20,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const connectorAssemblyFixture = "testdata/connector-assembly"
+const connectorAssemblyFixture = "testdata/connector-assembly-legacy"
 
 type assemblySelection struct {
 	Definition  string                    `yaml:"definition"`
@@ -215,7 +215,7 @@ func TestConnectorAssemblyExampleTLSExecution(t *testing.T) {
 					"safe-output": "ASSEMBLY_WRITE_TOKEN",
 				}
 				if requestedPhase != phase || name != expected[phase] {
-					return "", fmt.Errorf("credential crossed phase boundary")
+					return "", errors.New("credential crossed phase boundary")
 				}
 				resolutions++
 				return "fixture-" + phase, nil

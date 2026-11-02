@@ -9,7 +9,7 @@ import (
 
 // This checks provider fixture intent, not compiler support for the new grammar.
 func TestConfluenceConnectorGroupedWorkflowFixtures(t *testing.T) {
-	for _, file := range []string{"workflow.yaml", "workflow-ingress-unsupported.yaml"} {
+	for _, file := range []string{"legacy/workflow.yaml", "legacy/workflow-ingress-unsupported.yaml"} {
 		t.Run(file, func(t *testing.T) {
 			data, err := os.ReadFile("testdata/providers/confluence/" + file)
 			require.NoError(t, err)
@@ -22,10 +22,10 @@ func TestConfluenceConnectorGroupedWorkflowFixtures(t *testing.T) {
 			require.True(t, ok)
 			provider, ok := grouped["confluence"].(map[string]any)
 			require.True(t, ok)
-			require.Equal(t, ".github/aw/connectors/confluence.yaml", provider["definition"])
+			require.Equal(t, "pkg/connectors/testdata/providers/confluence/spec.yaml", provider["definition"])
 			require.Equal(t, "pkg/connectors/testdata/providers/confluence/connection.yaml", provider["connection"])
 			plan := confluenceFixturePlan(t, "")
-			if file == "workflow-ingress-unsupported.yaml" {
+			if file == "legacy/workflow-ingress-unsupported.yaml" {
 				require.Equal(t, []any{"page-created"}, provider["on"])
 				require.NotContains(t, provider, "tools")
 				require.NotContains(t, provider, "context")

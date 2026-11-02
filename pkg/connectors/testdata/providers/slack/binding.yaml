@@ -1,6 +1,6 @@
 apiVersion: github.com/gh-aw/connectors/v1
 kind: ConnectorBinding
-definition: .github/aw/connectors/slack.yaml
+definition: pkg/connectors/testdata/providers/slack/spec.yaml
 connection: pkg/connectors/testdata/providers/slack/connection.yaml
 triggers: [threaded-app-mention]
 mcp: [read-thread]

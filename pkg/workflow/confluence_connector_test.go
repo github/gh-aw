@@ -44,7 +44,7 @@ func parseConfluenceWorkflow(t *testing.T, document map[string]any) (*Compiler, 
 func TestConfluenceConnectorGroupedCompilation(t *testing.T) {
 	for _, selection := range []string{"combined", "tools", "context", "safe-outputs", "registration"} {
 		t.Run(selection, func(t *testing.T) {
-			document, provider := confluenceWorkflowFixture(t, "workflow.yaml")
+			document, provider := confluenceWorkflowFixture(t, "legacy/workflow.yaml")
 			for _, name := range []string{"tools", "context", "safe-outputs"} {
 				if selection != "combined" && selection != name {
 					delete(provider, name)
@@ -94,9 +94,9 @@ func TestConfluenceConnectorGroupedCompilation(t *testing.T) {
 func TestConfluenceConnectorCompilationFailures(t *testing.T) {
 	for _, failure := range []string{"ingress", "unknown-tool", "unknown-effect", "out-of-scope-context", "scattered-tools", "scattered-on", "scattered-effects"} {
 		t.Run(failure, func(t *testing.T) {
-			file := "workflow.yaml"
+			file := "legacy/workflow.yaml"
 			if failure == "ingress" {
-				file = "workflow-ingress-unsupported.yaml"
+				file = "legacy/workflow-ingress-unsupported.yaml"
 			}
 			document, provider := confluenceWorkflowFixture(t, file)
 			switch failure {

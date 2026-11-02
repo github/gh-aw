@@ -1,6 +1,6 @@
 apiVersion: github.com/gh-aw/connectors/v1
 kind: ConnectorBinding
-definition: .github/aw/connectors/confluence.yaml
+definition: pkg/connectors/testdata/providers/confluence/spec.yaml
 connection: pkg/connectors/testdata/providers/confluence/connection.yaml
 triggers: [page-created, page-updated]
 mcp: [get-page]

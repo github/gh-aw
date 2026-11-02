@@ -9,8 +9,7 @@ import (
 	"github.com/github/gh-aw/pkg/connectors"
 )
 
-const linearDefinition = "../../.github/aw/connectors/linear.yaml"
-const linearFixture = "testdata/providers/linear/spec.yaml"
+const linearDefinition = "testdata/providers/linear/spec.yaml"
 
 func loadLinear(t *testing.T) *connectors.ConnectorSpec {
 	t.Helper()
@@ -23,13 +22,6 @@ func loadLinear(t *testing.T) *connectors.ConnectorSpec {
 
 func TestLinearConnectorDefinition(t *testing.T) {
 	spec := loadLinear(t)
-	fixture, err := connectors.LoadSpec(linearFixture)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(spec, fixture) {
-		t.Fatal("provider fixture must exercise the actual external manifest")
-	}
 	if spec.ID != "linear.app/issues" || len(spec.Triggers) != 3 || len(spec.MCP) != 3 || len(spec.HTTPMCP) != 1 || len(spec.SafeOutputs) != 3 || len(spec.Context) != 1 {
 		t.Fatal("Linear must exercise all four capability types")
 	}
@@ -155,7 +147,7 @@ func TestLinearConnectorRejectsInvalidDefinitions(t *testing.T) {
 func TestLinearConnectorRejectsWildcardConnection(t *testing.T) {
 	binding := connectors.Binding{
 		APIVersion: connectors.APIVersion, Kind: "ConnectorBinding",
-		Definition: ".github/aw/connectors/linear.yaml",
+		Definition: "pkg/connectors/testdata/providers/linear/spec.yaml",
 		Connection: "pkg/connectors/testdata/providers/linear/connection-invalid.yaml",
 		MCP:        []string{"get-issue"},
 	}

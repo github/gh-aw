@@ -19,7 +19,7 @@ connectors:
     endpoints:
       bot: https://smba.trafficmanager.net
       graph: https://graph.microsoft.com
-    "on":
+    triggers:
       channel-message-created:
         match:
           /changeType: created

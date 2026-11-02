@@ -20,7 +20,7 @@ safe-outputs:
   tracker-add-comment:
 ```
 
-Declarations use the same section names as AW. Capability maps define APIs;
+Declarations use AW capability sections and `triggers` for event definitions. Capability maps define APIs;
 the root workflow selects them. A minimal direct or imported declaration is:
 
 ```yaml
@@ -52,7 +52,7 @@ connectors:
         maxResponseBytes: 65536
 ```
 
-`on`, `tools`, `mcp-servers`, and `safe-outputs` inside the declaration
+`triggers`, `tools`, `mcp-servers`, and `safe-outputs` inside the declaration
 are maps of trigger, REST read-tool, HTTP MCP, and effect definitions.
 Importing or declaring them grants nothing. Root workflow selections use
 `tools.<alias>`

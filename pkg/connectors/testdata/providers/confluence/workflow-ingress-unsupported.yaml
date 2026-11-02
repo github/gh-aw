@@ -1,8 +1,0 @@
-on: workflow_dispatch
-permissions:
-  contents: read
-connectors:
-  confluence:
-    definition: .github/aw/connectors/confluence.yaml
-    connection: pkg/connectors/testdata/providers/confluence/connection.yaml
-    on: [page-created]

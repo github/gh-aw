@@ -25,7 +25,7 @@ func jiraWorkflowFrontmatter(t *testing.T, name string) map[string]any {
 }
 
 func TestJiraProviderWorkflowSelections(t *testing.T) {
-	document := jiraWorkflowFrontmatter(t, "workflow.md")
+	document := jiraWorkflowFrontmatter(t, "legacy/workflow.md")
 	if document["on"] != "workflow_dispatch" {
 		t.Fatal("the runnable example must use the manual workflow trigger")
 	}
@@ -34,7 +34,7 @@ func TestJiraProviderWorkflowSelections(t *testing.T) {
 		t.Fatal("all Jira selections must be under one named service block")
 	}
 	want := map[string]any{
-		"definition":   ".github/aw/connectors/jira.yaml",
+		"definition":   "pkg/connectors/testdata/providers/jira/spec.yaml",
 		"connection":   "pkg/connectors/testdata/providers/jira/connection.yaml",
 		"tools":        []any{"service-account"},
 		"context":      map[string]any{"issue-details": map[string]any{"issue": "APP-1"}},
@@ -51,7 +51,7 @@ func TestJiraProviderWorkflowSelections(t *testing.T) {
 }
 
 func TestJiraProviderWorkflowIngressFixture(t *testing.T) {
-	document := jiraWorkflowFrontmatter(t, "workflow-trigger-unavailable.md")
+	document := jiraWorkflowFrontmatter(t, "legacy/workflow-trigger-unavailable.md")
 	if document["on"] != "workflow_dispatch" {
 		t.Fatal("root workflow trigger must remain independent from connector events")
 	}
@@ -60,7 +60,7 @@ func TestJiraProviderWorkflowIngressFixture(t *testing.T) {
 		t.Fatal("missing connector service block")
 	}
 	want := map[string]any{
-		"definition": ".github/aw/connectors/jira.yaml",
+		"definition": "pkg/connectors/testdata/providers/jira/spec.yaml",
 		"connection": "pkg/connectors/testdata/providers/jira/connection.yaml",
 		"on":         []any{"issue-created"},
 	}

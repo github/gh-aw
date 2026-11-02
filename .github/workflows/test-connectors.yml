@@ -1,0 +1,93 @@
+name: Test Connectors
+
+on:
+  pull_request:
+    paths:
+      - '.github/aw/connectors/**'
+      - '.github/workflows/test-connectors.yml'
+      - 'pkg/connectors/**'
+      - 'pkg/workflow/*connector*'
+      - 'pkg/parser/*connector*'
+      - 'pkg/parser/schemas/main_workflow_schema.json'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    paths:
+      - '.github/aw/connectors/**'
+      - '.github/workflows/test-connectors.yml'
+      - 'pkg/connectors/**'
+      - 'pkg/workflow/*connector*'
+      - 'pkg/parser/*connector*'
+      - 'pkg/parser/schemas/main_workflow_schema.json'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Optional read-only live check; offline tests always run
+        type: choice
+        options: [none, linear, jira, azure-devops]
+        default: none
+      resource_id:
+        description: Approved Linear issue UUID or Jira issue key
+        type: string
+      scope_id:
+        description: Linear organization UUID or Jira cloud ID
+        type: string
+      organization:
+        description: Azure DevOps organization name (not a URL)
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Offline connector conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Test scoped runtimes and provider fixtures
+        run: go test -race ./pkg/connectors -count=1 -timeout=5m
+      - name: Test Markdown imports, compiler, schema, and CLI
+        run: go test ./pkg/workflow ./pkg/parser ./pkg/cli -run Connector -count=1 -timeout=5m
+
+  live:
+    name: Explicit read-only provider smoke test
+    if: >-
+      !github.event.repository.fork &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.provider != 'none'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ${{ fromJSON(github.event_name == 'workflow_dispatch' && format('["{0}"]', inputs.provider) || '["linear","jira"]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Read through the compiled connector plan
+        env:
+          GH_AW_CONNECTOR_PROVIDER: ${{ matrix.provider }}
+          GH_AW_CONNECTOR_RESOURCE_ID: ${{ inputs.resource_id }}
+          GH_AW_CONNECTOR_SCOPE_ID: ${{ inputs.scope_id }}
+          GH_AW_CONNECTOR_ORGANIZATION: ${{ inputs.organization }}
+          LINEAR_READ_API_KEY: ${{ matrix.provider == 'linear' && secrets.LINEAR_API_KEY || '' }}
+          LINEAR_TEAM_ID: ${{ matrix.provider == 'linear' && secrets.LINEAR_TEAM_ID || '' }}
+          JIRA_USER_EMAIL: ${{ matrix.provider == 'jira' && secrets.JIRA_USER_EMAIL || '' }}
+          JIRA_API_TOKEN: ${{ matrix.provider == 'jira' && secrets.JIRA_API_TOKEN || '' }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL || 'https://pelidehalleux.atlassian.net' }}
+          JIRA_PROJECT_KEY: ${{ vars.JIRA_PROJECT_KEY || 'KAN' }}
+          AZURE_DEVOPS_MCP_ENTRA_TOKEN: ${{ matrix.provider == 'azure-devops' && secrets.AZURE_DEVOPS_MCP_ENTRA_TOKEN || '' }}
+        run: go test ./pkg/workflow -run '^TestConnectorLiveProvider$' -v -count=1 -timeout=90s

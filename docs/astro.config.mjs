@@ -262,6 +262,18 @@ export default defineConfig({
     "/reference/enclaves/": "/gh-aw/experimental/enclaves/",
     "/reference/lockdown-mode/": "/gh-aw/reference/integrity/",
     "/reference/repository-package-manifest/": "/gh-aw/reference/aw-yml-package-manifest/",
+
+    // Connector documentation has its own section.
+    "/reference/connector-validation/": "/gh-aw/reference/connectors/",
+    "/reference/connector-assembly/": "/gh-aw/reference/connectors/#configuration",
+    "/reference/linear-connector/": "/gh-aw/reference/connectors/#linear",
+    "/reference/jira-connector/": "/gh-aw/reference/connectors/#jira",
+    "/reference/azure-devops-connector/": "/gh-aw/reference/connectors/#azure-devops",
+    "/reference/slack-connector/": "/gh-aw/reference/connectors/#slack",
+    "/reference/teams-connector/": "/gh-aw/reference/connectors/#microsoft-teams",
+    "/reference/confluence-connector/": "/gh-aw/reference/connectors/#confluence",
+    "/reference/sentry-connector/": "/gh-aw/reference/connectors/#sentry",
+    "/reference/servicenow-connector/": "/gh-aw/reference/connectors/#servicenow",
   },
   integrations: [
     // Dev-only pages for the social preview images (see scripts/capture-og.mjs).
@@ -593,6 +605,7 @@ export default defineConfig({
             { label: "WASM Compilation", link: "/reference/wasm-compilation/" },
           ],
         },
+        { label: "Connectors", link: "/reference/connectors/" },
         { label: "Agent Factory", link: "/agent-factory-status/" },
         { label: "Editors", link: "/reference/editors/" },
         { label: "About", link: "/about/" },

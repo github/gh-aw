@@ -25,7 +25,7 @@ connectors:
         secret: ${{ github.aw.import-inputs.reader-secret }}
     endpoints:
       api: https://api.atlassian.com
-    "on":
+    triggers:
       page-created:
         match:
           /content/status: current

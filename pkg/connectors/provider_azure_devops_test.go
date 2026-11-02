@@ -20,13 +20,6 @@ func loadAzureDevOpsSpec(t *testing.T) *ConnectorSpec {
 
 func TestAzureDevOpsProviderDefinition(t *testing.T) {
 	spec := loadAzureDevOpsSpec(t)
-	external, err := LoadSpec("../../.github/aw/connectors/azure-devops.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(spec, external) {
-		t.Fatal("provider fixture drifted from the external definition")
-	}
 	for _, name := range []string{"created", "updated", "deleted", "restored"} {
 		trigger := spec.Triggers["work-item-"+name]
 		if !reflect.DeepEqual(trigger.NativeEvents, []string{"workitem." + name}) {

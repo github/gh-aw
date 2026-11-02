@@ -104,7 +104,7 @@ connectors:
               cloudId: cloud-ids
               jql: queries
         url: https://mcp.atlassian.com/v2/mcp
-    "on":
+    triggers:
       issue-created:
         match:
           /issue/fields/project/key: APP

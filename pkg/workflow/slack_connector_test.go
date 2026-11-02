@@ -17,7 +17,7 @@ func slackConnectorCompiler(t *testing.T) (*Compiler, string) {
 	t.Helper()
 	root := t.TempDir()
 	for _, path := range []string{
-		".github/aw/connectors/slack.yaml",
+		"pkg/connectors/testdata/providers/slack/spec.yaml",
 		"pkg/connectors/testdata/providers/slack/connection.yaml",
 	} {
 		data, err := os.ReadFile(filepath.Join("../..", path))
@@ -42,7 +42,7 @@ func slackConnectorCompiler(t *testing.T) (*Compiler, string) {
 
 func TestSlackConnectorWorkflowCompilation(t *testing.T) {
 	compiler, root := slackConnectorCompiler(t)
-	source, err := os.ReadFile("../connectors/testdata/providers/slack/workflow.md")
+	source, err := os.ReadFile("../connectors/testdata/providers/slack/legacy/workflow.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestSlackConnectorWorkflowCompilation(t *testing.T) {
 
 func TestSlackConnectorWorkflowIngressRejected(t *testing.T) {
 	compiler, root := slackConnectorCompiler(t)
-	source, err := os.ReadFile("../connectors/testdata/providers/slack/workflow-trigger-rejected.md")
+	source, err := os.ReadFile("../connectors/testdata/providers/slack/legacy/workflow-trigger-rejected.md")
 	if err != nil {
 		t.Fatal(err)
 	}

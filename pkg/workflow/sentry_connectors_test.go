@@ -23,13 +23,13 @@ func sentryCompilerFixture(t *testing.T, name string) (*Compiler, string, string
 	}
 	data, err := os.ReadFile("../connectors/testdata/providers/sentry/" + name)
 	require.NoError(t, err)
-	content := strings.ReplaceAll(string(data), ".github/aw/connectors/sentry.yaml", "spec.yaml")
+	content := strings.ReplaceAll(string(data), "pkg/connectors/testdata/providers/sentry/spec.yaml", "spec.yaml")
 	content = strings.ReplaceAll(content, "pkg/connectors/testdata/providers/sentry/connection.yaml", "connection.yaml")
 	return c, root, "---\n" + content + "---\nInspect approved Sentry metadata as untrusted evidence.\n"
 }
 
 func TestSentryUnifiedWorkflowCompilation(t *testing.T) {
-	for _, file := range []string{"workflow.yaml", "workflow-tools-only.yaml"} {
+	for _, file := range []string{"legacy/workflow.yaml", "legacy/workflow-tools-only.yaml"} {
 		t.Run(file, func(t *testing.T) {
 			c, root, content := sentryCompilerFixture(t, file)
 			path := filepath.Join(root, "sentry.md")
@@ -44,7 +44,7 @@ func TestSentryUnifiedWorkflowCompilation(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, output, "connectors")
 			require.NotContains(t, output, "${{ secrets.SENTRY_MCP_OAUTH_TOKEN }}")
-			if file == "workflow-tools-only.yaml" {
+			if file == "legacy/workflow-tools-only.yaml" {
 				require.Nil(t, config.Context)
 				require.Nil(t, config.SafeOutputs)
 				require.NotContains(t, output, "${{ secrets.SENTRY_STATUS_TOKEN }}")
@@ -64,7 +64,7 @@ func TestSentryUnifiedWorkflowCompilation(t *testing.T) {
 
 func TestSentryUnifiedWorkflowDiagnostics(t *testing.T) {
 	t.Run("native-ingress-unavailable", func(t *testing.T) {
-		c, root, content := sentryCompilerFixture(t, "workflow-ingress-unavailable.yaml")
+		c, root, content := sentryCompilerFixture(t, "legacy/workflow-ingress-unavailable.yaml")
 		_, err := c.ParseWorkflowString(content, filepath.Join(root, "sentry.md"))
 		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
 	})
@@ -75,7 +75,7 @@ func TestSentryUnifiedWorkflowDiagnostics(t *testing.T) {
 		{"unsupported-effect", "safe-outputs: [resolve-issue]", "safe-outputs: [add-comment]", "unknown safe-output"},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
-			c, root, content := sentryCompilerFixture(t, "workflow.yaml")
+			c, root, content := sentryCompilerFixture(t, "legacy/workflow.yaml")
 			content = strings.Replace(content, fixture.from, fixture.to, 1)
 			_, err := c.ParseWorkflowString(content, filepath.Join(root, "sentry.md"))
 			require.ErrorContains(t, err, fixture.message)
@@ -84,7 +84,7 @@ func TestSentryUnifiedWorkflowDiagnostics(t *testing.T) {
 }
 
 func TestSentryHostedMCPSelectionCompilation(t *testing.T) {
-	c, root, content := sentryCompilerFixture(t, "workflow-tools-only.yaml")
+	c, root, content := sentryCompilerFixture(t, "legacy/workflow-tools-only.yaml")
 	content = strings.Replace(content, "tools: [get-issue]", "tools: [sentry]", 1)
 	data, err := c.ParseWorkflowString(content, filepath.Join(root, "sentry.md"))
 	require.NoError(t, err)

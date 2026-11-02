@@ -30,7 +30,7 @@ connectors:
           core_list_projects:
             inputs: {}
         url: https://mcp.dev.azure.com/fabrikam
-    "on":
+    triggers:
       work-item-created:
         match:
           /eventType: workitem.created

@@ -1,6 +1,6 @@
 apiVersion: github.com/gh-aw/connectors/v1
 kind: ConnectorBinding
-definition: .github/aw/connectors/teams.yaml
+definition: pkg/connectors/testdata/providers/teams/spec.yaml
 connection: pkg/connectors/testdata/providers/teams/connection.yaml
 triggers: [channel-message-created]
 mcp: [get-channel-message, list-channel-replies]

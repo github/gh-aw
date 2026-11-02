@@ -14,7 +14,7 @@ type ConnectorDeclaration struct {
 	Endpoints   map[string]string               `json:"endpoints"`
 	Credentials map[string]ConnectorCredential  `json:"credentials"`
 	Resources   map[string][]string             `json:"resources,omitempty"`
-	On          map[string]connectors.Trigger   `json:"on,omitempty"`
+	Triggers    map[string]connectors.Trigger   `json:"triggers,omitempty"`
 	Tools       map[string]connectors.ReadTool  `json:"tools,omitempty"`
 	MCPServers  map[string]connectors.HTTPMCP   `json:"mcp-servers,omitempty"`
 	SafeOutputs map[string]connectors.Operation `json:"safe-outputs,omitempty"`
@@ -57,7 +57,7 @@ func (declaration ConnectorDeclaration) registration(alias string) (map[string]a
 	spec := connectors.ConnectorSpec{
 		APIVersion: connectors.APIVersion, Kind: "ConnectorSpec", ID: "aw.github.com/" + alias,
 		Endpoints: declaration.Endpoints, Credentials: map[string]connectors.Credential{},
-		Triggers: declaration.On, MCP: declaration.Tools, HTTPMCP: declaration.MCPServers,
+		Triggers: declaration.Triggers, MCP: declaration.Tools, HTTPMCP: declaration.MCPServers,
 		SafeOutputs: declaration.SafeOutputs,
 	}
 	credentials := map[string]connectors.SecretRef{}

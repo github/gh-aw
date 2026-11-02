@@ -1,6 +1,6 @@
 apiVersion: github.com/gh-aw/connectors/v1
 kind: ConnectorBinding
-definition: .github/aw/connectors/azure-devops.yaml
+definition: pkg/connectors/testdata/providers/azure-devops/spec.yaml
 connection: pkg/connectors/testdata/providers/azure-devops/connection.yaml
 triggers: [work-item-created, work-item-updated, work-item-deleted, work-item-restored]
 safeOutputs: [create-work-item, update-work-item, comment-on-work-item, assign-work-item, link-work-items]

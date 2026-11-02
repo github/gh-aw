@@ -27,7 +27,7 @@ func NewConnectorsCommand() *cobra.Command {
 		SilenceErrors: true,
 		Long: "Validate and inspect external connector definitions offline. " +
 			"The serve and invoke subcommands execute compiler-frozen capabilities in trusted hosts.",
-		Example: string(constants.CLIExtensionPrefix) + " connectors validate .github/aw/connectors/linear.yaml",
+		Example: string(constants.CLIExtensionPrefix) + " connectors validate connector-spec.yaml",
 	}
 	cmd.SetOut(os.Stdout)
 	validate := &cobra.Command{
@@ -36,8 +36,8 @@ func NewConnectorsCommand() *cobra.Command {
 		Long: "Validate one or more local ConnectorSpec files against the experimental versioned contract. " +
 			"All supplied definitions are checked. Validation does not approve provider access, " +
 			"verify external credentials, or activate webhook ingress.",
-		Example: `  ` + string(constants.CLIExtensionPrefix) + ` connectors validate .github/aw/connectors/linear.yaml
-  ` + string(constants.CLIExtensionPrefix) + ` connectors validate .github/aw/connectors/*.yaml --json`,
+		Example: `  ` + string(constants.CLIExtensionPrefix) + ` connectors validate connector-spec.yaml
+  ` + string(constants.CLIExtensionPrefix) + ` connectors validate connector-specs/*.yaml --json`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, err := cmd.Flags().GetBool("json")
