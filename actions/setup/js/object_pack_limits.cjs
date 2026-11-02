@@ -2,6 +2,25 @@
 
 const { constants } = require("buffer");
 
+/**
+ * @typedef {Object} ObjectPackLimits
+ * @property {number} maxObjects
+ * @property {number} maxUncompressedBytes
+ * @property {number} maxPackBytes
+ * @property {number} maxPreviewBytes
+ * @property {number} maxHeaderBytes
+ * @property {number} maxTreeEntries
+ * @property {number} maxScanEntries
+ * @property {number} maxHydrationBytes
+ * @property {number} commandTimeoutMs
+ * @property {number} networkTimeoutMs
+ * @property {number} maxCommandOutputBytes
+ * @property {number} maxGitOutputBytes
+ * @property {number} fetchBatchSize
+ * @property {readonly number[]} fetchDepths
+ */
+
+/** @type {Readonly<ObjectPackLimits>} */
 const DEFAULT_OBJECT_PACK_LIMITS = Object.freeze({
   maxObjects: 100000,
   maxUncompressedBytes: 64 * 1024 * 1024,

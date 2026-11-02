@@ -1,5 +1,5 @@
 ---
-description: Diagnose gh-aw diagnostic codes using cached audits, targeted evidence, and code-specific remedies. No dispatch.
+description: Diagnose gh-aw codes without dispatch.
 disable-model-invocation: true
 ---
 
@@ -10,8 +10,7 @@ Do not dispatch workflows or execute artifacts. Keep secrets/prompts/configurati
 
 ## Start here
 
-Keep supplied URL in `RUN_URL`, including its fragment.
-Derive `REPO` (`HOST/OWNER/REPO`) and `RUN_ID` from it; qualify bare IDs first.
+Preserve `RUN_URL`, including its fragment; derive `REPO` (`HOST/OWNER/REPO`)/`RUN_ID`. Qualify bare IDs.
 
 ```bash
 : "${RUN_URL:?Set URL}"
@@ -24,7 +23,7 @@ gh aw audit "$RUN_URL" --no-baseline --timeout 2m \
 Read completeness/`overview`/`key_findings`/`recommendations`/`errors`.
 Timeout: incomplete JSON report; fetch evidence.
 Read only the linked `playbook_url`/code row; [cluster fleets](analyzing-runs.md).
-Preserve codes/severity; advisory/pending/skipped/policy-denied aren't always bugs.
+Keep codes/severity; advisory/pending/skipped/policy-denied need not be bugs.
 Unknown: [unmapped codes](#unmapped-codes).
 
 ## Audit findings
@@ -38,7 +37,7 @@ Unknown: [unmapped codes](#unmapped-codes).
 | `model_unavailable`, `model_endpoint_unsupported` | Full same-run inventory: absent model/incompatible endpoint. | [Model availability](#model-availability); verify candidate/API, edit pin, recompile. |
 | `model_availability_unknown` | Missing/incomplete/malformed/ambiguous/contradictory reflection. | Inspect discovery/auth; do not declare removal/switch models without evidence. |
 | `model_resolution_failed` | Failed `model.resolution`; missing same-role startup-stop evidence. | Advisory: verify pins; unproven cause. |
-| `subagent_model_not_observed` | Spawn, child usage, evidence coverage. | Missing observations don't prove nonexecution. |
+| `subagent_model_not_observed` | Spawn, child usage, evidence coverage. | Missing observations != nonexecution. |
 | `subagent_model_unavailable` | Child model, request, provider policy/catalog. | Verify child separately; follow [model/engine guide](debug-model-engine-misconfiguration.md). |
 | `subagent_failed` | Child error; parent dispatch. | Fix child cause; parent success != child success. |
 | `blocked_network_requests` | Destination, caller, denial, necessity. | Fix URL/tool or authorize narrow destination; retain firewall. |
@@ -53,29 +52,28 @@ Unknown: [unmapped codes](#unmapped-codes).
 
 ## Agent, model, and proxy classifications
 
-Inspect `agent-stdio.log`, `agent_execution.json`, native errors/reflection/proxy events.
+Inspect `agent-stdio.log`, `agent_execution.json`, native errors/reflection/proxy events; [inventory](#model-availability).
 Assistant/tool prose isn't native error.
-Inventory: [Model availability](#model-availability).
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
 | `inference_access_error`, `inference_access_denied`, `authentication_failed` | Native 401/403, credential names, permissions/policy, proxy guards. | Fix access/config; budget/policy denial doesn't warrant credential rotation. |
 | `mcp_policy_error` | Blocked MCP server; organization policy. | Use approved tool/authorized policy correction; no bypass. |
-| `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change doesn't prove availability. |
-| `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone doesn't prove model removal. |
+| `model_not_supported_error`, `model_endpoint_mismatch_error`, `model_endpoint_mismatch` | Model, API, tool protocol, same-run inventory/routes. | Follow [model/engine guide](debug-model-engine-misconfiguration.md); endpoint change != availability. |
+| `http_400_response_error` | Provider diagnostic, endpoint, feature/schema. | Fix unsupported request; 400 alone != model removal. |
 | `unsupported_endpoint`, `invalid_selection`, `uncorroborated_endpoint`, `uncorroborated_selection`, `harness_selection_mismatch`, `provider_mismatch` | Selection vs harness model/API/metadata. | Align selection/API; never invent evidence. |
 | `unsupported_effort` | Effort vs engine/model support. | Use supported effort/mapping; no silent discard. |
-| `missing_model_pricing_error`, `unknown_model_ai_credits` | Proxy pricing table and `missing_model_pricing_model_name`. | Correct supported pricing/version/config; never disable credit accounting. |
-| `invocation_cap_exceeded`, `max_runs_exceeded` | Used/max pooled inference calls. | Narrow work/loops; exhausted run cannot recover through identical retries. |
+| `missing_model_pricing_error`, `unknown_model_ai_credits` | Proxy pricing table and `missing_model_pricing_model_name`. | Fix supported pricing/version/config; retain credit accounting. |
+| `invocation_cap_exceeded`, `max_runs_exceeded` | Used/max pooled inference calls. | Narrow work; exhausted run cannot recover via identical retries. |
 | `max_ai_credits_exceeded`, `ai_credits_rate_limit_error`, `ai_credits_limit_exceeded` | Used/max credits; cap. | Stop; reduce work or authorize future budget. |
 | `max_cache_misses_exceeded` | Miss counters; prompt/cache changes. | Stabilize context/cache; no exhausted-guard retry. |
 | `effective_tokens_limit_exceeded` | Effective tokens; prompt/turn growth. | Reduce context/iterations; retain guard. |
 | `permission_denied_limit_exceeded` | Denied calls; allowed tools. | Stop denied calls; use allowed tools, not larger denial budget. |
 | `model_policy_violation`, `content_filter` | Provider/proxy reason; endpoint mismatch separately. | Correct request within policy; no credential swap/bypass. |
-| `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone doesn't establish authentication failure. |
+| `awf_api_proxy_blocking_requests` | Specific budget/policy/filter guard. | Address guard; blocking alone != authentication failure. |
 | `capi_quota_exceeded_error` | Native 429; exhausted retries. | Respect quota/reset; no retry storm. |
 | `capi_server_error`, `engine_outage`, `infrastructure_error` | Exhausted native 5xx/infrastructure timeline. | Report cause; bounded backoff, no unapproved redispatch. |
-| `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone doesn't establish timeout. |
+| `agentic_engine_timeout` | Step/SDK budget vs post-result `watchdogFired=true`. | Fix genuine stall; post-result watchdog alone != timeout. |
 | `sandbox_runtime_crash` | Exit/signal, resources, runtime revision. | Fix crash/resources; retain redacted diagnostic/version. |
 | `goal_already_active` | Unfinished goal. | Update/complete existing goal; no duplicate. |
 | `shell_expansion_guard_rejected` | Private denied command; allowed syntax. | Use allowed tools; no dangerous expansion/obfuscation/bypass. |
@@ -97,8 +95,8 @@ gh aw models --json --refresh-observed=false --logs-dir "$EVIDENCE"
 gh aw models --repo "$REPO" --logs-dir "$EVIDENCE" --refresh-count 5
 ```
 
-Keep `catalog`, `aliases`, `observed` distinct; aggregates don't prove same-run access.
-Prefer cache; refresh downloads artifacts.
+`catalog`/`aliases`/`observed` differ; aggregates don't prove same-run access.
+Refresh downloads artifacts.
 
 ### Verify exact same-run inventory
 
@@ -127,8 +125,8 @@ Resolve provider aliases (`github` → `copilot`); inspect `auto`/`opus`
 | ID present; inference rejected | Inspect request model/API/status/policy/auth error. |
 
 `token-usage.jsonl`: empty file + fatal startup rejection supports no inference;
-missing file proves nothing. Missing/expired/denied artifacts remain unavailable.
-Use targeted `gh run download` for `agent`/`info` only if audit fails.
+missing file proves nothing. Missing/expired/denied artifacts: unavailable.
+If audit fails, target `gh run download` at `agent`/`info`.
 
 ### Compare one success
 
@@ -139,28 +137,27 @@ gh aw audit "$BASE_RUN_ID" "$RUN_ID" --repo "$REPO" \
 ```
 
 First run = reference. Compare model/provider, credential source (names only),
-revision, runtimes, inventory; success doesn't establish model identity.
+revision/runtimes/inventory; success != identity.
 Different inventories, same AWF version: not proof of regression/retirement.
 Require evidence for removal time/cause.
 Trace pins: `git log -S 'model: PROVIDER/MODEL' -- WORKFLOW.md`.
 
 Absent pin: verify same-provider API/capabilities/policy.
 Authorized patch: edit source/recompile; compilation cannot test inference.
-Runtime defect: [model/engine guide](debug-model-engine-misconfiguration.md).
 
 ## Completion and safe-output errors
 
 Trace registration → invocation → persistence → validation → publication.
-Nonempty `safeoutputs.jsonl` doesn't prove publication.
+Nonempty `safeoutputs.jsonl` != publication.
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
 | `agent_startup_failure` | First setup/engine error. | Fix startup; missing output need not be agent choice. |
-| `engine_driver_failure`, `driver_crash` | Driver exit/signal; final native error. | Fix driver first; nonzero exit alone doesn't establish outage. |
+| `engine_driver_failure`, `driver_crash` | Driver exit/signal; final native error. | Fix driver first; nonzero exit alone != outage. |
 | `secret_redaction_failure` | Redaction status; sanitized diagnostic. | Repair redaction before publication; never expose raw logs/disable masking. |
 | `safeoutputs_cli_error` | Arguments, registration, denial. | Fix supported invocation/allowlist; no unauthorized `gh` writes. |
 | `invalid_safe_outputs` | Record errors; generated schema. | Fix emitted type/fields; retain validation. |
-| `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Repair publication path or prompt completion contract; silence is not an intentional noop. |
+| `missing_terminal_safe_output` | Expected terminal tool, denied calls, last session event. | Fix publication/prompt completion contract; silence is not an intentional noop. |
 | `request_rejection`, `prompt_exhaustion`, `unknown` | Native error, budget, missing evidence. | Resolve cause; retain unknown without evidence. |
 | `ERR_VALIDATION`, `E001` | Fields/types, target IDs, schema. | Fix producer; no silent coercion. |
 | `E002`, `MAX_COUNT_REACHED` | Operation cap; accepted records. | Reduce count; never replay applied mutations. |
@@ -194,14 +191,14 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 
 | Codes | Check | Remedy |
 | --- | --- | --- |
-| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Syntax/patterns; actual head/base. | Fix authorized target/config. |
-| `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default restrictions; required PR. | Use permitted PR path; retain protections. |
-| `pr_is_draft` | Draft state. | Author-authorized readiness only. |
-| `merge_conflicts`, `not_mergeable` | Live mergeability/conflicts; unknown != conflict. | Resolve on reviewed head; bounded wait for known state. |
-| `missing_required_labels`, `title_prefix_mismatch` | Required labels/title. | Authorized correction; retain handler guards. |
-| `required_checks_missing`, `required_checks_failing` | Check identity/SHA/completion/result. | Fix current-head checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `unresolved_review_threads` | Pending/blocked reviews; open threads. | Address feedback; retain reviewer authority/policy. |
-| `merge_not_completed`, `merge_operation_error` | API response; live state. | Reconcile before retry; possibly merged. |
+| `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
+| `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use allowed PRs; retain protections. |
+| `pr_is_draft`, `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
+| `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
+| `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
+| `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
+| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Pending/blocked reviews/vetoes; threads; current-head allowlisted human approval. | Address feedback; retain reviewer authority/independent-human approval. |
+| `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
 
