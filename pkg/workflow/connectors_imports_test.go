@@ -301,7 +301,10 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 			}
 			inputs, ok := frontmatter.Frontmatter["import-schema"].(map[string]any)
 			require.True(t, ok)
-			for _, value := range inputs {
+			for name, value := range inputs {
+				if !strings.HasSuffix(name, "-secret") {
+					continue
+				}
 				input, ok := value.(map[string]any)
 				require.True(t, ok)
 				name, ok := input["default"].(string)

@@ -14895,7 +14895,7 @@
             }
           }
         },
-        "resources": { "type": "object", "additionalProperties": { "type": "array", "minItems": 1, "items": { "type": "string" } } },
+        "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
         "triggers": { "$ref": "#/$defs/connectorDefinitions" },
         "tools": { "$ref": "#/$defs/connectorDefinitions" },
         "mcp-servers": { "$ref": "#/$defs/connectorDefinitions" },
