@@ -78,6 +78,11 @@ func validateMCPConfigsWithWarnings(tools map[string]any) ([]string, error) {
 
 		// Skip built-in tools - they have their own schema validation
 		if builtInToolNames[toolName] && toolName != "linear" {
+			compatibilityWarnings, err := builtinMCPExpressionDiagnostics(toolName, toolConfig)
+			if err != nil {
+				return nil, err
+			}
+			warnings = append(warnings, compatibilityWarnings...)
 			mcpValidationLog.Printf("Skipping MCP validation for built-in tool: %s", toolName)
 			continue
 		}
@@ -88,36 +93,7 @@ func validateMCPConfigsWithWarnings(tools map[string]any) ([]string, error) {
 			continue
 		}
 
-		// Extract raw MCP configuration (without transformation)
-		mcpConfig, err := getRawMCPConfig(config)
-		if err != nil {
-			mcpValidationLog.Printf("Invalid MCP configuration for tool %s: %v", toolName, err)
-			return nil, fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
-		}
-
-		// Skip validation if no MCP configuration found
-		if len(mcpConfig) == 0 {
-			continue
-		}
-
-		mcpValidationLog.Printf("Validating MCP requirements for tool: %s", toolName)
-
-		// Validate MCP configuration requirements first (before transformation).
-		// Custom validation runs before schema validation to provide better error messages
-		// for the most common mistakes (matching the pattern in ValidateMainWorkflowFrontmatterWithSchemaAndLocation).
-		if err := validateMCPRequirements(toolName, mcpConfig, config); err != nil {
-			return nil, err
-		}
-
-		// Run JSON schema validation as a catch-all after custom validation. Build a
-		// schema-compatible view of the config by extracting only the properties defined
-		// in mcp_config_schema.json. Tool-specific fields (e.g. auth, proxy-args) are
-		// excluded because the schema uses additionalProperties: false.
-		if err := parser.ValidateMCPConfigWithSchema(buildSchemaMCPConfig(config)); err != nil {
-			mcpValidationLog.Printf("JSON schema validation failed for tool %s: %v", toolName, err)
-			return nil, fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
-		}
-		compatibilityWarnings, err := mcpConfigExpressionDiagnostics(toolName, config)
+		compatibilityWarnings, err := validateCustomMCPConfigWithWarnings(toolName, config)
 		if err != nil {
 			return nil, err
 		}
@@ -126,6 +102,40 @@ func validateMCPConfigsWithWarnings(tools map[string]any) ([]string, error) {
 
 	mcpValidationLog.Print("MCP configuration validation completed successfully")
 	return warnings, nil
+}
+
+func validateCustomMCPConfigWithWarnings(toolName string, config map[string]any) ([]string, error) {
+	mcpConfig, err := getRawMCPConfig(config)
+	if err != nil {
+		mcpValidationLog.Printf("Invalid MCP configuration for tool %s: %v", toolName, err)
+		return nil, fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
+	}
+	if len(mcpConfig) == 0 {
+		return nil, nil
+	}
+	mcpValidationLog.Printf("Validating MCP requirements for tool: %s", toolName)
+	// Specific requirement errors precede catch-all schema validation.
+	if err := validateMCPRequirements(toolName, mcpConfig, config); err != nil {
+		return nil, err
+	}
+	// Exclude tool-specific fields not defined in mcp_config_schema.json.
+	if err := parser.ValidateMCPConfigWithSchema(buildSchemaMCPConfig(config)); err != nil {
+		mcpValidationLog.Printf("JSON schema validation failed for tool %s: %v", toolName, err)
+		return nil, fmt.Errorf("tool '%s' has invalid MCP configuration: %w", toolName, err)
+	}
+	return mcpConfigExpressionDiagnostics(toolName, config)
+}
+
+func builtinMCPExpressionDiagnostics(toolName string, toolConfig any) ([]string, error) {
+	config, ok := toolConfig.(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+	return mcpConfigExpressionDiagnosticsAtPath("tools."+toolName, map[string]any{
+		"mounts":         config["mounts"],
+		"args":           config["args"],
+		"entrypointArgs": config["entrypointArgs"],
+	})
 }
 
 // ValidateToolsSection validates that all entries in the user-facing tools: frontmatter section

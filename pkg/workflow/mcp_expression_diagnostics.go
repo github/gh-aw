@@ -14,16 +14,22 @@ var (
 )
 
 func mcpConfigExpressionDiagnostics(toolName string, config map[string]any) ([]string, error) {
+	return mcpConfigExpressionDiagnosticsAtPath("mcp-servers."+toolName, config)
+}
+
+func mcpConfigExpressionDiagnosticsAtPath(configPath string, config map[string]any) ([]string, error) {
 	var warnings []string
-	for _, field := range []string{"url", "args", "entrypointArgs", "mounts", "headers", "env", "container", "entrypoint", "command", "registry", "proxy-args", "ca-cert-file", "allowed"} {
+	for _, field := range []string{"url", "args", "entrypointArgs", "mounts", "headers", "env", "container", "version", "entrypoint", "command", "registry", "proxy-args", "ca-cert-file", "allowed"} {
 		preserveLegacy := field == "headers" || field == "env"
-		replaceTemplates := preserveLegacy || field == "url" || field == "args" || field == "entrypointArgs" || field == "mounts"
-		err := inspectMCPStringValues("mcp-servers."+toolName+"."+field, config[field], func(path, value string) error {
-			rendered := value
-			if replaceTemplates {
-				rendered, _ = replaceMCPExpressions(value, preserveLegacy)
-			} else if field == "ca-cert-file" {
+		err := inspectMCPStringValues(configPath+"."+field, config[field], func(path, value string) error {
+			var rendered string
+			if field == "ca-cert-file" {
 				rendered = replaceMCPCACertFileExpressions(value)
+			} else {
+				rendered, _ = replaceMCPExpressions(value, preserveLegacy)
+			}
+			if ExpressionPattern.MatchString(rendered) {
+				return fmt.Errorf("%s: unsupported Actions expression in MCP configuration; use a supported expression in an expression-enabled field or supply a fully evaluated value", path)
 			}
 			normalized := normalizeMCPShellReferences(rendered)
 			// A sentinel prevents removal from joining literal fragments into a

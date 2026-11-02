@@ -67,10 +67,12 @@ func replaceMCPExpressions(value string, preserveLegacy bool) (string, map[strin
 
 func collectMCPConfigExpressionBindings(config *parser.RegistryMCPServerConfig) map[string]string {
 	bindings := make(map[string]string)
-	values := []string{config.URL}
+	values := []string{config.URL, config.Container, config.Entrypoint, config.Command, config.Registry}
 	values = append(values, config.Args...)
 	values = append(values, config.EntrypointArgs...)
 	values = append(values, config.Mounts...)
+	values = append(values, config.ProxyArgs...)
+	values = append(values, config.Allowed...)
 	for _, value := range values {
 		_, extracted := replaceMCPExpressions(value, false)
 		maps.Copy(bindings, extracted)

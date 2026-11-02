@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"io"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -173,7 +174,7 @@ func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBind
 			if shellIsPowerShell {
 				result.WriteString("$env:" + cachedName)
 			} else {
-				result.WriteString("$" + cachedName)
+				result.WriteString(stepBashExpressionReference(cachedName, line[fullEnd:]))
 			}
 			last = fullEnd
 			continue
@@ -198,7 +199,7 @@ func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBind
 		if shellIsPowerShell {
 			result.WriteString("$env:" + envName)
 		} else {
-			result.WriteString("$" + envName)
+			result.WriteString(stepBashExpressionReference(envName, line[fullEnd:]))
 		}
 		if !setutil.Contains(registeredNames, envName) {
 			registeredNames[envName] = struct{}{}
@@ -212,6 +213,14 @@ func replaceStepExpressionRefs(line string, shellIsPowerShell bool, existingBind
 
 	result.WriteString(line[last:])
 	return result.String(), ordered
+}
+
+func stepBashExpressionReference(name, suffix string) string {
+	first, _ := utf8.DecodeRuneInString(suffix)
+	if strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_", first) {
+		return "${" + name + "}"
+	}
+	return "$" + name
 }
 
 func mapRunExpressionToEnvBinding(body string) (string, string, bool) {

@@ -47,11 +47,15 @@ func writeJSONStringMapEntriesRaw(yaml *strings.Builder, values map[string]strin
 }
 
 func marshalMCPHeredocString(value string) string {
-	// Existing renderers mark gateway placeholders with a backslash. JSON owns
+	// Former expanding-heredoc escapes are syntax, not payload bytes. JSON owns
 	// escaping first; then protect every shell metacharacter in the heredoc.
-	value = strings.ReplaceAll(value, `\${`, `${`)
+	value = normalizeMCPHeredocEscapes(value)
 	encoded := mustMarshalJSONString(value)
 	return strings.NewReplacer(`\`, `\\`, "$", `\$`, "`", "\\`").Replace(encoded)
+}
+
+func normalizeMCPHeredocEscapes(value string) string {
+	return strings.NewReplacer(`\$`, `$`, "\\`", "`").Replace(value)
 }
 
 func writeMCPHeredocStringMapEntries(yaml *strings.Builder, values map[string]string, indent string) {

@@ -23,6 +23,7 @@ func TestStepsRunCodemodHeredocBoundaries(t *testing.T) {
 		wantError bool
 	}{
 		{"expanding body", "cat <<EOF\n" + expression + "\nEOF\n", "cat <<EOF\n$EXPR_GITHUB_EVENT_ISSUE_TITLE\nEOF\n", false},
+		{"adjacent suffixes", "set -u\ncat <<EOF\n" + expression + "_first|" + expression + "_cached\nEOF\n", "set -u\ncat <<EOF\n${EXPR_GITHUB_EVENT_ISSUE_TITLE}_first|${EXPR_GITHUB_EVENT_ISSUE_TITLE}_cached\nEOF\n", false},
 		{"hash body", "cat <<EOF\n# " + expression + "\nEOF\n", "cat <<EOF\n# $EXPR_GITHUB_EVENT_ISSUE_TITLE\nEOF\n", false},
 		{"inline hash body", "cat <<EOF\ntext # " + expression + "\nEOF\n", "cat <<EOF\ntext # $EXPR_GITHUB_EVENT_ISSUE_TITLE\nEOF\n", false},
 		{"quoted body", "cat <<'EOF'\n" + expression + "\nEOF\n", "", false},
@@ -93,6 +94,58 @@ func TestStepsRunCodemodExpandingBodyTreatsValuesAsData(t *testing.T) {
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 	assert.Equal(t, "# $(printf evaluated)\n", string(output))
+}
+
+func TestStepsRunCodemodAdjacentSuffixes(t *testing.T) {
+	t.Parallel()
+	const expression = "${{ github.event.issue.title }}"
+	const name = "EXPR_GITHUB_EVENT_ISSUE_TITLE"
+	const value = "$(printf evaluated) title"
+	for _, suffix := range []string{"_suffix", "lower", "UPPER", "123", "", "-suffix", ".suffix"} {
+		for _, mode := range []string{"command", "heredoc"} {
+			t.Run(suffix+"/"+mode, func(t *testing.T) {
+				t.Parallel()
+				body := expression + suffix + "|" + expression + suffix
+				run := "set -u\nprintf '%s\\n' \"" + body + "\"\n"
+				if mode == "heredoc" {
+					run = "set -u\ncat <<EOF\n# " + body + "\nEOF\n"
+				}
+				step := map[string]any{"run": run}
+				require.NoError(t, hoistStepRunExpressions(step))
+				assert.Equal(t, map[string]any{name: expression}, step["env"])
+				reference := "$" + name
+				if suffix == "_suffix" || suffix == "lower" || suffix == "UPPER" || suffix == "123" {
+					reference = "${" + name + "}"
+				}
+				assert.Equal(t, strings.ReplaceAll(run, expression, reference), step["run"],
+					"new and cached bindings must have the same variable spelling")
+				command := exec.Command("bash", "-c", step["run"].(string))
+				command.Env = []string{"PATH=" + os.Getenv("PATH"), name + "=" + value}
+				output, err := command.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+				expected := value + suffix + "|" + value + suffix + "\n"
+				if mode == "heredoc" {
+					expected = "# " + expected
+				}
+				assert.Equal(t, expected, string(output))
+			})
+		}
+	}
+}
+
+func TestStepsRunCodemodAdjacentSuffixesPowerShellUnchanged(t *testing.T) {
+	t.Parallel()
+	const expression = "${{ github.event.issue.title }}"
+	for _, shell := range []string{"pwsh", "powershell", "PwSh"} {
+		t.Run(shell, func(t *testing.T) {
+			step := map[string]any{
+				"shell": shell,
+				"run":   `Write-Output "` + expression + `_first|` + expression + `_cached"`,
+			}
+			require.NoError(t, hoistStepRunExpressions(step))
+			assert.Equal(t, `Write-Output "$env:EXPR_GITHUB_EVENT_ISSUE_TITLE_first|$env:EXPR_GITHUB_EVENT_ISSUE_TITLE_cached"`, step["run"])
+		})
+	}
 }
 
 func heredocCodemodSource(run string) string {

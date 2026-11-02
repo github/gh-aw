@@ -3,12 +3,64 @@
 package workflow
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSanitizeRunStepExpressionsAdjacentSuffixes(t *testing.T) {
+	t.Parallel()
+	const expression = "${{ github.event.issue.title }}"
+	const name = "GH_AW_GITHUB_EVENT_ISSUE_TITLE"
+	const value = "$(printf evaluated) title"
+	for _, suffix := range []string{"_suffix", "lower", "UPPER", "123", "", "-suffix", ".suffix"} {
+		for _, mode := range []string{"command", "heredoc"} {
+			t.Run(suffix+"/"+mode, func(t *testing.T) {
+				t.Parallel()
+				run := "set -u\nprintf '%s\\n' \"" + expression + suffix + "|" + expression + "\"\n"
+				if mode == "heredoc" {
+					run = "set -u\ncat <<EOF\n# " + expression + suffix + "|" + expression + "\nEOF\n"
+				}
+				step, warnings, changed := sanitizeRunStepExpressions(map[string]any{"run": run})
+				require.True(t, changed)
+				require.Len(t, warnings, 1)
+				assert.Equal(t, expression, step["env"].(map[string]any)[name])
+				reference := "$" + name
+				if suffix == "_suffix" || suffix == "lower" || suffix == "UPPER" || suffix == "123" {
+					reference = "${" + name + "}"
+				}
+				assert.Equal(t, strings.ReplaceAll(strings.ReplaceAll(run, expression+suffix+"|", reference+suffix+"|"), expression, "$"+name), step["run"])
+				command := exec.Command("bash", "-c", step["run"].(string))
+				command.Env = []string{"PATH=" + os.Getenv("PATH"), name + "=" + value}
+				output, err := command.CombinedOutput()
+				require.NoError(t, err, "%s", output)
+				expected := value + suffix + "|" + value + "\n"
+				if mode == "heredoc" {
+					expected = "# " + expected
+				}
+				assert.Equal(t, expected, string(output))
+			})
+		}
+	}
+}
+
+func TestSanitizeRunStepExpressionsPowerShellSpellingUnchanged(t *testing.T) {
+	t.Parallel()
+	for _, shell := range []string{"pwsh", "powershell", "PwSh"} {
+		t.Run(shell, func(t *testing.T) {
+			step, _, changed := sanitizeRunStepExpressions(map[string]any{
+				"shell": shell,
+				"run":   `Write-Output "${{ github.event.issue.title }}_suffix"`,
+			})
+			require.True(t, changed)
+			assert.Equal(t, `Write-Output "$GH_AW_GITHUB_EVENT_ISSUE_TITLE_suffix"`, step["run"])
+		})
+	}
+}
 
 func TestSanitizeRunStepExpressions(t *testing.T) {
 	tests := []struct {

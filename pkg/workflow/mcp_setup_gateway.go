@@ -303,7 +303,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 	yaml.WriteString("          export MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD=\"" + strconv.Itoa(payloadSizeThreshold) + "\"\n")
 	// Allow read-write access to the host paths our built-in MCP servers mount
 	// (workspace, safe-outputs runtime dir, temp dir); see buildMCPGatewayAllowedMountRoots.
-	yaml.WriteString("          export MCP_GATEWAY_ALLOWED_MOUNT_ROOTS=\"" + buildMCPGatewayAllowedMountRoots(tools, gatewayConfig) + "\"\n")
+	yaml.WriteString("          export MCP_GATEWAY_ALLOWED_MOUNT_ROOTS=\"" + escapeMCPMountRootsShell(buildMCPGatewayAllowedMountRoots(tools, gatewayConfig)) + "\"\n")
 	// These values are populated only for pull request checkouts, but the safe-outputs
 	// server config always references them. Export empty defaults so Docker forwards
 	// defined values and strict gateway config expansion also works for other triggers.
@@ -668,7 +668,7 @@ func buildMCPGatewayAllowedMountRoots(tools map[string]any, gatewayConfig *MCPGa
 // so we normalize it here too, or the allowlist would gain a spurious entry
 // that never matches the real mounted path.
 func parseMCPGatewayAllowlistMount(mount string) (string, string, bool) {
-	mount = strings.ReplaceAll(mount, `\$`, "$")
+	mount = strings.ReplaceAll(mount, `\${`, "${")
 	parts := strings.SplitN(mount, ":", 3)
 	if len(parts) < 2 || parts[0] == "" {
 		return "", "", false
@@ -678,6 +678,26 @@ func parseMCPGatewayAllowlistMount(mount string) (string, string, bool) {
 		mode = "ro"
 	}
 	return parts[0], mode, true
+}
+
+// Only simple environment references may expand in this double-quoted export.
+// In particular, authored computations and quotes must remain mount path data.
+func escapeMCPMountRootsShell(roots string) string {
+	escape := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`, "`", "\\`")
+	var result strings.Builder
+	remaining := roots
+	for _, reference := range mcpShellReferencePattern.FindAllString(roots, -1) {
+		literal, rest, _ := strings.Cut(remaining, reference)
+		result.WriteString(escape.Replace(normalizeMCPHeredocEscapes(literal)))
+		if strings.HasPrefix(reference, `\$`) {
+			result.WriteString(escape.Replace(reference[1:]))
+		} else {
+			result.WriteString(reference)
+		}
+		remaining = rest
+	}
+	result.WriteString(escape.Replace(normalizeMCPHeredocEscapes(remaining)))
+	return result.String()
 }
 
 // collectMCPServerConfiguredMounts scans every configured MCP server (built-in

@@ -50,6 +50,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
@@ -196,7 +197,7 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	// the scanContent check above), so they are left intact regardless.
 	newRun := runVal
 	for _, s := range ordered {
-		newRun = replaceOutsideQuotedHeredocs(newRun, s.Original, "$"+s.EnvVar)
+		newRun = replaceSanitizedRunStepExpression(newRun, s, step["shell"])
 	}
 
 	// Build the sanitized step as a shallow copy.
@@ -225,6 +226,35 @@ func sanitizeRunStepExpressions(step map[string]any) (map[string]any, []string, 
 	}
 
 	return sanitized, descriptions, true
+}
+
+func replaceSanitizedRunStepExpression(run string, expression sanitizedExpression, shellValue any) string {
+	shell, shellIsString := shellValue.(string)
+	powershell := shellIsString && (strings.EqualFold(shell, "pwsh") || strings.EqualFold(shell, "powershell"))
+	updated, err := TransformExecutableShellContent(run, func(segment string) string {
+		var result strings.Builder
+		for {
+			before, after, found := strings.Cut(segment, expression.Original)
+			if !found {
+				result.WriteString(segment)
+				break
+			}
+			result.WriteString(before)
+			reference := "$" + expression.EnvVar
+			first, _ := utf8.DecodeRuneInString(after)
+			if !powershell && strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_", first) {
+				// Bash otherwise consumes the adjacent suffix as part of the name.
+				reference = "${" + expression.EnvVar + "}"
+			}
+			result.WriteString(reference)
+			segment = after
+		}
+		return result.String()
+	})
+	if err != nil {
+		return run
+	}
+	return updated
 }
 
 // sanitizeCustomStepsYAML parses a raw "steps: ..." YAML string (as produced by

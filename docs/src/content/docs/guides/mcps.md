@@ -103,7 +103,7 @@ Custom MCP servers should be **read-only**. Write operations must go through [sa
 
 ### Migrate dynamic configuration values
 
-Treat MCP URLs, arguments, mounts, headers and environment values as data, not shell scripts. Actions expressions such as `${{ steps.setup.outputs.port }}` are transported through environment bindings and resolved after JSON parsing. Simple runner `$NAME` and `${NAME}` references remain supported.
+Treat MCP URLs, arguments, mounts, headers and environment values as data, not shell scripts. Actions expressions such as `${{ steps.setup.outputs.port }}` are transported through environment bindings and resolved after JSON parsing. This also applies to entrypoints, container versions, registry metadata, proxy arguments, allowed tools and built-in GitHub custom arguments. CA paths retain their restricted workspace/temp expression support; unsupported expressions fail before lock emission. Simple runner `$NAME` and `${NAME}` references remain supported.
 
 Replace shell computations such as `$(...)`, backticks and `${NAME:-default}` with a setup-step output or an equivalent Actions expression. For example, when `WORKSPACE_FALLBACK` is available in the Actions `env` context, replace `${WORKSPACE_FALLBACK:-/tmp}` with:
 
@@ -115,7 +115,7 @@ mcp-servers:
       X-Workspace: "${{ env.WORKSPACE_FALLBACK || '/tmp' }}"
 ```
 
-Compilation warns at configuration paths containing unsupported shell computations. It rejects a value that combines transported expressions or runner variables with an explicitly deferred gateway reference such as `\${TOKEN}`. When all inputs are available to the runner, combine them in a single Actions expression; otherwise keep gateway-only references in a separate configuration value. Do not assume a gateway variable is available in the runner's environment.
+Compilation warns at configuration paths containing unsupported shell computations. These computations remain literal in both JSON configuration and mount allowlist exports. Former heredoc escapes such as `\$(printf literal)` and escaped backticks retain their literal payload without the shell-escape backslash. Compilation rejects a value that combines transported expressions or runner variables with an explicitly deferred gateway reference such as `\${TOKEN}`. When all inputs are available to the runner, combine them in a single Actions expression; otherwise keep gateway-only references in a separate configuration value. Do not assume a gateway variable is available in the runner's environment.
 
 > [!CAUTION]
 > Startup also rejects transported runtime values containing `${NAME}`, even when intended as literal template text. The pinned gateway expands that syntax again and cannot distinguish literal data from credential references. These runtime failures cannot all be predicted at compilation, and adding a backslash is not a supported escape for literal placeholder data.

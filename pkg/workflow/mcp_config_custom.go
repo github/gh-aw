@@ -273,6 +273,9 @@ func renderMCPStringScalar(yaml *strings.Builder, renderer MCPConfigRenderer, ke
 		fmt.Fprintf(yaml, "%s%s = \"%s\"\n", renderer.IndentLevel, key, value)
 		return
 	}
+	if key != "caCertFile" && key != "ca_cert_file" {
+		value, _ = replaceMCPExpressions(value, false)
+	}
 	renderMCPJSONScalar(yaml, renderer, key, value, isLast)
 }
 
@@ -287,7 +290,7 @@ func renderMCPArrayProperty(yaml *strings.Builder, property string, isLast bool,
 		if len(values) == 0 {
 			values = []string{"*"}
 		}
-		renderMCPArray(yaml, renderer, "tools", values, isLast, false)
+		renderMCPArray(yaml, renderer, "tools", values, isLast, true)
 	case "entrypointArgs":
 		renderMCPArray(yaml, renderer, "entrypointArgs", mcpConfig.EntrypointArgs, isLast, true)
 	case "mounts":
@@ -295,7 +298,7 @@ func renderMCPArrayProperty(yaml *strings.Builder, property string, isLast bool,
 	case "args":
 		renderMCPArray(yaml, renderer, "args", mcpConfig.Args, isLast, true)
 	case "proxy-args":
-		renderMCPArray(yaml, renderer, "proxy-args", mcpConfig.ProxyArgs, isLast, false)
+		renderMCPArray(yaml, renderer, "proxy-args", mcpConfig.ProxyArgs, isLast, true)
 	}
 }
 
