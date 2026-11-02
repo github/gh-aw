@@ -8,6 +8,13 @@ They declare endpoints, credential secret names, exact resource grants, and
 capabilities under `connectors.<id>`; no separate YAML definition or connection
 file is required. Review the specimen hosts and resource IDs before use.
 
+The compiler embeds these declarations. Import `"@builtin:connectors/<provider>.md"`
+to use the declaration shipped with that compiler, without copying files into the
+consumer repository. Local `.github/aw/connectors/` imports and pinned remote
+imports remain available for reviewed endpoint and resource customizations.
+Embedded imports use the same `uses`/`with` inputs and validation as other imports;
+they never fall back to a checkout file or implicitly enable capabilities.
+
 > [!IMPORTANT]
 > These declarations are experimental. Custom connector triggers currently fail
 > closed: importing a connector does not install a receiver, authenticate events,
