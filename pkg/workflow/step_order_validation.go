@@ -252,7 +252,8 @@ func isUnderSecretRedactionRoot(artifactPath string) bool {
 // that is NOT text-scanned by the redact_secrets step, but is nevertheless explicitly
 // permitted in artifact uploads.
 //
-// Binary git bundles are not text-scanned.
+// Binary git bundles and object-pack recovery envelopes are not text-scanned.
+// Their paired .patch artifacts carry the diff or complete object preview.
 func isKnownUnscannedButAllowedForUpload(artifactPath string) bool {
 	normalizedPath, _ := normalizeArtifactPathForRedaction(artifactPath)
 	isUnderGhAwDir := isUnderSecretRedactionRoot(normalizedPath) ||

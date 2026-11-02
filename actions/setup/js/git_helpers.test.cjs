@@ -43,6 +43,27 @@ describe("git_helpers.cjs", () => {
   });
 
   describe("execGitSync", () => {
+    it("scopes recovery Git budgets through asynchronous helpers without changing ordinary defaults", async () => {
+      const { default: childProcess } = await import("child_process");
+      const { withGitCommandLimits, execGitSyncResult, execLocalGitSync } = await import("./git_helpers.cjs");
+      const spy = vi.spyOn(childProcess, "spawnSync").mockReturnValue({ status: 0, stdout: "git version fixture\n", stderr: "" });
+      try {
+        execGitSyncResult(["--version"]);
+        const recovery = withGitCommandLimits({ timeout: 120000, maxBuffer: 160 * 1024 * 1024 }, async () => {
+          execLocalGitSync(["--version"]);
+          await Promise.resolve();
+          execLocalGitSync(["--version"]);
+        });
+        execGitSyncResult(["--version"]);
+        await recovery;
+        execGitSyncResult(["--version"]);
+        expect(spy.mock.calls.map(([, , options]) => options.timeout)).toEqual([60000, 120000, 60000, 120000, 60000]);
+        expect(spy.mock.calls.map(([, , options]) => options.maxBuffer)).toEqual([100, 160, 100, 160, 100].map(mib => mib * 1024 * 1024));
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it("exposes structured Git results without logging remote diagnostics", async () => {
       const { execGitSyncResult } = await import("./git_helpers.cjs");
       const logger = { debug: vi.fn(), error: vi.fn() };

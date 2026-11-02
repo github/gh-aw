@@ -1939,11 +1939,11 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
     });
 
     it.each([
-      ["warning", "agent_failure", "> [!WARNING]", "> threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["warning", "agent_failure", "> [!WARNING]", "> Threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
       ["warning", "threat_detected", "> [!CAUTION]", "> agentic threat detected", "<!-- gh-aw-threat-detected -->", "<!-- gh-aw-threat-engine-error -->"],
       // Warn-mode detection engine failure as concluded by threat-detect v0.5.2 (run 39191157830).
-      ["failure", "agent_failure", "> [!WARNING]", "> threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
-      ["failure", "parse_error", "> [!WARNING]", "> threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["failure", "agent_failure", "> [!WARNING]", "> Threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["failure", "parse_error", "> [!WARNING]", "> Threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
     ])("should create a review PR body for %s/%s with the correct admonition and marker", async (conclusion, reason, admonition, title, expectedMarker, unexpectedMarker) => {
       process.env.GH_AW_DETECTION_CONCLUSION = conclusion;
       process.env.GH_AW_DETECTION_REASON = reason;

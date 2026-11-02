@@ -163,6 +163,7 @@ func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, 
 		"GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH", "GITHUB_REPOSITORY", "GITHUB_SHA",
 		"GITHUB_TOKEN", "GITHUB_WORKSPACE", "RUNNER_TEMP",
 	}
+	safeOutputsEnvVars = append(safeOutputsEnvVars, objectPackLimitEnvNames...)
 	if workflowData != nil {
 		safeOutputsEnvVars = append(safeOutputsEnvVars, sliceutil.SortedKeys(workflowData.SafeOutputsInputEnvVars)...)
 	}
@@ -360,6 +361,13 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 		{"GITHUB_TOKEN", "GITHUB_TOKEN", false},
 		{"GITHUB_WORKSPACE", "GITHUB_WORKSPACE", false},
 		{"RUNNER_TEMP", "RUNNER_TEMP", false},
+	}
+	for _, name := range objectPackLimitEnvNames {
+		envVars = append(envVars, struct {
+			name      string
+			value     string
+			isLiteral bool
+		}{name, name, false})
 	}
 	if isWorkQueueEnabled(workflowData) {
 		envVars = append(envVars, struct {

@@ -152,6 +152,7 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		// ${VAR} placeholders in the safeoutputs MCP container env block and must be resolvable
 		// by the gateway from process.env at startup time.
 		envVars["GH_AW_SAFE_OUTPUTS_CONFIG_PATH"] = "${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_CONFIG_PATH }}"
+		addObjectPackLimitEnv(envVars)
 		envVars["GH_AW_SAFE_OUTPUTS_TOOLS_PATH"] = "${{ steps.set-runtime-paths.outputs.GH_AW_SAFE_OUTPUTS_TOOLS_PATH }}"
 		if workflowData.TrialMode && workflowData.TrialLogicalRepo != "" {
 			envVars["GH_AW_TARGET_REPO_SLUG"] = workflowData.TrialLogicalRepo
