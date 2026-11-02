@@ -17,12 +17,10 @@ func TestCredentialFreePromptEnvironment(t *testing.T) {
 	if err != nil {
 		t.Skip("node is required for prompt process coverage")
 	}
-	runtimeDir, err := filepath.Abs("../../actions/setup/js")
-	require.NoError(t, err)
 	var output strings.Builder
 	require.NoError(t, writeCredentialFreePromptSteps(&output, `
 - name: Create prompt
-  uses: actions/github-script@pinned
+  uses: actions/github-script@pinned # v9.0.0
   env:
     GH_AW_PUBLIC: public-value
   with:
@@ -31,29 +29,52 @@ func TestCredentialFreePromptEnvironment(t *testing.T) {
         if (key in process.env) throw new Error("Inherited credential or startup environment: " + key);
       }
       if (typeof global.github !== "undefined" || typeof global.getOctokit !== "undefined") throw new Error("Authenticated client available");
+      if (process.env.GITHUB_OUTPUT !== "synthetic-output-path") throw new Error("github-script output path removed");
       process.stdout.write(process.env.GH_AW_PUBLIC);
 `, &WorkflowData{Env: "env:\n  ARBITRARY_SECRET: ${{ secrets.PRIVATE }}\n"}))
 	var steps []WorkflowStep
 	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &steps))
 	require.Len(t, steps, 1)
 	step := steps[0]
-	assert.Empty(t, step.Uses)
-	assert.Empty(t, step.With)
+	assert.Equal(t, "actions/github-script@pinned", step.Uses)
+	assert.Contains(t, output.String(), "uses: actions/github-script@pinned # v9.0.0")
+	assert.Equal(t, promptGitHubScriptToken, step.With["github-token"])
+	assert.Empty(t, step.Run)
 	assert.Empty(t, step.Env["ARBITRARY_SECRET"])
-	step.Env["GH_AW_ACTIONS_DIR"] = runtimeDir
-	command := exec.Command("bash", "--noprofile", "--norc", "-e", "-c", step.Run)
+	script, ok := step.With["script"].(string)
+	require.True(t, ok)
+	harness := `process.env.NODE_OPTIONS = "--require=/nonexistent-injected-startup.cjs";
+process.env.NODE_PATH = "/nonexistent-injected-modules";
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+new AsyncFunction("core", "context", process.env.GH_AW_TEST_SCRIPT)({}, {})
+  .catch(error => { console.error(error); process.exitCode = 1; });`
+	command := exec.Command(node, "-e", harness)
 	command.Env = append(os.Environ(),
-		"PATH="+filepath.Dir(node)+":/usr/bin:/bin",
 		"GITHUB_TOKEN=synthetic-token", "GH_TOKEN=synthetic-token", "INPUT_GITHUB-TOKEN=synthetic-token",
 		"ACTIONS_RUNTIME_TOKEN=synthetic-token", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=synthetic-token",
 		"ARBITRARY_SECRET=synthetic-secret", "GH_AW_UNSELECTED=synthetic-secret",
-		"NODE_OPTIONS=--require=/nonexistent-injected-startup.cjs", "NODE_PATH=/nonexistent-injected-modules")
+		"GH_AW_TEST_SCRIPT="+script, "GITHUB_OUTPUT=synthetic-output-path",
+		"NODE_OPTIONS=", "NODE_PATH=")
 	for key, value := range step.Env {
 		command.Env = append(command.Env, key+"="+value)
 	}
 	result, err := command.CombinedOutput()
 	require.NoError(t, err, "%s", result)
 	assert.Equal(t, "public-value", string(result))
+}
+
+func TestCredentialFreePromptPreservesShellSteps(t *testing.T) {
+	var output strings.Builder
+	require.NoError(t, writeCredentialFreePromptSteps(&output, `
+- name: Validate prompt
+  run: bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
+`, &WorkflowData{}))
+	var steps []WorkflowStep
+	require.NoError(t, yaml.Unmarshal([]byte(output.String()), &steps))
+	require.Len(t, steps, 1)
+	assert.Equal(t, `bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"`, steps[0].Run)
+	assert.NotContains(t, output.String(), "/usr/bin/env")
+	assert.NotContains(t, output.String(), "GH_AW_PROMPT_SCRIPT")
 }
 
 func TestPromptRejectsSecretBackedAuthorBindings(t *testing.T) {

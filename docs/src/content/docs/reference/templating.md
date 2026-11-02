@@ -29,7 +29,9 @@ The main workflow and local runtime-import files support `env.*` expressions, in
 
 Local runtime imports have the same author expression capabilities as the main workflow, including nested local imports within the permitted folders. Evaluated values remain literal data and cannot introduce additional imports or directives. Downloaded HTTPS content has no expression, template, or import capabilities, even when an importing local file has author bindings.
 
-Activation-job prompt creation, interpolation, substitution, validation, and printing run in credential-free child processes with explicitly selected environment variables. They do not use `actions/github-script` or receive its default GitHub token, authenticated API client, inherited action inputs, runtime tokens, OIDC credentials, or Node startup options. This is environment isolation, not filesystem or runner isolation; authors must not place credentials in prompt files, inputs, or custom job outputs.
+Activation-job prompt creation, interpolation, and substitution use pinned `actions/github-script` actions. Their default GitHub token is replaced with the non-secret `no-authentication` placeholder because the action requires a nonempty token. Before loading prompt modules, the compiler-owned script removes environment variables outside its explicit bindings and non-secret runner/context allowlist, including inherited tokens and Node startup options. Prompt modules receive `core` and `context`, not an authenticated API client. Existing shell validation and printing steps remain shell steps.
+
+Environment cleanup occurs after the action starts, not before Node startup. It is not process-startup, filesystem, or runner isolation; authors must not place credentials in prompt files, inputs, or custom job outputs.
 
 Expression safety is validated during compilation. Unauthorized expressions produce errors like:
 

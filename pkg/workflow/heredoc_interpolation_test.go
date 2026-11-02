@@ -69,8 +69,8 @@ Actor: ${{ github.actor }}
 	compiledStr := string(compiledYAML)
 	promptStep := promptCreationStepContent(compiledStr)
 
-	if !strings.Contains(promptStep, `node -e "$GH_AW_PROMPT_SCRIPT"`) || strings.Contains(promptStep, "<<") || strings.Contains(promptStep, "create_prompt_first.sh") {
-		t.Error("Prompt creation should pass a compiler-owned Node script through an environment variable, not a heredoc")
+	if !strings.Contains(promptStep, "uses: actions/github-script@") || strings.Contains(promptStep, "<<") || strings.Contains(promptStep, "/usr/bin/env") {
+		t.Error("Prompt creation should use github-script without a shell launcher or heredoc")
 	}
 	if !strings.Contains(promptStep, "create_prompt.cjs") {
 		t.Error("Prompt creation should use create_prompt.cjs")
@@ -91,8 +91,8 @@ Actor: ${{ github.actor }}
 		t.Error("Compiled workflow should contain interpolation and template rendering step")
 	}
 
-	if strings.Contains(promptStep, "uses:") {
-		t.Error("Prompt creation should not run an authenticated action")
+	if !strings.Contains(promptStep, "github-token: "+promptGitHubScriptToken) {
+		t.Error("Prompt creation must override github-script's default token with a non-secret placeholder")
 	}
 
 	// Verify environment variables are defined in the step
@@ -138,8 +138,8 @@ Actor: ${{ github.actor }}
 	compiledStr := string(compiledYAML)
 	promptStep := promptCreationStepContent(compiledStr)
 
-	if !strings.Contains(promptStep, `node -e "$GH_AW_PROMPT_SCRIPT"`) {
-		t.Error("Expected a compiler-owned Node script passed through an environment variable")
+	if !strings.Contains(promptStep, "uses: actions/github-script@") {
+		t.Error("Expected a github-script prompt renderer")
 	}
 	if !strings.Contains(promptStep, "create_prompt.cjs") {
 		t.Error("Expected JavaScript prompt creation")

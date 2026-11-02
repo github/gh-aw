@@ -120,6 +120,7 @@ Normal content here.
 			Steps []struct {
 				Name, Uses, Run string
 				Env             map[string]string
+				With            map[string]any
 			}
 		}
 	}
@@ -128,11 +129,14 @@ Normal content here.
 	for _, step := range workflow.Jobs["activation"].Steps {
 		if step.Name == "Interpolate variables and render templates" {
 			found = true
-			require.Empty(t, step.Uses)
-			require.Contains(t, step.Run, `node -e "$GH_AW_PROMPT_SCRIPT"`)
-			require.Contains(t, step.Env["GH_AW_PROMPT_SCRIPT"], "require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs')")
-			require.Contains(t, step.Env["GH_AW_PROMPT_SCRIPT"], "await main(")
-			require.NotContains(t, step.Env["GH_AW_PROMPT_SCRIPT"], "setupGlobals")
+			require.Contains(t, step.Uses, "actions/github-script@")
+			require.Empty(t, step.Run)
+			require.Equal(t, promptGitHubScriptToken, step.With["github-token"])
+			script, ok := step.With["script"].(string)
+			require.True(t, ok)
+			require.Contains(t, script, "require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs')")
+			require.Contains(t, script, "await main(")
+			require.NotContains(t, script, "setupGlobals")
 		}
 	}
 	require.True(t, found)
