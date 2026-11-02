@@ -15,6 +15,17 @@ const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./erro
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
 
+class CheckProducerError extends Error {
+  /** @param {string} message @param {Record<string, any>} rejection */
+  constructor(message, rejection) {
+    super(message);
+    for (const field of ["check_run_id", "expected_app_id", "observed_app_id"]) {
+      if (!Number.isSafeInteger(rejection[field]) || rejection[field] <= 0) delete rejection[field];
+    }
+    this.rejection = rejection;
+  }
+}
+
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
@@ -165,11 +176,8 @@ async function getReviewSummary(githubClient, owner, repo, pullNumber, headSha) 
  * @param {string[]} requiredApprovers
  */
 async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers) {
-  if (requiredApprovers.length === 0) {
-    return [];
-  }
-  const identity = await githubClient.graphql(`query { viewer { login } }`);
-  if (!identity?.viewer?.login || !pr.user?.login) {
+  const identity = requiredApprovers.length > 0 ? await githubClient.graphql(`query { viewer { login } }`) : null;
+  if (requiredApprovers.length > 0 && (!identity?.viewer?.login || !pr.user?.login)) {
     throw new Error(`${SAFE_OUTPUT_E007}: Missing merge identity or PR author for independent approval evaluation`);
   }
   const reviews = await githubClient.paginate(githubClient.rest.pulls.listReviews, {
@@ -205,9 +213,7 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
     // Review IDs reflect creation, so a pending review can be submitted after a higher-ID review.
     latest.set(login, review);
   }
-  if ([...latest.values()].some(review => review.state === "CHANGES_REQUESTED")) {
-    throw new Error(`${SAFE_OUTPUT_E007}: Blocking human review remains active for PR #${pr.number}`);
-  }
+  const blockingReviews = [...latest.values()].filter(review => review.state === "CHANGES_REQUESTED").map(review => ({ login: review.user.login, review_id: review.id, commit_id: review.commit_id }));
   const allowed = requiredApprovers.map(login => login.toLowerCase());
   const approvals = [...latest.values()]
     .filter(
@@ -221,7 +227,7 @@ async function getApprovalEvidence(githubClient, owner, repo, pr, requiredApprov
     )
     .map(review => ({ login: review.user.login, review_id: review.id, commit_id: review.commit_id }));
   core.debug(`merge_pull_request: ${JSON.stringify({ event: "approval_evidence", reviews: reviews.length, eligible_approvals: approvals.length })}`);
-  return approvals;
+  return { approvals, blocking_reviews: blockingReviews };
 }
 
 /**
@@ -353,9 +359,10 @@ async function getBranchPolicy(githubClient, owner, repo, baseBranch) {
  * @param {string} repo
  * @param {string} headSha
  * @param {string[]} requiredChecks
+ * @param {Record<string, number>} [requiredCheckApps]
  * @returns {Promise<{missing: string[], failing: Array<{name: string, status: string, conclusion: string|null}>, passing: Array<{name: string, check_run_id: number, head_sha: string, app_id: number|null}>}>}
  */
-async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requiredChecks) {
+async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requiredChecks, requiredCheckApps = {}) {
   core.info(`Evaluating required checks on ${headSha}: ${requiredChecks.join(", ") || "(none)"}`);
   if (requiredChecks.length === 0) {
     return { missing: [], failing: [], passing: [] };
@@ -374,12 +381,32 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
     if (!requiredChecks.includes(run.name) || isDeploymentCheck(run)) {
       continue;
     }
-    if (!Number.isInteger(run.app?.id) || run.app.id <= 0) {
-      throw new Error(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check "${run.name}"`);
+    if (!Number.isSafeInteger(run.app?.id) || run.app.id <= 0) {
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check`, {
+        code: "required_check_producer_missing",
+        name: run.name,
+        check_run_id: run.id,
+        expected_app_id: requiredCheckApps[run.name],
+      });
+    }
+    if (Object.hasOwn(requiredCheckApps, run.name) && run.app.id !== requiredCheckApps[run.name]) {
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Unexpected check producer for required check`, {
+        code: "required_check_producer_mismatch",
+        name: run.name,
+        check_run_id: run.id,
+        expected_app_id: requiredCheckApps[run.name],
+        observed_app_id: run.app.id,
+      });
     }
     const appId = producersByName.get(run.name);
     if (appId !== undefined && appId !== run.app.id) {
-      throw new Error(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check "${run.name}"`);
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check`, {
+        code: "required_check_producer_ambiguous",
+        name: run.name,
+        check_run_id: run.id,
+        expected_app_id: appId,
+        observed_app_id: run.app.id,
+      });
     }
     producersByName.set(run.name, run.app.id);
   }
@@ -508,6 +535,7 @@ async function main(config = {}) {
   const requiredTitlePrefix = config.required_title_prefix || "";
   const allowedBranches = Array.isArray(config.allowed_branches) ? config.allowed_branches : [];
   const requiredChecks = Array.isArray(config.required_checks) ? config.required_checks : [];
+  const requiredCheckApps = config.required_check_apps || {};
   const requiredApprovers = Array.isArray(config.required_approvers) ? config.required_approvers : [];
 
   const allowedBranchPatterns = compilePathGlobs(allowedBranches);
@@ -522,17 +550,39 @@ async function main(config = {}) {
 
   return async function handleMergePullRequest(message, resolvedTemporaryIds) {
     core.info(`Processing merge_pull_request message: ${JSON.stringify({ pull_request_number: message?.pull_request_number, repo: message?.repo, merge_method: message?.merge_method })}`);
+    const attemptedRepo = message?.repo || defaultTargetRepo;
+    const configuredTarget = targetConfig === "*" ? undefined : resolveTarget({ targetConfig, item: {}, context, itemType: "merge_pull_request" });
+    const attemptedNumber = targetConfig === "*" ? message?.pull_request_number : configuredTarget?.success ? configuredTarget.number : undefined;
+    /** @param {string} code @param {string} error @param {any} [repository] @param {any} [number] */
+    const rejectTarget = (code, error, repository = attemptedRepo, number = attemptedNumber) => {
+      if (typeof repository === "string" && !repository.includes("/") && typeof defaultTargetRepo === "string" && defaultTargetRepo.includes("/")) {
+        repository = `${defaultTargetRepo.split("/")[0]}/${repository}`;
+      }
+      return {
+        success: false,
+        data_trust: "untrusted",
+        staged: isStaged,
+        error,
+        failure_reasons: [{ code, message: "Merge target rejected before evaluation" }],
+        decision_evidence: {
+          data_trust: "untrusted",
+          repository: typeof repository === "string" && repository.trim() === repository && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?\/[a-zA-Z0-9_.-]{1,100}$/.test(repository) ? repository : undefined,
+          pull_request_number: Number.isSafeInteger(number) && number > 0 ? number : undefined,
+          evaluated_at: new Date().toISOString(),
+        },
+      };
+    };
     if (processedCount >= maxCount) {
       core.debug('merge_pull_request: {"event":"limit_reached"}');
       core.warning(`Skipping merge_pull_request: max count of ${maxCount} reached`);
-      return { success: false, data_trust: "untrusted", error: `Max count of ${maxCount} reached` };
+      return rejectTarget("merge_limit_reached", `Max count of ${maxCount} reached`);
     }
     processedCount++;
 
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "merge pull request");
     if (!repoResult.success) {
       core.error(`Repository validation failed: ${repoResult.error}`);
-      return { success: false, data_trust: "untrusted", error: repoResult.error };
+      return rejectTarget("repository_validation_failed", repoResult.error);
     }
     const { owner, repo } = repoResult.repoParts;
     core.info(`Resolved target repository: ${owner}/${repo}`);
@@ -542,7 +592,7 @@ async function main(config = {}) {
       const pullNumberResolution = resolvePullRequestNumber(message, resolvedTemporaryIds);
       if (!pullNumberResolution.success) {
         core.error(pullNumberResolution.error);
-        return { success: false, data_trust: "untrusted", error: pullNumberResolution.error };
+        return rejectTarget("pull_request_number_invalid", pullNumberResolution.error, `${owner}/${repo}`);
       }
       targetItem = { ...message, pull_request_number: pullNumberResolution.pullNumber };
       if (pullNumberResolution.fromTemporaryId) {
@@ -558,7 +608,7 @@ async function main(config = {}) {
     });
     if (!targetResult.success) {
       core.error(targetResult.error);
-      return { success: false, data_trust: "untrusted", error: targetResult.error };
+      return rejectTarget("target_resolution_failed", targetResult.error, `${owner}/${repo}`);
     }
     const pullNumber = targetResult.number;
     core.info(`Target PR number: ${pullNumber}`);
@@ -705,11 +755,12 @@ async function main(config = {}) {
       branchPolicy.requiredChecks = [...new Set([...branchPolicy.requiredChecks, ...requiredChecks])].sort();
       evidence.branch_policy = branchPolicy;
       phase = "required_checks";
-      const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks);
+      evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps };
+      const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
       core.debug(
         `merge_pull_request: ${JSON.stringify({ event: "check_evidence", required: branchPolicy.requiredChecks.length, passing: checkSummary.passing.length, missing: checkSummary.missing.length, failing: checkSummary.failing.length })}`
       );
-      evidence.checks = { required: branchPolicy.requiredChecks, ...checkSummary };
+      evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps, ...checkSummary };
       core.info(`Required check summary: missing=${checkSummary.missing.length}, failing=${checkSummary.failing.length}`);
       if (checkSummary.missing.length > 0) {
         failureReasons.push({
@@ -741,9 +792,15 @@ async function main(config = {}) {
       const reviewSummary = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
       evidence.reviews = reviewSummary;
       phase = "approval_evidence";
-      const approvals = await getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers);
-      evidence.approval_policy = { required_approvers: requiredApprovers, approvals };
-      if (requiredApprovers.length > 0 && approvals.length === 0) {
+      const approvalEvidence = await getApprovalEvidence(githubClient, owner, repo, pr, requiredApprovers);
+      evidence.approval_policy = { required_approvers: requiredApprovers, ...approvalEvidence };
+      if (approvalEvidence.blocking_reviews.length > 0) {
+        failureReasons.push({
+          code: "blocking_individual_review",
+          message: "An effective changes-requested review remains active",
+        });
+      }
+      if (requiredApprovers.length > 0 && approvalEvidence.approvals.length === 0) {
         failureReasons.push({
           code: "required_approval_missing",
           message: "An independent allowlisted human must approve the evaluated head revision",
@@ -769,6 +826,7 @@ async function main(config = {}) {
         return {
           success: false,
           data_trust: "untrusted",
+          staged: isStaged,
           error: "merge_pull_request gate checks failed",
           failure_reasons: failureReasons,
           checks_evaluated: branchPolicy.requiredChecks,
@@ -793,19 +851,27 @@ async function main(config = {}) {
       const upstreamPR = await getOpenPullRequestForBranch(githubClient, owner, repo, baseBranch);
       const currentReviews = await getReviewSummary(githubClient, owner, repo, pullNumber, pr.head.sha);
       const currentApprovals = await getApprovalEvidence(githubClient, owner, repo, currentPR, requiredApprovers);
-      const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks);
+      const currentChecks = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
+      evidence.revalidation = {
+        branch_policy: currentPolicy,
+        upstream_pull_request: upstreamPR?.number || null,
+        reviews: currentReviews,
+        approval_policy: currentApprovals,
+        checks: currentChecks,
+        evaluated_at: new Date().toISOString(),
+      };
       if (
         !isDeepStrictEqual(currentPolicy, branchPolicy) ||
         !upstreamPR ||
         !isDeepStrictEqual(currentReviews, reviewSummary) ||
-        !isDeepStrictEqual(currentApprovals, approvals) ||
+        !isDeepStrictEqual(currentApprovals, approvalEvidence) ||
         currentChecks.missing.length > 0 ||
         currentChecks.failing.length > 0
       ) {
         throw new Error(`${SAFE_OUTPUT_E007}: Merge policy evidence changed after evaluation; fresh evaluation required`);
       }
       evidence.upstream_pull_request = upstreamPR.number;
-      evidence.checks = { required: branchPolicy.requiredChecks, ...currentChecks };
+      evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps, ...currentChecks };
       evidence.revalidated_at = new Date().toISOString();
       core.debug('merge_pull_request: {"event":"revalidation_passed"}');
 
@@ -842,6 +908,7 @@ async function main(config = {}) {
         return {
           success: false,
           data_trust: "untrusted",
+          staged: isStaged,
           error: mergeResponse.data?.message || "Merge API returned merged=false",
           failure_reasons: [{ code: "merge_not_completed", message: mergeResponse.data?.message || "Merge was not completed" }],
           checks_evaluated: branchPolicy.requiredChecks,
@@ -863,11 +930,24 @@ async function main(config = {}) {
     } catch (error) {
       core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
       core.error(`merge_pull_request failed for PR #${pullNumber} during ${phase}`);
+      evidence.failure_phase = phase;
+      if (error instanceof CheckProducerError) {
+        const checks = { producer_rejections: [error.rejection] };
+        if (phase === "revalidation") {
+          evidence.revalidation = { checks, evaluated_at: new Date().toISOString() };
+        } else {
+          evidence.checks = { ...evidence.checks, ...checks };
+        }
+        failureReasons.push({ code: error.rejection.code, message: error.message });
+      } else {
+        failureReasons.push({ code: "merge_operation_error", message: getErrorMessage(error) });
+      }
       return {
         success: false,
         data_trust: "untrusted",
+        staged: isStaged,
         error: getErrorMessage(error),
-        failure_reasons: [{ code: "merge_operation_error", message: getErrorMessage(error) }],
+        failure_reasons: failureReasons,
         decision_evidence: evidence,
       };
     }

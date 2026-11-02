@@ -16,7 +16,13 @@ Bind every new merge attempt to the evaluated PR head SHA through the merge API'
 
 Compare stable authorization inputs separately from asynchronously computed mergeability. Bounded read retries allow mergeability computation to settle; unconfirmed mergeability and conflicts still block execution, without retrying the merge mutation.
 
-When configured, each required check must have a successful, completed check run on the evaluated SHA. The approval gate requires at least one allowlisted GitHub `User` account's latest effective approval on that SHA, excluding both the PR author and the acting identity; it does not require every allowlisted account to approve. These are opt-in gates, not new unconditional CI or human-approval requirements. Existing draft, mergeability, requested-reviewer, unresolved-thread, label, title, source-branch, and integration-branch constraints remain in force.
+When configured, each required check must have a successful, completed check run on the evaluated SHA. `required-check-apps` can bind named checks to workflow-owned GitHub App IDs. Effective changes-requested reviews always block, even without an approver allowlist or aggregate blocking review decision. The approval gate requires at least one allowlisted GitHub `User` account's latest effective approval on that SHA, excluding both the PR author and the acting identity; it does not require every allowlisted account to approve. CI and affirmative approval remain opt-in gates. Existing draft, mergeability, requested-reviewer, unresolved-thread, label, title, source-branch, and integration-branch constraints remain in force.
+
+The handler manager exposes only summary-safe gate codes and minimized evidence for blocked decisions. Audit artifacts for successful, blocked, and staged decisions retain run identity, outcome, fixed failure codes, and an allowlisted repository/PR identity, head/base revisions, and evaluation timestamps, not titles, labels, branches, check names, reviewer identities, or approval details. Producer rejections retain only fixed phase/code and validated check-run/app IDs; early target rejections retain a fixed code and valid attempted identity when available. Records remain bounded. Uploads require successful standard tracked-secret redaction and configured custom masking; secret tracking collects uppercase `secrets.NAME` references from preceding generated steps rather than claiming exhaustive detection.
+
+Audit persistence is separate from the operation outcome. If writing the audit fails after a completed merge, preserve the successful merge result, revision, URL, and internal decision evidence while surfacing an explicit audit-failure warning. Do not retry the merge or report that the merge failed merely because its audit could not be written.
+
+Global staged and trial runs retain merge decision audit artifacts while suppressing applied-item manifests. A staged preview never calls the merge API and does not claim that a merge occurred.
 
 ### Alternatives Considered
 
@@ -43,7 +49,7 @@ Agent-supplied check names and approvers would allow per-request flexibility wit
 #### Negative
 
 - Only the head SHA is an atomic merge precondition. Other policy inputs can still change after the final reads; revalidation narrows but does not eliminate that race.
-- Required check names are not producer authentication. Recording an app ID does not enforce an allowlisted check producer, and a GitHub `User` account is not proof that a person performed the review.
+- Required check names are not producer authentication unless pinned with `required-check-apps`. Even a pinned app ID cannot distinguish independently protected CI from agent-editable workflows using the same app, and a GitHub `User` account is not proof that a person performed the review.
 - Additional reads and review pagination increase latency, permission requirements, and sensitivity to API failures or concurrent edits. Check-run reads need `checks: read` even when requirements originate from branch policy rather than an explicit workflow list.
 - A revert can restore repository content but cannot undo deployments, notifications, or other external effects caused by a merge.
 
