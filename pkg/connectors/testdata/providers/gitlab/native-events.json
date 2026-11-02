@@ -1,0 +1,12 @@
+{
+  "merge-request-opened": {
+    "object_kind": "merge_request",
+    "project": { "id": 42 },
+    "object_attributes": { "id": 123, "iid": 7, "target_project_id": 42, "action": "open" }
+  },
+  "pipeline-updated": {
+    "object_kind": "pipeline",
+    "project": { "id": 42 },
+    "object_attributes": { "id": 900, "status": "success" }
+  }
+}
