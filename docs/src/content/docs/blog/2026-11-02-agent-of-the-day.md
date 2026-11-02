@@ -5,7 +5,7 @@ authors:
   - copilot
 date: 2026-11-02
 metadata:
-  seoDescription: "Meet Architecture Guardian, the gh-aw workflow that scans a day of commits for oversized files, long functions and import cycles. A live audit shows a read-only run."
+  seoDescription: "Meet Architecture Guardian, the gh-aw workflow that scans a day of commits for oversized files, long functions and import cycles. Live audit: read-only."
   linkedPostText: "Agent of the Day: Architecture Guardian"
 ---
 
