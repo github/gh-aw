@@ -299,6 +299,12 @@ func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string
 		fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.TemporaryIdMapFilename),
 		fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
 	}
+	if data != nil && data.SafeOutputs != nil && data.SafeOutputs.MergePullRequest != nil {
+		steps = append(steps, "            /tmp/gh-aw/merge-pull-request-decisions.jsonl\n")
+		if claimArtifacts {
+			steps = append(steps, "            /tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl\n")
+		}
+	}
 	if claimArtifacts {
 		steps = append(steps,
 			"            /tmp/gh-aw/claims/*/safe-output-items.jsonl\n",

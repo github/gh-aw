@@ -69,6 +69,7 @@ describe("Safe Output Handler Manager", () => {
     delete global.context;
     fs.rmSync("/tmp/gh-aw/comment-memory", { recursive: true, force: true });
     fs.rmSync("/tmp/gh-aw/safe-output-errors.json", { force: true });
+    fs.rmSync("/tmp/gh-aw/merge-pull-request-decisions.jsonl", { force: true });
     fs.rmSync("/tmp/gh-aw/actions", { recursive: true, force: true });
   });
 
@@ -119,6 +120,48 @@ describe("Safe Output Handler Manager", () => {
       expect(handler).toHaveBeenCalledTimes(1);
       expect(result.results[1]).toMatchObject({ skipped: true, reason: expect.stringContaining("closed after") });
       expect(computeSafeOutputsStatus(result.results)).toMatchObject({ itemsSucceeded: 1, itemsSkipped: 1 });
+    });
+
+    describe("merge decision audit", () => {
+      it("surfaces audit write failures without retrying an executed merge", async () => {
+        const handler = vi.fn().mockResolvedValue({ success: true, merged: true, decision_evidence: { head_sha: "abc123" } });
+        const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
+          throw new Error("Disk unavailable");
+        });
+        try {
+          const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+          expect(result.results[0]).toMatchObject({ success: false, error: expect.stringContaining("Failed to persist merge pull request decision") });
+          expect(handler).toHaveBeenCalledTimes(1);
+        } finally {
+          append.mockRestore();
+        }
+      });
+
+      it.each(["merged", "blocked", "staged"])("preserves and persists %s evidence", async mode => {
+        const decision = {
+          success: mode !== "blocked",
+          merged: mode === "merged",
+          staged: mode === "staged",
+          data_trust: "untrusted",
+          error: mode === "blocked" ? "merge_pull_request gate checks failed" : undefined,
+          failure_reasons: mode === "blocked" ? [{ code: "required_approval_missing" }] : [],
+          decision_evidence: { head_sha: "abc123", base_sha: "def456" },
+        };
+        const handler = vi.fn().mockResolvedValue(decision);
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0].result).toEqual(decision);
+        const entries = fs
+          .readFileSync("/tmp/gh-aw/merge-pull-request-decisions.jsonl", "utf8")
+          .trim()
+          .split("\n")
+          .map(line => JSON.parse(line));
+        expect(entries.at(-1)).toMatchObject({
+          data_trust: "untrusted",
+          merged: mode === "merged",
+          staged: mode === "staged",
+          decision_evidence: { head_sha: "abc123", base_sha: "def456" },
+        });
+      });
     });
 
     it("does not apply effects when live PR state cannot be read", async () => {

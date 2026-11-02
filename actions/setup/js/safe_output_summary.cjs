@@ -387,6 +387,14 @@ function generateSafeOutputSummary(options) {
     summary += formatOutcomeDiagnostics(result, message, error, outcome);
   }
 
+  if (type === "merge_pull_request" && result?.decision_evidence) {
+    const codes = (result.failure_reasons || []).map(reason => reason.code).filter(code => typeof code === "string" && /^[a-z_]{1,80}$/.test(code));
+    if (codes.length > 0) {
+      summary += `**Blocked Gates:** ${codes.map(code => `\`${code}\``).join(", ")}\n\n`;
+    }
+    summary += "Decision evidence is recorded in `merge-pull-request-decisions.jsonl` in the safe-outputs-items artifact.\n\n";
+  }
+
   // Display secrecy and integrity security metadata fields if present in the message.
   // secrecy indicates the confidentiality level of the message content.
   // integrity indicates the trustworthiness level of the message source.

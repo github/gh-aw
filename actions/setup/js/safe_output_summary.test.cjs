@@ -861,6 +861,23 @@ describe("safe_output_summary", () => {
     });
   });
 
+  it("renders bounded merge failure codes and the audit artifact location, not raw evidence", () => {
+    const summary = generateSafeOutputSummary({
+      type: "merge_pull_request",
+      messageIndex: 1,
+      success: false,
+      error: "merge_pull_request gate checks failed",
+      result: {
+        decision_evidence: { labels: ["private-instruction-like-label"] },
+        failure_reasons: [{ code: "required_approval_missing" }, { code: "unsafe\n@someone" }],
+      },
+    });
+    expect(summary).toContain("`required_approval_missing`");
+    expect(summary).toContain("merge-pull-request-decisions.jsonl");
+    expect(summary).not.toContain("private-instruction-like-label");
+    expect(summary).not.toContain("@someone");
+  });
+
   describe("writeSafeOutputSummaries", () => {
     it.each([
       { success: false, error: "ERR_API: operation failed" },

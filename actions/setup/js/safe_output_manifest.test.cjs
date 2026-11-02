@@ -13,6 +13,7 @@ import {
   extractCreatedItemFromResult,
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
+  writeMergePullRequestDecision,
 } from "./safe_output_manifest.cjs";
 
 describe("safe_output_manifest", () => {
@@ -38,6 +39,75 @@ describe("safe_output_manifest", () => {
   describe("MANIFEST_FILE_PATH", () => {
     it("should be the expected default path", () => {
       expect(MANIFEST_FILE_PATH).toBe("/tmp/gh-aw/safe-output-items.jsonl");
+    });
+
+    describe("writeMergePullRequestDecision", () => {
+      it.each(["merged", "blocked", "staged"])("persists redacted %s decision evidence", mode => {
+        const secret = "audit-test-secret-value";
+        process.env.GH_AW_SECRET_NAMES = "AUDIT_TEST";
+        process.env.SECRET_AUDIT_TEST = secret;
+        process.env.GITHUB_RUN_ID = "123";
+        try {
+          writeMergePullRequestDecision(
+            {
+              success: mode !== "blocked",
+              merged: mode === "merged",
+              staged: mode === "staged",
+              failure_reasons: mode === "blocked" ? [{ code: "required_approval_missing", message: secret }] : [],
+              decision_evidence: {
+                data_trust: "untrusted",
+                repository: "owner/repo",
+                head_sha: "abc123",
+                labels: { present: [secret] },
+                checks: { passing: [{ check_run_id: 1, app_id: 5 }] },
+                approval_policy: { approvals: [{ login: "reviewer", review_id: 2, commit_id: "abc123" }] },
+              },
+            },
+            0,
+            testManifestFile
+          );
+          const content = fs.readFileSync(testManifestFile, "utf8");
+          const entry = JSON.parse(content.trim());
+          expect(content).not.toContain(secret);
+          expect(entry).toMatchObject({
+            data_trust: "untrusted",
+            run_id: "123",
+            merged: mode === "merged",
+            staged: mode === "staged",
+            failure_codes: mode === "blocked" ? ["required_approval_missing"] : [],
+            decision_evidence: { head_sha: "abc123", approval_policy: { approvals: [{ review_id: 2 }] } },
+          });
+          expect(fs.statSync(testManifestFile).mode & 0o777).toBe(0o600);
+        } finally {
+          delete process.env.GH_AW_SECRET_NAMES;
+          delete process.env.SECRET_AUDIT_TEST;
+          delete process.env.GITHUB_RUN_ID;
+        }
+      });
+
+      it("bounds oversized evidence explicitly while preserving evaluated revisions", () => {
+        global.core = { warning: vi.fn() };
+        try {
+          writeMergePullRequestDecision(
+            {
+              success: false,
+              decision_evidence: { head_sha: "abc123", base_sha: "def456", labels: ["x".repeat(70000)] },
+            },
+            0,
+            testManifestFile
+          );
+          const content = fs.readFileSync(testManifestFile, "utf8");
+          expect(Buffer.byteLength(content)).toBeLessThanOrEqual(65537);
+          expect(JSON.parse(content)).toMatchObject({ evidence_truncated: true, decision_evidence: { head_sha: "abc123", base_sha: "def456" } });
+          expect(core.warning).toHaveBeenCalled();
+        } finally {
+          delete global.core;
+        }
+      });
+
+      it("surfaces persistence failures instead of reporting audit success", () => {
+        expect(() => writeMergePullRequestDecision({ success: true }, 0, path.dirname(testManifestFile))).toThrow("Failed to persist merge pull request decision");
+      });
     });
   });
 

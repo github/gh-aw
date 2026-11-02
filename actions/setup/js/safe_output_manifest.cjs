@@ -12,6 +12,62 @@ const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentit
 
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
 const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
+const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
+
+/**
+ * @param {Record<string, any>} result
+ * @param {number} messageIndex
+ * @param {string} [filePath]
+ */
+function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), MERGE_DECISIONS_FILE_NAME)) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    data_trust: "untrusted",
+    run_id: process.env.GITHUB_RUN_ID,
+    run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+    messageIndex,
+    success: result.success === true,
+    merged: result.merged === true,
+    staged: result.staged === true,
+    already_merged: result.alreadyMerged === true,
+    failure_codes: (result.failure_reasons || []).map(reason => reason.code),
+    decision_evidence: result.decision_evidence,
+  };
+  try {
+    const secretValues = collectArtifactSecretValues();
+    let content = JSON.stringify(redactManifestValue(entry, secretValues));
+    if (Buffer.byteLength(content, "utf8") > 65536) {
+      const evidence = result.decision_evidence || {};
+      content = JSON.stringify(
+        redactManifestValue(
+          {
+            ...entry,
+            failure_codes: entry.failure_codes.slice(0, 100),
+            decision_evidence: {
+              repository: evidence.repository,
+              pull_request_number: evidence.pull_request_number,
+              head_sha: evidence.head_sha,
+              base_sha: evidence.base_sha,
+              evaluated_at: evidence.evaluated_at,
+              revalidated_at: evidence.revalidated_at,
+            },
+            evidence_truncated: true,
+          },
+          secretValues
+        )
+      );
+      core.warning("Merge decision evidence exceeded 64 KiB; only revision identity and failure codes were retained");
+    }
+    if (Buffer.byteLength(content, "utf8") > 65536) {
+      throw new Error(`${ERR_SYSTEM}: Merge decision identity exceeds the 64 KiB audit limit`);
+    }
+    const destination = scopedArtifactFile(filePath);
+    fs.mkdirSync(nodePath.dirname(destination), { recursive: true });
+    fs.appendFileSync(destination, content + "\n", { mode: 0o600 });
+  } catch (error) {
+    throw new Error(`${ERR_SYSTEM}: Failed to persist merge pull request decision`, { cause: error });
+  }
+}
 
 /** @param {any[]} results @param {boolean} staged @param {string} [filePath] */
 function writeSafeOutputOutcomes(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_OUTCOMES_FILE_NAME)) {
@@ -428,4 +484,5 @@ module.exports = {
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
   writeSafeOutputOutcomes,
+  writeMergePullRequestDecision,
 };

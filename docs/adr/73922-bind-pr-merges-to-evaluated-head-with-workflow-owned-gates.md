@@ -16,7 +16,9 @@ Bind every new merge attempt to the evaluated PR head SHA through the merge API'
 
 Compare stable authorization inputs separately from asynchronously computed mergeability. Bounded read retries allow mergeability computation to settle; unconfirmed mergeability and conflicts still block execution, without retrying the merge mutation.
 
-When configured, each required check must have a successful, completed check run on the evaluated SHA. The approval gate requires at least one allowlisted GitHub `User` account's latest effective approval on that SHA, excluding both the PR author and the acting identity; it does not require every allowlisted account to approve. These are opt-in gates, not new unconditional CI or human-approval requirements. Existing draft, mergeability, requested-reviewer, unresolved-thread, label, title, source-branch, and integration-branch constraints remain in force.
+When configured, each required check must have a successful, completed check run on the evaluated SHA. `required-check-apps` can bind named checks to workflow-owned GitHub App IDs. Effective changes-requested reviews always block, even without an approver allowlist or aggregate blocking review decision. The approval gate requires at least one allowlisted GitHub `User` account's latest effective approval on that SHA, excluding both the PR author and the acting identity; it does not require every allowlisted account to approve. CI and affirmative approval remain opt-in gates. Existing draft, mergeability, requested-reviewer, unresolved-thread, label, title, source-branch, and integration-branch constraints remain in force.
+
+The handler manager preserves structured merge failures and persists bounded, secret-redacted decision evidence for successful, blocked, and staged decisions in the safe-output items artifact. Oversized evidence is explicitly marked as truncated; persistence failures are surfaced and do not undo a merge that already executed.
 
 ### Alternatives Considered
 
@@ -43,7 +45,7 @@ Agent-supplied check names and approvers would allow per-request flexibility wit
 #### Negative
 
 - Only the head SHA is an atomic merge precondition. Other policy inputs can still change after the final reads; revalidation narrows but does not eliminate that race.
-- Required check names are not producer authentication. Recording an app ID does not enforce an allowlisted check producer, and a GitHub `User` account is not proof that a person performed the review.
+- Required check names are not producer authentication unless pinned with `required-check-apps`. Even a pinned app ID cannot distinguish independently protected CI from agent-editable workflows using the same app, and a GitHub `User` account is not proof that a person performed the review.
 - Additional reads and review pagination increase latency, permission requirements, and sensitivity to API failures or concurrent edits. Check-run reads need `checks: read` even when requirements originate from branch policy rather than an explicit workflow list.
 - A revert can restore repository content but cannot undo deployments, notifications, or other external effects caused by a merge.
 

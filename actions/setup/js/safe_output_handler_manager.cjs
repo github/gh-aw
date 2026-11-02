@@ -38,6 +38,7 @@ const {
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
   writeSafeOutputOutcomes,
+  writeMergePullRequestDecision,
   SAFE_OUTPUT_ERRORS_FILE_PATH,
   CLAIM_DELIVERY_ERRORS_FILE_NAME,
 } = require("./safe_output_manifest.cjs");
@@ -1329,6 +1330,9 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
         continue;
       }
       const result = await messageHandler(effectiveMessage, resolvedTemporaryIds, temporaryIdMap);
+      if (messageType === "merge_pull_request" && result) {
+        writeMergePullRequestDecision(result, i);
+      }
 
       // Check if the handler explicitly returned a skipped result (e.g. policy filters,
       // no-op warnings, or if_no_changes: warn/ignore). Skipped results should NOT
@@ -1350,6 +1354,7 @@ async function processMessages(messageHandlers, messages, onItemCreated = null) 
           messageIndex: i,
           success: false,
           error: errorMsg,
+          ...(messageType === "merge_pull_request" ? { result } : {}),
         });
         // Track code-push failures for fail-fast behaviour
         if (CODE_PUSH_TYPES.has(messageType)) {

@@ -1854,6 +1854,18 @@ func TestBuildSafeOutputItemsManifestUploadStep(t *testing.T) {
 	assert.Contains(t, content, "/tmp/gh-aw/safe-output-outcomes.jsonl")
 	assert.NotContains(t, content, "process-safe-outputs.stdout.log")
 	assert.NotContains(t, content, "process-safe-outputs.stderr.log")
+	assert.NotContains(t, content, "merge-pull-request-decisions.jsonl")
+}
+
+func TestBuildMergePullRequestDecisionUploadStep(t *testing.T) {
+	for _, claims := range []bool{false, true} {
+		data := &WorkflowData{SafeOutputs: &SafeOutputsConfig{MergePullRequest: &MergePullRequestConfig{}}}
+		steps := buildSafeOutputItemsManifestUploadStep("", func(action string) string { return action + "@test-pin" }, claims, data)
+		content := strings.Join(steps, "")
+		assert.Contains(t, content, "if: always()")
+		assert.Contains(t, content, "/tmp/gh-aw/merge-pull-request-decisions.jsonl")
+		assert.Equal(t, claims, strings.Contains(content, "/tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl"))
+	}
 }
 
 func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.T) {
