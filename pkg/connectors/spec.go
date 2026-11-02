@@ -13,6 +13,7 @@ type ConnectorSpec struct {
 	Credentials map[string]Credential `json:"credentials"`
 	Triggers    map[string]Trigger    `json:"triggers,omitempty"`
 	MCP         map[string]ReadTool   `json:"mcp,omitempty"`
+	HTTPMCP     map[string]HTTPMCP    `json:"httpMcp,omitempty"`
 	SafeOutputs map[string]Operation  `json:"safeOutputs,omitempty"`
 	Context     map[string]Operation  `json:"context,omitempty"`
 }
@@ -33,6 +34,7 @@ type Input struct {
 	MaxLength int      `json:"maxLength,omitempty"`
 	Minimum   *float64 `json:"minimum,omitempty"`
 	Maximum   *float64 `json:"maximum,omitempty"`
+	Pattern   string   `json:"pattern,omitempty"`
 }
 
 // Value is exactly one literal JSON value or a reference to a declared input.
@@ -50,19 +52,46 @@ type Request struct {
 	Query      map[string]Value  `json:"query,omitempty"`
 	Body       map[string]Value  `json:"body,omitempty"`
 	GraphQL    string            `json:"graphql,omitempty"`
+	Patch      []Patch           `json:"patch,omitempty"`
+}
+
+type Patch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value Value  `json:"value"`
 }
 
 type Operation struct {
-	Credential       string            `json:"credential"`
-	Inputs           map[string]Input  `json:"inputs,omitempty"`
-	Resources        map[string]string `json:"resources,omitempty"`
-	Request          Request           `json:"request"`
-	MaxResponseBytes int               `json:"maxResponseBytes"`
+	Credential        string            `json:"credential"`
+	Inputs            map[string]Input  `json:"inputs,omitempty"`
+	Resources         map[string]string `json:"resources,omitempty"`
+	Request           Request           `json:"request"`
+	MaxResponseBytes  int               `json:"maxResponseBytes"`
+	ResponseChecks    map[string]any    `json:"responseChecks,omitempty"`
+	ResponseResources map[string]string `json:"responseResources,omitempty"`
+	ResponseRequired  []string          `json:"responseRequired,omitempty"`
+	Project           map[string]string `json:"project,omitempty"`
 }
 
 type ReadTool struct {
 	Operation
 	Tool string `json:"tool"`
+}
+
+// HTTPMCP registers a real streamable-HTTP MCP endpoint, not a REST adapter.
+// The host must enforce Inputs/Resources before forwarding any tools/call.
+type HTTPMCP struct {
+	URL              string             `json:"url"`
+	Credential       string             `json:"credential"`
+	Headers          map[string]string  `json:"headers,omitempty"`
+	ReadOnly         bool               `json:"readOnly"`
+	Tools            map[string]MCPTool `json:"tools"`
+	MaxResponseBytes int                `json:"maxResponseBytes"`
+}
+
+type MCPTool struct {
+	Inputs    map[string]Input  `json:"inputs"`
+	Resources map[string]string `json:"resources,omitempty"`
 }
 
 // Trigger describes native equality matching and JSON Pointer projection.
@@ -73,6 +102,7 @@ type Trigger struct {
 	NativeEvents        []string          `json:"nativeEvents"`
 	Match               map[string]string `json:"match"`
 	Normalize           map[string]string `json:"normalize"`
+	Resources           map[string]string `json:"resources,omitempty"`
 }
 
 type SecretRef struct {
@@ -95,6 +125,7 @@ type Binding struct {
 	Connection  string   `json:"connection"`
 	Triggers    []string `json:"triggers,omitempty"`
 	MCP         []string `json:"mcp,omitempty"`
+	HTTPMCP     []string `json:"httpMcp,omitempty"`
 	SafeOutputs []string `json:"safeOutputs,omitempty"`
 	Context     []string `json:"context,omitempty"`
 }
