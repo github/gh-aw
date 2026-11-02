@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/setutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
@@ -592,6 +593,19 @@ func (c *Compiler) appendLedgerTransactionsArtifactUpload(data *WorkflowData, st
 // appendCustomScriptFilesStep appends the setup step(s) for writing custom safe-output scripts to
 // disk, when the workflow declares any, to the accumulated job state.
 func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOutputsHandlerOutputsAndActionState) error {
+	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
+		if data.Connectors[alias].SafeOutputs != nil {
+			if isWorkQueueParticipant(data) {
+				return fmt.Errorf("connectors.%s.safe-outputs is not supported for work-queue participants; independent connector effect verification is required", alias)
+			}
+			var setup strings.Builder
+			if err := c.generateConnectorSetupSteps(&setup, data); err != nil {
+				return err
+			}
+			state.steps = append(state.steps, setup.String())
+			break
+		}
+	}
 	if !isWorkQueueParticipant(data) && len(data.SafeOutputs.Scripts) > 0 {
 		consolidatedSafeOutputsJobLog.Printf("Adding setup step for %d custom safe-output script(s)", len(data.SafeOutputs.Scripts))
 		scriptSetupSteps, err := buildCustomScriptFilesStep(data.SafeOutputs.Scripts)
