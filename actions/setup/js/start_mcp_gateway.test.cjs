@@ -3,10 +3,11 @@ import os from "os";
 import path from "path";
 import http from "http";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
 import vm from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  applyAgenticWorkflowsRunnerIdentity,
+  applyBuiltinMCPRunnerIdentity,
   applyOTLPIgnoreIfMissing,
   clearGatewayStartupMarker,
   createGatewayStderrPath,
@@ -346,17 +347,17 @@ describe("MCP transported-data startup rejection", () => {
   });
 });
 
-describe("agenticworkflows backend ownership", () => {
+describe.each(["agenticworkflows", "safeoutputs"])("%s backend ownership", name => {
   it.each(["localhost/gh-aw:dev", "alpine:3.24"])("uses the runner identity without widening private artifact modes (%s)", container => {
     const env = { GITHUB_TOKEN: "${GITHUB_TOKEN}", GITHUB_ACTOR: "${GITHUB_ACTOR}" };
     const backend = { container, args: ["--network", "host", "-w", "/workspace"], env };
     const other = { container: "example/server", args: [] };
-    const config = { mcpServers: { agenticworkflows: backend, other } };
-    applyAgenticWorkflowsRunnerIdentity(config, 1001, 123);
+    const config = { mcpServers: { [name]: backend, other } };
+    applyBuiltinMCPRunnerIdentity(config, 1001, 123);
     expect(backend.args).toEqual(["--network", "host", "-w", "/workspace", "--user", "1001:123"]);
     expect(backend.env).toEqual({ HOME: "/tmp", ...env });
     expect(other).toEqual({ container: "example/server", args: [] });
-    applyAgenticWorkflowsRunnerIdentity(config, 1001, 123);
+    applyBuiltinMCPRunnerIdentity(config, 1001, 123);
     expect(backend.args.filter(arg => arg === "--user")).toHaveLength(1);
   });
 
@@ -365,8 +366,8 @@ describe("agenticworkflows backend ownership", () => {
     (...args) => {
       const backend = { container: "example/server", args, env: { HOME: "/custom" } };
       const original = structuredClone(backend);
-      applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: backend } }, 1001, 123);
-      applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: backend } }, 1001, 123);
+      applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
+      applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
       expect(backend).toEqual(original);
     }
   );
@@ -374,25 +375,25 @@ describe("agenticworkflows backend ownership", () => {
   it.each(["-update", "-unshare"])("preserves %s as Docker's attached -u username, not an unrelated flag", arg => {
     const backend = { container: "example/server", args: [arg], env: { HOME: "/custom" } };
     const original = structuredClone(backend);
-    applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: backend } }, 1001, 123);
+    applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
     expect(backend).toEqual(original);
   });
 
   it("does not confuse --userns with an explicit container user", () => {
     const backend = { container: "example/server", args: ["--userns=host"], env: { HOME: "/custom" } };
-    applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: backend } }, 1001, 123);
+    applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
     expect(backend).toEqual({ container: "example/server", args: ["--userns=host", "--user", "1001:123"], env: { HOME: "/custom" } });
   });
 
   it("preserves a configured HOME and supports default container arguments", () => {
     const backend = { container: "alpine:3.24", env: { HOME: "/custom" } };
-    applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: backend } }, 1001, 123);
+    applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, 1001, 123);
     expect(backend).toEqual({ container: "alpine:3.24", args: ["--user", "1001:123"], env: { HOME: "/custom" } });
   });
 
-  it.each([{}, { mcpServers: {} }, { mcpServers: { agenticworkflows: { url: "https://example.com/mcp" } } }])("leaves absent and HTTP backends unchanged", config => {
+  it.each([{}, { mcpServers: {} }, { mcpServers: { [name]: { url: "https://example.com/mcp" } } }])("leaves absent and HTTP backends unchanged", config => {
     const original = structuredClone(config);
-    applyAgenticWorkflowsRunnerIdentity(config, 1001, 123);
+    applyBuiltinMCPRunnerIdentity(config, 1001, 123);
     expect(config).toEqual(original);
   });
 
@@ -404,17 +405,110 @@ describe("agenticworkflows backend ownership", () => {
     [1.5, 123],
   ])("rejects invalid runner identities (%s, %s)", (uid, gid) => {
     const backend = { container: "alpine:3.24" };
-    expect(() => applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: backend } }, uid, gid)).toThrow("Runner identity is required");
+    expect(() => applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: backend } }, uid, gid)).toThrow("Runner identity is required");
     expect(backend).toEqual({ container: "alpine:3.24" });
   });
 
   it.each([{ args: "invalid" }, { args: [42] }, { env: [] }, { env: null }])("rejects malformed backend configuration without publishing it", fields => {
-    expect(() => applyAgenticWorkflowsRunnerIdentity({ mcpServers: { agenticworkflows: { container: "alpine:3.24", ...fields } } }, 1001, 123)).toThrow(/Invalid agenticworkflows container/);
+    expect(() => applyBuiltinMCPRunnerIdentity({ mcpServers: { [name]: { container: "alpine:3.24", ...fields } } }, 1001, 123)).toThrow(`Invalid ${name} container`);
   });
 
   it("applies identity before serializing the configuration sent to the gateway", () => {
     const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
-    expect(source.indexOf("applyAgenticWorkflowsRunnerIdentity(configObj)")).toBeLessThan(source.indexOf("mcpConfig = JSON.stringify(configObj)"));
+    const identityIndex = source.indexOf("applyBuiltinMCPRunnerIdentity(configObj)");
+    expect(identityIndex).toBeGreaterThan(-1);
+    expect(identityIndex).toBeLessThan(source.indexOf("mcpConfig = JSON.stringify(configObj)"));
+  });
+});
+
+describe("safeoutputs asset ownership", () => {
+  it("publishes the runner identity and writable HOME before launching the gateway", async () => {
+    const require = createRequire(import.meta.url);
+    const core = { info: vi.fn(), warning: vi.fn(), error: vi.fn(), setFailed: vi.fn() };
+    const spawn = vi.fn();
+    const writeMcpConfiguration = vi.fn(() => {
+      throw new Error("stop before gateway launch");
+    });
+    const config = {
+      gateway: { port: 8080, domain: "localhost", agentId: "test-agent" },
+      mcpServers: {
+        safeoutputs: { container: "ghcr.io/github/gh-aw-node@sha256:test", args: ["-w", "${GITHUB_WORKSPACE}"], env: { RUNNER_TEMP: "${RUNNER_TEMP}" } },
+      },
+    };
+    const mocks = {
+      fs: {
+        readFileSync: vi.fn(() => Buffer.from(JSON.stringify(config))),
+        mkdirSync: vi.fn(),
+        chmodSync: vi.fn(),
+      },
+      child_process: { spawn, execSync: vi.fn() },
+      "./shim.cjs": {},
+      "./symlink_guard.cjs": { lstatGuard: vi.fn(() => ({})) },
+      "./mcp_configuration.cjs": { writeMcpConfiguration },
+    };
+    const source = fs.readFileSync(new URL("./start_mcp_gateway.cjs", import.meta.url), "utf8");
+    await vm.runInNewContext(`${source}\nmain().catch(err => core.setFailed(err.message));`, {
+      require: id => mocks[id] || require(id),
+      module: { exports: {} },
+      process: {
+        env: {
+          RUNNER_TEMP: "/tmp/test-runner",
+          GITHUB_WORKSPACE: "/workspace",
+          MCP_GATEWAY_DOCKER_COMMAND: "docker run --rm -i --network host gateway:latest --config-stdin",
+        },
+        getuid: () => 1001,
+        getgid: () => 123,
+        umask: vi.fn(),
+        on: vi.fn(),
+      },
+      core,
+    });
+    expect(writeMcpConfiguration).toHaveBeenCalledOnce();
+    expect(writeMcpConfiguration.mock.calls[0][1].mcpServers.safeoutputs).toMatchObject({
+      args: ["-w", "${GITHUB_WORKSPACE}", "--user", "1001:123"],
+      env: { HOME: "/tmp", RUNNER_TEMP: "${RUNNER_TEMP}" },
+    });
+    expect(core.setFailed).toHaveBeenCalledExactlyOnceWith("stop before gateway launch");
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it("applies the policy to both built-ins even when one has an explicit user", () => {
+    const agenticworkflows = { container: "alpine:3.24", args: ["--user", "42:43"] };
+    const safeoutputs = { container: "ghcr.io/github/gh-aw-node@sha256:test", args: ["-w", "/workspace"] };
+    applyBuiltinMCPRunnerIdentity({ mcpServers: { agenticworkflows, safeoutputs } }, 1001, 123);
+    expect(agenticworkflows.args).toEqual(["--user", "42:43"]);
+    expect(safeoutputs.args).toEqual(["-w", "/workspace", "--user", "1001:123"]);
+    expect(safeoutputs.env).toEqual({ HOME: "/tmp" });
+  });
+
+  it.skipIf(process.platform !== "linux")("keeps guarded assets and private Claim directories readable by the host uploader", () => {
+    const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "safeoutputs-ownership-")));
+    try {
+      const backend = { container: "ghcr.io/github/gh-aw-node@sha256:test" };
+      applyBuiltinMCPRunnerIdentity({ mcpServers: { safeoutputs: backend } });
+      expect(backend.args).toEqual(["--user", `${process.getuid()}:${process.getgid()}`]);
+      const [uid, gid] = backend.args[1].split(":").map(Number);
+      const files = [path.join(directory, "assets", "chart.png"), path.join(directory, "assets", "claims", "claim-1", "chart.png")];
+      const guard = path.join(import.meta.dirname, "symlink_guard.cjs");
+      execFileSync(process.execPath, ["-e", 'const { writeGuardedFile } = require(process.argv[1]); for (const file of process.argv.slice(2)) writeGuardedFile(file, Buffer.from("chart"));', guard, ...files], {
+        uid,
+        gid,
+        env: backend.env,
+        timeout: 10000,
+      });
+      for (const file of files) {
+        expect(fs.statSync(file).uid).toBe(process.getuid());
+        expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+        expect(fs.statSync(path.dirname(file)).mode & 0o777).toBe(0o700);
+      }
+      const uploaded = execFileSync(process.execPath, ["-e", 'const fs = require("fs"); for (const file of process.argv.slice(1)) process.stdout.write(fs.readFileSync(file));', ...files], {
+        timeout: 10000,
+        encoding: "utf8",
+      });
+      expect(uploaded).toBe("chartchart");
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
