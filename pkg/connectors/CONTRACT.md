@@ -104,13 +104,17 @@ bound through `pathInputs`; `query` and `body` values are `{input: name}` or
 `array: [<Value>]` compose typed bindings recursively, with a maximum depth of
 16 and bounded resolved JSON size. Each Value has exactly one source.
 REST query parameters remain primitive scalars; GraphQL variables, JSON
-bodies and JSON Patch values can be structured. There is no shell, JavaScript, Actions expression,
+bodies and JSON Patch values can be structured. There is no connector-authored shell, JavaScript, Actions expression,
 remote import or expression language. `graphql` is a fixed document; `query`
 then supplies GraphQL variables, not URL parameters. `patch` is an array of
 `{op: add|replace|test, path: /fixed/pointer, value: {input: name}}` (or
 `value: {literal: ...}`) on safe-output POST/PATCH requests, serialized as
 `application/json-patch+json`. It cannot coexist with another body.
-Multipart, pagination, arbitrary headers, OAuth acquisition, automatic version
+Fixed `request.headers` supply reviewed nonsecret metadata such as API versions,
+Accept, and a fixed acting-user address. Authentication, authority, transport,
+credential-like headers, and expressions cannot be overridden. Content-Type must
+match the JSON body encoding.
+Multipart, pagination, arbitrary secret headers, OAuth acquisition, automatic version
 preflights and dynamic endpoints are unsupported.
 
 String input references may use `encoding: jira-adf` or
@@ -127,7 +131,10 @@ body:
       description: {input: text, encoding: jira-adf}
 ```
 
-`Input.pattern` accepts bounded RE2 patterns. `Operation.responseChecks` maps
+`Input.pattern` is bounded to 1024 bytes. The bundled setup host supports portable
+patterns with Go-compatible ASCII whitespace, strict text-end anchors and a
+leading dot-all flag. Nonportable constructs fail closed. Evaluation runs in a
+bounded worker, never on the credentialed host's main event loop. `Operation.responseChecks` maps
 JSON Pointers to required literal values (e.g. `/ok: true`); `responseRequired`
 lists required non-null/nonempty evidence. `responseResources` maps JSON
 Pointers to connection resource allowlists. `project` maps output field names

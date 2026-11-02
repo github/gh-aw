@@ -144,6 +144,20 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if err := validatePayload(op, phase); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
+	if err := validateRequestHeaders(op.Request); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
+	}
+	for _, pointer := range op.ResponseOptionalEmpty {
+		if !validPointer(pointer) {
+			return fmt.Errorf("operation %q has invalid responseOptionalEmpty pointer", name)
+		}
+	}
+	for pointer, input := range op.ResponseResourceInputs {
+		field, exists := op.Inputs[input]
+		if !validPointer(pointer) || !exists || !field.Required || field.Type != "string" || op.Resources[input] == "" {
+			return fmt.Errorf("operation %q responseResourceInputs requires a pointer and a required resource-constrained string input", name)
+		}
+	}
 	path := op.Request.Path
 	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.ContainsAny(path, "?#\\%") || strings.Contains(path, "..") || strings.Contains(path, "${") {
 		return fmt.Errorf("operation %q requires a fixed absolute path without query, escaping or expressions", name)
