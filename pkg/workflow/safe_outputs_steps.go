@@ -53,7 +53,7 @@ func (c *Compiler) buildCustomActionStep(data *WorkflowData, config GitHubScript
 	steps = append(steps, "        env:\n")
 	steps = append(steps, "          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n")
 	steps = append(steps, config.CustomEnvVars...)
-	c.addCustomSafeOutputEnvVars(&steps, data)
+	c.addSafeOutputEnvVars(&steps, data, false)
 
 	// With section for inputs (replaces github-token in actions/github-script)
 	steps = append(steps, "        with:\n")
@@ -190,7 +190,7 @@ func (c *Compiler) buildGitHubScriptStepCommon(data *WorkflowData, config GitHub
 	steps = append(steps, config.CustomEnvVars...)
 
 	// Add custom environment variables from safe-outputs.env
-	c.addCustomSafeOutputEnvVars(&steps, data)
+	c.addSafeOutputEnvVars(&steps, data, false)
 
 	// With section for github-token
 	steps = append(steps, "        with:\n")

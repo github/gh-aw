@@ -14861,6 +14861,8 @@
           }
         },
         "resources": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "github-apps": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorGitHubApp" } },
+        "oidc-tokens": { "type": "object", "additionalProperties": { "$ref": "#/$defs/connectorGitHubOIDC" } },
         "on": { "$ref": "#/$defs/connectorCapabilities" },
         "tools": { "$ref": "#/$defs/connectorCapabilities" },
         "safe-outputs": { "$ref": "#/$defs/connectorCapabilities" },
@@ -14891,7 +14893,15 @@
               "header": { "enum": ["Authorization", "X-API-Key", "PRIVATE-TOKEN"] },
               "scheme": { "enum": ["bearer", "token", "basic", "raw"] },
               "scopes": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-              "secret": { "type": "string", "minLength": 1, "description": "GitHub Actions secret name, not a credential value or expression." }
+              "secret": { "type": "string", "minLength": 1, "description": "GitHub Actions secret name, not a credential value or expression." },
+              "github-app": { "$ref": "#/$defs/connectorGitHubApp" },
+              "github-oidc": { "$ref": "#/$defs/connectorGitHubOIDC" },
+              "token": {
+                "type": "object",
+                "required": ["secret"],
+                "additionalProperties": false,
+                "properties": { "secret": { "type": "string", "minLength": 1 } }
+              }
             }
           }
         },
@@ -14901,6 +14911,26 @@
         "mcp-servers": { "$ref": "#/$defs/connectorDefinitions" },
         "safe-outputs": { "$ref": "#/$defs/connectorDefinitions" }
       }
+    },
+    "connectorGitHubApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["private-key", "permissions"],
+      "anyOf": [{ "required": ["client-id"] }, { "required": ["app-id"] }],
+      "properties": {
+        "client-id": { "type": "string", "minLength": 1 },
+        "app-id": { "type": "string", "minLength": 1 },
+        "private-key": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string" },
+        "repositories": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "permissions": { "type": "object", "additionalProperties": { "enum": ["read", "write", "none"] } }
+      }
+    },
+    "connectorGitHubOIDC": {
+      "type": "object",
+      "required": ["audience"],
+      "additionalProperties": false,
+      "properties": { "audience": { "type": "string", "minLength": 1, "maxLength": 2048 } }
     },
     "connectorDefinitions": {
       "type": "object",

@@ -23,14 +23,14 @@ func connectorMap(parent map[string]any, key string) map[string]any {
 	return value
 }
 
-func connectorEnv(plan *connectors.Plan) (map[string]any, error) {
+func connectorEnv(plan *connectors.Plan, config *WorkflowConnector) (map[string]any, error) {
 	encoded, err := plan.Encode()
 	if err != nil {
 		return nil, err
 	}
 	env := map[string]any{"GH_AW_CONNECTOR_PLAN": encoded}
 	for _, secret := range plan.Secrets() {
-		env["GH_AW_CONNECTOR_SECRET_"+secret] = "${{ secrets." + secret + " }}"
+		env["GH_AW_CONNECTOR_SECRET_"+secret] = connectorSecretExpression(config, secret)
 	}
 	return env, nil
 }
@@ -47,7 +47,7 @@ func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs 
 			if _, exists := tools[name]; exists {
 				return fmt.Errorf("mcp-servers.%s conflicts with generated connector MCP server", name)
 			}
-			env, err := connectorEnv(config.Agent)
+			env, err := connectorEnv(config.Agent, config)
 			if err != nil {
 				return err
 			}
@@ -72,17 +72,32 @@ func connectorSafeOutputName(alias, operation string) string {
 	return "connector-" + strconv.Itoa(len(alias)) + "-" + alias + "-" + operation
 }
 
+func connectorCredentialEnvPrefix(alias string) string {
+	return "GH_AW_CONNECTOR_" + strconv.Itoa(len(alias)) + "_" + strings.ToUpper(strings.ReplaceAll(alias, "-", "_")) + "_SECRET_"
+}
+
 func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias string, config *WorkflowConnector) error {
 	safeOutputs := connectorMap(frontmatter, "safe-outputs")
 	scripts := connectorMap(safeOutputs, "scripts")
 	env := connectorMap(safeOutputs, "env")
-	prefix := "GH_AW_CONNECTOR_" + strconv.Itoa(len(alias)) + "_" + strings.ToUpper(strings.ReplaceAll(alias, "-", "_")) + "_SECRET_"
+	prefix := connectorCredentialEnvPrefix(alias)
 	for _, secret := range config.SafeOutputs.Secrets() {
 		name := prefix + secret
 		if _, exists := env[name]; exists {
 			return fmt.Errorf("safe-outputs.env.%s conflicts with a connector credential", name)
 		}
-		env[name] = "${{ secrets." + secret + " }}"
+		env[name] = connectorSecretExpression(config, secret)
+		staged := false
+		switch value := safeOutputs["staged"].(type) {
+		case bool:
+			staged = value
+		case string:
+			staged = value == "true"
+		}
+		if strings.HasPrefix(secret, connectorAppSecretPrefix) &&
+			(c.dryRun || c.trialMode || c.forceStaged || staged) {
+			env[name] = ""
+		}
 	}
 	encoded, err := config.SafeOutputs.Encode()
 	if err != nil {
@@ -197,6 +212,7 @@ func (c *Compiler) generateAgentConnectorSteps(yaml *strings.Builder, data *Work
 	if err := c.generateConnectorSetupSteps(yaml, data); err != nil {
 		return err
 	}
+	yaml.WriteString(strings.Join(c.connectorGitHubAppSteps(data, "agent"), ""))
 	return generateConnectorContextSteps(yaml, data)
 }
 
@@ -215,7 +231,7 @@ func generateConnectorContextSteps(yaml *strings.Builder, data *WorkflowData) er
 		if config.Context == nil {
 			continue
 		}
-		env, err := connectorEnv(config.Context)
+		env, err := connectorEnv(config.Context, config)
 		if err != nil {
 			return err
 		}

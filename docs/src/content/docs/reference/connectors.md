@@ -47,7 +47,7 @@ safe outputs retain their existing meaning.
 | Declaration field | Meaning |
 | --- | --- |
 | `endpoints` | Named, fixed HTTPS origins. |
-| `credentials` | Header, authentication scheme, scopes, phase, and optional secret name. |
+| `credentials` | Header, authentication scheme, scopes, phase, and a token, GitHub App, or GitHub OIDC route. |
 | `resources` | Exact approved resource-ID allowlists; no wildcards. |
 | `triggers` | Event definitions; consumers select them through root `on`. |
 | `tools` | Bounded REST/GraphQL reads exposed through the shared MCP adapter. |
@@ -62,9 +62,64 @@ require their credentials. Raw and bearer schemes store the token without an
 without `Basic `. Encoding is not encryption.
 
 Provision distinct least-privilege read and write credentials. Declared scopes
-do not grant provider permissions. OAuth token acquisition, expiry, refresh, and
+do not grant provider permissions. Provider OAuth token acquisition, expiry, refresh, and
 receiver credentials remain trusted-host responsibilities; a client secret or
 refresh token is not an access token.
+
+### Credential routes
+
+Each credential selects one route. Existing `secret: NAME` declarations remain
+supported as shorthand for `token: {secret: NAME}`.
+
+```yaml
+credentials:
+  stored-token:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [read]
+    token:
+      secret: CONNECTOR_READ_TOKEN
+  app-installation:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [write]
+    github-app:
+      client-id: ${{ vars.CONNECTOR_APP_ID }}
+      private-key: ${{ secrets.CONNECTOR_APP_PRIVATE_KEY }}
+      owner: example-org
+      repositories: [example-repo]
+      permissions:
+        issues: write
+  federated-identity:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [read]
+    github-oidc:
+      audience: https://connector.example/read
+```
+
+GitHub App tokens are minted with the pinned `actions/create-github-app-token`
+action and revoked by its post step. Permissions are mandatory and explicit;
+agent-phase permissions cannot include writes. Owner and repository grants are
+literal, never wildcards or event expressions. Omitting both limits the token to
+the current repository. An explicit owner requires explicit repositories.
+Private keys must be secret references, not embedded key material.
+
+GitHub OIDC routes mint a masked identity JWT for a fixed literal audience.
+Only jobs containing a selected OIDC mint step receive `id-token: write`. The receiving service
+must trust GitHub's issuer and validate the audience and workflow claims. This is
+not a GitHub API access token or an automatic Azure/Google/provider token exchange.
+Minted tokens are short-lived and are not automatically refreshed during a long
+phase.
+
+Only selected phases mint tokens. Write credentials are minted in the safe-output
+job, not the agent job; staged writes do not mint. Tokens are never transferred
+through cross-job outputs, and App private keys and OIDC request credentials are
+not included in frozen connector plans. A failed route does not fall back to
+another credential.
 
 ## Context
 

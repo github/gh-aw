@@ -61,7 +61,19 @@ and qualified `on["<alias>-<trigger>"]` and
 accept null or `{}`. Ambiguous prefixes and built-in GitHub name collisions
 are rejected; unqualified built-ins are never redirected to a connector.
 
-Credentials contain secret **names**, never values. Declaration `resources`
+Credentials select exactly one route: `token: {secret: NAME}` (or the legacy
+`secret: NAME` spelling), `github-app`, or `github-oidc: {audience: LITERAL}`.
+App tokens are minted through the existing pinned GitHub App action with explicit
+permissions and exact repository scope, and revoked by its post step. OIDC routes
+mint a masked GitHub identity JWT for a fixed audience; only the consuming job
+receives `id-token: write`. Minting happens independently in the selected phase,
+never through an agent-provided endpoint or fallback credential. Static staged
+effects do not mint tokens; dynamic staging guards the mint step.
+
+Token credentials contain secret **names**, never values. GitHub App private keys
+must be secret references, not inline PEM. Agent-phase App permissions must be
+read-only. Frozen runtime plans receive opaque credential identifiers, not App
+keys, mint configuration, or OIDC request credentials. Declaration `resources`
 contains exact resource allowlists. Both can use ordinary `import-schema`
 parameters with normal defaults and `with` substitution; imported configuration
 is trusted, reviewed repository code. Agent inputs cannot override endpoints,

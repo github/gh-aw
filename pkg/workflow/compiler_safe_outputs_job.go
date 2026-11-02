@@ -606,6 +606,7 @@ func (c *Compiler) appendCustomScriptFilesStep(data *WorkflowData, state *safeOu
 			break
 		}
 	}
+	state.steps = append(state.steps, c.connectorGitHubAppSteps(data, "safe-output")...)
 	if !isWorkQueueParticipant(data) && len(data.SafeOutputs.Scripts) > 0 {
 		consolidatedSafeOutputsJobLog.Printf("Adding setup step for %d custom safe-output script(s)", len(data.SafeOutputs.Scripts))
 		scriptSetupSteps, err := buildCustomScriptFilesStep(data.SafeOutputs.Scripts)

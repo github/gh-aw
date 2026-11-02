@@ -233,9 +233,25 @@ func buildModelRoutingOutputEnvVars(engineConfig *EngineConfig, mainJobName stri
 
 // addCustomSafeOutputEnvVars adds custom environment variables to safe output job steps
 func (c *Compiler) addCustomSafeOutputEnvVars(steps *[]string, data *WorkflowData) {
+	c.addSafeOutputEnvVars(steps, data, true)
+}
+
+func (c *Compiler) addSafeOutputEnvVars(steps *[]string, data *WorkflowData, includeConnectorCredentials bool) {
 	if data.SafeOutputs != nil && len(data.SafeOutputs.Env) > 0 {
 		ciTriggerTokenDisabled := isCITriggerTokenDisabled(data.SafeOutputs)
 		for _, key := range sliceutil.SortedKeys(data.SafeOutputs.Env) {
+			if !includeConnectorCredentials {
+				connectorCredential := false
+				for alias, config := range data.Connectors {
+					if config.SafeOutputs != nil && strings.HasPrefix(key, connectorCredentialEnvPrefix(alias)) {
+						connectorCredential = true
+						break
+					}
+				}
+				if connectorCredential {
+					continue
+				}
+			}
 			if key == "GH_AW_CI_TRIGGER_TOKEN" && ciTriggerTokenDisabled {
 				continue
 			}

@@ -18,6 +18,8 @@ type ConnectorRegistration struct {
 	Connection  string                          `json:"connection"`
 	Credentials map[string]connectors.SecretRef `json:"credentials,omitempty"`
 	Resources   map[string][]string             `json:"resources,omitempty"`
+	GitHubApps  map[string]*ConnectorGitHubApp  `json:"github-apps,omitempty"`
+	OIDCTokens  map[string]*ConnectorGitHubOIDC `json:"oidc-tokens,omitempty"`
 	On          []string                        `json:"on,omitempty"`
 	Tools       []string                        `json:"tools,omitempty"`
 	Context     map[string]map[string]any       `json:"context,omitempty"`
@@ -32,6 +34,9 @@ type WorkflowConnector struct {
 	Context     *connectors.Plan
 	SafeOutputs *connectors.Plan
 	ContextArgs map[string]map[string]any
+	Alias       string
+	GitHubApps  map[string]*ConnectorGitHubApp
+	OIDCTokens  map[string]*ConnectorGitHubOIDC
 }
 
 func validateConnectorNames(names []string) error {
@@ -130,6 +135,17 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 		if err := connectors.Decode(data, &registration); err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
+		if len(registration.GitHubApps)+len(registration.OIDCTokens) != 0 {
+			if registration.Spec == nil {
+				return nil, errors.New("connector github-app requires an inline declaration")
+			}
+			if err := validateConnectorGitHubApps(alias, registration); err != nil {
+				return nil, fmt.Errorf("connectors.%s: %w", alias, err)
+			}
+			if err := validateConnectorOIDC(alias, registration); err != nil {
+				return nil, fmt.Errorf("connectors.%s: %w", alias, err)
+			}
+		}
 		service, err := loadWorkflowConnectorService(c.gitRoot, registration)
 		if err != nil {
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
@@ -146,6 +162,8 @@ func (c *Compiler) resolveWorkflowConnectors(frontmatter map[string]any) (map[st
 			return nil, fmt.Errorf("connectors.%s: %w", alias, err)
 		}
 		resolved[alias] = config
+		config.Alias, config.GitHubApps = alias, registration.GitHubApps
+		config.OIDCTokens = registration.OIDCTokens
 	}
 	return resolved, nil
 }
