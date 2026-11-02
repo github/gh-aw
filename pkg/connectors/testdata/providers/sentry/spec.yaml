@@ -1,0 +1,175 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: sentry.io/issues
+endpoints:
+  api: https://sentry.io
+credentials:
+  reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [event:read]
+  writer:
+    phase: safe-output
+    header: Authorization
+    scheme: bearer
+    scopes: [event:write]
+  context-reader:
+    phase: context
+    header: Authorization
+    scheme: bearer
+    scopes: [event:read]
+  hosted-reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [event:read]
+triggers:
+  error-created:
+    verificationProfile: sentry.io/issue-hmac-sha256
+    nativeEvents: [issue.created]
+    match:
+      /action: created
+      /data/issue/issueCategory: error
+    resources:
+      /installation/uuid: installations
+      /data/issue/project/id: projects
+      /data/issue/id: issues
+    normalize:
+      subject: /data/issue/id
+      project: /data/issue/project/id
+      installation: /installation/uuid
+  error-regressed:
+    verificationProfile: sentry.io/issue-hmac-sha256
+    nativeEvents: [issue.unresolved]
+    match:
+      /action: unresolved
+      /data/issue/issueCategory: error
+      /data/issue/substatus: regressed
+    resources:
+      /installation/uuid: installations
+      /data/issue/project/id: projects
+      /data/issue/id: issues
+    normalize:
+      subject: /data/issue/id
+      project: /data/issue/project/id
+      installation: /installation/uuid
+  issue-alert-triggered:
+    verificationProfile: sentry.io/event-alert-hmac-sha256
+    nativeEvents: [event_alert.triggered]
+    match:
+      /action: triggered
+      /data/event/type: error
+    resources:
+      /installation/uuid: installations
+      /data/event/project: projects
+      /data/event/issue_id: issues
+      /data/event/event_id: events
+    normalize:
+      subject: /data/event/issue_id
+      event: /data/event/event_id
+      project: /data/event/project
+      installation: /installation/uuid
+mcp:
+  get-issue:
+    tool: get_issue_details
+    credential: reader
+    inputs:
+      organization: {type: string, required: true, maxLength: 100, pattern: '^[a-z0-9][a-z0-9-]*$'}
+      issue: {type: string, required: true, maxLength: 32, pattern: '^[0-9]+$'}
+    resources:
+      organization: organizations
+      issue: issues
+    request:
+      endpoint: api
+      method: GET
+      path: /api/0/organizations/{organization}/issues/{issue}/
+      pathInputs:
+        organization: organization
+        issue: issue
+    maxResponseBytes: 65536
+    responseChecks:
+      /issueCategory: error
+      /status: unresolved
+    responseRequired: [/id, /status, /project/id]
+    responseResources:
+      /id: issues
+      /project/id: projects
+    project:
+      issue: /id
+      status: /status
+      project: /project/id
+httpMcp:
+  sentry:
+    url: https://mcp.sentry.dev/mcp/example-org/example-project
+    credential: hosted-reader
+    readOnly: true
+    maxResponseBytes: 65536
+    tools:
+      get_issue_details:
+        inputs:
+          organizationSlug: {type: string, required: true, maxLength: 100, enum: [example-org]}
+          issueId: {type: string, required: true, maxLength: 32, pattern: '^[0-9]+$'}
+        resources:
+          organizationSlug: organizations
+          issueId: issues
+safeOutputs:
+  resolve-issue:
+    credential: writer
+    inputs:
+      organization: {type: string, required: true, maxLength: 100, pattern: '^[a-z0-9][a-z0-9-]*$'}
+      issue: {type: string, required: true, maxLength: 32, pattern: '^[0-9]+$'}
+    resources:
+      organization: organizations
+      issue: issues
+    request:
+      endpoint: api
+      method: PUT
+      path: /api/0/organizations/{organization}/issues/{issue}/
+      pathInputs:
+        organization: organization
+        issue: issue
+      body:
+        status: {literal: resolved}
+    maxResponseBytes: 65536
+    responseChecks:
+      /status: resolved
+      /issueCategory: error
+    responseRequired: [/id, /project/id]
+    responseResources:
+      /id: issues
+      /project/id: projects
+    project:
+      issue: /id
+      status: /status
+      project: /project/id
+context:
+  issue-event:
+    credential: context-reader
+    inputs:
+      organization: {type: string, required: true, maxLength: 100, pattern: '^[a-z0-9][a-z0-9-]*$'}
+      issue: {type: string, required: true, maxLength: 32, pattern: '^[0-9]+$'}
+      event: {type: string, required: true, maxLength: 32, pattern: '^[a-f0-9]{32}$'}
+    resources:
+      organization: organizations
+      issue: issues
+      event: events
+    request:
+      endpoint: api
+      method: GET
+      path: /api/0/organizations/{organization}/issues/{issue}/events/{event}/
+      pathInputs:
+        organization: organization
+        issue: issue
+        event: event
+    maxResponseBytes: 65536
+    responseChecks:
+      /type: error
+    responseRequired: [/eventID, /groupID]
+    responseResources:
+      /groupID: issues
+      /eventID: events
+    project:
+      event: /eventID
+      issue: /groupID
+      type: /type
