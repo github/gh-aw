@@ -164,6 +164,37 @@ func TestRuntimeResponseBoundsAndFailures(t *testing.T) {
 	}
 }
 
+func TestRedirectAndWriteFailuresNeverRetry(t *testing.T) {
+	destinations := 0
+	destination := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		destinations++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer destination.Close()
+	attempts := 0
+	redirect := true
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if redirect {
+			http.Redirect(w, r, destination.URL, http.StatusTemporaryRedirect)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	plan := fixturePlan(t, server.URL)
+	for _, mode := range []bool{true, false} {
+		redirect = mode
+		_, err := plan.Execute(t.Context(), testRuntime(server.Client(), server.URL, "safe-output"), "safe-output", "add-comment", map[string]any{"issue": "ISSUE-1", "text": "test"})
+		if err == nil {
+			t.Fatal("redirect or failed write accepted")
+		}
+	}
+	if destinations != 0 || attempts != 2 {
+		t.Fatalf("redirect followed or failed write retried: destinations=%d attempts=%d", destinations, attempts)
+	}
+}
+
 func TestRemoteMCPAndGatewayAdapter(t *testing.T) {
 	upstream := mcp.NewServer(&mcp.Implementation{Name: "provider", Version: "1"}, nil)
 	calls := 0
