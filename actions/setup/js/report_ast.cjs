@@ -679,13 +679,13 @@ function renderBlocks(nodes, compactExpiration = false) {
     })
     .map((value, index) =>
       nodes[index].type === "quote" || nodes[index].type === "alert"
-        ? value
+        ? (value ?? "")
             .split("\n")
             .map(line => (line ? `> ${line}` : ">"))
             .join("\n")
-        : value
+        : (value ?? "")
     )
-    .map((value, index) => (index ? (compactExpiration && nodes[index].type === "expiration" ? "\n" : "\n\n") : "") + value)
+    .map((value, index) => (index ? (compactExpiration && nodes[index].type === "expiration" && nodes[index - 1].type === "paragraph" ? "\n" : "\n\n") : "") + value)
     .join("");
 }
 
