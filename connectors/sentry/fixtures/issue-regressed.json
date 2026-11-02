@@ -1,0 +1,25 @@
+{
+  "action": "unresolved",
+  "installation": {
+    "uuid": "11111111-2222-4333-8444-555555555555"
+  },
+  "data": {
+    "issue": {
+      "id": "1234567890",
+      "shortId": "EXAMPLE-1",
+      "issueCategory": "error",
+      "issueType": "error",
+      "status": "unresolved",
+      "substatus": "regressed",
+      "project": {
+        "id": "4500000000000001",
+        "slug": "example-project"
+      }
+    }
+  },
+  "actor": {
+    "type": "application",
+    "id": "sentry",
+    "name": "Sentry"
+  }
+}

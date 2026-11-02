@@ -1,0 +1,55 @@
+{
+  "action": "triggered",
+  "installation": {
+    "uuid": "11111111-2222-4333-8444-555555555555"
+  },
+  "data": {
+    "event": {
+      "event_id": "0123456789abcdef0123456789abcdef",
+      "issue_id": "1234567890",
+      "project": 4500000000000001,
+      "type": "error",
+      "level": "error",
+      "url": "https://untrusted.invalid/event/",
+      "issue_url": "https://untrusted.invalid/issue/",
+      "user": {
+        "email": "synthetic@example.invalid",
+        "ip_address": "192.0.2.1"
+      },
+      "request": {
+        "headers": [["Authorization", "synthetic-do-not-forward"]],
+        "cookies": "synthetic-cookie"
+      },
+      "breadcrumbs": {
+        "values": [{ "message": "synthetic-private-breadcrumb" }]
+      },
+      "exception": {
+        "values": [
+          {
+            "type": "SyntheticError",
+            "value": "Synthetic fixture error",
+            "stacktrace": {
+              "frames": [
+                {
+                  "filename": "src/example.js",
+                  "function": "example",
+                  "lineno": 42,
+                  "colno": 7,
+                  "vars": {
+                    "privateValue": "synthetic-private-local"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "triggered_rule": "Synthetic new or regressed error rule"
+  },
+  "actor": {
+    "type": "application",
+    "id": "sentry",
+    "name": "Sentry"
+  }
+}
