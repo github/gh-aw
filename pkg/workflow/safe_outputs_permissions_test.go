@@ -562,7 +562,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			},
 		},
 		{
-			name: "merge-pull-request requires contents write and pull-requests write",
+			name: "merge-pull-request without configured checks requires checks read for branch policy",
 			safeOutputs: &SafeOutputsConfig{
 				MergePullRequest: &MergePullRequestConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: strPtr("1")},
@@ -571,6 +571,7 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 			expected: map[PermissionScope]PermissionLevel{
 				PermissionContents:     PermissionWrite,
 				PermissionPullRequests: PermissionWrite,
+				PermissionChecks:       PermissionRead,
 			},
 		},
 		{
@@ -617,6 +618,53 @@ func TestComputePermissionsForSafeOutputs(t *testing.T) {
 				assert.True(t, expected, "Unexpected permission scope: %s", scope)
 			}
 		})
+	}
+}
+
+func TestCompileMergePullRequestCheckPermissions(t *testing.T) {
+	for _, app := range []string{"", "global", "per-handler"} {
+		for _, checks := range []string{"", "    required-checks: [ci/test]\n"} {
+			policy := "branch-only"
+			if checks != "" {
+				policy = "configured-checks"
+			}
+			t.Run(app+"/"+policy, func(t *testing.T) {
+				appConfig := "github-app:\n      app-id: ${{ vars.APP_ID }}\n      private-key: ${{ secrets.APP_PRIVATE_KEY }}\n"
+				globalApp, handlerApp := "", ""
+				switch app {
+				case "global":
+					globalApp = "  " + strings.ReplaceAll(appConfig, "\n      ", "\n    ")
+				case "per-handler":
+					handlerApp = "    " + appConfig
+				}
+				content := "---\non: issues\nengine: copilot\nsafe-outputs:\n" +
+					globalApp + "  merge-pull-request:\n    max: 1\n" + checks + handlerApp + "---\n\nTest workflow.\n"
+				testFile := filepath.Join(t.TempDir(), "merge-permissions.md")
+				require.NoError(t, os.WriteFile(testFile, []byte(content), 0600))
+				compiler := NewCompiler(WithVersion("1.0.0"))
+				data, err := compiler.ParseWorkflowFile(testFile)
+				require.NoError(t, err)
+				compiled, _, _, err := compiler.generateYAML(data, testFile)
+				require.NoError(t, err)
+				job := extractJobSection(compiled, "safe_outputs")
+				assert.Contains(t, job, "checks: read")
+				assert.NotContains(t, job, "checks: write")
+				if app != "" {
+					stepID := "safe-outputs-app-token"
+					if app == "per-handler" {
+						stepID = "merge-pull-request-app-token"
+					}
+					step := compiledStepBlockForTest(job, stepID)
+					require.NotEmpty(t, step)
+					assert.Contains(t, step, "permission-checks: read")
+					assert.NotContains(t, step, "permission-checks: write")
+				}
+				if app == "per-handler" {
+					appPermissions := computePermissionsForSafeOutputs(data.SafeOutputs, true)
+					assert.NotContains(t, appPermissions.permissions, PermissionChecks)
+				}
+			})
+		}
 	}
 }
 
