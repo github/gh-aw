@@ -2576,6 +2576,32 @@ describe("Safe Output Handler Manager", () => {
       expect(commentHandler).toHaveBeenCalled();
     });
 
+    it.each(["push_to_pull_request_branch", "create_pull_request"])("should correct success claims when %s publication is skipped", async type => {
+      const reason = "Review branch push rejected: workflows scope may be required";
+      const messages = [{ type }, { type: "add_comment", body: "Pushed a fix for review feedback." }];
+      const pushHandler = vi.fn().mockResolvedValue({ success: false, skipped: true, error: reason });
+      const commentHandler = vi.fn().mockResolvedValue({ success: true });
+
+      const result = await processMessages(
+        new Map([
+          [type, pushHandler],
+          ["add_comment", commentHandler],
+        ]),
+        messages
+      );
+
+      expect(result.codePushFailures).toEqual([]);
+      expect(result.results[0]).toMatchObject({ success: false, skipped: true });
+      expect(result.results[1].success).toBe(true);
+      const message = commentHandler.mock.calls[0][0];
+      expect(message[COMMENT_PREAMBLE][1]).toMatchObject({ type: "alert", kind: "WARNING", agentTainted: false });
+      const body = renderedCommentMessage(message).body;
+      expect(body).toContain(`${type}\` operation was skipped:`);
+      expect(body).toContain(reason);
+      expect(body).toContain("The code changes were not applied.");
+      expect(body.indexOf("operation was skipped")).toBeLessThan(body.indexOf("Pushed a fix"));
+    });
+
     it("should prepend fallback note to add_comment body when create_pull_request falls back to issue", async () => {
       const messages = [
         {

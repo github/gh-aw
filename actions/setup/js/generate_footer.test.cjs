@@ -531,7 +531,7 @@ describe("generate_footer.cjs", () => {
         const result = getExpiredEntityCautionAlert("Test Workflow", "https://github.com/test/repo/actions/runs/123");
 
         expect(result).toContain("> [!WARNING]");
-        expect(result).toContain("> threat detection engine error");
+        expect(result).toContain("> **Threat detection engine error**");
         expect(result).toContain("What happened");
         expect(result).toContain("<!-- gh-aw-threat-engine-error -->");
         expect(result).not.toContain("<!-- gh-aw-threat-detected -->");
@@ -558,7 +558,7 @@ describe("generate_footer.cjs", () => {
         const result = getExpiredEntityCautionAlert("Test Workflow", "https://github.com/test/repo/actions/runs/123");
 
         expect(result).toContain("> [!WARNING]");
-        expect(result).toContain("> threat detection engine error");
+        expect(result).toContain("> **Threat detection engine error**");
         expect(result).toContain("What happened");
         expect(result).toContain("<!-- gh-aw-threat-engine-error -->");
         expect(result).not.toContain("<!-- gh-aw-threat-detected -->");

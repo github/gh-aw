@@ -14,7 +14,9 @@ permissions:
 engine:
   id: codex
   model-provider: github
-model: copilot/gpt-5.6-terra
+  model-routing:
+    goal: cost
+    mode: balanced
 strict: true
 timeout-minutes: 30
 network:
