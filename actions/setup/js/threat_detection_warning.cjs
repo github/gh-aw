@@ -104,8 +104,8 @@ function getThreatWarningPresentation(reason) {
   if (isToolingFailureReason(reason)) {
     return {
       admonition: "WARNING",
-      title: "threat detection engine error",
-      summary: "The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.",
+      title: "Threat detection engine error",
+      summary: "Threat detection could not complete its analysis due to a tooling error. This is not a security finding.",
       marker: getThreatEngineErrorMarker(),
     };
   }

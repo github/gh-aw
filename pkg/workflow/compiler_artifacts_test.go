@@ -819,6 +819,9 @@ safe-outputs:
 	}
 	assert.NotContains(t, uploadSection, "/tmp/gh-aw/")
 	consolidation := extractWorkflowStepByName(t, string(lockContent), "Consolidate artifacts for ARC/DinD")
+	assert.Less(t, strings.Index(string(lockContent), "Consolidate artifacts for ARC/DinD"), strings.Index(string(lockContent), "id: validate_final_recovery_envelopes"))
+	assert.Less(t, strings.Index(string(lockContent), "id: validate_final_recovery_envelopes"), strings.Index(string(lockContent), "Upload agent output fallback artifact"))
+	assert.Contains(t, uploadSection, "steps.validate_final_recovery_envelopes.outcome == 'success'")
 	assert.Contains(t, consolidation, `cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "${RUNNER_TEMP}/gh-aw/agent/harness_retry.json" || true`)
 	assert.Contains(t, consolidation, `cp "${RUNNER_TEMP}/gh-aw/sandbox/agent/harness_retry.json" "/tmp/gh-aw/agent/harness_retry.json" || true`)
 }

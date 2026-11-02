@@ -1915,7 +1915,7 @@ func TestMergePullRequestDecisionUploadsRequireRedactionInAllModes(t *testing.T)
 				}
 				require.NotNil(t, upload)
 				require.NotNil(t, redaction)
-				assert.Equal(t, "always() && steps.redact_secrets.outcome == 'success' && steps.mask_custom.outcome == 'success'", upload["if"])
+				assert.Equal(t, "always() && steps.redact_secrets.outcome == 'success' && steps.mask_custom.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'", upload["if"])
 				assert.Equal(t, "${{ secrets.MERGE_TOKEN }}", redaction["env"].(map[string]any)["SECRET_MERGE_TOKEN"])
 				assert.Contains(t, redaction["env"].(map[string]any)["GH_AW_SECRET_NAMES"], "MERGE_TOKEN")
 				assert.Equal(t, "${{ secrets.MERGE_PREFIX }}", redaction["env"].(map[string]any)["SECRET_MERGE_PREFIX"])

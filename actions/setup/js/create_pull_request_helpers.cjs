@@ -387,6 +387,15 @@ function _remediationForCause(cause) {
 }
 
 /**
+ * @typedef {object} ObjectPackRecovery
+ * @property {string} tip
+ * @property {string} baseline
+ * @property {string} remote
+ * @property {string} artifactFileName
+ * @property {string[]} excludedFiles
+ */
+
+/**
  * Build the shell instructions for manually recreating a branch (and later opening a PR)
  * from a workflow-run artifact, matching whichever transport (bundle or format-patch)
  * was actually used to encode the changes. Used when the automated push failed and a
@@ -403,9 +412,11 @@ function _remediationForCause(cause) {
  * @param {string} params.branchName - branch to create/checkout locally
  * @param {string} [params.baseBranch] - base branch to create the new branch from (patch transport only)
  * @param {string} [params.tempRef] - temporary ref used while transplanting the bundle (bundle transport only)
+ * @param {{ identity?: ObjectPackRecovery }} [params.objectPackRecovery] - populated only after successful recovery
  * @returns {string} Shell instructions (no leading/trailing blank lines, no code fence)
  */
-function buildManualBranchRecoveryCommands({ hasBundleFile, runId, artifactFileName, branchName, baseBranch, tempRef }) {
+function buildManualBranchRecoveryCommands({ hasBundleFile, runId, artifactFileName, branchName, baseBranch, tempRef, objectPackRecovery }) {
+  if (objectPackRecovery?.identity) return buildObjectPackRecoveryCommands({ runId, branchName, objectPackRecovery: objectPackRecovery.identity });
   if (hasBundleFile) {
     if (!tempRef) {
       throw new Error("tempRef is required for bundle manual branch recovery commands");
@@ -466,9 +477,13 @@ function buildManualBranchRecoveryCommands({ hasBundleFile, runId, artifactFileN
  * @param {string} params.artifactFileName - bundle or patch file name (relative to the artifact root)
  * @param {string} params.branchName - existing remote branch to update
  * @param {string} [params.branchRemote] - remote name or URL containing the existing branch
+ * @param {{ identity?: ObjectPackRecovery }} [params.objectPackRecovery] - populated only after successful recovery
  * @returns {string} Shell instructions (no leading/trailing blank lines, no code fence)
  */
-function buildManualBranchApplyCommands({ hasBundleFile, runId, artifactFileName, branchName, branchRemote = "origin" }) {
+function buildManualBranchApplyCommands({ hasBundleFile, runId, artifactFileName, branchName, branchRemote = "origin", objectPackRecovery }) {
+  if (objectPackRecovery?.identity) {
+    return [buildObjectPackRecoveryCommands({ runId, branchName, branchRemote, objectPackRecovery: objectPackRecovery.identity }), `git push ${shellQuote(branchRemote)} ${shellQuote(`HEAD:refs/heads/${branchName}`)}`].join("\n");
+  }
   const bundlePath = `/tmp/agent-${runId}/${artifactFileName}`;
   const pushRef = `HEAD:refs/heads/${branchName}`;
   if (hasBundleFile) {
@@ -503,6 +518,53 @@ function buildManualBranchApplyCommands({ hasBundleFile, runId, artifactFileName
     `git checkout -B ${shellQuote(branchName)} FETCH_HEAD`,
     `git am --3way ${shellQuote(`/tmp/agent-${runId}/${artifactFileName}`)}`,
     `git push ${shellQuote(branchRemote)} ${shellQuote(pushRef)}`,
+  ].join("\n");
+}
+
+/**
+ * Recovery envelopes are not bundles or mail patches. Rebuild a binary diff
+ * locally, retaining publisher exclusions without publishing additional bytes.
+ * @param {object} params
+ * @param {string|number} params.runId
+ * @param {string} params.branchName
+ * @param {string} [params.branchRemote]
+ * @param {ObjectPackRecovery} params.objectPackRecovery
+ */
+function buildObjectPackRecoveryCommands({ runId, branchName, branchRemote, objectPackRecovery }) {
+  const { tip, baseline, remote, artifactFileName, excludedFiles } = objectPackRecovery;
+  const directory = `.gh-aw-manual-${runId}`;
+  const envelope = `${directory}/${artifactFileName}`;
+  const pack = `${directory}/recovery.pack`;
+  const patch = `${directory}/recovery.patch`;
+  const git = "git --no-replace-objects -c core.hooksPath=/dev/null";
+  return [
+    "set -eu",
+    "# Run in a clean, complete clone. Review the paired object preview before importing.",
+    `test -z "$(git status --porcelain)"`,
+    `gh run download ${shellQuote(runId)} -n agent -D ${shellQuote(directory)}`,
+    "# Validate the immutable envelope and paired preview; neither is a git bundle/mail patch.",
+    `python3 - ${shellQuote(envelope)} ${shellQuote(pack)} ${shellQuote(tip)} <<'GH_AW_RECOVERY_PY'`,
+    "import hashlib, json, pathlib, sys",
+    "source, output, tip = sys.argv[1:]",
+    "data = pathlib.Path(source).read_bytes()",
+    "magic = b'GH-AW-OBJECT-PACK 1\\n'",
+    "if not data.startswith(magic): raise SystemExit('Not an object-pack envelope')",
+    "header, pack = data[len(magic):].split(b'\\n', 1)",
+    "metadata = json.loads(header)",
+    "preview = pathlib.Path(source).with_suffix('.patch').read_bytes()",
+    "if metadata['tip'] != tip or hashlib.sha256(pack).hexdigest() != metadata['packHash'] or hashlib.sha256(preview).hexdigest() != metadata['previewHash']:",
+    "    raise SystemExit('Recovery identity or preview changed; refusing import')",
+    "pathlib.Path(output).write_bytes(pack)",
+    "GH_AW_RECOVERY_PY",
+    "# Fetch only the publisher-authorized baseline before importing untrusted objects.",
+    `${git} fetch ${shellQuote(remote)} ${shellQuote(baseline)}`,
+    ...(branchRemote ? [`${git} fetch ${shellQuote(branchRemote)} ${shellQuote(branchName)}`, `recovery_head=$(${git} rev-parse FETCH_HEAD)`] : []),
+    `${git} -c protocol.allow=never index-pack --fsck-objects --stdin < ${shellQuote(pack)}`,
+    `${git} -c protocol.allow=never fsck --strict --no-reflogs ${shellQuote(tip)}`,
+    `${git} -c protocol.allow=never diff --binary --full-index --no-ext-diff --no-textconv ${shellQuote(baseline)} ${shellQuote(tip)} -- . ${excludedFiles.map(pattern => shellQuote(`:(exclude)${pattern}`)).join(" ")} > ${shellQuote(patch)}`,
+    ...(branchRemote ? [`${git} checkout -B ${shellQuote(branchName)} "$recovery_head"`] : [`${git} checkout -b ${shellQuote(branchName)} ${shellQuote(baseline)}`]),
+    `${git} -c protocol.allow=never apply --3way --index ${shellQuote(patch)}`,
+    `${git} commit -m 'Apply reviewed workflow changes'`,
   ].join("\n");
 }
 

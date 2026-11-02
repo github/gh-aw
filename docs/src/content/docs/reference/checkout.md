@@ -283,6 +283,124 @@ checkout:
 
 This differs from `checkout: false`, which disables checkout entirely (including any additional configured repositories). With `permissions.contents: none`, only the workflow's own repository is skipped.
 
+Safe-output patch and bundle generation is **local-only**. It never fetches
+missing refs or objects from the agent-writable checkout, even when safe-output
+API credentials are configured. All Git transports, including external remote
+helpers and partial-clone lazy fetches, are disabled during artifact generation.
+Repository-configured external diffs, text conversion, hooks, fsmonitor, and
+signing are also disabled. Filtered artifacts are synthesized from committed
+objects with index-only plumbing, without checkout or clean/smudge filters.
+Raw repo-memory staging pins parent-directory descriptors before reading files;
+it requires Linux descriptor-relative paths and fails closed on other platforms.
+Prepare the required refs with `checkout.fetch` and sufficient history with
+`checkout.fetch-depth` before agent execution; partial clones must also have the
+required blobs locally. Incremental updates require the pre-agent PR-head baseline
+recorded by the PR checkout step or an existing `origin/<branch>` tracking ref.
+Missing baselines are reported rather than replaced with a broader diff.
+Full-mode generation can use the local base branch when its `origin` tracking
+ref is absent, including cross-repository checkouts. Filtered bundles preserve
+the checkout's shallow boundaries; deeper history is only needed when the
+required baseline cannot be resolved locally. Failure messages retain fixed
+checkout and workflow-compilation guidance without exposing raw Git stderr,
+checkout paths, or caller-supplied ref names.
+
+When local generation cannot resolve required refs or objects, non-staged PR
+outputs can instead return `result: "queued"` with `recovery: "object-pack"`.
+This is not publication success. The agent packages available local objects
+without fetching; the trusted safe-outputs job fetches the authorized baseline
+into a new isolated bare repository, validates the objects, and regenerates the
+patch and bundle before applying the existing file, size, and publication policies.
+Agent repository configuration, remotes, hooks, and alternates are never copied.
+
+The fallback selects objects reachable from the pinned tip, using available
+local baseline refs as exclusion hints. It omits unrelated branches, tags,
+unreachable history, and objects already reachable from those hints. Hints
+reduce transfer size but never authorize a publisher baseline or a remote
+request. The default 100,000-object and 64 MiB uncompressed limits apply to the selected
+objects, not the entire monorepo. The existing patch artifact previews every
+packed object. Recovery rejects redacted or mismatched previews.
+After redaction and before upload, the artifact guard also blocks recovery
+envelopes whose paired previews changed or disappeared. Publisher rejection
+alone cannot protect bytes already available in a downloadable artifact.
+
+By default, the trusted publisher starts with a depth-one, treeless fetch of the authorized
+baseline. If required commit ancestry is absent, it increases depth geometrically
+through 16, 64, 256, 1,024, 4,096, 16,384, and at most 65,536 commits, keeping the
+first resolved revision pinned. Only the required trusted baseline/boundary tree
+snapshots are then fetched without blobs, rather than downloading every
+intermediate monorepo tree. It compares trees before importing agent objects
+and fetches only required old/new blobs whose identities were independently read
+from trusted fetched trees. Unchanged large files are not hydrated; missing
+agent-created bytes are rejected rather than requested from upload hints.
+Servers without filtering support fail explicitly instead of retrying an
+unfiltered clone. Authentication and other fetch failures are not retried.
+
+All fetching finishes before agent objects are imported. By default, requests have a
+60-second command deadline and share a 180-second network-operation deadline.
+Tree inspection is limited to one million entries, required baseline blob
+hydration to 64 MiB, and the uploaded pack/import to 80 MiB. Hydration size is
+checked after transfer; these limits are not a downloaded-byte budget.
+
+#### Repository-configured recovery limits
+
+GitHub Actions repository configuration variables (`Settings > Secrets and
+variables > Actions > Variables`) configure the following budgets without
+changing workflow frontmatter. The compiler binds them explicitly into the agent
+runtime, nested safe-outputs MCP container, upload-validation steps, and trusted
+publisher. Upload validation and publishing independently use repository values;
+uploaded metadata and agent-written environment files cannot override their limits.
+Existing compiled workflows require recompilation with the matching setup runtime.
+
+| Repository variable | Default | Controls |
+|---|---:|---|
+| `GH_AW_OBJECT_PACK_MAX_BYTES` | `67108864` | Uncompressed objects, hydration, and derived pack/preview/header/output-buffer bounds |
+| `GH_AW_OBJECT_PACK_MAX_OBJECTS` | `100000` | Selected/parsed objects and derived tree/scan entry and fetch-batch budgets |
+| `GH_AW_OBJECT_PACK_TIMEOUT_MS` | `60000` | Each command and the derived shared network deadline |
+| `GH_AW_OBJECT_PACK_FETCH_DEPTHS` | `1,16,64,256,1024,4096,16384,65536` | Finite, strictly increasing history search depths |
+
+For byte budget `B`, pack/import and Git graph buffers are `ceil(5B/4)`, previews
+are `2B`, total envelope headers are `max(1, floor(B/16384))`, diagnostic buffers
+are `max(1, floor(B/64))`, and nested regeneration Git buffers are `ceil(25B/16)`.
+Uncompressed object and post-transfer hydration budgets are each `B`.
+For object budget `N`, tree and scan entry budgets are each `10N`, and fetch
+batches contain at most `max(1, ceil(256N/100000))` IDs. The shared network deadline
+is three times the command timeout. These ratios preserve all existing defaults:
+80 MiB packs, 128 MiB previews, 4 KiB headers, 1 MiB diagnostic buffers, 100 MiB
+nested Git buffers, one million tree/scan entries, 256-ID batches, and 180 seconds
+for network operations.
+
+Empty or unset variables retain defaults. Numeric settings accept positive decimal
+integers only; zero does not disable a limit. Depths accept a comma-separated
+strictly increasing list of positive integers. Invalid settings fail closed
+instead of being ignored or clamped. Node.js buffer/string and subprocess-timer
+capacities, Git's depth range, and the pack format's object-count range still apply.
+Configured budgets must also keep every derived buffer and timer representable.
+
+For example, `gh variable set GH_AW_OBJECT_PACK_MAX_BYTES --body 134217728`
+raises the byte budget to 128 MiB, packs to 160 MiB, and previews to 256 MiB.
+Larger budgets can increase
+runner memory, CPU, and network use; no setting relaxes repository authorization,
+preview validation, native object validation, or the fetch-before-import boundary.
+
+Incremental recovery requires the triggering PR's exact pre-agent head SHA and
+an authorized head repository; an uploaded baseline or a newer remote head cannot
+replace it. Dynamic PR updates without that trusted event baseline, staged
+outputs, larger selected changes, exhausted recovery budgets, and missing agent-created content still
+require checkout provisioning. Full recovery uses the authorized base branch and
+preserves the trusted dispatch-SHA baseline for same-repository feature runs.
+Publisher credentials must authorize the fetched repository independently of any
+credentials previously used by `actions/checkout`.
+
+Fallback issues keep the original object-pack uploads immutable. Their recovery
+commands require a clean, complete clone and reconstruct a binary patch from the
+publisher-resolved baseline and tip, retaining configured exclusions. Object-pack
+envelopes and previews cannot be applied directly with `git fetch` or `git am`.
+
+GitHub Actions debug logging includes `[object_pack_transport]` resolution
+stages, decision booleans, and object/byte counts. These traces omit repository
+identities, refs, commit IDs, filesystem paths, credentials, object contents, and
+raw subprocess diagnostics.
+
 ## `pull_request_target` Checkout
 
 For `pull_request_target` workflows, the "Checkout PR branch" step is auto-disabled when no `checkout:` key is present in frontmatter. This prevents hard failures when the PR head branch is deleted (merged/closed events) or inaccessible (fork PRs).
