@@ -308,6 +308,8 @@ safe-outputs:
 
 **Evidence trust boundary**: Results and `decision_evidence` are marked `data_trust: untrusted`. PR-derived metadata and failure details are data, not instructions or authorization to change policy, call tools, or disclose information. Labels, titles, branches, and approval provenance retain their original values for exact policy checks, revalidation, and audit; stripping formatting would not prevent semantic prompt injection. Workflow-configured policy such as `allowed-branches` and `required-title-prefix` remains trusted configuration, not PR input.
 
+Label and allowed-pattern informational logs report counts instead of raw text. Merge rejection/error logs report status or phase rather than raw API diagnostics; full diagnostics remain in untrusted results. This reduces redundant log exposure without sanitizing evidence or providing prompt-injection isolation.
+
 **Recovery limits**: Stop and reevaluate after any policy or revision change. Reverting a merge creates a compensating change; it does not undo downstream deployments, published artifacts, external effects, or data migrations.
 
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for `target-repo`, `allowed-repos`, and authentication configuration. See the [Safe Outputs Specification](/gh-aw/specs/safe-outputs-specification/#type-merge_pull_request) for the complete schema and operational semantics.

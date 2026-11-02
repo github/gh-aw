@@ -640,7 +640,7 @@ async function main(config = {}) {
       }
 
       const labels = (pr.labels || []).map(l => l.name).filter(Boolean);
-      core.info(`PR labels (${labels.length}): ${labels.join(", ") || "(none)"}`);
+      core.info(`PR labels: ${labels.length}`);
       const missingRequiredLabels = findMissingRequiredLabels(labels, requiredLabels);
       evidence.labels = { required: requiredLabels, present: labels };
       evidence.source_branch = sourceBranch;
@@ -669,7 +669,7 @@ async function main(config = {}) {
         });
       }
       if (allowedBranchPatterns.length > 0) {
-        core.info(`Allowed branch patterns: ${allowedBranches.join(", ")}`);
+        core.info(`Allowed branch patterns: ${allowedBranches.length}`);
       }
 
       /** @type {{isProtected: boolean, isDefault: boolean, defaultBranch: string|null, requiredChecks: string[]}} */
@@ -838,7 +838,7 @@ async function main(config = {}) {
       core.debug(`merge_pull_request: ${JSON.stringify({ event: "merge_completed", merged: mergeResponse.data?.merged === true })}`);
 
       if (mergeResponse.data?.merged !== true) {
-        core.error(`Merge API returned merged=false for PR #${pullNumber}: ${mergeResponse.data?.message || "no message"}`);
+        core.error(`Merge API returned merged=false for PR #${pullNumber}`);
         return {
           success: false,
           data_trust: "untrusted",
@@ -862,7 +862,7 @@ async function main(config = {}) {
       };
     } catch (error) {
       core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
-      core.error(`merge_pull_request failed for PR #${pullNumber}: ${getErrorMessage(error)}`);
+      core.error(`merge_pull_request failed for PR #${pullNumber} during ${phase}`);
       return {
         success: false,
         data_trust: "untrusted",

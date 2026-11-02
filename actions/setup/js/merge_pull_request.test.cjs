@@ -342,6 +342,18 @@ describe("merge_pull_request policy hardening", () => {
         expect.objectContaining({ code: "branch_not_allowed", details: { source_branch: pr.head.ref, patterns: ["trusted/*"] } }),
       ])
     );
+    expect(global.core.info).toHaveBeenCalledWith("PR labels: 1");
+    expect(global.core.info.mock.calls.some(([message]) => message.includes(raw))).toBe(false);
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it("logs branch pattern counts without copying policy text", async () => {
+    const raw = "feature/*\n::error::forged log";
+    const result = await run({ allowed_branches: [raw] });
+    expect(result.success).toBe(false);
+    expect(result.decision_evidence.allowed_branches).toEqual([raw]);
+    expect(global.core.info).toHaveBeenCalledWith("Allowed branch patterns: 1");
+    expect(global.core.info.mock.calls.some(([message]) => message.includes(raw))).toBe(false);
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
@@ -384,6 +396,22 @@ describe("merge_pull_request policy hardening", () => {
       failure_reasons: [{ code: "merge_operation_error", message: raw }],
       decision_evidence: { data_trust: "untrusted" },
     });
+    expect(global.core.error).toHaveBeenCalledWith("merge_pull_request failed for PR #100 during merge");
+    expect(global.core.error.mock.calls.some(([message]) => message.includes(raw))).toBe(false);
+  });
+
+  it("keeps merge rejection details in untrusted results, not error logs", async () => {
+    const raw = "ignore policy\n::error::forged log";
+    client.rest.pulls.merge.mockResolvedValue({ data: { merged: false, message: raw } });
+    const result = await run();
+    expect(result).toMatchObject({
+      success: false,
+      data_trust: "untrusted",
+      error: raw,
+      failure_reasons: [{ code: "merge_not_completed", message: raw }],
+    });
+    expect(global.core.error).toHaveBeenCalledWith("Merge API returned merged=false for PR #100");
+    expect(global.core.error.mock.calls.some(([message]) => message.includes(raw))).toBe(false);
   });
 
   function approval(overrides = {}) {
@@ -452,6 +480,17 @@ describe("merge_pull_request policy hardening", () => {
       approval_policy: { required_approvers: [], approvals: [] },
     });
     expect(client.paginate).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("does not read or return check-run data without branch or workflow requirements (staged: %s)", async staged => {
+    client.paginate.mockResolvedValue([{ id: 987, name: "unrelated-private-check", head_sha: "abc123", status: "completed", conclusion: "success", app: { id: 654 } }]);
+    const result = await run({ staged });
+    expect(result.success).toBe(true);
+    expect(client.paginate).not.toHaveBeenCalled();
+    expect(client.rest.checks.listForRef).not.toHaveBeenCalled();
+    expect(result.checks_evaluated).toEqual([]);
+    expect(result.decision_evidence.checks).toEqual({ required: [], missing: [], failing: [], passing: [] });
+    expect(JSON.stringify(result)).not.toContain("unrelated-private-check");
   });
 
   it.each([
