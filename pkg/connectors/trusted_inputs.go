@@ -17,6 +17,8 @@ func (preflight TrustedPreflight) operation(credential string) Operation {
 		ResponseContains: preflight.ResponseContains, Project: preflight.Project,
 		ResponseChecks:        preflight.ResponseChecks,
 		ResponseOptionalEmpty: preflight.ResponseOptionalEmpty,
+		Resources:             preflight.Resources, ResponseResources: preflight.ResponseResources,
+		ResponseLimits: preflight.ResponseLimits, ResponseAnyInputs: preflight.ResponseAnyInputs,
 	}
 }
 
@@ -81,7 +83,7 @@ func (p *Plan) resolveTrustedInputs(ctx context.Context, runtime Runtime, name s
 	}
 	if op.Preflight != nil {
 		lookup := op.Preflight.operation(op.Credential)
-		if err := validateArguments(lookup.Inputs, nil, nil, bound); err != nil {
+		if err := validateArguments(lookup.Inputs, lookup.Resources, p.connection.Resources, bound); err != nil {
 			return nil, nil, errors.New("trusted preflight inputs violate their declared constraints")
 		}
 		result, err := p.executeOperation(ctx, runtime, "preflight", name, lookup, bound)
@@ -137,7 +139,7 @@ func (p *Plan) validateUnboundArguments(op Operation, args map[string]any) error
 			delete(ordinary, input)
 		}
 	}
-	if err := validateArguments(intent.Inputs, intent.Resources, p.connection.Resources, ordinary); err != nil {
+	if _, err := p.validateLookupArguments(intent, ordinary); err != nil {
 		return err
 	}
 	return nil

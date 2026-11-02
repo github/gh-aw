@@ -212,6 +212,14 @@ func validateSelection(spec ConnectorSpec, binding Binding, connection Connectio
 			if err := requireResources(op.ResponseResources, connection.Resources); err != nil {
 				return err
 			}
+			if op.Preflight != nil {
+				if err := requireResources(op.Preflight.Resources, connection.Resources); err != nil {
+					return err
+				}
+				if err := requireResources(op.Preflight.ResponseResources, connection.Resources); err != nil {
+					return err
+				}
+			}
 		}
 		total += len(names)
 	}

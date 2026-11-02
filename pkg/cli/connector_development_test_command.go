@@ -107,6 +107,9 @@ func stageDevelopmentConnector(output io.Writer, plan *connectors.Plan, options 
 	if contentRequired {
 		publicationNotice = "Default shared publication formatting passed for annotated inputs; prepared content is not printed.\n"
 	}
+	if len(intent.UnresolvedInputs) > 0 {
+		publicationNotice += "Unresolved targets: " + strings.Join(intent.UnresolvedInputs, ", ") + ". Canonical identities and relationships remain unverified until authorized execution.\n"
+	}
 	_, err = fmt.Fprintf(output, "PASS: safe-output %s staged; Go plan and argument checks passed.\n%sNo credentials were read and no HTTP requests or writes were made. Provider credentials and response checks were not tested.\n%s", options.capability, publicationNotice, connectorNodeNotice(options.nodeRuntime))
 	return err
 }

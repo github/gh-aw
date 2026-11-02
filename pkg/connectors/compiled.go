@@ -103,6 +103,14 @@ func (p *Plan) ForPhase(phase string) (*Plan, error) { //nolint:largefunc // Kee
 		spec.Endpoints[op.Request.Endpoint] = p.spec.Endpoints[op.Request.Endpoint]
 		addResources(op.Resources)
 		addResources(op.ResponseResources)
+		if op.Preflight != nil {
+			addResources(op.Preflight.Resources)
+			addResources(op.Preflight.ResponseResources)
+		}
+		for _, lookup := range op.Lookups {
+			addResources(lookup.Resources)
+			addResources(lookup.ResponseResources)
+		}
 	}
 	switch phase {
 	case "agent":
@@ -250,7 +258,8 @@ func (p *Plan) InputSchema(capability, name string) (map[string]any, error) {
 			inputs[input] = field
 		}
 	}
-	return inputSchema(inputs), nil
+	op, _ := selectedOperation(p.spec, capability, name)
+	return inputSchema(lookupPublicInputs(op, inputs)), nil
 }
 
 func (p *Plan) ValidateContext(name string, args map[string]any) error {
@@ -258,5 +267,6 @@ func (p *Plan) ValidateContext(name string, args map[string]any) error {
 		return fmt.Errorf("context capability %q is not selected", name)
 	}
 	op := p.spec.Context[name]
-	return validateArguments(op.Inputs, op.Resources, p.connection.Resources, args)
+	_, err := p.validateLookupArguments(op, args)
+	return err
 }

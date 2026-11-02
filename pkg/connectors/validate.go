@@ -171,11 +171,8 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if err := s.validateTrustedInputs(name, op, phase); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
-	for pointer, input := range op.ResponseContains {
-		field, exists := op.Inputs[input]
-		if strings.Count(pointer, "/*/") != 1 || !validPointer(pointer) || !exists || !field.Required || field.Type != "string" {
-			return errors.New("responseContains requires an array-element pointer and a required string input")
-		}
+	if err := s.validateInputLookups(name, op, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
 	}
 	return validateRequestBindings(name, op, path)
 }

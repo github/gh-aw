@@ -86,6 +86,9 @@ type Operation struct {
 	TrustedInputs          map[string]TrustedInput `json:"trustedInputs,omitempty"`
 	Preflight              *TrustedPreflight       `json:"preflight,omitempty"`
 	ResponseContains       map[string]string       `json:"responseContains,omitempty"`
+	ResponseLimits         map[string]int          `json:"responseLimits,omitempty"`
+	ResponseAnyInputs      map[string][]string     `json:"responseAnyInputs,omitempty"`
+	Lookups                []InputLookup           `json:"lookups,omitempty"`
 	Retry                  *RetryPolicy            `json:"retry,omitempty"`
 }
 
@@ -104,17 +107,29 @@ type TrustedInput struct {
 
 // TrustedPreflight is a fixed read in the safe-output credential phase. Its
 // arguments come exclusively from authored trusted inputs, never agent input.
+// InputLookup reuses its bounded read shape with separate exact alias grants.
 type TrustedPreflight struct {
-	Inputs                map[string]Input  `json:"inputs"`
-	Request               Request           `json:"request"`
-	MaxResponseBytes      int               `json:"maxResponseBytes"`
-	ResponseRequired      []string          `json:"responseRequired,omitempty"`
-	ResponseTypes         map[string]string `json:"responseTypes,omitempty"`
-	ResponseInputs        map[string]string `json:"responseInputs,omitempty"`
-	ResponseOptionalEmpty []string          `json:"responseOptionalEmpty,omitempty"`
-	ResponseContains      map[string]string `json:"responseContains,omitempty"`
-	ResponseChecks        map[string]any    `json:"responseChecks,omitempty"`
-	Project               map[string]string `json:"project"`
+	Inputs                map[string]Input    `json:"inputs"`
+	Resources             map[string]string   `json:"resources,omitempty"`
+	Request               Request             `json:"request"`
+	MaxResponseBytes      int                 `json:"maxResponseBytes"`
+	ResponseRequired      []string            `json:"responseRequired,omitempty"`
+	ResponseTypes         map[string]string   `json:"responseTypes,omitempty"`
+	ResponseInputs        map[string]string   `json:"responseInputs,omitempty"`
+	ResponseOptionalEmpty []string            `json:"responseOptionalEmpty,omitempty"`
+	ResponseContains      map[string]string   `json:"responseContains,omitempty"`
+	ResponseChecks        map[string]any      `json:"responseChecks,omitempty"`
+	ResponseResources     map[string]string   `json:"responseResources,omitempty"`
+	ResponseLimits        map[string]int      `json:"responseLimits,omitempty"`
+	ResponseAnyInputs     map[string][]string `json:"responseAnyInputs,omitempty"`
+	Project               map[string]string   `json:"project,omitempty"`
+}
+
+// InputLookup replaces one approved alias with an independently granted
+// canonical identity. An empty Input checks relationships after resolution.
+type InputLookup struct {
+	Input string `json:"input,omitempty"`
+	TrustedPreflight
 }
 
 // CreatedResource explicitly authorizes binding a validated create response to

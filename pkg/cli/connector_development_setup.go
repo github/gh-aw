@@ -179,6 +179,7 @@ func writeConnectorDevelopmentCapabilities(text *strings.Builder, registration w
 	for _, name := range slices.Sorted(maps.Keys(registration.Spec.MCP)) {
 		op := registration.Spec.MCP[name]
 		write(name, "agent", op.Inputs, op.Resources)
+		writeConnectorLookupCapabilities(text, name, "agent", phase, op.Operation)
 	}
 	for _, group := range []struct {
 		phase string
@@ -192,6 +193,7 @@ func writeConnectorDevelopmentCapabilities(text *strings.Builder, registration w
 				delete(resources, input)
 			}
 			write(name, group.phase, inputs, resources)
+			writeConnectorLookupCapabilities(text, name, group.phase, phase, op)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(registration.Spec.HTTPMCP)) {
@@ -200,6 +202,25 @@ func writeConnectorDevelopmentCapabilities(text *strings.Builder, registration w
 			write(name+" --remote-tool "+tool, "agent", server.Tools[tool].Inputs, server.Tools[tool].Resources)
 		}
 	}
+}
+
+func writeConnectorLookupCapabilities(text *strings.Builder, name, capabilityPhase, selectedPhase string, op connectors.Operation) {
+	if len(op.Lookups) == 0 || (selectedPhase != "" && capabilityPhase != selectedPhase) {
+		return
+	}
+	fmt.Fprintf(text, "    %s: automatic aliases use at most %d fixed reads with the same %s credential; provision its provider Read permissions too.\n", name, len(op.Lookups), capabilityPhase) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	grants := map[string]struct{}{}
+	for _, lookup := range op.Lookups {
+		for _, resources := range []map[string]string{lookup.Resources, lookup.ResponseResources} {
+			for _, resource := range resources {
+				grants[resource] = struct{}{}
+			}
+		}
+	}
+	for _, resource := range slices.Sorted(maps.Keys(grants)) {
+		fmt.Fprintf(text, "    --grant %s='[\"approved-id\"]' (conditional lookup grant, independent of canonical grants)\n", resource) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	}
+	text.WriteString("    Staging keeps aliases unresolved and makes no lookup requests.\n")
 }
 
 // XML supplies text only. encoding/xml does not resolve external entities, and
