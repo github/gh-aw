@@ -561,5 +561,35 @@
    "Deployments pin released versions"
   ],
   "blogged": false
+ },
+ "turfbuild/turf-agentic-workflows": {
+  "kind": "workflow-collection",
+  "reviewed": "2026-11-02",
+  "score": 7,
+  "summary": "Plan/apply-staging/apply-production Terraform loop via Turf MCP in gh-aw; only README readable, workflow files filtered.",
+  "highlights": [
+   "README: per-workflow MCP tool allowlist enforced at gateway (plan cannot apply)",
+   "README: cloud credentials stay in runner processes, not the agent",
+   "README: reusable shared/turf.md import"
+  ],
+  "blogged": false
+ },
+ "githubnext/gh-aw-enclave-demo-public": {
+  "kind": "other",
+  "reviewed": "2026-11-02",
+  "score": 5,
+  "summary": "Demo of vulnerable vs enclave workflow variants; README is compile/injection instructions only.",
+  "highlights": [
+   "README: roadmap-triage-enclave vs -vulnerable"
+  ],
+  "blogged": false
+ },
+ "MervinPraison/gh-aw-demo": {
+  "kind": "other",
+  "reviewed": "2026-11-02",
+  "score": 2,
+  "summary": "Tiny demo repo (cart.py, short README).",
+  "highlights": [],
+  "blogged": false
  }
 }
