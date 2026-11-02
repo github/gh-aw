@@ -13,6 +13,84 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestConnectorsSchemaCommand(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"ConnectorSpec", "ConnectorConnection", "ConnectorBinding"} {
+		cmd := NewConnectorsCommand()
+		var output bytes.Buffer
+		cmd.SetOut(&output)
+		cmd.SetArgs([]string{"schema", kind})
+		require.NoError(t, cmd.Execute())
+		var schema map[string]any
+		require.NoError(t, json.Unmarshal(output.Bytes(), &schema))
+		require.Equal(t, "object", schema["type"])
+	}
+	cmd := NewConnectorsCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetArgs([]string{"schema", "unsupported"})
+	require.Error(t, cmd.Execute())
+}
+
+func TestConnectorsPlanCommand(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	data, err := os.ReadFile("../connectors/testdata/example.yaml")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "spec.yaml"), data, 0600))
+	connection := `apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorConnection
+connector: example.com/issues
+credentials:
+  reader: {secret: EXAMPLE_READ_TOKEN}
+  writer: {secret: EXAMPLE_WRITE_TOKEN}
+  context-reader: {secret: EXAMPLE_CONTEXT_TOKEN}
+resources:
+  issues: [ISSUE-1]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(root, "connection.yaml"), []byte(connection), 0600))
+	binding := `apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorBinding
+definition: spec.yaml
+connection: connection.yaml
+mcp: [get-issue]
+safeOutputs: [add-comment]
+context: [issue-details]
+`
+	path := filepath.Join(root, "binding.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(binding), 0600))
+	cmd := NewConnectorsCommand()
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{"plan", path, "--root", root})
+	require.NoError(t, cmd.Execute())
+	var result struct {
+		Digest      string `json:"digest"`
+		Operational bool   `json:"operational"`
+	}
+	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	require.Len(t, result.Digest, 64)
+	require.False(t, result.Operational)
+	require.NotContains(t, output.String(), "EXAMPLE_WRITE_TOKEN")
+	require.NoError(t, os.WriteFile(filepath.Join(root, "connection.yaml"), []byte(connection+"unknown: true\n"), 0600))
+	cmd = NewConnectorsCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetArgs([]string{"plan", path, "--root", root})
+	require.ErrorContains(t, cmd.Execute(), "unknown field")
+}
+
+func TestConnectorsPlanRejectsInvalidFiles(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	_, err := readConnectorBinding(dir)
+	require.ErrorContains(t, err, "regular file")
+	_, err = readConnectorBinding(filepath.Join(dir, "missing.yaml"))
+	require.ErrorContains(t, err, "open connector binding")
+	path := filepath.Join(dir, "large.yaml")
+	require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte(" "), 256*1024+1), 0600))
+	_, err = readConnectorBinding(path)
+	require.Error(t, err)
+}
+
 func TestConnectorsValidateCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewConnectorsCommand()
