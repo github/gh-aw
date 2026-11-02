@@ -134,7 +134,7 @@ func TestEnclaveDiagnosticsLifecycleAndRetention(t *testing.T) {
 	generateEnclaveDiagnosticsCollect(&yaml, data)
 	content := yaml.String()
 	assert.Contains(t, content, `DIAGNOSTICS_STAGING="$staging_dir" NODE_OPTIONS= NODE_PATH= node`)
-	assert.Contains(t, content, `install_enclave_diagnostics.py`)
+	assert.Contains(t, content, `install_enclave_diagnostics_trusted.cjs`)
 	assert.Contains(t, content, enclaveDiagnosticsInstallerSHA)
 	require.Less(t, strings.Index(content, "prepare docker"), strings.Index(content, "id: agentic_execution"))
 	require.Less(t, strings.Index(content, "id: agentic_execution"), strings.Index(content, "collect docker"))
@@ -162,7 +162,7 @@ func TestEnclaveDiagnosticsLifecycleAndRetention(t *testing.T) {
 	assert.Empty(t, yaml.String())
 }
 
-func TestEnclaveDiagnosticsBootstrapDoesNotPassNodeCodeToRoot(t *testing.T) {
+func TestEnclaveDiagnosticsBootstrapVerifiesRootOwnedInstaller(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join("..", "..", "actions", "setup", "js", "install_enclave_diagnostics.cjs"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(source), "sudo")
@@ -172,11 +172,14 @@ func TestEnclaveDiagnosticsBootstrapDoesNotPassNodeCodeToRoot(t *testing.T) {
 	var yaml strings.Builder
 	require.NoError(t, generateEnclaveDiagnosticsPrepare(&yaml, data))
 	step := yaml.String()
-	assert.Contains(t, step, `install_enclave_diagnostics.py" "$installer_path"`)
+	assert.Contains(t, step, `install_enclave_diagnostics_trusted.cjs" "$installer_path"`)
 	assert.Contains(t, step, `[[ "${installer_sha256%% *}" == "`+enclaveDiagnosticsInstallerSHA+`" ]]`)
-	assert.Contains(t, step, `/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- /usr/bin/python3 -I "$installer_path"`)
+	assert.Contains(t, step, `/usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- "$installer_dir/node" --no-addons --no-global-search-paths "$installer_path"`)
 	assert.NotContains(t, step, "<<'PY'")
-	assert.Less(t, strings.Index(step, enclaveDiagnosticsInstallerSHA), strings.Index(step, `"$installer_path" "$staging_dir/node.tar.xz"`))
+	assert.Less(t, strings.Index(step, enclaveDiagnosticsInstallerSHA), strings.Index(step, `"$installer_path" "$installer_dir/node"`))
+	nodeDigest := strings.Index(step, `"${node_binary_digest%% *}" == "$node_binary_sha256"`)
+	require.GreaterOrEqual(t, nodeDigest, 0)
+	assert.Less(t, nodeDigest, strings.Index(step, `-- "$installer_dir/node" --no-addons`))
 	runStart := strings.Index(step, "        run: |\n")
 	require.GreaterOrEqual(t, runStart, 0)
 	runLines := strings.Split(step[runStart+len("        run: |\n"):], "\n")
@@ -194,14 +197,12 @@ func TestEnclaveDiagnosticsBootstrapDoesNotPassNodeCodeToRoot(t *testing.T) {
 		t.Fatalf("diagnostic setup shell syntax: %v: %s", err, output)
 	}
 
-	installerPath := filepath.Join("..", "..", "actions", "setup", "sh", "install_enclave_diagnostics.py")
+	installerPath := filepath.Join("..", "..", "actions", "setup", "js", "install_enclave_diagnostics_trusted.cjs")
 	installer, err := os.ReadFile(installerPath)
 	require.NoError(t, err)
 	require.Equal(t, enclaveDiagnosticsInstallerSHA, fmt.Sprintf("%x", sha256.Sum256(installer)))
-	pythonCheck := exec.Command("/usr/bin/python3", "-I", "-c", "import ast, sys; ast.parse(sys.stdin.read())")
-	pythonCheck.Stdin = strings.NewReader(string(installer))
-	if output, err := pythonCheck.CombinedOutput(); err != nil {
-		t.Fatalf("diagnostic setup Python syntax: %v: %s", err, output)
+	if output, err := exec.Command("node", "--check", installerPath).CombinedOutput(); err != nil {
+		t.Fatalf("diagnostic setup JavaScript syntax: %v: %s", err, output)
 	}
 }
 
@@ -278,63 +279,50 @@ func TestEnclaveDiagnosticsTrustedBootstrap(t *testing.T) {
 	assert.Contains(t, source, "v24.22.1")
 	assert.Contains(t, source, "3929c9a15c0f239b772affcaae6e55fec92f41c2")
 	assert.NotContains(t, source, "command -v node")
-	installer, err := os.ReadFile("../../actions/setup/sh/install_enclave_diagnostics.py")
+	installerPath, err := filepath.Abs("../../actions/setup/js/install_enclave_diagnostics_trusted.cjs")
+	require.NoError(t, err)
+	installer, err := os.ReadFile(installerPath)
 	require.NoError(t, err)
 	body := string(installer)
 	for _, required := range []string{
-		"v24.22.1", "6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6",
-		"dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e",
+		"e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb",
+		"c8c5721679d8d1a09e9987e345d5f9a64899bb85f7a384783ba8a93e6e62348a",
 		"7722affc5c076d79692d4268a543ef267281424ad4b374eb8f80c24cbec08cae",
-		"os.O_NOFOLLOW", "os.O_EXCL",
-		"protected_directory(directory)", "member.isfile()", "archive.getmember",
+		"fs.constants.O_NOFOLLOW", "fs.constants.O_EXCL",
+		"protectedDirectory(directory)", "node-checksum",
 	} {
 		assert.Contains(t, body, required)
 	}
 	assert.NotContains(t, body, "extractall")
-	python, err := exec.LookPath("python3")
-	require.NoError(t, err)
-	definitions, _, found := strings.Cut(body, "\nif __name__ == \"__main__\":")
-	require.True(t, found)
 	dir := testutil.TempDir(t, "trusted-collector-files")
 	target := filepath.Join(dir, "regular")
 	require.NoError(t, os.WriteFile(target, []byte("verified"), 0600))
-	harness := definitions + `
-target = sys.argv[1]
-assert read_regular(target, 8) == b"verified"
-def denied(path, limit, category):
-    try:
-        read_regular(path, limit)
-        raise AssertionError("accepted unsafe file")
-    except SystemExit as error:
-        assert category in str(error), error
-denied(target, 7, "file-size")
-os.link(target, target + "-hard")
-denied(target, 8, "unsafe-file")
-os.unlink(target + "-hard")
-os.symlink(target, target + "-link")
-try:
-    read_regular(target + "-link", 8)
-    raise AssertionError("accepted symlink")
-except OSError:
-    pass
-os.chmod(os.path.dirname(target), 0o777)
-try:
-    protected_directory(os.path.dirname(target))
-    raise AssertionError("accepted runner-owned or writable directory")
-except SystemExit as error:
-    assert "unsafe-directory" in str(error)
+	harness := `
+const fs = require("node:fs");
+const path = require("node:path");
+const assert = require("node:assert/strict");
+const { readRegular, protectedDirectory } = require(process.argv[1]);
+const target = process.argv[2];
+assert.equal(readRegular(target, 8).toString(), "verified");
+assert.throws(() => readRegular(target, 7), /file-size/);
+fs.linkSync(target, target + "-hard");
+assert.throws(() => readRegular(target, 8), /unsafe-file/);
+fs.unlinkSync(target + "-hard");
+fs.symlinkSync(target, target + "-link");
+assert.throws(() => readRegular(target + "-link", 8));
+fs.chmodSync(path.dirname(target), 0o777);
+assert.throws(() => protectedDirectory(path.dirname(target)), /unsafe-directory/);
 `
-	output, err := exec.Command(python, "-I", "-c", harness, target).CombinedOutput()
+	output, err := exec.Command("node", "-e", harness, installerPath, target).CombinedOutput()
 	require.NoError(t, err, string(output))
-	// Execute the real bootstrap body: corrupt archives must stop before any
+	// Execute the real bootstrap body: corrupt executables must stop before any
 	// protected destination is inspected or created.
-	bootstrap := definitions + `
-from types import SimpleNamespace
-from unittest.mock import patch
-with patch("os.getuid", return_value=0), patch("os.geteuid", return_value=0), patch("os.uname", return_value=SimpleNamespace(machine="x86_64")):
-    main(sys.argv[1:])
+	bootstrap := `
+process.getuid = () => 0;
+process.geteuid = () => 0;
+require(process.argv[1]).installEnclaveDiagnosticsTrusted(process.argv.slice(2));
 `
-	output, err = exec.Command(python, "-I", "-c", bootstrap, target, target).CombinedOutput()
+	output, err = exec.Command("node", "-e", bootstrap, installerPath, target, target).CombinedOutput()
 	require.Error(t, err)
-	assert.Contains(t, string(output), "archive-checksum")
+	assert.Contains(t, string(output), "node-checksum")
 }

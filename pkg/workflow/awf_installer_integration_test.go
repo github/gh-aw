@@ -55,7 +55,8 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 				`verify_release_attestation "$install_dir/enclave-storage-helper.py" github/gh-aw-firewall`,
 				`verify_release_digest "$install_dir/enclave-storage-helper.py" "$helper_sha256"`,
 				`/usr/bin/sudo -n /usr/bin/mktemp -d /var/lib/awf-helper-install.XXXXXX`,
-				`/usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- "${RUNNER_TEMP}/gh-aw/actions/install_awf_enclave_helper.py"`,
+				`/usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- "${RUNNER_TEMP}/gh-aw/actions/install_awf_enclave_helper.cjs"`,
+				`"$installer_dir/node" --no-addons --no-global-search-paths "$installer_path"`,
 				`[[ "${installer_sha256%% *}" == "` + dockerEnclaveHelperInstallerSHA + `" ]]`,
 				`"$install_dir/checksums.txt" "$install_dir/enclave-storage-helper.py" "$checksums_sha256" "$helper_sha256"`,
 				`/var/lib/awf/enclave-storage-helper.py probe`,
@@ -93,6 +94,11 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			if protectedDigest < 0 || protectedDigest > privilegedInstall {
 				t.Fatal("the root-owned installer copy must be verified before execution")
 			}
+			nodeDigest := strings.Index(text, `"${node_binary_digest%% *}" == "$node_binary_sha256"`)
+			nodeExecution := strings.Index(text, `-- "$installer_dir/node" --no-addons`)
+			if nodeDigest < 0 || nodeExecution < 0 || nodeDigest > nodeExecution {
+				t.Fatal("the root-owned Node binary must be authenticated before execution")
+			}
 			var run []string
 			for _, line := range step {
 				if strings.HasPrefix(line, "          ") && len(run) > 0 {
@@ -107,7 +113,7 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			if output, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("helper installer shell syntax: %v: %s", err, output)
 			}
-			installerPath := filepath.Join("..", "..", "actions", "setup", "sh", "install_awf_enclave_helper.py")
+			installerPath := filepath.Join("..", "..", "actions", "setup", "js", "install_awf_enclave_helper.cjs")
 			installer, err := os.ReadFile(installerPath)
 			if err != nil {
 				t.Fatal(err)
@@ -115,10 +121,8 @@ func TestDockerEnclaveHelperInstallerContract(t *testing.T) {
 			if got := fmt.Sprintf("%x", sha256.Sum256(installer)); got != dockerEnclaveHelperInstallerSHA {
 				t.Fatalf("installer pin = %s, want %s", got, dockerEnclaveHelperInstallerSHA)
 			}
-			pythonCheck := exec.Command("/usr/bin/python3", "-I", "-c", "import ast, sys; ast.parse(sys.stdin.read())")
-			pythonCheck.Stdin = strings.NewReader(string(installer))
-			if output, err := pythonCheck.CombinedOutput(); err != nil {
-				t.Fatalf("helper installer Python syntax: %v: %s", err, output)
+			if output, err := exec.Command("node", "--check", installerPath).CombinedOutput(); err != nil {
+				t.Fatalf("helper installer JavaScript syntax: %v: %s", err, output)
 			}
 		})
 	}

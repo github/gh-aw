@@ -114,6 +114,17 @@ values; the runner-mask policy does not reduce that redaction.
 
 ## Development
 
+Setup source must use JavaScript (`.cjs`) or shell scripts, not Python files.
+`make lint-setup-no-python` rejects `.py` files anywhere under `actions/setup/`,
+excluding installed `node_modules` dependencies. This check also runs during
+`make build` and `make lint`; replace Python source with a `.cjs` helper.
+
+The privileged enclave installers are standalone CJS scripts using only Node
+built-ins. Generated workflows copy them into root-owned staging, verify their
+pinned SHA-256 digests, and execute them with a separately checksum-pinned Node
+binary in a clean environment. The separately authenticated upstream AWF storage
+helper remains Python; it is a downloaded release asset, not setup action source.
+
 ### Decisions client
 
 `js/decisions_client.cjs` exports
