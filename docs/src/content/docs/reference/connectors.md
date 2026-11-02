@@ -8,6 +8,9 @@ They declare endpoints, credential secret names, exact resource grants, and
 capabilities under `connectors.<id>`; no separate YAML definition or connection
 file is required. Review the specimen hosts and resource IDs before use.
 
+For agent-oriented authoring instructions, use
+[`.github/aw/connectors.md`](https://github.com/github/gh-aw/blob/main/.github/aw/connectors.md).
+
 The compiler embeds these declarations. Import `"@builtin:connectors/<provider>.md"`
 to use the declaration shipped with that compiler, without copying files into the
 consumer repository. Local `.github/aw/connectors/` imports and pinned remote
