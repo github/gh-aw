@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import posixpath
 import re
+import shlex
 import unittest
 from urllib.parse import urljoin
 
@@ -30,6 +31,91 @@ def checklist(text):
     if "## Model and engine misconfiguration\n" not in text:
         return text
     return text.split("## Model and engine misconfiguration\n", 1)[1].split("\n## ", 1)[0]
+
+
+class QuickstartTests(unittest.TestCase):
+    def setUp(self):
+        self.guide = (ROOT / "docs/src/content/docs/setup/quick-start.mdx").read_text()
+
+    def test_installs_ci_doctor_with_an_executable_evidence_contract(self):
+        command = re.search(r"```bash wrap\n(gh aw add-wizard.*?)\n```", self.guide, re.S)
+        self.assertIsNotNone(command)
+        args = shlex.split(command.group(1))
+        self.assertEqual(args[:5], [
+            "gh", "aw", "add-wizard", "githubnext/agentics/ci-doctor", "--append",
+        ])
+        self.assertEqual(len(args), 6)
+        contract = args[5]
+        for required in (
+            "run URL, attempt, head SHA",
+            "Link the failed job logs",
+            "first meaningful error",
+            "code and workflow lines",
+            "not a moving branch",
+            "Separate observed facts from hypotheses",
+            "Checks performed",
+            "including failed tool calls",
+            "Do not claim tests were run",
+            "Suggested checks",
+            "Uncertainty",
+            "competing explanations",
+            "missing or inaccessible evidence",
+            "confirm or reject",
+            "inconclusive investigation",
+            "smallest supported repair",
+            "Do not execute code from the failed revision",
+            "Do not rerun CI or modify repository files",
+            "configured safe outputs",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, contract)
+        default_path = self.guide.split("## Customize or update the workflow", 1)[0]
+        self.assertNotIn("repo-status", default_path)
+        self.assertNotIn("dailyRepoReportResult", self.guide)
+
+    def test_activation_and_review_do_not_promise_unsupported_execution(self):
+        for required in (
+            "No, write files locally",
+            "does not upload secrets or start a run",
+            'workflows: ["CI"]',
+            "branches: [main]",
+            "checkout: false",
+            "toolsets: [actions, repos, issues, pull_requests]",
+            "mode: gh-proxy",
+            "cli-proxy: true",
+            "Keep threat detection enabled",
+            "gh aw compile ci-doctor",
+            "**default branch**",
+            "does not backfill old failures",
+            "**Re-run failed jobs**",
+            "may have side effects",
+            "no `workflow_dispatch` trigger",
+            "no failure report is expected",
+            "not that its diagnosis is correct",
+            "safe-output results",
+            "source:",
+            "gh aw update ci-doctor",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.guide)
+        self.assertNotRegex(self.guide, r"```[^\n]*\n(?:gh aw run|gh workflow run|gh run rerun)")
+
+    def test_structured_data_and_onboarding_use_ci_investigation(self):
+        schema = re.search(r"(?m)^      (\{.*?^      \})", self.guide, re.S)
+        data = json.loads(schema.group(1))
+        self.assertEqual(data["@type"], "HowTo")
+        self.assertEqual([step["position"] for step in data["step"]], [1, 2, 3, 4])
+        self.assertIn("ci-doctor", data["step"][1]["text"])
+        self.assertIn("Verify", data["step"][3]["name"])
+        for path in (
+            "README.md",
+            "docs/src/content/docs/setup/working-with-workflows.mdx",
+            "docs/src/content/docs/gallery/ci-failure-investigation.md",
+        ):
+            with self.subTest(path=path):
+                text = (ROOT / path).read_text()
+                self.assertRegex(text, r"CI Doctor|ci-doctor")
+                self.assertIn("quickstart", text.lower())
 
 
 class GuidanceTests(unittest.TestCase):

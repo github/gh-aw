@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,6 +16,18 @@ func TestAddWizardCommandMentionsEngines(t *testing.T) {
 	cmd := NewAddWizardCommand(func(string) error { return nil })
 	require.NotNil(t, cmd, "Add wizard command should be created")
 	assert.Contains(t, cmd.Long, "Copilot, Claude, Codex, Gemini, or Pi", "Add wizard help should mention all interactive engine options")
+}
+
+func TestAddCommandsIntroduceCIDoctor(t *testing.T) {
+	t.Parallel()
+	addCmd := NewAddCommand(validateEngineStub)
+	wizardCmd := NewAddWizardCommand(validateEngineStub)
+
+	for _, cmd := range []*cobra.Command{addCmd, wizardCmd} {
+		assert.Contains(t, cmd.Example, "githubnext/agentics/ci-doctor")
+		assert.NotContains(t, cmd.Example, "daily-repo-status")
+	}
+	require.ErrorContains(t, addCmd.Args(addCmd, nil), "githubnext/agentics/ci-doctor")
 }
 
 func TestAddWizardCommand_UsesStandardThreePartWorkflowSpecWording(t *testing.T) {

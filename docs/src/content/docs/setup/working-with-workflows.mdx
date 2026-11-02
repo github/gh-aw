@@ -67,15 +67,17 @@ The prompt normalizes terms such as “ghaw” to “gh-aw” and “work flow�
 Use `gh aw add-wizard` to add a workflow from a repository with interactive guidance:
 
 ```bash wrap
-gh aw add-wizard githubnext/agentics/daily-repo-status
+gh aw add-wizard githubnext/agentics/ci-doctor
 ```
 
 You can also use a full GitHub URL or skip the API key prompt when the required secret is already configured:
 
 ```bash wrap
-gh aw add-wizard https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md
-gh aw add-wizard githubnext/agentics/daily-repo-status --no-secret
+gh aw add-wizard https://github.com/githubnext/agentics/blob/main/workflows/ci-doctor.md
+gh aw add-wizard githubnext/agentics/ci-doctor --no-secret
 ```
+
+For a first investigation, follow the [CI failure quickstart](/gh-aw/setup/quick-start/) to install the evidence contract, match the watched workflow and branch, enable Actions tools, and verify the resulting report. CI Doctor reacts to failed `workflow_run` events, not manual dispatch.
 
 For non-interactive installation, use `gh aw add`. Pin a version when updates must be controlled:
 

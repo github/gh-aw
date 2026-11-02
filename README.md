@@ -42,7 +42,7 @@ Install the GitHub CLI extension:
 gh extension install github/gh-aw
 ```
 
-Then follow the [GitHub Agentic Workflows quickstart](https://github.github.com/gh-aw/setup/quick-start/) to select an AI engine, add a sample workflow, and run it through GitHub Actions.
+Then follow the [GitHub Agentic Workflows quickstart](https://github.github.com/gh-aw/setup/quick-start/) to select an AI engine and install CI Doctor. It investigates failed GitHub Actions runs and reports linked log/code evidence, checks performed, and explicit uncertainty so maintainers can verify the diagnosis.
 
 ## How Agentic Workflows work
 

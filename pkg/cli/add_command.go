@@ -45,7 +45,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
       Use full https://github.com/... source URLs for other public github.com workflows.
 Note: To create a new workflow from scratch, use the 'new' command instead.
 Note: For guided interactive setup, use the 'add-wizard' command instead.`
-	addCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/daily-repo-status        # Add workflow directly
+	addCommandExample = `  ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor                # Add CI investigator directly
   ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/repo-assist              # Add package from repository root aw.yml
   ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/packages/repo-assist     # Add package from nested aw.yml
   ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor@v1.0.0         # Add with version
@@ -126,7 +126,7 @@ func NewAddCommand(validateEngine func(string) error) *cobra.Command {
 		Example: addCommandExample,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return fmt.Errorf("missing workflow specification. Expected at least one workflow source argument. Example: %[1]s githubnext/agentics/daily-repo-status\n\nUsage:\n  %[1]s <workflow>...\n\nExamples:\n  %[1]s githubnext/agentics/daily-repo-status      Add from repository\n  %[1]s ./my-workflow.md                           Add local workflow\n\nRun '%[1]s --help' for more information", cmd.CommandPath())
+				return fmt.Errorf("missing workflow specification. Expected at least one workflow source argument. Example: %[1]s githubnext/agentics/ci-doctor\n\nUsage:\n  %[1]s <workflow>...\n\nExamples:\n  %[1]s githubnext/agentics/ci-doctor              Add from repository\n  %[1]s ./my-workflow.md                           Add local workflow\n\nRun '%[1]s --help' for more information", cmd.CommandPath())
 			}
 			return nil
 		},
@@ -166,7 +166,7 @@ func runAddCommand(cmd *cobra.Command, args []string, validateEngine func(string
 	}
 
 	if nameFlag != "" && len(args) > 1 {
-		return errors.New("--name was set while multiple workflows were provided. Expected --name only with a single workflow source. Example: gh aw add githubnext/agentics/daily-repo-status --name daily-repo-status")
+		return errors.New("--name was set while multiple workflows were provided. Expected --name only with a single workflow source. Example: gh aw add githubnext/agentics/ci-doctor --name ci-doctor")
 	}
 	if err := validateEngine(engineOverride); err != nil {
 		return err

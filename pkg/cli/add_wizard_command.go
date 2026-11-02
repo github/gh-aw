@@ -45,7 +45,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 Note: To create a new workflow from scratch, use the 'new' command instead.`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics                    # Guided setup for repository-root aw.yml package
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/packages/repo-assist # Guided setup for nested aw.yml package
-  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/daily-repo-status    # Guided setup
+  ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor            # Guided CI investigation setup
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard githubnext/agentics/ci-doctor@v1.0.0     # Guided setup with version
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard ./my-workflow.md                         # Guided setup for local workflow
   ` + string(constants.CLIExtensionPrefix) + ` add-wizard https://example.com/my-workflow.md       # Guided setup from any HTTPS URL
