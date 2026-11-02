@@ -1,7 +1,7 @@
 package connectors
 
 import (
-	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -15,24 +15,21 @@ func TestConnectorSpec(t *testing.T) {
 	}
 }
 
-// Provider sessions add definitions under testdata/providers/<provider>/spec.yaml.
-// This same test validates every definition against the shared contract.
+// Versioned YAML fixtures exercise legacy compatibility, not Markdown authoring.
 func TestProviderFixtures(t *testing.T) {
-	entries, err := os.ReadDir("testdata/providers")
-	if os.IsNotExist(err) {
-		t.Skip("provider fixtures are authored separately")
-	}
+	files, err := filepath.Glob("testdata/providers/*/spec.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			t.Run(entry.Name(), func(t *testing.T) {
-				if _, err := LoadSpec("testdata/providers/" + entry.Name() + "/spec.yaml"); err != nil {
-					t.Fatal(err)
-				}
-			})
-		}
+	if len(files) == 0 {
+		t.Fatal("legacy provider spec fixtures are missing")
+	}
+	for _, file := range files {
+		t.Run(filepath.Base(filepath.Dir(file)), func(t *testing.T) {
+			if _, err := LoadSpec(file); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

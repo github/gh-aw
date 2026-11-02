@@ -1,0 +1,12 @@
+{
+  "id": 900,
+  "iid": 15,
+  "project_id": 42,
+  "status": "success",
+  "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "ref": "main",
+  "source": "push",
+  "user": { "id": 999, "username": "not-projected" },
+  "variables": [{ "key": "NOT_RETURNED", "value": "fixture-only" }],
+  "detailed_status": { "details_path": "/not-projected" }
+}

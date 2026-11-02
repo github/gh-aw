@@ -5,9 +5,14 @@ on:
     paths:
       - '.github/aw/connectors/**'
       - '.github/workflows/test-connectors.yml'
+      - 'actions/setup/setup.sh'
+      - 'actions/setup/js/connector*'
+      - 'actions/setup/js/setup_sh_file_lists.test.cjs'
       - 'resources.go'
       - 'pkg/connectors/**'
       - 'pkg/workflow/*connector*'
+      - 'pkg/workflow/*node*_test.go'
+      - 'pkg/workflow/*documentation*_test.go'
       - 'pkg/parser/*connector*'
       - 'pkg/parser/schemas/main_workflow_schema.json'
       - 'go.mod'
@@ -16,9 +21,14 @@ on:
     paths:
       - '.github/aw/connectors/**'
       - '.github/workflows/test-connectors.yml'
+      - 'actions/setup/setup.sh'
+      - 'actions/setup/js/connector*'
+      - 'actions/setup/js/setup_sh_file_lists.test.cjs'
       - 'resources.go'
       - 'pkg/connectors/**'
       - 'pkg/workflow/*connector*'
+      - 'pkg/workflow/*node*_test.go'
+      - 'pkg/workflow/*documentation*_test.go'
       - 'pkg/parser/*connector*'
       - 'pkg/parser/schemas/main_workflow_schema.json'
       - 'go.mod'
@@ -55,10 +65,16 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
       - name: Test scoped runtimes and provider fixtures
         run: go test -race ./pkg/connectors -count=1 -timeout=5m
       - name: Test Markdown imports, compiler, schema, and CLI
-        run: go test ./pkg/workflow ./pkg/parser ./pkg/cli -run Connector -count=1 -timeout=5m
+        run: >-
+          go test ./pkg/workflow ./pkg/parser ./pkg/cli
+          -run 'Connector|ProviderDocumentation|Linear|Jira|AzureDevOps|Slack|Teams|Confluence|Sentry|ServiceNow|Servicenow|GitLab|PagerDuty|Datadog|Zendesk|Notion'
+          -count=1 -timeout=5m
 
   live:
     name: Explicit read-only provider smoke test

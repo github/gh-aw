@@ -1,6 +1,10 @@
 ---
 imports:
-  - .github/aw/connectors/servicenow.md
+  - uses: .github/aw/connectors/servicenow.md
+    with:
+      instance: https://example.service-now.com
+      incidents: ["0123456789abcdef0123456789abcdef"]
+      requested-items: ["fedcba9876543210fedcba9876543210"]
 network:
   allowed:
     - example.service-now.com
@@ -9,6 +13,7 @@ permissions:
   contents: read
   copilot-requests: write
 safe-outputs:
+  staged: true
   servicenow-append-incident-work-note: null
 tools:
   servicenow:

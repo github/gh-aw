@@ -42,7 +42,7 @@ func TestSentryUnifiedWorkflowCompilation(t *testing.T) {
 			require.Contains(t, data.Tools, "sentry")
 			output, err := c.CompileToYAML(data, path)
 			require.NoError(t, err)
-			require.Contains(t, output, "connectors")
+			require.Contains(t, output, "connector_runtime.cjs")
 			require.NotContains(t, output, "${{ secrets.SENTRY_MCP_OAUTH_TOKEN }}")
 			if file == "legacy/workflow-tools-only.yaml" {
 				require.Nil(t, config.Context)
@@ -53,7 +53,7 @@ func TestSentryUnifiedWorkflowCompilation(t *testing.T) {
 			}
 			require.Equal(t, []string{"SENTRY_CONTEXT_TOKEN"}, config.Context.Secrets())
 			require.Equal(t, []string{"SENTRY_STATUS_TOKEN"}, config.SafeOutputs.Secrets())
-			require.Contains(t, output, "connectors invoke context")
+			require.Contains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
 			require.Contains(t, output, "sentry_resolve_issue")
 			agent, err := json.Marshal(config.Agent)
 			require.NoError(t, err)

@@ -59,11 +59,18 @@ Importing grants nothing: omit `tools` or `safe-outputs` to disable that phase.
 Root triggers and safe outputs use `<id>-<capability>`; unqualified GitHub
 safe outputs retain their existing meaning.
 
+Every bundled declaration contains one self-contained
+`connector-documentation` XML comment in its Markdown body, including credential
+provisioning, resource inputs, capability limits, and complete consumer examples.
+The YAML and prompt elements form a workflow when wrapped in normal Markdown
+frontmatter delimiters. These comments are documentation, not executable setup
+or authenticated event enrollment.
+
 | Declaration field | Meaning |
 | --- | --- |
 | `endpoints` | Named, fixed HTTPS origins. |
 | `credentials` | Header, authentication scheme, scopes, phase, and a token, GitHub App, or GitHub OIDC route. |
-| `resources` | Exact approved resource-ID allowlists; no wildcards. |
+| `resources` | Exact approved resource-ID allowlists; no wildcards. Independent lists do not establish tenant, parent, or tuple membership. |
 | `triggers` | Event definitions; consumers select them through root `on`. |
 | `tools` | Bounded REST/GraphQL reads exposed through the shared MCP adapter. |
 | `mcp-servers` | Read-only HTTP MCP registrations with exact remote tool allowlists. |
@@ -157,8 +164,8 @@ Declaration: `.github/aw/connectors/linear.md`.
 Create separate personal API keys in Linear **Settings > Security & access**,
 restricted to the required read or write permissions and teams. Store the raw
 keys as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`; GraphQL personal keys
-use raw Authorization rather than a bearer prefix. For hosted MCP, obtain an authorized bearer token
-through the supported Linear MCP authorization flow and store it separately as
+use raw Authorization rather than a bearer prefix. For hosted MCP, separately provision
+an authorized bearer token through Linear's supported OAuth or direct-key route and store it as
 `LINEAR_READ_MCP_TOKEN`. Personal-key GraphQL access does not prove hosted MCP
 compatibility. See [Linear API authentication](https://linear.app/developers/graphql)
 and [MCP setup](https://linear.app/docs/mcp).
@@ -253,8 +260,12 @@ personal API token and store `base64(email:api_token)` as
 `JIRA_MCP_PERSONAL_BASIC_AUTH`. Both read profiles require
 `read:jira:agent-interface` and `search:jira:agent-interface`, and organization
 policy must permit token authentication. Follow [Atlassian MCP token setup](https://support.atlassian.com/atlassian-ai-gateway/docs/configure-authentication-via-api-token/).
+Successful MCP initialization is not authorization: organization policy can
+still deny API-token tool calls. An organization administrator must grant that
+access; the connector does not switch credentials or authentication schemes.
 
-For writes, create a separate account/API token with permission to perform the
+For the shipped site-origin write route, create a separate unscoped REST API
+token and use an account with permission to perform the
 selected issue operations, then store `base64(email:api_token)` as
 `JIRA_REST_BASIC_AUTH`. Existing `JIRA_USER_EMAIL` and `JIRA_API_TOKEN` values
 must be combined and encoded by the trusted host; neither alone is the encoded
@@ -425,7 +436,15 @@ and [Bot Connector authentication](https://learn.microsoft.com/en-us/azure/bot-s
 | Triggers | `teams-channel-message-created`: basic Graph `created` notifications for approved root messages. The receiver must validate `clientState`, tenant, subscription, and exact resource, and handle endpoint challenges and subscription renewal. Rich/encrypted notifications are unsupported. |
 | MCPs/read tools | REST-backed `get-channel-message` and `list-channel-replies`; no hosted Teams MCP is declared. |
 | Safe outputs | `teams-reply-to-activity`, `teams-reply-with-review-card` through the installed Bot Connector bot, not ordinary Graph application posting. |
-| Context | Approved Graph root plus a single bounded 20-reply page. No pagination or inferred Bot Connector references. The specimen targets standard channels and a fixed trusted bot service URL; private/shared channels are not implied. |
+| Context | Approved Graph root plus a single bounded 20-reply page. Reply `/value` objects are returned without per-item scope/projection checks; do not assume metadata-only replies or parent validation. No pagination or inferred Bot Connector references. |
+
+Resource-array import inputs default empty. Configure explicit grants before
+selecting capabilities; flat allowlists do not encode tenant/team/channel/thread
+or bot conversation/activity tuples. Tenant metadata in a trigger does not
+validate the Graph token's tenant claims. Bot replies require a verified
+conversation reference whose authenticated service URL matches the declared
+`https://smba.trafficmanager.net/teams/`; this is not a global fallback for other
+service URLs, private channels, or shared channels.
 
 ## Confluence
 
@@ -445,9 +464,12 @@ OAuth acquisition and renewal are external to the connector.
 | Surface | Current declaration |
 | --- | --- |
 | Triggers | `confluence-page-created`, `confluence-page-updated`, corresponding to Forge page events. Requires Forge Invocation Token signature, issuer, audience, lifetime, installation, and tenant verification, not a generic shared-secret HMAC. |
-| MCPs/read tools | REST-backed `get-page`, exposing `get-confluence-page` through the shared adapter. Hosted Atlassian MCP is **not configured**; its exact native argument schema must be reviewed before adding it. |
+| MCPs/read tools | REST-backed `get-page` through the shared adapter. Hosted Atlassian MCP is **not configured**; its exact native argument schema must be reviewed before adding it. |
 | Safe outputs | `confluence-create-runbook`, `confluence-add-review-comment`. Reviewed literal storage-format content only; no dynamic bodies, updates, version preflight, or uncertain-create reconciliation. |
 | Context | One approved current page selected by exact cloud, space, and page IDs, with a bounded storage-format response. Missing content or moved/out-of-scope pages fail; IDs and permissions need independent validation. |
+
+Independent cloud, space, and page allowlists do not prove their membership
+relationship. Comment writes do not perform a space-membership preflight.
 
 ## Sentry
 
@@ -455,8 +477,10 @@ Declaration: `.github/aw/connectors/sentry.md`.
 
 ### Secrets
 
-Create project-restricted internal integrations in the organization's Sentry
-settings, with separate read and status-write permissions. Store tokens as
+Create organization-scoped internal integrations in Sentry settings, with
+separate read and status-write permissions. Their scopes apply across the
+organization, not only one project; the connector's exact issue/project grants
+and response checks supply the narrower runtime boundary. Store tokens as
 `SENTRY_READ_TOKEN` (`event:read`) and `SENTRY_STATUS_TOKEN` (`event:write`).
 Follow [Sentry API authentication](https://docs.sentry.io/api/auth/).
 For the separately selected hosted MCP profile, complete its authorized OAuth
@@ -498,6 +522,24 @@ See [ServiceNow REST authentication](https://developer.servicenow.com/dev.do#!/r
 A record receipt does not prove a durable journal entry; review ACLs and business
 rules, and do not retry an ambiguous append.
 
+## Additional embedded connectors
+
+These declarations use the same import and phase-selection contract. Their XML
+documentation contains the full credential-acquisition instructions, exact input
+names, resource grants, limits, and staged manual-dispatch examples.
+
+| Declaration | Read capabilities | Safe output | Credential and scope boundary |
+| --- | --- | --- | --- |
+| `@builtin:connectors/gitlab.md` | `get-merge-request`, `get-pipeline` | `gitlab-add-merge-request-note` | Separate read and note-writing tokens; exact project, merge-request IID, and pipeline grants. No authenticated webhook receiver is installed. |
+| `@builtin:connectors/pagerduty.md` | `get-incident` | `pagerduty-add-note` | Separate full `Token token=...` REST authorization values and an approved `From` identity. Read checks bind incident/service/team; note authority is the exact incident ID, not an atomic membership check. Events v2 routing keys are not REST credentials. |
+| `@builtin:connectors/datadog.md` | `get-monitor`, `get-incident` | `datadog-rename-incident` | Separate OAuth bearer tokens for `monitors_read`, `incident_read`, and `incident_write`; exact site and resource grants. API/application-key pairs are not approximated by a bearer token. Only the incident title changes. |
+| `@builtin:connectors/zendesk.md` | `get-ticket` | `zendesk-add-internal-note` | Separate OAuth read/write tokens for one approved tenant and ticket. Private-note audit evidence can fail after a possible write; no retry or durable-readback guarantee. |
+| `@builtin:connectors/notion.md` | `get-page` | `notion-add-comment` | Separate internal bearer connections with explicit page sharing; exact canonical page UUID grants and fixed `Notion-Version: 2026-03-11`. Metadata and plain-text comments only; no page-body/database hydration, hosted OAuth MCP, or native trigger. |
+
+Hosted MCP, token acquisition/refresh, and ingress are not implied by any REST
+read capability. No new provider has been established as live-operational by
+offline mocked tests.
+
 ## Validation and runtime boundaries
 
 Compile a consuming workflow with `gh aw compile my-workflow --strict --no-emit`.
@@ -505,6 +547,10 @@ Compilation makes no provider requests. It freezes selected definitions,
 resource grants, and phase-specific secret references into content-addressed
 plans; runtime hosts do not reload mutable configuration. Each encoded phase
 plan is limited to 65,536 bytes.
+
+String input `maxLength` counts Unicode code points, not UTF-8 bytes.
+Encoded plans, JSON argument documents, and HTTP responses have separate byte
+limits; accepting a string's character count does not bypass those limits.
 
 Connector hosts execute the shared Node runtime shipped by `actions/setup`.
 Setup copies its runtime, pattern worker, and invocation-local binding helper

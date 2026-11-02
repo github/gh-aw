@@ -1,0 +1,27 @@
+{
+  "incident": {
+    "id": "PINC001",
+    "type": "incident",
+    "title": "Synthetic integration incident",
+    "status": "triggered",
+    "urgency": "high",
+    "service": {
+      "id": "PSVC001",
+      "type": "service_reference"
+    },
+    "teams": [
+      {
+        "id": "PTEAM01",
+        "type": "team_reference"
+      }
+    ],
+    "assignments": [
+      {
+        "private": "excluded responder data"
+      }
+    ],
+    "conference_bridge": {
+      "private": "excluded conference data"
+    }
+  }
+}

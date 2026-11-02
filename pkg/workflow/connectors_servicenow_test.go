@@ -104,8 +104,13 @@ func assertServiceNowCompiledJobs(t *testing.T, output string, tools, context, w
 	if strings.Contains(string(effects), "${{ secrets.SERVICENOW_WRITE_TOKEN }}") != write {
 		t.Fatal("effect credential selection does not match declared capability")
 	}
-	if strings.Contains(string(agent), "connectors invoke context") != context {
+	if strings.Contains(output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`) != context {
 		t.Fatal("context hydration must be emitted only when selected")
+	}
+	for _, removed := range []string{"Checkout trusted connector runtime", "Build trusted connector runtime", "connector_10_servicenow_"} {
+		if strings.Contains(output, removed) {
+			t.Fatalf("compiled workflow retains removed connector host behavior: %s", removed)
+		}
 	}
 }
 

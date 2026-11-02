@@ -62,6 +62,7 @@ mcp:
         limit: {literal: 15}
     maxResponseBytes: 65536
     responseChecks: {/ok: true, /has_more: false}
+    responseOptionalEmpty: [/response_metadata/next_cursor]
     responseRequired: [/messages/0/ts]
     responseResources: {/messages/0/ts: threads}
     responseTypes: {/messages/0/ts: string, /has_more: boolean}
@@ -112,6 +113,7 @@ context:
         limit: {literal: 15}
     maxResponseBytes: 65536
     responseChecks: {/ok: true, /has_more: false}
+    responseOptionalEmpty: [/response_metadata/next_cursor]
     responseRequired: [/messages/0/ts]
     responseResources: {/messages/0/ts: threads}
     responseTypes: {/messages/0/ts: string, /has_more: boolean}
