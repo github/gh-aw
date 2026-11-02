@@ -637,7 +637,7 @@ For `create_issue.blocked_by` and `link_sub_issue`, the runtime handler policy M
 
 Temporary-ID resolution MUST preserve the referenced repository and MUST NOT bypass this policy. After dependency resolution (Stage 6), handlers MUST revalidate effective repositories before Stage 7 or any auxiliary API lookup, including issue reads and per-item mention resolution. Deferred retries MUST repeat resolution and authorization with the resolved IDs. Staged previews MUST reject resolved disallowed repositories without API access; unresolved staged blocker IDs MAY remain display-only references.
 
-Conformance tests MUST assert zero API calls to disallowed repositories for numeric, qualified, URL, and temporary blocker references, including deferred retries, and for temporary parent/sub-issue pairs resolving to the same disallowed repository. Tests MUST preserve permitted explicit and wildcard policies and fixed/triggering parent selection. The bounded [`IssueRelationshipAuthorization.tla`](../../../../../specs/workflow-security/IssueRelationshipAuthorization.tla) model checks this boundary with synthetic negative controls; it does not prove refinement of the runtime handlers.
+Conformance tests MUST assert zero API calls to disallowed repositories for numeric, qualified, URL, and temporary blocker references, including deferred retries, and for temporary parent/sub-issue pairs resolving to the same disallowed repository. Tests MUST preserve permitted explicit and wildcard policies and fixed/triggering parent selection. The bounded [`IssueRelationshipAuthorization.tla`](https://github.com/github/gh-aw/blob/main/specs/workflow-security/IssueRelationshipAuthorization.tla) model checks this boundary with synthetic negative controls; it does not prove refinement of the runtime handlers.
 
 Internal work-queue Claim adapters use the authenticated worker profile's `effect_scope` as a singleton repository allowlist. Declared adapters MUST specify a fixed literal `target-repo`, validated by `work_queue_claim_adapters.cjs`. Every selected repository, including native adapter runtime fallbacks and independently resolved mutation targets, MUST match the profile allowlist through `assertClaimAuthorized` before effects execute. Repository allowlist rejection carries error code E004 while preserving the queue protocol message `work_queue_effect_scope_denied`. This queue-specific authorization does not replace type-specific or global allowlists for user-facing safe-output handlers.
 
@@ -3709,8 +3709,6 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Default Max**: 1
 **Cross-Repository Support**: No
 **Mandatory**: No
-
-**Experimental**: Yes. Compiling a workflow with `approve-workflow-run` emits: `Using experimental feature: approve-workflow-run`.
 
 **MCP Tool Schema**:
 

@@ -149,7 +149,7 @@ func TestAppTokenPermissionsGeneratedWildcardRepositories(t *testing.T) {
 			config: "safe-outputs:\n  github-app:\n    app-id: ${{ vars.APP_ID }}\n    private-key: ${{ secrets.APP_KEY }}\n    repositories: [\"*\"]\n" +
 				"  dispatch-repository:\n    trigger-ci:\n      workflow: ci.yml\n      event_type: ci_trigger\n      repository: github/gh-aw\n",
 			stepID:   "safe-outputs-app-token",
-			warnings: 1,
+			warnings: 0,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
