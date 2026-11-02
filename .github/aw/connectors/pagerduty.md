@@ -179,7 +179,7 @@ import-schema:
     </creation>
     <storage>
       In the consuming GitHub repository's Settings, Secrets and variables,
-      Actions, store PAGERDUTY_READ_AUTHORIZATION and, only if notes are enabled,
+      Actions, store PAGERDUTY_READ_AUTHORIZATION and, only before enabling note execution,
       PAGERDUTY_WRITE_AUTHORIZATION as separate repository secrets or approved
       organization secrets. Each secret contains the entire header value
       Token token=&lt;REST_API_KEY&gt;, not just the key. Never put values in
@@ -196,6 +196,8 @@ import-schema:
       with the account; replace the example.invalid placeholder before use.
       From is authored metadata, visible in the compiled plan, not a secret or
       an agent-controlled input and not an authentication replacement.
+      The generic metadata contract caps each literal header value at 1024
+      bytes and each request at 16 authored headers.
     </headers>
     <scopes>
       incidents.read and incidents.write describe the operations' minimum
@@ -262,7 +264,8 @@ import-schema:
       pagerduty_add_note with required incident-id and content strings.
       incident-id must match an exact incident grant and the ID bound.
       content must contain a non-whitespace character and is capped at 2000
-      characters by this connector. Extra arguments, including From, status,
+      Unicode characters. JSON document and HTTP response byte caps are separate.
+      Extra arguments, including From, status,
       routing keys, service targets, and credentials, are rejected.
       Staging creates an intent only, with no credential lookup or network call.
       With safe-outputs.staged set to true, the downstream host also stages only
@@ -327,7 +330,8 @@ import-schema:
       workflow, enclosed by the normal AW frontmatter delimiters, and body below
       as its Markdown body. Replace the three synthetic IDs with approved
       PagerDuty IDs, replace From with a valid authorized account user, and
-      configure the two named GitHub Actions secrets before manual dispatch.
+      configure the named reader secret before manual dispatch. The separate
+      writer secret is needed only before enabling note execution.
       The example explicitly selects staged writes and sets staged to true:
       no note is executed or writer secret resolved. Change staged to false only
       after reviewing and separately authorizing downstream note execution.

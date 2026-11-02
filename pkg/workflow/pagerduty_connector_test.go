@@ -57,6 +57,10 @@ func TestPagerDutyConnectorEmbeddedConsumer(t *testing.T) {
 	require.Equal(t, []string{"PAGERDUTY_WRITE_AUTHORIZATION"}, config.SafeOutputs.Secrets())
 	require.Equal(t, []string{"pagerduty_get_incident"}, config.Agent.ToolNames())
 	require.Equal(t, []string{"add-note"}, config.SafeOutputs.SafeOutputNames())
+	require.Contains(t, data.Tools, "pagerduty")
+	require.NotContains(t, data.Tools, "connector-pagerduty")
+	require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "process.execPath")
+	require.Contains(t, data.SafeOutputs.Scripts["pagerduty-add-note"].Script, "connector_runtime.cjs")
 	output, err := compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
 	var document struct {
