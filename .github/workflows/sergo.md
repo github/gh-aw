@@ -63,6 +63,11 @@ tools:
     - "*.json"
     - "*.jsonl"
 tracker-id: sergo-daily
+evals:
+  - id: strategy-split
+    question: Does the report describe the required equal split between cached strategy reuse and new exploration?
+  - id: validated-fixes
+    question: When fix pull requests are proposed, does the agent output provide validation results for the actual changes? Return UNKNOWN when no fix pull requests are proposed.
 ---
 
 # Sergo 🔬 - The Serena Go Expert

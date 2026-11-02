@@ -117,6 +117,11 @@ safe-outputs:
   report-failed-jobs: false
   threat-detection:
     report-as-issue: false
+evals:
+  - id: faithful-handoff-verdicts
+    question: Do the handoff's per-configuration verdicts faithfully represent the FairDAGGitHub and QueueOrdering result evidence, treating missing evidence as unavailable?
+  - id: checkpoint-not-resumable
+    question: When checkpoint archive candidates are discussed, does the handoff retain resumable as false? Return UNKNOWN when no archive candidate is discussed.
 ---
 
 # Work queue formal-verification handoff
