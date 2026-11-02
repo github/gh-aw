@@ -285,7 +285,7 @@ func TestConnectorDocumentationMatchesDeclarations(t *testing.T) {
 			section, _, _ = strings.Cut(section, "\n## ")
 			machineDocumentation := false
 			for _, match := range htmlCommentPattern.FindAllStringSubmatch(string(data), -1) {
-				if validConnectorDocumentation(match[1], declarations) {
+				if !strings.Contains(parser.RemoveConnectorDocumentation(string(data)), match[0]) {
 					section, machineDocumentation = match[1], true
 					break
 				}

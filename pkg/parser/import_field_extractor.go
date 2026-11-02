@@ -192,8 +192,9 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 // fm (parsed from possibly-substituted content, used for all field extraction), and
 // any error that should abort processing for this import.
 func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueueItem, visited map[string]struct{}) (origFm, fm map[string]any, err error) {
-	origContent := string(content)
-	origParsed, origParseErr := parseOriginalFrontmatter(content, item.fullPath, origContent)
+	origContent := RemoveConnectorDocumentation(string(content))
+	documentationRemoved := origContent != string(content)
+	origParsed, origParseErr := parseOriginalFrontmatter([]byte(origContent), item.fullPath, origContent)
 	if origParseErr == nil {
 		acc.collectActionPinSourceVersions([]byte(strings.Join(origParsed.FrontmatterLines, "\n")))
 	}
@@ -205,7 +206,7 @@ func (acc *importAccumulator) prepareFrontmatter(content []byte, item importQueu
 	if err := acc.collectInlineSubAgentWarnings(item.importPath, item.sectionName, rawContent, wasSubstituted, origParsed, origParseErr); err != nil {
 		return nil, nil, err
 	}
-	toolsContent, err := acc.extractToolsContent(rawContent, item, visited, wasSubstituted)
+	toolsContent, err := acc.extractToolsContent(rawContent, item, visited, wasSubstituted || documentationRemoved)
 	if err != nil {
 		return nil, nil, err
 	}

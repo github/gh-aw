@@ -59,7 +59,7 @@ func TestServiceNowMarkdownDocumentation(t *testing.T) {
 	require.True(t, found)
 	assert.NotContains(t, comment, "--", "HTML comments cannot contain internal double hyphens, even in CDATA")
 	assert.NotContains(t, comment, "connector_10_", "document the direct provider tool names")
-	assert.Empty(t, scanImportedConnectorMarkdown(string(source), "/repo/.github/workflows/connectors/servicenow.md"),
+	assert.Empty(t, scanImportedMarkdownSecurity(string(source)),
 		"the self-contained XML comment must be accepted by the actual local-import scanner")
 
 	var doc struct {

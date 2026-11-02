@@ -73,7 +73,12 @@ Every included declaration contains one self-contained
 provisioning, resource inputs, capability limits, and complete consumer examples.
 The YAML and prompt elements form a workflow when wrapped in normal Markdown
 frontmatter delimiters. These comments are documentation, not executable setup
-or authenticated event enrollment.
+or authenticated event enrollment. Matching, well-formed documentation blocks are
+omitted before import input substitution and security scanning, independent of
+the source or cache path. They are also omitted from inlined and runtime prompts,
+including partial runtime imports; malformed documentation and unrelated content
+do not receive a scanner exemption. This does not make other imported content
+trusted.
 
 | Declaration field | Meaning |
 | --- | --- |

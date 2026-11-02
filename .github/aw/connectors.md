@@ -269,6 +269,9 @@ body. Keep the public declaration and its documentation synchronized:
 
 Use the real connector ID and complete content, not the placeholders above.
 Do not put a double-hyphen sequence inside the outer comment, even in CDATA.
+These blocks are authoring documentation, not runtime instructions: matching
+blocks are omitted before import input substitution and from rendered prompts,
+including partial runtime imports. Other imported content remains untrusted.
 Describe Markdown frontmatter delimiters rather than embedding them there.
 Reconstruct each sample as an opening delimiter, YAML, closing delimiter, and
 prompt. Keep secrets out of all components. Existing providers may use

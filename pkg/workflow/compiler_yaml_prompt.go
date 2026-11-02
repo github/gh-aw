@@ -238,9 +238,10 @@ func (c *Compiler) processOrderedPromptImports(data *WorkflowData) (userPromptCh
 				userPromptChunks = append(userPromptChunks, fmt.Sprintf("{{#runtime-import %s}}", importPath))
 				continue
 			}
-			importedBody, extractErr := parser.ExtractMarkdownContent(string(rawContent))
+			source := parser.RemoveConnectorDocumentation(string(rawContent))
+			importedBody, extractErr := parser.ExtractMarkdownContent(source)
 			if extractErr != nil {
-				importedBody = string(rawContent)
+				importedBody = source
 			}
 			chunks, exprMaps := extractPromptChunksFromMarkdown(importedBody)
 			userPromptChunks = append(userPromptChunks, chunks...)
@@ -288,9 +289,10 @@ func (c *Compiler) processLegacyPromptImports(data *WorkflowData) (userPromptChu
 				userPromptChunks = append(userPromptChunks, fmt.Sprintf("{{#runtime-import %s}}", importPath))
 				continue
 			}
-			importedBody, extractErr := parser.ExtractMarkdownContent(string(rawContent))
+			source := parser.RemoveConnectorDocumentation(string(rawContent))
+			importedBody, extractErr := parser.ExtractMarkdownContent(source)
 			if extractErr != nil {
-				importedBody = string(rawContent)
+				importedBody = source
 			}
 			chunks, exprMaps := extractPromptChunksFromMarkdown(importedBody)
 			userPromptChunks = append(userPromptChunks, chunks...)
@@ -429,7 +431,7 @@ func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceR
 			continue
 		}
 		seen[seenKey] = struct{}{}
-		content := string(rawContent)
+		content := parser.RemoveConnectorDocumentation(string(rawContent))
 		if ref.startLine > 0 || ref.endLine > 0 {
 			content = applyRuntimeImportLineRangeForAnalysis(content, ref.startLine, ref.endLine)
 		}
