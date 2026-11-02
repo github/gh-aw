@@ -102,8 +102,9 @@ async function executeMain() {
   const model = resolveModelWithFallback(process.env, "GH_AW_EVALS_MODEL");
   if (!model) throw new Error("GH_AW_EVALS_MODEL is not set");
   const provider = process.env.GH_AW_DECISIONS_PROVIDER || "github-copilot";
-  const modelID = model.replace(/^(copilot|github-copilot|github|openai|codex)\//, "");
-  const resolvedModel = modelID === "evals" ? require("./model_aliases.json").aliases.evals[0] : modelID;
+  const stripProvider = value => value.replace(/^(copilot|github-copilot|github|openai|codex)\//, "");
+  const modelID = stripProvider(model);
+  const resolvedModel = modelID === "evals" ? stripProvider(require("./model_aliases.json").aliases.evals[0]) : modelID;
   const apiKey = process.env.GH_AW_DECISIONS_API_KEY;
   if (!apiKey?.trim()) throw new Error("GH_AW_DECISIONS_API_KEY is not set");
   const outputPath = `${EVALS_DIR}/agent_output.json`;
