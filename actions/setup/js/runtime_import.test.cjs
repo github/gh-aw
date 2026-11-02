@@ -433,6 +433,17 @@ describe("runtime_import", () => {
         expect(evaluateExpression("github.repository")).toBe("testorg/testrepo");
         expect(evaluateExpression("github.event_name")).toBe("issues");
       });
+      it.each(["'left || right'", '"left || right"', "`left || right`", "'left && right'", "'left == right'", "'left \\' || right'", "'plain'", "''", "42", "true", "false"])(
+        "should preserve standalone literal %s without splitting its operators",
+        expression => {
+          const wrapped = `\${{ ${expression} }}`;
+          const resolution = { resolved: false };
+          expect(isSafeExpression(expression)).toBe(true);
+          expect(evaluateExpression(expression, resolution)).toBe(wrapped);
+          expect(resolution.resolved).toBe(false);
+          expect(processExpressions(wrapped, "literal.md")).toBe(wrapped);
+        }
+      );
       it("should evaluate OR with literal fallback when left is undefined", () => {
         expect(evaluateExpression("inputs.missing || 'default'")).toBe("default");
         expect(evaluateExpression('inputs.undefined || "fallback"')).toBe("fallback");
@@ -2189,8 +2200,11 @@ describe("runtime_import", () => {
   });
 
   describe("extractAndReplacePlaceholders", () => {
-    it.each(["env.PRIVATE", "env['PRIVATE']", "github.actor && env.PRIVATE", "secrets.PRIVATE", "vars.PRIVATE"])("rejects restricted expressions before creating conditional placeholders: %s", expression => {
-      expect(() => extractAndReplacePlaceholders(`{{#if \${{ ${expression} }} }}body{{/if}}`)).toThrow(/unauthorized.*expression/i);
+    it.each(["env.INPUT_GITHUB-TOKEN", "env.PRIVATE", "env['PRIVATE']", "github.actor && env.PRIVATE", "secrets.PRIVATE", "vars.PRIVATE"])("rejects restricted expressions before creating conditional placeholders: %s", async expression => {
+      const content = `{{#if \${{ ${expression} }} }}body{{/if}}`;
+      expect(() => extractAndReplacePlaceholders(content)).toThrow(/unauthorized.*expression/i);
+      fs.writeFileSync(path.join(workflowsDir, "wrapped-conditional.md"), content);
+      await expect(processRuntimeImport("wrapped-conditional.md", false, tempDir)).rejects.toThrow(/unauthorized.*expression/i);
     });
 
     it("should convert {{#if ${{ github.actor }} }} to __GH_AW_GITHUB_ACTOR__", () => {

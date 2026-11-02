@@ -136,12 +136,16 @@ Remote imports accept only literal, unauthenticated HTTPS URLs. Both the URL and
 
 Directive rejection includes bare branch aliases such as `{{elseif true}}`, `{{else-if true}}`, and `{{else_if true}}`; remote text cannot use them to change a surrounding author-written conditional.
 
+Inline agent/skill control markers, such as `## agent:` and `## skill:`, are also rejected, including closing markers that could change surrounding definitions. Author-owned and local-fragment definitions remain supported.
+
 ```aw wrap
 {{#runtime-import https://raw.githubusercontent.com/org/repo/main/checklist.md}}
 {{#runtime-import https://example.com/standards.md:10-50}}
 ```
 
-HTTPS requests run during prompt creation on the runner, outside the agent network sandbox. All DNS answers must be ordinary public unicast IPv4/IPv6 addresses, and the connection uses those same validated addresses without resolving again. Private, loopback, link-local, metadata, special-purpose, and translation/tunneling destinations are rejected. Redirects, credentials in URLs, HTTP, other URI schemes, and network-path references are not supported. TLS hostname/certificate verification remains enabled.
+HTTPS requests run during prompt creation on the runner, outside the agent network sandbox. All DNS answers must be ordinary public unicast IPv4/IPv6 addresses, and the connection uses those same validated addresses without resolving again. Private, loopback, link-local, metadata, special-purpose, and translation/tunneling destinations are rejected. Redirects, protocol upgrades, credentials in URLs, HTTP, other URI schemes, and network-path references are not supported. TLS hostname/certificate verification remains enabled.
+
+Gzip, deflate, and Brotli responses are decoded before text conversion and content validation. The request timeout also bounds decompression; malformed or unsupported encodings fail instead of becoming corrupted prompt text.
 
 URL disk caches are not used; repeated imports may reuse validated content within the current prompt assembly. Optional network failures produce a warning and empty content, but invalid targets and expressions/directives in remote content fail even when optional. To use expressions in shared content, store it in a permitted local file instead. Existing local repo-root forms such as `/.github/`, `//.github/`, and `/.agents/` remain supported.
 

@@ -3,6 +3,9 @@
 const dns = require("node:dns");
 const https = require("node:https");
 const { BlockList, isIP } = require("node:net");
+const { Writable } = require("node:stream");
+const { pipeline } = require("node:stream/promises");
+const { createGunzip, createInflate, createBrotliDecompress } = require("node:zlib");
 const { ERR_API, ERR_VALIDATION } = require("./error_codes.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
@@ -136,16 +139,34 @@ async function readPublicImportUrl(url, signal) {
     const response = await new Promise((resolve, reject) => {
       const request = https.get(url, { agent: false, lookup: lookupPublicImport, signal }, resolve);
       request.on("error", reject);
+      request.on("upgrade", (_response, socket) => {
+        socket.destroy();
+        reject(new Error(`${ERR_API}: Failed to fetch URL ${displayImportUrl(url)}: HTTP upgrades are not supported`));
+      });
     });
     const status = response.statusCode || 0;
     if (status < 200 || status >= 300) {
       response.destroy();
       throw new Error(`${ERR_API}: Failed to fetch URL ${displayImportUrl(url)}: HTTP ${status}`);
     }
-    const chunks = [];
-    for await (const chunk of response) {
-      chunks.push(Buffer.from(chunk));
+    const encodings = (response.headers?.["content-encoding"] || "identity")
+      .split(",")
+      .map(encoding => encoding.trim().toLowerCase())
+      .reverse();
+    if (encodings.some(encoding => !["identity", "gzip", "deflate", "br"].includes(encoding))) {
+      response.destroy();
+      throw new Error(`${ERR_API}: Failed to fetch URL ${displayImportUrl(url)}: Unsupported Content-Encoding`);
     }
+    const decoders = encodings.filter(encoding => encoding !== "identity").map(encoding => (encoding === "gzip" ? createGunzip() : encoding === "deflate" ? createInflate() : createBrotliDecompress()));
+    /** @type {Buffer[]} */
+    const chunks = [];
+    const sink = new Writable({
+      write(chunk, _encoding, callback) {
+        chunks.push(Buffer.from(chunk));
+        callback();
+      },
+    });
+    await pipeline([response, ...decoders, sink], { signal });
     return Buffer.concat(chunks).toString("utf8");
   } catch (error) {
     if (error instanceof Error && (error.message.startsWith(ERR_API) || error.message.startsWith(ERR_VALIDATION))) {

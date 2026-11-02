@@ -17,6 +17,18 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+// Unescaped quote characters must not let a compound expression masquerade as a literal.
+const STRING_LITERAL_RE = /^'(?:[^'\\]|\\.)*'$|^"(?:[^"\\]|\\.)*"$|^`(?:[^`\\]|\\.)*`$/;
+
+/**
+ * @param {string} expr
+ * @returns {boolean}
+ */
+function isLiteralValue(expr) {
+  const trimmed = expr.trim();
+  return STRING_LITERAL_RE.test(trimmed) || /^-?\d+(\.\d+)?$/.test(trimmed) || trimmed === "true" || trimmed === "false";
+}
+
 /**
  * Makes any "## skill:"/"## agent:" block in a runtime-imported chunk of
  * content self-terminating before it is spliced into the larger prompt.
@@ -248,30 +260,6 @@ function isSafeExpression(expr) {
     }
   }
 
-  // Strict string-literal regex: the body must not contain an unescaped copy of the
-  // opening quote character.  This prevents compound expressions like
-  // `'a' || secrets.TOKEN || 'b'` from being misclassified as a string literal because
-  // they happen to start and end with a quote.
-  // Pattern: ^(quote)(non-quote-non-backslash | escaped-char)*(same-quote)$
-  //   [^'\\] = any char except the single-quote and backslash
-  //   \\.    = backslash followed by any character (escape sequence)
-  const STRING_LITERAL_RE = /^'(?:[^'\\]|\\.)*'$|^"(?:[^"\\]|\\.)*"$|^`(?:[^`\\]|\\.)*`$/;
-
-  /**
-   * Returns true when `expr` is a standalone literal value (string, number, or boolean).
-   * Used to refuse literal operands inside && / || compound expressions — a literal in a
-   * conjunction or disjunction is semantically incomplete and may hide injection vectors.
-   * @param {string} expr - The trimmed expression to test
-   * @returns {boolean}
-   */
-  const isLiteralValue = expr => {
-    const t = expr.trim();
-    if (STRING_LITERAL_RE.test(t)) return true;
-    if (/^-?\d+(\.\d+)?$/.test(t)) return true;
-    if (t === "true" || t === "false") return true;
-    return false;
-  };
-
   // Allow literal values (string, number, boolean) as *standalone* safe expressions only.
   // A literal is only valid when it is the entire expression, not as a sub-expression inside
   // && or ||.  The checks below enforce this constraint by refusing literal operands there.
@@ -424,6 +412,11 @@ function evaluateExpression(expr, resolution) {
     if (resolution) resolution.resolved = true;
     return value;
   };
+
+  // Standalone literals stay unresolved; operators inside quoted text are not expressions.
+  if (isLiteralValue(trimmed)) {
+    return `\${{ ${trimmed} }}`;
+  }
 
   // Check for OR expressions with literals (e.g., "inputs.repository || 'default'")
   const orMatch = trimmed.match(/^(.+?)\s*\|\|\s*(.+)$/);
@@ -719,13 +712,18 @@ async function fetchUrlContent(url) {
 }
 
 /**
- * Remote text has no expression or template capabilities, even inside comments,
- * frontmatter, or lines outside the selected range.
+ * Remote text has no expression, template, or inline definition capabilities,
+ * even inside comments, frontmatter, or lines outside the selected range.
  * @param {string} content
  */
 function assertStaticRemoteImport(content) {
   if (/\$\{\{|(?:\$\{|__)GH_AW_/.test(content) || hasTemplateDirectives(content)) {
     throw new Error(`${ERR_VALIDATION}: URL runtime imports must not contain expressions or template directives`);
+  }
+  // Both extractors accept tabs and explicit "end" markers. Reject their
+  // prefixes as well as complete definitions, before any inline extraction.
+  if (/^##[ \t]+(?:end[ \t]+)?(?:agent|skill):/im.test(content)) {
+    throw new Error(`${ERR_VALIDATION}: URL runtime imports must not contain inline agent or skill markers`);
   }
 }
 
@@ -759,7 +757,6 @@ async function processUrlImport(url, optional, startLine, endLine) {
   content = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
   content = removeXMLComments(content);
   content = neutralizeSystemTags(content);
-  content = closeUnterminatedInlineMarkers(content);
   assertStaticRemoteImport(content);
   return content;
 }
