@@ -45,7 +45,7 @@ tools:
   cli-proxy: true
   github:
     mode: gh-proxy
-    min-integrity: none
+    min-integrity: approved
     toolsets: [pull_requests, repos, issues]
   bash:
     - "*"
@@ -91,6 +91,10 @@ steps:
       path: /tmp/gh-aw/agent
 safe-outputs:
   needs: [prefilter]
+  dispatch-workflow:
+    workflows: [pr-finisher]
+    target-ref: main
+    max: 4
   add-comment:
     max: 5
     target: "*"
@@ -109,8 +113,6 @@ safe-outputs:
     expires: 3d
     group-by-day: true
     close-older-issues: true
-  mentions:
-    allowed: ["@copilot"]
   noop:
     report-as-issue: false
   messages:
@@ -120,7 +122,7 @@ safe-outputs:
 timeout-minutes: 15
 evals:
   - id: nudge-targeted
-    question: Did every Copilot nudge list only unanswered review feedback or concrete blockers, request a branch update, and include its Sous-chef state fingerprint?
+    question: Did every PR-finisher dispatch target an eligible PR and pass a work summary listing only unanswered feedback or concrete blockers, a branch update, and its Sous-chef state fingerprint?
   - id: dedup-respected
     question: Did the agent avoid nudging PRs classified as unchanged, stale, dependency_bot, opted_out, agent_active, not_idle, approval_required, or nothing_actionable, and entries with nudge_needed false, repeating unchanged work only for behind or conflicting branches?
   - id: progress-or-noop
@@ -225,20 +227,27 @@ may receive progress actions.
    --review_id <ID> --justification "All PR review threads are resolved."`. These
    IDs are emitted only when every thread is actually resolved, not merely replied.
 
-3. **Include a branch update in the nudge.** Do not update branches yourself.
-   Copilot should update the branch and address its outstanding reviews together.
+3. **Include a branch update in the dispatch.** Do not update branches yourself.
+   PR Finisher should update the branch and address its outstanding reviews together.
 
 4. **Delegate only remaining implementation work.** If approval or review cleanup
    removes the only blocker, or `nudge_needed` is false, do not nudge. Otherwise post ONE
-   combined comment using `safeoutputs add_comment --pr_number <N> --body <BODY>`.
-   Immediately before posting, re-run `node scripts/pr-sous-chef.mjs <N>` if any
+   dispatch of the dedicated `pr-finisher` workflow with `inputs.pr_number` set
+   to this eligible PR number. Use only `safeoutputs dispatch_workflow`, never
+   `assign_to_agent`, a direct API write, or an `@copilot` mention.
+   Immediately before dispatching, re-run `node scripts/pr-sous-chef.mjs <N>` if any
    other work occurred since the eligibility check. If the PR is now excluded,
-   do not post; otherwise use this latest entry's fingerprint. Do not delegate
+   do not dispatch; otherwise use this latest entry's fingerprint. Do not delegate
    `ACTION_REQUIRED` checks outside the approval allowlist to Copilot: those need
    a human, not another implementation pass.
    Run `node scripts/pr-sous-chef.mjs <N> --simulate` for the final refresh and
-   copy its `nudges[0].body` exactly into the safe-output comment. An empty `nudges`
-   means no implementation nudge is needed. This command is read-only: it generates
+   use its `nudges[0].pr_number` as `inputs.pr_number` and its `nudges[0].body`
+   exactly as `inputs.work_summary`. An empty `nudges` means no implementation
+   dispatch is needed. Do not post a nudge/state comment yourself: a staged dispatch
+   can still fail. PR Finisher records the markers only after actually running.
+   Active default-branch finisher runs block duplicate requests by PR number.
+   Report dispatch failures as failures, not successful delegation.
+   This command is read-only: it generates
    a precise numbered list of unanswered reviews (text, file/line and comment
    links), failing checks, and the branch-update instruction (`make merge-main`).
    It includes the visible `Sous-chef state: <state_fingerprint>` line required

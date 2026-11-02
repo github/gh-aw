@@ -159,6 +159,8 @@ Stdio-based MCP servers MUST be containerized. The gateway SHALL NOT support dir
 
 Direct command execution of stdio servers (e.g., `command: "node server.js"` without a container) is explicitly NOT SUPPORTED by this specification.
 
+The gh-aw launcher defaults the built-in `agenticworkflows` and `safeoutputs` backend containers to the runner's UID and GID, with a container-local writable `HOME` at `/tmp`. This keeps private logs and staged assets readable by host redaction and artifact-upload steps without relaxing file permissions. Explicit container-user settings and configured `HOME` values are preserved; other MCP servers are unchanged.
+
 ### 3.3 Operational Model
 
 The gateway operates in a headless mode:

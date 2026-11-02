@@ -113,6 +113,26 @@ test("visible fingerprint survives HTML marker removal and arbitrary comment ord
   }
 });
 
+test("dispatch state comments deduplicate without assigning or mentioning Copilot", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  const body = formatNudge(first).replace(/<!--.*?-->/g, "");
+  assert.doesNotMatch(body, /@copilot|assign.to.agent/i);
+  assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).skip_reason, "unchanged");
+  assert.equal(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body, user: { login: "outsider" } }], [], now).skip_reason, undefined);
+});
+
+test("failed or fallback finisher publications do not suppress a later dispatch", () => {
+  const first = classify(failingPr, detail(), [], [], now);
+  for (const note of [
+    "> [!WARNING]\n> The `push_to_pull_request_branch` operation failed: denied. The code changes were not applied.",
+    "> [!NOTE]\n> The pull request was not created — a fallback review issue was created instead due to protected file changes: #1",
+    "> [!NOTE]\n> Direct push to the original pull request branch was not possible (diverged/non-fast-forward). A fallback pull request was created instead: #1",
+  ]) {
+    const body = `${note}\n\n${formatNudge(first)}`;
+    assert.ok(classify(failingPr, detail(), [{ ...nudge(first.state_fingerprint), body }], [], now).nudge_needed);
+  }
+});
+
 test("new HEAD and changed blockers can advance again", () => {
   const first = classify(pr, detail(), [], [], now);
   const comments = [nudge(first.state_fingerprint)];
@@ -181,6 +201,16 @@ test("an active coding agent blocks even an old run on a previous SHA", () => {
 test("active reviewer workflows block duplicate sous-chef work", () => {
   for (const name of ["PR Code Quality Reviewer", "Ponytail Reviewer"]) {
     assert.equal(activeAgent(pr, [{ name, status: "queued", head_branch: pr.headRefName }]), true);
+  }
+});
+
+test("default-branch PR Finisher runs block only their selected PR", () => {
+  for (const status of ["queued", "in_progress", "pending", "requested", "waiting"]) {
+    const run = { name: "PR Finisher", path: ".github/workflows/pr-finisher.lock.yml", display_title: "PR Finisher #42", head_branch: "main", status };
+    assert.equal(activeAgent(pr, [run]), true);
+    assert.equal(activeAgent({ ...pr, number: 420 }, [run]), false);
+    assert.equal(activeAgent(pr, [{ ...run, status: "completed" }]), false);
+    assert.equal(activeAgent(pr, [{ ...run, path: ".github/workflows/unrelated.yml" }]), false);
   }
 });
 
@@ -303,7 +333,7 @@ test("active-run lookup paginates every nonterminal status", async () => {
   assert.ok(calls.every(args => args.includes("--paginate") && args.includes("--slurp")));
 });
 
-test("active-run lookup can be narrowed to one PR branch", async () => {
+test("targeted active-run lookup includes finishers dispatched on the default branch", async () => {
   const calls = [];
   await fetchActiveRuns(
     "github/gh-aw",
@@ -313,8 +343,11 @@ test("active-run lookup can be narrowed to one PR branch", async () => {
     },
     "copilot/fix a bug"
   );
-  assert.equal(calls.length, 5);
-  assert.ok(calls.every(args => args[1].includes("&branch=copilot%2Ffix%20a%20bug")));
+  assert.equal(calls.length, 10);
+  assert.equal(calls.filter(args => args[1].includes("&branch=copilot%2Ffix%20a%20bug")).length, 5);
+  const finishers = calls.filter(args => args[1].includes("/actions/workflows/pr-finisher.lock.yml/runs?"));
+  assert.equal(finishers.length, 5);
+  assert.ok(finishers.every(args => !args[1].includes("&branch=") && args.includes("--paginate") && args.includes("--slurp")));
 });
 
 const graphPr = {
@@ -560,12 +593,12 @@ test("a precise nudge lists only unanswered feedback and always requests a branc
   unanswered.comments.nodes[0].body = "Handle null input\n\n@copilot please address.";
   const result = classify(pr, detail([answered, unanswered, thread({ isResolved: true, id: "resolved" })]), [], [], now);
   const body = formatNudge(result);
-  assert.match(body, /@copilot address/);
+  assert.match(body, /PR finisher dispatch requested/);
   assert.match(body, /1\. Update this branch.*`main`.*`make merge-main`/);
   assert.match(body, /2\. Review \(scripts\/example.mjs:12\): Handle null input/);
   assert.match(body, /#discussion_r1/);
   assert.doesNotMatch(body, /Fix the regression/);
-  assert.equal(body.match(/@copilot/g).length, 1);
+  assert.doesNotMatch(body, /@copilot/);
   assert.ok(body.endsWith(`Sous-chef state: ${result.state_fingerprint}`));
 });
 
@@ -706,7 +739,7 @@ function queueAPI({ listed = [pr], candidate = graphPr, checks = [], statuses = 
       if (args[1] === "graphql" && args[3].includes("headRefOid")) return metadataResponse(candidate);
       if (args[1].includes("/check-runs?")) return [{ check_runs: checks }];
       if (args[1].includes("/status?")) return [{ statuses }];
-      if (args[1].includes("/actions/runs?")) return [{ workflow_runs: args[1].includes("status=action_required") ? approvals : runs }];
+      if (args[1].includes("/actions/runs?") || args[1].includes("/actions/workflows/pr-finisher.lock.yml/runs?")) return [{ workflow_runs: args[1].includes("status=action_required") ? approvals : runs }];
       if (args[1] === "graphql") return { data: { repository: { pullRequest: data } } };
       if (args[1].includes("/comments?")) return [comments];
       assert.fail(`Unexpected API call: ${args.join(" ")}`);
@@ -1001,6 +1034,71 @@ test("workflow polls every five minutes but never starts an agent for low budget
   assert.match(workflow, /^  skip-if-no-match: .* -label:broccoli"$/m);
   assert.match(workflow, /^if: needs\.prefilter\.outputs\.rate_limit_low == 'false' && \(needs\.prefilter\.outputs\.eligible_count > 0 \|\| needs\.activation\.outputs\.slash_command == 'souschef'\)$/m);
   assert.match(workflow, /sparse-checkout: \|\n\s+scripts\n\s+actions\/setup\/js\n\s+\.github\/scripts/);
+  assert.match(workflow, /dispatch-workflow:\n\s+workflows: \[pr-finisher\]\n\s+target-ref: main\n\s+max: 4/);
+  assert.match(workflow, /min-integrity: approved/);
+  assert.doesNotMatch(workflow, /^\s+assign-to-agent:|^\s+mentions:/m);
+});
+
+test("targeted refresh detects an active default-branch finisher", async () => {
+  const { api } = queueAPI({
+    runs: [{ name: "PR Finisher", path: ".github/workflows/pr-finisher.lock.yml", display_title: "PR Finisher #42", head_branch: "main", status: "in_progress" }],
+  });
+  assert.equal((await fetchQueue("github/gh-aw", "42", api, now)).skipped[0].skip_reason, "agent_active");
+});
+
+test("finisher pins checkout and all writes to its validated input, excluding workflow YAML", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/pr-finisher.md", import.meta.url), "utf8");
+  assert.match(workflow, /run-name: "PR Finisher #\$\{\{ inputs.pr_number \}\}"/);
+  assert.match(workflow, /ref: \$\{\{ needs.preflight.outputs.head_sha \}\}/);
+  assert.match(workflow, /pull-request: false/);
+  assert.match(workflow, /PR_HEAD_SHA: \$\{\{ needs.preflight.outputs.head_sha \}\}/);
+  assert.match(workflow, /git switch -C "\$PR_HEAD_REF" "\$PR_HEAD_SHA"/);
+  assert.match(workflow, /"GH_AW_PR_HEAD_BASE_SHA=\$PR_HEAD_SHA"/);
+  assert.match(workflow, /min-integrity: approved/);
+  assert.match(workflow, /push-to-pull-request-branch:\n\s+target: \$\{\{ needs.preflight.outputs.pr_number \}\}/);
+  assert.equal([...workflow.matchAll(/target: \$\{\{ needs.preflight.outputs.pr_number \}\}/g)].length, 4);
+  assert.match(workflow, /exclude-lock-yml: true/);
+  assert.match(workflow, /excluded-files: \[".github\/workflows\/\*\.yml", ".github\/workflows\/\*\.yaml"\]/);
+  assert.match(workflow, /fallback-as-pull-request: false/);
+  assert.doesNotMatch(workflow, /^\s+(assign-to-agent|dispatch-workflow|create-pull-request):/m);
+});
+
+test("finisher preflight rejects invalid numbers and ineligible PRs before checkout", async () => {
+  const workflow = readFileSync(new URL("../.github/workflows/pr-finisher.md", import.meta.url), "utf8");
+  const script = workflow.match(/          script: \|\n([\s\S]*?)\nsteps:/)[1].replace(/^            /gm, "");
+  const run = new (Object.getPrototypeOf(async function () {}).constructor)("github", "context", "core", "process", script);
+  const candidate = { state: "open", draft: false, head: { repo: { full_name: "github/gh-aw" }, sha: "abc", ref: "copilot/fix" }, base: { ref: "main" }, labels: [], user: { login: "Copilot" } };
+  const outputs = {};
+  const context = { repo: { owner: "github", repo: "gh-aw" } };
+  const core = { setOutput: (key, value) => (outputs[key] = value) };
+  const process = { env: { PR_NUMBER: "42", GITHUB_REPOSITORY: "github/gh-aw" } };
+  const github = {
+    rest: {
+      pulls: {
+        get: async args => {
+          assert.deepEqual(args, { owner: "github", repo: "gh-aw", pull_number: 42 });
+          return { data: candidate };
+        },
+      },
+    },
+  };
+  await run(github, context, core, process);
+  assert.deepEqual(outputs, { pr_number: 42, head_sha: "abc", head_ref: "copilot/fix", base_ref: "main" });
+  for (const number of ["", "0", "-1", "1.5", "NaN", "9007199254740992"]) {
+    await assert.rejects(() => run(github, context, core, { env: { ...process.env, PR_NUMBER: number } }), /positive integer/);
+  }
+  for (const changes of [
+    { state: "closed" },
+    { draft: true },
+    { head: { repo: null } },
+    { head: { repo: { full_name: "outsider/fork" } } },
+    { labels: [{ name: "broccoli" }] },
+    { user: { login: "dependabot[bot]" } },
+    { user: { login: "renovate[bot]" } },
+  ]) {
+    const ineligible = { rest: { pulls: { get: async () => ({ data: { ...candidate, ...changes } }) } } };
+    await assert.rejects(() => run(ineligible, context, core, process), /requires an open/);
+  }
 });
 
 test("each API budget no-ops at exactly ten percent remaining", async () => {

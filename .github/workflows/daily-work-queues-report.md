@@ -31,6 +31,11 @@ timeout-minutes: 20
 strict: true
 imports:
   - shared/reporting.md
+evals:
+  - id: source-correct-eligibility
+    question: In a proposed queue report, do the Issue Monster and PR Sous Chef eligible backlogs apply their current defining workflows' exclusion rules? Return UNKNOWN when those backlogs or their defining source evidence are unavailable.
+  - id: snapshot-not-history
+    question: When native queue activity is reported, are claimed 24-hour state changes supported by historical evidence rather than inferred from the activation snapshot alone? Return UNKNOWN when no native activity claim is made.
 ---
 
 # Daily Work Queues Report

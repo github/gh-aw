@@ -62,7 +62,9 @@ function isSousChefComment(comment) {
 }
 
 function isNudge(comment) {
-  return isSousChefComment(comment) && (comment.body ?? "").includes("@copilot");
+  const body = comment.body ?? "";
+  if (/The code changes were not applied\.|a fallback review issue was created instead due to protected file changes:|Direct push to the original pull request branch was not possible/.test(body)) return false;
+  return isSousChefComment(comment) && (body.includes("@copilot") || statePattern.test(body));
 }
 
 function workTokens(pr) {
@@ -76,8 +78,12 @@ function workTokens(pr) {
 
 export function activeAgent(pr, runs) {
   return (
-    runs.some(run => activeStatuses.has(run.status) && (agentPattern.test(run.name ?? "") || (run.path ?? "").startsWith("dynamic/")) && (run.pull_requests?.some(item => item.number === pr.number) || run.head_branch === pr.headRefName)) ||
-    (pr.statusCheckRollup ?? []).some(check => check.status !== "COMPLETED" && agentPattern.test(check.name ?? ""))
+    runs.some(
+      run =>
+        activeStatuses.has(run.status) &&
+        ((run.path === ".github/workflows/pr-finisher.lock.yml" && run.display_title === `PR Finisher #${pr.number}`) ||
+          ((agentPattern.test(run.name ?? "") || (run.path ?? "").startsWith("dynamic/")) && (run.pull_requests?.some(item => item.number === pr.number) || run.head_branch === pr.headRefName)))
+    ) || (pr.statusCheckRollup ?? []).some(check => check.status !== "COMPLETED" && agentPattern.test(check.name ?? ""))
   );
 }
 
@@ -288,6 +294,10 @@ export async function fetchActiveRuns(repo, api = gh, branch) {
   for (const status of activeStatuses) {
     const pages = await api(["api", `repos/${repo}/actions/runs?status=${status}&per_page=100${branchFilter}`, "--paginate", "--slurp"]);
     runs.push(...pages.flatMap(page => page.workflow_runs));
+    if (branch) {
+      const finishers = await api(["api", `repos/${repo}/actions/workflows/pr-finisher.lock.yml/runs?status=${status}&per_page=100`, "--paginate", "--slurp"]);
+      runs.push(...finishers.flatMap(page => page.workflow_runs));
+    }
   }
   return runs;
 }
@@ -427,11 +437,11 @@ export function formatNudge(pr) {
   if (pr.zero_diff_stalled) tasks.push("Implement the requested change, or close this zero-diff PR with a reason.");
   return [
     marker,
-    "@copilot address the following outstanding work in one pass:",
+    "PR finisher dispatch requested for the following outstanding work:",
     "",
     ...tasks.map((task, index) => `${index + 1}. ${task}`),
     "",
-    "Push the necessary fixes, reply to each listed review thread and resolve it when addressed. Ignore feedback already answered or resolved. Use the pr-finisher skill and stop when only human review or CI remains; do not trigger CI.",
+    "The dedicated pr-finisher workflow will apply the necessary fixes, reply to each listed review thread and resolve it when addressed. Ignore feedback already answered or resolved; stop when only human review or CI remains. Do not trigger CI.",
     "",
     `Sous-chef head: ${pr.headRefOid}`,
     `Sous-chef work: ${workTokens(pr).join(" ")}`,

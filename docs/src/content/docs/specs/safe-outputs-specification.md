@@ -4858,6 +4858,18 @@ safe-outputs:
 - The privileged upload job MUST validate that staged asset paths remain contained within the staged-assets directory and that the expected staged filename matches the declared source path.
 - The privileged upload job MUST compute asset size, SHA-256 digest, target filename, and published URL from staged file contents and trusted runtime context. It MUST NOT trust agent-supplied `size`, `sha`, `path`, `targetFileName`, or URL metadata for privileged decisions.
 
+##### Asset Staging Ownership and Transport
+
+The `upload_asset` MCP handler stages files inside a backend container; the agent job's host-side `Upload Safe Outputs Assets` action reads them to create the `safe-outputs-assets` artifact. The downstream `upload_assets` job downloads that artifact before publishing to the asset branch. A shared mount or a successful MCP tool result MUST NOT be treated as evidence that the host can read the staged bytes or that publication completed.
+
+Unless an explicit container user is configured, gateway startup MUST run the built-in `safeoutputs` backend with the host runner's numeric UID and GID before serializing or publishing its configuration. The backend MUST NOT rely on inheriting the outer gateway container's Docker user. Missing or invalid runner identity MUST fail startup rather than silently fall back to root. This default identity MUST include a writable, container-local `HOME` at `/tmp` unless `HOME` is already configured, so local Git configuration does not require `/root` access or exposure of the host's home directory. Explicit container-user settings and configured `HOME` values MUST remain effective; deployments using these overrides are responsible for compatible host access. Other MCP backends, mounts, credentials, and network policies MUST remain unchanged by this ownership policy.
+
+Guarded staging MUST exclusively create regular files with mode `0600`; private subdirectories created by the guard, including Claim-specific directories, MUST use mode `0700`. The ownership contract MUST keep those files and directories readable and traversable by the host uploader without broadening their modes. Source and destination symlink rejection, hard-link and nonregular-source rejection, descriptor-relative path checks, bounded reads, and content-derived metadata MUST remain enforced. Implementations MUST NOT repair ownership by following agent-controlled links, recursively changing arbitrary trees, or disabling these guards.
+
+Unreadable staging MUST fail the artifact upload rather than report successful publication. An absent producer artifact and the downstream missing-asset errors MUST remain distinguishable from a Git push failure or an artifact-storage quota error. Owner equality and successful upload establish access, not trusted content, detector acceptance, or authorization for additional effects.
+
+Implementation and regression mappings are maintained in the [compiler threat specification's runtime staging boundary](https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md#79-safe-output-staging-ownership-boundary). Linux conformance coverage MUST exercise guarded `0600` asset files and `0700` Claim directories written with the selected backend identity and read by a separate host-uploader process. Configuration-only or non-Linux tests MUST NOT be presented as live container-to-host verification.
+
 ---
 
 #### Type: dispatch_workflow
@@ -6608,6 +6620,8 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **Specified**: Four consolidated repository variables for bytes, objects, timeout, and fetch depths, with derived resource budgets across generation, gateway/nested containers, upload guards, and publishing, finite defaults, strict validation, and independent trusted publisher policy.
 - **Preserved**: Exact incremental/dispatch baselines, fetch-before-import ordering, immutable uploads, ordinary publication policies, original diagnostics, and object-pack-aware manual instructions.
 - **Extended**: Bounded recovery configuration/attempt invariants and synthetic controls, without claiming native thresholds or implementation refinement.
+- **Specified**: Runner UID/GID and container-local writable HOME defaults for the safeoutputs backend, preserving explicit overrides and private staged-file/Claim-directory modes.
+- **Clarified**: The container-to-host artifact handoff, retained asset guards, producer failures versus downstream publication cascades, and the limits of ownership and regression evidence. Adoption requires the fixed setup runtime, not a workflow lock or permission change.
 
 **Version 1.29.14** (2026-10-31):
 
