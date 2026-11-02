@@ -100,7 +100,6 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
 
   Accepts both `dispatch-repository` (dash, canonical) and `dispatch_repository` (underscore, deprecated alias). Each key in the config defines a named MCP tool. Requires a token with `repo` scope since `GITHUB_TOKEN` cannot trigger `repository_dispatch` in external repositories. Use `github-token` or set a PAT as `GH_AW_SAFE_OUTPUTS_TOKEN`.
 
-  **⚠️ Experimental**: Compilation emits a warning when this feature is used.
 - `call-workflow:` - Call reusable workflows via workflow_call fan-out (orchestrator pattern)
 
   ```yaml
