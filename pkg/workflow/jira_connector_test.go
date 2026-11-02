@@ -60,7 +60,10 @@ func TestJiraConnectorWorkflowCompilation(t *testing.T) {
 	require.NoError(t, err)
 	safe, err := json.Marshal(jobs["safe_outputs"])
 	require.NoError(t, err)
-	assert.Contains(t, string(agent), "connectors invoke context")
+	assert.Contains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+	assert.NotContains(t, output, "Checkout trusted connector runtime")
+	assert.NotContains(t, output, "Build trusted connector runtime")
+	assert.NotContains(t, output, "gh extension install")
 	assert.Contains(t, string(agent), "${{ secrets.JIRA_MCP_SERVICE_ACCOUNT_KEY }}")
 	assert.Contains(t, string(agent), "${{ secrets.JIRA_CONTEXT_BASIC_AUTH }}")
 	assert.NotContains(t, string(agent), "${{ secrets.JIRA_REST_BASIC_AUTH }}")
@@ -68,8 +71,8 @@ func TestJiraConnectorWorkflowCompilation(t *testing.T) {
 	assert.Contains(t, string(safe), "${{ secrets.JIRA_REST_BASIC_AUTH }}")
 	assert.NotContains(t, string(safe), "${{ secrets.JIRA_CONTEXT_BASIC_AUTH }}")
 	assert.Contains(t, output, "untrusted third-party data")
-	assert.Contains(t, output, "connector_4_jira_add_comment")
-	assert.NotContains(t, output, "connector_4_jira_create_issue")
+	assert.Contains(t, output, "jira_add_comment")
+	assert.NotContains(t, output, "jira_create_issue")
 }
 
 const jiraWorkflowSelections = "    tools: [service-account]\n    context:\n      issue-details:\n        issue: APP-1\n    safe-outputs: [add-comment]\n"
@@ -92,7 +95,7 @@ func TestJiraConnectorIndependentSelections(t *testing.T) {
 			require.NoError(t, err)
 			if test.name == "registration" {
 				assert.Empty(t, data.Connectors)
-				assert.NotContains(t, data.Tools, "connector-jira")
+				assert.NotContains(t, data.Tools, "jira")
 				return
 			}
 			config := data.Connectors["jira"]
@@ -105,12 +108,13 @@ func TestJiraConnectorIndependentSelections(t *testing.T) {
 			}
 			if test.write {
 				assert.Len(t, config.SafeOutputs.SafeOutputNames(), 4)
-				script := data.SafeOutputs.Scripts["connector-4-jira-add-comment"]
+				script := data.SafeOutputs.Scripts["jira-add-comment"]
 				require.NotNil(t, script)
 				schema, err := config.SafeOutputs.InputSchema("safe-output", "add-comment")
 				require.NoError(t, err)
 				assert.Equal(t, false, schema["additionalProperties"])
-				assert.Contains(t, script.Script, "connectors")
+				assert.Contains(t, script.Script, "connector_runtime.cjs")
+				assert.Contains(t, script.Script, "process.execPath")
 			}
 			_, err = c.CompileToYAML(data, filepath.Join(root, "jira.md"))
 			require.NoError(t, err)
