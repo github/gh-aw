@@ -79,7 +79,13 @@ func TestLinearConnectorWorkflowCompilation(t *testing.T) {
 	require.NotContains(t, output, "LINEAR_CONTEXT_API_KEY")
 	require.NotContains(t, output, "GH_AW_LINEAR_TOKEN")
 	require.NotContains(t, output, "linear_graphql.cjs")
-	require.NotContains(t, output, "connectors invoke context")
+	require.NotContains(t, output, `connector_runtime.cjs" invoke context`)
+	require.Contains(t, string(agent), "connector_runtime.cjs")
+	require.Contains(t, string(agent), "serve")
+	require.Contains(t, string(effects), "process.execPath")
+	require.NotContains(t, output, "Checkout trusted connector runtime")
+	require.NotContains(t, output, "Build trusted connector runtime")
+	require.NotContains(t, output, "gh extension install")
 	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw", "connectors"))
 	require.True(t, os.IsNotExist(err), "compilation must not require consumer connector files")
 }
@@ -99,7 +105,7 @@ func TestLinearConnectorWorkflowIndependentSelections(t *testing.T) {
 			require.NoError(t, err)
 			if test.name == "omitted" {
 				require.Empty(t, data.Connectors)
-				require.NotContains(t, data.Tools, "connector-linear")
+				require.NotContains(t, data.Tools, "linear")
 				return
 			}
 			config := data.Connectors["linear"]

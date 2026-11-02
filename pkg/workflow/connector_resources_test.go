@@ -84,15 +84,3 @@ func TestEmbeddedConnectorResolutionIsExact(t *testing.T) {
 		require.ErrorContains(t, err, "builtin file not found")
 	}
 }
-
-func TestConnectorRuntimeBuildRef(t *testing.T) {
-	const source = "0123456789abcdef0123456789abcdef01234567"
-	for _, test := range []struct{ version, linkedRef, expected string }{
-		{"v0.0.0-1-gabcdef0", source, source},
-		{"v0.0.0-2-g1234567", source, source},
-		{"v1.2.3", "", "v1.2.3"},
-		{"dev", "", ""},
-	} {
-		assert.Equal(t, test.expected, connectorRuntimeBuildRef(test.version, test.linkedRef))
-	}
-}
