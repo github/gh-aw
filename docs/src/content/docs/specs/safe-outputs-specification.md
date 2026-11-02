@@ -5695,10 +5695,11 @@ When threat detection executes in `warn` mode and reports a threat signal for a 
 1. A prominent warning section:
 
    > [!WARNING]
-   > threat detection engine error
-   > The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+   > **Threat detection engine error**
+   >
+   > Threat detection could not complete its analysis due to a tooling error. This is not a security finding.
 
-2. A visible warning label string: `threat detection engine error`.
+2. A visible warning label string: `Threat detection engine error`.
 3. An XML comment marker in emitted markdown content: `<!-- gh-aw-threat-engine-error -->`.
 
 **Requirement WTD2 (Convertible Fallback)**: For safe output types classified as **Convertible**, implementations MUST transform the operation into the mapped Reviewable type before execution. For this specification, `push_to_pull_request_branch` (also referred to as `update-pull-request-branch`) MUST fall back to `create_pull_request` with the WTD1 or WTD1a review annotation that matches the detection reason.

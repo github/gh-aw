@@ -233,7 +233,7 @@ describe("update_activation_comment.cjs", () => {
       );
     }),
     it.each([
-      ["agent_failure", "> threat detection engine error", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
+      ["agent_failure", "> **Threat detection engine error**", "<!-- gh-aw-threat-engine-error -->", "<!-- gh-aw-threat-detected -->"],
       ["threat_detected", "> agentic threat detected", "<!-- gh-aw-threat-detected -->", "<!-- gh-aw-threat-engine-error -->"],
     ])("should include the %s detection banner in created activation comments", async (reason, titleLine, expectedMarker, unexpectedMarker) => {
       mockDependencies.process.env.GH_AW_COMMENT_ID = "";
