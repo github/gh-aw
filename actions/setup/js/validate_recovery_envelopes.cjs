@@ -3,19 +3,17 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { getObjectPackLimits } = require("./object_pack_limits.cjs");
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
-const MAX_HEADER_BYTES = 4096;
-const MAX_PREVIEW_BYTES = 128 * 1024 * 1024;
-const MAX_ENVELOPE_BYTES = 80 * 1024 * 1024 + MAX_HEADER_BYTES;
 const READ_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
 
-/** @param {string} filename */
-function previewHash(filename) {
+/** @param {string} filename @param {ReturnType<typeof getObjectPackLimits>} limits */
+function previewHash(filename, limits) {
   const fd = fs.openSync(filename, READ_FLAGS);
   try {
     const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.size > MAX_PREVIEW_BYTES) throw new Error("Invalid recovery preview");
+    if (!stat.isFile() || stat.size > limits.maxPreviewBytes) throw new Error("Invalid recovery preview");
     const hash = crypto.createHash("sha256");
     const buffer = Buffer.alloc(64 * 1024);
     let total = 0;
@@ -23,7 +21,7 @@ function previewHash(filename) {
       const count = fs.readSync(fd, buffer, 0, buffer.length, null);
       if (!count) break;
       total += count;
-      if (total > MAX_PREVIEW_BYTES) throw new Error("Oversized recovery preview");
+      if (total > limits.maxPreviewBytes) throw new Error("Oversized recovery preview");
       hash.update(buffer.subarray(0, count));
     }
     if (total !== stat.size) throw new Error("Recovery preview changed during validation");
@@ -37,15 +35,16 @@ function previewHash(filename) {
  * Binary recovery objects must never outlive a redacted or removed text preview.
  * Ordinary Git bundles are deliberately untouched.
  * @param {string} filename
+ * @param {ReturnType<typeof getObjectPackLimits>} [limits]
  * @returns {boolean} Whether a recovery envelope was removed.
  */
-function validateEnvelope(filename) {
+function validateEnvelope(filename, limits = getObjectPackLimits()) {
   const fd = fs.openSync(filename, READ_FLAGS);
   let valid = false;
   try {
     const stat = fs.fstatSync(fd);
     if (!stat.isFile()) throw new Error("Invalid recovery envelope");
-    const header = Buffer.alloc(MAX_HEADER_BYTES);
+    const header = Buffer.alloc(Math.min(Math.max(limits.maxHeaderBytes, MAGIC.length), stat.size));
     let length = 0;
     while (length < header.length) {
       const count = fs.readSync(fd, header, length, header.length - length, length);
@@ -53,9 +52,9 @@ function validateEnvelope(filename) {
       length += count;
     }
     if (!header.subarray(0, MAGIC.length).equals(MAGIC)) return false;
-    if (stat.size > MAX_ENVELOPE_BYTES) throw new Error("Oversized recovery envelope");
+    if (stat.size > limits.maxPackBytes + limits.maxHeaderBytes) throw new Error("Oversized recovery envelope");
     const end = header.indexOf(10, MAGIC.length);
-    if (end < 0 || end >= length) throw new Error("Invalid recovery metadata");
+    if (end < 0 || end >= length || end >= limits.maxHeaderBytes) throw new Error("Invalid recovery metadata");
     const metadata = JSON.parse(header.subarray(MAGIC.length, end).toString("utf8"));
     if (!/^[0-9a-f]{64}$/.test(metadata.previewHash || "") || !/^[0-9a-f]{64}$/.test(metadata.packHash || "")) throw new Error("Invalid recovery hashes");
     if (!["sha1", "sha256"].includes(metadata.objectFormat)) throw new Error("Invalid recovery object format");
@@ -70,9 +69,9 @@ function validateEnvelope(filename) {
     // Both metadata hashes are agent-controlled: reconstruct every packed object
     // using the same bounded parser as publication, not just its claimed digest.
     const { inspectObjectPack } = require("./object_pack_transport.cjs");
-    const { preview } = inspectObjectPack(pack, metadata.objectFormat);
+    const { preview } = inspectObjectPack(pack, metadata.objectFormat, limits);
     const expectedHash = crypto.createHash("sha256").update(preview).digest("hex");
-    valid = expectedHash === metadata.previewHash && previewHash(filename.replace(/\.bundle$/, ".patch")) === expectedHash;
+    valid = expectedHash === metadata.previewHash && previewHash(filename.replace(/\.bundle$/, ".patch"), limits) === expectedHash;
   } catch {
     // Missing, unreadable, malformed and redacted previews all suppress the pack.
     valid = false;
@@ -91,6 +90,7 @@ function validateEnvelope(filename) {
  * @param {{ roots?: string[], core?: {info?: (message: string) => void} }} [options]
  */
 function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tmp", "gh-aw")], core = globalThis.core } = {}) {
+  const limits = getObjectPackLimits();
   const additionalRoots = JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS || "[]");
   if (!Array.isArray(additionalRoots) || additionalRoots.some(root => typeof root !== "string")) throw new Error("Invalid additional recovery artifact roots");
   const visited = new Set();
@@ -105,14 +105,14 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
       if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
       throw new Error("Unable to inspect recovery artifacts", { cause: error });
     }
-    if (++entries > 1000000) throw new Error("Recovery artifact scan exceeded its entry limit");
+    if (++entries > limits.maxScanEntries) throw new Error("Recovery artifact scan exceeded its entry limit");
     if (stat.isDirectory()) {
       const identity = `${stat.dev}:${stat.ino}`;
       if (visited.has(identity)) return;
       visited.add(identity);
       for (const entry of fs.readdirSync(filename)) visit(path.join(filename, entry));
     } else if (filename.endsWith(".bundle")) {
-      if (validateEnvelope(filename)) removed++;
+      if (validateEnvelope(filename, limits)) removed++;
     }
   }
   for (const root of [...roots, ...additionalRoots]) {

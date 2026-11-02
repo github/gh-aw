@@ -80,9 +80,12 @@ func generateRecoveryEnvelopeValidationStep(yaml *strings.Builder, id string, da
 	yaml.WriteString("        id: " + id + "\n")
 	yaml.WriteString("        if: always() && " + secretMaskingSuccessCondition(data) + "\n")
 	yaml.WriteString("        uses: " + pinAction("actions/github-script") + "\n")
+	yaml.WriteString("        env:\n")
+	for _, name := range objectPackLimitEnvNames {
+		yaml.WriteString("          " + name + ": ${{ vars." + name + " }}\n")
+	}
 	if len(additionalRoots) > 0 {
 		encoded, _ := json.Marshal(additionalRoots) //nolint:jsonmarshalignoredeerror // A slice of strings is always JSON-serializable.
-		yaml.WriteString("        env:\n")
 		yaml.WriteString("          GH_AW_RECOVERY_ADDITIONAL_ROOTS: '" + strings.ReplaceAll(string(encoded), "'", "''") + "'\n")
 	}
 	yaml.WriteString("        with:\n")

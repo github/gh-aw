@@ -9,6 +9,15 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { isTransientError } = require("./error_recovery.cjs");
 const { buildGitAuthEnv } = require("./git_auth_env.cjs");
 const { withGuardedDirectory } = require("./symlink_guard.cjs");
+const { AsyncLocalStorage } = require("async_hooks");
+
+/** @type {import("async_hooks").AsyncLocalStorage<{timeout: number, maxBuffer: number}>} */
+const gitCommandLimits = new AsyncLocalStorage();
+
+/** @template T @param {{timeout: number, maxBuffer: number}} limits @param {() => T} callback @returns {T} */
+function withGitCommandLimits(limits, callback) {
+  return gitCommandLimits.run(limits, callback);
+}
 
 /**
  * Build GIT_CONFIG_* environment variables that inject an Authorization header
@@ -95,8 +104,8 @@ function ensureSafeDirectoryTrust(gitCwd, logger) {
 function execGitSyncResult(args, options = {}) {
   const result = childProcess.spawnSync("git", args, {
     encoding: "utf8",
-    maxBuffer: 100 * 1024 * 1024,
-    timeout: 60_000,
+    maxBuffer: gitCommandLimits.getStore()?.maxBuffer ?? 100 * 1024 * 1024,
+    timeout: gitCommandLimits.getStore()?.timeout ?? 60_000,
     killSignal: "SIGKILL",
     ...options,
     stdio: options.stdio === "inherit" ? "pipe" : options.stdio,
@@ -154,7 +163,7 @@ function execGitSync(args, options = {}) {
   //    credential rejection fail fast instead of opening an interactive prompt.
   //  - timeout (default 60s) ensures a stuck network/TLS handshake cannot
   //    wedge the calling event loop. Callers can override via options.timeout.
-  const defaultTimeoutMs = 60_000;
+  const defaultTimeoutMs = gitCommandLimits.getStore()?.timeout ?? 60_000;
 
   const result = execGitSyncResult(args, spawnOptions);
 
@@ -1011,6 +1020,7 @@ async function linearizeRangeAsCommit(baseRef, commitMessage, execApi, opts = {}
 }
 
 module.exports = {
+  withGitCommandLimits,
   stageRawGitFiles,
   ensureSafeDirectoryTrust,
   isTransientGitError,

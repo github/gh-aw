@@ -453,6 +453,7 @@ SAFE_OUTPUTS_FILES=(
   "generate_git_bundle.cjs"
   "object_pack_transport.cjs"
   "object_pack_fetch.cjs"
+  "object_pack_limits.cjs"
   "workflow_file_exclusions.cjs"
   "git_patch_utils.cjs"
   "commit_sha_helpers.cjs"

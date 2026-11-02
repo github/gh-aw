@@ -1,11 +1,13 @@
 --------------------- MODULE SafeOutputObjectRecovery ---------------------
 EXTENDS Naturals
 
-CONSTANTS Mode, Fault
+CONSTANTS Mode, Fault, MaxFetchAttempts
 ASSUME Mode \in {"full", "incremental"}
+ASSUME MaxFetchAttempts \in 1..3
 ASSUME Fault \in {"none", "agent-fetch", "copied-config", "untrusted-remote",
                   "moving-baseline", "hidden-preview", "skip-policy",
-                  "unfiltered-fetch", "untrusted-blob", "unbounded-fetch"}
+                  "unfiltered-fetch", "untrusted-blob", "unbounded-fetch",
+                  "invalid-limits", "uploaded-limits"}
 
 \* Object/preview validation and authorization are abstract predicates, not a
 \* proof of Git parsing, detector completeness, or implementation refinement.
@@ -13,16 +15,25 @@ VARIABLE s
 vars == <<s>>
 
 Init ==
-    \E local, baseline, matches, complete, bounded, allowed \in BOOLEAN:
-        s = [stage |-> IF local THEN "policy" ELSE "package",
+    \E local, baseline, matches, complete, bounded, allowed,
+       limitsValid, publisherBounded, uploadedOverride \in BOOLEAN:
+        s = [stage |-> IF local THEN "policy" ELSE "limits",
              local |-> local, baseline |-> baseline, matches |-> matches,
              complete |-> complete, bounded |-> bounded, allowed |-> allowed,
+             limitsValid |-> limitsValid, publisherBounded |-> publisherBounded,
+             uploadedOverride |-> uploadedOverride,
              packaged |-> FALSE, fetched |-> FALSE, imported |-> FALSE,
              attempts |-> 0, filtered |-> TRUE, pinned |-> TRUE,
              hydrated |-> FALSE, trustedBlobs |-> TRUE,
              agentNetwork |-> FALSE, copiedConfig |-> FALSE,
              trustedRemote |-> TRUE, checkedPolicy |-> FALSE,
              published |-> FALSE, rejected |-> FALSE]
+
+CheckLimits ==
+    /\ s.stage = "limits"
+    /\ LET accept == s.limitsValid \/ Fault = "invalid-limits"
+       IN s' = [s EXCEPT !.stage = IF accept THEN "package" ELSE "done",
+                         !.rejected = ~accept]
 
 Package ==
     /\ s.stage = "package"
@@ -32,23 +43,27 @@ Package ==
 
 CheckPreview ==
     /\ s.stage = "preview"
-    /\ LET accept == s.matches \/ Fault = "hidden-preview"
+    /\ LET accept == (s.matches \/ Fault = "hidden-preview")
+                     /\ (s.publisherBounded
+                         \/ (Fault = "uploaded-limits" /\ s.uploadedOverride))
        IN s' = [s EXCEPT !.stage = IF accept THEN "fetch" ELSE "done",
                          !.rejected = ~accept]
 
 Fetch ==
     /\ s.stage = "fetch"
-    /\ s.attempts < 3
+    /\ s.attempts < MaxFetchAttempts
     /\ \E enough \in BOOLEAN:
        LET accept == Mode = "full" \/ s.baseline \/ Fault = "moving-baseline"
        IN s' = [s EXCEPT !.stage = IF ~accept THEN "done"
                                    ELSE IF enough THEN "hydrate"
-                                   ELSE IF s.attempts < 2 THEN "fetch"
+                                   ELSE IF s.attempts < MaxFetchAttempts - 1 THEN "fetch"
                                    ELSE "done",
-                         !.attempts = IF Fault = "unbounded-fetch" THEN 4 ELSE @ + 1,
+                         !.attempts = IF Fault = "unbounded-fetch"
+                                      THEN MaxFetchAttempts + 1 ELSE @ + 1,
                          !.filtered = Fault # "unfiltered-fetch",
                          !.fetched = accept,
-                         !.rejected = ~accept \/ (~enough /\ s.attempts = 2),
+                         !.rejected = ~accept
+                                      \/ (~enough /\ s.attempts = MaxFetchAttempts - 1),
                          !.copiedConfig = accept /\ Fault = "copied-config",
                          !.trustedRemote = Fault # "untrusted-remote"]
 
@@ -72,20 +87,24 @@ Publish ==
     /\ s.stage = "publish"
     /\ s' = [s EXCEPT !.stage = "done", !.published = TRUE]
 
-Next == Package \/ CheckPreview \/ Fetch \/ Hydrate \/ Import \/ Policy \/ Publish
+Next == CheckLimits \/ Package \/ CheckPreview \/ Fetch \/ Hydrate \/ Import \/ Policy \/ Publish
 Spec == Init /\ [][Next]_vars
 
 TypeOK ==
-    /\ s.stage \in {"package", "preview", "fetch", "hydrate", "import", "policy",
+    /\ s.stage \in {"limits", "package", "preview", "fetch", "hydrate", "import", "policy",
                     "publish", "done"}
     /\ \A field \in {"local", "baseline", "matches", "complete", "bounded",
                      "allowed", "packaged", "fetched", "imported",
                      "agentNetwork", "copiedConfig", "trustedRemote",
                      "checkedPolicy", "published", "rejected", "filtered",
-                     "pinned", "hydrated", "trustedBlobs"}:
+                     "pinned", "hydrated", "trustedBlobs", "limitsValid",
+                     "publisherBounded", "uploadedOverride"}:
            s[field] \in BOOLEAN
-    /\ s.attempts \in 0..4
-BoundedFilteredFetch == s.fetched => s.filtered /\ s.pinned /\ s.attempts \in 1..3
+    /\ s.attempts \in 0..(MaxFetchAttempts + 1)
+BoundedFilteredFetch ==
+    s.fetched => s.filtered /\ s.pinned /\ s.attempts \in 1..MaxFetchAttempts
+ConfigurationValid == s.packaged => s.limitsValid
+PublisherLimits == s.fetched => s.publisherBounded
 TrustedHydration == s.hydrated => s.trustedBlobs /\ s.fetched
 HydrateBeforeImport == s.imported => s.hydrated
 NoAgentNetwork == ~s.agentNetwork

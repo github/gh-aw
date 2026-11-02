@@ -3,19 +3,17 @@
 const childProcess = require("child_process");
 const { execLocalGitSync } = require("./git_helpers.cjs");
 const { buildGitAuthEnv } = require("./git_auth_env.cjs");
-
-const DEPTHS = [1, 16, 64, 256, 1024, 4096, 16384, 65536];
-const MAX_HYDRATION_BYTES = 64 * 1024 * 1024;
-const MAX_ENTRIES = 1000000;
+const { getObjectPackLimits } = require("./object_pack_limits.cjs");
 
 /**
  * Network access belongs only to a clean trusted store, before pack import.
  * Uploaded graph edges are hints, never fetch refspecs or remote authority.
  */
 function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspection, tip, trace }) {
-  const deadline = Date.now() + 180000;
+  const limits = getObjectPackLimits(env);
+  const deadline = Date.now() + limits.networkTimeoutMs;
   const auth = token ? buildGitAuthEnv(token) : {};
-  const git = args => execLocalGitSync(args, { cwd, env, maxBuffer: 80 * 1024 * 1024 });
+  const git = (args, settings = {}) => execLocalGitSync(args, { cwd, env, maxBuffer: limits.maxPackBytes, timeout: limits.commandTimeoutMs, ...settings });
   git(["config", "remote.recovery.promisor", "true"]);
   git(["config", "remote.recovery.partialclonefilter", "tree:0"]);
   /** @param {string[]} args @param {string} input @param {string} [filter] */
@@ -49,8 +47,8 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
         env: { ...env, ...auth, GIT_ALLOW_PROTOCOL: "https", GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "/bin/false" },
         input,
         encoding: "utf8",
-        maxBuffer: 1024 * 1024,
-        timeout: Math.min(60000, remaining),
+        maxBuffer: limits.maxCommandOutputBytes,
+        timeout: Math.min(limits.commandTimeoutMs, remaining),
         killSignal: "SIGKILL",
       }
     );
@@ -70,7 +68,7 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
     ].map(match => match[1]);
   const frontier = new Set(commits.flatMap(([, object]) => parents(object.bytes)).filter(oid => !objects.has(oid)));
   let pinned;
-  for (const [attempt, depth] of DEPTHS.entries()) {
+  for (const [attempt, depth] of limits.fetchDepths.entries()) {
     trace("fetch-step", { attempt, depth });
     const refs = [`${pinned || ref}:refs/heads/recovery-base`];
     if (checkoutSha) refs.push(`${checkoutSha}:refs/heads/recovery-checkout`);
@@ -81,7 +79,7 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
     const available = git(["rev-list", "--all"]).trim().split("\n");
     const found = new Set(available);
     if ([...frontier].every(oid => found.has(oid)) && (checkoutSha || available.some(oid => objects.has(oid) || frontier.has(oid)))) break;
-    if (attempt === DEPTHS.length - 1) throw new Error("Required commit ancestry exceeds the bounded recovery search");
+    if (attempt === limits.fetchDepths.length - 1) throw new Error("Required commit ancestry exceeds the bounded recovery search");
     // A complete trusted history cannot gain another ancestor by deepening.
     if (git(["rev-parse", "--is-shallow-repository"]).trim() === "false") throw new Error("Required commits are not in authorized history");
   }
@@ -95,8 +93,8 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
     roots.add(root);
   }
   const snapshots = [...roots];
-  for (let offset = 0; offset < snapshots.length; offset += 256) {
-    const batch = snapshots.slice(offset, offset + 256);
+  for (let offset = 0; offset < snapshots.length; offset += limits.fetchBatchSize) {
+    const batch = snapshots.slice(offset, offset + limits.fetchBatchSize);
     trace("fetch-trees", { objects: batch.length });
     fetch(["--refetch", "--stdin"], `${batch.join("\n")}\n`, "blob:none");
   }
@@ -107,7 +105,7 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
   const trustedTypes = new Map();
   const inspectTrustedTypes = ids => {
     if (!ids.length) return;
-    const records = execLocalGitSync(["cat-file", "--batch-check=%(objectname) %(objecttype)"], { cwd, env, input: `${ids.join("\n")}\n`, maxBuffer: 80 * 1024 * 1024 });
+    const records = git(["cat-file", "--batch-check=%(objectname) %(objecttype)"], { input: `${ids.join("\n")}\n` });
     for (const record of records.trim().split("\n")) {
       const [oid, type] = record.split(" ");
       trustedTypes.set(oid, type);
@@ -122,7 +120,7 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
       if (packed.type !== type) throw new Error("Recovery graph object type mismatch");
       return packed.bytes;
     }
-    const result = childProcess.spawnSync("git", ["cat-file", type, oid], { cwd, env, encoding: null, maxBuffer: 80 * 1024 * 1024, timeout: 60000, killSignal: "SIGKILL" });
+    const result = childProcess.spawnSync("git", ["cat-file", type, oid], { cwd, env, encoding: null, maxBuffer: limits.maxPackBytes, timeout: limits.commandTimeoutMs, killSignal: "SIGKILL" });
     if (result.status !== 0 || result.error || !Buffer.isBuffer(result.stdout)) throw new Error("Required trusted graph object is unavailable");
     return result.stdout;
   };
@@ -141,7 +139,7 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
     const width = tip.length / 2;
     let offset = 0;
     while (offset < bytes.length) {
-      if (++entries > MAX_ENTRIES) throw new Error("Recovery tree traversal budget exhausted");
+      if (++entries > limits.maxTreeEntries) throw new Error("Recovery tree traversal budget exhausted");
       const space = bytes.indexOf(32, offset);
       const nul = bytes.indexOf(0, space + 1);
       if (space < offset || nul < space || nul + 1 + width > bytes.length) throw new Error("Invalid recovery tree");
@@ -219,17 +217,17 @@ function fetchRecoveryObjects({ cwd, env, remote, ref, checkoutSha, token, inspe
   // requested. Missing agent-created bytes cannot be filled from upload hints.
   if (missing.some(oid => !trustedBlobs.has(oid))) throw new Error("Missing agent-created object bytes");
   let bytes = 0;
-  for (let offset = 0; offset < missing.length; offset += 256) {
-    const batch = missing.slice(offset, offset + 256);
+  for (let offset = 0; offset < missing.length; offset += limits.fetchBatchSize) {
+    const batch = missing.slice(offset, offset + limits.fetchBatchSize);
     trace("fetch-blobs", { objects: batch.length });
     fetch(["--refetch", "--stdin"], `${batch.join("\n")}\n`, "blob:none");
-    const sizes = execLocalGitSync(["cat-file", "--batch-check=%(objectsize)"], { cwd, env, input: `${batch.join("\n")}\n` })
+    const sizes = git(["cat-file", "--batch-check=%(objectsize)"], { input: `${batch.join("\n")}\n` })
       .trim()
       .split("\n");
     for (const size of sizes) {
       if (!/^\d+$/.test(size)) throw new Error("Unable to validate hydrated blobs");
       bytes += Number(size);
-      if (!Number.isSafeInteger(bytes) || bytes > MAX_HYDRATION_BYTES) throw new Error("Required baseline blobs exceed the 64 MiB hydration budget");
+      if (!Number.isSafeInteger(bytes) || bytes > limits.maxHydrationBytes) throw new Error("Required baseline blobs exceed the configured hydration budget");
     }
   }
   trace("fetch-hydrated", { objects: missing.length, bytes });

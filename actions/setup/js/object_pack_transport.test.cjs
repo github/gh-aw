@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 import zlib from "zlib";
-import { createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken } from "./object_pack_transport.cjs";
+import { createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken, inspectObjectPack } from "./object_pack_transport.cjs";
 import { createTransportIntegrity } from "./transport_integrity.cjs";
 import { generateGitPatch } from "./generate_git_patch.cjs";
 import { createHandlers } from "./safe_outputs_handlers.cjs";
@@ -119,6 +119,88 @@ describe("offline object-pack recovery", () => {
     expect(packs).toHaveLength(1);
     expect(isObjectPack(fs.readFileSync(artifact.bundlePath))).toBe(true);
     expect(fs.readFileSync(artifact.patchPath, "utf8")).toContain("agent content");
+  });
+
+  it.each(["MAX_OBJECTS", "MAX_BYTES"])("enforces configured %s during offline packaging", name => {
+    process.env[`GH_AW_OBJECT_PACK_${name}`] = "1";
+    expect(() => createObjectPack("agent-change", repoSlug, tip, { cwd: repo })).toThrow("configured");
+  });
+
+  it.each(["MAX_OBJECTS", "MAX_BYTES"])("applies the publisher's configured %s before fetching, ignoring uploaded limits", async name => {
+    const { artifact, transport, paths } = packageObjects();
+    const bytes = fs.readFileSync(artifact.bundlePath);
+    const boundary = bytes.indexOf(10, Buffer.byteLength("GH-AW-OBJECT-PACK 1\n"));
+    const metadata = JSON.parse(bytes.subarray(Buffer.byteLength("GH-AW-OBJECT-PACK 1\n"), boundary).toString("utf8"));
+    metadata.limits = { [name]: Number.MAX_SAFE_INTEGER };
+    fs.writeFileSync(artifact.bundlePath, Buffer.concat([bytes.subarray(0, Buffer.byteLength("GH-AW-OBJECT-PACK 1\n")), Buffer.from(JSON.stringify(metadata) + "\n"), bytes.subarray(boundary + 1)]));
+    transport.dispose();
+    const authoritative = createTransportIntegrity();
+    transports.push(authoritative);
+    authoritative.captureOptional(paths.patchPath);
+    authoritative.captureOptional(paths.bundlePath);
+    process.env[`GH_AW_OBJECT_PACK_${name}`] = "1";
+    const calls = vi.spyOn(childProcess, "spawnSync");
+    await expect(recoverObjectPack(authoritative, paths, { repo: repoSlug, baseBranch: "main", mode: "full", config: {}, message: {} })).rejects.toThrow();
+    expect(calls.mock.calls.some(([, args]) => args.includes("fetch"))).toBe(false);
+  });
+
+  it("accepts exact pack, preview, uncompressed and object-count boundaries", () => {
+    const { artifact } = packageObjects();
+    const bytes = fs.readFileSync(artifact.bundlePath);
+    const boundary = bytes.indexOf(10, Buffer.byteLength("GH-AW-OBJECT-PACK 1\n"));
+    const pack = bytes.subarray(boundary + 1);
+    const inspection = inspectObjectPack(pack, "sha1");
+    const total = [...inspection.objects.values()].reduce((sum, object) => sum + object.bytes.length, 0);
+    const { getObjectPackLimits } = require("./object_pack_limits.cjs");
+    const limits = { ...getObjectPackLimits({}), maxObjects: inspection.objects.size, maxUncompressedBytes: total, maxPackBytes: pack.length, maxPreviewBytes: inspection.preview.length };
+    expect(inspectObjectPack(pack, "sha1", limits).preview).toEqual(inspection.preview);
+    expect(() => inspectObjectPack(pack, "sha1", { ...limits, maxPackBytes: pack.length - 1 })).toThrow("transfer limit");
+    expect(() => inspectObjectPack(pack, "sha1", { ...limits, maxPreviewBytes: inspection.preview.length - 1 })).toThrow("preview");
+    expect(() => inspectObjectPack(pack, "sha1", { ...limits, maxUncompressedBytes: total - 1 })).toThrow("uncompressed limit");
+    process.env.GH_AW_OBJECT_PACK_MAX_OBJECTS = String(inspection.objects.size);
+    expect(createObjectPack("agent-change", repoSlug, tip, { cwd: repo }).size).toBe(bytes.length);
+  });
+
+  it("propagates configured command, network, depth, batch and import limits", async () => {
+    const { transport, paths } = packageObjects();
+    process.env.GH_AW_OBJECT_PACK_TIMEOUT_MS = "120000";
+    process.env.GH_AW_OBJECT_PACK_MAX_BYTES = "134217728";
+    process.env.GH_AW_OBJECT_PACK_MAX_OBJECTS = "390";
+    process.env.GH_AW_OBJECT_PACK_FETCH_DEPTHS = "2,32,131072";
+    const fetches = redirectTrustedFetch();
+    await expect(recoverObjectPack(transport, paths, { repo: repoSlug, baseBranch: "main", mode: "full", config: {}, message: {} })).resolves.toBe(true);
+    expect(fetches[0].args).toContain("--depth=2");
+    for (const fetch of fetches) {
+      expect(fetch.options.timeout).toBeGreaterThan(0);
+      expect(fetch.options.timeout).toBeLessThanOrEqual(120000);
+      expect(fetch.options.maxBuffer).toBe(2097152);
+      expect(fetch.options.input.trim().split("\n")).toHaveLength(1);
+    }
+    const calls = childProcess.spawnSync.mock.calls;
+    const imported = calls.find(([, args]) => args.includes("index-pack"));
+    expect(imported[1]).toContain("--max-input-size=167772160");
+    expect(imported[2].timeout).toBe(120000);
+    const regenerated = calls.find(([command]) => command === process.execPath);
+    expect(regenerated[2].timeout).toBe(120000);
+    expect(regenerated[2].maxBuffer).toBe(2097152);
+    expect(JSON.parse(regenerated[2].input).gitLimits).toEqual({ timeout: 120000, maxBuffer: 209715200 });
+  });
+
+  it("rejects exhaustion of the derived tree-entry budget before importing untrusted objects", async () => {
+    git(["checkout", "main"]);
+    for (let index = 0; index < 200; index++) fs.writeFileSync(path.join(repo, `baseline-${index}.txt`), "baseline\n");
+    git(["add", "."]);
+    git(["commit", "-m", "wide baseline"]);
+    git(["checkout", "agent-change"]);
+    git(["merge", "main", "--no-edit"]);
+    tip = git(["rev-parse", "HEAD"]);
+    const { artifact, transport, paths } = packageObjects();
+    const bytes = fs.readFileSync(artifact.bundlePath);
+    const boundary = bytes.indexOf(10, Buffer.byteLength("GH-AW-OBJECT-PACK 1\n"));
+    process.env.GH_AW_OBJECT_PACK_MAX_OBJECTS = String(bytes.readUInt32BE(boundary + 1 + 8));
+    redirectTrustedFetch();
+    await expect(recoverObjectPack(transport, paths, { repo: repoSlug, baseBranch: "main", mode: "full", config: {}, message: {} })).rejects.toThrow("recovery failed");
+    expect(childProcess.spawnSync.mock.calls.some(([, args]) => args.includes("index-pack"))).toBe(false);
   });
 
   it.each(["full", "incremental"])("reconstructs %s output and retains binary files", async mode => {

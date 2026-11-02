@@ -3,7 +3,7 @@ import childProcess from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { main } from "./validate_recovery_envelopes.cjs";
+import { main, validateEnvelope } from "./validate_recovery_envelopes.cjs";
 import { processFile } from "./redact_secrets.cjs";
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
@@ -59,6 +59,24 @@ describe("final recovery envelope upload boundary", () => {
     vi.unstubAllEnvs();
     global.core = originalCore;
     fs.rmSync(root, { recursive: true, force: true });
+  });
+  it.each(["MAX_OBJECTS", "MAX_BYTES"])("removes envelopes that exceed the trusted %s upload limit", name => {
+    const artifact = envelope();
+    vi.stubEnv(`GH_AW_OBJECT_PACK_${name}`, "1");
+    expect(validateEnvelope(artifact.bundle)).toBe(true);
+    expect(fs.existsSync(artifact.bundle)).toBe(false);
+  });
+  it("uses the configured scan entry budget and fails rather than silently skipping artifacts", () => {
+    envelope();
+    vi.stubEnv("GH_AW_OBJECT_PACK_MAX_OBJECTS", "1");
+    expect(() => main({ roots: [root] })).toThrow("scan exceeded");
+    vi.stubEnv("GH_AW_OBJECT_PACK_MAX_OBJECTS", "100");
+    expect(main({ roots: [root] })).toEqual({ removed: 0 });
+  });
+  it("rejects invalid repository limit configuration before allowing any upload", () => {
+    envelope();
+    vi.stubEnv("GH_AW_OBJECT_PACK_MAX_OBJECTS", "untrusted-value");
+    expect(() => main({ roots: [root] })).toThrow("Invalid GH_AW_OBJECT_PACK_MAX_OBJECTS");
   });
   it("removes a real packed secret from intermediate history after built-in redaction", () => {
     const artifact = envelope();

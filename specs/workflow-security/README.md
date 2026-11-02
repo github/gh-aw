@@ -513,15 +513,18 @@ Local artifacts retain their fast path. Missing local data may queue bounded
 offline packaging, followed by preview verification, an isolated authorized
 filtered fetch, trusted-blob hydration, complete-object import, and the same publication policy gates.
 Incremental fetches require a trusted exact pre-agent baseline.
-The abstraction allows at most three pinned adaptive fetch attempts before
-import, and records filtering, trusted hydration, and hydration-before-import
-invariants. Actual depth steps, tree comparisons, and byte/time limits remain
+The abstraction configures one or three pinned adaptive fetch attempts before
+import and rejects invalid trusted limit settings. Publisher boundedness is
+independent of uploaded limit claims. `ConfigurationValid`, `PublisherLimits`,
+and `BoundedFilteredFetch` retain those boundaries alongside filtering, trusted
+hydration, and hydration-before-import invariants. Actual depth steps, tree
+comparisons, and byte/time limits remain
 implementation properties covered by real-Git regressions, not TLA+ proofs.
 
-The runner checks full/incremental profiles, nine negative controls (agent fetch,
+The runner checks four full/incremental/attempt-budget profiles, eleven negative controls (agent fetch,
 copied configuration, unauthorized remote, substituted baseline, hidden preview
 bytes, bypassed publication policy, unfiltered requests, untrusted blob hydration,
-and unbounded fetching), and three reachability witnesses:
+unbounded fetching, invalid configuration, and uploaded limit overrides), and three reachability witnesses:
 
 ```bash
 TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \
@@ -535,12 +538,17 @@ or implementation refinement. JavaScript regressions exercise actual object
 bytes, binary bundles, exact baselines, Claim-scoped paths, exclusions, redaction
 rejection, and publisher policy enforcement.
 
-On 2026-11-02 UTC, a real TLC 1.8.0 run with the pinned jar digest and Java 21
+Before the repository-limit extension, on 2026-11-02 UTC, a real TLC 1.8.0 run with the pinned jar digest and Java 21
 passed all 114 cases: 34 transport, 24 Git operations, 42 offline generation,
 and 14 deferred recovery. Secure profiles exhausted their reachable state graphs;
 negative controls and witnesses produced their exact expected invariants.
 This does not cover descriptor-relative staging races or the post-redaction
-artifact-upload guard, which require implementation regressions.
+artifact-upload guard, which require implementation regressions. That historical
+114-case result does not establish verification of the extended recovery model.
+The extended recovery model was separately checked with the same pinned TLC 1.8.0
+jar and Java 21: all 18 cases passed, including the four finite-budget profiles,
+eleven exact-invariant negative controls, and three reachability witnesses.
+The current complete runner contains 118 cases.
 
 ```bash
 TLA2TOOLS_JAR=/path/to/tla2tools.jar JAVA_BIN=/path/to/java \

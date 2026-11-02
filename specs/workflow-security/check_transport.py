@@ -75,17 +75,20 @@ RECOVERY_FAULTS = {
     "unfiltered-fetch": "BoundedFilteredFetch",
     "untrusted-blob": "TrustedHydration",
     "unbounded-fetch": "BoundedFilteredFetch",
+    "invalid-limits": "ConfigurationValid",
+    "uploaded-limits": "PublisherLimits",
 }
 RECOVERY_WITNESSES = ["NoRecoveryPublication", "NoFastPublication", "NoRejection"]
 
 
 def recovery_cases():
     for mode in ["full", "incremental"]:
-        yield f"secure-{mode}", mode, "none", None
+        for attempts in [1, 3]:
+            yield f"secure-{mode}-{attempts}-attempts", mode, attempts, "none", None
     for fault, invariant in RECOVERY_FAULTS.items():
-        yield fault, "incremental", fault, invariant
+        yield fault, "incremental", 3, fault, invariant
     for invariant in RECOVERY_WITNESSES:
-        yield invariant, "incremental", "none", invariant
+        yield invariant, "incremental", 3, "none", invariant
 
 
 def generation_cases():
@@ -179,9 +182,11 @@ def main(model="all"):
                          f"generation-{name}", config, invariant)
         if model in {"all", "recovery"}:
             template = (ROOT / "SafeOutputObjectRecovery.cfg").read_text()
-            for name, mode, fault, invariant in recovery_cases():
+            for name, mode, attempts, fault, invariant in recovery_cases():
                 config = template.replace('Mode = "full"', f'Mode = "{mode}"')
                 config = config.replace('Fault = "none"', f'Fault = "{fault}"')
+                config = config.replace("MaxFetchAttempts = 3",
+                                        f"MaxFetchAttempts = {attempts}")
                 if invariant in RECOVERY_WITNESSES:
                     config += f"\nINVARIANT {invariant}\n"
                 run_case(jar, temporary, "SafeOutputObjectRecovery",
