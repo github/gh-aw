@@ -19,7 +19,8 @@ they never fall back to a checkout file or implicitly enable capabilities.
 > These declarations are experimental. Custom connector triggers currently fail
 > closed: importing a connector does not install a receiver, authenticate events,
 > enroll a gateway source, or activate a workflow. Use `workflow_dispatch` until
-> approved ingress is available. The separate built-in integrations are unchanged.
+> approved ingress is available. Jira uses this connector path instead of a
+> separate built-in integration.
 
 ## Configuration
 
@@ -111,6 +112,33 @@ and [MCP setup](https://linear.app/docs/mcp).
 
 Declaration: `.github/aw/connectors/jira.md`.
 
+Import `"@builtin:connectors/jira.md"` with `site` set to the approved HTTPS
+site origin for writes. `cloud-ids`, `issues`, `projects`, `queries`, and
+`issue-ids` are exact string-array grants, empty by default. Importing alone
+grants nothing. Each MCP profile requires `cloud-ids`, `issues`, and `queries`
+because it registers both read methods. Issue mutations require `issues`
+unless a selected creator establishes an authenticated temporary reference;
+creation requires `projects`. `site` defaults to `https://example.atlassian.net`
+only as a specimen, not tenant discovery.
+
+```aw wrap
+---
+on: workflow_dispatch
+engine: copilot
+permissions:
+  contents: read
+imports:
+  - uses: "@builtin:connectors/jira.md"
+    with:
+      site: https://example.atlassian.net
+      issues: [APP-1]
+safe-outputs:
+  jira-add-comment:
+---
+
+Request a factual comment only for the approved issue.
+```
+
 ### Secrets
 
 For hosted MCP, an Atlassian administrator can create a scoped service-account
@@ -132,8 +160,34 @@ endpoint **and path** change, not just substituting a hostname.
 | --- | --- |
 | Triggers | `jira-issue-created`, `jira-issue-updated`, `jira-issue-deleted`. Signed admin webhooks require the configured raw-body HMAC verifier and replay policy; this is not Connect JWT authentication. No inferred closure/reopening/label events. |
 | MCPs/read tools | `service-account` or `personal` at `https://mcp.atlassian.com/v2/mcp`; only `getJiraIssue` and `searchJiraIssuesUsingJql`. Cloud ID, issue keys, exact JQL, and result counts are constrained. |
-| Safe outputs | `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`. ADF text encoding; additive labels. Update requires both summary and description. No temporary-ID resolution. |
+| Safe outputs | `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`. ADF text encoding; additive labels. Update requires both summary and description. Explicit trusted temporary-reference chaining is supported when the creator and consumers are selected together. |
 | Context | Fetch approved issue content through the selected MCP profile. Validate tenant/project authority independently; issue keys can change projects. No public REST context recipe or raw-event fallback. |
+
+### Migration limits
+
+The former `tools.jira.auth`/`allowed`, native `jira_*` tools, automatic
+`JIRA_USER_EMAIL`/`JIRA_API_TOKEN` environment injection, and
+`on.gateway-dispatch.jira-issue` implementation are removed. A missing import or
+resource grant is a compilation error, not a fallback to the old integration.
+Selected effect tools are named `connector_4_jira_<operation_with_underscores>`.
+
+Effect arguments are `project`, `issue-type`, `summary`, and optional
+`description` for creation; `issue`, `summary`, and `description` for updates;
+`issue` and `text` for comments; `issue` and `label` for additive labels.
+Only the declared `Task` issue type is enabled. The current connector cannot
+express the old update requirement of *at least one* of summary or description:
+both are required. Creation accepts an optional explicit `temporary_id` such
+as `aw_jira_haiku`; selected follow-ups can use `#aw_jira_haiku` only after a
+validated creation in the same execution. Native automatic temporary-ID
+assignment and the other seven former read methods are unavailable.
+Use a reviewed declaration for additional
+capabilities rather than removing resource constraints.
+
+Effect selection accepts only null or `{}`. Use workflow-wide
+`safe-outputs.staged: true` or compiler dry-run mode for credential-free
+preparation; per-effect legacy `max`/`staged` options are rejected. No mutation
+is retried after an ambiguous failure. Declaration acceptance and MCP
+initialization alone do not establish live tool-call compatibility.
 
 ## Azure DevOps
 
@@ -296,6 +350,47 @@ redirects, bounds responses, and does not automatically retry writes.
 
 Versioned specs/connections and context-phase fixtures under `testdata` are
 legacy runtime compatibility tests, not the public authoring interface.
+
+### Trusted resource bindings
+
+Safe-output declarations can bind inputs through `trustedInputs`, mapping each
+resource-constrained input to exactly one author-owned `secret` name or literal
+`value`. These inputs are absent from agent tool schemas; agent-supplied values
+are rejected, even when they equal the trusted value. Selected source secrets
+exist only in the safe-output phase. They do not become general read grants.
+
+An optional `preflight` performs one fixed, bounded GET or GraphQL query on the
+same endpoint and with the same safe-output credential before mutation. It
+consumes only the declared trusted inputs. `responseInputs` verifies exact
+request/response identities; `responseContains` verifies an exact input value
+among elements of an explicitly named response array; `responseChecks` verifies
+fixed evidence such as a false pagination flag. Its `project` maps approved
+response pointers back to trusted input names. The final mutation validates the
+resolved identifiers against its input constraints and grants only those exact
+resources. Missing, ambiguous, malformed, oversized, mismatched, or redirected
+lookups fail before mutation. Staging resolves no source secrets and makes no
+preflight requests.
+
+### Created-resource references
+
+A safe-output operation can declare `creates` with a resource collection,
+projected response `value` pointer, required creation `scope` input, and optional
+temporary-reference input named by `temporaryId`. An optional `scopePrefix`
+requires the created identifier to begin with the exact scope value followed
+by that literal separator. Consumers opt in independently through
+`createdResources`, mapping their resource-constrained input to the selected
+creator operation on the same endpoint and collection.
+
+Only a successful validated create can produce an authenticated receipt. The
+trusted host holds the signing key and receipts in private, execution-local
+memory; neither agent arguments, temporary-ID map contents, nor artifacts create
+authority. Receipts bind the execution nonce, frozen plan, connector, endpoint,
+collection, creation scope, temporary reference, and returned identifier.
+Forgery, cross-execution or cross-connector reuse, duplicate bindings, missing
+receipts, and mismatched creation scopes are rejected before credentials or
+network access. A returned real identifier does not become an agent-selectable
+resource: without a static grant, consumers must use the authenticated temporary
+reference. Staged intents never mint receipts and cannot authorize execution.
 
 ### Direct CI checks
 

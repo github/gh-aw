@@ -584,14 +584,6 @@ func postProcessMCPConfig(result *parser.RegistryMCPServerConfig) {
 func getMCPConfig(toolConfig map[string]any, toolName string) (*parser.RegistryMCPServerConfig, error) {
 	mcpCustomLog.Printf("Extracting MCP config for tool: %s", toolName)
 
-	// Jira's first-class auth block is compiler input rather than MCP Gateway
-	// configuration. Remove it after expandJiraToolConfig has generated the
-	// appropriate Authorization header.
-	if toolName == "jira" {
-		toolConfig = maps.Clone(toolConfig)
-		delete(toolConfig, "auth")
-	}
-
 	config := MapToolConfig(toolConfig)
 	result := &parser.RegistryMCPServerConfig{
 		BaseMCPServerConfig: types.BaseMCPServerConfig{

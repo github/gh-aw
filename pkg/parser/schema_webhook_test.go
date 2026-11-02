@@ -231,7 +231,6 @@ func TestGatewayDispatchSchema(t *testing.T) {
 		"projects-items":      map[string]any{"project_id": "PVT_example"},
 		"code-scanning-alert": map[string]any{},
 		"dependabot-alerts":   map[string]any{},
-		"jira-issue":          map[string]any{"project": "APP"},
 		"linear-issue":        map[string]any{"organization-id": "org"},
 		"azure-devops-issue":  map[string]any{"project_id": "project"},
 	} {

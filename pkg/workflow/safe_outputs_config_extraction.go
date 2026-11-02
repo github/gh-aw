@@ -77,8 +77,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.CreateIssues = issuesConfig
 			}
 
-			c.extractJiraSafeOutputConfigs(outputMap, config)
-
 			// Handle create-agent-session
 			agentSessionConfig := c.parseAgentSessionConfig(outputMap)
 			if agentSessionConfig != nil {

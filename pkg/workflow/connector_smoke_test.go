@@ -28,7 +28,7 @@ type connectorSmokeTarget struct {
 
 func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.Plan {
 	t.Helper()
-	source, err := os.ReadFile("../../.github/aw/connectors/" + target.provider + ".md")
+	source, err := parser.ReadFile("@builtin:connectors/" + target.provider + ".md")
 	require.NoError(t, err)
 	document, err := parser.ExtractFrontmatterFromContent(string(source))
 	require.NoError(t, err)
@@ -39,6 +39,7 @@ func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.P
 	resources, ok := declaration["resources"].(map[string]any)
 	require.True(t, ok)
 	var tool string
+	var embeddedImport map[string]any
 	switch target.provider {
 	case "linear":
 		require.NotEmpty(t, target.resource, "resource_id must be an approved Linear issue UUID")
@@ -49,7 +50,13 @@ func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.P
 	case "jira":
 		require.NotEmpty(t, target.resource, "resource_id must be an approved Jira issue key")
 		require.NotEmpty(t, target.scope, "scope_id must be the approved Jira cloud ID")
-		resources["issues"], resources["cloud-ids"] = []string{target.resource}, []string{target.scope}
+		embeddedImport = map[string]any{
+			"uses": "@builtin:connectors/jira.md",
+			"with": map[string]any{
+				"issues": []string{target.resource}, "cloud-ids": []string{target.scope},
+				"queries": []string{"key = " + target.resource},
+			},
+		}
 		tool = "personal"
 	case "azure-devops":
 		require.Regexp(t, `^[A-Za-z0-9][A-Za-z0-9-]{0,49}$`, target.organization, "organization must be an Azure DevOps organization name, not a URL")
@@ -64,19 +71,24 @@ func connectorSmokePlan(t *testing.T, target connectorSmokeTarget) *connectors.P
 		t.Fatalf("unsupported live connector %q", target.provider)
 	}
 	root := t.TempDir()
-	dir := filepath.Join(root, ".github/aw/connectors")
-	require.NoError(t, os.MkdirAll(dir, 0700))
-	config, err := yaml.Marshal(document.Frontmatter)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, target.provider+".md"), []byte("---\n"+string(config)+"---\n"), 0600))
+	imports := []any{".github/aw/connectors/" + target.provider + ".md"}
+	if embeddedImport != nil {
+		imports = []any{embeddedImport}
+	} else {
+		dir := filepath.Join(root, ".github/aw/connectors")
+		require.NoError(t, os.MkdirAll(dir, 0700))
+		config, err := yaml.Marshal(document.Frontmatter)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, target.provider+".md"), []byte("---\n"+string(config)+"---\n"), 0600))
+	}
 	content, err := yaml.Marshal(map[string]any{
 		"on": "workflow_dispatch", "engine": "copilot",
 		"permissions": map[string]string{"contents": "read"},
-		"imports":     []string{".github/aw/connectors/" + target.provider + ".md"},
+		"imports":     imports,
 		"tools":       map[string][]string{target.provider: {tool}},
 	})
 	require.NoError(t, err)
-	dir = filepath.Join(root, ".github/workflows")
+	dir := filepath.Join(root, ".github/workflows")
 	require.NoError(t, os.MkdirAll(dir, 0700))
 	path := filepath.Join(dir, "connector-smoke.md")
 	require.NoError(t, os.WriteFile(path, []byte("---\n"+string(content)+"---\nRead approved references only.\n"), 0600))

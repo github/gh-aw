@@ -186,39 +186,6 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"repo":         {Type: "string", MaxLength: 256}, // Optional: target repository in format "owner/repo"
 		},
 	},
-	"jira_create_issue": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"project_key":  {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"issue_type":   {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"summary":      {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"description":  {Type: "string", MinLength: 1, MaxLength: 32767, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"temporary_id": {Required: true, Type: "string", Pattern: "^#aw_[A-Za-z0-9_]{3,12}$", TemporaryID: true},
-		},
-	},
-	"jira_update_issue": {
-		DefaultMax:       1,
-		CustomValidation: "requiresOneOf:summary,description",
-		Fields: map[string]FieldValidation{
-			"issue_key":   {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"summary":     {Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"description": {Type: "string", MinLength: 1, MaxLength: 32767, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-		},
-	},
-	"jira_add_comment": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"issue_key": {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"body":      {Required: true, Type: "string", MinLength: 1, MaxLength: 32767, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-		},
-	},
-	"jira_add_label": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"issue_key": {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: ".*\\S.*", PatternError: "must not be empty"},
-			"label":     {Required: true, Type: "string", MinLength: 1, MaxLength: 255, Pattern: "^[A-Za-z0-9_.-]+$", PatternError: "must contain only letters, numbers, periods, hyphens, and underscores"},
-		},
-	},
 	"comment_memory": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

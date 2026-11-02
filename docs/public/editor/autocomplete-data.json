@@ -1934,35 +1934,6 @@
             }
           }
         },
-        "jira": {
-          "type": "boolean|object",
-          "desc": "Jira tools provided by Atlassian's remote Rovo MCP service.",
-          "enum": [false],
-          "children": {
-            "url": {
-              "type": "string",
-              "desc": "Atlassian Rovo MCP endpoint.",
-              "leaf": true
-            },
-            "allowed": {
-              "type": "array",
-              "desc": "Approved read-only Jira MCP tools the agent may call.",
-              "array": true
-            },
-            "auth": {
-              "type": "object",
-              "desc": "Non-interactive authentication for GitHub Actions.",
-              "children": {
-                "type": {},
-                "token": {
-                  "type": "string",
-                  "desc": "Atlassian service account API key, sent with the HTTP bearer scheme.",
-                  "leaf": true
-                }
-              }
-            }
-          }
-        },
         "bash": {
           "type": "null|boolean|array",
           "desc": "Bash shell command execution tool.",
@@ -2451,22 +2422,6 @@
         "approve-workflow-run": {
           "type": "object|null",
           "desc": "Enable AI agents to approve pending workflow runs in the action required state.",
-          "leaf": true
-        },
-        "jira-create-issue": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "jira-update-issue": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "jira-add-comment": {
-          "type": "object|null",
-          "leaf": true
-        },
-        "jira-add-label": {
-          "type": "object|null",
           "leaf": true
         },
         "linear-create-issue": {

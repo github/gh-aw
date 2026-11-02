@@ -213,26 +213,6 @@ func validateSafeOutputsMax(config *SafeOutputsConfig) error {
 			return err
 		}
 	}
-	if config.JiraAddComment != nil {
-		if err := checkMaxField("jira_add_comment", config.JiraAddComment.Max); err != nil {
-			return err
-		}
-	}
-	if config.JiraAddLabel != nil {
-		if err := checkMaxField("jira_add_label", config.JiraAddLabel.Max); err != nil {
-			return err
-		}
-	}
-	if config.JiraCreateIssue != nil {
-		if err := checkMaxField("jira_create_issue", config.JiraCreateIssue.Max); err != nil {
-			return err
-		}
-	}
-	if config.JiraUpdateIssue != nil {
-		if err := checkMaxField("jira_update_issue", config.JiraUpdateIssue.Max); err != nil {
-			return err
-		}
-	}
 	if config.LinkSubIssue != nil {
 		if err := checkMaxField("link_sub_issue", config.LinkSubIssue.Max); err != nil {
 			return err

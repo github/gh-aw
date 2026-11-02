@@ -1,29 +1,4 @@
 {
-  "jira_issue": {
-    "provider": "jira",
-    "actions": ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"],
-    "native_events": {
-      "opened": "jira:issue_created",
-      "edited": "jira:issue_updated",
-      "closed": "jira:issue_updated",
-      "reopened": "jira:issue_updated",
-      "labeled": "jira:issue_updated",
-      "unlabeled": "jira:issue_updated",
-      "deleted": "jira:issue_deleted"
-    },
-    "description": "Experimental. Jira Cloud issue lifecycle and unambiguous single-label changes. Closed/reopened means resolution set/cleared, not a guessed status name. Multi-label changelog string deltas are not normalized.",
-    "source": "https://developer.atlassian.com/cloud/jira/platform/webhooks/",
-    "availability": ["Jira Cloud tenant"],
-    "filters": {
-      "issue_id": { "path": ["issue", "id"], "type": "string", "description": "Jira issue database ID." },
-      "issue_key": { "path": ["issue", "key"], "type": "string", "description": "Current human-readable issue key." },
-      "project": { "path": ["issue", "fields", "project", "key"], "type": "string", "description": "Jira project key." },
-      "labels": { "path": ["issue", "fields", "labels", "*"], "type": "string", "description": "A current issue label; not necessarily the label changed by this delivery." },
-      "status": { "path": ["issue", "fields", "status", "name"], "type": "string", "description": "Current workflow status name, not a lifecycle transition." },
-      "resolution": { "path": ["issue", "fields", "resolution", "id"], "type": "string", "description": "Current resolution ID, when set." },
-      "sender": { "path": ["user", "accountId"], "type": "string", "description": "Jira account ID of the actor; not dispatch authorization." }
-    }
-  },
   "linear_issue": {
     "provider": "linear",
     "actions": ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"],

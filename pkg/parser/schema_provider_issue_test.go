@@ -8,7 +8,7 @@ import (
 )
 
 func TestProviderIssueSchema(t *testing.T) {
-	for _, alias := range []string{"jira-issue", "linear-issue", "azure-devops-issue"} {
+	for _, alias := range []string{"linear-issue", "azure-devops-issue"} {
 		for name, test := range map[string]struct {
 			config any
 			valid  bool
@@ -30,7 +30,7 @@ func TestProviderIssueSchema(t *testing.T) {
 				valid := test.valid
 				if settings, ok := config.(map[string]any); ok {
 					settings = maps.Clone(settings)
-					field := map[string]string{"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id"}[alias]
+					field := map[string]string{"linear-issue": "organization-id", "azure-devops-issue": "project_id"}[alias]
 					settings[field] = "source-scope"
 					if alias == "azure-devops-issue" && name == "activities" {
 						settings["closed-states"] = []any{"Done"}
@@ -74,7 +74,7 @@ func TestAzureIssueClosedStatesSchema(t *testing.T) {
 
 func TestProviderIssueRequiredScopesSchema(t *testing.T) {
 	for alias, field := range map[string]string{
-		"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id",
+		"linear-issue": "organization-id", "azure-devops-issue": "project_id",
 	} {
 		t.Run(alias, func(t *testing.T) {
 			on := map[string]any{"gateway-dispatch": map[string]any{alias: map[string]any{}}}

@@ -5031,39 +5031,6 @@ describe("safe_outputs_handlers", () => {
     });
   });
 
-  describe("Jira handlers", () => {
-    it("assigns a temporary ID when recording issue creation", () => {
-      const result = handlers.jiraCreateIssueHandler({ project_key: "ENG", issue_type: "Task", summary: "Smoke test" });
-      const response = JSON.parse(result.content[0].text);
-
-      expect(response).toMatchObject({ result: "success", temporary_id: expect.stringMatching(/^#aw_[A-Za-z0-9]{8}$/) });
-      expect(result.structuredContent).toEqual(response);
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "jira_create_issue",
-          temporary_id: response.temporary_id,
-        })
-      );
-    });
-
-    it.each([{}, { summary: "" }, { description: "   " }])("rejects updates without a non-empty field", args => {
-      const result = handlers.jiraUpdateIssueHandler(args);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text)).toMatchObject({
-        result: "error",
-        error: expect.stringContaining("summary or description"),
-      });
-      expect(mockAppendSafeOutput).not.toHaveBeenCalled();
-    });
-
-    it("records an update with a non-empty field", () => {
-      const result = handlers.jiraUpdateIssueHandler({ issue_key: "ENG-123", summary: "Updated" });
-      expect(result.isError).toBeUndefined();
-      expect(JSON.parse(result.content[0].text).result).toBe("success");
-      expect(mockAppendSafeOutput).toHaveBeenCalledWith(expect.objectContaining({ type: "jira_update_issue", issue_key: "ENG-123", summary: "Updated" }));
-    });
-  });
-
   describe("updateIssueHandler", () => {
     it.each([undefined, null, {}, { issue_number: 42 }, { operation: "append" }, { secrecy: "public", integrity: "high" }, { status: "" }, { labels: " " }, { milestone: " \t\n" }])(
       "should reject calls without update fields before recording an output: %j",

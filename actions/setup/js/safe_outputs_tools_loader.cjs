@@ -175,10 +175,6 @@ function loadTools(server) {
 function attachHandlers(tools, handlers, logger) {
   const handlerMap = {
     create_issue: handlers.createIssueHandler,
-    jira_create_issue: handlers.jiraCreateIssueHandler,
-    jira_update_issue: handlers.jiraUpdateIssueHandler,
-    jira_add_comment: handlers.jiraAddCommentHandler,
-    jira_add_label: handlers.jiraAddLabelHandler,
     create_pull_request: handlers.createPullRequestHandler,
     push_to_pull_request_branch: handlers.pushToPullRequestBranchHandler,
     push_repo_memory: handlers.pushRepoMemoryHandler,

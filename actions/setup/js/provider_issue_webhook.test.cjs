@@ -7,14 +7,6 @@ const { providerIssueActivities, resolveProviderIssueItem, validProviderIssueSub
 const { normalizeWebhookContext, redactWebhookPayloads } = require("./webhook_context.cjs");
 const { validateWebhook } = require("./validate_webhook.cjs");
 
-function jira(native = "jira:issue_updated", changes = []) {
-  return {
-    webhookEvent: native,
-    issue: { id: "123", self: "https://example.atlassian.net/rest/api/2/issue/123", fields: { labels: ["bug"] } },
-    changelog: { items: changes.map(change => ({ fieldtype: "jira", ...change })) },
-  };
-}
-
 function linear(action = "update", data = {}, updatedFrom = {}) {
   return { type: "Issue", action, organizationId: "workspace-a", data: { id: "issue-a", completedAt: null, canceledAt: null, labelIds: [], ...data }, updatedFrom };
 }
@@ -25,7 +17,6 @@ function azure(eventType = "workitem.updated", fields = {}) {
 
 describe("provider issue native identity", () => {
   it.each([
-    ["jira_issue", jira(), "123", "https://example.atlassian.net"],
     ["linear_issue", linear(), "issue-a", "workspace-a"],
     ["azure_devops_issue", azure(), "123", "collection-a"],
   ])("uses source-scoped identities, not GitHub repositories: %s", (event, payload, number, source) => {
@@ -33,10 +24,6 @@ describe("provider issue native identity", () => {
   });
 
   it.each([
-    ["jira_issue", { ...jira(), webhookEvent: "comment_created" }],
-    ["jira_issue", { ...jira(), issue: { id: 123 } }],
-    ["jira_issue", { ...jira(), issue: { id: "123", self: "http://example.atlassian.net/rest/api/2/issue/123" } }],
-    ["jira_issue", { ...jira(), issue: { id: "123", self: "https://example.atlassian.net/browse/ABC-1" } }],
     ["linear_issue", { ...linear(), type: "IssueLabel" }],
     ["linear_issue", { ...linear(), organizationId: "" }],
     ["linear_issue", { ...linear(), action: "closed" }],
@@ -54,37 +41,6 @@ describe("provider issue native identity", () => {
     expect(providerIssueActivities("azure_devops_issue", payload, { closed_states: ["Done"] })).toEqual(["edited"]);
     payload.resource.revision = { id: 123 };
     expect(() => resolveProviderIssueItem("azure_devops_issue", payload)).toThrow(/work item ID/);
-  });
-});
-
-describe("Jira normalized issue activities", () => {
-  it.each([
-    ["jira:issue_created", ["opened"]],
-    ["jira:issue_deleted", ["deleted"]],
-    ["jira:issue_updated", ["edited"]],
-  ])("maps %s without fabricating lifecycle actions", (native, expected) => {
-    expect(providerIssueActivities("jira_issue", jira(native))).toEqual(expected);
-  });
-
-  it.each([
-    [{ field: "resolution", from: null, to: "1" }, ["edited", "closed"]],
-    [{ field: "resolution", from: "1", to: null }, ["edited", "reopened"]],
-    [{ field: "resolution", from: "1", to: "2" }, ["edited"]],
-    [{ field: "resolution", to: "1" }, ["edited"]],
-    [{ field: "status", fromString: "Doing", toString: "Done" }, ["edited"]],
-    [{ field: "labels", fromString: null, toString: "bug" }, ["edited", "labeled"]],
-    [{ field: "labels", fromString: "old", toString: null }, ["edited"]],
-    [{ field: "labels", fromString: "old other", toString: "bug" }, ["edited"]],
-    [{ field: "labels", fromString: null, toString: "not-current" }, ["edited"]],
-    [{ field: "resolution", fieldtype: "custom", from: null, to: "1" }, ["edited"]],
-  ])("requires explicit unambiguous changelog evidence %#", (change, expected) => {
-    expect(providerIssueActivities("jira_issue", jira("jira:issue_updated", [change]))).toEqual(expected);
-  });
-
-  it("recognizes clearing labels only with an empty delivered current label set", () => {
-    const payload = jira("jira:issue_updated", [{ field: "labels", fromString: "bug", toString: null }]);
-    payload.issue.fields.labels = [];
-    expect(providerIssueActivities("jira_issue", payload)).toEqual(["edited", "unlabeled"]);
   });
 });
 
@@ -211,7 +167,6 @@ function providerEnvironment(event, types, nativeEvents, normalization = {}) {
 describe("provider issue batch transport", () => {
   function notification(event, type = ["edited"], source = "a") {
     const urls = {
-      jira_issue: `https://workspace-${source}.atlassian.net/rest/api/2/issue/123`,
       linear_issue: `https://linear.app/workspace-${source}/issue/APP-123`,
       azure_devops_issue: `https://dev.azure.com/collection-${source}/_apis/wit/workItems/123`,
     };
@@ -219,7 +174,6 @@ describe("provider issue batch transport", () => {
   }
 
   it.each([
-    ["jira_issue", "jira:issue_created"],
     ["linear_issue", "create"],
     ["azure_devops_issue", "workitem.created"],
   ])("validates %s minimal notifications without fetching resource bodies", (event, native) => {
@@ -233,7 +187,7 @@ describe("provider issue batch transport", () => {
     expect(() => validateWebhook(dispatch, mismatched)).toThrow(/activity/);
   });
 
-  it.each(["jira_issue", "linear_issue", "azure_devops_issue"])("deduplicates %s by URL-derived source and issue, independently of deliveries", event => {
+  it.each(["linear_issue", "azure_devops_issue"])("deduplicates %s by URL-derived source and issue, independently of deliveries", event => {
     const payload = notification(event);
     const otherSource = notification(event, ["edited"], "b");
     const raw = providerDispatch(event, [payload, otherSource, payload]).client_payload.aw_context;
@@ -250,8 +204,8 @@ describe("provider issue batch transport", () => {
   });
 
   it("does not trust a forged GitHub-style action in a provider payload", () => {
-    const payload = { ...notification("jira_issue"), action: "closed" };
-    expect(() => validateWebhook(providerDispatch("jira_issue", [payload]), providerEnvironment("jira_issue", ["closed"], ["jira:issue_updated"]))).toThrow(/accepts only/);
+    const payload = { ...notification("linear_issue"), action: "closed" };
+    expect(() => validateWebhook(providerDispatch("linear_issue", [payload]), providerEnvironment("linear_issue", ["closed"], ["update"]))).toThrow(/accepts only/);
   });
 
   it("requires every forwarded activity to be selected, not just one activity in each delivery", () => {
@@ -323,7 +277,6 @@ describe("provider issue batch transport", () => {
   });
 
   it.each([
-    ["jira_issue", jira()],
     ["linear_issue", linear()],
     ["azure_devops_issue", azure()],
   ])("rejects full native %s bodies rather than stripping them after admission", (event, payload) => {

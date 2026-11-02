@@ -3085,27 +3085,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     return defaultHandler("update_issue")(normalizedArgs);
   };
 
-  const jiraCreateIssueHandler = args => {
-    const temporaryId = `#${generateTemporaryId()}`;
-    const entry = { ...(args || {}), type: "jira_create_issue", temporary_id: temporaryId };
-    appendSafeOutputCounted(entry);
-    const output = { result: "success", temporary_id: temporaryId };
-    return {
-      content: [{ type: "text", text: JSON.stringify(output) }],
-      structuredContent: output,
-    };
-  };
-  const jiraAddCommentHandler = defaultHandler("jira_add_comment");
-  const jiraAddLabelHandler = defaultHandler("jira_add_label");
-  const jiraUpdateIssueHandler = args => {
-    const summary = typeof args?.summary === "string" ? args.summary.trim() : "";
-    const description = typeof args?.description === "string" ? args.description.trim() : "";
-    if (!summary && !description) {
-      return buildIntentErrorResponse("jira_update_issue requires at least one non-empty field: summary or description");
-    }
-    return defaultHandler("jira_update_issue")(args || {});
-  };
-
   /**
    * Handler for update_pull_request tool
    * Spec cross-reference: Safe Output Outcome Evaluation §update_pull_request.
@@ -3418,10 +3397,6 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     assignWorkItemHandler: createAzureDevOpsWorkItemHandler("ado_assign_work_item"),
     linkWorkItemsHandler: createAzureDevOpsWorkItemHandler("ado_link_work_items"),
     uploadWorkItemAttachmentHandler,
-    jiraCreateIssueHandler,
-    jiraUpdateIssueHandler,
-    jiraAddCommentHandler,
-    jiraAddLabelHandler,
     createProjectHandler,
     addCommentHandler,
     createPullRequestReviewCommentHandler,

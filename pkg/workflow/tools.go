@@ -89,7 +89,7 @@ func prepareToolsForDefaults(data *WorkflowData) error {
 	for name := range collectExplicitlyDisabledTools(data.Tools) {
 		data.ExplicitlyDisabledTools[name] = struct{}{}
 	}
-	return expandJiraToolConfig(data.Tools)
+	return nil
 }
 
 func isToolExplicitlyFalse(value any) bool {

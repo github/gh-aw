@@ -645,7 +645,6 @@ func (c *Compiler) appendHandlerManagerStep(data *WorkflowData, state *safeOutpu
 			return err
 		}
 		handlerManagerSteps = injectLinearCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
-		handlerManagerSteps = injectJiraCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		handlerManagerSteps = injectAzureDevOpsCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		state.steps = append(state.steps, handlerManagerSteps...)
 		state.safeOutputStepNames = append(state.safeOutputStepNames, "process_safe_outputs")

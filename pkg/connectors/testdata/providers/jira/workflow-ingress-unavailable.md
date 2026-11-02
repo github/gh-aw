@@ -1,7 +1,10 @@
 ---
 engine: copilot
 imports:
-  - .github/aw/connectors/jira.md
+  - uses: "@builtin:connectors/jira.md"
+    with:
+      projects: [APP]
+      issue-ids: ["10001"]
 network:
   allowed:
     - defaults

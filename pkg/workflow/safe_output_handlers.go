@@ -88,30 +88,6 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		},
 	},
 	{
-		Key:         "jira-create-issue",
-		StructField: "JiraCreateIssue",
-		ToolName:    "jira_create_issue",
-		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
-	},
-	{
-		Key:         "jira-update-issue",
-		StructField: "JiraUpdateIssue",
-		ToolName:    "jira_update_issue",
-		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
-	},
-	{
-		Key:         "jira-add-comment",
-		StructField: "JiraAddComment",
-		ToolName:    "jira_add_comment",
-		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
-	},
-	{
-		Key:         "jira-add-label",
-		StructField: "JiraAddLabel",
-		ToolName:    "jira_add_label",
-		NewConfig:   func() any { return &JiraSafeOutputConfig{} },
-	},
-	{
 		Key:         "create-agent-session",
 		Aliases:     []string{"create-agent-task"},
 		StructField: "CreateAgentSessions",

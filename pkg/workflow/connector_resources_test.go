@@ -59,6 +59,9 @@ func TestEmbeddedConnectorImportWithInputsAndNoImplicitGrants(t *testing.T) {
   - uses: "@builtin:connectors/jira.md"
     with:
       mcp-personal-secret: APPROVED_READ_TOKEN
+      cloud-ids: [00000000-0000-4000-8000-000000000001]
+      issues: [APP-1]
+      queries: [project = APP ORDER BY created DESC]
 ` + selection + "---\nRead only approved evidence.\n"
 		file := filepath.Join(workflows, "proof.md")
 		require.NoError(t, os.WriteFile(file, []byte(source), 0600))

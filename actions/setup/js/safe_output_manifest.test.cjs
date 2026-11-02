@@ -336,7 +336,7 @@ describe("safe_output_manifest", () => {
 
     it.each([
       ["add_comment", { commentId: 123, itemNumber: 7, repo: "owner/repo" }, { provider: "github", id: 123 }],
-      ["jira_create_issue", { issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
+      ["connector_4_jira_create_issue", { provider: "jira", issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
       ["linear_create_issue", { id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
     ])("should preserve identity for %s", (type, result, expected) => {
       expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);

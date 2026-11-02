@@ -26,17 +26,6 @@ func getSafeOutputSecretRequirements(data *WorkflowData) []safeOutputSecretRequi
 	}
 
 	var requirements []safeOutputSecretRequirement
-	if hasAnyJiraSafeOutputEnabled(config) {
-		for _, secretName := range []string{"JIRA_USER_EMAIL", "JIRA_API_TOKEN"} {
-			if strings.TrimSpace(config.Env[secretName]) == "" {
-				requirements = append(requirements, safeOutputSecretRequirement{
-					secretNames: []string{secretName},
-					name:        "Jira safe outputs",
-					docsAnchor:  "#jira-safe-outputs",
-				})
-			}
-		}
-	}
 	if hasLinearSafeOutputs(config) &&
 		strings.TrimSpace(config.LinearToken) == "" &&
 		strings.TrimSpace(config.Env["GH_AW_LINEAR_TOKEN"]) == "" {

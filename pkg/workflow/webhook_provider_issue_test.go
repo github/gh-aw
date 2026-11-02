@@ -21,7 +21,7 @@ func providerIssueOn(alias string, config any) map[string]any {
 	if settings, ok := config.(map[string]any); ok {
 		settings = maps.Clone(settings)
 		scope := map[string]string{
-			"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id",
+			"linear-issue": "organization-id", "azure-devops-issue": "project_id",
 		}[alias]
 		if _, exists := settings[scope]; !exists {
 			settings[scope] = "source-scope"
@@ -33,7 +33,6 @@ func providerIssueOn(alias string, config any) map[string]any {
 
 func providerIssueScopeYAML(alias string) string {
 	return map[string]string{
-		"jira-issue":         "      project: APP\n",
 		"linear-issue":       "      organization-id: organization-uuid\n",
 		"azure-devops-issue": "      project_id: project-uuid\n",
 	}[alias]
@@ -70,7 +69,7 @@ func TestProviderIssueSubscriptions(t *testing.T) {
 }
 
 func TestProviderIssueMixedGatewayRequirements(t *testing.T) {
-	on := providerIssueOn("jira-issue", map[string]any{})
+	on := providerIssueOn("linear-issue", map[string]any{})
 	gateway := on["gateway-dispatch"].(map[string]any)
 	gateway["linear-issue"] = map[string]any{"organization-id": "organization-uuid"}
 	gateway["azure-devops-issue"] = map[string]any{"project_id": "project-uuid"}
@@ -170,7 +169,6 @@ func TestProviderIssuePayloadFilters(t *testing.T) {
 		field   string
 		path    []string
 	}{
-		"jira-issue":         {map[string]any{"labels": []any{"bug", "urgent"}}, "labels", []string{"issue", "fields", "labels", "*"}},
 		"linear-issue":       {map[string]any{"labels": "label-uuid"}, "labels", []string{"data", "labelIds", "*"}},
 		"azure-devops-issue": {map[string]any{"state": map[string]any{"to": "Done"}}, "state.to", []string{"resource", "fields", "System.State", "newValue"}},
 	} {
@@ -258,7 +256,6 @@ func TestProviderIssueRequiredScopes(t *testing.T) {
 		field string
 		path  []string
 	}{
-		"jira-issue":         {"project", []string{"issue", "fields", "project", "key"}},
 		"linear-issue":       {"organization-id", []string{"organizationId"}},
 		"azure-devops-issue": {"project_id", []string{"resourceContainers", "project", "id"}},
 	} {

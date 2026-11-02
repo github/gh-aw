@@ -486,7 +486,7 @@ A workflow-scoped identifier (format: `aw_` followed by 3–8 alphanumeric chara
 
 ### Jira Safe Outputs (`jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label`)
 
-A set of safe outputs that call Jira Cloud REST API v3 from the privileged safe-output job; Jira credentials (`JIRA_BASE_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN`) are configured under `safe-outputs.env` and are never exposed to the agent or included in `agent_output`. Each output accepts `max` and `staged`; in staged mode the handler writes a Jira-specific preview without requiring credentials or sending a request. Agent-provided descriptions and comment bodies are plain strings at the agent boundary; the runtime deterministically converts them to Atlassian Document Format (ADF) version 1, preserving paragraphs and line breaks. `jira_add_label` uses Jira's additive field-update operation and does not replace existing labels. See [Jira Safe Outputs](/gh-aw/reference/safe-outputs/#jira-safe-outputs).
+Independently selected effects from the shared [Jira connector](/gh-aw/reference/connectors/#jira). Import its embedded declaration and grant exact resources; REST credentials remain in the privileged safe-output phase. Native Jira handlers and automatic email/token environment injection are no longer supported.
 
 ### Linear Safe Outputs (`linear-create-issue`, `linear-add-comment`, `linear-update-issue`)
 

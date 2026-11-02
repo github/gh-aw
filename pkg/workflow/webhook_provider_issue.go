@@ -14,7 +14,6 @@ import (
 var providerIssueCatalogJSON []byte
 
 var providerIssueTriggers = map[string]string{
-	"jira-issue":         "jira_issue",
 	"linear-issue":       "linear_issue",
 	"azure-devops-issue": "azure_devops_issue",
 }
@@ -87,7 +86,7 @@ func providerIssueConfig(config map[string]any, path, event string, definition W
 
 func providerIssueSelectors(config map[string]any, path, event string) (map[string]any, error) {
 	scope := map[string]string{
-		"jira_issue": "project", "linear_issue": "organization-id", "azure_devops_issue": "project_id",
+		"linear_issue": "organization-id", "azure_devops_issue": "project_id",
 	}[event]
 	if _, exists := config["filters"]; exists {
 		return nil, fmt.Errorf("%s.filters is not supported; put selectors directly under %s, including required %s", path, path, scope)

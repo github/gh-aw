@@ -26,7 +26,7 @@ connectors:
           - write:jira-work
         secret: ${{ github.aw.import-inputs.rest-writer-secret }}
     endpoints:
-      site: https://example.atlassian.net
+      site: ${{ github.aw.import-inputs.site }}
     mcp-servers:
       personal:
         credential: mcp-personal
@@ -172,20 +172,15 @@ connectors:
           /webhookEvent: string
         verificationProfile: atlassian.com/jira-admin-hmac-sha256
     resources:
-      cloud-ids:
-        - 00000000-0000-4000-8000-000000000001
-      issue-ids:
-        - "10001"
-      issue-urls:
-        - https://example.atlassian.net/rest/api/3/issue/10001
-      issues:
-        - APP-1
-      projects:
-        - APP
-      queries:
-        - project = APP ORDER BY created DESC
+      cloud-ids: ${{ github.aw.import-inputs.cloud-ids }}
+      issue-ids: ${{ github.aw.import-inputs.issue-ids }}
+      issues: ${{ github.aw.import-inputs.issues }}
+      projects: ${{ github.aw.import-inputs.projects }}
+      queries: ${{ github.aw.import-inputs.queries }}
     safe-outputs:
       add-comment:
+        createdResources:
+          issue: create-issue
         credential: rest-writer
         inputs:
           issue:
@@ -218,6 +213,8 @@ connectors:
         responseTypes:
           /id: string
       add-label:
+        createdResources:
+          issue: create-issue
         credential: rest-writer
         inputs:
           issue:
@@ -248,12 +245,21 @@ connectors:
         resources:
           issue: issues
       create-issue:
+        creates:
+          resource: issues
+          value: /issue-key
+          scope: project
+          scopePrefix: "-"
+          temporaryId: temporary_id
         credential: rest-writer
         inputs:
+          temporary_id:
+            maxLength: 80
+            pattern: ^#?aw_[A-Za-z0-9_]{3,12}$
+            type: string
           description:
             maxLength: 32767
             pattern: \S
-            required: true
             type: string
           issue-type:
             enum:
@@ -306,6 +312,8 @@ connectors:
           /key: string
           /self: string
       update-issue:
+        createdResources:
+          issue: create-issue
         credential: rest-writer
         inputs:
           description:
@@ -341,6 +349,24 @@ connectors:
         resources:
           issue: issues
 import-schema:
+  site:
+    default: https://example.atlassian.net
+    type: string
+  cloud-ids:
+    default: []
+    type: array
+  issue-ids:
+    default: []
+    type: array
+  issues:
+    default: []
+    type: array
+  projects:
+    default: []
+    type: array
+  queries:
+    default: []
+    type: array
   mcp-personal-secret:
     default: JIRA_MCP_PERSONAL_BASIC_AUTH
     type: string

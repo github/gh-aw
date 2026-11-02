@@ -107,10 +107,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 
 | Output | Key | Description |
 |--------|-----|-------------|
-| [Jira Create Issue](#jira-safe-outputs) | `jira-create-issue` | Create a Jira issue (max: 1) |
-| [Jira Update Issue](#jira-safe-outputs) | `jira-update-issue` | Update a Jira issue summary or description (max: 1) |
-| [Jira Add Comment](#jira-safe-outputs) | `jira-add-comment` | Add a comment to a Jira issue (max: 1) |
-| [Jira Add Label](#jira-safe-outputs) | `jira-add-label` | Add one label to a Jira issue (max: 1) |
+| [Jira connector](/gh-aw/reference/connectors/#jira) | `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, `jira-add-label` | Independently selected connector effects; requires an import and exact resource grants |
 
 ### Projects, Releases & Assets
 
@@ -207,51 +204,11 @@ Mount any public GitHub Action as a once-callable MCP tool. The compiler pins th
 
 ## Jira Safe Outputs
 
-Jira safe outputs call Jira Cloud REST API v3 from the privileged safe-output job. Jira credentials are not exposed to the agent or included in `agent_output`.
-
-```aw wrap
----
-on:
-  workflow_dispatch:
-safe-outputs:
-  env:
-    JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-    JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-    JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-  jira-create-issue:
-    max: 1
-  jira-update-issue:
-    max: 1
-  jira-add-comment:
-    max: 1
-  jira-add-label:
-    max: 3
----
-
-# Jira maintenance
-
-Use Jira safe outputs for Jira mutations.
-```
-
-`JIRA_BASE_URL` is the Jira API base without `/rest/api/3`. For unscoped API tokens, use the site URL, such as `https://example.atlassian.net`. For scoped API tokens, use the Atlassian gateway URL, such as `https://api.atlassian.com/ex/jira/<cloudId>`. The initial authentication mechanism uses an Atlassian account email and API token with HTTP Basic authentication.
-
-Each output accepts `max` and `staged`. In staged mode, the handler writes a Jira-specific preview without requiring credentials or sending an HTTP request.
-
-| Frontmatter key | Agent tool | Inputs |
-|---|---|---|
-| `jira-create-issue` | `jira_create_issue` | Required: `project_key`, `issue_type`, `summary`; optional: `description` |
-| `jira-update-issue` | `jira_update_issue` | Required: `issue_key`; at least one of `summary` or `description` |
-| `jira-add-comment` | `jira_add_comment` | Required: `issue_key`, `body` |
-| `jira-add-label` | `jira_add_label` | Required: `issue_key`, `label` |
-
-Descriptions and comment bodies remain plain strings at the agent boundary. The runtime converts them deterministically to Atlassian Document Format version 1, preserving paragraphs and line breaks. `jira_add_label` uses Jira's additive field-update operation and does not replace existing labels.
-
-`jira_create_issue` returns a temporary `#aw_` ID. Pass that ID as `issue_key` to update, comment on, or label the newly created Jira issue later in the same run.
-
-> [!IMPORTANT]
-> Unprefixed tools such as `create_issue`, `update_issue`, `add_comment`, and `add_labels` operate on GitHub. Jira operations always use the `jira_` prefix.
-
-This integration does not support transitions, assignment, custom fields, priorities, components, attachments, issue links, subtasks, label removal, JQL, bulk operations, arbitrary Jira REST calls, or OAuth installation flows.
+Jira mutations use the shared [Jira connector](/gh-aw/reference/connectors/#jira),
+not native handlers. Import its declaration and independently select the desired
+`jira-*` effects. The connector reference defines their inputs, exact resource
+grants, separate write credential, staging behavior, and migration limitations.
+Unprefixed safe outputs still operate on GitHub.
 
 ## Steering Issues (`steer:`)
 

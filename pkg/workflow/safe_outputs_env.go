@@ -239,9 +239,6 @@ func (c *Compiler) addCustomSafeOutputEnvVars(steps *[]string, data *WorkflowDat
 			if key == "GH_AW_CI_TRIGGER_TOKEN" && ciTriggerTokenDisabled {
 				continue
 			}
-			if hasAnyJiraSafeOutputEnabled(data.SafeOutputs) && jiraSafeOutputDefaultEnv[key] != "" {
-				continue
-			}
 			if data.SafeOutputs.LinearCreateIssue != nil && (key == "LINEAR_TEAM_ID" || key == "LINEAR_PROJECT_ID") {
 				continue
 			}

@@ -5,13 +5,13 @@ permissions:
   contents: read
   actions: read
 engine: copilot
+imports:
+  - uses: "@builtin:connectors/jira.md"
+    with:
+      site: https://example.atlassian.net
+      issues: [APP-1]
 safe-outputs:
-  env:
-    JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
-    JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-    JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
   jira-add-comment:
-    max: 1
 timeout-minutes: 5
 ---
 
@@ -19,6 +19,6 @@ timeout-minutes: 5
 
 Test the jira-add-comment safe output functionality.
 
-Add a comment to an existing Jira issue with findings from the repository.
+Add a comment to the approved APP-1 issue with findings from the repository.
 
-Output as JSONL format using the `jira_add_comment` tool.
+Use the `connector_4_jira_add_comment` tool. The trusted write host uses JIRA_REST_BASIC_AUTH.

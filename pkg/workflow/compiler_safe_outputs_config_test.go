@@ -1134,66 +1134,6 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			checkJSON:    true,
 			expectedKeys: []string{"linear_update_issue"},
 		},
-		{
-			name: "jira create issue config",
-			safeOutputs: &SafeOutputsConfig{
-				JiraCreateIssue: &JiraSafeOutputConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: strPtr("1"),
-					},
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"jira_create_issue"},
-		},
-		{
-			name: "jira update issue config",
-			safeOutputs: &SafeOutputsConfig{
-				JiraUpdateIssue: &JiraSafeOutputConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: strPtr("1"),
-					},
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"jira_update_issue"},
-		},
-		{
-			name: "jira add comment config",
-			safeOutputs: &SafeOutputsConfig{
-				JiraAddComment: &JiraSafeOutputConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: strPtr("1"),
-					},
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"jira_add_comment"},
-		},
-		{
-			name: "jira add label config",
-			safeOutputs: &SafeOutputsConfig{
-				JiraAddLabel: &JiraSafeOutputConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: strPtr("3"),
-					},
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"jira_add_label"},
-		},
 	}
 
 	for _, tt := range tests {

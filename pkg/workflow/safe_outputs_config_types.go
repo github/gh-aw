@@ -67,10 +67,6 @@ type SafeOutputsConfig struct {
 	CreateCodeScanningAlerts               *CreateCodeScanningAlertsConfig        `yaml:"create-code-scanning-alert,omitempty"`
 	AutofixCodeScanningAlert               *AutofixCodeScanningAlertConfig        `yaml:"autofix-code-scanning-alert,omitempty"`
 	CreateCheckRun                         *CreateCheckRunConfig                  `yaml:"create-check-run,omitempty"` // Create GitHub Check Runs to report agent analysis results
-	JiraCreateIssue                        *JiraSafeOutputConfig                  `yaml:"jira-create-issue,omitempty"`
-	JiraUpdateIssue                        *JiraSafeOutputConfig                  `yaml:"jira-update-issue,omitempty"`
-	JiraAddComment                         *JiraSafeOutputConfig                  `yaml:"jira-add-comment,omitempty"`
-	JiraAddLabel                           *JiraSafeOutputConfig                  `yaml:"jira-add-label,omitempty"`
 	AddLabels                              *AddLabelsConfig                       `yaml:"add-labels,omitempty"`
 	RemoveLabels                           *RemoveLabelsConfig                    `yaml:"remove-labels,omitempty"`
 	ReplaceLabel                           *ReplaceLabelConfig                    `yaml:"replace-label,omitempty"` // Replace one label with another in a single atomic operation

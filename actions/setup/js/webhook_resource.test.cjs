@@ -13,7 +13,6 @@ const examples = [
   ["projects_v2_item", "https://api.github.com/orgs/org/projectsV2/1/items/123", ["edited"], "123", "https://api.github.com/orgs/org/projectsV2/1"],
   ["code_scanning_alert", "https://api.github.com/repos/org/repo/code-scanning/alerts/123", ["created"], "123", undefined],
   ["dependabot_alert", "https://api.github.com/repos/org/repo/dependabot/alerts/123", ["created"], "123", undefined],
-  ["jira_issue", "https://tenant.atlassian.net/rest/api/3/issue/123", ["edited", "closed", "labeled"], "123", "https://tenant.atlassian.net"],
   ["linear_issue", "https://linear.app/workspace/issue/APP-123/example-title", ["edited", "closed"], "APP-123", "https://linear.app/workspace"],
   ["azure_devops_issue", "https://dev.azure.com/organization/project/_apis/wit/workItems/123", ["edited", "closed"], "123", "https://dev.azure.com/organization"],
 ];
