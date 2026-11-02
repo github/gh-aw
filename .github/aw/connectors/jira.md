@@ -464,8 +464,9 @@ import-schema:
       Selecting any of these custom root on events fails closed: no receiver, authenticated gateway
       enrollment, or provider subscription is installed. Use workflow_dispatch. The verificationProfile
       atlassian.com/jira-admin-hmac-sha256 describes a future admin-webhook verifier, not implemented
-      authentication. Admin webhook signing secrets are distinct from API credentials; verify the
-      provider signature over the raw body before any future activation. OAuth and Connect webhook
+      authentication. Admin webhook signing secrets are distinct from API credentials; verify
+      X-Hub-Signature with sha256 and the secret over the raw body before any future activation.
+      OAuth and Connect webhook
       verification are not interchangeable with that profile.
     </ingress>
     <envelope>
@@ -502,7 +503,7 @@ import-schema:
       most 32767 characters. Optional temporary_id matches ^#?aw_[A-Za-z0-9_]{3,12}$ and is at most
       80 characters. Task must exist on the project's create screen; projects requiring unsupported
       mandatory fields cannot use this operation. Projects and issue types are not auto-resolved.
-      Projects response strings id, key, self to issue-id, issue-key, url, and requires all three.
+      Projects the response strings id, key, self to issue-id, issue-key, url, and requires all three.
     </operation>
     <operation selection="jira-update-issue" tool="jira_update_issue" method="PUT" path="/rest/api/3/issue/{issue}">
       Required inputs: issue, nonblank summary (at most 255 characters), and nonblank description
@@ -553,10 +554,13 @@ import-schema:
     Jira Cloud only; no Jira Server or Data Center compatibility is claimed. No transitions,
     deletion, custom fields, arbitrary issue types, account lookup, attachment fetching, or
     tenant discovery are exposed. These declarations are experimental. Local fixture and
-    compilation success does not establish provider authorization or live operability:
-    the current live Jira MCP read check fails opaquely and is not a successful operational test.
-    Diagnose policy, scopes, account permissions, endpoint, and provider diagnostics with the
-    same approved identity; never bypass an authorization failure by switching credentials.
+    compilation success or HTTP 200 MCP initialization does not establish read authorization.
+    A tool-level error saying "You don't have permission to connect via API token. Please ask
+    your organization admin for access." identifies an organization MCP API-token policy denial,
+    even when initialization succeeds. An organization administrator must enable that access;
+    this is not a successful operational read. Diagnose policy, scopes, account permissions,
+    endpoint, and provider diagnostics with the same approved identity; never bypass an
+    authorization failure by switching credentials or retrying with another profile.
   </limitations>
   <examples>
     <example id="manual-staged-chain" path=".github/workflows/jira-review.md">
@@ -618,6 +622,7 @@ Report these as staged intents, never as completed Jira mutations.
     <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/">Create and edit request shapes, permissions, and ADF.</reference>
     <reference href="https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-comments/">Comment body, permissions, and response evidence.</reference>
     <reference href="https://developer.atlassian.com/cloud/jira/platform/webhooks/">Native event names and webhook verification boundaries.</reference>
+    <reference href="https://developer.atlassian.com/cloud/jira/software/webhooks/#secure-admin-webhooks">Admin webhook secret and X-Hub-Signature verification.</reference>
   </references>
 </connector-documentation>
 -->

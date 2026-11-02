@@ -37,6 +37,7 @@ func jiraDocumentationExamples(t *testing.T) []jiraDocumentationExample {
 	require.True(t, strings.HasPrefix(document, "\n<connector-documentation "))
 	require.True(t, strings.HasSuffix(document, "</connector-documentation>"))
 	require.NotContains(t, document, "--", "XML content must be legal inside the outer comment, including CDATA")
+	require.Contains(t, document, "<yaml><![CDATA[", "consumer YAML must be preserved as literal CDATA")
 	var parsed struct {
 		XMLName  xml.Name                   `xml:"connector-documentation"`
 		ID       string                     `xml:"id,attr"`
@@ -108,6 +109,7 @@ func TestJiraDocumentationConsumers(t *testing.T) {
 				output, err := c.CompileToYAML(data, path)
 				require.NoError(t, err)
 				assert.NotContains(t, output, "${{ secrets.JIRA_REST_BASIC_AUTH }}", "staging must not inject writer credentials")
+				assert.NotContains(t, output, "connector_4_jira_")
 				for _, operation := range config.SafeOutputs.SafeOutputNames() {
 					assert.Contains(t, output, "jira_"+strings.ReplaceAll(operation, "-", "_"))
 				}

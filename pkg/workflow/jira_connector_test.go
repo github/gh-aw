@@ -73,6 +73,7 @@ func TestJiraConnectorWorkflowCompilation(t *testing.T) {
 	assert.Contains(t, output, "untrusted third-party data")
 	assert.Contains(t, output, "jira_add_comment")
 	assert.NotContains(t, output, "jira_create_issue")
+	assert.NotContains(t, output, "connector_4_jira_")
 }
 
 const jiraWorkflowSelections = "    tools: [service-account]\n    context:\n      issue-details:\n        issue: APP-1\n    safe-outputs: [add-comment]\n"
