@@ -1260,7 +1260,7 @@ describe("handle_agent_failure", () => {
       );
       fs.writeFileSync(
         path.join(promptsDir, "threat_detection_engine_error.md"),
-        "> [!WARNING]\n> threat detection engine error\n> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.\n> {threat_detected_marker}\n>\n> <details>\n> <summary>What happened</summary>\n>\n> {reason_text}\n>\n> Review the [workflow run logs]({run_url}) for details.\n> </details>"
+        "> [!WARNING]\n> **Threat detection engine error**\n>\n> Threat detection could not complete its analysis due to a tooling error. This is not a security finding, but the output still needs manual review.\n> {threat_detected_marker}\n>\n> <details>\n> <summary>What happened</summary>\n>\n> {reason_text}\n>\n> Review the [workflow run logs]({run_url}) for details.\n> </details>"
       );
 
       process.env.RUNNER_TEMP = tmpDir;

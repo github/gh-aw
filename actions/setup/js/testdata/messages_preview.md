@@ -65,8 +65,9 @@ Commit pushed: [`0123456`](https://example.test/synthetic/repository/commit/0123
 ## getDetectionWarningMessage: agent_failure
 
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding, but the output still needs manual review.
 > <!-- gh-aw-threat-engine-error -->
 >
 > <details>
@@ -82,8 +83,9 @@ Commit pushed: [`0123456`](https://example.test/synthetic/repository/commit/0123
 ## getDetectionWarningMessage: parse_error
 
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding, but the output still needs manual review.
 > <!-- gh-aw-threat-engine-error -->
 >
 > <details>
@@ -1983,8 +1985,9 @@ When the run succeeds, this issue is closed with a link to the created pull requ
 ## Template: threat_detection_engine_error.md
 
 > [!WARNING]
-> threat detection engine error
-> The threat detection engine encountered an error and could not complete analysis. This is a tooling failure, not a security finding.
+> **Threat detection engine error**
+>
+> Threat detection could not complete its analysis due to a tooling error. This is not a security finding, but the output still needs manual review.
 > synthetic_threat_detected_marker
 >
 > <details>
