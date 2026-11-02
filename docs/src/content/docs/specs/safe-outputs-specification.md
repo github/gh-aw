@@ -3710,8 +3710,6 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 **Cross-Repository Support**: No
 **Mandatory**: No
 
-**Experimental**: Yes. Compiling a workflow with `approve-workflow-run` emits: `Using experimental feature: approve-workflow-run`.
-
 **MCP Tool Schema**:
 
 ```json

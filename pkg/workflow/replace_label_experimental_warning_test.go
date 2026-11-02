@@ -13,14 +13,13 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-func TestReplaceLabelExperimentalWarning(t *testing.T) {
+func TestReplaceLabelNoExperimentalWarning(t *testing.T) {
 	tests := []struct {
-		name          string
-		content       string
-		expectWarning bool
+		name    string
+		content string
 	}{
 		{
-			name: "replace-label enabled produces experimental warning",
+			name: "replace-label enabled",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -32,10 +31,9 @@ safe-outputs:
 
 # Test Workflow
 `,
-			expectWarning: true,
 		},
 		{
-			name: "no replace-label does not produce experimental warning",
+			name: "no replace-label",
 			content: `---
 on: workflow_dispatch
 engine: copilot
@@ -43,7 +41,6 @@ engine: copilot
 
 # Test Workflow
 `,
-			expectWarning: false,
 		},
 	}
 
@@ -75,19 +72,12 @@ engine: copilot
 				return
 			}
 
-			expectedMessage := "Using experimental feature: replace-label"
-			if tt.expectWarning {
-				if !strings.Contains(stderrOutput, expectedMessage) {
-					t.Errorf("expected warning containing %q, got stderr:\n%s", expectedMessage, stderrOutput)
-				}
-				if compiler.GetWarningCount() == 0 {
-					t.Error("expected warning count > 0 but got 0")
-				}
-				return
+			unexpectedMessage := "Using experimental feature: replace-label"
+			if strings.Contains(stderrOutput, unexpectedMessage) {
+				t.Errorf("did not expect warning %q, but got stderr:\n%s", unexpectedMessage, stderrOutput)
 			}
-
-			if strings.Contains(stderrOutput, expectedMessage) {
-				t.Errorf("did not expect warning %q, but got stderr:\n%s", expectedMessage, stderrOutput)
+			if compiler.GetExperimentalWarningCount() != 0 {
+				t.Error("expected no experimental warnings")
 			}
 		})
 	}
