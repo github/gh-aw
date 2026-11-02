@@ -35,15 +35,12 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 	// Validate expression safety - check that all GitHub Actions expressions are in the allowed list.
 	// In non-strict mode, ${{ toJSON(secrets) }} occurrences were already warned about above;
 	// neutralize them so the allowlist does not re-surface them as errors.
-	if strings.Contains(workflowData.MarkdownContent, "${{") {
-		workflowLog.Printf("Validating expression safety")
-		markdownForAllowlist := workflowData.MarkdownContent
-		if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
-			markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
-		}
-		if err := validateExpressionSafety(markdownForAllowlist); err != nil {
-			return formatCompilerError(markdownPath, "error", err.Error(), err)
-		}
+	markdownForAllowlist := removeXMLComments(workflowData.MarkdownContent)
+	if !c.effectiveStrictMode(workflowData.RawFrontmatter) {
+		markdownForAllowlist = neutralizeSecretsSerializationExpressions(markdownForAllowlist)
+	}
+	if err := validateExpressionSafety(markdownForAllowlist); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
 	// Validate expressions in runtime-import files at compile time
@@ -64,6 +61,9 @@ func (c *Compiler) validateExpressions(workflowData *WorkflowData, markdownPath 
 		}
 	}
 
+	if err := validatePromptSecretBindings(workflowData, c.collectRuntimeImportMarkdownForCompilerAnalysis(workflowData)); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
 	// Warn when the prompt explicitly references /tmp/ or /tmp/gh-aw/ directly instead
 	// of the recommended /tmp/gh-aw/agent/ subtree.
 	c.validatePromptTmpPaths(workflowData, markdownPath)

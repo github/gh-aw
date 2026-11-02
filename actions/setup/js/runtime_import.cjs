@@ -4,17 +4,29 @@
 // runtime_import.cjs
 // Processes {{#runtime-import filepath}} and {{#runtime-import? filepath}} macros
 // at runtime to import markdown file contents dynamically.
-// Also processes inline @path and @url references.
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
+const { bindAuthorExpressions } = require("./author_prompt.cjs");
 
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+
+// Unescaped quote characters must not let a compound expression masquerade as a literal.
+const STRING_LITERAL_RE = /^'(?:[^'\\]|\\.)*'$|^"(?:[^"\\]|\\.)*"$|^`(?:[^`\\]|\\.)*`$/;
+
+/**
+ * @param {string} expr
+ * @returns {boolean}
+ */
+function isLiteralValue(expr) {
+  const trimmed = expr.trim();
+  return STRING_LITERAL_RE.test(trimmed) || /^-?\d+(\.\d+)?$/.test(trimmed) || trimmed === "true" || trimmed === "false";
+}
 
 /**
  * Makes any "## skill:"/"## agent:" block in a runtime-imported chunk of
@@ -29,7 +41,7 @@ const crypto = require("crypto");
  * Making the end marker explicit here keeps every runtime import
  * self-contained regardless of where it ends up in the assembled document.
  *
- * @param {string} content - Resolved content of a single runtime import (file or URL).
+ * @param {string} content - Resolved content of a single runtime import.
  * @returns {string} Content with implicit skill/agent end markers made explicit.
  */
 function closeUnterminatedInlineMarkers(content) {
@@ -232,14 +244,12 @@ function isSafeExpression(expr) {
   // - github.event.inputs.* (workflow_dispatch inputs)
   // - github.aw.inputs.* (shared workflow inputs)
   // - inputs.* (workflow_call inputs)
-  // - env.* (environment variables)
   // Limit nesting depth to max 5 levels to prevent deep traversal attacks
   const dynamicPatterns = [
     /^(needs|steps)\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+){0,2}$/, // Max depth: needs.job.outputs.foo.bar (5 levels)
     /^github\.event\.inputs\.[a-zA-Z0-9_-]+$/,
     /^github\.aw\.inputs\.[a-zA-Z0-9_-]+$/,
     /^inputs\.[a-zA-Z0-9_-]+$/,
-    /^env\.[a-zA-Z0-9_-]+$/,
     /^experiments\.[a-zA-Z0-9_-]+$/,
   ];
 
@@ -248,30 +258,6 @@ function isSafeExpression(expr) {
       return true;
     }
   }
-
-  // Strict string-literal regex: the body must not contain an unescaped copy of the
-  // opening quote character.  This prevents compound expressions like
-  // `'a' || secrets.TOKEN || 'b'` from being misclassified as a string literal because
-  // they happen to start and end with a quote.
-  // Pattern: ^(quote)(non-quote-non-backslash | escaped-char)*(same-quote)$
-  //   [^'\\] = any char except the single-quote and backslash
-  //   \\.    = backslash followed by any character (escape sequence)
-  const STRING_LITERAL_RE = /^'(?:[^'\\]|\\.)*'$|^"(?:[^"\\]|\\.)*"$|^`(?:[^`\\]|\\.)*`$/;
-
-  /**
-   * Returns true when `expr` is a standalone literal value (string, number, or boolean).
-   * Used to refuse literal operands inside && / || compound expressions — a literal in a
-   * conjunction or disjunction is semantically incomplete and may hide injection vectors.
-   * @param {string} expr - The trimmed expression to test
-   * @returns {boolean}
-   */
-  const isLiteralValue = expr => {
-    const t = expr.trim();
-    if (STRING_LITERAL_RE.test(t)) return true;
-    if (/^-?\d+(\.\d+)?$/.test(t)) return true;
-    if (t === "true" || t === "false") return true;
-    return false;
-  };
 
   // Allow literal values (string, number, boolean) as *standalone* safe expressions only.
   // A literal is only valid when it is the entire expression, not as a sub-expression inside
@@ -418,10 +404,18 @@ function generateHashedExpressionEnvVarName(expr) {
  */
 function evaluateExpression(expr, resolution) {
   const trimmed = expr.trim();
+  if (!isSafeExpression(expr)) {
+    throw new Error(`${ERR_VALIDATION}: Unauthorized runtime import expression`);
+  }
   const resolved = (/** @type {string} */ value) => {
     if (resolution) resolution.resolved = true;
     return value;
   };
+
+  // Standalone literals stay unresolved; operators inside quoted text are not expressions.
+  if (isLiteralValue(trimmed)) {
+    return `\${{ ${trimmed} }}`;
+  }
 
   // Check for OR expressions with literals (e.g., "inputs.repository || 'default'")
   const orMatch = trimmed.match(/^(.+?)\s*\|\|\s*(.+)$/);
@@ -500,7 +494,6 @@ function evaluateExpression(expr, resolution) {
           workspace: process.env.GITHUB_WORKSPACE || "",
           event: context.payload || {},
         },
-        env: process.env,
         inputs: context.payload?.inputs || {},
       };
 
@@ -594,7 +587,7 @@ function evaluateExpression(expr, resolution) {
 /**
  * Validates and renders GitHub Actions expressions in content
  * @param {string} content - The content with potential expressions
- * @param {string} source - The source identifier (file path or URL) for error messages
+ * @param {string} source - The source identifier for error messages
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values as opaque data during prompt processing
  * @returns {string} - Content with safe expressions rendered
  * @throws {Error} - If unsafe expressions are found
@@ -622,7 +615,7 @@ function processExpressions(content, source, protectValue = value => value) {
           "Safe expressions include:\n" +
           "  - github.actor, github.repository, github.run_id, etc.\n" +
           "  - github.event.issue.number, github.event.pull_request.number, etc.\n" +
-          "  - needs.*, steps.*, env.*, inputs.*, experiments.*\n\n" +
+          "  - needs.*, steps.*, inputs.*, experiments.*\n\n" +
           "See documentation for the complete list of allowed expressions."
       );
     }
@@ -672,7 +665,7 @@ function processExpressions(content, source, protectValue = value => value) {
       "Safe expressions include:\n" +
       "  - github.actor, github.repository, github.run_id, etc.\n" +
       "  - github.event.issue.number, github.event.pull_request.number, etc.\n" +
-      "  - needs.*, steps.*, env.*, inputs.*, experiments.*\n\n" +
+      "  - needs.*, steps.*, inputs.*, experiments.*\n\n" +
       "See documentation for the complete list of allowed expressions.";
     throw new Error(errorMsg);
   }
@@ -697,186 +690,6 @@ function processExpressions(content, source, protectValue = value => value) {
  */
 function hasGitHubActionsMacros(content) {
   return /\$\{\{[\s\S]*?\}\}/.test(content);
-}
-
-/** @type {number} Timeout in milliseconds for fetching URL content in {@link fetchUrlContent} */
-const FETCH_URL_TIMEOUT_MS = 30_000;
-
-/**
- * Fetches content from a URL with caching
- * @param {string} url - The URL to fetch
- * @param {string} cacheDir - Directory to store cached URL content
- * @returns {Promise<string>} - The fetched content
- * @throws {Error} - If URL fetch fails
- */
-async function fetchUrlContent(url, cacheDir) {
-  // Create cache directory if it doesn't exist
-  if (!fs.existsSync(cacheDir)) {
-    try {
-      fs.mkdirSync(cacheDir, { recursive: true });
-    } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to create directory ${cacheDir}: ${getErrorMessage(err)}`, { cause: err });
-    }
-  }
-
-  // Generate cache filename from URL (hash it for safety)
-  const crypto = require("crypto");
-  const urlHash = crypto.createHash("sha256").update(url).digest("hex");
-  const cacheFile = path.join(cacheDir, `url-${urlHash}.cache`);
-
-  // Check if cached version exists and is recent (less than 1 hour old)
-  if (fs.existsSync(cacheFile)) {
-    let stats;
-    try {
-      stats = fs.statSync(cacheFile);
-    } catch (err) {
-      core.warning(`Failed to inspect cache file ${cacheFile}: ${getErrorMessage(err)}. Refetching URL content.`);
-      stats = null;
-    }
-    if (stats) {
-      const ageInMs = Date.now() - stats.mtimeMs;
-      const oneHourInMs = 60 * 60 * 1000;
-
-      if (ageInMs < oneHourInMs) {
-        core.info(`Using cached content for URL: ${url}`);
-        try {
-          return fs.readFileSync(cacheFile, "utf8");
-        } catch (err) {
-          throw new Error(`${ERR_SYSTEM}: Failed to read file ${cacheFile}: ${getErrorMessage(err)}`, { cause: err });
-        }
-      }
-    }
-  }
-
-  // Fetch URL content
-  core.info(`Fetching content from URL: ${url}`);
-
-  // Share a single abort signal across both the connection/headers phase and the body-reading
-  // phase, since fetch()'s own timeout signal is only honored until the promise resolves.
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(new Error(`Timed out after ${FETCH_URL_TIMEOUT_MS}ms`)), FETCH_URL_TIMEOUT_MS);
-
-  let response;
-  let data;
-  try {
-    // Do not follow redirects automatically: a redirect landing on a 200 response would
-    // silently broaden the fetched origin and bypass the non-200 status check below.
-    response = await fetch(url, { signal: timeoutController.signal, redirect: "manual" });
-
-    if (!response.ok) {
-      throw new Error(`${ERR_API}: Failed to fetch URL ${url}: HTTP ${response.status}`);
-    }
-
-    data = await response.text();
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith(ERR_API)) {
-      throw err;
-    }
-    throw new Error(`${ERR_API}: Failed to fetch URL ${url}: ${getErrorMessage(err)}`, { cause: err });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  // Cache the content
-  try {
-    fs.writeFileSync(cacheFile, data, "utf8");
-  } catch (err) {
-    throw new Error(`${ERR_SYSTEM}: Failed to write file ${cacheFile}: ${getErrorMessage(err)}`, { cause: err });
-  }
-
-  return data;
-}
-
-/**
- * Processes a URL import and returns content with sanitization
- * @param {string} url - The URL to fetch
- * @param {boolean} optional - Whether the import is optional
- * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
- * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
- * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
- * @returns {Promise<string>} - The processed URL content
- * @throws {Error} - If URL fetch fails or content is invalid
- */
-async function processUrlImport(url, optional, startLine, endLine, protectValue = value => value) {
-  const cacheDir = "/tmp/gh-aw/url-cache";
-
-  // Fetch URL content (with caching)
-  let content;
-  try {
-    content = await fetchUrlContent(url, cacheDir);
-  } catch (error) {
-    if (optional) {
-      const errorMessage = getErrorMessage(error);
-      core.warning(`Optional runtime import URL failed: ${url}: ${errorMessage}`);
-      return "";
-    }
-    throw error;
-  }
-
-  // If line range is specified, extract those lines first (before other processing)
-  if (startLine !== undefined || endLine !== undefined) {
-    const lines = content.split("\n");
-    const totalLines = lines.length;
-
-    // Validate line numbers (1-indexed)
-    const start = startLine !== undefined ? startLine : 1;
-    const end = endLine !== undefined ? endLine : totalLines;
-
-    if (start < 1 || start > totalLines) {
-      throw new Error(`${ERR_VALIDATION}: Invalid start line ${start} for URL ${url} (total lines: ${totalLines})`);
-    }
-    if (end < 1 || end > totalLines) {
-      throw new Error(`${ERR_VALIDATION}: Invalid end line ${end} for URL ${url} (total lines: ${totalLines})`);
-    }
-    if (start > end) {
-      throw new Error(`${ERR_VALIDATION}: Start line ${start} cannot be greater than end line ${end} for URL ${url}`);
-    }
-
-    // Extract lines (convert to 0-indexed)
-    content = lines.slice(start - 1, end).join("\n");
-  }
-
-  // Check for front matter and warn
-  if (hasFrontMatter(content)) {
-    core.debug(`URL ${url} contains front matter which will be ignored in runtime import`);
-    // Remove front matter (everything between first --- and second ---)
-    const lines = content.split("\n");
-    let inFrontMatter = false;
-    let frontMatterCount = 0;
-    const processedLines = [];
-
-    for (const line of lines) {
-      if (line.trim() === "---" || line.trim() === "---\r") {
-        frontMatterCount++;
-        if (frontMatterCount === 1) {
-          inFrontMatter = true;
-          continue;
-        } else if (frontMatterCount === 2) {
-          inFrontMatter = false;
-          continue;
-        }
-      }
-      if (!inFrontMatter && frontMatterCount >= 2) {
-        processedLines.push(line);
-      }
-    }
-    content = processedLines.join("\n");
-  }
-
-  // Remove XML comments
-  content = removeXMLComments(content);
-
-  // Process GitHub Actions expressions (validate and render safe ones)
-  if (hasGitHubActionsMacros(content)) {
-    content = processExpressions(content, `URL ${url}`, protectValue);
-  }
-
-  // Close any unterminated "## skill:"/"## agent:" block so this import
-  // cannot swallow content that gets spliced in after it (see
-  // closeUnterminatedInlineMarkers above).
-  content = closeUnterminatedInlineMarkers(content);
-
-  return content;
 }
 
 /**
@@ -952,6 +765,10 @@ function extractAndReplacePlaceholders(content) {
   return content.replace(pattern, (match, expr) => {
     const trimmed = expr.trim();
 
+    if (!isSafeExpression(trimmed)) {
+      throw new Error(`${ERR_VALIDATION}: Runtime import contains unauthorized GitHub Actions expressions`);
+    }
+
     // Generate placeholder name from expression
     // Convert dots and special chars to underscores and uppercase
     const placeholder = generatePlaceholderName(trimmed);
@@ -994,15 +811,25 @@ function generatePlaceholderName(expr) {
 }
 
 /**
+ * @param {string} target
+ */
+function assertSupportedRuntimeImport(target) {
+  const trimmed = target.trim();
+  // Repo-root .github/.agents paths retain their existing multiple-slash syntax.
+  const repoRootPath = /^\/+\.(?:github|agents)[/\\]/.test(trimmed);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || (/^[/\\]{2}/.test(trimmed) && !repoRootPath)) {
+    throw new Error(`${ERR_VALIDATION}: Runtime imports require local files; ask the agent to fetch external content inside the AWF sandbox`);
+  }
+}
+
+/**
  * Resolves a runtime-import file path to its normalized absolute path.
- * @param {string} filepathOrUrl - File path (not URL)
+ * @param {string} filepathOrUrl - Local file path
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @returns {{filepath: string, normalizedPath: string, normalizedBaseFolder: string}}
  */
 function resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir) {
-  if (/^https?:\/\//i.test(filepathOrUrl)) {
-    throw new Error(`${ERR_VALIDATION}: Expected file path for runtime import, received URL: ${filepathOrUrl}`);
-  }
+  assertSupportedRuntimeImport(filepathOrUrl);
 
   let filepath = filepathOrUrl;
   let isAgentsPath = false;
@@ -1108,23 +935,19 @@ function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFol
 }
 
 /**
- * Reads and processes a file or URL for runtime import
- * @param {string} filepathOrUrl - The path to the file (relative to GITHUB_WORKSPACE) or URL to import
+ * Reads a local author file without network access.
+ * @param {string} filepathOrUrl - The local file path to import
  * @param {boolean} optional - Whether the import is optional (true for {{#runtime-import? filepath}})
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
  * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
- * @returns {Promise<string>} - The processed file or URL content, or empty string if optional and file not found
- * @throws {Error} - If file/URL is not found and import is not optional, or if GitHub Actions macros are detected
+ * @param {Record<string, string>} [authorExpressions] - Compiler-selected author bindings
+ * @returns {Promise<string>} - The processed content, or empty string for a missing optional import
+ * @throws {Error} - If the target, content, or required import is invalid
  */
-async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue = value => value) {
-  // Check if this is a URL
-  if (/^https?:\/\//i.test(filepathOrUrl)) {
-    return await processUrlImport(filepathOrUrl, optional, startLine, endLine, protectValue);
-  }
-
-  // Otherwise, process as a file
+async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue = value => value, authorExpressions = {}) {
+  assertSupportedRuntimeImport(filepathOrUrl);
   const { filepath, normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   // Check if file exists
@@ -1202,8 +1025,9 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Remove XML comments
   content = removeXMLComments(content);
 
-  // Neutralize AI-model control tags to prevent prompt injection via runtime-imported files
-  content = neutralizeSystemTags(content);
+  // Raw placeholders are literal; only explicit author expressions select bindings.
+  content = content.replace(/\$\{GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+\}|__GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+__/g, value => protectValue(value));
+  content = bindAuthorExpressions(content, authorExpressions, process.env, protectValue);
 
   // Wrap expressions in template conditionals
   // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
@@ -1227,7 +1051,7 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 }
 
 /**
- * Resolves an import path/URL to a canonical key for deduplication checks.
+ * Resolves an import target to a canonical key for deduplication checks.
  * @param {string} filepathOrUrl
  * @param {string} workspaceDir
  * @param {number} [startLine]
@@ -1237,10 +1061,6 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine) {
   const rangeSuffix = startLine !== undefined && endLine !== undefined ? `:${startLine}-${endLine}` : "";
 
-  if (/^https?:\/\//i.test(filepathOrUrl)) {
-    return `${filepathOrUrl}${rangeSuffix}`;
-  }
-
   const { normalizedPath } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   return `${normalizedPath}${rangeSuffix}`;
@@ -1249,7 +1069,8 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
 /**
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
- * @property {string} src - The resolved file path or URL
+ * @property {string} src - The resolved local file path
+ * @property {"author"} trust - Author-capable local source, not a guarantee about interpolated values
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -1272,7 +1093,8 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
  * @param {Map<string, string>} [rawImportCache] - Cache of raw (pre-expansion) file contents, used to set rawContent on cached tree nodes
  * @param {Set<string>} [resolvedInParent] - Canonical import keys already resolved in parent/sibling context; skipped during recursion
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values through nested imports and later directive processing
- * @returns {Promise<string>} - Content with runtime-import macros replaced by file/URL contents
+ * @param {Record<string, string>} [authorExpressions] - Compiler-selected bindings shared by local author files
+ * @returns {Promise<string>} - Content with runtime-import macros replaced by validated content
  */
 async function processRuntimeImports(
   content,
@@ -1283,7 +1105,8 @@ async function processRuntimeImports(
   parentTreeChildren = null,
   rawImportCache = new Map(),
   resolvedInParent = new Set(),
-  protectValue = value => value
+  protectValue = value => value,
+  authorExpressions = {}
 ) {
   // Normalize body-level {{#import}} directives to {{#runtime-import}} equivalents.
   // {{#import}} is deprecated — use {{#runtime-import}} or the 'imports:' frontmatter field instead.
@@ -1302,7 +1125,7 @@ async function processRuntimeImports(
     // Use a sentinel that cannot appear in normal workflow content.
     return `\u0000GH_AW_CODESPAN_${idx}_GH_AW\u0000`;
   });
-  const bodyImportRe = /\{\{#import(\?)?(?:[ \t]+|[ \t]*:[ \t]*)([^\{\}]+?)\}\}/g;
+  const bodyImportRe = /\{\{#import(\?)?(?:[ \t]+|[ \t]*:[ \t]*)((?:\$\{\{[^{}]*\}\}|\$\{[^{}]*\}|[^{}])+?)\}\}/g;
   let bodyImportCount = 0;
   const normalizedContent = contentWithPlaceholders.replace(bodyImportRe, (_, optional, importPath) => {
     bodyImportCount++;
@@ -1316,8 +1139,8 @@ async function processRuntimeImports(
   }
 
   // Pattern to match {{#runtime-import filepath}} or {{#runtime-import? filepath}}
-  // Captures: optional flag (?), whitespace, filepath/URL (which may include :startline-endline)
-  const pattern = /\{\{#runtime-import(\?)?[ \t]+([^\}]+?)\}\}/g;
+  // Captures: optional flag (?), whitespace, filepath (which may include :startline-endline)
+  const pattern = /\{\{#runtime-import(\?)?[ \t]+((?:\$\{\{[^{}]*\}\}|\$\{[^{}]*\}|[^{}])+?)\}\}/g;
 
   let processedContent = content;
   const matches = [];
@@ -1331,7 +1154,7 @@ async function processRuntimeImports(
     const filepathWithRange = match[2].trim();
     const fullMatch = match[0];
 
-    // Parse filepath/URL and optional line range (filepath:startline-endline)
+    // Parse filepath and optional line range (filepath:startline-endline)
     const rangeMatch = filepathWithRange.match(/^(.+?):(\d+)-(\d+)$/);
     let filepathOrUrl, startLine, endLine;
 
@@ -1355,16 +1178,18 @@ async function processRuntimeImports(
     });
   }
 
-  // Process all imports sequentially (to handle async URLs)
+  // Process imports sequentially to preserve nested import ordering.
   const resolvedInThisCall = new Set();
   for (const matchData of matches) {
     const { fullMatch, filepathOrUrl, optional, startLine, endLine, filepathWithRange } = matchData;
+    assertSupportedRuntimeImport(filepathOrUrl);
+    const displayPath = filepathWithRange;
     let importKey;
     try {
       importKey = resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${filepathWithRange}: ${errorMessage}`);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
     }
 
     // Skip imports already resolved in the parent/sibling context.
@@ -1375,7 +1200,7 @@ async function processRuntimeImports(
       // this branch exists specifically to prevent duplicate prompt blocks when
       // recursively traversing a self-imported workflow body.
       processedContent = processedContent.replace(fullMatch, "");
-      core.info(`Skipping already resolved import for ${filepathWithRange}`);
+      core.info(`Skipping already resolved import for ${displayPath}`);
       continue;
     }
 
@@ -1385,7 +1210,7 @@ async function processRuntimeImports(
       const cachedContent = importCache.get(filepathWithRange);
       if (cachedContent !== undefined) {
         processedContent = processedContent.replace(fullMatch, () => cachedContent);
-        core.info(`Reusing cached content for ${filepathWithRange}`);
+        core.info(`Reusing cached content for ${displayPath}`);
         if (parentTreeChildren !== null) {
           // Use the raw (pre-expansion) content from rawImportCache so that
           // rawContent is consistent between first and subsequent occurrences.
@@ -1393,6 +1218,7 @@ async function processRuntimeImports(
           parentTreeChildren.push({
             macro: fullMatch,
             src: filepathOrUrl,
+            trust: "author",
             optional,
             startLine: startLine ?? null,
             endLine: endLine ?? null,
@@ -1416,7 +1242,7 @@ async function processRuntimeImports(
 
     try {
       // Import the file content
-      let importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue);
+      let importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue, authorExpressions);
 
       // Capture raw content before any nested expansion so tree nodes always
       // record the pre-recursion state (consistent with first-occurrence behaviour).
@@ -1431,6 +1257,7 @@ async function processRuntimeImports(
         parentTreeChildren.push({
           macro: fullMatch,
           src: filepathOrUrl,
+          trust: "author",
           optional,
           startLine: startLine ?? null,
           endLine: endLine ?? null,
@@ -1443,9 +1270,20 @@ async function processRuntimeImports(
       // imported content. The recursive call to processRuntimeImports will normalize
       // any {{#import}} directives before processing them.
       if (importedContent && /\{\{#(?:runtime-import|import)/.test(importedContent)) {
-        core.info(`Recursively processing imports in ${filepathWithRange}`);
+        core.info(`Recursively processing imports in ${displayPath}`);
         const inheritedResolved = new Set([...resolvedInParent, ...resolvedInThisCall]);
-        importedContent = await processRuntimeImports(importedContent, workspaceDir, importedFiles, importCache, [...importStack], parentTreeChildren !== null ? treeNodeChildren : null, rawImportCache, inheritedResolved, protectValue);
+        importedContent = await processRuntimeImports(
+          importedContent,
+          workspaceDir,
+          importedFiles,
+          importCache,
+          [...importStack],
+          parentTreeChildren !== null ? treeNodeChildren : null,
+          rawImportCache,
+          inheritedResolved,
+          protectValue,
+          authorExpressions
+        );
       }
 
       // Cache the fully processed content and the raw pre-expansion content
@@ -1458,7 +1296,7 @@ async function processRuntimeImports(
       resolvedInThisCall.add(importKey);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${filepathWithRange}: ${errorMessage}`);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
     } finally {
       // Remove from import stack
       importStack.pop();
@@ -1471,7 +1309,9 @@ async function processRuntimeImports(
 module.exports = {
   processRuntimeImports,
   processRuntimeImport,
-  fetchUrlContent,
+  resolveRuntimeImportFilePath,
+  assertRuntimeImportRealPathWithinBase,
+  resolveRuntimeImportKey,
   closeUnterminatedInlineMarkers,
   hasFrontMatter,
   removeXMLComments,

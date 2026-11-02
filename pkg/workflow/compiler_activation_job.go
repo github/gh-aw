@@ -346,7 +346,9 @@ func (c *Compiler) generatePromptInActivationJob(steps *[]string, data *Workflow
 	var yaml strings.Builder
 
 	// Call the existing generatePrompt method to get all the prompt steps
-	c.generatePrompt(&yaml, data, preActivationJobCreated, beforeActivationJobs)
+	if err := c.generatePrompt(&yaml, data, preActivationJobCreated, beforeActivationJobs); err != nil {
+		return fmt.Errorf("generate credential-free prompt steps: %w", err)
+	}
 
 	// Append the generated YAML content as a single string to steps
 	yamlContent, err := rewriteActivationPromptOutputs(yaml.String(), outputs)

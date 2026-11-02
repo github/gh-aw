@@ -127,7 +127,7 @@ This is the main workflow content.`,
 				t.Fatalf("Failed to read generated lock file: %v", err)
 			}
 
-			lockContent := string(content)
+			lockContent := promptRenderPlan(t, string(content))
 
 			// With the new runtime-import approach:
 			// - Both imported content AND main workflow use runtime-import macros
@@ -149,7 +149,7 @@ This is the main workflow content.`,
 
 			// Verify runtime-import macro is present for main workflow
 			workflowFilename := tt.name + "-workflow.md"
-			expectedMainWorkflowMacro := "{{#runtime-import " + workflowFilename + "}}"
+			expectedMainWorkflowMacro := "{{#author-prompt " + workflowFilename + "}}"
 			if !strings.Contains(lockContent, expectedMainWorkflowMacro) {
 				t.Errorf("%s: Expected to find runtime-import macro '%s' for main workflow in lock file", tt.description, expectedMainWorkflowMacro)
 			}
@@ -258,7 +258,7 @@ This is the main workflow content.`
 	}
 
 	// Verify runtime-import macro for main workflow is in lock file
-	if !strings.Contains(lockContent, "{{#runtime-import combo-workflow.md}}") {
+	if !strings.Contains(promptRenderPlan(t, lockContent), "{{#author-prompt combo-workflow.md}}") {
 		t.Error("Lock file should contain runtime-import macro for main workflow")
 	}
 
@@ -354,7 +354,7 @@ This is the main workflow content.`
 	}
 
 	// Verify runtime-import macro for main workflow is present
-	if !strings.Contains(lockContent, "{{#runtime-import test-xml-workflow.md}}") {
+	if !strings.Contains(promptRenderPlan(t, lockContent), "{{#author-prompt test-xml-workflow.md}}") {
 		t.Error("Expected runtime-import macro for main workflow in lock file")
 	}
 }

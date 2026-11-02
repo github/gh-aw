@@ -153,8 +153,8 @@ func (c *Compiler) generateInterpolationAndTemplateStep(yaml *strings.Builder, e
 	yaml.WriteString("            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');\n")
 	yaml.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
 	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/interpolate_prompt.cjs');\n")
-	if bindings := promptDeferredBindingsJSON(expressionMappings); bindings != "{}" {
-		yaml.WriteString("            await main({ deferredBindings: " + bindings + " });\n")
+	if options := promptInterpolationOptions(expressionMappings); options != "" {
+		yaml.WriteString("            await main({ " + options + " });\n")
 	} else {
 		yaml.WriteString("            await main();\n")
 	}

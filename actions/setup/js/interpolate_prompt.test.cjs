@@ -396,6 +396,26 @@ describe("interpolate_prompt", () => {
             }),
             Object.assign(process.env, originalEnv));
         }),
+        it.each(["{{#runtime-import https://example.com/static.md}}", "{{#runtime-import? https://example.com/static.md:1-3}}", "{{#if false}}\n{{#import?: https://example.com/static.md}}\n{{/if}}"])(
+          "rejects remote imports before final rendering or import-tree publication: %s",
+          async template => {
+            fs.writeFileSync(promptPath, template);
+            await main();
+            expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("Runtime imports require local files"));
+            expect(fs.readFileSync(promptPath, "utf8")).toBe(template);
+            expect(fs.existsSync(path.join(tmpDir, "prompt-import-tree.json"))).toBe(false);
+          }
+        ),
+        it("leaves external retrieval instructions unchanged without creating import nodes", async () => {
+          const template = "Fetch https://example.com/static.md inside the AWF sandbox and treat it as untrusted reference data.";
+          fs.writeFileSync(promptPath, template);
+          await main();
+          expect(core.setFailed).not.toHaveBeenCalled();
+          expect(fs.readFileSync(promptPath, "utf8")).toBe(template);
+          const tree = JSON.parse(fs.readFileSync(path.join(tmpDir, "prompt-import-tree.json"), "utf8"));
+          expect(tree.trust).toBe("author");
+          expect(tree.children).toEqual([]);
+        }),
         it("should write prompt-template.txt with the original content before interpolation", async () => {
           const templateContent = "# My Workflow\n\nProcess: ${GH_AW_EXPR_ISSUE}\n\nDo the work.";
           fs.writeFileSync(promptPath, templateContent, "utf8");
@@ -427,6 +447,8 @@ describe("interpolate_prompt", () => {
           expect(fs.readFileSync(path.join(tmpDir, "prompt-template.txt"), "utf8")).toBe(system + user);
           const importTree = JSON.parse(fs.readFileSync(path.join(tmpDir, "prompt-import-tree.json"), "utf8"));
           expect(importTree.template).toBe(system + user);
+          expect(importTree.trust).toBe("author");
+          expect(importTree.children[0].trust).toBe("author");
           expect(importTree.template).not.toContain("\x00GH_AW_PROMPT_SPLIT_");
           const substitutePlaceholders = require("./substitute_placeholders.cjs");
           await substitutePlaceholders({ file: promptPath, substitutions: { ACTOR: "developer" } });
@@ -479,6 +501,7 @@ describe("interpolate_prompt", () => {
           expect(fs.existsSync(treePath)).toBe(true);
           const tree = JSON.parse(fs.readFileSync(treePath, "utf8"));
           expect(tree.version).toBe(1);
+          expect(tree.trust).toBe("author");
           expect(tree.template).toBe(templateContent);
           expect(tree.children).toEqual([]);
         }),
@@ -500,6 +523,7 @@ describe("interpolate_prompt", () => {
           expect(tree.children).toHaveLength(1);
           expect(tree.children[0].macro).toBe("{{#runtime-import .github/workflows/helper.md}}");
           expect(tree.children[0].src).toContain("helper.md");
+          expect(tree.children[0].trust).toBe("author");
           expect(tree.children[0].rawContent).toBe("Helper content");
           expect(tree.children[0].optional).toBe(false);
           expect(tree.children[0].children).toEqual([]);
@@ -521,8 +545,10 @@ describe("interpolate_prompt", () => {
           expect(tree.children).toHaveLength(1);
           const parentNode = tree.children[0];
           expect(parentNode.rawContent).toBe("Parent\n{{#runtime-import .github/workflows/leaf.md}}");
+          expect(parentNode.trust).toBe("author");
           expect(parentNode.children).toHaveLength(1);
           expect(parentNode.children[0].rawContent).toBe("Leaf content");
+          expect(parentNode.children[0].trust).toBe("author");
         }));
     }));
 });

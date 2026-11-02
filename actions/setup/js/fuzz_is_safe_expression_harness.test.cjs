@@ -7,7 +7,7 @@
  *   - AND (&&) compound expressions
  *   - Comparison expressions (==, !=, <=, >=)
  *   - Ternary-style AND/OR chains
- *   - Security boundaries: each new form must still block secrets.*, vars.*, runner.*
+ *   - Security boundaries: each new form must still block secrets.*, vars.*, runner.*, env.*
  *
  * Also contains property-based combinatorial tests that exhaustively check
  * safe×safe, safe×unsafe, and unsafe×safe pairs for every binary operator.
@@ -30,12 +30,11 @@ const SAFE_LEAVES = [
   "github.event.inputs.branch",
   "needs.build.outputs.version",
   "steps.test.outputs.result",
-  "env.NODE_VERSION",
   "inputs.branch",
 ];
 
 /** Unsafe leaf expressions that must always be blocked. */
-const UNSAFE_LEAVES = ["secrets.TOKEN", "secrets.GITHUB_TOKEN", "vars.MY_VAR", "runner.os", "runner.temp", "github.token"];
+const UNSAFE_LEAVES = ["secrets.TOKEN", "secrets.GITHUB_TOKEN", "vars.MY_VAR", "runner.os", "runner.temp", "github.token", "env.NODE_VERSION"];
 
 /** Safe literal values (standalone). */
 const SAFE_LITERALS = ["'full-sweep (enforce_all)'", "'round-robin'", '"default"', "`value`", "42", "3.14", "true", "false"];
@@ -90,10 +89,13 @@ describe("fuzz_is_safe_expression – comparisons (allowed)", () => {
 
 describe("fuzz_is_safe_expression – comparisons (unsafe left side blocked)", () => {
   for (const unsafe of UNSAFE_LEAVES) {
-    it(`should block ${unsafe} == 'value'`, () => {
-      const { safe } = testIsSafeExpression(`${unsafe} == 'value'`);
-      expect(safe).toBe(false);
-    });
+    for (const op of COMPARISON_OPS) {
+      it(`should block ${unsafe} ${op} 'value'`, () => {
+        const { safe, error } = testIsSafeExpression(`${unsafe} ${op} 'value'`);
+        expect(error).toBeNull();
+        expect(safe).toBe(false);
+      });
+    }
   }
 });
 
