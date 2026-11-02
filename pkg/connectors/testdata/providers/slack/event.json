@@ -1,0 +1,14 @@
+{
+  "type": "event_callback",
+  "team_id": "T123ABC456",
+  "api_app_id": "A123ABC456",
+  "event_id": "Ev123ABC456",
+  "event": {
+    "type": "app_mention",
+    "channel": "C123ABC456",
+    "user": "U123ABC456",
+    "text": "<@UBOT123> summarize this thread",
+    "ts": "1515449533.000017",
+    "thread_ts": "1515449522.000016"
+  }
+}
