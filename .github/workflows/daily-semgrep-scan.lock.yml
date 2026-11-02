@@ -328,12 +328,16 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"}],\"system_item_count\":12}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"author_file\":\".github/workflows/daily-semgrep-scan.md\"}],\"system_item_count\":12,\"author_expressions\":{\"experiments.semgrep_output_format\":\"GH_AW_EXPERIMENTS_SEMGREP_OUTPUT_FORMAT\",\"experiments.semgrep_output_format == 'bullet_list'\":\"GH_AW_EXPR_EB970811\",\"experiments.semgrep_output_format == 'prose'\":\"GH_AW_EXPR_9D823FC8\",\"experiments.semgrep_output_format == 'ste'\":\"GH_AW_EXPR_F8A3047C\",\"experiments.semgrep_output_format == 'structured_sections'\":\"GH_AW_EXPR_9F79187F\"}}"
           GH_AW_EXPERIMENTS_SEMGREP_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.semgrep_output_format }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_9D823FC8: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'prose' }}
+          GH_AW_EXPR_9F79187F: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'structured_sections' }}
           GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_EB970811: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'bullet_list' }}
+          GH_AW_EXPR_F8A3047C: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'ste' }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
@@ -346,7 +350,6 @@ jobs:
           GH_AW_PROMPT_CONTENT_0005: "{{#runtime-import .github/workflows/shared/security-analysis-base.md}}\n"
           GH_AW_PROMPT_CONTENT_0006: "{{#runtime-import .github/workflows/shared/mcp/semgrep.md}}\n"
           GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import .github/workflows/shared/otlp.md}}\n"
-          GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/daily-semgrep-scan.md}}\n"
         with:
           script: |
             const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
@@ -362,6 +365,10 @@ jobs:
           GH_AW_SUB_AGENT_EXT: ".md"
           GH_AW_SKILL_DIR: ".codex/skills"
           GH_AW_SKILL_EXT: "/SKILL.md"
+          GH_AW_EXPR_EB970811: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'bullet_list' }}
+          GH_AW_EXPR_9D823FC8: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'prose' }}
+          GH_AW_EXPR_F8A3047C: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'ste' }}
+          GH_AW_EXPR_9F79187F: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'structured_sections' }}
           GH_AW_EXPERIMENTS_SEMGREP_OUTPUT_FORMAT: ${{ steps.pick-experiment.outputs.semgrep_output_format }}
         with:
           script: |
@@ -379,7 +386,11 @@ jobs:
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_9D823FC8: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'prose' }}
+          GH_AW_EXPR_9F79187F: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'structured_sections' }}
           GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
+          GH_AW_EXPR_EB970811: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'bullet_list' }}
+          GH_AW_EXPR_F8A3047C: ${{ steps.pick-experiment.outputs.semgrep_output_format == 'ste' }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
@@ -402,7 +413,11 @@ jobs:
                 GH_AW_EXPR_76DF9333: process.env.GH_AW_EXPR_76DF9333,
                 GH_AW_EXPR_77C1A4D2: process.env.GH_AW_EXPR_77C1A4D2,
                 GH_AW_EXPR_7C248226: process.env.GH_AW_EXPR_7C248226,
+                GH_AW_EXPR_9D823FC8: process.env.GH_AW_EXPR_9D823FC8,
+                GH_AW_EXPR_9F79187F: process.env.GH_AW_EXPR_9F79187F,
                 GH_AW_EXPR_C19C384F: process.env.GH_AW_EXPR_C19C384F,
+                GH_AW_EXPR_EB970811: process.env.GH_AW_EXPR_EB970811,
+                GH_AW_EXPR_F8A3047C: process.env.GH_AW_EXPR_F8A3047C,
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,

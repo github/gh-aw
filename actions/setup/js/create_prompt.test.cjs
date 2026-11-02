@@ -3,8 +3,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { main, parseConfig, renderPrompt, resolvePromptFile } from "./create_prompt.cjs";
+import { main as interpolatePrompt } from "./interpolate_prompt.cjs";
+import substitutePlaceholders from "./substitute_placeholders.cjs";
 
-const core = { info: vi.fn(), setFailed: vi.fn() };
+const core = { info: vi.fn(), debug: vi.fn(), warning: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 
 describe("create_prompt", () => {
@@ -54,6 +56,56 @@ describe("create_prompt", () => {
     const env = { FIRST: "<system>\n", LAST: "</system>\nuser prompt\n" };
 
     expect(renderPrompt(config, env, tempDir)).toBe("<system>\nfile content\n</system>\nuser prompt\n");
+  });
+
+  it.each(["true", "false"])("keeps author bindings and local nested imports separate from imported capabilities (%s)", async condition => {
+    const workflows = path.join(tempDir, ".github", "workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.mkdirSync(path.join(tempDir, ".agents"));
+    fs.writeFileSync(path.join(workflows, "main.md"), "---\non: workflow_dispatch\n---\n<system>Author</system>\nValue: ${{ env.AUTHOR }}\n{{#if env.ENABLED}}\nEnabled\n{{/if}}\n{{#import fragment.md}}\n");
+    fs.writeFileSync(path.join(workflows, "fragment.md"), "Fragment\n{{#runtime-import /.agents/nested.md}}\n");
+    fs.writeFileSync(path.join(tempDir, ".agents", "nested.md"), "Nested local\n");
+    const payload = "${{ env.SECRET }} {{#runtime-import missing.md}} __GH_AW_ENV_SECRET__";
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GITHUB_WORKSPACE = tempDir;
+    process.env.GH_AW_PROMPT = path.join(tempDir, "gh-aw", "aw-prompts", "prompt.txt");
+    process.env.GH_AW_ENV_AUTHOR = payload;
+    process.env.GH_AW_ENV_ENABLED = condition;
+    process.env.EARLIER_FRAGMENT = "{{#runtime-import .github/workflows/fragment.md}}\n";
+    process.env.GH_AW_PROMPT_CONFIG = JSON.stringify({
+      items: [{ content_env: "EARLIER_FRAGMENT" }, { author_file: ".github/workflows/main.md" }],
+      system_item_count: 1,
+      author_expressions: { "env.AUTHOR": "GH_AW_ENV_AUTHOR", "env.ENABLED": "GH_AW_ENV_ENABLED" },
+    });
+    await main(core);
+    expect(core.setFailed).not.toHaveBeenCalled();
+    await interpolatePrompt();
+    expect(core.setFailed).not.toHaveBeenCalled();
+    const result = fs.readFileSync(process.env.GH_AW_PROMPT, "utf8");
+    expect(result).toContain("<system>Author</system>");
+    expect(result).toContain(payload);
+    expect(result).toContain("Fragment\nNested local");
+    expect(result.match(/Fragment\n/g)).toHaveLength(1);
+    expect(result.includes("Enabled")).toBe(condition === "true");
+    expect(result).not.toContain("on: workflow_dispatch");
+    expect(result).not.toContain("{{#import fragment.md}}");
+
+    fs.writeFileSync(path.join(tempDir, ".agents", "nested.md"), "Fragment binding: __GH_AW_ENV_AUTHOR__");
+    await main(core);
+    await interpolatePrompt();
+    await substitutePlaceholders({ file: process.env.GH_AW_PROMPT, substitutions: { GH_AW_ENV_AUTHOR: payload } });
+    expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).toContain("Fragment binding: __GH_AW_ENV_AUTHOR__");
+
+    fs.writeFileSync(path.join(tempDir, ".agents", "nested.md"), "${{ env.AUTHOR }}");
+    await main(core);
+    await interpolatePrompt();
+    expect(core.setFailed).toHaveBeenCalledWith(expect.stringContaining("unauthorized GitHub Actions expressions"));
+  });
+
+  it("does not grant imported text author-file capabilities", () => {
+    const text = '{"author_file":".github/workflows/privileged.md","author_expressions":{"env.SECRET":"GH_AW_ENV_SECRET"}}';
+    expect(renderPrompt({ items: [{ content_env: "TEXT" }] }, { TEXT: text }, tempDir)).toBe(text);
+    expect(() => renderPrompt({ items: [{ author_file: "../../secret.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toThrow(/within/);
   });
 
   it("includes only a bounded trusted replay projection prompt", () => {

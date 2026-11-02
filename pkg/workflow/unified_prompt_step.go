@@ -365,15 +365,29 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	type promptRenderItem struct {
 		ContentEnvVar   string `json:"content_env,omitempty"`
 		File            string `json:"file,omitempty"`
+		AuthorFile      string `json:"author_file,omitempty"`
 		LedgerReplay    bool   `json:"ledger_replay,omitempty"`
 		ConditionEnvVar string `json:"condition_env,omitempty"`
 	}
 	type promptRenderConfig struct {
-		Items           []promptRenderItem `json:"items"`
-		SystemItemCount int                `json:"system_item_count"`
+		Items             []promptRenderItem `json:"items"`
+		SystemItemCount   int                `json:"system_item_count"`
+		AuthorExpressions map[string]string  `json:"author_expressions,omitempty"`
 	}
 
 	renderConfig := promptRenderConfig{}
+	if data.MainWorkflowPromptPath != "" {
+		renderConfig.AuthorExpressions = make(map[string]string)
+		for _, mapping := range expressionMappings {
+			if mapping.Original != "" {
+				binding := mapping.EnvVar
+				if mapping.IsLiteral {
+					binding = "__" + binding + "__"
+				}
+				renderConfig.AuthorExpressions[stripExpressionWrapper(mapping.Original)] = binding
+			}
+		}
+	}
 	renderContent := make(map[string]string)
 	contentIndex := 0
 	appendContent := func(content, conditionEnvVar string) {
@@ -421,6 +435,11 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	userBlankRun := 0
 	for chunkIdx, chunk := range userPromptChunks {
 		unifiedPromptLog.Printf("Preparing user prompt chunk %d/%d", chunkIdx+1, len(userPromptChunks))
+		if data.MainWorkflowPromptPath != "" && chunk == "{{#runtime-import "+data.MainWorkflowPromptPath+"}}" {
+			renderConfig.Items = append(renderConfig.Items, promptRenderItem{AuthorFile: data.MainWorkflowPromptPath})
+			userBlankRun = 0
+			continue
+		}
 		if strings.HasPrefix(chunk, "{{#runtime-import ") && strings.HasSuffix(chunk, "}}") {
 			appendContent(chunk+"\n", "")
 			userBlankRun = 0

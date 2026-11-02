@@ -335,8 +335,9 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"}],\"system_item_count\":13}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"github_mcp_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"author_file\":\".github/workflows/agent-persona-explorer.md\"}],\"system_item_count\":13,\"author_expressions\":{\"experiments.sub_agent_strategy\":\"GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY\",\"experiments.sub_agent_strategy == 'batch'\":\"GH_AW_EXPR_491A3770\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\"}}"
           GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY: ${{ steps.pick-experiment.outputs.sub_agent_strategy }}
+          GH_AW_EXPR_491A3770: ${{ steps.pick-experiment.outputs.sub_agent_strategy == 'batch' }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -356,7 +357,6 @@ jobs:
           GH_AW_PROMPT_CONTENT_0008: "{{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}\n"
           GH_AW_PROMPT_CONTENT_0009: "{{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}\n"
           GH_AW_PROMPT_CONTENT_0010: "{{#runtime-import .github/workflows/shared/graders/recurrence-laminarity.md}}\n"
-          GH_AW_PROMPT_CONTENT_0011: "{{#runtime-import .github/workflows/agent-persona-explorer.md}}\n"
         with:
           script: |
             const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
@@ -372,6 +372,7 @@ jobs:
           GH_AW_SUB_AGENT_EXT: ".md"
           GH_AW_SKILL_DIR: ".claude/skills"
           GH_AW_SKILL_EXT: ".md"
+          GH_AW_EXPR_491A3770: ${{ steps.pick-experiment.outputs.sub_agent_strategy == 'batch' }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY: ${{ steps.pick-experiment.outputs.sub_agent_strategy }}
         with:
@@ -390,6 +391,7 @@ jobs:
           GH_AW_CACHE_DESCRIPTION: ""
           GH_AW_CACHE_DIR: "/tmp/gh-aw/cache-memory/"
           GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY: ${{ steps.pick-experiment.outputs.sub_agent_strategy }}
+          GH_AW_EXPR_491A3770: ${{ steps.pick-experiment.outputs.sub_agent_strategy == 'batch' }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
@@ -416,6 +418,7 @@ jobs:
                 GH_AW_CACHE_DESCRIPTION: process.env.GH_AW_CACHE_DESCRIPTION,
                 GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR,
                 GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY: process.env.GH_AW_EXPERIMENTS_SUB_AGENT_STRATEGY,
+                GH_AW_EXPR_491A3770: process.env.GH_AW_EXPR_491A3770,
                 GH_AW_EXPR_76DF9333: process.env.GH_AW_EXPR_76DF9333,
                 GH_AW_EXPR_77C1A4D2: process.env.GH_AW_EXPR_77C1A4D2,
                 GH_AW_EXPR_7C248226: process.env.GH_AW_EXPR_7C248226,

@@ -1101,6 +1101,9 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Neutralize AI-model control tags to prevent prompt injection via runtime-imported files
   content = neutralizeSystemTags(content);
 
+  // Raw fragment text cannot mint the compiler's author-expression bindings.
+  content = content.replace(/\$\{GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+\}|__GH_AW_(?:ENV|SECRETS|VARS|EXPR)_[A-Z0-9_]+__/g, value => protectValue(value));
+
   // Wrap expressions in template conditionals
   // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
   content = wrapExpressionsInTemplateConditionals(content);
@@ -1372,6 +1375,9 @@ module.exports = {
   fetchUrlContent,
   processRuntimeImports,
   processRuntimeImport,
+  resolveRuntimeImportFilePath,
+  assertRuntimeImportRealPathWithinBase,
+  resolveRuntimeImportKey,
   closeUnterminatedInlineMarkers,
   hasFrontMatter,
   removeXMLComments,

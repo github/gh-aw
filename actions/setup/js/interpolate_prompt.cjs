@@ -17,7 +17,7 @@ const { writeInlineSkills } = require("./extract_inline_skills.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_VALIDATION } = require("./error_codes.cjs");
 const { renderMarkdownTemplate } = require("./render_template.cjs");
-const { createLiteralValues, restoreInlineMetadata, writeLiteralState, literalFileKey } = require("./prompt_literal_values.cjs");
+const { createLiteralValues, readLiteralState, restoreInlineMetadata, writeLiteralState, literalFileKey } = require("./prompt_literal_values.cjs");
 
 /**
  * @typedef {Object} ImportTreeNode
@@ -96,7 +96,7 @@ async function main({ deferredBindings = {} } = {}) {
     const originalLength = content.length;
     // Keep evaluated context opaque until all author-owned directives have run.
     // The same protection covers values evaluated while expanding runtime imports.
-    const { state: literalState, protect: protectValue, restore: restoreValues } = createLiteralValues();
+    const { state: literalState, protect: protectValue, restore: restoreValues } = createLiteralValues(readLiteralState(promptPath) ?? undefined);
     const protectExpression = (/** @type {string} */ value, /** @type {string|undefined} */ expression) => {
       if (expression && (deferredBindings[generatePlaceholderName(expression)] === value || deferredBindings[generateHashedExpressionEnvVarName(expression)] === value)) {
         return value;
@@ -139,7 +139,7 @@ async function main({ deferredBindings = {} } = {}) {
     core.info("\n========================================");
     core.info("[main] STEP 1: Runtime Imports");
     core.info("========================================");
-    const hasRuntimeImports = /{{#runtime-import\??[ \t]+[^\}]+}}/.test(content);
+    const hasRuntimeImports = /\{\{#(?:runtime-import|import)\??(?:[ \t]+|[ \t]*:[ \t]*)/.test(content);
 
     // Build an import provenance tree so downstream consumers (e.g. threat detection)
     // can identify which parts of the rendered prompt originated from which source files.

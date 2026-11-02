@@ -19,6 +19,7 @@ type testPromptRenderConfig struct {
 	Items []struct {
 		ContentEnvVar   string `json:"content_env"`
 		File            string `json:"file"`
+		AuthorFile      string `json:"author_file"`
 		ConditionEnvVar string `json:"condition_env"`
 	} `json:"items"`
 }
@@ -39,6 +40,10 @@ func promptRenderPlan(t *testing.T, output string) string {
 
 	var plan strings.Builder
 	for _, item := range config.Items {
+		if item.AuthorFile != "" {
+			plan.WriteString("{{#author-prompt " + item.AuthorFile + "}}\n")
+			continue
+		}
 		if item.File != "" {
 			plan.WriteString(item.File)
 			plan.WriteByte('\n')

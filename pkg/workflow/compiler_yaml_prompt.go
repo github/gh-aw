@@ -104,7 +104,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 	if !c.inlinePrompt && !data.InlinedImports && data.MainWorkflowMarkdown != "" {
 		compilerYamlPromptLog.Printf("Extracting expressions from main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
 		mainExtractor := NewExpressionExtractor()
-		mainExprMappings, err := mainExtractor.ExtractExpressions(data.MainWorkflowMarkdown)
+		mainExprMappings, err := mainExtractor.ExtractExpressions(wrapExpressionsInTemplateConditionals(data.MainWorkflowMarkdown))
 		if err == nil && len(mainExprMappings) > 0 {
 			compilerYamlPromptLog.Printf("Extracted %d expressions from main workflow markdown", len(mainExprMappings))
 			expressionMappings = append(expressionMappings, mainExprMappings...)
@@ -130,6 +130,7 @@ func (c *Compiler) enrichExpressionMappings(data *WorkflowData, expressionMappin
 // In inline mode it embeds the markdown directly; otherwise it emits a runtime-import macro.
 // Any expression mappings extracted from inline markdown are appended to expressionMappings.
 func (c *Compiler) buildMainWorkflowPromptChunks(data *WorkflowData, userPromptChunks []string, expressionMappings []*ExpressionMapping) ([]string, []*ExpressionMapping) {
+	data.MainWorkflowPromptPath = ""
 	if c.inlinePrompt || data.InlinedImports {
 		if data.MainWorkflowMarkdown != "" {
 			compilerYamlPromptLog.Printf("Inlining main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
@@ -160,6 +161,7 @@ func (c *Compiler) buildMainWorkflowPromptChunks(data *WorkflowData, userPromptC
 		workflowFilePath = filepath.Base(c.markdownPath)
 	}
 	runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", workflowFilePath)
+	data.MainWorkflowPromptPath = workflowFilePath
 	compilerYamlPromptLog.Printf("Using runtime-import for main workflow markdown: %s", workflowFilePath)
 	return append(userPromptChunks, runtimeImportMacro), expressionMappings
 }

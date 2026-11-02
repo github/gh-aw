@@ -81,9 +81,9 @@ Normal content here.
 		t.Error("Interpolation and template rendering step should use github-script action")
 	}
 
-	// Verify runtime-import macro is in lock file
-	if !strings.Contains(compiledStr, "{{#runtime-import") {
-		t.Error("Compiled workflow should contain runtime-import macro")
+	// The author source is loaded separately from restricted imported fragments.
+	if !strings.Contains(promptRenderPlan(t, compiledStr), "{{#author-prompt ") {
+		t.Error("Compiled workflow should contain an author prompt source")
 	}
 
 	// Verify the runtime-import references the test workflow file

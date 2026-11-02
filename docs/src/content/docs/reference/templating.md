@@ -27,7 +27,7 @@ All other expressions are disallowed, including `secrets.*`, `vars.*`, and compl
 
 The main workflow's author-written prompt supports `env.*` expressions (including comparisons and defaults such as `${{ env.LOG_LEVEL || 'info' }}`). The compiler creates explicit expression bindings evaluated by GitHub Actions; this is not access to the runner's entire environment. These values become prompt content, so do not reference environment variables containing secrets.
 
-Runtime-imported fragments do **not** support `env.*`, even if the main prompt binds the same expression. This restriction also applies to nested imports and compound expressions. The compiler-generated self-import of the main workflow retains its author-prompt bindings; it does not grant those capabilities to additional imported fragments.
+Runtime-imported fragments do **not** support `env.*`, even if the main prompt binds the same expression. This restriction also applies to nested imports and compound expressions. The compiler loads the main workflow as an author prompt source, separately from runtime-imported fragments, and retains its explicit bindings. Locally assembled system and user prompts can contain imports; local fragments can nest imports within the permitted folders, while downloaded HTTPS content remains static and cannot trigger imports or expressions.
 
 Expression safety is validated during compilation. Unauthorized expressions produce errors like:
 

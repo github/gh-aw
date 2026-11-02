@@ -3,10 +3,13 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,6 +103,52 @@ func TestCompilerMainPromptPreservesEnvBindings(t *testing.T) {
 			require.NotEmpty(t, mappings)
 			for _, mapping := range mappings {
 				assert.Contains(t, string(content), mapping.EnvVar+": ${{ "+mapping.Content+" }}")
+			}
+			if mode == "runtime" {
+				var compiled struct {
+					Jobs map[string]struct {
+						Steps []struct {
+							Name string
+							Env  map[string]string
+						}
+					}
+				}
+				require.NoError(t, yaml.Unmarshal(content, &compiled))
+				for _, job := range compiled.Jobs {
+					for _, step := range job.Steps {
+						if step.Name != "Create prompt with built-in context" {
+							continue
+						}
+						var config struct {
+							Items []struct {
+								AuthorFile string `json:"author_file"`
+							}
+							Expressions map[string]string `json:"author_expressions"`
+						}
+						require.NoError(t, json.Unmarshal([]byte(step.Env["GH_AW_PROMPT_CONFIG"]), &config))
+						require.Contains(t, config.Items, struct {
+							AuthorFile string `json:"author_file"`
+						}{".github/workflows/test.md"})
+						for _, mapping := range mappings {
+							assert.Equal(t, mapping.EnvVar, config.Expressions[stripExpressionWrapper(mapping.Original)])
+						}
+						node, err := exec.LookPath("node")
+						require.NoError(t, err)
+						runtimeDir, err := filepath.Abs("../../actions/setup/js")
+						require.NoError(t, err)
+						command := exec.Command(node, "-e", `
+const { renderPrompt } = require(process.argv[1] + "/create_prompt.cjs");
+const config = JSON.parse(process.argv[2]);
+const env = { GITHUB_WORKSPACE: process.argv[3] };
+for (const binding of Object.values(config.author_expressions)) env[binding] = "author-value";
+config.items = config.items.filter(item => item.author_file);
+process.stdout.write(renderPrompt(config, env, process.argv[3]));
+`, runtimeDir, step.Env["GH_AW_PROMPT_CONFIG"], filepath.Dir(filepath.Dir(dir)))
+						output, err := command.CombinedOutput()
+						require.NoError(t, err, "%s", output)
+						assert.Equal(t, "Value: author-value\nDefault: author-value\n", string(output))
+					}
+				}
 			}
 		})
 	}
