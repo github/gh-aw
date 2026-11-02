@@ -12,7 +12,7 @@ const (
 	enclaveDiagnosticsRoot         = "/var/lib/awf-enclave-smoke-export"
 	enclaveDiagnosticsUploadAction = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
 	enclaveDiagnosticsRunKey       = "${{ github.run_id }}-${{ github.run_attempt }}"
-	enclaveDiagnosticsInstallerSHA = "10408aa198071a605e3f6492c6a6071fb785376a58f32924e71ab6303ebb0599"
+	enclaveDiagnosticsInstallerSHA = "adb59bd042bfe11a432b2c6577f3919988ff30dcc04ab9bc2f6264422eb4b021"
 )
 
 func enclaveDiagnosticsEnabled(data *WorkflowData) bool {
@@ -87,11 +87,14 @@ func generateEnclaveDiagnosticsPrepare(yaml *strings.Builder, data *WorkflowData
 	yaml.WriteString("          DIAGNOSTICS_STAGING=\"$staging_dir\" NODE_OPTIONS= NODE_PATH= node \"${RUNNER_TEMP}/gh-aw/actions/install_enclave_diagnostics.cjs\"\n")
 	yaml.WriteString("          installer_dir=$(/usr/bin/sudo -n /usr/bin/mktemp -d /var/lib/awf-enclave-diagnostics-install.XXXXXX)\n")
 	yaml.WriteString("          [[ \"$installer_dir\" == /var/lib/awf-enclave-diagnostics-install.* ]]\n")
-	yaml.WriteString("          installer_path=\"$installer_dir/install_enclave_diagnostics.py\"\n")
-	yaml.WriteString("          /usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- \"${RUNNER_TEMP}/gh-aw/actions/install_enclave_diagnostics.py\" \"$installer_path\"\n")
+	yaml.WriteString("          installer_path=\"$installer_dir/install_enclave_diagnostics_trusted.cjs\"\n")
+	yaml.WriteString("          /usr/bin/sudo -n /usr/bin/install -o root -g root -m 0500 -- \"${RUNNER_TEMP}/gh-aw/actions/install_enclave_diagnostics_trusted.cjs\" \"$installer_path\"\n")
 	yaml.WriteString("          installer_sha256=$(/usr/bin/sudo -n /usr/bin/sha256sum \"$installer_path\")\n")
 	writeFormattedYAML(yaml, "          [[ \"${installer_sha256%%%% *}\" == \"%s\" ]]\n", enclaveDiagnosticsInstallerSHA)
-	yaml.WriteString("          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- /usr/bin/python3 -I \"$installer_path\" \"$staging_dir/node.tar.xz\" \"$staging_dir/collector.cjs\"\n")
+	for _, line := range trustedEnclaveInstallerNodeLines("$staging_dir", false) {
+		yaml.WriteString(line + "\n")
+	}
+	yaml.WriteString("          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- \"$installer_dir/node\" --no-addons --no-global-search-paths \"$installer_path\" \"$installer_dir/node\" \"$staging_dir/collector.cjs\"\n")
 	writeFormattedYAML(yaml, "          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C /usr/bin/sudo -n -- %s/node %s/collector.cjs prepare docker \"$DEBUG_RUN_KEY\" \"$(id -u)\" \"$(id -g)\"\n", enclaveDiagnosticsRoot, enclaveDiagnosticsRoot)
 	return nil
 }

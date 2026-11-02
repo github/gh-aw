@@ -40,35 +40,35 @@ all: build
 
 # Build the binary, run make deps before this
 .PHONY: build
-build: sync-action-pins sync-action-scripts sync-compat sync-model-aliases
+build: lint-setup-no-python sync-action-pins sync-action-scripts sync-compat sync-model-aliases
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/gh-aw
 
 # Build for all platforms
 .PHONY: build-all
-build-all: build-linux build-darwin build-windows build-android
+build-all: lint-setup-no-python build-linux build-darwin build-windows build-android
 
 .PHONY: build-linux
-build-linux:
+build-linux: lint-setup-no-python
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY_NAME)-linux-amd64 ./cmd/gh-aw
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY_NAME)-linux-arm64 ./cmd/gh-aw
 
 .PHONY: build-darwin
-build-darwin:
+build-darwin: lint-setup-no-python
 	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY_NAME)-darwin-amd64 ./cmd/gh-aw
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY_NAME)-darwin-arm64 ./cmd/gh-aw
 
 .PHONY: build-windows
-build-windows:
+build-windows: lint-setup-no-python
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY_NAME)-windows-amd64.exe ./cmd/gh-aw
 
 .PHONY: build-android
-build-android:
+build-android: lint-setup-no-python
 	CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY_NAME)-android-arm64 ./cmd/gh-aw
 
 # Build WebAssembly module for browser usage
 # Optionally runs wasm-opt (from Binaryen) if available for ~8% size reduction
 .PHONY: build-wasm
-build-wasm:
+build-wasm: lint-setup-no-python
 	GOOS=js GOARCH=wasm go build -ldflags="-w -s" -o gh-aw.wasm ./cmd/gh-aw-wasm
 	@if command -v wasm-opt >/dev/null 2>&1; then \
 		echo "Running wasm-opt -Oz (size optimization)..."; \
@@ -534,6 +534,7 @@ test-scripts: build
 	bash scripts/check-stale-lock-files_test.sh
 	bash scripts/agent-report-progress_test.sh
 	bash scripts/check-skill-file-paths_test.sh
+	bash scripts/check-setup-no-python_test.sh
 	bash scripts/check-safe-outputs-conformance_test.sh
 	bash scripts/resolve-base-commit_test.sh
 	bash scripts/pr-data-prefetch_test.sh
@@ -1188,6 +1189,11 @@ lint-action-sh:
 	@echo "Checking action shell scripts for python/python3 invocations..."
 	@bash scripts/check-action-sh-no-python.sh
 
+# Reject Python source files in first-party setup action code.
+.PHONY: lint-setup-no-python
+lint-setup-no-python:
+	@bash scripts/check-setup-no-python.sh
+
 # Run shellcheck on actions/setup/sh scripts at error severity
 .PHONY: shellcheck-setup-sh
 shellcheck-setup-sh:
@@ -1208,7 +1214,7 @@ shellcheck-setup-sh:
 
 # Validate all project files
 .PHONY: lint
-lint: check-stale-lock-files check-skill-file-paths fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh shellcheck-setup-sh check-stale-schema-binary
+lint: check-stale-lock-files check-skill-file-paths fmt-check fmt-check-json lint-cjs golint validate-model-alias-chains lint-action-sh lint-setup-no-python shellcheck-setup-sh check-stale-schema-binary
 	@echo "✓ All validations passed"
 
 # Install the binary locally
@@ -1543,6 +1549,7 @@ help:
 	@echo "  lint-error-messages-report - Non-blocking full-repo error message audit"
 	@echo "  validate-otel-contract - Validate the gh-aw OpenTelemetry compatibility contract"
 	@echo "  lint-action-sh   - Lint action shell scripts for python/python3 invocations"
+	@echo "  lint-setup-no-python - Reject Python files under actions/setup (also runs during build)"
 	@echo "  shellcheck-setup-sh - Run shellcheck on actions/setup/sh scripts"
 	@echo "  check-file-sizes - Check Go file sizes and function counts (informational)"
 	@echo "  check-validator-sizes - Check *_validation.go files against the 768-line hard limit"
