@@ -135,6 +135,7 @@ describe("excluded workflow lock transport", () => {
     expect(bundle.success).toBe(false);
     expect(patch.error).toContain("gh aw compile");
     expect(bundle.error).toContain("gh aw compile");
+    expect(bundle.error).toBe(`Failed to generate filtered patch for bundle synthesis: No changes remain after workflow YAML exclusions.\n\n${WORKFLOW_COMPILATION_NOTICE}`);
     expect(patch.excludedWorkflowFiles).toEqual([".github/workflows/existing.lock.yml"]);
   });
 

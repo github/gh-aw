@@ -625,10 +625,6 @@ describe("git patch integration tests", () => {
       execGit(["add", "feature2.txt"], { cwd: workingRepo });
       execGit(["commit", "-m", "Second commit - the new one"], { cwd: workingRepo });
 
-      // Delete the origin/feature-branch tracking ref to simulate a fresh checkout
-      // that hasn't fetched the remote branch yet
-      execGit(["update-ref", "-d", "refs/remotes/origin/feature-branch"], { cwd: workingRepo });
-
       // Generate patch in incremental mode
       // Set environment
       const origWorkspace = process.env.GITHUB_WORKSPACE;
@@ -686,7 +682,9 @@ describe("git patch integration tests", () => {
         // Should fail with a clear error message
         expect(result.success).toBe(false);
         expect(result.error).toContain("Cannot generate incremental patch");
-        expect(result.error).toContain("origin/local-only-branch");
+        expect(result.error).toContain("PR-head baseline");
+        expect(result.error).toContain("checkout.fetch-depth");
+        expect(result.error).not.toContain("origin/local-only-branch");
       } finally {
         process.env.GITHUB_WORKSPACE = origWorkspace;
         process.env.DEFAULT_BRANCH = origDefaultBranch;
@@ -766,7 +764,7 @@ describe("git patch integration tests", () => {
       };
     }
 
-    it("should not write auth extraheader to git config during a successful fetch", async () => {
+    it("should not write auth extraheader during local artifact generation", async () => {
       // Set up a feature branch, push a first commit, then add a second commit so
       // incremental mode has something new to patch.
       execGit(["checkout", "-b", "auth-cleanup-success"], { cwd: workingRepo });
@@ -780,16 +778,13 @@ describe("git patch integration tests", () => {
       execGit(["add", "auth2.txt"], { cwd: workingRepo });
       execGit(["commit", "-m", "Auth cleanup new commit"], { cwd: workingRepo });
 
-      // Delete the tracking ref so generateGitPatch has to re-fetch
-      execGit(["update-ref", "-d", "refs/remotes/origin/auth-cleanup-success"], { cwd: workingRepo });
-
       const restore = setTestEnv(workingRepo);
       try {
         const result = await generateGitPatch("auth-cleanup-success", "main", { mode: "incremental" });
 
         expect(result.success).toBe(true);
 
-        // Verify the extraheader was never written to git config (auth is passed via env vars)
+        // Artifact generation does not configure authentication.
         const configCheck = spawnSync("git", ["config", "--local", "--get", "http.https://github.example.com/.extraheader"], { cwd: workingRepo, encoding: "utf8" });
         // exit status 1 means the key does not exist — that is what we want
         expect(configCheck.status).toBe(1);
@@ -798,23 +793,23 @@ describe("git patch integration tests", () => {
       }
     });
 
-    it("should not write auth extraheader to git config even when fetch fails", async () => {
-      // Create a local-only branch (fetch will fail because it's not on origin)
+    it("should not write auth extraheader when the required local ref is missing", async () => {
+      // Create a local-only branch without a pre-agent tracking ref.
       execGit(["checkout", "-b", "auth-cleanup-failure"], { cwd: workingRepo });
       fs.writeFileSync(path.join(workingRepo, "auth-fail.txt"), "auth fail test\n");
       execGit(["add", "auth-fail.txt"], { cwd: workingRepo });
       execGit(["commit", "-m", "Auth cleanup failure test commit"], { cwd: workingRepo });
-      // Do NOT push — so the fetch fails
+      // Do NOT push: there is no tracking ref.
 
       const restore = setTestEnv(workingRepo);
       try {
         const result = await generateGitPatch("auth-cleanup-failure", "main", { mode: "incremental" });
 
-        // The fetch must fail since origin/auth-cleanup-failure doesn't exist
+        // The missing baseline must fail without a fetch.
         expect(result.success).toBe(false);
         expect(result.error).toContain("Cannot generate incremental patch");
 
-        // Verify the extraheader was never written to git config (auth is passed via env vars)
+        // Artifact generation does not configure authentication.
         const configCheck = spawnSync("git", ["config", "--local", "--get", "http.https://github.example.com/.extraheader"], { cwd: workingRepo, encoding: "utf8" });
         // exit status 1 means the key does not exist — that is what we want
         expect(configCheck.status).toBe(1);
@@ -823,7 +818,7 @@ describe("git patch integration tests", () => {
       }
     });
 
-    it("should use options.token instead of GITHUB_TOKEN when provided", async () => {
+    it("should not fetch a missing baseline even when legacy options.token is provided", async () => {
       // Set up a feature branch with a commit to push
       execGit(["checkout", "-b", "token-option-test"], { cwd: workingRepo });
       fs.writeFileSync(path.join(workingRepo, "token-test.txt"), "token option test\n");
@@ -836,21 +831,26 @@ describe("git patch integration tests", () => {
       execGit(["add", "token-test2.txt"], { cwd: workingRepo });
       execGit(["commit", "-m", "Token option new commit"], { cwd: workingRepo });
 
-      // Delete the tracking ref so generateGitPatch has to re-fetch
+      // Delete the tracking ref; artifact generation must not restore it.
       execGit(["update-ref", "-d", "refs/remotes/origin/token-option-test"], { cwd: workingRepo });
 
       const restore = setTestEnv(workingRepo);
       try {
-        // Pass a custom token via options.token — the local git server ignores auth so the
-        // fetch still succeeds, but we verify no credentials are written to disk.
+        // Legacy token options must not enable a fetch.
+        core.warning.mockClear();
         const result = await generateGitPatch("token-option-test", "main", {
           mode: "incremental",
           token: "ghs_custom_token_for_cross_repo",
         });
 
-        expect(result.success).toBe(true);
+        expect(result.success).toBe(false);
+        expect(core.warning).toHaveBeenCalledTimes(1);
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("options.token is deprecated and ignored"));
+        expect(JSON.stringify(core.warning.mock.calls)).not.toContain("ghs_custom_token_for_cross_repo");
+        expect(result.error).toContain("Artifact generation never fetches");
+        expect(execGit(["show-ref", "--verify", "--quiet", "refs/remotes/origin/token-option-test"], { cwd: workingRepo, allowFailure: true }).status).toBe(1);
 
-        // Verify the extraheader was never written to git config (auth is passed via env vars only)
+        // Artifact generation does not configure authentication.
         const configCheck = spawnSync("git", ["config", "--local", "--get", "http.https://github.example.com/.extraheader"], { cwd: workingRepo, encoding: "utf8" });
         // exit status 1 means the key does not exist — that is what we want
         expect(configCheck.status).toBe(1);
@@ -859,7 +859,7 @@ describe("git patch integration tests", () => {
       }
     });
 
-    it("should fall back to existing remote tracking ref when fetch fails in incremental mode", async () => {
+    it("should use the existing remote tracking ref without contacting the remote", async () => {
       // Simulate a shallow checkout scenario:
       // 1. feature-branch is created, first commit pushed to origin (origin/feature-branch exists)
       // 2. Agent adds a new commit locally

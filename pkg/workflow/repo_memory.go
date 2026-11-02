@@ -448,6 +448,7 @@ func generateRepoMemoryArtifactUpload(builder *strings.Builder, data *WorkflowDa
 		filterStepID := generateRepoMemoryFilterFilesStep(builder, memory, memoryDir, memoryLabel, skipCondition)
 		validationStepID := generateRepoMemoryCustomValidationStep(builder, memory, memoryDir, memoryLabel, filterStepID, skipCondition)
 		generateRepoMemoryUploadArtifactStep(builder, repoMemoryUploadStepParams{
+			data:             data,
 			memory:           memory,
 			memoryDir:        memoryDir,
 			memoryLabel:      memoryLabel,
@@ -546,6 +547,7 @@ func generateRepoMemoryCustomValidationStep(builder *strings.Builder, memory Rep
 // (kept as a struct rather than individual parameters to stay within the repo's
 // function-parameter-count lint limit).
 type repoMemoryUploadStepParams struct {
+	data             *WorkflowData
 	memory           RepoMemoryEntry
 	memoryDir        string
 	memoryLabel      string
@@ -562,8 +564,10 @@ type repoMemoryUploadStepParams struct {
 // when configured, so a filter or validation failure can never result in an unfiltered
 // or unvalidated directory being uploaded.
 func generateRepoMemoryUploadArtifactStep(builder *strings.Builder, p repoMemoryUploadStepParams) {
+	recoveryStepID := "validate_recovery_repo_" + p.sanitizedID
+	generateRecoveryEnvelopeValidationStep(builder, recoveryStepID, p.data, p.pinAction, p.memoryDir)
 	fmt.Fprintf(builder, "      - name: Upload %s artifact (%s)\n", p.memoryLabel, p.memory.ID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	var conditions []string
+	conditions := []string{secretRedactionSuccessCondition(p.data), "steps." + recoveryStepID + ".outcome == 'success'"}
 	if p.skipCondition != "" {
 		conditions = append(conditions, p.skipCondition)
 	}

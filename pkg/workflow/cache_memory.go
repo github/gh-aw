@@ -262,6 +262,8 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 		builder.WriteString("        env:\n")
 		fmt.Fprintf(builder, "          GH_AW_CACHE_DIR: %s\n", cacheDir)
 		builder.WriteString("        run: bash \"${RUNNER_TEMP}/gh-aw/actions/check_cache_memory_git_integrity.sh\"\n")
+		recoveryStepID := "validate_recovery_cache_" + SanitizeWorkflowIDForCacheKey(cache.ID)
+		generateRecoveryEnvelopeValidationStep(builder, recoveryStepID, data, pinAction, cacheDir)
 
 		// Add upload-artifact step for each cache (runs always)
 		if useBackwardCompatiblePaths {
@@ -271,9 +273,9 @@ func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowD
 		}
 		fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact"))
 		if cacheHasValidationStep(cache) {
-			fmt.Fprintf(builder, "        if: always() && steps.%s.outcome == 'success'\n", cacheMemoryValidationStepID(cache.ID))
+			fmt.Fprintf(builder, "        if: always() && %s && steps.%s.outcome == 'success' && steps.%s.outcome == 'success'\n", secretRedactionSuccessCondition(data), recoveryStepID, cacheMemoryValidationStepID(cache.ID)) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		} else {
-			builder.WriteString("        if: always()\n")
+			fmt.Fprintf(builder, "        if: always() && %s && steps.%s.outcome == 'success'\n", secretRedactionSuccessCondition(data), recoveryStepID) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		}
 		builder.WriteString("        with:\n")
 		// Always use the new artifact name and path format, with prefix in workflow_call context

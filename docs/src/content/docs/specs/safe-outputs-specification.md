@@ -122,7 +122,7 @@ This specification does NOT define:
 - AI model selection, prompt engineering, or agent implementation strategies
 - User interface design for workflow authoring or monitoring
 - Container orchestration, deployment topology, or infrastructure provisioning
-- Performance benchmarks or resource consumption limits
+- Performance benchmarks or resource limits unrelated to specified safe-output security boundaries
 
 ### 1.3 Design Principles
 
@@ -2860,6 +2860,125 @@ These requirements apply to `create_pull_request` and `push_to_pull_request_bran
 | PTI-006–007 | Registered cleanup and structured diagnostics in `transport_integrity.cjs` | `transport_integrity_git.test.cjs` verifies real Git refs, conflicting-rebase rollback, and malformed-patch aborts; helper tests cover checkout pinning, failed cleanup, cause retention, and safe logging |
 
 All implementation and test paths in this table are under `actions/setup/js/`. The bounded [transport lifecycle model](https://github.com/github/gh-aw/blob/main/specs/workflow-security/SafeOutputTransport.tla) specifies stable consumption, failure, retry, cleanup, and diagnostic invariants; it does not prove filesystem isolation or cryptographic collision resistance.
+
+##### Offline Generation and Deferred Object-Pack Recovery
+
+These requirements apply to agent-side generation for `create_pull_request` and
+`push_to_pull_request_branch` and the separate trusted publisher. They refine
+AGG-001–005 in the [compiler threat specification](https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md).
+Bounded object-pack recovery is distinct from ordinary bundle-prerequisite
+recovery under BGO-002; `allow-full-history-fetch` MUST NOT grant network authority
+to generation or remove object-pack budgets.
+
+**OGR-001 — Local-only generation**: Generation and helper-mediated Git inspection
+MUST deny all transports and lazy downloads with `GIT_ALLOW_PROTOCOL=""` and
+`GIT_NO_LAZY_FETCH=1`, and MUST disable repository-configured executable hooks,
+filters, and helpers. Caller environment, repository configuration, and recovery
+flags MUST NOT weaken this guard. Generation MUST NOT receive publisher
+credentials. Missing data MUST NOT trigger fetch, unshallowing, sparse expansion,
+or configuration mutation in the agent checkout. Successful local generation MUST
+remain the fast path.
+
+**OGR-002 — Raw staged input**: Staged changes MUST be derived from an isolated
+index and descriptor-pinned raw workspace files rather than repository-managed
+filters or `git add` semantics. Traversal MUST reject symlinked/replaced parents
+without consuming bytes outside the pinned workspace. File symlinks MAY be staged
+as link text but MUST NOT be dereferenced; other nonregular inputs MUST be rejected.
+Staged generation MUST NOT queue deferred object-pack recovery.
+
+**OGR-003 — Selected offline packaging**: Eligible non-staged failures MAY return
+`result: "queued"` with `recovery: "object-pack"`; this MUST NOT report publication
+success. Packaging MUST export only locally available objects selected from the
+pinned commit, using a non-thin, delta-free pack. Local baseline refs MAY exclude
+already-reachable objects as size hints only; they MUST NOT authorize publisher
+baselines or remote requests. Unrelated branches, tags, and unreachable history
+SHOULD NOT be exported. Missing agent-created bytes MUST fail explicitly.
+
+**OGR-004 — Complete preview and pre-upload guard**: The ordinary `.patch`
+artifact MUST preview every packed object's bytes, including intermediate history;
+the `.bundle` artifact MAY contain the versioned envelope. Before artifact upload,
+a post-redaction guard MUST independently parse the bounded pack, reconstruct its
+complete preview, and remove any envelope whose paired preview is missing,
+redacted, forged, or mismatched. Removal or scanning failures MUST prevent upload.
+Scan roots MUST stay within the established artifact roots, not inherit
+agent-written environment values or authorize external memory mounts.
+The guard MUST reject traversal through symlinks outside the canonical approved
+roots. Generated validation steps MUST pin additional roots, including an empty
+list when none are configured.
+Experimental drive mounts outside those roots MUST fail validation before upload;
+an unchanged but unredacted preview MUST NOT authorize its binary envelope.
+Before network access or import, the publisher MUST repeat bounded pack and
+complete-preview validation. Agent-supplied checksums alone MUST NOT establish
+preview completeness or authorization.
+
+**OGR-005 — Isolated trusted recovery**: The publisher MUST initialize a clean bare
+repository without copied configuration, hooks, remotes, alternates, or worktree.
+All network operations MUST use its independently authorized HTTPS repository and
+credential and finish before untrusted object import. Ancestry search MUST use a
+finite increasing treeless-fetch schedule, pin the first resolved baseline, and
+deepen only after successful but insufficient history. Required tree snapshots
+MUST derive from independently fetched trusted commits. Missing blobs MAY be
+requested only when their identities were independently read from trusted trees;
+uploaded graph edges MUST NOT authorize requests. Authentication, filtering, and
+other fetch failures MUST fail without retry or unfiltered fallback. Native import
+validation and strict fsck MUST remain enforced; promisor treatment MUST NOT
+excuse missing agent-created bytes. Subsequent regeneration MUST remain offline.
+
+**OGR-006 — Repository-controlled resource budgets**: All object-pack-specific
+object counts, uncompressed/pack/preview/header byte bounds, tree/scan entry
+budgets, hydration bytes, command/network deadlines, subprocess-output buffers,
+fetch batch size, and history-depth schedule MUST be configurable through the
+four documented [repository variables](/gh-aw/reference/checkout/#repository-configured-recovery-limits):
+`GH_AW_OBJECT_PACK_MAX_BYTES`, `GH_AW_OBJECT_PACK_MAX_OBJECTS`,
+`GH_AW_OBJECT_PACK_TIMEOUT_MS`, and `GH_AW_OBJECT_PACK_FETCH_DEPTHS`.
+Subordinate byte/entry/batch/deadline limits MUST use the documented shared ratios
+rather than separate configuration values, preserving existing defaults.
+Unset/empty bindings MUST retain finite defaults. Numeric settings MUST be
+positive decimal integers within runtime representation limits; depths MUST be
+finite and strictly increasing. Invalid settings MUST fail explicitly without
+logging their values or silently falling back. Compiler-generated bindings MUST
+reach generation, gateway and nested MCP containers, upload validation, and
+publishing. Upload-validation steps and publishers MUST independently source
+trusted repository values, not uploaded metadata or agent-written environment
+files. Pack/header/preview bounds MUST be consistent across these stages. Hydration
+is checked after each transfer batch; depth and time budgets MUST NOT be described
+as network-byte bounds. Raising budgets MUST NOT weaken authorization or validation.
+
+**OGR-007 — Baseline and publication preservation**: Full recovery MUST use the
+authorized base and preserve applicable trusted dispatch-SHA baselines.
+Incremental recovery MUST use the triggering PR's exact pre-agent head SHA and
+independently authorize its live head repository, never substituting upload
+metadata or a newer remote head. Reconstructed outputs MUST undergo ordinary
+Claim scoping, exclusions, compilation notices, explicit transport selection,
+file/history protection, size limits, signing, and publication-integrity checks.
+Only private transport snapshots MAY change; original uploads MUST remain immutable.
+
+**OGR-008 — Actionable failures and manual recovery**: Recovery failures MUST
+preserve original checkout-provisioning and structured operation-limit guidance
+without exposing raw subprocess diagnostics, content, credentials, or filesystem
+paths. Fallback instructions MUST treat object-pack envelopes as envelopes, not
+ordinary Git bundles or `git am` input. They MUST identify immutable artifacts,
+verify their identities, reconstruct from publisher-resolved baseline/tip values
+in a clean complete clone, and preserve exclusions.
+
+**Conformance Evidence**:
+
+| Requirements | Implementation / regression evidence |
+|---|---|
+| OGR-001–003 | `git_helpers.cjs`, generation helpers, `object_pack_transport.cjs`; `object_pack_transport.test.cjs`, `safe_outputs_handlers_recovery.test.cjs`, and real-Git generation regressions |
+| OGR-004 | `inspectObjectPack` and `validate_recovery_envelopes.cjs`; forged/secret/omitted-preview, configured-boundary, failed-removal, and compiler upload-ordering regressions |
+| OGR-005, OGR-007 | `object_pack_fetch.cjs`, both PR publishers, and `object_pack_transport_git.test.cjs`; trusted-tree hydration, exact baselines, native validation, immutable transports, and policy-rejection cases |
+| OGR-006 | `object_pack_limits.cjs` and compiler environment/container wiring; parser/default/boundary tests, publisher override rejection, deployed-runtime dependency checks, and `pkg/workflow/object_pack_limits_test.go` |
+| OGR-008 | `create_pull_request_helpers.cjs`, handler recovery regressions, and fallback-command tests |
+
+JavaScript paths are under `actions/setup/js/`. The bounded
+[generation](https://github.com/github/gh-aw/blob/main/specs/workflow-security/SafeOutputGeneration.tla)
+and [object-recovery](https://github.com/github/gh-aw/blob/main/specs/workflow-security/SafeOutputObjectRecovery.tla)
+models check separate finite abstractions. Recovery models trusted limit validity,
+independent publisher boundedness, and configurable finite attempt counts, with
+negative controls for invalid settings and upload-controlled policy. They do not
+prove Git parsing, descriptor traversal, actual byte/time thresholds, container
+environment wiring, or implementation refinement.
 
 ##### Bundle Git Operations and Validation Baselines
 
@@ -6505,6 +6624,10 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 
 **Version 1.29.15** (2026-11-02):
 
+- **Added**: OGR-001–008 for local-only generation, descriptor-pinned raw staging, selected object packaging, complete-preview upload/publisher validation, and isolated monorepo-aware recovery.
+- **Specified**: Four consolidated repository variables for bytes, objects, timeout, and fetch depths, with derived resource budgets across generation, gateway/nested containers, upload guards, and publishing, finite defaults, strict validation, and independent trusted publisher policy.
+- **Preserved**: Exact incremental/dispatch baselines, fetch-before-import ordering, immutable uploads, ordinary publication policies, original diagnostics, and object-pack-aware manual instructions.
+- **Extended**: Bounded recovery configuration/attempt invariants and synthetic controls, without claiming native thresholds or implementation refinement.
 - **Specified**: Runner UID/GID and container-local writable HOME defaults for the safeoutputs backend, preserving explicit overrides and private staged-file/Claim-directory modes.
 - **Clarified**: The container-to-host artifact handoff, retained asset guards, producer failures versus downstream publication cascades, and the limits of ownership and regression evidence. Adoption requires the fixed setup runtime, not a workflow lock or permission change.
 
