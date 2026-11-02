@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/goccy/go-yaml"
 )
 
 // TestPortfolioAnalystAvoidsInvalidSentryAggregations verifies the guard that
@@ -33,14 +36,43 @@ func TestPortfolioAnalystAvoidsInvalidSentryAggregations(t *testing.T) {
 		}
 	}
 
-	// Guard must survive compilation: the lock file should import the source.
+	// Guard must survive compilation through the compiler-selected author file.
 	lockContent, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "portfolio-analyst.lock.yml"))
 	if err != nil {
 		t.Fatalf("failed to read portfolio-analyst.lock.yml: %v", err)
 	}
-	if !strings.Contains(string(lockContent), "runtime-import .github/workflows/portfolio-analyst.md") {
-		t.Fatalf("portfolio-analyst.lock.yml does not import the workflow source; the guard may have been dropped during compilation")
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string
+			}
+		}
 	}
+	if err := yaml.Unmarshal(lockContent, &workflow); err != nil {
+		t.Fatalf("failed to parse portfolio-analyst.lock.yml: %v", err)
+	}
+	for _, job := range workflow.Jobs {
+		for _, step := range job.Steps {
+			value, ok := step.Env["GH_AW_PROMPT_CONFIG"]
+			if !ok {
+				continue
+			}
+			var config struct {
+				Items []struct {
+					AuthorFile string `json:"author_file"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal([]byte(value), &config); err != nil {
+				t.Fatalf("failed to parse prompt render config: %v", err)
+			}
+			for _, item := range config.Items {
+				if item.AuthorFile == ".github/workflows/portfolio-analyst.md" {
+					return
+				}
+			}
+		}
+	}
+	t.Fatal("portfolio-analyst.lock.yml does not load the author file; the guard may have been dropped during compilation")
 }
 
 // TestSharedSentryImportFailsFastOnRepeatedQuery400s verifies the shared Sentry
