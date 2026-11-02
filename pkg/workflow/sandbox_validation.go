@@ -80,6 +80,25 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 		return nil
 	}
 
+	if ResolveEngineID(workflowData) == string(constants.ClaudeEngine) && isClaudeVertexWIF(workflowData) {
+		if provider := NewClaudeEngine().ResolveLLMProvider(workflowData); provider != LLMProviderAnthropic {
+			return NewValidationError(
+				"engine.model-provider",
+				string(provider),
+				"Claude Vertex WIF cannot be combined with a non-Anthropic engine.model-provider",
+				"Remove engine.model-provider and use a Claude model id or alias supported by Vertex AI.",
+			)
+		}
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(workflowData.Model)), "copilot/") {
+			return NewValidationError(
+				"model",
+				workflowData.Model,
+				"Claude Vertex WIF cannot be combined with a copilot/ model",
+				"Use a Claude model id or alias supported by Vertex AI.",
+			)
+		}
+	}
+
 	if workflowData.SandboxConfig == nil {
 		return nil // No sandbox config is valid
 	}
@@ -127,6 +146,14 @@ func validateSandboxConfig(workflowData *WorkflowData) error { //nolint:largefun
 				"false",
 				"Claude with GitHub Copilot inference requires the agent sandbox for credential-isolated routing",
 				"Enable the agent sandbox or select an Anthropic-hosted model.",
+			)
+		}
+		if ResolveEngineID(workflowData) == string(constants.ClaudeEngine) && isClaudeVertexWIF(workflowData) {
+			return NewValidationError(
+				"sandbox.agent",
+				"false",
+				"Claude Vertex WIF requires the agent sandbox for sidecar authentication",
+				"Enable the agent sandbox. Example:\nsandbox:\n  agent: awf",
 			)
 		}
 	}
