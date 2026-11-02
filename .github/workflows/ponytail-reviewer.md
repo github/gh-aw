@@ -16,7 +16,10 @@ on:
     events: [pull_request_comment, pull_request_review_comment]
 engine:
   id: codex
-model: openai/gpt-5.6-terra
+  model-provider: github
+  model-routing:
+    goal: cost
+    mode: economy
 permissions:
   contents: read
   pull-requests: read
