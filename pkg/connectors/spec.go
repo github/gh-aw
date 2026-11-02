@@ -1,0 +1,100 @@
+// Package connectors implements the experimental, declaration-only connector
+// contract. Validation does not enroll a webhook source or authorize execution.
+package connectors
+
+const APIVersion = "github.com/gh-aw/connectors/v1"
+
+// ConnectorSpec contains immutable provider behavior, never connection secrets.
+type ConnectorSpec struct {
+	APIVersion  string                `json:"apiVersion"`
+	Kind        string                `json:"kind"`
+	ID          string                `json:"id"`
+	Endpoints   map[string]string     `json:"endpoints"`
+	Credentials map[string]Credential `json:"credentials"`
+	Triggers    map[string]Trigger    `json:"triggers,omitempty"`
+	MCP         map[string]ReadTool   `json:"mcp,omitempty"`
+	SafeOutputs map[string]Operation  `json:"safeOutputs,omitempty"`
+	Context     map[string]Operation  `json:"context,omitempty"`
+}
+
+type Credential struct {
+	Phase  string   `json:"phase"`
+	Header string   `json:"header"`
+	Scheme string   `json:"scheme"`
+	Scopes []string `json:"scopes"`
+}
+
+// Input supports bounded primitive values; objects, expressions, and defaults
+// are deliberately excluded from this first contract.
+type Input struct {
+	Type      string   `json:"type"`
+	Required  bool     `json:"required,omitempty"`
+	Enum      []string `json:"enum,omitempty"`
+	MaxLength int      `json:"maxLength,omitempty"`
+	Minimum   *float64 `json:"minimum,omitempty"`
+	Maximum   *float64 `json:"maximum,omitempty"`
+}
+
+// Value is exactly one literal JSON value or a reference to a declared input.
+// Input references are data, not textual template expansion.
+type Value struct {
+	Input   string `json:"input,omitempty"`
+	Literal any    `json:"literal,omitempty"`
+}
+
+type Request struct {
+	Endpoint   string            `json:"endpoint"`
+	Method     string            `json:"method"`
+	Path       string            `json:"path"`
+	PathInputs map[string]string `json:"pathInputs,omitempty"`
+	Query      map[string]Value  `json:"query,omitempty"`
+	Body       map[string]Value  `json:"body,omitempty"`
+	GraphQL    string            `json:"graphql,omitempty"`
+}
+
+type Operation struct {
+	Credential       string            `json:"credential"`
+	Inputs           map[string]Input  `json:"inputs,omitempty"`
+	Resources        map[string]string `json:"resources,omitempty"`
+	Request          Request           `json:"request"`
+	MaxResponseBytes int               `json:"maxResponseBytes"`
+}
+
+type ReadTool struct {
+	Operation
+	Tool string `json:"tool"`
+}
+
+// Trigger describes native equality matching and JSON Pointer projection.
+// Verification profiles are identifiers for a future approved receiver, not
+// executable verification code and not evidence of operational enrollment.
+type Trigger struct {
+	VerificationProfile string            `json:"verificationProfile"`
+	NativeEvents        []string          `json:"nativeEvents"`
+	Match               map[string]string `json:"match"`
+	Normalize           map[string]string `json:"normalize"`
+}
+
+type SecretRef struct {
+	Secret string `json:"secret"`
+}
+
+type Connection struct {
+	APIVersion  string               `json:"apiVersion"`
+	Kind        string               `json:"kind"`
+	Connector   string               `json:"connector"`
+	Credentials map[string]SecretRef `json:"credentials"`
+	Resources   map[string][]string  `json:"resources"`
+}
+
+// Binding refers only to repository-local files, frozen during lowering.
+type Binding struct {
+	APIVersion  string   `json:"apiVersion"`
+	Kind        string   `json:"kind"`
+	Definition  string   `json:"definition"`
+	Connection  string   `json:"connection"`
+	Triggers    []string `json:"triggers,omitempty"`
+	MCP         []string `json:"mcp,omitempty"`
+	SafeOutputs []string `json:"safeOutputs,omitempty"`
+	Context     []string `json:"context,omitempty"`
+}
