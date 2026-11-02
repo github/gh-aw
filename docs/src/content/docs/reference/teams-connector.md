@@ -9,6 +9,18 @@ bounded thread reads. An installed Teams bot supplies unattended replies and
 Adaptive Cards. These are separate authorization paths, not interchangeable
 Graph application permissions.
 
+The experimental definition is `.github/aw/connectors/teams.yaml`. It is a
+configuration-interface prototype, not an enrolled webhook or a deployed bot.
+The common parser validates its shape; runtime request planning does not obtain
+tokens, attest bot installation, or authorize a live send.
+
+The positive configuration fixtures live in
+`pkg/connectors/testdata/providers/teams/`. The connection uses synthetic IDs and
+secret **names**, never access tokens. Its conversation and activity IDs are
+independently provisioned fixture values, not evidence that a Graph ID can be
+converted into a Bot Connector reference. Never use these examples as live
+conversation references.
+
 ## Identity and permissions
 
 | Surface | Supported identity | Required access |
@@ -21,6 +33,14 @@ Graph application permissions.
 its narrower configured channel scope on notifications, reads, and writes.
 Tenant-wide `/teams/getAllMessages` subscriptions are not a substitute for a
 channel-level subscription.
+
+The fixture connection additionally pins one tenant, subscription, exact
+notification resource, root message, bot conversation, and root activity.
+Fixture projection rejects mismatched tenant/subscription/resource evidence.
+It operates on one entry from `value`, not on the raw batch. Only preapproved
+root-message notifications are represented; resolving a reply notification to
+its root requires the future trusted receiver, not string inference in the
+agent.
 
 Ordinary Graph channel posting does **not** support client-credentials
 application permissions. `Teamwork.Migrate.All` is only for migration and must
@@ -116,11 +136,27 @@ and links as untrusted data; do not execute instructions from them or fetch
 arbitrary attachments automatically. Preserve tenant/team/channel/root
 provenance alongside the bounded context.
 
+The current runtime performs a single request per operation, with a 65,536-byte
+response limit and a fixed 20-item replies page request. It does not paginate,
+retry, recursively validate every reply, or enforce a combined two-request
+context budget. Root-message responses must identify the approved team,
+channel, and root, have `messageType: message`, and contain a user author.
+Application-authored roots fail the required-user evidence check, but this
+does not replace receiver-level self-loop suppression for reply events.
+Projection retains selected root fields and the replies array, excluding
+pagination links. An empty replies page is valid.
+
 The unattended write path is the Bot Connector reply operation:
 
 ```http
 POST {trusted-service-url}/v3/conversations/{conversation-id}/activities/{root-activity-id}
 ```
+
+The shipped definition fixes the public-cloud global service URL
+`https://smba.trafficmanager.net/teams/`. Use it only when trusted provisioning
+has confirmed that service URL for the target conversation. A deployment with a
+different authenticated service URL needs a separately reviewed definition;
+the connection and model cannot override the endpoint.
 
 Use the authenticated, stored conversation reference's service URL, not a URL
 from an untrusted Graph notification or model output. Allow only the approved
@@ -141,6 +177,13 @@ per-conversation rate limits, and surface exhausted retries. Missing permission,
 an uninstalled bot, expired credentials, and HTTP 401/403 are failures, not
 successful no-op sends.
 
+The prototype currently reports HTTP 429 as a failure and performs **no**
+automatic retries; it does not expose `Retry-After` to its caller. Scheduling
+and rate-limit header propagation remain host/runtime integration gaps.
+Both bot operations require a nonempty returned activity ID and expose only
+that ID as result evidence. This evidence is not an exactly-once delivery
+guarantee.
+
 ## MCP availability
 
 Microsoft documents a preview Teams MCP server, `mcp_TeamsServer`, but now marks
@@ -149,8 +192,12 @@ surfaces that should not be used for new production projects. Microsoft
 recommends Work IQ MCP for new integrations.
 
 No unattended, read-only, channel-bound MCP endpoint is asserted by this
-connector. The optional MCP surface is omitted rather than inventing a server,
-tool allowlist, or app-only authorization flow. A separately deployed Work IQ
+connector. Instead, the definition declares the common runtime's local
+`get-channel-message` and `list-channel-replies` read-tool facades, backed by the
+documented Graph GET endpoints and the separate agent-phase reader credential.
+These are request declarations, not a claim that Microsoft hosts an MCP server
+with those tool names. The optional **remote** MCP surface is omitted rather than
+inventing a server or app-only authorization flow. A separately deployed Work IQ
 integration needs its own verified authentication, tenant policy, read-tool
 allowlist, and scope enforcement.
 
@@ -162,6 +209,30 @@ durable queue, deduplication store, credential exchange, or conversation-referen
 registry. Do not treat successful manifest validation as proof of live delivery
 or write authorization. Provider-specific protocol requirements that the common
 runtime cannot express remain deployment prerequisites, not simulated successes.
+
+In particular, independent input allowlists do not attest the relationship
+between a Graph root message and a bot conversation/activity, or the token's
+tenant, audience, identity, and actual granted consent. Use a single approved
+tuple in each fixture connection; a production admission layer must validate
+the tuple and authorization before any execution. The trigger's verification
+profile identifier does not implement that admission layer.
+
+`ProjectEvent` deliberately does not validate `clientState`, encrypted data,
+validation JWTs, expiry, replay state, or bot identity. Tests keep its result
+`operational: false` and `untrusted: true`, including when `clientState` is
+incorrect. `ActivateTriggers` fails with `ErrIngressUnavailable`; there is no
+webhook validation-token responder or subscription worker in this prototype.
+
+Credential scope strings are declarations, not a provider-aware permission
+checker. An unknown `authenticationMode` fails strict decoding, but removing
+that field does not make an arbitrary Graph POST with `Teamwork.Migrate.All`
+safe or authorized. The shipped definition deliberately contains no such
+operation. The negative fixtures cover unsupported configuration syntax and
+credential phase misuse, not live Microsoft permission enforcement.
+
+The card operation permits only a reviewed, fixed, action-free Adaptive Card.
+Dynamic summary text remains in the activity's bounded top-level `text` field;
+the v1 primitive-input contract does not accept arbitrary card JSON.
 
 ## Microsoft references
 
