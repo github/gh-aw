@@ -21,4 +21,4 @@ Test the jira-update-issue safe output functionality.
 
 Update both summary and description of the approved APP-1 issue.
 
-Use the `connector_4_jira_update_issue` tool. The trusted write host uses JIRA_REST_BASIC_AUTH.
+Use the `jira_update_issue` tool. The trusted write host uses JIRA_REST_BASIC_AUTH.

@@ -66,7 +66,7 @@ func TestConnectorIndependentFrontmatter(t *testing.T) {
 			require.NoError(t, err)
 			if test.name == "registration" {
 				assert.Empty(t, data.Connectors)
-				assert.NotContains(t, data.Tools, "connector-tracker")
+				assert.NotContains(t, data.Tools, "tracker")
 				return
 			}
 			require.Contains(t, data.Connectors, "tracker")
@@ -76,11 +76,14 @@ func TestConnectorIndependentFrontmatter(t *testing.T) {
 			assert.Equal(t, test.write, config.SafeOutputs != nil)
 			if test.agent {
 				assert.Equal(t, []string{"CONNECTOR_READ_TOKEN"}, config.Agent.Secrets())
-				assert.Contains(t, data.Tools, "connector-tracker")
-				tool, ok := data.Tools["connector-tracker"].(map[string]any)
+				assert.Contains(t, data.Tools, "tracker")
+				tool, ok := data.Tools["tracker"].(map[string]any)
 				require.True(t, ok)
 				encoded, err := json.Marshal(tool)
 				require.NoError(t, err)
+				assert.Equal(t, "node", tool["entrypoint"])
+				assert.Contains(t, string(encoded), `"entrypointArgs":["${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs","serve"]`)
+				assert.NotContains(t, data.Tools, "connector-tracker")
 				assert.NotContains(t, string(encoded), "CONNECTOR_WRITE_TOKEN")
 				assert.NotContains(t, string(encoded), "CONNECTOR_CONTEXT_TOKEN")
 			}
@@ -90,9 +93,9 @@ func TestConnectorIndependentFrontmatter(t *testing.T) {
 			if test.write {
 				assert.Equal(t, []string{"CONNECTOR_WRITE_TOKEN"}, config.SafeOutputs.Secrets())
 				require.NotNil(t, data.SafeOutputs)
-				assert.Contains(t, data.SafeOutputs.Scripts, "connector-7-tracker-add-comment")
-				script := data.SafeOutputs.Scripts["connector-7-tracker-add-comment"]
-				tool := generateCustomScriptToolDefinition("connector-7-tracker-add-comment", script)
+				assert.Contains(t, data.SafeOutputs.Scripts, "tracker-add-comment")
+				script := data.SafeOutputs.Scripts["tracker-add-comment"]
+				tool := generateCustomScriptToolDefinition("tracker-add-comment", script)
 				schema, ok := tool["inputSchema"].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, false, schema["additionalProperties"])
@@ -129,7 +132,7 @@ func TestConnectorCompilationStaysStaged(t *testing.T) {
 			c.dryRun = mode == "dry-run"
 			data, err := c.ParseWorkflowString(connectorWorkflow("    safe-outputs: [add-comment]\n"), filepath.Join(root, "proof.md"))
 			require.NoError(t, err)
-			script := data.SafeOutputs.Scripts["connector-7-tracker-add-comment"]
+			script := data.SafeOutputs.Scripts["tracker-add-comment"]
 			assert.Contains(t, script.Script, "const staged = true || isStagedMode();")
 			assert.Contains(t, script.Script, "staged ? '--stage' : '--allow-writes'")
 			if mode == "dry-run" {
@@ -171,16 +174,18 @@ const adaptedRequire = name => {
 const result = new Function('item', 'require', 'process', 'temporaryIdMap', %s)(
   {type: 'connector_effect', issue: 'ISSUE-1', text: 'safe'},
   adaptedRequire,
-  {env: {RUNNER_TEMP: '/trusted', PREFIX_WRITER: 'test-token', OTHER: 'not-inherited'}},
+  {execPath: process.execPath, env: {RUNNER_TEMP: '/trusted', PREFIX_WRITER: 'test-token', OTHER: 'not-inherited'}},
   new Map()
 );
 const staged = %t;
 assert.deepEqual(result, {ok:true});
-assert.equal(call.binary, require('node:path').join('/trusted', 'gh-aw', 'gh-aw'));
-assert.deepEqual(call.args, ['connectors','invoke','safe-output','add-comment',staged ? '--stage' : '--allow-writes']);
+assert.equal(call.binary, process.execPath);
+assert.deepEqual(call.args, [require('node:path').join('/trusted', 'gh-aw', 'actions', 'connector_runtime.cjs'),'invoke','safe-output','add-comment',staged ? '--stage' : '--allow-writes']);
 assert.deepEqual(JSON.parse(call.options.input), {issue:'ISSUE-1',text:'safe'});
 assert.deepEqual(call.options.env, staged ? {GH_AW_CONNECTOR_PLAN:'frozen'} : {GH_AW_CONNECTOR_PLAN:'frozen',BINDING:'trusted',GH_AW_CONNECTOR_SECRET_WRITER:'test-token'});
 assert.equal(call.options.shell, undefined);
+assert.equal(call.options.timeout, 25000);
+assert.equal(call.options.maxBuffer, 2097152);
 `, mode.runtime, source, mode.compiled || mode.runtime)
 			output, err := exec.CommandContext(t.Context(), "node", "-e", driver).CombinedOutput()
 			require.NoError(t, err, "%s", output)
@@ -199,7 +204,7 @@ func TestConnectorCompilerDiagnostics(t *testing.T) {
 		{"missing-context-input", "    context:\n      issue-details: {}\n", "required connector argument"},
 		{"unapproved-context", "    context:\n      issue-details: {issue: OTHER}\n", "outside approved resources"},
 		{"unknown-context-input", "    context:\n      issue-details: {issue: ISSUE-1, extra: true}\n", "unknown connector argument"},
-		{"mcp-collision", "    tools: [get-issue]\nmcp-servers:\n  connector-tracker:\n    command: echo\n", "conflicts"},
+		{"mcp-collision", "    tools: [get-issue]\nmcp-servers:\n  tracker:\n    command: echo\n", "conflicts"},
 		{"duplicate-read", "    tools: [get-issue, get-issue]\n", ""},
 		{"empty-selection", "    tools: []\n", ""},
 	} {
@@ -236,7 +241,7 @@ func TestConnectorCompilesIntoRuntimeBoundaries(t *testing.T) {
 	require.NoError(t, err)
 	safe, err := json.Marshal(jobs["safe_outputs"])
 	require.NoError(t, err)
-	assert.Contains(t, string(agent), "connectors invoke context")
+	assert.Contains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
 	assert.Contains(t, string(agent), "CONNECTOR_CONTEXT_TOKEN")
 	assert.Contains(t, string(agent), "CONNECTOR_READ_TOKEN")
 	assert.NotContains(t, string(agent), "${{ secrets.CONNECTOR_WRITE_TOKEN }}")
@@ -244,9 +249,12 @@ func TestConnectorCompilesIntoRuntimeBoundaries(t *testing.T) {
 	assert.NotContains(t, string(safe), "${{ secrets.CONNECTOR_CONTEXT_TOKEN }}")
 	assert.Contains(t, output, connectorContextPath)
 	assert.Contains(t, output, "untrusted third-party data")
-	assert.Contains(t, output, "connector_7_tracker_add_comment")
-	assert.Contains(t, string(agent), "connectors")
+	assert.Contains(t, output, "tracker_add_comment")
+	assert.Contains(t, string(agent), "connector_runtime.cjs")
 	assert.Contains(t, string(agent), "serve")
+	assert.NotContains(t, output, "Checkout trusted connector runtime")
+	assert.NotContains(t, output, "Build trusted connector runtime")
+	assert.NotContains(t, output, "gh extension install")
 	assert.NotContains(t, output, "api.example.com/issues/{issue}")
 }
 

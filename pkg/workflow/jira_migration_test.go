@@ -94,7 +94,7 @@ func TestJiraMigrationIndependentPhases(t *testing.T) {
 			assert.NotContains(t, output, "JIRA_USER_EMAIL")
 			assert.NotContains(t, output, "JIRA_API_TOKEN")
 			assert.NotContains(t, output, `"jira_add_comment.cjs"`)
-			assert.Equal(t, test.write, strings.Contains(output, "connector_4_jira_"))
+			assert.Equal(t, test.write, strings.Contains(output, "jira_"))
 		})
 	}
 }

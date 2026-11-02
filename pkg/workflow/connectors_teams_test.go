@@ -56,6 +56,8 @@ func TestTeamsConnectorWorkflowCompilation(t *testing.T) {
 			combined := fixture == "legacy/workflow.yaml"
 			require.Equal(t, combined, config.Agent != nil)
 			require.Equal(t, combined, config.SafeOutputs != nil)
+			require.Equal(t, combined, data.Tools["teams"] != nil)
+			require.NotContains(t, data.Tools, "connector-teams")
 			if combined {
 				require.Equal(t, []string{"TEAMS_GRAPH_READ_ACCESS_TOKEN"}, config.Agent.Secrets())
 				require.Equal(t, []string{"TEAMS_BOT_ACCESS_TOKEN"}, config.SafeOutputs.Secrets())
@@ -75,14 +77,17 @@ func assertTeamsConnectorJobs(t *testing.T, output string, combined bool) {
 	require.True(t, ok)
 	agent, err := json.Marshal(jobs["agent"])
 	require.NoError(t, err)
-	require.Contains(t, string(agent), "connectors invoke context")
+	require.Contains(t, output, `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`)
+	require.NotContains(t, output, "Checkout trusted connector runtime")
+	require.NotContains(t, output, "Build trusted connector runtime")
+	require.NotContains(t, output, "gh extension install")
 	require.Contains(t, string(agent), "${{ secrets.TEAMS_GRAPH_CONTEXT_ACCESS_TOKEN }}")
 	require.NotContains(t, string(agent), "${{ secrets.TEAMS_BOT_ACCESS_TOKEN }}")
 	if !combined {
 		require.NotContains(t, output, "${{ secrets.TEAMS_GRAPH_READ_ACCESS_TOKEN }}")
 		require.NotContains(t, output, "${{ secrets.TEAMS_BOT_ACCESS_TOKEN }}")
 		require.NotContains(t, output, "connector-teams")
-		require.NotContains(t, output, "connector_5_teams_reply")
+		require.NotContains(t, output, "teams_reply")
 		return
 	}
 	require.Contains(t, string(agent), "${{ secrets.TEAMS_GRAPH_READ_ACCESS_TOKEN }}")
