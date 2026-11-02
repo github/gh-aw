@@ -1,341 +1,69 @@
 {
-  "run_date": "2026-10-30T00:50:12.975401Z",
-  "run_id": "40981316485",
-  "source": "pr-triage",
-  "eligible_total": 13,
-  "cooldown_skipped": 1,
-  "open_copilot_prs": 15,
-  "category_counts": {
-    "bug": 10,
-    "feature": 2,
-    "docs": 1
+  "run_id": "41443995887",
+  "run_date": "2026-11-02T12:24:17.234+00:00",
+  "summary": {
+    "eligible_total": 0,
+    "open_copilot_prs": 0,
+    "cooldown_skipped": 0,
+    "category_distribution": {},
+    "risk_distribution": {},
+    "priority_distribution": {},
+    "action_distribution": {},
+    "batch_count": 0,
+    "notes": "No open pull requests in this repository snapshot were authored by app/github-copilot; reported open PRs are from other users/bots and are excluded by policy."
   },
-  "risk_counts": {
-    "high": 2,
-    "medium": 10,
-    "low": 1
-  },
-  "priority_counts": {
-    "high": 2,
-    "medium": 10,
-    "low": 1
-  },
-  "action_counts": {
-    "fast_track": 3,
-    "batch_review": 9,
-    "auto_merge": 1
-  },
-  "batches": [
+  "batches": [],
+  "selected_candidates": [],
+  "excluded_prs": [
     {
-      "id": "pr-batch:agentic-safety-fixes",
-      "members": [
-        72970,
-        72969,
-        72968,
-        72940,
-        72939,
-        72938,
-        72936,
-        72932,
-        72929
-      ]
-    }
-  ],
-  "selected_candidates": [
-    {
-      "number": 73034,
-      "title": "Route Safe Output Health Monitor with model routing (goal: cost, mode: economy)",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "fast_track",
-      "score": 62,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 14,
-        "quality": 18
-      },
-      "batch": null,
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:fast_track",
-        "pr-agent:copilot"
-      ]
+      "number": 74092,
+      "author": "github-actions[bot]",
+      "title": "[archivx] Update workflow diagram \u2014 2026-11-02"
     },
     {
-      "number": 73033,
-      "title": "Route Agent Job Health Monitor with model routing (goal: cost, mode: economy)",
-      "category": "feature",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 58,
-      "score_breakdown": {
-        "impact": 28,
-        "urgency": 14,
-        "quality": 16
-      },
-      "batch": null,
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot"
-      ]
+      "number": 74091,
+      "author": "github-actions[bot]",
+      "title": "[architecture] Update architecture diagram - 2026-11-02"
     },
     {
-      "number": 72970,
-      "title": "Retry MCP gateway startup and identify pre-agent checkout failures",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 67,
-      "score_breakdown": {
-        "impact": 31,
-        "urgency": 20,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
+      "number": 74087,
+      "author": "github-actions[bot]",
+      "title": "[instructions] Sync instruction files with release v1.0.1"
     },
     {
-      "number": 72969,
-      "title": "Surface final engine errors in crash and outage reports",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 66,
-      "score_breakdown": {
-        "impact": 30,
-        "urgency": 20,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
+      "number": 74061,
+      "author": "github-actions[bot]",
+      "title": "[schema-coverage] feat: Add schema coverage demo for token-broker field"
     },
     {
-      "number": 72968,
-      "title": "Surface incomplete-result reasons in failure issues and conclusion summaries",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 64,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 19,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
+      "number": 74054,
+      "author": "github-agentic-autofix[bot]",
+      "title": "Bound cooldown parsing to native integer range"
     },
     {
-      "number": 72941,
-      "title": "Clarify feature-branch dispatch and document safe pre-merge validation",
-      "category": "docs",
-      "risk": "low",
-      "priority": "low",
-      "action": "auto_merge",
-      "score": 42,
-      "score_breakdown": {
-        "impact": 20,
-        "urgency": 10,
-        "quality": 12
-      },
-      "batch": null,
-      "labels": [
-        "pr-type:docs",
-        "pr-risk:low",
-        "pr-priority:low",
-        "pr-action:auto_merge",
-        "pr-agent:copilot"
-      ]
+      "number": 73986,
+      "author": "github-actions[bot]",
+      "title": "[eslint-miner] Add no-deprecated-string-substr rule"
     },
     {
-      "number": 72940,
-      "title": "Preserve agent config permissions and restore only after PR checkout",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 67,
-      "score_breakdown": {
-        "impact": 33,
-        "urgency": 20,
-        "quality": 14
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
+      "number": 73982,
+      "author": "github-actions[bot]",
+      "title": "fix(linters): unwrap parenthesized expressions in lenstringsplit, slicemakezerolength, sortslice"
     },
     {
-      "number": 72939,
-      "title": "Reject Copilot discovery-only responses as successful completion",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 65,
-      "score_breakdown": {
-        "impact": 29,
-        "urgency": 20,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
+      "number": 73469,
+      "author": "dependabot[bot]",
+      "title": "build(deps): bump @vitest/mocker from 4.1.9 to 4.1.12 in /eslint-factory in the npm_and_yarn group across 1 directory"
     },
     {
-      "number": 72938,
-      "title": "Keep safe-output credentials out of agent configuration",
-      "category": "bug",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 82,
-      "score_breakdown": {
-        "impact": 40,
-        "urgency": 24,
-        "quality": 18
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
+      "number": 73468,
+      "author": "dependabot[bot]",
+      "title": "build(deps-dev): bump follow-redirects from 1.16.1 to 1.16.2 in /docs in the npm_and_yarn group across 1 directory"
     },
     {
-      "number": 72936,
-      "title": "Fix compilation errors for compiler-generated setup action fallbacks",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 62,
-      "score_breakdown": {
-        "impact": 27,
-        "urgency": 18,
-        "quality": 17
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72932,
-      "title": "Wire minted-token env bindings and OIDC permissions in create-token jobs",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 61,
-      "score_breakdown": {
-        "impact": 27,
-        "urgency": 18,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72929,
-      "title": "Auto-migrate literal safe-output appends in post-steps",
-      "category": "bug",
-      "risk": "medium",
-      "priority": "medium",
-      "action": "batch_review",
-      "score": 60,
-      "score_breakdown": {
-        "impact": 26,
-        "urgency": 18,
-        "quality": 16
-      },
-      "batch": "pr-batch:agentic-safety-fixes",
-      "labels": [
-        "pr-type:bug",
-        "pr-risk:medium",
-        "pr-priority:medium",
-        "pr-action:batch_review",
-        "pr-agent:copilot",
-        "pr-batch:agentic-safety-fixes"
-      ]
-    },
-    {
-      "number": 72273,
-      "title": "Support Claude on Vertex AI with GCP WIF",
-      "category": "feature",
-      "risk": "high",
-      "priority": "high",
-      "action": "fast_track",
-      "score": 74,
-      "score_breakdown": {
-        "impact": 35,
-        "urgency": 21,
-        "quality": 18
-      },
-      "batch": null,
-      "labels": [
-        "pr-type:feature",
-        "pr-risk:high",
-        "pr-priority:high",
-        "pr-action:fast_track",
-        "pr-agent:copilot"
-      ]
+      "number": 73467,
+      "author": "dependabot[bot]",
+      "title": "build(deps-dev): bump minimatch from 10.2.6 to 11.0.1 in /actions/setup/js in the npm_and_yarn group across 1 directory"
     }
   ]
 }
