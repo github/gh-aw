@@ -66,6 +66,7 @@ func TestDatadogConnectorEmbeddedCompilation(t *testing.T) {
 	require.Equal(t, []string{"datadog_get_incident", "datadog_get_monitor"}, config.Agent.ToolNames())
 	require.Equal(t, []string{"rename-incident"}, config.SafeOutputs.SafeOutputNames())
 	require.Nil(t, data.SafeOutputs.CreateIssues)
+	require.Contains(t, data.SafeOutputs.Scripts, "datadog-rename-incident")
 	output, err := compiler.CompileToYAML(data, path)
 	require.NoError(t, err)
 	var document map[string]any
@@ -84,6 +85,11 @@ func TestDatadogConnectorEmbeddedCompilation(t *testing.T) {
 	require.NotContains(t, output, "DD-API-KEY")
 	require.NotContains(t, output, "DD-APPLICATION-KEY")
 	require.NotContains(t, output, "connectors invoke context")
+	require.Contains(t, output, "datadog_rename_incident")
+	require.Contains(t, output, "connector_runtime.cjs")
+	require.NotContains(t, output, ".gh-aw-connector-runtime")
+	require.NotContains(t, output, "Build trusted connector runtime")
+	require.NotContains(t, output, "connector_7_datadog")
 	_, err = os.Stat(filepath.Join(compiler.gitRoot, ".github", "aw", "connectors"))
 	require.True(t, os.IsNotExist(err), "embedded import must not read provider declarations from the consumer checkout")
 }

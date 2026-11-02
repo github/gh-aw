@@ -131,7 +131,7 @@ func TestDatadogConnectorRejectsBeforeCredentialAccess(t *testing.T) {
 		_, err = writer.Execute(t.Context(), runtime, "safe-output", "rename-incident", args)
 		require.Error(t, err)
 	}
-	for _, id := range []any{"0", "012345678", "12345679", "../12345678", strings.Repeat("1", 20), 12345678} {
+	for _, id := range []any{"0", "012345678", "12345679", "../12345678", strings.Repeat("1", 16), 12345678} {
 		agent := runtime
 		agent.Phase = "agent"
 		_, err := reader.Execute(t.Context(), agent, "mcp", "get-monitor", map[string]any{"monitor-id": id})
@@ -308,6 +308,10 @@ func TestDatadogConnectorTitleBoundaryAndPrunedPlans(t *testing.T) {
 	reader, writer := datadogPlans(t)
 	_, err := writer.PrepareSafeOutput("rename-incident", map[string]any{"incident-id": datadogIncidentID, "title": strings.Repeat("x", 128)})
 	require.NoError(t, err)
+	_, err = writer.PrepareSafeOutput("rename-incident", map[string]any{"incident-id": datadogIncidentID, "title": strings.Repeat("\u00e9", 128)})
+	require.NoError(t, err)
+	_, err = writer.PrepareSafeOutput("rename-incident", map[string]any{"incident-id": datadogIncidentID, "title": strings.Repeat("\u00e9", 129)})
+	require.Error(t, err)
 	for _, test := range []struct {
 		plan    *connectors.Plan
 		exclude []string
@@ -323,4 +327,35 @@ func TestDatadogConnectorTitleBoundaryAndPrunedPlans(t *testing.T) {
 			require.NotContains(t, string(planJSON), name)
 		}
 	}
+}
+
+func TestDatadogConnectorExactNumericMonitorEvidence(t *testing.T) {
+	source := strings.Replace(datadogFixture(t, "workflow.md"), `["12345678"]`, `["12345678", "12345679", "999999999999999"]`, 1)
+	_, data, _, err := parseDatadogConsumer(t, source)
+	require.NoError(t, err)
+	encoded, err := data.Connectors["datadog"].Agent.Encode()
+	require.NoError(t, err)
+	reader, err := connectors.DecodePlan(encoded)
+	require.NoError(t, err)
+	for _, token := range []string{
+		"12345679", "12345678.0", "1.2345678e7", "12345678.0000000001",
+		"9007199254740991.1", "9007199254740992", "9007199254740993", "012345678",
+	} {
+		t.Run(token, func(t *testing.T) {
+			runtime, access := datadogRuntime(t, "agent", "DATADOG_MONITOR_READ_OAUTH_TOKEN", func(*http.Request) (int, string) {
+				return 200, strings.Replace(datadogFixture(t, "monitor.json"), `"id": 12345678`, `"id": `+token, 1)
+			})
+			_, err := reader.Execute(t.Context(), runtime, "mcp", "get-monitor", map[string]any{"monitor-id": "12345678"})
+			require.Error(t, err, "only the exact canonical requested monitor ID establishes identity")
+			require.Equal(t, 1, access.requests)
+		})
+	}
+	runtime, access := datadogRuntime(t, "agent", "DATADOG_MONITOR_READ_OAUTH_TOKEN", func(request *http.Request) (int, string) {
+		require.Equal(t, "/api/v1/monitor/999999999999999", request.URL.Path)
+		return 200, strings.Replace(datadogFixture(t, "monitor.json"), `"id": 12345678`, `"id": 999999999999999`, 1)
+	})
+	result, err := reader.Execute(t.Context(), runtime, "mcp", "get-monitor", map[string]any{"monitor-id": "999999999999999"})
+	require.NoError(t, err)
+	require.Contains(t, string(result.Data), "999999999999999")
+	require.Equal(t, 1, access.requests)
 }

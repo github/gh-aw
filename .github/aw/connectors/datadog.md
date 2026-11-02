@@ -36,8 +36,8 @@ connectors:
           monitor-id:
             type: string
             required: true
-            maxLength: 19
-            pattern: ^[1-9][0-9]{0,18}$
+            maxLength: 15
+            pattern: ^[1-9][0-9]{0,14}$
         resources:
           monitor-id: monitors
         request:
@@ -50,6 +50,8 @@ connectors:
         responseRequired: [/id, /name, /type, /overall_state]
         responseResources:
           /id: monitors
+        responseResourceInputs:
+          /id: monitor-id
         responseTypes:
           /id: integer
           /name: string
@@ -201,7 +203,7 @@ import-schema:
       redirect URI and confidential client secret on the trusted host.
       Datadog's endpoint reference documents POST /api/v2/oauth2/token on the
       corresponding api domain for exchange and refresh. The overview also
-      mentions the older /oauth2/v1/token path; use the current endpoint
+      mentions a different /oauth2/v1/token path; use the endpoint
       reference and the registered client's supported flow, never a fallback
       attempted by this connector. Access tokens last one hour according to
       that reference. A trusted external host must refresh or rotate them
@@ -253,8 +255,11 @@ import-schema:
     </sites>
     <grants>
       monitors and incidents are exact string-array resource grants, empty by
-      default. Supply canonical positive decimal monitor IDs of 1 to 19 digits,
+      default. Supply canonical positive decimal monitor IDs of 1 to 15 digits,
       quoted as strings, and lowercase incident UUIDs of exactly 36 characters.
+      The conservative monitor bound keeps numeric response identifiers
+      losslessly representable in both Go and JavaScript; larger IDs are not
+      supported by this declaration even if accepted by Datadog.
       A selected operation requires its corresponding nonempty grant.
       Unselected capabilities do not require their grants or secrets.
       Wildcards, search expressions, numeric YAML IDs, URLs and incident
@@ -277,17 +282,16 @@ import-schema:
       The incident API is documented as public beta. Both reads use fixed
       paths and one response of at most 65536 bytes, with required evidence,
       primitive type checks and approved-resource validation.
-      The current generic runtime compares responseInputs without converting
-      numeric IDs to path strings. Monitor responses therefore verify numeric
-      type and exact approved-set membership, not equality to the requested
-      monitor when several IDs are approved. Prefer a single monitor grant
-      until that generic binding gap is closed. Incident responses bind the
-      returned UUID to the exact requested UUID.
+      Monitor responses bind the canonical numeric ID to the exact requested
+      monitor-id string, not merely another approved monitor. Fractions,
+      exponent notation, leading zeros and unsafe integers cannot establish
+      resource identity. Incident responses similarly bind the returned UUID
+      to the exact requested UUID.
     </reads>
     <effect>
       Select safe-outputs.datadog-rename-incident with null or an empty mapping.
       The generated datadog_rename_incident effect accepts only incident-id and
-      title. Title must contain non-whitespace text and be at most 128
+      title. Title must contain non-whitespace text and be at most 128 Unicode
       characters. PATCH /api/v2/incidents/{incident-id} sends only a data
       object with type incidents, the same id, and attributes.title.
       It does not set state, severity, impact, notification handles,
