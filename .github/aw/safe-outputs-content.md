@@ -8,7 +8,7 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
   `@builtin:connectors/jira.md` import and shared connector runtime. Bind the
   reviewed site, project, and issue grants through `with`, then select
   `jira-create-issue`, `jira-update-issue`, `jira-add-comment`, or `jira-add-label`.
-  Tools use the `connector_4_jira_` prefix; unqualified GitHub effects are unchanged.
+  Tools use the `jira_` prefix; unqualified GitHub effects are unchanged.
   Supply a separate encoded REST Basic credential; native email/token injection
   and per-effect `max`/`staged` options no longer apply. Explicit temporary IDs
   support same-run follow-ups through trusted created-resource receipts, never

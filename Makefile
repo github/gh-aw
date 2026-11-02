@@ -7,8 +7,6 @@ ifeq ($(OS),Windows_NT)
 	BINARY_NAME := gh-aw.exe
 endif
 VERSION ?= $(shell git describe --tags --always --dirty)
-# Keep connector runtime pins stable across generated-lock-only commits.
-CONNECTOR_RUNTIME_REF ?= $(shell git log -1 --format=%H -- ':(glob)**/*.go' go.mod go.sum Makefile actions/setup pkg/workflow/data pkg/parser/schemas .github/aw/connectors ':(exclude,glob)**/*_test.go' ':(exclude,glob)**/*.test.cjs' ':(exclude,glob)**/testdata/**' ':(exclude,glob)**/README.md')
 DOCKER_IMAGE=ghcr.io/github/gh-aw
 DOCKER_PLATFORMS=linux/amd64,linux/arm64
 BASE_REF ?= origin/main
@@ -34,8 +32,7 @@ TEST_UNIT_RUN_FULL ?= 0
 TEST_UNIT_IMPACTED_FALLBACK_MODE ?= sample
 
 # Build flags
-CONNECTOR_RUNTIME_LDFLAGS=-X github.com/github/gh-aw/pkg/workflow.connectorRuntimeRef=$(CONNECTOR_RUNTIME_REF)
-LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) $(CONNECTOR_RUNTIME_LDFLAGS)"
+LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION)"
 
 # Default target
 .PHONY: all
@@ -72,7 +69,7 @@ build-android:
 # Optionally runs wasm-opt (from Binaryen) if available for ~8% size reduction
 .PHONY: build-wasm
 build-wasm:
-	GOOS=js GOARCH=wasm go build -ldflags="-w -s $(CONNECTOR_RUNTIME_LDFLAGS)" -o gh-aw.wasm ./cmd/gh-aw-wasm
+	GOOS=js GOARCH=wasm go build -ldflags="-w -s" -o gh-aw.wasm ./cmd/gh-aw-wasm
 	@if command -v wasm-opt >/dev/null 2>&1; then \
 		echo "Running wasm-opt -Oz (size optimization)..."; \
 		BEFORE=$$(wc -c < gh-aw.wasm); \
