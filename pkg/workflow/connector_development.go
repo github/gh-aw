@@ -158,14 +158,28 @@ func developmentConnectorResource(spec *connectors.ConnectorSpec, resource strin
 		}
 		return false
 	}
-	for _, op := range spec.MCP {
+	operationHas := func(op connectors.Operation) bool {
 		if has(op.Resources) || has(op.ResponseResources) {
+			return true
+		}
+		if op.Preflight != nil && (has(op.Preflight.Resources) || has(op.Preflight.ResponseResources)) {
+			return true
+		}
+		for _, lookup := range op.Lookups {
+			if has(lookup.Resources) || has(lookup.ResponseResources) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, op := range spec.MCP {
+		if operationHas(op.Operation) {
 			return true
 		}
 	}
 	for _, ops := range []map[string]connectors.Operation{spec.Context, spec.SafeOutputs} {
 		for _, op := range ops {
-			if has(op.Resources) || has(op.ResponseResources) {
+			if operationHas(op) {
 				return true
 			}
 		}

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -232,8 +231,8 @@ func TestConnectorCompilerDiagnostics(t *testing.T) {
 		c, root := connectorCompiler(t)
 		content := strings.Replace(connectorWorkflow("    on: [issue-created]\n"), "on: workflow_dispatch\n", "", 1)
 		_, err := c.ParseWorkflowString(content, filepath.Join(root, "proof.md"))
-		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
-		require.ErrorContains(t, err, "connectors.tracker: on:")
+		require.ErrorContains(t, err, "gateway-dispatch")
+		require.ErrorContains(t, err, "gateway-dispatch")
 	})
 }
 

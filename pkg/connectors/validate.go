@@ -60,6 +60,16 @@ func (s *ConnectorSpec) validateTriggers() error {
 		if !namePattern.MatchString(name) || !idPattern.MatchString(trigger.VerificationProfile) || len(trigger.NativeEvents) == 0 || len(trigger.Match) == 0 || len(trigger.Normalize) == 0 {
 			return fmt.Errorf("trigger %q requires verificationProfile, nativeEvents, match and normalize", name)
 		}
+		if len(trigger.ResourceOrigins) > 16 {
+			return fmt.Errorf("trigger %q resourceOrigins must contain at most 16 fixed HTTPS origins", name)
+		}
+		for _, origin := range trigger.ResourceOrigins {
+			parsed, err := url.Parse(origin)
+			if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil ||
+				strings.ContainsAny(origin, "*?#") || (parsed.Path != "" && parsed.Path != "/") {
+				return fmt.Errorf("trigger %q resourceOrigins must be fixed HTTPS origins", name)
+			}
+		}
 		for pointer := range trigger.Match {
 			if !validPointer(pointer) {
 				return fmt.Errorf("trigger %q has invalid match JSON Pointer", name)
@@ -171,11 +181,8 @@ func (s *ConnectorSpec) validateOperation(name string, op Operation, phase strin
 	if err := s.validateTrustedInputs(name, op, phase); err != nil {
 		return fmt.Errorf("operation %q: %w", name, err)
 	}
-	for pointer, input := range op.ResponseContains {
-		field, exists := op.Inputs[input]
-		if strings.Count(pointer, "/*/") != 1 || !validPointer(pointer) || !exists || !field.Required || field.Type != "string" {
-			return errors.New("responseContains requires an array-element pointer and a required string input")
-		}
+	if err := s.validateInputLookups(name, op, phase); err != nil {
+		return fmt.Errorf("operation %q: %w", name, err)
 	}
 	return validateRequestBindings(name, op, path)
 }

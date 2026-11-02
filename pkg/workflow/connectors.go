@@ -92,9 +92,6 @@ func resolveWorkflowConnector(service *connectors.Service, selection connectors.
 			return nil, fmt.Errorf("context %q: %w", name, err)
 		}
 	}
-	if len(selection.Triggers) > 0 {
-		return nil, fmt.Errorf("on: %w; a declared verification profile is not receiver enrollment", plan.ActivateTriggers())
-	}
 	config := &WorkflowConnector{Plan: plan, ContextArgs: args}
 	phases := []struct {
 		name   string

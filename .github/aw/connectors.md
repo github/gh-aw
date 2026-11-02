@@ -82,7 +82,7 @@ secret values. `copilot-requests: write` authorizes inference, not provider writ
 | Writes | Select `safe-outputs.<id>-<operation>` with null, `{}`, or workflow-owned `max`/`staged` options. `max` is an integer from 1 to 100, default 1, enforced before handler execution; failures count but HTTP retries within an invocation do not. Call the generated safe-output tool, never a provider write API from the agent. |
 | Names | Selectors use hyphens; generated effect tools use underscores, such as `notion_add_comment`. Discover actual read-tool names and argument schemas; do not invent a `connector_N_` prefix. |
 | Context | No public configurable connector `context` exists. Retrieve content through selected reads; event references are not hydrated resource bodies. |
-| Triggers | Declaration definitions use `triggers`; workflow events use root `on`. Custom connector ingress is unavailable and fails closed. Use manual dispatch until a trusted receiver is implemented and approved. |
+| Triggers | Select `on.gateway-dispatch.connectors.<id>: [trigger]`. Qualified root `<id>-<trigger>` selections lower to the same protected route. Repo opt-in, exact source grants, declared resource origins, App provenance and hash-bound admission are required. Compilation does not deploy or approve a receiver. |
 
 Global or per-operation `staged: true` suppresses connector mutations, write-credential resolution,
 preflights, and creation receipts. It does not suppress selected reads or
@@ -90,6 +90,29 @@ arbitrary workflow scripts. A per-operation `false` cannot disable global or
 compiler-forced staging. Boolean expressions gate minting and credential delivery.
 Removing staging is a deployment decision, not a
 documentation fix.
+
+## Wire triggers without inventing ingress authority
+
+Use the existing exclusive webhook gateway route and opt-in
+`.github/workflows/aw.json` configuration. Trigger declarations need
+`resourceOrigins` containing fixed reviewed HTTPS origins in addition to
+verification profile, native events, match, normalization and resource grants.
+The compiler emits digest-bound source subscriptions and the standard
+provenance/admission jobs; do not add provider-specific dispatch shortcuts.
+
+The approved receiver must authenticate native deliveries and evaluate the
+original predicates, types and grants before projecting a canonical resource
+URL, one selected trigger name, and singleton matched-filter evidence into the
+existing version-2 envelope. URL canonicalization is `normalize.url` when present,
+otherwise a separately approved receiver-enrollment mapping. Unsupported profiles
+or mappings remain nonactivating. Origin matching on the runner does not prove
+the URL's resource membership or authenticate the provider.
+
+No receiver deployment, source enrollment, replay store or live dispatch is
+performed by declaration compilation. Keep manual dispatch until the backend
+supports and is approved for the exact generated subscription. Use
+[the gateway specification](../../docs/src/content/docs/specs/webhook-gateway-specification.md)
+for the receiver and destination responsibilities.
 
 ## Preserve credential and authority boundaries
 
@@ -115,6 +138,15 @@ authorize follow-ups only through validated execution-local creation receipts.
 Staged proposals and agent-supplied IDs do not create authority.
 Connector mutations are non-reviewable outputs and are blocked when threat
 detection concludes warning; agent-supplied policy fields cannot override this.
+
+Some operations declare automatic `lookups` for exact shorthand targets. Supply
+the declaration's separate alias and canonical-ID grants; resolution never adds
+authority. Linear accepts `issue-references` such as `ENG-123`, creation
+`team-references` keys/names, and `project-slugs`, with independent UUID grants.
+The same selected-phase credential performs fixed bounded reads and verifies
+identity, boundaries, and declared tuple membership before the operation.
+Staged aliases remain unchanged and appear in `unresolvedInputs`; no canonical
+identity or membership is verified until non-staged authorized execution.
 
 ## Author or extend a declaration
 
@@ -194,6 +226,21 @@ MCP transport does not inherit REST operation retry settings.
 
 Do not add automatic pagination, event-URL fetches, or unsupported provider
 functionality.
+
+Use operation-local `lookups` only when automatic alias resolution is necessary.
+The shared contract allows at most four ordered GET/fixed-GraphQL reads on the
+operation endpoint and credential. Each target has one exact alias resource
+collection, one canonical projection already in the final resource grant, and
+response identity checks. Dependencies may use only canonical inputs resolved
+earlier; cycles and duplicate targets are rejected. An untargeted final read can
+verify relationships after resolution. UUID-only calls skip the chain; when a
+chain is needed, all its grants are checked before secret access and the entire
+chain has a 20-second deadline. Lookups cannot mix with trusted-input or
+creation-receipt bindings. `responseLimits` bounds named response arrays to
+1 through 100 elements; require the first result separately when emptiness is
+invalid. `responseAnyInputs` checks an exact string input against one to four
+reviewed identity pointers, for example a team key or name. Always reject
+pagination explicitly, independently of array length.
 
 The compiler freezes selected plans and uses the Node runtime shipped by
 `actions/setup`. Do not add a per-provider checkout, build, CLI installation,

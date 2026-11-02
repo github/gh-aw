@@ -128,7 +128,7 @@ func TestAzureDevOpsConnectorRejectsLegacyAndUnsupportedCapabilities(t *testing.
 			_, err := compiler.ParseWorkflowFile(path)
 			require.Error(t, err)
 			if !strings.Contains(trigger, "gateway-dispatch") {
-				assert.ErrorContains(t, err, "ingress is not operational")
+				assert.ErrorContains(t, err, "gateway-dispatch")
 			}
 		})
 	}

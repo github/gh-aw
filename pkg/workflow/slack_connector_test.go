@@ -4,7 +4,6 @@ package workflow
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,7 +85,7 @@ func TestSlackConnectorWorkflowIngressRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = compiler.ParseWorkflowString(string(source), filepath.Join(root, "slack-ingress.md"))
-	if !errors.Is(err, connectors.ErrIngressUnavailable) || !strings.Contains(err.Error(), "connectors.slack: on:") {
+	if err == nil || !strings.Contains(err.Error(), "gateway-dispatch") {
 		t.Fatalf("Slack ingress must fail closed with precise service diagnostic: %v", err)
 	}
 }

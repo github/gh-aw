@@ -207,7 +207,7 @@ func TestTeamsConnectorPublicRejections(t *testing.T) {
 		fixture, err := os.ReadFile("../connectors/testdata/providers/teams/workflow-ingress-unavailable.md")
 		require.NoError(t, err)
 		_, _, _, err = teamsPublicCompiler(t, string(fixture), true)
-		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+		require.ErrorContains(t, err, "gateway-dispatch")
 	})
 	t.Run("registration-grants-nothing", func(t *testing.T) {
 		_, _, _, err := teamsPublicCompiler(t, awConnectorHeader+"imports: ['.github/workflows/connectors/teams.md']\ntools:\n  teams: [get-channel-message]\n---\nRead.\n", false)

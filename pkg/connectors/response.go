@@ -12,7 +12,7 @@ import (
 
 func (p *Plan) validateResponse(op Operation, data []byte, args map[string]any) ([]byte, error) {
 	if len(data) == 0 {
-		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseResourceInputs)+len(op.ResponseOptionalEmpty)+len(op.ResponseContains)+len(op.Project) != 0 || op.Request.GraphQL != "" {
+		if len(op.ResponseChecks)+len(op.ResponseRequired)+len(op.ResponseResources)+len(op.ResponseTypes)+len(op.ResponseInputs)+len(op.ResponseResourceInputs)+len(op.ResponseOptionalEmpty)+len(op.ResponseContains)+len(op.ResponseLimits)+len(op.ResponseAnyInputs)+len(op.Project) != 0 || op.Request.GraphQL != "" {
 			return nil, errors.New("connector response is empty; required evidence is missing")
 		}
 		return []byte("null"), nil
@@ -70,6 +70,19 @@ func checkResponseBindings(document any, op Operation, args map[string]any) erro
 	if err := checkPrimitiveTypes(document, op.ResponseTypes); err != nil {
 		return err
 	}
+	for input, pointers := range op.ResponseAnyInputs {
+		expected, supplied := args[input].(string)
+		matched := false
+		for _, pointer := range pointers {
+			actual, present := lookupPointer(document, pointer)
+			if present && supplied && actual == expected {
+				matched = true
+			}
+		}
+		if !matched {
+			return errors.New("connector response does not match the requested alias identity")
+		}
+	}
 	for pointer, input := range op.ResponseInputs {
 		actual, present := lookupPointer(document, pointer)
 		expected, supplied := args[input]
@@ -126,6 +139,13 @@ func checkPrimitiveTypes(document any, types map[string]string) error {
 }
 
 func checkResponseEvidence(document any, op Operation) error {
+	for pointer, maximum := range op.ResponseLimits {
+		value, exists := lookupPointer(document, pointer)
+		array, valid := value.([]any)
+		if !exists || !valid || len(array) > maximum {
+			return errors.New("connector response array is missing or exceeds its declared result bound")
+		}
+	}
 	for _, pointer := range op.ResponseOptionalEmpty {
 		value, present := lookupPointer(document, pointer)
 		if present && value != nil && value != "" {

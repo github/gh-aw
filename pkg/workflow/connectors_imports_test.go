@@ -90,9 +90,9 @@ func TestConnectorImportRejectsInvalidAuthority(t *testing.T) {
 		{"unknown-tool", connectorImportHeader, "tools:\n  tracker: [missing]\n", "must name exactly one"},
 		{"write-as-tool", connectorImportHeader, "tools:\n  tracker: [add-comment]\n", "must name exactly one"},
 		{"scope", connectorImportHeader, "context:\n  tracker:\n    issue-details: {issue: OTHER}\n", "outside approved resources"},
-		{"trigger", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on:\n  tracker-issue-created:", 1), "", "ingress is not operational"},
-		{"trigger-string", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: tracker-issue-created", 1), "", "ingress is not operational"},
-		{"trigger-list", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: [workflow_dispatch, tracker-issue-created]", 1), "", "ingress is not operational"},
+		{"trigger", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on:\n  tracker-issue-created:", 1), "", "gateway-dispatch"},
+		{"trigger-string", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: tracker-issue-created", 1), "", "gateway-dispatch"},
+		{"trigger-list", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: [workflow_dispatch, tracker-issue-created]", 1), "", "gateway-dispatch"},
 		{"trigger-duplicate", strings.Replace(connectorImportHeader, "on: workflow_dispatch", "on: [tracker-issue-created, tracker-issue-created]", 1), "", "duplicate trigger"},
 		{"effect-options", connectorImportHeader, "safe-outputs:\n  tracker-add-comment: {token: injected}\n", "unknown connector operation option"},
 		{"nested-effects", connectorImportHeader, "safe-outputs:\n  tracker: [add-comment]\n", ""},
@@ -249,7 +249,7 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 					require.NoError(t, os.WriteFile(path, []byte(source.content), 0600))
 					data, err := c.ParseWorkflowFile(path)
 					if source.reject {
-						require.ErrorContains(t, err, "ingress is not operational")
+						require.ErrorContains(t, err, "gateway-dispatch")
 						return
 					}
 					require.NoError(t, err, "ordinary Markdown imports must compile without external definition or connection files")

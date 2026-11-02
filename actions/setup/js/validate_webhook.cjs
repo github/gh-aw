@@ -9,6 +9,7 @@ const { WEBHOOK_PAYLOAD_POLICY, isWebhookEvent, isWebhookFilterName, validWebhoo
 const { isProviderIssueEvent, validProviderIssueSubscription, matchesProviderIssueSubscription } = require("./provider_issue_webhook.cjs");
 const { isGatewayCommand, validGatewayCommandSubscription, matchesGatewayCommandSubscription } = require("./gateway_command_webhook.cjs");
 const { isGitHubNotification, validGitHubNotificationSubscription } = require("./github_notification_webhook.cjs");
+const { isConnectorWebhookEvent, validConnectorWebhookSubscription, matchesConnectorWebhookSubscription } = require("./connector_webhook.cjs");
 
 const MAX_CLIENT_PAYLOAD_BYTES = 65535;
 const MAX_DISPATCH_REQUEST_BYTES = 65535;
@@ -163,6 +164,7 @@ function validateWebhook(event, env = process.env) {
         subscription.types.every(isNonemptyString) &&
         hasValidRepositorySelectors(subscription) &&
         hasValidOrganizationSelectors(subscription) &&
+        (isConnectorWebhookEvent(subscription.event) ? validConnectorWebhookSubscription(subscription) : subscription.connector === undefined) &&
         (!isProviderIssueEvent(subscription.event) || validProviderIssueSubscription(subscription)) &&
         (!isGitHubNotification(subscription.event) || validGitHubNotificationSubscription(subscription)) &&
         (isGatewayCommand(subscription.event) ? validGatewayCommandSubscription(subscription) : subscription.command_filter === undefined)
@@ -220,7 +222,9 @@ function validateWebhook(event, env = process.env) {
       if (isGatewayCommand(subscription.event)) reject("gateway command filters must contain exactly one declared matching source event and command/label value");
       reject("webhook payload filters must contain exactly the declared matching values for all shared conditions and one complete alternative");
     }
-    if (isProviderIssueEvent(subscription.event)) {
+    if (isConnectorWebhookEvent(subscription.event)) {
+      if (!matchesConnectorWebhookSubscription(subscription, delivery.payload)) reject("connector delivery must match its frozen trigger, resource origin and singleton scope evidence");
+    } else if (isProviderIssueEvent(subscription.event)) {
       if (!matchesProviderIssueSubscription(subscription, delivery.payload)) {
         reject("provider issue activity does not match the subscription types or native events");
       }

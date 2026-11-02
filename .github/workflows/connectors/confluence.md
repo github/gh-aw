@@ -34,6 +34,8 @@ connectors:
       api: https://api.atlassian.com
     triggers:
       page-created:
+        resourceOrigins:
+          - https://api.atlassian.com
         match:
           /content/status: current
           /content/type: page
@@ -54,6 +56,8 @@ connectors:
           /content/version/number: integer
         verificationProfile: atlassian.com/forge-invocation-token
       page-updated:
+        resourceOrigins:
+          - https://api.atlassian.com
         match:
           /content/status: current
           /content/type: page
@@ -268,6 +272,17 @@ import-schema:
 <!--
 <connector-documentation id="confluence" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
+  <gateway-routing receiver-installed="false">
+    Select these trigger names under on.gateway-dispatch.connectors for this
+    connector ID. Qualified root selections lower to the same protected route.
+    Repository gateway-dispatch opt-in and write-minimum roles are required.
+    The compiler emits frozen source predicates and grants, approved resource
+    origins, a scoped repository_dispatch route, and mandatory App-provenance
+    and workflow-version admission gates. The external receiver must implement
+    the verification profile, source enrollment, native-event matching, replay
+    handling and canonical resource URL binding before activation. Compilation
+    does not install or approve that receiver; unsupported profiles remain inactive.
+  </gateway-routing>
   <runtime-policies>
     Human text inputs marked sanitize title or body use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after
@@ -399,7 +414,7 @@ import-schema:
       the granular REST scopes above.
     </contract>
     <unavailable>
-      Selecting either custom trigger currently fails closed: no receiver,
+      Selecting either trigger requires the protected gateway path. No receiver,
       subscription, verified gateway enrollment, or Forge deployment is installed.
       Use workflow_dispatch. The named atlassian.com/forge-invocation-token profile
       is a required verification contract, not an implemented ingress verifier.

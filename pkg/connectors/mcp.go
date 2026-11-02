@@ -115,7 +115,11 @@ func (p *Plan) MCPServer(runtime Runtime) (*mcp.Server, error) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "gh-aw-connectors", Version: "v1"}, nil)
 	for _, name := range p.binding.MCP {
 		tool := p.spec.MCP[name]
-		server.AddTool(&mcp.Tool{Name: tool.Tool, InputSchema: inputSchema(tool.Inputs)}, p.readToolHandler(runtime, name))
+		schema, err := p.InputSchema("mcp", name)
+		if err != nil {
+			return nil, err
+		}
+		server.AddTool(&mcp.Tool{Name: tool.Tool, InputSchema: schema}, p.readToolHandler(runtime, name))
 	}
 	for _, registration := range p.binding.HTTPMCP {
 		for tool, constraints := range p.spec.HTTPMCP[registration].Tools {

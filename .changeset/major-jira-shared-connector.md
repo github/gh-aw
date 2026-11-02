@@ -23,7 +23,8 @@ execution-local authenticated receipts, without granting arbitrary real issue
 keys. Seven formerly exposed read methods remain unavailable; no parallel
 native implementation remains. Generic safe-output trusted inputs and bounded
 preflights can resolve author-owned resource identifiers without exposing them
-to the agent. Custom Jira ingress remains unavailable and fails closed. See the
+to the agent. Imported trigger selections are wired to the protected webhook
+gateway; receiver authentication, enrollment and deployment remain external. See the
 Connectors reference for migration inputs, boundaries, and limitations.
 
 Linear consumers must replace native toolsets and safe outputs with explicit
@@ -38,7 +39,9 @@ Entra credentials; automatic PAT/system-token wiring is removed. Hosted MCP
 currently exposes project metadata, while the declared mutations remain bounded
 to title changes, comments, assignment, and fixed related links. Other legacy
 work-item fields, attachments, and temporary-ID options are not drop-in
-replacements. Custom ingress for all three providers remains fail-closed.
+replacements. The gateway opt-in, App-provenance and workflow-version admission
+gates apply to all imported triggers. Unsupported or unenrolled receivers remain
+nonactivating; compilation does not install provider webhooks.
 
 Connector credentials now select explicit stored-token, GitHub App installation
 token, or GitHub OIDC identity-token routes. Minting is job- and phase-local;

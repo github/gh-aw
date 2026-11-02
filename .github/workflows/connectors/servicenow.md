@@ -27,6 +27,8 @@ connectors:
       instance: ${{ github.aw.import-inputs.instance }}
     triggers:
       incident-updated:
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.instance }}
         match:
           /event: record.updated
           /instance: ${{ github.aw.import-inputs.instance }}
@@ -43,6 +45,8 @@ connectors:
           /sys_id: string
         verificationProfile: gh-aw.local/servicenow-admin-ingress
       requested-item-updated:
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.instance }}
         match:
           /event: record.updated
           /instance: ${{ github.aw.import-inputs.instance }}
@@ -270,6 +274,17 @@ import-schema:
 <!--
 <connector-documentation id="servicenow" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
+  <gateway-routing receiver-installed="false">
+    Select these trigger names under on.gateway-dispatch.connectors for this
+    connector ID. Qualified root selections lower to the same protected route.
+    Repository gateway-dispatch opt-in and write-minimum roles are required.
+    The compiler emits frozen source predicates and grants, approved resource
+    origins, a scoped repository_dispatch route, and mandatory App-provenance
+    and workflow-version admission gates. The external receiver must implement
+    the verification profile, source enrollment, native-event matching, replay
+    handling and canonical resource URL binding before activation. Compilation
+    does not install or approve that receiver; unsupported profiles remain inactive.
+  </gateway-routing>
   <runtime-policies>
     Human text inputs marked sanitize title or body use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after
@@ -391,8 +406,8 @@ import-schema:
       gh-aw.local/servicenow-admin-ingress is a declared verification profile,
       not an implemented verifier. No receiver, authentication, replay
       protection, enrollment, or subscription is installed. Selecting either
-      custom root trigger fails closed because ingress is unavailable. Use
-      workflow_dispatch; do not assume events can activate this integration.
+      custom root trigger requires the protected gateway path and approved
+      external receiver. Use workflow_dispatch until that support is available.
     </triggers>
   </activation>
   <capabilities>

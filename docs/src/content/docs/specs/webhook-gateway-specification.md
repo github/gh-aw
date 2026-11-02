@@ -17,7 +17,7 @@ sidebar:
 
 **Required workflow-version admission:** Compiler-owned workflow-hash-bound OIDC `getToken` call and fail-closed continuation; server verification and on-demand reconciliation remain integration responsibilities.
 
-This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, external issues, and commands. Custom webhooks are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
+This specification defines the compiler-to-receiver and receiver-to-runner contract for `on.gateway-dispatch`. It covers GitHub issues, pull requests, discussions, every comment family, reviews/threads, Projects, security alerts, imported connector triggers, and commands. Arbitrary undeclared custom webhook identifiers are unsupported. It does not register webhook sources and is unrelated to the MCP gateway.
 
 The terms **MUST**, **MUST NOT**, and **MAY** describe requirements for conforming integrations. Receiver requirements are not claims that gh-aw ships a receiver: provider onboarding, signature verification, source authorization, durable admission, and dispatch remain integration responsibilities. This contract does not establish compatibility with the proposed hosted CAO RFC-033 interchange.
 
@@ -62,11 +62,44 @@ The following inventory is exhaustive. Other entries in an internal webhook cata
 | `on.gateway-dispatch.label-command` | `label_command` | Selected native GitHub source event with `action: labeled` | Original `label.name` and canonical item HTML URL. The server matches the label exactly and separately authorizes any requested label removal. |
 | GitHub notification triggers below | The corresponding GitHub semantic event | `X-GitHub-Event`, corroborated under the enrolled source profile, and native `action` | Original source resource, event-specific identity, declared filter evidence, and canonical item/comment HTML URL; no original body is forwarded. |
 
-Azure DevOps, Jira, and Linear use the [connector contract](/gh-aw/reference/connectors/). Their former native gateway aliases are removed and MUST be rejected. Custom connector ingress is unavailable and fails closed; importing an embedded declaration does not authorize or activate a receiver.
+Azure DevOps, Jira, and Linear use the [connector contract](/gh-aw/reference/connectors/). Their former native gateway aliases are removed and MUST be rejected. Imported trigger selections use `on.gateway-dispatch.connectors.<alias>: [trigger-name]`, not a compiler provider catalog.
+
+### Imported connector subscriptions
+
+A connector subscription extends the compiler metadata with `connector`, containing
+`id`, `alias`, `trigger`, `digest`, `verification_profile`, `native_events`,
+`normalize`, optional primitive `types`, and approved HTTPS `origins`.
+Its internal event name is `connector_` followed by the first 24 lowercase hex
+digits of SHA-256 over alias, NUL, trigger name, NUL, and the frozen plan digest.
+The public selector remains the connector ID and declared trigger name.
+
+Compiler conditions encode every original fixed match predicate and exact
+resource grant as equality checks on decoded JSON Pointer paths. Integer grants
+must use canonical safe-integer strings. Expressions in source metadata or
+conditions are rejected. The receiver MUST validate native types before matching,
+authenticate the named profile, bind native events and canonical URL to the
+enrolled source, and evaluate all original conditions before projection.
+
+`connector_match_N` and `connector_scope_N` are opaque projection filter names.
+Each projected condition carries exactly one matched literal; arrays of several
+allowlisted values are not proof of one source identity. The destination validates
+those literals, the frozen trigger/event binding, and the canonical URL origin,
+but does not verify native signatures or infer resource membership from origins.
+The closed version-2 envelope and `resource-url-types-filters/v2` policy are
+unchanged. No raw bodies, source objects, credentials, or extra normalization
+fields are forwarded. Runtime `uri:` identities deduplicate URLs only.
+
+These subscriptions use the existing repository opt-in, exclusive dispatch,
+App-token provenance and hash-bound admission gates. A receiver MUST reject
+unknown connector metadata, unsupported verification profiles, or missing
+approved canonicalization; accepting a generic version-2 envelope alone does
+not establish connector support. Provider authentication, enrollment, canonical
+URL construction when no `normalize.url` is declared, and durable replay handling
+remain external receiver responsibilities. Compilation is not receiver deployment.
 
 ### Provider webhook configuration
 
-Future connector webhooks require a separately approved HTTPS receiver, not a GitHub Actions workflow URL. Frontmatter does not create that endpoint or register subscriptions. Provider authentication and exact source/resource grants MUST be reviewed before activation; provider registration privileges and GitHub webhook headers do not establish dispatch authority. Until authenticated connector ingress is implemented, use `workflow_dispatch`. See [Provider Issue Triggers](/gh-aw/reference/provider-issue-triggers/) for migration guidance.
+Connector webhooks require a separately approved HTTPS receiver, not a GitHub Actions workflow URL. Frontmatter does not create that endpoint or register subscriptions. Provider authentication and exact source/resource grants MUST be reviewed before activation; provider registration privileges and GitHub webhook headers do not establish dispatch authority. Until the receiver supports and approves the generated connector subscription, use `workflow_dispatch`. See [Provider Issue Triggers](/gh-aw/reference/provider-issue-triggers/) for migration guidance.
 
 ### Activity types and filters
 

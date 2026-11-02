@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
 )
@@ -130,12 +129,12 @@ func TestGitLabConnectorNativeConsumerRejections(t *testing.T) {
 	for _, event := range []string{"gitlab-merge-request-opened", "gitlab-pipeline-updated"} {
 		source := strings.Replace(gitLabConsumerSource(t, ""), "on: workflow_dispatch", "on: "+event, 1)
 		_, _, _, err := parseGitLabConsumer(t, source)
-		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+		require.ErrorContains(t, err, "gateway-dispatch")
 	}
 	source, err := os.ReadFile(gitLabFixture + "workflow-ingress-unavailable.md")
 	require.NoError(t, err)
 	_, _, _, err = parseGitLabConsumer(t, string(source))
-	require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+	require.ErrorContains(t, err, "gateway-dispatch")
 }
 
 func TestGitLabConnectorEmptyGrantsAndDocumentedExamples(t *testing.T) {

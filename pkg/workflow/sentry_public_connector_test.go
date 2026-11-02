@@ -208,7 +208,7 @@ func TestSentryPublicUnsupportedSelections(t *testing.T) {
 		t.Run(trigger, func(t *testing.T) {
 			source := strings.Replace(sentryPublicSource(""), "on: workflow_dispatch", "on:\n  "+trigger+":", 1)
 			_, _, _, err := sentryPublicConsumer(t, source)
-			require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+			require.ErrorContains(t, err, "gateway-dispatch")
 		})
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,7 +65,7 @@ func TestSentryUnifiedWorkflowDiagnostics(t *testing.T) {
 	t.Run("native-ingress-unavailable", func(t *testing.T) {
 		c, root, content := sentryCompilerFixture(t, "legacy/workflow-ingress-unavailable.yaml")
 		_, err := c.ParseWorkflowString(content, filepath.Join(root, "sentry.md"))
-		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+		require.ErrorContains(t, err, "gateway-dispatch")
 	})
 	for _, fixture := range []struct{ name, from, to, message string }{
 		{"unknown-tool", "tools: [get-issue]", "tools: [update-issue]", "must name exactly one"},

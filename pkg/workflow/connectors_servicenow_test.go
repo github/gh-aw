@@ -4,14 +4,12 @@ package workflow
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/connectors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -117,7 +115,7 @@ func assertServiceNowCompiledJobs(t *testing.T, output string, tools, context, w
 func TestServiceNowWorkflowIngressRejected(t *testing.T) {
 	compiler, path, content := serviceNowCompilerFixture(t, "legacy/workflow-ingress-unavailable.md")
 	_, err := compiler.ParseWorkflowString(content, path)
-	if !errors.Is(err, connectors.ErrIngressUnavailable) {
+	if err == nil || !strings.Contains(err.Error(), "gateway-dispatch") {
 		t.Fatalf("connector subscription must fail closed pending approved ingress: %v", err)
 	}
 }

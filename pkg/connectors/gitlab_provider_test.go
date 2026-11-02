@@ -79,7 +79,7 @@ func TestGitLabProviderNativeEventEvidenceDoesNotEnrollIngress(t *testing.T) {
 	encoded, err := json.Marshal(declaration["triggers"])
 	require.NoError(t, err)
 	var triggers map[string]Trigger
-	require.NoError(t, Decode(encoded, &triggers))
+	require.NoError(t, Decode([]byte(strings.ReplaceAll(string(encoded), "${{ github.aw.import-inputs.api-origin }}", "https://gitlab.com")), &triggers))
 	service, err := NewService(ConnectorSpec{
 		APIVersion: APIVersion, Kind: "ConnectorSpec", ID: "aw.github.com/gitlab",
 		Endpoints: map[string]string{"api": "https://gitlab.com"}, Triggers: triggers,

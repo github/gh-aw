@@ -230,7 +230,7 @@ func TestConfluencePublicUnsupportedSurfaces(t *testing.T) {
 		source := strings.Replace(awConnectorHeader, "on: workflow_dispatch", "on: confluence-"+trigger, 1) +
 			confluencePublicImport + "---\nDo not activate ingress.\n"
 		compiler, path := confluencePublicConsumer(t, source, false)
-		require.ErrorIs(t, compiler.CompileWorkflow(path), connectors.ErrIngressUnavailable)
+		require.ErrorContains(t, compiler.CompileWorkflow(path), "gateway-dispatch")
 		_, err := os.Stat(strings.TrimSuffix(path, ".md") + ".lock.yml")
 		require.ErrorIs(t, err, os.ErrNotExist)
 	}

@@ -40,12 +40,17 @@ connectors:
         url: https://mcp.dev.azure.com/${{ github.aw.import-inputs.organization }}
     triggers:
       work-item-created:
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
         match:
           /eventType: workitem.created
           /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
           /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.created
+        types:
+          /resource/id: integer
         normalize:
           collection: /resourceContainers/collection/id
           project: /resourceContainers/project/id
@@ -56,12 +61,17 @@ connectors:
           /resourceContainers/project/id: projects
         verificationProfile: dev.azure.com/configured-https-auth
       work-item-deleted:
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
         match:
           /eventType: workitem.deleted
           /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
           /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.deleted
+        types:
+          /resource/id: integer
         normalize:
           collection: /resourceContainers/collection/id
           project: /resourceContainers/project/id
@@ -72,12 +82,17 @@ connectors:
           /resourceContainers/project/id: projects
         verificationProfile: dev.azure.com/configured-https-auth
       work-item-restored:
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
         match:
           /eventType: workitem.restored
           /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
           /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.restored
+        types:
+          /resource/id: integer
         normalize:
           collection: /resourceContainers/collection/id
           project: /resourceContainers/project/id
@@ -88,12 +103,17 @@ connectors:
           /resourceContainers/project/id: projects
         verificationProfile: dev.azure.com/configured-https-auth
       work-item-updated:
+        resourceOrigins:
+          - https://dev.azure.com
+          - https://${{ github.aw.import-inputs.organization }}.visualstudio.com
         match:
           /eventType: workitem.updated
           /resourceContainers/collection/id: ${{ github.aw.import-inputs.collection }}
           /resourceContainers/project/id: ${{ github.aw.import-inputs.project }}
         nativeEvents:
           - workitem.updated
+        types:
+          /resource/workItemId: integer
         normalize:
           collection: /resourceContainers/collection/id
           project: /resourceContainers/project/id
@@ -423,6 +443,17 @@ import-schema:
 <!--
 <connector-documentation id="azure-devops" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
+  <gateway-routing receiver-installed="false">
+    Select these trigger names under on.gateway-dispatch.connectors for this
+    connector ID. Qualified root selections lower to the same protected route.
+    Repository gateway-dispatch opt-in and write-minimum roles are required.
+    The compiler emits frozen source predicates and grants, approved resource
+    origins, a scoped repository_dispatch route, and mandatory App-provenance
+    and workflow-version admission gates. The external receiver must implement
+    the verification profile, source enrollment, native-event matching, replay
+    handling and canonical resource URL binding before activation. Compilation
+    does not install or approve that receiver; unsupported profiles remain inactive.
+  </gateway-routing>
   <runtime-policies>
     Human text inputs marked sanitize title or body use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after
@@ -550,8 +581,8 @@ import-schema:
       matching payload version before any future ingress implementation.
       Deleted/restored do not mean closed/reopened. The
       dev.azure.com/configured-https-auth verification profile is a declaration,
-      not an implementation: selecting any custom trigger fails compilation
-      closed. No receiver, subscription, gateway enrollment, or replay defense
+      not an implementation. Trigger selections require the protected gateway
+      route and approved receiver support. No receiver, subscription, gateway enrollment, or replay defense
       is installed. A future receiver must authenticate configured HTTPS hook
       credentials, validate source identities, and handle replay/deduplication;
       Azure service hooks do not supply a native HMAC header to invent. Receiver

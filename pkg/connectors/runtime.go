@@ -45,6 +45,10 @@ func (p *Plan) Execute(ctx context.Context, runtime Runtime, capability, name st
 	if err != nil {
 		return nil, err
 	}
+	args, err = p.resolveInputLookups(ctx, runtime, op, args)
+	if err != nil {
+		return nil, err
+	}
 	return p.executeOperation(ctx, runtime, capability, name, op, args)
 }
 
@@ -100,7 +104,7 @@ func (p *Plan) authorizeOperation(runtime Runtime, capability, name string, args
 	if err := runtime.checkOrigin(p.spec.Endpoints[op.Request.Endpoint]); err != nil {
 		return Operation{}, err
 	}
-	if err := validateArguments(op.Inputs, op.Resources, p.connection.Resources, args); err != nil {
+	if _, err := p.validateLookupArguments(op, args); err != nil {
 		return Operation{}, err
 	}
 	return op, nil

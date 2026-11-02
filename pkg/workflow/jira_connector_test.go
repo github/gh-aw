@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -146,8 +145,8 @@ func TestJiraConnectorCompilationRejections(t *testing.T) {
 	t.Run("authenticated-ingress-required", func(t *testing.T) {
 		c, root, content := jiraConnectorCompiler(t, "legacy/workflow-trigger-unavailable.md")
 		_, err := c.ParseWorkflowString(content, filepath.Join(root, "jira.md"))
-		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
-		assert.ErrorContains(t, err, "connectors.jira: on:")
+		require.ErrorContains(t, err, "gateway-dispatch")
+		assert.ErrorContains(t, err, "mapping on syntax")
 	})
 	for _, root := range []string{
 		"tools:\n  connectors: [jira]\n",

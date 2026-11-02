@@ -176,7 +176,7 @@ func TestLinearConnectorWorkflowRejections(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(source), "on: workflow_dispatch", "on: linear-issue-created", 1)), 0600))
 		_, err = compiler.ParseWorkflowFile(path)
-		require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+		require.ErrorContains(t, err, "gateway-dispatch")
 	})
 	t.Run("removed-gateway-alias", func(t *testing.T) {
 		_, err := ParseWebhookSubscriptions(map[string]any{"gateway-dispatch": map[string]any{

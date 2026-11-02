@@ -83,6 +83,12 @@ func importedConnectorRegistrations(frontmatter map[string]any, imports []parser
 			return nil, err
 		}
 	}
+	if err := connectorGatewaySelections(frontmatter, registrations); err != nil {
+		return nil, err
+	}
+	if err := normalizeConnectorGatewayOn(frontmatter, registrations); err != nil {
+		return nil, err
+	}
 	return registrations, nil
 }
 

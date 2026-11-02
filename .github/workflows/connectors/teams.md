@@ -29,6 +29,9 @@ connectors:
       graph: https://graph.microsoft.com
     triggers:
       channel-message-created:
+        resourceOrigins:
+          - https://graph.microsoft.com
+          - https://teams.microsoft.com
         match:
           /changeType: created
           /resourceData/@odata.type: '#Microsoft.Graph.chatMessage'
@@ -295,6 +298,17 @@ import-schema:
 <!--
 <connector-documentation id="teams" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
+  <gateway-routing receiver-installed="false">
+    Select these trigger names under on.gateway-dispatch.connectors for this
+    connector ID. Qualified root selections lower to the same protected route.
+    Repository gateway-dispatch opt-in and write-minimum roles are required.
+    The compiler emits frozen source predicates and grants, approved resource
+    origins, a scoped repository_dispatch route, and mandatory App-provenance
+    and workflow-version admission gates. The external receiver must implement
+    the verification profile, source enrollment, native-event matching, replay
+    handling and canonical resource URL binding before activation. Compilation
+    does not install or approve that receiver; unsupported profiles remain inactive.
+  </gateway-routing>
   <runtime-policies>
     Human text inputs marked sanitize title or body use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after
@@ -464,7 +478,8 @@ import-schema:
     subscriptions. Graph subscriptions longer than one hour require a lifecycle
     notification URL for this resource. No receiver, subscription creation,
     renewal, gateway enrollment, or bot-activity ingress is installed.
-    Selecting this trigger fails closed at compilation. Use workflow_dispatch.
+    Selecting this trigger requires the protected gateway route and an approved
+    receiver. Use workflow_dispatch until that external support is available.
     Rich/encrypted notifications, edits/deletes, and automatic reply ingress
     are not implemented. Projection alone never authenticates an event.
   </triggers>

@@ -116,7 +116,7 @@ func TestConfluenceConnectorCompilationFailures(t *testing.T) {
 			_, _, err := parseConfluenceWorkflow(t, document)
 			require.Error(t, err)
 			if failure == "ingress" {
-				require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+				require.ErrorContains(t, err, "gateway-dispatch")
 			}
 		})
 	}

@@ -33,6 +33,8 @@ connectors:
       pipelines: ${{ github.aw.import-inputs.pipelines }}
     triggers:
       merge-request-opened:
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.api-origin }}
         verificationProfile: gitlab.com/standard-webhooks-hmac-sha256
         nativeEvents: [Merge Request Hook]
         match:
@@ -45,7 +47,13 @@ connectors:
           /project/id: projects
           /object_attributes/target_project_id: projects
           /object_attributes/iid: merge-requests
+        types:
+          /project/id: integer
+          /object_attributes/target_project_id: integer
+          /object_attributes/iid: integer
       pipeline-updated:
+        resourceOrigins:
+          - ${{ github.aw.import-inputs.api-origin }}
         verificationProfile: gitlab.com/standard-webhooks-hmac-sha256
         nativeEvents: [Pipeline Hook]
         match:
@@ -57,6 +65,9 @@ connectors:
         resources:
           /project/id: projects
           /object_attributes/id: pipelines
+        types:
+          /project/id: integer
+          /object_attributes/id: integer
     tools:
       get-merge-request:
         tool: gitlab_get_merge_request
@@ -232,6 +243,17 @@ import-schema:
 <!--
 <connector-documentation id="gitlab" version="1">
   <stability>experimental: true. This connector's contract may change.</stability>
+  <gateway-routing receiver-installed="false">
+    Select these trigger names under on.gateway-dispatch.connectors for this
+    connector ID. Qualified root selections lower to the same protected route.
+    Repository gateway-dispatch opt-in and write-minimum roles are required.
+    The compiler emits frozen source predicates and grants, approved resource
+    origins, a scoped repository_dispatch route, and mandatory App-provenance
+    and workflow-version admission gates. The external receiver must implement
+    the verification profile, source enrollment, native-event matching, replay
+    handling and canonical resource URL binding before activation. Compilation
+    does not install or approve that receiver; unsupported profiles remain inactive.
+  </gateway-routing>
   <runtime-policies>
     Human text inputs marked sanitize title or body use the shared publisher's
     built-in sanitizers. Titles require at least 20 Unicode code points after

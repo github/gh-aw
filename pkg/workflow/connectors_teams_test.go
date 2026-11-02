@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -101,8 +100,8 @@ func assertTeamsConnectorJobs(t *testing.T, output string, combined bool) {
 func TestTeamsConnectorNativeIngressFailsCompilation(t *testing.T) {
 	compiler, root := teamsConnectorCompiler(t)
 	_, err := compiler.ParseWorkflowString(teamsConnectorWorkflow(t, "legacy/workflow-ingress-unavailable.yaml"), filepath.Join(root, "teams-proof.md"))
-	require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
-	require.ErrorContains(t, err, "connectors.teams: on:")
+	require.ErrorContains(t, err, "gateway-dispatch")
+	require.ErrorContains(t, err, "mapping on syntax")
 }
 
 func TestTeamsConnectorContextScopeFailsCompilation(t *testing.T) {

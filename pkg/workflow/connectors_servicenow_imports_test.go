@@ -286,7 +286,7 @@ func TestServiceNowMarkdownRejectsUnsupportedAuthority(t *testing.T) {
 			content = []byte(strings.Replace(string(content), "on: workflow_dispatch", "on:\n  "+trigger+":", 1))
 			require.NoError(t, os.WriteFile(path, content, 0600))
 			_, err = compiler.ParseWorkflowFile(path)
-			require.ErrorContains(t, err, "ingress is not operational")
+			require.ErrorContains(t, err, "gateway-dispatch")
 		})
 	}
 }

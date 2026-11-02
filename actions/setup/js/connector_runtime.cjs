@@ -38,9 +38,28 @@ const operationFields = [
   "trustedInputs",
   "preflight",
   "responseContains",
+  "responseLimits",
+  "responseAnyInputs",
+  "lookups",
   "retry",
 ];
 const numberTokens = new WeakMap();
+const readFields = [
+  "inputs",
+  "resources",
+  "request",
+  "maxResponseBytes",
+  "responseRequired",
+  "responseOptionalEmpty",
+  "responseTypes",
+  "responseInputs",
+  "responseContains",
+  "responseChecks",
+  "responseResources",
+  "responseLimits",
+  "responseAnyInputs",
+  "project",
+];
 
 class ConnectorError extends Error {}
 class ConnectorHTTPError extends ConnectorError {
@@ -323,7 +342,7 @@ function validateOperation(spec, op, phase, readTool = false) {
   assert(own(spec.endpoints, op.request?.endpoint), "Connector request references an unknown endpoint");
   assert(Number.isInteger(op.maxResponseBytes) && op.maxResponseBytes >= 1 && op.maxResponseBytes <= MAX_RESPONSE);
   validateInputs(op.inputs);
-  for (const key of ["resources", "project", "createdResources", "trustedInputs", "responseContains"]) assert(op[key] === undefined || object(op[key]));
+  for (const key of ["resources", "project", "createdResources", "trustedInputs", "responseContains", "responseLimits", "responseAnyInputs"]) assert(op[key] === undefined || object(op[key]));
   validateRequest(op.request, op.inputs, phase);
   if (op.retry !== undefined) {
     fields(op.retry, ["maxAttempts", "backoffMs", "retryOn", "idempotent"], ["maxAttempts", "backoffMs", "retryOn"]);
@@ -353,6 +372,11 @@ function validateOperation(spec, op, phase, readTool = false) {
   for (const [pointer, input] of entries(op.responseContains)) {
     assert(pointerValid(pointer) && pointer.split("/*/").length === 2 && op.inputs?.[input]?.required && op.inputs[input].type === "string");
   }
+  for (const [pointer, maximum] of entries(op.responseLimits)) assert(pointerValid(pointer) && Number.isInteger(maximum) && maximum >= 1 && maximum <= 100);
+  for (const [input, pointers] of entries(op.responseAnyInputs)) {
+    assert(op.inputs?.[input]?.required && op.inputs[input].type === "string" && Array.isArray(pointers) && pointers.length >= 1 && pointers.length <= 4 && pointers.every(pointerValid));
+  }
+  validateLookups(spec, op, phase);
   if (op.creates || count(op.createdResources) || count(op.trustedInputs) || op.preflight) assert(phase === "safe-output");
   for (const [input, source] of entries(op.trustedInputs)) {
     fields(source, ["secret", "value"]);
@@ -363,16 +387,46 @@ function validateOperation(spec, op, phase, readTool = false) {
   }
   if (op.preflight) {
     const lookup = op.preflight;
-    fields(
-      lookup,
-      ["inputs", "request", "maxResponseBytes", "responseRequired", "responseOptionalEmpty", "responseTypes", "responseInputs", "responseContains", "responseChecks", "project"],
-      ["inputs", "request", "maxResponseBytes", "project"]
-    );
+    fields(lookup, readFields, ["inputs", "request", "maxResponseBytes", "project"]);
     assert(count(op.trustedInputs) && lookup.request.endpoint === op.request.endpoint && count(lookup.project));
     assert(names(lookup.inputs).length === names(op.trustedInputs).length && names(lookup.inputs).every(key => own(op.trustedInputs, key)));
     assert(names(lookup.project).every(key => own(op.trustedInputs, key)));
     validateRequest(lookup.request, lookup.inputs, "context");
     validateOperation(spec, { ...lookup, credential: op.credential }, phase);
+  }
+  function validateLookups(spec, op, phase) {
+    if (op.lookups === undefined) return;
+    assert(Array.isArray(op.lookups) && op.lookups.length <= 4, "Connector lookups require at most four fixed reads");
+    if (!op.lookups.length) return;
+    assert(!count(op.trustedInputs) && !count(op.createdResources) && !op.preflight && !op.creates, "Connector lookups cannot mix with trusted-input or creation-receipt bindings");
+    const targets = new Map();
+    for (const [index, lookup] of op.lookups.entries()) {
+      fields(lookup, [...readFields, "input"], ["inputs", "request", "maxResponseBytes"]);
+      assert(lookup.input === undefined || typeof lookup.input === "string");
+      const input = lookup.input;
+      if (!input) {
+        assert(!count(lookup.project), "Relationship lookup cannot project arguments");
+        continue;
+      }
+      assert(op.inputs?.[input]?.required && op.inputs[input].type === "string" && !op.inputs[input].sanitize && op.resources?.[input] && !targets.has(input));
+      targets.set(input, index);
+      const alias = lookup.inputs?.[input];
+      const pointer = lookup.project?.[input];
+      assert(alias?.required && alias.type === "string" && !alias.sanitize && lookup.resources?.[input] && lookup.resources[input] !== op.resources[input]);
+      assert(count(lookup.project) === 1 && pointer && lookup.responseResources?.[pointer] === op.resources[input], "Lookup projection requires an independent canonical grant");
+      assert(Object.values(lookup.responseInputs || {}).includes(input) || lookup.responseAnyInputs?.[input]?.length, "Lookup response must match its requested alias");
+    }
+    assert(targets.size, "Connector lookups require an alias target");
+    for (const [index, lookup] of op.lookups.entries()) {
+      assert(lookup.request.endpoint === op.request.endpoint && count(lookup.inputs), "Connector lookup requires bounded inputs on the operation endpoint");
+      for (const [input, field] of entries(lookup.inputs)) {
+        if (input === lookup.input) continue;
+        assert(op.inputs?.[input] && field.required && equivalent(field, op.inputs[input]) && (!targets.has(input) || targets.get(input) < index), "Lookup dependencies must be canonical and acyclic");
+      }
+      validateRequest(lookup.request, lookup.inputs, "context");
+      const { input, ...read } = lookup;
+      validateOperation(spec, { ...read, credential: op.credential }, phase);
+    }
   }
   if (op.creates) {
     const created = op.creates;
@@ -427,7 +481,9 @@ function validatePlan(plan) {
     }
     for (const group of ["httpMcp", "triggers"]) assert(spec[group] === undefined || spec[group] === null || object(spec[group]));
     for (const [name, trigger] of entries(spec.triggers)) {
-      fields(trigger, ["verificationProfile", "nativeEvents", "match", "normalize", "resources", "types"], ["verificationProfile", "nativeEvents", "match", "normalize"]);
+      fields(trigger, ["verificationProfile", "nativeEvents", "match", "normalize", "resources", "types", "resourceOrigins"], ["verificationProfile", "nativeEvents", "match", "normalize"]);
+      if (trigger.resourceOrigins !== undefined)
+        assert(Array.isArray(trigger.resourceOrigins) && trigger.resourceOrigins.length <= 16 && trigger.resourceOrigins.every(value => typeof value === "string" && !value.includes("*") && origin(value)));
       assert(fixedPattern(namePattern, name) && fixedPattern(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+\/[a-z][a-z0-9-]*$/, trigger.verificationProfile));
       assert(Array.isArray(trigger.nativeEvents) && trigger.nativeEvents.length && trigger.nativeEvents.every(value => typeof value === "string"));
       assert(object(trigger.match) && count(trigger.match) && object(trigger.normalize) && count(trigger.normalize));
@@ -473,6 +529,8 @@ function validatePlan(plan) {
         assert(connection.resources[resource]?.length || (group === "safeOutputs" && (op.trustedInputs?.[input] || binding.safeOutputs?.includes(op.createdResources?.[input]))), "Connector resource grant is missing");
       }
       for (const resource of Object.values(op.responseResources || {})) assert(connection.resources[resource]?.length, "Connector response resource grant is missing");
+      if (op.preflight)
+        for (const resource of [...Object.values(op.preflight.resources || {}), ...Object.values(op.preflight.responseResources || {})]) assert(connection.resources[resource]?.length, "Connector preflight resource grant is missing");
       const publicNames = group === "mcp" ? [op.tool] : group === "httpMcp" ? names(op.tools).map(tool => name + "__" + tool) : [];
       for (const publicName of publicNames) {
         assert(publicName.length <= 128 && !tools.has(publicName), "Connector public tool name collision");
@@ -513,6 +571,8 @@ function restrictPhase(plan, phase) {
       credentials.add(op.credential);
       if (group !== "httpMcp") endpoints.add(op.request.endpoint);
       for (const resource of [...Object.values(op.resources || {}), ...Object.values(op.responseResources || {})]) resources.add(resource);
+      for (const read of op.lookups || []) for (const resource of [...Object.values(read.resources || {}), ...Object.values(read.responseResources || {})]) resources.add(resource);
+      if (op.preflight) for (const resource of [...Object.values(op.preflight.resources || {}), ...Object.values(op.preflight.responseResources || {})]) resources.add(resource);
       if (group === "httpMcp") for (const tool of Object.values(op.tools)) for (const resource of Object.values(tool.resources || {})) resources.add(resource);
       for (const producer of Object.values(op.createdResources || {})) assert(binding.safeOutputs?.includes(producer), "Connector snapshot contains an unselected creator");
     }
@@ -739,12 +799,19 @@ function compareResponse(document, pointer, expected, expectedToken) {
 async function validateResponse(op, text, args, allowed) {
   if (!text.length) {
     assert(
-      !op.request.graphql && !["responseChecks", "responseResources", "responseRequired", "responseOptionalEmpty", "responseTypes", "responseInputs", "responseResourceInputs", "responseContains", "project"].some(key => count(op[key])),
+      !op.request.graphql &&
+        !["responseChecks", "responseResources", "responseRequired", "responseOptionalEmpty", "responseTypes", "responseInputs", "responseResourceInputs", "responseContains", "responseLimits", "responseAnyInputs", "project"].some(key =>
+          count(op[key])
+        ),
       "Connector response is missing required evidence"
     );
     return null;
   }
   const document = parseJSON(text, op.maxResponseBytes).document;
+  for (const [pointer, maximum] of entries(op.responseLimits)) {
+    const value = lookup(document, pointer);
+    assert(Array.isArray(value) && value.length <= maximum, "Connector response array is missing or exceeds its declared result bound");
+  }
   if (op.request.graphql) {
     const errors = lookup(document, "/errors");
     assert(errors === undefined || errors === null || (Array.isArray(errors) && !errors.length), "Connector GraphQL response reports errors");
@@ -766,6 +833,9 @@ async function validateResponse(op, text, args, allowed) {
   }
   for (const [pointer, type] of entries(op.responseTypes)) await validateArgument({ type, maxLength: MAX_DOCUMENT }, lookup(document, pointer));
   for (const [pointer, input] of entries(op.responseInputs)) assert(own(args, input) && compareResponse(document, pointer, args[input], numberTokens.get(args)?.get(input)), "Connector response does not match its request input");
+  for (const [input, pointers] of entries(op.responseAnyInputs)) {
+    assert(typeof args[input] === "string" && pointers.some(pointer => lookup(document, pointer) === args[input]), "Connector response does not match its requested alias identity");
+  }
   for (const [pointer, input] of entries(op.responseResourceInputs)) {
     const actual = lookup(document, pointer);
     const expected = args[input];
@@ -877,11 +947,10 @@ async function boundedHTTP(fetchImpl, url, init, maximum, rpcId = undefined, tim
     if (reader) void reader.cancel().catch(() => {});
   }
 }
-async function runOperation(plan, op, capability, name, args, allowed, env, fetchImpl) {
+async function runOperation(plan, op, capability, name, args, allowed, env, fetchImpl, deadline = Date.now() + REQUEST_TIMEOUT) {
   const request = buildRequest(plan, op, args);
   authenticate(plan, op.credential, capability === "mcp" ? "agent" : capability === "preflight" ? "safe-output" : capability, request.init.headers, env);
   const attempts = op.retry?.maxAttempts || 1;
-  const deadline = Date.now() + REQUEST_TIMEOUT;
   for (let attempt = 0; attempt < attempts; attempt++) {
     assert(deadline > Date.now(), "Connector retries exceeded the bounded execution window");
     let result;
@@ -899,6 +968,7 @@ async function runOperation(plan, op, capability, name, args, allowed, env, fetc
         const suggested = numeric ? seconds * 1000 : Date.parse(header) - Date.now();
         if (Number.isFinite(suggested)) delay = Math.max(delay, suggested);
       }
+
       assert(delay < deadline - Date.now(), "Connector retry delay exceeds the bounded execution window");
       await new Promise(resolve => setTimeout(resolve, delay));
       continue;
@@ -907,6 +977,56 @@ async function runOperation(plan, op, capability, name, args, allowed, env, fetc
     return { connector: plan.spec.id, capability: capability + "/" + name, untrusted: true, statusCode: result.response.status, data };
   }
   throw new ConnectorError("Connector retry attempts exhausted");
+}
+
+async function lookupArguments(op, args, allowed) {
+  const inputs = { ...op.inputs };
+  const resources = { ...op.resources };
+  const unresolved = [];
+  for (const read of op.lookups || []) {
+    const input = read.input;
+    if (!input) continue;
+    let canonical = true;
+    try {
+      await validateArgument(op.inputs[input], args[input]);
+    } catch (error) {
+      if (!(error instanceof ConnectorError)) throw error;
+      canonical = false;
+    }
+    if (canonical) continue;
+    inputs[input] = read.inputs[input];
+    resources[input] = read.resources[input];
+    unresolved.push(input);
+  }
+  await validateArguments(inputs, resources, allowed, args);
+  if (unresolved.length) {
+    for (const read of op.lookups) {
+      if (read.input && !unresolved.includes(read.input)) continue;
+      for (const resource of [...Object.values(read.resources || {}), ...Object.values(read.responseResources || {})]) assert(allowed[resource]?.length, "Connector lookup resource grant is missing");
+    }
+  }
+  return unresolved.sort();
+}
+
+async function resolveLookups(plan, op, args, allowed, env, fetchImpl, capability) {
+  const unresolved = await lookupArguments(op, args, allowed);
+  if (!unresolved.length) return args;
+  const resolved = { ...args };
+  if (numberTokens.has(args)) numberTokens.set(resolved, numberTokens.get(args));
+  const deadline = Date.now() + REQUEST_TIMEOUT;
+  for (const read of op.lookups) {
+    if (read.input && !unresolved.includes(read.input)) continue;
+    const inputs = Object.fromEntries(names(read.inputs).map(input => [input, resolved[input]]));
+    await validateArguments(read.inputs, read.resources, allowed, inputs);
+    const result = await runOperation(plan, { ...read, credential: op.credential }, capability, "lookup", inputs, allowed, env, fetchImpl, deadline);
+    if (read.input) {
+      const value = result.data?.[read.input];
+      await validateArgument(op.inputs[read.input], value);
+      resolved[read.input] = value;
+    }
+  }
+  await validateArguments(op.inputs, op.resources, allowed, resolved);
+  return resolved;
 }
 
 function bindingHost(env) {
@@ -969,10 +1089,10 @@ async function stageIntent(plan, name, op, args) {
     resolved[input] = value.replace(/^#/u, "");
     allowed[resources[input]] = [...(allowed[resources[input]] || []), resolved[input]];
   }
-  await validateArguments(inputs, resources, allowed, resolved);
-  buildRequest(plan, op, resolved);
+  const unresolved = await lookupArguments({ ...op, inputs, resources }, resolved, allowed);
+  if (!unresolved.length) buildRequest(plan, op, resolved);
   assert(jsonBytes(resolved) <= MAX_DOCUMENT, "Safe-output connector arguments exceed their byte bound");
-  return { staged: true, request: { digest: plan.digest, operation: name, arguments: resolved } };
+  return { staged: true, request: { digest: plan.digest, operation: name, arguments: resolved, ...(unresolved.length ? { unresolvedInputs: unresolved } : {}) } };
 }
 async function resolveSafeOutput(plan, name, op, args, env, fetchImpl) {
   const allowed = { ...plan.connection.resources };
@@ -991,7 +1111,7 @@ async function resolveSafeOutput(plan, name, op, args, env, fetchImpl) {
       delete resources[input];
     }
   const ordinary = Object.fromEntries(entries(args).filter(([input]) => !own(op.createdResources || {}, input) || !fixedPattern(temporaryPattern, args[input])));
-  await validateArguments(inputs, resources, allowed, ordinary);
+  await lookupArguments({ ...op, inputs, resources }, ordinary, allowed);
   let host;
   if (env.GH_AW_CONNECTOR_BINDING_RUN) {
     host = bindingHost(env);
@@ -1019,7 +1139,7 @@ async function resolveSafeOutput(plan, name, op, args, env, fetchImpl) {
   }
   if (op.preflight) {
     const lookup = { ...op.preflight, credential: op.credential };
-    await validateArguments(lookup.inputs, {}, {}, bound);
+    await validateArguments(lookup.inputs, lookup.resources, allowed, bound);
     const result = await runOperation(plan, lookup, "preflight", name, bound, allowed, env, fetchImpl);
     assert(object(result.data), "Trusted connector preflight projection is invalid");
     Object.assign(bound, result.data);
@@ -1030,7 +1150,7 @@ async function resolveSafeOutput(plan, name, op, args, env, fetchImpl) {
     allowed[op.resources[input]] = [value];
     resolved[input] = value;
   }
-  await validateArguments(op.inputs, op.resources, allowed, resolved);
+  await lookupArguments(op, resolved, allowed);
   return { resolved, allowed, host };
 }
 async function createdReceipt(plan, name, op, args, resolved, host, result) {
@@ -1071,14 +1191,16 @@ async function executeConnector(encoded, capability, name, args, options = {}) {
     if (capability === "safe-output") {
       const intent = await stageIntent(plan, name, op, normalized);
       if (staged) return intent;
-      const { resolved, allowed, host } = await resolveSafeOutput(plan, name, op, normalized, env, fetchImpl);
+      const preparation = await resolveSafeOutput(plan, name, op, normalized, env, fetchImpl);
+      const { allowed, host } = preparation;
+      const resolved = await resolveLookups(plan, op, preparation.resolved, allowed, env, fetchImpl, capability);
       if (op.creates && own(normalized, op.creates.temporaryId)) assert(host, "Created-resource bindings require authenticated trusted execution state");
       const result = await runOperation(plan, op, capability, name, resolved, allowed, env, fetchImpl);
       await createdReceipt(plan, name, op, normalized, resolved, host, result);
       return result;
     }
-    await validateArguments(op.inputs, op.resources, plan.connection.resources, normalized);
-    return await runOperation(plan, op, capability, name, normalized, plan.connection.resources, env, fetchImpl);
+    const resolved = await resolveLookups(plan, op, normalized, plan.connection.resources, env, fetchImpl, capability);
+    return await runOperation(plan, op, capability, name, resolved, plan.connection.resources, env, fetchImpl);
   } catch (error) {
     if (error instanceof ConnectorError) throw error;
     return fail("Connector execution failed; no retry performed");
@@ -1141,13 +1263,29 @@ function inputSchema(inputs) {
   }
   return { type: "object", properties, required: required.sort(), additionalProperties: false };
 }
+function operationInputSchema(op) {
+  const inputs = { ...op.inputs };
+  for (const read of op.lookups || []) {
+    if (!read.input) continue;
+    const field = inputs[read.input];
+    const alias = read.inputs[read.input];
+    inputs[read.input] = {
+      ...field,
+      maxLength: Math.max(field.maxLength, alias.maxLength),
+      minLength: Math.min(field.minLength || 0, alias.minLength || 0),
+      pattern: field.pattern && alias.pattern ? "(?:" + field.pattern + ")|(?:" + alias.pattern + ")" : undefined,
+      enum: undefined,
+    };
+  }
+  return inputSchema(inputs);
+}
 async function serve(encoded, input = process.stdin, output = process.stdout, options = {}) {
   const plan = decodePlan(encoded);
   restrictPhase(plan, "agent");
   const tools = new Map();
   for (const name of plan.binding.mcp || []) {
     const op = plan.spec.mcp[name];
-    tools.set(op.tool, { inputSchema: inputSchema(op.inputs), call: args => executeConnector(encoded, "mcp", name, args, options) });
+    tools.set(op.tool, { inputSchema: operationInputSchema(op), call: args => executeConnector(encoded, "mcp", name, args, options) });
   }
   for (const registration of plan.binding.httpMcp || [])
     for (const [tool, constraints] of entries(plan.spec.httpMcp[registration].tools)) {

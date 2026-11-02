@@ -259,7 +259,7 @@ func TestSlackDocumentationRejectedSelections(t *testing.T) {
 			_, _, path, err := slackDocumentationCompiler(t, content, relativePath)
 			require.Error(t, err)
 			if test.name == "ingress" {
-				require.ErrorIs(t, err, connectors.ErrIngressUnavailable)
+				require.ErrorContains(t, err, "gateway-dispatch")
 			}
 			_, err = os.Stat(strings.TrimSuffix(path, ".md") + ".lock.yml")
 			require.ErrorIs(t, err, os.ErrNotExist)

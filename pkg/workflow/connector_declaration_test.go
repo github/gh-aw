@@ -151,7 +151,7 @@ func TestAWConnectorDeclarationRejectsInvalidAuthority(t *testing.T) {
 		{"unknown-capability", "", "", "tools:\n  tracker: [missing]\n", "must name exactly one"},
 		{"removed-context-selection", "", "", "context:\n  tracker:\n    issue-details: {issue: ISSUE-1}\n", "context.tracker is unsupported"},
 		{"removed-empty-context", "", "", "context:\n  tracker: {}\n", "context.tracker is unsupported"},
-		{"trigger", "", "", "on:\n  tracker-issue-created:\n", "ingress is not operational"},
+		{"trigger", "", "", "on:\n  tracker-issue-created:\n", "gateway-dispatch"},
 		{"unprefixed-output", "", "", "safe-outputs:\n  add-comment:\n", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {

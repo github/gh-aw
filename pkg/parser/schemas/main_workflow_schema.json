@@ -848,6 +848,7 @@
               "additionalProperties": false,
               "description": "Experimental exclusive trigger. Every nested key and value must be literal; GitHub Actions expressions are not supported anywhere in this section. No other triggers may coexist with gateway-dispatch; non-trigger on settings such as roles and bots remain supported. Contains independent nested gateway subscriptions with shared repository and organization selection. Forward only canonical resource URIs, event types, and declared matching filter literals; resolve all other data through provider-authenticated access. Requires aw.json gateway-dispatch: true and does not grant gateway authority.",
               "anyOf": [
+                { "required": ["connectors"] },
                 { "required": ["projects-items"] },
                 { "required": ["code-scanning-alert"] },
                 { "required": ["dependabot-alerts"] },
@@ -866,6 +867,14 @@
                 { "required": ["commit-comment"] }
               ],
               "properties": {
+                "connectors": {
+                  "description": "Imported connector trigger selections, lowered through the approved webhook gateway with the same provenance and admission gates. This does not enroll or authorize a receiver.",
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 32,
+                  "propertyNames": { "$ref": "#/$defs/connectorName" },
+                  "additionalProperties": { "$ref": "#/$defs/connectorCapabilities" }
+                },
                 "issue": { "$ref": "#/$defs/webhookGitHubNotification" },
                 "pull-request": { "$ref": "#/$defs/webhookGitHubNotification" },
                 "discussion": { "$ref": "#/$defs/webhookGitHubNotification" },

@@ -105,6 +105,7 @@ const WebhookPayloadProjectionPolicy = "resource-url-types-filters/v2"
 
 // WebhookSubscription is the compiler's versioned filter and routing declaration.
 type WebhookSubscription struct {
+	Connector             *ConnectorWebhookSource       `json:"connector,omitempty"`
 	Provider              string                        `json:"provider,omitempty"`
 	NativeEvents          []string                      `json:"native_events,omitempty"`
 	ActivityNormalization *WebhookActivityNormalization `json:"activity_normalization,omitempty"`
