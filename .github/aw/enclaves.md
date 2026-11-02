@@ -47,6 +47,12 @@ enclaves:
 - A fresh masked capability is generated per workflow run and passed only to the MCP gateway and AWF, never to the primary agent environment.
 - `timeout:` per enclave entry is capped at 4,740 seconds (AWF reserves the final 60 seconds of its 4,800-second finite-disclosure bucket for cleanup). The gateway itself enforces a 4,860-second tool timeout (4,800s AWF bucket + 60s transport allowance) — treat this as an enforcement bound, not a wall-clock guarantee.
 
+## Docker enclave credential staging and diagnostics
+
+- The default AWF release is `v0.29.5`. Compilation generates authenticated installation and probing of a same-release, runner-UID-scoped storage helper for Docker enclaves. Only helper provisioning is privileged; AWF itself stays rootless with network isolation and `noexec` writable invocation storage.
+- Set `sandbox.agent.host-github-token` to stage private host-side repository content for Docker enclaves, e.g. `host-github-token: ${{ secrets.GH_AW_GITHUB_TOKEN }}`. Requires `enclaves` and AWF `v0.29.5` or newer. Compilation rejects a missing staging credential and binds it only as host `GH_TOKEN`, excluded from the primary agent environment. This is separate from the enclave's own GitHub-tool credential and is never persisted through `GITHUB_ENV`. Grant only the repository read access needed for staging.
+- Set `sandbox.agent.enclave-debug-public: true` only for static, public-only Docker enclaves using official release images; default is `false`. Confidential, private, mixed, dynamic, custom-image, and unsupported-runtime configurations cannot opt in, and AWF independently verifies repository visibility before capture. Public diagnostic artifacts have a fixed one-day retention ceiling and redaction does not cover private repository content — never enable this for confidential targets.
+
 ## Experimental Cloud Hypervisor runtime
 
 `enclaves[].runtime: cloud-hypervisor` is an experimental preview for static script and agent enclaves on GitHub-hosted Ubuntu x86_64 KVM runners. Set `sandbox.agent.version: v0.28.47` or newer; the older default AWF version does not support this executor. Configuration and behavior may change without deprecation. Unsupported hosts, artifacts, or configurations fail closed without fallback to Docker or another runtime.
