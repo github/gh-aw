@@ -167,11 +167,6 @@ func (v threatDetectionVerdict) threatKinds() []string {
 	return kinds
 }
 
-func findThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
-	evidence := readThreatDetectionEvidence(runDir)
-	return evidence.Verdict, evidence.HasVerdict
-}
-
 func findLegacyThreatDetectionVerdict(runDir string) (threatDetectionVerdict, bool) {
 	if runDir == "" {
 		return threatDetectionVerdict{}, false

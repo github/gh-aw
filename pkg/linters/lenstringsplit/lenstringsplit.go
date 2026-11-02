@@ -51,7 +51,7 @@ func run(pass *analysis.Pass) (any, error) {
 		if len(outer.Args) != 1 {
 			return
 		}
-		inner, ok := outer.Args[0].(*ast.CallExpr)
+		inner, ok := astutil.UnwrapParenExpr(outer.Args[0]).(*ast.CallExpr) //nolint:uncheckedsliceindex // len(outer.Args) is checked above
 		if !ok {
 			return
 		}
@@ -84,7 +84,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 // isBuiltinLen reports whether call is an invocation of the builtin len function.
 func isBuiltinLen(pass *analysis.Pass, call *ast.CallExpr) bool {
-	ident, ok := call.Fun.(*ast.Ident)
+	ident, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.Ident)
 	if !ok || ident.Name != "len" {
 		return false
 	}
@@ -95,7 +95,7 @@ func isBuiltinLen(pass *analysis.Pass, call *ast.CallExpr) bool {
 // isStringsSplit reports whether call is strings.Split from the standard
 // library "strings" package.
 func isStringsSplit(pass *analysis.Pass, call *ast.CallExpr) bool {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok || sel.Sel.Name != "Split" {
 		return false
 	}
@@ -106,7 +106,7 @@ func hasProvablyNonEmptySeparator(pass *analysis.Pass, call *ast.CallExpr) bool 
 	if len(call.Args) != 2 {
 		return false
 	}
-	tv, ok := pass.TypesInfo.Types[call.Args[1]]
+	tv, ok := pass.TypesInfo.Types[call.Args[1]] //nolint:uncheckedsliceindex // len(call.Args) is checked above
 	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
 		return false
 	}
@@ -121,8 +121,8 @@ func buildCountFix(pass *analysis.Pass, outer, inner *ast.CallExpr) []analysis.S
 		return nil
 	}
 
-	sText := astutil.NodeText(pass.Fset, inner.Args[0])
-	sepText := astutil.NodeText(pass.Fset, inner.Args[1])
+	sText := astutil.NodeText(pass.Fset, inner.Args[0])   //nolint:uncheckedsliceindex // len(inner.Args) is checked above
+	sepText := astutil.NodeText(pass.Fset, inner.Args[1]) //nolint:uncheckedsliceindex // len(inner.Args) is checked above
 	pkgText := splitPkgText(pass, inner)
 	if sText == "" || sepText == "" || pkgText == "" {
 		return nil
@@ -139,7 +139,7 @@ func buildCountFix(pass *analysis.Pass, outer, inner *ast.CallExpr) []analysis.S
 }
 
 func splitPkgText(pass *analysis.Pass, call *ast.CallExpr) string {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return ""
 	}
