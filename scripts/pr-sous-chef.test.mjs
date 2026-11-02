@@ -1101,6 +1101,16 @@ test("finisher preflight rejects invalid numbers and ineligible PRs before check
   }
 });
 
+test("finisher distinguishes staged publication from published fixes and review cleanup", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/pr-finisher.md", import.meta.url), "utf8");
+  assert.match(workflow, /Describe new changes as submitted for publication, not pushed/);
+  assert.match(workflow, /staging\s+`push_to_pull_request_branch` does not confirm a remote commit/);
+  assert.match(workflow, /defer implementation-dependent review replies and\s+resolutions to a later pass/);
+  assert.match(workflow, /Reply to each addressed review comment before resolving its thread/);
+  assert.match(workflow, /Revisit\s+unresolved threads whose fixes are already published/);
+  assert.match(workflow, /never bypass that protection or broaden credentials to force a push/);
+});
+
 test("each API budget no-ops at exactly ten percent remaining", async () => {
   assert.equal((await checkRateLimit(() => budgets)).low, false);
   for (const resource of ["core", "graphql", "search"]) {
