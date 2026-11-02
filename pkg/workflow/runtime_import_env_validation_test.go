@@ -69,7 +69,7 @@ func TestCompilerRuntimeImportRejectsNestedEnv(t *testing.T) {
 			compiler := NewCompiler()
 			compiler.SetQuiet(true)
 			err := compiler.CompileWorkflow(path)
-			require.ErrorContains(t, err, "runtime-import files contain expression errors")
+			require.ErrorContains(t, err, "runtime-import validation failed")
 			require.ErrorContains(t, err, "inner.md")
 			require.ErrorContains(t, err, "env.MY_VAR")
 		})

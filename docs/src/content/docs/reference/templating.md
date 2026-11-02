@@ -5,7 +5,7 @@ sidebar:
   order: 350
 ---
 
-Agentic workflows support four templating and substitution mechanisms: GitHub Actions expressions in frontmatter or markdown, conditional markdown blocks, [compile-time imports](/gh-aw/reference/imports/), and runtime imports for files or URLs.
+Agentic workflows support four templating and substitution mechanisms: GitHub Actions expressions in frontmatter or markdown, conditional markdown blocks, [compile-time imports](/gh-aw/reference/imports/), and runtime imports for local files or static public HTTPS content.
 
 ## GitHub Actions Expressions
 
@@ -85,7 +85,7 @@ The template system supports only basic conditionals - no nesting, `else` clause
 
 ## Runtime Imports
 
-Runtime imports include content from files and URLs in workflow prompts **at runtime** (unlike [compile-time imports](/gh-aw/reference/imports/)). File paths are restricted to the `.github` folder. Use `{{#runtime-import filepath}}` or `{{#runtime-import? filepath}}` for optional imports.
+Runtime imports include content in workflow prompts **at runtime** (unlike [compile-time imports](/gh-aw/reference/imports/)). Local file paths are restricted to `.github` or explicit `.agents/` paths. Remote imports accept literal public HTTPS URLs with expression-free content. Use `{{#runtime-import target}}` or `{{#runtime-import? target}}` for optional imports.
 
 ### Macro Syntax
 
@@ -130,48 +130,46 @@ Verify the fix addresses the issue.
 Analyze issue #${{ github.event.issue.number }}.
 ```
 
-### URL Imports
+### Public HTTPS Imports
 
-The macro syntax supports unauthenticated HTTP/HTTPS URLs to public destinations. URLs are **not restricted to `.github` folder** and content is cached for 1 hour. Requests run during prompt creation on the runner, outside the agent network sandbox.
-
-Every DNS answer must be a public unicast IPv4 or IPv6 address, and the connection uses those validated addresses without resolving again. Loopback, private, link-local, cloud metadata, special-purpose, and IPv6 translation/tunneling destinations are rejected, including IP literals and mixed public/private DNS answers. Redirects and URL credentials are not supported. Public HTTPS imports retain hostname-based certificate verification.
+Remote imports accept only literal, unauthenticated HTTPS URLs. Both the URL and downloaded content must be free of GitHub Actions expressions (`${{ ... }}`) and internal expression/experiment placeholders. Downloaded content must also contain no template directives, including conditionals or nested imports. These checks cover comments, front matter, lines outside a selected range, and text after sanitization; even otherwise-allowed expressions such as `${{ github.actor }}` are rejected in remote text.
 
 ```aw wrap
 {{#runtime-import https://raw.githubusercontent.com/org/repo/main/checklist.md}}
 {{#runtime-import https://example.com/standards.md:10-50}}
 ```
 
+HTTPS requests run during prompt creation on the runner, outside the agent network sandbox. All DNS answers must be ordinary public unicast IPv4/IPv6 addresses, and the connection uses those same validated addresses without resolving again. Private, loopback, link-local, metadata, special-purpose, and translation/tunneling destinations are rejected. Redirects, credentials in URLs, HTTP, other URI schemes, and network-path references are not supported. TLS hostname/certificate verification remains enabled.
+
+URL disk caches are not used; repeated imports may reuse validated content within the current prompt assembly. Optional network failures produce a warning and empty content, but invalid targets and expressions/directives in remote content fail even when optional. To use expressions in shared content, store it in a permitted local file instead. Existing local repo-root forms such as `/.github/`, `//.github/`, and `/.agents/` remain supported.
+
 ### Security Features
 
-Runtime imports automatically strip YAML front matter and HTML/XML comments. GitHub Actions expressions (`${{ ... }}`) use a restricted set of expression capabilities. `env.*`, `secrets.*`, and `vars.*` are rejected, including inside comparisons and compound expressions; imported text cannot read the runner's ambient environment or action input tokens. Supported job outputs and inputs are read only through their compiler-provided bindings or GitHub event context.
+Runtime imports automatically strip YAML front matter and HTML/XML comments. Local imported GitHub Actions expressions (`${{ ... }}`) use a restricted set of expression capabilities. `env.*`, `secrets.*`, and `vars.*` are rejected, including inside comparisons and compound expressions; imported text cannot read the runner's ambient environment or action input tokens. Supported job outputs and inputs are read only through their compiler-provided bindings or GitHub event context. Remote content has no expression capabilities.
 
-`needs.*.outputs.*` expressions are allowed inside imported markdown and are validated recursively across nested runtime imports. At compile time, gh-aw checks existing referenced runtime-import files under `.github` for disallowed expressions, including `env.*`, and follows any nested `{{#runtime-import ...}}` macros it finds. Missing files and URL content cannot be checked at compilation; runtime validation still applies when content is loaded. This lets shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
+`needs.*.outputs.*` expressions are allowed inside local imported markdown and are validated recursively across nested local runtime imports. At compile time, gh-aw checks existing referenced runtime-import files under the permitted folders for disallowed expressions, including `env.*`, and follows any nested `{{#runtime-import ...}}` macros it finds. Missing files and remote content cannot be checked at compilation; runtime validation still applies when content is loaded. This lets local shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
 
 Imported prompt content is still evaluated in the activation job context. In practice, that means imported `needs.*` expressions must refer only to outputs that are available before activation runs, such as `needs.pre_activation.outputs.*` or outputs from custom jobs that explicitly run before activation.
 
-File paths are restricted to `.github` to prevent access to arbitrary repository files. Path traversal and absolute paths are rejected:
+File paths are restricted to `.github` or explicit `.agents/` paths to prevent access to arbitrary files. Traversal outside those folders and arbitrary absolute paths are rejected:
 
 ```aw wrap
 {{#runtime-import ../src/config.go}}  # Error: Relative traversal outside .github
 {{#runtime-import /etc/passwd}}       # Error: Absolute path not allowed
 ```
 
-### Caching
-
-Fetched URLs are cached for 1 hour per workflow run at `/tmp/gh-aw/url-cache/` (keyed by SHA256 hash). The first fetch adds ~500ms–2s latency; subsequent accesses use cached content.
-
 ### Processing Order
 
 Runtime imports run before other substitutions:
 
-1. `{{#runtime-import}}` macros for files and URLs
+1. `{{#runtime-import}}` macros for local files or static public HTTPS content
 2. Expression and experiment values are replaced with opaque placeholders
 3. Author-written `{{#if}}` conditionals are rendered, resolving placeholder values only when evaluating their conditions
 4. Literal values are restored in the selected content without further template processing
 
 ### Limitations
 
-Runtime imports are limited to the `.github` folder for files, do not support authenticated URL fetches, use a per-run URL cache that does not persist across workflow runs, and interpret line numbers against the raw file before front matter removal.
+Runtime imports accept local files within permitted folders or expression-free public HTTPS content. Line numbers refer to raw content before front matter removal. Remote content is checked for expressions and directives before line selection or stripping.
 
 ### Deprecated `{{#import}}`
 
@@ -185,7 +183,8 @@ Runtime imports are limited to the `.github` folder for files, do not support au
 | Invalid line range | `Invalid start line 100 for file docs/main.go (total lines: 50)` |
 | Path traversal | `Security: Path ../src/main.go must be within .github folder` |
 | GitHub Actions macros | `File template.md contains GitHub Actions macros (${{ ... }}) which are not allowed in runtime imports` |
-| URL fetch failure | `Failed to fetch URL https://example.com/file.txt: HTTP 404` |
+| Unsupported target | `Runtime imports require local files or literal public HTTPS URLs` |
+| Remote expression or directive | `URL runtime imports must not contain expressions or template directives` |
 
 ## Learn More
 

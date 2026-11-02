@@ -4,14 +4,13 @@
 // runtime_import.cjs
 // Processes {{#runtime-import filepath}} and {{#runtime-import? filepath}} macros
 // at runtime to import markdown file contents dynamically.
-// Also processes inline @path and @url references.
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
+const { displayImportUrl, importUrlErrorMessage, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
-const { displayImportUrl, importUrlErrorMessage, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
 
 const fs = require("fs");
 const path = require("path");
@@ -30,7 +29,7 @@ const crypto = require("crypto");
  * Making the end marker explicit here keeps every runtime import
  * self-contained regardless of where it ends up in the assembled document.
  *
- * @param {string} content - Resolved content of a single runtime import (file or URL).
+ * @param {string} content - Resolved content of a single runtime import.
  * @returns {string} Content with implicit skill/agent end markers made explicit.
  */
 function closeUnterminatedInlineMarkers(content) {
@@ -595,7 +594,7 @@ function evaluateExpression(expr, resolution) {
 /**
  * Validates and renders GitHub Actions expressions in content
  * @param {string} content - The content with potential expressions
- * @param {string} source - The source identifier (file path or URL) for error messages
+ * @param {string} source - The source identifier for error messages
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values as opaque data during prompt processing
  * @returns {string} - Content with safe expressions rendered
  * @throws {Error} - If unsafe expressions are found
@@ -700,180 +699,67 @@ function hasGitHubActionsMacros(content) {
   return /\$\{\{[\s\S]*?\}\}/.test(content);
 }
 
-/** @type {number} Timeout in milliseconds for fetching URL content in {@link fetchUrlContent} */
-const FETCH_URL_TIMEOUT_MS = 30_000;
-
 /**
- * Fetches content from a URL with caching
- * @param {string} url - The URL to fetch
- * @param {string} cacheDir - Directory to store cached URL content
- * @returns {Promise<string>} - The fetched content
- * @throws {Error} - If URL fetch fails
+ * @param {string} url
+ * @returns {Promise<string>}
  */
-async function fetchUrlContent(url, cacheDir) {
+async function fetchUrlContent(url) {
   const validatedUrl = validateImportUrl(url);
-  const displayUrl = displayImportUrl(validatedUrl);
-  // Create cache directory if it doesn't exist
-  if (!fs.existsSync(cacheDir)) {
-    try {
-      fs.mkdirSync(cacheDir, { recursive: true });
-    } catch (err) {
-      throw new Error(`${ERR_SYSTEM}: Failed to create directory ${cacheDir}: ${getErrorMessage(err)}`, { cause: err });
-    }
-  }
-
-  // Generate cache filename from URL (hash it for safety)
-  const crypto = require("crypto");
-  // Do not reuse content fetched before public-destination enforcement.
-  const urlHash = crypto
-    .createHash("sha256")
-    .update("public-v1:" + url)
-    .digest("hex");
-  const cacheFile = path.join(cacheDir, `url-${urlHash}.cache`);
-
-  // Check if cached version exists and is recent (less than 1 hour old)
-  if (fs.existsSync(cacheFile)) {
-    let stats;
-    try {
-      stats = fs.statSync(cacheFile);
-    } catch (err) {
-      core.warning(`Failed to inspect cache file ${cacheFile}: ${getErrorMessage(err)}. Refetching URL content.`);
-      stats = null;
-    }
-    if (stats) {
-      const ageInMs = Date.now() - stats.mtimeMs;
-      const oneHourInMs = 60 * 60 * 1000;
-
-      if (ageInMs < oneHourInMs) {
-        core.info(`Using cached content for URL: ${displayUrl}`);
-        try {
-          return fs.readFileSync(cacheFile, "utf8");
-        } catch (err) {
-          throw new Error(`${ERR_SYSTEM}: Failed to read file ${cacheFile}: ${getErrorMessage(err)}`, { cause: err });
-        }
-      }
-    }
-  }
-
-  // Fetch URL content
-  core.info(`Fetching content from URL: ${displayUrl}`);
-
-  // Bound DNS resolution, connection establishment, and response body reads together.
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(new Error(`Timed out after ${FETCH_URL_TIMEOUT_MS}ms`)), FETCH_URL_TIMEOUT_MS);
-
-  let data;
+  core.info(`Fetching content from URL: ${displayImportUrl(validatedUrl)}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error("Timed out after 30000ms")), 30_000);
   try {
-    data = await readPublicImportUrl(validatedUrl, timeoutController.signal);
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith(ERR_API)) {
-      throw new Error(importUrlErrorMessage(err));
-    }
-    throw new Error(`${ERR_API}: Failed to fetch URL ${displayUrl}: ${importUrlErrorMessage(err)}`);
+    const content = await readPublicImportUrl(validatedUrl, controller.signal);
+    assertStaticRemoteImport(content);
+    return content;
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timeout);
   }
-
-  // Cache the content
-  try {
-    fs.writeFileSync(cacheFile, data, "utf8");
-  } catch (err) {
-    throw new Error(`${ERR_SYSTEM}: Failed to write file ${cacheFile}: ${getErrorMessage(err)}`, { cause: err });
-  }
-
-  return data;
 }
 
 /**
- * Processes a URL import and returns content with sanitization
- * @param {string} url - The URL to fetch
- * @param {boolean} optional - Whether the import is optional
- * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
- * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
- * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
- * @returns {Promise<string>} - The processed URL content
- * @throws {Error} - If URL fetch fails or content is invalid
+ * Remote text has no expression or template capabilities, even inside comments,
+ * frontmatter, or lines outside the selected range.
+ * @param {string} content
  */
-async function processUrlImport(url, optional, startLine, endLine, protectValue = value => value) {
-  const cacheDir = "/tmp/gh-aw/url-cache";
-  const displayUrl = displayImportUrl(url);
+function assertStaticRemoteImport(content) {
+  if (/\$\{\{|\{\{[#/]|(?:\$\{|__)GH_AW_/.test(content)) {
+    throw new Error(`${ERR_VALIDATION}: URL runtime imports must not contain expressions or template directives`);
+  }
+}
 
-  // Fetch URL content (with caching)
+/**
+ * @param {string} url
+ * @param {boolean} optional
+ * @param {number} [startLine]
+ * @param {number} [endLine]
+ * @returns {Promise<string>}
+ */
+async function processUrlImport(url, optional, startLine, endLine) {
+  validateImportUrl(url);
   let content;
   try {
-    content = await fetchUrlContent(url, cacheDir);
+    content = await fetchUrlContent(url);
   } catch (error) {
-    if (optional) {
-      const errorMessage = importUrlErrorMessage(error);
-      core.warning(`Optional runtime import URL failed: ${displayUrl}: ${errorMessage}`);
-      return "";
-    }
-    throw error;
+    if (error instanceof Error && error.message.startsWith(ERR_VALIDATION)) throw error;
+    if (!optional) throw error;
+    core.warning(`Optional runtime import URL failed: ${displayImportUrl(url)}: ${importUrlErrorMessage(error)}`);
+    return "";
   }
-
-  // If line range is specified, extract those lines first (before other processing)
   if (startLine !== undefined || endLine !== undefined) {
     const lines = content.split("\n");
-    const totalLines = lines.length;
-
-    // Validate line numbers (1-indexed)
-    const start = startLine !== undefined ? startLine : 1;
-    const end = endLine !== undefined ? endLine : totalLines;
-
-    if (start < 1 || start > totalLines) {
-      throw new Error(`${ERR_VALIDATION}: Invalid start line ${start} for URL ${displayUrl} (total lines: ${totalLines})`);
+    const start = startLine ?? 1;
+    const end = endLine ?? lines.length;
+    if (start < 1 || start > lines.length || end < 1 || end > lines.length || start > end) {
+      throw new Error(`${ERR_VALIDATION}: Invalid line range ${start}-${end} for URL ${displayImportUrl(url)} (total lines: ${lines.length})`);
     }
-    if (end < 1 || end > totalLines) {
-      throw new Error(`${ERR_VALIDATION}: Invalid end line ${end} for URL ${displayUrl} (total lines: ${totalLines})`);
-    }
-    if (start > end) {
-      throw new Error(`${ERR_VALIDATION}: Start line ${start} cannot be greater than end line ${end} for URL ${displayUrl}`);
-    }
-
-    // Extract lines (convert to 0-indexed)
     content = lines.slice(start - 1, end).join("\n");
   }
-
-  // Check for front matter and warn
-  if (hasFrontMatter(content)) {
-    core.debug(`URL ${displayUrl} contains front matter which will be ignored in runtime import`);
-    // Remove front matter (everything between first --- and second ---)
-    const lines = content.split("\n");
-    let inFrontMatter = false;
-    let frontMatterCount = 0;
-    const processedLines = [];
-
-    for (const line of lines) {
-      if (line.trim() === "---" || line.trim() === "---\r") {
-        frontMatterCount++;
-        if (frontMatterCount === 1) {
-          inFrontMatter = true;
-          continue;
-        } else if (frontMatterCount === 2) {
-          inFrontMatter = false;
-          continue;
-        }
-      }
-      if (!inFrontMatter && frontMatterCount >= 2) {
-        processedLines.push(line);
-      }
-    }
-    content = processedLines.join("\n");
-  }
-
-  // Remove XML comments
+  content = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
   content = removeXMLComments(content);
-
-  // Process GitHub Actions expressions (validate and render safe ones)
-  if (hasGitHubActionsMacros(content)) {
-    content = processExpressions(content, `URL ${displayUrl}`, protectValue);
-  }
-
-  // Close any unterminated "## skill:"/"## agent:" block so this import
-  // cannot swallow content that gets spliced in after it (see
-  // closeUnterminatedInlineMarkers above).
+  content = neutralizeSystemTags(content);
   content = closeUnterminatedInlineMarkers(content);
-
+  assertStaticRemoteImport(content);
   return content;
 }
 
@@ -992,15 +878,29 @@ function generatePlaceholderName(expr) {
 }
 
 /**
+ * @param {string} target
+ */
+function assertSupportedRuntimeImport(target) {
+  const trimmed = target.trim();
+  if (/^https:/i.test(trimmed)) {
+    validateImportUrl(trimmed);
+    return;
+  }
+  // Repo-root .github/.agents paths retain their existing multiple-slash syntax.
+  const repoRootPath = /^\/+\.(?:github|agents)[/\\]/.test(trimmed);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || (/^[/\\]{2}/.test(trimmed) && !repoRootPath)) {
+    throw new Error(`${ERR_VALIDATION}: Runtime imports require local files or literal public HTTPS URLs`);
+  }
+}
+
+/**
  * Resolves a runtime-import file path to its normalized absolute path.
- * @param {string} filepathOrUrl - File path (not URL)
+ * @param {string} filepathOrUrl - Local file path
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @returns {{filepath: string, normalizedPath: string, normalizedBaseFolder: string}}
  */
 function resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir) {
-  if (/^https?:\/\//i.test(filepathOrUrl)) {
-    throw new Error(`${ERR_VALIDATION}: Expected file path for runtime import, received URL: ${displayImportUrl(filepathOrUrl)}`);
-  }
+  assertSupportedRuntimeImport(filepathOrUrl);
 
   let filepath = filepathOrUrl;
   let isAgentsPath = false;
@@ -1106,23 +1006,21 @@ function assertRuntimeImportRealPathWithinBase(normalizedPath, normalizedBaseFol
 }
 
 /**
- * Reads and processes a file or URL for runtime import
- * @param {string} filepathOrUrl - The path to the file (relative to GITHUB_WORKSPACE) or URL to import
+ * Reads a local file with restricted expressions or expression-free public HTTPS content.
+ * @param {string} filepathOrUrl - The local file path or literal public HTTPS URL to import
  * @param {boolean} optional - Whether the import is optional (true for {{#runtime-import? filepath}})
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
  * @param {number} [startLine] - Optional start line (1-indexed, inclusive)
  * @param {number} [endLine] - Optional end line (1-indexed, inclusive)
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values during prompt processing
- * @returns {Promise<string>} - The processed file or URL content, or empty string if optional and file not found
- * @throws {Error} - If file/URL is not found and import is not optional, or if GitHub Actions macros are detected
+ * @returns {Promise<string>} - The processed content, or empty string for a missing optional import
+ * @throws {Error} - If the target, content, or required import is invalid
  */
 async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine, protectValue = value => value) {
-  // Check if this is a URL
-  if (/^https?:\/\//i.test(filepathOrUrl)) {
-    return await processUrlImport(filepathOrUrl, optional, startLine, endLine, protectValue);
+  assertSupportedRuntimeImport(filepathOrUrl);
+  if (/^https:/i.test(filepathOrUrl)) {
+    return processUrlImport(filepathOrUrl, optional, startLine, endLine);
   }
-
-  // Otherwise, process as a file
   const { filepath, normalizedPath, normalizedBaseFolder } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   // Check if file exists
@@ -1225,7 +1123,7 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 }
 
 /**
- * Resolves an import path/URL to a canonical key for deduplication checks.
+ * Resolves an import target to a canonical key for deduplication checks.
  * @param {string} filepathOrUrl
  * @param {string} workspaceDir
  * @param {number} [startLine]
@@ -1235,10 +1133,10 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine) {
   const rangeSuffix = startLine !== undefined && endLine !== undefined ? `:${startLine}-${endLine}` : "";
 
-  if (/^https?:\/\//i.test(filepathOrUrl)) {
+  if (/^https:/i.test(filepathOrUrl)) {
+    validateImportUrl(filepathOrUrl);
     return `${filepathOrUrl}${rangeSuffix}`;
   }
-
   const { normalizedPath } = resolveRuntimeImportFilePath(filepathOrUrl, workspaceDir);
 
   return `${normalizedPath}${rangeSuffix}`;
@@ -1247,7 +1145,7 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
 /**
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
- * @property {string} src - The resolved file path or URL
+ * @property {string} src - The resolved local file path or static HTTPS URL
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -1270,7 +1168,7 @@ function resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine
  * @param {Map<string, string>} [rawImportCache] - Cache of raw (pre-expansion) file contents, used to set rawContent on cached tree nodes
  * @param {Set<string>} [resolvedInParent] - Canonical import keys already resolved in parent/sibling context; skipped during recursion
  * @param {(value: string, expression?: string) => string} [protectValue] - Preserve evaluated values through nested imports and later directive processing
- * @returns {Promise<string>} - Content with runtime-import macros replaced by file/URL contents
+ * @returns {Promise<string>} - Content with runtime-import macros replaced by validated content
  */
 async function processRuntimeImports(
   content,
@@ -1300,7 +1198,7 @@ async function processRuntimeImports(
     // Use a sentinel that cannot appear in normal workflow content.
     return `\u0000GH_AW_CODESPAN_${idx}_GH_AW\u0000`;
   });
-  const bodyImportRe = /\{\{#import(\?)?(?:[ \t]+|[ \t]*:[ \t]*)([^\{\}]+?)\}\}/g;
+  const bodyImportRe = /\{\{#import(\?)?(?:[ \t]+|[ \t]*:[ \t]*)((?:\$\{\{[^{}]*\}\}|\$\{[^{}]*\}|[^{}])+?)\}\}/g;
   let bodyImportCount = 0;
   const normalizedContent = contentWithPlaceholders.replace(bodyImportRe, (_, optional, importPath) => {
     bodyImportCount++;
@@ -1314,8 +1212,8 @@ async function processRuntimeImports(
   }
 
   // Pattern to match {{#runtime-import filepath}} or {{#runtime-import? filepath}}
-  // Captures: optional flag (?), whitespace, filepath/URL (which may include :startline-endline)
-  const pattern = /\{\{#runtime-import(\?)?[ \t]+([^\}]+?)\}\}/g;
+  // Captures: optional flag (?), whitespace, filepath (which may include :startline-endline)
+  const pattern = /\{\{#runtime-import(\?)?[ \t]+((?:\$\{\{[^{}]*\}\}|\$\{[^{}]*\}|[^{}])+?)\}\}/g;
 
   let processedContent = content;
   const matches = [];
@@ -1329,7 +1227,7 @@ async function processRuntimeImports(
     const filepathWithRange = match[2].trim();
     const fullMatch = match[0];
 
-    // Parse filepath/URL and optional line range (filepath:startline-endline)
+    // Parse filepath and optional line range (filepath:startline-endline)
     const rangeMatch = filepathWithRange.match(/^(.+?):(\d+)-(\d+)$/);
     let filepathOrUrl, startLine, endLine;
 
@@ -1353,17 +1251,19 @@ async function processRuntimeImports(
     });
   }
 
-  // Process all imports sequentially (to handle async URLs)
+  // Process imports sequentially to preserve nested import ordering.
   const resolvedInThisCall = new Set();
   for (const matchData of matches) {
     const { fullMatch, filepathOrUrl, optional, startLine, endLine, filepathWithRange } = matchData;
-    const displayPath = /^https?:\/\//i.test(filepathOrUrl) ? displayImportUrl(filepathOrUrl) : filepathWithRange;
+    assertSupportedRuntimeImport(filepathOrUrl);
+    const remote = /^https:/i.test(filepathOrUrl);
+    const displayPath = remote ? displayImportUrl(filepathOrUrl) : filepathWithRange;
     let importKey;
     try {
       importKey = resolveRuntimeImportKey(filepathOrUrl, workspaceDir, startLine, endLine);
     } catch (error) {
-      const errorMessage = importUrlErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
+      const errorMessage = getErrorMessage(error);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${importUrlErrorMessage(errorMessage)}`);
     }
 
     // Skip imports already resolved in the parent/sibling context.
@@ -1383,6 +1283,7 @@ async function processRuntimeImports(
       // Reuse cached content
       const cachedContent = importCache.get(filepathWithRange);
       if (cachedContent !== undefined) {
+        if (remote) assertStaticRemoteImport(cachedContent);
         processedContent = processedContent.replace(fullMatch, () => cachedContent);
         core.info(`Reusing cached content for ${displayPath}`);
         if (parentTreeChildren !== null) {
@@ -1406,7 +1307,7 @@ async function processRuntimeImports(
 
     // Check for circular dependencies
     if (importStack.includes(filepathWithRange)) {
-      const cycle = [...importStack, filepathWithRange].map(value => (/^https?:\/\//i.test(value) ? displayImportUrl(value) : value)).join(" -> ");
+      const cycle = [...importStack, filepathWithRange].map(value => (/^https:/i.test(value) ? displayImportUrl(value) : value)).join(" -> ");
       throw new Error(`${ERR_PARSE}: Circular dependency detected: ${cycle}`);
     }
 
@@ -1456,8 +1357,8 @@ async function processRuntimeImports(
       processedContent = processedContent.replace(fullMatch, () => importedContent);
       resolvedInThisCall.add(importKey);
     } catch (error) {
-      const errorMessage = importUrlErrorMessage(error);
-      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${errorMessage}`);
+      const errorMessage = getErrorMessage(error);
+      throw new Error(`${ERR_API}: Failed to process runtime import for ${displayPath}: ${importUrlErrorMessage(errorMessage)}`);
     } finally {
       // Remove from import stack
       importStack.pop();
@@ -1468,9 +1369,9 @@ async function processRuntimeImports(
 }
 
 module.exports = {
+  fetchUrlContent,
   processRuntimeImports,
   processRuntimeImport,
-  fetchUrlContent,
   closeUnterminatedInlineMarkers,
   hasFrontMatter,
   removeXMLComments,

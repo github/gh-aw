@@ -3,13 +3,11 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import http from "http";
 const core = { info: vi.fn(), warning: vi.fn(), debug: vi.fn(), setFailed: vi.fn() };
 global.core = core;
 const {
   processRuntimeImports,
   processRuntimeImport,
-  fetchUrlContent,
   closeUnterminatedInlineMarkers,
   hasFrontMatter,
   removeXMLComments,
@@ -1554,11 +1552,6 @@ describe("runtime_import", () => {
           await expect(processRuntimeImport("unsafe.md", false, tempDir)).rejects.toThrow("unauthorized");
         });
 
-        it("should process expressions in URL imports", async () => {
-          // Note: URL imports would need HTTP mocking to test properly
-          // This is a placeholder for the structure
-        });
-
         it("should handle expressions with front matter removal", async () => {
           const content = "---\ntitle: Test\n---\n\nActor: ${{ github.actor }}";
           fs.writeFileSync(path.join(workflowsDir, "frontmatter-expr.md"), content);
@@ -2377,36 +2370,6 @@ describe("runtime_import", () => {
       expect(children).toHaveLength(2);
       expect(children[0].rawContent).toBe("First");
       expect(children[1].rawContent).toBe("Second");
-    });
-  });
-
-  describe("fetchUrlContent", () => {
-    /** @type {import("http").Server} */
-    let server;
-    /** @type {string} */
-    let baseUrl;
-
-    afterEach(async () => {
-      if (server) {
-        await new Promise(resolve => server.close(resolve));
-      }
-    });
-
-    it("should reject loopback without contacting the server", async () => {
-      const handler = vi.fn((_req, res) => res.end("private data"));
-      server = http.createServer(handler);
-      await new Promise(resolve => server.listen(0, resolve));
-      const { port } = server.address();
-      baseUrl = `http://127.0.0.1:${port}/file.txt`;
-      await expect(fetchUrlContent(baseUrl, tempDir)).rejects.toThrow(/public IP address/);
-      expect(handler).not.toHaveBeenCalled();
-    });
-
-    it("should not trust an old URL cache entry", async () => {
-      const url = "http://127.0.0.1/private.txt";
-      const hash = crypto.createHash("sha256").update(url).digest("hex");
-      fs.writeFileSync(path.join(tempDir, `url-${hash}.cache`), "private data");
-      await expect(fetchUrlContent(url, tempDir)).rejects.toThrow(/public IP address/);
     });
   });
 });

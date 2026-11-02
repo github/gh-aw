@@ -416,6 +416,9 @@ func collectRuntimeImportMarkdownContent(markdownContent, workspaceRoot string, 
 }
 
 func readRuntimeImportMarkdownForAnalysis(ref runtimeImportReference, workspaceRoot string, seen map[string]struct{}) (string, bool, bool) {
+	if strings.HasPrefix(strings.ToLower(ref.importPath), "https:") {
+		return "", false, false
+	}
 	for _, candidate := range runtimeImportAnalysisCandidatePaths(ref.importPath, workspaceRoot) {
 		seenKey := fmt.Sprintf("%s:%d-%d", candidate, ref.startLine, ref.endLine)
 		if _, alreadySeen := seen[seenKey]; alreadySeen {

@@ -22,7 +22,7 @@ const { createLiteralValues, restoreInlineMetadata, writeLiteralState, literalFi
 /**
  * @typedef {Object} ImportTreeNode
  * @property {string} macro - The original {{#runtime-import ...}} macro text
- * @property {string} src - The resolved file path or URL
+ * @property {string} src - The resolved local file path or static HTTPS URL
  * @property {boolean} optional - Whether the import was optional ({{#runtime-import?}})
  * @property {number|null} startLine - Start line for partial imports, or null
  * @property {number|null} endLine - End line for partial imports, or null
@@ -135,7 +135,7 @@ async function main({ deferredBindings = {} } = {}) {
       content = system + splitMarker + user;
     }
 
-    // Step 1: Process runtime imports (files and URLs)
+    // Step 1: Process local file or static public HTTPS runtime imports
     core.info("\n========================================");
     core.info("[main] STEP 1: Runtime Imports");
     core.info("========================================");
@@ -151,7 +151,7 @@ async function main({ deferredBindings = {} } = {}) {
 
     if (hasRuntimeImports) {
       const importMatches = content.match(/{{#runtime-import\??[ \t]+[^\}]+}}/g) || [];
-      core.info(`Processing ${importMatches.length} runtime import macro(s) (files and URLs)`);
+      core.info(`Processing ${importMatches.length} runtime import macro(s) (local files or static public HTTPS)`);
 
       const beforeImports = content.length;
       content = await processRuntimeImports(content, workspaceDir, new Set(), new Map(), [], importTree.children, new Map(), new Set(), protectExpression);

@@ -1,7 +1,6 @@
 // @ts-check
 
 const dns = require("node:dns");
-const http = require("node:http");
 const https = require("node:https");
 const { BlockList, isIP } = require("node:net");
 const { ERR_API, ERR_VALIDATION } = require("./error_codes.cjs");
@@ -81,14 +80,17 @@ function isPublicImportAddress(address) {
  * @returns {URL}
  */
 function validateImportUrl(value) {
+  if (!/^https:\/\//i.test(value) || /\$\{\{|\{\{[#/]|(?:\$\{|__)GH_AW_|[\s\\]/.test(value)) {
+    throw new Error(`${ERR_VALIDATION}: Runtime import URL requires a literal, unauthenticated HTTPS URL`);
+  }
   let url;
   try {
     url = new URL(value);
   } catch {
-    throw new Error(`${ERR_VALIDATION}: Runtime import URL must be a valid HTTP or HTTPS URL`);
+    throw new Error(`${ERR_VALIDATION}: Runtime import URL must be a valid HTTPS URL`);
   }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
-    throw new Error(`${ERR_VALIDATION}: Runtime import URL requires unauthenticated HTTP or HTTPS`);
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error(`${ERR_VALIDATION}: Runtime import URL requires a literal, unauthenticated HTTPS URL`);
   }
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   if (isIP(hostname) && !isPublicImportAddress(hostname)) {
@@ -123,16 +125,16 @@ function lookupPublicImport(hostname, options, callback) {
 /**
  * Requests run on the runner, not in the agent firewall. Use a fresh direct
  * connection with a validating DNS lookup; preserve the hostname for Host/SNI
- * and certificate verification. Node HTTP does not follow redirects.
+ * and certificate verification. Node HTTPS does not follow redirects.
  * @param {URL} url
  * @param {AbortSignal} signal
  * @returns {Promise<string>}
  */
 async function readPublicImportUrl(url, signal) {
+  validateImportUrl(url.href);
   try {
-    const transport = url.protocol === "https:" ? https : http;
     const response = await new Promise((resolve, reject) => {
-      const request = transport.get(url, { agent: false, lookup: lookupPublicImport, signal }, resolve);
+      const request = https.get(url, { agent: false, lookup: lookupPublicImport, signal }, resolve);
       request.on("error", reject);
     });
     const status = response.statusCode || 0;
@@ -146,7 +148,7 @@ async function readPublicImportUrl(url, signal) {
     }
     return Buffer.concat(chunks).toString("utf8");
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith(ERR_API)) {
+    if (error instanceof Error && (error.message.startsWith(ERR_API) || error.message.startsWith(ERR_VALIDATION))) {
       throw new Error(importUrlErrorMessage(error));
     }
     throw new Error(`${ERR_API}: Failed to fetch URL ${displayImportUrl(url)}: ${importUrlErrorMessage(error)}`);
