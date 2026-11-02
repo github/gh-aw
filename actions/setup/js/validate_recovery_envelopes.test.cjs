@@ -179,6 +179,10 @@ describe("final recovery envelope upload boundary", () => {
     vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([path.dirname(artifact.bundle)]));
     expect(main({ roots: [path.join(root, "runner")] }).removed).toBe(1);
   });
+  it.each([["relative/path"], ["/"]])("rejects unsafe additional root %s", unsafe => {
+    vi.stubEnv("GH_AW_RECOVERY_ADDITIONAL_ROOTS", JSON.stringify([unsafe]));
+    expect(() => main({ roots: [root] })).toThrow("Invalid additional recovery artifact roots");
+  });
   it("removes a pack changed or appended after its preview was created", () => {
     const artifact = envelope();
     fs.appendFileSync(artifact.bundle, secret);

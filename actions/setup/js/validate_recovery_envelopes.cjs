@@ -93,6 +93,10 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
   const limits = getObjectPackLimits();
   const additionalRoots = JSON.parse(process.env.GH_AW_RECOVERY_ADDITIONAL_ROOTS || "[]");
   if (!Array.isArray(additionalRoots) || additionalRoots.some(root => typeof root !== "string")) throw new Error("Invalid additional recovery artifact roots");
+  // Compiler-emitted roots may lie outside the primary roots (memory mounts), but must be absolute and never the filesystem root.
+  for (const root of additionalRoots) {
+    if (!path.isAbsolute(root) || path.resolve(root) === path.parse(path.resolve(root)).root) throw new Error("Invalid additional recovery artifact roots");
+  }
   const visited = new Set();
   let removed = 0;
   let entries = 0;
