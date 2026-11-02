@@ -57,6 +57,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
+	osopenreadallpreferreadfile "github.com/github/gh-aw/pkg/linters/osopen-readall-prefer-readfile"
 	"github.com/github/gh-aw/pkg/linters/ossetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap"
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
@@ -120,7 +121,7 @@ type docAnalyzer struct {
 //	appendbytestring, appendoneelement, blankassigncomma, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage,
 //	errortypeassertion, errstringmatch, execcommandwithoutcontext, fileclosenotdeferred, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
 //	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, httpnoctx, httprespbodyclose, httpstatuscode, ioutildeprecated, jsonmarshalignoredeerror, largefunc, lenstringsplit, lenstringzero,
-//	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
+//	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopen-readall-prefer-readfile, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortslice, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, timeafterleak, timesleepnocontext, timenowsub,
 //	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
@@ -172,6 +173,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"osexitinlibrary", osexitinlibrary.Analyzer},
 		{"osgetenvlibrary", osgetenvlibrary.Analyzer},
 		{"osisnotexist", osisnotexist.Analyzer},
+		{"osopen-readall-prefer-readfile", osopenreadallpreferreadfile.Analyzer},
 		{"ossetenvlibrary", ossetenvlibrary.Analyzer},
 		{"packagelevelmutableslicemap", packagelevelmutableslicemap.Analyzer},
 		{"panic-in-library-code", panicinlibrarycode.Analyzer},

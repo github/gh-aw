@@ -39,6 +39,7 @@ var notYetEnforced = map[string]string{
 	"largefunc":                   "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":               "requires an enforcement audit after the diagnostic-message fix (#54717)",
 	"manualpathconcat":            "existing production violations need remediation",
+	"osopenreadallpreferreadfile": "new analyzer needs an enforcement-readiness audit before CI enables it",
 	"osisnotexist":                "existing os error predicates need case-by-case review before CI enforcement",
 	"packagelevelmutableslicemap": "existing production violations need remediation",
 	"readerstringconv":            "existing reader conversions need an enforcement-readiness audit before CI enables it",
@@ -282,6 +283,8 @@ func normalizedDocSlugSetToAnalyzerNames(slugSet map[string]struct{}) map[string
 
 func docSlugToAnalyzerName(slug string) string {
 	switch slug {
+	case "osopen-readall-prefer-readfile":
+		return "osopenreadallpreferreadfile"
 	case "panic-in-library-code":
 		return "panicinlibrarycode"
 	default:

@@ -49,6 +49,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/osexitinlibrary"
 	"github.com/github/gh-aw/pkg/linters/osgetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/osisnotexist"
+	osopenreadallpreferreadfile "github.com/github/gh-aw/pkg/linters/osopen-readall-prefer-readfile"
 	"github.com/github/gh-aw/pkg/linters/ossetenvlibrary"
 	"github.com/github/gh-aw/pkg/linters/packagelevelmutableslicemap"
 	panicinlibrarycode "github.com/github/gh-aw/pkg/linters/panic-in-library-code"
@@ -143,6 +144,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	osexitinlibrary.Analyzer,
 	osgetenvlibrary.Analyzer,
 	osisnotexist.Analyzer,
+	osopenreadallpreferreadfile.Analyzer,
 	ossetenvlibrary.Analyzer,
 	packagelevelmutableslicemap.Analyzer,
 	panicinlibrarycode.Analyzer,
