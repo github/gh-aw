@@ -193,11 +193,11 @@ Check current PR head/base/checks/reviews/guards; diagnosis isn't merge authoriz
 | --- | --- | --- |
 | `source_branch_invalid`, `target_base_branch_invalid`, `branch_not_allowed` | Head/base syntax/patterns. | Fix authorized target/config. |
 | `target_branch_protected`, `target_branch_default`, `target_branch_has_no_open_pr` | Protection/default/PR. | Use allowed PRs; retain protections. |
-| `pr_is_draft`, `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
+| `pr_is_draft` `pr_not_open` | Draft/open. | Honor author readiness; stop closed/merged PRs. |
 | `merge_conflicts`, `not_mergeable` | Mergeability/conflicts; unknown != conflict. | Resolve reviewed-head conflicts; bound waits. |
 | `missing_required_labels`, `title_prefix_mismatch` | Labels/title. | Correct authorized metadata; retain guards. |
-| `required_checks_missing`, `required_checks_failing`, `required_check_producer_missing`, `required_check_producer_mismatch`, `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
-| `pending_reviewers`, `blocking_review_state`, `blocking_individual_review`, `unresolved_review_threads`, `required_approval_missing` | Pending/blocked reviews/vetoes; threads; current-head allowlisted human approval. | Address feedback; retain reviewer authority/independent-human approval. |
+| `required_checks_missing` `required_checks_failing` `required_check_producer_missing` `required_check_producer_mismatch` `required_check_producer_ambiguous` | Identity/SHA/completion/result/app IDs. | Require complete, unambiguous current-head configured-producer checks; no bypass. |
+| `pending_reviewers` `blocking_review_state` `blocking_individual_review` `unresolved_review_threads` `required_approval_missing` | Pending/blocked reviews/vetoes; threads; current-head allowlisted human approval. | Address feedback; retain reviewer authority/independent-human approval. |
 | `merge_not_completed`, `merge_operation_error` | API/live state. | Reconcile possibly-merged state before retry. |
 
 ## Parser and ledger diagnostics
