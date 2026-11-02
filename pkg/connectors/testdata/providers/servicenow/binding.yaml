@@ -1,0 +1,8 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorBinding
+definition: spec.yaml
+connection: connection.yaml
+triggers: [incident-updated, requested-item-updated]
+mcp: [get-incident, get-requested-item]
+safeOutputs: [append-incident-work-note, append-requested-item-work-note]
+context: [incident-metadata, requested-item-metadata]
