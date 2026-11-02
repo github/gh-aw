@@ -1868,6 +1868,77 @@ func TestBuildMergePullRequestDecisionUploadStep(t *testing.T) {
 	}
 }
 
+func TestMergePullRequestDecisionUploadsRequireRedactionInAllModes(t *testing.T) {
+	for _, worker := range []bool{false, true} {
+		for _, mode := range []string{"applied", "handler-staged", "global-staged", "trial"} {
+			t.Run(mode+map[bool]string{false: "-ordinary", true: "-worker"}[worker], func(t *testing.T) {
+				compiler := NewCompiler()
+				compiler.trialMode = mode == "trial"
+				compiler.jobManager = NewJobManager()
+				data := &WorkflowData{
+					Name: "Merge audit",
+					SafeOutputs: &SafeOutputsConfig{
+						MergePullRequest: &MergePullRequestConfig{RequiredTitlePrefix: "${{ secrets.MERGE_PREFIX }}"},
+						GitHubToken:      "${{ secrets.MERGE_TOKEN }}",
+					},
+					Tools: map[string]any{},
+					SecretMasking: &SecretMaskingConfig{Steps: []map[string]any{
+						{"id": "mask_custom", "run": "echo masking"},
+					}},
+				}
+				staged := TemplatableBool("true")
+				if mode == "handler-staged" {
+					data.SafeOutputs.MergePullRequest.Staged = &staged
+				}
+				if mode == "global-staged" {
+					data.SafeOutputs.Staged = &staged
+				}
+				if worker {
+					data.Tools["work-queue"] = map[string]any{"worker": true}
+				}
+				job, _, err := compiler.buildConsolidatedSafeOutputsJob(data, string(constants.AgentJobName), "merge-audit.md")
+				require.NoError(t, err)
+				require.NotNil(t, job)
+				content := strings.Join(job.Steps, "")
+				var document []map[string]any
+				require.NoError(t, yaml.Unmarshal([]byte(content), &document))
+				var upload, redaction map[string]any
+				for _, step := range document {
+					if step["name"] == "Upload Safe Outputs Items" {
+						require.Nil(t, upload, "audit and item manifests must share one artifact")
+						upload = step
+					}
+					if step["id"] == "redact_secrets" {
+						require.Nil(t, redaction)
+						redaction = step
+					}
+				}
+				require.NotNil(t, upload)
+				require.NotNil(t, redaction)
+				assert.Equal(t, "always() && steps.redact_secrets.outcome == 'success' && steps.mask_custom.outcome == 'success'", upload["if"])
+				assert.Equal(t, "${{ secrets.MERGE_TOKEN }}", redaction["env"].(map[string]any)["SECRET_MERGE_TOKEN"])
+				assert.Contains(t, redaction["env"].(map[string]any)["GH_AW_SECRET_NAMES"], "MERGE_TOKEN")
+				assert.Equal(t, "${{ secrets.MERGE_PREFIX }}", redaction["env"].(map[string]any)["SECRET_MERGE_PREFIX"])
+				assert.Contains(t, redaction["env"].(map[string]any)["GH_AW_SECRET_NAMES"], "MERGE_PREFIX")
+				with := upload["with"].(map[string]any)
+				assert.Contains(t, with["name"], constants.SafeOutputItemsArtifactName)
+				paths := with["path"].(string)
+				assert.Contains(t, paths, "/tmp/gh-aw/merge-pull-request-decisions.jsonl")
+				assert.Equal(t, worker, strings.Contains(paths, "/tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl"))
+				suppressItems := mode == "global-staged" || mode == "trial"
+				assert.Equal(t, !suppressItems, strings.Contains(paths, "/tmp/gh-aw/safe-output-items.jsonl"))
+				if suppressItems {
+					assert.NotContains(t, paths, "safe-output-outcomes.jsonl")
+					assert.NotContains(t, paths, "temporary-id-map.json")
+					assert.NotContains(t, paths, "safe-output-errors.json")
+					assert.NotContains(t, paths, "claim-delivery-errors.json")
+				}
+				assert.Less(t, strings.Index(content, "id: redact_secrets"), strings.Index(content, "name: Upload Safe Outputs Items"))
+			})
+		}
+	}
+}
+
 func TestSafeOutputClaimArtifactsRequireWorkerAndSuccessfulRedaction(t *testing.T) {
 	for _, test := range []struct {
 		name   string

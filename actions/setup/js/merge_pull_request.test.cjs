@@ -1,4 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { writeMergePullRequestDecision } from "./safe_output_manifest.cjs";
+
+function persistDecision(result) {
+  const directory = path.resolve(`.test-merge-pull-request-audit-${Math.random().toString(36).slice(2)}`);
+  const file = path.join(directory, "decisions.jsonl");
+  try {
+    writeMergePullRequestDecision(result, 0, file);
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
 
 describe("merge_pull_request branch validation", () => {
   beforeEach(() => {
@@ -676,6 +690,17 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
+  it.each([Number.MAX_SAFE_INTEGER + 1, Infinity, 1.5, 0, -1, "5"])("rejects invalid producer app identity %s without persisting it", async appId => {
+    pr.head.sha = "a".repeat(40);
+    pr.base.sha = "b".repeat(40);
+    reviewPR.headRefOid = pr.head.sha;
+    checkResults.mockResolvedValue([{ id: 1, name: "ci", head_sha: pr.head.sha, status: "completed", conclusion: "success", app: { id: appId } }]);
+    const result = await run({ required_checks: ["ci"] });
+    expect(result.success).toBe(false);
+    expect(persistDecision(result).decision_evidence.check_producer_rejections).toEqual([{ phase: "initial", code: "required_check_producer_missing", check_run_id: 1 }]);
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
   it("accepts a successful rerun from the same app while ignoring deployment gates", async () => {
     const check = { name: "ci", head_sha: "abc123", status: "completed", app: { id: 5 } };
     checkResults.mockResolvedValue([
@@ -747,6 +772,34 @@ describe("merge_pull_request policy hardening", () => {
     expect(result.error).toContain("Unexpected check producer");
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
+
+  it.each([false, true].flatMap(staged => ["initial", "revalidation"].flatMap(phase => ["missing", "mismatch", "ambiguous"].map(reason => ({ staged, phase, reason })))))(
+    "persists bounded producer rejection evidence ($reason, $phase, staged=$staged)",
+    async ({ staged, phase, reason }) => {
+      pr.head.sha = "a".repeat(40);
+      pr.base.sha = "b".repeat(40);
+      reviewPR.headRefOid = pr.head.sha;
+      const name = "private check name <|system|>";
+      const check = { id: 1, name, head_sha: pr.head.sha, status: "completed", conclusion: "success", app: { id: 5 } };
+      const rejected = reason === "missing" ? [{ ...check, app: null }] : reason === "mismatch" ? [{ ...check, app: { id: 999 } }] : [check, { ...check, id: 2, app: { id: 999 } }];
+      if (phase === "revalidation") checkResults.mockResolvedValueOnce([check]).mockResolvedValueOnce(rejected);
+      else checkResults.mockResolvedValue(rejected);
+      const result = await run({ staged, required_checks: [name], required_check_apps: reason === "ambiguous" ? {} : { [name]: 5 } });
+      const code = `required_check_producer_${reason}`;
+      const expected = { code, name, check_run_id: reason === "ambiguous" ? 2 : 1, expected_app_id: 5, ...(reason === "missing" ? {} : { observed_app_id: 999 }) };
+      expect(result.success).toBe(false);
+      expect(result.failure_reasons).toContainEqual(expect.objectContaining({ code }));
+      const checks = phase === "initial" ? result.decision_evidence.checks : result.decision_evidence.revalidation.checks;
+      expect(checks.producer_rejections).toEqual([expected]);
+      if (phase === "revalidation") expect(result.decision_evidence.checks.passing).toHaveLength(1);
+      const entry = persistDecision(result);
+      const { name: _name, ...numericRejection } = expected;
+      expect(entry.decision_evidence.check_producer_rejections).toEqual([{ phase, ...numericRejection }]);
+      expect(entry.failure_codes).toContain(code);
+      expect(JSON.stringify(entry)).not.toContain(name);
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    }
+  );
 
   it("accepts and records the configured producer without permitting tool-call overrides", async () => {
     checkResults.mockResolvedValue([{ id: 1, name: "ci", head_sha: "abc123", status: "completed", conclusion: "success", app: { id: 5 } }]);
@@ -837,13 +890,18 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
-  it("staged mode evaluates and revalidates the same gates without merging", async () => {
+  it.each(["handler", "handler-expression", "global"])("staged mode evaluates and revalidates the same gates without merging (%s)", async mode => {
     client.paginate.mockResolvedValue([approval()]);
-    const result = await run({ staged: true, required_approvers: ["reviewer"] });
-    expect(result).toMatchObject({ success: true, staged: true, merged: false });
-    expect(result.decision_evidence.revalidated_at).toBeDefined();
-    expect(client.rest.pulls.get).toHaveBeenCalledTimes(2);
-    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", mode === "global" ? "true" : "false");
+    try {
+      const result = await run({ staged: mode === "handler" ? true : mode === "handler-expression" ? "true" : false, required_approvers: ["reviewer"] });
+      expect(result).toMatchObject({ success: true, staged: true, merged: false });
+      expect(result.decision_evidence.revalidated_at).toBeDefined();
+      expect(client.rest.pulls.get).toHaveBeenCalledTimes(2);
+      expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("staged mode also refuses missing independent approval", async () => {
@@ -852,12 +910,16 @@ describe("merge_pull_request policy hardening", () => {
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });
 
-  it("preserves max=1", async () => {
+  it.each([false, true])("preserves and audits max=1 (staged=%s)", async staged => {
     const { main } = await import("./merge_pull_request.cjs");
-    const handler = await main();
+    const handler = await main({ staged });
     expect((await handler({})).success).toBe(true);
-    expect((await handler({})).success).toBe(false);
-    expect(client.rest.pulls.merge).toHaveBeenCalledTimes(1);
+    const result = await handler({});
+    expect(result.success).toBe(false);
+    const entry = persistDecision(result);
+    expect(entry.failure_codes).toEqual(["merge_limit_reached"]);
+    expect(entry.decision_evidence).toMatchObject({ repository: "github/gh-aw", pull_request_number: 100 });
+    expect(client.rest.pulls.merge).toHaveBeenCalledTimes(staged ? 0 : 1);
   });
 
   it.each([
@@ -885,6 +947,44 @@ describe("merge_pull_request policy hardening", () => {
   it("preserves repository allowlisting before making API calls", async () => {
     const result = await run({ target: "*" }, { pull_request_number: 100, repo: "untrusted/repo" });
     expect(result.success).toBe(false);
+    expect(client.rest.pulls.get).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true].flatMap(staged => [42, "42", "triggering"].map(target => ({ staged, target }))))("keeps configured $target identity in early rejection and ignores agent overrides (staged=$staged)", async ({ target, staged }) => {
+    const number = target === "triggering" ? 100 : 42;
+    const rejected = await run({ staged, target }, { repo: "untrusted/repo", pull_request_number: 999 });
+    expect(persistDecision(rejected).decision_evidence.pull_request_number).toBe(number);
+    expect(client.rest.pulls.get).not.toHaveBeenCalled();
+    expect(client.rest.pulls.merge).not.toHaveBeenCalled();
+    const allowed = await run({ staged, target }, { pull_request_number: 999 });
+    expect(allowed.success).toBe(true);
+    expect(client.rest.pulls.get).toHaveBeenCalledWith({ owner: "github", repo: "gh-aw", pull_number: number });
+    expect(client.rest.pulls.merge).toHaveBeenCalledTimes(staged ? 0 : 1);
+    if (!staged) expect(client.rest.pulls.merge).toHaveBeenCalledWith(expect.objectContaining({ pull_number: number }));
+  });
+
+  it.each(
+    [false, true].flatMap(staged =>
+      [
+        { code: "repository_validation_failed", config: {}, message: { repo: "untrusted/repo", pull_request_number: 100 }, repository: "untrusted/repo", number: 100 },
+        { code: "repository_validation_failed", config: {}, message: { repo: "invalid/repo\nprivate context", pull_request_number: -1 }, repository: undefined, number: undefined },
+        { code: "repository_validation_failed", config: {}, message: { repo: "invalid/repo\n", pull_request_number: Number.MAX_SAFE_INTEGER + 1 }, repository: undefined, number: undefined },
+        { code: "pull_request_number_invalid", config: {}, message: { pull_request_number: "private invalid number" }, repository: "github/gh-aw", number: undefined },
+        { code: "target_resolution_failed", config: {}, message: {}, repository: "github/gh-aw", number: undefined },
+      ].map(test => ({ ...test, staged }))
+    )
+  )("audits early $code safely (staged=$staged)", async ({ code, config, message, repository, number, staged }) => {
+    const result = await run({ target: "*", staged, ...config }, message);
+    expect(result.success).toBe(false);
+    expect(result.failure_reasons).toEqual([{ code, message: "Merge target rejected before evaluation" }]);
+    const entry = persistDecision(result);
+    expect(entry.failure_codes).toEqual([code]);
+    expect(entry.decision_evidence.repository).toBe(repository);
+    expect(entry.decision_evidence.pull_request_number).toBe(number);
+    expect(entry.decision_evidence.evaluated_at).toBeDefined();
+    expect(JSON.stringify(entry)).not.toContain("private");
+    expect(entry).not.toHaveProperty("error");
     expect(client.rest.pulls.get).not.toHaveBeenCalled();
     expect(client.rest.pulls.merge).not.toHaveBeenCalled();
   });

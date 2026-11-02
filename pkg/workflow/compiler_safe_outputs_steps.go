@@ -283,8 +283,13 @@ func (c *Compiler) buildDispatchRepositoryAppTokenSteps(data *WorkflowData) []st
 // buildSafeOutputItemsManifestUploadStep builds the step that uploads the safe output
 // items manifest and temporary ID map as a separate artifact.
 func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string) string, claimArtifacts bool, data *WorkflowData) []string {
+	return buildSafeOutputManifestUploadStep(prefix, pinAction, claimArtifacts, data, true)
+}
+
+func buildSafeOutputManifestUploadStep(prefix string, pinAction func(string) string, claimArtifacts bool, data *WorkflowData, includeItems bool) []string {
+	includeMergeDecisions := data != nil && data.SafeOutputs != nil && data.SafeOutputs.MergePullRequest != nil
 	condition := "always()"
-	if claimArtifacts {
+	if claimArtifacts || includeMergeDecisions {
 		condition += " && " + secretRedactionSuccessCondition(data)
 	}
 	steps := []string{
@@ -294,18 +299,22 @@ func buildSafeOutputItemsManifestUploadStep(prefix string, pinAction func(string
 		"        with:\n",
 		fmt.Sprintf("          name: %s%s\n", prefix, constants.SafeOutputItemsArtifactName),
 		"          path: |\n",
-		"            /tmp/gh-aw/safe-output-items.jsonl\n",
-		"            /tmp/gh-aw/safe-output-outcomes.jsonl\n",
-		fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.TemporaryIdMapFilename),
-		fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
 	}
-	if data != nil && data.SafeOutputs != nil && data.SafeOutputs.MergePullRequest != nil {
+	if includeItems {
+		steps = append(steps,
+			"            /tmp/gh-aw/safe-output-items.jsonl\n",
+			"            /tmp/gh-aw/safe-output-outcomes.jsonl\n",
+			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.TemporaryIdMapFilename),
+			fmt.Sprintf("            /tmp/gh-aw/%s\n", constants.SafeOutputErrorsFilename),
+		)
+	}
+	if includeMergeDecisions {
 		steps = append(steps, "            /tmp/gh-aw/merge-pull-request-decisions.jsonl\n")
 		if claimArtifacts {
 			steps = append(steps, "            /tmp/gh-aw/claims/*/merge-pull-request-decisions.jsonl\n")
 		}
 	}
-	if claimArtifacts {
+	if claimArtifacts && includeItems {
 		steps = append(steps,
 			"            /tmp/gh-aw/claims/*/safe-output-items.jsonl\n",
 			"            /tmp/gh-aw/claims/*/safe-output-outcomes.jsonl\n",

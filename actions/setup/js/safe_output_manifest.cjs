@@ -13,7 +13,13 @@ const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentit
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
 const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
 const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
+const MERGE_PRODUCER_FAILURE_CODES = new Set(["required_check_producer_missing", "required_check_producer_mismatch", "required_check_producer_ambiguous"]);
 const MERGE_FAILURE_CODES = new Set([
+  ...MERGE_PRODUCER_FAILURE_CODES,
+  "merge_limit_reached",
+  "repository_validation_failed",
+  "pull_request_number_invalid",
+  "target_resolution_failed",
   "source_branch_invalid",
   "target_base_branch_invalid",
   "pr_is_draft",
@@ -67,6 +73,28 @@ function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath
     const isPositiveInteger = value => Number.isSafeInteger(value) && value > 0;
     const isRunIdentity = value => typeof value === "string" && /^[1-9]\d{0,19}$/.test(value);
     const isCommitSHA = value => typeof value === "string" && /^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(value);
+    const producerRejections = [];
+    for (const [phase, checks] of [
+      ["initial", evidence.checks],
+      ["revalidation", evidence.revalidation?.checks],
+    ]) {
+      if (checks?.producer_rejections === undefined) continue;
+      if (!Array.isArray(checks.producer_rejections) || checks.producer_rejections.length > 100) {
+        throw new Error(`${ERR_SYSTEM}: Invalid merge decision producer rejections`);
+      }
+      for (const rejection of checks.producer_rejections) {
+        if (!rejection || !MERGE_PRODUCER_FAILURE_CODES.has(rejection.code)) {
+          throw new Error(`${ERR_SYSTEM}: Invalid merge decision producer rejection code`);
+        }
+        producerRejections.push({
+          phase,
+          code: rejection.code,
+          check_run_id: mergeAuditIdentity(rejection.check_run_id, isPositiveInteger, "check_run_id"),
+          expected_app_id: mergeAuditIdentity(rejection.expected_app_id, isPositiveInteger, "expected_app_id"),
+          observed_app_id: mergeAuditIdentity(rejection.observed_app_id, isPositiveInteger, "observed_app_id"),
+        });
+      }
+    }
     const entry = {
       timestamp: new Date().toISOString(),
       data_trust: "untrusted",
@@ -85,6 +113,7 @@ function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath
         base_sha: mergeAuditIdentity(evidence.base_sha, isCommitSHA, "base_sha"),
         evaluated_at: mergeAuditIdentity(evidence.evaluated_at, isAuditTimestamp, "evaluated_at"),
         revalidated_at: mergeAuditIdentity(evidence.revalidated_at, isAuditTimestamp, "revalidated_at"),
+        check_producer_rejections: producerRejections.length > 0 ? producerRejections : undefined,
       },
     };
     const secretValues = collectArtifactSecretValues();

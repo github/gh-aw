@@ -15,6 +15,17 @@ const { SAFE_OUTPUT_E001, SAFE_OUTPUT_E007, SAFE_OUTPUT_E099 } = require("./erro
 const MERGEABILITY_PENDING_ERROR = "pull request mergeability is still being computed";
 const MERGEABILITY_PENDING_ERROR_E099 = `${SAFE_OUTPUT_E099}: ${MERGEABILITY_PENDING_ERROR}`;
 
+class CheckProducerError extends Error {
+  /** @param {string} message @param {Record<string, any>} rejection */
+  constructor(message, rejection) {
+    super(message);
+    for (const field of ["check_run_id", "expected_app_id", "observed_app_id"]) {
+      if (!Number.isSafeInteger(rejection[field]) || rejection[field] <= 0) delete rejection[field];
+    }
+    this.rejection = rejection;
+  }
+}
+
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
@@ -370,15 +381,32 @@ async function evaluateRequiredChecks(githubClient, owner, repo, headSha, requir
     if (!requiredChecks.includes(run.name) || isDeploymentCheck(run)) {
       continue;
     }
-    if (!Number.isInteger(run.app?.id) || run.app.id <= 0) {
-      throw new Error(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check "${run.name}"`);
+    if (!Number.isSafeInteger(run.app?.id) || run.app.id <= 0) {
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Missing check producer evidence for required check "${run.name}"`, {
+        code: "required_check_producer_missing",
+        name: run.name,
+        check_run_id: run.id,
+        expected_app_id: requiredCheckApps[run.name],
+      });
     }
     if (Object.hasOwn(requiredCheckApps, run.name) && run.app.id !== requiredCheckApps[run.name]) {
-      throw new Error(`${SAFE_OUTPUT_E007}: Unexpected check producer for required check "${run.name}"`);
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Unexpected check producer for required check "${run.name}"`, {
+        code: "required_check_producer_mismatch",
+        name: run.name,
+        check_run_id: run.id,
+        expected_app_id: requiredCheckApps[run.name],
+        observed_app_id: run.app.id,
+      });
     }
     const appId = producersByName.get(run.name);
     if (appId !== undefined && appId !== run.app.id) {
-      throw new Error(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check "${run.name}"`);
+      throw new CheckProducerError(`${SAFE_OUTPUT_E007}: Ambiguous check producers for required check "${run.name}"`, {
+        code: "required_check_producer_ambiguous",
+        name: run.name,
+        check_run_id: run.id,
+        expected_app_id: appId,
+        observed_app_id: run.app.id,
+      });
     }
     producersByName.set(run.name, run.app.id);
   }
@@ -522,17 +550,39 @@ async function main(config = {}) {
 
   return async function handleMergePullRequest(message, resolvedTemporaryIds) {
     core.info(`Processing merge_pull_request message: ${JSON.stringify({ pull_request_number: message?.pull_request_number, repo: message?.repo, merge_method: message?.merge_method })}`);
+    const attemptedRepo = message?.repo || defaultTargetRepo;
+    const configuredTarget = targetConfig === "*" ? undefined : resolveTarget({ targetConfig, item: {}, context, itemType: "merge_pull_request" });
+    const attemptedNumber = targetConfig === "*" ? message?.pull_request_number : configuredTarget?.success ? configuredTarget.number : undefined;
+    /** @param {string} code @param {string} error @param {any} [repository] @param {any} [number] */
+    const rejectTarget = (code, error, repository = attemptedRepo, number = attemptedNumber) => {
+      if (typeof repository === "string" && !repository.includes("/") && typeof defaultTargetRepo === "string" && defaultTargetRepo.includes("/")) {
+        repository = `${defaultTargetRepo.split("/")[0]}/${repository}`;
+      }
+      return {
+        success: false,
+        data_trust: "untrusted",
+        staged: isStaged,
+        error,
+        failure_reasons: [{ code, message: "Merge target rejected before evaluation" }],
+        decision_evidence: {
+          data_trust: "untrusted",
+          repository: typeof repository === "string" && repository.trim() === repository && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?\/[a-zA-Z0-9_.-]{1,100}$/.test(repository) ? repository : undefined,
+          pull_request_number: Number.isSafeInteger(number) && number > 0 ? number : undefined,
+          evaluated_at: new Date().toISOString(),
+        },
+      };
+    };
     if (processedCount >= maxCount) {
       core.debug('merge_pull_request: {"event":"limit_reached"}');
       core.warning(`Skipping merge_pull_request: max count of ${maxCount} reached`);
-      return { success: false, data_trust: "untrusted", staged: isStaged, error: `Max count of ${maxCount} reached` };
+      return rejectTarget("merge_limit_reached", `Max count of ${maxCount} reached`);
     }
     processedCount++;
 
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "merge pull request");
     if (!repoResult.success) {
       core.error(`Repository validation failed: ${repoResult.error}`);
-      return { success: false, data_trust: "untrusted", staged: isStaged, error: repoResult.error };
+      return rejectTarget("repository_validation_failed", repoResult.error);
     }
     const { owner, repo } = repoResult.repoParts;
     core.info(`Resolved target repository: ${owner}/${repo}`);
@@ -542,7 +592,7 @@ async function main(config = {}) {
       const pullNumberResolution = resolvePullRequestNumber(message, resolvedTemporaryIds);
       if (!pullNumberResolution.success) {
         core.error(pullNumberResolution.error);
-        return { success: false, data_trust: "untrusted", staged: isStaged, error: pullNumberResolution.error };
+        return rejectTarget("pull_request_number_invalid", pullNumberResolution.error, `${owner}/${repo}`);
       }
       targetItem = { ...message, pull_request_number: pullNumberResolution.pullNumber };
       if (pullNumberResolution.fromTemporaryId) {
@@ -558,7 +608,7 @@ async function main(config = {}) {
     });
     if (!targetResult.success) {
       core.error(targetResult.error);
-      return { success: false, data_trust: "untrusted", staged: isStaged, error: targetResult.error };
+      return rejectTarget("target_resolution_failed", targetResult.error, `${owner}/${repo}`);
     }
     const pullNumber = targetResult.number;
     core.info(`Target PR number: ${pullNumber}`);
@@ -705,6 +755,7 @@ async function main(config = {}) {
       branchPolicy.requiredChecks = [...new Set([...branchPolicy.requiredChecks, ...requiredChecks])].sort();
       evidence.branch_policy = branchPolicy;
       phase = "required_checks";
+      evidence.checks = { required: branchPolicy.requiredChecks, required_apps: requiredCheckApps };
       const checkSummary = await evaluateRequiredChecks(githubClient, owner, repo, pr.head.sha, branchPolicy.requiredChecks, requiredCheckApps);
       core.debug(
         `merge_pull_request: ${JSON.stringify({ event: "check_evidence", required: branchPolicy.requiredChecks.length, passing: checkSummary.passing.length, missing: checkSummary.missing.length, failing: checkSummary.failing.length })}`
@@ -880,12 +931,23 @@ async function main(config = {}) {
       core.debug(`merge_pull_request: ${JSON.stringify({ event: "operation_failed", phase })}`);
       core.error(`merge_pull_request failed for PR #${pullNumber} during ${phase}`);
       evidence.failure_phase = phase;
+      if (error instanceof CheckProducerError) {
+        const checks = { producer_rejections: [error.rejection] };
+        if (phase === "revalidation") {
+          evidence.revalidation = { checks, evaluated_at: new Date().toISOString() };
+        } else {
+          evidence.checks = { ...evidence.checks, ...checks };
+        }
+        failureReasons.push({ code: error.rejection.code, message: error.message });
+      } else {
+        failureReasons.push({ code: "merge_operation_error", message: getErrorMessage(error) });
+      }
       return {
         success: false,
         data_trust: "untrusted",
         staged: isStaged,
         error: getErrorMessage(error),
-        failure_reasons: [{ code: "merge_operation_error", message: getErrorMessage(error) }],
+        failure_reasons: failureReasons,
         decision_evidence: evidence,
       };
     }

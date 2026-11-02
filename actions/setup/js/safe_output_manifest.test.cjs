@@ -169,6 +169,35 @@ describe("safe_output_manifest", () => {
         expect(entry.decision_evidence).toEqual({});
       });
 
+      it("projects only fixed phases, producer codes and numeric identities from both check evaluation paths", () => {
+        const rejection = { code: "required_check_producer_mismatch", check_run_id: 12, expected_app_id: 5, observed_app_id: 999, name: "private check", message: "private error", phase: "private phase" };
+        writeMergePullRequestDecision(
+          {
+            failure_reasons: [{ code: rejection.code }],
+            decision_evidence: { ...identity, checks: { producer_rejections: [rejection] }, revalidation: { checks: { producer_rejections: [rejection] } } },
+          },
+          0,
+          testManifestFile
+        );
+        const content = fs.readFileSync(testManifestFile, "utf8");
+        expect(content).not.toContain("private");
+        expect(JSON.parse(content).decision_evidence.check_producer_rejections).toEqual(["initial", "revalidation"].map(phase => ({ phase, code: rejection.code, check_run_id: 12, expected_app_id: 5, observed_app_id: 999 })));
+      });
+
+      it.each([
+        null,
+        "private",
+        [null],
+        [{ code: "private" }],
+        [{ code: "required_check_producer_mismatch", check_run_id: "private" }],
+        [{ code: "required_check_producer_mismatch", expected_app_id: 0 }],
+        [{ code: "required_check_producer_mismatch", observed_app_id: Number.MAX_SAFE_INTEGER + 1 }],
+        Array.from({ length: 101 }, () => ({ code: "required_check_producer_missing" })),
+      ])("rejects malformed or excessive producer rejections: %j", producer_rejections => {
+        expect(() => writeMergePullRequestDecision({ decision_evidence: { checks: { producer_rejections } } }, 0, testManifestFile)).toThrow("Failed to persist merge pull request decision");
+        expect(fs.existsSync(testManifestFile)).toBe(false);
+      });
+
       it("accepts SHA-256 revisions and omits unavailable optional identity", () => {
         writeMergePullRequestDecision({ decision_evidence: { head_sha: "c".repeat(64) } }, 0, testManifestFile);
         expect(JSON.parse(fs.readFileSync(testManifestFile, "utf8")).decision_evidence).toEqual({ head_sha: "c".repeat(64) });
