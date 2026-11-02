@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
@@ -92,7 +93,9 @@ func (p *Plan) ForPhase(phase string) (*Plan, error) { //nolint:largefunc // Kee
 	}
 	addResources := func(resources map[string]string) {
 		for _, name := range resources {
-			connection.Resources[name] = p.connection.Resources[name]
+			if len(p.connection.Resources[name]) > 0 {
+				connection.Resources[name] = p.connection.Resources[name]
+			}
 		}
 	}
 	addOperation := func(op Operation) {
@@ -146,6 +149,12 @@ func (p *Plan) ForPhase(phase string) (*Plan, error) { //nolint:largefunc // Kee
 		binding.SafeOutputs = p.binding.SafeOutputs
 		for _, name := range binding.SafeOutputs {
 			op := p.spec.SafeOutputs[name]
+			op.CreatedResources = maps.Clone(op.CreatedResources)
+			for input, creator := range op.CreatedResources {
+				if !slices.Contains(binding.SafeOutputs, creator) {
+					delete(op.CreatedResources, input)
+				}
+			}
 			spec.SafeOutputs[name] = op
 			addOperation(op)
 		}
@@ -167,6 +176,13 @@ func (p *Plan) Secrets() []string {
 	names := []string{}
 	for _, ref := range p.connection.Credentials {
 		names = append(names, ref.Secret)
+	}
+	for _, name := range p.binding.SafeOutputs {
+		for _, source := range p.spec.SafeOutputs[name].TrustedInputs {
+			if source.Secret != "" {
+				names = append(names, source.Secret)
+			}
+		}
 	}
 	slices.Sort(names)
 	return slices.Compact(names)
@@ -214,6 +230,9 @@ func (p *Plan) Inputs(capability, name string) (map[string]Input, error) {
 	if err := decodeJSON(data, &inputs); err != nil {
 		return nil, err
 	}
+	for name := range op.TrustedInputs {
+		delete(inputs, name)
+	}
 	return inputs, nil
 }
 
@@ -221,6 +240,15 @@ func (p *Plan) InputSchema(capability, name string) (map[string]any, error) {
 	inputs, err := p.Inputs(capability, name)
 	if err != nil {
 		return nil, err
+	}
+	if capability == "safe-output" {
+		for input := range p.spec.SafeOutputs[name].CreatedResources {
+			field := inputs[input]
+			if field.Pattern != "" {
+				field.Pattern = "(?:" + field.Pattern + ")|(?:" + temporaryResourcePattern.String() + ")"
+			}
+			inputs[input] = field
+		}
 	}
 	return inputSchema(inputs), nil
 }

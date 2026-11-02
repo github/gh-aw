@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -112,7 +113,7 @@ func invokeConnector(ctx context.Context, input io.Reader, output io.Writer, pha
 	}
 	var result *connectors.Result
 	if phase == "safe-output" {
-		request, err := plan.PrepareSafeOutput(name, args)
+		request, err := plan.PrepareSafeOutputIntent(name, args)
 		if err != nil {
 			return err
 		}
@@ -123,7 +124,18 @@ func invokeConnector(ctx context.Context, input io.Reader, output io.Writer, pha
 			return nil
 		}
 		runtime.AllowWrites = allowWrites
-		result, err = plan.ExecuteSafeOutput(ctx, runtime, *request)
+		if !allowWrites {
+			return errors.New("connector safe-output execution requires explicit host write authorization")
+		}
+		if run := getenv("GH_AW_CONNECTOR_BINDING_RUN"); run != "" {
+			host, hostErr := connectorBindingHost(run, getenv)
+			if hostErr != nil {
+				return hostErr
+			}
+			result, err = plan.ExecuteCreatedSafeOutput(ctx, runtime, host, name, args)
+		} else {
+			result, err = plan.ExecuteSafeOutput(ctx, runtime, *request)
+		}
 		if err != nil {
 			return err
 		}
@@ -137,4 +149,16 @@ func invokeConnector(ctx context.Context, input io.Reader, output io.Writer, pha
 		return fmt.Errorf("write connector result: %w", err)
 	}
 	return nil
+}
+
+func connectorBindingHost(run string, getenv func(string) string) (connectors.CreatedResourceHost, error) {
+	key, err := base64.StdEncoding.DecodeString(getenv("GH_AW_CONNECTOR_BINDING_KEY"))
+	if err != nil {
+		return connectors.CreatedResourceHost{}, errors.New("invalid trusted connector binding key")
+	}
+	var receipts []string
+	if err := connectors.Decode([]byte(getenv("GH_AW_CONNECTOR_BINDING_RECEIPTS")), &receipts); err != nil {
+		return connectors.CreatedResourceHost{}, errors.New("invalid trusted connector binding receipts")
+	}
+	return connectors.CreatedResourceHost{Run: run, Key: key, Receipts: receipts}, nil
 }
