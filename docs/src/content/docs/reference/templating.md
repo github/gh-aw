@@ -134,6 +134,8 @@ Analyze issue #${{ github.event.issue.number }}.
 
 Remote imports accept only literal, unauthenticated HTTPS URLs. Both the URL and downloaded content must be free of GitHub Actions expressions (`${{ ... }}`) and internal expression/experiment placeholders. Downloaded content must also contain no template directives, including conditionals or nested imports. These checks cover comments, front matter, lines outside a selected range, and text after sanitization; even otherwise-allowed expressions such as `${{ github.actor }}` are rejected in remote text.
 
+Directive rejection includes bare branch aliases such as `{{elseif true}}`, `{{else-if true}}`, and `{{else_if true}}`; remote text cannot use them to change a surrounding author-written conditional.
+
 ```aw wrap
 {{#runtime-import https://raw.githubusercontent.com/org/repo/main/checklist.md}}
 {{#runtime-import https://example.com/standards.md:10-50}}
@@ -146,6 +148,8 @@ URL disk caches are not used; repeated imports may reuse validated content withi
 ### Security Features
 
 Runtime imports automatically strip YAML front matter and HTML/XML comments. Local imported GitHub Actions expressions (`${{ ... }}`) use a restricted set of expression capabilities. `env.*`, `secrets.*`, and `vars.*` are rejected, including inside comparisons and compound expressions; imported text cannot read the runner's ambient environment or action input tokens. Supported job outputs and inputs are read only through their compiler-provided bindings or GitHub event context. Remote content has no expression capabilities.
+
+Wrapped fragment conditions are checked before conversion to internal placeholders, including inside code fences or unmatched conditionals. They cannot acquire an author-only environment binding through later substitution.
 
 `needs.*.outputs.*` expressions are allowed inside local imported markdown and are validated recursively across nested local runtime imports. At compile time, gh-aw checks existing referenced runtime-import files under the permitted folders for disallowed expressions, including `env.*`, and follows any nested `{{#runtime-import ...}}` macros it finds. Missing files and remote content cannot be checked at compilation; runtime validation still applies when content is loaded. This lets local shared prompt fragments safely reference job outputs such as `${{ needs.build.outputs.version }}` without bypassing expression safety checks.
 

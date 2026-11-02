@@ -108,6 +108,33 @@ describe("create_prompt", () => {
     expect(() => renderPrompt({ items: [{ author_file: "../../secret.md" }] }, { GITHUB_WORKSPACE: tempDir }, tempDir)).toThrow(/within/);
   });
 
+  it.each([
+    "{{#if ${{ env.PRIVATE }} }}",
+    "{{#if ${{ env.PRIVATE }} }}hidden{{/if}}",
+    "`{{#if ${{ env.PRIVATE }} }}`",
+    "```text\n{{#if ${{ env.PRIVATE }} }}\n```",
+    "~~~text\n{{#if ${{ env['PRIVATE'] }} }}\n~~~",
+    "```text\n{{#if ${{ github.actor && env.PRIVATE }} }}\n```",
+  ])("rejects fragment-created author bindings before late substitution: %s", async fragment => {
+    const workflows = path.join(tempDir, ".github", "workflows");
+    fs.mkdirSync(workflows, { recursive: true });
+    fs.writeFileSync(path.join(workflows, "main.md"), "{{#if ${{ env.PRIVATE }} }}\nPrivate mode enabled.\n{{#endif}}\n{{#runtime-import fragment.md}}\n");
+    fs.writeFileSync(path.join(workflows, "fragment.md"), fragment);
+    process.env.RUNNER_TEMP = tempDir;
+    process.env.GITHUB_WORKSPACE = tempDir;
+    process.env.GH_AW_PROMPT = path.join(tempDir, "gh-aw", "aw-prompts", "prompt.txt");
+    process.env.GH_AW_ENV_PRIVATE = "SYNTHETIC-PRIVATE-BINDING";
+    process.env.GH_AW_PROMPT_CONFIG = JSON.stringify({
+      items: [{ author_file: ".github/workflows/main.md" }],
+      author_expressions: { "env.PRIVATE": "GH_AW_ENV_PRIVATE" },
+    });
+    await main(core);
+    expect(core.setFailed).not.toHaveBeenCalled();
+    await interpolatePrompt();
+    expect(core.setFailed).toHaveBeenCalledWith(expect.stringMatching(/unauthorized.*expression/i));
+    expect(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8")).not.toContain("SYNTHETIC-PRIVATE-BINDING");
+  });
+
   it("includes only a bounded trusted replay projection prompt", () => {
     const replayFile = path.join(tempDir, "replay-prompt.txt");
     fs.writeFileSync(replayFile, "Ledger findings: items(id, status)\n");

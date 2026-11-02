@@ -2189,6 +2189,10 @@ describe("runtime_import", () => {
   });
 
   describe("extractAndReplacePlaceholders", () => {
+    it.each(["env.PRIVATE", "env['PRIVATE']", "github.actor && env.PRIVATE", "secrets.PRIVATE", "vars.PRIVATE"])("rejects restricted expressions before creating conditional placeholders: %s", expression => {
+      expect(() => extractAndReplacePlaceholders(`{{#if \${{ ${expression} }} }}body{{/if}}`)).toThrow(/unauthorized.*expression/i);
+    });
+
     it("should convert {{#if ${{ github.actor }} }} to __GH_AW_GITHUB_ACTOR__", () => {
       const input = "{{#if ${{ github.actor }} }}body{{/if}}";
       expect(extractAndReplacePlaceholders(input)).toBe("{{#if __GH_AW_GITHUB_ACTOR__ }}body{{/if}}");

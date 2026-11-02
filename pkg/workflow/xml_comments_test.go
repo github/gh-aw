@@ -218,10 +218,9 @@ End`,
 
 func TestGeneratePromptRemovesXMLComments(t *testing.T) {
 	compiler := NewCompiler()
+	compiler.markdownPath = ".github/workflows/test.md"
 
-	// Note: With the hybrid runtime-import approach, workflows without imports use runtime-import
-	// which means generatePrompt emits a runtime-import macro, not inline content
-	// XML comments are removed at runtime by runtime_import.cjs
+	// Author sources are loaded separately; create_prompt.cjs removes their comments at runtime.
 	data := &WorkflowData{
 		MarkdownContent: `# Workflow Title
 
@@ -234,7 +233,7 @@ that spans multiple lines
 should also be removed -->
 
 Final content.`,
-		ImportedFiles: []string{}, // No imports, so will use runtime-import
+		ImportedFiles: []string{},
 		ImportInputs:  nil,
 	}
 
@@ -243,10 +242,11 @@ Final content.`,
 
 	output := yaml.String()
 
-	// With runtime-import (no imports), the output should contain the runtime-import macro
-	// XML comments will be removed at runtime by runtime_import.cjs
-	if !strings.Contains(output, "{{#runtime-import") {
-		t.Error("Expected runtime-import macro in prompt generation output for workflow without imports")
+	if !strings.Contains(promptRenderPlan(t, output), "{{#author-prompt .github/workflows/test.md}}") {
+		t.Error("Expected main workflow source to load with author capabilities")
+	}
+	if strings.Contains(output, "{{#runtime-import .github/workflows/test.md}}") {
+		t.Error("Main workflow source must not load as a restricted runtime fragment")
 	}
 }
 

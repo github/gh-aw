@@ -9,6 +9,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_API, ERR_CONFIG, ERR_PARSE, ERR_SYSTEM, ERR_VALIDATION } = require("./error_codes.cjs");
 const { displayImportUrl, importUrlErrorMessage, validateImportUrl, readPublicImportUrl } = require("./runtime_import_url.cjs");
 const { isTruthy } = require("./is_truthy.cjs");
+const { hasTemplateDirectives } = require("./template_branch.cjs");
 const { closeUnterminatedSkillMarkers } = require("./extract_inline_skills.cjs");
 const { closeUnterminatedSubAgentMarkers } = require("./extract_inline_sub_agents.cjs");
 
@@ -723,7 +724,7 @@ async function fetchUrlContent(url) {
  * @param {string} content
  */
 function assertStaticRemoteImport(content) {
-  if (/\$\{\{|\{\{[#/]|(?:\$\{|__)GH_AW_/.test(content)) {
+  if (/\$\{\{|(?:\$\{|__)GH_AW_/.test(content) || hasTemplateDirectives(content)) {
     throw new Error(`${ERR_VALIDATION}: URL runtime imports must not contain expressions or template directives`);
   }
 }
@@ -835,6 +836,10 @@ function extractAndReplacePlaceholders(content) {
 
   return content.replace(pattern, (match, expr) => {
     const trimmed = expr.trim();
+
+    if (!isSafeExpression(trimmed)) {
+      throw new Error(`${ERR_VALIDATION}: Runtime import contains unauthorized GitHub Actions expressions`);
+    }
 
     // Generate placeholder name from expression
     // Convert dots and special chars to underscores and uppercase

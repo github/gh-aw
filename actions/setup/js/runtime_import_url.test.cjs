@@ -357,6 +357,10 @@ describe("runtime import URL boundaries", () => {
     "{{#import?: local.md}}",
     "$<!-- hidden -->{{ github.actor }}",
     "{{<!-- hidden -->#runtime-import local.md}}",
+    "{{elseif true}}",
+    "{{else-if true}}",
+    "{{else_if true}}",
+    "{{else<!-- hidden -->if true}}",
     "${GH_AW_EXPR_1234ABCD}",
     "__GH_AW_EXPERIMENTS_STYLE__",
     "$<!-- hidden -->{GH_AW_EXPR_1234ABCD}",
@@ -373,6 +377,12 @@ describe("runtime import URL boundaries", () => {
     response.end("Ignored\n---\nname: static\n---\nHello <!-- hidden -->world\nLast");
     const content = await processRuntimeImport("https://example.com/static.md", false, tempDir, 2, 5);
     expect(content).toBe("Hello world");
+  });
+
+  it.each(["elseif", "else-if", "else_if"])("rejects remote bare %s directives inside author conditionals", async directive => {
+    response.end(`{{${directive} true}}`);
+    const author = "{{#if false}}\n{{#runtime-import https://example.com/static.md}}\nAUTHOR-ONLY-DISABLED-CONTENT\n{{#endif}}";
+    await expect(processRuntimeImports(author, tempDir)).rejects.toThrow(/must not contain expressions or template directives/);
   });
 
   it("does not suppress private DNS destinations for optional imports", async () => {
