@@ -14,7 +14,7 @@ This changelog records the version history and the dated mapping audits for `spe
 
 ## Version History
 
-The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers, compiler rejection of agent-controlled check-name overlap, submission-time review ordering, and explicit untrusted-data designation for returned metadata. Approval provenance remains available for audit and final revalidation; neither metadata designation nor check-name matching authenticates an instruction source or expected check producer.
+The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers, compiler rejection of explicit/default/suffixed agent-controlled check names, validated submission-time review ordering, and same-count approval replacement during revalidation. It distinguishes runtime-required `checks: read` from the absence of check-run reads or returned metadata when requirements are empty, in both live and staged mode. Evidence mappings include structural-only debug records, count-only label/pattern logs, and status/phase error logs with full diagnostics retained in untrusted results. Approval provenance remains available for audit and final revalidation; neither metadata designation nor check-name matching authenticates an instruction source or expected check producer, and log minimization does not establish prompt-injection isolation.
 
 | Version | Change |
 |---|---|
