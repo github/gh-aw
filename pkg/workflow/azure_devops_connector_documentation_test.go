@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"io"
 	"os"
@@ -147,7 +148,7 @@ func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.gitRoot = root
 	compiler.SetActionMode(ActionModeRelease)
-	compiler.SetActionTag("dc0f368c6ccda0ad1f009eae288b5cfa64656a09")
+	compiler.SetActionTag("72c8a3ff80e4a7549a83bb82c8ff5a97b879e92d")
 	compiler.SetStrictMode(true)
 	compiler.version = "v0.0.0-1-g683ddf9617"
 	require.NoError(t, compiler.CompileWorkflow(path))
@@ -155,8 +156,14 @@ func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(output), "workflow_dispatch:")
 	require.Contains(t, string(output), "staged")
-	require.Contains(t, string(output), "github/gh-aw/actions/setup@dc0f368c6ccda0ad1f009eae288b5cfa64656a09")
+	require.Contains(t, string(output), "github/gh-aw/actions/setup@72c8a3ff80e4a7549a83bb82c8ff5a97b879e92d")
 	require.NotContains(t, string(output), "uses: ./actions/")
+	require.Contains(t, string(output), "connector_runtime.cjs")
+	require.NotContains(t, string(output), "/tmp/gh-aw/connector-bin/")
+	require.NotContains(t, string(output), "/tmp/gh-aw/connector-source/")
+	require.NotContains(t, string(output), "go build")
+	require.NotContains(t, string(output), "source-ref")
+	require.NotContains(t, string(output), "connector_12_azure_devops_")
 	require.NotContains(t, string(output), "${{ secrets.AZURE_DEVOPS_WRITE_TOKEN }}")
 	data, err := compiler.ParseWorkflowFile(path)
 	require.NoError(t, err)
@@ -164,10 +171,13 @@ func TestAzureDevOpsConnectorDocumentationExample(t *testing.T) {
 	require.Equal(t, []string{"azure-devops__core_list_projects"}, data.Connectors["azure-devops"].Agent.ToolNames())
 	require.Len(t, docs.Effects.Items, 5)
 	names := data.Connectors["azure-devops"].SafeOutputs.SafeOutputNames()
+	var manifest map[string]string
+	require.NoError(t, json.Unmarshal([]byte(buildCustomSafeOutputScriptsJSON(data)), &manifest))
 	require.Len(t, names, len(docs.Effects.Items))
 	for _, effect := range docs.Effects.Items {
 		require.Contains(t, names, strings.TrimPrefix(effect.ID, "azure-devops-"))
 		require.Equal(t, strings.ReplaceAll(effect.ID, "-", "_"), effect.Tool)
+		require.Equal(t, "safe_output_script_"+effect.Tool+".cjs", manifest[effect.Tool])
 		require.NotEmpty(t, effect.Inputs)
 		require.NotEmpty(t, strings.TrimSpace(effect.Text))
 	}

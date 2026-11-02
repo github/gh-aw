@@ -260,6 +260,7 @@ func TestAzureDevOpsConnectorMutationFailuresAreNotRetried(t *testing.T) {
 		"oversized":     {http.StatusOK, strings.Repeat("x", 65537)},
 		"missing-id":    {http.StatusOK, `{"fields":{"System.TeamProject":"Approved Project"}}`},
 		"wrong-id":      {http.StatusOK, `{"id":9999,"fields":{"System.TeamProject":"Approved Project"}}`},
+		"other-grant":   {http.StatusOK, `{"id":9877,"fields":{"System.TeamProject":"Approved Project"}}`},
 		"string-id":     {http.StatusOK, `{"id":"9876","fields":{"System.TeamProject":"Approved Project"}}`},
 		"fractional-id": {http.StatusOK, `{"id":9876.5,"fields":{"System.TeamProject":"Approved Project"}}`},
 		"wrong-project": {http.StatusOK, `{"id":9876,"fields":{"System.TeamProject":"Other Project"}}`},
@@ -291,11 +292,12 @@ func TestAzureDevOpsConnectorCommentResponseAuthority(t *testing.T) {
 	_, data, _ := parseAzureDevOpsConsumer(t, azureDevOpsWriteSelection)
 	plan := data.Connectors["azure-devops"].SafeOutputs
 	for name, body := range map[string]string{
-		"missing":    `{}`,
-		"null":       `{"workItemId":null}`,
-		"wrong-item": `{"workItemId":9999}`,
-		"string-id":  `{"workItemId":"9876"}`,
-		"fraction":   `{"workItemId":9876.5}`,
+		"missing":     `{}`,
+		"null":        `{"workItemId":null}`,
+		"wrong-item":  `{"workItemId":9999}`,
+		"other-grant": `{"workItemId":9877}`,
+		"string-id":   `{"workItemId":"9876"}`,
+		"fraction":    `{"workItemId":9876.5}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			calls := 0
@@ -364,5 +366,43 @@ func TestAzureDevOpsConnectorInputBounds(t *testing.T) {
 		args[field] = strings.Repeat("x", limit)
 		_, err := plan.PrepareSafeOutput(operation, args)
 		require.NoError(t, err, "documented inclusive limit must remain usable")
+	}
+}
+
+func TestAzureDevOpsConnectorExactResponseIdentity(t *testing.T) {
+	t.Parallel()
+	_, data, _ := parseAzureDevOpsConsumer(t, azureDevOpsWriteSelection)
+	plan := data.Connectors["azure-devops"].SafeOutputs
+	for _, operation := range []string{"update-work-item", "comment-on-work-item", "assign-work-item", "link-work-items"} {
+		t.Run(operation, func(t *testing.T) {
+			for _, token := range []string{
+				"9877", `"9876"`, "9876.0", "9.876e3", "9876.0000000000000001",
+				"09876", "-9876", "-0", "9007199254740992", "9007199254740993",
+				"null", "true", `["9876"]`, `{"id":9876}`,
+			} {
+				t.Run(token, func(t *testing.T) {
+					calls := 0
+					runtime := connectors.Runtime{
+						Phase: "safe-output", AllowWrites: true, AllowedOrigins: []string{"https://dev.azure.com"},
+						ResolveSecret: func(context.Context, string, string) (string, error) { return "fixture-token", nil },
+						Client: &http.Client{Transport: connectorSmokeTransport(func(request *http.Request) (*http.Response, error) {
+							calls++
+							key := "id"
+							if operation == "comment-on-work-item" {
+								key = "workItemId"
+							}
+							body := `{"` + key + `":` + token + `,"fields":{"System.TeamProject":"Approved Project"}}`
+							return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+						})},
+					}
+					_, err := plan.Execute(t.Context(), runtime, "safe-output", operation, azureDevOpsMutationArguments(operation))
+					require.Error(t, err)
+					if token == "9877" {
+						require.ErrorContains(t, err, "resource identity does not match request input", "another approved resource is not the requested item")
+					}
+					require.Equal(t, 1, calls, "an ambiguous write must not retry")
+				})
+			}
+		})
 	}
 }

@@ -157,6 +157,8 @@ connectors:
         responseRequired:
           - /id
           - /fields/System.TeamProject
+        responseResourceInputs:
+          /id: work-item
         responseResources:
           /id: work-items
           /fields/System.TeamProject: project-names
@@ -209,6 +211,8 @@ connectors:
           work-item: work-items
         responseRequired:
           - /workItemId
+        responseResourceInputs:
+          /workItemId: work-item
         responseResources:
           /workItemId: work-items
         responseTypes:
@@ -305,6 +309,8 @@ connectors:
         responseRequired:
           - /id
           - /fields/System.TeamProject
+        responseResourceInputs:
+          /id: work-item
         responseResources:
           /id: work-items
           /fields/System.TeamProject: project-names
@@ -356,6 +362,8 @@ connectors:
         responseRequired:
           - /id
           - /fields/System.TeamProject
+        responseResourceInputs:
+          /id: work-item
         responseResources:
           /id: work-items
           /fields/System.TeamProject: project-names
@@ -405,6 +413,8 @@ import-schema:
     through hosted read-only MCP, and five separately selected bounded REST
     mutations outside the agent credential boundary. This ordinary Markdown
     declaration is embedded in the compiler; consumers need no provider checkout.
+    Normal workflow setup supplies the bundled Node host for reads and effects;
+    no connector-specific source checkout, Go build, or CLI install is needed.
     Importing registers capabilities but enables none. Azure DevOps Server and
     arbitrary provider endpoints are not configured.
   </purpose>
@@ -562,7 +572,8 @@ import-schema:
     <effect id="azure-devops-comment-on-work-item" tool="azure_devops_comment_on_work_item" inputs="organization, project, work-item, text">
       POST /{organization}/{project}/_apis/wit/workItems/{work-item}/comments
       with format=markdown and a JSON object containing text. Requires integer
-      /workItemId in the approved work-items set; projects only work-item from
+      /workItemId matching the exact requested string work-item and its approved
+      resource grant; projects only work-item from
       /workItemId. Does not verify project-name or return the comment body.
     </effect>
     <effect id="azure-devops-assign-work-item" tool="azure_devops_assign_work_item" inputs="organization, project, work-item, assignee">
@@ -579,9 +590,15 @@ import-schema:
     </effect>
     <responses>
       Update, assign, and link require integer /id in the approved work-items
-      set and exact approved /fields/System.TeamProject. Response membership is
-      not exact request/response ID equality: the shared responseInputs check
-      cannot compare Azure numeric response IDs with string resource inputs.
+      set, exact requested work-item identity, and exact approved
+      /fields/System.TeamProject. responseResourceInputs explicitly correlates
+      /id, or comment /workItemId, with the required resource-constrained string
+      work-item input. Numeric response tokens must be canonical unsigned decimal
+      integers at most 9007199254740991: fractions, exponents, leading zeros,
+      negative values, and rounded or unsafe numbers are rejected. Numeric 123
+      matches string input "123", never "0123"; responseTypes still requires an
+      integer, so textual response IDs are not accepted by this provider.
+      Another approved ID is not a substitute for the requested ID.
       Creation has no pre-existing ID grant. Mutation responses other than the
       explicitly projected create/comment result remain untrusted provider JSON,
       not additional agent reads or context hydration. Redirects, malformed or
