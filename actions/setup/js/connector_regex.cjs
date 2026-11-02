@@ -56,7 +56,7 @@ function connectorPatternSource(pattern) {
  * @returns {Promise<boolean>}
  */
 async function matchesConnectorPattern(pattern, value) {
-  if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > 65536) throw new Error(`${ERR_VALIDATION}: Connector pattern input exceeds its bound`);
+  if (typeof value !== "string" || Array.from(value).length > 65536 || Buffer.byteLength(value, "utf8") > 262144) throw new Error(`${ERR_VALIDATION}: Connector pattern input exceeds its bound`);
   const source = connectorPatternSource(pattern);
   let wellFormed = "";
   for (const character of value) {
