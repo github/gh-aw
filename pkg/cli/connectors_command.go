@@ -20,9 +20,15 @@ type connectorValidationResult struct {
 
 // NewConnectorsCommand creates inspection and trusted-host connector commands.
 func NewConnectorsCommand() *cobra.Command {
-	cmd := NewConnectorCommand()
-	cmd.Aliases = []string{"connectors"}
-	cmd.Long += "\n\nThe legacy plural 'connectors' spelling remains an alias. Its validate, plan, schema, serve and invoke subcommands inspect or execute trusted raw plans."
+	cmd := &cobra.Command{
+		Use:           "connectors",
+		Short:         "Inspect and validate experimental connector definitions",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Long: "Validate and inspect external connector definitions offline. " +
+			"The serve and invoke subcommands execute compiler-frozen capabilities in trusted hosts. " +
+			"Use 'gh aw connector <id> setup' or 'gh aw connector <id> test' to develop AW Markdown connectors.",
+	}
 	cmd.SetOut(os.Stdout)
 	validate := &cobra.Command{
 		Use:   "validate <file>...",

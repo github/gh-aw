@@ -52,7 +52,7 @@ is never printed. This command does not load a workflow's custom footer settings
 Node remains optional for operations without content annotations.`
 
 const connectorDevelopmentExamples = `  ` + string(constants.CLIExtensionPrefix) + ` connector slack setup
-  ` + string(constants.CLIExtensionPrefix) + ` connector jira setup --input 'reader-secret="JIRA_DEV_READ_TOKEN"'
+  ` + string(constants.CLIExtensionPrefix) + ` connector jira setup --input 'mcp-personal-secret="JIRA_DEV_BASIC_AUTH"'
   ` + string(constants.CLIExtensionPrefix) + ` connector slack test --phase agent --capability read-thread \
     --grant 'channels=["C123ABC456"]' --grant 'threads=["1515449522.000016"]' \
     --args '{"channel":"C123ABC456","thread":"1515449522.000016"}'

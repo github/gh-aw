@@ -8,10 +8,45 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
+
+func TestConnectorDevelopmentIDsDoNotCollideWithLegacyCommands(t *testing.T) {
+	for _, id := range []string{"plan", "schema", "validate", "serve", "invoke"} {
+		t.Run(id, func(t *testing.T) {
+			repository := t.TempDir()
+			source := strings.Replace(developmentConnectorFixture, "  demo:", "  "+id+":", 1)
+			path := filepath.Join(repository, ".github", "workflows", "connectors", id+".md")
+			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
+			require.NoError(t, os.WriteFile(path, []byte(source), 0600))
+			root := &cobra.Command{Use: "aw"}
+			root.AddCommand(NewConnectorsCommand(), NewConnectorCommand())
+			var output bytes.Buffer
+			root.SetOut(&output)
+			root.SetErr(&output)
+			root.SetArgs([]string{"connector", id, "setup", "--root", repository})
+			require.NoError(t, root.Execute())
+			require.Contains(t, output.String(), "Experimental connector "+id)
+		})
+	}
+}
+
+func TestConnectorJiraSetupExampleUsesDeclaredInput(t *testing.T) {
+	repository, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	command := NewConnectorCommand()
+	require.Contains(t, command.Example, `mcp-personal-secret="JIRA_DEV_BASIC_AUTH"`)
+	var output bytes.Buffer
+	command.SetOut(&output)
+	command.SetErr(&output)
+	command.SetArgs([]string{"jira", "setup", "--root", repository, "--input", `mcp-personal-secret="JIRA_DEV_BASIC_AUTH"`})
+	require.NoError(t, command.Execute())
+	require.Contains(t, output.String(), "JIRA_DEV_BASIC_AUTH")
+}
 
 func TestConnectorsSchemaCommand(t *testing.T) {
 	t.Parallel()
