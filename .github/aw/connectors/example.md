@@ -1,67 +1,87 @@
 ---
-import-schema:
-  connection:
-    type: string
-    required: true
 connectors:
   tracker:
-    connection: ${{ github.aw.import-inputs.connection }}
-    spec:
-      apiVersion: github.com/gh-aw/connectors/v1
-      kind: ConnectorSpec
-      id: example.com/issues
-      endpoints:
-        api: https://api.example.com
-      credentials:
-        reader: {phase: agent, header: Authorization, scheme: bearer, scopes: ["issues:read"]}
-        writer: {phase: safe-output, header: Authorization, scheme: bearer, scopes: ["comments:write"]}
-        context-reader: {phase: context, header: Authorization, scheme: bearer, scopes: ["issues:read"]}
-      triggers:
-        issue-created:
-          verificationProfile: example.com/hmac-sha256
-          nativeEvents: [issue.created]
-          match: {/event: issue.created}
-          normalize: {subject: /issue/id, title: /issue/title}
-      mcp:
-        get-issue:
-          tool: get-issue
-          credential: reader
-          inputs:
-            issue: {type: string, required: true, maxLength: 80}
-          resources: {issue: issues}
-          request:
-            endpoint: api
-            method: GET
-            path: /issues/{issue}
-            pathInputs: {issue: issue}
-          maxResponseBytes: 65536
-      context:
-        issue-details:
-          credential: context-reader
-          inputs:
-            issue: {type: string, required: true, maxLength: 80}
-          resources: {issue: issues}
-          request:
-            endpoint: api
-            method: GET
-            path: /issues/{issue}
-            pathInputs: {issue: issue}
-          maxResponseBytes: 65536
-      safeOutputs:
-        add-comment:
-          credential: writer
-          inputs:
-            issue: {type: string, required: true, maxLength: 80}
-            text: {type: string, required: true, maxLength: 4000}
-          resources: {issue: issues}
-          request:
-            endpoint: api
-            method: POST
-            path: /issues/{issue}/comments
-            pathInputs: {issue: issue}
+    credentials:
+      reader:
+        header: Authorization
+        phase: agent
+        scheme: bearer
+        scopes:
+          - issues:read
+        secret: ${{ github.aw.import-inputs.reader-secret }}
+      writer:
+        header: Authorization
+        phase: safe-output
+        scheme: bearer
+        scopes:
+          - comments:write
+        secret: ${{ github.aw.import-inputs.writer-secret }}
+    endpoints:
+      api: https://api.example.com
+    "on":
+      issue-created:
+        match:
+          /event: issue.created
+        nativeEvents:
+          - issue.created
+        normalize:
+          subject: /issue/id
+        verificationProfile: example.com/hmac-sha256
+    resources:
+      issues:
+        - ${{ github.aw.import-inputs.issue }}
+    safe-outputs:
+      add-comment:
+        credential: writer
+        inputs:
+          issue:
+            maxLength: 80
+            required: true
+            type: string
+          text:
+            maxLength: 4000
+            required: true
+            type: string
+        maxResponseBytes: 65536
+        request:
+          body:
             body:
-              body: {input: text}
-          maxResponseBytes: 65536
+              input: text
+          endpoint: api
+          method: POST
+          path: /issues/{issue}/comments
+          pathInputs:
+            issue: issue
+        resources:
+          issue: issues
+    tools:
+      get-issue:
+        credential: reader
+        inputs:
+          issue:
+            maxLength: 80
+            required: true
+            type: string
+        maxResponseBytes: 65536
+        request:
+          endpoint: api
+          method: GET
+          path: /issues/{issue}
+          pathInputs:
+            issue: issue
+        resources:
+          issue: issues
+        tool: get-issue
+import-schema:
+  issue:
+    default: ISSUE-1
+    type: string
+  reader-secret:
+    default: EXAMPLE_READ_TOKEN
+    type: string
+  writer-secret:
+    default: EXAMPLE_WRITE_TOKEN
+    type: string
 ---
 
-Example connector for a fictional issue service. Import with an administrator-owned connection file, then select tracker APIs explicitly. Treat all returned content as untrusted. Declared triggers do not install or activate an authenticated receiver.
+Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.

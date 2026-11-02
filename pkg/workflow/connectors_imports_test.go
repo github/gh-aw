@@ -140,12 +140,14 @@ func TestConnectorSelfContainedMarkdownExample(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(root, "connector.md"), wrapper, 0600))
 	require.NoError(t, os.Remove(filepath.Join(root, "spec.yaml")))
-	content := connectorImportHeader + "tools:\n  tracker: [get-issue]\nsafe-outputs:\n  tracker-add-comment:\n---\nInvestigate.\n"
+	require.NoError(t, os.Remove(filepath.Join(root, "connection.yaml")))
+	header := strings.Replace(connectorImportHeader, "    with:\n      connection: connection.yaml\n", "", 1)
+	content := header + "tools:\n  tracker: [get-issue]\nsafe-outputs:\n  tracker-add-comment:\n---\nInvestigate.\n"
 	for _, objectForm := range []bool{false, true} {
 		t.Run(map[bool]string{false: "array", true: "aw"}[objectForm], func(t *testing.T) {
 			source := content
 			if objectForm {
-				source = strings.Replace(source, "imports:\n  - uses: connector.md\n    with:\n      connection: connection.yaml", "imports:\n  aw:\n    - uses: connector.md\n      with:\n        connection: connection.yaml", 1)
+				source = strings.Replace(source, "imports:\n  - uses: connector.md", "imports:\n  aw:\n    - uses: connector.md", 1)
 			}
 			path := filepath.Join(root, "proof.md")
 			require.NoError(t, os.WriteFile(path, []byte(source), 0600))
@@ -213,10 +215,9 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 			wrapper, err := os.ReadFile(filepath.Join("../../.github/aw/connectors", provider+".md"))
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, provider+".md"), wrapper, 0600))
-			spec, err := os.ReadFile(filepath.Join(root, "spec.yaml"))
-			require.NoError(t, err)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, provider+".yaml"), spec, 0600))
 			content := providerNativeImportWorkflow(t, root, provider)
+			require.NoError(t, os.Remove(filepath.Join(root, "spec.yaml")))
+			require.NoError(t, os.Remove(filepath.Join(root, "connection.yaml")))
 			c := NewCompiler(WithNoEmit(true), WithSkipValidation(true))
 			c.gitRoot = root
 			c.SetActionMode(ActionModeDev)
@@ -226,6 +227,19 @@ func TestConnectorImportAllProviderWrappers(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, data.Connectors, provider)
 			_, err = c.CompileToYAML(data, path)
+			require.NoError(t, err)
+
+			doc, err := os.ReadFile(filepath.Join("../../docs/src/content/docs/reference", provider+"-connector.md"))
+			require.NoError(t, err)
+			_, snippet, found := strings.Cut(string(doc), "```aw wrap\n")
+			require.True(t, found)
+			snippet, _, found = strings.Cut(snippet, "```")
+			require.True(t, found)
+			documented, err := c.ParseWorkflowString(snippet, path)
+			require.NoError(t, err, "documented workflow must compile without external definition or connection files")
+			require.NotNil(t, documented.Connectors[provider])
+			assert.Nil(t, documented.Connectors[provider].Context)
+			_, err = c.CompileToYAML(documented, path)
 			require.NoError(t, err)
 		})
 	}
@@ -259,13 +273,10 @@ func providerNativeImportWorkflow(t *testing.T, root, provider string) string {
 		"permissions": map[string]any{"contents": "read"},
 		"imports": []any{map[string]any{
 			"uses": ".github/aw/connectors/" + provider + ".md",
-			"with": map[string]any{"connection": "connection.yaml"},
 		}},
 	}
-	for _, field := range []string{"tools", "context"} {
-		if value, exists := selected[field]; exists {
-			native[field] = map[string]any{provider: value}
-		}
+	if tools, exists := selected["tools"]; exists {
+		native["tools"] = map[string]any{provider: tools}
 	}
 	if effects, ok := selected["safe-outputs"].([]any); ok {
 		qualified := map[string]any{}

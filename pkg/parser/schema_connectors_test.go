@@ -47,6 +47,7 @@ func TestConnectorSchemaRejectsInvalidOrScatteredDeclarations(t *testing.T) {
 		frontmatter := map[string]any{"on": "workflow_dispatch", "connectors": map[string]any{"slack": config}}
 		require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "proof.md"))
 	}
+
 	for _, field := range []string{"tools", "safe-outputs", "context"} {
 		frontmatter := map[string]any{"on": "workflow_dispatch", field: map[string]any{"connectors": map[string]any{"slack": []any{"read"}}}}
 		require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "proof.md"))
@@ -54,4 +55,26 @@ func TestConnectorSchemaRejectsInvalidOrScatteredDeclarations(t *testing.T) {
 	require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
 		"connectors": map[string]any{"slack": map[string]any{"definition": "spec.yaml", "connection": "connection.yaml", "tools": []any{"read"}}},
 	}, "proof.md"), "a tools-only connector is not a trigger")
+}
+
+func TestAWConnectorDefinitionsAreImportableButNotTriggers(t *testing.T) {
+	t.Parallel()
+	config := map[string]any{
+		"endpoints":   map[string]any{"api": "https://api.example.com"},
+		"credentials": map[string]any{},
+		"on":          map[string]any{"issue-created": map[string]any{}},
+		"tools":       map[string]any{"get-issue": map[string]any{}},
+		"safe-outputs": map[string]any{
+			"add-comment": map[string]any{},
+		},
+	}
+	frontmatter := map[string]any{"connectors": map[string]any{"tracker": config}}
+	require.NoError(t, ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter, "shared.md"))
+	assert.False(t, HasConnectorTriggers(frontmatter), "declaring events must not activate them")
+	require.Error(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "proof.md"), "main workflow still needs a selected trigger")
+	frontmatter["on"] = "workflow_dispatch"
+	require.NoError(t, ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "proof.md"))
+	config["tools"] = []any{"get-issue"}
+	delete(frontmatter, "on")
+	require.ErrorContains(t, ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatter, "shared.md"), "main workflow")
 }

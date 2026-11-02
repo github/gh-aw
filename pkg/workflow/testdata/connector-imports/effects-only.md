@@ -2,7 +2,7 @@
 imports:
   - uses: connector.md
     with:
-      connection: pkg/workflow/testdata/connector-imports/connection.yaml
+      issue: ISSUE-1
 on: workflow_dispatch
 engine: copilot
 permissions:

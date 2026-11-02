@@ -13,13 +13,15 @@ import (
 var connectorNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
 
 type ConnectorRegistration struct {
-	Definition  string                    `json:"definition,omitempty"`
-	Spec        *connectors.ConnectorSpec `json:"spec,omitempty"`
-	Connection  string                    `json:"connection"`
-	On          []string                  `json:"on,omitempty"`
-	Tools       []string                  `json:"tools,omitempty"`
-	Context     map[string]map[string]any `json:"context,omitempty"`
-	SafeOutputs []string                  `json:"safe-outputs,omitempty"`
+	Definition  string                          `json:"definition,omitempty"`
+	Spec        *connectors.ConnectorSpec       `json:"spec,omitempty"`
+	Connection  string                          `json:"connection"`
+	Credentials map[string]connectors.SecretRef `json:"credentials,omitempty"`
+	Resources   map[string][]string             `json:"resources,omitempty"`
+	On          []string                        `json:"on,omitempty"`
+	Tools       []string                        `json:"tools,omitempty"`
+	Context     map[string]map[string]any       `json:"context,omitempty"`
+	SafeOutputs []string                        `json:"safe-outputs,omitempty"`
 }
 
 // WorkflowConnector is the compiler-resolved service, not an all-or-nothing
@@ -152,6 +154,13 @@ func loadWorkflowConnectorService(root string, registration ConnectorRegistratio
 	if registration.Spec != nil {
 		if registration.Definition != "" {
 			return nil, errors.New("connector registration requires exactly one definition or spec")
+		}
+		if registration.Connection == "" {
+			connection := connectors.Connection{
+				APIVersion: connectors.APIVersion, Kind: "ConnectorConnection",
+				Connector: registration.Spec.ID, Credentials: registration.Credentials, Resources: registration.Resources,
+			}
+			return connectors.NewService(*registration.Spec, connection)
 		}
 		return connectors.LoadServiceSpec(root, *registration.Spec, registration.Connection)
 	}

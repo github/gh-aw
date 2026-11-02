@@ -116,7 +116,7 @@ func TestTeamsWorkflowDocsMatchFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, snippet, ok := strings.Cut(string(doc), "```aw\n---\n")
+	_, snippet, ok := strings.Cut(string(doc), "```aw wrap\n---\n")
 	if !ok {
 		t.Fatal("missing manual workflow example")
 	}
@@ -128,8 +128,32 @@ func TestTeamsWorkflowDocsMatchFixture(t *testing.T) {
 	if err := connectors.Decode([]byte(frontmatter), &documented); err != nil {
 		t.Fatal(err)
 	}
-	fixture, _ := teamsWorkflowBlock(t, "workflow.yaml")
-	if !reflect.DeepEqual(documented, fixture) {
-		t.Fatal("documented workflow grammar must match the provider fixture exactly")
+	_, fixture := teamsWorkflowBlock(t, "workflow.yaml")
+	if !reflect.DeepEqual(documented["imports"], []any{".github/aw/connectors/teams.md"}) {
+		t.Fatal("documented workflow must import the self-contained Teams Markdown")
+	}
+	tools, ok := documented["tools"].(map[string]any)
+	if !ok || !reflect.DeepEqual(tools["teams"], fixture["tools"]) {
+		t.Fatal("documented read tools must preserve the provider fixture")
+	}
+	if _, configured := documented["context"]; configured {
+		t.Fatal("event references must not require a separate context configuration")
+	}
+	effects, ok := documented["safe-outputs"].(map[string]any)
+	if !ok {
+		t.Fatal("documented effects must use native prefixed keys")
+	}
+	selected, ok := fixture["safe-outputs"].([]any)
+	if !ok || len(effects) != len(selected) {
+		t.Fatal("documented effects must preserve the provider fixture")
+	}
+	for _, value := range selected {
+		name, ok := value.(string)
+		if !ok {
+			t.Fatal("fixture effect must be a string")
+		}
+		if _, present := effects["teams-"+name]; !present {
+			t.Fatalf("missing prefixed Teams effect %q", name)
+		}
 	}
 }

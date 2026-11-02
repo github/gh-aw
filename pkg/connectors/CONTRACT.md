@@ -1,103 +1,90 @@
-# Experimental connector contract v1
+# Experimental AW connectors
 
-This is an experimental compiler-integrated interface, not a deployed integration.
-`ConnectorSpec` in `spec.go` is the authoritative typed schema; `Schema(kind)`
-exports structural JSON Schema for all three document kinds. `LoadSpec` parses
-YAML 1.2 or JSON, rejects unknown fields, and validates security invariants.
-The version string is `github.com/gh-aw/connectors/v1`.
+Declare connectors directly under `connectors.<id>` in ordinary AW Markdown.
+There is no required connection, definition, binding, or versioned authoring file.
+Provider declarations belong in `.github/aw/connectors/<provider>.md`.
+`ConnectorDeclaration` in `pkg/workflow/connector_declaration.go` extends the
+existing frontmatter; it reuses this package's typed, bounded operation primitives.
 
-Provider definitions belong in `.github/aw/connectors/<provider>.yaml`.
-Provider test fixtures belong in
-`pkg/connectors/testdata/providers/<provider>/spec.yaml`. Use the complete
-four-capability `testdata/example.yaml` as the starting point. Do not fork
-the schema, shared parser, or test harness.
-
-Run `go test ./pkg/connectors -run 'TestConnectorSpec|TestProviderFixtures' -count=1`.
-To select one provider, use `-run 'TestProviderFixtures/<provider>$'`.
-
-Definition, connection, and workflow selection are separate concerns. Consumers
-reuse normal `imports` / `uses` / `with` syntax and select APIs in native sections:
+Consumers reuse normal `imports` / `uses` / `with` syntax:
 
 ```yaml
 imports:
   - uses: .github/aw/connectors/example.md
     with:
-      connection: .github/aw/connections/example.yaml
+      issue: ISSUE-1
 on: workflow_dispatch
 tools:
   tracker: [get-issue]
-context:
-  tracker:
-    issue-details: {issue: ISSUE-1}
 safe-outputs:
   tracker-add-comment:
 ```
 
-The Markdown import uses ordinary `import-schema` parameters and declares
-`connectors.tracker.connection: ${{ github.aw.import-inputs.connection }}`.
-Its `definition` is a repository-relative YAML/JSON file, or `spec` contains the
-full inline `ConnectorSpec` for a self-contained remote Markdown import.
-Exactly one is required. There is no separate import resolver or parameter
-language. Imported registrations grant nothing; capability selections inside
-them and duplicate aliases are rejected. Connection paths remain confined to
-the consuming repository.
-
-Direct registrations remain supported:
+Declarations use the same section names as AW. Capability maps define APIs;
+the root workflow selects them. A minimal direct or imported declaration is:
 
 ```yaml
 connectors:
   tracker:
-    definition: .github/aw/connectors/example.yaml
-    connection: .github/aw/connections/example.yaml
-    tools: [get-issue]
-    context:
-      issue-details: {issue: ISSUE-1}
-    safe-outputs: [add-comment]
+    endpoints:
+      api: https://api.example.com
+    credentials:
+      reader:
+        phase: agent
+        header: Authorization
+        scheme: bearer
+        scopes: ["issues:read"]
+        secret: EXAMPLE_READ_TOKEN
+    resources:
+      issues: [ISSUE-1]
+    tools:
+      get-issue:
+        tool: get-issue
+        credential: reader
+        inputs:
+          issue: {type: string, required: true, maxLength: 80}
+        resources: {issue: issues}
+        request:
+          endpoint: api
+          method: GET
+          path: /issues/{issue}
+          pathInputs: {issue: issue}
+        maxResponseBytes: 65536
 ```
 
-`on`, `tools`, `context`, and `safe-outputs` are optional siblings inside the
-service block. Omitted parts are disabled, not inherited or auto-enabled.
-`tools` resolves both REST-backed `mcp` and actual `httpMcp` capability names.
-`on: [issue-created]` selects a native trigger but compilation refuses activation
-until an approved receiver exists. Ordinary GitHub triggers stay at the root
-`on` field. Imported registrations expose `tools.<alias>`, `context.<alias>`,
+`on`, `tools`, `mcp-servers`, and `safe-outputs` inside the declaration
+are maps of trigger, REST read-tool, HTTP MCP, and effect definitions.
+Importing or declaring them grants nothing. Root workflow selections use
+`tools.<alias>`
 and qualified `on["<alias>-<trigger>"]` and
 `safe-outputs["<alias>-<operation>"]` selections. Trigger and effect entries
 accept null or `{}`. Ambiguous prefixes and built-in GitHub name collisions
 are rejected; unqualified built-ins are never redirected to a connector.
 
-Connection grants remain a separate administrator-owned document:
+Credentials contain secret **names**, never values. Declaration `resources`
+contains exact resource allowlists. Both can use ordinary `import-schema`
+parameters with normal defaults and `with` substitution; imported configuration
+is trusted, reviewed repository code. Agent inputs cannot override endpoints,
+secret references, or grants. Only selected phases receive credentials.
+Duplicate registrations and imported capability selections are rejected.
 
-```yaml
-apiVersion: github.com/gh-aw/connectors/v1
-kind: ConnectorConnection
-connector: example.com/issues
-credentials:
-  reader: {secret: EXAMPLE_READ_TOKEN}
-  writer: {secret: EXAMPLE_WRITE_TOKEN}
-  context-reader: {secret: EXAMPLE_CONTEXT_TOKEN}
-resources:
-  issues: [ISSUE-1]
-```
+There is no public connector `context` field, recipe, or context credential.
+Gateway envelopes contain IDs/canonical URLs, event types, and matched filters,
+not resource bodies. Selected read APIs retrieve content after origin, shape,
+and scope validation; never attach credentials to event-supplied arbitrary URLs.
+Manual examples name approved IDs, not an automatic hydration pipeline.
 
-```yaml
-apiVersion: github.com/gh-aw/connectors/v1
-kind: ConnectorBinding
-definition: .github/aw/connectors/example.yaml
-connection: .github/aw/connections/example.yaml
-triggers: [issue-created]
-mcp: [get-issue]
-safeOutputs: [add-comment]
-context: [issue-details]
-```
+`ConnectorSpec`, `Connection`, and `Binding` remain internal frozen-plan types
+at version `github.com/gh-aw/connectors/v1`. The compiler constructs them from
+AW declarations; `NewService` copies and validates their content without file
+I/O. Their existing YAML/JSON fixtures and external-file prototype APIs remain
+for runtime compatibility testing, not as the recommended authoring interface.
+Run `go test ./pkg/connectors -count=1` for the runtime suite.
 
-Definition/connection paths are relative to the repository root, not the binding
-file. Connections contain secret **names**, never values. Endpoints are fixed
-HTTPS origins in the definition and cannot be overridden by connections or
-agent inputs. Input names accept identifiers including native MCP camelCase
-and snake_case; string inputs require an
-explicit `maxLength`. `resources` maps input names to connection resource
-allowlists. Required resource inputs must match those allowlists exactly.
+Input names accept identifiers including native MCP camelCase and snake_case;
+string inputs require an explicit `maxLength`. Operation `resources` maps input
+names to the declaration's resource allowlists. Required resource inputs must
+match those allowlists exactly.
 
 Requests have a fixed method, endpoint and path. `{name}` path segments are
 bound through `pathInputs`; `query` and `body` values are `{input: name}` or
@@ -140,7 +127,9 @@ equality with the request, not just membership in a broad connection allowlist.
 GraphQL `errors` are
 always failures, including HTTP 200 responses. The runtime never retries writes.
 
-Each credential has exactly one phase: `agent`, `context`, or `safe-output`.
+AW credentials have exactly one phase: `agent` or `safe-output`. The internal
+frozen wire format retains a legacy `context` phase for compatibility fixtures;
+it is not part of the Markdown declaration interface.
 `mcp` entries are exact allowlisted REST-backed read tools. `httpMcp` entries
 register real streamable-HTTP MCP servers:
 

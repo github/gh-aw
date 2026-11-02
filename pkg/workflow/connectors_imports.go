@@ -15,50 +15,73 @@ import (
 // Resolve registrations through the existing import pipeline before native schema
 // validation. The normal engine import pass reuses the same confined import cache.
 func (c *Compiler) normalizeImportedConnectors(frontmatter map[string]any, path, content string) error {
-	if !frontmatterDeclaresImports(frontmatter) {
-		return nil
+	var imported []parser.ConnectorImport
+	if frontmatterDeclaresImports(frontmatter) {
+		imports, err := parser.ProcessImportsFromFrontmatterWithSource(frontmatter, filepath.Dir(path), c.getSharedImportCache(), path, content)
+		if err != nil {
+			return err
+		}
+		imported = imports.Connectors
 	}
-	imports, err := parser.ProcessImportsFromFrontmatterWithSource(frontmatter, filepath.Dir(path), c.getSharedImportCache(), path, content)
+	registrations, err := importedConnectorRegistrations(frontmatter, imported)
 	if err != nil {
 		return err
 	}
-	if len(imports.Connectors) == 0 {
-		return nil
+	if len(registrations) != 0 {
+		frontmatter["connectors"] = registrations
 	}
-	registrations, err := importedConnectorRegistrations(frontmatter, imports.Connectors)
-	if err != nil {
-		return err
-	}
-	frontmatter["connectors"] = registrations
 	return nil
 }
 
 func importedConnectorRegistrations(frontmatter map[string]any, imports []parser.ConnectorImport) (map[string]any, error) {
 	registrations := map[string]any{}
 	configs := map[string]map[string]any{}
+	var declarations []string
 	if existing, present := frontmatter["connectors"]; present {
 		values, ok := existing.(map[string]any)
 		if !ok {
 			return nil, errors.New("connectors must be an object")
 		}
-		maps.Copy(registrations, values)
+		for _, alias := range sliceutil.SortedKeys(values) {
+			config, declaration, err := normalizeConnectorDeclaration(alias, values[alias])
+			if err != nil {
+				return nil, err
+			}
+			registrations[alias] = config
+			if declaration {
+				declarations = append(declarations, alias)
+				configs[alias] = config
+			}
+		}
 	}
 	for _, imported := range imports {
 		for _, alias := range sliceutil.SortedKeys(imported.Registrations) {
 			if _, duplicate := registrations[alias]; duplicate {
 				return nil, fmt.Errorf("import %q: connector %q is already registered; use distinct aliases instead of overriding service authority", imported.Source, alias)
 			}
-			value, ok := imported.Registrations[alias].(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("import %q: connector %q must be an object", imported.Source, alias)
+			value, declaration, err := normalizeConnectorDeclaration(alias, imported.Registrations[alias])
+			if err != nil {
+				return nil, fmt.Errorf("import %q: %w", imported.Source, err)
 			}
 			config := maps.Clone(value)
+			if declaration {
+				declarations = append(declarations, alias)
+			}
 			registrations[alias] = config
 			configs[alias] = config
 		}
 	}
-	if err := applyImportedConnectorSelections(frontmatter, configs); err != nil {
-		return nil, err
+	if contextSelections, ok := frontmatter["context"].(map[string]any); ok {
+		for _, alias := range declarations {
+			if _, configured := contextSelections[alias]; configured {
+				return nil, fmt.Errorf("context.%s is unsupported; select tools.%s to read content using approved event references", alias, alias)
+			}
+		}
+	}
+	if len(configs) != 0 {
+		if err := applyImportedConnectorSelections(frontmatter, configs); err != nil {
+			return nil, err
+		}
 	}
 	return registrations, nil
 }

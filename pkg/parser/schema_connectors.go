@@ -15,7 +15,10 @@ func HasConnectorTriggers(frontmatter map[string]any) bool {
 	}
 	for _, value := range registrations {
 		if config, ok := value.(map[string]any); ok {
-			if _, exists := config["on"]; exists {
+			if _, selected := config["on"].([]any); selected {
+				return true
+			}
+			if _, selected := config["on"].([]string); selected {
 				return true
 			}
 		}
@@ -51,6 +54,16 @@ func validateSharedConnectorFields(frontmatter map[string]any) error {
 		config, ok := value.(map[string]any)
 		if !ok {
 			return fmt.Errorf("connector %q must be an object", alias)
+		}
+		if _, declaration := config["endpoints"]; declaration {
+			for _, field := range []string{"on", "tools", "safe-outputs", "mcp-servers"} {
+				if value, present := config[field]; present {
+					if _, definitions := value.(map[string]any); !definitions {
+						return fmt.Errorf("connector %q: %s must declare capabilities as an object; select capabilities in the main workflow", alias, field)
+					}
+				}
+			}
+			continue
 		}
 		for _, field := range []string{"on", "tools", "context", "safe-outputs"} {
 			if _, selected := config[field]; selected {
