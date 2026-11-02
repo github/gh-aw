@@ -4,8 +4,8 @@ set +o histexpand
 # Safe Outputs Specification Conformance Checker
 # This script implements automated checks for the Safe Outputs specification
 # Specification: docs/src/content/docs/specs/safe-outputs-specification.md
-# Spec Version: 1.29.13 (2026-10-18; reviewed through 2026-10-21 changes)
-# Script Version: 1.29.13 (2026-10-25)
+# Spec Version: 1.29.14 (2026-10-31; reviewed through 2026-11-02 changes)
+# Script Version: 1.29.14 (2026-11-02)
 
 set -euo pipefail
 
@@ -3030,6 +3030,185 @@ check_report_html_code_fidelity() {
     fi
 }
 check_report_html_code_fidelity
+
+# TYPE-018: merge_pull_request Hardened Policy Gates and Decision Audit (Section 7.3 merge_pull_request, 2026-11-02)
+# Spec requires: revision binding (merge API receives evaluated head SHA), individual
+# CHANGES_REQUESTED reviews block even without an approver allowlist, required-check-apps
+# producer binding (validated at compile time), final revalidation before execution or
+# staged preview, and a bounded, redacted merge-pull-request-decisions.jsonl audit artifact
+# whose persistence failures are surfaced separately without retrying the merge.
+echo "Running TYPE-018: merge_pull_request Hardened Policy Gates and Decision Audit..."
+check_merge_pull_request_hardening() {
+    local handler="actions/setup/js/merge_pull_request.cjs"
+    local manifest="actions/setup/js/safe_output_manifest.cjs"
+    local manager="actions/setup/js/safe_output_handler_manager.cjs"
+    local go_config="pkg/workflow/merge_pull_request.go"
+    local steps="pkg/workflow/compiler_safe_outputs_steps.go"
+    local failed=0
+
+    if [ ! -f "$handler" ]; then
+        log_high "TYPE-018: merge_pull_request handler missing: $handler"
+        return
+    fi
+
+    # Revision Binding: merge API MUST receive the evaluated head SHA as `sha`
+    if ! grep -qE 'sha: pr\.head\.sha' "$handler"; then
+        log_critical "TYPE-018: merge API call is not bound to the evaluated head SHA (Revision Binding)"
+        failed=1
+    fi
+
+    # Complete Review Evidence: any reviewer's latest CHANGES_REQUESTED MUST block merging
+    if ! grep -qE 'review\.state === "CHANGES_REQUESTED"' "$handler" || ! grep -qE 'blockingReviews' "$handler"; then
+        log_critical "TYPE-018: Individual CHANGES_REQUESTED reviews are not evaluated independently of the aggregate review decision"
+        failed=1
+    fi
+
+    # required-check-apps: observed check runs MUST match configured app IDs
+    if ! grep -qE 'requiredCheckApps\[run\.name\]' "$handler"; then
+        log_high "TYPE-018: required-check-apps app identity binding is not enforced for required check runs"
+        failed=1
+    fi
+    if [ ! -f "$go_config" ] || ! grep -q 'required-check-apps contains check' "$go_config" || ! grep -q 'must be a positive GitHub App ID' "$go_config"; then
+        log_high "TYPE-018: Compiler does not reject unknown required-check-apps names or invalid app IDs"
+        failed=1
+    fi
+
+    # Final Revalidation before execution or staged preview
+    if ! grep -qE 'phase = "revalidation"' "$handler" || ! grep -q 'revalidated_at' "$handler"; then
+        log_high "TYPE-018: Final policy revalidation before merge/staged preview not detected"
+        failed=1
+    fi
+
+    # Results carry data_trust: untrusted; staged preview returns staged: true without merging
+    if ! grep -q 'data_trust: "untrusted"' "$handler"; then
+        log_high "TYPE-018: merge_pull_request results do not carry data_trust: untrusted"
+        failed=1
+    fi
+
+    # Decision Audit: bounded, redacted, untrusted-marked JSONL record
+    if [ ! -f "$manifest" ] || ! grep -q 'merge-pull-request-decisions.jsonl' "$manifest"; then
+        log_high "TYPE-018: merge-pull-request-decisions.jsonl decision audit writer missing"
+        failed=1
+    else
+        if ! grep -q '65536' "$manifest"; then
+            log_high "TYPE-018: Merge decision audit records are not bounded to 64 KiB"
+            failed=1
+        fi
+        if ! sed -n '/^function writeMergePullRequestDecision/,/^}/p' "$manifest" | grep -q 'redactManifestValue'; then
+            log_critical "TYPE-018: Merge decision audit records are not secret-redacted before persistence"
+            failed=1
+        fi
+        if ! sed -n '/^function writeMergePullRequestDecision/,/^}/p' "$manifest" | grep -q 'data_trust: "untrusted"'; then
+            log_high "TYPE-018: Merge decision audit records do not retain the untrusted-data marker"
+            failed=1
+        fi
+    fi
+    if [ ! -f "$manager" ] || ! grep -q 'audit_failed: true' "$manager"; then
+        log_high "TYPE-018: Merge decision audit persistence failures are not surfaced separately from merge outcome"
+        failed=1
+    fi
+    if [ ! -f "$steps" ] || ! grep -q 'merge-pull-request-decisions.jsonl' "$steps"; then
+        log_high "TYPE-018: Merge decision audit file is not uploaded with the safe-output items artifact"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "TYPE-018: merge_pull_request binds head SHA, blocks individual objections, enforces check producers, revalidates, and audits decisions"
+    fi
+}
+check_merge_pull_request_hardening
+
+# SEC-011: Resolved Issue Relationship Repository Authorization (Section 3 Resolved Issue Relationship Repositories, LSI-006, 2026-11-02)
+# For create_issue.blocked_by and link_sub_issue, each effective repository resolved after
+# temporary-ID resolution MUST match the default target-repo or allowed-repos before any API
+# access (mention lookups, issue reads, dependency or sub-issue mutation).
+echo "Running SEC-011: Resolved Issue Relationship Repository Authorization..."
+check_issue_relationship_authorization() {
+    local create_issue="actions/setup/js/create_issue.cjs"
+    local link_sub="actions/setup/js/link_sub_issue.cjs"
+    local failed=0
+
+    if [ ! -f "$create_issue" ]; then
+        log_high "SEC-011: create_issue handler missing: $create_issue"
+        failed=1
+    else
+        local auth_line mention_line
+        auth_line=$(grep -n 'resolveAndValidateRepo(blockedIssue' "$create_issue" | head -1 | cut -d: -f1)
+        mention_line=$(grep -n 'await resolveMentionsForItem(' "$create_issue" | head -1 | cut -d: -f1)
+        if [ -z "$auth_line" ]; then
+            log_critical "SEC-011: create_issue does not authorize resolved blocked_by repositories against target-repo/allowed-repos"
+            failed=1
+        elif [ -n "$mention_line" ] && [ "$auth_line" -gt "$mention_line" ]; then
+            log_critical "SEC-011: create_issue authorizes blocked_by repositories after per-item mention lookups (must precede all API access)"
+            failed=1
+        fi
+        if ! grep -q 'blocked_by_errors' "$create_issue"; then
+            log_medium "SEC-011: create_issue does not report best-effort blocked_by attachment failures via blocked_by_errors"
+            failed=1
+        fi
+    fi
+
+    if [ ! -f "$link_sub" ]; then
+        log_high "SEC-011: link_sub_issue handler missing: $link_sub"
+        failed=1
+    else
+        local effective_line read_line
+        effective_line=$(grep -n 'const effectiveRepoResult = resolveAndValidateRepo(' "$link_sub" | head -1 | cut -d: -f1)
+        read_line=$(grep -n 'githubClient\.rest\.issues\.get(' "$link_sub" | head -1 | cut -d: -f1)
+        if [ -z "$effective_line" ]; then
+            log_critical "SEC-011: link_sub_issue does not authorize the effective parent/sub-issue repository after temporary-ID resolution (LSI-006)"
+            failed=1
+        elif [ -n "$read_line" ] && [ "$effective_line" -gt "$read_line" ]; then
+            log_critical "SEC-011: link_sub_issue authorizes the effective repository after issue reads (LSI-006 requires authorization before any API access)"
+            failed=1
+        fi
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "SEC-011: Resolved issue relationship repositories are authorized before API access"
+    fi
+}
+check_issue_relationship_authorization
+
+# SEC-012: Handler Tokens and Global App Permissions (Section GP5b, v1.29.14)
+# Permissions used solely through a handler's own github-token or github-app MUST NOT contribute
+# to the global App mint. This also applies to individual
+# safe-outputs.dispatch-repository.<tool>.github-token overrides.
+echo "Running SEC-012: Handler Tokens and Global App Permissions..."
+check_handler_token_global_app_exclusion() {
+    local perms="pkg/workflow/safe_outputs_permissions.go"
+    local dispatch_handler="actions/setup/js/dispatch_repository.cjs"
+    local failed=0
+
+    if [ ! -f "$perms" ]; then
+        log_high "SEC-012: Safe outputs permission computation missing: $perms"
+        return
+    fi
+
+    # GP5b rule 1: handler github-token overrides are excluded from the global App mint
+    if ! grep -qE 'getHandlerGitHubToken\(safeOutputs, handler\.StructField\) != ""' "$perms"; then
+        log_high "SEC-012: Handler github-token overrides are not excluded from the global App mint (GP5b rule 1)"
+        failed=1
+    fi
+
+    # GP5b rule 1: dispatch-repository per-tool github-token overrides are excluded as well.
+    # Excluding them is only safe when the runtime handler actually authenticates each tool with
+    # its own per-tool credential (GP5b rule 4: an override alone MUST NOT remove permissions for
+    # an operation that still uses the global credential), so both sides are checked.
+    if ! sed -n '/^func computeDispatchRepositoryPermissions/,/^}/p' "$perms" | grep -qE 'tool\.GitHubToken != ""'; then
+        log_high "SEC-012: dispatch-repository.<tool>.github-token overrides still contribute to the global App mint (GP5b rule 1)"
+        failed=1
+    fi
+    if [ -f "$dispatch_handler" ] && ! grep -qE 'createAuthenticatedGitHubClient\(toolConfig' "$dispatch_handler"; then
+        log_high "SEC-012: dispatch_repository handler authenticates with the handler-level client and ignores per-tool github-token/github-app credentials; per-tool overrides cannot be excluded from the global App mint until they are used at runtime (GP5b rules 1 and 4)"
+        failed=1
+    fi
+
+    if [ $failed -eq 0 ]; then
+        log_pass "SEC-012: Handler and dispatch-repository token overrides are excluded from the global App mint"
+    fi
+}
+check_handler_token_global_app_exclusion
 
 # Summary
 echo ""
