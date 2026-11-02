@@ -1,0 +1,262 @@
+apiVersion: github.com/gh-aw/connectors/v1
+kind: ConnectorSpec
+id: linear.app/issues
+endpoints:
+  api: https://api.linear.app
+credentials:
+  mcp-reader:
+    phase: agent
+    header: Authorization
+    scheme: bearer
+    scopes: [read]
+  reader:
+    phase: agent
+    header: Authorization
+    scheme: raw
+    scopes: [read]
+  writer:
+    phase: safe-output
+    header: Authorization
+    scheme: raw
+    scopes: [write]
+  context-reader:
+    phase: context
+    header: Authorization
+    scheme: raw
+    scopes: [read]
+triggers:
+  issue-created:
+    verificationProfile: linear.app/hmac-sha256-timestamp
+    nativeEvents: [create]
+    match: { /type: Issue, /action: create }
+    resources: { /organizationId: organizations, /data/teamId: teams }
+    normalize:
+      issue-id: /data/id
+      organization-id: /organizationId
+      team-id: /data/teamId
+      url: /url
+  issue-updated:
+    verificationProfile: linear.app/hmac-sha256-timestamp
+    nativeEvents: [update]
+    match: { /type: Issue, /action: update }
+    resources: { /organizationId: organizations, /data/teamId: teams }
+    normalize:
+      issue-id: /data/id
+      organization-id: /organizationId
+      team-id: /data/teamId
+      url: /url
+  issue-removed:
+    verificationProfile: linear.app/hmac-sha256-timestamp
+    nativeEvents: [remove]
+    match: { /type: Issue, /action: remove }
+    resources: { /organizationId: organizations, /data/teamId: teams }
+    normalize:
+      issue-id: /data/id
+      organization-id: /organizationId
+      team-id: /data/teamId
+      url: /url
+httpMcp:
+  read-only:
+    url: https://mcp.linear.app/mcp/readonly
+    credential: mcp-reader
+    readOnly: true
+    tools:
+      get_issue:
+        inputs:
+          id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+        resources: { id: issues }
+    maxResponseBytes: 131072
+mcp:
+  get-issue:
+    tool: get-issue
+    credential: reader
+    inputs:
+      issue-id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+    resources: { issue-id: issues }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        query ConnectorLinearIssue($id: String!) {
+          organization { id }
+          issue(id: $id) {
+            id identifier title description url
+            team { id key }
+            project { id }
+          }
+        }
+      query: { id: { input: issue-id } }
+    maxResponseBytes: 131072
+    responseRequired: [/data/issue/id, /data/issue/title]
+    responseResources:
+      /data/organization/id: organizations
+      /data/issue/id: issues
+      /data/issue/team/id: teams
+    project:
+      issue-id: /data/issue/id
+      organization-id: /data/organization/id
+      team-id: /data/issue/team/id
+      issue: /data/issue
+  resolve-team:
+    tool: resolve-team
+    credential: reader
+    inputs:
+      team-key: { type: string, required: true, maxLength: 16, pattern: "^[A-Z][A-Z0-9]{0,15}$" }
+    resources: { team-key: team-keys }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        query ConnectorLinearTeam($key: String!) {
+          organization { id }
+          teams(first: 1, filter: { key: { eq: $key } }) {
+            nodes { id key name }
+            pageInfo { hasNextPage }
+          }
+        }
+      query: { key: { input: team-key } }
+    maxResponseBytes: 16384
+    responseChecks: { /data/teams/pageInfo/hasNextPage: false }
+    responseRequired: [/data/teams/nodes/0/id]
+    responseResources:
+      /data/organization/id: organizations
+      /data/teams/nodes/0/id: teams
+  resolve-project:
+    tool: resolve-project
+    credential: reader
+    inputs:
+      project-slug: { type: string, required: true, maxLength: 12, pattern: "^[0-9a-f]{12}$" }
+    resources: { project-slug: project-slugs }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        query ConnectorLinearProject($slug: String!) {
+          organization { id }
+          projects(first: 1, filter: { slugId: { eq: $slug } }) {
+            nodes { id slugId name }
+            pageInfo { hasNextPage }
+          }
+        }
+      query: { slug: { input: project-slug } }
+    maxResponseBytes: 16384
+    responseChecks: { /data/projects/pageInfo/hasNextPage: false }
+    responseRequired: [/data/projects/nodes/0/id]
+    responseResources:
+      /data/organization/id: organizations
+      /data/projects/nodes/0/id: projects
+safeOutputs:
+  create-issue:
+    credential: writer
+    inputs:
+      team-id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+      project-id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+      title: { type: string, required: true, maxLength: 128, pattern: '\S' }
+      body: { type: string, required: true, maxLength: 65000, pattern: '\S' }
+    resources: { team-id: teams, project-id: projects }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        mutation ConnectorLinearCreate($team: String!, $project: String!, $title: String!, $body: String!) {
+          issueCreate(input: { teamId: $team, projectId: $project, title: $title, description: $body }) {
+            success
+            issue { id identifier title team { id } project { id } }
+          }
+        }
+      query:
+        team: { input: team-id }
+        project: { input: project-id }
+        title: { input: title }
+        body: { input: body }
+    maxResponseBytes: 16384
+    responseChecks: { /data/issueCreate/success: true }
+    responseRequired: [/data/issueCreate/issue/id, /data/issueCreate/issue/identifier]
+    responseResources:
+      /data/issueCreate/issue/team/id: teams
+      /data/issueCreate/issue/project/id: projects
+  update-issue:
+    credential: writer
+    inputs:
+      issue-id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+      title: { type: string, required: true, maxLength: 128, pattern: '\S' }
+      body: { type: string, required: true, maxLength: 65000, pattern: '\S' }
+    resources: { issue-id: issues }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        mutation ConnectorLinearUpdate($id: String!, $title: String!, $body: String!) {
+          issueUpdate(id: $id, input: { title: $title, description: $body }) {
+            success
+            issue { id identifier title }
+          }
+        }
+      query:
+        id: { input: issue-id }
+        title: { input: title }
+        body: { input: body }
+    maxResponseBytes: 16384
+    responseChecks: { /data/issueUpdate/success: true }
+    responseRequired: [/data/issueUpdate/issue/id, /data/issueUpdate/issue/identifier]
+    responseResources: { /data/issueUpdate/issue/id: issues }
+  add-comment:
+    credential: writer
+    inputs:
+      issue-id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+      body: { type: string, required: true, maxLength: 65000, pattern: '\S' }
+    resources: { issue-id: issues }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        mutation ConnectorLinearComment($id: String!, $body: String!) {
+          commentCreate(input: { issueId: $id, body: $body }) {
+            success
+            comment { id body issue { id } }
+          }
+        }
+      query:
+        id: { input: issue-id }
+        body: { input: body }
+    maxResponseBytes: 131072
+    responseChecks: { /data/commentCreate/success: true }
+    responseRequired: [/data/commentCreate/comment/id]
+    responseResources: { /data/commentCreate/comment/issue/id: issues }
+context:
+  issue-details:
+    credential: context-reader
+    inputs:
+      issue-id: { type: string, required: true, maxLength: 36, pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }
+    resources: { issue-id: issues }
+    request:
+      endpoint: api
+      method: POST
+      path: /graphql
+      graphql: |
+        query ConnectorLinearContext($id: String!) {
+          organization { id }
+          issue(id: $id) {
+            id identifier title description url
+            team { id key }
+            project { id }
+          }
+        }
+      query: { id: { input: issue-id } }
+    maxResponseBytes: 131072
+    responseRequired: [/data/issue/id, /data/issue/title]
+    responseResources:
+      /data/organization/id: organizations
+      /data/issue/id: issues
+      /data/issue/team/id: teams
+    project:
+      issue-id: /data/issue/id
+      organization-id: /data/organization/id
+      team-id: /data/issue/team/id
+      issue: /data/issue

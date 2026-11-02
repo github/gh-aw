@@ -1,0 +1,73 @@
+{
+  "base": {
+    "type": "Issue",
+    "action": "update",
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "webhookTimestamp": 1793577600000,
+    "url": "https://linear.app/example/issue/ENG-12/example",
+    "data": {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "identifier": "ENG-12",
+      "teamId": "33333333-3333-4333-8333-333333333333",
+      "completedAt": null,
+      "canceledAt": null,
+      "labelIds": []
+    },
+    "updatedFrom": {}
+  },
+  "cases": [
+    { "name": "create", "patch": { "action": "create" }, "activities": ["opened"] },
+    { "name": "remove", "patch": { "action": "remove" }, "activities": ["deleted"] },
+    { "name": "ordinary update", "patch": {}, "activities": ["edited"] },
+    {
+      "name": "completed",
+      "patch": { "data": { "completedAt": "2026-11-02T00:00:00Z" }, "updatedFrom": { "completedAt": null } },
+      "activities": ["edited", "closed"]
+    },
+    {
+      "name": "canceled",
+      "patch": { "data": { "canceledAt": "2026-11-02T00:00:00Z" }, "updatedFrom": { "canceledAt": null } },
+      "activities": ["edited", "closed"]
+    },
+    {
+      "name": "reopened",
+      "patch": { "updatedFrom": { "completedAt": "2026-11-02T00:00:00Z" } },
+      "activities": ["edited", "reopened"]
+    },
+    {
+      "name": "terminal state replacement",
+      "patch": { "data": { "canceledAt": "2026-11-02T00:01:00Z" }, "updatedFrom": { "completedAt": "2026-11-02T00:00:00Z", "canceledAt": null } },
+      "activities": ["edited"]
+    },
+    {
+      "name": "missing old terminal evidence",
+      "patch": { "data": { "completedAt": "2026-11-02T00:00:00Z" } },
+      "activities": ["edited"]
+    },
+    {
+      "name": "state names are not evidence",
+      "patch": { "data": { "state": { "name": "Done" } }, "updatedFrom": { "state": { "name": "Doing" } } },
+      "activities": ["edited"]
+    },
+    {
+      "name": "label replacement",
+      "patch": { "data": { "labelIds": ["new", "shared"] }, "updatedFrom": { "labelIds": ["old", "shared"] } },
+      "activities": ["edited", "labeled", "unlabeled"]
+    },
+    {
+      "name": "label ordering and duplicates",
+      "patch": { "data": { "labelIds": ["b", "a", "a"] }, "updatedFrom": { "labelIds": ["a", "b"] } },
+      "activities": ["edited"]
+    },
+    {
+      "name": "missing old labels",
+      "patch": { "data": { "labelIds": ["bug"] } },
+      "activities": ["edited"]
+    },
+    { "name": "IssueLabel is not an Issue", "patch": { "type": "IssueLabel" }, "reject": true },
+    { "name": "SLA is not a data change", "patch": { "type": "IssueSLA", "action": "breached" }, "reject": true },
+    { "name": "invented native close", "patch": { "action": "closed" }, "reject": true },
+    { "name": "missing organization", "patch": { "organizationId": "" }, "reject": true },
+    { "name": "missing issue identity", "patch": { "data": { "id": "" } }, "reject": true }
+  ]
+}
