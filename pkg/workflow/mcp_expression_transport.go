@@ -21,6 +21,9 @@ var mcpShellReferencePattern = regexp.MustCompile(`\\?\$(?:\{([A-Za-z_][A-Za-z0-
 func normalizeMCPShellReferences(value string) string {
 	return mcpShellReferencePattern.ReplaceAllStringFunc(value, func(reference string) string {
 		if strings.HasPrefix(reference, `\`) {
+			if !strings.HasPrefix(reference, `\${`) {
+				return reference[1:]
+			}
 			return reference
 		}
 		name := strings.Trim(reference[1:], "{}")
@@ -33,9 +36,17 @@ func normalizeMCPShellReferences(value string) string {
 func replaceMCPExpressions(value string, preserveLegacy bool) (string, map[string]string) {
 	bindings := make(map[string]string)
 	if preserveLegacy {
-		maps.Copy(bindings, ExtractSecretsFromValue(value))
-		maps.Copy(bindings, ExtractEnvExpressionsFromValue(value))
-		value = ReplaceTemplateExpressionsWithEnvVars(value)
+		legacy := ReplaceTemplateExpressionsWithEnvVars(value)
+		normalized := normalizeMCPShellReferences(legacy)
+		// A gateway reference cannot share a transported value: the runtime
+		// rejects references left after substitution to prevent second-pass expansion.
+		if !ExpressionPattern.MatchString(legacy) &&
+			!strings.Contains(normalized, `\${GH_AW_MCP_ENV_`) &&
+			!strings.Contains(normalized, `\${`+mcpExpressionEnvPrefix) {
+			maps.Copy(bindings, ExtractSecretsFromValue(value))
+			maps.Copy(bindings, ExtractEnvExpressionsFromValue(value))
+			return legacy, bindings
+		}
 	}
 	return ExpressionPattern.ReplaceAllStringFunc(value, func(full string) string {
 		if _, ok := actionslanguageservice.WrappedExpression(full); !ok {
@@ -44,7 +55,7 @@ func replaceMCPExpressions(value string, preserveLegacy bool) (string, map[strin
 		content := strings.TrimSpace(full[3 : len(full)-2])
 		hash := sha256.Sum256([]byte(content))
 		name := mcpExpressionEnvPrefix + strings.ToUpper(hex.EncodeToString(hash[:]))
-		bindings[name] = full
+		bindings[name] = "${{ " + content + " }}"
 		return `\${` + name + "}"
 	}), bindings
 }

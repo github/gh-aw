@@ -643,6 +643,9 @@ func buildMCPGatewayAllowedMountRoots(tools map[string]any, gatewayConfig *MCPGa
 	}
 
 	for _, mount := range collectMCPServerConfiguredMounts(tools) {
+		// Reuse the config's step environment bindings rather than interpolating
+		// authored Actions expressions into the allowlist export's shell source.
+		mount, _ = replaceMCPExpressions(mount, false)
 		addMount(mount)
 	}
 

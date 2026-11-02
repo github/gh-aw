@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,17 +44,26 @@ mcp-servers:
     headers:
       X-Ref: "${{ github.ref }}"
       X-Computed: "${{ format('{0}: {1}', github.ref, steps.setup.outputs.port) }}"
+      X-Mixed: "${{ secrets.MCP_TOKEN }}:${{ github.ref }}"
+      X-Runner: "${{ secrets.MCP_TOKEN }}:$GITHUB_RUN_ID"
   container:
     container: example/mcp:latest
     args:
       - "--ref=${{ github.ref }}"
       - "${{ steps.setup.outputs.port }}"
       - "${GITHUB_WORKSPACE}"
+      - '\$TOKEN'
     entrypointArgs:
       - "${{ github.event.repository.description }}"
     env:
       DESCRIPTION: "${{ github.event.repository.description }}"
       WORKSPACE: "$GITHUB_WORKSPACE"
+      CACHE: "${{ github.workspace }}/cache-${{ github.run_id }}"
+      MIXED: "${{ secrets.MCP_TOKEN }}:${{ github.ref }}"
+      RUNNER: "${{ secrets.MCP_TOKEN }}:$GITHUB_RUN_ID"
+    mounts:
+      - "${{ steps.setup.outputs.path }}:/data:ro"
+      - "${{ github.workspace }}/cache-${{ github.run_id }}:/cache:ro"
 ---
 Inspect configured tools.
 `, engine)
@@ -85,6 +95,10 @@ Inspect configured tools.
 				"${{ github.ref }}",
 				"${{ format('{0}: {1}', github.ref, steps.setup.outputs.port) }}",
 				"${{ github.event.repository.description }}",
+				"${{ steps.setup.outputs.path }}",
+				"${{ github.workspace }}",
+				"${{ github.run_id }}",
+				"${{ secrets.MCP_TOKEN }}",
 			} {
 				placeholder, env := replaceMCPExpressions(expression, false)
 				assert.Contains(t, run, placeholder)
@@ -93,6 +107,20 @@ Inspect configured tools.
 					assert.Contains(t, run, " -e "+name, "gateway container must receive binding")
 				}
 			}
+			_, heredoc, found := strings.Cut(run, "cat << ")
+			require.True(t, found)
+			header, body, found := strings.Cut(heredoc, "\n")
+			require.True(t, found)
+			body, _, found = strings.Cut(body, "\n"+strings.Fields(header)[0])
+			require.True(t, found)
+			command := exec.Command("bash", "-c", "cat <<EOF\n"+body+"\nEOF")
+			command.Env = append(os.Environ(), "MCP_GATEWAY_PORT=8080")
+			output, err := command.Output()
+			require.NoError(t, err)
+			var config map[string]any
+			require.NoError(t, json.Unmarshal(output, &config), "heredoc must preserve valid JSON")
+			servers := config["mcpServers"].(map[string]any)
+			assert.Contains(t, servers["container"].(map[string]any)["args"].([]any), "$TOKEN")
 		})
 	}
 }
@@ -103,8 +131,97 @@ func TestMCPNormalizeLegacyShellReferences(t *testing.T) {
 	assert.Equal(t, `\${GH_AW_MCP_ENV_GITHUB_WORKSPACE}/\${GH_AW_MCP_ENV_RUNNER_TEMP}`,
 		normalizeMCPShellReferences("${GITHUB_WORKSPACE}/$RUNNER_TEMP"))
 	assert.Equal(t, `\${TOKEN}`, normalizeMCPShellReferences(`\${TOKEN}`))
+	assert.Equal(t, `$TOKEN`, normalizeMCPShellReferences(`\$TOKEN`))
+	command := exec.Command("bash", "-c", "cat <<EOF\n"+marshalMCPHeredocString(normalizeMCPShellReferences(`\$TOKEN`))+"\nEOF")
+	command.Env = append(os.Environ(), "TOKEN=must-not-expand")
+	output, err := command.Output()
+	require.NoError(t, err)
+	var decoded string
+	require.NoError(t, json.Unmarshal(output, &decoded))
+	assert.Equal(t, "$TOKEN", decoded)
 	placeholder := `\${GH_AW_MCP_EXPR_` + strings.Repeat("A", 64) + "}"
 	assert.Equal(t, placeholder, normalizeMCPShellReferences(placeholder))
+}
+
+func TestMCPExpressionBindingNormalization(t *testing.T) {
+	config := &parser.RegistryMCPServerConfig{
+		Headers: map[string]string{"X-Spaced": "${{ github.ref }}", "X-Compact": "${{github.ref}}"},
+		Env:     map[string]string{"SPACED": "${{  github.ref  }}", "COMPACT": "${{github.ref}}"},
+	}
+	placeholder, expected := replaceMCPExpressions("${{ github.ref }}", false)
+	for range 100 {
+		assert.Equal(t, expected, collectMCPConfigExpressionBindings(config))
+	}
+	for _, expression := range []string{"${{github.ref}}", "${{  github.ref  }}", "${{\tgithub.ref\t}}"} {
+		actualPlaceholder, actual := replaceMCPExpressions(expression, false)
+		assert.Equal(t, placeholder, actualPlaceholder)
+		assert.Equal(t, expected, actual)
+	}
+}
+
+func TestMCPExpressionMountAllowlistUsesTransport(t *testing.T) {
+	expression := "${{ steps.setup.outputs.path }}"
+	roots := buildMCPGatewayAllowedMountRoots(map[string]any{
+		"container": map[string]any{
+			"container": "example/mcp:latest",
+			"mounts":    []any{expression + ":/data:ro"},
+		},
+	}, nil)
+	assert.NotContains(t, roots, "${{")
+	command := exec.Command("bash", "-c", `printf '%s' "`+roots+`"`)
+	command.Env = os.Environ()
+	value := "/srv/\"$(printf executed)`printf also-executed`"
+	_, bindings := replaceMCPExpressions(expression, false)
+	for name := range bindings {
+		command.Env = append(command.Env, name+"="+value)
+	}
+	output, err := command.Output()
+	require.NoError(t, err)
+	assert.Contains(t, string(output), value+":ro")
+}
+
+func TestMCPMixedLegacyExpressions(t *testing.T) {
+	for _, test := range []struct {
+		value string
+		want  string
+	}{
+		{"${{ github.workspace }}/cache-${{ github.run_id }}", "/workspace/cache-123"},
+		{"${{ secrets.MCP_TOKEN }}:${{ github.ref }}", "token:refs/heads/main"},
+		{"${{ env.MCP_TOKEN }}:${{ github.ref }}", "token:refs/heads/main"},
+		{"${{ secrets.MCP_TOKEN }}:$GITHUB_RUN_ID", "token:123"},
+		{"${{ env.MCP_TOKEN }}:${GITHUB_RUN_ID}", "token:123"},
+	} {
+		t.Run(test.value, func(t *testing.T) {
+			rendered, bindings := replaceMCPExpressions(test.value, true)
+			command := exec.Command("bash", "-c", "cat <<EOF\n"+marshalMCPHeredocString(normalizeMCPShellReferences(rendered))+"\nEOF")
+			output, err := command.Output()
+			require.NoError(t, err)
+			command = exec.Command("node", "-e", `
+const fs = require("fs");
+const {resolveMCPConfigExpressions} = require("../../actions/setup/js/start_mcp_gateway.cjs");
+process.stdout.write(JSON.stringify(resolveMCPConfigExpressions(JSON.parse(fs.readFileSync(0, "utf8")))));
+`)
+			command.Stdin = strings.NewReader(string(output))
+			command.Env = append(os.Environ(), "GITHUB_RUN_ID=123")
+			values := map[string]string{
+				"${{ github.workspace }}":  "/workspace",
+				"${{ github.run_id }}":     "123",
+				"${{ secrets.MCP_TOKEN }}": "token",
+				"${{ env.MCP_TOKEN }}":     "token",
+				"${{ github.ref }}":        "refs/heads/main",
+			}
+			for name, expression := range bindings {
+				value, ok := values[expression]
+				require.True(t, ok, "unexpected expression %s", expression)
+				command.Env = append(command.Env, name+"="+value)
+			}
+			resolved, err := command.CombinedOutput()
+			require.NoError(t, err, "%s", resolved)
+			var decoded string
+			require.NoError(t, json.Unmarshal(resolved, &decoded))
+			assert.Equal(t, test.want, decoded)
+		})
+	}
 }
 
 func TestMCPExpressionBindingsUseFullDigest(t *testing.T) {

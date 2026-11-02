@@ -29,6 +29,8 @@ func TestHeredocInjectionControls(t *testing.T) {
 		{"double quoted custom", "cat <<\"custom-marker\"\n" + expression + "\ncustom-marker", false},
 		{"partially quoted", "cat <<E'OF'\n" + expression + "\nEOF", false},
 		{"prefix quoted", "cat <<'E'OF\n" + expression + "\nEOF", false},
+		{"ANSI quoted without escapes", "cat <<$'EOF'\n" + expression + "\nEOF", false},
+		{"single quoted literal backslash", "cat <<'E\\OF'\n" + expression + "\nE\\OF", false},
 		{"continued unquoted delimiter", "cat <<EO\\\nF\n" + expression + "\nEOF", true},
 		{"escaped delimiter", "cat <<\\EOF\n" + expression + "\nEOF", false},
 		{"escaped delimiter followed by command", "cat <<\\EOF\nliteral\\\nEOF\necho " + expression, true},
@@ -111,6 +113,10 @@ func TestHeredocUnknownBoundariesPreserveScript(t *testing.T) {
 		{"prefix quote continuation parser error", "cat <<'E'OF\nliteral\\\nEOF\necho " + expression + "\n"},
 		{"prefix quote continuation mismatch", "cat <<'E'OF\nliteral\\\nEOF\necho " + expression + "\nEOF\n"},
 		{"double prefix quote continuation mismatch", "cat <<\"E\"OF\nliteral\\\nEOF\necho " + expression + "\nEOF\n"},
+		{"ANSI quoted escaped delimiter mismatch", "cat <<$'E\\x4fF'\nliteral\nEOF\necho " + expression + "\nE\\x4fF\n"},
+		{"double quoted escaped delimiter mismatch", "cat <<\"E\\$OF\"\nliteral\nE$OF\necho " + expression + "\nE\\$OF\n"},
+		{"partially ANSI quoted escaped delimiter mismatch", "cat <<E$'\\x4f'F\nliteral\nEOF\necho " + expression + "\nE\\x4fF\n"},
+		{"partially double quoted escaped delimiter mismatch", "cat <<E\"\\$\"OF\nliteral\nE$OF\necho " + expression + "\nE\\$OF\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -174,6 +180,8 @@ func TestHeredocDelimiterSemanticsMatchBash(t *testing.T) {
 	}{
 		{"prefix quote", "cat <<'E'OF\nliteral\\\nEOF\nprintf later", "literal\\\nlater"},
 		{"continued unquoted delimiter", "cat <<EO\\\nF\n$(printf expanded)\nEOF", "expanded\n"},
+		{"ANSI quoted escaped delimiter", "cat <<$'E\\x4fF'\nliteral\nEOF\nprintf later", "literal\nlater"},
+		{"double quoted escaped delimiter", "cat <<\"E\\$OF\"\nliteral\nE$OF\nprintf later", "literal\nlater"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

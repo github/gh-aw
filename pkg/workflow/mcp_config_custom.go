@@ -293,7 +293,7 @@ func renderMCPArrayProperty(yaml *strings.Builder, property string, isLast bool,
 	case "entrypointArgs":
 		renderMCPArray(yaml, renderer, "entrypointArgs", mcpConfig.EntrypointArgs, isLast, true)
 	case "mounts":
-		renderMCPArray(yaml, renderer, "mounts", mcpConfig.Mounts, isLast, renderer.RequiresCopilotFields)
+		renderMCPArray(yaml, renderer, "mounts", mcpConfig.Mounts, isLast, true)
 	case "args":
 		renderMCPArray(yaml, renderer, "args", mcpConfig.Args, isLast, true)
 	case "proxy-args":

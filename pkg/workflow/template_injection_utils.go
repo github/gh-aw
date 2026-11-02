@@ -87,19 +87,8 @@ func shellHeredocRegions(content string, includeComments bool) ([]shellHeredocRe
 		}
 		start, end := int(redirect.Hdoc.Pos().Offset()), int(redirect.Hdoc.End().Offset())
 		delimiter := content[redirect.Word.Pos().Offset():redirect.Word.End().Offset()]
-		quoted := false
-		for _, part := range redirect.Word.Parts {
-			switch part := part.(type) {
-			case *syntax.Lit:
-				// The parser already removes unquoted backslash-newline
-				// continuations; only remaining escapes quote the delimiter.
-				quoted = quoted || strings.Contains(part.Value, "\\")
-			case *syntax.SglQuoted, *syntax.DblQuoted:
-				quoted = true
-			default:
-				valid = false
-			}
-		}
+		quoted, delimiterValid := shellHeredocDelimiterQuoted(redirect.Word, content)
+		valid = valid && delimiterValid
 		if quoted && !mayContainInlineExpression(delimiter) {
 			// mvdan can treat prefix-quoted delimiters as expanding, joining
 			// body lines across continuations. Bash instead stops at the
@@ -119,6 +108,32 @@ func shellHeredocRegions(content string, includeComments bool) ([]shellHeredocRe
 		return a.start - b.start
 	})
 	return regions, valid
+}
+
+func shellHeredocDelimiterQuoted(word *syntax.Word, content string) (bool, bool) {
+	quoted := false
+	for _, part := range word.Parts {
+		switch part := part.(type) {
+		case *syntax.Lit:
+			// The parser removes unquoted backslash-newline continuations.
+			quoted = quoted || strings.Contains(part.Value, "\\")
+		case *syntax.SglQuoted:
+			quoted = true
+			// Bash decodes ANSI-C escapes that mvdan may retain.
+			if part.Dollar && strings.Contains(part.Value, "\\") {
+				return true, false
+			}
+		case *syntax.DblQuoted:
+			quoted = true
+			// Double-quoted escapes can likewise disagree with Bash.
+			if strings.Contains(content[part.Pos().Offset():part.End().Offset()], "\\") {
+				return true, false
+			}
+		default:
+			return false, false
+		}
+	}
+	return quoted, true
 }
 
 func quotedHeredocBoundaryMatches(content string, start, end int, stripTabs bool) bool {

@@ -16,6 +16,8 @@ This changelog records the version history and the dated mapping audits for `spe
 
 The 1.0.82 transport contract additionally requires fail-closed rejection of gateway `${NAME}` references after runtime-data substitution, including boundary-assembled references and mixed authored/runtime strings. The pinned gateway expands raw JSON and parsed header/environment values again; launcher-local single-pass replacement does not prevent that downstream credential-expansion path. Regression evidence covers dummy-credential payloads and both downstream expansion stages without live endpoint calls.
 
+Review corrections for 1.0.82 require proven Bash-decoded quoted delimiters, mount expression transport across all JSON engine renderers, and canonical binding values for whitespace-equivalent expressions. Legacy-reference and mixed-value compatibility MUST NOT weaken the downstream expansion check.
+
 The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers, compiler rejection of explicit/default/suffixed agent-controlled check names, validated submission-time review ordering, and same-count approval replacement during revalidation. It distinguishes runtime-required `checks: read` from the absence of check-run reads or returned metadata when requirements are empty, in both live and staged mode. Evidence mappings include structural-only debug records, count-only label/pattern logs, and status/phase error logs with full diagnostics retained in untrusted results. Approval provenance remains available for audit and final revalidation; neither metadata designation nor check-name matching authenticates an instruction source or expected check producer, and log minimization does not establish prompt-injection isolation.
 
 | Version | Change |
