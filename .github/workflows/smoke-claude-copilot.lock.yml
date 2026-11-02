@@ -268,49 +268,86 @@ jobs:
         run: bash "${RUNNER_TEMP}/gh-aw/actions/log_runtime_features_summary.sh"
       - name: Create prompt with built-in context
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_auto_create_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"}],\"system_item_count\":10}"
-          GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: create_issue, report_missing_tool, report_missing_data, noop\n"
-          GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
-          GH_AW_PROMPT_CONTENT_0003: "</system>\n"
-          GH_AW_PROMPT_CONTENT_0004: "{{#runtime-import .github/workflows/smoke-claude-copilot.md}}\n"
         with:
+          github-token: no-authentication
           script: |
-            const { setupGlobals } = require(process.env.GH_AW_ACTIONS_DIR + '/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io, getOctokit);
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_PROMPT","GH_AW_PROMPT_CONFIG","GH_AW_PROMPT_CONTENT_0000","GH_AW_PROMPT_CONTENT_0001","GH_AW_PROMPT_CONTENT_0002","GH_AW_PROMPT_CONTENT_0003","GH_AW_SAFE_OUTPUTS","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
             const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/create_prompt.cjs');
             await main(core);
+        env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"safe_outputs_mcp_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"file\":\"safe_outputs_auto_create_issue.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"author_file\":\".github/workflows/smoke-claude-copilot.md\"}],\"system_item_count\":10}"
+          GH_AW_PROMPT_CONTENT_0000: |
+            <system>
+          GH_AW_PROMPT_CONTENT_0001: |
+            <safe-output-tools>
+            Tools: create_issue, report_missing_tool, report_missing_data, noop
+          GH_AW_PROMPT_CONTENT_0002: |
+            </safe-output-tools>
+          GH_AW_PROMPT_CONTENT_0003: |
+            </system>
+          GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Interpolate variables and render templates
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ENGINE_ID: "claude"
-          GH_AW_SUB_AGENT_DIR: ".claude/agents"
-          GH_AW_SUB_AGENT_EXT: ".md"
-          GH_AW_SKILL_DIR: ".claude/skills"
-          GH_AW_SKILL_EXT: ".md"
         with:
+          github-token: no-authentication
           script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'interpolate_prompt.cjs'));
+            const promptEnvironment = new Set(["GH_AW_ACTIONS_DIR","GH_AW_ENGINE_ID","GH_AW_PROMPT","GH_AW_SKILL_DIR","GH_AW_SKILL_EXT","GH_AW_SUB_AGENT_DIR","GH_AW_SUB_AGENT_EXT","GITHUB_ACTION","GITHUB_ACTOR","GITHUB_API_URL","GITHUB_EVENT_NAME","GITHUB_EVENT_PATH","GITHUB_GRAPHQL_URL","GITHUB_JOB","GITHUB_OUTPUT","GITHUB_REF","GITHUB_REPOSITORY","GITHUB_RUN_ATTEMPT","GITHUB_RUN_ID","GITHUB_RUN_NUMBER","GITHUB_SERVER_URL","GITHUB_SHA","GITHUB_STEP_SUMMARY","GITHUB_WORKFLOW","GITHUB_WORKSPACE","PATH","RUNNER_ARCH","RUNNER_OS","RUNNER_TEMP"]);
+            for (const name of Object.keys(process.env)) {
+              if (!promptEnvironment.has(name)) delete process.env[name];
+            }
+            global.core = core;
+            global.context = context;
+            const { main } = require(process.env.GH_AW_ACTIONS_DIR + '/interpolate_prompt.cjs');
             await main();
-      - name: Validate prompt placeholders
         env:
+          GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
+          GH_AW_ENGINE_ID: claude
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          GH_AW_SKILL_DIR: .claude/skills
+          GH_AW_SKILL_EXT: .md
+          GH_AW_SUB_AGENT_DIR: .claude/agents
+          GH_AW_SUB_AGENT_EXT: .md
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Validate prompt placeholders
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/validate_prompt_placeholders.sh"
-      - name: Print prompt
         env:
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
+      - name: Print prompt
         run: |
           bash "${RUNNER_TEMP}/gh-aw/actions/print_prompt_summary.sh"
+        env:
+          GH_AW_OTLP_ENDPOINTS: ""
+          GH_AW_OTLP_IF_MISSING: ""
+          GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
+          OTEL_EXPORTER_OTLP_ENDPOINT: ""
+          OTEL_EXPORTER_OTLP_HEADERS: ""
+          OTEL_RESOURCE_ATTRIBUTES: ""
+          OTEL_SERVICE_NAME: ""
       - name: Inventory installed skills
         if: success() || failure()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

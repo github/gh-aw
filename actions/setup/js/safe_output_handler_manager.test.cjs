@@ -69,6 +69,7 @@ describe("Safe Output Handler Manager", () => {
     delete global.context;
     fs.rmSync("/tmp/gh-aw/comment-memory", { recursive: true, force: true });
     fs.rmSync("/tmp/gh-aw/safe-output-errors.json", { force: true });
+    fs.rmSync("/tmp/gh-aw/merge-pull-request-decisions.jsonl", { force: true });
     fs.rmSync("/tmp/gh-aw/actions", { recursive: true, force: true });
   });
 
@@ -119,6 +120,116 @@ describe("Safe Output Handler Manager", () => {
       expect(handler).toHaveBeenCalledTimes(1);
       expect(result.results[1]).toMatchObject({ skipped: true, reason: expect.stringContaining("closed after") });
       expect(computeSafeOutputsStatus(result.results)).toMatchObject({ itemsSucceeded: 1, itemsSkipped: 1 });
+    });
+
+    describe("merge decision audit", () => {
+      it.each([false, true])("surfaces audit write failures without retrying an executed merge (deferred: %s)", async deferred => {
+        const decision = {
+          success: true,
+          merged: true,
+          sha: "merged123",
+          pull_request_number: 42,
+          pull_request_url: "https://github.com/owner/repo/pull/42",
+          decision_evidence: { head_sha: "a".repeat(40) },
+        };
+        const handler = vi.fn().mockResolvedValue(decision);
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
+          throw new Error("Disk unavailable: private-error-details");
+        });
+        try {
+          const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+          expect(result.results).toHaveLength(1);
+          expect(result.results[0]).toEqual({
+            type: "merge_pull_request",
+            messageIndex: 0,
+            success: true,
+            ...(deferred ? { deferred: false } : {}),
+            result: { ...decision, audit_failed: true, audit_error: "ERR_SYSTEM: Failed to persist merge pull request decision" },
+          });
+          expect(computeSafeOutputsStatus(result.results)).toMatchObject({ status: "success", itemsSucceeded: 1, itemsFailed: 0 });
+          expect(global.core.warning).toHaveBeenCalledWith("ERR_SYSTEM: Failed to persist merge pull request decision");
+          expect(global.core.error).not.toHaveBeenCalled();
+          expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+          expect(append).toHaveBeenCalledTimes(1);
+        } finally {
+          append.mockRestore();
+        }
+      });
+
+      it.each(["merged", "blocked", "staged"])("preserves and persists %s evidence", async mode => {
+        const decision = {
+          success: mode !== "blocked",
+          merged: mode === "merged",
+          staged: mode === "staged",
+          data_trust: "untrusted",
+          error: mode === "blocked" ? "merge_pull_request gate checks failed" : undefined,
+          failure_reasons: mode === "blocked" ? [{ code: "required_approval_missing" }] : [],
+          decision_evidence: { head_sha: "a".repeat(40), base_sha: "b".repeat(40) },
+        };
+        const handler = vi.fn().mockResolvedValue(decision);
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0].result).toEqual(mode === "blocked" ? { failure_reasons: [{ code: "required_approval_missing" }], audit_recorded: true, staged: false } : { ...decision, audit_recorded: true });
+        const entries = fs
+          .readFileSync("/tmp/gh-aw/merge-pull-request-decisions.jsonl", "utf8")
+          .trim()
+          .split("\n")
+          .map(line => JSON.parse(line));
+        expect(entries.at(-1)).toMatchObject({
+          data_trust: "untrusted",
+          merged: mode === "merged",
+          staged: mode === "staged",
+          decision_evidence: { head_sha: "a".repeat(40), base_sha: "b".repeat(40) },
+        });
+      });
+
+      it.each([false, true])("keeps raw blocked evidence out of processing records (deferred: %s)", async deferred => {
+        const decision = {
+          success: false,
+          error: "merge_pull_request gate checks failed",
+          failure_reasons: [{ code: "required_approval_missing", message: "private-pr-metadata", details: { title: "private-pr-metadata" } }],
+          checks_evaluated: ["private-pr-metadata"],
+          decision_evidence: { title: "private-pr-metadata", labels: ["private-pr-metadata"] },
+        };
+        const handler = vi.fn().mockResolvedValue(decision);
+        if (deferred) handler.mockResolvedValueOnce({ deferred: true });
+        const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+        expect(result.results[0]).toMatchObject({
+          success: false,
+          error: decision.error,
+          result: { failure_reasons: [{ code: "required_approval_missing" }], audit_recorded: true },
+        });
+        expect(JSON.stringify(result.results)).not.toContain("private-pr-metadata");
+        expect(handler).toHaveBeenCalledTimes(deferred ? 2 : 1);
+      });
+
+      it("preserves a blocked outcome when its audit cannot be persisted", async () => {
+        const append = vi.spyOn(fs, "appendFileSync").mockImplementation(() => {
+          throw new Error("private-error-details");
+        });
+        try {
+          const handler = vi.fn().mockResolvedValue({
+            success: false,
+            error: "merge_pull_request gate checks failed",
+            failure_reasons: [{ code: "required_approval_missing", details: { title: "private-pr-metadata" } }],
+            decision_evidence: { title: "private-pr-metadata" },
+          });
+          const result = await processMessages(new Map([["merge_pull_request", handler]]), [{ type: "merge_pull_request" }]);
+          expect(result.results[0]).toMatchObject({
+            success: false,
+            error: "merge_pull_request gate checks failed",
+            result: {
+              failure_reasons: [{ code: "required_approval_missing" }],
+              audit_failed: true,
+              audit_error: "ERR_SYSTEM: Failed to persist merge pull request decision",
+            },
+          });
+          expect(JSON.stringify(result.results)).not.toContain("private-");
+          expect(handler).toHaveBeenCalledTimes(1);
+        } finally {
+          append.mockRestore();
+        }
+      });
     });
 
     it("does not apply effects when live PR state cannot be read", async () => {

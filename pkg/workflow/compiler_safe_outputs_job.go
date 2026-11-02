@@ -553,6 +553,7 @@ func hasHandlerManagerTypes(data *WorkflowData) bool {
 		data.SafeOutputs.PushToPullRequestBranch != nil ||
 		data.SafeOutputs.UpdatePullRequests != nil ||
 		data.SafeOutputs.ClosePullRequests != nil ||
+		data.SafeOutputs.MergePullRequest != nil ||
 		data.SafeOutputs.MarkPullRequestAsReadyForReview != nil ||
 		data.SafeOutputs.ApproveWorkflowRun != nil ||
 		data.SafeOutputs.HideComment != nil ||
@@ -972,14 +973,15 @@ func (c *Compiler) calculatePreambleInsertIndex(steps []string, data *WorkflowDa
 // cleanup steps that must come after all safe-output handler steps.
 func (c *Compiler) appendFinalSafeOutputSteps(data *WorkflowData, steps []string, agentArtifactPrefix string) []string {
 	isStaged := c.trialMode || templatableBoolIsTrue(data.SafeOutputs.Staged)
-	if !isStaged {
+	hasMergeDecisions := data.SafeOutputs.MergePullRequest != nil
+	if !isStaged || hasMergeDecisions {
 		claimArtifacts := isWorkQueueWorker(data)
-		if claimArtifacts {
+		if claimArtifacts || hasMergeDecisions {
 			var redaction strings.Builder
 			c.generateTrackedSecretRedactionStep(&redaction, strings.Join(steps, ""), data)
 			steps = append(steps, redaction.String())
 		}
-		steps = append(steps, buildSafeOutputItemsManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts, data)...)
+		steps = append(steps, buildSafeOutputManifestUploadStep(agentArtifactPrefix, c.getActionPin, claimArtifacts, data, !isStaged)...)
 	}
 	steps = append(steps, c.buildTokenBrokerInvalidationStep(data)...)
 	if c.actionMode.IsDev() && usesPatchesAndCheckouts(data.SafeOutputs) {

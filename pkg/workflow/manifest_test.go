@@ -453,11 +453,9 @@ Generate the daily report.`
 		t.Fatalf("Failed to read generated lock file: %v", err)
 	}
 
-	lockContent := string(content)
+	lockContent := promptRenderPlan(t, string(content))
 
-	// The compiled prompt must contain an explicit {{#runtime-import .github/shared/editorial.md}}
-	// BEFORE the {{#runtime-import ...daily-report.md}} line so that the editorial content
-	// is visible in the lock file and imported before the main workflow body is processed.
+	// Fragment imports retain their order before the compiler-selected author source.
 	expectedEditorialMacro := "{{#runtime-import .github/shared/editorial.md}}"
 	if !strings.Contains(lockContent, expectedEditorialMacro) {
 		t.Errorf("Expected %q in compiled lock file prompt, but not found.\nContent excerpt:\n%s",
@@ -465,7 +463,7 @@ Generate the daily report.`
 	}
 
 	// The main workflow file must still be imported after the editorial import
-	expectedMainMacro := "{{#runtime-import .github/workflows/daily-report.md}}"
+	expectedMainMacro := "{{#author-prompt .github/workflows/daily-report.md}}"
 	if !strings.Contains(lockContent, expectedMainMacro) {
 		t.Errorf("Expected %q in compiled lock file prompt, but not found", expectedMainMacro)
 	}

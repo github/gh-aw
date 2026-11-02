@@ -12,6 +12,122 @@ const { currentClaimHandle, claimArtifactPath, claimIdentity, assertClaimIdentit
 
 const CLAIM_DELIVERY_ERRORS_FILE_NAME = "claim-delivery-errors.json";
 const SAFE_OUTPUT_OUTCOMES_FILE_NAME = "safe-output-outcomes.jsonl";
+const MERGE_DECISIONS_FILE_NAME = "merge-pull-request-decisions.jsonl";
+const MERGE_PRODUCER_FAILURE_CODES = new Set(["required_check_producer_missing", "required_check_producer_mismatch", "required_check_producer_ambiguous"]);
+const MERGE_FAILURE_CODES = new Set([
+  ...MERGE_PRODUCER_FAILURE_CODES,
+  "merge_limit_reached",
+  "repository_validation_failed",
+  "pull_request_number_invalid",
+  "target_resolution_failed",
+  "source_branch_invalid",
+  "target_base_branch_invalid",
+  "pr_is_draft",
+  "pr_not_open",
+  "merge_conflicts",
+  "not_mergeable",
+  "missing_required_labels",
+  "title_prefix_mismatch",
+  "branch_not_allowed",
+  "target_branch_protected",
+  "target_branch_default",
+  "target_branch_has_no_open_pr",
+  "required_checks_missing",
+  "required_checks_failing",
+  "pending_reviewers",
+  "blocking_individual_review",
+  "required_approval_missing",
+  "blocking_review_state",
+  "unresolved_review_threads",
+  "merge_not_completed",
+  "merge_operation_error",
+]);
+
+/** @param {unknown} value @param {(value: any) => boolean} valid @param {string} field */
+function mergeAuditIdentity(value, valid, field) {
+  if (value === undefined) return undefined;
+  if ((typeof value === "string" && value.trim() !== value) || !valid(value)) throw new Error(`${ERR_SYSTEM}: Invalid merge decision audit field: ${field}`);
+  return value;
+}
+
+/** @param {unknown} value */
+function isAuditTimestamp(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
+
+/**
+ * @param {Record<string, any>} result
+ * @param {number} messageIndex
+ * @param {string} [filePath]
+ */
+function writeMergePullRequestDecision(result, messageIndex, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), MERGE_DECISIONS_FILE_NAME)) {
+  try {
+    const evidence = result.decision_evidence === undefined ? {} : result.decision_evidence;
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+      throw new Error(`${ERR_SYSTEM}: Invalid merge decision audit evidence`);
+    }
+    const failureReasons = result.failure_reasons === undefined ? [] : result.failure_reasons;
+    if (!Array.isArray(failureReasons) || failureReasons.length > 100 || failureReasons.some(reason => !reason || typeof reason.code !== "string" || !MERGE_FAILURE_CODES.has(reason.code))) {
+      throw new Error(`${ERR_SYSTEM}: Invalid merge decision audit failure codes`);
+    }
+    const isPositiveInteger = value => Number.isSafeInteger(value) && value > 0;
+    const isRunIdentity = value => typeof value === "string" && /^[1-9]\d{0,19}$/.test(value);
+    const isCommitSHA = value => typeof value === "string" && /^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(value);
+    const producerRejections = [];
+    for (const [phase, checks] of [
+      ["initial", evidence.checks],
+      ["revalidation", evidence.revalidation?.checks],
+    ]) {
+      if (checks?.producer_rejections === undefined) continue;
+      if (!Array.isArray(checks.producer_rejections) || checks.producer_rejections.length > 100) {
+        throw new Error(`${ERR_SYSTEM}: Invalid merge decision producer rejections`);
+      }
+      for (const rejection of checks.producer_rejections) {
+        if (!rejection || !MERGE_PRODUCER_FAILURE_CODES.has(rejection.code)) {
+          throw new Error(`${ERR_SYSTEM}: Invalid merge decision producer rejection code`);
+        }
+        producerRejections.push({
+          phase,
+          code: rejection.code,
+          check_run_id: mergeAuditIdentity(rejection.check_run_id, isPositiveInteger, "check_run_id"),
+          expected_app_id: mergeAuditIdentity(rejection.expected_app_id, isPositiveInteger, "expected_app_id"),
+          observed_app_id: mergeAuditIdentity(rejection.observed_app_id, isPositiveInteger, "observed_app_id"),
+        });
+      }
+    }
+    const entry = {
+      timestamp: new Date().toISOString(),
+      data_trust: "untrusted",
+      run_id: mergeAuditIdentity(process.env.GITHUB_RUN_ID, isRunIdentity, "run_id"),
+      run_attempt: mergeAuditIdentity(process.env.GITHUB_RUN_ATTEMPT, isRunIdentity, "run_attempt"),
+      messageIndex: mergeAuditIdentity(messageIndex, value => Number.isSafeInteger(value) && value >= 0, "messageIndex"),
+      success: result.success === true,
+      merged: result.merged === true,
+      staged: result.staged === true,
+      already_merged: result.alreadyMerged === true,
+      failure_codes: failureReasons.map(reason => reason.code),
+      decision_evidence: {
+        repository: mergeAuditIdentity(evidence.repository, value => typeof value === "string" && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?\/[a-zA-Z0-9_.-]{1,100}$/.test(value), "repository"),
+        pull_request_number: mergeAuditIdentity(evidence.pull_request_number, isPositiveInteger, "pull_request_number"),
+        head_sha: mergeAuditIdentity(evidence.head_sha, isCommitSHA, "head_sha"),
+        base_sha: mergeAuditIdentity(evidence.base_sha, isCommitSHA, "base_sha"),
+        evaluated_at: mergeAuditIdentity(evidence.evaluated_at, isAuditTimestamp, "evaluated_at"),
+        revalidated_at: mergeAuditIdentity(evidence.revalidated_at, isAuditTimestamp, "revalidated_at"),
+        check_producer_rejections: producerRejections.length > 0 ? producerRejections : undefined,
+      },
+    };
+    const secretValues = collectArtifactSecretValues();
+    const content = JSON.stringify(redactManifestValue(entry, secretValues));
+    if (Buffer.byteLength(content, "utf8") > 65536) {
+      throw new Error(`${ERR_SYSTEM}: Merge decision identity exceeds the 64 KiB audit limit`);
+    }
+    const destination = scopedArtifactFile(filePath);
+    fs.mkdirSync(nodePath.dirname(destination), { recursive: true });
+    fs.appendFileSync(destination, content + "\n", { mode: 0o600 });
+  } catch (error) {
+    throw new Error(`${ERR_SYSTEM}: Failed to persist merge pull request decision`, { cause: error });
+  }
+}
 
 /** @param {any[]} results @param {boolean} staged @param {string} [filePath] */
 function writeSafeOutputOutcomes(results, staged, filePath = nodePath.join(nodePath.dirname(MANIFEST_FILE_PATH), SAFE_OUTPUT_OUTCOMES_FILE_NAME)) {
@@ -428,4 +544,5 @@ module.exports = {
   writeTemporaryIdMapFile,
   writeSafeOutputErrorReport,
   writeSafeOutputOutcomes,
+  writeMergePullRequestDecision,
 };

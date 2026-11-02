@@ -664,6 +664,7 @@ func TestCompilerIncludesAgentFileViaImportPaths(t *testing.T) {
 	var buf strings.Builder
 	compiler.generatePrompt(&buf, workflowData, false, nil)
 	generated := buf.String()
+	plan := promptRenderPlan(t, generated)
 
 	// The runtime-import macro for the agent file must appear in the generated YAML (exactly once).
 	agentImportMacro := "{{#runtime-import " + agentFilePath + "}}"
@@ -675,9 +676,9 @@ func TestCompilerIncludesAgentFileViaImportPaths(t *testing.T) {
 	}
 
 	// The agent file import must appear before the main workflow markdown import.
-	mainWorkflowMacro := "{{#runtime-import .github/workflows/test.md}}"
-	agentIdx := strings.Index(generated, agentImportMacro)
-	mainIdx := strings.Index(generated, mainWorkflowMacro)
+	mainWorkflowMacro := "{{#author-prompt .github/workflows/test.md}}"
+	agentIdx := strings.Index(plan, agentImportMacro)
+	mainIdx := strings.Index(plan, mainWorkflowMacro)
 	if mainIdx == -1 {
 		t.Errorf("Expected main workflow runtime-import macro %q in generated prompt YAML, got:\n%s", mainWorkflowMacro, generated)
 	} else if agentIdx > mainIdx {

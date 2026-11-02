@@ -218,10 +218,9 @@ End`,
 
 func TestGeneratePromptRemovesXMLComments(t *testing.T) {
 	compiler := NewCompiler()
+	compiler.markdownPath = ".github/workflows/test.md"
 
-	// Note: With the hybrid runtime-import approach, workflows without imports use runtime-import
-	// which means generatePrompt emits a runtime-import macro, not inline content
-	// XML comments are removed at runtime by runtime_import.cjs
+	// Author sources are loaded separately; create_prompt.cjs removes their comments at runtime.
 	data := &WorkflowData{
 		MarkdownContent: `# Workflow Title
 
@@ -234,7 +233,7 @@ that spans multiple lines
 should also be removed -->
 
 Final content.`,
-		ImportedFiles: []string{}, // No imports, so will use runtime-import
+		ImportedFiles: []string{},
 		ImportInputs:  nil,
 	}
 
@@ -243,10 +242,11 @@ Final content.`,
 
 	output := yaml.String()
 
-	// With runtime-import (no imports), the output should contain the runtime-import macro
-	// XML comments will be removed at runtime by runtime_import.cjs
-	if !strings.Contains(output, "{{#runtime-import") {
-		t.Error("Expected runtime-import macro in prompt generation output for workflow without imports")
+	if !strings.Contains(promptRenderPlan(t, output), "{{#author-prompt .github/workflows/test.md}}") {
+		t.Error("Expected main workflow source to load with author capabilities")
+	}
+	if strings.Contains(output, "{{#runtime-import .github/workflows/test.md}}") {
+		t.Error("Main workflow source must not load as a restricted runtime fragment")
 	}
 }
 
@@ -324,7 +324,7 @@ This is a normal-sized workflow that should compile successfully.`
 	}
 
 	// Test that oversized content now compiles successfully with chunking
-	// Note: Add imports to trigger inlining (runtime-import is only used for workflows without imports)
+	// Include a fragment import alongside the oversized author source.
 	longContent := "---\n" +
 		"on:\n" +
 		"  issues:\n" +
@@ -368,7 +368,7 @@ This is a normal-sized workflow that should compile successfully.`
 		t.Fatalf("Failed to read generated normal lock file: %v", err)
 	}
 
-	// Verify that the generated lock file contains multiple prompt steps
+	// Read the lock file for the oversized workflow.
 	lockFile := filepath.Join(tmpDir, "long-workflow.lock.yml")
 	lockContent, err := os.ReadFile(lockFile)
 	if err != nil {
@@ -383,16 +383,20 @@ This is a normal-sized workflow that should compile successfully.`
 		t.Error("Expected 'Create prompt with built-in context' step in generated workflow")
 	}
 
-	// Normal workflow (no imports) should use runtime-import
-	if !strings.Contains(normalLockString, "{{#runtime-import") {
-		t.Error("Normal workflow without imports should use runtime-import")
+	if !strings.Contains(promptRenderPlan(t, normalLockString), "{{#author-prompt normal-workflow.md}}") {
+		t.Error("Normal workflow should load its main source with author capabilities")
+	}
+	if strings.Contains(normalLockString, "{{#runtime-import normal-workflow.md}}") {
+		t.Error("Normal workflow main source must not be loaded as a restricted runtime fragment")
+	}
+	if !strings.Contains(promptRenderPlan(t, lockString), "{{#author-prompt long-workflow.md}}") {
+		t.Error("Long workflow should load its main source with author capabilities")
+	}
+	if !strings.Contains(lockString, "{{#runtime-import shared/dummy.md}}") {
+		t.Error("Long workflow should load its imported fragment with runtime-import restrictions")
 	}
 
-	// Long workflow (with imports) should be inlined into a single consolidated heredoc block.
-	// The compiler groups all user prompt chunks into the same heredoc to minimise the number
-	// of delimiter lines that change in the diff when content changes.
-	// Verify this by checking that the long workflow's run section is larger than the normal
-	// workflow's (which uses a compact runtime-import macro instead of inlining the full text).
+	// The additional fragment import makes the long workflow's render plan larger.
 	if len(lockString) <= len(normalLockString) {
 		t.Errorf("Expected long workflow lock file to be larger than normal (normal=%d bytes, long=%d bytes)", len(normalLockString), len(lockString))
 	}

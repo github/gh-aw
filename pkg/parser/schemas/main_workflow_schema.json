@@ -11156,6 +11156,12 @@
                   "uniqueItems": true,
                   "description": "Exact check-run names that must complete successfully on the evaluated PR head SHA, in addition to branch-policy checks. Empty or omitted adds no workflow-owned CI requirement."
                 },
+                "required-check-apps": {
+                  "type": "object",
+                  "propertyNames": { "minLength": 1 },
+                  "additionalProperties": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                  "description": "Expected GitHub App ID for each named check. Keys must also appear in required-checks. A missing or different producer blocks merging."
+                },
                 "required-approvers": {
                   "type": "array",
                   "items": { "type": "string", "minLength": 1 },
