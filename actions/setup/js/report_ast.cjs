@@ -675,6 +675,8 @@ function renderBlocks(nodes, compactExpiration = false) {
         }
         case "marker":
           return `<!-- ${node.name} -->`;
+        default:
+          throw new Error(`Unsupported report block type: ${/** @type {{type?: string}} */ (node).type}`);
       }
     })
     .map((value, index) =>
@@ -685,7 +687,7 @@ function renderBlocks(nodes, compactExpiration = false) {
             .join("\n")
         : value
     )
-    .map((value, index) => (index ? (compactExpiration && nodes[index].type === "expiration" ? "\n" : "\n\n") : "") + value)
+    .map((value, index) => (index ? (compactExpiration && nodes[index].type === "expiration" && nodes[index - 1].type === "paragraph" ? "\n" : "\n\n") : "") + value)
     .join("");
 }
 

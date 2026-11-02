@@ -26,6 +26,18 @@ describe("report AST", () => {
     expect(renderReport(report([{ type: "alert", kind: "NOTE", children }])).body).toContain("> Attribution\n>\n> - [x] expires");
   });
 
+  it("keeps a blank line between a quoted list and expiration so the expiration round-trips", () => {
+    const children = [{ type: "list", ordered: false, items: [[paragraph("item")]] }, { type: "expiration", expiresAt: "2099-01-02T00:00:00.000Z" }];
+    const quoted = renderReport(report([{ type: "quote", children }])).body;
+    expect(quoted).toContain("> - item\n>\n> - [x] expires");
+    const [quote] = parseReportMarkdown(quoted, { allowMetadata: true });
+    expect(quote.children.map(node => node.type)).toEqual(["list", "expiration"]);
+  });
+
+  it("rejects unknown block types instead of publishing undefined", () => {
+    expect(() => renderReport(report([{ type: "bogus" }]))).toThrow();
+  });
+
   it.each(["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"])("parses and renders %s as a structured GitHub alert", kind => {
     const source = `> [!${kind}]\n> **Guidance:** safe text.`;
     const children = parseReportMarkdown(source, { agentTainted: false });
