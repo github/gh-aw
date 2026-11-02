@@ -167,6 +167,9 @@ func (c *Compiler) parseSharedOrRedirectWorkflow(
 	// Check if "on" field is missing or contains only import-safe shared fields -
 	// if so, treat as a shared/imported workflow.
 	onValue, hasOnField := frontmatterForValidation["on"]
+	if parser.HasConnectorTriggers(frontmatterForValidation) {
+		return nil, false, nil
+	}
 	if hasOnField && !parser.IsImportSafeSharedWorkflowOn(onValue) {
 		return nil, false, nil
 	}

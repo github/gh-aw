@@ -5,8 +5,57 @@
   "description": "JSON Schema for validating agentic workflow frontmatter configuration",
   "version": "1.0.0",
   "type": "object",
-  "required": ["on"],
+  "anyOf": [
+    { "required": ["on"] },
+    {
+      "required": ["connectors"],
+      "properties": {
+        "connectors": {
+          "not": { "additionalProperties": { "not": { "required": ["on"] } } }
+        }
+      }
+    }
+  ],
   "properties": {
+    "connectors": {
+      "description": "Experimental. Declare each third-party service once, with its external definition, connection and independent on, tools, context and safe-outputs selections. Omitted parts are disabled.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 32,
+      "propertyNames": { "$ref": "#/$defs/connectorName" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["definition", "connection"],
+        "additionalProperties": false,
+        "properties": {
+          "definition": { "type": "string", "minLength": 1 },
+          "connection": { "type": "string", "minLength": 1 },
+          "on": {
+            "$ref": "#/$defs/connectorCapabilities",
+            "description": "Select declared native triggers. Activation fails closed until an approved receiver is available."
+          },
+          "tools": {
+            "$ref": "#/$defs/connectorCapabilities",
+            "description": "Select bounded read tools or actual remote MCP registrations from the service definition."
+          },
+          "safe-outputs": {
+            "$ref": "#/$defs/connectorCapabilities",
+            "description": "Select typed effects staged by the agent and executed with separate write credentials."
+          },
+          "context": {
+            "description": "Bounded context recipes fetched before agent execution with separate context credentials.",
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "$ref": "#/$defs/connectorName" },
+            "additionalProperties": {
+              "description": "Literal input arguments for this context recipe. Actions expressions are not supported.",
+              "type": "object",
+              "additionalProperties": { "type": ["string", "number", "boolean"] }
+            }
+          }
+        }
+      }
+    },
     "token-broker": {
       "description": "Experimental. Select independent Copilot capabilities to authenticate through the OIDC token broker. Using this field emits a compile-time warning. Configuration and behavior may change without deprecation.",
       "type": "object",
@@ -14805,6 +14854,16 @@
     }
   ],
   "$defs": {
+    "connectorName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "connectorCapabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/connectorName" }
+    },
     "webhookProviderIssueTypes": {
       "type": "array",
       "minItems": 1,
