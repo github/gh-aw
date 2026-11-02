@@ -80,7 +80,7 @@ func run(pass *analysis.Pass) (any, error) {
 // sort.SliceStable (even under an import alias) and returns the selector
 // expression for the call site.
 func matchSortCall(pass *analysis.Pass, call *ast.CallExpr) (*ast.SelectorExpr, bool) {
-	sel, ok := call.Fun.(*ast.SelectorExpr)
+	sel, ok := astutil.UnwrapParenExpr(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return nil, false
 	}

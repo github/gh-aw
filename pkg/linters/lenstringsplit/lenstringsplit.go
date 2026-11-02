@@ -51,7 +51,7 @@ func run(pass *analysis.Pass) (any, error) {
 		if len(outer.Args) != 1 {
 			return
 		}
-		inner, ok := outer.Args[0].(*ast.CallExpr)
+		inner, ok := astutil.UnwrapParenExpr(outer.Args[0]).(*ast.CallExpr)
 		if !ok {
 			return
 		}

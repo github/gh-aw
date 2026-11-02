@@ -66,3 +66,8 @@ func countSplitN(s string) int {
 func countSplitAfter(s string) int {
 	return len(strings.SplitAfter(s, ","))
 }
+
+// flagged: a parenthesized strings.Split call must not escape detection.
+func countParenSplit(s string) int {
+	return len((strings.Split(s, ","))) // want `len\(strings\.Split\(\.\.\.`
+}
