@@ -90,10 +90,10 @@ function validateDecisionResponse(response, questions) {
  * No SDK, Actions globals, agent engine, automatic retries, or credential discovery.
  * Refusals are returned to the caller; transport and protocol failures throw.
  *
- * @param {{baseURL: string, apiKey?: string, model: string, input: string | object[], questions: DecisionQuestion[], timeoutMs?: number, fetchImpl?: typeof fetch}} options
+ * @param {{baseURL: string, apiKey?: string, model: string, input: string | object[], questions: DecisionQuestion[], timeoutMs?: number, fetchImpl?: typeof fetch, onUsage?: (usage: unknown, model: string) => void}} options
  * @returns {Promise<DecisionResponse>}
  */
-async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeoutMs = 120000, fetchImpl = fetch }) {
+async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeoutMs = 120000, fetchImpl = fetch, onUsage }) {
   validateQuestions(questions);
   if (typeof model !== "string" || !model.trim()) throw new Error("Decisions requires a model");
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Decisions timeout must be positive");
@@ -111,7 +111,12 @@ async function invokeDecisions({ baseURL, apiKey, model, input, questions, timeo
   });
   // Do not include provider bodies: they may echo credentials or untrusted evidence.
   if (!response.ok) throw new Error(`Decisions request failed (HTTP ${response.status})`);
-  return validateDecisionResponse(await response.json(), questions);
+  const result = await response.json();
+  // Account for billed requests even if the answer batch fails validation.
+  if (onUsage && result && typeof result === "object") {
+    onUsage("usage" in result ? result.usage : undefined, "model" in result && typeof result.model === "string" ? result.model : model);
+  }
+  return validateDecisionResponse(result, questions);
 }
 
 module.exports = { invokeDecisions, validateDecisionResponse, validateQuestions, MAX_DECISION_QUESTIONS };

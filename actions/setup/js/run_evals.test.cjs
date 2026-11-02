@@ -3,7 +3,9 @@ import fs from "fs";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { executeMain, parseMain, summarizeUsageMain, classifyJudgeExecution } = require("./run_evals.cjs");
+const { executeMain, parseMain, summarizeUsageMain, recordUsage, classifyJudgeExecution } = require("./run_evals.cjs");
+const { findModelPricing } = require("./model_costs.cjs");
+const { sumAICFromUsageJSONLFiles } = require("./daily_aic_workflow_helpers.cjs");
 const dir = "/tmp/gh-aw/evals";
 const output = "/tmp/gh-aw/evals.jsonl";
 const status = "/tmp/gh-aw/evals_status.json";
@@ -23,7 +25,9 @@ describe("Decisions BinEval harness", () => {
     for (const file of files) fs.rmSync(file, { force: true });
     vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
     vi.stubEnv("GH_AW_EVALS_MODEL", "gpt-6-luna");
-    vi.stubEnv("GH_AW_DECISIONS_BASE_URL", "http://api-proxy:10002");
+    vi.stubEnv("GH_AW_DECISIONS_BASE_URL", "https://api.githubcopilot.com");
+    vi.stubEnv("GH_AW_DECISIONS_API_KEY", "test-token");
+    vi.stubEnv("GH_AW_DECISIONS_PROVIDER", "github-copilot");
     vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "success");
     vi.stubEnv("GITHUB_RUN_ID", "123");
     vi.stubEnv("GITHUB_RUN_ATTEMPT", "1");
@@ -33,6 +37,7 @@ describe("Decisions BinEval harness", () => {
         ok: true,
         json: async () => ({
           model: "gpt-6-luna",
+          usage: { input_tokens: 1000, output_tokens: 100, input_tokens_details: { cached_tokens: 200, cache_write_tokens: 50 }, output_tokens_details: { reasoning_tokens: 20 } },
           answers: [
             { type: "choice", name: "tests", choice: "NO" },
             { type: "choice", name: "builds", choice: "YES" },
@@ -52,7 +57,8 @@ describe("Decisions BinEval harness", () => {
     await executeMain();
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, request] = fetch.mock.calls[0];
-    expect(url).toBe("http://api-proxy:10002/decisions");
+    expect(url).toBe("https://api.githubcopilot.com/decisions");
+    expect(request.headers.Authorization).toBe("Bearer test-token");
     const body = JSON.parse(request.body);
     expect(body.model).toBe("gpt-6-luna");
     expect(body.questions).toHaveLength(2);
@@ -139,11 +145,11 @@ describe("Decisions BinEval harness", () => {
     expect(classifyJudgeExecution("skipped", null).reasonCode).toBe("judge_not_started");
   });
 
-  it.each([0, 0.123456])("publishes AWF-reported credits with full precision (%s)", async credits => {
-    fs.writeFileSync(usagePath, JSON.stringify({ model: "gpt-6-luna", input_tokens: 10, output_tokens: 2, ai_credits_this_response: credits, ai_credits_total: credits }) + "\n");
+  it.each([0, 0.123456])("publishes response-derived credits with full precision (%s)", async credits => {
+    fs.writeFileSync(usagePath, JSON.stringify({ ai_credits: credits }) + "\n");
     await summarizeUsageMain();
     expect(core.setOutput).toHaveBeenCalledWith("aic", String(credits));
-    expect(core.summary.addDetails).toHaveBeenCalledWith("Evals Token Usage", expect.stringContaining("AI Credits"));
+    expect(core.summary.addDetails).toHaveBeenCalledWith("Evals Token Usage", expect.stringContaining(`AIC cost: ${credits}`));
     expect(core.summary.write).toHaveBeenCalledTimes(1);
   });
 
@@ -151,5 +157,82 @@ describe("Decisions BinEval harness", () => {
     await summarizeUsageMain();
     expect(core.setOutput).not.toHaveBeenCalled();
     expect(core.info).toHaveBeenCalledWith("No evals token usage data found");
+  });
+
+  it("collects cache-aware AIC and USD costs from the actual response for daily accounting", async () => {
+    await executeMain();
+    const usage = JSON.parse(fs.readFileSync(usagePath, "utf8"));
+    const pricing = findModelPricing("github-copilot", "gpt-6-luna");
+    expect(pricing).not.toBeNull();
+    const cost = 750 * pricing.input + 200 * pricing.cache_read + 50 * (pricing.cache_write || pricing.input) + 80 * pricing.output + 20 * (pricing.reasoning || pricing.output);
+    expect(usage.cost_usd).toBeCloseTo(cost, 12);
+    expect(usage.ai_credits).toBeCloseTo(cost / 0.01, 12);
+    expect(usage).toMatchObject({ input_tokens: 1000, output_tokens: 80, cache_read_tokens: 200, cache_write_tokens: 50, reasoning_tokens: 20, input_tokens_include_cache: true });
+    expect(sumAICFromUsageJSONLFiles([usagePath], { strict: true })).toBeCloseTo(usage.ai_credits, 12);
+    await summarizeUsageMain();
+    expect(core.setOutput).toHaveBeenCalledWith("aic", String(usage.ai_credits));
+    expect(JSON.parse(fs.readFileSync(`${dir}/execution.json`, "utf8"))).toMatchObject({ state: "started", run_id: "123", run_attempt: "1" });
+  });
+
+  it("preserves token usage without inventing costs for unknown pricing", async () => {
+    recordUsage({ input_tokens: 10, output_tokens: 2 }, "unknown-decisions-model", "openai");
+    const usage = JSON.parse(fs.readFileSync(usagePath, "utf8"));
+    expect(usage.input_tokens).toBe(10);
+    expect(usage).not.toHaveProperty("ai_credits");
+    await summarizeUsageMain();
+    expect(core.setOutput).not.toHaveBeenCalled();
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("No pricing"));
+  });
+
+  it("reports missing response usage without inventing zero cost", () => {
+    recordUsage(undefined, "gpt-6-luna", "github-copilot");
+    expect(fs.existsSync(usagePath)).toBe(false);
+    expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("no token usage"));
+  });
+
+  it("rejects malformed or contradictory usage", () => {
+    expect(() => recordUsage({ input_tokens: -1, output_tokens: 2 }, "gpt-6-luna", "openai")).toThrow("Invalid Decisions usage");
+    expect(() => recordUsage({ input_tokens: 1, output_tokens: 2, output_tokens_details: { reasoning_tokens: 3 } }, "gpt-6-luna", "openai")).toThrow("exceed token totals");
+    expect(fs.existsSync(usagePath)).toBe(false);
+  });
+
+  it("clears stale costs before a failed request", async () => {
+    fs.writeFileSync(usagePath, '{"ai_credits":42}');
+    fetch.mockResolvedValue({ ok: false, status: 500 });
+    await expect(executeMain()).rejects.toThrow("HTTP 500");
+    expect(fs.existsSync(usagePath)).toBe(false);
+  });
+
+  it("retains billed usage even if the answer batch is malformed", async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ model: "gpt-6-luna", usage: { input_tokens: 100, output_tokens: 2 }, answers: [] }),
+    });
+    await expect(executeMain()).rejects.toThrow("one answer per question");
+    const usage = JSON.parse(fs.readFileSync(usagePath, "utf8"));
+    expect(usage.ai_credits).toBeGreaterThan(0);
+    await summarizeUsageMain();
+    expect(core.setOutput).toHaveBeenCalledWith("aic", String(usage.ai_credits));
+    expect(fs.existsSync(`${dir}/decisions.json`)).toBe(false);
+  });
+
+  it("records a known zero-token response as zero cost", async () => {
+    recordUsage({ input_tokens: 0, output_tokens: 0 }, "gpt-6-luna", "github-copilot");
+    await summarizeUsageMain();
+    expect(core.setOutput).toHaveBeenCalledWith("aic", "0");
+    expect(sumAICFromUsageJSONLFiles([usagePath], { strict: true })).toBe(0);
+  });
+
+  it("fails explicitly before sending requests when credentials are absent", async () => {
+    vi.stubEnv("GH_AW_DECISIONS_API_KEY", "");
+    await expect(executeMain()).rejects.toThrow("GH_AW_DECISIONS_API_KEY is not set");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["evals", "openai/evals", "copilot/evals"])("resolves the Decisions alias without a proxy (%s)", async model => {
+    vi.stubEnv("GH_AW_EVALS_MODEL", model);
+    await executeMain();
+    expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe("gpt-6-luna");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

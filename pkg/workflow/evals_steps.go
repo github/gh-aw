@@ -11,7 +11,6 @@ import (
 
 const (
 	evalsDir              = "/tmp/gh-aw/evals"
-	evalsLogPath          = evalsDir + "/evals.log"
 	evalsResultsPath      = "/tmp/gh-aw/" + string(constants.EvalsResultFilename)
 	evalsStatusPath       = "/tmp/gh-aw/" + string(constants.EvalsStatusFilename)
 	defaultDecisionsModel = "gpt-6-luna"
@@ -23,7 +22,6 @@ func (c *Compiler) buildEvalsJobSteps(data *WorkflowData) []string {
 		return nil
 	}
 	steps := generateComponentExecutionEvidenceStep("evals", "not_started", evalsExecutionEvidencePath, "always()")
-	steps = append(steps, c.buildCleanFirewallDirsStep()...)
 	steps = append(steps, buildPrepareEvalsFilesStep()...)
 	steps = append(steps, c.buildEvalsDecisionSteps(data)...)
 	steps = append(steps, c.buildParseEvalsResultsStep(data)...)
@@ -41,103 +39,61 @@ func buildPrepareEvalsFilesStep() []string {
 	}
 }
 
-// Only the selected Decisions provider determines credentials and proxy topology.
+// Only the selected Decisions provider determines credentials.
 // The main agent's command, model, harness, tools, and routing are not inherited.
 func (c *Compiler) buildEvalsDecisionData(data *WorkflowData) *WorkflowData {
 	providerID := c.getEvalsProviderID(data)
 	result := &WorkflowData{
-		AI:                 providerID,
-		Model:              c.resolveEvalsExecutionModel(data),
-		EngineConfig:       &EngineConfig{ID: providerID},
-		Features:           data.Features,
-		Permissions:        data.Permissions,
-		CachedPermissions:  data.CachedPermissions,
-		RunnerConfig:       data.RunnerConfig,
-		ModelMappings:      data.ModelMappings,
-		ModelCosts:         data.ModelCosts,
-		CompiledVersion:    data.CompiledVersion,
-		DryRun:             data.DryRun,
-		IsEvalsRun:         true,
-		AdmissionEnabled:   admissionBudgetOutputsEnabled(data),
-		TimeoutMinutes:     data.TimeoutMinutes,
-		NetworkPermissions: &NetworkPermissions{},
-		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{
-			Type:            SandboxTypeAWF,
-			ChecksumsSHA256: getAWFChecksumsSHA256(data),
-			Targets:         cloneAgentAPITargets(data),
-		}},
+		AI:                providerID,
+		Model:             c.resolveEvalsExecutionModel(data),
+		EngineConfig:      &EngineConfig{ID: providerID},
+		Permissions:       data.Permissions,
+		CachedPermissions: data.CachedPermissions,
+		IsEvalsRun:        true,
 	}
 	inheritTokenBrokerConfig(data, result)
-	if config := getFirewallConfig(data); config != nil {
-		copy := *config
-		result.NetworkPermissions.Firewall = &copy
-		result.SandboxConfig.Agent.Version = copy.Version
-	}
-	if isOTLPEnabled(data) {
-		result.ExcludedEnv = append(result.ExcludedEnv, otlpSandboxExcludedEnvVarNames...)
-	}
 	return result
 }
 
 func (c *Compiler) buildEvalsDecisionSteps(data *WorkflowData) []string {
 	evalsData := c.buildEvalsDecisionData(data)
-	var steps strings.Builder
-	if isArcDindTopology(data) {
-		c.generateArcDindToolCacheRedirectStep(&steps)
-	}
-	c.emitRuntimeSetupSteps(&steps, []GitHubActionStep{generateNodeJsSetupStepForWorkflow(data)}, isArcDindTopology(data))
-	version := string(constants.DefaultFirewallVersion)
-	if config := getFirewallConfig(evalsData); config != nil && config.Version != "" {
-		version = config.Version
-	}
-	for _, line := range generateAWFInstallationStep(version, getAgentConfig(evalsData)) {
-		steps.WriteString(line + "\n")
-	}
-	for _, line := range c.buildTokenBrokerRequestStep(evalsData, "") {
-		steps.WriteString(line)
-	}
-	backend := UniversalLLMBackendCopilot
-	if evalsData.AI == "codex" {
-		backend = UniversalLLMBackendCodex
-	}
-	profile := getUniversalLLMBackendProfile(backend, hasCopilotRequestsWritePermission(evalsData) && !usesTokenBrokerInference(evalsData))
-	env := profile.env
-	env["GH_AW_DECISIONS_BASE_URL"] = llmGatewayBaseURL(profile.gatewayPort, evalsData)
 	var questions []EvalDefinition
 	if data.Evals != nil {
 		questions = data.Evals.Questions
 	}
-	env["GH_AW_EVALS_QUESTIONS"] = "'" + escapeYAMLSingleQuoted(marshalEvalsQuestions(questions)) + "'"
-	model := c.resolveEvalsExecutionModel(data)
-	env["GH_AW_EVALS_MODEL"] = fmt.Sprintf("%q", model)
-	if containsExpression(model) {
-		env["GH_AW_EVALS_MODEL"] = model
-		env[constants.EnvVarModelFallback] = buildEvalsModelFallbackExpression()
+	steps := c.buildTokenBrokerRequestStep(evalsData, "")
+	baseURL := "https://api.githubcopilot.com"
+	apiKey := "${{ secrets.COPILOT_GITHUB_TOKEN }}"
+	provider := "github-copilot"
+	if evalsData.AI == "codex" {
+		baseURL = "https://api.openai.com/v1"
+		apiKey = "${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}"
+		provider = "openai"
+	} else if usesTokenBrokerInference(evalsData) {
+		apiKey = tokenBrokerCopilotRequestOutput
+	} else if hasCopilotRequestsWritePermission(evalsData) {
+		apiKey = "${{ github.token }}"
 	}
-	applyDefaultMaxAICreditsEnvToMap(env, evalsData)
-	env["GH_AW_PHASE"] = "evals"
-	if usesTokenBrokerInference(evalsData) {
-		env["COPILOT_GITHUB_TOKEN"] = tokenBrokerCopilotRequestOutput
-	}
-	excluded := ComputeAWFExcludeEnvVarNames(evalsData, profile.coreSecretNames)
-	command := BuildAWFCommand(AWFCommandConfig{
-		EngineName:                 evalsData.AI,
-		EngineCommand:              nodeRuntimeResolutionCommand + ` "` + SetupActionDestinationShell + `/run_evals.cjs"`,
-		LogFile:                    evalsLogPath,
-		WorkflowData:               evalsData,
-		ExcludeEnvVarNames:         excluded,
-		ResolveMaxAICreditsFromEnv: true,
-	})
-	step := FormatStepWithCommandAndEnv([]string{
-		"      - name: Execute BinEval Decisions",
-		"        id: evals_decisions_execution",
-		"        continue-on-error: true",
-	}, command, env)
-	step = injectComponentExecutionStarted(step, "evals", evalsExecutionEvidencePath)
-	for _, line := range step {
-		steps.WriteString(line + "\n")
-	}
-	return []string{steps.String()}
+	steps = append(steps,
+		"      - name: Execute BinEval Decisions\n",
+		"        id: evals_decisions_execution\n",
+		"        continue-on-error: true\n",
+		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
+		"        env:\n",
+		"          GH_AW_DECISIONS_BASE_URL: "+baseURL+"\n",
+		"          GH_AW_DECISIONS_API_KEY: "+apiKey+"\n",
+		"          GH_AW_DECISIONS_PROVIDER: "+provider+"\n",
+		fmt.Sprintf("          GH_AW_EVALS_QUESTIONS: '%s'\n", escapeYAMLSingleQuoted(marshalEvalsQuestions(questions))),
+	)
+	steps = appendEvalsModelEnvLines(steps, c.resolveEvalsExecutionModel(data))
+	return append(steps,
+		"        with:\n",
+		"          script: |\n",
+		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
+		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
+		"            const { executeMain } = require('"+SetupActionDestination+"/run_evals.cjs');\n",
+		"            await executeMain();\n",
+	)
 }
 
 func (c *Compiler) buildParseEvalsResultsStep(data *WorkflowData) []string {
@@ -214,26 +170,7 @@ func (c *Compiler) buildRenderEvalsSummaryStep(data *WorkflowData) []string {
 
 func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 	name := artifactPrefixExprForDownstreamJob(data) + constants.EvalsArtifactName.String()
-	proxyLogsDir := constants.AWFProxyLogsDir.String()
-	auditDir := constants.AWFAuditDir.String()
-	if isArcDindTopology(data) {
-		proxyLogsDir = rewriteArcDindPath(proxyLogsDir)
-		auditDir = rewriteArcDindPath(auditDir)
-	}
 	steps := []string{
-		"      - name: Collect evals token usage\n",
-		"        if: always()\n",
-		"        run: |\n",
-		"          if [ -n \"${AWF_TOKEN_USAGE_LOG:-}\" ] && [ -f \"$AWF_TOKEN_USAGE_LOG\" ]; then\n",
-		"            cp \"$AWF_TOKEN_USAGE_LOG\" /tmp/gh-aw/evals_token_usage.jsonl\n",
-		"          else\n",
-		fmt.Sprintf("            for root in \"%s\" \"%s\"; do\n", auditDir, proxyLogsDir),
-		"              source=\"$root/api-proxy-logs/token-usage.jsonl\"\n",
-		"              if [ -s \"$source\" ]; then cp \"$source\" /tmp/gh-aw/evals_token_usage.jsonl; fi\n",
-		"            done\n",
-		"          fi\n",
-	}
-	steps = append(steps,
 		"      - name: Parse evals token usage for step summary\n",
 		"        id: parse_evals_token_usage\n",
 		"        if: always()\n",
@@ -241,11 +178,11 @@ func (c *Compiler) buildUploadEvalsArtifactStep(data *WorkflowData) []string {
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", data)),
 		"        with:\n",
 		"          script: |\n",
-		"            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n",
+		"            const { setupGlobals } = require('" + SetupActionDestination + "/setup_globals.cjs');\n",
 		"            setupGlobals(core, github, context, exec, io, getOctokit);\n",
-		"            const { summarizeUsageMain } = require('"+SetupActionDestination+"/run_evals.cjs');\n",
+		"            const { summarizeUsageMain } = require('" + SetupActionDestination + "/run_evals.cjs');\n",
 		"            await summarizeUsageMain();\n",
-	)
+	}
 	return append(steps,
 		"      - name: Upload evals results\n",
 		"        if: always() && steps.redact_evals_results.outcome == 'success'\n",

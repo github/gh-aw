@@ -152,9 +152,11 @@ func TestReleaseChecksumPinsPropagateAcrossJobs(t *testing.T) {
 		assert.Contains(t, content, "--checksums-sha256 "+testEngineChecksumsPin, name)
 		assert.NotContains(t, content, "--prefer-toolcache", name)
 	}
-	for name, content := range map[string]string{"main": main.String(), "detection": awfDetection, "evals": evals} {
+	for name, content := range map[string]string{"main": main.String(), "detection": awfDetection} {
 		assert.Contains(t, content, "--checksums-sha256 "+testAWFChecksumsPin, name)
 	}
+	assert.NotContains(t, evals, "install_awf")
+	assert.NotContains(t, evals, "--checksums-sha256")
 	assert.Equal(t, testEngineChecksumsPin, data.EngineConfig.ChecksumsSHA256)
 	assert.Equal(t, testAWFChecksumsPin, data.SandboxConfig.Agent.ChecksumsSHA256)
 }

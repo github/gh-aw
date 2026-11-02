@@ -9,7 +9,11 @@ Use `evals:` with `safe-outputs` to judge whether an agent achieved its intended
 The evals job sends all questions and shared agent output in one OpenAI-compatible
 `POST /decisions` request. Each question uses `choice` with `YES`, `NO`, and
 `UNKNOWN` (insufficient evidence or not applicable). The job does not install or
-run an agentic engine. AWF still provides credential isolation and usage accounting.
+run an agentic engine or AWF. A trusted JavaScript step calls the provider directly
+with its credential. Response token usage (including cache and reasoning tokens)
+is saved with catalog-derived AIC and USD costs for summaries and daily accounting.
+Missing usage or pricing is reported as unavailable, not zero. AWF per-request
+credit limits and sandbox target overrides do not apply to evals.
 Request failures produce a `not_evaluated` marker, not `UNKNOWN` question results.
 
 ---
