@@ -793,7 +793,7 @@
           "minLength": 1,
           "description": "Simple trigger event name (e.g., 'push', 'issues', 'pull_request', 'discussion', 'schedule', 'fork', 'create', 'delete', 'public', 'watch', 'workflow_call'), schedule shorthand (e.g., 'daily', 'weekly'), or slash command shorthand (e.g., '/my-bot' expands to slash_command + workflow_dispatch)",
           "not": {
-            "enum": ["gateway-dispatch", "orgs", "projects-items", "code-scanning-alert", "dependabot-alerts", "security-alerts", "jira-issue", "linear-issue", "azure-devops-issue", "slash-command", "label-command"]
+            "enum": ["gateway-dispatch", "orgs", "projects-items", "code-scanning-alert", "dependabot-alerts", "security-alerts", "jira-issue", "azure-devops-issue", "slash-command", "label-command"]
           },
           "examples": ["push", "issues", "workflow_dispatch", "daily", "/my-bot"]
         },
@@ -843,7 +843,6 @@
             "slash-command": false,
             "label-command": false,
             "jira-issue": false,
-            "linear-issue": false,
             "azure-devops-issue": false,
             "gateway-dispatch": {
               "type": "object",
@@ -854,7 +853,6 @@
                 { "required": ["code-scanning-alert"] },
                 { "required": ["dependabot-alerts"] },
                 { "required": ["jira-issue"] },
-                { "required": ["linear-issue"] },
                 { "required": ["azure-devops-issue"] },
                 { "required": ["slash-command"] },
                 { "required": ["label-command"] },
@@ -945,10 +943,6 @@
                 "jira-issue": {
                   "$ref": "#/$defs/webhookJiraIssue",
                   "description": "Experimental. Jira Cloud issue lifecycle and label activities normalized from native issue webhooks. Requires nested on.gateway-dispatch, the repository gateway-dispatch opt-in, and an approved provider bridge; does not register webhooks or grant source access."
-                },
-                "linear-issue": {
-                  "$ref": "#/$defs/webhookLinearIssue",
-                  "description": "Experimental. Linear Issue create/update/remove webhooks with payload-derived lifecycle and label activities. Requires nested on.gateway-dispatch, the repository gateway-dispatch opt-in, and an approved provider bridge; does not register webhooks or grant source access."
                 },
                 "azure-devops-issue": {
                   "$ref": "#/$defs/webhookAzureDevOpsIssue",
@@ -5327,59 +5321,6 @@
             false
           ]
         },
-        "linear": {
-          "description": "Linear tools provided by Linear's official hosted MCP server",
-          "oneOf": [
-            {
-              "type": "null",
-              "description": "Enable Linear using the well-known LINEAR_API_KEY secret"
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "token": {
-                  "type": "string",
-                  "description": "Optional Linear API key or OAuth access token secret reference. Defaults to ${{ secrets.LINEAR_API_KEY }}.",
-                  "pattern": "^\\$\\{\\{\\s*secrets\\.[A-Z_][A-Z0-9_]*\\s*\\}\\}$"
-                },
-                "toolsets": {
-                  "description": "Linear MCP toolset name(s) to enable. Toolsets are expanded to gateway-enforced allowed tools.",
-                  "oneOf": [
-                    {
-                      "$ref": "#/$defs/linear_toolset_name"
-                    },
-                    {
-                      "type": "array",
-                      "description": "Array of Linear MCP toolset names",
-                      "items": {
-                        "$ref": "#/$defs/linear_toolset_name"
-                      },
-                      "minItems": 1,
-                      "uniqueItems": true,
-                      "examples": [["issues", "projects"]]
-                    }
-                  ]
-                },
-                "allowed": {
-                  "type": "array",
-                  "description": "List of allowed Linear MCP tool names or wildcard patterns. When toolsets are set, every pattern must match a tool in those toolsets.",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "minItems": 1,
-                  "uniqueItems": true
-                },
-                "required": {
-                  "type": "boolean",
-                  "description": "Whether failure to connect to Linear should fail MCP gateway startup. Defaults to true.",
-                  "default": true
-                }
-              }
-            }
-          ]
-        },
         "jira": {
           "description": "Jira tools provided by Atlassian's remote Rovo MCP service. This integration supports non-interactive CI/CD authentication only.",
           "oneOf": [
@@ -8519,98 +8460,6 @@
               "description": "Enable Jira label additions with default configuration."
             }
           ]
-        },
-        "linear-create-issue": {
-          "type": "object",
-          "description": "Experimental. Create Linear issues through the isolated safe_outputs job.",
-          "properties": {
-            "team-id": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Optional trusted Linear team model UUID, key, name, or GitHub Actions expression. Defaults to LINEAR_TEAM_ID."
-            },
-            "project-id": {
-              "type": "string",
-              "pattern": "^(?:[0-9a-fA-F]{12}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
-              "description": "Optional trusted Linear project identifier from a project URL or model UUID."
-            },
-            "max": {
-              "oneOf": [
-                { "type": "integer", "minimum": 1, "maximum": 100 },
-                { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
-              ],
-              "description": "Maximum number of Linear issues to create (default: 1)."
-            },
-            "staged": { "$ref": "#/$defs/templatable_boolean" },
-            "samples": {
-              "oneOf": [
-                { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-                { "type": "object", "additionalProperties": true }
-              ]
-            }
-          },
-          "additionalProperties": false
-        },
-        "linear-add-comment": {
-          "type": "object",
-          "description": "Experimental. Add comments to one trusted Linear issue through the isolated safe_outputs job.",
-          "properties": {
-            "target": {
-              "$ref": "#/$defs/linear_issue_identifier",
-              "description": "Trusted Linear issue UUID or shorthand identifier such as ENG-123."
-            },
-            "max": {
-              "oneOf": [
-                { "type": "integer", "minimum": 1, "maximum": 100 },
-                { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
-              ],
-              "description": "Maximum number of Linear comments to add (default: 1)."
-            },
-            "staged": { "$ref": "#/$defs/templatable_boolean" },
-            "samples": {
-              "oneOf": [
-                { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-                { "type": "object", "additionalProperties": true }
-              ]
-            }
-          },
-          "required": ["target"],
-          "additionalProperties": false
-        },
-        "linear-update-issue": {
-          "type": "object",
-          "description": "Experimental. Update explicitly enabled fields on one trusted Linear issue through the isolated safe_outputs job.",
-          "properties": {
-            "target": {
-              "$ref": "#/$defs/linear_issue_identifier",
-              "description": "Trusted Linear issue UUID or shorthand identifier such as ENG-123."
-            },
-            "title": {
-              "const": true,
-              "description": "Allow the agent to update the Linear issue title."
-            },
-            "body": {
-              "const": true,
-              "description": "Allow the agent to replace the Linear issue description."
-            },
-            "max": {
-              "oneOf": [
-                { "type": "integer", "minimum": 1, "maximum": 100 },
-                { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
-              ],
-              "description": "Maximum number of updates to apply (default: 1)."
-            },
-            "staged": { "$ref": "#/$defs/templatable_boolean" },
-            "samples": {
-              "oneOf": [
-                { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-                { "type": "object", "additionalProperties": true }
-              ]
-            }
-          },
-          "required": ["target"],
-          "anyOf": [{ "required": ["title"] }, { "required": ["body"] }],
-          "additionalProperties": false
         },
         "add-comment": {
           "oneOf": [
@@ -12705,11 +12554,6 @@
           "description": "GitHub token to use for safe output jobs. Typically a secret reference like ${{ secrets.GITHUB_TOKEN }} or ${{ secrets.CUSTOM_PAT }}",
           "examples": ["${{ secrets.GITHUB_TOKEN }}", "${{ secrets.CUSTOM_PAT }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"]
         },
-        "linear-token": {
-          "$ref": "#/$defs/linear_token",
-          "description": "Linear personal API key expression used only by the trusted safe_outputs job.",
-          "examples": ["${{ secrets.LINEAR_API_KEY }}"]
-        },
         "github-app": {
           "$ref": "#/$defs/github_app",
           "description": "GitHub App credentials for minting installation access tokens. When configured, a token will be generated using the app credentials and used for all safe output operations."
@@ -14946,25 +14790,6 @@
         "sender": { "$ref": "#/$defs/webhookProviderSelectorValues" }
       }
     },
-    "webhookLinearIssue": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["organization-id"],
-      "properties": {
-        "types": { "$ref": "#/$defs/webhookProviderIssueTypes" },
-        "organization-id": {
-          "$ref": "#/$defs/webhookStringValues",
-          "description": "Experimental. Required literal Linear organization ID or nonempty list of IDs; sibling of types."
-        },
-        "team-id": {
-          "$ref": "#/$defs/webhookStringValues",
-          "description": "Experimental. Optional literal Linear team model ID or nonempty list of IDs. Matches delivered data.teamId without API resolution."
-        },
-        "issue_id": { "$ref": "#/$defs/webhookProviderSelectorValues" },
-        "labels": { "$ref": "#/$defs/webhookProviderSelectorValues" },
-        "sender": { "$ref": "#/$defs/webhookProviderSelectorValues" }
-      }
-    },
     "webhookAzureDevOpsIssue": {
       "type": "object",
       "additionalProperties": false,
@@ -15535,11 +15360,6 @@
         "stargazers",
         "users"
       ]
-    },
-    "linear_toolset_name": {
-      "type": "string",
-      "description": "A Linear MCP toolset name that enables a related group of read-only Linear tools.",
-      "enum": ["all", "attachments", "comments", "customers", "cycles", "diffs", "documentation", "documents", "initiatives", "issues", "milestones", "projects", "status_updates", "teams", "users"]
     },
     "non_empty_string": {
       "type": "string",
@@ -17055,18 +16875,6 @@
         "${{ steps.fetch-token.outputs.my-token }}",
         "${{ env.GH_TOKEN }}"
       ]
-    },
-    "linear_token": {
-      "type": "string",
-      "pattern": "^\\$\\{\\{\\s*(secrets\\.[A-Za-z_][A-Za-z0-9_]*(\\s*\\|\\|\\s*secrets\\.[A-Za-z_][A-Za-z0-9_]*)*|needs\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*|steps\\.[A-Za-z_][A-Za-z0-9_-]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_-]*)\\s*\\}\\}$",
-      "description": "Linear API key expression resolved only in the trusted safe_outputs job."
-    },
-    "linear_issue_identifier": {
-      "type": "string",
-      "minLength": 3,
-      "maxLength": 100,
-      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[A-Z][A-Z0-9]{0,15}-[1-9][0-9]*)$",
-      "description": "Linear issue model UUID or uppercase shorthand identifier."
     },
     "github_app": {
       "type": "object",

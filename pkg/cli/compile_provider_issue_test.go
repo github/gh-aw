@@ -15,13 +15,13 @@ import (
 )
 
 func TestCompileProviderIssueJSONContract(t *testing.T) {
-	for _, alias := range []string{"jira-issue", "linear-issue", "azure-devops-issue"} {
+	for _, alias := range []string{"jira-issue", "azure-devops-issue"} {
 		t.Run(alias, func(t *testing.T) {
 			root := t.TempDir()
 			enableWebhookTriggers(t, root)
 			path := filepath.Join(root, alias+".md")
 			scope := map[string]string{
-				"jira-issue": "project: APP", "linear-issue": "organization-id: organization-uuid\n      team-id: team-uuid", "azure-devops-issue": "project_id: project-uuid",
+				"jira-issue": "project: APP", "azure-devops-issue": "project_id: project-uuid",
 			}[alias]
 			source := "---\non:\n  gateway-dispatch:\n    " + alias + ":\n      " + scope + "\n      types: [opened, labeled]\npermissions:\n  contents: read\nengine: copilot\n---\nInspect every issue in github.aw.context.items.\n"
 			require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
@@ -33,11 +33,6 @@ func TestCompileProviderIssueJSONContract(t *testing.T) {
 			assert.NotEmpty(t, sub.Provider)
 			assert.NotEmpty(t, sub.NativeEvents)
 			require.NotEmpty(t, sub.Conditions, "the required source scope must be present in emitted subscriptions")
-			if alias == "linear-issue" {
-				require.Len(t, sub.Conditions, 2)
-				assert.Equal(t, []string{"data", "teamId"}, sub.Conditions[1].Path)
-				assert.Equal(t, []any{"team-uuid"}, sub.Conditions[1].Values)
-			}
 			output, err := json.Marshal(result.validationResult)
 			require.NoError(t, err)
 			assert.Contains(t, string(output), `"activity_normalization":`)
@@ -53,7 +48,7 @@ func TestCompileProviderIssueJSONContract(t *testing.T) {
 
 func TestCompileProviderIssueRequiresScope(t *testing.T) {
 	for alias, field := range map[string]string{
-		"jira-issue": "project", "linear-issue": "organization-id", "azure-devops-issue": "project_id",
+		"jira-issue": "project", "azure-devops-issue": "project_id",
 	} {
 		for _, wrapped := range []bool{false, true} {
 			name := "missing"

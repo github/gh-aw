@@ -54,15 +54,6 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		enabledTools["ado_upload_workitem_attachment"] = struct {
 		}{}
 	}
-	if data.SafeOutputs.LinearCreateIssue != nil {
-		enabledTools["linear_create_issue"] = struct{}{}
-	}
-	if data.SafeOutputs.LinearAddComment != nil {
-		enabledTools["linear_add_comment"] = struct{}{}
-	}
-	if data.SafeOutputs.LinearUpdateIssue != nil {
-		enabledTools["linear_update_issue"] = struct{}{}
-	}
 	if data.SafeOutputs.CreateAgentSessions != nil {
 		enabledTools["create_agent_session"] = struct {
 		}{}

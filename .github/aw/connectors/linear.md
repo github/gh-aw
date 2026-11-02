@@ -88,18 +88,12 @@ connectors:
           /organizationId: organizations
         verificationProfile: linear.app/hmac-sha256-timestamp
     resources:
-      issues:
-        - 22222222-2222-4222-8222-222222222222
-      organizations:
-        - 11111111-1111-4111-8111-111111111111
-      project-slugs:
-        - abcdef123456
-      projects:
-        - 44444444-4444-4444-8444-444444444444
-      team-keys:
-        - ENG
-      teams:
-        - 33333333-3333-4333-8333-333333333333
+      issues: ${{ github.aw.import-inputs.issues }}
+      organizations: ${{ github.aw.import-inputs.organizations }}
+      project-slugs: ${{ github.aw.import-inputs.project-slugs }}
+      projects: ${{ github.aw.import-inputs.projects }}
+      team-keys: ${{ github.aw.import-inputs.team-keys }}
+      teams: ${{ github.aw.import-inputs.teams }}
     safe-outputs:
       add-comment:
         credential: writer
@@ -350,6 +344,36 @@ connectors:
           /data/teams/nodes/0/id: teams
         tool: resolve-team
 import-schema:
+  issues:
+    type: array
+    items:
+      type: string
+    default: []
+  organizations:
+    type: array
+    items:
+      type: string
+    default: []
+  project-slugs:
+    type: array
+    items:
+      type: string
+    default: []
+  projects:
+    type: array
+    items:
+      type: string
+    default: []
+  team-keys:
+    type: array
+    items:
+      type: string
+    default: []
+  teams:
+    type: array
+    items:
+      type: string
+    default: []
   mcp-reader-secret:
     default: LINEAR_READ_MCP_TOKEN
     type: string
@@ -361,4 +385,8 @@ import-schema:
     type: string
 ---
 
-Use ordinary AW imports and explicitly selected read tools and hyphen-prefixed safe outputs. Event envelopes contain references, not resource content; retrieve approved content through scoped read APIs. Native ingress is not operational.
+Import `@builtin:connectors/linear.md` and explicitly select read tools and
+hyphen-prefixed safe outputs. Supply exact resource allowlists through `with`;
+the defaults grant no resources. Personal API keys use raw Authorization;
+hosted MCP requires a separate bearer credential. Event envelopes contain
+references, not resource content. Native ingress is not operational.

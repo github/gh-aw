@@ -532,9 +532,6 @@ func hasHandlerManagerTypes(data *WorkflowData) bool {
 		data.SafeOutputs.AssignWorkItems != nil ||
 		data.SafeOutputs.LinkWorkItems != nil ||
 		data.SafeOutputs.UploadWorkItemAttachments != nil ||
-		data.SafeOutputs.LinearCreateIssue != nil ||
-		data.SafeOutputs.LinearAddComment != nil ||
-		data.SafeOutputs.LinearUpdateIssue != nil ||
 		data.SafeOutputs.AddComments != nil ||
 		data.SafeOutputs.CreateDiscussions != nil ||
 		data.SafeOutputs.CreateProjectStatusUpdates != nil ||
@@ -644,7 +641,6 @@ func (c *Compiler) appendHandlerManagerStep(data *WorkflowData, state *safeOutpu
 		if err != nil {
 			return err
 		}
-		handlerManagerSteps = injectLinearCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		handlerManagerSteps = injectJiraCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		handlerManagerSteps = injectAzureDevOpsCredentialsIntoProcessorStep(handlerManagerSteps, data.SafeOutputs)
 		state.steps = append(state.steps, handlerManagerSteps...)
@@ -875,7 +871,7 @@ func (c *Compiler) buildPreambleTokenSteps(data *WorkflowData, outputs map[strin
 	if data.SafeOutputs.GitHubApp != nil {
 		appPermissions := computePermissionsForSafeOutputs(data.SafeOutputs, true)
 		if !globalAppTokenNeededForPermissions(appPermissions) {
-			// No enabled handler (e.g. a Linear-only configuration) consumes GitHub
+			// No enabled handler (e.g. a connector-only configuration) consumes GitHub
 			// permissions from this global app, so skip minting an unrelated
 			// installation token purely because a top-level github-app was
 			// configured or auto-copied via applyTopLevelGitHubAppFallbacks.

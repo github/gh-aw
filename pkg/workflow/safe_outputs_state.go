@@ -2,6 +2,8 @@ package workflow
 
 import (
 	"fmt"
+	"maps"
+	"strings"
 )
 
 // ========================================
@@ -22,6 +24,22 @@ import (
 // It is NOT used for existence checks — see hasAnySafeOutputEnabled and
 // hasNonBuiltinSafeOutputsEnabled for the performance-critical direct-field versions.
 var safeOutputFieldMapping = buildSafeOutputFieldMapping()
+
+func defaultReportIncompleteCreateIssue(config *SafeOutputsConfig) string {
+	withoutConnectors := *config
+	withoutConnectors.Scripts = maps.Clone(config.Scripts)
+	hasConnector := false
+	for name := range withoutConnectors.Scripts {
+		if strings.HasPrefix(name, "connector-") {
+			hasConnector = true
+			delete(withoutConnectors.Scripts, name)
+		}
+	}
+	if hasConnector && !hasNonBuiltinSafeOutputsEnabled(&withoutConnectors) {
+		return "false"
+	}
+	return "true"
+}
 
 // hasAnySafeOutputEnabled reports whether any safe output field is non-nil.
 // It uses direct struct-field nil checks instead of reflection for performance;
@@ -95,8 +113,7 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 		safeOutputs.ReportIncomplete != nil ||
 		safeOutputs.SetIssueType != nil ||
 		safeOutputs.SetIssueField != nil ||
-		safeOutputs.NoOp != nil ||
-		hasLinearSafeOutputs(safeOutputs)
+		safeOutputs.NoOp != nil
 }
 
 // The builtin types (noop, missing-data, missing-tool) are excluded from this check
@@ -166,15 +183,7 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 		safeOutputs.DispatchRepository != nil ||
 		safeOutputs.CallWorkflow != nil ||
 		safeOutputs.SetIssueType != nil ||
-		safeOutputs.SetIssueField != nil || // non-builtin safe output field
-		hasLinearSafeOutputs(safeOutputs)
-}
-
-func hasLinearSafeOutputs(safeOutputs *SafeOutputsConfig) bool {
-	return safeOutputs != nil &&
-		(safeOutputs.LinearCreateIssue != nil ||
-			safeOutputs.LinearAddComment != nil ||
-			safeOutputs.LinearUpdateIssue != nil)
+		safeOutputs.SetIssueField != nil // non-builtin safe output field
 }
 
 // HasSafeOutputsEnabled checks if any safe-outputs are enabled

@@ -232,7 +232,6 @@ func TestGatewayDispatchSchema(t *testing.T) {
 		"code-scanning-alert": map[string]any{},
 		"dependabot-alerts":   map[string]any{},
 		"jira-issue":          map[string]any{"project": "APP"},
-		"linear-issue":        map[string]any{"organization-id": "org"},
 		"azure-devops-issue":  map[string]any{"project_id": "project"},
 	} {
 		t.Run(trigger, func(t *testing.T) {

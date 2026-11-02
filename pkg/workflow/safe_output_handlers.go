@@ -58,24 +58,6 @@ var safeOutputHandlers = []safeOutputHandlerDescriptor{
 		NewConfig:   func() any { return &UploadWorkItemAttachmentConfig{} },
 	},
 	{
-		Key:         "linear-create-issue",
-		StructField: "LinearCreateIssue",
-		ToolName:    "linear_create_issue",
-		NewConfig:   func() any { return &LinearCreateIssueConfig{} },
-	},
-	{
-		Key:         "linear-add-comment",
-		StructField: "LinearAddComment",
-		ToolName:    "linear_add_comment",
-		NewConfig:   func() any { return &LinearTargetConfig{} },
-	},
-	{
-		Key:         "linear-update-issue",
-		StructField: "LinearUpdateIssue",
-		ToolName:    "linear_update_issue",
-		NewConfig:   func() any { return &LinearUpdateIssueConfig{} },
-	},
-	{
 		Key:         "create-issue",
 		StructField: "CreateIssues",
 		ToolName:    "create_issue",

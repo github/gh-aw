@@ -443,7 +443,7 @@ describe("shared source organization selectors", () => {
     expect(() => validateWebhook(dispatch(), env)).toThrow(/GH_AW_WEBHOOK_SUBSCRIPTIONS/);
   });
 
-  it.each(["jira_issue", "linear_issue", "azure_devops_issue"])("rejects org metadata on non-GitHub family %s", event => {
+  it.each(["jira_issue", "azure_devops_issue"])("rejects org metadata on non-GitHub family %s", event => {
     const env = environment({ GH_AW_WEBHOOK_SUBSCRIPTIONS: JSON.stringify([subscription({ event, orgs: ["*"] })]) });
     expect(() => validateWebhook(dispatch(), env)).toThrow(/GH_AW_WEBHOOK_SUBSCRIPTIONS/);
   });

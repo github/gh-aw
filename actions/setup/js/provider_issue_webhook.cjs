@@ -4,7 +4,6 @@ const { ERR_VALIDATION } = require("./error_codes.cjs");
 
 const PROVIDER_ISSUE_EVENTS = {
   jira_issue: ["jira:issue_created", "jira:issue_updated", "jira:issue_deleted"],
-  linear_issue: ["create", "update", "remove"],
   azure_devops_issue: ["workitem.created", "workitem.updated", "workitem.deleted", "workitem.restored"],
 };
 const PROVIDER_ISSUE_ACTIVITIES = ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"];
@@ -19,10 +18,6 @@ function isString(value) {
 
 function isStringArray(value) {
   return Array.isArray(value) && value.every(isString);
-}
-
-function isTimestamp(value) {
-  return isString(value) && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value));
 }
 
 /** @returns {never} */
@@ -48,8 +43,8 @@ function isProviderIssueEvent(event) {
 }
 
 function nativeIssueEvent(event, payload) {
-  const native = event === "jira_issue" ? payload.webhookEvent : event === "linear_issue" ? payload.action : payload.eventType;
-  if (!PROVIDER_ISSUE_EVENTS[event]?.includes(native) || (event === "linear_issue" && payload.type !== "Issue")) {
+  const native = event === "jira_issue" ? payload.webhookEvent : payload.eventType;
+  if (!PROVIDER_ISSUE_EVENTS[event]?.includes(native)) {
     reject("provider issue payload must contain a supported native issue event");
   }
   return native;
@@ -68,12 +63,6 @@ function resolveProviderIssueItem(event, payload) {
       reject("Jira issue.self must identify a Jira REST issue");
     }
     return { item_type: event, item_number: issue.id, repo: "", source: url.origin, url: url.href };
-  }
-  if (event === "linear_issue") {
-    if (!isObject(payload.data) || !isString(payload.data.id) || !isString(payload.organizationId)) {
-      reject("Linear issue payload requires data.id and organizationId");
-    }
-    return { item_type: event, item_number: payload.data.id, repo: "", source: payload.organizationId };
   }
   const resource = payload.resource;
   const snapshot = native !== "workitem.updated" || (payload.resourceVersion === "1.0" && !resource?.revision);
@@ -120,28 +109,6 @@ function jiraActivities(payload, native) {
   return activities;
 }
 
-function linearActivities(payload, native) {
-  if (native === "create") return ["opened"];
-  if (native === "remove") return ["deleted"];
-  const activities = ["edited"];
-  if (!isObject(payload.updatedFrom)) return activities;
-  const before = payload.updatedFrom;
-  const after = payload.data;
-  if (["completedAt", "canceledAt"].some(field => Object.hasOwn(before, field))) {
-    const terminal = value => {
-      if (isTimestamp(value.completedAt) || isTimestamp(value.canceledAt)) return true;
-      if (value.completedAt === null && value.canceledAt === null) return false;
-      return undefined;
-    };
-    const wasClosed = terminal({ ...after, ...before });
-    const isClosed = terminal(after);
-    if (wasClosed === false && isClosed === true) activities.push("closed");
-    if (wasClosed === true && isClosed === false) activities.push("reopened");
-  }
-  if (Object.hasOwn(before, "labelIds")) addLabelActivities(activities, before.labelIds, after.labelIds);
-  return activities;
-}
-
 function azureActivities(payload, native, closedStates) {
   if (native === "workitem.created") return ["opened"];
   if (native === "workitem.deleted") return ["deleted"];
@@ -166,7 +133,6 @@ function azureActivities(payload, native, closedStates) {
 function providerIssueActivities(event, payload, normalization) {
   const native = nativeIssueEvent(event, payload);
   if (event === "jira_issue") return jiraActivities(payload, native);
-  if (event === "linear_issue") return linearActivities(payload, native);
   return azureActivities(payload, native, normalization?.closed_states ?? []);
 }
 

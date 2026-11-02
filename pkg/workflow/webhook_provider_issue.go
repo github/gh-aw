@@ -15,7 +15,6 @@ var providerIssueCatalogJSON []byte
 
 var providerIssueTriggers = map[string]string{
 	"jira-issue":         "jira_issue",
-	"linear-issue":       "linear_issue",
 	"azure-devops-issue": "azure_devops_issue",
 }
 
@@ -87,7 +86,7 @@ func providerIssueConfig(config map[string]any, path, event string, definition W
 
 func providerIssueSelectors(config map[string]any, path, event string) (map[string]any, error) {
 	scope := map[string]string{
-		"jira_issue": "project", "linear_issue": "organization-id", "azure_devops_issue": "project_id",
+		"jira_issue": "project", "azure_devops_issue": "project_id",
 	}[event]
 	if _, exists := config["filters"]; exists {
 		return nil, fmt.Errorf("%s.filters is not supported; put selectors directly under %s, including required %s", path, path, scope)
@@ -102,14 +101,6 @@ func providerIssueSelectors(config map[string]any, path, event string) (map[stri
 	}
 	selectors := maps.Clone(config)
 	selectors[scope] = values
-	if event == "linear_issue" {
-		if raw, exists := selectors["team-id"]; exists {
-			selectors["team-id"], err = webhookStringValues(raw, path+".team-id")
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
 	normalized := map[string]any{"filters": selectors}
 	if raw, exists := config["types"]; exists {
 		normalized["types"] = raw

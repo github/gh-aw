@@ -3142,73 +3142,13 @@ This section provides complete definitions for all remaining safe output types. 
 
 ---
 
-#### Type: linear_create_issue
+#### Linear connector effects
 
-**Purpose**: Create an issue in one trusted Linear team using Linear's public GraphQL API.
-
-**Experimental**: Yes. Compiling a workflow with any Linear Safe Output emits: `Using experimental feature: Linear safe outputs`.
-
-**Configuration**:
-
-- `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-create-issue.team-id`: OPTIONAL Linear team model UUID, key, name, or GitHub Actions expression, falling back to `LINEAR_TEAM_ID`
-- `linear-create-issue.project-id`: OPTIONAL trusted Linear project URL identifier or model UUID, falling back to `LINEAR_PROJECT_ID`
-- `linear-create-issue.max`: Operation limit (default: 1)
-- `linear-create-issue.staged`: Staged mode override
-
-**MCP Tool**: `linear_create_issue`
-
-The MCP input object MUST require `title` and `body`, MUST reject additional properties, and MUST limit them to 128 and 65,000 characters respectively. The body MUST contain at least 20 characters. The trusted team identifier, optional project identifier, and credential MUST NOT be MCP inputs. Team UUIDs MUST be passed directly to `issueCreate`; other identifiers MUST be resolved case-insensitively against available team keys, then names, before issue creation.
-
-**Operational Semantics**:
-
-1. The processor MUST POST to the fixed `https://api.linear.app/graphql` endpoint using `Content-Type: application/json` and the API key as the raw `Authorization` header value.
-2. The implementation-defined `issueCreate(input: IssueCreateInput!)` document MUST use GraphQL variables for `teamId`, `title`, and `description`.
-3. `title` and `body` MUST undergo standard Safe Outputs title and content sanitization before `body` is mapped to Linear's `description`.
-4. The processor MUST fail on HTTP errors, malformed JSON, a non-empty top-level GraphQL `errors` array, `success: false`, or a missing issue object.
-5. Staged mode MUST validate and sanitize the request but MUST NOT perform a network mutation.
-
-The configured team ID MUST be a canonical UUID. Input exceeding a configured limit MUST be rejected, not silently truncated.
-
-#### Type: linear_add_comment
-
-**Purpose**: Add a comment to one trusted Linear issue.
-
-**Experimental**: Yes.
-
-**Configuration**:
-
-- `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-add-comment.target`: REQUIRED fixed issue UUID or shorthand identifier such as `ENG-123`
-- `linear-add-comment.max`: Operation limit (default: 1)
-- `linear-add-comment.staged`: Staged mode override
-
-**MCP Tool**: `linear_add_comment`
-
-The MCP input object MUST require only `body`, MUST reject additional properties, and MUST limit the body to 65,000 characters. The target and credential MUST NOT be MCP inputs.
-
-The processor MUST use the fixed `commentCreate(input: CommentCreateInput!)` GraphQL document and pass the configured target as `issueId` through variables. The body MUST undergo standard Safe Outputs content sanitization. HTTP, parsing, GraphQL, unsuccessful-payload, and staged-mode behavior MUST match `linear_create_issue`.
-
-#### Type: linear_update_issue
-
-**Purpose**: Replace explicitly enabled basic fields on one trusted Linear issue.
-
-**Experimental**: Yes.
-
-**Configuration**:
-
-- `linear-token`: REQUIRED trusted secret expression containing a Linear personal API key
-- `linear-update-issue.target`: REQUIRED fixed issue UUID or shorthand identifier such as `ENG-123`
-- `linear-update-issue.title`: Set to `true` to enable title replacement
-- `linear-update-issue.body`: Set to `true` to enable description replacement
-- `linear-update-issue.max`: Operation limit (default: 1)
-- `linear-update-issue.staged`: Staged mode override
-
-At least one of `title` or `body` MUST be enabled. The MCP tool name is `linear_update_issue`; its schema MUST expose only enabled fields, require at least one exposed field, reject additional properties, and apply the same field limits and sanitization as `linear_create_issue`. The target and credential MUST NOT be MCP inputs.
-
-The processor MUST use the fixed `issueUpdate(id: String!, input: IssueUpdateInput!)` GraphQL document. The configured target and update values MUST be GraphQL variables. `body` maps to Linear's `description`. Omitted fields MUST remain unchanged. HTTP, parsing, GraphQL, unsuccessful-payload, and staged-mode behavior MUST match `linear_create_issue`.
-
-For all Linear types, GraphQL source, endpoint, protocol, and host are implementation-defined and MUST NOT be agent-controlled. Linear API keys and GitHub App installation tokens are separate credentials for separate services. Enabling only Linear handlers MUST NOT request GitHub API write permissions or mint GitHub App tokens. Linear credentials MUST exist only in the trusted execution path and MUST NOT appear in handler configuration visible to the agent.
+The former `linear_create_issue`, `linear_add_comment`, and
+`linear_update_issue` handlers are removed. Linear operations are declarations
+in the compiler-embedded Markdown connector and run through the shared
+connector runtime. See [Connectors](/gh-aw/reference/connectors/#linear) for the
+authoritative credential, resource, typed-input, staging, and migration contract.
 
 ---
 

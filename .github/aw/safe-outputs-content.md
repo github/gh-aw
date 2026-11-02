@@ -29,29 +29,13 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
 
   Jira update, comment, and label operations require a known issue key. Same-run references to an issue created by `jira_create_issue` are not supported. The initial integration does not provide transitions, assignments, custom fields, label removal, JQL, bulk operations, or arbitrary REST calls.
 
-- **[Experimental]** Linear operations use the `LINEAR_API_KEY` secret and run through the Linear GraphQL API:
-
-  ```yaml
-  safe-outputs:
-    linear-create-issue:
-      max: 1
-      team-id: "TEAM_ID"
-      project-id: "PROJECT_ID"
-    linear-add-comment:
-      max: 1
-    linear-update-issue:
-      max: 1
-      title: true
-      body: true
-  ```
-
-  | Frontmatter | Tool | Agent inputs |
-  |---|---|---|
-  | `linear-create-issue` | `linear_create_issue` | `title`, `body` (team and optional project taken from config) |
-  | `linear-add-comment` | `linear_add_comment` | `body` (target issue) |
-  | `linear-update-issue` | `linear_update_issue` | `title`/`body`, gated by the matching `title:`/`body:` config flags |
-
-  `linear-token:` optionally overrides the `LINEAR_API_KEY` secret and is a top-level `safe-outputs:` field, not nested under `env:`. `linear-create-issue.team-id` accepts a Linear team UUID, key, or name; keys and names are resolved through Linear's API before issue creation. `linear-create-issue.project-id` optionally fixes created issues to a trusted Linear project identifier from its URL or model UUID. Each output supports `max` and `staged`. Only fields explicitly enabled in `update-issue` config (`title`, `body`) can be changed by the agent.
+- **[Experimental]** Linear uses the compiler-embedded
+  `@builtin:connectors/linear.md` import and shared connector runtime. Select
+  `linear-create-issue`, `linear-update-issue`, or `linear-add-comment` only
+  after declaring approved resource arrays through `with`. Use separate read
+  and write credentials. The old built-in options and implicit ID resolution
+  are removed; the single reference is
+  [Connectors](https://github.github.com/gh-aw/reference/connectors/#linear).
 
 - **[Experimental]** Azure DevOps work-item operations are namespaced `ado-*` and rely on an Azure DevOps MCP server (configured separately under `mcp-servers:`/`tools:`) for the underlying connection and credentials:
 

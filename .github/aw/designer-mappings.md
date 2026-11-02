@@ -35,9 +35,9 @@ Quick-reference mapping tables for `.github/aw/designer.md`. Load this file duri
 | "update Jira issue ENG-123" | `jira-update-issue` |
 | "comment on Jira issue ENG-123" | `jira-add-comment` |
 | "add a Jira label" | `jira-add-label` |
-| "create a Linear issue" | `linear-create-issue` (experimental) |
-| "update Linear issue" | `linear-update-issue` (experimental) |
-| "comment on Linear issue" | `linear-add-comment` (experimental) |
+| "create a Linear issue" | Import `@builtin:connectors/linear.md`, approve resource arrays, select `linear-create-issue` |
+| "update Linear issue" | Imported connector `linear-update-issue` (requires title and body) |
+| "comment on Linear issue" | Imported connector `linear-add-comment` |
 | "create an Azure DevOps work item" | `ado-create-work-item` (experimental) |
 | "update an Azure DevOps work item" | `ado-update-work-item` (experimental) |
 | "comment/assign/link Azure DevOps work items" | `ado-comment-on-work-item`, `ado-assign-work-item`, `ado-link-work-items` (experimental) |

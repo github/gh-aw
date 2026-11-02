@@ -186,7 +186,7 @@ func TestConnectorPrefixesRejectAmbiguousAndReservedNames(t *testing.T) {
 		{"on", "tracker-sub-created", []string{"tracker", "tracker-sub"}, "ambiguous connector prefixes"},
 		{"safe-outputs", "add-comment", []string{"add"}, "cannot shadow built-in GitHub"},
 		{"safe-outputs", "allowed-domains", []string{"allowed"}, "cannot shadow built-in GitHub"},
-		{"safe-outputs", "linear-token", []string{"linear"}, "cannot shadow built-in GitHub"},
+		{"safe-outputs", "github-token", []string{"github"}, "cannot shadow built-in GitHub"},
 		{"on", "github-app", []string{"github"}, "cannot shadow built-in trigger"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

@@ -14,7 +14,6 @@ const examples = [
   ["code_scanning_alert", "https://api.github.com/repos/org/repo/code-scanning/alerts/123", ["created"], "123", undefined],
   ["dependabot_alert", "https://api.github.com/repos/org/repo/dependabot/alerts/123", ["created"], "123", undefined],
   ["jira_issue", "https://tenant.atlassian.net/rest/api/3/issue/123", ["edited", "closed", "labeled"], "123", "https://tenant.atlassian.net"],
-  ["linear_issue", "https://linear.app/workspace/issue/APP-123/example-title", ["edited", "closed"], "APP-123", "https://linear.app/workspace"],
   ["azure_devops_issue", "https://dev.azure.com/organization/project/_apis/wit/workItems/123", ["edited", "closed"], "123", "https://dev.azure.com/organization"],
 ];
 
@@ -198,34 +197,20 @@ describe("minimal resource notification contract", () => {
     });
   });
 
-  it.each([
-    "https://linear.app/issue/APP-123",
-    "https://other.example/workspace/issue/APP-123",
-    "https://linear.app/workspace/project/APP-123",
-    "https://linear.app/workspace/issue/APP-0",
-    "https://linear.app/workspace/issue/APP-123#comment",
-  ])("rejects ambiguous or non-issue Linear URL %#", url => {
-    expect(() => resolveWebhookResource("linear_issue", { url, type: ["opened"] })).toThrow(/canonical/);
-  });
-
   it("derives legacy Azure collection identities without treating project or update IDs as resource identity", () => {
     const url = "https://organization.visualstudio.com/DefaultCollection/project/_apis/wit/workItems/123";
     expect(resolveWebhookResource("azure_devops_issue", { url, type: ["restored"] })).toMatchObject({ item_number: "123", source: "https://organization.visualstudio.com/DefaultCollection" });
     expect(() => resolveWebhookResource("azure_devops_issue", { url: `${url}/updates/5`, type: ["edited"] })).toThrow(/canonical/);
   });
 
-  it.each([
-    ["linear_issue", "https://linear.app/workspace/issue/APP-123/%E6%BC%A2%E5%AD%97", "APP-123", "https://linear.app/workspace"],
-    ["azure_devops_issue", "https://dev.azure.com/organization/My%20Project/_apis/wit/workItems/123", "123", "https://dev.azure.com/organization"],
-  ])("accepts canonical percent-encoded %s URL segments without changing identity", (event, url, number, source) => {
-    expect(resolveWebhookResource(event, { url, type: ["edited"] })).toMatchObject({ item_number: number, source, url });
-  });
+  it.each([["azure_devops_issue", "https://dev.azure.com/organization/My%20Project/_apis/wit/workItems/123", "123", "https://dev.azure.com/organization"]])(
+    "accepts canonical percent-encoded %s URL segments without changing identity",
+    (event, url, number, source) => {
+      expect(resolveWebhookResource(event, { url, type: ["edited"] })).toMatchObject({ item_number: number, source, url });
+    }
+  );
 
-  it.each([
-    ["linear_issue", "https://linear.app/workspace/issue/APP-123/title%"],
-    ["linear_issue", "https://linear.app/workspace/issue/APP-123/title%GG"],
-    ["azure_devops_issue", "https://dev.azure.com/organization/My%Project/_apis/wit/workItems/123"],
-  ])("rejects malformed escapes in %s URL segments", (event, url) => {
+  it.each([["azure_devops_issue", "https://dev.azure.com/organization/My%Project/_apis/wit/workItems/123"]])("rejects malformed escapes in %s URL segments", (event, url) => {
     expect(() => resolveWebhookResource(event, { url, type: ["edited"] })).toThrow(/canonical/);
   });
 
@@ -242,17 +227,6 @@ describe("minimal resource notification contract", () => {
 
   it.each([[["projects_v2_item"]], [{ event: "projects_v2_item" }], ["constructor"], ["__proto__"], ["unsupported_issue"]])("rejects non-string and unsupported event families %#", event => {
     expect(() => normalizeWebhookContext({ webhook: { event, deliveries: [{ delivery_id: "d", payload: { url: examples[0][1], type: ["edited"] } }] } })).toThrow(/supported webhook event/);
-  });
-
-  it("does not split Linear identities when only a readable URL slug changes", () => {
-    const result = normalizeWebhookContext({
-      webhook: {
-        event: "linear_issue",
-        deliveries: ["before", "after"].map(slug => ({ delivery_id: slug, payload: { url: `https://linear.app/workspace/issue/APP-123/${slug}`, type: ["edited"] } })),
-      },
-    });
-    expect(result.items).toHaveLength(1);
-    expect(result.webhook.deliveries).toHaveLength(2);
   });
 
   it("deduplicates Azure collection-scoped work items across optional project URL segments", () => {

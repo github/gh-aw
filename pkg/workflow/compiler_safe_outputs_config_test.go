@@ -1083,58 +1083,6 @@ func TestAddHandlerManagerConfigEnvVar(t *testing.T) {
 			expectedKeys: []string{"ado_upload_workitem_attachment"},
 		},
 		{
-			name: "linear create issue config",
-			safeOutputs: &SafeOutputsConfig{
-				LinearCreateIssue: &LinearCreateIssueConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: strPtr("1"),
-					},
-					TeamID: "9cfb482a-81e3-4154-b5b9-2c805e70a02d",
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"linear_create_issue"},
-		},
-		{
-			name: "linear add comment config",
-			safeOutputs: &SafeOutputsConfig{
-				LinearAddComment: &LinearTargetConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: strPtr("1"),
-					},
-					Target: "ENG-123",
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"linear_add_comment"},
-		},
-		{
-			name: "linear update issue config",
-			safeOutputs: &SafeOutputsConfig{
-				LinearUpdateIssue: &LinearUpdateIssueConfig{
-					LinearTargetConfig: LinearTargetConfig{
-						BaseSafeOutputConfig: BaseSafeOutputConfig{
-							Max: strPtr("1"),
-						},
-						Target: "ENG-123",
-					},
-					Title: boolPtr(true),
-					Body:  boolPtr(true),
-				},
-			},
-			checkContains: []string{
-				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-			},
-			checkJSON:    true,
-			expectedKeys: []string{"linear_update_issue"},
-		},
-		{
 			name: "jira create issue config",
 			safeOutputs: &SafeOutputsConfig{
 				JiraCreateIssue: &JiraSafeOutputConfig{

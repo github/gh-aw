@@ -47,9 +47,6 @@ type SafeOutputsConfig struct {
 	AssignWorkItems                        *AssignWorkItemConfig                  `yaml:"ado-assign-work-item,omitempty"`
 	LinkWorkItems                          *LinkWorkItemsConfig                   `yaml:"ado-link-work-items,omitempty"`
 	UploadWorkItemAttachments              *UploadWorkItemAttachmentConfig        `yaml:"ado-upload-workitem-attachment,omitempty"`
-	LinearCreateIssue                      *LinearCreateIssueConfig               `yaml:"linear-create-issue,omitempty"`
-	LinearAddComment                       *LinearTargetConfig                    `yaml:"linear-add-comment,omitempty"`
-	LinearUpdateIssue                      *LinearUpdateIssueConfig               `yaml:"linear-update-issue,omitempty"`
 	CreateDiscussions                      *CreateDiscussionsConfig               `yaml:"create-discussion,omitempty"`
 	UpdateDiscussions                      *UpdateDiscussionsConfig               `yaml:"update-discussion,omitempty"`
 	CloseDiscussions                       *CloseDiscussionsConfig                `yaml:"close-discussion,omitempty"`
@@ -119,7 +116,6 @@ type SafeOutputsConfig struct {
 	Staged                                 *TemplatableBool                   `yaml:"staged,omitempty"`                    // Templatable preview-only mode for all safe outputs
 	Env                                    map[string]string                  `yaml:"env,omitempty"`                       // Environment variables to pass to safe output jobs
 	GitHubToken                            string                             `yaml:"github-token,omitempty"`              // GitHub token for safe output jobs
-	LinearToken                            string                             `yaml:"linear-token,omitempty"`              // Linear API key for Linear safe output handlers
 	MaximumPatchSize                       int                                `yaml:"max-patch-size,omitempty"`            // Maximum allowed patch size in KB (defaults to 4096)
 	MaximumPatchFiles                      int                                `yaml:"max-patch-files,omitempty"`           // Maximum allowed unique files per create-pull-request patch (defaults to 100)
 	RunsOn                                 string                             `yaml:"runs-on,omitempty"`                   // Runner configuration for safe-outputs jobs

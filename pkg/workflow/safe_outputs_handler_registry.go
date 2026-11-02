@@ -63,7 +63,6 @@ var handlerRegistry = mergeHandlerMaps(
 	assignmentHandlerRegistry,
 	commentHandlerRegistry,
 	jiraHandlerRegistry,
-	linearHandlerRegistry,
 	releaseHandlerRegistry,
 	diagnosticHandlerRegistry,
 	azureDevOpsWorkItemHandlerRegistry,

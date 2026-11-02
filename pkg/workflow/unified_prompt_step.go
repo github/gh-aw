@@ -560,15 +560,6 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	if safeOutputs.CreateAgentSessions != nil {
 		tools = append(tools, toolWithMaxBudget("create_agent_session", safeOutputs.CreateAgentSessions.Max))
 	}
-	if safeOutputs.LinearCreateIssue != nil {
-		tools = append(tools, toolWithMaxBudget("linear_create_issue", safeOutputs.LinearCreateIssue.Max))
-	}
-	if safeOutputs.LinearAddComment != nil {
-		tools = append(tools, toolWithMaxBudget("linear_add_comment", safeOutputs.LinearAddComment.Max))
-	}
-	if safeOutputs.LinearUpdateIssue != nil {
-		tools = append(tools, toolWithMaxBudget("linear_update_issue", safeOutputs.LinearUpdateIssue.Max))
-	}
 	if safeOutputs.JiraCreateIssue != nil {
 		tools = append(tools, toolWithMaxBudget("jira_create_issue", safeOutputs.JiraCreateIssue.Max))
 	}

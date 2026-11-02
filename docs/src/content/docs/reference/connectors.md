@@ -19,7 +19,8 @@ they never fall back to a checkout file or implicitly enable capabilities.
 > These declarations are experimental. Custom connector triggers currently fail
 > closed: importing a connector does not install a receiver, authenticate events,
 > enroll a gateway source, or activate a workflow. Use `workflow_dispatch` until
-> approved ingress is available. The separate built-in integrations are unchanged.
+> approved ingress is available. Linear uses only this shared connector path;
+> its former built-in toolsets and provider-specific handlers have been removed.
 
 ## Configuration
 
@@ -32,9 +33,11 @@ engine: copilot
 permissions:
   contents: read
 imports:
-  - uses: .github/aw/connectors/linear.md
+  - uses: "@builtin:connectors/linear.md"
     with:
-      reader-secret: LINEAR_API_KEY
+      issues: [22222222-2222-4222-8222-222222222222]
+      organizations: [11111111-1111-4111-8111-111111111111]
+      teams: [33333333-3333-4333-8333-333333333333]
 tools:
   linear: [get-issue]
 safe-outputs:
@@ -46,7 +49,11 @@ Request a comment only when useful; never call a write API directly.
 ```
 
 `with` overrides secret **names**, not values, through ordinary `import-schema`
-inputs. Cross-repository imports use pinned `owner/repo/path@ref` references.
+inputs. Linear also accepts exact resource arrays through `with`; replace the
+specimen UUIDs above with approved resources. The `@builtin:connectors/linear.md`
+import is embedded in the compiler and requires no connector file in the
+consumer checkout. Local declarations and pinned cross-repository
+`owner/repo/path@ref` imports remain available.
 Importing grants nothing: omit `tools` or `safe-outputs` to disable that phase.
 Root triggers and safe outputs use `<id>-<capability>`; unqualified GitHub
 safe outputs retain their existing meaning.
@@ -94,7 +101,7 @@ Declaration: `.github/aw/connectors/linear.md`.
 Create separate personal API keys in Linear **Settings > Security & access**,
 restricted to the required read or write permissions and teams. Store the raw
 keys as `LINEAR_READ_API_KEY` and `LINEAR_WRITE_API_KEY`; GraphQL personal keys
-do not use a `Bearer ` prefix. For hosted MCP, obtain an authorized bearer token
+use raw Authorization rather than a bearer prefix. For hosted MCP, obtain an authorized bearer token
 through the supported Linear MCP authorization flow and store it separately as
 `LINEAR_READ_MCP_TOKEN`. Personal-key GraphQL access does not prove hosted MCP
 compatibility. See [Linear API authentication](https://linear.app/developers/graphql)
@@ -106,6 +113,38 @@ and [MCP setup](https://linear.app/docs/mcp).
 | MCPs/read tools | Hosted `read-only` at `https://mcp.linear.app/mcp/readonly`, allowing only `get_issue`. REST/GraphQL selections: `get-issue`, `resolve-team`, `resolve-project`. |
 | Safe outputs | `linear-create-issue`, `linear-update-issue`, `linear-add-comment`. Fixed GraphQL operations and approved organization/team/project/issue targets. |
 | Context | Fetch the approved issue with `get-issue`; validate organization and team. Resolution is bounded and rejects ambiguity. No automatic resolution chain or paginated hydration. |
+
+### Migration from built-in Linear
+
+Import `@builtin:connectors/linear.md`, supply approved resource arrays through
+`with`, and independently select capabilities. Resource inputs are `issues`,
+`organizations`, `teams`, `projects`, `team-keys`, and `project-slugs`; each
+defaults to an empty allowlist. Selection fails closed when any required grant
+is missing. Secret-name overrides are `reader-secret`, `mcp-reader-secret`, and
+`writer-secret`.
+
+The former `tools.linear: {token, toolsets, allowed, required}` shorthand,
+`safe-outputs.linear-token`, output options such as `target`, `team-id`, `max`,
+and `staged`, and `on.gateway-dispatch.linear-issue` are no longer supported.
+Connector safe-output selections accept only null or `{}`. Their generated tools
+are `connector_6_linear_create_issue`, `connector_6_linear_update_issue`, and
+`connector_6_linear_add_comment`. Targets are typed UUID arguments constrained by
+the trusted resource arrays, never arbitrary URLs or credential inputs.
+
+Create requires approved team and project UUIDs plus title/body; update requires
+an approved issue UUID and both title/body; comment requires issue UUID and body.
+Titles are bounded to 128 characters and bodies to 65,000. The shared runtime
+validates inputs and provider responses without retries. Whole-workflow
+dry-run/staged mode prepares requests without resolving write credentials or
+sending mutations. Connector-only writes do not implicitly enable GitHub issue
+reporting, request GitHub write permissions, or mint a GitHub App token.
+
+There is no automatic conversion of team names, issue shorthand, or old
+environment-variable defaults; use separately selected bounded `resolve-team`
+and `resolve-project` reads and approve the resulting model UUIDs. Broad hosted
+MCP toolsets, optional project creation, single-field updates, and per-operation
+budget/staging options are contract gaps, not silently retained legacy paths.
+No custom authenticated ingress or configurable context is installed.
 
 ## Jira
 

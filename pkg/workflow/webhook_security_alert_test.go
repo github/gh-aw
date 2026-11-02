@@ -184,14 +184,13 @@ func TestWebhookRepositoriesAreSharedOnlyWithRepositoryAwareEvents(t *testing.T)
 		"code-scanning-alert": map[string]any{},
 		"dependabot-alerts":   map[string]any{},
 		"jira-issue":          map[string]any{"project": "APP"},
-		"linear-issue":        map[string]any{"organization-id": "org"},
 		"azure-devops-issue":  map[string]any{"project_id": "project"},
 	}}
 	before, err := json.Marshal(on)
 	require.NoError(t, err)
 	subscriptions, err := ParseWebhookSubscriptions(on, "shared-repos")
 	require.NoError(t, err)
-	require.Len(t, subscriptions, 6)
+	require.Len(t, subscriptions, 5)
 	for _, subscription := range subscriptions {
 		switch subscription.Event {
 		case "projects_v2_item", "code_scanning_alert", "dependabot_alert":

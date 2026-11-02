@@ -63,9 +63,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			config.AssignWorkItems = c.parseAssignWorkItemConfig(outputMap)
 			config.LinkWorkItems = c.parseLinkWorkItemsConfig(outputMap)
 			config.UploadWorkItemAttachments = c.parseUploadWorkItemAttachmentConfig(outputMap)
-			config.LinearCreateIssue = c.parseLinearCreateIssueConfig(outputMap)
-			config.LinearAddComment = c.parseLinearAddCommentConfig(outputMap)
-			config.LinearUpdateIssue = c.parseLinearUpdateIssueConfig(outputMap)
 
 			// Handle create-issue
 			if enabled, ok := outputMap["create-issue"].(bool); ok {
@@ -395,6 +392,8 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				}
 			}
 
+			c.extractGlobalConfigFields(outputMap, config)
+
 			// Handle report-incomplete (parse configuration if present, or enable by default)
 			reportIncompleteConfig := c.parseReportIncompleteConfig(outputMap)
 			if reportIncompleteConfig != nil {
@@ -413,7 +412,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				}
 			}
 
-			c.extractGlobalConfigFields(outputMap, config)
 		}
 	}
 

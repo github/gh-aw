@@ -40,27 +40,12 @@ See **[GitHub Tools Reference](/gh-aw/reference/github-tools/)** for complete co
 
 ### Linear Tools (`linear:`)
 
-Connect to [Linear's official hosted MCP server](https://linear.app/docs/mcp) with the `LINEAR_API_KEY` GitHub Actions secret:
-
-```yaml wrap
-tools:
-  linear: {}
-```
-
-Set `token` to use a different secret, `toolsets` to enable groups such as `issues` and `projects`, `allowed` to further restrict tool names, and `required: false` to make connectivity best-effort:
-
-```yaml wrap
-tools:
-  linear:
-    token: ${{ secrets.CUSTOM_LINEAR_TOKEN }}
-    toolsets: [issues, projects]
-    allowed: ["*"]
-    required: true
-```
-
-Supported toolsets are `all`, `attachments`, `comments`, `customers`, `cycles`, `diffs`, `documentation`, `documents`, `initiatives`, `issues`, `milestones`, `projects`, `status_updates`, `teams`, and `users`. The compiler expands toolsets into the gateway's allowed-tool list, and any `allowed` names or wildcards must match a tool in the selected toolsets.
-
-Linear always uses Linear's server-enforced read-only endpoint. The credential is passed to the gateway as an environment variable and sent as an `Authorization: Bearer` header, not embedded in MCP configuration. Like other remote MCP servers, Linear also works with `tools.cli-proxy: true`.
+Linear is supplied by the compiler-embedded Markdown connector, not a built-in
+toolset. Import `@builtin:connectors/linear.md`, configure exact resource grants,
+and select `tools.linear: [get-issue]` or the reviewed hosted MCP registration.
+Personal GraphQL API keys and hosted MCP bearer tokens are separate credentials.
+See [Connectors](/gh-aw/reference/connectors/#linear) for the single configuration
+reference and migration limitations.
 
 ### Jira Tools (`jira:`)
 

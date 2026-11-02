@@ -239,9 +239,6 @@ func (c *Compiler) resolveToolsConfiguration(
 		orchestratorToolsLog.Printf("Tools merge failed: %v", err)
 		return nil, fmt.Errorf("failed to merge tools: %w", err)
 	}
-	if err := expandLinearTool(tools); err != nil {
-		return nil, err
-	}
 	githubToolExplicit := hasExplicitGitHubTool(tools, topTools)
 	toolsTimeout, toolsStartupTimeout, err := c.extractToolTimeouts(tools)
 	if err != nil {

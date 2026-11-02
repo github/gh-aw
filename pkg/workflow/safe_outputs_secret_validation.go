@@ -3,8 +3,6 @@ package workflow
 import (
 	"fmt"
 	"strings"
-
-	"github.com/github/gh-aw/pkg/constants"
 )
 
 const safeOutputsDocsURL = "https://github.github.com/gh-aw/reference/safe-outputs/"
@@ -36,32 +34,6 @@ func getSafeOutputSecretRequirements(data *WorkflowData) []safeOutputSecretRequi
 				})
 			}
 		}
-	}
-	if hasLinearSafeOutputs(config) &&
-		strings.TrimSpace(config.LinearToken) == "" &&
-		strings.TrimSpace(config.Env["GH_AW_LINEAR_TOKEN"]) == "" {
-		requirements = append(requirements, safeOutputSecretRequirement{
-			secretNames: []string{"LINEAR_API_KEY"},
-			name:        "Linear safe outputs",
-			docsAnchor:  "#linear-safe-outputs",
-		})
-	}
-	if config.LinearCreateIssue != nil {
-		teamID := config.LinearCreateIssue.TeamID
-		if strings.TrimSpace(teamID) == "" {
-			teamID = config.Env["LINEAR_TEAM_ID"]
-		}
-		if strings.TrimSpace(teamID) == "" {
-			teamID = constants.LinearTeamIDExpr
-		}
-		requirements = append(requirements, safeOutputSecretRequirement{
-			secretNames: []string{"LINEAR_TEAM_ID"},
-			name:        "Linear safe outputs",
-			docsAnchor:  "#linear-safe-outputs",
-			envOverrides: map[string]string{
-				"LINEAR_TEAM_ID": teamID,
-			},
-		})
 	}
 	if hasAzureDevOpsSafeOutputs(config) &&
 		strings.TrimSpace(config.Env["SYSTEM_ACCESSTOKEN"]) == "" &&

@@ -36,7 +36,7 @@ type FieldValidation struct {
 	TemporaryID              bool     `json:"temporaryId,omitempty"`
 	// RejectIfOversized rejects the field outright when the raw value exceeds MaxLength,
 	// instead of silently truncating it via sanitization. Used for external-system fields
-	// (e.g. Linear) where truncation could turn an oversized/placeholder value into a
+	// where truncation could turn an oversized/placeholder value into a
 	// deceptively short but "valid" operation.
 	RejectIfOversized bool `json:"rejectIfOversized,omitempty"`
 	// StripOnError marks optional enrichment fields (e.g. confidence, rationale) that should be
@@ -121,26 +121,6 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"file_path":    {Required: true, Type: "string", MaxLength: 1024},
 			"staged_file":  {Required: true, Type: "string", Pattern: "^[A-Za-z0-9._/-]+$"},
 			"comment":      {Type: "string", Sanitize: true, MinLength: 3, MaxLength: 1024},
-		},
-	},
-	"linear_create_issue": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"title": {Required: true, Type: "string", Sanitize: true, MaxLength: 128, RejectIfOversized: true},
-			"body":  {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength, MinLength: MinIssueBodyLength, RejectIfOversized: true},
-		},
-	},
-	"linear_add_comment": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"body": {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength, RejectIfOversized: true},
-		},
-	},
-	"linear_update_issue": {
-		DefaultMax: 1,
-		Fields: map[string]FieldValidation{
-			"title": {Type: "string", Sanitize: true, MaxLength: 128, RejectIfOversized: true},
-			"body":  {Type: "string", Sanitize: true, MaxLength: MaxBodyLength, RejectIfOversized: true},
 		},
 	},
 	"create_issue": {

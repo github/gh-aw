@@ -24,29 +24,6 @@
       "sender": { "path": ["user", "accountId"], "type": "string", "description": "Jira account ID of the actor; not dispatch authorization." }
     }
   },
-  "linear_issue": {
-    "provider": "linear",
-    "actions": ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted"],
-    "native_events": {
-      "opened": "create",
-      "edited": "update",
-      "closed": "update",
-      "reopened": "update",
-      "labeled": "update",
-      "unlabeled": "update",
-      "deleted": "remove"
-    },
-    "description": "Experimental. Linear Issue data-change events. Terminal timestamp changes and label ID set differences require complete data/updatedFrom evidence. IssueLabel definition events are not issue labeling.",
-    "source": "https://linear.app/developers/webhooks",
-    "availability": ["Linear organization", "Linear team"],
-    "filters": {
-      "issue_id": { "path": ["data", "id"], "type": "string", "description": "Immutable Linear issue ID." },
-      "organization-id": { "path": ["organizationId"], "type": "string", "description": "Required Linear organization ID; configured beside types." },
-      "team-id": { "path": ["data", "teamId"], "type": "string", "description": "Optional Linear team model ID, when delivered; configured beside organization-id." },
-      "labels": { "path": ["data", "labelIds", "*"], "type": "string", "description": "A current label ID, not its name and not necessarily the changed label." },
-      "sender": { "path": ["actor", "id"], "type": "string", "description": "Actor ID, when present; not dispatch authorization." }
-    }
-  },
   "azure_devops_issue": {
     "provider": "azure-devops",
     "actions": ["opened", "edited", "closed", "reopened", "labeled", "unlabeled", "deleted", "restored"],

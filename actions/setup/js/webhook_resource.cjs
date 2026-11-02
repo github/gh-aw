@@ -11,7 +11,6 @@ const WEBHOOK_TYPES = {
   code_scanning_alert: ["appeared_in_branch", "closed_by_user", "created", "fixed", "reopened", "reopened_by_user", "updated_assignment"],
   dependabot_alert: ["assignees_changed", "auto_dismissed", "auto_reopened", "created", "dismissed", "fixed", "reintroduced", "reopened", "withdrawn"],
   jira_issue: ISSUE_TYPES,
-  linear_issue: ISSUE_TYPES,
   azure_devops_issue: [...ISSUE_TYPES, "restored"],
   slash_command: ["opened", "edited", "reopened", "created"],
   label_command: ["labeled"],
@@ -78,13 +77,6 @@ function resolveProviderResource(event, url) {
     const match = url.pathname.match(/^\/rest\/api\/[23]\/issue\/([1-9][0-9]*)$/);
     if (!match) reject("Jira payload requires a canonical REST issue URL with a decimal issue ID");
     return { item_type: event, item_number: match[1], repo: "", source: url.origin, url: url.href };
-  }
-  if (event === "linear_issue") {
-    const match = url.pathname.match(/^\/([a-zA-Z0-9_-]+)\/issue\/([A-Z][A-Z0-9_-]*-[1-9][0-9]*)(?:\/(?:[a-zA-Z0-9_-]|%[0-9a-fA-F]{2})+)?$/);
-    if (url.origin !== "https://linear.app" || !match || match[1] === "issue") {
-      reject("Linear payload requires a canonical workspace-qualified Linear issue URL");
-    }
-    return { item_type: event, item_number: match[2], repo: "", source: `${url.origin}/${match[1]}`, url: url.href };
   }
   // Work item IDs are collection-scoped, not update/revision IDs. The optional
   // project segment does not change that identity.

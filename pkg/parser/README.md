@@ -116,8 +116,6 @@ remain unchanged.
 | `ParseMCPConfig` | `func(toolName string, mcpSection any, toolConfig map[string]any) (RegistryMCPServerConfig, error)` | Parses a single MCP server entry |
 | `IsMCPType` | `func(typeStr string) bool` | Validates an MCP transport type string |
 | `IsSimpleSecretExpression` | `func(value string) bool` | Reports whether `value` is a direct `${{ secrets.NAME }}` GitHub Actions reference without additional expression operators |
-| `ParseLinearToolsets` | `func(value any) ([]string, error)` | Validates and expands `tools.linear.toolsets` (a name or array of names) into the corresponding sorted, deduplicated MCP tool names; `"all"` expands to `["*"]` |
-| `ValidateLinearAllowedForToolsets` | `func(allowed, toolsetTools []string) error` | Checks that every `tools.linear.allowed` glob pattern matches at least one tool in the configured toolsets (the `"*"` toolset accepts any pattern) |
 
 #### Schedule Parsing
 
