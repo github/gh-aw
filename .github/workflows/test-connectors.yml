@@ -82,6 +82,7 @@ jobs:
       - name: Read through the compiled connector plan
         env:
           GH_AW_CONNECTOR_PROVIDER: ${{ matrix.provider }}
+          GH_AW_CONNECTOR_TRACE: "true"
           GH_AW_CONNECTOR_RESOURCE_ID: ${{ inputs.resource_id }}
           GH_AW_CONNECTOR_SCOPE_ID: ${{ inputs.scope_id }}
           GH_AW_CONNECTOR_ORGANIZATION: ${{ inputs.organization }}

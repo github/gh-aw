@@ -100,17 +100,20 @@ func TestConnectorAssemblyExampleCompilation(t *testing.T) {
 			require.Equal(t, reads, strings.Contains(string(agent), "${{ secrets.ASSEMBLY_READ_TOKEN }}"))
 			require.Equal(t, prepares, strings.Contains(string(agent), "${{ secrets.ASSEMBLY_CONTEXT_TOKEN }}"))
 			require.NotContains(t, string(agent), "${{ secrets.ASSEMBLY_WRITE_TOKEN }}")
-			require.Equal(t, prepares, strings.Contains(string(agent), "connectors invoke context"))
+			require.Equal(t, prepares, strings.Contains(string(lock), `node "${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs" invoke context`))
 			require.Equal(t, prepares, strings.Contains(string(agent), "/tmp/gh-aw/connector-context.jsonl"))
 			require.Equal(t, writes, strings.Contains(string(safe), "${{ secrets.ASSEMBLY_WRITE_TOKEN }}"))
 			require.NotContains(t, string(safe), "${{ secrets.ASSEMBLY_READ_TOKEN }}")
 			require.NotContains(t, string(safe), "${{ secrets.ASSEMBLY_CONTEXT_TOKEN }}")
+			require.NotContains(t, string(lock), "Checkout trusted connector runtime")
+			require.NotContains(t, string(lock), "Build trusted connector runtime")
+			require.NotContains(t, string(lock), "gh extension install")
 			if reads {
-				require.Contains(t, string(agent), "connector-issues")
+				require.Contains(t, string(agent), "issues")
 				require.Contains(t, string(agent), "get-issue")
 			}
 			if writes {
-				require.Contains(t, string(safe), "connector-6-issues-add-comment")
+				require.Contains(t, string(safe), "issues-add-comment")
 				require.Contains(t, string(safe), "--allow-writes")
 			}
 			if name == "combined" {

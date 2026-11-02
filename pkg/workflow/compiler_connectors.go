@@ -14,16 +14,6 @@ import (
 
 const connectorContextPath = "/tmp/gh-aw/connector-context.jsonl"
 
-// Set by development builds from runtime/build inputs, not generated lock files.
-var connectorRuntimeRef string
-
-func connectorRuntimeBuildRef(version, linkedRef string) string {
-	if linkedRef != "" {
-		return linkedRef
-	}
-	return versionToGitRef(version)
-}
-
 func connectorMap(parent map[string]any, key string) map[string]any {
 	value, ok := parent[key].(map[string]any)
 	if !ok {
@@ -53,7 +43,7 @@ func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs 
 		config := configs[alias]
 		if config.Agent != nil {
 			tools := connectorMap(frontmatter, "mcp-servers")
-			name := "connector-" + alias
+			name := alias
 			if _, exists := tools[name]; exists {
 				return fmt.Errorf("mcp-servers.%s conflicts with generated connector MCP server", name)
 			}
@@ -62,8 +52,8 @@ func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs 
 				return err
 			}
 			tools[name] = map[string]any{
-				"type": "stdio", "container": constants.DefaultAlpineImage,
-				"entrypoint": GhAwBinaryPath, "entrypointArgs": []string{"connectors", "serve"},
+				"type": "stdio", "container": constants.DefaultNodeAlpineLTSImage,
+				"entrypoint": "node", "entrypointArgs": []string{constants.GhAwRootDirShell + "/actions/connector_runtime.cjs", "serve"},
 				"mounts": []string{constants.DefaultGhAwMount},
 				"env":    env, "allowed": config.Agent.ToolNames(),
 			}
@@ -78,8 +68,7 @@ func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs 
 }
 
 func connectorSafeOutputName(alias, operation string) string {
-	// The alias length makes normalized a-b/c and a/b-c unambiguous.
-	return "connector-" + strconv.Itoa(len(alias)) + "-" + alias + "-" + operation
+	return alias + "-" + operation
 }
 
 func connectorCredentialEnvPrefix(alias string) string {
@@ -96,7 +85,6 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 		if _, exists := env[name]; exists {
 			return fmt.Errorf("safe-outputs.env.%s conflicts with a connector credential", name)
 		}
-		env[name] = connectorSecretExpression(config, secret)
 		staged := false
 		switch value := safeOutputs["staged"].(type) {
 		case bool:
@@ -105,8 +93,10 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 			staged = value == "true"
 		}
 		if c.dryRun || c.trialMode || c.forceStaged || staged {
-			env[name] = ""
-		} else if value, ok := safeOutputs["staged"].(string); ok && isExpression(value) {
+			continue
+		}
+		env[name] = connectorSecretExpression(config, secret)
+		if value, ok := safeOutputs["staged"].(string); ok && isExpression(value) {
 			env[name] = "${{ format('{0}', " + stripExpressionWrapper(value) + ") != 'true' && (" +
 				stripExpressionWrapper(connectorSecretExpression(config, secret)) + ") || '' }}"
 		}
@@ -153,6 +143,10 @@ func attachConnectorInputSchemas(data *WorkflowData) error {
 			data.SafeOutputs.Scripts[name].connectorInputSchema = schema
 		}
 	}
+	if data.SafeOutputs != nil && data.SafeOutputs.ReportIncomplete != nil && data.SafeOutputs.ReportIncomplete.Implicit {
+		value := defaultReportIncompleteCreateIssue(data.SafeOutputs)
+		data.SafeOutputs.ReportIncomplete.CreateIssue = &value
+	}
 	return nil
 }
 
@@ -193,7 +187,7 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	for _, secret := range secrets {
 		fmt.Fprintf(&script, "if (!staged) env[%q] = process.env[%q];\n", "GH_AW_CONNECTOR_SECRET_"+secret, prefix+secret) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	}
-	fmt.Fprintf(&script, "const result = spawnSync(join(process.env.RUNNER_TEMP, 'gh-aw', 'gh-aw'), ['connectors', 'invoke', 'safe-output', %q, staged ? '--stage' : '--allow-writes'], { input: JSON.stringify(args), encoding: 'utf8', env, timeout: 25000, maxBuffer: 2097152 });\n", operation) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	fmt.Fprintf(&script, "const result = spawnSync(process.execPath, [join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'connector_runtime.cjs'), 'invoke', 'safe-output', %q, staged ? '--stage' : '--allow-writes'], { input: JSON.stringify(args), encoding: 'utf8', env, timeout: 25000, maxBuffer: 2097152 });\n", operation) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("if (result.error || result.status !== 0) throw new Error('Connector effect failed; no retry performed: ' + (result.error?.message || result.stderr));\n")
 	script.WriteString("const output = JSON.parse(result.stdout);\n")
 	script.WriteString("if (!staged) bindings.record(output);\n")
@@ -201,34 +195,7 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	return script.String()
 }
 
-func (c *Compiler) generateConnectorSetupSteps(yaml *strings.Builder, data *WorkflowData) error {
-	if len(data.Connectors) == 0 {
-		return nil
-	}
-	if !c.actionMode.IsDev() {
-		generateAgenticWorkflowsInstallStep(c, yaml, true, data)
-		return nil
-	}
-	ref := connectorRuntimeBuildRef(c.version, connectorRuntimeRef)
-	if ref == "" {
-		return errors.New("development connector runtime requires a compiler version with a published git reference")
-	}
-	// Never build credentialed hosts from an agent-controlled workspace or artifact.
-	yaml.WriteString("      - name: Checkout trusted connector runtime\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/checkout")) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-	yaml.WriteString("        with:\n          repository: github/gh-aw\n")
-	fmt.Fprintf(yaml, "          ref: %q\n", ref) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-	yaml.WriteString("          path: .gh-aw-connector-runtime\n          fetch-depth: 1\n          persist-credentials: false\n")
-	yaml.WriteString("      - name: Build trusted connector runtime\n")
-	yaml.WriteString("        working-directory: ${{ github.workspace }}/.gh-aw-connector-runtime\n")
-	yaml.WriteString("        run: |\n          CGO_ENABLED=0 make build\n          mkdir -p \"${RUNNER_TEMP}/gh-aw\"\n          install -m 755 gh-aw \"${RUNNER_TEMP}/gh-aw/gh-aw\"\n")
-	return nil
-}
-
 func (c *Compiler) generateAgentConnectorSteps(yaml *strings.Builder, data *WorkflowData) error {
-	if err := c.generateConnectorSetupSteps(yaml, data); err != nil {
-		return err
-	}
 	yaml.WriteString(strings.Join(c.connectorGitHubAppSteps(data, "agent"), ""))
 	return generateConnectorContextSteps(yaml, data)
 }
@@ -271,7 +238,7 @@ func generateConnectorContextSteps(yaml *strings.Builder, data *WorkflowData) er
 			fmt.Fprintf(yaml, "          GH_AW_CONNECTOR_OPERATION: %q\n", name)      //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 			yaml.WriteString("        run: |\n")
 			yaml.WriteString("          set -euo pipefail\n")
-			yaml.WriteString("          printf '%s' \"$GH_AW_CONNECTOR_INPUTS\" | \"${RUNNER_TEMP}/gh-aw/gh-aw\" connectors invoke context \"$GH_AW_CONNECTOR_OPERATION\" >> " + connectorContextPath + "\n")
+			yaml.WriteString("          printf '%s' \"$GH_AW_CONNECTOR_INPUTS\" | node \"${RUNNER_TEMP}/gh-aw/actions/connector_runtime.cjs\" invoke context \"$GH_AW_CONNECTOR_OPERATION\" >> " + connectorContextPath + "\n")
 		}
 	}
 	return nil
