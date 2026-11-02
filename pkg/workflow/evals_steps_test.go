@@ -33,7 +33,7 @@ func TestEvalsDecisionsIndependentOfAgentEngine(t *testing.T) {
 			assert.Contains(t, steps, "name: Execute BinEval Decisions")
 			assert.Contains(t, steps, "id: evals_decisions_execution")
 			assert.Contains(t, steps, `GH_AW_EVALS_MODEL: "gpt-6-luna"`)
-			assert.Contains(t, steps, "GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com")
+			assert.Contains(t, steps, "GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1\n")
 			assert.Contains(t, steps, "GH_AW_DECISIONS_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}")
 			assert.Contains(t, steps, "await executeMain();")
 			for _, excluded := range []string{"copilot_harness", "claude_harness", "codex_harness", "custom-command", "custom-agent", "custom.cjs", "unrelated-agent-model", "Install GitHub Copilot", "Install Claude", "Install Codex", "Install AWF", "Setup Node.js", "Download container images", "firewall", "api-proxy", "--env-all", "GH_AW_MAX_AI_CREDITS"} {

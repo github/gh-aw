@@ -15,6 +15,8 @@ is saved with catalog-derived AIC and USD costs for summaries and daily accounti
 Missing usage or pricing is reported as unavailable, not zero. AWF per-request
 credit limits and sandbox target overrides do not apply to evals.
 Request failures produce a `not_evaluated` marker, not `UNKNOWN` question results.
+Copilot uses `/v1/decisions` and maps `gpt-6-luna` to its advertised
+`gpt-6-luna-decisions` model ID. OpenAI uses `/v1/decisions` with `gpt-6-luna`.
 
 ---
 

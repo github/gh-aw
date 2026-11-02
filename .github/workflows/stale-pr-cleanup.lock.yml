@@ -2257,7 +2257,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ github.token }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"stale-prs-triaged","question":"Did the workflow review pull requests open for 30 or more days and classify them according to the cleanup policy?"},{"id":"actions-taken-or-noop","question":"Were the appropriate stale PR comments, labels, and closures applied when needed, or was noop used correctly when no action was required?"}]'

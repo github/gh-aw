@@ -3939,7 +3939,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ github.token }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"nudge-targeted","question":"Did every Copilot nudge list only unanswered review feedback or concrete blockers, request a branch update, and include its Sous-chef state fingerprint?"},{"id":"dedup-respected","question":"Did the agent avoid nudging PRs classified as unchanged, stale, dependency_bot, opted_out, agent_active, not_idle, approval_required, or nothing_actionable, and entries with nudge_needed false, repeating unchanged work only for behind or conflicting branches?"},{"id":"progress-or-noop","question":"Did the agent either perform a specific forward-progress action on an eligible PR or stop with an explicit no-op when none remained?"}]'

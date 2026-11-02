@@ -2200,7 +2200,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ github.token }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"candidate_expanded","question":"Did the agent expand a centralization candidate into a concrete draft workflow or reusable prompt template?"},{"id":"artifact_created","question":"Was a draft workflow, issue, or template artifact created for the centralization opportunity?"}]'

@@ -2676,7 +2676,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"instruction_file_optimized","question":"Did the agent apply caveman optimization to an instruction file in .github/aw or .github/agents?"},{"id":"pr_created_or_noop","question":"Was a PR created with concise improvements, or was noop used when no improvements were needed?"}]'

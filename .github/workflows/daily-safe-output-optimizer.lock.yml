@@ -2486,7 +2486,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"errored_calls_analyzed","question":"Did the agent analyze gateway logs for errored safe output tool calls?"},{"id":"pull_requests_created_or_noop","question":"Were validated pull requests created to correct tool descriptions or workflow prompts, or was noop used when no actionable errors were found?"}]'

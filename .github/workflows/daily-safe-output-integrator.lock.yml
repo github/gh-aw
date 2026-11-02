@@ -2296,7 +2296,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ github.token }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"safe_output_coverage_checked","question":"Did the agent inspect test workflows for safe-output coverage and detect any missing types?"},{"id":"pr_created_or_noop","question":"Was a PR created with new test workflows and compilation tests for missing safe-output types, or was noop used when coverage was complete?"}]'

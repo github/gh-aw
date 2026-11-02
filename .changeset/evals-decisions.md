@@ -16,3 +16,7 @@ directly without installing AWF or starting a proxy or sandbox. Response token
 usage, including cache and reasoning tokens, is recorded with catalog-derived
 AIC and USD costs for summaries and daily accounting. AWF credit limits and
 sandbox target overrides no longer apply to evals.
+
+Copilot requests use `/v1/decisions` and the provider's
+`gpt-6-luna-decisions` wire model for `gpt-6-luna`; OpenAI uses `gpt-6-luna`
+unchanged.

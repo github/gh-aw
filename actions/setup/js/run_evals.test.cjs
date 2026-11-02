@@ -25,7 +25,7 @@ describe("Decisions BinEval harness", () => {
     for (const file of files) fs.rmSync(file, { force: true });
     vi.stubEnv("GH_AW_EVALS_QUESTIONS", JSON.stringify(questions));
     vi.stubEnv("GH_AW_EVALS_MODEL", "gpt-6-luna");
-    vi.stubEnv("GH_AW_DECISIONS_BASE_URL", "https://api.githubcopilot.com");
+    vi.stubEnv("GH_AW_DECISIONS_BASE_URL", "https://api.githubcopilot.com/v1");
     vi.stubEnv("GH_AW_DECISIONS_API_KEY", "test-token");
     vi.stubEnv("GH_AW_DECISIONS_PROVIDER", "github-copilot");
     vi.stubEnv("GH_AW_EVALS_EXECUTION_OUTCOME", "success");
@@ -57,10 +57,10 @@ describe("Decisions BinEval harness", () => {
     await executeMain();
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, request] = fetch.mock.calls[0];
-    expect(url).toBe("https://api.githubcopilot.com/decisions");
+    expect(url).toBe("https://api.githubcopilot.com/v1/decisions");
     expect(request.headers.Authorization).toBe("Bearer test-token");
     const body = JSON.parse(request.body);
-    expect(body.model).toBe("gpt-6-luna");
+    expect(body.model).toBe("gpt-6-luna-decisions");
     expect(body.questions).toHaveLength(2);
     expect(body.questions.map(q => [q.type, q.name, q.choices.map(c => c.value)])).toEqual([
       ["choice", "builds", ["YES", "NO", "UNKNOWN"]],
@@ -229,10 +229,17 @@ describe("Decisions BinEval harness", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(["evals", "openai/evals", "copilot/evals"])("resolves the Decisions alias without a proxy (%s)", async model => {
+  it.each([
+    ["evals", "github-copilot", "gpt-6-luna-decisions"],
+    ["openai/evals", "openai", "gpt-6-luna"],
+    ["copilot/evals", "github-copilot", "gpt-6-luna-decisions"],
+    ["gpt-6-luna", "openai", "gpt-6-luna"],
+    ["gpt-6-luna-decisions", "github-copilot", "gpt-6-luna-decisions"],
+  ])("selects the provider's Decisions model without a proxy (%s, %s)", async (model, provider, expected) => {
     vi.stubEnv("GH_AW_EVALS_MODEL", model);
+    vi.stubEnv("GH_AW_DECISIONS_PROVIDER", provider);
     await executeMain();
-    expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe("gpt-6-luna");
+    expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe(expected);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

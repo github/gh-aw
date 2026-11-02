@@ -2382,7 +2382,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com
+          GH_AW_DECISIONS_BASE_URL: https://api.githubcopilot.com/v1
           GH_AW_DECISIONS_API_KEY: ${{ github.token }}
           GH_AW_DECISIONS_PROVIDER: github-copilot
           GH_AW_EVALS_QUESTIONS: '[{"id":"container_images_scanned","question":"Did the agent analyze container images for vulnerabilities, updates, and rejected licenses?"},{"id":"findings_reported_or_noop","question":"Did the agent report actionable image findings, or use noop when no findings required action?"},{"id":"critical_burn_down_tracked","question":"Did the agent maintain one burn-down issue per image family and the index in issue 52657, mapping every finding to a fixed version or a documented exception and stating the remediation SLA?"},{"id":"superseded_image_findings_closed","question":"Did the agent close legacy per-tag findings only when their exact image reference was no longer used by the compiler?"},{"id":"cves_mapped_or_excepted","question":"Does every reported CVE identify a fixed package/image version or a documented exception with its reason and review details?"},{"id":"upstream_vendored_triaged","question":"Did the agent classify each finding as vendored (fixable in this repo) or upstream (owned by another repository), and avoid requesting a local code-fix PR for upstream-owned findings?"}]'

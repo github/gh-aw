@@ -62,7 +62,7 @@ func (c *Compiler) buildEvalsDecisionSteps(data *WorkflowData) []string {
 		questions = data.Evals.Questions
 	}
 	steps := c.buildTokenBrokerRequestStep(evalsData, "")
-	baseURL := "https://api.githubcopilot.com"
+	baseURL := "https://api.githubcopilot.com/v1"
 	apiKey := "${{ secrets.COPILOT_GITHUB_TOKEN }}"
 	provider := "github-copilot"
 	if evalsData.AI == "codex" {
