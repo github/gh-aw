@@ -43,6 +43,7 @@ negative controls and validated readable traces without live effects.
 | [`no-async-foreach-callback`](#no-async-foreach-callback) | Disallow `async` callbacks passed to `Array.prototype.forEach()`, which ignores returned promises |
 | [`no-core-exportvariable-non-string`](#no-core-exportvariable-non-string) | Require explicit string values for `core.exportVariable` calls |
 | [`no-core-setoutput-non-string`](#no-core-setoutput-non-string) | Require explicit string values for `core.setOutput` calls |
+| [`no-deprecated-string-substr`](#no-deprecated-string-substr) | Disallow deprecated `String.prototype.substr()` calls |
 | [`no-empty-catch-block`](#no-empty-catch-block) | Disallow undocumented empty `catch` blocks |
 | [`no-duplicate-constant-values`](#no-duplicate-constant-values) | Report constants with duplicate static primitive values in the same file |
 | [`no-child-process-interpolated-command`](#no-child-process-interpolated-command) | Disallow interpolated command strings in shell-evaluated `child_process` calls |
@@ -139,6 +140,12 @@ Empty catch blocks are allowed only when their comment explicitly documents an i
 Inventory module-level `const` declarations with static primitive initializers and report each declaration after the first one that uses the same value in a file. The diagnostic names both constants and shows the duplicated value.
 
 The rule compares string, number, boolean, `null`, bigint, regular-expression, static template-literal, and signed numeric initializers. To avoid collisions in their small value spaces, it reports duplicate numeric, boolean, and `null` values only when at least three module-level constants share them. Dynamic expressions, object and array literals, destructuring declarations, function-local declarations, and `let` or `var` declarations are ignored.
+
+### `no-deprecated-string-substr`
+
+Disallow calls to the deprecated Annex B `String.prototype.substr()`, whose arguments are `(start, length)` rather than the `(start, end)` used by `slice()`. Calls with omitted or extra arguments are also reported.
+
+Migrate while preserving the original behavior: `substr()` defaults `start` to `0`, an omitted `length` extends to the end, and a negative `start` counts from the end. In particular, `.slice(start, start + length)` is not a general replacement for negative starts.
 
 ### `no-github-request-interpolated-route`
 

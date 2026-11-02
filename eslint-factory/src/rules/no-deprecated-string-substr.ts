@@ -1,4 +1,4 @@
-import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import { ESLintUtils } from "@typescript-eslint/utils";
 
 const createRule = ESLintUtils.RuleCreator(name => `https://github.com/github/gh-aw/tree/main/eslint-factory#${name}`);
 
@@ -11,27 +11,20 @@ export const noDeprecatedStringSubstrRule = createRule({
     },
     schema: [],
     messages: {
-      noSubstr: "String.prototype.substr() is deprecated (Annex B) and takes (start, length). Use .slice(start, start + length) or .substring(...) instead.",
+      noSubstr: "String.prototype.substr() is deprecated (Annex B); migrate while preserving its (start, length) semantics.",
     },
   },
   defaultOptions: [],
   create(context) {
-    function isSubstrProperty(node: TSESTree.MemberExpression): boolean {
-      const property = node.property;
-      if (!node.computed) {
-        return property.type === "Identifier" && property.name === "substr";
-      }
-      return property.type === "Literal" && property.value === "substr";
-    }
-
     return {
       CallExpression(node) {
         const callee = node.callee;
-        if (callee.type !== "MemberExpression" || !isSubstrProperty(callee)) {
+        if (callee.type !== "MemberExpression") {
           return;
         }
-        // substr always needs at least a start argument; zero-arg calls are some other API.
-        if (node.arguments.length === 0 || node.arguments.length > 2) {
+        const property = callee.property;
+        const isSubstrProperty = callee.computed ? property.type === "Literal" && property.value === "substr" : property.type === "Identifier" && property.name === "substr";
+        if (!isSubstrProperty) {
           return;
         }
         context.report({ node: callee.property, messageId: "noSubstr" });

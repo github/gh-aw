@@ -11,10 +11,13 @@ describe("no-deprecated-string-substr", () => {
 
   it("valid and invalid cases", () => {
     ruleTester.run("no-deprecated-string-substr", noDeprecatedStringSubstrRule, {
-      valid: [`s.slice(1, 3);`, `s.substring(1, 3);`, `s.substr();`, `s.substr(1, 2, 3);`, `substr(1, 2);`, `s.substring(1);`],
+      valid: [`s.slice(1, 3);`, `s.substring(1, 3);`, `substr(1, 2);`, `s.substring(1);`],
       invalid: [
+        { code: `s.substr();`, errors: [{ messageId: "noSubstr" }] },
         { code: `s.substr(1, 3);`, errors: [{ messageId: "noSubstr" }] },
         { code: `s.substr(2);`, errors: [{ messageId: "noSubstr" }] },
+        { code: `s.substr(1, 2, 3);`, errors: [{ messageId: "noSubstr" }] },
+        { code: `s.substr(-2, 3);`, errors: [{ messageId: "noSubstr" }] },
         { code: `s["substr"](0, n);`, errors: [{ messageId: "noSubstr" }] },
         { code: `(a + b).substr(-1);`, errors: [{ messageId: "noSubstr" }] },
       ],
