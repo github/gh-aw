@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -111,7 +112,10 @@ func TestSentryPublicDocumentationConsumer(t *testing.T) {
 	assert.NotContains(t, output, "connector_6_sentry_")
 	assert.NotContains(t, output, "${{ secrets.SENTRY_STATUS_TOKEN }}")
 	assert.NotContains(t, output, "${{ secrets.SENTRY_MCP_OAUTH_TOKEN }}")
-	assert.NotContains(t, output, "go build")
+	assert.Contains(t, output, "connector_runtime.cjs")
+	for _, legacy := range []string{"go build", "CGO_ENABLED=0 make build", ".gh-aw-connector-runtime", "Checkout trusted connector runtime"} {
+		assert.NotContains(t, output, legacy)
+	}
 	var embedded map[string]any
 	require.NoError(t, yaml.Unmarshal([]byte(documentation.Consumer.Frontmatter), &embedded))
 	fixture, err := os.ReadFile("../connectors/testdata/providers/sentry/workflow.md")
@@ -172,7 +176,9 @@ func TestSentryPublicIndependentSelections(t *testing.T) {
 			assert.Equal(t, test.write && test.name != "staged", strings.Contains(output, "${{ secrets.APPROVED_SENTRY_WRITER }}"))
 			assert.NotContains(t, output, "SENTRY_CONTEXT_TOKEN")
 			assert.NotContains(t, output, "connector_6_sentry_")
-			assert.NotContains(t, output, "go build")
+			for _, legacy := range []string{"go build", "CGO_ENABLED=0 make build", ".gh-aw-connector-runtime", "Checkout trusted connector runtime"} {
+				assert.NotContains(t, output, legacy)
+			}
 			var lock map[string]any
 			require.NoError(t, yaml.Unmarshal([]byte(output), &lock))
 			jobs := lock["jobs"].(map[string]any)
@@ -463,4 +469,117 @@ func TestSentryPublicHostedMCP(t *testing.T) {
 			assert.EqualValues(t, 1, calls.Load())
 		})
 	}
+}
+
+func TestSentryPublicBundledNodeRuntime(t *testing.T) {
+	node, err := exec.LookPath("node")
+	require.NoError(t, err, "Node.js is required for the bundled connector host")
+	runtime, err := filepath.Abs("../../actions/setup/js/connector_runtime.cjs")
+	require.NoError(t, err)
+	config := sentryPublicPlan(t)
+	reader, err := config.Agent.Encode()
+	require.NoError(t, err)
+	writer, err := config.SafeOutputs.Encode()
+	require.NoError(t, err)
+	request, err := config.SafeOutputs.PrepareSafeOutput("resolve-issue", sentryPublicArguments())
+	require.NoError(t, err)
+	fixture, err := os.ReadFile("../connectors/testdata/providers/sentry/issue-details.json")
+	require.NoError(t, err)
+	input, err := json.Marshal(map[string]any{
+		"reader": reader, "writer": writer, "args": sentryPublicArguments(),
+		"staged": map[string]any{"staged": true, "request": request}, "response": string(fixture),
+	})
+	require.NoError(t, err)
+	driver := `
+const assert = require("node:assert/strict");
+const {executeConnector, callMCP} = require(process.argv[1]);
+const input = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+let forbiddenCredentials = 0, forbiddenRequests = 0;
+const noSecrets = new Proxy({}, {get() { forbiddenCredentials++; throw new Error("credential access forbidden"); }});
+const noNetwork = async () => { forbiddenRequests++; throw new Error("network access forbidden"); };
+const credential = name => new Proxy({["GH_AW_CONNECTOR_SECRET_" + name]: "fixture-token"}, {
+  get(target, key) {
+    if (typeof key === "string" && key.startsWith("GH_AW_CONNECTOR_SECRET_"))
+      assert.equal(key, "GH_AW_CONNECTOR_SECRET_" + name);
+    return target[key];
+  }
+});
+(async () => {
+  const staged = await executeConnector(input.writer, "safe-output", "resolve-issue", input.args,
+    {staged:true, env:noSecrets, fetchImpl:noNetwork});
+  assert.deepEqual(staged, input.staged);
+  for (const phase of ["agent", "safe-output"]) {
+    const writing = phase === "safe-output";
+    let calls = 0;
+    const env = credential(writing ? "APPROVED_SENTRY_WRITER" : "APPROVED_SENTRY_READER");
+    const response = writing ? input.response.replace('"status": "unresolved"', '"status": "resolved"') : input.response;
+    const fetchImpl = async (url, init) => {
+      calls++;
+      assert.equal(url, "https://sentry.io/api/0/organizations/example-org/issues/1234567890/");
+      assert.equal(new Headers(init.headers).get("Authorization"), "Bearer fixture-token");
+      assert.equal(init.redirect, "manual");
+      assert.equal(init.method, writing ? "PUT" : "GET");
+      if (writing) assert.deepEqual(JSON.parse(init.body), {status:"resolved"});
+      return new Response(response, {status:200});
+    };
+    const result = await executeConnector(writing ? input.writer : input.reader,
+      writing ? "safe-output" : "mcp", writing ? "resolve-issue" : "get-issue", input.args, {env, fetchImpl});
+    assert.equal(result.untrusted, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.data)),
+      {issue:"1234567890", project:"4500000000000001", status:writing ? "resolved" : "unresolved"});
+    assert.equal(calls, 1);
+  }
+  const base = JSON.stringify({...JSON.parse(input.response), padding:""});
+  const boundary = base.slice(0, -2) + "x".repeat(65536 - Buffer.byteLength(base)) + '"}';
+  assert.equal(Buffer.byteLength(boundary), 65536);
+  const bounded = await executeConnector(input.reader, "mcp", "get-issue", input.args,
+    {env:credential("APPROVED_SENTRY_READER"), fetchImpl:async () => new Response(boundary, {status:200})});
+  assert.deepEqual(JSON.parse(JSON.stringify(bounded.data)),
+    {issue:"1234567890", project:"4500000000000001", status:"unresolved"});
+  for (const [body, status] of [
+    [input.response.replace("4500000000000001", "4500000000000002"), 200],
+    [input.response.replace("unresolved", "resolved"), 200],
+    [input.response, 429], ["x".repeat(65537), 200]
+  ]) {
+    let calls = 0;
+    await assert.rejects(executeConnector(input.reader, "mcp", "get-issue", input.args,
+      {env:credential("APPROVED_SENTRY_READER"), fetchImpl:async () => {
+        calls++;
+        return new Response(body, {status});
+      }}));
+    assert.equal(calls, 1);
+  }
+  await assert.rejects(executeConnector(input.reader, "mcp", "get-issue",
+    {...input.args, issue:"9999999999"}, {env:noSecrets, fetchImpl:noNetwork}));
+  const hostedArgs = {organizationSlug:"example-org", issueId:"1234567890"};
+  const remoteResult = {content:[{type:"text", text:"synthetic hosted detail, not a local scalar projection"}]};
+  let hostedCalls = 0;
+  const fetchHosted = async (url, init) => {
+    hostedCalls++;
+    assert.equal(url, "https://mcp.sentry.dev/mcp/example-org/example-project");
+    assert.equal(new Headers(init.headers).get("Authorization"), "Bearer fixture-token");
+    const message = JSON.parse(init.body);
+    if (message.method === "notifications/initialized") return new Response(null, {status:202});
+    const result = message.method === "initialize" ? {protocolVersion:"2025-03-26", capabilities:{}, serverInfo:{name:"fixture", version:"1"}} : remoteResult;
+    if (message.method === "tools/call") {
+      assert.equal(message.params.name, "get_issue_details");
+      assert.deepEqual(message.params.arguments, hostedArgs);
+    }
+    return new Response(JSON.stringify({jsonrpc:"2.0", id:message.id, result}), {status:200, headers:{"Content-Type":"application/json"}});
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(await callMCP(input.reader, "sentry", "get_issue_details", hostedArgs,
+    {env:credential("APPROVED_SENTRY_MCP"), fetchImpl:fetchHosted}))), remoteResult);
+  assert.equal(hostedCalls, 3);
+  await assert.rejects(callMCP(input.reader, "sentry", "update_issue", hostedArgs, {env:noSecrets, fetchImpl:noNetwork}));
+  assert.equal(forbiddenCredentials, 0);
+  assert.equal(forbiddenRequests, 0);
+  process.stdout.write("sentry bundled runtime parity passed");
+})().catch(error => { console.error(error); process.exitCode = 1; });
+`
+	command := exec.CommandContext(t.Context(), node, "-e", driver, runtime)
+	command.Env = []string{}
+	command.Stdin = strings.NewReader(string(input))
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	assert.Equal(t, "sentry bundled runtime parity passed", string(output))
 }
