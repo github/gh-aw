@@ -157,15 +157,20 @@ func connectorSafeOutputScript(encoded, operation, prefix string, secrets []stri
 	script.WriteString("const { spawnSync } = require('node:child_process');\n")
 	script.WriteString("const { join } = require('node:path');\n")
 	script.WriteString("const { isStagedMode } = require('./safe_output_helpers.cjs');\n")
+	script.WriteString("const { connectorEffectBindings } = require('./connector_effect_bindings.cjs');\n")
 	fmt.Fprintf(&script, "const staged = %t || isStagedMode();\n", staged) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("const args = { ...item }; delete args.type;\n")
 	fmt.Fprintf(&script, "const env = { GH_AW_CONNECTOR_PLAN: %q };\n", encoded) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+	script.WriteString("const bindings = connectorEffectBindings(temporaryIdMap, env.GH_AW_CONNECTOR_PLAN);\n")
+	script.WriteString("if (!staged) Object.assign(env, bindings.env);\n")
 	for _, secret := range secrets {
 		fmt.Fprintf(&script, "if (!staged) env[%q] = process.env[%q];\n", "GH_AW_CONNECTOR_SECRET_"+secret, prefix+secret) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	}
 	fmt.Fprintf(&script, "const result = spawnSync(join(process.env.RUNNER_TEMP, 'gh-aw', 'gh-aw'), ['connectors', 'invoke', 'safe-output', %q, staged ? '--stage' : '--allow-writes'], { input: JSON.stringify(args), encoding: 'utf8', env, timeout: 25000, maxBuffer: 2097152 });\n", operation) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("if (result.error || result.status !== 0) throw new Error('Connector effect failed; no retry performed: ' + (result.error?.message || result.stderr));\n")
-	script.WriteString("return JSON.parse(result.stdout);\n")
+	script.WriteString("const output = JSON.parse(result.stdout);\n")
+	script.WriteString("if (!staged) bindings.record(output);\n")
+	script.WriteString("return output;\n")
 	return script.String()
 }
 

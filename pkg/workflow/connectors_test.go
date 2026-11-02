@@ -165,19 +165,21 @@ const adaptedRequire = name => {
     return {status: 0, stdout: '{"ok":true}'};
   }};
   if (name === './safe_output_helpers.cjs') return {isStagedMode: () => %t};
+  if (name === './connector_effect_bindings.cjs') return {connectorEffectBindings: () => ({env: {BINDING: 'trusted'}, record: () => {}})};
   return require(name);
 };
-const result = new Function('item', 'require', 'process', %s)(
+const result = new Function('item', 'require', 'process', 'temporaryIdMap', %s)(
   {type: 'connector_effect', issue: 'ISSUE-1', text: 'safe'},
   adaptedRequire,
-  {env: {RUNNER_TEMP: '/trusted', PREFIX_WRITER: 'test-token', OTHER: 'not-inherited'}}
+  {env: {RUNNER_TEMP: '/trusted', PREFIX_WRITER: 'test-token', OTHER: 'not-inherited'}},
+  new Map()
 );
 const staged = %t;
 assert.deepEqual(result, {ok:true});
 assert.equal(call.binary, require('node:path').join('/trusted', 'gh-aw', 'gh-aw'));
 assert.deepEqual(call.args, ['connectors','invoke','safe-output','add-comment',staged ? '--stage' : '--allow-writes']);
 assert.deepEqual(JSON.parse(call.options.input), {issue:'ISSUE-1',text:'safe'});
-assert.deepEqual(call.options.env, staged ? {GH_AW_CONNECTOR_PLAN:'frozen'} : {GH_AW_CONNECTOR_PLAN:'frozen',GH_AW_CONNECTOR_SECRET_WRITER:'test-token'});
+assert.deepEqual(call.options.env, staged ? {GH_AW_CONNECTOR_PLAN:'frozen'} : {GH_AW_CONNECTOR_PLAN:'frozen',BINDING:'trusted',GH_AW_CONNECTOR_SECRET_WRITER:'test-token'});
 assert.equal(call.options.shell, undefined);
 `, mode.runtime, source, mode.compiled || mode.runtime)
 			output, err := exec.CommandContext(t.Context(), "node", "-e", driver).CombinedOutput()

@@ -19,10 +19,11 @@ var secretPattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 // Plan is a frozen definition, connection and explicit capability selection.
 // It contains secret references only. Digest binds all three documents.
 type Plan struct {
-	Digest     string `json:"digest"`
-	spec       ConnectorSpec
-	connection Connection
-	binding    Binding
+	Digest           string `json:"digest"`
+	spec             ConnectorSpec
+	connection       Connection
+	binding          Binding
+	trustedOperation string
 }
 
 // Lower loads repository-confined local files and freezes their validated
@@ -201,8 +202,10 @@ func validateSelection(spec ConnectorSpec, binding Binding, connection Connectio
 			if _, ok := connection.Credentials[op.Credential]; !ok {
 				return fmt.Errorf("selected capability %q has no connection credential reference", name)
 			}
-			for _, resource := range op.Resources {
-				if len(connection.Resources[resource]) == 0 {
+			for input, resource := range op.Resources {
+				_, trusted := op.TrustedInputs[input]
+				dynamic := phase == "safe-output" && (trusted || (op.CreatedResources[input] != "" && slices.Contains(binding.SafeOutputs, op.CreatedResources[input])))
+				if len(connection.Resources[resource]) == 0 && !dynamic {
 					return fmt.Errorf("selected capability %q has no connection resource allowlist %q", name, resource)
 				}
 			}
