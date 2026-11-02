@@ -129,8 +129,18 @@ func TestTeamsMarkdownWorkflowMatchesLegacySelections(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, fixture := teamsWorkflowBlock(t, "legacy/workflow.yaml")
-	if !reflect.DeepEqual(documented["imports"], []any{".github/aw/connectors/teams.md"}) {
+	imports, ok := documented["imports"].([]any)
+	if !ok || len(imports) != 1 {
+		t.Fatal("documented workflow must have one Teams import")
+	}
+	imported, ok := imports[0].(map[string]any)
+	if !ok || imported["uses"] != ".github/aw/connectors/teams.md" {
 		t.Fatal("documented workflow must import the self-contained Teams Markdown")
+	}
+	grants, ok := imported["with"].(map[string]any)
+	if !ok || !reflect.DeepEqual(grants["threads"], []any{"1730000000000"}) ||
+		!reflect.DeepEqual(grants["activities"], []any{"1730000001000"}) {
+		t.Fatal("Graph message and Bot activity grants must be independently approved")
 	}
 	tools, ok := documented["tools"].(map[string]any)
 	if !ok || !reflect.DeepEqual(tools["teams"], fixture["tools"]) {
@@ -144,7 +154,7 @@ func TestTeamsMarkdownWorkflowMatchesLegacySelections(t *testing.T) {
 		t.Fatal("documented effects must use native prefixed keys")
 	}
 	selected, ok := fixture["safe-outputs"].([]any)
-	if !ok || len(effects) != len(selected) {
+	if !ok || len(effects) != len(selected)+1 || effects["staged"] != true {
 		t.Fatal("documented effects must preserve the provider fixture")
 	}
 	for _, value := range selected {
